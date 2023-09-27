@@ -50,6 +50,13 @@ spec:
           spec:
             description: BackupRepoSpec defines the desired state of BackupRepo
             properties:
+              accessMethod:
+                default: Mount
+                description: Specifies the access method of the backup repo.
+                enum:
+                - Mount
+                - Tool
+                type: string
               config:
                 additionalProperties:
                   type: string
@@ -211,6 +218,10 @@ spec:
                   - Deleting
                 description: Backup repo reconciliation phases. Valid values are PreChecking,
                   Failed, Ready, Deleting.
+                type: string
+              toolConfigSecretName:
+                description: toolConfigSecretName is the name of the secret containing
+                  the configuration for the access tool.
                 type: string
             type: object
         type: object

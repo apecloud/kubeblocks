@@ -17,7 +17,17 @@ spec:
     singular: storageprovider
   scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: STATUS
+      type: string
+    - jsonPath: .spec.csiDriverName
+      name: CSIDRIVER
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: StorageProvider is the Schema for the storageproviders API StorageProvider
@@ -46,6 +56,11 @@ spec:
                 description: 'A Go template for rendering a secret which will be used
                   by the CSI driver. The template will be rendered with the following
                   variables: - Parameters: a map of parameters defined in the ParametersSchema.'
+                type: string
+              datasafedConfigTemplate:
+                description: 'A Go template for rendering a config used by the datasafed
+                  command. The template will be rendered with the following variables:
+                  - Parameters: a map of parameters defined in the ParametersSchema.'
                 type: string
               parametersSchema:
                 description: The schema describes the parameters required by this

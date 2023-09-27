@@ -537,8 +537,8 @@ func (r *BackupReconciler) handlePVCByBackupRepo(reqCtx intctrlutil.RequestCtx,
 	// add a special label and wait for the backup repo controller to create the PVC.
 	// we need to update the object meta immediately, because we are going to break the current reconciliation.
 	_, err = r.patchBackupObjectLabels(reqCtx, backup, map[string]string{
-		dataProtectionBackupRepoKey:  repo.Name,
-		dataProtectionNeedRepoPVCKey: trueVal,
+		dataProtectionBackupRepoKey:          repo.Name,
+		dataProtectionWaitRepoPreparationKey: trueVal,
 	})
 	if err != nil {
 		return "", "", err

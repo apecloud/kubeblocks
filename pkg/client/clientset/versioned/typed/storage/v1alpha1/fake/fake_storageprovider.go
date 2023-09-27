@@ -24,7 +24,6 @@ import (
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -35,9 +34,9 @@ type FakeStorageProviders struct {
 	Fake *FakeStorageV1alpha1
 }
 
-var storageprovidersResource = schema.GroupVersionResource{Group: "storage.kubeblocks.io", Version: "v1alpha1", Resource: "storageproviders"}
+var storageprovidersResource = v1alpha1.SchemeGroupVersion.WithResource("storageproviders")
 
-var storageprovidersKind = schema.GroupVersionKind{Group: "storage.kubeblocks.io", Version: "v1alpha1", Kind: "StorageProvider"}
+var storageprovidersKind = v1alpha1.SchemeGroupVersion.WithKind("StorageProvider")
 
 // Get takes name of the storageProvider, and returns the corresponding storageProvider object, and an error if there is any.
 func (c *FakeStorageProviders) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.StorageProvider, err error) {

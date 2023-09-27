@@ -210,6 +210,7 @@ func buildHelmValues(c *cluster.ChartInfo, values map[string]interface{}) map[st
 		if slices.Contains(subSchemaKeys, k) {
 			newValues[c.SubChartName].(map[string]interface{})[k] = v
 		} else {
+			// todo: fix "."
 			build(strings.Split(k, "."), v, &newValues)
 		}
 	}

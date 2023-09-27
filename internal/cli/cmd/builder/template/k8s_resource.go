@@ -32,8 +32,8 @@ import (
 
 type MatchResourceFunc func(object client.Object) bool
 
-func CustomizedObjFromYaml[T generics.Object, PT generics.PObject[T], L generics.ObjList[T]](filePath string, signature func(T, L)) (PT, error) {
-	objList, err := CustomizedObjectListFromYaml[T, PT, L](filePath, signature)
+func CustomizedObjFromYaml[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](filePath string, signature func(T, PT, L, PL)) (PT, error) {
+	objList, err := CustomizedObjectListFromYaml[T, PT, L, PL](filePath, signature)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func CustomizedObjFromYaml[T generics.Object, PT generics.PObject[T], L generics
 	return objList[0], nil
 }
 
-func CustomizedObjectListFromYaml[T generics.Object, PT generics.PObject[T], L generics.ObjList[T]](yamlfile string, signature func(T, L)) ([]PT, error) {
+func CustomizedObjectListFromYaml[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](yamlfile string, signature func(T, PT, L, PL)) ([]PT, error) {
 	objBytes, err := os.ReadFile(yamlfile)
 	if err != nil {
 		return nil, err
@@ -58,12 +58,12 @@ func CustomizedObjectListFromYaml[T generics.Object, PT generics.PObject[T], L g
 		if err != nil {
 			return nil, err
 		}
-		objList = append(objList, CreateTypedObjectFromYamlByte[T, PT, L](doc, signature))
+		objList = append(objList, CreateTypedObjectFromYamlByte[T, PT, L, PL](doc, signature))
 	}
 	return objList, nil
 }
 
-func CreateTypedObjectFromYamlByte[T generics.Object, PT generics.PObject[T], L generics.ObjList[T]](yamlBytes []byte, _ func(T, L)) PT {
+func CreateTypedObjectFromYamlByte[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](yamlBytes []byte, _ func(T, PT, L, PL)) PT {
 	var obj PT
 	if err := yaml.Unmarshal(yamlBytes, &obj); err != nil {
 		return nil
@@ -71,7 +71,7 @@ func CreateTypedObjectFromYamlByte[T generics.Object, PT generics.PObject[T], L 
 	return obj
 }
 
-func GetTypedResourceObjectBySignature[T generics.Object, PT generics.PObject[T], L generics.ObjList[T]](objects []client.Object, _ func(T, L), matchers ...MatchResourceFunc) PT {
+func GetTypedResourceObjectBySignature[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](objects []client.Object, _ func(T, PT, L, PL), matchers ...MatchResourceFunc) PT {
 	for _, object := range objects {
 		obj, ok := object.(PT)
 		if !ok {

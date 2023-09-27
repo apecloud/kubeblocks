@@ -1,0 +1,27 @@
+name: Set Milestone
+
+on:
+  issues:
+    types:
+      - opened
+      - closed
+  pull_request_target:
+    types:
+      - opened
+      - closed
+
+
+jobs:
+  issue-milestone:
+    if: ${{ github.event_name == 'issues' }}
+    uses: apecloud/apecloud-cd/.github/workflows/issue-milestone.yml@v0.1.30
+    with:
+      APECD_REF: "v0.1.30"
+    secrets: inherit
+    
+  pr-milestone:
+    if: ${{ github.event_name  == 'pull_request_target' }}
+    uses: apecloud/apecloud-cd/.github/workflows/pull-request-milestone.yml@v0.1.30
+    with:
+      APECD_REF: "v0.1.30"
+    secrets: inherit

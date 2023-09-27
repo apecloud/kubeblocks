@@ -94,9 +94,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		var cmObj *corev1.ConfigMap
 		configuration := builder.NewConfigurationBuilder(testCtx.DefaultNamespace, core.GenerateComponentConfigurationName(clusterName, componentName)).
 			ClusterRef(clusterName).
-			Component(componentName).
-			ClusterDefRef(clusterDefinitionName).
-			ClusterVerRef(clusterVersionName)
+			Component(componentName)
 		for _, configSpec := range cdComponent.ConfigSpecs {
 			cmInsName := core.GetComponentCfgName(clusterName, componentName, configSpec.Name)
 			cfgCM := testapps.NewCustomizedObj("operations_config/config-template.yaml",
@@ -112,7 +110,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 					constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
 				),
 			)
-			configuration.AddConfigurationItem(configSpec.Name)
+			configuration.AddConfigurationItem(configSpec)
 			Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
 			cmObj = cfgCM
 		}
@@ -195,7 +193,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			opsRes, eventContext := assureMockReconfigureData("simple")
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx:      testCtx.Ctx,
-				Log:      log.FromContext(ctx).WithValues("Reconfigure"),
+				Log:      log.FromContext(ctx).WithName("Reconfigure"),
 				Recorder: opsRes.Recorder,
 			}
 
@@ -260,7 +258,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			opsRes, eventContext := assureMockReconfigureData("autoReload")
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx:      testCtx.Ctx,
-				Log:      log.FromContext(ctx).WithValues("Reconfigure"),
+				Log:      log.FromContext(ctx).WithName("Reconfigure"),
 				Recorder: opsRes.Recorder,
 			}
 

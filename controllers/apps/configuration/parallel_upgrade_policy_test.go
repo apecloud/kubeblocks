@@ -66,6 +66,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 					return reconfigureClient, nil
 				}),
 				withMockStatefulSet(3, nil),
+				withClusterComponent(3),
 				withConfigSpec("for_test", map[string]string{
 					"a": "b",
 				}),
@@ -94,6 +95,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 					return reconfigureClient, nil
 				}),
 				withMockStatefulSet(3, nil),
+				withClusterComponent(3),
 				withConfigSpec("for_test", map[string]string{
 					"a": "b",
 				}),
@@ -133,6 +135,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 					return reconfigureClient, nil
 				}),
 				withMockStatefulSet(3, nil),
+				withClusterComponent(3),
 				withConfigSpec("for_test", map[string]string{
 					"a": "b",
 				}),
@@ -174,6 +177,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 					return reconfigureClient, nil
 				}),
 				withMockStatefulSet(3, nil),
+				withClusterComponent(3),
 				withConfigSpec("for_test", map[string]string{
 					"a": "b",
 				}),
@@ -203,6 +207,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),
+				withClusterComponent(2),
 				withCDComponent(appsv1alpha1.Stateless, []appsv1alpha1.ComponentConfigSpec{{
 					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 						Name:       "for_test",

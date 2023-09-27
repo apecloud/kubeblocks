@@ -69,6 +69,16 @@ func (r redis) ConnectExample(info *ConnectionInfo, client string) string {
 	return buildExample(info, client, r.examples)
 }
 
-func (r redis) ExecuteCommand([]string) ([]string, []corev1.EnvVar, error) {
-	return nil, nil, fmt.Errorf("%s not implemented", r.info.Client)
+func (r redis) ExecuteCommand(scripts []string) ([]string, []corev1.EnvVar, error) {
+	cmd := []string{}
+	args := []string{}
+	cmd = append(cmd, "/bin/sh", "-c")
+	for _, script := range scripts {
+		args = append(args, fmt.Sprintf("%s -h %s -p 6379 --user %s --pass %s %s", r.info.Client,
+			fmt.Sprintf("$%s", envVarMap[host]),
+			fmt.Sprintf("$%s", envVarMap[user]),
+			fmt.Sprintf("$%s", envVarMap[password]), script))
+	}
+	cmd = append(cmd, strings.Join(args, " && "))
+	return cmd, nil, nil
 }

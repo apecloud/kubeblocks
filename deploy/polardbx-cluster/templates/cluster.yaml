@@ -1,0 +1,99 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ include "polardbx.name" . }}
+  labels:
+    {{ include "polardbx.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: polardbx
+  clusterVersionRef: polardbx-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  terminationPolicy: {{ .Values.polardbx.terminationPolicy }}
+  componentSpecs:
+    - componentDefRef: gms
+      name: gms
+      replicas: {{ .Values.gms.replicas }}
+      {{- with  .Values.gms.resources }}
+      resources:
+        {{- with .limits }}
+        limits:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+        {{- with .requests }}
+        requests:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+      {{- end }}
+      {{- if .Values.gms.persistence.enabled }}
+      volumeClaimTemplates:
+        - name: data   # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.gms.persistence.data.size }}
+      {{- end }}
+    {{- $i := 0 }}
+    {{- range .Values.dn }}
+    - componentDefRef: dn
+      name: dn-{{ $i }}
+      replicas: {{ .replicas }}
+      {{- with  .resources }}
+      resources:
+        {{- with .limits }}
+        limits:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+        {{- with .requests }}
+        requests:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+      {{- end }}
+      {{- if .persistence.enabled }}
+      volumeClaimTemplates:
+        - name: data   # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage:  {{ .persistence.data.size }}
+      {{- end }}
+    {{- end }}
+    {{- $i = add1 $i }}
+    - componentDefRef: cn
+      name: cn
+      replicas: {{ .Values.cn.replicas }}
+      {{- with  .Values.cn.resources }}
+      resources:
+        {{- with .limits }}
+        limits:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+        {{- with .requests }}
+        requests:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+      {{- end }}
+    - componentDefRef: cdc
+      name: cdc
+      replicas: {{ .Values.cdc.replicas }}
+      {{- with  .Values.cn.resources }}
+      resources:
+        {{- with .limits }}
+        limits:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+        {{- with .requests }}
+        requests:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+      {{- end }}

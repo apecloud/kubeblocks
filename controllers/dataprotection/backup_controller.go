@@ -31,7 +31,6 @@ import (
 	"strings"
 	"time"
 
-	ctrlbuilder "github.com/apecloud/kubeblocks/internal/controller/factory"
 	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/leaanthony/debme"
@@ -60,6 +59,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	ctrlbuilder "github.com/apecloud/kubeblocks/internal/controller/factory"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
@@ -538,8 +538,8 @@ func (r *BackupReconciler) handlePVCByBackupRepo(reqCtx intctrlutil.RequestCtx,
 	// add a special label and wait for the backup repo controller to create the PVC.
 	// we need to update the object meta immediately, because we are going to break the current reconciliation.
 	_, err = r.patchBackupObjectLabels(reqCtx, backup, map[string]string{
-		dataProtectionBackupRepoKey:  repo.Name,
-		dataProtectionNeedRepoPVCKey: trueVal,
+		dataProtectionBackupRepoKey:          repo.Name,
+		dataProtectionWaitRepoPreparationKey: trueVal,
 	})
 	if err != nil {
 		return "", "", err
@@ -1251,11 +1251,8 @@ func (r *BackupReconciler) getVolumeSnapshotClassOrCreate(ctx context.Context, s
 	}
 	// not found matched volume snapshot class, create one
 	vscName := fmt.Sprintf("vsc-%s-%s", storageClassName, storageClassObj.UID[:8])
-	newVSC, err := ctrlbuilder.BuildVolumeSnapshotClass(vscName, storageClassObj.Provisioner)
-	if err != nil {
-		return err
-	}
-	if err = r.snapshotCli.Create(newVSC); err != nil {
+	newVSC := ctrlbuilder.BuildVolumeSnapshotClass(vscName, storageClassObj.Provisioner)
+	if err := r.snapshotCli.Create(newVSC); err != nil {
 		return err
 	}
 	*vsc = *newVSC
@@ -1335,9 +1332,7 @@ func (r *BackupReconciler) createMetadataCollectionJob(reqCtx intctrlutil.Reques
 	if err != nil {
 		return err
 	}
-	if job, err = ctrlbuilder.BuildBackupManifestsJob(key, backup, &jobPodSpec); err != nil {
-		return err
-	}
+	job = ctrlbuilder.BuildBackupManifestsJob(key, backup, &jobPodSpec)
 	msg := fmt.Sprintf("creating job %s", key.Name)
 	r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatingJob-"+key.Name, msg)
 	return client.IgnoreAlreadyExists(r.Client.Create(reqCtx.Ctx, job))

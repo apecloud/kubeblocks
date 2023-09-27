@@ -27,6 +27,7 @@ require (
 	github.com/dlclark/regexp2 v1.10.0
 	github.com/docker/docker v24.0.2+incompatible
 	github.com/docker/go-connections v0.4.1-0.20190612165340-fd1b1942c4d5
+	github.com/dustin/go-humanize v1.0.1
 	github.com/evanphx/json-patch v5.6.0+incompatible
 	github.com/fatih/color v1.15.0
 	github.com/fsnotify/fsnotify v1.6.0
@@ -37,7 +38,6 @@ require (
 	github.com/go-logr/zapr v1.2.4
 	github.com/go-redis/redismock/v9 v9.0.3
 	github.com/go-sql-driver/mysql v1.7.1
-	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.5.9
@@ -179,7 +179,6 @@ require (
 	github.com/docker/go v1.5.1-1.0.20160303222718-d30aec9fd63c // indirect
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/dvsekhvalnov/jose2go v1.5.0 // indirect
 	github.com/eapache/go-resiliency v1.3.0 // indirect
 	github.com/eapache/go-xerial-snappy v0.0.0-20230111030713-bf00bc1b83b6 // indirect
@@ -210,6 +209,7 @@ require (
 	github.com/go-openapi/swag v0.22.3 // indirect
 	github.com/go-openapi/validate v0.22.1 // indirect
 	github.com/go-redis/redis/v7 v7.4.1 // indirect
+	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/go-test/deep v1.1.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2 // indirect

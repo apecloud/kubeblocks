@@ -44,9 +44,7 @@ var _ = Describe("probe_utils", func() {
 		var clusterDefProbe *appsv1alpha1.ClusterDefinitionProbe
 
 		BeforeEach(func() {
-			var err error
-			container, err = buildProbeContainer()
-			Expect(err).NotTo(HaveOccurred())
+			container = buildBasicContainer()
 			probeServiceHTTPPort, probeServiceGrpcPort = 3501, 50001
 
 			clusterDefProbe = &appsv1alpha1.ClusterDefinitionProbe{}
@@ -95,20 +93,13 @@ var _ = Describe("probe_utils", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			Expect(buildProbeContainers(reqCtx, component)).Should(Succeed())
-			Expect(len(component.PodSpec.Containers)).Should(Equal(3))
+			Expect(buildLorryContainers(reqCtx, component)).Should(Succeed())
+			Expect(len(component.PodSpec.Containers)).Should(Equal(2))
 			Expect(component.PodSpec.Containers[0].Command).ShouldNot(BeEmpty())
 		})
 
-		It("should build role changed probe container", func() {
-			synthesizedComponent := &SynthesizedComponent{CharacterType: "wesql"}
-			pod := &corev1.PodSpec{}
-			buildRoleProbeContainer(synthesizedComponent, container, clusterDefProbe, probeServiceHTTPPort, pod)
-			Expect(container.ReadinessProbe.HTTPGet).ShouldNot(BeNil())
-		})
-
 		It("should build role service container", func() {
-			buildProbeServiceContainer(component, container, probeServiceHTTPPort, probeServiceGrpcPort)
+			buildLorryServiceContainer(component, container, probeServiceHTTPPort, probeServiceGrpcPort)
 			Expect(container.Command).ShouldNot(BeEmpty())
 		})
 
@@ -140,8 +131,8 @@ var _ = Describe("probe_utils", func() {
 					},
 				},
 			}
-			Expect(buildProbeContainers(reqCtx, component)).Should(Succeed())
-			Expect(len(component.PodSpec.Containers)).Should(Equal(4))
+			Expect(buildLorryContainers(reqCtx, component)).Should(Succeed())
+			Expect(len(component.PodSpec.Containers)).Should(Equal(3))
 		})
 
 		It("build volume protection probe container with RBAC", func() {
@@ -163,8 +154,8 @@ var _ = Describe("probe_utils", func() {
 				},
 			}
 			viper.SetDefault(constant.EnableRBACManager, true)
-			Expect(buildProbeContainers(reqCtx, component)).Should(Succeed())
-			Expect(len(component.PodSpec.Containers)).Should(Equal(4))
+			Expect(buildLorryContainers(reqCtx, component)).Should(Succeed())
+			Expect(len(component.PodSpec.Containers)).Should(Equal(3))
 			spec := &appsv1alpha1.VolumeProtectionSpec{}
 			for _, e := range component.PodSpec.Containers[0].Env {
 				if e.Name == constant.KBEnvVolumeProtectionSpec {

@@ -46,7 +46,7 @@ tolerations: []
 persistence:
   ## @param shard[*].persistence.enabled Enable persistence using Persistent Volume Claims
   ##
-  enabled: false
+  enabled: true
   ## `data` volume settings
   ##
   data:

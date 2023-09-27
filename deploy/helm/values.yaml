@@ -1564,7 +1564,7 @@ grafana:
     # ingressClassName: nginx
     # Values can be templated
     annotations: {}
-      # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/ingress.class: nginx
     # kubernetes.io/tls-acme: "true"
     labels: {}
     path: /
@@ -1754,36 +1754,46 @@ agamotto:
     registry: registry.cn-hangzhou.aliyuncs.com
 
 
+provider: "" # cloud be "aws","gcp","aliyun","tencentCloud", "huaweiCloud", "azure"
+validProviders:
+ - "aws"
+ - "gcp"
+ - "aliyun"
+ - "tencentCloud"
+ - "huaweiCloud"
+ - "azure"
+ - ""
 ## @section KubeBlocks default storageClass Parameters for cloud provider.
 storageClass:
   ## @param storageClass.name -- Specifies the name of the default storage class.
   ## If name is not specified and KubeBlocks deployed in a cloud, a default name will be generated.
   ##
   name: ""
-
   ## @param storageClass.create -- Specifies whether the storage class should be created. If storageClass.name is not
   ## specified or generated, this value will be ignored.
   ##
   create: true
-
   mountOptions:
     - noatime
     - nobarrier
   provider:
-    eks:
+    aws:
       volumeType: gp3
       fsType: xfs
-    gke:
+    gcp:
       volumeType: pd-balanced
       fsType: xfs
     aliyun:
       volumeType: cloud_essd
       fsType: xfs
-    aks:
+    azure:
       volumeType: managed
       fsType: xfs
-    tke:
+    tencentCloud:
       volumeType: CLOUD_SSD
+    huaweiCloud: # Huawei Cloud
+      volumeType: SSD
+      fsType: ext4
 
 external-dns:
   enabled: false
@@ -1793,4 +1803,3 @@ external-dns:
     operator: Equal
     value: "true"
     effect: NoSchedule
-

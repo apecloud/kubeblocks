@@ -51,12 +51,13 @@ const (
 
 // AddonSelectorKey are selector requirement key types.
 // +enum
-// +kubebuilder:validation:Enum={KubeGitVersion,KubeVersion}
+// +kubebuilder:validation:Enum={KubeGitVersion,KubeVersion,KubeProvider}
 type AddonSelectorKey string
 
 const (
 	KubeGitVersion AddonSelectorKey = "KubeGitVersion"
 	KubeVersion    AddonSelectorKey = "KubeVersion"
+	KubeProvider   AddonSelectorKey = "KubeProvider"
 )
 
 const (

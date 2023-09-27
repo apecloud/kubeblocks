@@ -49,12 +49,15 @@ const (
 	dataProtectionBackupTargetPodKey          = "dataprotection.kubeblocks.io/target-pod-name"
 	dataProtectionAnnotationCreateByPolicyKey = "dataprotection.kubeblocks.io/created-by-policy"
 
-	dataProtectionBackupRepoKey  = "dataprotection.kubeblocks.io/backup-repo-name"
-	dataProtectionNeedRepoPVCKey = "dataprotection.kubeblocks.io/need-repo-pvc"
+	dataProtectionBackupRepoKey          = "dataprotection.kubeblocks.io/backup-repo-name"
+	dataProtectionWaitRepoPreparationKey = "dataprotection.kubeblocks.io/wait-repo-preparation"
+	dataProtectionIsToolConfigKey        = "dataprotection.kubeblocks.io/is-tool-config"
 
 	// annotation keys
-	dataProtectionSecretTemplateMD5AnnotationKey = "dataprotection.kubeblocks.io/secret-template-md5"
-	dataProtectionTemplateValuesMD5AnnotationKey = "dataprotection.kubeblocks.io/template-values-md5"
+	dataProtectionSecretTemplateMD5AnnotationKey        = "dataprotection.kubeblocks.io/secret-template-md5"
+	dataProtectionTemplateValuesMD5AnnotationKey        = "dataprotection.kubeblocks.io/template-values-md5"
+	dataProtectionPVCTemplateMD5MD5AnnotationKey        = "dataprotection.kubeblocks.io/pvc-template-md5"
+	dataProtectionToolConfigTemplateMD5MD5AnnotationKey = "dataprotection.kubeblocks.io/tool-config-template-md5"
 
 	// the key of persistentVolumeTemplate in the configmap.
 	persistentVolumeTemplateKey = "persistentVolume"
@@ -66,20 +69,30 @@ const (
 const (
 	// condition types
 	ConditionTypeStorageProviderReady  = "StorageProviderReady"
+	ConditionTypeParametersChecked     = "ParametersChecked"
 	ConditionTypeStorageClassCreated   = "StorageClassCreated"
+	ConditionTypePVCTemplateChecked    = "PVCTemplateChecked"
+	ConditionTypeToolConfigChecked     = "ToolConfigSecretChecked"
 	ConditionTypeDerivedObjectsDeleted = "DerivedObjectsDeleted"
 
 	// condition reasons
-	ReasonStorageProviderReady    = "StorageProviderReady"
-	ReasonStorageProviderNotReady = "StorageProviderNotReady"
-	ReasonStorageProviderNotFound = "StorageProviderNotFound"
-	ReasonBadSecretTemplate       = "BadSecretTemplate"
-	ReasonBadStorageClassTemplate = "BadStorageClassTemplate"
-	ReasonStorageClassCreated     = "StorageClassCreated"
-	ReasonHaveAssociatedBackups   = "HaveAssociatedBackups"
-	ReasonHaveResidualPVCs        = "HaveResidualPVCs"
-	ReasonDerivedObjectsDeleted   = "DerivedObjectsDeleted"
-	ReasonUnknownError            = "UnknownError"
+	ReasonStorageProviderReady      = "StorageProviderReady"
+	ReasonStorageProviderNotReady   = "StorageProviderNotReady"
+	ReasonStorageProviderNotFound   = "StorageProviderNotFound"
+	ReasonInvalidStorageProvider    = "InvalidStorageProvider"
+	ReasonParametersChecked         = "ParametersChecked"
+	ReasonCredentialSecretNotFound  = "CredentialSecretNotFound"
+	ReasonPrepareCSISecretFailed    = "PrepareCSISecretFailed"
+	ReasonPrepareStorageClassFailed = "PrepareStorageClassFailed"
+	ReasonBadPVCTemplate            = "BadPVCTemplate"
+	ReasonBadToolConfigTemplate     = "BadToolConfigTemplate"
+	ReasonStorageClassCreated       = "StorageClassCreated"
+	ReasonPVCTemplateChecked        = "PVCTemplateChecked"
+	ReasonToolConfigChecked         = "ToolConfigChecked"
+	ReasonHaveAssociatedBackups     = "HaveAssociatedBackups"
+	ReasonHaveResidualPVCs          = "HaveResidualPVCs"
+	ReasonDerivedObjectsDeleted     = "DerivedObjectsDeleted"
+	ReasonUnknownError              = "UnknownError"
 )
 
 const manifestsUpdaterContainerName = "manifests-updater"

@@ -4,16 +4,10 @@ on:
   pull_request_target:
     types: [ edited, opened, synchronize ]
 
-env:
-  GITHUB_TOKEN: ${{ github.token }}
 
 jobs:
   size-label:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: set size label
-        run: |
-          bash .github/utils/utils.sh --type 15 \
-              --github-token "${{ env.GITHUB_TOKEN }}" \
-              --pr-number ${{ github.event.pull_request.number }}
+    uses: apecloud/apecloud-cd/.github/workflows/pull-request-label-size.yml@v0.1.30
+    with:
+      APECD_REF: "v0.1.30"
+    secrets: inherit

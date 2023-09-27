@@ -1070,7 +1070,7 @@ func (c *rsmComponent) leaveMember4ScaleIn(reqCtx intctrlutil.RequestCtx, cli cl
 			continue
 		}
 
-		if lorryCli == nil {
+		if intctrlutil.IsNil(lorryCli) {
 			// no lorry in the pod
 			continue
 		}

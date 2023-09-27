@@ -21,6 +21,7 @@ package configuration
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -102,11 +103,26 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to get related object.")
 	}
 
+	if fetcherTask.ClusterComObj == nil || fetcherTask.ClusterDefComObj == nil {
+		return r.failWithInvalidComponent(configuration, reqCtx)
+	}
+
 	if err := r.runTasks(reqCtx, configuration, fetcherTask, tasks); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to run configuration reconcile task.")
 	}
 	if !isAllReady(configuration) {
 		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+	}
+	return intctrlutil.Reconciled()
+}
+
+func (r *ConfigurationReconciler) failWithInvalidComponent(configuration *appsv1alpha1.Configuration, reqCtx intctrlutil.RequestCtx) (ctrl.Result, error) {
+	msg := fmt.Sprintf("not found cluster component or cluster definition component: [%s]", configuration.Spec.ComponentName)
+	reqCtx.Log.Error(fmt.Errorf(msg), "")
+	patch := client.MergeFrom(configuration.DeepCopy())
+	configuration.Status.Message = msg
+	if err := r.Client.Status().Patch(reqCtx.Ctx, configuration, patch); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update configuration status.")
 	}
 	return intctrlutil.Reconciled()
 }
@@ -140,8 +156,8 @@ func (r *ConfigurationReconciler) runTasks(
 		return err
 	}
 
-	revision := strconv.FormatInt(configuration.GetGeneration(), 10)
 	patch := client.MergeFrom(configuration.DeepCopy())
+	revision := strconv.FormatInt(configuration.GetGeneration(), 10)
 	for _, task := range tasks {
 		if err := task.Do(fetcher, synthesizedComp, revision); err != nil {
 			task.Status.Phase = appsv1alpha1.CMergeFailedPhase
@@ -158,6 +174,7 @@ func (r *ConfigurationReconciler) runTasks(
 		}
 	}
 
+	configuration.Status.Message = ""
 	if len(errs) > 0 {
 		configuration.Status.Message = utilerrors.NewAggregate(errs).Error()
 	}
@@ -202,6 +219,7 @@ func isReconcileStatus(phase appsv1alpha1.ConfigurationPhase) bool {
 	return phase == appsv1alpha1.CRunningPhase ||
 		phase == appsv1alpha1.CInitPhase ||
 		phase == appsv1alpha1.CPendingPhase ||
+		phase == appsv1alpha1.CFailedPhase ||
 		phase == appsv1alpha1.CMergedPhase ||
 		phase == appsv1alpha1.CMergeFailedPhase ||
 		phase == appsv1alpha1.CUpgradingPhase ||

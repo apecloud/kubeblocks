@@ -401,7 +401,7 @@ func (r *BackupReconciler) patchBackupObjectMeta(
 	// backup repo controller to create the PVC.
 	wait := false
 	if request.BackupRepoPVC == nil {
-		request.Labels[dataProtectionNeedRepoPVCKey] = trueVal
+		request.Labels[dataProtectionWaitRepoPreparationKey] = trueVal
 		wait = true
 	}
 

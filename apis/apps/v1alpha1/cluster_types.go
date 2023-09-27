@@ -122,7 +122,7 @@ type ClusterBackup struct {
 	// Sample duration format:
 	// - years: 	2y
 	// - months: 	6mo
-	// - days: 		30d
+	// - days:		30d
 	// - hours: 	12h
 	// - minutes: 	30m
 	// You can also combine the above durations. For example: 30d12h30m

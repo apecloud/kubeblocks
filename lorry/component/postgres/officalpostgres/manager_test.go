@@ -359,14 +359,6 @@ func TestGetSyncStandbys(t *testing.T) {
 		assert.Nil(t, standbys)
 	})
 
-	t.Run("parse query failed", func(t *testing.T) {
-		mock.ExpectQuery("select").
-			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}))
-
-		standbys := manager.getSyncStandbys(ctx)
-		assert.Nil(t, standbys)
-	})
-
 	t.Run("parse pg sync standby failed", func(t *testing.T) {
 		mock.ExpectQuery("select").
 			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow(`ANY 4("a" b,"c c")`))
@@ -1042,5 +1034,15 @@ func TestGetPgControlData(t *testing.T) {
 		assert.NotNil(t, data)
 		assert.Equal(t, "1002", data["pg_control version number"])
 		assert.Equal(t, "0", data["Data page checksum version"])
+	})
+
+	t.Run("pg control data has been set", func(t *testing.T) {
+		manager.pgControlData = map[string]string{
+			"Data page checksum version": "1",
+		}
+
+		data := manager.getPgControlData()
+		assert.NotNil(t, data)
+		assert.Equal(t, "1", data["Data page checksum version"])
 	})
 }

@@ -24,6 +24,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -288,18 +290,12 @@ func (mgr *Manager) getReplicationMode(ctx context.Context) (string, error) {
 		return mgr.DBState.Extra[postgres.ReplicationMode], nil
 	}
 
-	sql := "select pg_catalog.current_setting('synchronous_commit');"
-	resp, err := mgr.Query(ctx, sql)
+	synchronousCommit, err := mgr.GetPgCurrentSetting(ctx, "synchronous_commit")
 	if err != nil {
 		return "", err
 	}
 
-	resMap, err := postgres.ParseQuery(string(resp))
-	if err != nil {
-		return "", errors.Errorf("parse query response:%s failed, err:%v", string(resp), err)
-	}
-
-	switch cast.ToString(resMap[0]["current_setting"]) {
+	switch synchronousCommit {
 	case "off":
 		return postgres.Asynchronous, nil
 	case "local":
@@ -383,20 +379,13 @@ func (mgr *Manager) getSyncStandbys(ctx context.Context) *postgres.PGStandby {
 		return mgr.syncStandbys
 	}
 
-	sql := "select pg_catalog.current_setting('synchronous_standby_names');"
-	resp, err := mgr.Query(ctx, sql)
+	synchronousStandbyNames, err := mgr.GetPgCurrentSetting(ctx, "synchronous_standby_names")
 	if err != nil {
-		mgr.Logger.Error(err, fmt.Sprintf("query sql:%s failed", sql))
+		mgr.Logger.Error(err, "get synchronous_standby_names failed")
 		return nil
 	}
 
-	resMap, err := postgres.ParseQuery(string(resp))
-	if err != nil {
-		mgr.Logger.Error(err, fmt.Sprintf("parse query response:%s failed", string(resp)))
-		return nil
-	}
-
-	syncStandbys, err := postgres.ParsePGSyncStandby(cast.ToString(resMap[0]["current_setting"]))
+	syncStandbys, err := postgres.ParsePGSyncStandby(synchronousStandbyNames)
 	if err != nil {
 		mgr.Logger.Error(err, "parse pg sync standby failed")
 		return nil
@@ -424,7 +413,7 @@ func (mgr *Manager) handleRewind(ctx context.Context, cluster *dcs.Cluster) erro
 		return nil
 	}
 
-	return mgr.executeRewind()
+	return mgr.executeRewind(ctx)
 }
 
 func (mgr *Manager) canRewind() bool {
@@ -435,11 +424,99 @@ func (mgr *Manager) canRewind() bool {
 	}
 
 	pgControlData := mgr.getPgControlData()
-	return pgControlData["wal_log_hints setting"] == "on" || pgControlData["Data page checksum version"] != "0"
+	if pgControlData["wal_log_hints setting"] != "on" && pgControlData["Data page checksum version"] == "0" {
+		mgr.Logger.Info("unable to execute pg_rewind due to configuration not allowed")
+	}
+
+	return true
 }
 
-func (mgr *Manager) executeRewind() error {
+func (mgr *Manager) executeRewind(ctx context.Context) error {
+	if mgr.IsRunning() {
+		return errors.New("can't run rewind when pg is running")
+	}
+
+	err := mgr.checkArchiveReadyWal(ctx)
+	return err
+}
+
+func (mgr *Manager) checkArchiveReadyWal(ctx context.Context) error {
+	archiveMode, _ := mgr.GetPgCurrentSetting(ctx, "archive_mode")
+	archiveCommand, _ := mgr.GetPgCurrentSetting(ctx, "archive_command")
+
+	if (archiveMode != "on" && archiveMode != "always") || archiveCommand == "" {
+		mgr.Logger.Info("archive is not enabled")
+		return nil
+	}
+
+	// starting from PostgreSQL 10, the "wal" directory has been renamed to "pg_wal"
+	archiveDir := mgr.DataDir + "pg_wal/archive_status"
+	var walFileList []string
+	err := filepath.Walk(archiveDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		fileName := strings.Split(info.Name(), ".")
+		if len(fileName) == 2 && fileName[1] == "ready" {
+			walFileList = append(walFileList, fileName[0])
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if len(walFileList) == 0 {
+		mgr.Logger.Info("no ready wal file exist")
+		return nil
+	}
+
+	sort.Strings(walFileList)
+	for _, wal := range walFileList {
+		walFileName := archiveDir + wal + ".ready"
+		_, err = postgres.ExecCommand(buildArchiverCommand(archiveCommand, wal, archiveDir))
+		if err != nil {
+			return err
+		}
+
+		err = fs.Rename(walFileName, archiveDir+wal+".done")
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+func buildArchiverCommand(archiveCommand, walFileName, walDir string) string {
+	cmd := ""
+
+	i := 0
+	archiveCommandLength := len(archiveCommand)
+	for i < archiveCommandLength {
+		if archiveCommand[i] == '%' && i+1 < archiveCommandLength {
+			i += 1
+			switch archiveCommand[i] {
+			case 'p':
+				cmd += walDir + walFileName
+			case 'f':
+				cmd += walFileName
+			case 'r':
+				cmd += "000000010000000000000001"
+			case '%':
+				cmd += "%"
+			default:
+				cmd += "%"
+				i -= 1
+			}
+		} else {
+			cmd += string(archiveCommand[i])
+		}
+		i += 1
+	}
+
+	return cmd
 }
 
 func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluster) bool {
@@ -725,31 +802,13 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 		return nil
 	}
 
-	err := mgr.prePromote()
-	if err != nil {
-		return err
-	}
-
 	resp, err := postgres.PgCtl("promote")
 	if err != nil {
 		mgr.Logger.Error(err, "promote failed")
 		return err
 	}
 
-	err = mgr.postPromote()
-	if err != nil {
-		return err
-	}
-
 	mgr.Logger.Info("promote success", "response", resp)
-	return nil
-}
-
-func (mgr *Manager) prePromote() error {
-	return nil
-}
-
-func (mgr *Manager) postPromote() error {
 	return nil
 }
 
@@ -788,6 +847,7 @@ func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 	err := mgr.handleRewind(ctx, cluster)
 	if err != nil {
 		mgr.Logger.Error(err, "handle rewind failed")
+		return err
 	}
 
 	needChange, needRestart := mgr.checkRecoveryConf(ctx, cluster.Leader.Name)

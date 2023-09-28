@@ -18,7 +18,7 @@ spec:
       service:
         ports:
           - name: model
-            port: 8080
+            port: 8000
             targetPort: model
       podSpec:
         volumes:
@@ -44,7 +44,7 @@ spec:
               - /scripts/start.sh
             ports:
               - name: model
-                containerPort: 8080
+                containerPort: 8000
   connectionCredential:
     username: root
     password: ""

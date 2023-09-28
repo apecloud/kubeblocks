@@ -354,6 +354,13 @@ type ScriptSpec struct {
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.scriptFrom"
 	ScriptFrom *ScriptFrom `json:"scriptFrom,omitempty"`
+	// KubeBlocks, by default, will execute the script on the primary pod, with role=leader.
+	// There are some exceptions, such as Redis, which does not synchronize accounts info between primary and secondary.
+	// In this case, we need to execute the script on all pods, matching the selector.
+	// selector indicates the components on which the script is executed.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.script.selector"
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
 type BackupSpec struct {
@@ -365,11 +372,9 @@ type BackupSpec struct {
 	// +optional
 	BackupPolicyName string `json:"backupPolicyName"`
 
-	// Backup Type. datafile or logfile or snapshot. If not set, datafile is the default type.
-	// +kubebuilder:default=datafile
-	// +kubeBuilder:validation:Enum={datafile,logfile,snapshot}
+	// Backup method name that is defined in backupPolicy.
 	// +optional
-	BackupType string `json:"backupType"`
+	BackupMethod string `json:"backupMethod"`
 
 	// if backupType is incremental, parentBackupName is required.
 	// +optional

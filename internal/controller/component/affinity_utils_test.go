@@ -114,7 +114,7 @@ var _ = Describe("affinity utils", func() {
 			Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).Should(BeEmpty())
 			Expect(affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution).Should(BeEmpty())
 
-			topologySpreadConstraints := buildPodTopologySpreadConstraints(clusterObj, clusterObj.Spec.Affinity, component)
+			topologySpreadConstraints := BuildPodTopologySpreadConstraints(clusterObj, clusterObj.Spec.Affinity, component)
 			Expect(topologySpreadConstraints[0].WhenUnsatisfiable).Should(Equal(corev1.DoNotSchedule))
 			Expect(topologySpreadConstraints[0].TopologyKey).Should(Equal(topologyKey))
 		})
@@ -131,7 +131,7 @@ var _ = Describe("affinity utils", func() {
 			Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).Should(BeEmpty())
 			Expect(affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Preference.MatchExpressions[0].Key).Should(Equal(nodeKey))
 
-			topologySpreadConstraints := buildPodTopologySpreadConstraints(clusterObj, clusterObj.Spec.Affinity, component)
+			topologySpreadConstraints := BuildPodTopologySpreadConstraints(clusterObj, clusterObj.Spec.Affinity, component)
 			Expect(topologySpreadConstraints[0].WhenUnsatisfiable).Should(Equal(corev1.DoNotSchedule))
 			Expect(topologySpreadConstraints[0].TopologyKey).Should(Equal(topologyKey))
 		})
@@ -175,7 +175,7 @@ var _ = Describe("affinity utils", func() {
 			Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight).ShouldNot(BeNil())
 			Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].PodAffinityTerm.TopologyKey).Should(Equal(topologyKey))
 
-			topologySpreadConstraints := buildPodTopologySpreadConstraints(clusterObj, clusterObj.Spec.Affinity, component)
+			topologySpreadConstraints := BuildPodTopologySpreadConstraints(clusterObj, clusterObj.Spec.Affinity, component)
 			Expect(topologySpreadConstraints[0].WhenUnsatisfiable).Should(Equal(corev1.ScheduleAnyway))
 			Expect(topologySpreadConstraints[0].TopologyKey).Should(Equal(topologyKey))
 		})

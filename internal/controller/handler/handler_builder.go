@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package handler
 
 import (
+	"context"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -50,7 +52,7 @@ func (builder *realBuilder) AddFinder(finder Finder) Builder {
 }
 
 func (builder *realBuilder) Build() handler.EventHandler {
-	fn := func(obj client.Object) []reconcile.Request {
+	fn := func(ctx context.Context, obj client.Object) []reconcile.Request {
 		var key *model.GVKNObjKey
 		for i, finder := range builder.finders {
 			key = finder.Find(builder.ctx, obj)

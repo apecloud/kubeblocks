@@ -31,7 +31,7 @@ import (
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
-func buildPodTopologySpreadConstraints(
+func BuildPodTopologySpreadConstraints(
 	cluster *appsv1alpha1.Cluster,
 	clusterOrCompAffinity *appsv1alpha1.Affinity,
 	component *SynthesizedComponent,

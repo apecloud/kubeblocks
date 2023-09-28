@@ -425,20 +425,6 @@ var _ = Describe("create", func() {
 		Expect(setBackup(o, components)).Should(Succeed())
 	})
 
-	It("set restoreTime", func() {
-		o := &CreateOptions{}
-		o.Namespace = testing.Namespace
-		o.RestoreTime = "Jun 16,2023 18:57:01 UTC+0800"
-		o.SourceCluster = testing.ClusterName
-		components := []map[string]interface{}{
-			{
-				"name": testing.ClusterName,
-			},
-		}
-		By("test setRestoreTime")
-		Expect(setRestoreTime(o, components)).Should(Succeed())
-	})
-
 	It("test fillClusterMetadataFromBackup", func() {
 		baseBackupName := "test-backup"
 		logBackupName := "test-logfile-backup"
@@ -452,32 +438,30 @@ var _ = Describe("create", func() {
 		o.Dynamic = dynamic
 		o.Namespace = testing.Namespace
 		o.RestoreTime = "Jun 16,2023 18:57:01 UTC+0800"
+		o.Backup = logBackupName
 		backupLogTime, _ := util.TimeParse(o.RestoreTime, time.Second)
-		o.SourceCluster = clusterName
 		buildBackupLogTime := func(d time.Duration) string {
 			return backupLogTime.Add(d).Format(time.RFC3339)
 		}
-		buildManifests := func(startTime, stopTime string) map[string]any {
+		buildTimeRange := func(startTime, stopTime string) map[string]any {
 			return map[string]any{
-				"backupLog": map[string]any{
-					"startTime": startTime,
-					"stopTime":  stopTime,
-				},
+				"start": startTime,
+				"end":   stopTime,
 			}
 		}
-		mockBackupInfo(dynamic, baseBackupName, clusterName, buildManifests(buildBackupLogTime(-30*time.Second), buildBackupLogTime(-10*time.Second)), "snapshot")
-		mockBackupInfo(dynamic, logBackupName, clusterName, buildManifests(buildBackupLogTime(-1*time.Minute), buildBackupLogTime(time.Minute)), "logfile")
+		mockBackupInfo(dynamic, baseBackupName, clusterName, buildTimeRange(buildBackupLogTime(-30*time.Second), buildBackupLogTime(-10*time.Second)), "snapshot")
+		mockBackupInfo(dynamic, logBackupName, clusterName, buildTimeRange(buildBackupLogTime(-1*time.Minute), buildBackupLogTime(time.Minute)), "logfile")
 		By("fill cluster from backup success")
 		Expect(fillClusterInfoFromBackup(o, &cluster)).Should(Succeed())
 		Expect(cluster.Spec.ClusterDefRef).Should(Equal(testing.ClusterDefName))
 		Expect(cluster.Spec.ClusterVersionRef).Should(Equal(testing.ClusterVersionName))
 
-		By("fill cluster definition does not matched")
+		By("fill cluster definition does not match")
 		o.ClusterDefRef = "test-not-match-cluster-definition"
 		Expect(fillClusterInfoFromBackup(o, &cluster)).Should(HaveOccurred())
 		o.ClusterDefRef = ""
 
-		By("fill cluster version does not matched")
+		By("fill cluster version does not match")
 		o.ClusterVersionRef = "test-not-match-cluster-version"
 		Expect(fillClusterInfoFromBackup(o, &cluster)).Should(HaveOccurred())
 	})
@@ -492,9 +476,9 @@ var _ = Describe("create", func() {
 
 		By("test backup is with snapshot method")
 		o.BackupMethod = "snapshot"
-		Expect(o.Cmd.Flags().Set("backup", "snapshot")).To(Succeed())
+		Expect(o.Cmd.Flags().Set("backup-method", "snapshot")).To(Succeed())
 		Expect(o.buildBackupConfig(cluster)).To(Succeed())
-		Expect(string(o.BackupConfig.Method)).Should(Equal("snapshot"))
+		Expect(o.BackupConfig.Method).Should(Equal("snapshot"))
 
 		By("test backup is with wrong cron expression")
 		o.BackupCronExpression = "wrong-cron-expression"

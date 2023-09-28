@@ -206,10 +206,6 @@ func (o *SysBenchOptions) Validate() error {
 		return fmt.Errorf("database is required")
 	}
 
-	if err := validateBenchmarkExist(o.factory, o.IOStreams, o.name); err != nil {
-		return err
-	}
-
 	if len(o.Type) == 0 {
 		return fmt.Errorf("type is required")
 	}

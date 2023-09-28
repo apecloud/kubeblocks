@@ -109,7 +109,7 @@ spec:
                     key: password
                     optional: false
             volumeMounts:
-              - mountPath: /data/mongodb
+              - mountPath: {{ .Values.dataMountPath }}
                 name: data
               - mountPath: /etc/mongodb/mongodb.conf
                 name: mongodb-config

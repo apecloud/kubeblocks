@@ -35,7 +35,7 @@ type MockPersistentVolumeClaimFactory struct {
 func NewPersistentVolumeClaimFactory(namespace, name, clusterName, componentName, vctName string) *MockPersistentVolumeClaimFactory {
 	f := &MockPersistentVolumeClaimFactory{}
 	volumeMode := corev1.PersistentVolumeFilesystem
-	f.init(namespace, name,
+	f.Init(namespace, name,
 		&corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
@@ -58,12 +58,12 @@ func NewPersistentVolumeClaimFactory(namespace, name, clusterName, componentName
 }
 
 func (factory *MockPersistentVolumeClaimFactory) SetStorageClass(storageClassName string) *MockPersistentVolumeClaimFactory {
-	factory.get().Spec.StorageClassName = &storageClassName
+	factory.Get().Spec.StorageClassName = &storageClassName
 	return factory
 }
 
 func (factory *MockPersistentVolumeClaimFactory) SetStorage(storageSize string) *MockPersistentVolumeClaimFactory {
-	factory.get().Spec.Resources = corev1.ResourceRequirements{
+	factory.Get().Spec.Resources = corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceStorage: resource.MustParse(storageSize),
 		},
@@ -72,6 +72,6 @@ func (factory *MockPersistentVolumeClaimFactory) SetStorage(storageSize string) 
 }
 
 func (factory *MockPersistentVolumeClaimFactory) SetAnnotations(annotations map[string]string) *MockPersistentVolumeClaimFactory {
-	factory.get().Annotations = annotations
+	factory.Get().Annotations = annotations
 	return factory
 }

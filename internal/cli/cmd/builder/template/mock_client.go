@@ -26,6 +26,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
@@ -152,5 +153,13 @@ func (m *mockClient) Scheme() *runtime.Scheme {
 }
 
 func (m *mockClient) RESTMapper() meta.RESTMapper {
+	panic("implement me")
+}
+
+func (m *mockClient) GroupVersionKindFor(obj runtime.Object) (schema.GroupVersionKind, error) {
+	panic("implement me")
+}
+
+func (m *mockClient) IsObjectNamespaced(obj runtime.Object) (bool, error) {
 	panic("implement me")
 }

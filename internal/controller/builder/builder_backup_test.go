@@ -22,8 +22,6 @@ package builder
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	dataprotection "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
 var _ = Describe("backup builder", func() {
@@ -33,18 +31,15 @@ var _ = Describe("backup builder", func() {
 			ns   = "default"
 		)
 		policyName := "policyName"
-		backupType := dataprotection.BackupTypeSnapshot
-		parent := "parent"
+		backupMethod := "backupMethodName"
 		backup := NewBackupBuilder(ns, name).
 			SetBackupPolicyName(policyName).
-			SetBackType(backupType).
-			SetParentBackupName(parent).
+			SetBackupMethod(backupMethod).
 			GetObject()
 
 		Expect(backup.Name).Should(Equal(name))
 		Expect(backup.Namespace).Should(Equal(ns))
 		Expect(backup.Spec.BackupPolicyName).Should(Equal(policyName))
-		Expect(backup.Spec.BackupType).Should(Equal(backupType))
-		Expect(backup.Spec.ParentBackupName).Should(Equal(parent))
+		Expect(backup.Spec.BackupMethod).Should(Equal(backupMethod))
 	})
 })

@@ -24,16 +24,18 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// ActionSets returns a ActionSetInformer.
+	ActionSets() ActionSetInformer
 	// Backups returns a BackupInformer.
 	Backups() BackupInformer
 	// BackupPolicies returns a BackupPolicyInformer.
 	BackupPolicies() BackupPolicyInformer
 	// BackupRepos returns a BackupRepoInformer.
 	BackupRepos() BackupRepoInformer
-	// BackupTools returns a BackupToolInformer.
-	BackupTools() BackupToolInformer
-	// RestoreJobs returns a RestoreJobInformer.
-	RestoreJobs() RestoreJobInformer
+	// BackupSchedules returns a BackupScheduleInformer.
+	BackupSchedules() BackupScheduleInformer
+	// Restores returns a RestoreInformer.
+	Restores() RestoreInformer
 }
 
 type version struct {
@@ -45,6 +47,11 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// ActionSets returns a ActionSetInformer.
+func (v *version) ActionSets() ActionSetInformer {
+	return &actionSetInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // Backups returns a BackupInformer.
@@ -62,12 +69,12 @@ func (v *version) BackupRepos() BackupRepoInformer {
 	return &backupRepoInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
-// BackupTools returns a BackupToolInformer.
-func (v *version) BackupTools() BackupToolInformer {
-	return &backupToolInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+// BackupSchedules returns a BackupScheduleInformer.
+func (v *version) BackupSchedules() BackupScheduleInformer {
+	return &backupScheduleInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// RestoreJobs returns a RestoreJobInformer.
-func (v *version) RestoreJobs() RestoreJobInformer {
-	return &restoreJobInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+// Restores returns a RestoreInformer.
+func (v *version) Restores() RestoreInformer {
+	return &restoreInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

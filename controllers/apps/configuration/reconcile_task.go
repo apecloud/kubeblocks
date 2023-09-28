@@ -62,7 +62,6 @@ func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.Con
 				ApplyParameters().
 				UpdateConfigVersion(revision).
 				Sync().
-				SyncStatus().
 				Complete()
 		},
 		SyncStatus: syncStatus,

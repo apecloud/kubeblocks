@@ -47,13 +47,13 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 	"golang.org/x/exp/slices"
 
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
-	"github.com/apecloud/kubeblocks/internal/constant"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
 
 const (
@@ -306,7 +306,7 @@ func (o *createOptions) validate(cmd *cobra.Command) error {
 			return err
 		}
 		for _, item := range list.Items {
-			if item.GetAnnotations()[constant.DefaultBackupRepoAnnotationKey] == "true" {
+			if item.GetAnnotations()[dptypes.DefaultBackupRepoAnnotationKey] == "true" {
 				name := item.GetName()
 				return fmt.Errorf("there is already a default backup repo \"%s\","+
 					" please don't specify the --default flag,\n"+
@@ -346,12 +346,12 @@ func (o *createOptions) createCredentialSecret() (*corev1.Secret, error) {
 }
 
 func (o *createOptions) buildBackupRepoObject(secret *corev1.Secret) (*unstructured.Unstructured, error) {
-	backupRepo := &dataprotectionv1alpha1.BackupRepo{
+	backupRepo := &dpv1alpha1.BackupRepo{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPAPIVersion),
 			Kind:       "BackupRepo",
 		},
-		Spec: dataprotectionv1alpha1.BackupRepoSpec{
+		Spec: dpv1alpha1.BackupRepoSpec{
 			StorageProviderRef: o.storageProvider,
 			PVReclaimPolicy:    corev1.PersistentVolumeReclaimPolicy(o.pvReclaimPolicy),
 			VolumeCapacity:     resource.MustParse(o.volumeCapacity),
@@ -371,7 +371,7 @@ func (o *createOptions) buildBackupRepoObject(secret *corev1.Secret) (*unstructu
 	}
 	if o.isDefault {
 		backupRepo.Annotations = map[string]string{
-			constant.DefaultBackupRepoAnnotationKey: "true",
+			dptypes.DefaultBackupRepoAnnotationKey: "true",
 		}
 	}
 	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(backupRepo)
@@ -452,7 +452,7 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		providerFlagName,
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.StorageProviderGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.CompGetResource(f, util.GVRToString(types.StorageProviderGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"pv-reclaim-policy",

@@ -45,7 +45,7 @@ func MockReplicationComponentPod(
 		SetOwnerReferences("apps/v1", constant.StatefulSetKind, sts).
 		AddAppInstanceLabel(clusterName).
 		AddAppComponentLabel(compName).
-		AddAppManangedByLabel().
+		AddAppManagedByLabel().
 		AddRoleLabel(roleName).
 		AddControllerRevisionHashLabel(sts.Status.UpdateRevision).
 		AddContainer(corev1.Container{Name: DefaultRedisContainerName, Image: DefaultRedisImageName}).

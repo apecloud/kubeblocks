@@ -53,7 +53,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
@@ -227,9 +227,9 @@ type CreateOptions struct {
 	RBACEnabled       bool                     `json:"-"`
 	Storages          []string                 `json:"-"`
 	// backup name to restore in creation
-	Backup        string `json:"backup,omitempty"`
-	RestoreTime   string `json:"restoreTime,omitempty"`
-	SourceCluster string `json:"sourceCluster,omitempty"`
+	Backup                  string `json:"backup,omitempty"`
+	RestoreTime             string `json:"restoreTime,omitempty"`
+	RestoreManagementPolicy string `json:"-"`
 
 	// backup config
 	BackupConfig *appsv1alpha1.ClusterBackup `json:"backupConfig,omitempty"`
@@ -262,7 +262,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().StringArrayVar(&o.Storages, "pvc", []string{}, "Set the cluster detail persistent volume claim, each '--pvc' corresponds to a component, and will override the simple configurations about storage by --set (e.g. --pvc type=mysql,name=data,mode=ReadWriteOnce,size=20Gi --pvc type=mysql,name=log,mode=ReadWriteOnce,size=1Gi)")
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 	cmd.Flags().StringVar(&o.RestoreTime, "restore-to-time", "", "Set a time for point in time recovery")
-	cmd.Flags().StringVar(&o.SourceCluster, "source-cluster", "", "Set a source cluster for point in time recovery")
+	cmd.Flags().StringVar(&o.RestoreManagementPolicy, "volume-restore-policy", "Parallel", "the volume claim restore policy, supported values: [Serial, Parallel]")
 	cmd.Flags().BoolVar(&o.RBACEnabled, "rbac-enabled", false, "Specify whether rbac resources will be created by kbcli, otherwise KubeBlocks server will try to create rbac resources")
 	cmd.PersistentFlags().BoolVar(&o.EditBeforeCreate, "edit", o.EditBeforeCreate, "Edit the API resource before creating")
 	cmd.PersistentFlags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
@@ -308,7 +308,7 @@ func setMonitor(monitoringInterval uint8, components []map[string]interface{}) {
 	}
 }
 
-func getRestoreFromBackupAnnotation(backup *dataprotectionv1alpha1.Backup, compSpecsCount int, firstCompName string) (string, error) {
+func getRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, managementPolicy string, compSpecsCount int, firstCompName string, restoreTime string) (string, error) {
 	componentName := backup.Labels[constant.KBAppComponentLabelKey]
 	if len(componentName) == 0 {
 		if compSpecsCount != 1 {
@@ -316,11 +316,19 @@ func getRestoreFromBackupAnnotation(backup *dataprotectionv1alpha1.Backup, compS
 		}
 		componentName = firstCompName
 	}
-	restoreFromBackupAnnotation := fmt.Sprintf(`{"%s":"%s"}`, componentName, backup.Name)
+	backupNameString := fmt.Sprintf(`"%s":"%s"`, constant.BackupNameKeyForRestore, backup.Name)
+	backupNamespaceString := fmt.Sprintf(`"%s":"%s"`, constant.BackupNamespaceKeyForRestore, backup.Namespace)
+	managementPolicyString := fmt.Sprintf(`"%s":"%s"`, constant.VolumeManagementPolicyKeyForRestore, managementPolicy)
+	var restoreTimeString string
+	if restoreTime != "" {
+		restoreTimeString = fmt.Sprintf(`",%s":"%s"`, constant.RestoreTimeKeyForRestore, restoreTime)
+	}
+
+	restoreFromBackupAnnotation := fmt.Sprintf(`{"%s":{%s,%s,%s%s}}`, componentName, backupNameString, backupNamespaceString, managementPolicyString, restoreTimeString)
 	return restoreFromBackupAnnotation, nil
 }
 
-func getSourceClusterFromBackup(backup *dataprotectionv1alpha1.Backup) (*appsv1alpha1.Cluster, error) {
+func getSourceClusterFromBackup(backup *dpv1alpha1.Backup) (*appsv1alpha1.Cluster, error) {
 	sourceCluster := &appsv1alpha1.Cluster{}
 	sourceClusterJSON := backup.Annotations[constant.ClusterSnapshotAnnotationKey]
 	if err := json.Unmarshal([]byte(sourceClusterJSON), sourceCluster); err != nil {
@@ -330,55 +338,27 @@ func getSourceClusterFromBackup(backup *dataprotectionv1alpha1.Backup) (*appsv1a
 	return sourceCluster, nil
 }
 
-func getBackupObjectFromRestoreArgs(o *CreateOptions, backup *dataprotectionv1alpha1.Backup) error {
-	if o.Backup != "" {
-		if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.Namespace, o.Backup); err != nil {
-			return err
-		}
-	} else if o.RestoreTime != "" {
-		createRestoreOptions := CreateRestoreOptions{
-			SourceCluster:  o.SourceCluster,
-			RestoreTimeStr: o.RestoreTime,
-		}
-		createRestoreOptions.Dynamic = o.Dynamic
-		createRestoreOptions.Namespace = o.Namespace
-		if err := createRestoreOptions.validateRestoreTime(); err != nil {
-			return err
-		}
-		objs, err := o.Dynamic.Resource(types.BackupGVR()).Namespace(o.Namespace).
-			List(context.TODO(), metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("%s=%s",
-					constant.AppInstanceLabelKey, o.SourceCluster),
-			})
-		if err != nil {
-			return err
-		}
-		if len(objs.Items) == 0 {
-			return fmt.Errorf("can not found any backup to restore time")
-		}
-
-		return runtime.DefaultUnstructuredConverter.FromUnstructured(objs.Items[0].UnstructuredContent(), backup)
+func getBackupObjectFromRestoreArgs(o *CreateOptions, backup *dpv1alpha1.Backup) error {
+	if o.Backup == "" {
+		return nil
+	}
+	if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.Namespace, o.Backup); err != nil {
+		return err
 	}
 	return nil
 }
 
 func fillClusterInfoFromBackup(o *CreateOptions, cls **appsv1alpha1.Cluster) error {
-	if o.Backup == "" && o.RestoreTime == "" && o.SourceCluster == "" {
+	if o.Backup == "" {
 		return nil
 	}
-	backup := &dataprotectionv1alpha1.Backup{}
+	backup := &dpv1alpha1.Backup{}
 	if err := getBackupObjectFromRestoreArgs(o, backup); err != nil {
 		return err
 	}
 	backupCluster, err := getSourceClusterFromBackup(backup)
 	if err != nil {
 		return err
-	}
-	// HACK/TODO: apecloud-mysql pitr only support one replica for PITR.
-	if backupCluster.Spec.ClusterDefRef == apeCloudMysql && o.RestoreTime != "" {
-		for _, c := range backupCluster.Spec.ComponentSpecs {
-			c.Replicas = 1
-		}
 	}
 	curCluster := *cls
 	if curCluster == nil {
@@ -402,54 +382,53 @@ func fillClusterInfoFromBackup(o *CreateOptions, cls **appsv1alpha1.Cluster) err
 	return nil
 }
 
+func formatRestoreTimeAndValidate(restoreTimeStr string, continuousBackup *dpv1alpha1.Backup) (string, error) {
+	if restoreTimeStr == "" {
+		return restoreTimeStr, nil
+	}
+	restoreTime, err := util.TimeParse(restoreTimeStr, time.Second)
+	if err != nil {
+		// retry to parse time with RFC3339 format.
+		var errRFC error
+		restoreTime, errRFC = time.Parse(time.RFC3339, restoreTimeStr)
+		if errRFC != nil {
+			// if retry failure, report the error
+			return restoreTimeStr, err
+		}
+	}
+	restoreTimeStr = restoreTime.Format(time.RFC3339)
+	// TODO: check with Recoverable time
+	if !isTimeInRange(restoreTime, continuousBackup.Status.TimeRange.Start.Time, continuousBackup.Status.TimeRange.End.Time) {
+		return restoreTimeStr, fmt.Errorf("restore-to-time is out of time range, you can view the recoverable time: \n"+
+			"\tkbcli cluster describe %s -n %s", continuousBackup.Labels[constant.AppInstanceLabelKey], continuousBackup.Namespace)
+	}
+	return restoreTimeStr, nil
+}
+
 func setBackup(o *CreateOptions, components []map[string]interface{}) error {
 	backupName := o.Backup
 	if len(backupName) == 0 || len(components) == 0 {
 		return nil
 	}
-	backup := &dataprotectionv1alpha1.Backup{}
+	backup := &dpv1alpha1.Backup{}
 	if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.Namespace, backupName); err != nil {
 		return err
 	}
-	if backup.Status.Phase != dataprotectionv1alpha1.BackupCompleted {
+	if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
 		return fmt.Errorf(`backup "%s" is not completed`, backup.Name)
 	}
-	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, len(components), components[0]["name"].(string))
+	restoreTimeStr, err := formatRestoreTimeAndValidate(o.RestoreTime, backup)
+	if err != nil {
+		return err
+	}
+	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, o.RestoreManagementPolicy, len(components), components[0]["name"].(string), restoreTimeStr)
 	if err != nil {
 		return err
 	}
 	if o.Annotations == nil {
 		o.Annotations = map[string]string{}
 	}
-	o.Annotations[constant.RestoreFromBackUpAnnotationKey] = restoreAnnotation
-	return nil
-}
-
-func setRestoreTime(o *CreateOptions, components []map[string]interface{}) error {
-	if o.RestoreTime == "" || o.SourceCluster == "" {
-		return nil
-	}
-
-	// HACK/TODO: apecloud-mysql pitr only support one replica for PITR.
-	if o.ClusterDefRef == apeCloudMysql {
-		for _, c := range components {
-			if c["replicas"].(int64) > 1 {
-				return fmt.Errorf("apecloud-mysql only support one replica for point-in-time recovery")
-			}
-		}
-	}
-
-	if o.Annotations == nil {
-		o.Annotations = map[string]string{}
-	}
-	restoreTime, err := util.TimeParse(o.RestoreTime, time.Second)
-	if err != nil {
-		return err
-	}
-	// TODO: hack implement for multi-component cluster, how to elegantly implement pitr for multi-component cluster?
-	o.Annotations[constant.RestoreFromTimeAnnotationKey] = fmt.Sprintf(`{"%s":"%s"}`, components[0]["name"], restoreTime.Format(time.RFC3339))
-	o.Annotations[constant.RestoreFromSrcClusterAnnotationKey] = o.SourceCluster
-
+	o.Annotations[constant.RestoreFromBackupAnnotationKey] = restoreAnnotation
 	return nil
 }
 
@@ -546,9 +525,6 @@ func (o *CreateOptions) Complete() error {
 
 	setMonitor(o.MonitoringInterval, components)
 	if err = setBackup(o, components); err != nil {
-		return err
-	}
-	if err = setRestoreTime(o, components); err != nil {
 		return err
 	}
 	o.ComponentSpecs = components
@@ -869,7 +845,7 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cluster-definition",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterDefGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.CompGetResource(f, util.GVRToString(types.ClusterDefGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cluster-version",
@@ -877,7 +853,7 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 			var clusterVersion []string
 			clusterDefinition, err := cmd.Flags().GetString("cluster-definition")
 			if clusterDefinition == "" || err != nil {
-				clusterVersion = utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterVersionGVR()), toComplete)
+				clusterVersion = utilcomp.CompGetResource(f, util.GVRToString(types.ClusterVersionGVR()), toComplete)
 			} else {
 				label := fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, clusterDefinition)
 				clusterVersion = util.CompGetResourceWithLabels(f, cmd, util.GVRToString(types.ClusterVersionGVR()), []string{label}, toComplete)
@@ -1404,9 +1380,7 @@ func (o *CreateOptions) buildAnnotation(cls *appsv1alpha1.Cluster) {
 
 func (o *CreateOptions) buildBackupConfig(cls *appsv1alpha1.Cluster) error {
 	// set default backup config
-	o.BackupConfig = &appsv1alpha1.ClusterBackup{
-		Method: dataprotectionv1alpha1.BackupMethodSnapshot,
-	}
+	o.BackupConfig = &appsv1alpha1.ClusterBackup{}
 
 	// if the cls.Backup isn't nil, use the backup config in cluster
 	if cls != nil && cls.Spec.Backup != nil {
@@ -1427,9 +1401,9 @@ func (o *CreateOptions) buildBackupConfig(cls *appsv1alpha1.Cluster) error {
 		case "backup-enabled":
 			o.BackupConfig.Enabled = &o.BackupEnabled
 		case "backup-retention-period":
-			o.BackupConfig.RetentionPeriod = &o.BackupRetentionPeriod
+			o.BackupConfig.RetentionPeriod = dpv1alpha1.RetentionPeriod(o.BackupRetentionPeriod)
 		case "backup-method":
-			o.BackupConfig.Method = dataprotectionv1alpha1.BackupMethod(o.BackupMethod)
+			o.BackupConfig.Method = o.BackupMethod
 		case "backup-cron-expression":
 			if _, err := cron.ParseStandard(o.BackupCronExpression); err != nil {
 				return fmt.Errorf("invalid cron expression: %s, please see https://en.wikipedia.org/wiki/Cron", o.BackupCronExpression)

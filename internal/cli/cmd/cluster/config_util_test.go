@@ -53,7 +53,7 @@ func NewFakeOperationsOptions(ns, cName string, opsType appsv1alpha1.OpsType, ob
 		types.ClusterGVR():          types.KindCluster + "List",
 		types.ConfigConstraintGVR(): types.KindConfigConstraint + "List",
 		types.BackupGVR():           types.KindBackup + "List",
-		types.RestoreJobGVR():       types.KindRestoreJob + "List",
+		types.RestoreGVR():          types.KindRestore + "List",
 		types.OpsGVR():              types.KindOps + "List",
 	}
 	baseOptions.Dynamic = dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, listMapping, objs...)

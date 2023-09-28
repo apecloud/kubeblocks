@@ -33,7 +33,7 @@ type MockStatefulSetFactory struct {
 
 func NewStatefulSetFactory(namespace, name string, clusterName string, componentName string) *MockStatefulSetFactory {
 	f := &MockStatefulSetFactory{}
-	f.init(namespace, name,
+	f.Init(namespace, name,
 		&appsv1.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
@@ -68,12 +68,12 @@ func NewStatefulSetFactory(namespace, name string, clusterName string, component
 }
 
 func (factory *MockStatefulSetFactory) SetReplicas(replicas int32) *MockStatefulSetFactory {
-	factory.get().Spec.Replicas = &replicas
+	factory.Get().Spec.Replicas = &replicas
 	return factory
 }
 
 func (factory *MockStatefulSetFactory) AddVolume(volume corev1.Volume) *MockStatefulSetFactory {
-	volumes := &factory.get().Spec.Template.Spec.Volumes
+	volumes := &factory.Get().Spec.Template.Spec.Volumes
 	*volumes = append(*volumes, volume)
 	return factory
 }
@@ -92,13 +92,13 @@ func (factory *MockStatefulSetFactory) AddConfigmapVolume(volumeName string, con
 }
 
 func (factory *MockStatefulSetFactory) AddVolumeClaimTemplate(pvc corev1.PersistentVolumeClaim) *MockStatefulSetFactory {
-	volumeClaimTpls := &factory.get().Spec.VolumeClaimTemplates
+	volumeClaimTpls := &factory.Get().Spec.VolumeClaimTemplates
 	*volumeClaimTpls = append(*volumeClaimTpls, pvc)
 	return factory
 }
 
 func (factory *MockStatefulSetFactory) AddContainer(container corev1.Container) *MockStatefulSetFactory {
-	containers := &factory.get().Spec.Template.Spec.Containers
+	containers := &factory.Get().Spec.Template.Spec.Containers
 	*containers = append(*containers, container)
 	return factory
 }

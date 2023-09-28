@@ -9,14 +9,14 @@ spec:
   clusterDefinitionRef: weaviate
   backupPolicies:
   - componentDefRef: weaviate
-    retention:
-      ttl: 7d
-    schedule:
-      snapshot:
-        enable: false
-        cronExpression: "0 18 * * 0"
-    snapshot:
-      target:
-        connectionCredentialKey:
-          passwordKey: password
-          usernameKey: username
+    retentionPeriod: 7d
+    backupMethods:
+    - name: volume-snapshot
+      snapshotVolumes: true
+      targetVolumes:
+        volumes:
+        - data
+    schedules:
+    - backupMethod: volume-snapshot
+      enabled: false
+      cronExpression: "0 18 * * 0"

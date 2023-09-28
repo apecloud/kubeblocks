@@ -34,7 +34,7 @@ type MockRSMFactory struct {
 
 func NewRSMFactory(namespace, name string, clusterName string, componentName string) *MockRSMFactory {
 	f := &MockRSMFactory{}
-	f.init(namespace, name,
+	f.Init(namespace, name,
 		&workloads.ReplicatedStateMachine{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
@@ -69,12 +69,12 @@ func NewRSMFactory(namespace, name string, clusterName string, componentName str
 }
 
 func (factory *MockRSMFactory) SetReplicas(replicas int32) *MockRSMFactory {
-	factory.get().Spec.Replicas = &replicas
+	factory.Get().Spec.Replicas = &replicas
 	return factory
 }
 
 func (factory *MockRSMFactory) AddVolume(volume corev1.Volume) *MockRSMFactory {
-	volumes := &factory.get().Spec.Template.Spec.Volumes
+	volumes := &factory.Get().Spec.Template.Spec.Volumes
 	*volumes = append(*volumes, volume)
 	return factory
 }
@@ -93,13 +93,13 @@ func (factory *MockRSMFactory) AddConfigmapVolume(volumeName string, configmapNa
 }
 
 func (factory *MockRSMFactory) AddVolumeClaimTemplate(pvc corev1.PersistentVolumeClaim) *MockRSMFactory {
-	volumeClaimTpls := &factory.get().Spec.VolumeClaimTemplates
+	volumeClaimTpls := &factory.Get().Spec.VolumeClaimTemplates
 	*volumeClaimTpls = append(*volumeClaimTpls, pvc)
 	return factory
 }
 
 func (factory *MockRSMFactory) AddContainer(container corev1.Container) *MockRSMFactory {
-	containers := &factory.get().Spec.Template.Spec.Containers
+	containers := &factory.Get().Spec.Template.Spec.Containers
 	*containers = append(*containers, container)
 	return factory
 }

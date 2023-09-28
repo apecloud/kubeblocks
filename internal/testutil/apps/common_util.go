@@ -77,7 +77,7 @@ func ChangeObjStatus[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *t
 	return testCtx.Cli.Status().Patch(testCtx.Ctx, pobj, patch)
 }
 
-// Helper functions to get object, change its fields in input closure and update it.
+// Helper functions to Get object, change its fields in input closure and update it.
 // Each helper is a wrapper of client.Get and client.Patch.
 // Each helper returns a Gomega assertion function, which should be passed into
 // Eventually() or Consistently() as the first parameter.
@@ -154,7 +154,7 @@ func CheckObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil
 
 func List[T intctrlutil.Object, PT intctrlutil.PObject[T],
 	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
-	testCtx *testutil.TestContext, _ func(T, L), opt ...client.ListOption) func(gomega.Gomega) []T {
+	testCtx *testutil.TestContext, _ func(T, PT, L, PL), opt ...client.ListOption) func(gomega.Gomega) []T {
 	return func(g gomega.Gomega) []T {
 		var objList L
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, PL(&objList), opt...)).To(gomega.Succeed())
@@ -290,7 +290,7 @@ func DeleteObject[T intctrlutil.Object, PT intctrlutil.PObject[T]](
 // ClearResources clears all resources of the given type T satisfying the input ListOptions.
 func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
-	testCtx *testutil.TestContext, funcSig func(T, L), opts ...client.DeleteAllOfOption) {
+	testCtx *testutil.TestContext, funcSig func(T, PT, L, PL), opts ...client.DeleteAllOfOption) {
 	ClearResourcesWithRemoveFinalizerOption[T, PT, L, PL](testCtx, funcSig, false, opts...)
 }
 
@@ -298,7 +298,7 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 // removeFinalizer specifier, and satisfying the input ListOptions.
 func ClearResourcesWithRemoveFinalizerOption[T intctrlutil.Object, PT intctrlutil.PObject[T],
 	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
-	testCtx *testutil.TestContext, _ func(T, L), removeFinalizer bool, opts ...client.DeleteAllOfOption) {
+	testCtx *testutil.TestContext, _ func(T, PT, L, PL), removeFinalizer bool, opts ...client.DeleteAllOfOption) {
 	var (
 		obj     T
 		objList L

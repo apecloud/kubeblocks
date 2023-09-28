@@ -24,7 +24,6 @@ import (
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -35,9 +34,9 @@ type FakeClusterVersions struct {
 	Fake *FakeAppsV1alpha1
 }
 
-var clusterversionsResource = schema.GroupVersionResource{Group: "apps.kubeblocks.io", Version: "v1alpha1", Resource: "clusterversions"}
+var clusterversionsResource = v1alpha1.SchemeGroupVersion.WithResource("clusterversions")
 
-var clusterversionsKind = schema.GroupVersionKind{Group: "apps.kubeblocks.io", Version: "v1alpha1", Kind: "ClusterVersion"}
+var clusterversionsKind = v1alpha1.SchemeGroupVersion.WithKind("ClusterVersion")
 
 // Get takes name of the clusterVersion, and returns the corresponding clusterVersion object, and an error if there is any.
 func (c *FakeClusterVersions) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ClusterVersion, err error) {

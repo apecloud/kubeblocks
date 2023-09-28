@@ -1,6 +1,6 @@
 # Build client images for mysql and postgres to support datascripts
-# Use alpine with tag 20230329 is corresponding to "edge" tag (latest release to date is 3.18) as of 20230625
-FROM docker.io/alpine:edge as dist
+# The latest release to date is 3.18) as of 20230625
+FROM docker.io/alpine:3.18 as dist
 # ARG APK_MIRROR
 
 # install tools via apk
@@ -12,6 +12,8 @@ RUN apk add --no-cache jq --allow-untrusted
 RUN apk add --no-cache postgresql-client --allow-untrusted
 
 RUN apk add --no-cache mysql-client mariadb-connector-c --allow-untrusted
+
+RUN apk add redis
 RUN rm -rf /var/cache/apk/*
 
 USER 65532:65532

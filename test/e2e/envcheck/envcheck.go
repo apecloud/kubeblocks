@@ -26,7 +26,7 @@ import (
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 
 	. "github.com/apecloud/kubeblocks/test/e2e"
 )
@@ -71,7 +71,7 @@ func EnvGotCleanedTest() {
 
 func CheckNoKubeBlocksCRDs() {
 	apiGroups := []string{
-		dataprotectionv1alpha1.GroupVersion.Group,
+		dpv1alpha1.GroupVersion.Group,
 		appsv1alpha1.GroupVersion.Group,
 	}
 

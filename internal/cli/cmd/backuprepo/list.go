@@ -31,7 +31,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -103,9 +103,9 @@ func printBackupRepoList(o *listBackupRepoOptions) error {
 		return nil
 	}
 
-	backupRepos := make([]*dataprotectionv1alpha1.BackupRepo, 0)
+	backupRepos := make([]*dpv1alpha1.BackupRepo, 0)
 	for _, info := range infos {
-		backupRepo := &dataprotectionv1alpha1.BackupRepo{}
+		backupRepo := &dpv1alpha1.BackupRepo{}
 		obj := info.Object.(*unstructured.Unstructured)
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, backupRepo); err != nil {
 			return err

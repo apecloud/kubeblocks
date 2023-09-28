@@ -24,13 +24,17 @@ import (
 	"reflect"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 )
 
 // TODO(component): type check
 
 func BuildComponentDefinitionFrom(clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
-	clusterCompVer *appsv1alpha1.ClusterComponentVersion) (*appsv1alpha1.ComponentDefinition, error) {
+	clusterCompVer *appsv1alpha1.ClusterComponentVersion, clusterName string) (*appsv1alpha1.ComponentDefinition, error) {
 	if clusterCompDef == nil {
 		return nil, nil
 	}
@@ -57,7 +61,7 @@ func BuildComponentDefinitionFrom(clusterCompDef *appsv1alpha1.ClusterComponentD
 		"servicerefdeclarations": &serviceRefDeclarationConvertor{},
 	}
 	compDef := &appsv1alpha1.ComponentDefinition{}
-	if err := covertObject(convertors, &compDef.Spec, clusterCompDef, clusterCompVer); err != nil {
+	if err := covertObject(convertors, &compDef.Spec, clusterCompDef, clusterCompVer, clusterName); err != nil {
 		return nil, err
 	}
 	return compDef, nil
@@ -150,11 +154,21 @@ type runtimeConvertor struct{}
 
 func (c *runtimeConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	// TODO: cluster version definition
+	clusterCompVer := args[1].(*appsv1alpha1.ClusterComponentVersion)
 	if clusterCompDef.PodSpec == nil {
 		return nil, fmt.Errorf("no pod spec")
 	}
-	return *clusterCompDef.PodSpec, nil
+
+	podSpec := *clusterCompDef.PodSpec
+	if clusterCompVer != nil {
+		for _, container := range clusterCompVer.VersionsCtx.InitContainers {
+			podSpec.InitContainers = appendOrOverrideContainerAttr(podSpec.InitContainers, container)
+		}
+		for _, container := range clusterCompVer.VersionsCtx.Containers {
+			podSpec.Containers = appendOrOverrideContainerAttr(podSpec.Containers, container)
+		}
+	}
+	return podSpec, nil
 }
 
 type volumeConvertor struct{}
@@ -194,15 +208,55 @@ func (c *volumeConvertor) convert(args ...any) (any, error) {
 type serviceConvertor struct{}
 
 func (c *serviceConvertor) convert(args ...any) (any, error) {
-	// clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return "", nil // TODO
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	clusterName := args[2].(string)
+	if clusterCompDef.Service == nil {
+		return nil, nil
+	}
+
+	svcName := fmt.Sprintf("%s-%s", clusterName, clusterCompDef.Name)
+	svc := builder.NewServiceBuilder("", svcName).
+		SetType(corev1.ServiceTypeClusterIP).
+		AddPorts(clusterCompDef.Service.ToSVCSpec().Ports...).
+		GetObject()
+
+	headlessSvcName := fmt.Sprintf("%s-headless", svcName)
+	headlessSvcBuilder := builder.NewHeadlessServiceBuilder("", headlessSvcName).
+		AddPorts(clusterCompDef.Service.ToSVCSpec().Ports...)
+	if clusterCompDef.PodSpec != nil {
+		for _, container := range clusterCompDef.PodSpec.Containers {
+			headlessSvcBuilder = headlessSvcBuilder.AddContainerPorts(container.Ports...)
+		}
+	}
+	headlessSvc := headlessSvcBuilder.GetObject()
+
+	services := []appsv1alpha1.ComponentService{
+		{
+			Name:         "default",
+			ServiceName:  appsv1alpha1.BuiltInString(svc.Name),
+			ServiceSpec:  svc.Spec,
+			RoleSelector: []string{}, // TODO(component): service selector
+		},
+		{
+			Name:         "default-headless",
+			ServiceName:  appsv1alpha1.BuiltInString(headlessSvc.Name),
+			ServiceSpec:  headlessSvc.Spec,
+			RoleSelector: []string{}, // TODO(component): service selector
+		},
+	}
+	return services, nil
 }
 
 type configConvertor struct{}
 
 func (c *configConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.ConfigSpecs, nil
+	clusterCompVer := args[1].(*appsv1alpha1.ClusterComponentVersion)
+	if clusterCompVer == nil {
+		return clusterCompDef.ConfigSpecs, nil
+	} else {
+		return cfgcore.MergeConfigTemplates(clusterCompVer.ConfigSpecs, clusterCompDef.ConfigSpecs), nil
+	}
 }
 
 type logConfigConvertor struct{}
@@ -248,15 +302,29 @@ func (c *labelConvertor) convert(args ...any) (any, error) {
 type systemAccountConvertor struct{}
 
 func (c *systemAccountConvertor) convert(args ...any) (any, error) {
-	// clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return "", nil // TODO
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	if clusterCompDef.SystemAccounts == nil {
+		return nil, nil
+	}
+
+	accounts := make([]appsv1alpha1.ComponentSystemAccount, 0)
+	for _, account := range clusterCompDef.SystemAccounts.Accounts {
+		accounts = append(accounts, appsv1alpha1.ComponentSystemAccount{
+			Name:                     string(account.Name),
+			PasswordGenerationPolicy: clusterCompDef.SystemAccounts.PasswordConfig,
+			SecretRef:                account.ProvisionPolicy.SecretRef,
+		})
+		if account.ProvisionPolicy.Statements != nil {
+			accounts[len(accounts)-1].Statement = account.ProvisionPolicy.Statements.CreationStatement
+		}
+	}
+	return accounts, nil
 }
 
 type connectionCredentialConvertor struct{}
 
 func (c *connectionCredentialConvertor) convert(args ...any) (any, error) {
-	// clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return "", nil // TODO
+	return nil, nil
 }
 
 type updateStrategyConvertor struct{}
@@ -342,8 +410,76 @@ func (c *roleArbitratorConvertor) convert(args ...any) (any, error) {
 type lifecycleActionConvertor struct{}
 
 func (c *lifecycleActionConvertor) convert(args ...any) (any, error) {
-	// clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return "", nil // TODO
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	clusterCompVer := args[1].(*appsv1alpha1.ClusterComponentVersion)
+
+	lifecycleActions := &appsv1alpha1.ComponentLifecycleActions{}
+
+	if clusterCompDef.Probes != nil && clusterCompDef.Probes.RoleProbe != nil {
+		lifecycleActions.RoleProbe = c.convertRoleProbe(clusterCompDef.Probes.RoleProbe)
+	}
+
+	if clusterCompDef.SwitchoverSpec != nil {
+		lifecycleActions.Switchover = c.convertSwitchover(clusterCompDef.SwitchoverSpec, clusterCompVer)
+	}
+
+	lifecycleActions.MemberJoin = nil
+	lifecycleActions.MemberLeave = nil
+	lifecycleActions.Readonly = nil
+	lifecycleActions.Readwrite = nil
+	lifecycleActions.DataPopulate = nil
+	lifecycleActions.DataAssemble = nil
+	lifecycleActions.Reconfigure = nil
+	lifecycleActions.AccountProvision = nil
+
+	return lifecycleActions, nil // TODO
+}
+
+func (c *lifecycleActionConvertor) convertRoleProbe(probe *appsv1alpha1.ClusterDefinitionProbe) *corev1.Probe {
+	if probe.Commands == nil || len(probe.Commands.Writes) == 0 || len(probe.Commands.Queries) == 0 {
+		return nil
+	}
+	commands := probe.Commands.Writes
+	if len(probe.Commands.Writes) == 0 {
+		commands = probe.Commands.Queries
+	}
+	return &corev1.Probe{
+		ProbeHandler: corev1.ProbeHandler{
+			Exec: &corev1.ExecAction{
+				Command: commands,
+			},
+		},
+		TimeoutSeconds:   probe.TimeoutSeconds,
+		PeriodSeconds:    probe.PeriodSeconds,
+		FailureThreshold: probe.FailureThreshold,
+	}
+}
+
+func (c *lifecycleActionConvertor) convertSwitchover(switchover *appsv1alpha1.SwitchoverSpec,
+	clusterCompVer *appsv1alpha1.ClusterComponentVersion) *appsv1alpha1.Action {
+	spec := *switchover
+	if clusterCompVer != nil {
+		overrideSwitchoverSpecAttr(&spec, clusterCompVer.SwitchoverSpec)
+	}
+	if spec.WithCandidate == nil && spec.WithoutCandidate == nil {
+		return nil
+	}
+
+	// TODO(component): how to support ScriptSpec?
+	action := spec.WithoutCandidate
+	if action == nil {
+		action = spec.WithCandidate
+	}
+	if action.CmdExecutorConfig == nil {
+		return nil
+	}
+	return &appsv1alpha1.Action{
+		Image: action.CmdExecutorConfig.Image,
+		Exec: &corev1.ExecAction{
+			Command: action.CmdExecutorConfig.Command, // TODO(component): + action.CmdExecutorConfig.Args
+		},
+		Env: action.CmdExecutorConfig.Env,
+	}
 }
 
 type serviceRefDeclarationConvertor struct{}

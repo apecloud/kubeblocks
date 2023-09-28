@@ -437,7 +437,11 @@ func (mgr *Manager) executeRewind(ctx context.Context) error {
 	}
 
 	err := mgr.checkArchiveReadyWal(ctx)
-	return err
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (mgr *Manager) checkArchiveReadyWal(ctx context.Context) error {

@@ -54,7 +54,7 @@ const (
 	DefaultRedisCompSpecName      = "redis-rsts"
 	DefaultRedisImageName         = "redis:7.0.5"
 	DefaultRedisContainerName     = "redis"
-	DefaultRedisInitContainerName = "redis-Init-container"
+	DefaultRedisInitContainerName = "redis-init-container"
 
 	Class1c1gName                 = "general-1c1g"
 	Class2c4gName                 = "general-2c4g"
@@ -271,7 +271,7 @@ var (
 		Image:           DefaultRedisImageName,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		VolumeMounts:    defaultReplicationRedisVolumeMounts,
-		Command:         []string{"/scripts/Init.sh"},
+		Command:         []string{"/scripts/init.sh"},
 		Resources:       zeroResRequirements,
 	}
 

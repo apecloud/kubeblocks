@@ -350,20 +350,6 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	// err = (&dpctrl.RestoreJobReconciler{
-	//	Client:   k8sManager.GetClient(),
-	//	Scheme:   k8sManager.GetScheme(),
-	//	Recorder: k8sManager.GetEventRecorderFor("restore-job-controller"),
-	// }).SetupWithManager(k8sManager)
-	// Expect(err).ToNot(HaveOccurred())
-
-	// err = (&dpctrl.CronJobReconciler{
-	// 	Client:   k8sManager.GetClient(),
-	// 	Scheme:   k8sManager.GetScheme(),
-	// 	Recorder: k8sManager.GetEventRecorderFor("cronjob-controller"),
-	// }).SetupWithManager(k8sManager)
-	// Expect(err).ToNot(HaveOccurred())
-
 	// pulling docker images is slow
 	viper.SetDefault("EventuallyTimeout", time.Second*300)
 	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)

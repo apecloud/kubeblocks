@@ -77,7 +77,7 @@ func ChangeObjStatus[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *t
 	return testCtx.Cli.Status().Patch(testCtx.Ctx, pobj, patch)
 }
 
-// Helper functions to Get object, change its fields in input closure and update it.
+// Helper functions to get object, change its fields in input closure and update it.
 // Each helper is a wrapper of client.Get and client.Patch.
 // Each helper returns a Gomega assertion function, which should be passed into
 // Eventually() or Consistently() as the first parameter.

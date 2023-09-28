@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -908,24 +909,17 @@ func (o *describeBackupPolicyOptions) printBackupPolicyObj(obj *dpv1alpha1.Backu
 	realPrintPairStringToLine("Name", obj.Name)
 	realPrintPairStringToLine("Cluster", obj.Labels[constant.AppInstanceLabelKey])
 	realPrintPairStringToLine("Namespace", obj.Namespace)
-	realPrintPairStringToLine("Default", obj.GetAnnotations()[constant.DefaultBackupPolicyAnnotationKey])
+	if obj.Spec.BackupRepoName != nil {
+		realPrintPairStringToLine("Backup Repo Name", *obj.Spec.BackupRepoName)
+	}
 
-	printer.PrintLine("\nDatafile:")
-	realPrintPairStringToLine("Backup Tool Name", obj.Spec.Datafile.BackupToolName)
-	realPrintPairStringToLine("History Limit", fmt.Sprintf("%d", obj.Spec.Datafile.BackupsHistoryLimit))
-	realPrintPairStringToLine("Cron Expression", obj.Spec.Schedule.Datafile.CronExpression)
-	realPrintPairStringToLine("Enable", fmt.Sprintf("%t", obj.Spec.Schedule.Datafile.Enable))
-
-	printer.PrintLine("\nLogfile:")
-	realPrintPairStringToLine("Backup Tool Name", obj.Spec.Logfile.BackupToolName)
-	realPrintPairStringToLine("History Limit", fmt.Sprintf("%d", obj.Spec.Logfile.BackupsHistoryLimit))
-	realPrintPairStringToLine("Cron Expression", obj.Spec.Schedule.Logfile.CronExpression)
-	realPrintPairStringToLine("Enable", fmt.Sprintf("%t", obj.Spec.Schedule.Logfile.Enable))
-
-	printer.PrintLine("\nSnapshot:")
-	realPrintPairStringToLine("History Limit", fmt.Sprintf("%d", obj.Spec.Snapshot.BackupsHistoryLimit))
-	realPrintPairStringToLine("Cron Expression", obj.Spec.Schedule.Snapshot.CronExpression)
-	realPrintPairStringToLine("Enable", fmt.Sprintf("%t", obj.Spec.Schedule.Snapshot.Enable))
+	printer.PrintLine("\nBackup Methods:")
+	for _, v := range obj.Spec.BackupMethods {
+		realPrintPairStringToLine("Name", v.Name)
+		realPrintPairStringToLine("ActionSet Name", v.ActionSetName)
+		realPrintPairStringToLine("SnapshotVolumes", strconv.FormatBool(*v.SnapshotVolumes))
+		printer.PrintLine("\n")
+	}
 
 	return nil
 }

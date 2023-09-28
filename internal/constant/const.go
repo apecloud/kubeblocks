@@ -123,7 +123,7 @@ const (
 	OpsRequestAnnotationKey                     = "kubeblocks.io/ops-request"                // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
 	ReconcileAnnotationKey                      = "kubeblocks.io/reconcile"                  // ReconcileAnnotationKey Notify k8s object to reconcile
 	RestartAnnotationKey                        = "kubeblocks.io/restart"                    // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
-	RestoreFromBackUpAnnotationKey              = "kubeblocks.io/restore-from-backup"        // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
+	RestoreFromBackupAnnotationKey              = "kubeblocks.io/restore-from-backup"        // RestoreFromBackupAnnotationKey specifies the component to recover from the backup.
 	SnapShotForStartAnnotationKey               = "kubeblocks.io/snapshot-for-start"
 	ComponentReplicasAnnotationKey              = "apps.kubeblocks.io/component-replicas" // ComponentReplicasAnnotationKey specifies the number of pods in replicas
 	BackupPolicyTemplateAnnotationKey           = "apps.kubeblocks.io/backup-policy-template"

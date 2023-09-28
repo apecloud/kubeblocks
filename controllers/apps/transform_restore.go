@@ -54,7 +54,7 @@ func (t *RestoreTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 		return err
 	}
 	for _, spec := range cluster.Spec.ComponentSpecs {
-		if cluster.Annotations[constant.RestoreFromBackUpAnnotationKey] == "" {
+		if cluster.Annotations[constant.RestoreFromBackupAnnotationKey] == "" {
 			continue
 		}
 

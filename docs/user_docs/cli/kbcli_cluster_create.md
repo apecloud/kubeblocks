@@ -116,7 +116,7 @@ kbcli cluster create [NAME] [flags]
       --termination-policy string              Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
       --tolerations strings                    Tolerations for cluster, such as "key=value:effect, key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'
       --topology-keys stringArray              Topology keys for affinity
-      --volume-restore-policy string           the volume claim restore policy, supported values: [OrderedReady, Parallel] (default "Parallel")
+      --volume-restore-policy string           the volume claim restore policy, supported values: [Serial, Parallel] (default "Parallel")
 ```
 
 ### Options inherited from parent commands

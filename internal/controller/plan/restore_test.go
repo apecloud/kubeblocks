@@ -219,7 +219,7 @@ var _ = Describe("PITR Functions", func() {
 			restoreFromBackup := fmt.Sprintf(`{"%s": {"name":"%s"}}`, mysqlCompName, backup.Name)
 			Expect(testapps.ChangeObj(&testCtx, cluster, func(tmpCluster *appsv1alpha1.Cluster) {
 				tmpCluster.Annotations = map[string]string{
-					constant.RestoreFromBackUpAnnotationKey: restoreFromBackup,
+					constant.RestoreFromBackupAnnotationKey: restoreFromBackup,
 				}
 			})).Should(Succeed())
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
@@ -261,7 +261,7 @@ var _ = Describe("PITR Functions", func() {
 			By("clean up annotations after cluster running")
 			_ = restoreMGR.DoRestore(synthesizedComponent)
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackUpAnnotationKey]).Should(BeEmpty())
+				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackupAnnotationKey]).Should(BeEmpty())
 			})).Should(Succeed())
 		})
 

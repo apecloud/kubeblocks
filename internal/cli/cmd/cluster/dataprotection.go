@@ -472,7 +472,7 @@ func (o *CreateRestoreOptions) runRestoreFromBackup() error {
 	clusterObj.ObjectMeta = metav1.ObjectMeta{
 		Namespace:   clusterObj.Namespace,
 		Name:        o.Name,
-		Annotations: map[string]string{constant.RestoreFromBackUpAnnotationKey: restoreAnnotation},
+		Annotations: map[string]string{constant.RestoreFromBackupAnnotationKey: restoreAnnotation},
 	}
 	return o.createCluster(clusterObj)
 }
@@ -543,7 +543,7 @@ func NewCreateRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	}
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Backup name")
 	cmd.Flags().StringVar(&o.RestoreTimeStr, "restore-to-time", "", "point in time recovery(PITR)")
-	cmd.Flags().StringVar(&o.RestoreManagementPolicy, "volume-restore-policy", "Parallel", "the volume claim restore policy, supported values: [OrderedReady, Parallel]")
+	cmd.Flags().StringVar(&o.RestoreManagementPolicy, "volume-restore-policy", "Parallel", "the volume claim restore policy, supported values: [Serial, Parallel]")
 	return cmd
 }
 

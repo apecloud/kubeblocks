@@ -82,7 +82,6 @@ type BackupConfig struct {
 }
 
 type RestoreKubeResources struct {
-
 	// will restore the specified resources
 	IncludeResources []IncludeResource `json:"included,omitempty"`
 
@@ -100,7 +99,6 @@ type IncludeResource struct {
 }
 
 type PrepareDataConfig struct {
-
 	// dataSourceRef describes the configuration when using `persistentVolumeClaim.spec.dataSourceRef` method for restoring.
 	// it describes the source volume of the backup targetVolumes and how to mount path in the restoring container.
 	// +kubebuilder:validation:XValidation:rule="self.volumeSource != '' || self.mountPath !=''",message="at least one exists for volumeSource and mountPath."
@@ -126,7 +124,7 @@ type PrepareDataConfig struct {
 
 	// VolumeClaimManagementPolicy defines recovery strategy for persistent volume claim. supported policies are as follows:
 	// 1. Parallel: parallel recovery of persistent volume claim.
-	// 2. OrderedReady: restore the persistent volume claim in sequence, and wait until the previous persistent volume claim is restored before restoring a new one.
+	// 2. Serial: restore the persistent volume claim in sequence, and wait until the previous persistent volume claim is restored before restoring a new one.
 	// +kubebuilder:default=Parallel
 	// +kubebuilder:validation:Required
 	VolumeClaimManagementPolicy VolumeClaimManagementPolicy `json:"volumeClaimManagementPolicy"`
@@ -138,7 +136,6 @@ type PrepareDataConfig struct {
 }
 
 type ReadyConfig struct {
-
 	// configuration for job action.
 	// +optional
 	JobAction *JobAction `json:"jobAction,omitempty"`
@@ -172,7 +169,6 @@ type ExecAction struct {
 }
 
 type ExecActionTarget struct {
-
 	// kubectl exec in all selected pods.
 	// +kubebuilder:validation:Required
 	PodSelector metav1.LabelSelector `json:"podSelector"`
@@ -191,7 +187,6 @@ type JobActionTarget struct {
 }
 
 type VolumeConfig struct {
-
 	// volumeSource describes the volume will be restored from the specified volume of the backup targetVolumes.
 	// required if the backup uses volume snapshot.
 	// +optional
@@ -203,7 +198,6 @@ type VolumeConfig struct {
 }
 
 type RestoreVolumeClaim struct {
-
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +kubebuilder:validation:Required
@@ -296,7 +290,6 @@ type ConnectCredential struct {
 }
 
 type ReadinessProbe struct {
-
 	// number of seconds after the container has started before probe is initiated.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
@@ -334,7 +327,6 @@ type ReadinessProbeExecAction struct {
 }
 
 type RestoreStatusActions struct {
-
 	// record the actions for prepareData phase.
 	// +patchMergeKey=jobName
 	// +patchStrategy=merge,retainKeys
@@ -349,7 +341,6 @@ type RestoreStatusActions struct {
 }
 
 type RestoreStatusAction struct {
-
 	// name describes the name of the recovery action based on the current backup.
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
@@ -439,9 +430,9 @@ type RestoreList struct {
 func init() {
 	SchemeBuilder.Register(&Restore{}, &RestoreList{})
 }
-func (p *PrepareDataConfig) IsOrderedReadyPolicy() bool {
+func (p *PrepareDataConfig) IsSerialPolicy() bool {
 	if p == nil {
 		return false
 	}
-	return p.VolumeClaimManagementPolicy == OrderedReadyManagementPolicy
+	return p.VolumeClaimManagementPolicy == SerialManagementPolicy
 }

@@ -553,6 +553,6 @@ func (r *SystemAccountReconciler) jobCompletionHandler() *handler.Funcs {
 // existsOperations checks if the cluster is doing operations
 func existsOperations(cluster *appsv1alpha1.Cluster) bool {
 	opsRequestMap, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
-	_, isRestoring := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]
+	_, isRestoring := cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
 	return len(opsRequestMap) > 0 || isRestoring
 }

@@ -1435,12 +1435,12 @@ spec:
                     description: 'VolumeClaimManagementPolicy defines recovery strategy
                       for persistent volume claim. supported policies are as follows:
                       1. Parallel: parallel recovery of persistent volume claim. 2.
-                      OrderedReady: restore the persistent volume claim in sequence,
-                      and wait until the previous persistent volume claim is restored
+                      Serial: restore the persistent volume claim in sequence, and
+                      wait until the previous persistent volume claim is restored
                       before restoring a new one.'
                     enum:
                     - Parallel
-                    - OrderedReady
+                    - Serial
                     type: string
                   volumeClaims:
                     description: volumeClaims defines the persistent Volume claims

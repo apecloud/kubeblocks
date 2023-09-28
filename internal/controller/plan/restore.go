@@ -274,7 +274,7 @@ func (r *RestoreManager) existVolumeSource(targetVolumes *dpv1alpha1.TargetVolum
 }
 
 func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.SynthesizedComponent) (*dpv1alpha1.Backup, error) {
-	valueString := r.Cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]
+	valueString := r.Cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
 	if len(valueString) == 0 {
 		return nil, nil
 	}
@@ -330,7 +330,7 @@ func (r *RestoreManager) cleanupClusterAnnotations() error {
 	if r.Cluster.Status.Phase == appsv1alpha1.RunningClusterPhase && r.Cluster.Annotations != nil {
 		cluster := r.Cluster
 		patch := client.MergeFrom(cluster.DeepCopy())
-		delete(cluster.Annotations, constant.RestoreFromBackUpAnnotationKey)
+		delete(cluster.Annotations, constant.RestoreFromBackupAnnotationKey)
 		return r.Client.Patch(r.Ctx, cluster, patch)
 	}
 	return nil

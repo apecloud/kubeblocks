@@ -266,7 +266,7 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 		claimsTemplate     = prepareDataConfig.RestoreVolumeClaimsTemplate
 	)
 
-	if prepareDataConfig.IsOrderedReadyPolicy() {
+	if prepareDataConfig.IsSerialPolicy() {
 		// obtain the PVC serial number that needs to be restored
 		currentOrder := 1
 		prepareActions := r.Restore.Status.Actions.PrepareData
@@ -276,8 +276,8 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 			}
 			if prepareActions[i].Status == dpv1alpha1.RestoreActionCompleted && currentOrder < restoreJobReplicas {
 				currentOrder += 1
-				if prepareDataConfig.IsOrderedReadyPolicy() {
-					// if the restore policy is OrderedReady, should delete the completed job s release the pvc.
+				if prepareDataConfig.IsSerialPolicy() {
+					// if the restore policy is Serial, should delete the completed job to release the pvc.
 					if err := deleteRestoreJob(reqCtx, cli, prepareActions[i].ObjectKey, r.Restore.Namespace); err != nil {
 						return nil, err
 					}
@@ -304,9 +304,9 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 		}
 		// build job and append
 		job := jobBuilder.build(i)
-		if prepareDataConfig.IsOrderedReadyPolicy() &&
+		if prepareDataConfig.IsSerialPolicy() &&
 			restoreJobHasCompleted(r.Restore.Status.Actions.PrepareData, job.Name) {
-			// if the job has completed and the restore policy is OrderedReady, continue
+			// if the job has completed and the restore policy is Serial, continue
 			continue
 		}
 		restoreJobs = append(restoreJobs, job)
@@ -491,12 +491,12 @@ func (r *RestoreManager) CheckJobsDone(
 // Recalculation whether all actions have been completed.
 func (r *RestoreManager) Recalculation(backupName, actionName string, allActionsFinished, existFailedAction *bool) {
 	prepareDataConfig := r.Restore.Spec.PrepareDataConfig
-	if !prepareDataConfig.IsOrderedReadyPolicy() {
+	if !prepareDataConfig.IsSerialPolicy() {
 		return
 	}
 
 	if *existFailedAction {
-		// under the OrderedReady policy, restore will be failed if any action is failed.
+		// under the Serial policy, restore will be failed if any action is failed.
 		*allActionsFinished = true
 		return
 	}

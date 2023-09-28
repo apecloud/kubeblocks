@@ -2336,7 +2336,7 @@ var _ = Describe("Cluster Controller", func() {
 				AddComponent(compName, compDefName).
 				SetReplicas(int32(replicas)).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-				AddAnnotations(constant.RestoreFromBackUpAnnotationKey, restoreFromBackup).Create(&testCtx).GetObject()
+				AddAnnotations(constant.RestoreFromBackupAnnotationKey, restoreFromBackup).Create(&testCtx).GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 			// mock pvcs have restored
@@ -2381,7 +2381,7 @@ var _ = Describe("Cluster Controller", func() {
 				g.Expect(tmpCluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
 				// mock postReady restore completed
 				mockRestoreCompleted(ml)
-				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackUpAnnotationKey]).Should(BeEmpty())
+				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackupAnnotationKey]).Should(BeEmpty())
 			})).Should(Succeed())
 		})
 	})

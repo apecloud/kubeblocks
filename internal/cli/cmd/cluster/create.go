@@ -229,7 +229,7 @@ type CreateOptions struct {
 	// backup name to restore in creation
 	Backup                  string `json:"backup,omitempty"`
 	RestoreTime             string `json:"restoreTime,omitempty"`
-	RestoreManagementPolicy string `json:"restoreManagementPolicy,omitempty"`
+	RestoreManagementPolicy string `json:"-"`
 
 	// backup config
 	BackupConfig *appsv1alpha1.ClusterBackup `json:"backupConfig,omitempty"`
@@ -262,7 +262,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().StringArrayVar(&o.Storages, "pvc", []string{}, "Set the cluster detail persistent volume claim, each '--pvc' corresponds to a component, and will override the simple configurations about storage by --set (e.g. --pvc type=mysql,name=data,mode=ReadWriteOnce,size=20Gi --pvc type=mysql,name=log,mode=ReadWriteOnce,size=1Gi)")
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 	cmd.Flags().StringVar(&o.RestoreTime, "restore-to-time", "", "Set a time for point in time recovery")
-	cmd.Flags().StringVar(&o.RestoreManagementPolicy, "volume-restore-policy", "Parallel", "the volume claim restore policy, supported values: [OrderedReady, Parallel]")
+	cmd.Flags().StringVar(&o.RestoreManagementPolicy, "volume-restore-policy", "Parallel", "the volume claim restore policy, supported values: [Serial, Parallel]")
 	cmd.Flags().BoolVar(&o.RBACEnabled, "rbac-enabled", false, "Specify whether rbac resources will be created by kbcli, otherwise KubeBlocks server will try to create rbac resources")
 	cmd.PersistentFlags().BoolVar(&o.EditBeforeCreate, "edit", o.EditBeforeCreate, "Edit the API resource before creating")
 	cmd.PersistentFlags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
@@ -428,7 +428,7 @@ func setBackup(o *CreateOptions, components []map[string]interface{}) error {
 	if o.Annotations == nil {
 		o.Annotations = map[string]string{}
 	}
-	o.Annotations[constant.RestoreFromBackUpAnnotationKey] = restoreAnnotation
+	o.Annotations[constant.RestoreFromBackupAnnotationKey] = restoreAnnotation
 	return nil
 }
 

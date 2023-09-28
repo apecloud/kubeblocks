@@ -25,7 +25,7 @@ kbcli cluster restore [flags]
       --backup string                  Backup name
   -h, --help                           help for restore
       --restore-to-time string         point in time recovery(PITR)
-      --volume-restore-policy string   the volume claim restore policy, supported values: [OrderedReady, Parallel] (default "Parallel")
+      --volume-restore-policy string   the volume claim restore policy, supported values: [Serial, Parallel] (default "Parallel")
 ```
 
 ### Options inherited from parent commands

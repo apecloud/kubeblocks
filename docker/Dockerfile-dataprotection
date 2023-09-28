@@ -26,12 +26,11 @@ ENV GOPROXY=${GOPROXY}
 
 WORKDIR /src
 # Copy the Go Modules manifests
-#COPY go.mod go.mod
-#COPY go.sum go.sum
+COPY go.mod go.mod
+COPY go.sum go.sum
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
-RUN --mount=type=bind,target=. \
-    --mount=type=cache,target=/go/pkg/mod \
+RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
 # Copy the go source

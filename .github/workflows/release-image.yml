@@ -54,7 +54,7 @@ jobs:
     needs: image-tag
     uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.24
     with:
-      MAKE_OPS_PRE: "generate test-go-generate"
+      MAKE_OPS_PRE: "module generate test-go-generate"
       IMG: "apecloud/kubeblocks-tools"
       VERSION: "${{ needs.image-tag.outputs.tag-name }}"
       GO_VERSION: "1.21"

@@ -40,7 +40,7 @@ spec:
           - name: mysql-container
             imagePullPolicy: IfNotPresent
             volumeMounts:
-              - mountPath: /var/lib/mysql
+              - mountPath: {{ .Values.dataMountPath }}
                 name: data
               - mountPath: /etc/mysql/conf.d
                 name: configs

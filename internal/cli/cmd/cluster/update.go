@@ -43,7 +43,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/patch"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -547,23 +547,19 @@ func (o *updateOptions) updateBackupRetentionPeriod(val string) error {
 		return nil
 	}
 
-	// judge whether val end with the 'd'|'D'|'h'|'H' character
+	// judge whether val end with the 'd'|'h' character
 	lastChar := val[len(val)-1]
-	if lastChar != 'd' && lastChar != 'D' && lastChar != 'h' && lastChar != 'H' {
-		return fmt.Errorf("invalid retention period: %s, only support d|D|h|H", val)
+	if lastChar != 'd' && lastChar != 'h' {
+		return fmt.Errorf("invalid retention period: %s, only support d|h", val)
 	}
 
-	o.cluster.Spec.Backup.RetentionPeriod = &val
+	o.cluster.Spec.Backup.RetentionPeriod = dpv1alpha1.RetentionPeriod(val)
 	return nil
 }
 
 func (o *updateOptions) updateBackupMethod(val string) error {
-	method := dataprotectionv1alpha1.BackupMethod(val)
-	if method != dataprotectionv1alpha1.BackupMethodSnapshot && method != dataprotectionv1alpha1.BackupMethodBackupTool {
-		return fmt.Errorf("invalid backup method: %s, only support %s and %s", val,
-			dataprotectionv1alpha1.BackupMethodSnapshot, dataprotectionv1alpha1.BackupMethodBackupTool)
-	}
-	o.cluster.Spec.Backup.Method = dataprotectionv1alpha1.BackupMethod(val)
+	// TODO(ldm): validate backup method are defined in the backup policy.
+	o.cluster.Spec.Backup.Method = val
 	return nil
 }
 

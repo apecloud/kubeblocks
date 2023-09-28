@@ -33,7 +33,7 @@ type MockDeploymentFactory struct {
 
 func NewDeploymentFactory(namespace, name, clusterName, componentName string) *MockDeploymentFactory {
 	f := &MockDeploymentFactory{}
-	f.init(namespace, name,
+	f.Init(namespace, name,
 		&appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
@@ -65,17 +65,17 @@ func NewDeploymentFactory(namespace, name, clusterName, componentName string) *M
 }
 
 func (factory *MockDeploymentFactory) SetMinReadySeconds(minReadySeconds int32) *MockDeploymentFactory {
-	factory.get().Spec.MinReadySeconds = minReadySeconds
+	factory.Get().Spec.MinReadySeconds = minReadySeconds
 	return factory
 }
 
 func (factory *MockDeploymentFactory) SetReplicas(replicas int32) *MockDeploymentFactory {
-	factory.get().Spec.Replicas = &replicas
+	factory.Get().Spec.Replicas = &replicas
 	return factory
 }
 
 func (factory *MockDeploymentFactory) AddVolume(volume corev1.Volume) *MockDeploymentFactory {
-	volumes := &factory.get().Spec.Template.Spec.Volumes
+	volumes := &factory.Get().Spec.Template.Spec.Volumes
 	*volumes = append(*volumes, volume)
 	return factory
 }
@@ -94,7 +94,7 @@ func (factory *MockDeploymentFactory) AddConfigmapVolume(volumeName, configmapNa
 }
 
 func (factory *MockDeploymentFactory) AddContainer(container corev1.Container) *MockDeploymentFactory {
-	containers := &factory.get().Spec.Template.Spec.Containers
+	containers := &factory.Get().Spec.Template.Spec.Containers
 	*containers = append(*containers, container)
 	return factory
 }

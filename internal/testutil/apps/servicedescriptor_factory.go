@@ -32,7 +32,7 @@ type MockServiceDescriptorFactory struct {
 
 func NewServiceDescriptorFactory(namespace, name string) *MockServiceDescriptorFactory {
 	f := &MockServiceDescriptorFactory{}
-	f.init(namespace, name,
+	f.Init(namespace, name,
 		&appsv1alpha1.ServiceDescriptor{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
@@ -46,26 +46,26 @@ func NewServiceDescriptorFactory(namespace, name string) *MockServiceDescriptorF
 }
 
 func (factory *MockServiceDescriptorFactory) SetServiceKind(serviceKind string) *MockServiceDescriptorFactory {
-	factory.get().Spec.ServiceKind = serviceKind
+	factory.Get().Spec.ServiceKind = serviceKind
 	return factory
 }
 
 func (factory *MockServiceDescriptorFactory) SetServiceVersion(serviceVersion string) *MockServiceDescriptorFactory {
-	factory.get().Spec.ServiceVersion = serviceVersion
+	factory.Get().Spec.ServiceVersion = serviceVersion
 	return factory
 }
 
 func (factory *MockServiceDescriptorFactory) SetEndpoint(endpoint appsv1alpha1.CredentialVar) *MockServiceDescriptorFactory {
-	factory.get().Spec.Endpoint = &endpoint
+	factory.Get().Spec.Endpoint = &endpoint
 	return factory
 }
 
 func (factory *MockServiceDescriptorFactory) SetPort(port appsv1alpha1.CredentialVar) *MockServiceDescriptorFactory {
-	factory.get().Spec.Port = &port
+	factory.Get().Spec.Port = &port
 	return factory
 }
 
 func (factory *MockServiceDescriptorFactory) SetAuth(auth appsv1alpha1.ConnectionCredentialAuth) *MockServiceDescriptorFactory {
-	factory.get().Spec.Auth = &auth
+	factory.Get().Spec.Auth = &auth
 	return factory
 }

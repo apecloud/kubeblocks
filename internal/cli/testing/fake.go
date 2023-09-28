@@ -44,6 +44,8 @@ import (
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
+	"github.com/apecloud/kubeblocks/internal/dataprotection/utils/boolptr"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -62,7 +64,9 @@ const (
 	KubeBlocksRepoName  = "fake-kubeblocks-repo"
 	KubeBlocksChartName = "fake-kubeblocks"
 	KubeBlocksChartURL  = "fake-kubeblocks-chart-url"
-	BackupToolName      = "fake-backup-tool"
+	BackupMethodName    = "fake-backup-method"
+	ActionSetName       = "fake-action-set"
+	BackupName          = "fake-backup-name"
 
 	IsDefault    = true
 	IsNotDefault = false
@@ -356,14 +360,13 @@ func FakeClusterVersion() *appsv1alpha1.ClusterVersion {
 	return cv
 }
 
-func FakeBackupTool() *dpv1alpha1.BackupTool {
-	tool := &dpv1alpha1.BackupTool{}
-	tool.Name = BackupToolName
-	return tool
+func FakeActionSet() *dpv1alpha1.ActionSet {
+	as := &dpv1alpha1.ActionSet{}
+	as.Name = ActionSetName
+	return as
 }
 
 func FakeBackupPolicy(backupPolicyName, clusterName string) *dpv1alpha1.BackupPolicy {
-	ttl := "7d"
 	template := &dpv1alpha1.BackupPolicy{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPAPIVersion),
@@ -376,51 +379,30 @@ func FakeBackupPolicy(backupPolicyName, clusterName string) *dpv1alpha1.BackupPo
 				constant.AppInstanceLabelKey: clusterName,
 			},
 			Annotations: map[string]string{
-				constant.DefaultBackupPolicyAnnotationKey: "true",
+				dptypes.DefaultBackupPolicyAnnotationKey: "true",
 			},
 		},
 		Spec: dpv1alpha1.BackupPolicySpec{
-			Snapshot: &dpv1alpha1.SnapshotPolicy{
-				BasePolicy: dpv1alpha1.BasePolicy{
-					BackupsHistoryLimit: 1,
+			BackupMethods: []dpv1alpha1.BackupMethod{
+				{
+					Name:            BackupMethodName,
+					SnapshotVolumes: boolptr.False(),
+					ActionSetName:   ActionSetName,
 				},
 			},
-			Datafile: &dpv1alpha1.CommonBackupPolicy{
-				BasePolicy: dpv1alpha1.BasePolicy{
-					BackupsHistoryLimit: 1,
+			Target: &dpv1alpha1.BackupTarget{
+				PodSelector: &dpv1alpha1.PodSelector{
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							constant.AppInstanceLabelKey:    ClusterName,
+							constant.KBAppComponentLabelKey: ComponentName,
+							constant.AppManagedByLabelKey:   constant.AppName},
+					},
 				},
-				PersistentVolumeClaim: dpv1alpha1.PersistentVolumeClaim{
-					Name: pointer.String("test1"),
-				},
-			},
-			Logfile: &dpv1alpha1.CommonBackupPolicy{
-				BasePolicy: dpv1alpha1.BasePolicy{
-					BackupsHistoryLimit: 1,
-				},
-				PersistentVolumeClaim: dpv1alpha1.PersistentVolumeClaim{
-					Name: pointer.String("test1"),
-				},
-			},
-			Schedule: dpv1alpha1.Schedule{
-				Snapshot: &dpv1alpha1.SchedulePolicy{
-					Enable:         false,
-					CronExpression: "0 18 * * *",
-				},
-				Datafile: &dpv1alpha1.SchedulePolicy{
-					Enable:         false,
-					CronExpression: "0 18 * * *",
-				},
-				Logfile: &dpv1alpha1.SchedulePolicy{
-					Enable:         false,
-					CronExpression: "* */1 * * *",
-				},
-			},
-			Retention: &dpv1alpha1.RetentionSpec{
-				TTL: &ttl,
 			},
 		},
 		Status: dpv1alpha1.BackupPolicyStatus{
-			Phase: dpv1alpha1.PolicyAvailable,
+			Phase: dpv1alpha1.AvailablePhase,
 		},
 	}
 	return template
@@ -451,8 +433,8 @@ func FakeBackupWithCluster(cluster *appsv1alpha1.Cluster, backupName string) *dp
 			Name:      backupName,
 			Namespace: Namespace,
 			Labels: map[string]string{
-				constant.AppInstanceLabelKey:              cluster.Name,
-				constant.DataProtectionLabelClusterUIDKey: string(cluster.UID),
+				constant.AppInstanceLabelKey:             cluster.Name,
+				dptypes.DataProtectionLabelClusterUIDKey: string(cluster.UID),
 			},
 		},
 	}
@@ -1025,7 +1007,7 @@ func FakeBackupRepo(name string, isDefault bool) *dpv1alpha1.BackupRepo {
 	}
 	if isDefault {
 		backupRepo.Annotations = map[string]string{
-			constant.DefaultBackupRepoAnnotationKey: "true",
+			dptypes.DefaultBackupRepoAnnotationKey: "true",
 		}
 	}
 	return backupRepo

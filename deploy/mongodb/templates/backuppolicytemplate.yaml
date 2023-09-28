@@ -9,37 +9,36 @@ spec:
   clusterDefinitionRef: mongodb
   backupPolicies:
   - componentDefRef: mongodb
-    retention:
-      ttl: 7d
-    schedule:
-      startingDeadlineMinutes: 120
-      snapshot:
-        enable: false
-        cronExpression: "0 18 * * *"
-      datafile:
-        enable: false
-        cronExpression: "0 18 * * *"
-      logfile:
-        enable: false
-        cronExpression: "*/1 * * * *"
-    snapshot:
-      target:
-        role: primary
-      hooks:
-        containerName: mongodb
-        preCommands:
-        - "touch /data/mongodb/db/mongodb.backup; sync"
-        postCommands:
-        - "rm -f /data/mongodb/db/mongodb.backup; sync"
-    datafile:
-      backupToolName: mongodb-dump-tool
-      backupsHistoryLimit: 7
-      target:
-        role: primary
-      backupStatusUpdates:
-      - updateStage: post
-        useTargetPodServiceAccount: true
-    logfile:
-      backupToolName: mongodb-pitr-backup-tool
-      target:
-        role: primary
+    retentionPeriod: 7d
+    target:
+      role: follower
+    backupMethods:
+    - name: datafile
+      snapshotVolumes: false
+      actionSetName: mongodb-physical-backup
+      targetVolumes:
+        volumeMounts:
+        - name: data
+          mountPath: {{ .Values.dataMountPath }}
+    - name: volume-snapshot
+      snapshotVolumes: true
+      actionSetName: mongodb-volumesnapshot
+      targetVolumes:
+        volumes:
+        - data
+        volumeMounts:
+        - name: data
+          mountPath: {{ .Values.dataMountPath }}
+    - name: dump
+      snapshotVolumes: false
+      actionSetName: mongodb-dump
+    schedules:
+    - backupMethod: datafile
+      enabled: false
+      cronExpression: "0 18 * * *"
+    - backupMethod: volume-snapshot
+      enabled: false
+      cronExpression: "0 18 * * *"
+    - backupMethod: dump
+      enabled: false
+      cronExpression: "0 18 * * *"

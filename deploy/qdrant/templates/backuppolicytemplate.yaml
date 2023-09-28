@@ -9,16 +9,24 @@ spec:
   clusterDefinitionRef: qdrant
   backupPolicies:
   - componentDefRef: qdrant
-    retention:
-      ttl: 7d
-    schedule:
-      snapshot:
-        enable: false
-        cronExpression: "0 18 * * 0"
-    snapshot:
-      target:
-        connectionCredentialKey:
-          passwordKey: password
-          usernameKey: username
-    datafile:
-      backupToolName: qdrant-snapshot
+    retentionPeriod: 7d
+    backupMethods:
+    - name: datafile
+      snapshotVolumes: false
+      actionSetName: qdrant-snapshot
+      targetVolumes:
+        volumeMounts:
+        - name: data
+          mountPath: {{ .Values.dataMountPath }}
+    - name: volume-snapshot
+      snapshotVolumes: true
+      targetVolumes:
+        volumes:
+        - data
+    schedules:
+    - backupMethod: datafile
+      enabled: false
+      cronExpression: "0 18 * * 0"
+    - backupMethod: volume-snapshot
+      enabled: false
+      cronExpression: "0 18 * * 0"

@@ -32,7 +32,7 @@ type MockComponentClassDefinitionFactory struct {
 
 func NewComponentClassDefinitionFactory(name, clusterDefinitionRef, componentType string) *MockComponentClassDefinitionFactory {
 	f := &MockComponentClassDefinitionFactory{}
-	f.init("", name, &appsv1alpha1.ComponentClassDefinition{
+	f.Init("", name, &appsv1alpha1.ComponentClassDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
@@ -46,7 +46,7 @@ func NewComponentClassDefinitionFactory(name, clusterDefinitionRef, componentTyp
 }
 
 func (factory *MockComponentClassDefinitionFactory) AddClasses(classes []appsv1alpha1.ComponentClass) *MockComponentClassDefinitionFactory {
-	groups := factory.get().Spec.Groups
+	groups := factory.Get().Spec.Groups
 	groups = append(groups, appsv1alpha1.ComponentClassGroup{
 		Series: []appsv1alpha1.ComponentClassSeries{
 			{
@@ -54,6 +54,6 @@ func (factory *MockComponentClassDefinitionFactory) AddClasses(classes []appsv1a
 			},
 		},
 	})
-	factory.get().Spec.Groups = groups
+	factory.Get().Spec.Groups = groups
 	return factory
 }

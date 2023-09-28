@@ -54,19 +54,18 @@ func (t *RestoreTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 		return err
 	}
 	for _, spec := range cluster.Spec.ComponentSpecs {
+		if cluster.Annotations[constant.RestoreFromBackupAnnotationKey] == "" {
+			continue
+		}
+
 		comp, err := components.NewComponent(reqCtx, t.Client, clusterDef, clusterVer, cluster, spec.Name, nil)
 		if err != nil {
 			return err
 		}
 		syncComp := comp.GetSynthesizedComponent()
-		if cluster.Annotations[constant.RestoreFromBackUpAnnotationKey] != "" {
-			if err = plan.DoRestore(reqCtx.Ctx, t.Client, cluster, syncComp, rscheme); err != nil {
-				return commitError(err)
-			}
-		} else if cluster.Annotations[constant.RestoreFromTimeAnnotationKey] != "" {
-			if err = plan.DoPITR(reqCtx.Ctx, t.Client, cluster, syncComp, rscheme); err != nil {
-				return commitError(err)
-			}
+		restoreMGR := plan.NewRestoreManager(reqCtx.Ctx, t.Client, cluster, rscheme, nil, syncComp.Replicas, 0)
+		if err = restoreMGR.DoRestore(syncComp); err != nil {
+			return commitError(err)
 		}
 	}
 	return nil

@@ -34,7 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -447,21 +446,6 @@ var _ = Describe("builder", func() {
 			Expect(configmap.SecurityContext).ShouldNot(BeNil())
 			Expect(configmap.SecurityContext.RunAsUser).ShouldNot(BeNil())
 			Expect(*configmap.SecurityContext.RunAsUser).Should(BeEquivalentTo(int64(0)))
-		})
-
-		It("builds backup manifests job correctly", func() {
-			backup := &dataprotectionv1alpha1.Backup{}
-			podSpec := &corev1.PodSpec{
-				Containers: []corev1.Container{
-					{
-						Command: []string{"sh"},
-					},
-				},
-			}
-			key := types.NamespacedName{Name: "backup", Namespace: "default"}
-			job := BuildBackupManifestsJob(key, backup, podSpec)
-			Expect(job).ShouldNot(BeNil())
-			Expect(job.Name).Should(Equal(key.Name))
 		})
 
 		It("builds restore job correctly", func() {

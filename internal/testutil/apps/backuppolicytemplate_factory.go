@@ -20,195 +20,120 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	corev1 "k8s.io/api/core/v1"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
 type MockBackupPolicyTemplateFactory struct {
 	BaseFactory[appsv1alpha1.BackupPolicyTemplate, *appsv1alpha1.BackupPolicyTemplate, MockBackupPolicyTemplateFactory]
-	backupType dataprotectionv1alpha1.BackupType
 }
 
 func NewBackupPolicyTemplateFactory(name string) *MockBackupPolicyTemplateFactory {
 	f := &MockBackupPolicyTemplateFactory{}
-	f.init("", name,
+	f.Init("", name,
 		&appsv1alpha1.BackupPolicyTemplate{},
 		f)
 	return f
 }
 
-func (factory *MockBackupPolicyTemplateFactory) SetClusterDefRef(clusterDefRef string) *MockBackupPolicyTemplateFactory {
-	factory.get().Spec.ClusterDefRef = clusterDefRef
-	return factory
+func (f *MockBackupPolicyTemplateFactory) SetClusterDefRef(clusterDefRef string) *MockBackupPolicyTemplateFactory {
+	f.Get().Spec.ClusterDefRef = clusterDefRef
+	return f
 }
 
-func (factory *MockBackupPolicyTemplateFactory) getLastBackupPolicy() *appsv1alpha1.BackupPolicy {
-	l := len(factory.get().Spec.BackupPolicies)
+func (f *MockBackupPolicyTemplateFactory) getLastBackupPolicy() *appsv1alpha1.BackupPolicy {
+	l := len(f.Get().Spec.BackupPolicies)
 	if l == 0 {
 		return nil
 	}
-	backupPolicies := factory.get().Spec.BackupPolicies
+	backupPolicies := f.Get().Spec.BackupPolicies
 	return &backupPolicies[l-1]
 }
 
-func (factory *MockBackupPolicyTemplateFactory) AddBackupPolicy(componentDef string) *MockBackupPolicyTemplateFactory {
-	factory.get().Spec.BackupPolicies = append(factory.get().Spec.BackupPolicies, appsv1alpha1.BackupPolicy{
+func (f *MockBackupPolicyTemplateFactory) getLastBackupMethod() *dpv1alpha1.BackupMethod {
+	backupPolicy := f.getLastBackupPolicy()
+	l := len(backupPolicy.BackupMethods)
+	if l == 0 {
+		return nil
+	}
+	backupMethods := backupPolicy.BackupMethods
+	return &backupMethods[l-1]
+}
+
+func (f *MockBackupPolicyTemplateFactory) AddBackupPolicy(componentDef string) *MockBackupPolicyTemplateFactory {
+	f.Get().Spec.BackupPolicies = append(f.Get().Spec.BackupPolicies, appsv1alpha1.BackupPolicy{
 		ComponentDefRef: componentDef,
 	})
-	return factory
+	return f
 }
 
-func (factory *MockBackupPolicyTemplateFactory) SetTTL(duration string) *MockBackupPolicyTemplateFactory {
-	factory.getLastBackupPolicy().Retention = &appsv1alpha1.RetentionSpec{
-		TTL: &duration,
-	}
-	return factory
+func (f *MockBackupPolicyTemplateFactory) SetRetentionPeriod(duration string) *MockBackupPolicyTemplateFactory {
+	f.getLastBackupPolicy().RetentionPeriod = dpv1alpha1.RetentionPeriod(duration)
+	return f
 }
 
-func (factory *MockBackupPolicyTemplateFactory) setBasePolicyField(setField func(basePolicy *appsv1alpha1.BasePolicy)) {
-	backupPolicy := factory.getLastBackupPolicy()
-	var basePolicy *appsv1alpha1.BasePolicy
-	switch factory.backupType {
-	case dataprotectionv1alpha1.BackupTypeDataFile:
-		basePolicy = &backupPolicy.Datafile.BasePolicy
-	case dataprotectionv1alpha1.BackupTypeLogFile:
-		basePolicy = &backupPolicy.Logfile.BasePolicy
-	case dataprotectionv1alpha1.BackupTypeSnapshot:
-		basePolicy = &backupPolicy.Snapshot.BasePolicy
-	}
-	if basePolicy == nil {
+func (f *MockBackupPolicyTemplateFactory) setBackupPolicyField(setField func(backupPolicy *appsv1alpha1.BackupPolicy)) {
+	backupPolicy := f.getLastBackupPolicy()
+	if backupPolicy == nil {
 		// ignore
 		return
 	}
-	setField(basePolicy)
+	setField(backupPolicy)
 }
 
-func (factory *MockBackupPolicyTemplateFactory) setCommonPolicyField(setField func(commonPolicy *appsv1alpha1.CommonBackupPolicy)) {
-	backupPolicy := factory.getLastBackupPolicy()
-	var commonPolicy *appsv1alpha1.CommonBackupPolicy
-	switch factory.backupType {
-	case dataprotectionv1alpha1.BackupTypeDataFile:
-		commonPolicy = backupPolicy.Datafile
-	case dataprotectionv1alpha1.BackupTypeLogFile:
-		commonPolicy = backupPolicy.Logfile
+func (f *MockBackupPolicyTemplateFactory) AddSchedule(method, schedule string, enable bool) *MockBackupPolicyTemplateFactory {
+	schedulePolicy := appsv1alpha1.SchedulePolicy{
+		Enabled:        &enable,
+		CronExpression: schedule,
+		BackupMethod:   method,
 	}
-	if commonPolicy == nil {
-		// ignore
-		return
+	backupPolicy := f.getLastBackupPolicy()
+	backupPolicy.Schedules = append(backupPolicy.Schedules, schedulePolicy)
+	return f
+}
+
+func (f *MockBackupPolicyTemplateFactory) AddBackupMethod(name string,
+	snapshotVolumes bool, actionSetName string) *MockBackupPolicyTemplateFactory {
+	backupPolicy := f.getLastBackupPolicy()
+	backupPolicy.BackupMethods = append(backupPolicy.BackupMethods,
+		dpv1alpha1.BackupMethod{
+			Name:            name,
+			SnapshotVolumes: &snapshotVolumes,
+			ActionSetName:   actionSetName,
+			TargetVolumes:   &dpv1alpha1.TargetVolumeInfo{},
+		})
+	return f
+}
+
+func (f *MockBackupPolicyTemplateFactory) SetBackupMethodVolumes(names []string) *MockBackupPolicyTemplateFactory {
+	backupMethod := f.getLastBackupMethod()
+	backupMethod.TargetVolumes.Volumes = names
+	return f
+}
+
+func (f *MockBackupPolicyTemplateFactory) SetBackupMethodVolumeMounts(keyAndValues ...string) *MockBackupPolicyTemplateFactory {
+	var volumeMounts []corev1.VolumeMount
+	for k, v := range WithMap(keyAndValues...) {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      k,
+			MountPath: v,
+		})
 	}
-	setField(commonPolicy)
+	backupMethod := f.getLastBackupMethod()
+	backupMethod.TargetVolumes.VolumeMounts = volumeMounts
+	return f
 }
 
-func (factory *MockBackupPolicyTemplateFactory) setScheduleField(setField func(schedulePolicy *appsv1alpha1.SchedulePolicy)) {
-	backupPolicy := factory.getLastBackupPolicy()
-	var schedulePolicy *appsv1alpha1.SchedulePolicy
-	switch factory.backupType {
-	case dataprotectionv1alpha1.BackupTypeSnapshot:
-		backupPolicy.Schedule.Snapshot = &appsv1alpha1.SchedulePolicy{}
-		schedulePolicy = backupPolicy.Schedule.Snapshot
-	case dataprotectionv1alpha1.BackupTypeDataFile:
-		backupPolicy.Schedule.Datafile = &appsv1alpha1.SchedulePolicy{}
-		schedulePolicy = backupPolicy.Schedule.Datafile
-	case dataprotectionv1alpha1.BackupTypeLogFile:
-		backupPolicy.Schedule.Logfile = &appsv1alpha1.SchedulePolicy{}
-		schedulePolicy = backupPolicy.Schedule.Logfile
-	}
-	if schedulePolicy == nil {
-		// ignore
-		return
-	}
-	setField(schedulePolicy)
-}
-
-func (factory *MockBackupPolicyTemplateFactory) AddSnapshotPolicy() *MockBackupPolicyTemplateFactory {
-	backupPolicy := factory.getLastBackupPolicy()
-	backupPolicy.Snapshot = &appsv1alpha1.SnapshotPolicy{
-		Hooks: &appsv1alpha1.BackupPolicyHook{},
-	}
-	factory.backupType = dataprotectionv1alpha1.BackupTypeSnapshot
-	return factory
-}
-
-func (factory *MockBackupPolicyTemplateFactory) AddDatafilePolicy() *MockBackupPolicyTemplateFactory {
-	backupPolicy := factory.getLastBackupPolicy()
-	backupPolicy.Datafile = &appsv1alpha1.CommonBackupPolicy{}
-	factory.backupType = dataprotectionv1alpha1.BackupTypeDataFile
-	return factory
-}
-
-func (factory *MockBackupPolicyTemplateFactory) AddIncrementalPolicy() *MockBackupPolicyTemplateFactory {
-	backupPolicy := factory.getLastBackupPolicy()
-	backupPolicy.Logfile = &appsv1alpha1.CommonBackupPolicy{}
-	factory.backupType = dataprotectionv1alpha1.BackupTypeLogFile
-	return factory
-}
-
-func (factory *MockBackupPolicyTemplateFactory) SetHookContainerName(containerName string) *MockBackupPolicyTemplateFactory {
-	backupPolicy := factory.getLastBackupPolicy()
-	if backupPolicy.Snapshot == nil {
-		return factory
-	}
-	backupPolicy.Snapshot.Hooks.ContainerName = containerName
-	return factory
-}
-
-func (factory *MockBackupPolicyTemplateFactory) AddHookPreCommand(preCommand string) *MockBackupPolicyTemplateFactory {
-	backupPolicy := factory.getLastBackupPolicy()
-	if backupPolicy.Snapshot == nil {
-		return factory
-	}
-	preCommands := &backupPolicy.Snapshot.Hooks.PreCommands
-	*preCommands = append(*preCommands, preCommand)
-	return factory
-}
-
-func (factory *MockBackupPolicyTemplateFactory) AddHookPostCommand(postCommand string) *MockBackupPolicyTemplateFactory {
-	backupPolicy := factory.getLastBackupPolicy()
-	if backupPolicy.Snapshot == nil {
-		return factory
-	}
-	postCommands := &backupPolicy.Snapshot.Hooks.PostCommands
-	*postCommands = append(*postCommands, postCommand)
-	return factory
-}
-
-func (factory *MockBackupPolicyTemplateFactory) SetSchedule(schedule string, enable bool) *MockBackupPolicyTemplateFactory {
-	factory.setScheduleField(func(schedulePolicy *appsv1alpha1.SchedulePolicy) {
-		schedulePolicy.Enable = enable
-		schedulePolicy.CronExpression = schedule
+func (f *MockBackupPolicyTemplateFactory) SetTargetRole(role string) *MockBackupPolicyTemplateFactory {
+	f.setBackupPolicyField(func(backupPolicy *appsv1alpha1.BackupPolicy) {
+		backupPolicy.Target.Role = role
 	})
-	return factory
+	return f
 }
 
-func (factory *MockBackupPolicyTemplateFactory) SetBackupsHistoryLimit(backupsHistoryLimit int32) *MockBackupPolicyTemplateFactory {
-	factory.setBasePolicyField(func(basePolicy *appsv1alpha1.BasePolicy) {
-		basePolicy.BackupsHistoryLimit = backupsHistoryLimit
-	})
-	return factory
-}
-
-func (factory *MockBackupPolicyTemplateFactory) SetBackupToolName(backupToolName string) *MockBackupPolicyTemplateFactory {
-	factory.setCommonPolicyField(func(commonPolicy *appsv1alpha1.CommonBackupPolicy) {
-		commonPolicy.BackupToolName = backupToolName
-	})
-	return factory
-}
-
-func (factory *MockBackupPolicyTemplateFactory) SetTargetRole(role string) *MockBackupPolicyTemplateFactory {
-	factory.setBasePolicyField(func(basePolicy *appsv1alpha1.BasePolicy) {
-		basePolicy.Target.Role = role
-	})
-	return factory
-}
-
-func (factory *MockBackupPolicyTemplateFactory) SetTargetAccount(account string) *MockBackupPolicyTemplateFactory {
-	factory.setBasePolicyField(func(basePolicy *appsv1alpha1.BasePolicy) {
-		basePolicy.Target.Account = account
-	})
-	return factory
-}
-
-func (factory *MockBackupPolicyTemplateFactory) SetLabels(labels map[string]string) *MockBackupPolicyTemplateFactory {
-	factory.get().SetLabels(labels)
-	return factory
+func (f *MockBackupPolicyTemplateFactory) SetLabels(labels map[string]string) *MockBackupPolicyTemplateFactory {
+	f.Get().SetLabels(labels)
+	return f
 }

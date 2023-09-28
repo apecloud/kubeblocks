@@ -37,6 +37,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
@@ -210,7 +211,7 @@ parameters:
 				dataProtectionBackupRepoKey:          repoKey.Name,
 				dataProtectionWaitRepoPreparationKey: trueVal,
 			}
-			obj.Spec.BackupType = dpv1alpha1.BackupTypeSnapshot
+			obj.Spec.BackupMethod = "test-backup-method"
 			obj.Spec.BackupPolicyName = "default"
 			if mutateFunc != nil {
 				mutateFunc(obj)
@@ -222,11 +223,11 @@ parameters:
 				obj := &dpv1alpha1.Backup{}
 				err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(backup), obj)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				if obj.Status.Phase == dpv1alpha1.BackupFailed {
+				if obj.Status.Phase == dpv1alpha1.BackupPhaseFailed {
 					// the controller will set the status to failed because
 					// essential objects (e.g. backup policy) are missed.
 					// we set the status to completed after that, to avoid conflict.
-					obj.Status.Phase = dpv1alpha1.BackupCompleted
+					obj.Status.Phase = dpv1alpha1.BackupPhaseCompleted
 					err = testCtx.Cli.Status().Update(testCtx.Ctx, obj)
 					g.Expect(err).ShouldNot(HaveOccurred())
 				} else {
@@ -880,7 +881,7 @@ new-item=new-value
 			By("making the repo default")
 			Eventually(testapps.GetAndChangeObj(&testCtx, repoKey, func(repo *dpv1alpha1.BackupRepo) {
 				repo.Annotations = map[string]string{
-					constant.DefaultBackupRepoAnnotationKey: trueVal,
+					dptypes.DefaultBackupRepoAnnotationKey: trueVal,
 				}
 			})).Should(Succeed())
 			By("checking the repo is default")

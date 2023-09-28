@@ -112,11 +112,11 @@ kbcli cluster create [NAME] [flags]
       --restore-to-time string                 Set a time for point in time recovery
       --set stringArray                        Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)
   -f, --set-file string                        Use yaml file, URL, or stdin to set the cluster resource
-      --source-cluster string                  Set a source cluster for point in time recovery
       --tenancy string                         Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
       --termination-policy string              Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
       --tolerations strings                    Tolerations for cluster, such as "key=value:effect, key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'
       --topology-keys stringArray              Topology keys for affinity
+      --volume-restore-policy string           the volume claim restore policy, supported values: [Serial, Parallel] (default "Parallel")
 ```
 
 ### Options inherited from parent commands

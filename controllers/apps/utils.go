@@ -87,3 +87,9 @@ func boolValue(b *bool) bool {
 	}
 	return *b
 }
+
+func mergeMap(dst, src map[string]string) {
+	for key, val := range src {
+		dst[key] = val
+	}
+}

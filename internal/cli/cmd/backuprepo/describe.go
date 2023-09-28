@@ -34,7 +34,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -111,7 +111,7 @@ func (o *describeBackupRepoOptions) run() error {
 		if err != nil {
 			return err
 		}
-		backupRepo := &dataprotectionv1alpha1.BackupRepo{}
+		backupRepo := &dpv1alpha1.BackupRepo{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(backupRepoObj.Object, backupRepo); err != nil {
 			return err
 		}
@@ -123,7 +123,7 @@ func (o *describeBackupRepoOptions) run() error {
 	return nil
 }
 
-func (o *describeBackupRepoOptions) printBackupRepo(backupRepo *dataprotectionv1alpha1.BackupRepo) error {
+func (o *describeBackupRepoOptions) printBackupRepo(backupRepo *dpv1alpha1.BackupRepo) error {
 	printer.PrintLine("Summary:")
 	printer.PrintPairStringToLine("Name", backupRepo.Name)
 	printer.PrintPairStringToLine("Provider", backupRepo.Spec.StorageProviderRef)
@@ -153,7 +153,7 @@ func (o *describeBackupRepoOptions) printBackupRepo(backupRepo *dataprotectionv1
 	return nil
 }
 
-func countBackupNumsAndSize(dynamic dynamic.Interface, backupRepo *dataprotectionv1alpha1.BackupRepo) (int, string, error) {
+func countBackupNumsAndSize(dynamic dynamic.Interface, backupRepo *dpv1alpha1.BackupRepo) (int, string, error) {
 	var size uint64
 	count := 0
 
@@ -166,12 +166,12 @@ func countBackupNumsAndSize(dynamic dynamic.Interface, backupRepo *dataprotectio
 	count = len(backupList.Items)
 
 	for _, obj := range backupList.Items {
-		backup := &dataprotectionv1alpha1.Backup{}
+		backup := &dpv1alpha1.Backup{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, backup); err != nil {
 			return count, humanize.Bytes(size), err
 		}
 		// if backup doesn't complete, we don't count it's size
-		if backup.Status.Phase != dataprotectionv1alpha1.BackupCompleted {
+		if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
 			continue
 		}
 		backupSize, err := humanize.ParseBytes(backup.Status.TotalSize)

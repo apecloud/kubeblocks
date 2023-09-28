@@ -293,7 +293,7 @@ var _ = Describe("Component utils test", func() {
 				SetOwnerReferences("apps/v1", constant.StatefulSetKind, nil).
 				AddAppInstanceLabel(clusterName).
 				AddAppComponentLabel(compName).
-				AddAppManangedByLabel().
+				AddAppManagedByLabel().
 				AddRoleLabel(role).
 				AddConsensusSetAccessModeLabel(mode).
 				AddControllerRevisionHashLabel("").

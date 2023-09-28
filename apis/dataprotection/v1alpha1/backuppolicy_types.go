@@ -101,17 +101,21 @@ const (
 type ConnectionCredential struct {
 	// secretName refers to the Secret object that contains the connection credential.
 	// +kube:validation:Required
-	SecretName string `json:"secretName,omitempty"`
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	SecretName string `json:"secretName"`
 
 	// usernameKey specifies the map key of the user in the connection credential secret.
+	// +kubebuilder:validation:Required
 	// +kubebuilder:default=username
-	UsernameKey string `json:"usernameKey,omitempty"`
+	UsernameKey string `json:"usernameKey"`
 
 	// passwordKey specifies the map key of the password in the connection credential secret.
+	// +kubebuilder:validation:Required
 	// +kubebuilder:default=password
-	PasswordKey string `json:"passwordKey,omitempty"`
+	PasswordKey string `json:"passwordKey"`
 
 	// hostKey specifies the map key of the host in the connection credential secret.
+	// +kubebuilder:default=host
 	HostKey string `json:"hostKey,omitempty"`
 
 	// portKey specifies the map key of the port in the connection credential secret.

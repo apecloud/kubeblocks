@@ -2016,33 +2016,34 @@ spec:
               readyConfig:
                 description: configuration for the action of "postReady" phase.
                 properties:
-                  connectCredential:
+                  connectionCredential:
                     description: credential template used for creating a connection
                       credential
                     properties:
                       hostKey:
                         default: host
-                        description: hostKey the map key of the host in the connection
-                          credential secret
+                        description: hostKey specifies the map key of the host in
+                          the connection credential secret.
                         type: string
                       passwordKey:
                         default: password
-                        description: passwordKey the map key of the password in the
-                          connection credential secret
+                        description: passwordKey specifies the map key of the password
+                          in the connection credential secret.
                         type: string
                       portKey:
                         default: port
-                        description: portKey the map key of the port in the connection
-                          credential secret
+                        description: portKey specifies the map key of the port in
+                          the connection credential secret.
                         type: string
                       secretName:
-                        description: the secret name
+                        description: secretName refers to the Secret object that contains
+                          the connection credential.
                         pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                       usernameKey:
                         default: username
-                        description: usernameKey the map key of the user in the connection
-                          credential secret
+                        description: usernameKey specifies the map key of the user
+                          in the connection credential secret.
                         type: string
                     required:
                     - passwordKey

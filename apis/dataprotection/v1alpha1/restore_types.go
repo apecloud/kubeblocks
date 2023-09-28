@@ -146,7 +146,7 @@ type ReadyConfig struct {
 
 	// credential template used for creating a connection credential
 	// +optional
-	ConnectCredential *ConnectCredential `json:"connectCredential,omitempty"`
+	ConnectionCredential *ConnectionCredential `json:"connectionCredential,omitempty"`
 
 	// periodic probe of the service readiness.
 	// controller will perform postReadyHooks of BackupScript.spec.restore after the service readiness when readinessProbe is configured.

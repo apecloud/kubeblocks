@@ -362,7 +362,8 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 		job := jobBuilder.setImage(actionSpec.Job.Image).
 			setCommand(actionSpec.Job.Command).
 			setToleration(targetPod.Spec.Tolerations).
-			addTargetPodAndCredentialEnv(&targetPod, r.Restore.Spec.ReadyConfig.ConnectCredential).build(0)
+			addTargetPodAndCredentialEnv(&targetPod, r.Restore.Spec.ReadyConfig.ConnectionCredential).
+			build(0)
 		return []*batchv1.Job{job}, nil
 	}
 
@@ -384,7 +385,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 			command := fmt.Sprintf("kubectl -n %s exec -it pod/%s -c %s -- %s", targetPodList[i].Namespace, targetPodList[i].Name, containerName, actionSpec.Exec.Command)
 			jobBuilder.setImage(constant.KBToolsImage).setCommand([]string{"sh", "-c", command}).
 				setToleration(targetPodList[i].Spec.Tolerations).
-				addTargetPodAndCredentialEnv(&targetPodList[i], r.Restore.Spec.ReadyConfig.ConnectCredential)
+				addTargetPodAndCredentialEnv(&targetPodList[i], r.Restore.Spec.ReadyConfig.ConnectionCredential)
 			restoreJobs = append(restoreJobs, jobBuilder.build(i))
 		}
 		return restoreJobs, nil

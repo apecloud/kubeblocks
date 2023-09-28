@@ -264,31 +264,6 @@ type SchedulingSpec struct {
 	SchedulerName string `json:"schedulerName,omitempty"`
 }
 
-type ConnectCredential struct {
-	// the secret name
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	SecretName string `json:"secretName"`
-
-	// usernameKey the map key of the user in the connection credential secret
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=username
-	UsernameKey string `json:"usernameKey"`
-
-	// passwordKey the map key of the password in the connection credential secret
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=password
-	PasswordKey string `json:"passwordKey"`
-
-	// hostKey the map key of the host in the connection credential secret
-	// +kubebuilder:default=host
-	HostKey string `json:"hostKey,omitempty"`
-
-	// portKey the map key of the port in the connection credential secret
-	// +kubebuilder:default=port
-	PortKey string `json:"portKey,omitempty"`
-}
-
 type ReadinessProbe struct {
 	// number of seconds after the container has started before probe is initiated.
 	// +optional

@@ -225,6 +225,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&dpcontrollers.VolumePopulatorReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("volume-populator-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "VolumePopulator")
+		os.Exit(1)
+	}
+
 	if err = (&dpcontrollers.BackupPolicyReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),

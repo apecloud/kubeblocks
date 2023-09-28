@@ -23,6 +23,8 @@ import (
 	"runtime"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
@@ -83,6 +85,29 @@ const (
 	ReasonHaveResidualPVCs          = "HaveResidualPVCs"
 	ReasonDerivedObjectsDeleted     = "DerivedObjectsDeleted"
 	ReasonUnknownError              = "UnknownError"
+)
+
+// constant  for volume populator
+const (
+	populatePodPrefix = "kb-populate"
+
+	// context keys
+	nodeNameKey = "nodeName"
+
+	// annotation keys
+	annSelectedNode = "volume.kubernetes.io/selected-node"
+	annPopulateFrom = "dataprotections.kubeblocks.io/populate-from"
+
+	// event reason
+	reasonStartToVolumePopulate = "StartToVolumePopulate"
+	reasonVolumePopulateSucceed = "VolumePopulateSucceed"
+	reasonVolumePopulateFailed  = "VolumePopulateFailed"
+
+	// pvc condition type and reason
+	PersistentVolumeClaimPopulating corev1.PersistentVolumeClaimConditionType = "Populating"
+	reasonPopulatingFailed                                                    = "Failed"
+	reasonPopulatingProcessing                                                = "Processing"
+	reasonPopulatingSucceed                                                   = "Succeed"
 )
 
 var reconcileInterval = time.Second

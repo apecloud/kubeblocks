@@ -97,3 +97,8 @@ const (
 	// DPBackupStopTime backup stop time
 	DPBackupStopTime = "BACKUP_STOP_TIME" // backup stop time
 )
+
+const (
+	RestoreKind            = "Restore"
+	DataprotectionApiGroup = "dataprotection.kubeblocks.io"
+)

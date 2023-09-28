@@ -354,9 +354,7 @@ spec:
                           in the connection credential secret.
                         type: string
                     required:
-                    - passwordKey
                     - secretName
-                    - usernameKey
                     type: object
                   podSelector:
                     description: podSelector is used to find the target pod. The volumes

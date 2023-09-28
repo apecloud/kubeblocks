@@ -75,3 +75,12 @@ func (factory *MockPersistentVolumeClaimFactory) SetAnnotations(annotations map[
 	factory.Get().Annotations = annotations
 	return factory
 }
+
+func (factory *MockPersistentVolumeClaimFactory) SetDataSourceRef(apiGroup, kind, name string) *MockPersistentVolumeClaimFactory {
+	factory.Get().Spec.DataSourceRef = &corev1.TypedObjectReference{
+		Name:     name,
+		APIGroup: &apiGroup,
+		Kind:     kind,
+	}
+	return factory
+}

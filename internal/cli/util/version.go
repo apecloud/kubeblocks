@@ -130,7 +130,7 @@ func GetDockerVersion() (*gv.Version, error) {
 	cmd := exec.Command("docker", "info", "--format", "{{.ServerVersion}}")
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("playground init failed locally due to the absence of the Docker service")
 	}
 	return gv.NewVersion(strings.TrimSpace(string(out)))
 }

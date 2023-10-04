@@ -310,6 +310,7 @@ spec:
                     phase:
                       description: phase is status of configurationItem.
                       enum:
+                      - Creating
                       - Init
                       - Running
                       - Pending

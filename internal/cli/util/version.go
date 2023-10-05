@@ -133,7 +133,11 @@ func GetDockerVersion() (*gv.Version, error) {
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil || stderr.String() != "" {
-		return nil, fmt.Errorf("failed to get the docker version by executing \"docker info --format {{.ServerVersion}}\": %s", stderr.String())
+		var errMsg = stderr.String()
+		if errMsg == "" {
+			errMsg = err.Error()
+		}
+		return nil, fmt.Errorf("failed to get the docker version by executing \"docker info --format {{.ServerVersion}}\": %s", errMsg)
 	}
 	return gv.NewVersion(strings.TrimSpace(string(out)))
 }

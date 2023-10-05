@@ -133,7 +133,7 @@ func GetDockerVersion() (*gv.Version, error) {
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil || stderr.String() != "" {
-		var errMsg = stderr.String()
+		errMsg := stderr.String()
 		if errMsg == "" {
 			errMsg = err.Error()
 		}

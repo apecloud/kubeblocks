@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package util
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os/exec"
@@ -128,9 +129,11 @@ func GetKubeBlocksDeploy(client kubernetes.Interface) (*appsv1.Deployment, error
 func GetDockerVersion() (*gv.Version, error) {
 	// exec cmd to get output from docker info --format '{{.ServerVersion}}'
 	cmd := exec.Command("docker", "info", "--format", "{{.ServerVersion}}")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	out, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get the docker version by executing \"docker info --format {{.ServerVersion}}\": %s", err)
+	if err != nil || stderr.String() != "" {
+		return nil, fmt.Errorf("failed to get the docker version by executing \"docker info --format {{.ServerVersion}}\": %s", stderr.String())
 	}
 	return gv.NewVersion(strings.TrimSpace(string(out)))
 }

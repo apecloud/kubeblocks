@@ -456,7 +456,7 @@ func (c *lifecycleActionConvertor) convertRoleProbe(probe *appsv1alpha1.ClusterD
 }
 
 func (c *lifecycleActionConvertor) convertSwitchover(switchover *appsv1alpha1.SwitchoverSpec,
-	clusterCompVer *appsv1alpha1.ClusterComponentVersion) *appsv1alpha1.Action {
+	clusterCompVer *appsv1alpha1.ClusterComponentVersion) *appsv1alpha1.ComponentSwitchoverSpec {
 	spec := *switchover
 	if clusterCompVer != nil {
 		overrideSwitchoverSpecAttr(&spec, clusterCompVer.SwitchoverSpec)
@@ -465,20 +465,52 @@ func (c *lifecycleActionConvertor) convertSwitchover(switchover *appsv1alpha1.Sw
 		return nil
 	}
 
-	// TODO(component): how to support ScriptSpec?
-	action := spec.WithoutCandidate
-	if action == nil {
-		action = spec.WithCandidate
+	var (
+		withCandidateAction    *appsv1alpha1.Action
+		withoutCandidateAction *appsv1alpha1.Action
+	)
+	if spec.WithCandidate != nil && spec.WithCandidate.CmdExecutorConfig != nil {
+		withCandidateAction = &appsv1alpha1.Action{
+			Image: spec.WithCandidate.CmdExecutorConfig.Image,
+			Exec: &appsv1alpha1.ExecAction{
+				Command: spec.WithCandidate.CmdExecutorConfig.Command,
+				Args:    spec.WithCandidate.CmdExecutorConfig.Args,
+			},
+			Env: spec.WithCandidate.CmdExecutorConfig.Env,
+		}
 	}
-	if action.CmdExecutorConfig == nil {
-		return nil
+	if spec.WithoutCandidate != nil && spec.WithoutCandidate.CmdExecutorConfig != nil {
+		withoutCandidateAction = &appsv1alpha1.Action{
+			Image: spec.WithoutCandidate.CmdExecutorConfig.Image,
+			Exec: &appsv1alpha1.ExecAction{
+				Command: spec.WithoutCandidate.CmdExecutorConfig.Command,
+				Args:    spec.WithoutCandidate.CmdExecutorConfig.Args,
+			},
+			Env: spec.WithoutCandidate.CmdExecutorConfig.Env,
+		}
 	}
-	return &appsv1alpha1.Action{
-		Image: action.CmdExecutorConfig.Image,
-		Exec: &corev1.ExecAction{
-			Command: action.CmdExecutorConfig.Command, // TODO(component): + action.CmdExecutorConfig.Args
-		},
-		Env: action.CmdExecutorConfig.Env,
+
+	mergeScriptSpec := func() []appsv1alpha1.ScriptSpecSelector {
+		if len(spec.WithCandidate.ScriptSpecSelectors) == 0 && len(spec.WithoutCandidate.ScriptSpecSelectors) == 0 {
+			return nil
+		}
+
+		mergeScriptSpecMap := map[appsv1alpha1.ScriptSpecSelector]bool{}
+		for _, val := range append(spec.WithCandidate.ScriptSpecSelectors, spec.WithoutCandidate.ScriptSpecSelectors...) {
+			mergeScriptSpecMap[val] = true
+		}
+
+		scriptSpecList := make([]appsv1alpha1.ScriptSpecSelector, 0, len(mergeScriptSpecMap))
+		for key := range mergeScriptSpecMap {
+			scriptSpecList = append(scriptSpecList, key)
+		}
+		return scriptSpecList
+	}
+
+	return &appsv1alpha1.ComponentSwitchoverSpec{
+		WithCandidate:       withCandidateAction,
+		WithoutCandidate:    withoutCandidateAction,
+		ScriptSpecSelectors: mergeScriptSpec(),
 	}
 }
 

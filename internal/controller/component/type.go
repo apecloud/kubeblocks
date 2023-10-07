@@ -51,7 +51,6 @@ type SynthesizedComponent struct {
 	TLS                  bool                                   `json:"tls"`
 	Issuer               *v1alpha1.Issuer                       `json:"issuer,omitempty"`
 	ServiceAccountName   string                                 `json:"serviceAccountName,omitempty"`
-	StatefulSetWorkload  v1alpha1.StatefulSetWorkload           `json:"statefulSetWorkload,omitempty"`
 	ComponentRefEnvs     []*corev1.EnvVar                       `json:"componentRefEnvs,omitempty"`
 	ServiceReferences    map[string]*v1alpha1.ServiceDescriptor `json:"serviceReferences,omitempty"`
 
@@ -68,12 +67,13 @@ type SynthesizedComponent struct {
 	ComponentServices     []v1alpha1.ComponentService         `json:"componentServices,omitempty"`
 
 	// TODO(xingran): The following fields will be deprecated after version 0.7.0 and will be replaced with a new data structure.
-	CustomLabelSpecs []v1alpha1.CustomLabelSpec        `json:"customLabelSpecs,omitempty"` // The CustomLabelSpecs will be replaced with Labels in the future.
-	SwitchoverSpec   *v1alpha1.SwitchoverSpec          `json:"switchoverSpec,omitempty"`   // The SwitchoverSpec will be replaced with LifecycleActions.Switchover in the future.
-	Probes           *v1alpha1.ClusterDefinitionProbes `json:"probes,omitempty"`           // The Probes will be replaced with LifecycleActions.RoleProbe in the future.
-	VolumeTypes      []v1alpha1.VolumeTypeSpec         `json:"volumeTypes,omitempty"`      // The VolumeTypes will be replaced with Volumes in the future.
-	VolumeProtection *v1alpha1.VolumeProtectionSpec    `json:"volumeProtection,omitempty"` // The VolumeProtection will be replaced with Volumes in the future.
-	Services         []corev1.Service                  `json:"services,omitempty"`         // The Services will be replaced with ComponentServices in the future.
+	CustomLabelSpecs    []v1alpha1.CustomLabelSpec        `json:"customLabelSpecs,omitempty"`    // The CustomLabelSpecs will be replaced with Labels in the future.
+	SwitchoverSpec      *v1alpha1.SwitchoverSpec          `json:"switchoverSpec,omitempty"`      // The SwitchoverSpec will be replaced with LifecycleActions.Switchover in the future.
+	Probes              *v1alpha1.ClusterDefinitionProbes `json:"probes,omitempty"`              // The Probes will be replaced with LifecycleActions.RoleProbe in the future.
+	VolumeTypes         []v1alpha1.VolumeTypeSpec         `json:"volumeTypes,omitempty"`         // The VolumeTypes will be replaced with Volumes in the future.
+	VolumeProtection    *v1alpha1.VolumeProtectionSpec    `json:"volumeProtection,omitempty"`    // The VolumeProtection will be replaced with Volumes in the future.
+	Services            []corev1.Service                  `json:"services,omitempty"`            // The Services will be replaced with ComponentServices in the future.
+	StatefulSetWorkload v1alpha1.StatefulSetWorkload      `json:"statefulSetWorkload,omitempty"` // The StatefulSetWorkload will be replaced with UpdateStrategy in the future.
 
 	// TODO(xingran): The following fields will be deprecated after KubeBlocks version 0.7.0
 	ClusterDefName        string                          `json:"clusterDefName,omitempty"`     // the name of the clusterDefinition

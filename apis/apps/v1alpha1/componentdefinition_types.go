@@ -194,16 +194,6 @@ type ComponentDefinitionSpec struct {
 
 	// TODO: introduce the event-based interoperability mechanism.
 
-	// ComponentDefRef is used to inject values from other components into the current component.
-	// values will be saved and updated in a configmap and mounted to the current component.
-	// Cannot be updated.
-	// +patchMergeKey=componentDefName
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=componentDefName
-	// +optional
-	// ComponentDefRef []ComponentDefRef `json:"componentDefRef,omitempty" patchStrategy:"merge" patchMergeKey:"componentDefName"`
-
 	// serviceRefDeclarations is used to declare the service reference of the current component.
 	// Cannot be updated.
 	// +optional
@@ -413,6 +403,20 @@ type HTTPAction struct {
 	HTTPHeaders []corev1.HTTPHeader `json:"httpHeaders,omitempty"`
 }
 
+type ExecAction struct {
+	// Command is the command line to execute inside the container, the working directory for the
+	// command  is root ('/') in the container's filesystem. The command is simply exec'd, it is
+	// not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use
+	// a shell, you need to explicitly call out to that shell.
+	// Exit status of 0 is treated as live/healthy and non-zero is unhealthy.
+	// +optional
+	Command []string `json:"command,omitempty" protobuf:"bytes,1,rep,name=command"`
+
+	// args is used to perform statements.
+	// +optional
+	Args []string `json:"args,omitempty"`
+}
+
 // Preconditions must be fulfilled before an action is executed.
 type Preconditions struct {
 }
@@ -447,7 +451,7 @@ type Action struct {
 	// Exec specifies the action to take.
 	// Cannot be updated.
 	// +optional
-	Exec *corev1.ExecAction `json:"exec,omitempty"`
+	Exec *ExecAction `json:"exec,omitempty"`
 
 	// HTTP specifies the http request to perform.
 	// Cannot be updated.
@@ -526,7 +530,7 @@ type ComponentLifecycleActions struct {
 	// - KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new candidate replica. It may be empty.
 	// Cannot be updated.
 	// +optional
-	Switchover *Action `json:"switchover,omitempty"`
+	Switchover *ComponentSwitchoverSpec `json:"switchover,omitempty"`
 
 	// MemberJoin defines how to add a new replica to the replication group.
 	// This action is typically invoked when a new replica needs to be added, such as during scale-out.
@@ -584,6 +588,21 @@ type ComponentLifecycleActions struct {
 	// Cannot be updated.
 	// +optional
 	AccountProvision *Action `json:"accountProvision,omitempty"`
+}
+
+type ComponentSwitchoverSpec struct {
+	// withCandidate corresponds to the switchover of the specified candidate primary or leader instance.
+	// +optional
+	WithCandidate *Action `json:"withCandidate,omitempty"`
+
+	// withoutCandidate corresponds to a switchover that does not specify a candidate primary or leader instance.
+	// +optional
+	WithoutCandidate *Action `json:"withoutCandidate,omitempty"`
+
+	// scriptSpecSelectors defines the selector of the scriptSpecs that need to be referenced.
+	// Once ScriptSpecSelectors is defined, the scripts defined in scripts can be referenced in the Action.
+	// +optional
+	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
 }
 
 // ValidateEnabledLogConfigs validates enabledLogs against component compDefName, and returns the invalid logNames undefined in ComponentDefinition.

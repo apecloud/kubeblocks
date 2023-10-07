@@ -2,7 +2,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.12.1
+    controller-gen.kubebuilder.io/version: v0.9.0
+  creationTimestamp: null
   labels:
     app.kubernetes.io/name: kubeblocks
   name: servicedescriptors.apps.kubeblocks.io
@@ -96,7 +97,6 @@ spec:
                             required:
                             - key
                             type: object
-                            x-kubernetes-map-type: atomic
                           fieldRef:
                             description: 'Selects a field of the pod: supports metadata.name,
                               metadata.namespace, `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`,
@@ -114,7 +114,6 @@ spec:
                             required:
                             - fieldPath
                             type: object
-                            x-kubernetes-map-type: atomic
                           resourceFieldRef:
                             description: 'Selects a resource of the container: only
                               resources limits and requests (limits.cpu, limits.memory,
@@ -139,7 +138,6 @@ spec:
                             required:
                             - resource
                             type: object
-                            x-kubernetes-map-type: atomic
                           secretKeyRef:
                             description: Selects a key of a secret in the pod's namespace
                             properties:
@@ -159,7 +157,6 @@ spec:
                             required:
                             - key
                             type: object
-                            x-kubernetes-map-type: atomic
                         type: object
                     type: object
                   username:
@@ -199,7 +196,6 @@ spec:
                             required:
                             - key
                             type: object
-                            x-kubernetes-map-type: atomic
                           fieldRef:
                             description: 'Selects a field of the pod: supports metadata.name,
                               metadata.namespace, `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`,
@@ -217,7 +213,6 @@ spec:
                             required:
                             - fieldPath
                             type: object
-                            x-kubernetes-map-type: atomic
                           resourceFieldRef:
                             description: 'Selects a resource of the container: only
                               resources limits and requests (limits.cpu, limits.memory,
@@ -242,7 +237,6 @@ spec:
                             required:
                             - resource
                             type: object
-                            x-kubernetes-map-type: atomic
                           secretKeyRef:
                             description: Selects a key of a secret in the pod's namespace
                             properties:
@@ -262,7 +256,6 @@ spec:
                             required:
                             - key
                             type: object
-                            x-kubernetes-map-type: atomic
                         type: object
                     type: object
                 type: object
@@ -301,7 +294,6 @@ spec:
                         required:
                         - key
                         type: object
-                        x-kubernetes-map-type: atomic
                       fieldRef:
                         description: 'Selects a field of the pod: supports metadata.name,
                           metadata.namespace, `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`,
@@ -319,7 +311,6 @@ spec:
                         required:
                         - fieldPath
                         type: object
-                        x-kubernetes-map-type: atomic
                       resourceFieldRef:
                         description: 'Selects a resource of the container: only resources
                           limits and requests (limits.cpu, limits.memory, limits.ephemeral-storage,
@@ -344,7 +335,6 @@ spec:
                         required:
                         - resource
                         type: object
-                        x-kubernetes-map-type: atomic
                       secretKeyRef:
                         description: Selects a key of a secret in the pod's namespace
                         properties:
@@ -363,7 +353,6 @@ spec:
                         required:
                         - key
                         type: object
-                        x-kubernetes-map-type: atomic
                     type: object
                 type: object
               port:
@@ -401,7 +390,6 @@ spec:
                         required:
                         - key
                         type: object
-                        x-kubernetes-map-type: atomic
                       fieldRef:
                         description: 'Selects a field of the pod: supports metadata.name,
                           metadata.namespace, `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`,
@@ -419,7 +407,6 @@ spec:
                         required:
                         - fieldPath
                         type: object
-                        x-kubernetes-map-type: atomic
                       resourceFieldRef:
                         description: 'Selects a resource of the container: only resources
                           limits and requests (limits.cpu, limits.memory, limits.ephemeral-storage,
@@ -444,7 +431,6 @@ spec:
                         required:
                         - resource
                         type: object
-                        x-kubernetes-map-type: atomic
                       secretKeyRef:
                         description: Selects a key of a secret in the pod's namespace
                         properties:
@@ -463,7 +449,6 @@ spec:
                         required:
                         - key
                         type: object
-                        x-kubernetes-map-type: atomic
                     type: object
                 type: object
               serviceKind:

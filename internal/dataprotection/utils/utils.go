@@ -22,13 +22,16 @@ package utils
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -132,4 +135,11 @@ func MergeEnv(originalEnv, targetEnv []corev1.EnvVar) []corev1.EnvVar {
 
 func VolumeSnapshotEnabled() bool {
 	return viper.GetBool("VOLUMESNAPSHOT")
+}
+
+func SetControllerReference(owner, controlled metav1.Object, scheme *runtime.Scheme) error {
+	if owner == nil || reflect.ValueOf(owner).IsNil() {
+		return nil
+	}
+	return ctrlutil.SetControllerReference(owner, controlled, scheme)
 }

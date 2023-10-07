@@ -625,8 +625,7 @@ spec:
                                 type: string
                               volumeMode:
                                 description: volumeMode defines what type of volume
-                                  is required by the claim. Value of Filesystem is
-                                  implied when not included in claim spec.
+                                  is required by the claim.
                                 type: string
                             type: object
                         required:

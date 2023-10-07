@@ -466,7 +466,6 @@ type PersistentVolumeClaimSpec struct {
 	// +optional
 	StorageClassName *string `json:"storageClassName,omitempty" protobuf:"bytes,5,opt,name=storageClassName"`
 	// volumeMode defines what type of volume is required by the claim.
-	// Value of Filesystem is implied when not included in claim spec.
 	// +optional
 	VolumeMode *corev1.PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,6,opt,name=volumeMode,casttype=PersistentVolumeMode"`
 }

@@ -158,7 +158,7 @@ var _ = Describe("component module", func() {
 			cluster.Spec.ComponentSpecs = nil
 
 			By("build first component from simplified fields")
-			component, err := buildComponent(
+			component, err := BuildComponent(
 				reqCtx,
 				nil,
 				cluster,
@@ -173,7 +173,7 @@ var _ = Describe("component module", func() {
 			Expect(component.VolumeClaimTemplates[0].Spec.Resources.Requests["storage"]).Should(Equal(cluster.Spec.Storage.Size))
 
 			By("build second component will be nil")
-			component, err = buildComponent(
+			component, err = BuildComponent(
 				reqCtx,
 				nil,
 				cluster,
@@ -197,7 +197,7 @@ var _ = Describe("component module", func() {
 			By("clear cluster's component spec")
 			cluster.Spec.ComponentSpecs = nil
 			By("call build")
-			component, err := buildComponent(
+			component, err := BuildComponent(
 				reqCtx,
 				nil,
 				cluster,
@@ -227,7 +227,7 @@ var _ = Describe("component module", func() {
 			By("clear cluster's component spec")
 			cluster.Spec.ComponentSpecs = nil
 			By("call build")
-			component, err := buildComponent(
+			component, err := BuildComponent(
 				reqCtx,
 				nil,
 				cluster,
@@ -243,7 +243,7 @@ var _ = Describe("component module", func() {
 			interval2 := intstr.Parse("10s")
 			cluster.Spec.Monitor.MonitoringInterval = &interval2
 			By("call build")
-			component, err = buildComponent(
+			component, err = BuildComponent(
 				reqCtx,
 				nil,
 				cluster,
@@ -272,7 +272,7 @@ var _ = Describe("component module", func() {
 			By("clear cluster's component spec")
 			cluster.Spec.ComponentSpecs = nil
 			By("call build")
-			component, err := buildComponent(
+			component, err := BuildComponent(
 				reqCtx,
 				nil,
 				cluster,
@@ -332,7 +332,7 @@ var _ = Describe("component module", func() {
 			By("clear cluster's component spec")
 			cluster.Spec.ComponentSpecs = nil
 			By("call build")
-			component, err := buildComponent(
+			component, err := BuildComponent(
 				reqCtx,
 				nil,
 				cluster,
@@ -371,7 +371,7 @@ var _ = Describe("component module", func() {
 				testapps.NginxImage: serviceDescriptor,
 			}
 			By("call build")
-			component, err := buildComponent(
+			component, err := BuildComponent(
 				reqCtx,
 				nil,
 				cluster,

@@ -66,6 +66,19 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	ComponentSpecs []ClusterComponentSpec `json:"componentSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
+	// affinity is a group of affinity scheduling rules.
+	// +optional
+	Affinity *Affinity `json:"affinity,omitempty"`
+
+	// tolerations are attached to tolerate any taint that matches the triple `key,value,effect` using the matching operator `operator`.
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// PriorityClassName specifies the priority that all the cluster pods have.
+	// +optional
+	PriorityClassName *string `json:"priorityClassName,omitempty"`
+
 	// tenancy describes how pods are distributed across node.
 	// SharedNode means multiple pods may share the same node.
 	// DedicatedNode means each pod runs on their own dedicated node.
@@ -75,15 +88,6 @@ type ClusterSpec struct {
 	// availabilityPolicy describes the availability policy, including zone, node, and none.
 	// +optional
 	AvailabilityPolicy AvailabilityPolicyType `json:"availabilityPolicy,omitempty"`
-
-	// affinity is a group of affinity scheduling rules.
-	// +optional
-	Affinity *Affinity `json:"affinity,omitempty"`
-
-	// tolerations are attached to tolerate any taint that matches the triple `key,value,effect` using the matching operator `operator`.
-	// +kubebuilder:pruning:PreserveUnknownFields
-	// +optional
-	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
 	// replicas specifies the replicas of the first componentSpec, if the replicas of the first componentSpec is specified, this value will be ignored.
 	// +optional

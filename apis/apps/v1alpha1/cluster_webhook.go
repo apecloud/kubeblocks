@@ -22,6 +22,7 @@ import (
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -130,13 +131,14 @@ func (r *Cluster) validate() error {
 	r.validateClusterVersionRef(&allErrs)
 
 	err := webhookMgr.client.Get(ctx, types.NamespacedName{Name: r.Spec.ClusterDefRef}, clusterDef)
-
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clusterDefinitionRef"),
 			r.Spec.ClusterDefRef, err.Error()))
 	} else {
 		r.validateComponents(&allErrs, clusterDef)
 	}
+
+	r.validatePriorityClass(&allErrs)
 
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
@@ -156,6 +158,21 @@ func (r *Cluster) validateClusterVersionRef(allErrs *field.ErrorList) {
 	if err != nil {
 		*allErrs = append(*allErrs, field.Invalid(field.NewPath("spec.clusterVersionRef"),
 			r.Spec.ClusterDefRef, err.Error()))
+	}
+}
+
+// validatePriorityClass validates spec.priorityClassName is legal
+func (r *Cluster) validatePriorityClass(allErrs *field.ErrorList) {
+	if r.Spec.PriorityClassName == nil || *r.Spec.PriorityClassName == "" {
+		return
+	}
+	priorityClass := &schedulingv1.PriorityClass{}
+	err := webhookMgr.client.Get(context.Background(), types.NamespacedName{
+		Name: *r.Spec.PriorityClassName,
+	}, priorityClass)
+	if err != nil {
+		*allErrs = append(*allErrs, field.Invalid(field.NewPath("spec.priorityClassName"),
+			r.Spec.PriorityClassName, err.Error()))
 	}
 }
 

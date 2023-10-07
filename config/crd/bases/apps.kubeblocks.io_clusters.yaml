@@ -663,6 +663,10 @@ spec:
                       accessible. It defaults to false
                     type: boolean
                 type: object
+              priorityClassName:
+                description: PriorityClassName specifies the priority that all the
+                  cluster pods have.
+                type: string
               replicas:
                 description: replicas specifies the replicas of the first componentSpec,
                   if the replicas of the first componentSpec is specified, this value

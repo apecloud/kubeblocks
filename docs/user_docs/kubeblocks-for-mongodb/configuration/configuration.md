@@ -42,9 +42,9 @@ You can also view the details of this configuration file and parameters.
 
 ### Configure parameters with configure command
 
-The example below configures velocity to 1.
+The example below configures systemLog.verbosity to 1.
 
-1. Adjust the values of `velocity` to 1.
+1. Adjust the values of `systemLog.verbosity` to 1.
 
    ```bash
    kbcli cluster configure mongodb-cluster --component mongodb --config-spec mongodb-config --config-file mongodb.conf --set systemLog.verbosity=1

@@ -914,12 +914,12 @@ func (o *describeBackupPolicyOptions) printBackupPolicyObj(obj *dpv1alpha1.Backu
 	}
 
 	printer.PrintLine("\nBackup Methods:")
+	p := printer.NewTablePrinter(o.Out)
+	p.SetHeader("Name", "ActionSet Name", "SnapshotVolumes")
 	for _, v := range obj.Spec.BackupMethods {
-		realPrintPairStringToLine("Name", v.Name)
-		realPrintPairStringToLine("ActionSet Name", v.ActionSetName)
-		realPrintPairStringToLine("SnapshotVolumes", strconv.FormatBool(*v.SnapshotVolumes))
-		printer.PrintLine("\n")
+		p.AddRow(v.Name, v.ActionSetName, strconv.FormatBool(*v.SnapshotVolumes))
 	}
+	p.Print()
 
 	return nil
 }

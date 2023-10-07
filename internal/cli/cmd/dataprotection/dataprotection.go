@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package backup
+package dataprotection
 
 import (
 	"github.com/spf13/cobra"
@@ -25,16 +25,14 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
-func NewBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewDataProtectionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "backup command",
-		Short: "Backup command.",
+		Use:     "dataprotection command",
+		Short:   "Data protection command.",
+		Aliases: []string{"dp"},
 	}
 	cmd.AddCommand(
-		newListCommand(f, streams),
-		newCreateCommand(f, streams),
-		newDeleteCommand(f, streams),
-		newDescribeCommand(f, streams),
+		NewBackupCmd(f, streams),
 	)
 	return cmd
 }

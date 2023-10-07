@@ -207,15 +207,15 @@ func BuildCommonLabels(cluster *appsv1alpha1.Cluster,
 	}
 }
 
+func vctToPVC(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
+	return corev1.PersistentVolumeClaim{
+		ObjectMeta: vct.ObjectMeta,
+		Spec:       vct.Spec,
+	}
+}
+
 func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent, envConfigName string) (*appsv1.StatefulSet, error) {
-	vctToPVC := func(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
-		return corev1.PersistentVolumeClaim{
-			ObjectMeta: vct.ObjectMeta,
-			Spec:       vct.Spec,
-		}
-	}
-
 	commonLabels := BuildCommonLabels(cluster, component)
 	podBuilder := builder.NewPodBuilder("", "").
 		AddLabelsInMap(commonLabels).
@@ -274,13 +274,6 @@ func buildWellKnownLabels(clusterDefName, clusterName, componentName string) map
 
 func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent, envConfigName string) (*workloads.ReplicatedStateMachine, error) {
-	vctToPVC := func(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
-		return corev1.PersistentVolumeClaim{
-			ObjectMeta: vct.ObjectMeta,
-			Spec:       vct.Spec,
-		}
-	}
-
 	commonLabels := buildWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
 	addCommonLabels := func(service *corev1.Service) {
 		if service == nil {

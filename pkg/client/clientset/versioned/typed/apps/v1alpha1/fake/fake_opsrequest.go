@@ -24,7 +24,6 @@ import (
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,9 +35,9 @@ type FakeOpsRequests struct {
 	ns   string
 }
 
-var opsrequestsResource = schema.GroupVersionResource{Group: "apps.kubeblocks.io", Version: "v1alpha1", Resource: "opsrequests"}
+var opsrequestsResource = v1alpha1.SchemeGroupVersion.WithResource("opsrequests")
 
-var opsrequestsKind = schema.GroupVersionKind{Group: "apps.kubeblocks.io", Version: "v1alpha1", Kind: "OpsRequest"}
+var opsrequestsKind = v1alpha1.SchemeGroupVersion.WithKind("OpsRequest")
 
 // Get takes name of the opsRequest, and returns the corresponding opsRequest object, and an error if there is any.
 func (c *FakeOpsRequests) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.OpsRequest, err error) {

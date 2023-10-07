@@ -119,7 +119,7 @@ func NewDefaultCliCmd() *cobra.Command {
 			case "help", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
 				// Don't search for a plugin
 			default:
-				if err := kccmd.HandlePluginCommand(pluginHandler, cmdPathPieces); err != nil {
+				if err := kccmd.HandlePluginCommand(pluginHandler, cmdPathPieces, true); err != nil {
 					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 					os.Exit(1)
 				}
@@ -260,7 +260,7 @@ func registerCompletionFuncForGlobalFlags(cmd *cobra.Command, f cmdutil.Factory)
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"namespace",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return utilcomp.CompGetResource(f, cmd, "namespace", toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.CompGetResource(f, "namespace", toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"context",

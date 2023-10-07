@@ -21,6 +21,7 @@ package authenticator
 
 import (
 	"context"
+	"embed"
 	"errors"
 	"fmt"
 	"log"
@@ -28,11 +29,17 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+
+	"github.com/leaanthony/debme"
+)
+
+var (
+	//go:embed callback_html/*
+	callbackHTML embed.FS
 )
 
 const (
 	ListenerAddress = "127.0.0.1"
-	DIR             = "./internal/cli/cmd/auth/authorize/callback_html/"
 )
 
 type HTTPServer interface {
@@ -114,18 +121,19 @@ func (c *CallbackService) awaitResponse(callbackResponse chan CallbackResponse, 
 	})
 }
 
-func writeHTML(w http.ResponseWriter, file string) {
-	htmlContent, err := os.ReadFile(DIR + file)
+func writeHTML(w http.ResponseWriter, fileName string) {
+	tmplFs, _ := debme.FS(callbackHTML, "callback_html")
+	tmlBytes, err := tmplFs.ReadFile(fileName)
 	if err != nil {
 		http.Error(w, "Failed to read HTML file", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html")
-	write(w, string(htmlContent))
+	write(w, tmlBytes)
 }
 
-func write(w http.ResponseWriter, msg string) {
-	_, err := w.Write([]byte(msg))
+func write(w http.ResponseWriter, msg []byte) {
+	_, err := w.Write(msg)
 	if err != nil {
 		fmt.Println("Error writing response:", err)
 	}

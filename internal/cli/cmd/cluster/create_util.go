@@ -115,7 +115,7 @@ func registerFlagCompFunc(cmd *cobra.Command, f cmdutil.Factory, c *cluster.Char
 				label := fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, c.ClusterDef)
 				versions = util.CompGetResourceWithLabels(f, cmd, util.GVRToString(types.ClusterVersionGVR()), []string{label}, toComplete)
 			} else {
-				versions = utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterVersionGVR()), toComplete)
+				versions = utilcomp.CompGetResource(f, util.GVRToString(types.ClusterVersionGVR()), toComplete)
 			}
 			return versions, cobra.ShellCompDirectiveNoFileComp
 		})

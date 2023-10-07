@@ -21,6 +21,7 @@ package configuration
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -46,7 +47,7 @@ type ConfigurationReconciler struct {
 	Recorder record.EventRecorder
 }
 
-const reconcileInterval = time.Millisecond * 10
+const reconcileInterval = time.Second * 2
 
 //+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=configurations,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=configurations/status,verbs=get;update;patch
@@ -102,7 +103,11 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to get related object.")
 	}
 
-	if err := r.runTasks(reqCtx, configuration, fetcherTask, tasks); err != nil {
+	if fetcherTask.ClusterComObj == nil || fetcherTask.ClusterDefComObj == nil {
+		return r.failWithInvalidComponent(configuration, reqCtx)
+	}
+
+	if err := r.runTasks(TaskContext{configuration, reqCtx, fetcherTask}, tasks); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to run configuration reconcile task.")
 	}
 	if !isAllReady(configuration) {
@@ -111,59 +116,70 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return intctrlutil.Reconciled()
 }
 
+func (r *ConfigurationReconciler) failWithInvalidComponent(configuration *appsv1alpha1.Configuration, reqCtx intctrlutil.RequestCtx) (ctrl.Result, error) {
+	msg := fmt.Sprintf("not found cluster component or cluster definition component: [%s]", configuration.Spec.ComponentName)
+	reqCtx.Log.Error(fmt.Errorf(msg), "")
+	patch := client.MergeFrom(configuration.DeepCopy())
+	configuration.Status.Message = msg
+	if err := r.Client.Status().Patch(reqCtx.Ctx, configuration, patch); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update configuration status.")
+	}
+	return intctrlutil.Reconciled()
+}
+
 func isAllReady(configuration *appsv1alpha1.Configuration) bool {
 	for _, item := range configuration.Spec.ConfigItemDetails {
 		itemStatus := configuration.Status.GetItemStatus(item.Name)
-		if itemStatus == nil || itemStatus.Phase != appsv1alpha1.CFinishedPhase {
+		if itemStatus != nil && !isFinishStatus(itemStatus.Phase) {
 			return false
 		}
 	}
 	return true
 }
 
-func (r *ConfigurationReconciler) runTasks(
-	reqCtx intctrlutil.RequestCtx,
-	configuration *appsv1alpha1.Configuration,
-	fetcher *Task,
-	tasks []Task) (err error) {
-	var errs []error
-	var synthesizedComp *component.SynthesizedComponent
+func (r *ConfigurationReconciler) runTasks(taskCtx TaskContext, tasks []Task) (err error) {
+	var (
+		errs            []error
+		synthesizedComp *component.SynthesizedComponent
 
-	synthesizedComp, err = component.BuildComponent(reqCtx, nil,
-		fetcher.ClusterObj,
-		fetcher.ClusterDefObj,
-		fetcher.ClusterDefComObj,
-		fetcher.ClusterComObj,
+		ctx           = taskCtx.reqCtx.Ctx
+		configuration = taskCtx.configuration
+	)
+
+	synthesizedComp, err = component.BuildComponent(taskCtx.reqCtx,
 		nil,
-		fetcher.ClusterVerComObj)
+		taskCtx.fetcher.ClusterObj,
+		taskCtx.fetcher.ClusterDefObj,
+		taskCtx.fetcher.ClusterDefComObj,
+		taskCtx.fetcher.ClusterComObj,
+		nil,
+		taskCtx.fetcher.ClusterVerComObj)
 	if err != nil {
-		return
+		return err
 	}
 
-	revision := strconv.FormatInt(configuration.GetGeneration(), 10)
+	// TODO manager multiple version
 	patch := client.MergeFrom(configuration.DeepCopy())
+	revision := strconv.FormatInt(configuration.GetGeneration(), 10)
 	for _, task := range tasks {
-		if err := task.Do(fetcher, synthesizedComp, revision); err != nil {
+		task.Status.UpdateRevision = revision
+		if err := task.Do(taskCtx.fetcher, synthesizedComp, revision); err != nil {
 			task.Status.Phase = appsv1alpha1.CMergeFailedPhase
 			task.Status.Message = cfgutil.ToPointer(err.Error())
 			errs = append(errs, err)
 			continue
 		}
-		if err := task.SyncStatus(fetcher, task.Status); err != nil {
-			task.Status.Phase = appsv1alpha1.CFailedPhase
-			task.Status.Message = cfgutil.ToPointer(err.Error())
-			errs = append(errs, err)
-		}
 	}
 
+	configuration.Status.Message = ""
 	if len(errs) > 0 {
 		configuration.Status.Message = utilerrors.NewAggregate(errs).Error()
 	}
-	if err := r.Client.Status().Patch(reqCtx.Ctx, configuration, patch); err != nil {
+	if err := r.Client.Status().Patch(ctx, configuration, patch); err != nil {
 		errs = append(errs, err)
 	}
 	if len(errs) == 0 {
-		return
+		return nil
 	}
 	return utilerrors.NewAggregate(errs)
 }
@@ -177,6 +193,10 @@ func (r *ConfigurationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func fromItemStatus(ctx intctrlutil.RequestCtx, status *appsv1alpha1.ConfigurationStatus, item appsv1alpha1.ConfigurationItemDetail) *appsv1alpha1.ConfigurationItemDetailStatus {
+	if item.ConfigSpec == nil {
+		ctx.Log.WithName(item.Name).Error(core.MakeError("configSpec phase is not ready and pass: %v", item), "")
+		return nil
+	}
 	for i := range status.ConfigurationItemStatus {
 		itemStatus := &status.ConfigurationItemStatus[i]
 		switch {
@@ -193,11 +213,11 @@ func fromItemStatus(ctx intctrlutil.RequestCtx, status *appsv1alpha1.Configurati
 }
 
 func isReconcileStatus(phase appsv1alpha1.ConfigurationPhase) bool {
-	return phase == appsv1alpha1.CRunningPhase ||
-		phase == appsv1alpha1.CInitPhase ||
-		phase == appsv1alpha1.CPendingPhase ||
-		phase == appsv1alpha1.CMergedPhase ||
-		phase == appsv1alpha1.CMergeFailedPhase ||
-		phase == appsv1alpha1.CUpgradingPhase ||
-		phase == appsv1alpha1.CFinishedPhase
+	return phase != "" &&
+		phase != appsv1alpha1.CCreatingPhase &&
+		phase != appsv1alpha1.CDeletingPhase
+}
+
+func isFinishStatus(phase appsv1alpha1.ConfigurationPhase) bool {
+	return phase == appsv1alpha1.CFinishedPhase || phase == appsv1alpha1.CFailedAndPausePhase
 }

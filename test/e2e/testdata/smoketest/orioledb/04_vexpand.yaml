@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: oriole-cluster-vexpand-
+spec:
+  clusterRef: oriole-cluster
+  type: VolumeExpansion
+  volumeExpansion:
+    - componentName: orioledb
+      volumeClaimTemplates:
+        - name: data
+          storage: "21Gi"

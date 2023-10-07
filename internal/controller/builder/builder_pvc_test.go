@@ -38,12 +38,30 @@ var _ = Describe("pvc builder", func() {
 				"CPU": resource.MustParse("500m"),
 			},
 		}
+		accessModes := []corev1.PersistentVolumeAccessMode{
+			corev1.ReadWriteOnce,
+		}
+		sc := "openebs-local-pv"
+		apiGroup := "apps.kubeblocks.io/v1alpha1"
+		dataSource := corev1.TypedLocalObjectReference{
+			APIGroup: &apiGroup,
+			Kind:     "Backup",
+			Name:     "cluster-component-backup",
+		}
 		pvc := NewPVCBuilder(ns, name).
 			SetResources(resources).
+			SetAccessModes(accessModes).
+			SetStorageClass(sc).
+			SetDataSource(dataSource).
 			GetObject()
 
 		Expect(pvc.Name).Should(Equal(name))
 		Expect(pvc.Namespace).Should(Equal(ns))
 		Expect(pvc.Spec.Resources).Should(Equal(resources))
+		Expect(pvc.Spec.AccessModes).Should(Equal(accessModes))
+		Expect(pvc.Spec.StorageClassName).ShouldNot(BeNil())
+		Expect(*pvc.Spec.StorageClassName).Should(Equal(sc))
+		Expect(pvc.Spec.DataSource).ShouldNot(BeNil())
+		Expect(*pvc.Spec.DataSource).Should(Equal(dataSource))
 	})
 })

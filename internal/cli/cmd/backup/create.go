@@ -86,7 +86,7 @@ func newCreateCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 		},
 	}
 
-	cmd.Flags().StringVar(&o.BackupType, "type", "snapshot", "Backup type")
+	cmd.Flags().StringVar(&o.BackupMethod, "method", "snapshot", "Backup type")
 	cmd.Flags().StringVar(&clusterName, "cluster", "", "Cluster name")
 	cmd.Flags().StringVar(&o.BackupPolicy, "policy", "", "Backup policy name, this flag will be ignored when backup-type is snapshot")
 	util.RegisterClusterCompletionFunc(cmd, f)

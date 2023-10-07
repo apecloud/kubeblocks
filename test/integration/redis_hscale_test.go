@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
+	"github.com/apecloud/kubeblocks/internal/common"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -106,7 +106,7 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 		Expect(len(stsList.Items)).Should(BeEquivalentTo(1))
 
 		By("Checking pods number and role label in StatefulSet")
-		podList, err := components.GetPodListByStatefulSet(ctx, k8sClient, &stsList.Items[0])
+		podList, err := common.GetPodListByStatefulSet(ctx, k8sClient, &stsList.Items[0])
 		Expect(err).To(Succeed())
 		Expect(len(podList)).Should(BeEquivalentTo(replicas))
 		for _, pod := range podList {

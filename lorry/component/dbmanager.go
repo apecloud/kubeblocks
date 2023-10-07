@@ -222,6 +222,14 @@ func (mgr *DBManagerBase) ShutDownWithWait() {
 	mgr.Logger.Info("Override me if need")
 }
 
+func (*DBManagerBase) JoinCurrentMemberToCluster(context.Context, *dcs.Cluster) error {
+	return nil
+}
+
+func (*DBManagerBase) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string) error {
+	return nil
+}
+
 func RegisterManager(characterType, workloadType string, manager DBManager) {
 	key := strings.ToLower(characterType + "_" + workloadType)
 	managers[key] = manager
@@ -306,11 +314,11 @@ func (*FakeManager) IsFirstMember() bool {
 }
 
 func (*FakeManager) JoinCurrentMemberToCluster(context.Context, *dcs.Cluster) error {
-	return fmt.Errorf("NotSupported")
+	return nil
 }
 
 func (*FakeManager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string) error {
-	return fmt.Errorf("NotSuppported")
+	return nil
 }
 
 func (*FakeManager) Promote(context.Context, *dcs.Cluster) error {

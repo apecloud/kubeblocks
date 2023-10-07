@@ -2,8 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.12.1
   labels:
     app.kubernetes.io/name: kubeblocks
   name: configurations.apps.kubeblocks.io
@@ -36,21 +35,12 @@ spec:
           spec:
             description: ConfigurationSpec defines the desired state of Configuration
             properties:
-              clusterDefRef:
-                description: clusterDefRef referencing ClusterDefinition name. This
-                  is an immutable attribute.
-                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                type: string
               clusterRef:
                 description: clusterRef references Cluster name.
                 type: string
                 x-kubernetes-validations:
                 - message: forbidden to update spec.clusterRef
                   rule: self == oldSelf
-              clusterVerRef:
-                description: clusterVerRef referencing ClusterVersion name.
-                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                type: string
               componentName:
                 description: componentName is cluster component name.
                 type: string
@@ -78,6 +68,104 @@ spec:
                         type: object
                       description: configFileParams is used to set the parameters
                         to be updated.
+                      type: object
+                    configSpec:
+                      description: configSpec is used to set the configuration template.
+                      properties:
+                        asEnvFrom:
+                          description: 'asEnvFrom is optional: the list of containers
+                            will be injected into EnvFrom.'
+                          items:
+                            type: string
+                          type: array
+                          x-kubernetes-list-type: set
+                        constraintRef:
+                          description: Specify the name of the referenced the configuration
+                            constraints object.
+                          maxLength: 63
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          type: string
+                        defaultMode:
+                          description: 'defaultMode is optional: mode bits used to
+                            set permissions on created files by default. Must be an
+                            octal value between 0000 and 0777 or a decimal value between
+                            0 and 511. YAML accepts both octal and decimal values,
+                            JSON requires decimal values for mode bits. Defaults to
+                            0644. Directories within the path are not affected by
+                            this setting. This might be in conflict with other options
+                            that affect the file mode, like fsGroup, and the result
+                            can be other mode bits set.'
+                          format: int32
+                          type: integer
+                        keys:
+                          description: Specify a list of keys. If empty, ConfigConstraint
+                            takes effect for all keys in configmap.
+                          items:
+                            type: string
+                          type: array
+                          x-kubernetes-list-type: set
+                        legacyRenderedConfigSpec:
+                          description: 'lazyRenderedConfigSpec is optional: specify
+                            the secondary rendered config spec.'
+                          properties:
+                            namespace:
+                              default: default
+                              description: Specify the namespace of the referenced
+                                the configuration template ConfigMap object. An empty
+                                namespace is equivalent to the "default" namespace.
+                              maxLength: 63
+                              pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                              type: string
+                            policy:
+                              default: none
+                              description: policy defines how to merge external imported
+                                templates into component templates.
+                              enum:
+                              - patch
+                              - replace
+                              - none
+                              type: string
+                            templateRef:
+                              description: Specify the name of the referenced the
+                                configuration template ConfigMap object.
+                              maxLength: 63
+                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - templateRef
+                          type: object
+                        name:
+                          description: Specify the name of configuration template.
+                          maxLength: 63
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          type: string
+                        namespace:
+                          default: default
+                          description: Specify the namespace of the referenced the
+                            configuration template ConfigMap object. An empty namespace
+                            is equivalent to the "default" namespace.
+                          maxLength: 63
+                          pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                          type: string
+                        templateRef:
+                          description: Specify the name of the referenced the configuration
+                            template ConfigMap object.
+                          maxLength: 63
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          type: string
+                        volumeName:
+                          description: volumeName is the volume name of PodTemplate,
+                            which the configuration file produced through the configuration
+                            template will be mounted to the corresponding volume.
+                            Must be a DNS_LABEL name. The volume name must be defined
+                            in podSpec.containers[*].volumeMounts.
+                          maxLength: 63
+                          pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
+                          type: string
+                      required:
+                      - name
+                      - templateRef
+                      - volumeName
                       type: object
                     importTemplateRef:
                       description: Specify the configuration template.
@@ -124,7 +212,6 @@ spec:
                 - name
                 x-kubernetes-list-type: map
             required:
-            - clusterDefRef
             - clusterRef
             - componentName
             type: object
@@ -223,6 +310,7 @@ spec:
                     phase:
                       description: phase is status of configurationItem.
                       enum:
+                      - Creating
                       - Init
                       - Running
                       - Pending

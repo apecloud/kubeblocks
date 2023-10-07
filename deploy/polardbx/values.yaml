@@ -1,0 +1,61 @@
+# Default values for PolarDB-X.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+clusterVersionOverride: ""
+
+roleProbe:
+  failureThreshold: 2
+  periodSeconds: 1
+  timeoutSeconds: 1
+
+# Related image configurations.
+images:
+  polardbx:
+    pullPolicy: IfNotPresent
+    # Repo of polardbx default images. Default is polardbx.
+    repository: polardbx
+
+    # Images for xstore(DN) tools updater.
+    toolsUpdater:
+      name: xstore-tools
+      tag: latest
+
+    # Image for DN engine
+    dn:
+      name: polardbx-engine-2.0
+      tag: latest
+
+    # Image for CN engine
+    cn:
+      name: polardbx-sql
+      tag: latest
+
+    # Image for CN initialization
+    init:
+      name: polardbx-init
+      tag: latest
+
+    # Image for CN engine
+    cdc:
+      name: polardbx-cdc
+      tag: latest
+
+    # Image for CN&CDC exporter
+    exporter:
+      name: polardbx-exporter
+      tag: latest
+
+  # Tool image settings for gms initialization
+  mysql:
+    repository: mysql
+    pullPolicy: IfNotPresent
+    tag: "8.0.30"
+
+  # Images for DN exporter
+  prom:
+    repository: prom
+    pullPolicy: IfNotPresent
+    mysqld_exporter:
+      name: mysqld-exporter
+      tag: v0.14.0

@@ -89,3 +89,8 @@ spec:
         values:
           - tke
           - aliyun
+      - key: KubeProvider
+        operator: DoesNotContain
+        values:
+          - huaweiCloud
+          - azure

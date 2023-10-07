@@ -5,53 +5,30 @@ metadata:
   labels:
     clusterdefinition.kubeblocks.io/name: postgresql
     {{- include "postgresql.labels" . | nindent 4 }}
-  annotations:
-    dataprotection.kubeblocks.io/reconfigure-ref: |
-      {
-        "name": "postgresql-configuration",
-        "key": "postgresql.conf",
-        "enable": {
-          "logfile": [{"key": "archive_command","value": "''"}]
-        },
-        "disable": {
-          "logfile": [{ "key": "archive_command","value": "'/bin/true'"}]
-        }
-      }
 spec:
   clusterDefinitionRef: postgresql
   backupPolicies:
   - componentDefRef: postgresql
-    retention:
-      ttl: 7d
-    schedule:
-      startingDeadlineMinutes: 120
-      snapshot:
-        enable: false
-        cronExpression: "0 18 * * *"
-      datafile:
-        enable: false
-        cronExpression: "0 18 * * *"
-      logfile:
-        enable: false
-        cronExpression: "*/2 * * * *"
-    snapshot:
-      target:
-        connectionCredentialKey:
-          passwordKey: password
-          usernameKey: username
-      hooks:
-        containerName: postgresql
-        preCommands:
-          - psql -c "CHECKPOINT;"
-    datafile:
-      backupToolName: postgres-basebackup
-      backupStatusUpdates:
-      - updateStage: post
-        useTargetPodServiceAccount: true
-    logfile:
-      backupToolName: postgres-pitr
-      target:
-        role: primary
-      backupStatusUpdates:
-      - updateStage: post
-        useTargetPodServiceAccount: true
+    retentionPeriod: 7d
+    target:
+      role: secondary
+    backupMethods:
+    - name: pg-basebackup
+      snapshotVolumes: false
+      actionSetName: postgres-basebackup
+      targetVolumes:
+        volumeMounts:
+        - name: data
+          mountPath: {{ .Values.dataMountPath }}
+    - name: volume-snapshot
+      snapshotVolumes: true
+      targetVolumes:
+        volumes:
+        - data
+    schedules:
+    - backupMethod: pg-basebackup
+      enabled: false
+      cronExpression: "0 18 * * *"
+    - backupMethod: volume-snapshot
+      enabled: false
+      cronExpression: "0 18 * * *"

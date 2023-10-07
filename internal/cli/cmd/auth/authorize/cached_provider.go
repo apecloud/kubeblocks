@@ -38,7 +38,7 @@ const (
 	tokenFile    = "token.json"
 
 	keyringKey     = "token"
-	keyringService = "kueblocks"
+	keyringService = "kubeblocks"
 	keyringLabel   = "KUBEBLOCKS CLI"
 
 	fileMode = 0o600

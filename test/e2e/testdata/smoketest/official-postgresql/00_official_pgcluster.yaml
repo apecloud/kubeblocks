@@ -1,0 +1,91 @@
+---
+# Source: official-postgresql-cluster/templates/rbac.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kb-official-pg
+  namespace: default
+  labels:
+    helm.sh/chart: official-postgresql-cluster-0.7.0-alpha.0
+    app.kubernetes.io/version: "14.7"
+    app.kubernetes.io/instance: official-pg
+---
+# Source: official-postgresql-cluster/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kb-official-pg
+  labels:
+    helm.sh/chart: official-postgresql-cluster-0.7.0-alpha.0
+    app.kubernetes.io/version: "14.7"
+    app.kubernetes.io/instance: official-pg
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubeblocks-volume-protection-pod-role
+subjects:
+  - kind: ServiceAccount
+    name: kb-official-pg
+    namespace: default
+---
+# Source: official-postgresql-cluster/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kb-official-pg
+  labels:
+    helm.sh/chart: official-postgresql-cluster-0.7.0-alpha.0
+    app.kubernetes.io/version: "14.7"
+    app.kubernetes.io/instance: official-pg
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubeblocks-cluster-pod-role
+subjects:
+  - kind: ServiceAccount
+    name: kb-official-pg
+    namespace: default
+---
+# Source: official-postgresql-cluster/templates/cluster.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: official-pg
+  namespace: default
+  labels: 
+    helm.sh/chart: official-postgresql-cluster-0.7.0-alpha.0
+    app.kubernetes.io/version: "14.7"
+    app.kubernetes.io/instance: official-pg
+spec:
+  clusterVersionRef: official-postgresql-14.7
+  terminationPolicy: Delete  
+  affinity:
+    podAntiAffinity: Preferred
+    topologyKeys:
+      - kubernetes.io/hostname
+    tenancy: SharedNode
+  clusterDefinitionRef: official-postgresql
+  componentSpecs:
+    - name: postgresql
+      componentDefRef: postgresql      
+      monitor: false      
+      replicas: 1
+      serviceAccountName: kb-official-pg
+      switchPolicy:
+        type: Noop      
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"      
+      volumeClaimTemplates:
+        - name: data # ref clusterDefinition components.containers.volumeMounts.name
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi      
+      services:

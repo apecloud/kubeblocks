@@ -40,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
 
 // ConditionsError cluster displays this status on list cmd when the status of ApplyResources or ProvisioningStarted condition is "False".
@@ -182,7 +183,7 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 		// filter back-up job pod
 		for _, pod := range objs.Pods.Items {
 			labels := pod.GetLabels()
-			if labels[constant.DataProtectionLabelBackupNameKey] == "" {
+			if labels[dptypes.DataProtectionLabelBackupNameKey] == "" {
 				podList = append(podList, pod)
 			}
 		}
@@ -247,7 +248,7 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 		}
 		// filter backups with cluster uid for excluding same cluster name
 		for _, v := range backups {
-			sourceClusterUID := v.Labels[constant.DataProtectionLabelClusterUIDKey]
+			sourceClusterUID := v.Labels[dptypes.DataProtectionLabelClusterUIDKey]
 			if sourceClusterUID == "" || sourceClusterUID == string(objs.Cluster.UID) {
 				objs.Backups = append(objs.Backups, v)
 			}

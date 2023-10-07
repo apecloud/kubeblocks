@@ -20,12 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	"github.com/apecloud/kubeblocks/internal/controller/configuration"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/configuration/validate"
+	"github.com/apecloud/kubeblocks/internal/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 

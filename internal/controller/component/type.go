@@ -47,6 +47,7 @@ type SynthesizedComponent struct {
 	StatefulSpec          *v1alpha1.StatefulSetSpec              `json:"statefulSpec,omitempty"`
 	ConsensusSpec         *v1alpha1.ConsensusSetSpec             `json:"consensusSpec,omitempty"`
 	ReplicationSpec       *v1alpha1.ReplicationSetSpec           `json:"replicationSpec,omitempty"`
+	RSMSpec               *v1alpha1.RSMSpec                      `json:"rsmSpec,omitempty"`
 	PodSpec               *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	Services              []corev1.Service                       `json:"services,omitempty"`
 	Probes                *v1alpha1.ClusterDefinitionProbes      `json:"probes,omitempty"`

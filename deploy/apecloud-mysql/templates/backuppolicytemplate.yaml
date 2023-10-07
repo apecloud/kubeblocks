@@ -11,39 +11,30 @@ spec:
   clusterDefinitionRef: apecloud-mysql
   backupPolicies:
   - componentDefRef: mysql
-    retention:
-      ttl: 7d
-    schedule:
-      startingDeadlineMinutes: 120
-      snapshot:
-        enable: false
-        cronExpression: "0 18 * * *"
-      datafile:
-        enable: false
-        cronExpression: "0 18 * * *"
-      logfile:
-        enable: false
-        cronExpression: "*/5 * * * *"
-    snapshot:
-      hooks:
-        containerName: mysql
-        preCommands:
-        - touch {{ .Values.mysqlConfigs.dataDir }}/.restore_new_cluster; sync
-        postCommands:
-        - "rm -f {{ .Values.mysqlConfigs.dataDir }}/.restore_new_cluster; sync"
-      target:
-        role: leader
-    datafile:
-      backupToolName: xtrabackup-for-apecloud-mysql
-      backupStatusUpdates:
-      - updateStage: post
-        useTargetPodServiceAccount: true
-      target:
-        role: follower
-    logfile:
-      backupToolName: apecloud-mysql-pitr-tool
-      backupStatusUpdates:
-      - updateStage: post
-        useTargetPodServiceAccount: true
-      target:
-        role: follower
+    retentionPeriod: 7d
+    target:
+      role: follower
+    backupMethods:
+    - name: xtrabackup
+      snapshotVolumes: false
+      actionSetName: xtrabackup-for-apecloud-mysql
+      targetVolumes:
+        volumeMounts:
+        - name: data
+          mountPath: {{ .Values.mysqlConfigs.dataMountPath }}
+    - name: volume-snapshot
+      snapshotVolumes: true
+      actionSetName: volumesnapshot-for-apecloud-mysql
+      targetVolumes:
+        volumes:
+        - data
+        volumeMounts:
+        - name: data
+          mountPath: {{ .Values.mysqlConfigs.dataMountPath }}
+    schedules:
+    - backupMethod: xtrabackup
+      enabled: false
+      cronExpression: "0 18 * * *"
+    - backupMethod: volume-snapshot
+      enabled: false
+      cronExpression: "0 18 * * *"

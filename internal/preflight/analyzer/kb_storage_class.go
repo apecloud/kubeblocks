@@ -33,7 +33,7 @@ import (
 
 const (
 	StorageClassPath      = "cluster-resources/storage-classes.json"
-	StorageClassErrorPath = "cluster-resources/storage-classes-error.json"
+	StorageClassErrorPath = "cluster-resources/storage-classes-errors.json"
 )
 
 type AnalyzeStorageClassByKb struct {
@@ -68,8 +68,13 @@ func (a *AnalyzeStorageClassByKb) analyzeStorageClass(analyzer *preflightv1beta2
 	}
 
 	storageClassesErrorData, err := getFile(StorageClassErrorPath)
-	if err != nil && storageClassesErrorData != nil && len(storageClassesErrorData) > 0 && len(storageClassesData) == 0 {
-		return newWarnResultWithMessage(a.Title(), fmt.Sprintf("get nodes list from k8s failed, err:%v", err)), err
+	if err == nil && storageClassesErrorData != nil && len(storageClassesErrorData) > 0 && len(storageClassesData) == 0 {
+		var values []string
+		err = json.Unmarshal(storageClassesErrorData, &values)
+		if err != nil || len(values) == 0 {
+			return newWarnResultWithMessage(a.Title(), fmt.Sprintf("get storage class failed, err:%v", storageClassesErrorData)), err
+		}
+		return newWarnResultWithMessage(a.Title(), fmt.Sprintf("get storage class failed, err:%v", values[0])), nil
 	}
 
 	var storageClasses storagev1beta1.StorageClassList

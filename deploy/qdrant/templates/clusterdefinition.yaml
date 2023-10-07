@@ -130,7 +130,7 @@ spec:
             volumeMounts:
               - mountPath: /qdrant/config/
                 name: qdrant-config
-              - mountPath: /qdrant/storage
+              - mountPath: {{ .Values.dataMountPath }}
                 name: data
               - mountPath: /qdrant/scripts
                 name: scripts

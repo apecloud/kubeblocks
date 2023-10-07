@@ -28,7 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
@@ -115,18 +116,23 @@ type ClusterBackup struct {
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
 
-	// retentionPeriod is a time string ending with the 'd'|'D'|'h'|'H' character to describe how long
-	// the Backup should be retained. if not set, will be retained forever.
-	// +kubebuilder:validation:Pattern:=`^\d+[d|D|h|H]$`
-	// +kubebuilder:default="1d"
+	// retentionPeriod determines a duration up to which the backup should be kept.
+	// controller will remove all backups that are older than the RetentionPeriod.
+	// For example, RetentionPeriod of `30d` will keep only the backups of last 30 days.
+	// Sample duration format:
+	// - years: 	2y
+	// - months: 	6mo
+	// - days: 		30d
+	// - hours: 	12h
+	// - minutes: 	30m
+	// You can also combine the above durations. For example: 30d12h30m
+	// +kubebuilder:default="7d"
 	// +optional
-	RetentionPeriod *string `json:"retentionPeriod,omitempty"`
+	RetentionPeriod dpv1alpha1.RetentionPeriod `json:"retentionPeriod,omitempty"`
 
-	// backup method, support: snapshot, backupTool.
-	// +kubebuilder:validation:Enum=snapshot;backupTool
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=snapshot
-	Method dataprotectionv1alpha1.BackupMethod `json:"method"`
+	// backup method name to use, that is defined in backupPolicy.
+	// +optional
+	Method string `json:"method"`
 
 	// the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
 	// +optional
@@ -134,9 +140,9 @@ type ClusterBackup struct {
 
 	// startingDeadlineMinutes defines the deadline in minutes for starting the backup job
 	// if it misses scheduled time for any reason.
-	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=1440
+	// +optional
 	StartingDeadlineMinutes *int64 `json:"startingDeadlineMinutes,omitempty"`
 
 	// repoName is the name of the backupRepo, if not set, will use the default backupRepo.
@@ -349,11 +355,17 @@ type ClusterComponentStatus struct {
 
 	// consensusSetStatus specifies the mapping of role and pod name.
 	// +optional
+	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use MembersStatus instead."
 	ConsensusSetStatus *ConsensusSetStatus `json:"consensusSetStatus,omitempty"`
 
 	// replicationSetStatus specifies the mapping of role and pod name.
 	// +optional
+	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use MembersStatus instead."
 	ReplicationSetStatus *ReplicationSetStatus `json:"replicationSetStatus,omitempty"`
+
+	// members' status.
+	// +optional
+	MembersStatus []workloads.MemberStatus `json:"membersStatus,omitempty"`
 }
 
 type ConsensusSetStatus struct {

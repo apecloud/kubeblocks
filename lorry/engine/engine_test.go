@@ -53,14 +53,14 @@ var _ = Describe("Engine", func() {
 	})
 
 	It("new execute command ", func() {
-		for _, typeName := range []string{stateMysql, statePostgreSQL} {
+		for _, typeName := range []string{stateMysql, statePostgreSQL, stateRedis} {
 			engine, _ := New(typeName)
 			Expect(engine).ShouldNot(BeNil())
 
 			_, _, err := engine.ExecuteCommand([]string{"some", "cmd"})
 			Expect(err).Should(Succeed())
 		}
-		for _, typeName := range []string{stateRedis, stateMongoDB, stateNebula} {
+		for _, typeName := range []string{stateMongoDB, stateNebula} {
 			engine, _ := New(typeName)
 			Expect(engine).ShouldNot(BeNil())
 

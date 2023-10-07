@@ -2,8 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.12.1
   labels:
     app.kubernetes.io/name: kubeblocks
   name: storageproviders.storage.kubeblocks.io
@@ -18,7 +17,17 @@ spec:
     singular: storageprovider
   scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: STATUS
+      type: string
+    - jsonPath: .spec.csiDriverName
+      name: CSIDRIVER
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: StorageProvider is the Schema for the storageproviders API StorageProvider
@@ -48,6 +57,11 @@ spec:
                   by the CSI driver. The template will be rendered with the following
                   variables: - Parameters: a map of parameters defined in the ParametersSchema.'
                 type: string
+              datasafedConfigTemplate:
+                description: 'A Go template for rendering a config used by the datasafed
+                  command. The template will be rendered with the following variables:
+                  - Parameters: a map of parameters defined in the ParametersSchema.'
+                type: string
               parametersSchema:
                 description: The schema describes the parameters required by this
                   StorageProvider, when rendering the templates.
@@ -64,6 +78,12 @@ spec:
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                 type: object
+              persistentVolumeClaimTemplate:
+                description: 'A Go template for rendering a PersistentVolumeClaim.
+                  The template will be rendered with the following variables: - Parameters:
+                  a map of parameters defined in the ParametersSchema. - GeneratedStorageClassName:
+                  the name of the storage class generated with the StorageClassTemplate.'
+                type: string
               storageClassTemplate:
                 description: 'A Go template for rendering a storage class which will
                   be used by the CSI driver. The template will be rendered with the

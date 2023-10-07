@@ -28,7 +28,7 @@ Restarting a PostgreSQL cluster triggers a concurrent restart and the leader may
    Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
 
    ```bash
-   kbcli cluster restart NAME --components="pg-replication" \
+   kbcli cluster restart NAME --components="postgresql" \
    --ttlSecondsAfterSucceed=30
    ```
 
@@ -49,7 +49,7 @@ Restarting a PostgreSQL cluster triggers a concurrent restart and the leader may
      clusterRef: pg-cluster
      type: Restart 
      restart:
-     - componentName: pg-replication
+     - componentName: postgresql
    EOF
    ```
 

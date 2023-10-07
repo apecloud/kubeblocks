@@ -72,7 +72,7 @@ var _ = Describe("kubeblocks upgrade", func() {
 		Expect(o.Namespace).To(Equal("test"))
 	})
 
-	It("run upgrade double-check", func() {
+	It("double-check when version change", func() {
 		mockDeploy := func() *appsv1.Deployment {
 			deploy := &appsv1.Deployment{}
 			deploy.SetLabels(map[string]string{
@@ -99,6 +99,30 @@ var _ = Describe("kubeblocks upgrade", func() {
 		o.autoApprove = true
 		Expect(o.Upgrade()).Should(Succeed())
 
+	})
+
+	It("helm ValueOpts upgrade", func() {
+		mockDeploy := func() *appsv1.Deployment {
+			deploy := &appsv1.Deployment{}
+			deploy.SetLabels(map[string]string{
+				"app.kubernetes.io/name":    types.KubeBlocksChartName,
+				"app.kubernetes.io/version": "0.3.0",
+			})
+			return deploy
+		}
+
+		o := &InstallOptions{
+			Options: Options{
+				IOStreams: streams,
+				HelmCfg:   helm.NewFakeConfig(namespace),
+				Namespace: "default",
+				Client:    testing.FakeClientSet(mockDeploy()),
+				Dynamic:   testing.FakeDynamicClient(),
+			},
+			Version: "",
+		}
+		o.ValueOpts.Values = []string{"replicaCount=2"}
+		Expect(o.Upgrade()).Should(Succeed())
 	})
 
 	It("run upgrade", func() {

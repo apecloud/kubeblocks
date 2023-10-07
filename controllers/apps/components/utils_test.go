@@ -40,10 +40,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 func TestIsFailedOrAbnormal(t *testing.T) {
@@ -65,82 +63,7 @@ func TestIsProbeTimeout(t *testing.T) {
 	}
 }
 
-func TestGetComponentPhase(t *testing.T) {
-	var (
-		isFailed   = true
-		isAbnormal = true
-	)
-	getComponentPhase := func(isFailed, isAbnormal bool) appsv1alpha1.ClusterComponentPhase {
-		var componentPhase appsv1alpha1.ClusterComponentPhase
-		if isFailed {
-			componentPhase = appsv1alpha1.FailedClusterCompPhase
-		} else if isAbnormal {
-			componentPhase = appsv1alpha1.AbnormalClusterCompPhase
-		}
-		return componentPhase
-	}
-	status := getComponentPhase(isFailed, isAbnormal)
-	if status != appsv1alpha1.FailedClusterCompPhase {
-		t.Error("function getComponentPhase should return Failed")
-	}
-	isFailed = false
-	status = getComponentPhase(isFailed, isAbnormal)
-	if status != appsv1alpha1.AbnormalClusterCompPhase {
-		t.Error("function getComponentPhase should return Abnormal")
-	}
-	isAbnormal = false
-	status = getComponentPhase(isFailed, isAbnormal)
-	if status != "" {
-		t.Error(`function getComponentPhase should return ""`)
-	}
-}
-
-func TestGetPhaseWithNoAvailableReplicas(t *testing.T) {
-	status := getPhaseWithNoAvailableReplicas(int32(0))
-	if status != "" {
-		t.Error(`function getComponentPhase should return ""`)
-	}
-	status = getPhaseWithNoAvailableReplicas(int32(2))
-	if status != appsv1alpha1.FailedClusterCompPhase {
-		t.Error(`function getComponentPhase should return "Failed"`)
-	}
-}
-
-func TestAvailableReplicasAreConsistent(t *testing.T) {
-	isConsistent := availableReplicasAreConsistent(int32(1), int32(1), int32(1))
-	if !isConsistent {
-		t.Error(`function getComponentPhase should return "true"`)
-	}
-	isConsistent = availableReplicasAreConsistent(int32(1), int32(2), int32(1))
-	if isConsistent {
-		t.Error(`function getComponentPhase should return "false"`)
-	}
-}
-
-func TestGetCompPhaseByConditions(t *testing.T) {
-	existLatestRevisionFailedPod := true
-	primaryReplicaIsReady := true
-	phase := getCompPhaseByConditions(existLatestRevisionFailedPod, primaryReplicaIsReady, int32(1), int32(1), int32(1))
-	if phase != "" {
-		t.Error(`function getComponentPhase should return ""`)
-	}
-	phase = getCompPhaseByConditions(existLatestRevisionFailedPod, primaryReplicaIsReady, int32(2), int32(1), int32(1))
-	if phase != appsv1alpha1.AbnormalClusterCompPhase {
-		t.Error(`function getComponentPhase should return "Abnormal"`)
-	}
-	primaryReplicaIsReady = false
-	phase = getCompPhaseByConditions(existLatestRevisionFailedPod, primaryReplicaIsReady, int32(2), int32(1), int32(1))
-	if phase != appsv1alpha1.FailedClusterCompPhase {
-		t.Error(`function getComponentPhase should return "Failed"`)
-	}
-	existLatestRevisionFailedPod = false
-	phase = getCompPhaseByConditions(existLatestRevisionFailedPod, primaryReplicaIsReady, int32(2), int32(1), int32(1))
-	if phase != "" {
-		t.Error(`function getComponentPhase should return ""`)
-	}
-}
-
-var _ = Describe("Consensus Component", func() {
+var _ = Describe("Component", func() {
 	var (
 		randomStr          = testCtx.GetRandomStr()
 		clusterDefName     = "mysql-clusterdef-" + randomStr
@@ -175,8 +98,8 @@ var _ = Describe("Consensus Component", func() {
 
 	AfterEach(cleanAll)
 
-	Context("Consensus Component test", func() {
-		It("Consensus Component test", func() {
+	Context("Component test", func() {
+		It("Component test", func() {
 			By(" init cluster, statefulSet, pods")
 			_, _, cluster := testapps.InitClusterWithHybridComps(&testCtx, clusterDefName,
 				clusterVersionName, clusterName, statelessCompName, "stateful", consensusCompName)
@@ -246,38 +169,6 @@ var _ = Describe("Consensus Component", func() {
 			delete(podNoLabel.Labels, constant.KBAppComponentLabelKey)
 			_, _, err = GetComponentInfoByPod(ctx, k8sClient, *cluster, podNoLabel)
 			Expect(err).ShouldNot(Succeed())
-
-			By("test getComponentPhaseWhenPodsNotReady function")
-			consensusComp := cluster.Spec.GetComponentByName(consensusCompName)
-			checkExistFailedPodOfLatestRevision := func(pod *corev1.Pod, workload metav1.Object) bool {
-				sts := workload.(*appsv1.StatefulSet)
-				return !intctrlutil.PodIsReady(pod) && intctrlutil.PodIsControlledByLatestRevision(pod, sts)
-			}
-			// component phase should be Failed when available replicas is 0
-			phase := getComponentPhaseWhenPodsNotReady(podList, sts, consensusComp.Replicas,
-				sts.Status.AvailableReplicas, nil, checkExistFailedPodOfLatestRevision)
-			Expect(phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
-
-			// mock available replicas to component replicas
-			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
-				testk8s.MockStatefulSetReady(sts)
-			})).Should(Succeed())
-			phase = getComponentPhaseWhenPodsNotReady(podList, sts, consensusComp.Replicas,
-				sts.Status.AvailableReplicas, nil, checkExistFailedPodOfLatestRevision)
-			Expect(len(phase) == 0).Should(BeTrue())
-
-			// mock component is abnormal
-			pod := &podList.Items[0]
-			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
-				pod.Status.Conditions = nil
-			})).Should(Succeed())
-			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
-				sts.Status.AvailableReplicas = *sts.Spec.Replicas - 1
-			})).Should(Succeed())
-			phase = getComponentPhaseWhenPodsNotReady(podList, sts, consensusComp.Replicas,
-				sts.Status.AvailableReplicas, nil, checkExistFailedPodOfLatestRevision)
-			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
-
 		})
 
 		It("test GetComponentInfoByPod with no cluster componentSpec", func() {
@@ -402,7 +293,7 @@ var _ = Describe("Component utils test", func() {
 				SetOwnerReferences("apps/v1", constant.StatefulSetKind, nil).
 				AddAppInstanceLabel(clusterName).
 				AddAppComponentLabel(compName).
-				AddAppManangedByLabel().
+				AddAppManagedByLabel().
 				AddRoleLabel(role).
 				AddConsensusSetAccessModeLabel(mode).
 				AddControllerRevisionHashLabel("").

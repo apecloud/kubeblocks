@@ -41,13 +41,6 @@ type Operation func(ctx context.Context, req *ProbeRequest, resp *ProbeResponse)
 
 type OpsResult map[string]interface{}
 
-type GlobalInfo struct {
-	Event        string            `json:"event,omitempty"`
-	Term         int               `json:"term,omitempty"`
-	PodName2Role map[string]string `json:"map,omitempty"`
-	Message      string            `json:"message,omitempty"`
-}
-
 // AccessMode defines SVC access mode enums.
 // +enum
 type AccessMode string
@@ -76,14 +69,12 @@ type BaseOperations struct {
 	DBAddress              string
 	DBType                 string
 	OriRole                string
-	OriGlobalInfo          *GlobalInfo
 	DBRoles                map[string]AccessMode
 	Logger                 logr.Logger
 	Metadata               map[string]string
 	InitIfNeed             func() bool
 	Manager                component.DBManager
 	GetRole                func(context.Context, *ProbeRequest, *ProbeResponse) (string, error)
-	GetGlobalInfo          func(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (GlobalInfo, error)
 
 	OperationsMap map[OperationKind]Operation
 }
@@ -204,6 +195,7 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *ProbeRequest) (*Prob
 	if err != nil {
 		return nil, err
 	}
+	ops.Logger.Info("operation called", "operation", req.Operation, "result", opsRes)
 	if opsRes != nil {
 		res, _ := json.Marshal(opsRes)
 		resp.Data = res
@@ -225,8 +217,14 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *ProbeRequest, 
 		return opsRes, nil
 	}
 
-	// sql exec timeout needs to be less than httpget's timeout which by default 1s.
-	ctx1, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	timeoutSeconds := defaultRoleProbeTimeoutSeconds
+	if viper.IsSet(roleProbeTimeoutVarName) {
+		timeoutSeconds = viper.GetInt(roleProbeTimeoutVarName)
+	}
+	// lorry utilizes the pod readiness probe to trigger role probe and 'timeoutSeconds' is directly copied from the 'probe.timeoutSeconds' field of pod.
+	// here we give 80% of the total time to role probe job and leave the remaining 20% to kubelet to handle the readiness probe related tasks.
+	timeout := time.Duration(timeoutSeconds) * (800 * time.Millisecond)
+	ctx1, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	role, err := ops.GetRole(ctx1, req, resp)
 	if err != nil {
@@ -235,7 +233,7 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *ProbeRequest, 
 		opsRes["message"] = err.Error()
 		if ops.CheckRoleFailedCount%ops.FailedEventReportFrequency == 0 {
 			ops.Logger.Info("role checks failed continuously", "times", ops.CheckRoleFailedCount)
-			SentProbeEvent(ctx, opsRes, ops.Logger)
+			SentProbeEvent(ctx, opsRes, resp, ops.Logger)
 		}
 		ops.CheckRoleFailedCount++
 		return opsRes, nil
@@ -252,7 +250,7 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *ProbeRequest, 
 	opsRes["role"] = role
 	if ops.OriRole != role {
 		ops.OriRole = role
-		SentProbeEvent(ctx, opsRes, ops.Logger)
+		SentProbeEvent(ctx, opsRes, resp, ops.Logger)
 	}
 
 	// RoleUnchangedCount is the count of consecutive role unchanged checks.
@@ -291,51 +289,6 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *ProbeRequest, re
 	}
 	opsRes["event"] = OperationSuccess
 	opsRes["role"] = role
-	return opsRes, nil
-}
-
-func (ops *BaseOperations) GetGlobalInfoOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
-	opsRes := OpsResult{}
-	opsRes["operation"] = GetGlobalInfoOperation
-	if ops.GetGlobalInfo == nil {
-		message := fmt.Sprintf("getGlobalInfo operation is not implemented for %v", ops.DBType)
-		ops.Logger.Error(fmt.Errorf("not implemented"), message)
-		opsRes["event"] = OperationNotImplemented
-		opsRes["message"] = message
-		resp.Metadata[StatusCode] = OperationNotFoundHTTPCode
-		return opsRes, nil
-	}
-
-	globalInfo, err := ops.GetGlobalInfo(ctx, req, resp)
-	if err != nil {
-		ops.Logger.Error(err, "error executing GlobalInfo")
-		opsRes["event"] = OperationFailed
-		opsRes["message"] = err.Error()
-		if ops.CheckRoleFailedCount%ops.FailedEventReportFrequency == 0 {
-			ops.Logger.Info("getRole failed continuously", "failed times", ops.CheckRoleFailedCount)
-			SentProbeEvent(ctx, opsRes, ops.Logger)
-		}
-		// just reuse the checkRoleFailCount temporarily
-		ops.CheckRoleFailedCount++
-		return opsRes, nil
-	}
-
-	ops.CheckRoleFailedCount = 0
-
-	for _, role := range globalInfo.PodName2Role {
-		if isValid, message := ops.roleValidate(role); !isValid {
-			opsRes["event"] = OperationInvalid
-			opsRes["message"] = message
-			return opsRes, nil
-		}
-	}
-
-	globalInfo.Transform(opsRes)
-	if ops.OriGlobalInfo == nil || globalInfo.ShouldUpdate(*ops.OriGlobalInfo) {
-		ops.OriGlobalInfo = &globalInfo
-		SentProbeEvent(ctx, opsRes, ops.Logger)
-	}
-
 	return opsRes, nil
 }
 
@@ -381,7 +334,7 @@ func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *ProbeReques
 		if ops.CheckRunningFailedCount%ops.FailedEventReportFrequency == 0 {
 			ops.Logger.Info("running checks failed continuously", "times", ops.CheckRunningFailedCount)
 			// resp.Metadata[StatusCode] = OperationFailedHTTPCode
-			SentProbeEvent(ctx, opsRes, ops.Logger)
+			SentProbeEvent(ctx, opsRes, resp, ops.Logger)
 		}
 		ops.CheckRunningFailedCount++
 		return opsRes, nil
@@ -476,10 +429,11 @@ func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *ProbeRequest,
 func (ops *BaseOperations) JoinMemberOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
 	manager, err := component.GetDefaultManager()
-	if err != nil {
-		opsRes["event"] = OperationFailed
+	if manager == nil {
+		// manager for the DB is not supported, just return
+		opsRes["event"] = OperationSuccess
 		opsRes["message"] = err.Error()
-		return opsRes, err
+		return opsRes, nil
 	}
 
 	dcsStore := dcs.GetStore()
@@ -515,10 +469,11 @@ func (ops *BaseOperations) JoinMemberOps(ctx context.Context, req *ProbeRequest,
 func (ops *BaseOperations) LeaveMemberOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
 	manager, err := component.GetDefaultManager()
-	if err != nil {
-		opsRes["event"] = OperationFailed
+	if manager == nil {
+		// manager for the DB is not supported, just return
+		opsRes["event"] = OperationSuccess
 		opsRes["message"] = err.Error()
-		return opsRes, err
+		return opsRes, nil
 	}
 
 	dcsStore := dcs.GetStore()
@@ -548,30 +503,4 @@ func (ops *BaseOperations) LeaveMemberOps(ctx context.Context, req *ProbeRequest
 	opsRes["event"] = OperationSuccess
 	opsRes["message"] = "left of the current member is complete"
 	return opsRes, nil
-}
-
-func (g *GlobalInfo) ShouldUpdate(another GlobalInfo) bool {
-	if g.Term != another.Term {
-		return g.Term < another.Term
-	}
-	if g.Message != another.Message || g.Event != another.Event {
-		return true
-	}
-	for k, v := range g.PodName2Role {
-		if s, ok := another.PodName2Role[k]; ok {
-			if s != v {
-				return true
-			}
-		} else {
-			return true
-		}
-	}
-	return false
-}
-
-func (g *GlobalInfo) Transform(result OpsResult) {
-	result["event"] = g.Event
-	result["term"] = g.Term
-	result["message"] = g.Message
-	result["map"] = g.PodName2Role
 }

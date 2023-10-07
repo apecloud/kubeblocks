@@ -12,8 +12,8 @@ metadata:
 allowVolumeExpansion: true
 parameters:
   ## parameters references: https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/master/docs/parameters.md
-  type: {{ .Values.storageClass.provider.eks.volumeType }} # io2, io1, gp3, gp2 are all SSD variant
-  "csi.storage.k8s.io/fstype": {{ .Values.storageClass.provider.eks.fsType | default "xfs" }}
+  type: {{ .Values.storageClass.provider.aws.volumeType }} # io2, io1, gp3, gp2 are all SSD variant
+  "csi.storage.k8s.io/fstype": {{ .Values.storageClass.provider.aws.fsType | default "xfs" }}
 provisioner: ebs.csi.aws.com
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
@@ -29,8 +29,8 @@ metadata:
 allowVolumeExpansion: true
 parameters:
   ## refer: https://github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver/issues/617
-  type: {{ .Values.storageClass.provider.gke.volumeType }}
-  csi.storage.k8s.io/fstype: {{ .Values.storageClass.provider.gke.fsType | default "xfs" }}
+  type: {{ .Values.storageClass.provider.gcp.volumeType }}
+  csi.storage.k8s.io/fstype: {{ .Values.storageClass.provider.gcp.fsType | default "xfs" }}
 provisioner: pd.csi.storage.gke.io
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
@@ -62,7 +62,7 @@ metadata:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 parameters:
   ## parameters references: https://cloud.tencent.com/document/product/457/44239, the fsType is not supported by tke.
-  type: {{ .Values.storageClass.provider.tke.volumeType }}
+  type: {{ .Values.storageClass.provider.tencentCloud.volumeType }}
 reclaimPolicy: Delete
 provisioner: com.tencent.cloud.csi.cbs
 volumeBindingMode: WaitForFirstConsumer
@@ -79,12 +79,31 @@ metadata:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 parameters:
   # parameters references: https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/docs/driver-parameters.md
-  fsType: {{ .Values.storageClass.provider.aks.fsType | default "xfs" }}
-  kind: {{ .Values.storageClass.provider.aks.volumeType }}
+  fsType: {{ .Values.storageClass.provider.azure.fsType | default "xfs" }}
+  kind: {{ .Values.storageClass.provider.azure.volumeType }}
   skuName: Standard_LRS
 provisioner: kubernetes.io/azure-disk
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
+---
+{{- else if eq $cloudProvider "huaweiCloud" }} # huawei cloud
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ $scName }}
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+parameters:
+  # parameters references: https://support.huaweicloud.com/usermanual-cce/cce_10_0380.html#section3
+  csi.storage.k8s.io/csi-driver-name: disk.csi.everest.io
+  csi.storage.k8s.io/fstype: {{ .Values.storageClass.provider.huaweiCloud.fsType | default "xfs" }}
+  everest.io/disk-volume-type: {{ .Values.storageClass.provider.huaweiCloud.volumeType }}
+  everest.io/passthrough: "true"
+provisioner: everest-csi-provisioner
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
 ---
 {{- end }}
 {{- end }}

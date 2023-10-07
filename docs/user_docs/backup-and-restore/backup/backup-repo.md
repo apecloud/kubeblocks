@@ -130,7 +130,7 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
        --provider oss \
        --region cn-zhangjiakou \
        --bucket  test-kb-backup \
-       # --endpoint oss-cn-zhangjiakou-internal.aliyuncs.com \ To display the specified oss endpoint
+       # --endpoint https://oss-cn-zhangjiakou-internal.aliyuncs.com \ To display the specified oss endpoint
        --access-key-id <ACCESS KEY> \
        --secret-access-key <SECRET KEY> \
        --default

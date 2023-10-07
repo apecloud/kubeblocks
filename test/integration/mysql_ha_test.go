@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
+	"github.com/apecloud/kubeblocks/internal/common"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -121,7 +121,7 @@ var _ = Describe("MySQL High-Availability function", func() {
 		By("Checking pods' role label")
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
 		sts := &stsList.Items[0]
-		pods, err := components.GetPodListByStatefulSet(ctx, k8sClient, sts)
+		pods, err := common.GetPodListByStatefulSet(ctx, k8sClient, sts)
 		Expect(err).To(Succeed())
 		// should have 3 pods
 		Expect(len(pods)).Should(Equal(3))

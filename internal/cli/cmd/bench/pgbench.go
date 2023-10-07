@@ -190,10 +190,6 @@ func (o *PgBenchOptions) Validate() error {
 		return fmt.Errorf("database is required")
 	}
 
-	if err := validateBenchmarkExist(o.factory, o.IOStreams, o.name); err != nil {
-		return err
-	}
-
 	return nil
 }
 

@@ -111,5 +111,7 @@ pgbouncer:
     tag: 1.19.0
     pullPolicy: IfNotPresent
 
+dataMountPath: /home/postgres/pgdata
+
 logConfigs:
   running: /home/postgres/pgdata/pgroot/data/log/postgresql-*

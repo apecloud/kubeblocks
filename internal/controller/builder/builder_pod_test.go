@@ -31,33 +31,48 @@ var _ = Describe("pod builder", func() {
 		name := "foo"
 		ns := "default"
 		port := int32(12345)
-		container := corev1.Container{
-			Name:  "foo-1",
-			Image: "bar-2",
-			Ports: []corev1.ContainerPort{
-				{
-					Name:          "foo-1",
+		container := *NewContainerBuilder("foo-1").
+			SetImage("bar-1").
+			AddPorts(corev1.ContainerPort{
+				Name:          "foo-1",
+				Protocol:      corev1.ProtocolTCP,
+				ContainerPort: port,
+			}).GetObject()
+		containers := []corev1.Container{
+			*NewContainerBuilder("foo-2").SetImage("bar-2").
+				AddPorts(corev1.ContainerPort{
+					Name:          "foo-2",
 					Protocol:      corev1.ProtocolTCP,
 					ContainerPort: port,
+				}).GetObject(),
+		}
+		volumes := []corev1.Volume{
+			{
+				Name: "data",
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
 				},
 			},
 		}
-		containers := []corev1.Container{
+		restartPolicy := corev1.RestartPolicyOnFailure
+		user := int64(0)
+		ctx := corev1.PodSecurityContext{
+			RunAsUser: &user,
+		}
+		tolerations := []corev1.Toleration{
 			{
-				Name:  "foo-2",
-				Image: "bar-2",
-				Ports: []corev1.ContainerPort{
-					{
-						Name:          "foo-2",
-						Protocol:      corev1.ProtocolTCP,
-						ContainerPort: port,
-					},
-				},
+				Key:      "node",
+				Operator: corev1.TolerationOpEqual,
+				Value:    "node-0",
 			},
 		}
 		pod := NewPodBuilder(ns, name).
 			SetContainers(containers).
 			AddContainer(container).
+			AddVolumes(volumes...).
+			SetRestartPolicy(restartPolicy).
+			SetSecurityContext(ctx).
+			AddTolerations(tolerations...).
 			GetObject()
 
 		Expect(pod.Name).Should(Equal(name))
@@ -65,5 +80,12 @@ var _ = Describe("pod builder", func() {
 		Expect(pod.Spec.Containers).Should(HaveLen(2))
 		Expect(pod.Spec.Containers[0]).Should(Equal(containers[0]))
 		Expect(pod.Spec.Containers[1]).Should(Equal(container))
+		Expect(pod.Spec.Volumes).Should(HaveLen(1))
+		Expect(pod.Spec.Volumes[0]).Should(Equal(volumes[0]))
+		Expect(pod.Spec.RestartPolicy).Should(Equal(restartPolicy))
+		Expect(pod.Spec.SecurityContext).ShouldNot(BeNil())
+		Expect(*pod.Spec.SecurityContext).Should(Equal(ctx))
+		Expect(pod.Spec.Tolerations).Should(HaveLen(1))
+		Expect(pod.Spec.Tolerations[0]).Should(Equal(tolerations[0]))
 	})
 })

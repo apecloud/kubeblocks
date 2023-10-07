@@ -477,8 +477,8 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v4.5.7
-CONTROLLER_TOOLS_VERSION ?= v0.9.0
+KUSTOMIZE_VERSION ?= v5.1.1
+CONTROLLER_TOOLS_VERSION ?= v0.12.1
 CUE_VERSION ?= v0.4.3
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "$(GITHUB_PROXY)https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
@@ -646,8 +646,24 @@ else ifeq ($(TEST_TYPE), kafka)
 	$(HELM) template kafka-cluster deploy/kafka-cluster > test/e2e/testdata/smoketest/kafka/00_kafkacluster.yaml
 else ifeq ($(TEST_TYPE), foxlake)
 	$(HELM) dependency build deploy/foxlake-cluster --skip-refresh
-	$(HELM) upgrade --install etcd deploy/foxlake
+	$(HELM) upgrade --install foxlake deploy/foxlake
 	$(HELM) template foxlake-cluster deploy/foxlake-cluster > test/e2e/testdata/smoketest/foxlake/00_foxlakecluster.yaml
+else ifeq ($(TEST_TYPE), oceanbase)
+	$(HELM) dependency build deploy/oceanbase-cluster --skip-refresh
+	$(HELM) upgrade --install oceanbase deploy/oceanbase
+	$(HELM) template oceanbase-cluster deploy/oceanbase-cluster > test/e2e/testdata/smoketest/oceanbase/00_oceanbasecluster.yaml
+else ifeq ($(TEST_TYPE), official-postgresql)
+	$(HELM) dependency build deploy/official-postgresql-cluster --skip-refresh
+	$(HELM) upgrade --install official-postgresql deploy/official-postgresql
+	$(HELM) template official-pg deploy/official-postgresql-cluster > test/e2e/testdata/smoketest/official-postgresql/00_official_pgcluster.yaml
+else ifeq ($(TEST_TYPE), openldap)
+	$(HELM) dependency build deploy/openldap-cluster --skip-refresh
+	$(HELM) upgrade --install openldap deploy/openldap
+	$(HELM) template openldap-cluster deploy/openldap-cluster > test/e2e/testdata/smoketest/openldap/00_openldapcluster.yaml
+else ifeq ($(TEST_TYPE), orioledb)
+	$(HELM) dependency build deploy/orioledb-cluster --skip-refresh
+	$(HELM) upgrade --install orioledb deploy/orioledb
+	$(HELM) template oriole-cluster deploy/orioledb-cluster > test/e2e/testdata/smoketest/orioledb/00_orioledbcluster.yaml
 else
 	$(error "test type does not exist")
 endif
@@ -685,6 +701,12 @@ else ifeq ($(TEST_TYPE), kafka)
 	$(HELM) upgrade --install kafka deploy/kafka
 else ifeq ($(TEST_TYPE), foxlake)
 	$(HELM) upgrade --install foxlake deploy/foxlake
+else ifeq ($(TEST_TYPE), oceanbase)
+	$(HELM) upgrade --install oceanbase deploy/oceanbase
+else ifeq ($(TEST_TYPE), oceanbase)
+	$(HELM) upgrade --install official-postgresql deploy/official-postgresql
+else ifeq ($(TEST_TYPE), openldap)
+	$(HELM) upgrade --install openldap deploy/openldap
 else
 	$(error "test type does not exist")
 endif

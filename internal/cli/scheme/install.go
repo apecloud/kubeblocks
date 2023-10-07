@@ -28,7 +28,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
@@ -37,7 +37,7 @@ func init() {
 	utilruntime.Must(metav1.AddMetaToScheme(Scheme))
 	utilruntime.Must(clientgoscheme.AddToScheme(Scheme))
 	utilruntime.Must(appsv1alpha1.AddToScheme(Scheme))
-	utilruntime.Must(dataprotectionv1alpha1.AddToScheme(Scheme))
+	utilruntime.Must(dpv1alpha1.AddToScheme(Scheme))
 	utilruntime.Must(snapshotv1.AddToScheme(Scheme))
 	utilruntime.Must(snapshotv1beta1.AddToScheme(Scheme))
 	utilruntime.Must(extensionsv1alpha1.AddToScheme(Scheme))

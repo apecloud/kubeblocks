@@ -75,35 +75,35 @@ var _ = Describe("kubeblocks objects", func() {
 		clusterDef.Finalizers = []string{"test"}
 		clusterVersion := testing.FakeClusterVersion()
 		clusterVersion.Finalizers = []string{"test"}
-		backupTool := testing.FakeBackupTool()
-		backupTool.Finalizers = []string{"test"}
+		actionSet := testing.FakeActionSet()
+		actionSet.Finalizers = []string{"test"}
 
 		testCases := []struct {
 			clusterDef     *appsv1alpha1.ClusterDefinition
 			clusterVersion *appsv1alpha1.ClusterVersion
-			backupTool     *dpv1alpha1.BackupTool
+			actionSet      *dpv1alpha1.ActionSet
 		}{
 			{
 				clusterDef:     testing.FakeClusterDef(),
 				clusterVersion: testing.FakeClusterVersion(),
-				backupTool:     testing.FakeBackupTool(),
+				actionSet:      testing.FakeActionSet(),
 			},
 			{
 				clusterDef:     clusterDef,
 				clusterVersion: testing.FakeClusterVersion(),
-				backupTool:     testing.FakeBackupTool(),
+				actionSet:      testing.FakeActionSet(),
 			},
 			{
 				clusterDef:     clusterDef,
 				clusterVersion: clusterVersion,
-				backupTool:     backupTool,
+				actionSet:      actionSet,
 			},
 		}
 
 		for _, c := range testCases {
 			objects := mockCRD()
 			objects = append(objects, testing.FakeVolumeSnapshotClass())
-			objects = append(objects, c.clusterDef, c.clusterVersion, c.backupTool)
+			objects = append(objects, c.clusterDef, c.clusterVersion, c.actionSet)
 			client := testing.FakeDynamicClient(objects...)
 			objs, _ := getKBObjects(client, "", nil)
 			Expect(removeCustomResources(client, objs)).Should(Succeed())
@@ -135,22 +135,22 @@ var _ = Describe("kubeblocks objects", func() {
 		Expect(objs[types.CRDGVR()].Items).Should(HaveLen(4))
 		// verify crs
 		for _, gvr := range []schema.GroupVersionResource{types.ClusterDefGVR(), types.ClusterVersionGVR()} {
-			objlist, ok := objs[gvr]
+			objList, ok := objs[gvr]
 			Expect(ok).Should(BeTrue())
-			Expect(objlist.Items).Should(HaveLen(1))
+			Expect(objList.Items).Should(HaveLen(1))
 		}
 
 		// verify rbac info
 		for _, gvr := range []schema.GroupVersionResource{types.RoleGVR(), types.ClusterRoleBindingGVR(), types.ServiceAccountGVR()} {
-			objlist, ok := objs[gvr]
+			objList, ok := objs[gvr]
 			Expect(ok).Should(BeTrue())
-			Expect(objlist.Items).Should(HaveLen(1), gvr.String())
+			Expect(objList.Items).Should(HaveLen(1), gvr.String())
 		}
-		// verify cofnig tpl
+		// verify config tpl
 		for _, gvr := range []schema.GroupVersionResource{types.ConfigmapGVR()} {
-			objlist, ok := objs[gvr]
+			objList, ok := objs[gvr]
 			Expect(ok).Should(BeTrue())
-			Expect(objlist.Items).Should(HaveLen(1), gvr.String())
+			Expect(objList.Items).Should(HaveLen(1), gvr.String())
 		}
 	})
 })
@@ -200,20 +200,20 @@ func mockCRD() []runtime.Object {
 		Status: v1.CustomResourceDefinitionStatus{},
 	}
 
-	backupToolCRD := v1.CustomResourceDefinition{
+	actionSetCRD := v1.CustomResourceDefinition{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "CustomResourceDefinition",
 			APIVersion: "apiextensions.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "backuptools.dataprotection.kubeblocks.io",
+			Name: "actionsets.dataprotection.kubeblocks.io",
 		},
 		Spec: v1.CustomResourceDefinitionSpec{
 			Group: types.DPAPIGroup,
 		},
 		Status: v1.CustomResourceDefinitionStatus{},
 	}
-	return []runtime.Object{&clusterCRD, &clusterDefCRD, &clusterVersionCRD, &backupToolCRD}
+	return []runtime.Object{&clusterCRD, &clusterDefCRD, &clusterVersionCRD, &actionSetCRD}
 }
 
 func mockCRs() []runtime.Object {

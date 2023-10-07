@@ -20,26 +20,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"embed"
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 
-	"github.com/leaanthony/debme"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 const (
 	// http://localhost:<port>/v1.0/bindings/<binding_type>
-	checkRoleURIFormat        = "/v1.0/bindings/%s?operation=checkRole&workloadType=%s"
-	getGlobalInfoFormat       = "/v1.0/bindings/%s?operation=getGlobalInfo"
 	checkRunningURIFormat     = "/v1.0/bindings/%s?operation=checkRunning"
 	checkStatusURIFormat      = "/v1.0/bindings/%s?operation=checkStatus"
 	volumeProtectionURIFormat = "/v1.0/bindings/%s?operation=volumeProtection"
@@ -48,9 +44,6 @@ const (
 )
 
 var (
-	//go:embed cue/*
-	cueTemplates embed.FS
-
 	// default probe setting for volume protection.
 	defaultVolumeProtectionProbe = appsv1alpha1.ClusterDefinitionProbe{
 		PeriodSeconds:    60,
@@ -59,87 +52,98 @@ var (
 	}
 )
 
-func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedComponent) error {
-	container, err := buildProbeContainer()
-	if err != nil {
-		return err
-	}
-
-	probeContainers := []corev1.Container{}
-	componentProbes := component.Probes
-	if componentProbes == nil {
+func buildLorryContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedComponent) error {
+	container := buildBasicContainer()
+	var lorryContainers []corev1.Container
+	componentLorry := component.Probes
+	if componentLorry == nil {
 		return nil
 	}
-	reqCtx.Log.V(3).Info("probe", "settings", componentProbes)
-	probeSvcHTTPPort := viper.GetInt32("PROBE_SERVICE_HTTP_PORT")
-	probeSvcGRPCPort := viper.GetInt32("PROBE_SERVICE_GRPC_PORT")
-	availablePorts, err := getAvailableContainerPorts(component.PodSpec.Containers, []int32{probeSvcHTTPPort, probeSvcGRPCPort})
-	probeSvcHTTPPort = availablePorts[0]
-	probeSvcGRPCPort = availablePorts[1]
+	reqCtx.Log.V(3).Info("lorry", "settings", componentLorry)
+	lorrySvcHTTPPort := viper.GetInt32("PROBE_SERVICE_HTTP_PORT")
+	lorrySvcGRPCPort := viper.GetInt32("PROBE_SERVICE_GRPC_PORT")
+	// override by new env name
+	if viper.IsSet("LORRY_SERVICE_HTTP_PORT") {
+		lorrySvcHTTPPort = viper.GetInt32("LORRY_SERVICE_HTTP_PORT")
+	}
+	if viper.IsSet("LORRY_SERVICE_GRPC_PORT") {
+		lorrySvcGRPCPort = viper.GetInt32("LORRY_SERVICE_GRPC_PORT")
+	}
+	availablePorts, err := getAvailableContainerPorts(component.PodSpec.Containers, []int32{lorrySvcHTTPPort, lorrySvcGRPCPort})
+	lorrySvcHTTPPort = availablePorts[0]
+	lorrySvcGRPCPort = availablePorts[1]
 	if err != nil {
-		reqCtx.Log.Info("get probe container port failed", "error", err)
+		reqCtx.Log.Info("get lorry container port failed", "error", err)
 		return err
 	}
 
-	// injectHttp2Shell(component.PodSpec)
-
-	if componentProbes.RoleProbe != nil {
-		roleChangedContainer := container.DeepCopy()
-		buildRoleProbeContainer(component, roleChangedContainer, componentProbes.RoleProbe, int(probeSvcHTTPPort), component.PodSpec)
-		probeContainers = append(probeContainers, *roleChangedContainer)
-	}
-
-	if componentProbes.StatusProbe != nil {
+	if componentLorry.StatusProbe != nil {
 		statusProbeContainer := container.DeepCopy()
-		buildStatusProbeContainer(component.CharacterType, statusProbeContainer, componentProbes.StatusProbe, int(probeSvcHTTPPort))
-		probeContainers = append(probeContainers, *statusProbeContainer)
+		buildStatusProbeContainer(component.CharacterType, statusProbeContainer, componentLorry.StatusProbe, int(lorrySvcHTTPPort))
+		lorryContainers = append(lorryContainers, *statusProbeContainer)
 	}
 
-	if componentProbes.RunningProbe != nil {
+	if componentLorry.RunningProbe != nil {
 		runningProbeContainer := container.DeepCopy()
-		buildRunningProbeContainer(component.CharacterType, runningProbeContainer, componentProbes.RunningProbe, int(probeSvcHTTPPort))
-		probeContainers = append(probeContainers, *runningProbeContainer)
+		buildRunningProbeContainer(component.CharacterType, runningProbeContainer, componentLorry.RunningProbe, int(lorrySvcHTTPPort))
+		lorryContainers = append(lorryContainers, *runningProbeContainer)
 	}
 
 	if volumeProtectionEnabled(component) {
 		c := container.DeepCopy()
-		buildVolumeProtectionProbeContainer(component.CharacterType, c, int(probeSvcHTTPPort))
-		probeContainers = append(probeContainers, *c)
+		buildVolumeProtectionProbeContainer(component.CharacterType, c, int(lorrySvcHTTPPort))
+		lorryContainers = append(lorryContainers, *c)
 	}
 
-	if len(probeContainers) >= 1 {
-		container := &probeContainers[0]
-		buildProbeServiceContainer(component, container, int(probeSvcHTTPPort), int(probeSvcGRPCPort))
+	// inject WeSyncer(currently part of Lorry) in cluster controller.
+	// as all the above features share the lorry service, only one lorry need to be injected.
+	// if none of the above feature enabled, WeSyncer still need to be injected for the HA feature functions well.
+	if len(lorryContainers) == 0 {
+		weSyncerContainer := container.DeepCopy()
+		buildWeSyncerContainer(weSyncerContainer, int(lorrySvcHTTPPort))
+		lorryContainers = append(lorryContainers, *weSyncerContainer)
 	}
 
-	reqCtx.Log.V(1).Info("probe", "containers", probeContainers)
-	component.PodSpec.Containers = append(component.PodSpec.Containers, probeContainers...)
+	buildLorryServiceContainer(component, &lorryContainers[0], int(lorrySvcHTTPPort), int(lorrySvcGRPCPort))
+
+	reqCtx.Log.V(1).Info("lorry", "containers", lorryContainers)
+	component.PodSpec.Containers = append(component.PodSpec.Containers, lorryContainers...)
 	return nil
 }
 
-func buildProbeContainer() (*corev1.Container, error) {
-	cueFS, _ := debme.FS(cueTemplates, "cue")
-
-	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("probe_template.cue"))
-	if err != nil {
-		return nil, err
-	}
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-	probeContainerByte, err := cueValue.Lookup("probeContainer")
-	if err != nil {
-		return nil, err
-	}
-	container := &corev1.Container{}
-	if err = json.Unmarshal(probeContainerByte, container); err != nil {
-		return nil, err
-	}
-	return container, nil
+func buildBasicContainer() *corev1.Container {
+	return builder.NewContainerBuilder("string").
+		SetImage("registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.6").
+		SetImagePullPolicy(corev1.PullIfNotPresent).
+		AddCommands("/pause").
+		AddEnv(corev1.EnvVar{
+			Name: "KB_SERVICE_USER",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key:                  "username",
+					LocalObjectReference: corev1.LocalObjectReference{Name: "$(CONN_CREDENTIAL_SECRET_NAME)"},
+				},
+			}},
+			corev1.EnvVar{
+				Name: "KB_SERVICE_PASSWORD",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						Key:                  "password",
+						LocalObjectReference: corev1.LocalObjectReference{Name: "$(CONN_CREDENTIAL_SECRET_NAME)"},
+					},
+				},
+			}).
+		SetStartupProbe(corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(3501)},
+			}}).
+		GetObject()
 }
 
-func buildProbeServiceContainer(component *SynthesizedComponent, container *corev1.Container, probeSvcHTTPPort int, probeSvcGRPCPort int) {
+func buildLorryServiceContainer(component *SynthesizedComponent, container *corev1.Container, probeSvcHTTPPort int, probeSvcGRPCPort int) {
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
-	container.Command = []string{"probe",
+	container.Command = []string{"lorry",
 		"--port", strconv.Itoa(probeSvcHTTPPort)}
 
 	if len(component.PodSpec.Containers) > 0 {
@@ -174,14 +178,6 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 		}
 	}
 
-	roles := getComponentRoles(component)
-	rolesJSON, _ := json.Marshal(roles)
-	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      constant.KBEnvServiceRoles,
-		Value:     string(rolesJSON),
-		ValueFrom: nil,
-	})
-
 	container.Env = append(container.Env, corev1.EnvVar{
 		Name:      constant.KBEnvCharacterType,
 		Value:     component.CharacterType,
@@ -191,12 +187,6 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 	container.Env = append(container.Env, corev1.EnvVar{
 		Name:      constant.KBEnvWorkloadType,
 		Value:     string(component.WorkloadType),
-		ValueFrom: nil,
-	})
-
-	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      "KB_RSM_ACTION_SVC_LIST",
-		Value:     viper.GetString("KB_RSM_ACTION_SVC_LIST"),
 		ValueFrom: nil,
 	})
 
@@ -212,93 +202,44 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 			Protocol:      "TCP",
 		}}
 
-	// pass the volume protection spec to probe container through env.
+	// pass the volume protection spec to lorry container through env.
 	if volumeProtectionEnabled(component) {
 		container.Env = append(container.Env, env4VolumeProtection(*component.VolumeProtection))
 	}
 }
 
-func getComponentRoles(component *SynthesizedComponent) map[string]string {
-	var roles = map[string]string{}
-	if component.ConsensusSpec == nil {
-		return roles
-	}
-
-	consensus := component.ConsensusSpec
-	roles[strings.ToLower(consensus.Leader.Name)] = string(consensus.Leader.AccessMode)
-	for _, follower := range consensus.Followers {
-		roles[strings.ToLower(follower.Name)] = string(follower.AccessMode)
-	}
-	if consensus.Learner != nil {
-		roles[strings.ToLower(consensus.Learner.Name)] = string(consensus.Learner.AccessMode)
-	}
-	return roles
-}
-
-func buildRoleProbeContainer(component *SynthesizedComponent, roleChangedContainer *corev1.Container,
-	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int, pod *corev1.PodSpec) {
-	roleChangedContainer.Name = constant.RoleProbeContainerName
-	probe := roleChangedContainer.ReadinessProbe
-	bindingType := strings.ToLower(component.CharacterType)
-	workloadType := component.WorkloadType
-	httpGet := &corev1.HTTPGetAction{}
-	httpGet.Path = fmt.Sprintf(checkRoleURIFormat, bindingType, workloadType)
-	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
-	probe.Exec = nil
-	probe.HTTPGet = httpGet
-	probe.PeriodSeconds = probeSetting.PeriodSeconds
-	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
-	probe.FailureThreshold = probeSetting.FailureThreshold
-	roleChangedContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
-
-	// -> uncomment it to enable snapshot to cluster
-
-	// base := probeSvcHTTPPort + 2
-	// portNeeded := len(probeSetting.Actions)
-	// activePorts := make([]int32, portNeeded)
-	// for i := 0; i < portNeeded; i++ {
-	//	 activePorts[i] = int32(base + i)
-	// }
-	// activePorts, err := getAvailableContainerPorts(pod.Containers, activePorts)
-	// if err != nil {
-	//	 return
-	// }
-	// marshal, err := json.Marshal(activePorts)
-	// if err != nil {
-	//	 return
-	// }
-	// viper.Set("KB_RSM_ACTION_SVC_LIST", string(marshal))
-
-	// injectProbeUtilImages(pod, probeSetting, activePorts, "/role", "checkrole", roleChangedContainer.Env)
+func buildWeSyncerContainer(weSyncerContainer *corev1.Container, probeSvcHTTPPort int) {
+	weSyncerContainer.Name = constant.WeSyncerContainerName
+	weSyncerContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
 func buildStatusProbeContainer(characterType string, statusProbeContainer *corev1.Container,
 	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	statusProbeContainer.Name = constant.StatusProbeContainerName
-	probe := statusProbeContainer.ReadinessProbe
+	probe := &corev1.Probe{}
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = fmt.Sprintf(checkStatusURIFormat, characterType)
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
-	probe.Exec = nil
 	probe.HTTPGet = httpGet
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
 	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
 	probe.FailureThreshold = probeSetting.FailureThreshold
+	statusProbeContainer.ReadinessProbe = probe
 	statusProbeContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
 func buildRunningProbeContainer(characterType string, runningProbeContainer *corev1.Container,
 	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	runningProbeContainer.Name = constant.RunningProbeContainerName
-	probe := runningProbeContainer.ReadinessProbe
+	probe := &corev1.Probe{}
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = fmt.Sprintf(checkRunningURIFormat, characterType)
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
-	probe.Exec = nil
 	probe.HTTPGet = httpGet
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
 	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
 	probe.FailureThreshold = probeSetting.FailureThreshold
+	runningProbeContainer.ReadinessProbe = probe
 	runningProbeContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
@@ -308,15 +249,15 @@ func volumeProtectionEnabled(component *SynthesizedComponent) bool {
 
 func buildVolumeProtectionProbeContainer(characterType string, c *corev1.Container, probeSvcHTTPPort int) {
 	c.Name = constant.VolumeProtectionProbeContainerName
-	probe := c.ReadinessProbe
+	probe := &corev1.Probe{}
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = fmt.Sprintf(volumeProtectionURIFormat, characterType)
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
-	probe.Exec = nil
 	probe.HTTPGet = httpGet
 	probe.PeriodSeconds = defaultVolumeProtectionProbe.PeriodSeconds
 	probe.TimeoutSeconds = defaultVolumeProtectionProbe.TimeoutSeconds
 	probe.FailureThreshold = defaultVolumeProtectionProbe.FailureThreshold
+	c.ReadinessProbe = probe
 	c.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
@@ -330,72 +271,3 @@ func env4VolumeProtection(spec appsv1alpha1.VolumeProtectionSpec) corev1.EnvVar 
 		Value: string(value),
 	}
 }
-
-// func injectHttp2Shell(pod *corev1.PodSpec) {
-//	// inject shared volume
-//	agentVolume := corev1.Volume{
-//		Name: constant.ProbeAgentMountName,
-//		VolumeSource: corev1.VolumeSource{
-//			EmptyDir: &corev1.EmptyDirVolumeSource{},
-//		},
-//	}
-//	pod.Volumes = append(pod.Volumes, agentVolume)
-//
-//	// inject shell2http
-//	volumeMount := corev1.VolumeMount{
-//		Name:      constant.ProbeAgentMountName,
-//		MountPath: constant.ProbeAgentMountPath,
-//	}
-//	binPath := strings.Join([]string{constant.ProbeAgentMountPath, constant.ProbeAgent}, "/")
-//	initContainer := corev1.Container{
-//		Name:            constant.ProbeAgent,
-//		Image:           constant.ProbeAgentImage,
-//		ImagePullPolicy: corev1.PullIfNotPresent,
-//		VolumeMounts:    []corev1.VolumeMount{volumeMount},
-//		Command: []string{
-//			"cp",
-//			constant.OriginBinaryPath,
-//			binPath,
-//		},
-//	}
-//	pod.InitContainers = append(pod.InitContainers, initContainer)
-//}
-//
-// func injectProbeUtilImages(pod *corev1.PodSpec, probeSetting *appsv1alpha1.ClusterDefinitionProbe,
-//	port []int32, path, usage string,
-//	credentialEnv []corev1.EnvVar) {
-//	// todo: uncomment to enable new lorry way
-//	// actions := probeSetting.Actions
-//	// volumeMount := corev1.VolumeMount{
-//	//	Name:      constant.ProbeAgentMountName,
-//	//	MountPath: constant.ProbeAgentMountPath,
-//	// }
-//	// binPath := strings.Join([]string{constant.ProbeAgentMountPath, constant.ProbeAgent}, "/")
-//	//
-//	// for i, action := range actions {
-//	//	image := action.Image
-//	//	if len(action.Image) == 0 {
-//	//		image = constant.DefaultActionImage
-//	//	}
-//	//
-//	//	command := []string{
-//	//		binPath,
-//	//		"-port", fmt.Sprintf("%d", port[i]),
-//	//		"-export-all-vars",
-//	//		"-form",
-//	//		path,
-//	//		strings.Join(action.Command, " "),
-//	//	}
-//	//
-//	//	container := corev1.Container{
-//	//		Name:            fmt.Sprintf("%s-action-%d", usage, i),
-//	//		Image:           image,
-//	//		ImagePullPolicy: corev1.PullIfNotPresent,
-//	//		VolumeMounts:    []corev1.VolumeMount{volumeMount},
-//	//		Env:             credentialEnv,
-//	//		Command:         command,
-//	//	}
-//	//
-//	//	pod.Containers = append(pod.Containers, container)
-//	// }
-// }

@@ -33,7 +33,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
-	klog "k8s.io/klog/v2"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -348,6 +348,8 @@ func (o *reportKubeblocksOptions) handleManifests(ctx context.Context) error {
 	resourceLists = append(resourceLists, cliutil.ListResourceByGVR(ctx, o.genericClientSet.dynamic, o.namespace, scopedgvrs, []metav1.ListOptions{o.kubeBlocksSelector}, &allErrors)...)
 	// get global resources
 	resourceLists = append(resourceLists, cliutil.ListResourceByGVR(ctx, o.genericClientSet.dynamic, metav1.NamespaceAll, globalGvrs, []metav1.ListOptions{o.kubeBlocksSelector}, &allErrors)...)
+	// get all storage class
+	resourceLists = append(resourceLists, cliutil.ListResourceByGVR(ctx, o.genericClientSet.dynamic, metav1.NamespaceAll, []schema.GroupVersionResource{types.StorageClassGVR()}, []metav1.ListOptions{{}}, &allErrors)...)
 	if err := o.reportWritter.WriteObjects(manifestsFolder, resourceLists, o.outputFormat); err != nil {
 		return err
 	}
@@ -490,10 +492,16 @@ func (o *reportClusterOptions) handleManifests(ctx context.Context) error {
 			types.RoleBindingGVR(),
 			types.BackupGVR(),
 			types.BackupPolicyGVR(),
-			types.BackupToolGVR(),
-			types.RestoreJobGVR(),
+			types.BackupScheduleGVR(),
+			types.ActionSetGVR(),
+			types.RestoreGVR(),
+			types.PVCGVR(),
+		}
+		globalGvrs = []schema.GroupVersionResource{
+			types.PVGVR(),
 		}
 	)
+
 	var err error
 	if o.cluster, err = o.genericClientSet.kbClientSet.AppsV1alpha1().Clusters(o.namespace).Get(ctx, o.clusterName, metav1.GetOptions{}); err != nil {
 		return err
@@ -508,6 +516,7 @@ func (o *reportClusterOptions) handleManifests(ctx context.Context) error {
 	resourceLists := make([]*unstructured.UnstructuredList, 0)
 	// write manifest
 	resourceLists = append(resourceLists, cliutil.ListResourceByGVR(ctx, o.genericClientSet.dynamic, o.namespace, scopedgvrs, []metav1.ListOptions{o.clusterSelector}, &allErrors)...)
+	resourceLists = append(resourceLists, cliutil.ListResourceByGVR(ctx, o.genericClientSet.dynamic, metav1.NamespaceAll, globalGvrs, []metav1.ListOptions{o.clusterSelector}, &allErrors)...)
 	if err := o.reportWritter.WriteObjects("manifests", resourceLists, o.outputFormat); err != nil {
 		return err
 	}

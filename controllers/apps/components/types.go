@@ -20,62 +20,98 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package components
 
 import (
-	"time"
+	"context"
+	"fmt"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/class"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-)
-
-const (
-	// ComponentPhaseTransition the event reason indicates that the component transits to a new phase.
-	ComponentPhaseTransition = "ComponentPhaseTransition"
-
-	// PodContainerFailedTimeout the timeout for container of pod failures, the component phase will be set to Failed/Abnormal after this time.
-	PodContainerFailedTimeout = 10 * time.Second
-
-	// PodScheduledFailedTimeout timeout for scheduling failure.
-	PodScheduledFailedTimeout = 30 * time.Second
 )
 
 type Component interface {
 	GetName() string
 	GetNamespace() string
 	GetClusterName() string
-	GetDefinitionName() string
-	GetWorkloadType() appsv1alpha1.WorkloadType
 
 	GetCluster() *appsv1alpha1.Cluster
 	GetClusterVersion() *appsv1alpha1.ClusterVersion
 	GetSynthesizedComponent() *component.SynthesizedComponent
 
-	GetConsensusSpec() *appsv1alpha1.ConsensusSetSpec
-
-	GetMatchingLabels() client.MatchingLabels
-
-	GetPhase() appsv1alpha1.ClusterComponentPhase
-	// GetStatus() appsv1alpha1.ClusterComponentStatus
-
-	// GetBuiltObjects returns all objects that will be created by this component
-	GetBuiltObjects(reqCtx intctrlutil.RequestCtx, cli client.Client) ([]client.Object, error)
-
 	Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error
 	Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error
 	Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error
 	Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error
-
-	Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error
-
-	ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error
-
-	HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error
-
-	// TODO(impl): impl-related, replace them with component workload
-	SetWorkload(obj client.Object, action *ictrltypes.LifecycleAction, parent *ictrltypes.LifecycleVertex)
-	AddResource(obj client.Object, action *ictrltypes.LifecycleAction, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex
 }
 
-type ComponentWorkload interface{}
+func NewComponent(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	definition *appsv1alpha1.ClusterDefinition,
+	version *appsv1alpha1.ClusterVersion,
+	cluster *appsv1alpha1.Cluster,
+	compName string,
+	dag *graph.DAG) (Component, error) {
+	var compDef *appsv1alpha1.ClusterComponentDefinition
+	var compVer *appsv1alpha1.ClusterComponentVersion
+	compSpec := cluster.Spec.GetComponentByName(compName)
+	if compSpec != nil {
+		compDef = definition.GetComponentDefByName(compSpec.ComponentDefRef)
+		if compDef == nil {
+			return nil, fmt.Errorf("referenced component definition does not exist, cluster: %s, component: %s, component definition ref:%s",
+				cluster.Name, compSpec.Name, compSpec.ComponentDefRef)
+		}
+		if version != nil {
+			compVer = version.Spec.GetDefNameMappingComponents()[compSpec.ComponentDefRef]
+		}
+	} else {
+		compDef = definition.GetComponentDefByName(compName)
+		if version != nil {
+			compVer = version.Spec.GetDefNameMappingComponents()[compName]
+		}
+	}
+
+	if compDef == nil {
+		return nil, nil
+	}
+
+	clsMgr, err := getClassManager(reqCtx.Ctx, cli, cluster)
+	if err != nil {
+		return nil, err
+	}
+	serviceReferences, err := plan.GenServiceReferences(reqCtx, cli, cluster, compDef, compSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	synthesizedComp, err := component.BuildComponent(reqCtx, clsMgr, cluster, definition, compDef, compSpec, serviceReferences, compVer)
+	if err != nil {
+		return nil, err
+	}
+	if synthesizedComp == nil {
+		return nil, nil
+	}
+
+	return newRSMComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
+}
+
+func getClassManager(ctx context.Context, cli types2.ReadonlyClient, cluster *appsv1alpha1.Cluster) (*class.Manager, error) {
+	var classDefinitionList appsv1alpha1.ComponentClassDefinitionList
+	ml := []client.ListOption{
+		client.MatchingLabels{constant.ClusterDefLabelKey: cluster.Spec.ClusterDefRef},
+	}
+	if err := cli.List(ctx, &classDefinitionList, ml...); err != nil {
+		return nil, err
+	}
+
+	var constraintList appsv1alpha1.ComponentResourceConstraintList
+	if err := cli.List(ctx, &constraintList); err != nil {
+		return nil, err
+	}
+	return class.NewManager(classDefinitionList, constraintList)
+}

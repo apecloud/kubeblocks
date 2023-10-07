@@ -33,3 +33,5 @@ nameOverride: ""
 fullnameOverride: ""
 ## MySQl ClusterVersion
 clusterVersionOverride: "8.0.32"
+
+dataMountPath: /var/lib/mysql

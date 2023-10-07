@@ -1,0 +1,35 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: ActionSet
+metadata:
+  name: qdrant-snapshot
+  labels:
+    clusterdefinition.kubeblocks.io/name: qdrant
+    {{- include "qdrant.labels" . | nindent 4 }}
+spec:
+  backupType: Full
+  env:
+    - name: DATA_DIR
+      value: {{ .Values.dataMountPath }}/
+  backup:
+    preBackup: []
+    postBackup: []
+    backupData:
+      image: apecloud/curl-jq:latest
+      runOnTargetPodNode: false
+      command:
+      - sh
+      - -c
+      - |
+        {{- .Files.Get "scripts/qdrant-backup.sh" | nindent 8 }}
+      syncProgress:
+        enabled: true
+        intervalSeconds: 5
+  restore:
+    prepareData:
+      image: apecloud/curl-jq:latest
+      command:
+      - sh
+      - -c
+      - |
+        {{- .Files.Get "scripts/qdrant-restore.sh" | nindent 8 }}
+    postReady: []

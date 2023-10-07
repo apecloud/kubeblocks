@@ -1,0 +1,95 @@
+---
+# Source: oceanbase-cluster/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: obcluster-observer-sa
+  namespace: "default"
+  labels:
+    helm.sh/chart: oceanbase-cluster-0.0.1-alpha1
+    app.kubernetes.io/name: oceanbase-cluster
+    app.kubernetes.io/instance: oceanbase-cluster
+    app.kubernetes.io/version: "4.2.0.0-100010032023083021"
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: oceanbase-cluster/templates/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: obcluster-statefulset-reader
+  namespace: "default"
+  labels:
+    helm.sh/chart: oceanbase-cluster-0.0.1-alpha1
+    app.kubernetes.io/name: oceanbase-cluster
+    app.kubernetes.io/instance: oceanbase-cluster
+    app.kubernetes.io/version: "4.2.0.0-100010032023083021"
+    app.kubernetes.io/managed-by: Helm
+rules:
+- apiGroups: ["apps"] # "" indicates the core API group
+  resources: ["statefulsets"]
+  verbs: ["get", "watch", "list"]
+---
+# Source: oceanbase-cluster/templates/rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: obcluster-read-statefulsets
+  namespace: "default"
+  labels:
+    helm.sh/chart: oceanbase-cluster-0.0.1-alpha1
+    app.kubernetes.io/name: oceanbase-cluster
+    app.kubernetes.io/instance: oceanbase-cluster
+    app.kubernetes.io/version: "4.2.0.0-100010032023083021"
+    app.kubernetes.io/managed-by: Helm
+subjects:
+- kind: ServiceAccount
+  name: obcluster-observer-sa 
+- kind: ServiceAccount
+  name: kb-obcluster
+roleRef:
+  kind: Role
+  name: obcluster-statefulset-reader
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: oceanbase-cluster/templates/cluster.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: oceanbase-cluster
+  labels:
+    helm.sh/chart: oceanbase-cluster-0.0.1-alpha1
+    app.kubernetes.io/name: oceanbase-cluster
+    app.kubernetes.io/instance: oceanbase-cluster
+    app.kubernetes.io/version: "4.2.0.0-100010032023083021"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  clusterDefinitionRef: oceanbase
+  clusterVersionRef: oceanbase-4.2.0.0-100010032023083021
+  terminationPolicy: Delete
+  componentSpecs:
+    - name: ob-bundle
+      componentDefRef: ob-bundle
+      serviceAccountName: obcluster-observer-sa
+      replicas: 3
+      volumeClaimTemplates:
+        - name: data-file
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: "50Gi"
+        - name: data-log
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: "50Gi"
+        - name: log
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: "20Gi"

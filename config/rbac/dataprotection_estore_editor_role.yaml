@@ -1,0 +1,24 @@
+# permissions for end users to edit restores.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: restore-editor-role
+rules:
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - restores
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - restores/status
+  verbs:
+  - get

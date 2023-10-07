@@ -137,7 +137,6 @@ var _ = Describe("Cluster Controller", func() {
 		cleanEnv()
 	})
 
-	// test function helpers
 	createAllWorkloadTypesClusterDef := func(noCreateAssociateCV ...bool) {
 		By("Create a clusterDefinition obj")
 		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
@@ -764,7 +763,6 @@ var _ = Describe("Cluster Controller", func() {
 
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
-			createBackupPolicyTpl(clusterDefObj)
 		})
 		AfterEach(func() {
 			cleanEnv()

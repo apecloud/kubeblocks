@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
-	"encoding/json"
-	"reflect"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -257,7 +255,7 @@ func (p *updatePipeline) isDone() bool {
 
 func (p *updatePipeline) PrepareForTemplate() *updatePipeline {
 	buildTemplate := func() (err error) {
-		p.reconcile = !IsApplyConfigChanged(p.ConfigMapObj, p.item)
+		p.reconcile = !intctrlutil.IsApplyConfigChanged(p.ConfigMapObj, p.item)
 		if p.isDone() {
 			return
 		}
@@ -270,23 +268,6 @@ func (p *updatePipeline) PrepareForTemplate() *updatePipeline {
 		return
 	}
 	return p.Wrap(buildTemplate)
-}
-
-func IsApplyConfigChanged(cm *corev1.ConfigMap, item appsv1alpha1.ConfigurationItemDetail) bool {
-	if cm == nil {
-		return false
-	}
-
-	lastAppliedVersion, ok := cm.Annotations[constant.ConfigAppliedVersionAnnotationKey]
-	if !ok {
-		return false
-	}
-	var target appsv1alpha1.ConfigurationItemDetail
-	if err := json.Unmarshal([]byte(lastAppliedVersion), &target); err != nil {
-		return false
-	}
-
-	return reflect.DeepEqual(target, item)
 }
 
 func (p *updatePipeline) ConfigSpec() *appsv1alpha1.ComponentConfigSpec {
@@ -310,7 +291,7 @@ func (p *updatePipeline) RerenderTemplate() *updatePipeline {
 		if p.isDone() {
 			return
 		}
-		if needRerender(p.ConfigMapObj, p.item) {
+		if intctrlutil.IsRerender(p.ConfigMapObj, p.item) {
 			p.newCM, err = p.renderWrapper.rerenderConfigTemplate(p.ctx.Cluster, p.ctx.Component, *p.configSpec, &p.item)
 		} else {
 			p.newCM = p.ConfigMapObj.DeepCopy()
@@ -408,19 +389,4 @@ func (p *updatePipeline) SyncStatus() *updatePipeline {
 		p.itemStatus.Phase = appsv1alpha1.CMergedPhase
 		return
 	})
-}
-
-func needRerender(obj *corev1.ConfigMap, item appsv1alpha1.ConfigurationItemDetail) bool {
-	if obj == nil {
-		return true
-	}
-	if item.Version == "" {
-		return false
-	}
-
-	version, ok := obj.Annotations[constant.CMConfigurationTemplateVersion]
-	if !ok || version != item.Version {
-		return true
-	}
-	return false
 }

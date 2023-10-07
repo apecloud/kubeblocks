@@ -21,6 +21,8 @@ package controllerutil
 
 import (
 	"context"
+	"encoding/json"
+	"reflect"
 
 	"github.com/StudioSol/set"
 	appsv1 "k8s.io/api/apps/v1"
@@ -32,6 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/configuration/validate"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type ConfigEventContext struct {
@@ -115,4 +118,51 @@ func fromUpdatedConfig(m map[string]string, sets *set.LinkedHashSetString) map[s
 		}
 	}
 	return r
+}
+
+// IsApplyConfigChanged checks if the configuration is changed
+func IsApplyConfigChanged(configMap *corev1.ConfigMap, item v1alpha1.ConfigurationItemDetail) bool {
+	if configMap == nil {
+		return false
+	}
+
+	lastAppliedVersion, ok := configMap.Annotations[constant.ConfigAppliedVersionAnnotationKey]
+	if !ok {
+		return false
+	}
+	var target v1alpha1.ConfigurationItemDetail
+	if err := json.Unmarshal([]byte(lastAppliedVersion), &target); err != nil {
+		return false
+	}
+
+	return reflect.DeepEqual(target, item)
+}
+
+// IsRerender checks if the configuration template is changed
+func IsRerender(configMap *corev1.ConfigMap, item v1alpha1.ConfigurationItemDetail) bool {
+	if configMap == nil {
+		return true
+	}
+	if item.Version == "" {
+		return false
+	}
+
+	version, ok := configMap.Annotations[constant.CMConfigurationTemplateVersion]
+	if !ok || version != item.Version {
+		return true
+	}
+	return false
+}
+
+// GetConfigSpecReconcilePhase gets the configuration phase
+func GetConfigSpecReconcilePhase(configMap *corev1.ConfigMap,
+	item v1alpha1.ConfigurationItemDetail,
+	status *v1alpha1.ConfigurationItemDetailStatus) v1alpha1.ConfigurationPhase {
+	if status == nil || status.Phase == "" {
+		return v1alpha1.CCreatingPhase
+	}
+	if !IsApplyConfigChanged(configMap, item) {
+		return v1alpha1.CPendingPhase
+	}
+	return status.Phase
 }

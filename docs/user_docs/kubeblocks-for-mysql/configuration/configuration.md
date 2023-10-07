@@ -38,8 +38,10 @@ You can also view the details of this configuration file and parameters.
 * View the user guide of a specified parameter.
   
   ```bash
-  kbcli cluster explain-config mysql-cluster --param=innodb_buffer_pool_size
+  kbcli cluster explain-config mysql-cluster --param=innodb_buffer_pool_size --config-spec=mysql-consensusset-config
   ```
+
+  `--config-spec` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mysql-cluster` to view the all template names.
 
   <details>
 
@@ -204,18 +206,18 @@ The following steps take configuring MySQL Standalone as an example.
 
 :::note
 
-* ApeCloud MySQL currently supports multiple configuration templates, so `--config-spec` is required.
+* `--config-spec` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mysql-cluster` to view the all template names.
 * If there are multiple components in a cluster, use `--component` to specify a component.
 
 :::
 
-2. View the status of the parameter configuration.
+1. View the status of the parameter configuration.
 
    ```bash
    kbcli cluster describe-ops xxx -n default
    ```
 
-3. Connect to the database to verify whether the parameters are configured as expected.
+2. Connect to the database to verify whether the parameters are configured as expected.
 
    ```bash
    kbcli cluster connect mysql-cluster

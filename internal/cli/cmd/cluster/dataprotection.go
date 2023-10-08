@@ -29,7 +29,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dapr/kit/cron"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	batchv1 "k8s.io/api/batch/v1"
@@ -61,6 +60,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
 
 var (
@@ -116,12 +116,16 @@ var (
 		# describe a backup
 		kbcli cluster describe-backup backup-default-mycluster-20230616190023
 	`)
+	describeBackupPolicyExample = templates.Examples(`
+		# describe a backup policy
+		kbcli cluster describe-backup-policy mycluster-mysql-backup-policy
+	`)
 )
 
 const annotationTrueValue = "true"
 
 type CreateBackupOptions struct {
-	BackupType   string `json:"backupType"`
+	BackupMethod string `json:"backupMethod"`
 	BackupName   string `json:"backupName"`
 	Role         string `json:"role,omitempty"`
 	BackupPolicy string `json:"backupPolicy"`
@@ -173,8 +177,10 @@ func (o *CreateBackupOptions) Validate() error {
 			return err
 		}
 	}
-	if o.BackupType == string(dpv1alpha1.BackupTypeLogFile) {
-		return fmt.Errorf(`can not create logfile backup, you can create it by enabling spec.schedule.logfile in BackupPolicy "%s"`, o.BackupPolicy)
+	if o.BackupMethod == "" {
+		// TODO(ldm): if backup policy only has one backup method, use it as default
+		//  backup method.
+		return fmt.Errorf("missing backup method")
 	}
 	// TODO: check if pvc exists
 	return nil
@@ -212,7 +218,7 @@ func (o *CreateBackupOptions) getDefaultBackupPolicy() (string, error) {
 	}
 	var defaultBackupPolicies []unstructured.Unstructured
 	for _, obj := range objs.Items {
-		if obj.GetAnnotations()[constant.DefaultBackupPolicyAnnotationKey] == annotationTrueValue {
+		if obj.GetAnnotations()[dptypes.DefaultBackupPolicyAnnotationKey] == annotationTrueValue {
 			defaultBackupPolicies = append(defaultBackupPolicies, obj)
 		}
 	}
@@ -258,7 +264,7 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		},
 	}
 
-	cmd.Flags().StringVar(&o.BackupType, "type", "snapshot", "Backup type")
+	cmd.Flags().StringVar(&o.BackupMethod, "method", "", "Backup method that defined in backup policy")
 	cmd.Flags().StringVar(&o.BackupName, "name", "", "Backup name")
 	cmd.Flags().StringVar(&o.BackupPolicy, "policy", "", "Backup policy name, this flag will be ignored when backup-type is snapshot")
 
@@ -302,28 +308,23 @@ func PrintBackupList(o ListBackupOptions) error {
 	// sort the unstructured objects with the creationTimestamp in positive order
 	sort.Sort(unstructuredList(backupList.Items))
 	tbl := printer.NewTablePrinter(o.Out)
-	tbl.SetHeader("NAME", "NAMESPACE", "SOURCE-CLUSTER", "TYPE", "STATUS", "TOTAL-SIZE", "DURATION", "CREATE-TIME", "COMPLETION-TIME", "EXPIRATION")
+	tbl.SetHeader("NAME", "NAMESPACE", "SOURCE-CLUSTER", "METHOD", "STATUS", "TOTAL-SIZE", "DURATION", "CREATE-TIME", "COMPLETION-TIME", "EXPIRATION")
 	for _, obj := range backupList.Items {
 		backup := &dpv1alpha1.Backup{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, backup); err != nil {
 			return err
 		}
-		sourceCluster := backup.Status.SourceCluster
-		if sourceCluster == "" {
-			sourceCluster = backup.Labels[constant.AppInstanceLabelKey]
-		}
+		// TODO(ldm): find cluster from backup policy target spec.
+		sourceCluster := backup.Labels[constant.AppInstanceLabelKey]
 		durationStr := ""
 		if backup.Status.Duration != nil {
 			durationStr = duration.HumanDuration(backup.Status.Duration.Duration)
 		}
 		statusString := string(backup.Status.Phase)
-		if backup.Status.Phase == dpv1alpha1.BackupRunning && backup.Status.AvailableReplicas != nil {
-			statusString = fmt.Sprintf("%s(AvailablePods: %d)", statusString, *backup.Status.AvailableReplicas)
-		}
 		if len(o.Names) > 0 && !backupNameMap[backup.Name] {
 			continue
 		}
-		tbl.AddRow(backup.Name, backup.Namespace, sourceCluster, backup.Spec.BackupType, statusString, backup.Status.TotalSize,
+		tbl.AddRow(backup.Name, backup.Namespace, sourceCluster, backup.Spec.BackupMethod, statusString, backup.Status.TotalSize,
 			durationStr, util.TimeFormat(&backup.CreationTimestamp), util.TimeFormat(backup.Status.CompletionTimestamp),
 			util.TimeFormat(backup.Status.Expiration))
 	}
@@ -419,9 +420,9 @@ type CreateRestoreOptions struct {
 	Backup string `json:"backup,omitempty"`
 
 	// point in time recovery args
-	RestoreTime    *time.Time `json:"restoreTime,omitempty"`
-	RestoreTimeStr string     `json:"restoreTimeStr,omitempty"`
-	SourceCluster  string     `json:"sourceCluster,omitempty"`
+	RestoreTime             *time.Time `json:"restoreTime,omitempty"`
+	RestoreTimeStr          string     `json:"restoreTimeStr,omitempty"`
+	RestoreManagementPolicy string     `json:"volumeRestorePolicy,omitempty"`
 
 	create.CreateOptions `json:"-"`
 }
@@ -443,8 +444,6 @@ func (o *CreateRestoreOptions) getClusterObject(backup *dpv1alpha1.Backup) (*app
 func (o *CreateRestoreOptions) Run() error {
 	if o.Backup != "" {
 		return o.runRestoreFromBackup()
-	} else if o.RestoreTime != nil {
-		return o.runPITR()
 	}
 	return nil
 }
@@ -455,25 +454,30 @@ func (o *CreateRestoreOptions) runRestoreFromBackup() error {
 	if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.Namespace, o.Backup); err != nil {
 		return err
 	}
-	if backup.Status.Phase != dpv1alpha1.BackupCompleted {
+	if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
 		return errors.Errorf(`backup "%s" is not completed.`, backup.Name)
 	}
 	if len(backup.Labels[constant.AppInstanceLabelKey]) == 0 {
 		return errors.Errorf(`missing source cluster in backup "%s", "app.kubernetes.io/instance" is empty in labels.`, o.Backup)
+	}
+
+	restoreTimeStr, err := formatRestoreTimeAndValidate(o.RestoreTimeStr, backup)
+	if err != nil {
+		return err
 	}
 	// get the cluster object and set the annotation for restore
 	clusterObj, err := o.getClusterObject(backup)
 	if err != nil {
 		return err
 	}
-	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, len(clusterObj.Spec.ComponentSpecs), clusterObj.Spec.ComponentSpecs[0].Name)
+	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, o.RestoreManagementPolicy, len(clusterObj.Spec.ComponentSpecs), clusterObj.Spec.ComponentSpecs[0].Name, restoreTimeStr)
 	if err != nil {
 		return err
 	}
 	clusterObj.ObjectMeta = metav1.ObjectMeta{
 		Namespace:   clusterObj.Namespace,
 		Name:        o.Name,
-		Annotations: map[string]string{constant.RestoreFromBackUpAnnotationKey: restoreAnnotation},
+		Annotations: map[string]string{constant.RestoreFromBackupAnnotationKey: restoreAnnotation},
 	}
 	return o.createCluster(clusterObj)
 }
@@ -500,103 +504,13 @@ func (o *CreateRestoreOptions) createCluster(cluster *appsv1alpha1.Cluster) erro
 	return nil
 }
 
-func (o *CreateRestoreOptions) runPITR() error {
-	objs, err := o.Dynamic.Resource(types.BackupGVR()).Namespace(o.Namespace).
-		List(context.TODO(), metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=%s",
-				constant.AppInstanceLabelKey, o.SourceCluster),
-		})
-	if err != nil {
-		return err
-	}
-	backup := &dpv1alpha1.Backup{}
-
-	// no need to check items len because it is validated by o.validateRestoreTime().
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(objs.Items[0].Object, backup); err != nil {
-		return err
-	}
-	compName := backup.Labels[constant.KBAppComponentLabelKey]
-	if compName == "" {
-		return fmt.Errorf(`component name label %s is missing in backup "%s"`, constant.KBAppComponentLabelKey, backup.Name)
-	}
-	// TODO: use opsRequest to create cluster.
-	// get the cluster object and set the annotation for restore
-	clusterObj, err := o.getClusterObject(backup)
-	if err != nil {
-		return err
-	}
-	// TODO: hack implement for multi-component cluster, how to elegantly implement pitr for multi-component cluster?
-	clusterObj.ObjectMeta = metav1.ObjectMeta{
-		Namespace: clusterObj.Namespace,
-		Name:      o.Name,
-		Annotations: map[string]string{
-			constant.RestoreFromTimeAnnotationKey:       fmt.Sprintf(`{"%s":"%s"}`, compName, o.RestoreTime.Format(time.RFC3339)),
-			constant.RestoreFromSrcClusterAnnotationKey: o.SourceCluster,
-		},
-	}
-	return o.createCluster(clusterObj)
-}
-
 func isTimeInRange(t time.Time, start time.Time, end time.Time) bool {
 	return !t.Before(start) && !t.After(end)
 }
 
-func (o *CreateRestoreOptions) validateRestoreTime() error {
-	if o.RestoreTimeStr == "" && o.SourceCluster == "" {
-		return nil
-	}
-	if o.RestoreTimeStr != "" && o.SourceCluster == "" {
-		return fmt.Errorf("--source-cluster must be specified if specified --restore-to-time")
-	}
-	restoreTime, err := util.TimeParse(o.RestoreTimeStr, time.Second)
-	if err != nil {
-		// retry to parse time with RFC3339 format.
-		var errRFC error
-		restoreTime, errRFC = time.Parse(time.RFC3339, o.RestoreTimeStr)
-		if errRFC != nil {
-			// if retry failure, report the error
-			return err
-		}
-	}
-	o.RestoreTime = &restoreTime
-	objs, err := o.Dynamic.Resource(types.BackupGVR()).Namespace(o.Namespace).
-		List(context.TODO(), metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=%s",
-				constant.AppInstanceLabelKey, o.SourceCluster),
-		})
-	if err != nil {
-		return err
-	}
-	backupMap := map[string][]dpv1alpha1.Backup{}
-	for _, i := range objs.Items {
-		obj := dpv1alpha1.Backup{}
-		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(i.Object, &obj); err != nil {
-			return err
-		}
-		uid := obj.Labels[constant.DataProtectionLabelClusterUIDKey]
-		if backupMap[uid] == nil {
-			backupMap[uid] = make([]dpv1alpha1.Backup, 0)
-		}
-		backupMap[uid] = append(backupMap[uid], obj)
-	}
-	for _, v := range backupMap {
-		recoverableTime := dpv1alpha1.GetRecoverableTimeRange(v)
-		for _, i := range recoverableTime {
-			if isTimeInRange(restoreTime, i.StartTime.Time, i.StopTime.Time) {
-				return nil
-			}
-		}
-	}
-	return fmt.Errorf("restore-to-time is out of time range, you can view the recoverable time: \n"+
-		"\tkbcli cluster describe %s -n %s", o.SourceCluster, o.Namespace)
-}
-
 func (o *CreateRestoreOptions) Validate() error {
-	if o.Backup == "" && o.RestoreTimeStr == "" {
-		return fmt.Errorf("must be specified one of the --backup or --restore-to-time")
-	}
-	if err := o.validateRestoreTime(); err != nil {
-		return err
+	if o.Backup == "" {
+		return fmt.Errorf("must be specified one of the --backup ")
 	}
 
 	if o.Name == "" {
@@ -634,7 +548,7 @@ func NewCreateRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	}
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Backup name")
 	cmd.Flags().StringVar(&o.RestoreTimeStr, "restore-to-time", "", "point in time recovery(PITR)")
-	cmd.Flags().StringVar(&o.SourceCluster, "source-cluster", "", "source cluster name")
+	cmd.Flags().StringVar(&o.RestoreManagementPolicy, "volume-restore-policy", "Parallel", "the volume claim restore policy, supported values: [Serial, Parallel]")
 	return cmd
 }
 
@@ -688,7 +602,7 @@ func printBackupPolicyList(o list.ListOptions) error {
 	tbl := printer.NewTablePrinter(o.Out)
 	tbl.SetHeader("NAME", "NAMESPACE", "DEFAULT", "CLUSTER", "CREATE-TIME", "STATUS")
 	for _, obj := range backupPolicyList.Items {
-		defaultPolicy, ok := obj.GetAnnotations()[constant.DefaultBackupPolicyAnnotationKey]
+		defaultPolicy, ok := obj.GetAnnotations()[dptypes.DefaultBackupPolicyAnnotationKey]
 		backupPolicy := &dpv1alpha1.BackupPolicy{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, backupPolicy); err != nil {
 			return err
@@ -766,28 +680,7 @@ func (o *editBackupPolicyOptions) complete(args []string) error {
 	if o.dynamic, err = o.Factory.DynamicClient(); err != nil {
 		return err
 	}
-	updateSchedulePolicyEnable := func(schedulePolicy *dpv1alpha1.SchedulePolicy, targetVal string) error {
-		if schedulePolicy != nil {
-			enable, err := strconv.ParseBool(targetVal)
-			if err != nil {
-				return err
-			}
-			schedulePolicy.Enable = enable
-		}
-		return nil
-	}
-	updateSchedulePolicyCronExpression := func(schedulePolicy *dpv1alpha1.SchedulePolicy, targetVal string) error {
-		if targetVal != "" {
-			if _, err = cron.ParseStandard(targetVal); err != nil {
-				return err
-			}
-		}
-		if schedulePolicy != nil {
-			schedulePolicy.CronExpression = targetVal
-		}
-		return nil
-	}
-	updateRepoName := func(commonPolicy *dpv1alpha1.CommonBackupPolicy, targetVal string) error {
+	updateRepoName := func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
 		// check if the backup repo exists
 		if targetVal != "" {
 			_, err := o.dynamic.Resource(types.BackupRepoGVR()).Get(context.Background(), targetVal, metav1.GetOptions{})
@@ -795,117 +688,22 @@ func (o *editBackupPolicyOptions) complete(args []string) error {
 				return err
 			}
 		}
-		if commonPolicy != nil {
+		if backupPolicy != nil {
 			if targetVal != "" {
-				commonPolicy.BackupRepoName = &targetVal
+				backupPolicy.Spec.BackupRepoName = &targetVal
 			} else {
-				commonPolicy.BackupRepoName = nil
+				backupPolicy.Spec.BackupRepoName = nil
 			}
 		}
 		return nil
 	}
-	updatePVCName := func(commonPolicy *dpv1alpha1.CommonBackupPolicy, targetVal string) error {
-		if commonPolicy != nil {
-			commonPolicy.PersistentVolumeClaim.Name = &targetVal
-		}
-		return nil
-	}
-	updatePVCStorageClass := func(commonPolicy *dpv1alpha1.CommonBackupPolicy, targetVal string) error {
-		if commonPolicy != nil {
-			commonPolicy.PersistentVolumeClaim.StorageClassName = &targetVal
-		}
-		return nil
-	}
+
 	o.editContent = []editorRow{
 		{
-			key:      "retention.ttl",
-			jsonpath: "retention.ttl",
+			key:      "backupRepoName",
+			jsonpath: "backupRepoName",
 			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
-				backupPolicy.Spec.Retention.TTL = &targetVal
-				return nil
-			},
-		},
-		{
-			key:      "schedule.datafile.enable",
-			jsonpath: "schedule.datafile.enable",
-			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
-				return updateSchedulePolicyEnable(backupPolicy.Spec.Schedule.Datafile, targetVal)
-			},
-		},
-		{
-			key:      "schedule.datafile.cronExpression",
-			jsonpath: "schedule.datafile.cronExpression",
-			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
-				return updateSchedulePolicyCronExpression(backupPolicy.Spec.Schedule.Datafile, targetVal)
-			},
-		},
-		{
-			key:      "schedule.snapshot.enable",
-			jsonpath: "schedule.snapshot.enable",
-			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
-				return updateSchedulePolicyEnable(backupPolicy.Spec.Schedule.Snapshot, targetVal)
-			},
-		},
-		{
-			key:      "schedule.snapshot.cronExpression",
-			jsonpath: "schedule.snapshot.cronExpression",
-			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
-				return updateSchedulePolicyCronExpression(backupPolicy.Spec.Schedule.Snapshot, targetVal)
-			},
-		},
-		{
-			key:      "schedule.logfile.enable",
-			jsonpath: "schedule.logfile.enable",
-			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
-				return updateSchedulePolicyEnable(backupPolicy.Spec.Schedule.Logfile, targetVal)
-			},
-		},
-		{
-			key:      "schedule.logfile.cronExpression",
-			jsonpath: "schedule.logfile.cronExpression", updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
-				return updateSchedulePolicyCronExpression(backupPolicy.Spec.Schedule.Logfile, targetVal)
-			},
-		},
-		{
-			key:      "datafile.pvc.name",
-			jsonpath: "datafile.persistentVolumeClaim.name",
-			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
-				return updatePVCName(backupPolicy.Spec.Datafile, targetVal)
-			},
-		},
-		{
-			key:      "datafile.pvc.storageClassName",
-			jsonpath: "datafile.persistentVolumeClaim.storageClassName",
-			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
-				return updatePVCStorageClass(backupPolicy.Spec.Datafile, targetVal)
-			},
-		},
-		{
-			key:      "datafile.backupRepoName",
-			jsonpath: "datafile.backupRepoName",
-			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
-				return updateRepoName(backupPolicy.Spec.Datafile, targetVal)
-			},
-		},
-		{
-			key:      "logfile.pvc.name",
-			jsonpath: "logfile.persistentVolumeClaim.name",
-			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
-				return updatePVCName(backupPolicy.Spec.Logfile, targetVal)
-			},
-		},
-		{
-			key:      "logfile.pvc.storageClassName",
-			jsonpath: "logfile.persistentVolumeClaim.storageClassName",
-			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
-				return updatePVCStorageClass(backupPolicy.Spec.Logfile, targetVal)
-			},
-		},
-		{
-			key:      "logfile.backupRepoName",
-			jsonpath: "logfile.backupRepoName",
-			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
-				return updateRepoName(backupPolicy.Spec.Logfile, targetVal)
+				return updateRepoName(backupPolicy, targetVal)
 			},
 		},
 	}
@@ -1060,6 +858,93 @@ func (o *editBackupPolicyOptions) applyChanges(backupPolicy *dpv1alpha1.BackupPo
 	return nil
 }
 
+type describeBackupPolicyOptions struct {
+	namespace string
+	names     []string
+	dynamic   dynamic.Interface
+	Factory   cmdutil.Factory
+	client    clientset.Interface
+
+	genericclioptions.IOStreams
+}
+
+func (o *describeBackupPolicyOptions) Complete(args []string) error {
+	var err error
+
+	if len(args) == 0 {
+		return fmt.Errorf("backupPolicy name should be specified")
+	}
+
+	o.names = args
+
+	if o.client, err = o.Factory.KubernetesClientSet(); err != nil {
+		return err
+	}
+
+	if o.dynamic, err = o.Factory.DynamicClient(); err != nil {
+		return err
+	}
+
+	if o.namespace, _, err = o.Factory.ToRawKubeConfigLoader().Namespace(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (o *describeBackupPolicyOptions) Run() error {
+	for _, name := range o.names {
+		backupPolicyObj := &dpv1alpha1.BackupPolicy{}
+		if err := cluster.GetK8SClientObject(o.dynamic, backupPolicyObj, types.BackupPolicyGVR(), o.namespace, name); err != nil {
+			return err
+		}
+		if err := o.printBackupPolicyObj(backupPolicyObj); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (o *describeBackupPolicyOptions) printBackupPolicyObj(obj *dpv1alpha1.BackupPolicy) error {
+	printer.PrintLine("Summary:")
+	realPrintPairStringToLine("Name", obj.Name)
+	realPrintPairStringToLine("Cluster", obj.Labels[constant.AppInstanceLabelKey])
+	realPrintPairStringToLine("Namespace", obj.Namespace)
+	if obj.Spec.BackupRepoName != nil {
+		realPrintPairStringToLine("Backup Repo Name", *obj.Spec.BackupRepoName)
+	}
+
+	printer.PrintLine("\nBackup Methods:")
+	p := printer.NewTablePrinter(o.Out)
+	p.SetHeader("Name", "ActionSet", "snapshot-volumes")
+	for _, v := range obj.Spec.BackupMethods {
+		p.AddRow(v.Name, v.ActionSetName, strconv.FormatBool(*v.SnapshotVolumes))
+	}
+	p.Print()
+
+	return nil
+}
+
+func NewDescribeBackupPolicyCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := &describeBackupPolicyOptions{
+		Factory:   f,
+		IOStreams: streams,
+	}
+	cmd := &cobra.Command{
+		Use:                   "describe-backup-policy",
+		DisableFlagsInUseLine: true,
+		Aliases:               []string{"describe-bp"},
+		Short:                 "Describe backup policy",
+		Example:               describeBackupPolicyExample,
+		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, types.BackupPolicyGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
+			util.CheckErr(o.Complete(args))
+			util.CheckErr(o.Run())
+		},
+	}
+	return cmd
+}
+
 func (o *DescribeBackupOptions) Complete(args []string) error {
 	var err error
 
@@ -1097,23 +982,23 @@ func (o *DescribeBackupOptions) Run() error {
 }
 
 func (o *DescribeBackupOptions) printBackupObj(obj *dpv1alpha1.Backup) error {
+	targetCluster := obj.Labels[constant.AppInstanceLabelKey]
 	printer.PrintLineWithTabSeparator(
 		printer.NewPair("Name", obj.Name),
-		printer.NewPair("Cluster", obj.Status.SourceCluster),
+		printer.NewPair("Cluster", targetCluster),
 		printer.NewPair("Namespace", obj.Namespace),
 	)
 	printer.PrintLine("\nSpec:")
-	realPrintPairStringToLine("Type", string(obj.Spec.BackupType))
+	realPrintPairStringToLine("Method", obj.Spec.BackupMethod)
 	realPrintPairStringToLine("Policy Name", obj.Spec.BackupPolicyName)
 
 	printer.PrintLine("\nStatus:")
 	realPrintPairStringToLine("Phase", string(obj.Status.Phase))
 	realPrintPairStringToLine("Total Size", obj.Status.TotalSize)
-	realPrintPairStringToLine("Backup Tool", obj.Status.BackupToolName)
-	realPrintPairStringToLine("PVC Name", obj.Status.PersistentVolumeClaimName)
-	if obj.Status.AvailableReplicas != nil {
-		realPrintPairStringToLine("Available Replicas", string(*obj.Status.AvailableReplicas))
+	if obj.Status.BackupMethod != nil {
+		realPrintPairStringToLine("ActionSet Name", obj.Status.BackupMethod.ActionSetName)
 	}
+	realPrintPairStringToLine("PVC Name", obj.Status.PersistentVolumeClaimName)
 	if obj.Status.Duration != nil {
 		realPrintPairStringToLine("Duration", duration.HumanDuration(obj.Status.Duration.Duration))
 	}
@@ -1123,26 +1008,20 @@ func (o *DescribeBackupOptions) printBackupObj(obj *dpv1alpha1.Backup) error {
 	// print failure reason, ignore error
 	_ = o.enhancePrintFailureReason(obj.Name, obj.Status.FailureReason)
 
-	if obj.Status.Manifests != nil {
-		printer.PrintLine("\nManifests:")
-		realPrintPairStringToLine("Target", obj.Status.Manifests.Target)
-		if obj.Status.Manifests.BackupLog != nil {
-			realPrintPairStringToLine("Log Start Time", util.TimeFormat(obj.Status.Manifests.BackupLog.StartTime))
-			realPrintPairStringToLine("Log Stop Time", util.TimeFormat(obj.Status.Manifests.BackupLog.StopTime))
-		}
-		if obj.Status.Manifests.BackupTool != nil {
-			realPrintPairStringToLine("File Path", obj.Status.Manifests.BackupTool.FilePath)
-			realPrintPairStringToLine("Volume Name", obj.Status.Manifests.BackupTool.VolumeName)
-			realPrintPairStringToLine("Upload Total Size", obj.Status.Manifests.BackupTool.UploadTotalSize)
-			realPrintPairStringToLine("Checksum", obj.Status.Manifests.BackupTool.Checksum)
-			realPrintPairStringToLine("Checkpoint", obj.Status.Manifests.BackupTool.Checkpoint)
-		}
-		if obj.Status.Manifests.Snapshot != nil {
-			realPrintPairStringToLine("Snapshot Name", obj.Status.Manifests.Snapshot.VolumeSnapshotName)
-			realPrintPairStringToLine("Snapshot Content Name", obj.Status.Manifests.Snapshot.VolumeSnapshotContentName)
-		}
-		for k, v := range obj.Status.Manifests.UserContext {
-			realPrintPairStringToLine(k, v)
+	realPrintPairStringToLine("Path", obj.Status.Path)
+
+	if obj.Status.TimeRange != nil {
+		realPrintPairStringToLine("Time Range Start", util.TimeFormat(obj.Status.TimeRange.Start))
+		realPrintPairStringToLine("Time Range End", util.TimeFormat(obj.Status.TimeRange.End))
+	}
+
+	if len(obj.Status.VolumeSnapshots) > 0 {
+		printer.PrintLine("\nVolume Snapshots:")
+		for _, v := range obj.Status.VolumeSnapshots {
+			realPrintPairStringToLine("Name", v.Name)
+			realPrintPairStringToLine("Content Name", v.ContentName)
+			realPrintPairStringToLine("Volume Name:", v.VolumeName)
+			realPrintPairStringToLine("Size", v.Size)
 		}
 	}
 
@@ -1173,7 +1052,7 @@ func (o *DescribeBackupOptions) enhancePrintFailureReason(backupName, failureRea
 	ctx := context.Background()
 	// get the latest job log details.
 	labels := fmt.Sprintf("%s=%s",
-		constant.DataProtectionLabelBackupNameKey, backupName,
+		dptypes.DataProtectionLabelBackupNameKey, backupName,
 	)
 	jobList, err := o.client.BatchV1().Jobs("").List(ctx, metav1.ListOptions{LabelSelector: labels})
 	if err != nil {

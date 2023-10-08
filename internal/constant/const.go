@@ -111,22 +111,19 @@ const (
 	CMConfigurationConstraintsNameLabelKey   = "config.kubeblocks.io/config-constraints-name"
 	CMConfigurationTemplateVersion           = "config.kubeblocks.io/config-template-version"
 	ConsensusSetAccessModeLabelKey           = "cs.apps.kubeblocks.io/access-mode"
-	BackupTypeLabelKeyKey                    = "dataprotection.kubeblocks.io/backup-type"
-	DataProtectionLabelBackupNameKey         = "dataprotection.kubeblocks.io/backup-name"
 	AddonNameLabelKey                        = "extensions.kubeblocks.io/addon-name"
 	OpsRequestTypeLabelKey                   = "ops.kubeblocks.io/ops-type"
 	OpsRequestNameLabelKey                   = "ops.kubeblocks.io/ops-name"
 	ServiceDescriptorNameLabelKey            = "servicedescriptor.kubeblocks.io/name"
+	RestoreForHScaleLabelKey                 = "apps.kubeblocks.io/restore-for-hscale"
 
 	// kubeblocks.io annotations
-	ClusterSnapshotAnnotationKey                = "kubeblocks.io/cluster-snapshot"            // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
-	DefaultClusterVersionAnnotationKey          = "kubeblocks.io/is-default-cluster-version"  // DefaultClusterVersionAnnotationKey specifies the default cluster version.
-	OpsRequestAnnotationKey                     = "kubeblocks.io/ops-request"                 // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
-	ReconcileAnnotationKey                      = "kubeblocks.io/reconcile"                   // ReconcileAnnotationKey Notify k8s object to reconcile
-	RestartAnnotationKey                        = "kubeblocks.io/restart"                     // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
-	RestoreFromTimeAnnotationKey                = "kubeblocks.io/restore-from-time"           // RestoreFromTimeAnnotationKey specifies the time to recover from the backup.
-	RestoreFromSrcClusterAnnotationKey          = "kubeblocks.io/restore-from-source-cluster" // RestoreFromSrcClusterAnnotationKey specifies the source cluster to recover from the backup.
-	RestoreFromBackUpAnnotationKey              = "kubeblocks.io/restore-from-backup"         // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
+	ClusterSnapshotAnnotationKey                = "kubeblocks.io/cluster-snapshot"           // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
+	DefaultClusterVersionAnnotationKey          = "kubeblocks.io/is-default-cluster-version" // DefaultClusterVersionAnnotationKey specifies the default cluster version.
+	OpsRequestAnnotationKey                     = "kubeblocks.io/ops-request"                // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
+	ReconcileAnnotationKey                      = "kubeblocks.io/reconcile"                  // ReconcileAnnotationKey Notify k8s object to reconcile
+	RestartAnnotationKey                        = "kubeblocks.io/restart"                    // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
+	RestoreFromBackupAnnotationKey              = "kubeblocks.io/restore-from-backup"        // RestoreFromBackupAnnotationKey specifies the component to recover from the backup.
 	SnapShotForStartAnnotationKey               = "kubeblocks.io/snapshot-for-start"
 	ComponentReplicasAnnotationKey              = "apps.kubeblocks.io/component-replicas" // ComponentReplicasAnnotationKey specifies the number of pods in replicas
 	BackupPolicyTemplateAnnotationKey           = "apps.kubeblocks.io/backup-policy-template"
@@ -136,12 +133,6 @@ const (
 	HaltRecoveryAllowInconsistentResAnnotKey    = "clusters.apps.kubeblocks.io/allow-inconsistent-resource"
 	LeaderAnnotationKey                         = "cs.apps.kubeblocks.io/leader"
 	PrimaryAnnotationKey                        = "rs.apps.kubeblocks.io/primary"
-	DefaultBackupPolicyAnnotationKey            = "dataprotection.kubeblocks.io/is-default-policy"          // DefaultBackupPolicyAnnotationKey specifies the default backup policy.
-	DefaultBackupPolicyTemplateAnnotationKey    = "dataprotection.kubeblocks.io/is-default-policy-template" // DefaultBackupPolicyTemplateAnnotationKey specifies the default backup policy template.
-	DefaultBackupRepoAnnotationKey              = "dataprotection.kubeblocks.io/is-default-repo"            // DefaultBackupRepoAnnotationKey specifies the default backup repo.
-	BackupDataPathPrefixAnnotationKey           = "dataprotection.kubeblocks.io/path-prefix"                // BackupDataPathPrefixAnnotationKey specifies the backup data path prefix.
-	ReconfigureRefAnnotationKey                 = "dataprotection.kubeblocks.io/reconfigure-ref"
-	DataProtectionLabelClusterUIDKey            = "dataprotection.kubeblocks.io/cluster-uid"
 	DisableUpgradeInsConfigurationAnnotationKey = "config.kubeblocks.io/disable-reconfigure"
 	LastAppliedConfigAnnotationKey              = "config.kubeblocks.io/last-applied-configuration"
 	LastAppliedOpsCRAnnotationKey               = "config.kubeblocks.io/last-applied-ops-name"
@@ -295,29 +286,6 @@ const (
 )
 
 const (
-	// dataProtection env names
-	DPTargetPodName            = "DP_TARGET_POD_NAME"
-	DPDBHost                   = "DB_HOST"                     // db host for dataProtection
-	DPDBUser                   = "DB_USER"                     // db user for dataProtection
-	DPDBPassword               = "DB_PASSWORD"                 // db password for dataProtection
-	DPBackupDIR                = "BACKUP_DIR"                  // the dest directory for backup data
-	DPLogFileDIR               = "BACKUP_LOGFILE_DIR"          // logfile dir
-	DPBackupName               = "BACKUP_NAME"                 // backup cr name
-	DPTTL                      = "TTL"                         // backup time to live, reference the backupPolicy.spec.retention.ttl
-	DPLogfileTTL               = "LOGFILE_TTL"                 // ttl for logfile backup, one more day than backupPolicy.spec.retention.ttl
-	DPLogfileTTLSecond         = "LOGFILE_TTL_SECOND"          // ttl seconds with LOGFILE_TTL, integer format
-	DPArchiveInterval          = "ARCHIVE_INTERVAL"            // archive interval for statefulSet deploy kind, trans from the schedule cronExpression for logfile
-	DPBackupInfoFile           = "BACKUP_INFO_FILE"            // the file name which retains the backup.status info
-	DPTimeFormat               = "TIME_FORMAT"                 // golang time format string
-	DPVolumeDataDIR            = "VOLUME_DATA_DIR"             //
-	DPKBRecoveryTime           = "KB_RECOVERY_TIME"            // recovery time
-	DPKBRecoveryTimestamp      = "KB_RECOVERY_TIMESTAMP"       // recovery timestamp
-	DPBaseBackupStartTime      = "BASE_BACKUP_START_TIME"      // base backup start time for pitr
-	DPBaseBackupStartTimestamp = "BASE_BACKUP_START_TIMESTAMP" // base backup start timestamp for pitr
-	DPBackupStopTime           = "BACKUP_STOP_TIME"            // backup stop time
-)
-
-const (
 	FeatureGateReplicatedStateMachine = "REPLICATED_STATE_MACHINE" // enable rsm
 )
 
@@ -331,4 +299,11 @@ const (
 	ServiceDescriptorPasswordKey = "password"
 	ServiceDescriptorEndpointKey = "endpoint"
 	ServiceDescriptorPortKey     = "port"
+)
+
+const (
+	BackupNameKeyForRestore             = "name"
+	BackupNamespaceKeyForRestore        = "namespace"
+	VolumeManagementPolicyKeyForRestore = "managementPolicy"
+	RestoreTimeKeyForRestore            = "restoreTime"
 )

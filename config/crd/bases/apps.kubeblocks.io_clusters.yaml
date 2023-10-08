@@ -2,8 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.12.1
   labels:
     app.kubernetes.io/name: kubeblocks
   name: clusters.apps.kubeblocks.io
@@ -119,15 +118,7 @@ spec:
                     description: enabled defines whether to enable automated backup.
                     type: boolean
                   method:
-                    allOf:
-                    - enum:
-                      - snapshot
-                      - backupTool
-                    - enum:
-                      - snapshot
-                      - backupTool
-                    default: snapshot
-                    description: 'backup method, support: snapshot, backupTool.'
+                    description: backup method name to use, that is defined in backupPolicy.
                     type: string
                   pitrEnabled:
                     default: false
@@ -139,11 +130,14 @@ spec:
                       will use the default backupRepo.
                     type: string
                   retentionPeriod:
-                    default: 1d
-                    description: retentionPeriod is a time string ending with the
-                      'd'|'D'|'h'|'H' character to describe how long the Backup should
-                      be retained. if not set, will be retained forever.
-                    pattern: ^\d+[d|D|h|H]$
+                    default: 7d
+                    description: "retentionPeriod determines a duration up to which
+                      the backup should be kept. controller will remove all backups
+                      that are older than the RetentionPeriod. For example, RetentionPeriod
+                      of `30d` will keep only the backups of last 30 days. Sample
+                      duration format: - years: \t2y - months: \t6mo - days: \t\t30d
+                      - hours: \t12h - minutes: \t30m You can also combine the above
+                      durations. For example: 30d12h30m"
                     type: string
                   startingDeadlineMinutes:
                     description: startingDeadlineMinutes defines the deadline in minutes
@@ -153,8 +147,6 @@ spec:
                     maximum: 1440
                     minimum: 0
                     type: integer
-                required:
-                - method
                 type: object
               clusterDefinitionRef:
                 description: Cluster referencing ClusterDefinition name. This is an
@@ -362,8 +354,8 @@ spec:
                           description: 'Requests describes the minimum amount of compute
                             resources required. If Requests is omitted for a container,
                             it defaults to Limits if that is explicitly specified,
-                            otherwise to an implementation-defined value. More info:
-                            https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            otherwise to an implementation-defined value. Requests
+                            cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                           type: object
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
@@ -622,14 +614,18 @@ spec:
                                       of compute resources required. If Requests is
                                       omitted for a container, it defaults to Limits
                                       if that is explicitly specified, otherwise to
-                                      an implementation-defined value. More info:
-                                      https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                      an implementation-defined value. Requests cannot
+                                      exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                                     type: object
                                 type: object
                                 x-kubernetes-preserve-unknown-fields: true
                               storageClassName:
                                 description: 'storageClassName is the name of the
                                   StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.'
+                                type: string
+                              volumeMode:
+                                description: volumeMode defines what type of volume
+                                  is required by the claim.
                                 type: string
                             type: object
                         required:

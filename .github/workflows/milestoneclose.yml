@@ -12,7 +12,13 @@ env:
   PROJECT_NUMBER: 2
 
 jobs:
-   move_issues:
+  move_milestone:
+    uses: apecloud/apecloud-cd/.github/workflows/milestone-move.yml@v0.1.32
+    with:
+      APECD_REF: "v0.1.32"
+    secrets: inherit
+
+  move_issues:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo

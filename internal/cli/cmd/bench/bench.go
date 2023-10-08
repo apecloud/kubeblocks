@@ -129,6 +129,10 @@ func (o *BenchBaseOptions) BaseValidate() error {
 		return fmt.Errorf("port is required")
 	}
 
+	if err := validateBenchmarkExist(o.factory, o.IOStreams, o.name); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -461,6 +465,9 @@ func validateBenchmarkExist(factory cmdutil.Factory, streams genericclioptions.I
 		bench.Print = false
 		result, err := bench.Run()
 		if err != nil {
+			if strings.Contains(err.Error(), "the server doesn't have a resource type") {
+				return fmt.Errorf("kubebench is not installed, please run `kbcli addon enable kubebench` to install it")
+			}
 			return err
 		}
 

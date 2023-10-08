@@ -193,7 +193,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			opsRes, eventContext := assureMockReconfigureData("simple")
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx:      testCtx.Ctx,
-				Log:      log.FromContext(ctx).WithValues("Reconfigure"),
+				Log:      log.FromContext(ctx).WithName("Reconfigure"),
 				Recorder: opsRes.Recorder,
 			}
 
@@ -258,7 +258,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			opsRes, eventContext := assureMockReconfigureData("autoReload")
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx:      testCtx.Ctx,
-				Log:      log.FromContext(ctx).WithValues("Reconfigure"),
+				Log:      log.FromContext(ctx).WithName("Reconfigure"),
 				Recorder: opsRes.Recorder,
 			}
 

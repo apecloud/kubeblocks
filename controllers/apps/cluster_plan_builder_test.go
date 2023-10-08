@@ -62,7 +62,7 @@ var _ = Describe("cluster plan builder test", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.VolumeSnapshotSignature, true, inNS)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
-		testapps.ClearResources(&testCtx, generics.BackupToolSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ActionSetSignature, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 	}
 

@@ -28,9 +28,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
 
 const backupTimeLayout = "20060102150405"
@@ -79,7 +80,7 @@ func (b BackupOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 	cluster := opsRes.Cluster
 
 	// get backup
-	backups := &dataprotectionv1alpha1.BackupList{}
+	backups := &dpv1alpha1.BackupList{}
 	if err := cli.List(reqCtx.Ctx, backups, client.InNamespace(cluster.Namespace), client.MatchingLabels(getBackupLabels(cluster.Name, opsRequest.Name))); err != nil {
 		return appsv1alpha1.OpsFailedPhase, 0, err
 	}
@@ -89,9 +90,9 @@ func (b BackupOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 	}
 	// check backup status
 	phase := backups.Items[0].Status.Phase
-	if phase == dataprotectionv1alpha1.BackupCompleted {
+	if phase == dpv1alpha1.BackupPhaseCompleted {
 		return appsv1alpha1.OpsSucceedPhase, 0, nil
-	} else if phase == dataprotectionv1alpha1.BackupFailed {
+	} else if phase == dpv1alpha1.BackupPhaseFailed {
 		return appsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("backup failed")
 	}
 	return appsv1alpha1.OpsRunningPhase, 0, nil
@@ -102,14 +103,12 @@ func (b BackupOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, c
 	return nil
 }
 
-func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest, cluster *appsv1alpha1.Cluster) (*dataprotectionv1alpha1.Backup, error) {
+func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest, cluster *appsv1alpha1.Cluster) (*dpv1alpha1.Backup, error) {
 	var err error
 
 	backupSpec := opsRequest.Spec.BackupSpec
 	if backupSpec == nil {
-		backupSpec = &appsv1alpha1.BackupSpec{
-			BackupType: string(dataprotectionv1alpha1.BackupTypeDataFile),
-		}
+		backupSpec = &appsv1alpha1.BackupSpec{}
 	}
 
 	if len(backupSpec.BackupName) == 0 {
@@ -121,15 +120,15 @@ func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *a
 		return nil, err
 	}
 
-	backup := &dataprotectionv1alpha1.Backup{
+	backup := &dpv1alpha1.Backup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      backupSpec.BackupName,
 			Namespace: cluster.Namespace,
 			Labels:    getBackupLabels(cluster.Name, opsRequest.Name),
 		},
-		Spec: dataprotectionv1alpha1.BackupSpec{
+		Spec: dpv1alpha1.BackupSpec{
 			BackupPolicyName: backupSpec.BackupPolicyName,
-			BackupType:       dataprotectionv1alpha1.BackupType(backupSpec.BackupType),
+			BackupMethod:     backupSpec.BackupMethod,
 		},
 	}
 
@@ -142,28 +141,28 @@ func getDefaultBackupPolicy(reqCtx intctrlutil.RequestCtx, cli client.Client, cl
 		return backupPolicy, nil
 	}
 
-	backupPolicyList := &dataprotectionv1alpha1.BackupPolicyList{}
+	backupPolicyList := &dpv1alpha1.BackupPolicyList{}
 	if err := cli.List(reqCtx.Ctx, backupPolicyList, client.InNamespace(cluster.Namespace),
 		client.MatchingLabels(map[string]string{
 			constant.AppInstanceLabelKey: cluster.Name,
 		})); err != nil {
 		return "", err
 	}
-	defaultBackupPolicys := &dataprotectionv1alpha1.BackupPolicyList{}
+	defaultBackupPolices := &dpv1alpha1.BackupPolicyList{}
 	for _, backupPolicy := range backupPolicyList.Items {
-		if backupPolicy.GetAnnotations()[constant.DefaultBackupPolicyAnnotationKey] == "true" {
-			defaultBackupPolicys.Items = append(defaultBackupPolicys.Items, backupPolicy)
+		if backupPolicy.GetAnnotations()[dptypes.DefaultBackupPolicyAnnotationKey] == "true" {
+			defaultBackupPolices.Items = append(defaultBackupPolices.Items, backupPolicy)
 		}
 	}
 
-	if len(defaultBackupPolicys.Items) == 0 {
+	if len(defaultBackupPolices.Items) == 0 {
 		return "", fmt.Errorf(`not found any default backup policy for cluster "%s"`, cluster.Name)
 	}
-	if len(defaultBackupPolicys.Items) > 1 {
+	if len(defaultBackupPolices.Items) > 1 {
 		return "", fmt.Errorf(`cluster "%s" has multiple default backup policies`, cluster.Name)
 	}
 
-	return defaultBackupPolicys.Items[0].GetName(), nil
+	return defaultBackupPolices.Items[0].GetName(), nil
 }
 
 func getBackupLabels(cluster, request string) map[string]string {

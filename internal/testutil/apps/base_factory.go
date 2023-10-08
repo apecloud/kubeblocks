@@ -40,7 +40,7 @@ type BaseFactory[T intctrlutil.Object, PT intctrlutil.PObject[T], F any] struct 
 	concreteFactory *F
 }
 
-func (factory *BaseFactory[T, PT, F]) init(namespace, name string, obj PT, f *F) {
+func (factory *BaseFactory[T, PT, F]) Init(namespace, name string, obj PT, f *F) {
 	obj.SetNamespace(namespace)
 	obj.SetName(name)
 	if obj.GetLabels() == nil {
@@ -53,7 +53,7 @@ func (factory *BaseFactory[T, PT, F]) init(namespace, name string, obj PT, f *F)
 	factory.concreteFactory = f
 }
 
-func (factory *BaseFactory[T, PT, F]) get() PT {
+func (factory *BaseFactory[T, PT, F]) Get() PT {
 	return factory.object
 }
 
@@ -89,7 +89,7 @@ func (factory *BaseFactory[T, PT, F]) AddAppComponentLabel(value string) *F {
 	return factory.AddLabels(constant.KBAppComponentLabelKey, value)
 }
 
-func (factory *BaseFactory[T, PT, F]) AddAppManangedByLabel() *F {
+func (factory *BaseFactory[T, PT, F]) AddAppManagedByLabel() *F {
 	return factory.AddLabels(constant.AppManagedByLabelKey, constant.AppName)
 }
 
@@ -137,22 +137,24 @@ func (factory *BaseFactory[T, PT, F]) AddFinalizers(finalizers []string) *F {
 }
 
 func (factory *BaseFactory[T, PT, F]) Apply(changeFn func(PT)) *F {
-	changeFn(factory.object)
+	if changeFn != nil {
+		changeFn(factory.object)
+	}
 	return factory.concreteFactory
 }
 
 func (factory *BaseFactory[T, PT, F]) Create(testCtx *testutil.TestContext) *F {
-	gomega.Expect(testCtx.CreateObj(testCtx.Ctx, factory.get())).Should(gomega.Succeed())
+	gomega.Expect(testCtx.CreateObj(testCtx.Ctx, factory.Get())).Should(gomega.Succeed())
 	return factory.concreteFactory
 }
 
 func (factory *BaseFactory[T, PT, F]) CheckedCreate(testCtx *testutil.TestContext) *F {
-	gomega.Expect(testCtx.CheckedCreateObj(testCtx.Ctx, factory.get())).Should(gomega.Succeed())
+	gomega.Expect(testCtx.CheckedCreateObj(testCtx.Ctx, factory.Get())).Should(gomega.Succeed())
 	return factory.concreteFactory
 }
 
 func (factory *BaseFactory[T, PT, F]) CreateCli(ctx context.Context, cli client.Client) *F {
-	gomega.Expect(cli.Create(ctx, factory.get())).Should(gomega.Succeed())
+	gomega.Expect(cli.Create(ctx, factory.Get())).Should(gomega.Succeed())
 	return factory.concreteFactory
 }
 

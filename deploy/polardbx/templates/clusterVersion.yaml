@@ -1,0 +1,64 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: polardbx-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  labels:
+    {{- include "polardbx.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: polardbx
+  componentVersions:
+    - componentDefRef: gms
+      versionsContext:
+        containers:
+          - name: engine
+            image: {{ .Values.images.polardbx.repository }}/{{ .Values.images.polardbx.dn.name}}:{{.Values.images.polardbx.dn.tag}}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.polardbx.pullPolicy }}
+          - name: exporter
+            image: {{ .Values.images.prom.repository }}/{{ .Values.images.prom.mysqld_exporter.name}}:{{.Values.images.prom.mysqld_exporter.tag}}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.prom.pullPolicy }}
+        initContainers:
+          - name: tools-updater
+            image: {{ .Values.images.polardbx.repository }}/{{ .Values.images.polardbx.toolsUpdater.name }}:{{.Values.images.polardbx.toolsUpdater.tag}}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.polardbx.pullPolicy }}
+    - componentDefRef: dn
+      versionsContext:
+        containers:
+          - name: engine
+            image: {{ .Values.images.polardbx.repository }}/{{ .Values.images.polardbx.dn.name}}:{{.Values.images.polardbx.dn.tag}}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.polardbx.pullPolicy }}
+          - name: exporter
+            image: {{ .Values.images.prom.repository }}/{{ .Values.images.prom.mysqld_exporter.name}}:{{.Values.images.prom.mysqld_exporter.tag}}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.prom.pullPolicy }}
+        initContainers:
+          - name: tools-updater
+            image: {{ .Values.images.polardbx.repository }}/{{ .Values.images.polardbx.toolsUpdater.name }}:{{.Values.images.polardbx.toolsUpdater.tag}}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.polardbx.pullPolicy }}
+    - componentDefRef: cn
+      versionsContext:
+        containers:
+          - name: engine
+            image: {{ .Values.images.polardbx.repository }}/{{ .Values.images.polardbx.cn.name}}:{{.Values.images.polardbx.cn.tag}}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.polardbx.pullPolicy }}
+          - name: exporter
+            image: {{ .Values.images.polardbx.repository }}/{{ .Values.images.polardbx.exporter.name}}:{{.Values.images.polardbx.exporter.tag}}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.polardbx.pullPolicy }}
+        initContainers:
+          - name: init
+            image: {{ .Values.images.polardbx.repository }}/{{ .Values.images.polardbx.init.name }}:{{.Values.images.polardbx.init.tag}}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.polardbx.pullPolicy }}
+          - name: metadb-init
+            image:  {{ .Values.images.mysql.repository }}:{{ .Values.images.mysql.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.mysql.pullPolicy }}
+    - componentDefRef: cdc
+      versionsContext:
+        containers:
+          - name: engine
+            image: {{ .Values.images.polardbx.repository }}/{{ .Values.images.polardbx.cdc.name}}:{{.Values.images.polardbx.cdc.tag}}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.polardbx.pullPolicy }}
+          - name: exporter
+            image: {{ .Values.images.polardbx.repository }}/{{ .Values.images.polardbx.exporter.name}}:{{.Values.images.polardbx.exporter.tag}}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.polardbx.pullPolicy }}
+        initContainers:
+          - name: wait-cn-ready
+            image: {{ .Values.images.mysql.repository }}:{{ .Values.images.mysql.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.mysql.pullPolicy }}

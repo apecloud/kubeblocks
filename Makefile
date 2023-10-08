@@ -477,8 +477,8 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v4.5.7
-CONTROLLER_TOOLS_VERSION ?= v0.9.0
+KUSTOMIZE_VERSION ?= v5.1.1
+CONTROLLER_TOOLS_VERSION ?= v0.12.1
 CUE_VERSION ?= v0.4.3
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "$(GITHUB_PROXY)https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"

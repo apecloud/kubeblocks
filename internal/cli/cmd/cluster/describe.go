@@ -23,11 +23,9 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
@@ -41,7 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
 
 var (
@@ -233,60 +231,60 @@ func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backups []dpv1
 	}
 	tbl := newTbl(out, "\nData Protection:", "AUTO-BACKUP", "BACKUP-SCHEDULE", "TYPE", "BACKUP-TTL", "LAST-SCHEDULE", "RECOVERABLE-TIME")
 	for _, policy := range backupPolicies {
-		if policy.Annotations[constant.DefaultBackupPolicyAnnotationKey] != "true" {
+		if policy.Annotations[dptypes.DefaultBackupPolicyAnnotationKey] != "true" {
 			continue
 		}
-		if policy.Status.Phase != dpv1alpha1.PolicyAvailable {
+		if policy.Status.Phase != dpv1alpha1.AvailablePhase {
 			continue
 		}
-		ttlString := printer.NoneString
-		backupSchedule := printer.NoneString
-		backupType := printer.NoneString
-		scheduleEnable := "Disabled"
-		if policy.Spec.Schedule.Snapshot != nil {
-			if policy.Spec.Schedule.Snapshot.Enable {
-				scheduleEnable = "Enabled"
-				backupSchedule = policy.Spec.Schedule.Snapshot.CronExpression
-				backupType = string(dpv1alpha1.BackupTypeSnapshot)
-			}
-		}
-		if policy.Spec.Schedule.Datafile != nil {
-			if policy.Spec.Schedule.Datafile.Enable {
-				scheduleEnable = "Enabled"
-				backupSchedule = policy.Spec.Schedule.Datafile.CronExpression
-				backupType = string(dpv1alpha1.BackupTypeDataFile)
-			}
-		}
-		if policy.Spec.Retention != nil && policy.Spec.Retention.TTL != nil {
-			ttlString = *policy.Spec.Retention.TTL
-		}
-		lastScheduleTime := printer.NoneString
-		if policy.Status.LastScheduleTime != nil {
-			lastScheduleTime = util.TimeFormat(policy.Status.LastScheduleTime)
-		}
-		tbl.AddRow(scheduleEnable, backupSchedule, backupType, ttlString, lastScheduleTime, getBackupRecoverableTime(backups))
+		//	ttlString := printer.NoneString
+		//	backupSchedule := printer.NoneString
+		//	backupType := printer.NoneString
+		//	scheduleEnable := "Disabled"
+		//	if policy.Spec.SchedulePolicy.Snapshot != nil {
+		//		if policy.Spec.SchedulePolicy.Snapshot.Enable {
+		//			scheduleEnable = "Enabled"
+		//			backupSchedule = policy.Spec.SchedulePolicy.Snapshot.CronExpression
+		//			backupType = string(dpv1alpha1.BackupTypeSnapshot)
+		//		}
+		//	}
+		//	if policy.Spec.SchedulePolicy.Datafile != nil {
+		//		if policy.Spec.SchedulePolicy.Datafile.Enable {
+		//			scheduleEnable = "Enabled"
+		//			backupSchedule = policy.Spec.SchedulePolicy.Datafile.CronExpression
+		//			backupType = string(dpv1alpha1.BackupTypeDataFile)
+		//		}
+		//	}
+		//	if policy.Spec.Retention != nil && policy.Spec.Retention.TTL != nil {
+		//		ttlString = *policy.Spec.Retention.TTL
+		//	}
+		//	lastScheduleTime := printer.NoneString
+		//	if policy.Status.LastScheduleTime != nil {
+		//		lastScheduleTime = util.TimeFormat(policy.Status.LastScheduleTime)
+		//	}
+		//	tbl.AddRow(scheduleEnable, backupSchedule, backupType, ttlString, lastScheduleTime, getBackupRecoverableTime(backups))
 	}
 	tbl.Print()
 }
 
-// getBackupRecoverableTime returns the recoverable time range string
-func getBackupRecoverableTime(backups []dpv1alpha1.Backup) string {
-	recoverabelTime := dpv1alpha1.GetRecoverableTimeRange(backups)
-	var result string
-	for _, i := range recoverabelTime {
-		result = addTimeRange(result, i.StartTime, i.StopTime)
-	}
-	if result == "" {
-		return printer.NoneString
-	}
-	return result
-}
+//	 getBackupRecoverableTime returns the recoverable time range string
+//	func getBackupRecoverableTime(backups []dpv1alpha1.Backup) string {
+//	recoverabelTime := dpv1alpha1.GetRecoverableTimeRange(backups)
+//	var result string
+//	for _, i := range recoverabelTime {
+//		result = addTimeRange(result, i.StartTime, i.StopTime)
+//	}
+//	if result == "" {
+//		return printer.NoneString
+//	}
+//	return result
+//	}
 
-func addTimeRange(result string, start, end *metav1.Time) string {
-	if result != "" {
-		result += ", "
-	}
-	result += fmt.Sprintf("%s ~ %s", util.TimeFormatWithDuration(start, time.Second),
-		util.TimeFormatWithDuration(end, time.Second))
-	return result
-}
+//	func addTimeRange(result string, start, end *metav1.Time) string {
+//		if result != "" {
+//			result += ", "
+//		}
+//		result += fmt.Sprintf("%s ~ %s", util.TimeFormatWithDuration(start, time.Second),
+//			util.TimeFormatWithDuration(end, time.Second))
+//		return result
+//	}

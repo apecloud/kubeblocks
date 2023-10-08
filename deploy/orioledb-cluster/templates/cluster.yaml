@@ -3,6 +3,10 @@
   componentSpecs:
     - name: orioledb
       componentDefRef: orioledb
+      serviceRefs:
+      - name: etcdService
+        cluster: {{ .Values.etcd.cluster | default "etcd" }}
+        namespace: {{ .Values.etcd.namespace | default "default" }}
       {{- include "kblib.componentMonitor" . | indent 6 }}
       {{- include "orioledb-cluster.replicaCount" . | indent 6 }}
       enabledLogs:

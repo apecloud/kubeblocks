@@ -120,7 +120,8 @@ func (o *InstallOptions) Upgrade() error {
 	}
 
 	// double check for KubeBlocks upgrade
-	if !o.autoApprove {
+	// and only check when KubeBlocks version change
+	if !o.autoApprove && o.Version != "" {
 		oldVersion, err := version.NewVersion(kbVersion)
 		if err != nil {
 			return err

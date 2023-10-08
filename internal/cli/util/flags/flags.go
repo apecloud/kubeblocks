@@ -64,7 +64,7 @@ func AddClusterDefinitionFlag(f cmdutil.Factory, cmd *cobra.Command, p *string) 
 	cmd.Flags().StringVar(p, "cluster-definition", *p, "Specify cluster definition, run \"kbcli clusterdefinition list\" to show all available cluster definition")
 	util.CheckErr(cmd.RegisterFlagCompletionFunc("cluster-definition",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterDefGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.CompGetResource(f, util.GVRToString(types.ClusterDefGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 }
 

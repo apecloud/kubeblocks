@@ -113,7 +113,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 	//		AddAppInstanceLabel(clusterName).
 	//		AddAppComponentLabel(componentName).
 	//		AddRoleLabel(podRole).
-	//		AddAppManangedByLabel().
+	//		AddAppManagedByLabel().
 	//		AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 	//		Create(&testCtx).GetObject()
 	// }

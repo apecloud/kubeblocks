@@ -28,10 +28,13 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/StudioSol/set"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 	"github.com/apecloud/kubeblocks/test/testdata"
@@ -76,6 +79,134 @@ func TestFromUpdatedConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := fromUpdatedConfig(tt.args.base, tt.args.sets); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("fromUpdatedConfig() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsRerender(t *testing.T) {
+	type args struct {
+		cm   *corev1.ConfigMap
+		item v1alpha1.ConfigurationItemDetail
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{{
+
+		name: "test",
+		args: args{
+			cm: nil,
+			item: v1alpha1.ConfigurationItemDetail{
+				Name: "test",
+			},
+		},
+		want: true,
+	}, {
+		name: "test",
+		args: args{
+			cm: builder.NewConfigMapBuilder("default", "test").GetObject(),
+			item: v1alpha1.ConfigurationItemDetail{
+				Name: "test",
+			},
+		},
+		want: false,
+	}, {
+		name: "test",
+		args: args{
+			cm: builder.NewConfigMapBuilder("default", "test").
+				GetObject(),
+			item: v1alpha1.ConfigurationItemDetail{
+				Name:    "test",
+				Version: "v1",
+			},
+		},
+		want: true,
+	}, {
+		name: "test",
+		args: args{
+			cm: builder.NewConfigMapBuilder("default", "test").
+				AddAnnotations(constant.CMConfigurationTemplateVersion, "v1").
+				GetObject(),
+			item: v1alpha1.ConfigurationItemDetail{
+				Name:    "test",
+				Version: "v2",
+			},
+		},
+		want: true,
+	}, {
+		name: "test",
+		args: args{
+			cm: builder.NewConfigMapBuilder("default", "test").
+				AddAnnotations(constant.CMConfigurationTemplateVersion, "v1").
+				GetObject(),
+			item: v1alpha1.ConfigurationItemDetail{
+				Name:    "test",
+				Version: "v1",
+			},
+		},
+		want: false,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsRerender(tt.args.cm, tt.args.item); got != tt.want {
+				t.Errorf("IsRerender() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetConfigSpecReconcilePhase(t *testing.T) {
+	type args struct {
+		cm     *corev1.ConfigMap
+		item   v1alpha1.ConfigurationItemDetail
+		status *v1alpha1.ConfigurationItemDetailStatus
+	}
+	tests := []struct {
+		name string
+		args args
+		want v1alpha1.ConfigurationPhase
+	}{{
+		name: "test",
+		args: args{
+			cm: nil,
+			item: v1alpha1.ConfigurationItemDetail{
+				Name: "test",
+			},
+		},
+		want: v1alpha1.CCreatingPhase,
+	}, {
+		name: "test",
+		args: args{
+			cm: builder.NewConfigMapBuilder("default", "test").GetObject(),
+			item: v1alpha1.ConfigurationItemDetail{
+				Name: "test",
+			},
+			status: &v1alpha1.ConfigurationItemDetailStatus{
+				Phase: v1alpha1.CInitPhase,
+			},
+		},
+		want: v1alpha1.CPendingPhase,
+	}, {
+		name: "test",
+		args: args{
+			cm: builder.NewConfigMapBuilder("default", "test").
+				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, `{"name":"test"}`).
+				GetObject(),
+			item: v1alpha1.ConfigurationItemDetail{
+				Name: "test",
+			},
+			status: &v1alpha1.ConfigurationItemDetailStatus{
+				Phase: v1alpha1.CUpgradingPhase,
+			},
+		},
+		want: v1alpha1.CUpgradingPhase,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetConfigSpecReconcilePhase(tt.args.cm, tt.args.item, tt.args.status); got != tt.want {
+				t.Errorf("GetConfigSpecReconcilePhase() = %v, want %v", got, tt.want)
 			}
 		})
 	}

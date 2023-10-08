@@ -217,8 +217,14 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *ProbeRequest, 
 		return opsRes, nil
 	}
 
-	// sql exec timeout needs to be less than httpget's timeout which by default 1s.
-	ctx1, cancel := context.WithTimeout(ctx, 999*time.Millisecond)
+	timeoutSeconds := defaultRoleProbeTimeoutSeconds
+	if viper.IsSet(roleProbeTimeoutVarName) {
+		timeoutSeconds = viper.GetInt(roleProbeTimeoutVarName)
+	}
+	// lorry utilizes the pod readiness probe to trigger role probe and 'timeoutSeconds' is directly copied from the 'probe.timeoutSeconds' field of pod.
+	// here we give 80% of the total time to role probe job and leave the remaining 20% to kubelet to handle the readiness probe related tasks.
+	timeout := time.Duration(timeoutSeconds) * (800 * time.Millisecond)
+	ctx1, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	role, err := ops.GetRole(ctx1, req, resp)
 	if err != nil {
@@ -423,10 +429,11 @@ func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *ProbeRequest,
 func (ops *BaseOperations) JoinMemberOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
 	manager, err := component.GetDefaultManager()
-	if err != nil {
-		opsRes["event"] = OperationFailed
+	if manager == nil {
+		// manager for the DB is not supported, just return
+		opsRes["event"] = OperationSuccess
 		opsRes["message"] = err.Error()
-		return opsRes, err
+		return opsRes, nil
 	}
 
 	dcsStore := dcs.GetStore()
@@ -462,10 +469,11 @@ func (ops *BaseOperations) JoinMemberOps(ctx context.Context, req *ProbeRequest,
 func (ops *BaseOperations) LeaveMemberOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
 	manager, err := component.GetDefaultManager()
-	if err != nil {
-		opsRes["event"] = OperationFailed
+	if manager == nil {
+		// manager for the DB is not supported, just return
+		opsRes["event"] = OperationSuccess
 		opsRes["message"] = err.Error()
-		return opsRes, err
+		return opsRes, nil
 	}
 
 	dcsStore := dcs.GetStore()

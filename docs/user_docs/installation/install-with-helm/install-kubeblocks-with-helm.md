@@ -47,6 +47,7 @@ If you install KubeBlocks with Helm, to uninstall it, you have to use Helm too.
 
 ## Installation steps
 **Use Helm to install KubeBlocks**
+
 Run the following command:
 ```bash
 helm repo add kubeblocks https://apecloud.github.io/helm-charts

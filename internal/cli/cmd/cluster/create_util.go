@@ -123,7 +123,7 @@ func registerFlagCompFunc(cmd *cobra.Command, f cmdutil.Factory, c *cluster.Char
 				label := fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, c.ClusterDef)
 				versions = util.CompGetResourceWithLabels(f, cmd, util.GVRToString(types.ClusterVersionGVR()), []string{label}, toComplete)
 			} else {
-				versions = utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterVersionGVR()), toComplete)
+				versions = utilcomp.CompGetResource(f, util.GVRToString(types.ClusterVersionGVR()), toComplete)
 			}
 			return versions, cobra.ShellCompDirectiveNoFileComp
 		})
@@ -188,7 +188,7 @@ func buildHelmValues(c *cluster.ChartInfo, values map[string]interface{}) map[st
 	if c.SubSchema == nil {
 		return values
 	}
-
+	// todo: for key like `etcd.cluster` should adjust it to a map like
 	subSchemaKeys := maps.Keys(c.SubSchema.Properties)
 	newValues := map[string]interface{}{
 		c.SubChartName: map[string]interface{}{},

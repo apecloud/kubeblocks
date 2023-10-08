@@ -305,7 +305,7 @@ type ServiceRefDeclarationSpec struct {
 // ClusterComponentDefinition provides a workload component specification template,
 // with attributes that strongly work with stateful workloads and day-2 operations
 // behaviors.
-// +kubebuilder:validation:XValidation:rule="has(self.workloadType) && self.workloadType == 'Consensus' ?  has(self.consensusSpec) : !has(self.consensusSpec)",message="componentDefs.consensusSpec is required when componentDefs.workloadType is Consensus, and forbidden otherwise"
+// +kubebuilder:validation:XValidation:rule="has(self.workloadType) && self.workloadType == 'Consensus' ? (has(self.consensusSpec) || has(self.rsmSpec)) : !has(self.consensusSpec)",message="componentDefs.consensusSpec(deprecated) or componentDefs.rsmSpec(recommended) is required when componentDefs.workloadType is Consensus, and forbidden otherwise"
 type ClusterComponentDefinition struct {
 	// A component definition name, this name could be used as default name of `Cluster.spec.componentSpecs.name`,
 	// and so this name is need to conform with same validation rules as `Cluster.spec.componentSpecs.name`, that

@@ -27,6 +27,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // log is for logging in this package.
@@ -57,24 +58,24 @@ func (r *ServiceDescriptor) Default() {
 var _ webhook.Validator = &ServiceDescriptor{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *ServiceDescriptor) ValidateCreate() error {
+func (r *ServiceDescriptor) ValidateCreate() (admission.Warnings, error) {
 	servicedescriptorlog.Info("validate create", "name", r.Name)
 
-	return r.validate()
+	return nil, r.validate()
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *ServiceDescriptor) ValidateUpdate(old runtime.Object) error {
+func (r *ServiceDescriptor) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	servicedescriptorlog.Info("validate update", "name", r.Name)
 
-	return r.validate()
+	return nil, r.validate()
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *ServiceDescriptor) ValidateDelete() error {
+func (r *ServiceDescriptor) ValidateDelete() (admission.Warnings, error) {
 	servicedescriptorlog.Info("validate delete", "name", r.Name)
 
-	return r.validate()
+	return nil, r.validate()
 }
 
 func (r *ServiceDescriptor) validate() error {

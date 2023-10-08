@@ -83,7 +83,7 @@ func (r *ActionSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// TODO(ldm): validate actionSet
 
-	if err := patchStatus(dpv1alpha1.AvailablePhase, ""); err != nil {
+	if err = patchStatus(dpv1alpha1.AvailablePhase, ""); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	intctrlutil.RecordCreatedEvent(r.Recorder, actionSet)

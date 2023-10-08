@@ -34,7 +34,7 @@ spec:
       name: DURATION
       type: string
     - jsonPath: .metadata.creationTimestamp
-      name: CREATE-TIME
+      name: CREATION-TIME
       type: string
     - jsonPath: .status.completionTimestamp
       name: COMPLETION-TIME
@@ -60,13 +60,13 @@ spec:
             description: RestoreSpec defines the desired state of Restore
             properties:
               backup:
-                description: 'backup name, the following behavior based on the backup
-                  type: 1. Full: will be restored the full backup directly. 2. Incremental:
-                  will be restored sequentially from the most recent full backup of
-                  this incremental backup. 3. Differential: will be restored sequentially
-                  from the parent backup of the differential backup. 4. Continuous:
-                  will find the most recent full backup at this time point and the
-                  input continuous backup to restore.'
+                description: 'backup to be restored. The restore behavior based on
+                  the backup type: 1. Full: will be restored the full backup directly.
+                  2. Incremental: will be restored sequentially from the most recent
+                  full backup of this incremental backup. 3. Differential: will be
+                  restored sequentially from the parent backup of the differential
+                  backup. 4. Continuous: will find the most recent full backup at
+                  this time point and the continuous backups after it to restore.'
                 properties:
                   name:
                     description: backup name
@@ -132,7 +132,7 @@ spec:
               env:
                 description: 'list of environment variables to set in the container
                   for restore and will be merged with the env of Backup and ActionSet.
-                  the priority of merging is as follows: Restore env > Backup env
+                  The priority of merging is as follows: Restore env > Backup env
                   > ActionSet env.'
                 items:
                   description: EnvVar represents an environment variable present in
@@ -1433,7 +1433,7 @@ spec:
                   volumeClaimManagementPolicy:
                     default: Parallel
                     description: 'VolumeClaimManagementPolicy defines recovery strategy
-                      for persistent volume claim. supported policies are as follows:
+                      for persistent volume claim. Supported policies are as follows:
                       1. Parallel: parallel recovery of persistent volume claim. 2.
                       Serial: restore the persistent volume claim in sequence, and
                       wait until the previous persistent volume claim is restored
@@ -2016,33 +2016,34 @@ spec:
               readyConfig:
                 description: configuration for the action of "postReady" phase.
                 properties:
-                  connectCredential:
+                  connectionCredential:
                     description: credential template used for creating a connection
                       credential
                     properties:
                       hostKey:
                         default: host
-                        description: hostKey the map key of the host in the connection
-                          credential secret
+                        description: hostKey specifies the map key of the host in
+                          the connection credential secret.
                         type: string
                       passwordKey:
                         default: password
-                        description: passwordKey the map key of the password in the
-                          connection credential secret
+                        description: passwordKey specifies the map key of the password
+                          in the connection credential secret.
                         type: string
                       portKey:
                         default: port
-                        description: portKey the map key of the port in the connection
-                          credential secret
+                        description: portKey specifies the map key of the port in
+                          the connection credential secret.
                         type: string
                       secretName:
-                        description: the secret name
+                        description: secretName refers to the Secret object that contains
+                          the connection credential.
                         pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                       usernameKey:
                         default: username
-                        description: usernameKey the map key of the user in the connection
-                          credential secret
+                        description: usernameKey specifies the map key of the user
+                          in the connection credential secret.
                         type: string
                     required:
                     - passwordKey
@@ -2322,7 +2323,7 @@ spec:
                 - message: forbidden to update spec.resources
                   rule: self == oldSelf
               restoreTime:
-                description: restore according to a specified point in time.
+                description: restoreTime is the point in time for restoring.
                 pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$
                 type: string
                 x-kubernetes-validations:

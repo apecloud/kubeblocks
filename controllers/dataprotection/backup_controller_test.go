@@ -20,15 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 import (
-	"time"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -195,29 +192,20 @@ var _ = Describe("Backup Controller test", func() {
 				backup = testdp.NewFakeBackup(&testCtx, nil)
 				backupKey = client.ObjectKeyFromObject(backup)
 
-				By("waiting for finalizers to be added")
-				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, backup *dpv1alpha1.Backup) {
-					g.Expect(backup.GetFinalizers()).ToNot(BeEmpty())
-				})).Should(Succeed())
-
-				By("setting backup status")
-				Eventually(testapps.ChangeObjStatus(&testCtx, backup, func() {
-					if backup.Status.PersistentVolumeClaimName == "" {
-						backup.Status.PersistentVolumeClaimName = repoPVCName
-					}
-					backup.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
+				By("waiting for backup status to be running")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseRunning))
 				})).Should(Succeed())
 			})
 
 			It("should create a Job for deleting backup files", func() {
-				By("deleting a Backup object")
+				By("deleting a backup object")
 				testapps.DeleteObject(&testCtx, backupKey, &dpv1alpha1.Backup{})
 
 				By("checking new created Job")
 				jobKey := dpbackup.BuildDeleteBackupFilesJobKey(backup)
 				job := &batchv1.Job{}
-				Eventually(testapps.CheckObjExists(&testCtx, jobKey,
-					job, true)).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, jobKey, job, true)).Should(Succeed())
 				volumeName := dpbackup.GenerateBackupRepoVolumeName(repoPVCName)
 				Eventually(testapps.CheckObj(&testCtx, jobKey, func(g Gomega, job *batchv1.Job) {
 					Expect(job.Spec.Template.Spec.Volumes).

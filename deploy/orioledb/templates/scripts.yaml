@@ -120,9 +120,10 @@ data:
     CREATE EXTENSION pg_stat_statements;
   setup.sh: |
     mkdir -p /home/postgres/pgdata/conf
-    chmod 777 -R /home/postgres/pgdata/conf
+    chmod 777 -R /home/postgres/pgdata
     cp /home/postgres/conf/postgresql.conf /home/postgres/pgdata/conf
-    chmod 777 /home/postgres/pgdata/conf/postgresql.conf
+    chmod 777 -R /home/postgres/pgdata/conf
+    source /dependency/conf
 
 {{/*    chmod 750 -R /home/postgres/pgdata*/}}
 {{/*    mkdir -p  /var/lib/postgresql/conf*/}}

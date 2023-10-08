@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etcd-env
+  labels:
+    {{- include "orioledb.labels" . | nindent 4 }}
+data:
+  conf: |-
+    {{- .Files.Get "config/etcd-serve-config.tpl" | nindent 4 }}
+

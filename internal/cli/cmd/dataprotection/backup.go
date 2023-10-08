@@ -20,13 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
@@ -39,53 +43,39 @@ import (
 var (
 	createBackupExample = templates.Examples(`
 		# Create a backup for the cluster
-		kbcli backup create mybackup --cluster mycluster
+		kbcli dp backup mybackup --cluster mycluster
 
 		# create a snapshot backup
-		kbcli backup create mybackup --cluster mycluster --type snapshot
+		kbcli dp backup mybackup --cluster mycluster --method volume-snapshot
 
 		# create a backup with specified policy
-		kbcli backup create mybackup --cluster mycluster --policy mypolicy
+		kbcli dp backup mybackup --cluster mycluster --policy mypolicy
 	`)
 
 	deleteBackupExample = templates.Examples(`
 		# delete a backup
-		kbcli backup delete mybackup
+		kbcli dp delete-backup mybackup
 	`)
 
 	describeBackupExample = templates.Examples(`
 		# describe a backup
-		kbcli backup describe mybackup
+		kbcli dp describe-backup mybackup
 	`)
 
 	listBackupExample = templates.Examples(`
 		# list all backups
-		kbcli backup list
+		kbcli dp list-backups
 
 		# list all backups of specified cluster
-		kbcli backup list --cluster mycluster
+		kbcli dp list-backups --cluster mycluster
 	`)
 )
 
-func NewBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "backup command",
-		Short: "Backup command.",
-	}
-	cmd.AddCommand(
-		newListCommand(f, streams),
-		newCreateCommand(f, streams),
-		newDeleteCommand(f, streams),
-		newDescribeCommand(f, streams),
-	)
-	return cmd
-}
-
-func newCreateCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newBackupCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	customOutPut := func(opt *create.CreateOptions) {
 		output := fmt.Sprintf("Backup %s created successfully, you can view the progress:", opt.Name)
 		printer.PrintLine(output)
-		nextLine := fmt.Sprintf("\tkbcli dp backup list %s -n %s", opt.Name, opt.Namespace)
+		nextLine := fmt.Sprintf("\tkbcli dp list-backups %s -n %s", opt.Name, opt.Namespace)
 		printer.PrintLine(nextLine)
 	}
 
@@ -103,7 +93,7 @@ func newCreateCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	o.CreateOptions.Options = o
 
 	cmd := &cobra.Command{
-		Use:     "create NAME",
+		Use:     "backup NAME",
 		Short:   "Create a backup for the cluster.",
 		Example: createBackupExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -120,10 +110,11 @@ func newCreateCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 		},
 	}
 
-	cmd.Flags().StringVar(&o.BackupMethod, "method", "snapshot", "Backup type")
+	cmd.Flags().StringVar(&o.BackupMethod, "method", "volume-snapshot", "Backup method")
 	cmd.Flags().StringVar(&clusterName, "cluster", "", "Cluster name")
 	cmd.Flags().StringVar(&o.BackupPolicy, "policy", "", "Backup policy name, this flag will be ignored when backup-type is snapshot")
 	util.RegisterClusterCompletionFunc(cmd, f)
+	registerBackupFlagCompletionFunc(cmd, f)
 
 	return cmd
 }
@@ -132,7 +123,7 @@ func newDeleteCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	o := delete.NewDeleteOptions(f, streams, types.BackupGVR())
 	clusterName := ""
 	cmd := &cobra.Command{
-		Use:               "delete",
+		Use:               "delete-backup",
 		Short:             "Delete a backup.",
 		Example:           deleteBackupExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.BackupGVR()),
@@ -168,8 +159,9 @@ func newDescribeCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Gvr:       types.BackupGVR(),
 	}
 	cmd := &cobra.Command{
-		Use:               "describe",
+		Use:               "describe-backup NAME",
 		Short:             "Describe a backup",
+		Aliases:           []string{"desc-backup"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.BackupGVR()),
 		Example:           describeBackupExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -181,13 +173,13 @@ func newDescribeCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	return cmd
 }
 
-func newListCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newListBackupCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &cluster.ListBackupOptions{ListOptions: list.NewListOptions(f, streams, types.BackupGVR())}
 	clusterName := ""
 	cmd := &cobra.Command{
-		Use:               "list",
+		Use:               "list-backups",
 		Short:             "List backups.",
-		Aliases:           []string{"ls"},
+		Aliases:           []string{"ls-backups"},
 		Example:           listBackupExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -205,4 +197,37 @@ func newListCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	util.RegisterClusterCompletionFunc(cmd, f)
 
 	return cmd
+}
+
+func registerBackupFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"method",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			var methods []string
+			var labelSelector string
+			clusterName, _ := cmd.Flags().GetString("cluster")
+			if clusterName != "" {
+				labelSelector = util.BuildLabelSelectorByNames(labelSelector, []string{clusterName})
+			}
+			dynamic, err := f.DynamicClient()
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveError
+			}
+			backupPolicies, err := dynamic.Resource(types.BackupPolicyGVR()).List(context.TODO(), metav1.ListOptions{
+				LabelSelector: labelSelector,
+			})
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveError
+			}
+			for _, obj := range backupPolicies.Items {
+				backupPolicy := &dpv1alpha1.BackupPolicy{}
+				if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, backupPolicy); err != nil {
+					return nil, cobra.ShellCompDirectiveError
+				}
+				for _, method := range backupPolicy.Spec.BackupMethods {
+					methods = append(methods, method.Name)
+				}
+			}
+			return methods, cobra.ShellCompDirectiveDefault
+		}))
 }

@@ -154,7 +154,10 @@ List and open the KubeBlocks dashboards.
 
 Data protection command.
 
-* [kbcli dataprotection backup](kbcli_dataprotection_backup.md)	 - Backup command.
+* [kbcli dataprotection backup](kbcli_dataprotection_backup.md)	 - Create a backup for the cluster.
+* [kbcli dataprotection delete-backup](kbcli_dataprotection_delete-backup.md)	 - Delete a backup.
+* [kbcli dataprotection describe-backup](kbcli_dataprotection_describe-backup.md)	 - Describe a backup
+* [kbcli dataprotection list-backups](kbcli_dataprotection_list-backups.md)	 - List backups.
 
 
 ## [fault](kbcli_fault.md)

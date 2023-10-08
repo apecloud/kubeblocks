@@ -1,28 +1,28 @@
 ---
-title: kbcli dataprotection backup list
+title: kbcli dataprotection list-backups
 ---
 
 List backups.
 
 ```
-kbcli dataprotection backup list [flags]
+kbcli dataprotection list-backups [flags]
 ```
 
 ### Examples
 
 ```
   # list all backups
-  kbcli backup list
+  kbcli dp list-backups
   
   # list all backups of specified cluster
-  kbcli backup list --cluster mycluster
+  kbcli dp list-backups --cluster mycluster
 ```
 
 ### Options
 
 ```
       --cluster string    List backups in the specified cluster
-  -h, --help              help for list
+  -h, --help              help for list-backups
   -o, --output format     prints the output in the specified format. Allowed values: table, json, yaml, wide (default table)
   -l, --selector string   Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.
       --show-labels       When printing, show all labels as the last column (default hide labels column)
@@ -53,7 +53,7 @@ kbcli dataprotection backup list [flags]
 
 ### SEE ALSO
 
-* [kbcli dataprotection backup](kbcli_dataprotection_backup.md)	 - Backup command.
+* [kbcli dataprotection](kbcli_dataprotection.md)	 - Data protection command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

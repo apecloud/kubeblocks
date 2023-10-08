@@ -2,12 +2,32 @@
 title: kbcli dataprotection backup
 ---
 
-Backup command.
+Create a backup for the cluster.
+
+```
+kbcli dataprotection backup NAME [flags]
+```
+
+### Examples
+
+```
+  # Create a backup for the cluster
+  kbcli dp backup mybackup --cluster mycluster
+  
+  # create a snapshot backup
+  kbcli dp backup mybackup --cluster mycluster --method volume-snapshot
+  
+  # create a backup with specified policy
+  kbcli dp backup mybackup --cluster mycluster --policy mypolicy
+```
 
 ### Options
 
 ```
-  -h, --help   help for backup
+      --cluster string   Cluster name
+  -h, --help             help for backup
+      --method string    Backup method (default "volume-snapshot")
+      --policy string    Backup policy name, this flag will be ignored when backup-type is snapshot
 ```
 
 ### Options inherited from parent commands
@@ -20,7 +40,6 @@ Backup command.
       --certificate-authority string   Path to a cert file for the certificate authority
       --client-certificate string      Path to a client certificate file for TLS
       --client-key string              Path to a client key file for TLS
-      --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
       --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
@@ -37,10 +56,6 @@ Backup command.
 ### SEE ALSO
 
 * [kbcli dataprotection](kbcli_dataprotection.md)	 - Data protection command.
-* [kbcli dataprotection backup create](kbcli_dataprotection_backup_create.md)	 - Create a backup for the cluster.
-* [kbcli dataprotection backup delete](kbcli_dataprotection_backup_delete.md)	 - Delete a backup.
-* [kbcli dataprotection backup describe](kbcli_dataprotection_backup_describe.md)	 - Describe a backup
-* [kbcli dataprotection backup list](kbcli_dataprotection_backup_list.md)	 - List backups.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

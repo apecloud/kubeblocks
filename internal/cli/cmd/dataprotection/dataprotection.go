@@ -32,7 +32,10 @@ func NewDataProtectionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 		Aliases: []string{"dp"},
 	}
 	cmd.AddCommand(
-		NewBackupCmd(f, streams),
+		newBackupCommand(f, streams),
+		newDeleteCommand(f, streams),
+		newDescribeCommand(f, streams),
+		newListBackupCommand(f, streams),
 	)
 	return cmd
 }

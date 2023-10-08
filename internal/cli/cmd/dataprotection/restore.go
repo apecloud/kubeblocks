@@ -52,6 +52,7 @@ func newRestoreCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		Use:               "restore",
 		Short:             "Restore a new cluster from backup",
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.BackupGVR()),
+		Example:           createRestoreExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) > 0 {
 				o.Backup = args[0]

@@ -8,6 +8,13 @@ Restore a new cluster from backup
 kbcli dataprotection restore [flags]
 ```
 
+### Examples
+
+```
+  # restore a new cluster from a backup
+  kbcli dp restore mybackup --cluster cluster-name
+```
+
 ### Options
 
 ```

@@ -562,6 +562,10 @@ spec:
                                 description: 'storageClassName is the name of the
                                   StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.'
                                 type: string
+                              volumeMode:
+                                description: volumeMode defines what type of volume
+                                  is required by the claim.
+                                type: string
                             type: object
                         required:
                         - name

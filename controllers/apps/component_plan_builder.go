@@ -149,7 +149,7 @@ func NewComponentPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req 
 		cli: cli,
 		transCtx: &ComponentTransformContext{
 			Context:       ctx.Ctx,
-			Client:        cli,
+			Client:        model.NewGraphClient(cli),
 			EventRecorder: ctx.Recorder,
 			Logger:        ctx.Log,
 		},

@@ -183,7 +183,6 @@ func (c *rsmComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Client, bu
 	var err error
 	if builder != nil {
 		if err = builder.
-			BuildConfig().
 			Complete(); err != nil {
 			return err
 		}

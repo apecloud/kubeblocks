@@ -386,7 +386,7 @@ func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 		maxLagOnSwitchover = 1048576
 	}
 
-	var enable bool
+	enable := false
 	str := annotations["enable"]
 	if str != "" {
 		enable, err = strconv.ParseBool(str)

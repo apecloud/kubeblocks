@@ -10,7 +10,14 @@ sidebar_label: Install KubeBlocks
 
 The quickest way to try out KubeBlocks is to create a new Kubernetes cluster and install KubeBlocks using the playground. However, production environments are more complex, with applications running in different namespaces and with resource or permission limitations. This document explains how to deploy KubeBlocks on an existing Kubernetes cluster.
 
+## Before you start
+
+Prepare an accessible Kubernetes cluster with the version 1.22 or above.
+
+
 ## Environment preparation
+
+Deploy the Kubernetes cluster with the following requirements.  
 
 <table>
 	<tr>

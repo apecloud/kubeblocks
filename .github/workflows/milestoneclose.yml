@@ -13,9 +13,9 @@ env:
 
 jobs:
   move_milestone:
-    uses: apecloud/apecloud-cd/.github/workflows/milestone-move.yml@v0.1.31
+    uses: apecloud/apecloud-cd/.github/workflows/milestone-move.yml@v0.1.32
     with:
-      APECD_REF: "v0.1.31"
+      APECD_REF: "v0.1.32"
     secrets: inherit
 
   move_issues:

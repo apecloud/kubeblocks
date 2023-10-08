@@ -229,7 +229,7 @@ func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backups []dpv1
 	if len(backupPolicies) == 0 {
 		return
 	}
-	tbl := newTbl(out, "\nData Protection:", "AUTO-BACKUP", "BACKUP-SCHEDULE", "TYPE", "BACKUP-TTL", "LAST-SCHEDULE", "RECOVERABLE-TIME")
+	tbl := newTbl(out, "\nData Protection:", "BACKUP-REPO", "PATH-PREFIX", "BACKOFF-LIMIT", "BACKUP-METHODS")
 	for _, policy := range backupPolicies {
 		if policy.Annotations[dptypes.DefaultBackupPolicyAnnotationKey] != "true" {
 			continue
@@ -237,32 +237,11 @@ func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backups []dpv1
 		if policy.Status.Phase != dpv1alpha1.AvailablePhase {
 			continue
 		}
-		//	ttlString := printer.NoneString
-		//	backupSchedule := printer.NoneString
-		//	backupType := printer.NoneString
-		//	scheduleEnable := "Disabled"
-		//	if policy.Spec.SchedulePolicy.Snapshot != nil {
-		//		if policy.Spec.SchedulePolicy.Snapshot.Enable {
-		//			scheduleEnable = "Enabled"
-		//			backupSchedule = policy.Spec.SchedulePolicy.Snapshot.CronExpression
-		//			backupType = string(dpv1alpha1.BackupTypeSnapshot)
-		//		}
-		//	}
-		//	if policy.Spec.SchedulePolicy.Datafile != nil {
-		//		if policy.Spec.SchedulePolicy.Datafile.Enable {
-		//			scheduleEnable = "Enabled"
-		//			backupSchedule = policy.Spec.SchedulePolicy.Datafile.CronExpression
-		//			backupType = string(dpv1alpha1.BackupTypeDataFile)
-		//		}
-		//	}
-		//	if policy.Spec.Retention != nil && policy.Spec.Retention.TTL != nil {
-		//		ttlString = *policy.Spec.Retention.TTL
-		//	}
-		//	lastScheduleTime := printer.NoneString
-		//	if policy.Status.LastScheduleTime != nil {
-		//		lastScheduleTime = util.TimeFormat(policy.Status.LastScheduleTime)
-		//	}
-		//	tbl.AddRow(scheduleEnable, backupSchedule, backupType, ttlString, lastScheduleTime, getBackupRecoverableTime(backups))
+		var methods []string
+		for _, m := range policy.Spec.BackupMethods {
+			methods = append(methods, m.Name)
+		}
+		tbl.AddRow(policy.Spec.BackupRepoName, policy.Spec.PathPrefix, policy.Spec.BackoffLimit, strings.Join(methods, ","))
 	}
 	tbl.Print()
 }

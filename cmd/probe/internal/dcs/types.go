@@ -107,11 +107,16 @@ func (c *Cluster) GetMemberAddrs() []string {
 type HaConfig struct {
 	index              string
 	ttl                int
+	enable             bool
 	maxLagOnSwitchover int64
 }
 
 func (c *HaConfig) GetTTL() int {
 	return c.ttl
+}
+
+func (c *HaConfig) IsEnable() bool {
+	return c.enable
 }
 
 func (c *HaConfig) GetMaxLagOnSwitchover() int64 {

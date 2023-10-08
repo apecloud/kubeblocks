@@ -106,6 +106,7 @@ func (store *KubernetesStore) Initialize() error {
 				Labels:    labelsMap,
 				Annotations: map[string]string{
 					"ttl":                ttl,
+					"enable":             "false",
 					"MaxLagOnSwitchover": "0",
 				},
 				// OwnerReferences: ownerReference,
@@ -385,9 +386,16 @@ func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 		maxLagOnSwitchover = 1048576
 	}
 
+	enable := false
+	str := annotations["enable"]
+	if str != "" {
+		enable, err = strconv.ParseBool(str)
+	}
+
 	return &HaConfig{
 		index:              configmap.ResourceVersion,
 		ttl:                ttl,
+		enable:             enable,
 		maxLagOnSwitchover: int64(maxLagOnSwitchover),
 	}, err
 }

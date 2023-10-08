@@ -70,6 +70,10 @@ func (ha *Ha) RunCycle() {
 		return
 	}
 
+	if !cluster.HaConfig.IsEnable() {
+		return
+	}
+
 	switch {
 	case !ha.dbManager.IsRunning():
 		ha.logger.Infof("DB Service is not running,  wait for sqlctl to start it")
@@ -210,7 +214,7 @@ func (ha *Ha) Start() {
 
 	for {
 		ha.RunCycle()
-		time.Sleep(1 * time.Second)
+		time.Sleep(10 * time.Second)
 	}
 }
 

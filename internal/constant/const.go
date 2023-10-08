@@ -61,6 +61,7 @@ const (
 const (
 	KBPrefix      = "KB"
 	KBLowerPrefix = "kb"
+	KBHyphen      = "-"
 )
 
 const (

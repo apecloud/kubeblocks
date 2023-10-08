@@ -39,7 +39,6 @@ type SynthesizedComponent struct {
 	ClusterUID           string                                 `json:"clusterUID,omitempty"`
 	Name                 string                                 `json:"name,omitempty"`        // the name of the component
 	CompDefName          string                                 `json:"compDefName,omitempty"` // the name of the componentDefinition
-	MinAvailable         *intstr.IntOrString                    `json:"minAvailable,omitempty"`
 	Replicas             int32                                  `json:"replicas"`
 	PodSpec              *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
@@ -86,6 +85,10 @@ type SynthesizedComponent struct {
 	ReplicationSpec       *v1alpha1.ReplicationSetSpec    `json:"replicationSpec,omitempty"`
 	RSMSpec               *v1alpha1.RSMSpec               `json:"rsmSpec,omitempty"`
 	HorizontalScalePolicy *v1alpha1.HorizontalScalePolicy `json:"horizontalScalePolicy,omitempty"`
+	// MinAvailable is used to determine whether to create a PDB (Pod Disruption Budget) object.
+	// However, the functionality of PDB should be implemented within the RSM. Therefore, PDB objects are no longer needed in the new API, and the MinAvailable field should be deprecated.
+	// The old MinAvailable field, which is determined based on the deprecated "workloadType" field, is also no longer applicable in the new API.
+	MinAvailable *intstr.IntOrString `json:"minAvailable,omitempty"`
 }
 
 type CloudProvider string

@@ -81,6 +81,7 @@ func buildSynthesizeComponent(reqCtx intctrlutil.RequestCtx,
 		ServiceAccountName:    comp.Spec.ServiceAccountName,
 	}
 
+	// build backward compatible fields, including workload, services, componentRefEnvs, clusterDefName, clusterCompDefName, and clusterCompVer, etc.
 	// if cluster referenced a clusterDefinition and clusterVersion, for backward compatibility, we need to merge the clusterDefinition and clusterVersion into the component
 	// TODO(xingran): it will be removed in the future
 	if err = buildBackwardCompatibleFields(reqCtx, cli, cluster, synthesizeComp); err != nil {
@@ -88,41 +89,32 @@ func buildSynthesizeComponent(reqCtx intctrlutil.RequestCtx,
 	}
 
 	// build affinity and tolerations
-	affinity := BuildAffinity(cluster, comp.Spec.Affinity)
-	if synthesizeComp.PodSpec.Affinity, err = BuildPodAffinity(cluster, affinity, synthesizeComp); err != nil {
-		reqCtx.Log.Error(err, "build pod affinity failed.")
+	if err := buildAffinitiesAndTolerations(cluster, synthesizeComp, comp); err != nil {
+		reqCtx.Log.Error(err, "build affinities and tolerations failed.")
 		return nil, err
 	}
-	synthesizeComp.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(cluster, affinity, synthesizeComp)
-	if synthesizeComp.PodSpec.Tolerations, err = BuildTolerations(cluster, comp.Spec.Tolerations); err != nil {
-		reqCtx.Log.Error(err, "build pod tolerations failed.")
+
+	// build and update resources
+	// TODO(xingran): ComponentResourceConstraint API needs to be restructured.
+	if err := buildAndUpdateResources(synthesizeComp, comp); err != nil {
+		reqCtx.Log.Error(err, "build and update resources failed.")
 		return nil, err
 	}
 
 	// build volumeClaimTemplates
-	if comp.Spec.VolumeClaimTemplates != nil {
-		synthesizeComp.VolumeClaimTemplates = comp.Spec.ToVolumeClaimTemplates()
-	}
-
-	// build resources
-	if comp.Spec.Resources.Requests != nil || comp.Spec.Resources.Limits != nil {
-		synthesizeComp.PodSpec.Containers[0].Resources = comp.Spec.Resources
-	}
-	// TODO(xingran): update component resource with ComponentResourceConstraint and ComponentClassDefinition
-	// However, the current API related to ComponentClassDefinition and ComponentResourceConstraint heavily relies on cd (ClusterDefinition) and cv (ClusterVersion), requiring a restructuring.
-	// if err = updateResources(cluster, component, *clusterCompSpec, clsMgr); err != nil {
-	//	reqCtx.Log.Error(err, "update class resources failed")
-	//	return nil, err
-	// }
+	buildVolumeClaimTemplates(synthesizeComp, comp)
 
 	// build componentService
 	buildComponentServices(synthesizeComp, compDefObj)
 
 	// build monitor
-	buildMonitorConfig(compDefObj, comp, synthesizeComp)
+	buildMonitorConfig(compDefObj.Spec.Monitor, comp.Spec.Monitor, &compDefObj.Spec.Runtime, synthesizeComp)
 
 	// build serviceAccountName
 	buildServiceAccountName(synthesizeComp)
+
+	// build lifecycleActions
+	buildLifecycleActions(synthesizeComp, compDefObj, comp)
 
 	// build lorryContainer
 	// TODO(xingran): buildLorryContainers relies on synthesizeComp.CharacterType and synthesizeComp.Probes, which will be deprecated in the future.
@@ -141,6 +133,41 @@ func buildSynthesizeComponent(reqCtx intctrlutil.RequestCtx,
 	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForConnCredential(cluster.GetName()))
 
 	return synthesizeComp, nil
+}
+
+// buildAffinitiesAndTolerations builds affinities and tolerations for component.
+func buildAffinitiesAndTolerations(cluster *appsv1alpha1.Cluster, synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
+	var err error
+	affinity := BuildAffinity(cluster, comp.Spec.Affinity)
+	if synthesizeComp.PodSpec.Affinity, err = BuildPodAffinity(cluster, affinity, synthesizeComp); err != nil {
+		return err
+	}
+	synthesizeComp.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(cluster, affinity, synthesizeComp)
+	if synthesizeComp.PodSpec.Tolerations, err = BuildTolerations(cluster, comp.Spec.Tolerations); err != nil {
+		return err
+	}
+	return nil
+}
+
+// buildVolumeClaimTemplates builds volumeClaimTemplates for component.
+func buildVolumeClaimTemplates(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) {
+	if comp.Spec.VolumeClaimTemplates != nil {
+		synthesizeComp.VolumeClaimTemplates = comp.Spec.ToVolumeClaimTemplates()
+	}
+}
+
+// buildResources builds and updates podSpec resources for component.
+func buildAndUpdateResources(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
+	if comp.Spec.Resources.Requests != nil || comp.Spec.Resources.Limits != nil {
+		synthesizeComp.PodSpec.Containers[0].Resources = comp.Spec.Resources
+	}
+	// TODO(xingran): update component resource with ComponentResourceConstraint and ComponentClassDefinition
+	// However, the current API related to ComponentClassDefinition and ComponentResourceConstraint heavily relies on cd (ClusterDefinition) and cv (ClusterVersion), requiring a restructuring.
+	// if err = updateResources(cluster, component, *clusterCompSpec, clsMgr); err != nil {
+	//	reqCtx.Log.Error(err, "update class resources failed")
+	//	return nil, err
+	// }
+	return nil
 }
 
 // buildServiceReferences builds serviceReferences for component.
@@ -170,9 +197,14 @@ func buildServiceAccountName(synthesizeComp *SynthesizedComponent) {
 	if synthesizeComp.LifecycleActions == nil || synthesizeComp.LifecycleActions.RoleProbe == nil {
 		return
 	}
-	synthesizeComp.ServiceAccountName = constant.KBLowerPrefix + synthesizeComp.ClusterName
+	synthesizeComp.ServiceAccountName = constant.KBLowerPrefix + constant.KBHyphen + synthesizeComp.ClusterName
 	// set component.PodSpec.ServiceAccountName
 	synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
+}
+
+// buildLifecycleActions builds lifecycleActions for component.
+func buildLifecycleActions(synthesizeComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) {
+	return
 }
 
 // buildBackwardCompatibleFields builds backward compatible fields for component which referenced a clusterComponentDefinition and clusterComponentVersion before KubeBlocks Version 0.7.0
@@ -228,6 +260,8 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx, cli roclient.R
 		synthesizeComp.VolumeTypes = clusterCompDef.VolumeTypes
 		synthesizeComp.VolumeProtection = clusterCompDef.VolumeProtectionSpec
 		synthesizeComp.CustomLabelSpecs = clusterCompDef.CustomLabelSpecs
+		synthesizeComp.SwitchoverSpec = clusterCompDef.SwitchoverSpec
+		synthesizeComp.MinAvailable = clusterCompSpec.GetMinAvailable(clusterCompDef.GetMinAvailable())
 	}
 
 	// Services is a backward compatible field, which will be replaced with ComponentServices in the future.

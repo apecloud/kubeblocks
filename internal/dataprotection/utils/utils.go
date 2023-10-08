@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -61,10 +60,13 @@ func AddTolerations(podSpec *corev1.PodSpec) (err error) {
 
 func IsJobFinished(job *batchv1.Job) (bool, batchv1.JobConditionType, string) {
 	for _, c := range job.Status.Conditions {
-		if c.Type == batchv1.JobComplete && c.Status == corev1.ConditionTrue {
+		if c.Status != corev1.ConditionTrue {
+			continue
+		}
+		if c.Type == batchv1.JobComplete {
 			return true, c.Type, ""
 		}
-		if c.Type == batchv1.JobFailed && c.Status == corev1.ConditionTrue {
+		if c.Type == batchv1.JobFailed {
 			return true, c.Type, c.Reason + "/" + c.Message
 		}
 	}
@@ -141,5 +143,5 @@ func SetControllerReference(owner, controlled metav1.Object, scheme *runtime.Sch
 	if owner == nil || reflect.ValueOf(owner).IsNil() {
 		return nil
 	}
-	return ctrlutil.SetControllerReference(owner, controlled, scheme)
+	return controllerutil.SetControllerReference(owner, controlled, scheme)
 }

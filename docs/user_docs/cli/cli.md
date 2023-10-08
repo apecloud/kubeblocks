@@ -158,6 +158,7 @@ Data protection command.
 * [kbcli dataprotection delete-backup](kbcli_dataprotection_delete-backup.md)	 - Delete a backup.
 * [kbcli dataprotection describe-backup](kbcli_dataprotection_describe-backup.md)	 - Describe a backup
 * [kbcli dataprotection list-backups](kbcli_dataprotection_list-backups.md)	 - List backups.
+* [kbcli dataprotection restore](kbcli_dataprotection_restore.md)	 - Restore a new cluster from backup
 
 
 ## [fault](kbcli_fault.md)

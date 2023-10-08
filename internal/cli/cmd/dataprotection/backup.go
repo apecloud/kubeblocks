@@ -119,7 +119,7 @@ func newBackupCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	return cmd
 }
 
-func newDeleteCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newBackupDeleteCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := delete.NewDeleteOptions(f, streams, types.BackupGVR())
 	clusterName := ""
 	cmd := &cobra.Command{
@@ -152,7 +152,7 @@ func completeForDeleteBackup(o *delete.DeleteOptions, cluster string) error {
 	return nil
 }
 
-func newDescribeCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newBackupDescribeCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := cluster.DescribeBackupOptions{
 		Factory:   f,
 		IOStreams: streams,

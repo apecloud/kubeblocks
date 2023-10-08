@@ -2,8 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.12.1
   labels:
     app.kubernetes.io/name: kubeblocks
   name: clusterversions.apps.kubeblocks.io
@@ -230,6 +229,7 @@ spec:
                                         required:
                                         - key
                                         type: object
+                                        x-kubernetes-map-type: atomic
                                       fieldRef:
                                         description: 'Selects a field of the pod:
                                           supports metadata.name, metadata.namespace,
@@ -249,6 +249,7 @@ spec:
                                         required:
                                         - fieldPath
                                         type: object
+                                        x-kubernetes-map-type: atomic
                                       resourceFieldRef:
                                         description: 'Selects a resource of the container:
                                           only resources limits and requests (limits.cpu,
@@ -275,6 +276,7 @@ spec:
                                         required:
                                         - resource
                                         type: object
+                                        x-kubernetes-map-type: atomic
                                       secretKeyRef:
                                         description: Selects a key of a secret in
                                           the pod's namespace
@@ -297,6 +299,7 @@ spec:
                                         required:
                                         - key
                                         type: object
+                                        x-kubernetes-map-type: atomic
                                     type: object
                                 required:
                                 - name
@@ -370,6 +373,7 @@ spec:
                                         required:
                                         - key
                                         type: object
+                                        x-kubernetes-map-type: atomic
                                       fieldRef:
                                         description: 'Selects a field of the pod:
                                           supports metadata.name, metadata.namespace,
@@ -389,6 +393,7 @@ spec:
                                         required:
                                         - fieldPath
                                         type: object
+                                        x-kubernetes-map-type: atomic
                                       resourceFieldRef:
                                         description: 'Selects a resource of the container:
                                           only resources limits and requests (limits.cpu,
@@ -415,6 +420,7 @@ spec:
                                         required:
                                         - resource
                                         type: object
+                                        x-kubernetes-map-type: atomic
                                       secretKeyRef:
                                         description: Selects a key of a secret in
                                           the pod's namespace
@@ -437,6 +443,7 @@ spec:
                                         required:
                                         - key
                                         type: object
+                                        x-kubernetes-map-type: atomic
                                     type: object
                                 required:
                                 - name
@@ -545,6 +552,7 @@ spec:
                                           required:
                                           - key
                                           type: object
+                                          x-kubernetes-map-type: atomic
                                         fieldRef:
                                           description: 'Selects a field of the pod:
                                             supports metadata.name, metadata.namespace,
@@ -564,6 +572,7 @@ spec:
                                           required:
                                           - fieldPath
                                           type: object
+                                          x-kubernetes-map-type: atomic
                                         resourceFieldRef:
                                           description: 'Selects a resource of the
                                             container: only resources limits and requests
@@ -591,6 +600,7 @@ spec:
                                           required:
                                           - resource
                                           type: object
+                                          x-kubernetes-map-type: atomic
                                         secretKeyRef:
                                           description: Selects a key of a secret in
                                             the pod's namespace
@@ -613,6 +623,7 @@ spec:
                                           required:
                                           - key
                                           type: object
+                                          x-kubernetes-map-type: atomic
                                       type: object
                                   required:
                                   - name
@@ -645,6 +656,7 @@ spec:
                                             must be defined
                                           type: boolean
                                       type: object
+                                      x-kubernetes-map-type: atomic
                                     prefix:
                                       description: An optional identifier to prepend
                                         to each key in the ConfigMap. Must be a C_IDENTIFIER.
@@ -663,6 +675,7 @@ spec:
                                             must be defined
                                           type: boolean
                                       type: object
+                                      x-kubernetes-map-type: atomic
                                   type: object
                                 type: array
                               image:
@@ -1955,6 +1968,7 @@ spec:
                                           required:
                                           - key
                                           type: object
+                                          x-kubernetes-map-type: atomic
                                         fieldRef:
                                           description: 'Selects a field of the pod:
                                             supports metadata.name, metadata.namespace,
@@ -1974,6 +1988,7 @@ spec:
                                           required:
                                           - fieldPath
                                           type: object
+                                          x-kubernetes-map-type: atomic
                                         resourceFieldRef:
                                           description: 'Selects a resource of the
                                             container: only resources limits and requests
@@ -2001,6 +2016,7 @@ spec:
                                           required:
                                           - resource
                                           type: object
+                                          x-kubernetes-map-type: atomic
                                         secretKeyRef:
                                           description: Selects a key of a secret in
                                             the pod's namespace
@@ -2023,6 +2039,7 @@ spec:
                                           required:
                                           - key
                                           type: object
+                                          x-kubernetes-map-type: atomic
                                       type: object
                                   required:
                                   - name
@@ -2055,6 +2072,7 @@ spec:
                                             must be defined
                                           type: boolean
                                       type: object
+                                      x-kubernetes-map-type: atomic
                                     prefix:
                                       description: An optional identifier to prepend
                                         to each key in the ConfigMap. Must be a C_IDENTIFIER.
@@ -2073,6 +2091,7 @@ spec:
                                             must be defined
                                           type: boolean
                                       type: object
+                                      x-kubernetes-map-type: atomic
                                   type: object
                                 type: array
                               image:

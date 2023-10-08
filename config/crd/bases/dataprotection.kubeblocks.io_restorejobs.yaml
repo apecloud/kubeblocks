@@ -2,8 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.12.1
   labels:
     app.kubernetes.io/name: kubeblocks
   name: restorejobs.dataprotection.kubeblocks.io
@@ -105,6 +104,7 @@ spec:
                           "value". The requirements are ANDed.
                         type: object
                     type: object
+                    x-kubernetes-map-type: atomic
                     x-kubernetes-preserve-unknown-fields: true
                   secret:
                     description: secret is used to connect to the target database
@@ -301,6 +301,7 @@ spec:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         user:
                           description: 'user is optional: User is the rados user name,
                             default is admin More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it'
@@ -332,6 +333,7 @@ spec:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         volumeID:
                           description: 'volumeID used to identify the volume in cinder.
                             More info: https://examples.k8s.io/mysql-cinder-pd/README.md'
@@ -403,6 +405,7 @@ spec:
                             keys must be defined
                           type: boolean
                       type: object
+                      x-kubernetes-map-type: atomic
                     csi:
                       description: csi (Container Storage Interface) represents ephemeral
                         storage that is handled by certain external CSI drivers (Beta
@@ -433,6 +436,7 @@ spec:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         readOnly:
                           description: readOnly specifies a read-only configuration
                             for the volume. Defaults to false (read/write).
@@ -486,6 +490,7 @@ spec:
                                 required:
                                 - fieldPath
                                 type: object
+                                x-kubernetes-map-type: atomic
                               mode:
                                 description: 'Optional: mode bits used to set permissions
                                   on this file, must be an octal value between 0000
@@ -529,6 +534,7 @@ spec:
                                 required:
                                 - resource
                                 type: object
+                                x-kubernetes-map-type: atomic
                             required:
                             - path
                             type: object
@@ -665,6 +671,7 @@ spec:
                                   - kind
                                   - name
                                   type: object
+                                  x-kubernetes-map-type: atomic
                                 dataSourceRef:
                                   description: 'dataSourceRef specifies the object
                                     from which to populate the volume with data, if
@@ -838,6 +845,7 @@ spec:
                                         The requirements are ANDed.
                                       type: object
                                   type: object
+                                  x-kubernetes-map-type: atomic
                                 storageClassName:
                                   description: 'storageClassName is the name of the
                                     StorageClass required by the claim. More info:
@@ -928,6 +936,7 @@ spec:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                       required:
                       - driver
                       type: object
@@ -1105,6 +1114,7 @@ spec:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         targetPortal:
                           description: targetPortal is iSCSI Target Portal. The Portal
                             is either an IP or ip_addr:port if the port is other than
@@ -1275,6 +1285,7 @@ spec:
                                       or its keys must be defined
                                     type: boolean
                                 type: object
+                                x-kubernetes-map-type: atomic
                               downwardAPI:
                                 description: downwardAPI information about the downwardAPI
                                   data to project
@@ -1304,6 +1315,7 @@ spec:
                                           required:
                                           - fieldPath
                                           type: object
+                                          x-kubernetes-map-type: atomic
                                         mode:
                                           description: 'Optional: mode bits used to
                                             set permissions on this file, must be
@@ -1352,6 +1364,7 @@ spec:
                                           required:
                                           - resource
                                           type: object
+                                          x-kubernetes-map-type: atomic
                                       required:
                                       - path
                                       type: object
@@ -1417,6 +1430,7 @@ spec:
                                       Secret or its key must be defined
                                     type: boolean
                                 type: object
+                                x-kubernetes-map-type: atomic
                               serviceAccountToken:
                                 description: serviceAccountToken is information about
                                   the serviceAccountToken data to project
@@ -1533,6 +1547,7 @@ spec:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         user:
                           description: 'user is the rados user name. Default is admin.
                             More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it'
@@ -1572,6 +1587,7 @@ spec:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         sslEnabled:
                           description: sslEnabled Flag enable/disable SSL communication
                             with Gateway, default false
@@ -1687,6 +1703,7 @@ spec:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         volumeName:
                           description: volumeName is the human-readable name of the
                             StorageOS volume.  Volume names are only unique within

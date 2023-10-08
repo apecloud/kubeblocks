@@ -188,7 +188,7 @@ func (r *ComponentDefinitionReconciler) validateVolumes(cli client.Client, rctx 
 		}
 	}
 	if hasVolumeToProtect {
-		if cmpd.Spec.LifecycleActions.Readonly == nil || cmpd.Spec.LifecycleActions.Readwrite == nil {
+		if cmpd.Spec.LifecycleActions == nil || cmpd.Spec.LifecycleActions.Readonly == nil || cmpd.Spec.LifecycleActions.Readwrite == nil {
 			return fmt.Errorf("the Readonly and Readwrite actions are needed to protect volumes")
 		}
 	}
@@ -256,7 +256,7 @@ func (r *ComponentDefinitionReconciler) validateLabels(cli client.Client, rctx i
 
 func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
-	if len(cmpd.Spec.SystemAccounts) != 0 && cmpd.Spec.LifecycleActions.AccountProvision == nil {
+	if len(cmpd.Spec.SystemAccounts) != 0 && (cmpd.Spec.LifecycleActions == nil || cmpd.Spec.LifecycleActions.AccountProvision == nil) {
 		return fmt.Errorf("the AccountProvision action is needed to provision system accounts")
 	}
 

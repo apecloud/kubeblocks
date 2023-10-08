@@ -39,20 +39,28 @@ import (
 func GenServiceReferencesLegacy(reqCtx intctrlutil.RequestCtx,
 	cli roclient.ReadonlyClient,
 	cluster *appsv1alpha1.Cluster,
-	compDef *appsv1alpha1.ClusterComponentDefinition,
-	compSpec *appsv1alpha1.ClusterComponentSpec,
-) (map[string]*appsv1alpha1.ServiceDescriptor, error) {
-	// TODO(component): appsv1alpha1.ClusterComponentDefinition -> appsv1alpha1.ComponentDefinition
-	//                  appsv1alpha1.ClusterComponentSpec -> appsv1alpha1.Component
-	return GenServiceReferences(reqCtx, cli, cluster, nil, nil)
+	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
+	clusterCompVer *appsv1alpha1.ClusterComponentVersion,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (map[string]*appsv1alpha1.ServiceDescriptor, error) {
+	var (
+		compDef *appsv1alpha1.ComponentDefinition
+		comp    *appsv1alpha1.Component
+		err     error
+	)
+	if compDef, err = BuildComponentDefinitionFrom(clusterCompDef, clusterCompVer, cluster.Name); err != nil {
+		return nil, err
+	}
+	if comp, err = BuildComponentFrom(clusterCompDef, clusterCompVer, clusterCompSpec); err != nil {
+		return nil, err
+	}
+	return GenServiceReferences(reqCtx, cli, cluster, compDef, comp)
 }
 
 func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 	cli roclient.ReadonlyClient,
 	cluster *appsv1alpha1.Cluster,
 	compDef *appsv1alpha1.ComponentDefinition,
-	comp *appsv1alpha1.Component,
-) (map[string]*appsv1alpha1.ServiceDescriptor, error) {
+	comp *appsv1alpha1.Component) (map[string]*appsv1alpha1.ServiceDescriptor, error) {
 	if cluster == nil || compDef == nil || comp == nil {
 		return nil, nil
 	}

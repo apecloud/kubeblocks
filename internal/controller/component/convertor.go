@@ -34,7 +34,8 @@ import (
 // TODO(component): type check
 
 func BuildComponentDefinitionFrom(clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
-	clusterCompVer *appsv1alpha1.ClusterComponentVersion, clusterName string) (*appsv1alpha1.ComponentDefinition, error) {
+	clusterCompVer *appsv1alpha1.ClusterComponentVersion,
+	clusterName string) (*appsv1alpha1.ComponentDefinition, error) {
 	if clusterCompDef == nil {
 		return nil, nil
 	}
@@ -99,7 +100,7 @@ func BuildComponentFrom(clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
 }
 
 func covertObject(convertors map[string]convertor, obj any, args ...any) error {
-	tp := reflect.TypeOf(obj)
+	tp := typeofObject(obj)
 	for i := 0; i < tp.NumField(); i++ {
 		fieldName := tp.Field(i).Name
 		c, ok := convertors[strings.ToLower(fieldName)]
@@ -118,6 +119,17 @@ func covertObject(convertors map[string]convertor, obj any, args ...any) error {
 		}
 	}
 	return nil
+}
+
+func typeofObject(obj any) reflect.Type {
+	val := reflect.ValueOf(obj)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	if val.Kind() != reflect.Struct {
+		panic("not a struct")
+	}
+	return reflect.TypeOf(val)
 }
 
 type convertor interface {

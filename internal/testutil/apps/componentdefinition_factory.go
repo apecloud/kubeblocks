@@ -247,7 +247,7 @@ func (f *MockComponentDefinitionFactory) SetRoleArbitrator(arbitrator *appsv1alp
 
 func (f *MockComponentDefinitionFactory) SetLifecycleAction(name string, val interface{}) *MockComponentDefinitionFactory {
 	obj := &f.get().Spec.LifecycleActions
-	t := reflect.TypeOf(*obj)
+	t := reflect.TypeOf(reflect.ValueOf(obj).Elem())
 	for i := 0; i < t.NumField(); i++ {
 		fieldName := t.Field(i).Name
 		if strings.ToUpper(fieldName) == strings.ToUpper(name) {

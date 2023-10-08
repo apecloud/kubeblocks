@@ -221,9 +221,10 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		ServiceAccountName:    clusterCompSpec.ServiceAccountName,
 	}
 
+	var clusterCompVer *appsv1alpha1.ClusterComponentVersion
 	if len(clusterCompVers) > 0 && clusterCompVers[0] != nil {
 		// only accept 1st ClusterVersion override context
-		clusterCompVer := clusterCompVers[0]
+		clusterCompVer = clusterCompVers[0]
 		component.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterCompVer.ConfigSpecs, component.ConfigTemplates)
 		// override component.PodSpec.InitContainers and component.PodSpec.Containers
 		for _, c := range clusterCompVer.VersionsCtx.InitContainers {
@@ -278,8 +279,7 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
-	// TODO(xingran): buildComponent will be replaced by buildSynthesizedComponent and will delete it later, so set compDef and comp to nil.
-	buildMonitorConfig(nil, nil, component)
+	buildMonitorConfigLegacy(clusterCompDef, clusterCompVer, clusterCompSpec, component)
 
 	// lorry container requires a service account with adequate privileges.
 	// If lorry required and the serviceAccountName is not set,

@@ -231,7 +231,7 @@ var _ = Describe("generate service descriptor", func() {
 				Log: log.FromContext(ctx).WithValues("cluster", req.NamespacedName),
 			}
 			By("GenServiceReferences failed because external service descriptor not found")
-			serviceReferences, err := GenServiceReferencesLegacy(reqCtx, testCtx.Cli, cluster, &clusterDef.Spec.ComponentDefs[0], &cluster.Spec.ComponentSpecs[0])
+			serviceReferences, err := GenServiceReferencesLegacy(reqCtx, testCtx.Cli, cluster, &clusterDef.Spec.ComponentDefs[0], nil, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).ShouldNot(Succeed())
 			Expect(apierrors.IsNotFound(err)).Should(BeTrue())
 			Expect(serviceReferences).Should(BeNil())
@@ -258,7 +258,7 @@ var _ = Describe("generate service descriptor", func() {
 				Create(&testCtx).GetObject()
 
 			By("GenServiceReferences failed because external service descriptor status is not available")
-			serviceReferences, err = GenServiceReferencesLegacy(reqCtx, testCtx.Cli, cluster, &clusterDef.Spec.ComponentDefs[0], &cluster.Spec.ComponentSpecs[0])
+			serviceReferences, err = GenServiceReferencesLegacy(reqCtx, testCtx.Cli, cluster, &clusterDef.Spec.ComponentDefs[0], nil, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("status is not available"))
 			Expect(serviceReferences).Should(BeNil())
@@ -269,7 +269,7 @@ var _ = Describe("generate service descriptor", func() {
 			})).Should(Succeed())
 
 			By("GenServiceReferences failed because external service descriptor kind and version not match")
-			serviceReferences, err = GenServiceReferencesLegacy(reqCtx, testCtx.Cli, cluster, &clusterDef.Spec.ComponentDefs[0], &cluster.Spec.ComponentSpecs[0])
+			serviceReferences, err = GenServiceReferencesLegacy(reqCtx, testCtx.Cli, cluster, &clusterDef.Spec.ComponentDefs[0], nil, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("kind or version is not match with"))
 			Expect(serviceReferences).Should(BeNil())
@@ -296,7 +296,7 @@ var _ = Describe("generate service descriptor", func() {
 			Expect(testCtx.CheckedCreateObj(ctx, secret)).Should(Succeed())
 			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: secret.Name,
 				Namespace: secret.Namespace}, secret)).Should(Succeed())
-			serviceReferences, err = GenServiceReferencesLegacy(reqCtx, testCtx.Cli, cluster, &clusterDef.Spec.ComponentDefs[0], &cluster.Spec.ComponentSpecs[0])
+			serviceReferences, err = GenServiceReferencesLegacy(reqCtx, testCtx.Cli, cluster, &clusterDef.Spec.ComponentDefs[0], nil, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 			Expect(serviceReferences).ShouldNot(BeNil())
 			Expect(len(serviceReferences)).Should(Equal(2))

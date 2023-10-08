@@ -25,17 +25,26 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
-func buildMonitorConfigLegacy(
-	compDef *appsv1alpha1.ClusterComponentDefinition,
-	compSpec *appsv1alpha1.ClusterComponentSpec,
-	synthesizeComp *SynthesizedComponent) {
-	// TODO(component): appsv1alpha1.ClusterComponentDefinition -> appsv1alpha1.ComponentDefinition
-	//                  appsv1alpha1.ClusterComponentSpec -> appsv1alpha1.Component
-	buildMonitorConfig(nil, nil, synthesizeComp)
+func buildMonitorConfigLegacy(clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
+	clusterCompVer *appsv1alpha1.ClusterComponentVersion,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
+	synthesizeComp *SynthesizedComponent) error {
+	var (
+		compDef *appsv1alpha1.ComponentDefinition
+		comp    *appsv1alpha1.Component
+		err     error
+	)
+	if compDef, err = BuildComponentDefinitionFrom(clusterCompDef, clusterCompVer, synthesizeComp.ClusterName); err != nil {
+		return err
+	}
+	if comp, err = BuildComponentFrom(clusterCompDef, clusterCompVer, clusterCompSpec); err != nil {
+		return err
+	}
+	buildMonitorConfig(compDef, comp, synthesizeComp)
+	return nil
 }
 
-func buildMonitorConfig(
-	compDef *appsv1alpha1.ComponentDefinition,
+func buildMonitorConfig(compDef *appsv1alpha1.ComponentDefinition,
 	comp *appsv1alpha1.Component,
 	synthesizeComp *SynthesizedComponent) {
 	monitorEnable := false

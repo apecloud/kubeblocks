@@ -480,9 +480,10 @@ var _ = Describe("builder", func() {
 			}
 			job, err := BuildRestoreJob(cluster, component, key.Name, "", []string{"sh"}, volumes, volumeMounts, env, nil)
 			Expect(err).Should(BeNil())
-			Expect(job.Spec.Template.Spec.Tolerations[0].Key).Should(Equal("testKey"))
 			Expect(job).ShouldNot(BeNil())
 			Expect(job.Name).Should(Equal(key.Name))
+			Expect(len(job.Spec.Template.Spec.Tolerations) > 0).Should(BeTrue())
+			Expect(job.Spec.Template.Spec.Tolerations[0].Key).Should(Equal("testKey"))
 		})
 
 		It("builds volume snapshot class correctly", func() {

@@ -84,12 +84,14 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&ComponentCredentialTransformer{},
 			// handle rsm(ReplicatedStateMachine) workload generation
 			&ComponentWorkloadTransformer{},
+			// handle tls volume and cert
+			&ComponentTLSTransformer{},
+			// handle configuration rendering
+			&ComponentConfigurationRenderTransformer{Client: r.Client},
 			// add our finalizer to all objects
-			&OwnershipTransformer{},
-			// make all workload objects depending on credential secret
-			&SecretTransformer{},
+			&ComponentOwnershipTransformer{},
 			// update cluster status
-			&ClusterStatusTransformer{},
+			&ComponentStatusTransformer{},
 		).
 		Build()
 

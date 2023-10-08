@@ -9,13 +9,33 @@ metadata:
 spec:
   group: apps.kubeblocks.io
   names:
+    categories:
+    - kubeblocks
     kind: Component
     listKind: ComponentList
     plural: components
+    shortNames:
+    - cmp
     singular: component
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: cluster name
+      jsonPath: .spec.cluster
+      name: CLUSTER
+      type: string
+    - description: component definition
+      jsonPath: .spec.compDef
+      name: COMPONENT-DEFINITION
+      type: string
+    - description: status phase
+      jsonPath: .status.phase
+      name: STATUS
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: Component is the Schema for the components API

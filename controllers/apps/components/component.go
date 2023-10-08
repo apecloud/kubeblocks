@@ -182,12 +182,8 @@ func (c *rsmComponent) addResource(obj client.Object, action *ictrltypes.Lifecyc
 func (c *rsmComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Client, builder componentWorkloadBuilder, load bool) error {
 	var err error
 	if builder != nil {
-		if err = builder.BuildWorkload().
-			BuildPDB().
+		if err = builder.
 			BuildConfig().
-			BuildTLSVolume().
-			BuildVolumeMount().
-			BuildTLSCert().
 			Complete(); err != nil {
 			return err
 		}

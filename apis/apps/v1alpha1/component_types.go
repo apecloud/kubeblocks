@@ -137,8 +137,13 @@ type ComponentStatus struct {
 	Message ComponentMessageMap `json:"message,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:categories={kubeblocks},shortName=cmp
+// +kubebuilder:printcolumn:name="CLUSTER",type="string",JSONPath=".spec.cluster",description="cluster name"
+// +kubebuilder:printcolumn:name="COMPONENT-DEFINITION",type="string",JSONPath=".spec.compDef",description="component definition"
+// +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Component is the Schema for the components API
 type Component struct {

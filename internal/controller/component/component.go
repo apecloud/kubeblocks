@@ -279,7 +279,7 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
-	buildMonitorConfigLegacy(clusterCompDef, clusterCompVer, clusterCompSpec, component)
+	buildMonitorConfig(clusterCompDef.Monitor, clusterCompSpec.Monitor, clusterCompDef.PodSpec, component)
 
 	// lorry container requires a service account with adequate privileges.
 	// If lorry required and the serviceAccountName is not set,

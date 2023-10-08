@@ -20,14 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // ComponentWorkloadTransformer handles component rsm workload generation
@@ -49,6 +52,9 @@ func (t *ComponentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	cluster := transCtx.Cluster
 	synthesizeComp := transCtx.SynthesizeComponent
 
+	// build synthesizeComp podSpec volumeMounts
+	buildPodSpecVolumeMounts(synthesizeComp)
+
 	// build rsm workload
 	// TODO(xingran): BuildRSM relies on the deprecated fields of the component, for example component.WorkloadType, which should be removed in the future
 	rsm, err := factory.BuildRSM(cluster, synthesizeComp)
@@ -56,6 +62,16 @@ func (t *ComponentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 		return err
 	}
 	objects := []client.Object{rsm}
+
+	// build PDB for backward compatibility
+	// MinAvailable is used to determine whether to create a PDB (Pod Disruption Budget) object. However, the functionality of PDB should be implemented within the RSM.
+	// Therefore, PDB objects are no longer needed in the new API, and the MinAvailable field should be deprecated.
+	// The old MinAvailable field, which value is determined based on the deprecated "workloadType" field, is also no longer applicable in the new API.
+	// TODO(xingran): which should be removed when workloadType and ClusterCompDefName are removed
+	if synthesizeComp.MinAvailable != nil {
+		pdb := factory.BuildPDB(cluster, synthesizeComp)
+		objects = append(objects, pdb)
+	}
 
 	// read cache snapshot
 	ml := constant.GetComponentWellKnownLabels(cluster.Name, comp.Name)
@@ -114,4 +130,28 @@ func ownedWorkloadKinds() []client.ObjectList {
 	return []client.ObjectList{
 		&workloads.ReplicatedStateMachineList{},
 	}
+}
+
+// buildPodSpecVolumeMounts builds podSpec volumeMounts
+func buildPodSpecVolumeMounts(synthesizeComp *component.SynthesizedComponent) {
+	podSpec := synthesizeComp.PodSpec
+	for _, cc := range []*[]corev1.Container{&podSpec.Containers, &podSpec.InitContainers} {
+		volumes := podSpec.Volumes
+		for _, c := range *cc {
+			for _, v := range c.VolumeMounts {
+				// if persistence is not found, add emptyDir pod.spec.volumes[]
+				createFn := func(_ string) corev1.Volume {
+					return corev1.Volume{
+						Name: v.Name,
+						VolumeSource: corev1.VolumeSource{
+							EmptyDir: &corev1.EmptyDirVolumeSource{},
+						},
+					}
+				}
+				volumes, _ = intctrlutil.CreateOrUpdateVolume(volumes, v.Name, createFn, nil)
+			}
+		}
+		podSpec.Volumes = volumes
+	}
+	synthesizeComp.PodSpec = podSpec
 }

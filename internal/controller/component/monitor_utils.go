@@ -20,39 +20,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
-func buildMonitorConfigLegacy(clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
-	clusterCompVer *appsv1alpha1.ClusterComponentVersion,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
-	synthesizeComp *SynthesizedComponent) error {
-	var (
-		compDef *appsv1alpha1.ComponentDefinition
-		comp    *appsv1alpha1.Component
-		err     error
-	)
-	if compDef, err = BuildComponentDefinitionFrom(clusterCompDef, clusterCompVer, synthesizeComp.ClusterName); err != nil {
-		return err
-	}
-	if comp, err = BuildComponentFrom(clusterCompDef, clusterCompVer, clusterCompSpec); err != nil {
-		return err
-	}
-	buildMonitorConfig(compDef, comp, synthesizeComp)
-	return nil
+func buildMonitorConfigLegacy(
+	compDef *appsv1alpha1.ClusterComponentDefinition,
+	compSpec *appsv1alpha1.ClusterComponentSpec,
+	synthesizeComp *SynthesizedComponent) {
+	buildMonitorConfig(compDef.Monitor, compSpec.Monitor, compDef.PodSpec, synthesizeComp)
 }
 
-func buildMonitorConfig(compDef *appsv1alpha1.ComponentDefinition,
-	comp *appsv1alpha1.Component,
+func buildMonitorConfig(
+	monitorConfig *appsv1alpha1.MonitorConfig,
+	monitorEnable bool,
+	podSpec *corev1.PodSpec,
 	synthesizeComp *SynthesizedComponent) {
-	monitorEnable := false
-	if comp != nil {
-		monitorEnable = comp.Spec.Monitor
-	}
-
-	monitorConfig := compDef.Spec.Monitor
 	if !monitorEnable || monitorConfig == nil {
 		disableMonitor(synthesizeComp)
 		return
@@ -72,7 +57,7 @@ func buildMonitorConfig(compDef *appsv1alpha1.ComponentDefinition,
 
 		if monitorConfig.Exporter.ScrapePort.Type == intstr.String {
 			portName := monitorConfig.Exporter.ScrapePort.StrVal
-			for _, c := range compDef.Spec.Runtime.Containers {
+			for _, c := range podSpec.Containers {
 				for _, p := range c.Ports {
 					if p.Name == portName {
 						synthesizeComp.Monitor.ScrapePort = p.ContainerPort

@@ -746,9 +746,9 @@ func (c *rsmComponent) restart(reqCtx intctrlutil.RequestCtx, cli client.Client)
 func (c *rsmComponent) expandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	for _, vct := range c.runningWorkload.Spec.VolumeClaimTemplates {
 		var proto *corev1.PersistentVolumeClaimTemplate
-		for _, v := range c.component.VolumeClaimTemplates {
+		for i, v := range c.component.VolumeClaimTemplates {
 			if v.Name == vct.Name {
-				proto = &v
+				proto = &c.component.VolumeClaimTemplates[i]
 				break
 			}
 		}

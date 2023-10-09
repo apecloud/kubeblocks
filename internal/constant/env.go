@@ -39,4 +39,6 @@ const (
 	KBEnvServicePort     = "KB_SERVICE_PORT"
 	KBEnvDataPath        = "KB_DATA_PATH"
 	KBEnvTTL             = "KB_TTL"
+	KBEnvMaxLag          = "KB_MAX_LAG"
+	KBEnvEnableHA        = "KB_ENABLE_HA"
 )

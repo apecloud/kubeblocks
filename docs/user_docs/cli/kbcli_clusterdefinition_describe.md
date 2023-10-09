@@ -1,13 +1,24 @@
 ---
-title: kbcli clusterdefinition
+title: kbcli clusterdefinition describe
 ---
 
-ClusterDefinition command.
+Describe ClusterDefinition.
+
+```
+kbcli clusterdefinition describe [flags]
+```
+
+### Examples
+
+```
+  # describe a specified cluster definition
+  kbcli clusterdefinition describe myclusterdef
+```
 
 ### Options
 
 ```
-  -h, --help   help for clusterdefinition
+  -h, --help   help for describe
 ```
 
 ### Options inherited from parent commands
@@ -36,10 +47,7 @@ ClusterDefinition command.
 
 ### SEE ALSO
 
-
-* [kbcli clusterdefinition describe](kbcli_clusterdefinition_describe.md)	 - Describe ClusterDefinition.
-* [kbcli clusterdefinition list](kbcli_clusterdefinition_list.md)	 - List ClusterDefinitions.
-* [kbcli clusterdefinition list-components](kbcli_clusterdefinition_list-components.md)	 - List cluster definition components.
+* [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

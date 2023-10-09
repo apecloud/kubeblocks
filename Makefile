@@ -490,12 +490,15 @@ ifeq (, $(shell ls $(LOCALBIN)/kustomize 2>/dev/null))
 endif
 
 .PHONY: controller-gen
-controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
-$(CONTROLLER_GEN): $(LOCALBIN)
-ifeq (, $(shell ls $(LOCALBIN)/controller-gen 2>/dev/null))
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
-endif
-
+controller-gen: $(LOCALBIN) ## Download controller-gen locally if necessary.
+	@{ \
+	set -e ;\
+	if [ ! -f "$(CONTROLLER_GEN)" ] || [ "$$($(CONTROLLER_GEN) --version 2>&1 | awk '{print $$NF}')" != "$(CONTROLLER_TOOLS_VERSION)" ]; then \
+        echo 'Installing controller-gen@$(CONTROLLER_TOOLS_VERSION)...' ;\
+        GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION) ;\
+        echo 'Successfully installed' ;\
+    fi \
+	}
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
@@ -503,7 +506,6 @@ $(ENVTEST): $(LOCALBIN)
 ifeq (, $(shell ls $(LOCALBIN)/setup-envtest 2>/dev/null))
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 endif
-
 
 .PHONY: install-docker-buildx
 install-docker-buildx: ## Create `docker buildx` builder.
@@ -513,7 +515,6 @@ install-docker-buildx: ## Create `docker buildx` builder.
 	else \
 		echo "Buildx builder $(BUILDX_BUILDER) already exists"; \
 	fi
-
 
 .PHONY: golangci
 golangci: GOLANGCILINT_VERSION = v1.51.2

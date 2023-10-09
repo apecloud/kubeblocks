@@ -17,58 +17,58 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package backup
+package dataprotection
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	"github.com/apecloud/kubeblocks/internal/cli/delete"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
+	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var (
-	deleteBackupExample = templates.Examples(`
-		# delete a backup
-		kbcli backup delete mybackup
-	`)
+	createRestoreExample = templates.Examples(`
+		# restore a new cluster from a backup
+		kbcli dp restore mybackup --cluster cluster-name`)
 )
 
-func newDeleteCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := delete.NewDeleteOptions(f, streams, types.BackupGVR())
+func newRestoreCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := cluster.CreateRestoreOptions{}
+	o.CreateOptions = create.CreateOptions{
+		IOStreams: streams,
+		Factory:   f,
+		Options:   o,
+	}
+
 	clusterName := ""
+
 	cmd := &cobra.Command{
-		Use:               "delete",
-		Short:             "Delete a backup.",
-		Example:           deleteBackupExample,
+		Use:               "restore",
+		Short:             "Restore a new cluster from backup",
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.BackupGVR()),
+		Example:           createRestoreExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			o.Names = args
+			if len(args) > 0 {
+				o.Backup = args[0]
+			}
+			if clusterName != "" {
+				o.Args = []string{clusterName}
+			}
 			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
-			util.CheckErr(completeForDeleteBackup(o, clusterName))
+			util.CheckErr(o.Complete())
+			util.CheckErr(o.Validate())
 			util.CheckErr(o.Run())
 		},
 	}
 
-	o.AddFlags(cmd)
-	cmd.Flags().StringVar(&clusterName, "cluster", "", "The cluster name.")
-	util.RegisterClusterCompletionFunc(cmd, f)
-
+	cmd.Flags().StringVar(&clusterName, "cluster", "", "The cluster to restore")
+	cmd.Flags().StringVar(&o.RestoreTimeStr, "restore-to-time", "", "point in time recovery(PITR)")
+	cmd.Flags().StringVar(&o.RestoreManagementPolicy, "volume-restore-policy", "Parallel", "the volume claim restore policy, supported values: [Serial, Parallel]")
 	return cmd
-}
-
-func completeForDeleteBackup(o *delete.DeleteOptions, cluster string) error {
-	if o.Force && len(o.Names) == 0 {
-		if cluster == "" {
-			return fmt.Errorf("must give a backup name or cluster name")
-		}
-		o.LabelSelector = util.BuildLabelSelectorByNames(o.LabelSelector, []string{cluster})
-	}
-	return nil
 }

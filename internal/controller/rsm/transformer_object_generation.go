@@ -402,6 +402,10 @@ func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, templat
 	if probeDaemonPort == 0 {
 		probeDaemonPort = defaultRoleProbeDaemonPort
 	}
+	probeGRPCPort := viper.GetInt("ROLE_PROBE_GRPC_PORT")
+	if probeGRPCPort == 0 {
+		probeGRPCPort = defaultRoleProbeGRPCPort
+	}
 	env := credentialEnv
 	env = append(env,
 		corev1.EnvVar{
@@ -489,9 +493,11 @@ func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, templat
 
 	readinessProbe := &corev1.Probe{
 		ProbeHandler: corev1.ProbeHandler{
-			HTTPGet: &corev1.HTTPGetAction{
-				Path: roleProbeURI,
-				Port: intstr.FromInt(probeDaemonPort),
+			Exec: &corev1.ExecAction{
+				Command: []string{
+					"/bin/grpc_health_probe",
+					fmt.Sprintf("-addr=:%d", probeGRPCPort),
+				},
 			},
 		},
 		InitialDelaySeconds: roleProbe.InitialDelaySeconds,
@@ -517,12 +523,16 @@ func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, templat
 		}
 		return nil
 	}
-	// if role probe container exists, update the readiness probe, env and serving container port
+
+	// if role probe container exists, update the env and serving container port
 	if container := tryToGetRoleProbeContainer(); container != nil {
 		// presume the first port is the http port.
 		// this is an easily broken contract between rsm controller and cluster controller.
 		// TODO(free6om): design a better way to do this after Lorry-WeSyncer separation done
-		readinessProbe.HTTPGet.Port = intstr.FromInt(int(container.Ports[0].ContainerPort))
+		readinessProbe.Exec.Command = []string{
+			"/bin/grpc_health_probe",
+			fmt.Sprintf("-addr=:%d", int(container.Ports[1].ContainerPort)),
+		}
 		container.ReadinessProbe = readinessProbe
 		for _, e := range env {
 			if slices.IndexFunc(container.Env, func(v corev1.EnvVar) bool {
@@ -543,13 +553,21 @@ func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, templat
 		AddCommands([]string{
 			roleProbeBinaryName,
 			"--port", strconv.Itoa(probeDaemonPort),
+			"--grpcport", strconv.Itoa(probeGRPCPort),
 		}...).
 		AddEnv(env...).
-		AddPorts(corev1.ContainerPort{
-			ContainerPort: int32(probeDaemonPort),
-			Name:          roleProbeContainerName,
-			Protocol:      "TCP",
-		}).
+		AddPorts(
+			corev1.ContainerPort{
+				ContainerPort: int32(probeDaemonPort),
+				Name:          roleProbeContainerName,
+				Protocol:      "TCP",
+			},
+			corev1.ContainerPort{
+				ContainerPort: int32(probeGRPCPort),
+				Name:          roleProbeGRPCPortName,
+				Protocol:      "TCP",
+			},
+		).
 		SetReadinessProbe(*readinessProbe).
 		GetObject()
 

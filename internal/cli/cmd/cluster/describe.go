@@ -21,7 +21,6 @@ package cluster
 
 import (
 	"fmt"
-	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	"io"
 	"strings"
 
@@ -230,37 +229,30 @@ func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backupSchedule
 		return
 	}
 	tbl := newTbl(out, "\nData Protection:", "BACKUP-REPO", "AUTO-BACKUP", "BACKUP-SCHEDULE", "BACKUP-METHOD", "BACKUP-RETENTION")
-	for _, policy := range backupPolicies {
-		if policy.Annotations[dptypes.DefaultBackupPolicyAnnotationKey] != "true" {
-			continue
-		}
-		if policy.Status.Phase != dpv1alpha1.AvailablePhase {
-			continue
-		}
+	for _, schedule := range backupSchedules {
 		backupRepo := printer.NoneString
 		backupMethod := printer.NoneString
 		backupSchedule := printer.NoneString
 		backupRetention := printer.NoneString
 		scheduleEnable := "Disabled"
-		for _, schedule := range backupSchedules {
-			if schedule.Spec.BackupPolicyName == policy.Name {
-				for _, shcedulePolicy := range schedule.Spec.Schedules {
-					if shcedulePolicy.Enabled != nil && *shcedulePolicy.Enabled {
-						scheduleEnable = "Enabled"
-						backupMethod = shcedulePolicy.BackupMethod
-						backupSchedule = shcedulePolicy.CronExpression
-						backupRetention = shcedulePolicy.RetentionPeriod.String()
-						break
-					}
-				}
-				break
+		for _, policy := range backupPolicies {
+			if policy.Name != schedule.Spec.BackupPolicyName {
+				continue
+			}
+			if policy.Spec.BackupRepoName != nil {
+				backupRepo = *policy.Spec.BackupRepoName
 			}
 		}
-		if policy.Spec.BackupRepoName != nil {
-			backupRepo = *policy.Spec.BackupRepoName
+		for _, schedulePolicy := range schedule.Spec.Schedules {
+			if schedulePolicy.Enabled != nil && *schedulePolicy.Enabled == false {
+				continue
+			}
+			scheduleEnable = "Enabled"
+			backupMethod = schedulePolicy.BackupMethod
+			backupSchedule = schedulePolicy.CronExpression
+			backupRetention = schedulePolicy.RetentionPeriod.String()
+			tbl.AddRow(backupRepo, scheduleEnable, backupSchedule, backupMethod, backupRetention)
 		}
-
-		tbl.AddRow(backupRepo, scheduleEnable, backupSchedule, backupMethod, backupRetention)
 	}
 	tbl.Print()
 }

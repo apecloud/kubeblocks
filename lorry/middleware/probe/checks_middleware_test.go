@@ -33,7 +33,7 @@ func TestGetRequestBody(t *testing.T) {
 	mock := make(map[string][]string)
 	mock["sql"] = []string{"dd"}
 	operation := "exec"
-	body := GetRequestBody(operation, mock)
+	body := getRequestBody(operation, mock)
 
 	meta := RequestMeta{
 		Operation: operation,

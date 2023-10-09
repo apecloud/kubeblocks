@@ -51,7 +51,8 @@ const (
 
 func init() {
 	k8score.PersistentVolumeClaimHandlerMap["volume-expansion"] = handleVolumeExpansionWithPVC
-	k8score.EventHandlerMap["volume-expansion"] = PersistentVolumeClaimEventHandler{}
+	// Note: remove the event check for volume expansion
+	// k8score.EventHandlerMap["volume-expansion"] = PersistentVolumeClaimEventHandler{}
 }
 
 // handleVolumeExpansionOperation handles the pvc for the volume expansion OpsRequest.

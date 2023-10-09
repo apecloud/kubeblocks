@@ -414,12 +414,10 @@ type ClusterComponentVolumeClaimTemplate struct {
 }
 
 func (r *ClusterComponentVolumeClaimTemplate) toVolumeClaimTemplate() corev1.PersistentVolumeClaimTemplate {
-	return corev1.PersistentVolumeClaimTemplate{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: r.Name,
-		},
-		Spec: r.Spec.ToV1PersistentVolumeClaimSpec(),
-	}
+	t := corev1.PersistentVolumeClaimTemplate{}
+	t.ObjectMeta.Name = r.Name
+	t.Spec = r.Spec.ToV1PersistentVolumeClaimSpec()
+	return t
 }
 
 type PersistentVolumeClaimSpec struct {
@@ -440,9 +438,12 @@ type PersistentVolumeClaimSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.
 	// +optional
 	StorageClassName *string `json:"storageClassName,omitempty" protobuf:"bytes,5,opt,name=storageClassName"`
-	// volumeMode defines what type of volume is required by the claim.
-	// +optional
-	VolumeMode *corev1.PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,6,opt,name=volumeMode,casttype=PersistentVolumeMode"`
+	// TODO:
+	// // preferStorageClassNames added support specifying storageclasses.storage.k8s.io names, in order
+	// // to adapt multi-cloud deployment, where storageclasses are all distinctly different among clouds.
+	// // +listType=set
+	// // +optional
+	// PreferSCNames []string `json:"preferStorageClassNames,omitempty"`
 }
 
 // ToV1PersistentVolumeClaimSpec converts to corev1.PersistentVolumeClaimSpec.
@@ -450,21 +451,21 @@ func (r *PersistentVolumeClaimSpec) ToV1PersistentVolumeClaimSpec() corev1.Persi
 	return corev1.PersistentVolumeClaimSpec{
 		AccessModes:      r.AccessModes,
 		Resources:        r.Resources,
-		StorageClassName: r.getStorageClassName(viper.GetString(constant.CfgKeyDefaultStorageClass)),
-		VolumeMode:       r.VolumeMode,
+		StorageClassName: r.GetStorageClassName(viper.GetString(constant.CfgKeyDefaultStorageClass)),
 	}
 }
 
-// getStorageClassName returns PersistentVolumeClaimSpec.StorageClassName if a value is assigned; otherwise,
+// GetStorageClassName returns PersistentVolumeClaimSpec.StorageClassName if a value is assigned; otherwise,
 // it returns preferSC argument.
-func (r *PersistentVolumeClaimSpec) getStorageClassName(preferSC string) *string {
+func (r *PersistentVolumeClaimSpec) GetStorageClassName(preferSC string) *string {
 	if r.StorageClassName != nil && *r.StorageClassName != "" {
 		return r.StorageClassName
 	}
-	if preferSC != "" {
-		return &preferSC
+
+	if preferSC == "" {
+		return nil
 	}
-	return nil
+	return &preferSC
 }
 
 type Affinity struct {

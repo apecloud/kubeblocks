@@ -220,9 +220,9 @@ func (c *statefulComponentBase) Restart(reqCtx intctrlutil.RequestCtx, cli clien
 func (c *statefulComponentBase) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	for _, vct := range c.runningWorkload.Spec.VolumeClaimTemplates {
 		var proto *corev1.PersistentVolumeClaimTemplate
-		for i, v := range c.Component.VolumeClaimTemplates {
+		for _, v := range c.Component.VolumeClaimTemplates {
 			if v.Name == vct.Name {
-				proto = &c.Component.VolumeClaimTemplates[i]
+				proto = &v
 				break
 			}
 		}

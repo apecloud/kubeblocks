@@ -31,13 +31,20 @@ WORKDIR /src
 # role-observe
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=cache,target=/go/pkg \
-     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/probe cmd/lorry/main.go
-
+    --mount=type=cache,target=/go/pkg/mod \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/lorry cmd/lorry/main.go
 
 # Use alpine
 FROM docker.io/alpine:3.18 as dist
 
 # copy probe and config
-COPY --from=builder /out/probe  /bin/probe
-COPY config/lorry/components config/probe
+COPY --from=builder /out/lorry /bin
+COPY config/lorry config/lorry
+
+# make breaking change compatible
+RUN ln -s /bin/lorry /bin/probe
+RUN ln -s /config/lorry /config/probe
+
+RUN GRPC_HEALTH_PROBE_VERSION=v0.4.13 && \
+    wget -qO/bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-linux-amd64 && \
+    chmod +x /bin/grpc_health_probe

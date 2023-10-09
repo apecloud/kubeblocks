@@ -180,7 +180,7 @@ func buildHelmValues(c *cluster.ChartInfo, values map[string]interface{}) map[st
 	if c.SubSchema == nil {
 		return values
 	}
-
+	// todo: for key like `etcd.cluster` should adjust it to a map like
 	subSchemaKeys := maps.Keys(c.SubSchema.Properties)
 	newValues := map[string]interface{}{
 		c.SubChartName: map[string]interface{}{},

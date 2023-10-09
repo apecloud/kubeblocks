@@ -1,11 +1,10 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.0
   creationTimestamp: null
-  labels:
-    app.kubernetes.io/name: kubeblocks
   name: collectordatasources.monitor.kubeblocks.io
 spec:
   group: monitor.kubeblocks.io
@@ -58,6 +57,15 @@ spec:
                 items:
                   type: string
                 type: array
+              mode:
+                description: Mode represents how the OTeld should be deployed (deployment,
+                  daemonset, statefulset or sidecar)
+                enum:
+                - daemonset
+                - deployment
+                - sidecar
+                - statefulset
+                type: string
               name:
                 description: Name is the name of the data source
                 type: string

@@ -20,34 +20,121 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package reconcile
 
 import (
-	"github.com/apecloud/kubeblocks/controllers/monitor/types"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/spf13/viper"
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	monitorv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/monitor/types"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
-const OteldServiceName = "oteld-service"
-
 func Service(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
-	var (
-		k8sClient = params.Client
-		namespace = viper.GetString(constant.MonitorNamespaceEnvName)
-	)
+	desired := []*corev1.Service{}
 
-	svc := buildSvcForOtel(namespace, OTeldName)
-	exitingSvc := &corev1.Service{}
-	err := k8sClient.Get(reqCtx.Ctx, client.ObjectKey{Name: OTeldName, Namespace: namespace}, exitingSvc)
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			reqCtx.Log.Error(err, "failed to find secret", "secret", client.ObjectKeyFromObject(exitingSvc))
-			params.Recorder.Eventf(exitingSvc, corev1.EventTypeWarning, "failed to find service", err.Error())
-			return err
+	if reqCtx.GetOteldInstance(monitorv1alpha1.ModeDaemonSet) != nil {
+		svc, _ := buildSvcForOtel(reqCtx.Config, reqCtx.GetOteldInstance(monitorv1alpha1.ModeDaemonSet), reqCtx.Namespace)
+		if svc != nil {
+			desired = append(desired, svc)
 		}
-		return k8sClient.Create(reqCtx.Ctx, svc)
 	}
 
-	reqCtx.Log.Info("updating existing secret", "secret", client.ObjectKeyFromObject(exitingSvc))
-	return k8sClient.Update(reqCtx.Ctx, svc)
+	if reqCtx.GetOteldInstance(monitorv1alpha1.ModeDeployment) != nil {
+		svc, _ := buildSvcForOtel(reqCtx.Config, reqCtx.GetOteldInstance(monitorv1alpha1.ModeDeployment), reqCtx.Namespace)
+		if svc != nil {
+			desired = append(desired, svc)
+		}
+	}
+
+	if err := expectedService(reqCtx, params, desired); err != nil {
+		return err
+	}
+
+	if err := deleteService(reqCtx, params, desired); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func expectedService(reqCtx types.ReconcileCtx, params types.OTeldParams, desired []*corev1.Service) error {
+	for _, svc := range desired {
+		desired := svc
+
+		existing := &corev1.Service{}
+		getErr := params.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: desired.Name, Namespace: desired.Namespace}, existing)
+		if getErr != nil && apierrors.IsNotFound(getErr) {
+			if createErr := params.Client.Create(reqCtx.Ctx, desired); createErr != nil {
+				if apierrors.IsAlreadyExists(createErr) {
+					return nil
+				}
+				return fmt.Errorf("failed to create: %w", createErr)
+			}
+			reqCtx.Log.V(2).Info("created", "configmap.name", desired.Name, "configmap.namespace", desired.Namespace)
+			continue
+		} else if getErr != nil {
+			return getErr
+		}
+
+		updated := existing.DeepCopy()
+		if updated.Annotations == nil {
+			updated.Annotations = map[string]string{}
+		}
+		if updated.Labels == nil {
+			updated.Labels = map[string]string{}
+		}
+
+		updated.Spec = desired.Spec
+		updated.ObjectMeta.OwnerReferences = desired.ObjectMeta.OwnerReferences
+
+		for k, v := range desired.ObjectMeta.Annotations {
+			updated.ObjectMeta.Annotations[k] = v
+		}
+		for k, v := range desired.ObjectMeta.Labels {
+			updated.ObjectMeta.Labels[k] = v
+		}
+
+		patch := client.MergeFrom(existing)
+
+		if err := params.Client.Patch(reqCtx.Ctx, updated, patch); err != nil {
+			return fmt.Errorf("failed to apply changes: %w", err)
+		}
+
+		reqCtx.Log.V(2).Info("applied", "configmap.name", desired.Name, "configmap.namespace", desired.Namespace)
+	}
+	return nil
+}
+
+func deleteService(reqCtx types.ReconcileCtx, params types.OTeldParams, desired []*corev1.Service) error {
+	listopts := []client.ListOption{
+		client.InNamespace(reqCtx.Namespace),
+		client.MatchingLabels(map[string]string{
+			constant.AppManagedByLabelKey: constant.AppName,
+			constant.AppNameLabelKey:      OTeldName,
+		}),
+	}
+
+	serviceList := &corev1.ServiceList{}
+	if params.Client.List(reqCtx.Ctx, serviceList, listopts...) != nil {
+		return nil
+	}
+
+	for _, configMap := range serviceList.Items {
+		isdel := true
+		for _, keep := range desired {
+			if keep.Name == configMap.Name && keep.Namespace == configMap.Namespace {
+				isdel = false
+				break
+			}
+		}
+
+		if isdel {
+			if err := params.Client.Delete(reqCtx.Ctx, &configMap); err != nil {
+				return fmt.Errorf("failed to delete: %w", err)
+			}
+		}
+	}
+	return nil
 }

@@ -74,3 +74,43 @@ type SinkQueueConfig struct {
 	// +optional
 	QueueSize int `json:"queueSize"`
 }
+
+type (
+	// Mode represents how the OTeld should be deployed (deployment vs. daemonset)
+	// +kubebuilder:validation:Enum=daemonset;deployment;sidecar;statefulset
+	Mode string
+)
+
+const (
+	// ModeDaemonSet specifies that the OTeld should be deployed as a Kubernetes DaemonSet.
+	ModeDaemonSet Mode = "daemonset"
+
+	// ModeDeployment specifies that the OTeld should be deployed as a Kubernetes Deployment.
+	ModeDeployment Mode = "deployment"
+
+	// ModeSidecar specifies that the OTeld should be deployed as a sidecar to pods.
+	ModeSidecar Mode = "sidecar"
+
+	// ModeStatefulSet specifies that the OTeld should be deployed as a Kubernetes StatefulSet.
+	ModeStatefulSet Mode = "statefulset"
+)
+
+type (
+	// LogLevel represents the log level for the OTeld
+	// +kubebuilder:validation:Enum=debug;info;warn;error
+	LogLevel string
+)
+
+const (
+	// LogLevelDebug specifies that the OTeld should log at debug level.
+	LogLevelDebug LogLevel = "debug"
+
+	// LogLevelInfo specifies that the OTeld should log at info level.
+	LogLevelInfo LogLevel = "info"
+
+	// LogLevelWarn specifies that the OTeld should log at warn level.
+	LogLevelWarn LogLevel = "warn"
+
+	// LogLevelError specifies that the OTeld should log at error level.
+	LogLevelError LogLevel = "error"
+)

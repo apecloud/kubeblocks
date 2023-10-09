@@ -23,26 +23,24 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
-
-	"github.com/apecloud/kubeblocks/internal/constant"
-
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	monitorv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 	monitorreconsile "github.com/apecloud/kubeblocks/controllers/monitor/reconcile"
 	monitortypes "github.com/apecloud/kubeblocks/controllers/monitor/types"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -82,8 +80,7 @@ func (r *OTeldReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		Req: req,
 		Log: log.FromContext(ctx).WithName("OTeldCollectorReconciler"),
 
-		Config:      r.Config,
-		OteldCfgRef: &monitortypes.OteldCfgRef{},
+		Config: r.Config,
 	}
 
 	// TODO prepare required resources
@@ -114,8 +111,8 @@ func New(params monitortypes.OTeldParams, config *monitortypes.Config) *OTeldRec
 		tasks: []monitortypes.ReconcileTask{
 			monitortypes.NewReconcileTask(monitorreconsile.OTeldName, monitortypes.WithReconcileOption(monitorreconsile.OTeld, params)),
 			monitortypes.NewReconcileTask(monitorreconsile.OteldSecretName, monitortypes.WithReconcileOption(monitorreconsile.Secret, params)),
-			monitortypes.NewReconcileTask(monitorreconsile.OteldConfigMapName, monitortypes.WithReconcileOption(monitorreconsile.ConfigMap, params)),
-			monitortypes.NewReconcileTask(monitorreconsile.OteldServiceName, monitortypes.WithReconcileOption(monitorreconsile.Service, params)),
+			monitortypes.NewReconcileTask(monitorreconsile.OteldConfigMapNamePattern, monitortypes.WithReconcileOption(monitorreconsile.ConfigMap, params)),
+			monitortypes.NewReconcileTask(monitorreconsile.OteldServiceNamePattern, monitortypes.WithReconcileOption(monitorreconsile.Service, params)),
 			monitortypes.NewReconcileTask(monitorreconsile.OTeldAPIServerName, monitortypes.WithReconcileOption(monitorreconsile.Deployment, params)),
 			monitortypes.NewReconcileTask(monitorreconsile.OTeldAgentName, monitortypes.WithReconcileOption(monitorreconsile.OTeldAgent, params)),
 			monitortypes.NewReconcileTask(monitorreconsile.PrometheusName, monitortypes.WithReconcileOption(monitorreconsile.Prometheus, params)),
@@ -141,13 +138,10 @@ func New(params monitortypes.OTeldParams, config *monitortypes.Config) *OTeldRec
 // SetupWithManager sets up the controller with the Manager.
 func (r *OTeldReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		Named("OTeld").
-		Watches(&source.Kind{Type: &monitorv1alpha1.LogsExporterSink{}},
-			handler.EnqueueRequestsFromMapFunc(r.filterOTelResources)).
-		Watches(&source.Kind{Type: &monitorv1alpha1.MetricsExporterSink{}},
-			handler.EnqueueRequestsFromMapFunc(r.filterOTelResources)).
-		Watches(&source.Kind{Type: &monitorv1alpha1.CollectorDataSource{}},
-			handler.EnqueueRequestsFromMapFunc(r.filterOTelResources)).
+		For(&monitorv1alpha1.OTeldCollectorTemplate{}).
+		Owns(&monitorv1alpha1.LogsExporterSink{}).
+		Owns(&monitorv1alpha1.MetricsExporterSink{}).
+		Owns(&monitorv1alpha1.CollectorDataSource{}).
 		Watches(&source.Kind{Type: &corev1.ConfigMap{}},
 			handler.EnqueueRequestsFromMapFunc(r.filterOTelResources)).
 		Watches(&source.Kind{Type: &corev1.Secret{}},

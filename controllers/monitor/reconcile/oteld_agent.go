@@ -22,15 +22,17 @@ package reconcile
 import (
 	"reflect"
 
-	"github.com/apecloud/kubeblocks/controllers/monitor/types"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	monitorv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/monitor/types"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 )
 
 const OTeldAgentName = "oteld-agent"
@@ -41,7 +43,9 @@ func OTeldAgent(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 		namespace = viper.GetString(constant.MonitorNamespaceEnvName)
 	)
 
-	oteldDaemonset := buildDaemonsetForOteld(reqCtx.Config, namespace, OTeldName)
+	instance := reqCtx.GetOteldInstance(monitorv1alpha1.ModeDaemonSet)
+
+	oteldDaemonset := buildDaemonsetForOteld(reqCtx.Config, instance, namespace, OTeldName)
 
 	existingDaemonset := &appsv1.DaemonSet{}
 	err := k8sClient.Get(reqCtx.Ctx, client.ObjectKey{Name: OTeldName, Namespace: namespace}, existingDaemonset)
@@ -51,7 +55,14 @@ func OTeldAgent(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 			params.Recorder.Eventf(existingDaemonset, corev1.EventTypeWarning, "Failed to find secret", err.Error())
 			return err
 		}
+		if existingDaemonset == nil {
+			return nil
+		}
 		return k8sClient.Create(reqCtx.Ctx, oteldDaemonset)
+	}
+
+	if existingDaemonset == nil {
+		return k8sClient.Delete(reqCtx.Ctx, existingDaemonset)
 	}
 
 	if reflect.DeepEqual(existingDaemonset.Spec, oteldDaemonset.Spec) {
@@ -66,7 +77,11 @@ func OTeldAgent(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 	return k8sClient.Update(reqCtx.Ctx, oteldDaemonset)
 }
 
-func buildDaemonsetForOteld(config *types.Config, namespace string, name string) *appsv1.DaemonSet {
+func buildDaemonsetForOteld(config *types.Config, instance *types.OteldInstance, namespace string, name string) *appsv1.DaemonSet {
+	if instance == nil || instance.OteldTemplate == nil {
+		return nil
+	}
+
 	commonLabels := map[string]string{
 		constant.AppManagedByLabelKey: constant.AppName,
 		constant.AppNameLabelKey:      OTeldName,
@@ -78,7 +93,8 @@ func buildDaemonsetForOteld(config *types.Config, namespace string, name string)
 		MatchLabels: commonLabels,
 	}
 
-	podSpec := buildPodSpecForOteld(config)
+	template := instance.OteldTemplate
+	podSpec := buildPodSpecForOteld(config, template)
 
 	podBuilder := builder.NewPodBuilder("", "").
 		AddLabelsInMap(commonLabels)
@@ -93,5 +109,6 @@ func buildDaemonsetForOteld(config *types.Config, namespace string, name string)
 		AddLabelsInMap(commonLabels).
 		AddMatchLabelsInMap(commonLabels).
 		SetSelector(labelSelector).
+		SetOwnerReferences(template.APIVersion, template.Kind, template).
 		GetObject()
 }

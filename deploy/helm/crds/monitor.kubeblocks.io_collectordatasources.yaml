@@ -58,6 +58,15 @@ spec:
                 items:
                   type: string
                 type: array
+              mode:
+                description: Mode represents how the OTeld should be deployed (deployment,
+                  daemonset, statefulset or sidecar)
+                enum:
+                - daemonset
+                - deployment
+                - sidecar
+                - statefulset
+                type: string
               name:
                 description: Name is the name of the data source
                 type: string

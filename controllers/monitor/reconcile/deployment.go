@@ -19,11 +19,93 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package reconcile
 
-import "github.com/apecloud/kubeblocks/controllers/monitor/types"
+import (
+	monitorv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
+	monitortypes "github.com/apecloud/kubeblocks/controllers/monitor/types"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/spf13/viper"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
 
 const OTeldAPIServerName = "grafana"
 
-func Deployment(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
-	// TODO: implement me
-	return nil
+func Deployment(reqCtx monitortypes.ReconcileCtx, params monitortypes.OTeldParams) error {
+	var (
+		k8sClient = params.Client
+		namespace = viper.GetString(constant.MonitorNamespaceEnvName)
+	)
+
+	instance := reqCtx.GetOteldInstance(monitorv1alpha1.ModeDaemonSet)
+
+	oteldDaemonset := buildDeploymentForOteld(reqCtx.Config, instance, namespace, OTeldName)
+
+	existingDeployment := &appsv1.Deployment{}
+	err := k8sClient.Get(reqCtx.Ctx, client.ObjectKey{Name: OTeldName, Namespace: namespace}, existingDeployment)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			reqCtx.Log.Error(err, "Failed to find daemonset", "daemonset", existingDeployment.Name)
+			params.Recorder.Eventf(existingDeployment, corev1.EventTypeWarning, "Failed to find secret", err.Error())
+			return err
+		}
+		if existingDeployment == nil {
+			return nil
+		}
+		return k8sClient.Create(reqCtx.Ctx, oteldDaemonset)
+	}
+
+	if oteldDaemonset == nil {
+		return k8sClient.Delete(reqCtx.Ctx, existingDeployment)
+	}
+
+	if reflect.DeepEqual(existingDeployment.Spec, oteldDaemonset.Spec) {
+		return nil
+	}
+
+	updatedDeployment := existingDeployment.DeepCopy()
+	updatedDeployment.Spec = oteldDaemonset.Spec
+	updatedDeployment.Labels = oteldDaemonset.Labels
+	updatedDeployment.Annotations = oteldDaemonset.Annotations
+	reqCtx.Log.Info("updating existing daemonset", "daemonset", client.ObjectKeyFromObject(updatedDeployment))
+	return k8sClient.Update(reqCtx.Ctx, oteldDaemonset)
+}
+
+func buildDeploymentForOteld(config *monitortypes.Config, instance *monitortypes.OteldInstance, namespace, name string) *appsv1.Deployment {
+	if instance == nil || instance.OteldTemplate == nil {
+		return nil
+	}
+
+	commonLabels := map[string]string{
+		constant.AppManagedByLabelKey: constant.AppName,
+		constant.AppNameLabelKey:      OTeldName,
+		constant.AppInstanceLabelKey:  name,
+		constant.MonitorManagedByKey:  "agamotto",
+	}
+
+	labelSelector := &metav1.LabelSelector{
+		MatchLabels: commonLabels,
+	}
+
+	template := instance.OteldTemplate
+	podSpec := buildPodSpecForOteld(config, template)
+
+	podBuilder := builder.NewPodBuilder("", "").
+		AddLabelsInMap(commonLabels)
+	podTemplate := corev1.PodTemplateSpec{
+		ObjectMeta: podBuilder.GetObject().ObjectMeta,
+		Spec:       *podSpec,
+	}
+
+	return builder.NewDeploymentBuilder(namespace, name).
+		SetTemplate(podTemplate).
+		AddLabelsInMap(commonLabels).
+		AddMatchLabelsInMap(commonLabels).
+		SetSelector(labelSelector).
+		SetOwnerReferences(template.APIVersion, template.Kind, template).
+		GetObject()
 }

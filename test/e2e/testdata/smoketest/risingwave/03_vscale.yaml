@@ -11,18 +11,18 @@ spec:
         cpu: "600m"
         memory: 600Mi
     - componentName: meta
-        requests:
-          cpu: "600m"
-          memory: 600Mi
+      requests:
+        cpu: "600m"
+        memory: 600Mi
     - componentName: compute
-        requests:
-          cpu: "600m"
-          memory: 600Mi
+      requests:
+        cpu: "600m"
+        memory: 600Mi
     - componentName: compactor
-        requests:
-          cpu: "600m"
-          memory: 600Mi
+      requests:
+        cpu: "600m"
+        memory: 600Mi
     - componentName: connector
-        requests:
-          cpu: "600m"
-          memory: 600Mi
+      requests:
+        cpu: "600m"
+        memory: 600Mi

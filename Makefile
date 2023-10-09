@@ -669,6 +669,17 @@ else ifeq ($(TEST_TYPE), weaviate)
 	$(HELM) dependency build deploy/weaviate-cluster --skip-refresh
 	$(HELM) upgrade --install weaviate deploy/weaviate
 	$(HELM) template weaviate-cluster deploy/weaviate-cluster > test/e2e/testdata/smoketest/weaviate/00_weaviatecluster.yaml
+else ifeq ($(TEST_TYPE), mysql-80)
+	$(HELM) dependency build deploy/mysql-cluster --skip-refresh
+	$(HELM) upgrade --install mysql deploy/mysql
+	$(HELM) template mysqlcluster deploy/mysql-cluster > test/e2e/testdata/smoketest/mysql-80/00_mysqlcluster.yaml
+else ifeq ($(TEST_TYPE), mysql-57)
+	$(HELM) dependency build deploy/mysql-cluster --skip-refresh
+	$(HELM) upgrade --install mysql deploy/mysql
+else ifeq ($(TEST_TYPE), polardbx)
+	$(HELM) dependency build deploy/polardbx-cluster --skip-refresh
+	$(HELM) upgrade --install polardbx deploy/polardbx
+	$(HELM) template pxc deploy/polardbx-cluster > test/e2e/testdata/smoketest/polardbx/00_polardbxcluster.yaml
 else
 	$(error "test type does not exist")
 endif
@@ -714,6 +725,12 @@ else ifeq ($(TEST_TYPE), openldap)
 	$(HELM) upgrade --install openldap deploy/openldap
 else ifeq ($(TEST_TYPE), weaviate)
 	$(HELM) upgrade --install weaviate deploy/weaviate
+else ifeq ($(TEST_TYPE), mysql-80)
+	$(HELM) upgrade --install mysql deploy/mysql
+else ifeq ($(TEST_TYPE), mysql-57)
+	$(HELM) upgrade --install mysql deploy/mysql
+else ifeq ($(TEST_TYPE), polardbx)
+	$(HELM) upgrade --install polardbx deploy/polardbx
 else
 	$(error "test type does not exist")
 endif

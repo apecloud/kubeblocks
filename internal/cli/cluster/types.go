@@ -39,8 +39,9 @@ type ClusterObjects struct {
 	ConfigMaps *corev1.ConfigMapList
 	Events     *corev1.EventList
 
-	BackupPolicies []dpv1alpha1.BackupPolicy
-	Backups        []dpv1alpha1.Backup
+	BackupPolicies  []dpv1alpha1.BackupPolicy
+	BackupSchedules []dpv1alpha1.BackupSchedule
+	Backups         []dpv1alpha1.Backup
 }
 
 type ClusterInfo struct {

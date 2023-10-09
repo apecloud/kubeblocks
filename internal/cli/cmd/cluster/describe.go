@@ -21,6 +21,7 @@ package cluster
 
 import (
 	"fmt"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	"io"
 	"strings"
 
@@ -39,7 +40,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
 
 var (
@@ -160,7 +160,7 @@ func (o *describeOptions) describeCluster(name string) error {
 	showImages(comps, o.Out)
 
 	// data protection info
-	showDataProtection(o.BackupPolicies, o.Backups, o.Out)
+	showDataProtection(o.BackupPolicies, o.BackupSchedules, o.Out)
 
 	// events
 	showEvents(o.Cluster.Name, o.Cluster.Namespace, o.Out)
@@ -225,11 +225,11 @@ func showEndpoints(c *appsv1alpha1.Cluster, svcList *corev1.ServiceList, out io.
 	tbl.Print()
 }
 
-func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backups []dpv1alpha1.Backup, out io.Writer) {
-	if len(backupPolicies) == 0 {
+func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backupSchedules []dpv1alpha1.BackupSchedule, out io.Writer) {
+	if len(backupPolicies) == 0 || len(backupSchedules) == 0 {
 		return
 	}
-	tbl := newTbl(out, "\nData Protection:", "BACKUP-REPO", "PATH-PREFIX", "BACKOFF-LIMIT", "BACKUP-METHODS")
+	tbl := newTbl(out, "\nData Protection:", "BACKUP-REPO", "AUTO-BACKUP", "BACKUP-SCHEDULE", "BACKUP-METHOD", "BACKUP-RETENTION")
 	for _, policy := range backupPolicies {
 		if policy.Annotations[dptypes.DefaultBackupPolicyAnnotationKey] != "true" {
 			continue
@@ -237,11 +237,30 @@ func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backups []dpv1
 		if policy.Status.Phase != dpv1alpha1.AvailablePhase {
 			continue
 		}
-		var methods []string
-		for _, m := range policy.Spec.BackupMethods {
-			methods = append(methods, m.Name)
+		backupRepo := printer.NoneString
+		backupMethod := printer.NoneString
+		backupSchedule := printer.NoneString
+		backupRetention := printer.NoneString
+		scheduleEnable := "Disabled"
+		for _, schedule := range backupSchedules {
+			if schedule.Spec.BackupPolicyName == policy.Name {
+				for _, shcedulePolicy := range schedule.Spec.Schedules {
+					if shcedulePolicy.Enabled != nil && *shcedulePolicy.Enabled {
+						scheduleEnable = "Enabled"
+						backupMethod = shcedulePolicy.BackupMethod
+						backupSchedule = shcedulePolicy.CronExpression
+						backupRetention = shcedulePolicy.RetentionPeriod.String()
+						break
+					}
+				}
+				break
+			}
 		}
-		tbl.AddRow(policy.Spec.BackupRepoName, policy.Spec.PathPrefix, policy.Spec.BackoffLimit, strings.Join(methods, ","))
+		if policy.Spec.BackupRepoName != nil {
+			backupRepo = *policy.Spec.BackupRepoName
+		}
+
+		tbl.AddRow(backupRepo, scheduleEnable, backupSchedule, backupMethod, backupRetention)
 	}
 	tbl.Print()
 }

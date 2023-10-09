@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: pulsar-cluster-vscale-out-
+spec:
+  clusterRef: pulsar-cluster
+  type: VerticalScaling
+  verticalScaling:
+    - componentName: bookies
+      requests:
+        memory: "1Gi"
+        cpu: 1

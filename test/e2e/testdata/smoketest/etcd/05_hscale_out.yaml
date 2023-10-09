@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: etcd-cluster-hscale-out-
+spec:
+  clusterRef: etcd-cluster
+  type: HorizontalScaling
+  horizontalScaling:
+    - componentName: etcd
+      replicas: 4

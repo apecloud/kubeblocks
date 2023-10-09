@@ -17,32 +17,40 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package reconcile
+package builder
 
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/apecloud/kubeblocks/controllers/monitor/types"
+	yamlv2 "gopkg.in/yaml.v2"
 )
 
 var _ = Describe("monitor_controller", func() {
-	var (
-		config   *types.Config
-		instance *types.OteldInstance
-	)
 
-	BeforeEach(func() {
-		config = &types.Config{}
-		instance = &types.OteldInstance{}
+	It("should generate config correctly from config yaml", func() {
+		Eventually(func(g Gomega) {
+			valMap := map[string]any{
+				"transport": "http",
+				//"meta.allow_native_password": false,
+				//"meta.endpoint":              "http://",
+				"password": "labels[\"pass\"]",
+			}
+			tplName := "test.cue"
+			bytes, err := BuildFromCUEForOTel(tplName, valMap, "output")
+
+			Expect(err).ShouldNot(HaveOccurred())
+			slice := yamlv2.MapSlice{}
+			err = yamlv2.Unmarshal(bytes, &slice)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(bytes).ShouldNot(BeNil())
+
+		}).Should(Succeed())
 	})
 
 	It("should generate config correctly from config yaml", func() {
 		Eventually(func(g Gomega) {
-			otel := buildDaemonsetForOteld(config, instance, "test", "test")
-			g.Expect(otel).ShouldNot(BeNil())
-			g.Expect(otel.Name).Should(Equal("test"))
+
 		}).Should(Succeed())
 	})
-
 })

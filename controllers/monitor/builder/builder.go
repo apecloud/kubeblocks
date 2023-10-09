@@ -20,37 +20,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
+	"cuelang.org/go/cue"
 	"embed"
-
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/leaanthony/debme"
-
-	"github.com/apecloud/kubeblocks/internal/gotemplate"
+	"gopkg.in/yaml.v2"
 )
 
 var (
-	//go:embed template/*
-	cueTemplate embed.FS
+	//go:embed cue/*
+	cueTemplates embed.FS
+	cacheCtx     = map[string]interface{}{}
 )
 
-func newBuildTemplate(templateName string) (string, error) {
-	tmplFs, _ := debme.FS(cueTemplate, "template")
-	if tmlBytes, err := tmplFs.ReadFile(templateName); err != nil {
-		return "", err
-	} else {
-		return string(tmlBytes), nil
+func getCacheCUETplValue(key string, valueCreator func() (*intctrlutil.CUETpl, error)) (*intctrlutil.CUETpl, error) {
+	vIf, ok := cacheCtx[key]
+	if ok {
+		return vIf.(*intctrlutil.CUETpl), nil
 	}
+	v, err := valueCreator()
+	if err != nil {
+		return nil, err
+	}
+	cacheCtx[key] = v
+	return v, err
 }
 
-func BuildFromTemplate(values *gotemplate.TplValues, templateName string) (string, error) {
-	tpl, err := newBuildTemplate(templateName)
+func BuildFromCUEForOTel(tplName string, fillMap map[string]any, lookupKey string) ([]byte, error) {
+	cueFS, _ := debme.FS(cueTemplates, "cue")
+	cueTpl, err := getCacheCUETplValue(tplName, func() (*intctrlutil.CUETpl, error) {
+		return intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplName))
+	})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	engine := gotemplate.NewTplEngine(values, nil, templateName, nil, nil)
-	rendered, err := engine.Render(tpl)
-	if err != nil {
-		return "", err
+	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+
+	for k, v := range fillMap {
+		if err := cueValue.FillObjWithRelativePath("parameters", k, v); err != nil {
+			return nil, err
+		}
 	}
-	return rendered, nil
+
+	value := cueValue.Value.LookupPath(cue.ParsePath(lookupKey))
+	bytes, err := value.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	var jsonObj interface{}
+	if err := yaml.Unmarshal(bytes, &jsonObj); err != nil {
+		return nil, err
+	}
+	yamlBytes, err := yaml.Marshal(jsonObj)
+	if err != nil {
+		return nil, err
+	}
+	return yamlBytes, nil
+}
+
+func MergeValMapFromYamlStr(defaultMap map[string]any, yamlStr string) {
+	if defaultMap == nil {
+		defaultMap = map[string]any{}
+	}
+	valMap := map[string]any{}
+	yaml.Unmarshal([]byte(yamlStr), &valMap)
+	for k, v := range valMap {
+		defaultMap[k] = v
+	}
+	return
 }

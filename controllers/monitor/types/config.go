@@ -20,10 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package types
 
 import (
-	corev1 "k8s.io/api/core/v1"
-
-	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
-
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 )
 
@@ -51,75 +47,12 @@ const (
 	AuthTypeTLS AuthType = "tls"
 )
 
-type KubeletStateConfig struct {
-	Enabled bool `json:"enabled"`
-	// MetricGroups are the groups of metrics to collect
-	MetricGroups []string `json:"metricGroups"`
-}
-
-type K8sNodeConfig struct {
-	Enabled bool `json:"enabled"`
-}
-
-type K8sClusterConfig struct {
-	Enabled bool `json:"enabled"`
-}
-
-type MetricsDatasource struct {
-
-	// KubeletStateConfig is the configuration to scrape metrics from Kubelet
-	KubeletStateConfig *KubeletStateConfig `json:"kubeletState"`
-
-	// K8sNodeConfig is the configuration to scrape metrics from K8s node
-	K8sNodeConfig *K8sNodeConfig `json:"k8sNode"`
-
-	// K8sClusterConfig is the configuration to scrape metrics from K8s cluster
-	K8sClusterConfig *K8sClusterConfig `json:"k8sCluster"`
-
-	// CollectionInterval is the metrics collection interval
-	CollectionInterval *string `json:"collectionInterval"`
-
-	// ExporterRef is the exporters to export metrics
-	v1alpha1.ExporterRef `json:",inline"`
-}
-
-type PodsLogsConfig struct{}
-
-type LogsDatasource struct {
-
-	// PodsLogsConfig is the configuration to scrape logs from pods
-	PodsLogsConfig *PodsLogsConfig `json:"podsLogs"`
-
-	// ExporterRef is the exporters to export logs
-	v1alpha1.ExporterRef `json:",inline"`
-}
-
-type Datasource struct {
-	// MetricsDatasource defines the metrics to be scraped
-	MetricsDatasource *MetricsDatasource `json:"metrics"`
-
-	// LogsDatasource defines the logs to be scraped
-	LogDatasource *LogsDatasource `json:"logs"`
-}
-
 type Config struct {
 	// APIConfig is the authentication method used to connect to Kubelet
 	APIConfig `json:",inline"`
 
 	// CollectionInterval is the metrics collection interval
 	CollectionInterval string `json:"collectionInterval"`
-
-	// Datasource is the metrics and logs to be scraped
-	Datasource Datasource `json:"datasource"`
-
-	// Image is the image of the oteld
-	Image string `json:"image,omitempty"`
-
-	// Resources is the resource requirements for the oteld
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
-
-	// UseConfigMap indicates whether to use configmap to store oteld config
-	UseConfigMap bool `json:"useConfigMap"`
 }
 
 func LoadConfig(configFile string) (*Config, error) {

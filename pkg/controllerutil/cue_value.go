@@ -21,6 +21,7 @@ package controllerutil
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 
 	"cuelang.org/go/cue"
@@ -81,6 +82,10 @@ func (v *CUEBuilder) Fill(path string, jsonByte []byte) error {
 	cueValue := v.cueTplValue.Ctx.BuildExpr(expr)
 	v.Value = v.Value.FillPath(cue.ParsePath(path), cueValue)
 	return nil
+}
+
+func (v *CUEBuilder) FillObjWithRelativePath(relativePath string, path string, obj any) error {
+	return v.FillObj(fmt.Sprintf("%s.%s", relativePath, path), obj)
 }
 
 func (v *CUEBuilder) Lookup(path string) ([]byte, error) {

@@ -43,7 +43,7 @@ type DataSource struct {
 	Name string `json:"name"`
 
 	// Parameter is the parameter of the data source
-	Parameter *string `json:"parameter,omitempty"`
+	Parameter string `json:"parameter,omitempty"`
 }
 
 // CollectorDataSourceSpec defines the desired state of CollectorDataSource
@@ -51,9 +51,9 @@ type CollectorDataSourceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Name is the name of the data source
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
+	// Mode represents how the OTeld should be deployed (deployment, daemonset, statefulset or sidecar)
+	// +optional
+	Mode Mode `json:"mode,omitempty"`
 
 	// ExporterRef is the exporters to export data source
 	// +kubebuilder:validation:Required

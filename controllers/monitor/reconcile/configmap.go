@@ -20,40 +20,120 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package reconcile
 
 import (
-	"github.com/spf13/viper"
+	"fmt"
+	monitorv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/monitor/types"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/apecloud/kubeblocks/controllers/monitor/types"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 )
 
-const OteldConfigMapName = "oteld-configmap"
-
 func ConfigMap(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
-	k8sClient := params.Client
-	configData, err := reqCtx.GetOteldConfigYaml()
-	if err != nil {
+	desired := []*corev1.ConfigMap{}
+
+	if reqCtx.GetOteldInstance(monitorv1alpha1.ModeDaemonSet) != nil {
+		configmap, _ := buildConfigMapForOteld(reqCtx.Config, reqCtx.GetOteldInstance(monitorv1alpha1.ModeDaemonSet), reqCtx.Namespace, reqCtx.GetExporters(), params.ConfigGenerator)
+		if configmap != nil {
+			desired = append(desired, configmap)
+		}
+	}
+
+	if reqCtx.GetOteldInstance(monitorv1alpha1.ModeDeployment) != nil {
+		configmap, _ := buildConfigMapForOteld(reqCtx.Config, reqCtx.GetOteldInstance(monitorv1alpha1.ModeDeployment), reqCtx.Namespace, reqCtx.GetExporters(), nil)
+		if configmap != nil {
+			desired = append(desired, configmap)
+		}
+	}
+
+	if err := expectedConfigMap(reqCtx, params, desired); err != nil {
 		return err
 	}
 
-	name := OteldConfigMapName
-	namespace := viper.GetString(constant.MonitorNamespaceEnvName)
-	exitingConfigMap := &corev1.ConfigMap{}
-	err = k8sClient.Get(reqCtx.Ctx, client.ObjectKey{Name: name, Namespace: namespace}, exitingConfigMap)
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return err
-		}
-		configmap := builder.NewConfigMapBuilder(namespace, name).
-			SetData(map[string]string{"config.yaml": string(configData)}).
-			GetObject()
-		return k8sClient.Create(reqCtx.Ctx, configmap)
+	if err := deleteConfigMap(reqCtx, params, desired); err != nil {
+		return err
 	}
 
-	updatedConfigmap := exitingConfigMap.DeepCopy()
-	updatedConfigmap.Data["config.yaml"] = string(configData)
-	return k8sClient.Update(reqCtx.Ctx, updatedConfigmap)
+	return nil
+}
+
+func expectedConfigMap(reqCtx types.ReconcileCtx, params types.OTeldParams, desired []*corev1.ConfigMap) error {
+	for _, configmap := range desired {
+		desired := configmap
+
+		existing := &corev1.ConfigMap{}
+		getErr := params.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: desired.Name, Namespace: desired.Namespace}, existing)
+		if getErr != nil && apierrors.IsNotFound(getErr) {
+			if createErr := params.Client.Create(reqCtx.Ctx, desired); createErr != nil {
+				if apierrors.IsAlreadyExists(createErr) {
+					return nil
+				}
+				return fmt.Errorf("failed to create: %w", createErr)
+			}
+			reqCtx.Log.V(2).Info("created", "configmap.name", desired.Name, "configmap.namespace", desired.Namespace)
+			continue
+		} else if getErr != nil {
+			return getErr
+		}
+
+		updated := existing.DeepCopy()
+		if updated.Annotations == nil {
+			updated.Annotations = map[string]string{}
+		}
+		if updated.Labels == nil {
+			updated.Labels = map[string]string{}
+		}
+
+		updated.Data = desired.Data
+		updated.BinaryData = desired.BinaryData
+		updated.ObjectMeta.OwnerReferences = desired.ObjectMeta.OwnerReferences
+
+		for k, v := range desired.ObjectMeta.Annotations {
+			updated.ObjectMeta.Annotations[k] = v
+		}
+		for k, v := range desired.ObjectMeta.Labels {
+			updated.ObjectMeta.Labels[k] = v
+		}
+
+		patch := client.MergeFrom(existing)
+
+		if err := params.Client.Patch(reqCtx.Ctx, updated, patch); err != nil {
+			return fmt.Errorf("failed to apply changes: %w", err)
+		}
+
+		reqCtx.Log.V(2).Info("applied", "configmap.name", desired.Name, "configmap.namespace", desired.Namespace)
+	}
+	return nil
+}
+
+func deleteConfigMap(reqCtx types.ReconcileCtx, params types.OTeldParams, desired []*corev1.ConfigMap) error {
+	listopts := []client.ListOption{
+		client.InNamespace(reqCtx.Namespace),
+		client.MatchingLabels(map[string]string{
+			constant.AppManagedByLabelKey: constant.AppName,
+			constant.AppNameLabelKey:      OTeldName,
+		}),
+	}
+
+	configMapList := &corev1.ConfigMapList{}
+	if params.Client.List(reqCtx.Ctx, configMapList, listopts...) != nil {
+		return nil
+	}
+
+	for _, configMap := range configMapList.Items {
+		isdel := true
+		for _, keep := range desired {
+			if keep.Name == configMap.Name && keep.Namespace == configMap.Namespace {
+				isdel = false
+				break
+			}
+		}
+
+		if isdel {
+			if err := params.Client.Delete(reqCtx.Ctx, &configMap); err != nil {
+				return fmt.Errorf("failed to delete: %w", err)
+			}
+		}
+	}
+	return nil
 }

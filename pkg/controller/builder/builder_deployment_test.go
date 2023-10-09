@@ -17,16 +17,4 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package reconcile_test
-
-import (
-	"testing"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-)
-
-func TestReconcile(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Reconcile Suite")
-}
+package builder

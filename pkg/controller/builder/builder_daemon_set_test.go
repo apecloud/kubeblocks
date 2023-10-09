@@ -18,16 +18,3 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package builder
-
-const (
-	MysqlReceiverTemplate = "mysql-receiver.yaml"
-	PG12ReceiverTemplate  = "postgresql12-receiver.yaml"
-	PG14ReceiverTemplate  = "postgresql14-receiver.yaml"
-	RedisReceiverTemplate = "redis-receiver.yaml"
-	MongoReceiverTemplate = "mongodb-receiver.yaml"
-)
-
-const (
-	PGCDName    = "postgresql"
-	MysqlCDName = "apecloud-mysql"
-)

@@ -22,10 +22,12 @@ package utils
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -58,10 +60,13 @@ func AddTolerations(podSpec *corev1.PodSpec) (err error) {
 
 func IsJobFinished(job *batchv1.Job) (bool, batchv1.JobConditionType, string) {
 	for _, c := range job.Status.Conditions {
-		if c.Type == batchv1.JobComplete && c.Status == corev1.ConditionTrue {
+		if c.Status != corev1.ConditionTrue {
+			continue
+		}
+		if c.Type == batchv1.JobComplete {
 			return true, c.Type, ""
 		}
-		if c.Type == batchv1.JobFailed && c.Status == corev1.ConditionTrue {
+		if c.Type == batchv1.JobFailed {
 			return true, c.Type, c.Reason + "/" + c.Message
 		}
 	}
@@ -132,4 +137,11 @@ func MergeEnv(originalEnv, targetEnv []corev1.EnvVar) []corev1.EnvVar {
 
 func VolumeSnapshotEnabled() bool {
 	return viper.GetBool("VOLUMESNAPSHOT")
+}
+
+func SetControllerReference(owner, controlled metav1.Object, scheme *runtime.Scheme) error {
+	if owner == nil || reflect.ValueOf(owner).IsNil() {
+		return nil
+	}
+	return controllerutil.SetControllerReference(owner, controlled, scheme)
 }

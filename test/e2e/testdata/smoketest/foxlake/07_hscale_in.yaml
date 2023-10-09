@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: foxlake-cluster-hscale-in-
+spec:
+  clusterRef: foxlake-cluster
+  type: HorizontalScaling
+  horizontalScaling:
+    - componentName: foxlake-server
+      replicas: 1
+    - componentName: foxlake-metadb
+      replicas: 1

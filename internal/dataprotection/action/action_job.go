@@ -113,7 +113,7 @@ func (j *JobAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
 	}
 
 	controllerutil.AddFinalizer(job, types.DataProtectionFinalizerName)
-	if err = setControllerReference(j.Owner, job, ctx.Scheme); err != nil {
+	if err = utils.SetControllerReference(j.Owner, job, ctx.Scheme); err != nil {
 		return handleErr(err)
 	}
 	msg := fmt.Sprintf("creating job %s/%s", job.Namespace, job.Name)

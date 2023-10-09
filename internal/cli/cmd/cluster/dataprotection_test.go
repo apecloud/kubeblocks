@@ -392,6 +392,29 @@ var _ = Describe("DataProtection", func() {
 		o.client = testing.FakeClientSet()
 		Expect(o.Run()).Should(Succeed())
 	})
+
+	It("describe-backup-policy", func() {
+		cmd := NewDescribeBackupPolicyCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+		By("test describe-backup-policy cmd with no backup policy")
+		tf.FakeDynamicClient = testing.FakeDynamicClient()
+		o := describeBackupPolicyOptions{
+			Factory:   tf,
+			IOStreams: streams,
+		}
+		args := []string{}
+		Expect(o.Complete(args)).Should(HaveOccurred())
+
+		By("test describe-backup-policy")
+		policyName := "test1"
+		policy1 := testing.FakeBackupPolicy(policyName, testing.ClusterName)
+		args = append(args, policyName)
+		tf.FakeDynamicClient = testing.FakeDynamicClient(policy1)
+		Expect(o.Complete(args)).Should(Succeed())
+		o.client = testing.FakeClientSet()
+		Expect(o.Run()).Should(Succeed())
+	})
+
 })
 
 func mockBackupInfo(dynamic dynamic.Interface, backupName, clusterName string, timeRange map[string]any, backupMethod string) {

@@ -183,7 +183,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&RestoreTransformer{Client: r.Client},
 			// create all components objects
 			&ComponentTransformer{Client: r.Client},
-			// transform backupPolicy tpl to backuppolicy.dataprotection.kubeblocks.io
+			// transform backupPolicyTemplate to backuppolicy.dataprotection.kubeblocks.io
+			// and backupschedule.dataprotection.kubeblocks.io
 			&BackupPolicyTplTransformer{},
 			// handle rbac for pod
 			&RBACTransformer{},

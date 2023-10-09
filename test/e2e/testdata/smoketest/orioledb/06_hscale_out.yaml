@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: orioledb-cluster-hscale-out-
+spec:
+  clusterRef: orioledb-cluster
+  type: HorizontalScaling
+  horizontalScaling:
+    - componentName: orioledb
+      replicas: 3

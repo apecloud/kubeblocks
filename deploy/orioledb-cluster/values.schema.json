@@ -3,14 +3,10 @@
   "type": "object",
   "properties": {
     "version": {
-      "title": "Version",
-      "description": "Cluster version.",
       "type": "string",
       "default": "orioledb-beta1"
     },
     "mode": {
-      "title": "Mode",
-      "description": "Cluster topology mode.",
       "type": "string",
       "default": "standalone",
       "enum": [
@@ -19,8 +15,6 @@
       ]
     },
     "replicas": {
-      "title": "Replicas",
-      "description": "The number of replicas, for standalone mode, the replicas is 1, for replication mode, the default replicas is 2.",
       "type": "integer",
       "default": 1,
       "minimum": 1,
@@ -59,6 +53,22 @@
       "default": 20,
       "minimum": 1,
       "maximum": 10000
+    },
+    "etcd": {
+      "type": "object",
+      "title": "The patroni dependency etcd Schema",
+      "properties": {
+        "cluster": {
+          "type": "string",
+          "default": "etcd",
+          "description": "The patroni dependency etcd cluster name"
+        },
+        "namespace": {
+          "type": "string",
+          "default": "default",
+          "description": "The patroni dependency etcd cluster namespace"
+        }
+      }
     }
   }
 }

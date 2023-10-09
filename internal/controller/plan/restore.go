@@ -168,7 +168,7 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: r.GetRestoreObjectMeta(comp, dpv1alpha1.PrepareData),
 		Spec: dpv1alpha1.RestoreSpec{
-			Backup: dpv1alpha1.BackupConfig{
+			Backup: dpv1alpha1.BackupRef{
 				Name:      backupObj.Name,
 				Namespace: r.namespace,
 			},
@@ -202,7 +202,7 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent, backu
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: r.GetRestoreObjectMeta(comp, dpv1alpha1.PostReady),
 		Spec: dpv1alpha1.RestoreSpec{
-			Backup: dpv1alpha1.BackupConfig{
+			Backup: dpv1alpha1.BackupRef{
 				Name:      backupObj.Name,
 				Namespace: r.namespace,
 			},

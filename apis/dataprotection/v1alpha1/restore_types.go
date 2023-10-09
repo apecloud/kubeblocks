@@ -26,16 +26,16 @@ import (
 
 // RestoreSpec defines the desired state of Restore
 type RestoreSpec struct {
-	// backup name, the following behavior based on the backup type:
+	// backup to be restored. The restore behavior based on the backup type:
 	// 1. Full: will be restored the full backup directly.
 	// 2. Incremental: will be restored sequentially from the most recent full backup of this incremental backup.
 	// 3. Differential: will be restored sequentially from the parent backup of the differential backup.
-	// 4. Continuous: will find the most recent full backup at this time point and the input continuous backup to restore.
+	// 4. Continuous: will find the most recent full backup at this time point and the continuous backups after it to restore.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.backupName"
-	Backup BackupConfig `json:"backup"`
+	Backup BackupRef `json:"backup"`
 
-	// restore according to a specified point in time.
+	// restoreTime is the point in time for restoring.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.restoreTime"
 	// +optional
 	// +kubebuilder:validation:Pattern=`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$`
@@ -60,8 +60,9 @@ type RestoreSpec struct {
 	// +optional
 	ReadyConfig *ReadyConfig `json:"readyConfig,omitempty"`
 
-	// list of environment variables to set in the container for restore and will be merged with the env of Backup and ActionSet.
-	// the priority of merging is as follows: Restore env > Backup env > ActionSet env.
+	// list of environment variables to set in the container for restore and will be
+	// merged with the env of Backup and ActionSet.
+	// The priority of merging is as follows: Restore env > Backup env > ActionSet env.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
@@ -71,7 +72,8 @@ type RestoreSpec struct {
 	ContainerResources corev1.ResourceRequirements `json:"containerResources,omitempty"`
 }
 
-type BackupConfig struct {
+// BackupRef describes the backup name and namespace.
+type BackupRef struct {
 	// backup name
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
@@ -122,7 +124,8 @@ type PrepareDataConfig struct {
 	// +optional
 	RestoreVolumeClaimsTemplate *RestoreVolumeClaimsTemplate `json:"volumeClaimsTemplate,omitempty"`
 
-	// VolumeClaimManagementPolicy defines recovery strategy for persistent volume claim. supported policies are as follows:
+	// VolumeClaimManagementPolicy defines recovery strategy for persistent volume claim.
+	// Supported policies are as follows:
 	// 1. Parallel: parallel recovery of persistent volume claim.
 	// 2. Serial: restore the persistent volume claim in sequence, and wait until the previous persistent volume claim is restored before restoring a new one.
 	// +kubebuilder:default=Parallel
@@ -146,7 +149,7 @@ type ReadyConfig struct {
 
 	// credential template used for creating a connection credential
 	// +optional
-	ConnectCredential *ConnectCredential `json:"connectCredential,omitempty"`
+	ConnectionCredential *ConnectionCredential `json:"connectionCredential,omitempty"`
 
 	// periodic probe of the service readiness.
 	// controller will perform postReadyHooks of BackupScript.spec.restore after the service readiness when readinessProbe is configured.
@@ -262,31 +265,6 @@ type SchedulingSpec struct {
 	// If not specified, the pod will be dispatched by default scheduler.
 	// +optional
 	SchedulerName string `json:"schedulerName,omitempty"`
-}
-
-type ConnectCredential struct {
-	// the secret name
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	SecretName string `json:"secretName"`
-
-	// usernameKey the map key of the user in the connection credential secret
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=username
-	UsernameKey string `json:"usernameKey"`
-
-	// passwordKey the map key of the password in the connection credential secret
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=password
-	PasswordKey string `json:"passwordKey"`
-
-	// hostKey the map key of the host in the connection credential secret
-	// +kubebuilder:default=host
-	HostKey string `json:"hostKey,omitempty"`
-
-	// portKey the map key of the port in the connection credential secret
-	// +kubebuilder:default=port
-	PortKey string `json:"portKey,omitempty"`
 }
 
 type ReadinessProbe struct {
@@ -406,7 +384,7 @@ type RestoreStatus struct {
 // +kubebuilder:printcolumn:name="RESTORE-TIME",type="string",JSONPath=".spec.restoreTime",description="Point in time for restoring"
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="Restore Status."
 // +kubebuilder:printcolumn:name="DURATION",type=string,JSONPath=".status.duration"
-// +kubebuilder:printcolumn:name="CREATE-TIME",type=string,JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:printcolumn:name="CREATION-TIME",type=string,JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="COMPLETION-TIME",type=string,JSONPath=".status.completionTimestamp"
 
 // Restore is the Schema for the restores API
@@ -418,7 +396,7 @@ type Restore struct {
 	Status RestoreStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // RestoreList contains a list of Restore
 type RestoreList struct {
@@ -430,6 +408,7 @@ type RestoreList struct {
 func init() {
 	SchemeBuilder.Register(&Restore{}, &RestoreList{})
 }
+
 func (p *PrepareDataConfig) IsSerialPolicy() bool {
 	if p == nil {
 		return false

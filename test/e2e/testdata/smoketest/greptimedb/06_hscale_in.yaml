@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: greptimedb-cluster-hscale-in-
+spec:
+  clusterRef: greptimedb-cluster
+  type: HorizontalScaling
+  horizontalScaling:
+    - componentName: frontend
+      replicas: 3
+    - componentName: meta
+      replicas: 3

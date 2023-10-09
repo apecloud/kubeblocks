@@ -37,7 +37,8 @@ import (
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
 
-// BackupPolicyTplTransformer transforms the backup policy template to the backup policy.
+// BackupPolicyTplTransformer transforms the backup policy template to the data
+// protection backup policy and backup schedule.
 type BackupPolicyTplTransformer struct {
 	*ClusterTransformContext
 
@@ -121,7 +122,7 @@ func (r *BackupPolicyTplTransformer) Transform(ctx graph.TransformContext, dag *
 				}
 
 				// only create backup schedule for the default backup policy template
-				// if there are multiple backup policy templates.
+				// if there are more than one backup policy templates.
 				if r.isDefaultTemplate != trueVal && r.tplCount > 1 {
 					return
 				}

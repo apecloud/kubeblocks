@@ -36,7 +36,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/dataprotection/builder"
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
-	dputils "github.com/apecloud/kubeblocks/internal/dataprotection/utils"
+	"github.com/apecloud/kubeblocks/internal/dataprotection/utils"
 )
 
 // CreateVolumeSnapshotAction is an action that creates the volume snapshot.
@@ -100,7 +100,7 @@ func (c *CreateVolumeSnapshotAction) Execute(ctx Context) (*dpv1alpha1.ActionSta
 	for _, w := range c.PersistentVolumeClaimWrappers {
 		key := client.ObjectKey{
 			Namespace: w.PersistentVolumeClaim.Namespace,
-			Name:      dputils.GetBackupVolumeSnapshotName(c.ObjectMeta.Name, w.VolumeName),
+			Name:      utils.GetBackupVolumeSnapshotName(c.ObjectMeta.Name, w.VolumeName),
 		}
 		// create volume snapshot
 		if err = c.createVolumeSnapshotIfNotExist(ctx, vsCli, &w.PersistentVolumeClaim, key); err != nil {
@@ -183,7 +183,7 @@ func (c *CreateVolumeSnapshotAction) createVolumeSnapshotIfNotExist(ctx Context,
 	}
 
 	controllerutil.AddFinalizer(snap, dptypes.DataProtectionFinalizerName)
-	if err = setControllerReference(c.Owner, snap, ctx.Scheme); err != nil {
+	if err = utils.SetControllerReference(c.Owner, snap, ctx.Scheme); err != nil {
 		return err
 	}
 

@@ -61,6 +61,9 @@ type Deleter struct {
 	Scheme *runtime.Scheme
 }
 
+// DeleteBackupFiles builds a job to delete backup files, and returns the deletion status.
+// If the deletion job exists, it will check the job status and return the corresponding
+// deletion status.
 func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, error) {
 	jobKey := BuildDeleteBackupFilesJobKey(backup)
 	job := &batchv1.Job{}
@@ -109,10 +112,10 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 			"backupFilePath", backupFilePath, "backup", backup.Name)
 		return DeletionStatusSucceeded, nil
 	}
-	return DeletionStatusDeleting, d.createDeleteBackupFileJob(jobKey, backup, pvcName, backup.Status.Path)
+	return DeletionStatusDeleting, d.createDeleteBackupFilesJob(jobKey, backup, pvcName, backup.Status.Path)
 }
 
-func (d *Deleter) createDeleteBackupFileJob(
+func (d *Deleter) createDeleteBackupFilesJob(
 	jobKey types.NamespacedName,
 	backup *dpv1alpha1.Backup,
 	backupPVCName string,
@@ -197,7 +200,7 @@ func (d *Deleter) createDeleteBackupFileJob(
 			BackoffLimit: &dptypes.DefaultBackOffLimit,
 		},
 	}
-	if err := controllerutil.SetControllerReference(backup, job, d.Scheme); err != nil {
+	if err := utils.SetControllerReference(backup, job, d.Scheme); err != nil {
 		return err
 	}
 	d.Log.V(1).Info("create a job to delete backup files", "job", job)

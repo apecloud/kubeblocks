@@ -9,4 +9,4 @@ spec:
     - componentName: mysql
       volumeClaimTemplates:
         - name: data
-          storage: "20Gi"
+          storage: "21Gi"

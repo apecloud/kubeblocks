@@ -215,7 +215,7 @@ func buildConfigMapForOteld(_ *types.Config, instance *types.OteldInstance, name
 		constant.AppInstanceLabelKey:  name,
 	}
 
-	configData := gc.GenerateOteldConfiguration(instance, exporters.Metricsexporter, exporters.Logsexporter)
+	configData, _ := gc.GenerateOteldConfiguration(instance, exporters.Metricsexporter, exporters.Logsexporter)
 	marshal, err := yaml.Marshal(configData)
 	if err != nil {
 		return nil, err
@@ -241,7 +241,7 @@ func buildSecretForOteld(_ *types.Config, instance *types.OteldInstance, namespa
 		constant.AppInstanceLabelKey:  name,
 	}
 
-	configData := gc.GenerateOteldConfiguration(instance, exporters.Metricsexporter, exporters.Logsexporter)
+	configData, _ := gc.GenerateOteldConfiguration(instance, exporters.Metricsexporter, exporters.Logsexporter)
 	marshal, err := yaml.Marshal(configData)
 	if err != nil {
 		return nil, err

@@ -28,7 +28,7 @@ output: {
 		endpoint: parameters.endpoint
 		send_timestamps: parameters.send_timestamps
 		metric_expiration: parameters.metric_expiration
-		enable_open_metrics: prarameters.enable_open_metrics
+		enable_open_metrics: parameters.enable_open_metrics
 		resource_to_telemetry_conversion:
 			enabled: parameters.resource_to_telemetry_conversion_enabled
 	}

@@ -22,6 +22,10 @@ parameters: {
 
 output:
   apecloudnode: {
-  	collection_interval: parameters.collection_interval
+  	rule: "type == \"k8s.node\""
+  	config:
+  	  collection_interval: parameters.collection_interval
+  	resource_attributes:
+      receiver: "apecloudnode"
   }
 

@@ -64,6 +64,7 @@ func BuildFromCUEForOTel(tplName string, fillMap map[string]any, lookupKey strin
 	}
 
 	value := cueValue.Value.LookupPath(cue.ParsePath(lookupKey))
+
 	bytes, err := value.MarshalJSON()
 	if err != nil {
 		return nil, err

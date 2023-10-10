@@ -37,7 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/lorry/component/postgres"
 	"github.com/apecloud/kubeblocks/lorry/component/postgres/apecloudpostgres"
 	"github.com/apecloud/kubeblocks/lorry/component/postgres/officalpostgres"
-	. "github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
 // List of operations.
@@ -107,7 +107,7 @@ func (pgOps *PostgresOperations) Init(metadata Properties) error {
 	}
 
 	var manager postgres.PgIFace
-	if strings.EqualFold(pgOps.workloadType, Consensus) {
+	if strings.EqualFold(pgOps.workloadType, "Consensus") {
 		manager, err = apecloudpostgres.NewManager(pgOps.Logger)
 		if err != nil {
 			pgOps.Logger.Error(err, "ApeCloud PostgreSQL DB Manager initialize failed")
@@ -125,20 +125,20 @@ func (pgOps *PostgresOperations) Init(metadata Properties) error {
 	pgOps.manager = manager
 	pgOps.DBPort = config.GetDBPort()
 	pgOps.BaseOperations.GetRole = pgOps.GetRole
-	pgOps.RegisterOperation(GetRoleOperation, pgOps.GetRoleOps)
+	pgOps.RegisterOperation(util.GetRoleOperation, pgOps.GetRoleOps)
 	// pgOps.RegisterOperation(GetLagOperation, pgOps.GetLagOps)
-	pgOps.RegisterOperationOnDBReady(CheckStatusOperation, pgOps.CheckStatusOps, manager)
-	pgOps.RegisterOperationOnDBReady(ExecOperation, pgOps.ExecOps, manager)
-	pgOps.RegisterOperationOnDBReady(QueryOperation, pgOps.QueryOps, manager)
+	pgOps.RegisterOperationOnDBReady(util.CheckStatusOperation, pgOps.CheckStatusOps, manager)
+	pgOps.RegisterOperationOnDBReady(util.ExecOperation, pgOps.ExecOps, manager)
+	pgOps.RegisterOperationOnDBReady(util.QueryOperation, pgOps.QueryOps, manager)
 
 	// following are ops for account management
-	pgOps.RegisterOperationOnDBReady(ListUsersOp, pgOps.listUsersOps, manager)
-	pgOps.RegisterOperationOnDBReady(CreateUserOp, pgOps.createUserOps, manager)
-	pgOps.RegisterOperationOnDBReady(DeleteUserOp, pgOps.deleteUserOps, manager)
-	pgOps.RegisterOperationOnDBReady(DescribeUserOp, pgOps.describeUserOps, manager)
-	pgOps.RegisterOperationOnDBReady(GrantUserRoleOp, pgOps.grantUserRoleOps, manager)
-	pgOps.RegisterOperationOnDBReady(RevokeUserRoleOp, pgOps.revokeUserRoleOps, manager)
-	pgOps.RegisterOperationOnDBReady(ListSystemAccountsOp, pgOps.listSystemAccountsOps, manager)
+	pgOps.RegisterOperationOnDBReady(util.ListUsersOp, pgOps.listUsersOps, manager)
+	pgOps.RegisterOperationOnDBReady(util.CreateUserOp, pgOps.createUserOps, manager)
+	pgOps.RegisterOperationOnDBReady(util.DeleteUserOp, pgOps.deleteUserOps, manager)
+	pgOps.RegisterOperationOnDBReady(util.DescribeUserOp, pgOps.describeUserOps, manager)
+	pgOps.RegisterOperationOnDBReady(util.GrantUserRoleOp, pgOps.grantUserRoleOps, manager)
+	pgOps.RegisterOperationOnDBReady(util.RevokeUserRoleOp, pgOps.revokeUserRoleOps, manager)
+	pgOps.RegisterOperationOnDBReady(util.ListSystemAccountsOp, pgOps.listSystemAccountsOps, manager)
 	return nil
 }
 
@@ -154,17 +154,17 @@ func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *ProbeRequest,
 	result := OpsResult{}
 	sql, ok := req.Metadata["sql"]
 	if !ok || sql == "" {
-		result["event"] = OperationFailed
+		result["event"] = util.OperationFailed
 		result["message"] = "no sql provided"
 		return result, nil
 	}
 	count, err := pgOps.manager.Exec(ctx, sql)
 	if err != nil {
 		pgOps.Logger.Error(err, "exec error")
-		result["event"] = OperationFailed
+		result["event"] = util.OperationFailed
 		result["message"] = err.Error()
 	} else {
-		result["event"] = OperationSuccess
+		result["event"] = util.OperationSuccess
 		result["count"] = count
 	}
 	return result, nil
@@ -195,7 +195,7 @@ insert into kb_health_check values(%d, CURRENT_TIMESTAMP) on conflict(type) do u
 	result := OpsResult{}
 	if err != nil {
 		pgOps.Logger.Error(err, "CheckStatus error")
-		result["event"] = OperationFailed
+		result["event"] = util.OperationFailed
 		result["message"] = err.Error()
 		if pgOps.CheckStatusFailedCount%pgOps.FailedEventReportFrequency == 0 {
 			pgOps.Logger.Info("status checks failed continuously", "times", pgOps.CheckStatusFailedCount)
@@ -203,7 +203,7 @@ insert into kb_health_check values(%d, CURRENT_TIMESTAMP) on conflict(type) do u
 		}
 		pgOps.CheckStatusFailedCount++
 	} else {
-		result["event"] = OperationSuccess
+		result["event"] = util.OperationSuccess
 		result["message"] = string(data)
 		pgOps.CheckStatusFailedCount = 0
 	}
@@ -214,17 +214,17 @@ func (pgOps *PostgresOperations) QueryOps(ctx context.Context, req *ProbeRequest
 	result := OpsResult{}
 	sql, ok := req.Metadata["sql"]
 	if !ok || sql == "" {
-		result["event"] = OperationFailed
+		result["event"] = util.OperationFailed
 		result["message"] = "no sql provided"
 		return result, nil
 	}
 	data, err := pgOps.manager.Query(ctx, sql)
 	if err != nil {
 		pgOps.Logger.Error(err, "Query error")
-		result["event"] = OperationFailed
+		result["event"] = util.OperationFailed
 		result["message"] = err.Error()
 	} else {
-		result["event"] = OperationSuccess
+		result["event"] = util.OperationSuccess
 		result["message"] = string(data)
 	}
 	return result, nil
@@ -247,21 +247,21 @@ func (pgOps *PostgresOperations) GetLogger() logr.Logger {
 
 func (pgOps *PostgresOperations) createUserOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
-		object  = UserInfo{}
-		opsKind = CreateUserOp
+		object  = util.UserInfo{}
+		opsKind = util.CreateUserOp
 
-		sqlTplRend = func(user UserInfo) string {
+		sqlTplRend = func(user util.UserInfo) string {
 			return fmt.Sprintf(createUserTpl, user.UserName, user.Password)
 		}
-		msgTplRend = func(user UserInfo) string {
+		msgTplRend = func(user util.UserInfo) string {
 			return fmt.Sprintf("created user: %s, with password: %s", user.UserName, user.Password)
 		}
 	)
 
 	if err := ParseObjFromRequest(req, DefaultUserInfoParser, UserNameAndPasswdValidator, &object); err != nil {
 		result := OpsResult{}
-		result[RespTypEve] = RespEveFail
-		result[RespTypMsg] = err.Error()
+		result[util.RespTypEve] = util.RespEveFail
+		result[util.RespTypMsg] = err.Error()
 		return result, nil
 	}
 
@@ -270,20 +270,20 @@ func (pgOps *PostgresOperations) createUserOps(ctx context.Context, req *ProbeRe
 
 func (pgOps *PostgresOperations) deleteUserOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
-		object     = UserInfo{}
-		opsKind    = CreateUserOp
-		sqlTplRend = func(user UserInfo) string {
+		object     = util.UserInfo{}
+		opsKind    = util.CreateUserOp
+		sqlTplRend = func(user util.UserInfo) string {
 			return fmt.Sprintf(dropUserTpl, user.UserName)
 		}
-		msgTplRend = func(user UserInfo) string {
+		msgTplRend = func(user util.UserInfo) string {
 			return fmt.Sprintf("deleted user: %s", user.UserName)
 		}
 	)
 
 	if err := ParseObjFromRequest(req, DefaultUserInfoParser, UserNameValidator, &object); err != nil {
 		result := OpsResult{}
-		result[RespTypEve] = RespEveFail
-		result[RespTypMsg] = err.Error()
+		result[util.RespTypEve] = util.RespEveFail
+		result[util.RespTypMsg] = err.Error()
 		return result, nil
 	}
 	return ExecuteObject(ctx, pgOps, req, opsKind, sqlTplRend, msgTplRend, object)
@@ -293,23 +293,23 @@ func (pgOps *PostgresOperations) grantUserRoleOps(ctx context.Context, req *Prob
 	var (
 		succMsgTpl = "role %s granted to user: %s"
 	)
-	return pgOps.managePrivillege(ctx, req, GrantUserRoleOp, grantTpl, succMsgTpl)
+	return pgOps.managePrivillege(ctx, req, util.GrantUserRoleOp, grantTpl, succMsgTpl)
 }
 
 func (pgOps *PostgresOperations) revokeUserRoleOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
 		succMsgTpl = "role %s revoked from user: %s"
 	)
-	return pgOps.managePrivillege(ctx, req, RevokeUserRoleOp, revokeTpl, succMsgTpl)
+	return pgOps.managePrivillege(ctx, req, util.RevokeUserRoleOp, revokeTpl, succMsgTpl)
 }
 
-func (pgOps *PostgresOperations) managePrivillege(ctx context.Context, req *ProbeRequest, op OperationKind, sqlTpl string, succMsgTpl string) (OpsResult, error) {
+func (pgOps *PostgresOperations) managePrivillege(ctx context.Context, req *ProbeRequest, op util.OperationKind, sqlTpl string, succMsgTpl string) (OpsResult, error) {
 	var (
-		object = UserInfo{}
+		object = util.UserInfo{}
 
-		sqlTplRend = func(user UserInfo) string {
-			if SuperUserRole.EqualTo(user.RoleName) {
-				if op == GrantUserRoleOp {
+		sqlTplRend = func(user util.UserInfo) string {
+			if util.SuperUserRole.EqualTo(user.RoleName) {
+				if op == util.GrantUserRoleOp {
 					return "ALTER USER " + user.UserName + " WITH SUPERUSER;"
 				} else {
 					return "ALTER USER " + user.UserName + " WITH NOSUPERUSER;"
@@ -319,15 +319,15 @@ func (pgOps *PostgresOperations) managePrivillege(ctx context.Context, req *Prob
 			return fmt.Sprintf(sqlTpl, roleDesc, user.UserName)
 		}
 
-		msgTplRend = func(user UserInfo) string {
+		msgTplRend = func(user util.UserInfo) string {
 			return fmt.Sprintf(succMsgTpl, user.RoleName, user.UserName)
 		}
 	)
 
 	if err := ParseObjFromRequest(req, DefaultUserInfoParser, UserNameAndRoleValidator, &object); err != nil {
 		result := OpsResult{}
-		result[RespTypEve] = RespEveFail
-		result[RespTypMsg] = err.Error()
+		result[util.RespTypEve] = util.RespEveFail
+		result[util.RespTypMsg] = err.Error()
 		return result, nil
 	}
 
@@ -336,18 +336,18 @@ func (pgOps *PostgresOperations) managePrivillege(ctx context.Context, req *Prob
 
 func (pgOps *PostgresOperations) listUsersOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
-		opsKind    = ListUsersOp
-		sqlTplRend = func(user UserInfo) string {
+		opsKind    = util.ListUsersOp
+		sqlTplRend = func(user util.UserInfo) string {
 			return listUserTpl
 		}
 	)
-	return QueryObject(ctx, pgOps, req, opsKind, sqlTplRend, pgUserRolesProcessor, UserInfo{})
+	return QueryObject(ctx, pgOps, req, opsKind, sqlTplRend, pgUserRolesProcessor, util.UserInfo{})
 }
 
 func (pgOps *PostgresOperations) listSystemAccountsOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
-		opsKind    = ListUsersOp
-		sqlTplRend = func(user UserInfo) string {
+		opsKind    = util.ListUsersOp
+		sqlTplRend = func(user util.UserInfo) string {
 			return listSystemAccountsTpl
 		}
 	)
@@ -371,23 +371,23 @@ func (pgOps *PostgresOperations) listSystemAccountsOps(ctx context.Context, req 
 		}
 	}
 
-	return QueryObject(ctx, pgOps, req, opsKind, sqlTplRend, dataProcessor, UserInfo{})
+	return QueryObject(ctx, pgOps, req, opsKind, sqlTplRend, dataProcessor, util.UserInfo{})
 }
 
 func (pgOps *PostgresOperations) describeUserOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
-		object  = UserInfo{}
-		opsKind = DescribeUserOp
+		object  = util.UserInfo{}
+		opsKind = util.DescribeUserOp
 
-		sqlTplRend = func(user UserInfo) string {
+		sqlTplRend = func(user util.UserInfo) string {
 			return fmt.Sprintf(descUserTpl, user.UserName)
 		}
 	)
 
 	if err := ParseObjFromRequest(req, DefaultUserInfoParser, UserNameValidator, &object); err != nil {
 		result := OpsResult{}
-		result[RespTypEve] = RespEveFail
-		result[RespTypMsg] = err.Error()
+		result[util.RespTypEve] = util.RespEveFail
+		result[util.RespTypMsg] = err.Error()
 		return result, nil
 	}
 
@@ -409,9 +409,9 @@ func pgUserRolesProcessor(data interface{}) (interface{}, error) {
 		return nil, err
 	}
 	// parse roles
-	users := make([]UserInfo, len(pgUsers))
+	users := make([]util.UserInfo, len(pgUsers))
 	for i := range pgUsers {
-		users[i] = UserInfo{
+		users[i] = util.UserInfo{
 			UserName: pgUsers[i].UserName,
 		}
 
@@ -423,11 +423,11 @@ func pgUserRolesProcessor(data interface{}) (interface{}, error) {
 
 		// parse Super attribute
 		if pgUsers[i].Super {
-			pgUsers[i].Roles = append(pgUsers[i].Roles, string(SuperUserRole))
+			pgUsers[i].Roles = append(pgUsers[i].Roles, string(util.SuperUserRole))
 		}
 
 		// convert to RoleType and sort by weight
-		roleTypes := make([]RoleType, 0)
+		roleTypes := make([]util.RoleType, 0)
 		for _, role := range pgUsers[i].Roles {
 			roleTypes = append(roleTypes, String2RoleType(role))
 		}
@@ -446,9 +446,9 @@ func pgUserRolesProcessor(data interface{}) (interface{}, error) {
 func (pgOps *PostgresOperations) role2PGRole(roleName string) (string, error) {
 	roleType := String2RoleType(roleName)
 	switch roleType {
-	case ReadWriteRole:
+	case util.ReadWriteRole:
 		return "pg_write_all_data", nil
-	case ReadOnlyRole:
+	case util.ReadOnlyRole:
 		return "pg_read_all_data", nil
 	}
 	return "", fmt.Errorf("role name: %s is not supported", roleName)

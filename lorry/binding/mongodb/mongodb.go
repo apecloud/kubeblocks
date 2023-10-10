@@ -29,7 +29,7 @@ import (
 	. "github.com/apecloud/kubeblocks/lorry/binding"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/component/mongodb"
-	. "github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
 // MongoDBOperations is a binding implementation for MongoDB.
@@ -94,8 +94,8 @@ func (mongoOps *MongoDBOperations) Init(properties component.Properties) error {
 	// mongoOps.InitIfNeed = mongoOps.initIfNeed
 	mongoOps.DBPort = config.GetDBPort()
 	mongoOps.BaseOperations.GetRole = mongoOps.GetRole
-	mongoOps.RegisterOperationOnDBReady(GetRoleOperation, mongoOps.GetRoleOps, manager)
-	mongoOps.RegisterOperationOnDBReady(CheckRoleOperation, mongoOps.CheckRoleOps, manager)
+	mongoOps.RegisterOperationOnDBReady(util.GetRoleOperation, mongoOps.GetRoleOps, manager)
+	mongoOps.RegisterOperationOnDBReady(util.CheckRoleOperation, mongoOps.CheckRoleOps, manager)
 
 	return nil
 }

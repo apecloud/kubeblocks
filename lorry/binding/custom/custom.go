@@ -37,7 +37,7 @@ import (
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	. "github.com/apecloud/kubeblocks/lorry/binding"
 	"github.com/apecloud/kubeblocks/lorry/component"
-	. "github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
 // HTTPCustom is a binding for an http url endpoint invocation
@@ -84,7 +84,7 @@ func (h *HTTPCustom) Init(metadata component.Properties) error {
 
 	h.BaseOperations.Init(metadata)
 	h.BaseOperations.GetRole = h.GetRole
-	h.OperationsMap[CheckRoleOperation] = h.CheckRoleOps
+	h.OperationsMap[util.CheckRoleOperation] = h.CheckRoleOps
 
 	return nil
 }

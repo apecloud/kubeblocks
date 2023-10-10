@@ -37,7 +37,7 @@ import (
 	. "github.com/apecloud/kubeblocks/lorry/binding"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/component/mysql"
-	. "github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
 const (
@@ -63,18 +63,18 @@ func TestInit(t *testing.T) {
 	assert.Equal(t, "mysql", mysqlOps.DBType)
 	assert.NotNil(t, mysqlOps.GetRole)
 	assert.Equal(t, 3306, mysqlOps.DBPort)
-	assert.NotNil(t, mysqlOps.OperationsMap[GetRoleOperation])
-	assert.NotNil(t, mysqlOps.OperationsMap[CheckStatusOperation])
-	assert.NotNil(t, mysqlOps.OperationsMap[GetLagOperation])
-	assert.NotNil(t, mysqlOps.OperationsMap[ExecOperation])
-	assert.NotNil(t, mysqlOps.OperationsMap[QueryOperation])
+	assert.NotNil(t, mysqlOps.OperationsMap[util.GetRoleOperation])
+	assert.NotNil(t, mysqlOps.OperationsMap[util.CheckStatusOperation])
+	assert.NotNil(t, mysqlOps.OperationsMap[util.GetLagOperation])
+	assert.NotNil(t, mysqlOps.OperationsMap[util.ExecOperation])
+	assert.NotNil(t, mysqlOps.OperationsMap[util.QueryOperation])
 
-	assert.NotNil(t, mysqlOps.OperationsMap[ListUsersOp])
-	assert.NotNil(t, mysqlOps.OperationsMap[CreateUserOp])
-	assert.NotNil(t, mysqlOps.OperationsMap[DeleteUserOp])
-	assert.NotNil(t, mysqlOps.OperationsMap[DescribeUserOp])
-	assert.NotNil(t, mysqlOps.OperationsMap[GrantUserRoleOp])
-	assert.NotNil(t, mysqlOps.OperationsMap[RevokeUserRoleOp])
+	assert.NotNil(t, mysqlOps.OperationsMap[util.ListUsersOp])
+	assert.NotNil(t, mysqlOps.OperationsMap[util.CreateUserOp])
+	assert.NotNil(t, mysqlOps.OperationsMap[util.DeleteUserOp])
+	assert.NotNil(t, mysqlOps.OperationsMap[util.DescribeUserOp])
+	assert.NotNil(t, mysqlOps.OperationsMap[util.GrantUserRoleOp])
+	assert.NotNil(t, mysqlOps.OperationsMap[util.RevokeUserRoleOp])
 	// Clear out previously set viper variables
 	viper.Reset()
 }
@@ -124,7 +124,7 @@ func TestGetLagOps(t *testing.T) {
 		// Assert that the event and message are correct
 		event, ok := result["event"]
 		assert.True(t, ok)
-		assert.Equal(t, OperationSuccess, event)
+		assert.Equal(t, util.OperationSuccess, event)
 	})
 }
 
@@ -146,7 +146,7 @@ func TestQueryOps(t *testing.T) {
 		// Assert that the event and message are correct
 		event, ok := result["event"]
 		assert.True(t, ok)
-		assert.Equal(t, OperationSuccess, event)
+		assert.Equal(t, util.OperationSuccess, event)
 
 		message, ok := result["message"]
 		assert.True(t, ok)
@@ -162,7 +162,7 @@ func TestQueryOps(t *testing.T) {
 		// Assert that the event and message are correct
 		event, ok := result["event"]
 		assert.True(t, ok)
-		assert.Equal(t, OperationFailed, event)
+		assert.Equal(t, util.OperationFailed, event)
 
 		message, ok := result["message"]
 		assert.True(t, ok)
@@ -184,7 +184,7 @@ func TestExecOps(t *testing.T) {
 		// Assert that the event and message are correct
 		event, ok := result["event"]
 		assert.True(t, ok)
-		assert.Equal(t, OperationSuccess, event)
+		assert.Equal(t, util.OperationSuccess, event)
 
 		count, ok := result["count"]
 		assert.True(t, ok)
@@ -200,7 +200,7 @@ func TestExecOps(t *testing.T) {
 		// Assert that the event and message are correct
 		event, ok := result["event"]
 		assert.True(t, ok)
-		assert.Equal(t, OperationFailed, event)
+		assert.Equal(t, util.OperationFailed, event)
 
 		message, ok := result["message"]
 		assert.True(t, ok)
@@ -231,7 +231,7 @@ func TestCheckStatusOps(t *testing.T) {
 		// Assert that the event and message are correct
 		event, ok := result["event"]
 		assert.True(t, ok)
-		assert.Equal(t, OperationSuccess, event)
+		assert.Equal(t, util.OperationSuccess, event)
 
 		message, ok := result["message"]
 		assert.True(t, ok)
@@ -253,7 +253,7 @@ func TestCheckStatusOps(t *testing.T) {
 		// Assert that the event and message are correct
 		event, ok := result["event"]
 		assert.True(t, ok)
-		assert.Equal(t, OperationSuccess, event)
+		assert.Equal(t, util.OperationSuccess, event)
 
 		message, ok := result["message"]
 		assert.True(t, ok)
@@ -269,7 +269,7 @@ func TestCheckStatusOps(t *testing.T) {
 		// Assert that the event and message are correct
 		event, ok := result["event"]
 		assert.True(t, ok)
-		assert.Equal(t, OperationSuccess, event)
+		assert.Equal(t, util.OperationSuccess, event)
 
 		message, ok := result["message"]
 		assert.True(t, ok)
@@ -292,7 +292,7 @@ func TestCheckStatusOps(t *testing.T) {
 		// Assert that the event and message are correct
 		event, ok := result["event"]
 		assert.True(t, ok)
-		assert.Equal(t, OperationFailed, event)
+		assert.Equal(t, util.OperationFailed, event)
 
 		message, ok := result["message"]
 		assert.True(t, ok)
@@ -315,19 +315,19 @@ func TestMySQLAccounts(t *testing.T) {
 		var result OpsResult
 
 		req := &ProbeRequest{}
-		req.Operation = CreateUserOp
+		req.Operation = util.CreateUserOp
 		req.Metadata = map[string]string{}
 
 		result, err = mysqlOps.createUserOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, RespEveFail, result[RespTypEve])
-		assert.Equal(t, ErrNoUserName.Error(), result[RespTypMsg])
+		assert.Equal(t, util.RespEveFail, result[util.RespTypEve])
+		assert.Equal(t, ErrNoUserName.Error(), result[util.RespTypMsg])
 
 		req.Metadata["userName"] = userName
 		result, err = mysqlOps.createUserOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, RespEveFail, result[RespTypEve])
-		assert.Equal(t, ErrNoPassword.Error(), result[RespTypMsg])
+		assert.Equal(t, util.RespEveFail, result[util.RespTypEve])
+		assert.Equal(t, ErrNoPassword.Error(), result[util.RespTypMsg])
 
 		req.Metadata["password"] = password
 
@@ -335,7 +335,7 @@ func TestMySQLAccounts(t *testing.T) {
 		mock.ExpectExec(createUserCmd).WillReturnResult(sqlmock.NewResult(1, 1))
 		result, err = mysqlOps.createUserOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, RespEveSucc, result[RespTypEve], result[RespTypMsg])
+		assert.Equal(t, util.RespEveSucc, result[util.RespTypEve], result[util.RespTypMsg])
 	})
 
 	t.Run("Delete account", func(t *testing.T) {
@@ -343,13 +343,13 @@ func TestMySQLAccounts(t *testing.T) {
 		var result OpsResult
 
 		req := &ProbeRequest{}
-		req.Operation = CreateUserOp
+		req.Operation = util.CreateUserOp
 		req.Metadata = map[string]string{}
 
 		result, err = mysqlOps.deleteUserOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, RespEveFail, result[RespTypEve])
-		assert.Equal(t, ErrNoUserName.Error(), result[RespTypMsg])
+		assert.Equal(t, util.RespEveFail, result[util.RespTypEve])
+		assert.Equal(t, ErrNoUserName.Error(), result[util.RespTypMsg])
 
 		req.Metadata["userName"] = userName
 		deleteUserCmd := fmt.Sprintf("DROP USER IF EXISTS '%s'@'%%';", req.Metadata["userName"])
@@ -357,14 +357,14 @@ func TestMySQLAccounts(t *testing.T) {
 
 		result, err = mysqlOps.deleteUserOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, RespEveSucc, result[RespTypEve], result[RespTypMsg])
+		assert.Equal(t, util.RespEveSucc, result[util.RespTypEve], result[util.RespTypMsg])
 	})
 	t.Run("Describe account", func(t *testing.T) {
 		var err error
 		var result OpsResult
 
 		req := &ProbeRequest{}
-		req.Operation = CreateUserOp
+		req.Operation = util.CreateUserOp
 		req.Metadata = map[string]string{}
 
 		col1 := sqlmock.NewColumn("Grants for "+userName+"@%").OfType("STRING", "turning")
@@ -372,8 +372,8 @@ func TestMySQLAccounts(t *testing.T) {
 
 		result, err = mysqlOps.describeUserOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, RespEveFail, result[RespTypEve])
-		assert.Equal(t, ErrNoUserName.Error(), result[RespTypMsg])
+		assert.Equal(t, util.RespEveFail, result[util.RespTypEve])
+		assert.Equal(t, ErrNoUserName.Error(), result[util.RespTypMsg])
 
 		req.Metadata["userName"] = userName
 
@@ -383,16 +383,16 @@ func TestMySQLAccounts(t *testing.T) {
 
 		result, err = mysqlOps.describeUserOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, RespEveSucc, result[RespTypEve])
+		assert.Equal(t, util.RespEveSucc, result[util.RespTypEve])
 
-		data := result[RespTypMsg].(string)
-		users := []UserInfo{}
+		data := result[util.RespTypMsg].(string)
+		users := []util.UserInfo{}
 		err = json.Unmarshal([]byte(data), &users)
 		assert.Nil(t, err)
 		assert.Equal(t, 1, len(users))
 		assert.Equal(t, userName, users[0].UserName)
 		assert.NotEmpty(t, users[0].RoleName)
-		assert.True(t, ReadOnlyRole.EqualTo(users[0].RoleName))
+		assert.True(t, util.ReadOnlyRole.EqualTo(users[0].RoleName))
 	})
 
 	t.Run("List accounts", func(t *testing.T) {
@@ -400,7 +400,7 @@ func TestMySQLAccounts(t *testing.T) {
 		var result OpsResult
 
 		req := &ProbeRequest{}
-		req.Operation = CreateUserOp
+		req.Operation = util.CreateUserOp
 		req.Metadata = map[string]string{}
 
 		col1 := sqlmock.NewColumn("userName").OfType("STRING", "turning")
@@ -414,9 +414,9 @@ func TestMySQLAccounts(t *testing.T) {
 
 		result, err = mysqlOps.listUsersOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, RespEveSucc, result[RespTypEve], result[RespTypMsg])
-		data := result[RespTypMsg].(string)
-		users := []UserInfo{}
+		assert.Equal(t, util.RespEveSucc, result[util.RespTypEve], result[util.RespTypMsg])
+		data := result[util.RespTypMsg].(string)
+		users := []util.UserInfo{}
 		err = json.Unmarshal([]byte(data), &users)
 		assert.Nil(t, err)
 		assert.Equal(t, 2, len(users))
@@ -428,19 +428,19 @@ func TestMySQLAccounts(t *testing.T) {
 		var result OpsResult
 
 		req := &ProbeRequest{}
-		req.Operation = CreateUserOp
+		req.Operation = util.CreateUserOp
 		req.Metadata = map[string]string{}
 
 		result, err = mysqlOps.grantUserRoleOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, RespEveFail, result[RespTypEve])
-		assert.Equal(t, ErrNoUserName.Error(), result[RespTypMsg])
+		assert.Equal(t, util.RespEveFail, result[util.RespTypEve])
+		assert.Equal(t, ErrNoUserName.Error(), result[util.RespTypMsg])
 
 		req.Metadata["userName"] = userName
 		result, err = mysqlOps.grantUserRoleOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, RespEveFail, result[RespTypEve])
-		assert.Equal(t, ErrNoRoleName.Error(), result[RespTypMsg])
+		assert.Equal(t, util.RespEveFail, result[util.RespTypEve])
+		assert.Equal(t, ErrNoRoleName.Error(), result[util.RespTypMsg])
 
 		req.Metadata["roleName"] = roleName
 		roleDesc, err := mysqlOps.role2Priv(req.Metadata["roleName"])
@@ -450,7 +450,7 @@ func TestMySQLAccounts(t *testing.T) {
 		mock.ExpectExec(grantRoleCmd).WillReturnResult(sqlmock.NewResult(1, 1))
 		result, err = mysqlOps.grantUserRoleOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, RespEveSucc, result[RespTypEve], result[RespTypMsg])
+		assert.Equal(t, util.RespEveSucc, result[util.RespTypEve], result[util.RespTypMsg])
 	})
 
 	t.Run("Revoke Roles", func(t *testing.T) {
@@ -458,19 +458,19 @@ func TestMySQLAccounts(t *testing.T) {
 		var result OpsResult
 
 		req := &ProbeRequest{}
-		req.Operation = CreateUserOp
+		req.Operation = util.CreateUserOp
 		req.Metadata = map[string]string{}
 
 		result, err = mysqlOps.revokeUserRoleOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, RespEveFail, result[RespTypEve])
-		assert.Equal(t, ErrNoUserName.Error(), result[RespTypMsg])
+		assert.Equal(t, util.RespEveFail, result[util.RespTypEve])
+		assert.Equal(t, ErrNoUserName.Error(), result[util.RespTypMsg])
 
 		req.Metadata["userName"] = userName
 		result, err = mysqlOps.revokeUserRoleOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, RespEveFail, result[RespTypEve])
-		assert.Equal(t, ErrNoRoleName.Error(), result[RespTypMsg])
+		assert.Equal(t, util.RespEveFail, result[util.RespTypEve])
+		assert.Equal(t, ErrNoRoleName.Error(), result[util.RespTypMsg])
 
 		req.Metadata["roleName"] = roleName
 		roleDesc, err := mysqlOps.role2Priv(req.Metadata["roleName"])
@@ -480,14 +480,14 @@ func TestMySQLAccounts(t *testing.T) {
 		mock.ExpectExec(revokeRoleCmd).WillReturnResult(sqlmock.NewResult(1, 1))
 		result, err = mysqlOps.revokeUserRoleOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, RespEveSucc, result[RespTypEve], result[RespTypMsg])
+		assert.Equal(t, util.RespEveSucc, result[util.RespTypEve], result[util.RespTypMsg])
 	})
 	t.Run("List System Accounts", func(t *testing.T) {
 		var err error
 		var result OpsResult
 
 		req := &ProbeRequest{}
-		req.Operation = CreateUserOp
+		req.Operation = util.CreateUserOp
 		req.Metadata = map[string]string{}
 
 		col1 := sqlmock.NewColumn("userName").OfType("STRING", "turning")
@@ -500,8 +500,8 @@ func TestMySQLAccounts(t *testing.T) {
 
 		result, err = mysqlOps.listSystemAccountsOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, RespEveSucc, result[RespTypEve], result[RespTypMsg])
-		data := result[RespTypMsg].(string)
+		assert.Equal(t, util.RespEveSucc, result[util.RespTypEve], result[util.RespTypMsg])
+		data := result[util.RespTypMsg].(string)
 		users := []string{}
 		err = json.Unmarshal([]byte(data), &users)
 		assert.Nil(t, err)
@@ -512,7 +512,7 @@ func TestMySQLAccounts(t *testing.T) {
 func mockDatabase(t *testing.T) (*MysqlOperations, sqlmock.Sqlmock, error) {
 	viper.SetDefault("KB_SERVICE_ROLES", "{\"follower\":\"Readonly\",\"leader\":\"ReadWrite\"}")
 	viper.Set("KB_POD_NAME", "test-pod-0")
-	viper.Set(constant.KBEnvWorkloadType, Consensus)
+	viper.Set(constant.KBEnvWorkloadType, "consensus")
 	db, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)

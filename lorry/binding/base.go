@@ -34,7 +34,7 @@ import (
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/dcs"
-	. "github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
 type Operation func(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error)
@@ -76,7 +76,7 @@ type BaseOperations struct {
 	Manager                component.DBManager
 	GetRole                func(context.Context, *ProbeRequest, *ProbeResponse) (string, error)
 
-	OperationsMap map[OperationKind]Operation
+	OperationsMap map[util.OperationKind]Operation
 }
 
 func init() {
@@ -106,35 +106,35 @@ func (ops *BaseOperations) Init(properties component.Properties) {
 		}
 	}
 	ops.Metadata = properties
-	ops.OperationsMap = map[OperationKind]Operation{
-		CheckRunningOperation: ops.CheckRunningOps,
-		CheckRoleOperation:    ops.CheckRoleOps,
-		GetRoleOperation:      ops.GetRoleOps,
-		VolumeProtection:      ops.VolumeProtectionOps,
-		SwitchoverOperation:   ops.SwitchoverOps,
-		LockOperation:         ops.LockOps,
-		UnlockOperation:       ops.UnlockOps,
-		JoinMemberOperation:   ops.JoinMemberOps,
-		LeaveMemberOperation:  ops.LeaveMemberOps,
+	ops.OperationsMap = map[util.OperationKind]Operation{
+		util.CheckRunningOperation: ops.CheckRunningOps,
+		util.CheckRoleOperation:    ops.CheckRoleOps,
+		util.GetRoleOperation:      ops.GetRoleOps,
+		util.VolumeProtection:      ops.VolumeProtectionOps,
+		util.SwitchoverOperation:   ops.SwitchoverOps,
+		util.LockOperation:         ops.LockOps,
+		util.UnlockOperation:       ops.UnlockOps,
+		util.JoinMemberOperation:   ops.JoinMemberOps,
+		util.LeaveMemberOperation:  ops.LeaveMemberOps,
 	}
 
 	ops.DBAddress = ops.getAddress()
 }
 
-func (ops *BaseOperations) RegisterOperation(opsKind OperationKind, operation Operation) {
+func (ops *BaseOperations) RegisterOperation(opsKind util.OperationKind, operation Operation) {
 	if ops.OperationsMap == nil {
-		ops.OperationsMap = map[OperationKind]Operation{}
+		ops.OperationsMap = map[util.OperationKind]Operation{}
 	}
 	ops.OperationsMap[opsKind] = operation
 }
 
-func (ops *BaseOperations) RegisterOperationOnDBReady(opsKind OperationKind, operation Operation, manager component.DBManager) {
+func (ops *BaseOperations) RegisterOperationOnDBReady(opsKind util.OperationKind, operation Operation, manager component.DBManager) {
 	ops.RegisterOperation(opsKind, StartupCheckWraper(manager, operation))
 }
 
 // Operations returns list of operations supported by the binding.
-func (ops *BaseOperations) Operations() []OperationKind {
-	opsKinds := make([]OperationKind, len(ops.OperationsMap))
+func (ops *BaseOperations) Operations() []util.OperationKind {
+	opsKinds := make([]util.OperationKind, len(ops.OperationsMap))
 	i := 0
 	for opsKind := range ops.OperationsMap {
 		opsKinds[i] = opsKind
@@ -175,7 +175,7 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *ProbeRequest) (*Prob
 	if !ok {
 		message := fmt.Sprintf("%v operation is not implemented for %v", req.Operation, ops.DBType)
 		ops.Logger.Error(nil, message)
-		opsRes["event"] = OperationNotImplemented
+		opsRes["event"] = util.OperationNotImplemented
 		opsRes["message"] = message
 		resp.Metadata[StatusCode] = OperationNotFoundHTTPCode
 		res, _ := json.Marshal(opsRes)
@@ -184,7 +184,7 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *ProbeRequest) (*Prob
 	}
 
 	if ops.InitIfNeed != nil && ops.InitIfNeed() {
-		opsRes["event"] = OperationFailed
+		opsRes["event"] = util.OperationFailed
 		opsRes["message"] = "db not ready"
 		res, _ := json.Marshal(opsRes)
 		resp.Data = res
@@ -206,12 +206,12 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *ProbeRequest) (*Prob
 
 func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
-	opsRes["operation"] = CheckRoleOperation
+	opsRes["operation"] = util.CheckRoleOperation
 	opsRes["originalRole"] = ops.OriRole
 	if ops.GetRole == nil {
 		message := fmt.Sprintf("checkRole operation is not implemented for %v", ops.DBType)
 		ops.Logger.Info(message)
-		opsRes["event"] = OperationNotImplemented
+		opsRes["event"] = util.OperationNotImplemented
 		opsRes["message"] = message
 		resp.Metadata[StatusCode] = OperationNotFoundHTTPCode
 		return opsRes, nil
@@ -229,7 +229,7 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *ProbeRequest, 
 	role, err := ops.GetRole(ctx1, req, resp)
 	if err != nil {
 		ops.Logger.Error(err, "executing checkRole error")
-		opsRes["event"] = OperationFailed
+		opsRes["event"] = util.OperationFailed
 		opsRes["message"] = err.Error()
 		if ops.CheckRoleFailedCount%ops.FailedEventReportFrequency == 0 {
 			ops.Logger.Info("role checks failed continuously", "times", ops.CheckRoleFailedCount)
@@ -241,12 +241,12 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *ProbeRequest, 
 
 	ops.CheckRoleFailedCount = 0
 	if isValid, message := ops.roleValidate(role); !isValid {
-		opsRes["event"] = OperationInvalid
+		opsRes["event"] = util.OperationInvalid
 		opsRes["message"] = message
 		return opsRes, nil
 	}
 
-	opsRes["event"] = OperationSuccess
+	opsRes["event"] = util.OperationSuccess
 	opsRes["role"] = role
 	if ops.OriRole != role {
 		ops.OriRole = role
@@ -269,7 +269,7 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *ProbeRequest, re
 	if ops.GetRole == nil {
 		message := fmt.Sprintf("getRole operation is not implemented for %v", ops.DBType)
 		ops.Logger.Error(fmt.Errorf("not implemented"), message)
-		opsRes["event"] = OperationNotImplemented
+		opsRes["event"] = util.OperationNotImplemented
 		opsRes["message"] = message
 		resp.Metadata[StatusCode] = OperationNotFoundHTTPCode
 		return opsRes, nil
@@ -278,7 +278,7 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *ProbeRequest, re
 	role, err := ops.GetRole(ctx, req, resp)
 	if err != nil {
 		ops.Logger.Error(err, "error executing getRole")
-		opsRes["event"] = OperationFailed
+		opsRes["event"] = util.OperationFailed
 		opsRes["message"] = err.Error()
 		if ops.CheckRoleFailedCount%ops.FailedEventReportFrequency == 0 {
 			ops.Logger.Info("getRole failed continuously", "failed times", ops.CheckRoleFailedCount)
@@ -287,7 +287,7 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *ProbeRequest, re
 		ops.CheckRoleFailedCount++
 		return opsRes, nil
 	}
-	opsRes["event"] = OperationSuccess
+	opsRes["event"] = util.OperationSuccess
 	opsRes["role"] = role
 	return opsRes, nil
 }
@@ -321,7 +321,7 @@ func (ops *BaseOperations) roleValidate(role string) (bool, string) {
 func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var message string
 	opsRes := OpsResult{}
-	opsRes["operation"] = CheckRunningOperation
+	opsRes["operation"] = util.CheckRunningOperation
 
 	host := net.JoinHostPort(ops.DBAddress, strconv.Itoa(ops.DBPort))
 	// sql exec timeout needs to be less than httpget's timeout which by default 1s.
@@ -329,7 +329,7 @@ func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *ProbeReques
 	if err != nil {
 		message = fmt.Sprintf("running check %s error", host)
 		ops.Logger.Error(err, message)
-		opsRes["event"] = OperationFailed
+		opsRes["event"] = util.OperationFailed
 		opsRes["message"] = message
 		if ops.CheckRunningFailedCount%ops.FailedEventReportFrequency == 0 {
 			ops.Logger.Info("running checks failed continuously", "times", ops.CheckRunningFailedCount)
@@ -346,7 +346,7 @@ func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *ProbeReques
 		err := tcpCon.SetLinger(0)
 		ops.Logger.Error(err, "running check, set tcp linger failed")
 	}
-	opsRes["event"] = OperationSuccess
+	opsRes["event"] = util.OperationSuccess
 	opsRes["message"] = message
 	return opsRes, nil
 }
@@ -356,27 +356,27 @@ func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *ProbeRequest,
 	leader := req.Metadata["leader"]
 	candidate := req.Metadata["candidate"]
 	if leader == "" && candidate == "" {
-		opsRes["event"] = OperationFailed
+		opsRes["event"] = util.OperationFailed
 		opsRes["message"] = "Leader or Candidate must be set"
 		return opsRes, nil
 	}
 
 	dcsStore := dcs.GetStore()
 	if dcsStore == nil {
-		opsRes["event"] = OperationFailed
+		opsRes["event"] = util.OperationFailed
 		opsRes["message"] = "DCS store init failed"
 		return opsRes, nil
 	}
 	cluster, err := dcsStore.GetCluster()
 	if cluster == nil {
-		opsRes["event"] = OperationFailed
+		opsRes["event"] = util.OperationFailed
 		opsRes["message"] = fmt.Sprintf("Get Cluster %s error: %v.", dcsStore.GetClusterName(), err)
 		return opsRes, nil
 	}
 
 	manager, err := component.GetDefaultManager()
 	if err != nil {
-		opsRes["event"] = OperationFailed
+		opsRes["event"] = util.OperationFailed
 		opsRes["message"] = err.Error()
 		return opsRes, nil
 	}
@@ -384,12 +384,12 @@ func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *ProbeRequest,
 	if leader != "" {
 		leaderMember := cluster.GetMemberWithName(leader)
 		if leaderMember == nil {
-			opsRes["event"] = OperationFailed
+			opsRes["event"] = util.OperationFailed
 			opsRes["message"] = fmt.Sprintf("leader %s not exists", leader)
 			return opsRes, nil
 		}
 		if ok, err := manager.IsLeaderMember(ctx, cluster, leaderMember); err != nil || !ok {
-			opsRes["event"] = OperationFailed
+			opsRes["event"] = util.OperationFailed
 			opsRes["message"] = fmt.Sprintf("%s is not the leader", leader)
 			return opsRes, nil
 		}
@@ -397,29 +397,29 @@ func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *ProbeRequest,
 	if candidate != "" {
 		candidateMember := cluster.GetMemberWithName(candidate)
 		if candidateMember == nil {
-			opsRes["event"] = OperationFailed
+			opsRes["event"] = util.OperationFailed
 			opsRes["message"] = fmt.Sprintf("candidate %s not exists", candidate)
 			return opsRes, nil
 		}
 		if !manager.IsMemberHealthy(ctx, cluster, candidateMember) {
-			opsRes["event"] = OperationFailed
+			opsRes["event"] = util.OperationFailed
 			opsRes["message"] = fmt.Sprintf("candidate %s is unhealthy", candidate)
 			return opsRes, nil
 		}
 	} else if len(manager.HasOtherHealthyMembers(ctx, cluster, leader)) == 0 {
-		opsRes["event"] = OperationFailed
+		opsRes["event"] = util.OperationFailed
 		opsRes["message"] = "candidate is not set and has no other healthy members"
 		return opsRes, nil
 	}
 
 	err = dcsStore.CreateSwitchover(leader, candidate)
 	if err != nil {
-		opsRes["event"] = OperationFailed
+		opsRes["event"] = util.OperationFailed
 		opsRes["message"] = fmt.Sprintf("Create switchover failed: %v", err)
 		return opsRes, nil
 	}
 
-	opsRes["event"] = OperationSuccess
+	opsRes["event"] = util.OperationSuccess
 	return opsRes, nil
 }
 
@@ -431,7 +431,7 @@ func (ops *BaseOperations) JoinMemberOps(ctx context.Context, req *ProbeRequest,
 	manager, err := component.GetDefaultManager()
 	if manager == nil {
 		// manager for the DB is not supported, just return
-		opsRes["event"] = OperationSuccess
+		opsRes["event"] = util.OperationSuccess
 		opsRes["message"] = err.Error()
 		return opsRes, nil
 	}
@@ -440,7 +440,7 @@ func (ops *BaseOperations) JoinMemberOps(ctx context.Context, req *ProbeRequest,
 	var cluster *dcs.Cluster
 	cluster, err = dcsStore.GetCluster()
 	if err != nil {
-		opsRes["event"] = OperationFailed
+		opsRes["event"] = util.OperationFailed
 		opsRes["message"] = fmt.Sprintf("get cluster from dcs failed: %v", err)
 		return opsRes, err
 	}
@@ -449,12 +449,12 @@ func (ops *BaseOperations) JoinMemberOps(ctx context.Context, req *ProbeRequest,
 	err = manager.JoinCurrentMemberToCluster(ctx, cluster)
 	if err != nil {
 		message := fmt.Sprintf("Join member to cluster failed: %v", err)
-		opsRes["event"] = OperationFailed
+		opsRes["event"] = util.OperationFailed
 		opsRes["message"] = message
 		return opsRes, err
 	}
 
-	opsRes["event"] = OperationSuccess
+	opsRes["event"] = util.OperationSuccess
 	opsRes["message"] = "Join of the current member is complete"
 	return opsRes, nil
 }
@@ -471,7 +471,7 @@ func (ops *BaseOperations) LeaveMemberOps(ctx context.Context, req *ProbeRequest
 	manager, err := component.GetDefaultManager()
 	if manager == nil {
 		// manager for the DB is not supported, just return
-		opsRes["event"] = OperationSuccess
+		opsRes["event"] = util.OperationSuccess
 		opsRes["message"] = err.Error()
 		return opsRes, nil
 	}
@@ -480,7 +480,7 @@ func (ops *BaseOperations) LeaveMemberOps(ctx context.Context, req *ProbeRequest
 	var cluster *dcs.Cluster
 	cluster, err = dcsStore.GetCluster()
 	if err != nil {
-		opsRes["event"] = OperationFailed
+		opsRes["event"] = util.OperationFailed
 		opsRes["message"] = fmt.Sprintf("get cluster from dcs failed: %v", err)
 		return opsRes, err
 	}
@@ -495,12 +495,12 @@ func (ops *BaseOperations) LeaveMemberOps(ctx context.Context, req *ProbeRequest
 	err = manager.LeaveMemberFromCluster(ctx, cluster, manager.GetCurrentMemberName())
 	if err != nil {
 		message := fmt.Sprintf("Leave member form cluster failed: %v", err)
-		opsRes["event"] = OperationFailed
+		opsRes["event"] = util.OperationFailed
 		opsRes["message"] = message
 		return opsRes, err
 	}
 
-	opsRes["event"] = OperationSuccess
+	opsRes["event"] = util.OperationSuccess
 	opsRes["message"] = "left of the current member is complete"
 	return opsRes, nil
 }

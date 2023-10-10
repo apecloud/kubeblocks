@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -59,8 +60,9 @@ type KubernetesStore struct {
 	logger             logr.Logger
 }
 
-func NewKubernetesStore(logger logr.Logger) (*KubernetesStore, error) {
+func NewKubernetesStore() (*KubernetesStore, error) {
 	ctx := context.Background()
+	logger := ctrl.Log.WithName("DCS-K8S")
 	clientset, err := k8scomponent.GetClientSet(logger)
 	if err != nil {
 		err = errors.Wrap(err, "clientset init failed")
@@ -220,7 +222,7 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 		member.Role = pod.Labels["app.kubernetes.io/role"]
 		member.PodIP = pod.Status.PodIP
 		member.DBPort = getDBPort(&pod)
-		member.SQLChannelPort = getSQLChannelPort(&pod)
+		member.LorryPort = getLorryPort(&pod)
 		member.UID = string(pod.UID)
 		member.resource = pod.DeepCopy()
 	}
@@ -620,7 +622,7 @@ func getDBPort(pod *corev1.Pod) string {
 	return strconv.Itoa(int(dbPort))
 }
 
-func getSQLChannelPort(pod *corev1.Pod) string {
+func getLorryPort(pod *corev1.Pod) string {
 	for _, container := range pod.Spec.Containers {
 		for _, port := range container.Ports {
 			if port.Name == "probe-http-port" {

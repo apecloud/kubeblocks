@@ -27,7 +27,7 @@ import (
 	. "github.com/apecloud/kubeblocks/lorry/binding"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/component/polardbx"
-	. "github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
 // PolardbxOperations represents polardbx output bindings.
@@ -66,9 +66,9 @@ func (polardbxOps *PolardbxOperations) Init(metadata component.Properties) error
 	polardbxOps.BaseOperations.GetRole = polardbxOps.GetRole
 	polardbxOps.DBPort = config.GetDBPort()
 
-	polardbxOps.RegisterOperationOnDBReady(GetRoleOperation, polardbxOps.GetRoleOps, manager)
-	polardbxOps.RegisterOperationOnDBReady(ExecOperation, polardbxOps.ExecOps, manager)
-	polardbxOps.RegisterOperationOnDBReady(QueryOperation, polardbxOps.QueryOps, manager)
+	polardbxOps.RegisterOperationOnDBReady(util.GetRoleOperation, polardbxOps.GetRoleOps, manager)
+	polardbxOps.RegisterOperationOnDBReady(util.ExecOperation, polardbxOps.ExecOps, manager)
+	polardbxOps.RegisterOperationOnDBReady(util.QueryOperation, polardbxOps.QueryOps, manager)
 
 	return nil
 }
@@ -95,10 +95,10 @@ func (polardbxOps *PolardbxOperations) ExecOps(ctx context.Context, req *ProbeRe
 	count, err := manager.Exec(ctx, sql)
 	if err != nil {
 		polardbxOps.Logger.Error(err, "exec error", "sql", sql)
-		result["event"] = OperationFailed
+		result["event"] = util.OperationFailed
 		result["message"] = err.Error()
 	} else {
-		result["event"] = OperationSuccess
+		result["event"] = util.OperationSuccess
 		result["count"] = count
 	}
 	return result, nil
@@ -108,7 +108,7 @@ func (polardbxOps *PolardbxOperations) QueryOps(ctx context.Context, req *ProbeR
 	result := OpsResult{}
 	sql, ok := req.Metadata["sql"]
 	if !ok || sql == "" {
-		result["event"] = OperationFailed
+		result["event"] = util.OperationFailed
 		result["message"] = "no sql provided"
 		return result, nil
 	}
@@ -116,10 +116,10 @@ func (polardbxOps *PolardbxOperations) QueryOps(ctx context.Context, req *ProbeR
 	data, err := manager.Query(ctx, sql)
 	if err != nil {
 		polardbxOps.Logger.Error(err, "Query error", "sql", sql)
-		result["event"] = OperationFailed
+		result["event"] = util.OperationFailed
 		result["message"] = err.Error()
 	} else {
-		result["event"] = OperationSuccess
+		result["event"] = util.OperationSuccess
 		result["message"] = string(data)
 	}
 	return result, nil

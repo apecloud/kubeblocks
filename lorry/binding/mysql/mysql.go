@@ -37,7 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/component/mysql"
 	"github.com/apecloud/kubeblocks/lorry/dcs"
-	. "github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
 // MysqlOperations represents MySQL output bindings.
@@ -87,7 +87,7 @@ func (mysqlOps *MysqlOperations) Init(metadata component.Properties) error {
 
 	var manager component.DBManager
 	workloadType := viper.GetString(constant.KBEnvWorkloadType)
-	if strings.EqualFold(workloadType, Consensus) {
+	if strings.EqualFold(workloadType, "Consensus") {
 		manager, err = mysql.NewWesqlManager(mysqlOps.Logger)
 		if err != nil {
 			mysqlOps.Logger.Error(err, "WeSQL DB Manager initialize failed")
@@ -108,27 +108,27 @@ func (mysqlOps *MysqlOperations) Init(metadata component.Properties) error {
 	mysqlOps.BaseOperations.GetRole = mysqlOps.GetRole
 	mysqlOps.DBPort = config.GetDBPort()
 
-	mysqlOps.RegisterOperationOnDBReady(GetRoleOperation, mysqlOps.GetRoleOps, manager)
-	mysqlOps.RegisterOperationOnDBReady(CheckRoleOperation, mysqlOps.CheckRoleOps, manager)
-	mysqlOps.RegisterOperationOnDBReady(GetLagOperation, mysqlOps.GetLagOps, manager)
-	mysqlOps.RegisterOperationOnDBReady(CheckStatusOperation, mysqlOps.CheckStatusOps, manager)
-	mysqlOps.RegisterOperationOnDBReady(ExecOperation, mysqlOps.ExecOps, manager)
-	mysqlOps.RegisterOperationOnDBReady(QueryOperation, mysqlOps.QueryOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(util.GetRoleOperation, mysqlOps.GetRoleOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(util.CheckRoleOperation, mysqlOps.CheckRoleOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(util.GetLagOperation, mysqlOps.GetLagOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(util.CheckStatusOperation, mysqlOps.CheckStatusOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(util.ExecOperation, mysqlOps.ExecOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(util.QueryOperation, mysqlOps.QueryOps, manager)
 
 	// following are ops for account management
-	mysqlOps.RegisterOperationOnDBReady(ListUsersOp, mysqlOps.listUsersOps, manager)
-	mysqlOps.RegisterOperationOnDBReady(CreateUserOp, mysqlOps.createUserOps, manager)
-	mysqlOps.RegisterOperationOnDBReady(DeleteUserOp, mysqlOps.deleteUserOps, manager)
-	mysqlOps.RegisterOperationOnDBReady(DescribeUserOp, mysqlOps.describeUserOps, manager)
-	mysqlOps.RegisterOperationOnDBReady(GrantUserRoleOp, mysqlOps.grantUserRoleOps, manager)
-	mysqlOps.RegisterOperationOnDBReady(RevokeUserRoleOp, mysqlOps.revokeUserRoleOps, manager)
-	mysqlOps.RegisterOperationOnDBReady(ListSystemAccountsOp, mysqlOps.listSystemAccountsOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(util.ListUsersOp, mysqlOps.listUsersOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(util.CreateUserOp, mysqlOps.createUserOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(util.DeleteUserOp, mysqlOps.deleteUserOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(util.DescribeUserOp, mysqlOps.describeUserOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(util.GrantUserRoleOp, mysqlOps.grantUserRoleOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(util.RevokeUserRoleOp, mysqlOps.revokeUserRoleOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(util.ListSystemAccountsOp, mysqlOps.listSystemAccountsOps, manager)
 	return nil
 }
 
 func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (string, error) {
 	workloadType := viper.GetString(constant.KBEnvWorkloadType)
-	if strings.EqualFold(workloadType, Replication) {
+	if strings.EqualFold(workloadType, "Replication") {
 		dcsStore := dcs.GetStore()
 		if dcsStore == nil {
 			return "", nil
@@ -213,10 +213,10 @@ func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *ProbeRequest,
 	count, err := manager.Exec(ctx, sql)
 	if err != nil {
 		mysqlOps.Logger.Error(err, "sql exec error")
-		result["event"] = OperationFailed
+		result["event"] = util.OperationFailed
 		result["message"] = err.Error()
 	} else {
-		result["event"] = OperationSuccess
+		result["event"] = util.OperationSuccess
 		result["count"] = count
 	}
 	return result, nil
@@ -230,13 +230,13 @@ func (mysqlOps *MysqlOperations) GetLagOps(ctx context.Context, req *ProbeReques
 	if mysqlOps.OriRole == "" {
 		mysqlOps.OriRole, err = mysqlOps.GetRole(ctx, req, resp)
 		if err != nil {
-			result["event"] = OperationFailed
+			result["event"] = util.OperationFailed
 			result["message"] = err.Error()
 			return result, nil
 		}
 	}
 	if mysqlOps.OriRole == LEADER {
-		result["event"] = OperationSuccess
+		result["event"] = util.OperationSuccess
 		result["lag"] = 0
 		result["message"] = "This is leader instance, leader has no lag"
 		return result, nil
@@ -251,15 +251,15 @@ func (mysqlOps *MysqlOperations) GetLagOps(ctx context.Context, req *ProbeReques
 	data, err := manager.Query(ctx, sql)
 	if err != nil {
 		mysqlOps.Logger.Error(err, "GetLagOps error")
-		result["event"] = OperationFailed
+		result["event"] = util.OperationFailed
 		result["message"] = err.Error()
 	} else {
 		err = json.Unmarshal(data, &slaveStatus)
 		if err != nil {
-			result["event"] = OperationFailed
+			result["event"] = util.OperationFailed
 			result["message"] = err.Error()
 		} else {
-			result["event"] = OperationSuccess
+			result["event"] = util.OperationSuccess
 			result["lag"] = slaveStatus[0].SecondsBehindMaster
 		}
 	}
@@ -270,7 +270,7 @@ func (mysqlOps *MysqlOperations) QueryOps(ctx context.Context, req *ProbeRequest
 	result := OpsResult{}
 	sql, ok := req.Metadata["sql"]
 	if !ok || sql == "" {
-		result["event"] = OperationFailed
+		result["event"] = util.OperationFailed
 		result["message"] = "no sql provided"
 		return result, nil
 	}
@@ -281,10 +281,10 @@ func (mysqlOps *MysqlOperations) QueryOps(ctx context.Context, req *ProbeRequest
 	data, err := manager.Query(ctx, sql)
 	if err != nil {
 		mysqlOps.Logger.Error(err, "Query error")
-		result["event"] = OperationFailed
+		result["event"] = util.OperationFailed
 		result["message"] = err.Error()
 	} else {
-		result["event"] = OperationSuccess
+		result["event"] = util.OperationSuccess
 		result["message"] = string(data)
 	}
 	return result, nil
@@ -320,7 +320,7 @@ func (mysqlOps *MysqlOperations) CheckStatusOps(ctx context.Context, req *ProbeR
 	result := OpsResult{}
 	if err != nil {
 		mysqlOps.Logger.Error(err, "CheckStatus error")
-		result["event"] = OperationFailed
+		result["event"] = util.OperationFailed
 		result["message"] = err.Error()
 		if mysqlOps.CheckStatusFailedCount%mysqlOps.FailedEventReportFrequency == 0 {
 			mysqlOps.Logger.Info("status check failed continuously", "times", mysqlOps.CheckStatusFailedCount)
@@ -328,7 +328,7 @@ func (mysqlOps *MysqlOperations) CheckStatusOps(ctx context.Context, req *ProbeR
 		}
 		mysqlOps.CheckStatusFailedCount++
 	} else {
-		result["event"] = OperationSuccess
+		result["event"] = util.OperationSuccess
 		result["message"] = string(data)
 		mysqlOps.CheckStatusFailedCount = 0
 	}
@@ -359,19 +359,19 @@ func (mysqlOps *MysqlOperations) GetLogger() logr.Logger {
 }
 
 func (mysqlOps *MysqlOperations) listUsersOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
-	sqlTplRend := func(user UserInfo) string {
+	sqlTplRend := func(user util.UserInfo) string {
 		return listUserTpl
 	}
 
-	return QueryObject(ctx, mysqlOps, req, ListUsersOp, sqlTplRend, nil, UserInfo{})
+	return QueryObject(ctx, mysqlOps, req, util.ListUsersOp, sqlTplRend, nil, util.UserInfo{})
 }
 
 func (mysqlOps *MysqlOperations) listSystemAccountsOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
-	sqlTplRend := func(user UserInfo) string {
+	sqlTplRend := func(user util.UserInfo) string {
 		return listSystemAccountsTpl
 	}
 	dataProcessor := func(data interface{}) (interface{}, error) {
-		var users []UserInfo
+		var users []util.UserInfo
 		if err := json.Unmarshal(data.([]byte), &users); err != nil {
 			return nil, err
 		}
@@ -385,15 +385,15 @@ func (mysqlOps *MysqlOperations) listSystemAccountsOps(ctx context.Context, req 
 			return string(jsonData), nil
 		}
 	}
-	return QueryObject(ctx, mysqlOps, req, ListSystemAccountsOp, sqlTplRend, dataProcessor, UserInfo{})
+	return QueryObject(ctx, mysqlOps, req, util.ListSystemAccountsOp, sqlTplRend, dataProcessor, util.UserInfo{})
 }
 
 func (mysqlOps *MysqlOperations) describeUserOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
-		object = UserInfo{}
+		object = util.UserInfo{}
 
 		// get user grants
-		sqlTplRend = func(user UserInfo) string {
+		sqlTplRend = func(user util.UserInfo) string {
 			return fmt.Sprintf(showGrantTpl, user.UserName)
 		}
 
@@ -403,9 +403,9 @@ func (mysqlOps *MysqlOperations) describeUserOps(ctx context.Context, req *Probe
 			if err != nil {
 				return nil, err
 			}
-			user := UserInfo{}
+			user := util.UserInfo{}
 			// only keep one role name of the highest privilege
-			userRoles := make([]RoleType, 0)
+			userRoles := make([]util.RoleType, 0)
 			for _, roleMap := range roles {
 				for k, v := range roleMap {
 					if len(user.UserName) == 0 {
@@ -420,7 +420,7 @@ func (mysqlOps *MysqlOperations) describeUserOps(ctx context.Context, req *Probe
 			if len(userRoles) > 0 {
 				user.RoleName = (string)(userRoles[0])
 			}
-			if jsonData, err := json.Marshal([]UserInfo{user}); err != nil {
+			if jsonData, err := json.Marshal([]util.UserInfo{user}); err != nil {
 				return nil, err
 			} else {
 				return string(jsonData), nil
@@ -430,95 +430,95 @@ func (mysqlOps *MysqlOperations) describeUserOps(ctx context.Context, req *Probe
 
 	if err := ParseObjFromRequest(req, DefaultUserInfoParser, UserNameValidator, &object); err != nil {
 		result := OpsResult{}
-		result[RespTypEve] = RespEveFail
-		result[RespTypMsg] = err.Error()
+		result[util.RespTypEve] = util.RespEveFail
+		result[util.RespTypMsg] = err.Error()
 		return result, nil
 	}
 
-	return QueryObject(ctx, mysqlOps, req, DescribeUserOp, sqlTplRend, dataProcessor, object)
+	return QueryObject(ctx, mysqlOps, req, util.DescribeUserOp, sqlTplRend, dataProcessor, object)
 }
 
 func (mysqlOps *MysqlOperations) createUserOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
-		object = UserInfo{}
+		object = util.UserInfo{}
 
-		sqlTplRend = func(user UserInfo) string {
+		sqlTplRend = func(user util.UserInfo) string {
 			return fmt.Sprintf(createUserTpl, user.UserName, user.Password)
 		}
 
-		msgTplRend = func(user UserInfo) string {
+		msgTplRend = func(user util.UserInfo) string {
 			return fmt.Sprintf("created user: %s, with password: %s", user.UserName, user.Password)
 		}
 	)
 
 	if err := ParseObjFromRequest(req, DefaultUserInfoParser, UserNameAndPasswdValidator, &object); err != nil {
 		result := OpsResult{}
-		result[RespTypEve] = RespEveFail
-		result[RespTypMsg] = err.Error()
+		result[util.RespTypEve] = util.RespEveFail
+		result[util.RespTypMsg] = err.Error()
 		return result, nil
 	}
 
-	return ExecuteObject(ctx, mysqlOps, req, CreateUserOp, sqlTplRend, msgTplRend, object)
+	return ExecuteObject(ctx, mysqlOps, req, util.CreateUserOp, sqlTplRend, msgTplRend, object)
 }
 
 func (mysqlOps *MysqlOperations) deleteUserOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
-		object  = UserInfo{}
-		validFn = func(user UserInfo) error {
+		object  = util.UserInfo{}
+		validFn = func(user util.UserInfo) error {
 			if len(user.UserName) == 0 {
 				return ErrNoUserName
 			}
 			return nil
 		}
-		sqlTplRend = func(user UserInfo) string {
+		sqlTplRend = func(user util.UserInfo) string {
 			return fmt.Sprintf(deleteUserTpl, user.UserName)
 		}
-		msgTplRend = func(user UserInfo) string {
+		msgTplRend = func(user util.UserInfo) string {
 			return fmt.Sprintf("deleted user: %s", user.UserName)
 		}
 	)
 	if err := ParseObjFromRequest(req, DefaultUserInfoParser, validFn, &object); err != nil {
 		result := OpsResult{}
-		result[RespTypEve] = RespEveFail
-		result[RespTypMsg] = err.Error()
+		result[util.RespTypEve] = util.RespEveFail
+		result[util.RespTypMsg] = err.Error()
 		return result, nil
 	}
 
-	return ExecuteObject(ctx, mysqlOps, req, DeleteUserOp, sqlTplRend, msgTplRend, object)
+	return ExecuteObject(ctx, mysqlOps, req, util.DeleteUserOp, sqlTplRend, msgTplRend, object)
 }
 
 func (mysqlOps *MysqlOperations) grantUserRoleOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
 		succMsgTpl = "role %s granted to user: %s"
 	)
-	return mysqlOps.managePrivillege(ctx, req, GrantUserRoleOp, grantTpl, succMsgTpl)
+	return mysqlOps.managePrivillege(ctx, req, util.GrantUserRoleOp, grantTpl, succMsgTpl)
 }
 
 func (mysqlOps *MysqlOperations) revokeUserRoleOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
 	var (
 		succMsgTpl = "role %s revoked from user: %s"
 	)
-	return mysqlOps.managePrivillege(ctx, req, RevokeUserRoleOp, revokeTpl, succMsgTpl)
+	return mysqlOps.managePrivillege(ctx, req, util.RevokeUserRoleOp, revokeTpl, succMsgTpl)
 }
 
-func (mysqlOps *MysqlOperations) managePrivillege(ctx context.Context, req *ProbeRequest, op OperationKind, sqlTpl string, succMsgTpl string) (OpsResult, error) {
+func (mysqlOps *MysqlOperations) managePrivillege(ctx context.Context, req *ProbeRequest, op util.OperationKind, sqlTpl string, succMsgTpl string) (OpsResult, error) {
 	var (
-		object     = UserInfo{}
-		sqlTplRend = func(user UserInfo) string {
+		object     = util.UserInfo{}
+		sqlTplRend = func(user util.UserInfo) string {
 			// render sql stmts
 			roleDesc, _ := mysqlOps.role2Priv(user.RoleName)
 			// update privilege
 			sql := fmt.Sprintf(sqlTpl, roleDesc, user.UserName)
 			return sql
 		}
-		msgTplRend = func(user UserInfo) string {
+		msgTplRend = func(user util.UserInfo) string {
 			return fmt.Sprintf(succMsgTpl, user.RoleName, user.UserName)
 		}
 	)
 	if err := ParseObjFromRequest(req, DefaultUserInfoParser, UserNameAndRoleValidator, &object); err != nil {
 		result := OpsResult{}
-		result[RespTypEve] = RespEveFail
-		result[RespTypMsg] = err.Error()
+		result[util.RespTypEve] = util.RespEveFail
+		result[util.RespTypMsg] = err.Error()
 		return result, nil
 	}
 	return ExecuteObject(ctx, mysqlOps, req, op, sqlTplRend, msgTplRend, object)
@@ -527,28 +527,28 @@ func (mysqlOps *MysqlOperations) managePrivillege(ctx context.Context, req *Prob
 func (mysqlOps *MysqlOperations) role2Priv(roleName string) (string, error) {
 	roleType := String2RoleType(roleName)
 	switch roleType {
-	case SuperUserRole:
+	case util.SuperUserRole:
 		return superUserPriv, nil
-	case ReadWriteRole:
+	case util.ReadWriteRole:
 		return readWritePriv, nil
-	case ReadOnlyRole:
+	case util.ReadOnlyRole:
 		return readOnlyRPriv, nil
 	}
 	return "", fmt.Errorf("role name: %s is not supported", roleName)
 }
 
-func (mysqlOps *MysqlOperations) priv2Role(priv string) RoleType {
+func (mysqlOps *MysqlOperations) priv2Role(priv string) util.RoleType {
 	if strings.HasPrefix(priv, readOnlyRPriv) {
-		return ReadOnlyRole
+		return util.ReadOnlyRole
 	}
 	if strings.HasPrefix(priv, readWritePriv) {
-		return ReadWriteRole
+		return util.ReadWriteRole
 	}
 	if strings.HasPrefix(priv, superUserPriv) {
-		return SuperUserRole
+		return util.SuperUserRole
 	}
 	if strings.HasPrefix(priv, noPriv) {
-		return NoPrivileges
+		return util.NoPrivileges
 	}
-	return CustomizedRole
+	return util.CustomizedRole
 }

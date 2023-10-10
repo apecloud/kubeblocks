@@ -186,14 +186,14 @@ type DBState struct {
 	Extra       map[string]string
 }
 type Member struct {
-	Index          string
-	Name           string
-	Role           string
-	PodIP          string
-	DBPort         string
-	SQLChannelPort string
-	UID            string
-	resource       any
+	Index     string
+	Name      string
+	Role      string
+	PodIP     string
+	DBPort    string
+	LorryPort string
+	UID       string
+	resource  any
 }
 
 func (m *Member) GetName() string {

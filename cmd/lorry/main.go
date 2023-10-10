@@ -21,86 +21,74 @@ package main
 
 import (
 	"flag"
-	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 	"go.uber.org/automaxprocs/maxprocs"
+	"go.uber.org/zap"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	kzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
-	"github.com/apecloud/kubeblocks/lorry/component"
+	"github.com/apecloud/kubeblocks/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/lorry/highavailability"
-	"github.com/apecloud/kubeblocks/lorry/middleware/http/probe"
+	"github.com/apecloud/kubeblocks/lorry/httpserver"
+	"github.com/apecloud/kubeblocks/lorry/operations"
 	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
-var port int
-var configDir string
-
-const (
-	DefaultPort       = 3501
-	DefaultConfigPath = "/config/lorry/components"
-)
-
-func init() {
-	viper.AutomaticEnv()
-	flag.IntVar(&port, "port", DefaultPort, "probe default port")
-	flag.StringVar(&configDir, "config-path", DefaultConfigPath, "probe default config directory for builtin type")
-}
-
 func main() {
-	// set GOMAXPROCS
+	// Set GOMAXPROCS
 	_, _ = maxprocs.Set()
 
-	opts := zap.Options{
+	// Initialize flags
+	opts := kzap.Options{
 		Development: true,
 	}
 	opts.BindFlags(flag.CommandLine)
-
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
+	viper.AutomaticEnv()
 	err := viper.BindPFlags(pflag.CommandLine)
 	if err != nil {
-		panic(fmt.Errorf("fatal error viper bindPFlags: %v", err))
+		panic(errors.Wrap(err, "fatal error viper bindPFlags"))
 	}
 
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
-
-	err = component.GetAllComponent(configDir) // find all builtin config file and read
-	if err != nil {                            // Handle errors reading the config file
-		panic(fmt.Errorf("fatal error config file: %v", err))
+	// Initialize logger
+	kopts := []kzap.Opts{kzap.UseFlagOptions(&opts)}
+	if strings.EqualFold("debug", viper.GetString("zap-log-level")) {
+		kopts = append(kopts, kzap.RawZapOpts(zap.AddCaller()))
 	}
+	ctrl.SetLogger(kzap.New(kopts...))
 
-	err = probe.RegisterBuiltin() // register all builtin component
+	// Initialize DB Manager
+	_, err = register.GetOrCreateManager()
 	if err != nil {
-		panic(fmt.Errorf("fatal error register builtin: %v", err))
+		panic(errors.Wrap(err, "DB manager initialize failed"))
 	}
 
-	http.HandleFunc("/", probe.SetMiddleware(probe.GetRouter()))
-	go func() {
-		addr := fmt.Sprintf(":%d", port)
-		err := http.ListenAndServe(addr, nil)
-		if err != nil {
-			panic(fmt.Errorf("fatal error listen on port %d", port))
-		}
-	}()
-
-	// ha dependent on dbmanager which is initialized by rt.Run
+	// Start HA
 	characterType := viper.GetString(constant.KBEnvCharacterType)
 	workloadType := viper.GetString(constant.KBEnvWorkloadType)
-	logHa := ctrl.Log.WithName("HA")
-	ha := highavailability.NewHa(logHa)
 	if util.IsHAAvailable(characterType, workloadType) {
+		ha := highavailability.NewHa()
 		if ha != nil {
 			defer ha.ShutdownWithWait()
 			go ha.Start()
 		}
+	}
+
+	// Start HTTP Server
+	ops := operations.Operations()
+	hServer := httpserver.NewServer(ops)
+	err = hServer.StartNonBlocking()
+	if err != nil {
+		panic(errors.Wrap(err, "HTTP server initialize failed"))
 	}
 
 	stop := make(chan os.Signal, 1)

@@ -24,14 +24,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/apecloud/kubeblocks/lorry/component"
-
 	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	. "github.com/apecloud/kubeblocks/lorry/binding"
+	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/component/kafka"
-	. "github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
 const (
@@ -71,7 +70,7 @@ func (kafkaOps *KafkaOperations) Init(metadata component.Properties) error {
 	// kafkaOps.DBPort = kafkaOps.GetRunningPort()
 	// kafkaOps.RegisterOperation(GetRoleOperation, kafkaOps.GetRoleOps)
 	// kafkaOps.RegisterOperation(GetLagOperation, kafkaOps.GetLagOps)
-	kafkaOps.RegisterOperation(CheckStatusOperation, kafkaOps.CheckStatusOps)
+	kafkaOps.RegisterOperation(util.CheckStatusOperation, kafkaOps.CheckStatusOps)
 	// kafkaOps.RegisterOperation(ExecOperation, kafkaOps.ExecOps)
 	// kafkaOps.RegisterOperation(QueryOperation, kafkaOps.QueryOps)
 	return nil
@@ -121,7 +120,7 @@ func (kafkaOps *KafkaOperations) CheckStatusOps(ctx context.Context, req *ProbeR
 
 	err := kafkaOps.kafka.BrokerOpen()
 	if err != nil {
-		result["event"] = OperationFailed
+		result["event"] = util.OperationFailed
 		result["message"] = err.Error()
 		return result, nil
 	}
@@ -129,10 +128,10 @@ func (kafkaOps *KafkaOperations) CheckStatusOps(ctx context.Context, req *ProbeR
 
 	err = kafkaOps.kafka.BrokerCreateTopics(topic)
 	if err != nil {
-		result["event"] = OperationFailed
+		result["event"] = util.OperationFailed
 		result["message"] = err.Error()
 	} else {
-		result["event"] = OperationSuccess
+		result["event"] = util.OperationSuccess
 		result["message"] = "topic validateOnly success"
 	}
 

@@ -30,11 +30,12 @@ import (
 
 	"github.com/go-logr/logr"
 	probing "github.com/prometheus-community/pro-bing"
+	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	dcs3 "github.com/apecloud/kubeblocks/lorry/dcs"
+	"github.com/apecloud/kubeblocks/lorry/engines/register"
 )
 
 type Ha struct {
@@ -47,23 +48,13 @@ type Ha struct {
 
 var ha *Ha
 
-func NewHa(logger logr.Logger) *Ha {
+func NewHa() *Ha {
+	logger := ctrl.Log.WithName("HA")
 
-	dcs, _ := dcs3.NewKubernetesStore(logger)
-	characterType := viper.GetString(constant.KBEnvCharacterType)
-	if characterType == "" {
-		logger.Error(nil, "%s not set", "characterType", constant.KBEnvCharacterType)
-		return nil
-	}
-	workloadType := viper.GetString(constant.KBEnvWorkloadType)
-	if workloadType == "" {
-		logger.Error(nil, fmt.Sprintf("%s not set", constant.KBEnvWorkloadType))
-		return nil
-	}
-
-	manager := component.GetManager(characterType, workloadType)
-	if manager == nil {
-		logger.Error(nil, fmt.Sprintf("No DB Manager for character type %s, workload type %s", characterType, workloadType))
+	dcs, _ := dcs3.NewKubernetesStore()
+	manager, err := register.GetOrCreateManager()
+	if err != nil {
+		logger.Error(err, "No DB Manager")
 		return nil
 	}
 

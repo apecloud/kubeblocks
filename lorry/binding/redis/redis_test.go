@@ -33,7 +33,7 @@ import (
 
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	. "github.com/apecloud/kubeblocks/lorry/binding"
-	. "github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
 const (
@@ -43,7 +43,7 @@ const (
 
 	userName = "kiminonawa"
 	password = "moss"
-	roleName = ReadWriteRole
+	roleName = util.ReadWriteRole
 )
 
 type redisTestCase struct {
@@ -58,12 +58,12 @@ func TestRedisInit(t *testing.T) {
 	defer r.Close()
 	// make sure operations are inited
 	assert.NotNil(t, r.client)
-	assert.NotNil(t, r.OperationsMap[ListUsersOp])
-	assert.NotNil(t, r.OperationsMap[CreateUserOp])
-	assert.NotNil(t, r.OperationsMap[DeleteUserOp])
-	assert.NotNil(t, r.OperationsMap[DescribeUserOp])
-	assert.NotNil(t, r.OperationsMap[GrantUserRoleOp])
-	assert.NotNil(t, r.OperationsMap[RevokeUserRoleOp])
+	assert.NotNil(t, r.OperationsMap[util.ListUsersOp])
+	assert.NotNil(t, r.OperationsMap[util.CreateUserOp])
+	assert.NotNil(t, r.OperationsMap[util.DeleteUserOp])
+	assert.NotNil(t, r.OperationsMap[util.DescribeUserOp])
+	assert.NotNil(t, r.OperationsMap[util.GrantUserRoleOp])
+	assert.NotNil(t, r.OperationsMap[util.RevokeUserRoleOp])
 }
 func TestRedisInvokeCreate(t *testing.T) {
 	r, mock := mockRedisOps(t)
@@ -73,7 +73,7 @@ func TestRedisInvokeCreate(t *testing.T) {
 	request := &ProbeRequest{
 		Data:      []byte(testData),
 		Metadata:  map[string]string{"key": testKey},
-		Operation: CreateOperation,
+		Operation: util.CreateOperation,
 	}
 	// mock expectation
 	mock.ExpectDo("SET", testKey, testData).SetVal("ok")
@@ -86,7 +86,7 @@ func TestRedisInvokeCreate(t *testing.T) {
 
 	err = json.Unmarshal(bindingRes.Data, &result)
 	assert.Nil(t, err)
-	assert.Equal(t, RespEveSucc, result[RespTypEve], result[RespTypMsg])
+	assert.Equal(t, util.RespEveSucc, result[util.RespTypEve], result[util.RespTypMsg])
 }
 
 func TestRedisInvokeGet(t *testing.T) {
@@ -96,7 +96,7 @@ func TestRedisInvokeGet(t *testing.T) {
 	opsResult := OpsResult{}
 	request := &ProbeRequest{
 		Metadata:  map[string]string{"key": testKey},
-		Operation: GetOperation,
+		Operation: util.GetOperation,
 	}
 	// mock expectation, set to nil
 	mock.ExpectDo("GET", testKey).RedisNil()
@@ -109,7 +109,7 @@ func TestRedisInvokeGet(t *testing.T) {
 	assert.NotNil(t, bindingRes.Data)
 	err = json.Unmarshal(bindingRes.Data, &opsResult)
 	assert.Nil(t, err)
-	assert.Equal(t, RespEveFail, opsResult[RespTypEve])
+	assert.Equal(t, util.RespEveFail, opsResult[util.RespTypEve])
 
 	// invoke one more time
 	bindingRes, err = r.Invoke(context.TODO(), request)
@@ -117,9 +117,9 @@ func TestRedisInvokeGet(t *testing.T) {
 	assert.NotNil(t, bindingRes.Data)
 	err = json.Unmarshal(bindingRes.Data, &opsResult)
 	assert.Nil(t, err)
-	assert.Equal(t, RespEveSucc, opsResult[RespTypEve])
+	assert.Equal(t, util.RespEveSucc, opsResult[util.RespTypEve])
 	var o1 interface{}
-	_ = json.Unmarshal([]byte(opsResult[RespTypMsg].(string)), &o1)
+	_ = json.Unmarshal([]byte(opsResult[util.RespTypMsg].(string)), &o1)
 	assert.Equal(t, testData, o1)
 }
 
@@ -130,7 +130,7 @@ func TestRedisInvokeDelete(t *testing.T) {
 	opsResult := OpsResult{}
 	request := &ProbeRequest{
 		Metadata:  map[string]string{"key": testKey},
-		Operation: DeleteOperation,
+		Operation: util.DeleteOperation,
 	}
 	// mock expectation, set to err
 	mock.ExpectDo("DEL", testKey).SetVal("ok")
@@ -142,7 +142,7 @@ func TestRedisInvokeDelete(t *testing.T) {
 	assert.NotNil(t, bindingRes.Data)
 	err = json.Unmarshal(bindingRes.Data, &opsResult)
 	assert.Nil(t, err)
-	assert.Equal(t, RespEveSucc, opsResult[RespTypEve])
+	assert.Equal(t, util.RespEveSucc, opsResult[util.RespTypEve])
 }
 
 func TestRedisGetRoles(t *testing.T) {
@@ -151,7 +151,7 @@ func TestRedisGetRoles(t *testing.T) {
 
 	opsResult := OpsResult{}
 	request := &ProbeRequest{
-		Operation: GetRoleOperation,
+		Operation: util.GetRoleOperation,
 	}
 
 	// mock expectation, set to err
@@ -164,7 +164,7 @@ func TestRedisGetRoles(t *testing.T) {
 	assert.NotNil(t, bindingRes.Data)
 	err = json.Unmarshal(bindingRes.Data, &opsResult)
 	assert.Nil(t, err)
-	assert.Equal(t, RespEveSucc, opsResult[RespTypEve])
+	assert.Equal(t, util.RespEveSucc, opsResult[util.RespTypEve])
 	assert.Equal(t, PRIMARY, opsResult["role"])
 
 	// invoke one more time
@@ -172,7 +172,7 @@ func TestRedisGetRoles(t *testing.T) {
 	assert.Nil(t, err)
 	err = json.Unmarshal(bindingRes.Data, &opsResult)
 	assert.Nil(t, err)
-	assert.Equal(t, RespEveSucc, opsResult[RespTypEve])
+	assert.Equal(t, util.RespEveSucc, opsResult[util.RespTypEve])
 	assert.Equal(t, SECONDARY, opsResult["role"])
 }
 
@@ -187,7 +187,7 @@ func TestRedisAccounts(t *testing.T) {
 		mock.ExpectDo("ACL", "USERS").SetVal([]string{"ape", "default", "kbadmin"})
 
 		response, err := r.Invoke(ctx, &ProbeRequest{
-			Operation: ListUsersOp,
+			Operation: util.ListUsersOp,
 		})
 
 		assert.Nil(t, err)
@@ -196,10 +196,10 @@ func TestRedisAccounts(t *testing.T) {
 		// parse result
 		opsResult := OpsResult{}
 		_ = json.Unmarshal(response.Data, &opsResult)
-		assert.Equal(t, RespEveSucc, opsResult[RespTypEve], opsResult[RespTypMsg])
+		assert.Equal(t, util.RespEveSucc, opsResult[util.RespTypEve], opsResult[util.RespTypMsg])
 
-		users := make([]UserInfo, 0)
-		err = json.Unmarshal([]byte(opsResult[RespTypMsg].(string)), &users)
+		users := make([]util.UserInfo, 0)
+		err = json.Unmarshal([]byte(opsResult[util.RespTypMsg].(string)), &users)
 		assert.Nil(t, err)
 		assert.NotEmpty(t, users)
 		user := users[0]
@@ -215,7 +215,7 @@ func TestRedisAccounts(t *testing.T) {
 			opsResult = OpsResult{}
 			response  *ProbeResponse
 			request   = &ProbeRequest{
-				Operation: CreateUserOp,
+				Operation: util.CreateUserOp,
 			}
 		)
 
@@ -223,19 +223,19 @@ func TestRedisAccounts(t *testing.T) {
 			{
 				testName:      "emptymeta",
 				testMetaData:  map[string]string{},
-				expectEveType: RespEveFail,
+				expectEveType: util.RespEveFail,
 				expectEveMsg:  ErrNoUserName.Error(),
 			},
 			{
 				testName:      "nousername",
 				testMetaData:  map[string]string{"password": "moli"},
-				expectEveType: RespEveFail,
+				expectEveType: util.RespEveFail,
 				expectEveMsg:  ErrNoUserName.Error(),
 			},
 			{
 				testName:      "nopasswd",
 				testMetaData:  map[string]string{"userName": "namae"},
-				expectEveType: RespEveFail,
+				expectEveType: util.RespEveFail,
 				expectEveMsg:  ErrNoPassword.Error(),
 			},
 			{
@@ -244,7 +244,7 @@ func TestRedisAccounts(t *testing.T) {
 					"userName": userName,
 					"password": password,
 				},
-				expectEveType: RespEveSucc,
+				expectEveType: util.RespEveSucc,
 				expectEveMsg:  fmt.Sprintf("created user: %s", userName),
 			},
 		}
@@ -258,8 +258,8 @@ func TestRedisAccounts(t *testing.T) {
 			assert.NotNil(t, response.Data)
 			err = json.Unmarshal(response.Data, &opsResult)
 			assert.Nil(t, err)
-			assert.Equal(t, accTest.expectEveType, opsResult[RespTypEve], opsResult[RespTypMsg])
-			assert.Contains(t, opsResult[RespTypMsg], accTest.expectEveMsg)
+			assert.Equal(t, accTest.expectEveType, opsResult[util.RespTypEve], opsResult[util.RespTypMsg])
+			assert.Contains(t, opsResult[util.RespTypMsg], accTest.expectEveMsg)
 		}
 		mock.ClearExpect()
 	})
@@ -276,25 +276,25 @@ func TestRedisAccounts(t *testing.T) {
 			{
 				testName:      "emptymeta",
 				testMetaData:  map[string]string{},
-				expectEveType: RespEveFail,
+				expectEveType: util.RespEveFail,
 				expectEveMsg:  ErrNoUserName.Error(),
 			},
 			{
 				testName:      "nousername",
 				testMetaData:  map[string]string{"password": "moli"},
-				expectEveType: RespEveFail,
+				expectEveType: util.RespEveFail,
 				expectEveMsg:  ErrNoUserName.Error(),
 			},
 			{
 				testName:      "norolename",
 				testMetaData:  map[string]string{"userName": "namae"},
-				expectEveType: RespEveFail,
+				expectEveType: util.RespEveFail,
 				expectEveMsg:  ErrNoRoleName.Error(),
 			},
 			{
 				testName:      "invalidRoleName",
 				testMetaData:  map[string]string{"userName": "namae", "roleName": "superman"},
-				expectEveType: RespEveFail,
+				expectEveType: util.RespEveFail,
 				expectEveMsg:  ErrInvalidRoleName.Error(),
 			},
 			{
@@ -303,11 +303,11 @@ func TestRedisAccounts(t *testing.T) {
 					"userName": userName,
 					"roleName": (string)(roleName),
 				},
-				expectEveType: RespEveSucc,
+				expectEveType: util.RespEveSucc,
 			},
 		}
 
-		for _, ops := range []OperationKind{GrantUserRoleOp, RevokeUserRoleOp} {
+		for _, ops := range []util.OperationKind{util.GrantUserRoleOp, util.RevokeUserRoleOp} {
 			// mock exepctation
 			args := tokenizeCmd2Args(fmt.Sprintf("ACL SETUSER %s %s", userName, r.role2Priv(ops, (string)(roleName))))
 			mock.ExpectDo(args...).SetVal("ok")
@@ -322,9 +322,9 @@ func TestRedisAccounts(t *testing.T) {
 				assert.NotNil(t, response.Data)
 				err = json.Unmarshal(response.Data, &opsResult)
 				assert.Nil(t, err)
-				assert.Equal(t, accTest.expectEveType, opsResult[RespTypEve], opsResult[RespTypMsg])
+				assert.Equal(t, accTest.expectEveType, opsResult[util.RespTypEve], opsResult[util.RespTypMsg])
 				if len(accTest.expectEveMsg) > 0 {
-					assert.Contains(t, accTest.expectEveMsg, opsResult[RespTypMsg])
+					assert.Contains(t, accTest.expectEveMsg, opsResult[util.RespTypMsg])
 				}
 			}
 		}
@@ -338,7 +338,7 @@ func TestRedisAccounts(t *testing.T) {
 			opsResult = OpsResult{}
 			response  *ProbeResponse
 			request   = &ProbeRequest{
-				Operation: DescribeUserOp,
+				Operation: util.DescribeUserOp,
 			}
 			// mock a user, describing it as an array of interface{}
 			userInfo = []interface{}{
@@ -370,13 +370,13 @@ func TestRedisAccounts(t *testing.T) {
 			{
 				testName:      "emptymeta",
 				testMetaData:  map[string]string{},
-				expectEveType: RespEveFail,
+				expectEveType: util.RespEveFail,
 				expectEveMsg:  ErrNoUserName.Error(),
 			},
 			{
 				testName:      "nousername",
 				testMetaData:  map[string]string{"password": "moli"},
-				expectEveType: RespEveFail,
+				expectEveType: util.RespEveFail,
 				expectEveMsg:  ErrNoUserName.Error(),
 			},
 			{
@@ -384,7 +384,7 @@ func TestRedisAccounts(t *testing.T) {
 				testMetaData: map[string]string{
 					"userName": userName,
 				},
-				expectEveType: RespEveFail,
+				expectEveType: util.RespEveFail,
 				expectEveMsg:  "redis: nil",
 			},
 			{
@@ -392,14 +392,14 @@ func TestRedisAccounts(t *testing.T) {
 				testMetaData: map[string]string{
 					"userName": userName,
 				},
-				expectEveType: RespEveSucc,
+				expectEveType: util.RespEveSucc,
 			},
 			{
 				testName: "validInputAsMap",
 				testMetaData: map[string]string{
 					"userName": userName,
 				},
-				expectEveType: RespEveSucc,
+				expectEveType: util.RespEveSucc,
 			},
 		}
 
@@ -414,19 +414,19 @@ func TestRedisAccounts(t *testing.T) {
 			assert.NotNil(t, response.Data)
 			err = json.Unmarshal(response.Data, &opsResult)
 			assert.Nil(t, err)
-			assert.Equal(t, accTest.expectEveType, opsResult[RespTypEve], opsResult[RespTypMsg])
+			assert.Equal(t, accTest.expectEveType, opsResult[util.RespTypEve], opsResult[util.RespTypMsg])
 			if len(accTest.expectEveMsg) > 0 {
-				assert.Contains(t, opsResult[RespTypMsg], accTest.expectEveMsg)
+				assert.Contains(t, opsResult[util.RespTypMsg], accTest.expectEveMsg)
 			}
-			if RespEveSucc == opsResult[RespTypEve] {
+			if util.RespEveSucc == opsResult[util.RespTypEve] {
 				// parse user info
-				users := make([]UserInfo, 0)
-				err = json.Unmarshal([]byte(opsResult[RespTypMsg].(string)), &users)
+				users := make([]util.UserInfo, 0)
+				err = json.Unmarshal([]byte(opsResult[util.RespTypMsg].(string)), &users)
 				assert.Nil(t, err)
 				assert.Len(t, users, 1)
 				user := users[0]
 				assert.Equal(t, userName, user.UserName)
-				assert.True(t, SuperUserRole.EqualTo(user.RoleName))
+				assert.True(t, util.SuperUserRole.EqualTo(user.RoleName))
 			}
 		}
 		mock.ClearExpect()
@@ -439,7 +439,7 @@ func TestRedisAccounts(t *testing.T) {
 			opsResult = OpsResult{}
 			response  *ProbeResponse
 			request   = &ProbeRequest{
-				Operation: DeleteUserOp,
+				Operation: util.DeleteUserOp,
 			}
 		)
 
@@ -447,13 +447,13 @@ func TestRedisAccounts(t *testing.T) {
 			{
 				testName:      "emptymeta",
 				testMetaData:  map[string]string{},
-				expectEveType: RespEveFail,
+				expectEveType: util.RespEveFail,
 				expectEveMsg:  ErrNoUserName.Error(),
 			},
 			{
 				testName:      "nousername",
 				testMetaData:  map[string]string{"password": "moli"},
-				expectEveType: RespEveFail,
+				expectEveType: util.RespEveFail,
 				expectEveMsg:  ErrNoUserName.Error(),
 			},
 			{
@@ -461,7 +461,7 @@ func TestRedisAccounts(t *testing.T) {
 				testMetaData: map[string]string{
 					"userName": userName,
 				},
-				expectEveType: RespEveSucc,
+				expectEveType: util.RespEveSucc,
 				expectEveMsg:  fmt.Sprintf("deleted user: %s", userName),
 			},
 		}
@@ -475,33 +475,33 @@ func TestRedisAccounts(t *testing.T) {
 			assert.NotNil(t, response.Data)
 			err = json.Unmarshal(response.Data, &opsResult)
 			assert.Nil(t, err)
-			assert.Equal(t, accTest.expectEveType, opsResult[RespTypEve], opsResult[RespTypMsg])
-			assert.Contains(t, opsResult[RespTypMsg], accTest.expectEveMsg)
+			assert.Equal(t, accTest.expectEveType, opsResult[util.RespTypEve], opsResult[util.RespTypMsg])
+			assert.Contains(t, opsResult[util.RespTypMsg], accTest.expectEveMsg)
 		}
 		mock.ClearExpect()
 	})
 
 	t.Run("RoleName Conversion", func(t *testing.T) {
 		type roleTestCase struct {
-			roleName   RoleType
+			roleName   util.RoleType
 			redisPrivs string
 		}
 		grantTestCases := []roleTestCase{
 			{
-				SuperUserRole,
+				util.SuperUserRole,
 				"+@all allkeys",
 			},
 			{
-				ReadWriteRole,
+				util.ReadWriteRole,
 				"-@all +@write +@read allkeys",
 			},
 			{
-				ReadOnlyRole,
+				util.ReadOnlyRole,
 				"-@all +@read allkeys",
 			},
 		}
 		for _, test := range grantTestCases {
-			cmd := r.role2Priv(GrantUserRoleOp, (string)(test.roleName))
+			cmd := r.role2Priv(util.GrantUserRoleOp, (string)(test.roleName))
 			assert.Equal(t, test.redisPrivs, cmd)
 
 			// allkeys -> ~*
@@ -512,20 +512,20 @@ func TestRedisAccounts(t *testing.T) {
 
 		revokeTestCases := []roleTestCase{
 			{
-				SuperUserRole,
+				util.SuperUserRole,
 				"-@all allkeys",
 			},
 			{
-				ReadWriteRole,
+				util.ReadWriteRole,
 				"-@all -@write -@read allkeys",
 			},
 			{
-				ReadOnlyRole,
+				util.ReadOnlyRole,
 				"-@all -@read allkeys",
 			},
 		}
 		for _, test := range revokeTestCases {
-			cmd := r.role2Priv(RevokeUserRoleOp, (string)(test.roleName))
+			cmd := r.role2Priv(util.RevokeUserRoleOp, (string)(test.roleName))
 			assert.Equal(t, test.redisPrivs, cmd)
 		}
 	})
@@ -534,7 +534,7 @@ func TestRedisAccounts(t *testing.T) {
 		mock.ExpectDo("ACL", "USERS").SetVal([]string{"ape", "default", "kbadmin"})
 
 		response, err := r.Invoke(ctx, &ProbeRequest{
-			Operation: ListSystemAccountsOp,
+			Operation: util.ListSystemAccountsOp,
 		})
 
 		assert.Nil(t, err)
@@ -543,10 +543,10 @@ func TestRedisAccounts(t *testing.T) {
 		// parse result
 		opsResult := OpsResult{}
 		_ = json.Unmarshal(response.Data, &opsResult)
-		assert.Equal(t, RespEveSucc, opsResult[RespTypEve], opsResult[RespTypMsg])
+		assert.Equal(t, util.RespEveSucc, opsResult[util.RespTypEve], opsResult[util.RespTypMsg])
 
 		users := []string{}
-		err = json.Unmarshal([]byte(opsResult[RespTypMsg].(string)), &users)
+		err = json.Unmarshal([]byte(opsResult[util.RespTypMsg].(string)), &users)
 		assert.Nil(t, err)
 		assert.NotEmpty(t, users)
 		assert.Len(t, users, 2)

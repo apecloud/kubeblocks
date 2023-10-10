@@ -32,7 +32,7 @@ import (
 
 	. "github.com/apecloud/kubeblocks/lorry/binding"
 	"github.com/apecloud/kubeblocks/lorry/component"
-	. "github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
 type Etcd struct {
@@ -62,7 +62,7 @@ func (e *Etcd) Init(metadata component.Properties) error {
 	e.InitIfNeed = e.initIfNeed
 	e.DBPort = e.GetRunningPort()
 	e.BaseOperations.GetRole = e.GetRole
-	e.OperationsMap[GetRoleOperation] = e.GetRoleOps
+	e.OperationsMap[util.GetRoleOperation] = e.GetRoleOps
 	return nil
 }
 

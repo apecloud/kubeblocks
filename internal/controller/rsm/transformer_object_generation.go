@@ -524,9 +524,9 @@ func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, templat
 		return nil
 	}
 
-	// if role probe container exists, update the env and serving container port
+	// if role probe container exists, update the readiness probe, env and serving container port
 	if container := tryToGetRoleProbeContainer(); container != nil {
-		// presume the first port is the http port.
+		// presume the second port is the grpc port.
 		// this is an easily broken contract between rsm controller and cluster controller.
 		// TODO(free6om): design a better way to do this after Lorry-WeSyncer separation done
 		readinessProbe.Exec.Command = []string{

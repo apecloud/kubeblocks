@@ -35,7 +35,10 @@ func Service(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 	desired := []*corev1.Service{}
 
 	if reqCtx.GetOteldInstance(monitorv1alpha1.ModeDaemonSet) != nil {
-		svc, _ := buildSvcForOtel(reqCtx.Config, reqCtx.GetOteldInstance(monitorv1alpha1.ModeDaemonSet), reqCtx.Namespace)
+		svc, err := buildSvcForOtel(reqCtx.Config, reqCtx.GetOteldInstance(monitorv1alpha1.ModeDaemonSet), reqCtx.Namespace)
+		if err != nil {
+			return err
+		}
 		if svc != nil {
 			desired = append(desired, svc)
 		}

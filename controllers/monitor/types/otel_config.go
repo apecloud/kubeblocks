@@ -49,7 +49,7 @@ func (cg *OteldConfigGenerater) GenerateOteldConfiguration(instance *OteldInstan
 	if instance == nil || instance.OteldTemplate == nil {
 		return nil, nil
 	}
-	if cg.cache == nil && cg.cache[instance.OteldTemplate.Spec.Mode] != nil {
+	if cg.cache != nil && cg.cache[instance.OteldTemplate.Spec.Mode] != nil {
 		return cg.cache[instance.OteldTemplate.Spec.Mode], nil
 	}
 	cfg := yaml.MapSlice{}
@@ -110,7 +110,7 @@ func newReceiverCreator(name string, datasourceType v1alpha1.DataSourceType, rec
 	for name, params := range receiverMap {
 		tplName := fmt.Sprintf(CUEPathPattern, datasourceType, name)
 		valueMap := map[string]any{}
-		if params.Parameter != "" {
+		if params.CollectionInterval != "" {
 			valueMap["collection_interval"] = params.CollectionInterval
 		}
 		builder.MergeValMapFromYamlStr(valueMap, params.Parameter)

@@ -68,7 +68,7 @@ func fakeInstance() *OteldInstance {
 			{
 				Name: "metrics",
 				ReceiverMap: map[string]Receiver{
-					"apecloudmysql":        {},
+					"apecloudmysql":        {Parameter: "endpoint: test5"},
 					"apecloudkubeletstats": {},
 					"apecloudnode":         {},
 				},

@@ -86,7 +86,10 @@ func MergeValMapFromYamlStr(defaultMap map[string]any, yamlStr string) {
 		defaultMap = map[string]any{}
 	}
 	valMap := map[string]any{}
-	yaml.Unmarshal([]byte(yamlStr), &valMap)
+	err := yaml.Unmarshal([]byte(yamlStr), &valMap)
+	if err != nil {
+		return
+	}
 	for k, v := range valMap {
 		defaultMap[k] = v
 	}

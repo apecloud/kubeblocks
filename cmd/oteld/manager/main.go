@@ -56,7 +56,7 @@ func init() {
 
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
-	viper.SetDefault("OTELD_NAMESPACE", "default")
+	viper.SetDefault(constant.MonitorNamespaceEnvName, "default")
 	viper.AddConfigPath(fmt.Sprintf("/etc/%s/", constant.OTeldAppName))
 	viper.AddConfigPath(fmt.Sprintf("$HOME/.%s", constant.OTeldAppName))
 	viper.AddConfigPath(".")

@@ -41,9 +41,9 @@ func Deployment(reqCtx monitortypes.ReconcileCtx, params monitortypes.OTeldParam
 		namespace = viper.GetString(constant.MonitorNamespaceEnvName)
 	)
 
-	instance := reqCtx.GetOteldInstance(monitorv1alpha1.ModeDaemonSet)
+	instance := reqCtx.GetOteldInstance(monitorv1alpha1.ModeDeployment)
 
-	oteldDaemonset := buildDeploymentForOteld(reqCtx.Config, instance, namespace, OTeldName)
+	oteldDeployment := buildDeploymentForOteld(reqCtx.Config, instance, namespace, OTeldName)
 
 	existingDeployment := &appsv1.Deployment{}
 	err := k8sClient.Get(reqCtx.Ctx, client.ObjectKey{Name: OTeldName, Namespace: namespace}, existingDeployment)
@@ -53,26 +53,26 @@ func Deployment(reqCtx monitortypes.ReconcileCtx, params monitortypes.OTeldParam
 			params.Recorder.Eventf(existingDeployment, corev1.EventTypeWarning, "Failed to find secret", err.Error())
 			return err
 		}
-		if existingDeployment == nil {
+		if oteldDeployment == nil {
 			return nil
 		}
-		return k8sClient.Create(reqCtx.Ctx, oteldDaemonset)
+		return k8sClient.Create(reqCtx.Ctx, oteldDeployment)
 	}
 
-	if oteldDaemonset == nil {
+	if oteldDeployment == nil {
 		return k8sClient.Delete(reqCtx.Ctx, existingDeployment)
 	}
 
-	if reflect.DeepEqual(existingDeployment.Spec, oteldDaemonset.Spec) {
+	if reflect.DeepEqual(existingDeployment.Spec, oteldDeployment.Spec) {
 		return nil
 	}
 
 	updatedDeployment := existingDeployment.DeepCopy()
-	updatedDeployment.Spec = oteldDaemonset.Spec
-	updatedDeployment.Labels = oteldDaemonset.Labels
-	updatedDeployment.Annotations = oteldDaemonset.Annotations
+	updatedDeployment.Spec = oteldDeployment.Spec
+	updatedDeployment.Labels = oteldDeployment.Labels
+	updatedDeployment.Annotations = oteldDeployment.Annotations
 	reqCtx.Log.Info("updating existing daemonset", "daemonset", client.ObjectKeyFromObject(updatedDeployment))
-	return k8sClient.Update(reqCtx.Ctx, oteldDaemonset)
+	return k8sClient.Update(reqCtx.Ctx, oteldDeployment)
 }
 
 func buildDeploymentForOteld(config *monitortypes.Config, instance *monitortypes.OteldInstance, namespace, name string) *appsv1.Deployment {

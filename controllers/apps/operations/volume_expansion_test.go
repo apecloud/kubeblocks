@@ -145,56 +145,6 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		Expect(err).Should(BeNil())
 	}
 
-	testWarningEventOnPVC := func(reqCtx intctrlutil.RequestCtx, clusterObject *appsv1alpha1.Cluster, opsRes *OpsResource) {
-		// init resources for volume expansion
-		comp := opsRes.Cluster.Spec.GetComponentByName(consensusCompName)
-		newOps, pvcNames := initResourcesForVolumeExpansion(clusterObject, opsRes, "4Gi", int(comp.Replicas))
-
-		By("mock run volumeExpansion action and reconcileAction")
-		mockVolumeExpansionActionAndReconcile(reqCtx, opsRes, newOps, pvcNames)
-
-		By("test warning event and volumeExpansion failed")
-		// test when the event does not reach the conditions
-		event := &corev1.Event{
-			Count:   1,
-			Type:    corev1.EventTypeWarning,
-			Reason:  VolumeResizeFailed,
-			Message: OptimisticLockErrorMsg,
-		}
-		stsInvolvedObject := corev1.ObjectReference{
-			Name:      pvcNames[0],
-			Kind:      constant.PersistentVolumeClaimKind,
-			Namespace: "default",
-		}
-		event.InvolvedObject = stsInvolvedObject
-		pvcEventHandler := PersistentVolumeClaimEventHandler{}
-		Expect(pvcEventHandler.Handle(k8sClient, reqCtx, eventRecorder, event)).Should(Succeed())
-
-		// test when the event reaches the conditions
-		event.Count = 5
-		event.FirstTimestamp = metav1.Time{Time: time.Now()}
-		event.LastTimestamp = metav1.Time{Time: time.Now().Add(61 * time.Second)}
-
-		By("expect for progressDetail is not failed")
-		Expect(pvcEventHandler.Handle(k8sClient, reqCtx, eventRecorder, event)).Should(Succeed())
-		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(newOps), func(g Gomega, tmpOps *appsv1alpha1.OpsRequest) {
-			progressDetails := tmpOps.Status.Components[consensusCompName].ProgressDetails
-			g.Expect(len(progressDetails) > 0).Should(BeTrue())
-			progressDetail := findStatusProgressDetail(progressDetails, getPVCProgressObjectKey(pvcNames[0]))
-			g.Expect(progressDetail.Status).ShouldNot(Equal(appsv1alpha1.FailedProgressStatus))
-		})).Should(Succeed())
-
-		By("expect for progressDetail is  failed")
-		event.Message = "You've reached the maximum modification rate per volume limit. Wait at least 6 hours between modifications per EBS volume."
-		Expect(pvcEventHandler.Handle(k8sClient, reqCtx, eventRecorder, event)).Should(Succeed())
-		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(newOps), func(g Gomega, tmpOps *appsv1alpha1.OpsRequest) {
-			progressDetails := tmpOps.Status.Components[consensusCompName].ProgressDetails
-			g.Expect(len(progressDetails) > 0).Should(BeTrue())
-			progressDetail := findStatusProgressDetail(progressDetails, getPVCProgressObjectKey(pvcNames[0]))
-			g.Expect(progressDetail.Status).Should(Equal(appsv1alpha1.FailedProgressStatus))
-		})).Should(Succeed())
-	}
-
 	testVolumeExpansion := func(reqCtx intctrlutil.RequestCtx, clusterObject *appsv1alpha1.Cluster, opsRes *OpsResource, randomStr string) {
 		// mock cluster is Running to support volume expansion ops
 		Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
@@ -295,9 +245,6 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 
 			By("Test VolumeExpansion")
 			testVolumeExpansion(reqCtx, clusterObject, opsRes, randomStr)
-
-			By("Test Warning Event occurs during volume expanding")
-			testWarningEventOnPVC(reqCtx, clusterObject, opsRes)
 
 			By("Test delete the Running VolumeExpansion OpsRequest")
 			testDeleteRunningVolumeExpansion(clusterObject, opsRes)

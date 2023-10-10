@@ -68,7 +68,7 @@ func main() {
 	// set GOMAXPROCS
 	_, _ = maxprocs.Set()
 
-	// set up log
+	// setup log
 	opts := zap.Options{
 		Development: true,
 	}

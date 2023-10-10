@@ -50,12 +50,6 @@ var (
 		TimeoutSeconds:   5,
 		FailureThreshold: 3,
 	}
-
-	defaultRoleProbe = appsv1alpha1.ClusterDefinitionProbe{
-		PeriodSeconds:    2,
-		TimeoutSeconds:   1,
-		FailureThreshold: 3,
-	}
 )
 
 func buildLorryContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedComponent) error {

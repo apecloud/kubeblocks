@@ -495,8 +495,8 @@ func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, templat
 		ProbeHandler: corev1.ProbeHandler{
 			Exec: &corev1.ExecAction{
 				Command: []string{
-					"/bin/grpc_health_probe",
-					fmt.Sprintf("-addr=:%d", probeGRPCPort),
+					grpcHealthProbeBinaryPath,
+					fmt.Sprintf(grpcHealthProbeArgsFormat, probeGRPCPort),
 				},
 			},
 		},
@@ -530,8 +530,8 @@ func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, templat
 		// this is an easily broken contract between rsm controller and cluster controller.
 		// TODO(free6om): design a better way to do this after Lorry-WeSyncer separation done
 		readinessProbe.Exec.Command = []string{
-			"/bin/grpc_health_probe",
-			fmt.Sprintf("-addr=:%d", int(container.Ports[1].ContainerPort)),
+			grpcHealthProbeBinaryPath,
+			fmt.Sprintf(grpcHealthProbeArgsFormat, int(container.Ports[1].ContainerPort)),
 		}
 		container.ReadinessProbe = readinessProbe
 		for _, e := range env {

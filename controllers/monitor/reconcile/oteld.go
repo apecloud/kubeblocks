@@ -60,15 +60,17 @@ func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) (err
 		return err
 	}
 	instanceMap, err := buildOteldInstance(datasources, oteldTemplates)
-	reqCtx.SetOteldInstanceMap(instanceMap)
 
-	for _, template := range oteldTemplates.Items {
-		instance := reqCtx.GetOteldInstance(template.Spec.Mode)
+	for i := 0; i < len(oteldTemplates.Items); i++ {
+		template := oteldTemplates.Items[i]
+		instance := instanceMap[template.Spec.Mode]
 		if instance == nil {
 			continue
 		}
 		instance.OteldTemplate = &template
 	}
+
+	reqCtx.SetOteldInstanceMap(instanceMap)
 	if err != nil {
 		return err
 	}

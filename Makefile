@@ -477,8 +477,8 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v4.5.7
-CONTROLLER_TOOLS_VERSION ?= v0.9.0
+KUSTOMIZE_VERSION ?= v5.1.1
+CONTROLLER_TOOLS_VERSION ?= v0.12.1
 CUE_VERSION ?= v0.4.3
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "$(GITHUB_PROXY)https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
@@ -490,12 +490,15 @@ ifeq (, $(shell ls $(LOCALBIN)/kustomize 2>/dev/null))
 endif
 
 .PHONY: controller-gen
-controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
-$(CONTROLLER_GEN): $(LOCALBIN)
-ifeq (, $(shell ls $(LOCALBIN)/controller-gen 2>/dev/null))
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
-endif
-
+controller-gen: $(LOCALBIN) ## Download controller-gen locally if necessary.
+	@{ \
+	set -e ;\
+	if [ ! -f "$(CONTROLLER_GEN)" ] || [ "$$($(CONTROLLER_GEN) --version 2>&1 | awk '{print $$NF}')" != "$(CONTROLLER_TOOLS_VERSION)" ]; then \
+        echo 'Installing controller-gen@$(CONTROLLER_TOOLS_VERSION)...' ;\
+        GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION) ;\
+        echo 'Successfully installed' ;\
+    fi \
+	}
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
@@ -503,7 +506,6 @@ $(ENVTEST): $(LOCALBIN)
 ifeq (, $(shell ls $(LOCALBIN)/setup-envtest 2>/dev/null))
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 endif
-
 
 .PHONY: install-docker-buildx
 install-docker-buildx: ## Create `docker buildx` builder.
@@ -513,7 +515,6 @@ install-docker-buildx: ## Create `docker buildx` builder.
 	else \
 		echo "Buildx builder $(BUILDX_BUILDER) already exists"; \
 	fi
-
 
 .PHONY: golangci
 golangci: GOLANGCILINT_VERSION = v1.51.2
@@ -664,6 +665,10 @@ else ifeq ($(TEST_TYPE), orioledb)
 	$(HELM) dependency build deploy/orioledb-cluster --skip-refresh
 	$(HELM) upgrade --install orioledb deploy/orioledb
 	$(HELM) template oriole-cluster deploy/orioledb-cluster > test/e2e/testdata/smoketest/orioledb/00_orioledbcluster.yaml
+else ifeq ($(TEST_TYPE), weaviate)
+	$(HELM) dependency build deploy/weaviate-cluster --skip-refresh
+	$(HELM) upgrade --install weaviate deploy/weaviate
+	$(HELM) template weaviate-cluster deploy/weaviate-cluster > test/e2e/testdata/smoketest/weaviate/00_weaviatecluster.yaml
 else
 	$(error "test type does not exist")
 endif
@@ -707,6 +712,8 @@ else ifeq ($(TEST_TYPE), oceanbase)
 	$(HELM) upgrade --install official-postgresql deploy/official-postgresql
 else ifeq ($(TEST_TYPE), openldap)
 	$(HELM) upgrade --install openldap deploy/openldap
+else ifeq ($(TEST_TYPE), weaviate)
+	$(HELM) upgrade --install weaviate deploy/weaviate
 else
 	$(error "test type does not exist")
 endif

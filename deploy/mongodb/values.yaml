@@ -36,6 +36,8 @@ auth:
 logConfigs:
   running: /data/mongodb/logs/mongodb.log*
 
+dataMountPath: /data/mongodb
+
 metrics:
   image:
     registry: registry.cn-hangzhou.aliyuncs.com

@@ -38,7 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/addon"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/alert"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/backup"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/backuprepo"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/bench"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/builder"
@@ -48,6 +47,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/clusterversion"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/context"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/dashboard"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/dataprotection"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/fault"
 	infras "github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
@@ -119,7 +119,7 @@ func NewDefaultCliCmd() *cobra.Command {
 			case "help", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
 				// Don't search for a plugin
 			default:
-				if err := kccmd.HandlePluginCommand(pluginHandler, cmdPathPieces); err != nil {
+				if err := kccmd.HandlePluginCommand(pluginHandler, cmdPathPieces, true); err != nil {
 					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 					os.Exit(1)
 				}
@@ -212,7 +212,7 @@ A Command Line Interface for KubeBlocks`,
 		report.NewReportCmd(f, ioStreams),
 		infras.NewInfraCmd(ioStreams),
 		backuprepo.NewBackupRepoCmd(f, ioStreams),
-		backup.NewBackupCmd(f, ioStreams),
+		dataprotection.NewDataProtectionCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}
@@ -260,7 +260,7 @@ func registerCompletionFuncForGlobalFlags(cmd *cobra.Command, f cmdutil.Factory)
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"namespace",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return utilcomp.CompGetResource(f, cmd, "namespace", toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.CompGetResource(f, "namespace", toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"context",

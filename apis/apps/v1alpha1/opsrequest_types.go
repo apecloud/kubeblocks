@@ -372,11 +372,9 @@ type BackupSpec struct {
 	// +optional
 	BackupPolicyName string `json:"backupPolicyName"`
 
-	// Backup Type. datafile or logfile or snapshot. If not set, datafile is the default type.
-	// +kubebuilder:default=datafile
-	// +kubeBuilder:validation:Enum={datafile,logfile,snapshot}
+	// Backup method name that is defined in backupPolicy.
 	// +optional
-	BackupType string `json:"backupType"`
+	BackupMethod string `json:"backupMethod"`
 
 	// if backupType is incremental, parentBackupName is required.
 	// +optional

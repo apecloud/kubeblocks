@@ -19,7 +19,7 @@
 options: {
 	backupName:   string
 	namespace:    string
-	backupType:   string
+	backupMethod: string
 	backupPolicy: string
 }
 
@@ -35,7 +35,7 @@ content: {
 		}
 	}
 	spec: {
-		backupType:       options.backupType
+		backupMethod:     options.backupMethod
 		backupPolicyName: options.backupPolicy
 	}
 }

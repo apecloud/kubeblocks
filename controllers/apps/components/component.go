@@ -45,7 +45,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
@@ -729,8 +729,8 @@ func (c *rsmComponent) isScaleOutFailed(reqCtx intctrlutil.RequestCtx, cli clien
 	} else if status == backupStatusFailed {
 		return true, nil
 	}
-	for _, name := range d.pvcKeysToRestore() {
-		if status, err := d.checkRestoreStatus(name); err != nil {
+	for i := *c.runningWorkload.Spec.Replicas; i < c.component.Replicas; i++ {
+		if status, err := d.checkRestoreStatus(i); err != nil {
 			return false, err
 		} else if status == backupStatusFailed {
 			return true, nil
@@ -746,9 +746,9 @@ func (c *rsmComponent) restart(reqCtx intctrlutil.RequestCtx, cli client.Client)
 func (c *rsmComponent) expandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	for _, vct := range c.runningWorkload.Spec.VolumeClaimTemplates {
 		var proto *corev1.PersistentVolumeClaimTemplate
-		for _, v := range c.component.VolumeClaimTemplates {
+		for i, v := range c.component.VolumeClaimTemplates {
 			if v.Name == vct.Name {
-				proto = &v
+				proto = &c.component.VolumeClaimTemplates[i]
 				break
 			}
 		}
@@ -1472,7 +1472,7 @@ func ownedKinds() []client.ObjectList {
 		&corev1.ConfigMapList{},
 		&corev1.PersistentVolumeClaimList{}, // TODO(merge): remove it?
 		&policyv1.PodDisruptionBudgetList{},
-		&dataprotectionv1alpha1.BackupPolicyList{},
+		&dpv1alpha1.BackupPolicyList{},
 	}
 }
 

@@ -49,12 +49,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
@@ -109,7 +109,7 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// handle finalizer
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, repo, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, repo, dptypes.DataProtectionFinalizerName, func() (*ctrl.Result, error) {
 		return nil, r.deleteExternalResources(reqCtx, repo)
 	})
 	if res != nil {
@@ -203,7 +203,7 @@ func (r *BackupRepoReconciler) updateStatus(reqCtx intctrlutil.RequestCtx, repo 
 		}
 		repo.Status.Phase = phase
 	}
-	repo.Status.IsDefault = repo.Annotations[constant.DefaultBackupRepoAnnotationKey] == trueVal
+	repo.Status.IsDefault = repo.Annotations[dptypes.DefaultBackupRepoAnnotationKey] == trueVal
 
 	// update other fields
 	if repo.Status.BackupPVCName == "" {
@@ -567,7 +567,7 @@ func (r *BackupRepoReconciler) listAssociatedBackups(
 	var filtered []*dpv1alpha1.Backup
 	for idx := range backupList.Items {
 		backup := &backupList.Items[idx]
-		if backup.Status.Phase == dpv1alpha1.BackupFailed {
+		if backup.Status.Phase == dpv1alpha1.BackupPhaseFailed {
 			continue
 		}
 		filtered = append(filtered, backup)
@@ -867,14 +867,14 @@ func (r *BackupRepoReconciler) deleteSecrets(reqCtx intctrlutil.RequestCtx, repo
 	return nil
 }
 
-func (r *BackupRepoReconciler) mapBackupToRepo(obj client.Object) []ctrl.Request {
+func (r *BackupRepoReconciler) mapBackupToRepo(ctx context.Context, obj client.Object) []ctrl.Request {
 	backup := obj.(*dpv1alpha1.Backup)
 	repoName, ok := backup.Labels[dataProtectionBackupRepoKey]
 	if !ok {
 		return nil
 	}
 	// ignore failed backups
-	if backup.Status.Phase == dpv1alpha1.BackupFailed {
+	if backup.Status.Phase == dpv1alpha1.BackupPhaseFailed {
 		return nil
 	}
 	// we should reconcile the BackupRepo when:
@@ -890,11 +890,11 @@ func (r *BackupRepoReconciler) mapBackupToRepo(obj client.Object) []ctrl.Request
 	return nil
 }
 
-func (r *BackupRepoReconciler) mapProviderToRepos(obj client.Object) []ctrl.Request {
+func (r *BackupRepoReconciler) mapProviderToRepos(ctx context.Context, obj client.Object) []ctrl.Request {
 	return r.providerRefMapper.mapToRequests(obj)
 }
 
-func (r *BackupRepoReconciler) mapSecretToRepos(obj client.Object) []ctrl.Request {
+func (r *BackupRepoReconciler) mapSecretToRepos(ctx context.Context, obj client.Object) []ctrl.Request {
 	// check if the secret is created by this controller
 	owner := metav1.GetControllerOf(obj)
 	if owner != nil {
@@ -917,12 +917,9 @@ func (r *BackupRepoReconciler) mapSecretToRepos(obj client.Object) []ctrl.Reques
 func (r *BackupRepoReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dpv1alpha1.BackupRepo{}).
-		Watches(&source.Kind{Type: &storagev1alpha1.StorageProvider{}},
-			handler.EnqueueRequestsFromMapFunc(r.mapProviderToRepos)).
-		Watches(&source.Kind{Type: &dpv1alpha1.Backup{}},
-			handler.EnqueueRequestsFromMapFunc(r.mapBackupToRepo)).
-		Watches(&source.Kind{Type: &corev1.Secret{}},
-			handler.EnqueueRequestsFromMapFunc(r.mapSecretToRepos)).
+		Watches(&storagev1alpha1.StorageProvider{}, handler.EnqueueRequestsFromMapFunc(r.mapProviderToRepos)).
+		Watches(&dpv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.mapBackupToRepo)).
+		Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(r.mapSecretToRepos)).
 		Owns(&storagev1.StorageClass{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Complete(r)

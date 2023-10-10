@@ -146,7 +146,7 @@ jobs:
     with:
       MAKE_OPS_PRE: "generate"
       IMG: "apecloud/kubeblocks"
-      GO_VERSION: "1.20.5"
+      GO_VERSION: "1.21"
       BUILDX_PLATFORMS: "linux/amd64"
       DOCKERFILE_PATH: "./docker/Dockerfile"
     secrets: inherit
@@ -156,9 +156,9 @@ jobs:
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
     uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.24
     with:
-      MAKE_OPS_PRE: "generate test-go-generate"
+      MAKE_OPS_PRE: "module generate test-go-generate"
       IMG: "apecloud/kubeblocks-tools"
-      GO_VERSION: "1.20.5"
+      GO_VERSION: "1.21"
       BUILDX_PLATFORMS: "linux/amd64"
       DOCKERFILE_PATH: "./docker/Dockerfile-tools"
     secrets: inherit

@@ -29,3 +29,5 @@ images:
 ## @param debugEnabled enables containers' debug logging
 ##
 debugEnabled: true
+
+dataMountPath: /qdrant/storage

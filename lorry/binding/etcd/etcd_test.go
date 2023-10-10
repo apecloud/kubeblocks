@@ -112,8 +112,8 @@ func (e *EmbeddedETCD) Start(peerAddress string) error {
 	cfg.Dir = dir
 	lpurl, _ := url.Parse("http://localhost:0")
 	lcurl, _ := url.Parse(peerAddress)
-	cfg.LPUrls = []url.URL{*lpurl}
-	cfg.LCUrls = []url.URL{*lcurl}
+	cfg.ListenPeerUrls = []url.URL{*lpurl}
+	cfg.ListenClientUrls = []url.URL{*lcurl}
 	e.ETCD, err = embed.StartEtcd(cfg)
 	if err != nil {
 		return err

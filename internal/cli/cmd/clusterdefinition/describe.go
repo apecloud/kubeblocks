@@ -19,7 +19,6 @@ package clusterdefinition
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/dataprotection/utils/boolptr"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -37,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
+	"github.com/apecloud/kubeblocks/internal/dataprotection/utils/boolptr"
 )
 
 var (

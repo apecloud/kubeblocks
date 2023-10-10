@@ -70,10 +70,11 @@ func buildOteldInstance(
 	datasources *v1alpha1.CollectorDataSourceList,
 	templates *v1alpha1.OTeldCollectorTemplateList,
 ) error {
-	err := mergeDatasourceForPipline(reqCtx, datasources)
+	instanceMap, err := BuildInstanceMapForPipline(datasources)
 	if err != nil {
 		return err
 	}
+	reqCtx.SetOteldInstanceMap(instanceMap)
 
 	for _, template := range templates.Items {
 		instance := reqCtx.GetOteldInstance(template.Spec.Mode)
@@ -89,14 +90,15 @@ func buildOteldInstance(
 	return nil
 }
 
-func mergeDatasourceForPipline(reqCtx monitortype.ReconcileCtx, datasources *v1alpha1.CollectorDataSourceList) error {
+func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList) (map[v1alpha1.Mode]*monitortype.OteldInstance, error) {
+	instanceMap := map[v1alpha1.Mode]*monitortype.OteldInstance{}
 	for _, dataSource := range datasources.Items {
 		mode := dataSource.Spec.Mode
 		if mode == "" {
 			mode = DefaultMode
 		}
-		oteldInstance := reqCtx.GetOteldInstance(mode)
-		if oteldInstance == nil {
+		oteldInstance, ok := instanceMap[mode]
+		if !ok {
 			oteldInstance = monitortype.NewOteldInstance()
 		}
 		switch dataSource.Spec.Type {
@@ -125,7 +127,7 @@ func mergeDatasourceForPipline(reqCtx monitortype.ReconcileCtx, datasources *v1a
 			}
 			oteldInstance.LogsPipline = append(oteldInstance.LogsPipline, pipline)
 		}
-		reqCtx.SetOteldInstance(dataSource.Spec.Mode, oteldInstance)
+		instanceMap[dataSource.Spec.Mode] = oteldInstance
 	}
-	return nil
+	return instanceMap, nil
 }

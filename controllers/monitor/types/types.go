@@ -132,6 +132,10 @@ func (c *ReconcileCtx) VerifyOteldInstance(metricsExporterList *v1alpha1.Metrics
 	return nil
 }
 
+func (c *ReconcileCtx) SetOteldInstanceMap(instanceMap map[v1alpha1.Mode]*OteldInstance) {
+	c.OteldInstanceMap = instanceMap
+}
+
 type ReconcileTask interface {
 	Do(reqCtx ReconcileCtx) error
 }

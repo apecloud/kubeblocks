@@ -20,11 +20,34 @@ parameters: {
   container_runtime_type: *"containerd" | string
 }
 
-
-output:
-  runtime_contaienr: {
-	enable: parameters.enable
-  container_runtime_type: parameters.container_runtime_type
+output: {
+	extensions: {
+  	memory_ballast:
+      size_mib: 32
+    apecloud_k8s_observer: {
+    	auth_type: "kubeConfig"
+      node: "${env:NODE_NAME}"
+      observe_pods: true
+      observe_nodes: false
+    }
+    "apecloud_k8s_observer/node": {
+    	auth_type: "kubeConfig"
+      node: "${env:NODE_NAME}"
+      observe_pods: false
+      observe_nodes: true
+    }
+    runtime_container: {
+    	enable: true
+      auth_type: "kubeConfig"
+      kubernetes_node: "${env:NODE_NAME}"
+    }
+    apecloud_engine_observer: {
+    	pod_observer: "apecloud_k8s_observer"
+      container_observer: "runtime_container"
+      scraper_config_file: "/tmp/oteld_test_work/kb_engine.yaml"
+    }
   }
+}
+
 
 

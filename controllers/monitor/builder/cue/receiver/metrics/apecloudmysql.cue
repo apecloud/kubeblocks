@@ -16,21 +16,26 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 parameters: {
-	username: *"${env:MYSQL_USER}" | string
-  password: *"${env:MYSQL_PASSWORD}" | string
+	endpoint: *"`endpoint`:3306" | string
+	username: *"`envs[\"MYSQL_ROOT_USER\"]`" | string
+  password: *"`envs[\"MYSQL_ROOT_PASSWORD\"]" | string
   allow_native_passwords: *true | bool
   transport: *"tcp" | string
-  collection_interval: *"${env:COLLECTION_INTERVAL}" | string
+  collection_interval: *"`settings.CollectionInterval`" | string
 }
-
-
 
 output:
   apecloudmysql: {
-    username: parameters.username
-    password: parameters.password
-    allow_native_passwords: parameters.allow_native_passwords
-    transport: parameters.transport
-    collection_interval: parameters.collection_interval
+  	rule: "type == \"pod\" && monitor_type == \"mysql\""
+  	config:{
+  		endpoint: parameters.endpoint
+  		username: parameters.username
+      password: parameters.password
+      allow_native_passwords: parameters.allow_native_passwords
+      transport: parameters.transport
+      collection_interval: parameters.collection_interval
+  	}
+    resource_attributes:
+      receiver: "apecloudmysql"
   }
 

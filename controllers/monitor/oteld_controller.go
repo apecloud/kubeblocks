@@ -76,11 +76,13 @@ type OTeldReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *OTeldReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	reqCtx := monitortypes.ReconcileCtx{
-		Ctx: ctx,
-		Req: req,
-		Log: log.FromContext(ctx).WithName("OTeldCollectorReconciler"),
+		Ctx:       ctx,
+		Req:       req,
+		Log:       log.FromContext(ctx).WithName("OTeldCollectorReconciler"),
+		Namespace: viper.GetString(constant.MonitorNamespaceEnvName),
 
-		Config: r.Config,
+		Config:      r.Config,
+		OteldCfgRef: &monitortypes.OteldCfgRef{},
 	}
 
 	// TODO prepare required resources

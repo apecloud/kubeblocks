@@ -54,7 +54,7 @@ func NewPipline() Pipline {
 
 func NewOteldInstance() *OteldInstance {
 	return &OteldInstance{
-		MetricsPipline: []Pipline{NewPipline()},
-		LogsPipline:    []Pipline{NewPipline()},
+		MetricsPipline: []Pipline{},
+		LogsPipline:    []Pipline{},
 	}
 }

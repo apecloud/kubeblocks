@@ -67,16 +67,12 @@ spec:
                 - sidecar
                 - statefulset
                 type: string
-              name:
-                description: Name is the name of the data source
-                type: string
               type:
                 description: Type is the type of the data source
                 type: string
             required:
             - dataSourceList
             - exporterRef
-            - name
             - type
             type: object
           status:

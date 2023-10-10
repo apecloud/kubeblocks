@@ -21,7 +21,6 @@ package types
 
 import (
 	"context"
-
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -36,17 +35,17 @@ type OTeldParams struct {
 	Client   client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
-
-	ConfigGenerator *OteldConfigGenerater
 }
 
-//type OteldConfig struct {
-//	AsMap yaml.MapSlice
-//}
-//
-//type OteldCfgRef struct {
-//	Config *OteldConfig
-//}
+type OteldConfig struct {
+	OteldInstanceMap map[v1alpha1.Mode]*OteldInstance
+	Exporters        *Exporters
+	ConfigGenerator  *OteldConfigGenerater
+}
+
+type OteldCfgRef struct {
+	Config *OteldConfig
+}
 
 // ReconcileCtx wrapper for reconcile procedure context parameters
 type ReconcileCtx struct {
@@ -56,47 +55,64 @@ type ReconcileCtx struct {
 	Config    *Config
 	Namespace string
 
-	//OteldCfgRef      *OteldCfgRef
-	OteldInstanceMap map[v1alpha1.Mode]*OteldInstance
-	Exporters        *Exporters
+	OteldCfgRef *OteldCfgRef
 }
 
-//func (c *ReconcileCtx) SetOteldConfig(configAsMap yaml.MapSlice) {
-//	if c.OteldCfgRef == nil {
-//		c.OteldCfgRef = &OteldCfgRef{}
-//	}
-//	c.OteldCfgRef.Config = &OteldConfig{AsMap: configAsMap}
-//}
-//
-//func (c *ReconcileCtx) GetOteldConfigYaml() ([]byte, error) {
-//	if c.OteldCfgRef == nil ||
-//		c.OteldCfgRef.Config == nil ||
-//		c.OteldCfgRef.Config.AsMap == nil {
-//		return nil, cfgcore.MakeError("not found oteld config")
-//	}
-//	return yaml.Marshal(c.OteldCfgRef.Config.AsMap)
-//}
-
-func (c *ReconcileCtx) SetOteldInstance(mode v1alpha1.Mode, instance *OteldInstance) {
-	if c.OteldInstanceMap == nil {
-		c.OteldInstanceMap = make(map[v1alpha1.Mode]*OteldInstance)
+func (c *ReconcileCtx) SetConfigGenerator(cg *OteldConfigGenerater) {
+	if c.OteldCfgRef == nil {
+		c.OteldCfgRef = &OteldCfgRef{}
 	}
-	c.OteldInstanceMap[mode] = instance
+	if c.OteldCfgRef.Config == nil {
+		c.OteldCfgRef.Config = &OteldConfig{}
+	}
+	c.OteldCfgRef.Config.ConfigGenerator = cg
 }
 
-func (c *ReconcileCtx) GetOteldInstance(mode v1alpha1.Mode) *OteldInstance {
-	if c.OteldInstanceMap == nil {
+func (c *ReconcileCtx) GetConfigGenerator() *OteldConfigGenerater {
+	if c.OteldCfgRef == nil ||
+		c.OteldCfgRef.Config == nil ||
+		c.OteldCfgRef.Config.OteldInstanceMap == nil {
 		return nil
 	}
-	return c.OteldInstanceMap[mode]
+	return c.OteldCfgRef.Config.ConfigGenerator
+}
+
+func (c *ReconcileCtx) SetOteldInstanceMap(oteldInstanceMap map[v1alpha1.Mode]*OteldInstance) {
+	if c.OteldCfgRef == nil {
+		c.OteldCfgRef = &OteldCfgRef{}
+	}
+	if c.OteldCfgRef.Config == nil {
+		c.OteldCfgRef.Config = &OteldConfig{}
+	}
+	c.OteldCfgRef.Config.OteldInstanceMap = oteldInstanceMap
+}
+
+func (c *ReconcileCtx) GetOteldConfig() (map[v1alpha1.Mode]*OteldInstance, error) {
+	if c.OteldCfgRef == nil ||
+		c.OteldCfgRef.Config == nil ||
+		c.OteldCfgRef.Config.OteldInstanceMap == nil {
+		return nil, cfgcore.MakeError("not found oteld config")
+	}
+	return c.OteldCfgRef.Config.OteldInstanceMap, nil
 }
 
 func (c *ReconcileCtx) SetExporters(exporters *Exporters) {
-	c.Exporters = exporters
+	if c.OteldCfgRef == nil {
+		c.OteldCfgRef = &OteldCfgRef{}
+	}
+	if c.OteldCfgRef.Config == nil {
+		c.OteldCfgRef.Config = &OteldConfig{}
+	}
+	c.OteldCfgRef.Config.Exporters = exporters
 }
 
 func (c *ReconcileCtx) GetExporters() *Exporters {
-	return c.Exporters
+	if c.OteldCfgRef == nil ||
+		c.OteldCfgRef.Config == nil ||
+		c.OteldCfgRef.Config.Exporters == nil {
+		return nil
+	}
+	return c.OteldCfgRef.Config.Exporters
 }
 
 func (c *ReconcileCtx) VerifyOteldInstance(metricsExporterList *v1alpha1.MetricsExporterSinkList, logsExporterList *v1alpha1.LogsExporterSinkList) error {
@@ -109,11 +125,11 @@ func (c *ReconcileCtx) VerifyOteldInstance(metricsExporterList *v1alpha1.Metrics
 		logMap[string(lExporter.Spec.Type)] = true
 	}
 
-	for _, instance := range c.OteldInstanceMap {
+	for _, instance := range c.OteldCfgRef.Config.OteldInstanceMap {
 		if instance.MetricsPipline != nil {
 			for _, pipline := range instance.MetricsPipline {
 				for key, _ := range pipline.ExporterMap {
-					if _, ok := logMap[key]; !ok {
+					if _, ok := metricsMap[key]; !ok {
 						return cfgcore.MakeError("not found exporter %s", key)
 					}
 				}
@@ -132,8 +148,11 @@ func (c *ReconcileCtx) VerifyOteldInstance(metricsExporterList *v1alpha1.Metrics
 	return nil
 }
 
-func (c *ReconcileCtx) SetOteldInstanceMap(instanceMap map[v1alpha1.Mode]*OteldInstance) {
-	c.OteldInstanceMap = instanceMap
+func (c *ReconcileCtx) GetOteldInstance(mode v1alpha1.Mode) *OteldInstance {
+	if c.OteldCfgRef == nil || c.OteldCfgRef.Config == nil || c.OteldCfgRef.Config.OteldInstanceMap == nil {
+		return nil
+	}
+	return c.OteldCfgRef.Config.OteldInstanceMap[mode]
 }
 
 type ReconcileTask interface {
@@ -159,10 +178,12 @@ func NewReconcileTask(name string, task ReconcileFunc) ReconcileTask {
 	}
 	newTask := func(reqCtx ReconcileCtx) error {
 		reqCtx = ReconcileCtx{
-			Ctx:    reqCtx.Ctx,
-			Req:    reqCtx.Req,
-			Log:    reqCtx.Log.WithValues("subTask", name),
-			Config: reqCtx.Config,
+			Ctx:         reqCtx.Ctx,
+			Req:         reqCtx.Req,
+			Log:         reqCtx.Log.WithValues("subTask", name),
+			Config:      reqCtx.Config,
+			Namespace:   reqCtx.Namespace,
+			OteldCfgRef: reqCtx.OteldCfgRef,
 		}
 		return task(reqCtx)
 	}

@@ -21,7 +21,6 @@ package reconcile
 
 import (
 	"fmt"
-
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -40,86 +39,6 @@ const (
 
 var (
 	defaultMetricsPort = 8888
-
-	env = []corev1.EnvVar{
-		{
-			Name:  "HOST_IP",
-			Value: "0.0.0.0",
-		},
-		{
-			Name:  "HOST_ROOT",
-			Value: "/host/root",
-		},
-		{
-			Name: "POD_NAME",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "metadata.name",
-				},
-			},
-		},
-		{
-			Name: "POD_NAMESPACE",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "metadata.namespace",
-				},
-			},
-		},
-		{
-			Name: "NODE_NAME",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "spec.nodeName",
-				},
-			},
-		},
-	}
-
-	volumeMounts = []corev1.VolumeMount{
-		{
-			Name:      OTeldName,
-			MountPath: "/var/log/oteld",
-		},
-		{
-			Name:      "root",
-			MountPath: "/host/root",
-			ReadOnly:  true,
-		},
-		{
-			Name:      "config-volume",
-			MountPath: "/etc/oteld/config",
-		},
-	}
-
-	hostPathType = corev1.HostPathDirectoryOrCreate
-	volumes      = []corev1.Volume{
-		{
-			Name: OTeldName,
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/etc/oteld",
-					Type: &hostPathType,
-				},
-			},
-		},
-		{
-			Name: "root",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/",
-				},
-			},
-		},
-		{
-			Name: "config-volume",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: OTeldName,
-				},
-			},
-		},
-	}
 )
 
 func buildPodSpecForOteld(config *types.Config, template *v1alpha1.OTeldCollectorTemplate) *corev1.PodSpec {
@@ -156,7 +75,7 @@ func buildSvcForOtel(config *types.Config, instance *types.OteldInstance, namesp
 	}
 
 	name := fmt.Sprintf(OteldServiceNamePattern, instance.OteldTemplate.Spec.Mode)
-	port := defaultMetricsPort
+	port := instance.OteldTemplate.Spec.MetricsPort
 	if instance != nil && instance.OteldTemplate != nil && instance.OteldTemplate.Spec.MetricsPort != 0 {
 		port = instance.OteldTemplate.Spec.MetricsPort
 	}
@@ -222,18 +141,18 @@ func buildConfigMapForOteld(_ *types.Config, instance *types.OteldInstance, name
 	}
 
 	return builder.NewConfigMapBuilder(namespace, name).
-		SetBinaryData(map[string][]byte{"config.yaml": marshal}).
+		SetData(map[string]string{"config.yaml": string(marshal)}).
 		AddLabelsInMap(commonLabels).
 		SetOwnerReferences(instance.OteldTemplate.APIVersion, instance.OteldTemplate.Kind, instance.OteldTemplate).
 		GetObject(), nil
 }
 
 func buildSecretForOteld(_ *types.Config, instance *types.OteldInstance, namespace string, exporters *types.Exporters, gc *types.OteldConfigGenerater) (*corev1.Secret, error) {
-	if instance == nil || instance.OteldTemplate == nil || !instance.OteldTemplate.Spec.UseConfigMap {
+	if instance == nil || instance.OteldTemplate == nil {
 		return nil, nil
 	}
 
-	name := fmt.Sprintf(OteldConfigMapNamePattern, instance.OteldTemplate.Spec.Mode)
+	name := fmt.Sprintf(OteldSecretNamePattern, instance.OteldTemplate.Spec.Mode)
 
 	commonLabels := map[string]string{
 		constant.AppManagedByLabelKey: constant.AppName,

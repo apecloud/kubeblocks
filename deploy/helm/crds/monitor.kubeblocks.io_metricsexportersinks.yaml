@@ -37,14 +37,6 @@ spec:
           spec:
             description: MetricsExporterSinkSpec defines the desired state of MetricsExporterSink
             properties:
-              mode:
-                description: mode defines the mode of the exporterSink
-                enum:
-                - daemonset
-                - deployment
-                - sidecar
-                - statefulset
-                type: string
               prometheusConfig:
                 description: lokiConfig defines the config of the loki
                 properties:

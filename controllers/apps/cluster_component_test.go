@@ -109,7 +109,7 @@ func (c *mockLorryClient) LeaveMember(ctx context.Context) error {
 	return nil
 }
 
-var _ = Describe("Cluster Controller", func() {
+var _ = Describe("Cluster Component", func() {
 	const (
 		clusterDefName     = "test-clusterdef"
 		clusterVersionName = "test-clusterversion"

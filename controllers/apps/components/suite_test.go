@@ -21,6 +21,10 @@ package components
 
 import (
 	"context"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/go-logr/logr"
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	"k8s.io/client-go/tools/record"
 	"path/filepath"
 	"testing"
 
@@ -53,6 +57,8 @@ var testEnv *envtest.Environment
 var ctx context.Context
 var cancel context.CancelFunc
 var testCtx testutil.TestContext
+var logger logr.Logger
+var recorder record.EventRecorder
 
 func init() {
 	viper.AutomaticEnv()
@@ -72,6 +78,8 @@ var _ = BeforeSuite(func() {
 	}
 
 	ctx, cancel = context.WithCancel(context.TODO())
+	logger = logf.FromContext(ctx).WithValues()
+	logger.Info("logger start")
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
@@ -88,10 +96,16 @@ var _ = BeforeSuite(func() {
 	err = appsv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = corev1.AddToScheme(scheme.Scheme)
+	err = dpv1alpha1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = snapshotv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = workloads.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = corev1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme
@@ -108,6 +122,7 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
+	recorder = k8sManager.GetEventRecorderFor("cluster-component")
 	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)
 
 	go func() {

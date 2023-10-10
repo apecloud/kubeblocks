@@ -19,6 +19,7 @@ package clusterdefinition
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/dataprotection/utils/boolptr"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -153,21 +154,25 @@ func showBackupConfig(backupPolicyTemplates []*v1alpha1.BackupPolicyTemplate, ou
 	}
 	fmt.Fprintf(out, "Backup Config:\n")
 	tbl := printer.NewTablePrinter(out)
-	tbl.SetHeader("AUTO-BACKUP", "BACKUP-SCHEDULE", "BACKUP-METHOD", "BACKUP-RETENTION")
 	defaultBackupPolicyTemplate := &v1alpha1.BackupPolicyTemplate{}
+	// if there is only one backup policy template, it will be the default backup policy template
+	if len(backupPolicyTemplates) == 1 {
+		defaultBackupPolicyTemplate = backupPolicyTemplates[0]
+	}
 	for _, item := range backupPolicyTemplates {
 		if item.Annotations[dptypes.DefaultBackupPolicyTemplateAnnotationKey] == "true" {
 			defaultBackupPolicyTemplate = item
 			break
 		}
 	}
+	tbl.SetHeader("BACKUP-METHOD", "ACTION-SET", "SNAPSHOT-VOLUME")
 	for _, policy := range defaultBackupPolicyTemplate.Spec.BackupPolicies {
-		for _, schedule := range policy.Schedules {
-			scheduleEnable := "Disabled"
-			if schedule.Enabled != nil && *schedule.Enabled {
-				scheduleEnable = "Enabled"
+		for _, method := range policy.BackupMethods {
+			snapshotVolume := "false"
+			if boolptr.IsSetToTrue(method.SnapshotVolumes) {
+				snapshotVolume = "true"
 			}
-			tbl.AddRow(scheduleEnable, schedule.CronExpression, schedule.BackupMethod, policy.RetentionPeriod)
+			tbl.AddRow(method.Name, method.ActionSetName, snapshotVolume)
 		}
 	}
 	tbl.Print()

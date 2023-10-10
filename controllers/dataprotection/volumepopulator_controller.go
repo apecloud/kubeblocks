@@ -140,7 +140,7 @@ func (r *VolumePopulatorReconciler) populate(reqCtx intctrlutil.RequestCtx, pvc 
 	if err != nil || wait {
 		return err
 	}
-	// Make sure the PVC finalizer is gone
+	// Make sure the PVC finalizer is present
 	if !slices.Contains(pvc.Finalizers, dptypes.DataProtectionFinalizerName) {
 		pvcPatch := client.MergeFrom(pvc.DeepCopy())
 		controllerutil.AddFinalizer(pvc, dptypes.DataProtectionFinalizerName)

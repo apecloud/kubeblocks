@@ -53,13 +53,13 @@ func (s *GRPCServer) Check(ctx context.Context, in *health.HealthCheckRequest) (
 
 	code, ok := resp.Metadata[StatusCode]
 	if ok && code == OperationFailedHTTPCode {
-		s.logger.Info("Detect event changed", "role", string(resp.Data))
+		s.logger.Info("Role changed event detected", "role", string(resp.Data))
 		return &health.HealthCheckResponse{Status: health.HealthCheckResponse_NOT_SERVING}, errors.New(string(resp.Data))
 	}
 
 	meta, _ := json.Marshal(resp.Metadata)
 
-	s.logger.Info("Nothing happened", "meta", string(meta), "data", string(resp.Data))
+	s.logger.Info("No event detected", "meta", string(meta), "data", string(resp.Data))
 	return &health.HealthCheckResponse{Status: health.HealthCheckResponse_SERVING}, nil
 }
 

@@ -41,6 +41,7 @@ import (
 	. "github.com/apecloud/kubeblocks/lorry/binding"
 	. "github.com/apecloud/kubeblocks/lorry/component"
 	redis3 "github.com/apecloud/kubeblocks/lorry/component/redis"
+	. "github.com/apecloud/kubeblocks/lorry/util"
 )
 
 var (

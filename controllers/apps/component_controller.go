@@ -83,7 +83,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			// handle component connection credential secret object
 			&ComponentCredentialTransformer{},
 			// handle rsm(ReplicatedStateMachine) workload generation
-			&ComponentWorkloadTransformer{},
+			&ComponentWorkloadTransformer{Client: r.Client},
 			// handle tls volume and cert
 			&ComponentTLSTransformer{},
 			// handle configuration rendering

@@ -53,7 +53,7 @@ var (
 	errReqClusterObj = errors.New("required arg *appsv1alpha1.Cluster is nil")
 )
 
-func listObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](
+func ListObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](
 	ctx context.Context, cli client.Client, _ func(T, PT, L, PL), namespace string, labels client.MatchingLabels) ([]PT, error) {
 	var objList L
 	if err := cli.List(ctx, PL(&objList), labels, client.InNamespace(namespace)); err != nil {
@@ -69,15 +69,15 @@ func listObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L g
 }
 
 func listRSMOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*workloads.ReplicatedStateMachine, error) {
-	return listObjWithLabelsInNamespace(ctx, cli, generics.RSMSignature, namespace, labels)
+	return ListObjWithLabelsInNamespace(ctx, cli, generics.RSMSignature, namespace, labels)
 }
 
-func listPodOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*corev1.Pod, error) {
-	return listObjWithLabelsInNamespace(ctx, cli, generics.PodSignature, namespace, labels)
+func ListPodOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*corev1.Pod, error) {
+	return ListObjWithLabelsInNamespace(ctx, cli, generics.PodSignature, namespace, labels)
 }
 
-// restartPod restarts a Pod through updating the pod's annotation
-func restartPod(podTemplate *corev1.PodTemplateSpec) error {
+// RestartPod restarts a Pod through updating the pod's annotation
+func RestartPod(podTemplate *corev1.PodTemplateSpec) error {
 	if podTemplate.Annotations == nil {
 		podTemplate.Annotations = map[string]string{}
 	}
@@ -370,8 +370,8 @@ func replaceKBEnvPlaceholderTokens(clusterName, uid, componentName, strToReplace
 	return componentutil.ReplaceNamedVars(builtInEnvMap, strToReplace, -1, true)
 }
 
-// resolvePodSpecDefaultFields set default value for some known fields of proto PodSpec @pobj.
-func resolvePodSpecDefaultFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
+// ResolvePodSpecDefaultFields set default value for some known fields of proto PodSpec @pobj.
+func ResolvePodSpecDefaultFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	resolveVolume := func(v corev1.Volume, vv *corev1.Volume) {
 		if vv.DownwardAPI != nil && v.DownwardAPI != nil {
 			for i := range vv.DownwardAPI.Items {
@@ -505,15 +505,15 @@ func ConvertRSMToSTS(rsm *workloads.ReplicatedStateMachine) *appsv1.StatefulSet 
 	return sts
 }
 
-// delayUpdatePodSpecSystemFields to delay the updating to system fields in pod spec.
-func delayUpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
+// DelayUpdatePodSpecSystemFields to delay the updating to system fields in pod spec.
+func DelayUpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	for i := range pobj.Containers {
 		delayUpdateKubeBlocksToolsImage(obj.Containers, &pobj.Containers[i])
 	}
 }
 
-// updatePodSpecSystemFields to update system fields in pod spec.
-func updatePodSpecSystemFields(pobj *corev1.PodSpec) {
+// UpdatePodSpecSystemFields to update system fields in pod spec.
+func UpdatePodSpecSystemFields(pobj *corev1.PodSpec) {
 	for i := range pobj.Containers {
 		updateKubeBlocksToolsImage(&pobj.Containers[i])
 	}
@@ -741,7 +741,7 @@ func IsComponentPodsWithLatestRevision(ctx context.Context, cli client.Client,
 	if sts.Status.ObservedGeneration != sts.Generation {
 		return false, nil
 	}
-	pods, err := listPodOwnedByComponent(ctx, cli, rsm.Namespace, rsm.Spec.Selector.MatchLabels)
+	pods, err := ListPodOwnedByComponent(ctx, cli, rsm.Namespace, rsm.Spec.Selector.MatchLabels)
 	if err != nil {
 		return false, err
 	}

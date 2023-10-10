@@ -275,7 +275,7 @@ func (c *rsmComponent) status(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 	isZeroReplica := func() bool {
 		return (c.runningWorkload.Spec.Replicas == nil || *c.runningWorkload.Spec.Replicas == 0) && c.component.Replicas == 0
 	}()
-	pods, err := listPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.getMatchingLabels())
+	pods, err := ListPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.getMatchingLabels())
 	if err != nil {
 		return err
 	}
@@ -714,7 +714,7 @@ func (c *rsmComponent) isScaleOutFailed(reqCtx intctrlutil.RequestCtx, cli clien
 		Namespace: stsObj.Namespace,
 		Name:      stsObj.Name + "-scaling",
 	}
-	d, err := newDataClone(reqCtx, cli, c.Cluster, c.component, stsObj, stsProto, backupKey)
+	d, err := NewDataClone(reqCtx, cli, c.Cluster, c.component, stsObj, stsProto, backupKey)
 	if err != nil {
 		return false, err
 	}
@@ -734,7 +734,7 @@ func (c *rsmComponent) isScaleOutFailed(reqCtx intctrlutil.RequestCtx, cli clien
 }
 
 func (c *rsmComponent) restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return restartPod(&c.runningWorkload.Spec.Template)
+	return RestartPod(&c.runningWorkload.Spec.Template)
 }
 
 func (c *rsmComponent) expandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -1010,7 +1010,7 @@ func (c *rsmComponent) updatePodEnvConfig() {
 }
 
 func (c *rsmComponent) updatePodReplicaLabel4Scaling(reqCtx intctrlutil.RequestCtx, cli client.Client, replicas int32) error {
-	pods, err := listPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.getMatchingLabels())
+	pods, err := ListPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.getMatchingLabels())
 	if err != nil {
 		return err
 	}
@@ -1045,7 +1045,7 @@ func (c *rsmComponent) postScaleIn(reqCtx intctrlutil.RequestCtx, cli client.Cli
 }
 
 func (c *rsmComponent) leaveMember4ScaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
-	pods, err := listPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.getMatchingLabels())
+	pods, err := ListPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.getMatchingLabels())
 	if err != nil {
 		return err
 	}
@@ -1115,7 +1115,7 @@ func (c *rsmComponent) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client
 	c.workloadVertex.Immutable = true
 	rsmProto := c.workloadVertex.Obj.(*workloads.ReplicatedStateMachine)
 	stsProto := ConvertRSMToSTS(rsmProto)
-	d, err := newDataClone(reqCtx, cli, c.Cluster, c.component, stsObj, stsProto, backupKey)
+	d, err := NewDataClone(reqCtx, cli, c.Cluster, c.component, stsObj, stsProto, backupKey)
 	if err != nil {
 		return err
 	}
@@ -1123,7 +1123,7 @@ func (c *rsmComponent) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client
 	if d == nil {
 		succeed = true
 	} else {
-		succeed, err = d.succeed()
+		succeed, err = d.Succeed()
 		if err != nil {
 			return err
 		}
@@ -1135,7 +1135,7 @@ func (c *rsmComponent) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client
 	} else {
 		c.workloadVertex.Immutable = true
 		// update objs will trigger cluster reconcile, no need to requeue error
-		objs, err := d.cloneData(d)
+		objs, err := d.CloneData(d)
 		if err != nil {
 			return err
 		}
@@ -1154,14 +1154,14 @@ func (c *rsmComponent) postScaleOut(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		}
 	)
 
-	d, err := newDataClone(reqCtx, cli, c.Cluster, c.component, stsObj, stsObj, snapshotKey)
+	d, err := NewDataClone(reqCtx, cli, c.Cluster, c.component, stsObj, stsObj, snapshotKey)
 	if err != nil {
 		return err
 	}
 	if d != nil {
 		// clean backup resources.
 		// there will not be any backup resources other than scale out.
-		tmpObjs, err := d.clearTmpResources()
+		tmpObjs, err := d.ClearTmpResources()
 		if err != nil {
 			return err
 		}
@@ -1224,12 +1224,12 @@ func (c *rsmComponent) updateWorkload(rsmObj *workloads.ReplicatedStateMachine) 
 	rsmObjCopy.Spec.MemberUpdateStrategy = rsmProto.Spec.MemberUpdateStrategy
 	rsmObjCopy.Spec.Credential = rsmProto.Spec.Credential
 
-	resolvePodSpecDefaultFields(rsmObj.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
+	ResolvePodSpecDefaultFields(rsmObj.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
 
-	delayUpdatePodSpecSystemFields(rsmObj.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
+	DelayUpdatePodSpecSystemFields(rsmObj.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
 	isTemplateUpdated := !reflect.DeepEqual(&rsmObj.Spec, &rsmObjCopy.Spec)
 	if isTemplateUpdated {
-		updatePodSpecSystemFields(&rsmObjCopy.Spec.Template.Spec)
+		UpdatePodSpecSystemFields(&rsmObjCopy.Spec.Template.Spec)
 	}
 	if isTemplateUpdated || !reflect.DeepEqual(rsmObj.Annotations, rsmObjCopy.Annotations) {
 		c.workloadVertex.Obj = rsmObjCopy
@@ -1240,7 +1240,7 @@ func (c *rsmComponent) updateWorkload(rsmObj *workloads.ReplicatedStateMachine) 
 }
 
 func (c *rsmComponent) updatePDB(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	pdbObjList, err := listObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.PodDisruptionBudgetSignature, c.GetNamespace(), c.getMatchingLabels())
+	pdbObjList, err := ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.PodDisruptionBudgetSignature, c.GetNamespace(), c.getMatchingLabels())
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -1304,7 +1304,7 @@ func (c *rsmComponent) updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.C
 
 func (c *rsmComponent) getRunningVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, vctName string,
 	rsmObj *workloads.ReplicatedStateMachine) ([]*corev1.PersistentVolumeClaim, error) {
-	pvcs, err := listObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.PersistentVolumeClaimSignature, c.GetNamespace(), c.getMatchingLabels())
+	pvcs, err := ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.PersistentVolumeClaimSignature, c.GetNamespace(), c.getMatchingLabels())
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, nil

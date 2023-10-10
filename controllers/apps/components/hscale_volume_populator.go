@@ -42,12 +42,12 @@ import (
 )
 
 type dataClone interface {
-	// succeed check if data clone succeeded
-	succeed() (bool, error)
-	// cloneData do clone data, return objects that need to be created
-	cloneData(dataClone) ([]client.Object, error)
-	// clearTmpResources clear all the temporary resources created during data clone, return objects that need to be deleted
-	clearTmpResources() ([]client.Object, error)
+	// Succeed check if data clone succeeded
+	Succeed() (bool, error)
+	// CloneData do clone data, return objects that need to be created
+	CloneData(dataClone) ([]client.Object, error)
+	// ClearTmpResources clear all the temporary resources created during data clone, return objects that need to be deleted
+	ClearTmpResources() ([]client.Object, error)
 
 	checkBackupStatus() (backupStatus, error)
 	backup() ([]client.Object, error)
@@ -65,7 +65,7 @@ const (
 	backupStatusFailed     backupStatus = "Failed"
 )
 
-func newDataClone(reqCtx intctrlutil.RequestCtx,
+func NewDataClone(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
@@ -132,7 +132,7 @@ type baseDataClone struct {
 	key       types.NamespacedName
 }
 
-func (d *baseDataClone) cloneData(realDataClone dataClone) ([]client.Object, error) {
+func (d *baseDataClone) CloneData(realDataClone dataClone) ([]client.Object, error) {
 	objs := make([]client.Object, 0)
 
 	// check backup ready
@@ -291,15 +291,15 @@ type dummyDataClone struct {
 
 var _ dataClone = &dummyDataClone{}
 
-func (d *dummyDataClone) succeed() (bool, error) {
+func (d *dummyDataClone) Succeed() (bool, error) {
 	return d.checkAllPVCsExist()
 }
 
-func (d *dummyDataClone) cloneData(dataClone) ([]client.Object, error) {
+func (d *dummyDataClone) CloneData(dataClone) ([]client.Object, error) {
 	return d.createPVCs(d.allVCTs())
 }
 
-func (d *dummyDataClone) clearTmpResources() ([]client.Object, error) {
+func (d *dummyDataClone) ClearTmpResources() ([]client.Object, error) {
 	return nil, nil
 }
 
@@ -325,7 +325,7 @@ type snapshotDataClone struct {
 
 var _ dataClone = &snapshotDataClone{}
 
-func (d *snapshotDataClone) succeed() (bool, error) {
+func (d *snapshotDataClone) Succeed() (bool, error) {
 	if len(d.component.VolumeClaimTemplates) == 0 {
 		d.reqCtx.Recorder.Eventf(d.cluster,
 			corev1.EventTypeNormal,
@@ -336,7 +336,7 @@ func (d *snapshotDataClone) succeed() (bool, error) {
 	return d.checkAllPVCsExist()
 }
 
-func (d *snapshotDataClone) clearTmpResources() ([]client.Object, error) {
+func (d *snapshotDataClone) ClearTmpResources() ([]client.Object, error) {
 	allPVCBound, err := d.isAllPVCBound()
 	if err != nil {
 		return nil, err
@@ -528,7 +528,7 @@ type backupDataClone struct {
 
 var _ dataClone = &backupDataClone{}
 
-func (d *backupDataClone) succeed() (bool, error) {
+func (d *backupDataClone) Succeed() (bool, error) {
 	if len(d.component.VolumeClaimTemplates) == 0 {
 		d.reqCtx.Recorder.Eventf(d.cluster,
 			corev1.EventTypeNormal,
@@ -552,7 +552,7 @@ func (d *backupDataClone) succeed() (bool, error) {
 	return true, nil
 }
 
-func (d *backupDataClone) clearTmpResources() ([]client.Object, error) {
+func (d *backupDataClone) ClearTmpResources() ([]client.Object, error) {
 	objs := make([]client.Object, 0)
 	// delete backup
 	ml := d.getBackupMatchingLabels()

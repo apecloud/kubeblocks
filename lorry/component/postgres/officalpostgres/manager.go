@@ -441,6 +441,8 @@ func (mgr *Manager) executeRewind(ctx context.Context) error {
 		return err
 	}
 
+	// TODO: checkpoint
+
 	return nil
 }
 

@@ -20,12 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
@@ -159,13 +162,34 @@ func (o *describeOptions) describeCluster(name string) error {
 	showImages(comps, o.Out)
 
 	// data protection info
-	showDataProtection(o.BackupPolicies, o.BackupSchedules, o.Out)
+	defaultBackupRepo, err := o.getDefaultBackupRepo()
+	if err != nil {
+		return err
+	}
+	showDataProtection(o.BackupPolicies, o.BackupSchedules, defaultBackupRepo, o.Out)
 
 	// events
 	showEvents(o.Cluster.Name, o.Cluster.Namespace, o.Out)
 	fmt.Fprintln(o.Out)
 
 	return nil
+}
+
+func (o *describeOptions) getDefaultBackupRepo() (string, error) {
+	backupRepoListObj, err := o.dynamic.Resource(types.BackupRepoGVR()).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return printer.NoneString, err
+	}
+	for _, item := range backupRepoListObj.Items {
+		repo := dpv1alpha1.BackupRepo{}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, &repo); err != nil {
+			return printer.NoneString, err
+		}
+		if repo.Status.IsDefault {
+			return repo.Name, nil
+		}
+	}
+	return printer.NoneString, nil
 }
 
 func showCluster(c *appsv1alpha1.Cluster, out io.Writer) {
@@ -224,13 +248,13 @@ func showEndpoints(c *appsv1alpha1.Cluster, svcList *corev1.ServiceList, out io.
 	tbl.Print()
 }
 
-func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backupSchedules []dpv1alpha1.BackupSchedule, out io.Writer) {
+func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backupSchedules []dpv1alpha1.BackupSchedule, defaultBackupRepo string, out io.Writer) {
 	if len(backupPolicies) == 0 || len(backupSchedules) == 0 {
 		return
 	}
 	tbl := newTbl(out, "\nData Protection:", "BACKUP-REPO", "AUTO-BACKUP", "BACKUP-SCHEDULE", "BACKUP-METHOD", "BACKUP-RETENTION")
 	for _, schedule := range backupSchedules {
-		backupRepo := printer.NoneString
+		backupRepo := defaultBackupRepo
 		backupMethod := printer.NoneString
 		backupSchedule := printer.NoneString
 		backupRetention := printer.NoneString

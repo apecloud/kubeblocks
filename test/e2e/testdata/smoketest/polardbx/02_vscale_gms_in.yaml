@@ -1,12 +1,12 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  generateName: oracle-cluster-vscale-
+  generateName: gms-vscale-in-
 spec:
-  clusterRef: oracle-cluster
+  clusterRef: pxc
   type: VerticalScaling
   verticalScaling:
-    - componentName: mysql-comp
+    - componentName: gms
       requests:
-        cpu: "1.5"
+        cpu: "1"
         memory: 1Gi

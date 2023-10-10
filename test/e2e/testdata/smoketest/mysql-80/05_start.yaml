@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: cluster-start-
+spec:
+  clusterRef: mysqlcluster
+  ttlSecondsAfterSucceed: 27017
+  type: Start
+  restart:
+    - componentName: mysql

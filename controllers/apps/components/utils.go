@@ -584,7 +584,8 @@ func updateComponentInfoToPods(
 		return err
 	}
 	// list all pods in dag
-	podVertices := ictrltypes.FindAll[*corev1.Pod](dag)
+	graphCli := model.NewGraphClient(cli)
+	pods := graphCli.FindAll(dag, &corev1.Pod{}, true)
 
 	replicasStr := strconv.Itoa(int(component.Replicas))
 	updateAnnotation := func(obj client.Object) {
@@ -602,19 +603,17 @@ func updateComponentInfoToPods(
 			pod.Annotations[constant.ComponentReplicasAnnotationKey] == replicasStr {
 			continue
 		}
-		idx := slices.IndexFunc(podVertices, func(vertex graph.Vertex) bool {
-			v, _ := vertex.(*ictrltypes.LifecycleVertex)
-			return v.Obj.GetName() == pod.Name
+		idx := slices.IndexFunc(pods, func(obj client.Object) bool {
+			return obj.GetName() == pod.Name
 		})
 		// pod already in dag, merge annotations
 		if idx >= 0 {
-			v, _ := podVertices[idx].(*ictrltypes.LifecycleVertex)
-			updateAnnotation(v.Obj)
+			updateAnnotation(pods[idx])
 			continue
 		}
 		// pod not in dag, add a new vertex
 		updateAnnotation(pod)
-		dag.AddVertex(&ictrltypes.LifecycleVertex{Obj: pod, Action: ictrltypes.ActionUpdatePtr()})
+		graphCli.Update(dag, nil, pod)
 	}
 	return nil
 }
@@ -629,7 +628,8 @@ func updateCustomLabelToPods(ctx context.Context,
 		return nil
 	}
 	// list all pods in dag
-	podVertices := ictrltypes.FindAll[*corev1.Pod](dag)
+	graphCli := model.NewGraphClient(cli)
+	pods := graphCli.FindAll(dag, &corev1.Pod{}, true)
 
 	for _, customLabelSpec := range component.CustomLabelSpecs {
 		for _, resource := range customLabelSpec.Resources {
@@ -651,19 +651,17 @@ func updateCustomLabelToPods(ctx context.Context,
 			}
 
 			for i := range podList.Items {
-				idx := slices.IndexFunc(podVertices, func(vertex graph.Vertex) bool {
-					v, _ := vertex.(*ictrltypes.LifecycleVertex)
-					return v.Obj.GetName() == podList.Items[i].Name
+				idx := slices.IndexFunc(pods, func(obj client.Object) bool {
+					return obj.GetName() == podList.Items[i].Name
 				})
 				// pod already in dag, merge labels
 				if idx >= 0 {
-					v, _ := podVertices[idx].(*ictrltypes.LifecycleVertex)
-					updateObjLabel(cluster.Name, string(cluster.UID), component.Name, customLabelSpec, v.Obj)
+					updateObjLabel(cluster.Name, string(cluster.UID), component.Name, customLabelSpec, pods[idx])
 					continue
 				}
 				pod := &podList.Items[i]
 				updateObjLabel(cluster.Name, string(cluster.UID), component.Name, customLabelSpec, pod)
-				dag.AddVertex(&ictrltypes.LifecycleVertex{Obj: pod, Action: ictrltypes.ActionUpdatePtr()})
+				graphCli.Update(dag, nil, pod)
 			}
 		}
 	}

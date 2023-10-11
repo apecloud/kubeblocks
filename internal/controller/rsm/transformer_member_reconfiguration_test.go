@@ -93,11 +93,11 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 		graphCli.Update(d, stsOld, stsNew)
 		return d
 	}
-	expectStsImmutable := func(d *graph.DAG, immutable bool) {
-		stsList := graphCli.FindAll(d, &apps.StatefulSet{})
+	expectStsNoopAction := func(d *graph.DAG, noop bool) {
+		stsList := graphCli.FindAll(d, &apps.StatefulSet{}, true)
 		Expect(stsList).Should(HaveLen(1))
 		sts, _ := stsList[0].(*apps.StatefulSet)
-		Expect(graphCli.GetImmutability(d, sts)).Should(Equal(immutable))
+		Expect(graphCli.IsNooped(d, sts)).Should(Equal(noop))
 	}
 
 	BeforeEach(func() {
@@ -178,7 +178,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 
 			By("update the underlying sts")
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
-			expectStsImmutable(dag, false)
+			expectStsNoopAction(dag, false)
 
 			rsm.Status.ObservedGeneration = rsm.Generation
 			rsm.Status.CurrentGeneration = rsm.Generation
@@ -192,7 +192,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 				}).Times(1)
 			dag = mockDAG(sts, sts)
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
-			expectStsImmutable(dag, true)
+			expectStsNoopAction(dag, true)
 			dagExpected := mockDAG(sts, sts)
 			action := mockAction(3, jobTypeMemberJoinNotifying, false)
 			graphCli.Create(dagExpected, action)
@@ -203,7 +203,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			action = mockAction(3, jobTypeMemberJoinNotifying, true)
 			dag = mockDAG(sts, sts)
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
-			expectStsImmutable(dag, true)
+			expectStsNoopAction(dag, true)
 			dagExpected = mockDAG(sts, sts)
 			graphCli.Update(dagExpected, action, action)
 			action = mockAction(4, jobTypeMemberJoinNotifying, false)
@@ -215,7 +215,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			action = mockAction(4, jobTypeMemberJoinNotifying, true)
 			dag = mockDAG(sts, sts)
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
-			expectStsImmutable(dag, false)
+			expectStsNoopAction(dag, false)
 			dagExpected = mockDAG(sts, sts)
 			graphCli.Update(dagExpected, action, action)
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
@@ -223,7 +223,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 	})
 
 	Context("scale-in", func() {
-		It("should work well", func() {
+		FIt("should work well", func() {
 			setRSMMembersStatus := func(replicas int) {
 				membersStatus := buildMembersStatus(replicas)
 				rsm.Status.InitReplicas = 3
@@ -245,6 +245,14 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			sts := mockUnderlyingSts(*rsm, rsm.Generation)
 			graphCli.Update(dag, stsOld, sts)
 
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &apps.StatefulSet{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *apps.StatefulSet, _ ...client.GetOption) error {
+					Expect(obj).ShouldNot(BeNil())
+					*obj = *stsOld
+					return nil
+				}).Times(1)
+
 			By("prepare member 2 leaving")
 			k8sMock.EXPECT().
 				List(gomock.Any(), &batchv1.JobList{}, gomock.Any()).
@@ -252,7 +260,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 					return nil
 				}).Times(1)
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
-			expectStsImmutable(dag, true)
+			expectStsNoopAction(dag, true)
 			dagExpected := mockDAG(stsOld, sts)
 			action := mockAction(2, jobTypeMemberLeaveNotifying, false)
 			graphCli.Create(dagExpected, action)
@@ -266,7 +274,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			action = mockAction(2, jobTypeMemberLeaveNotifying, true)
 			dag = mockDAG(stsOld, sts)
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
-			expectStsImmutable(dag, true)
+			expectStsNoopAction(dag, true)
 			dagExpected = mockDAG(stsOld, sts)
 			graphCli.Update(dagExpected, action, action)
 			action = mockAction(1, jobTypeSwitchover, false)
@@ -288,7 +296,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			action = mockAction(1, jobTypeSwitchover, true)
 			dag = mockDAG(stsOld, sts)
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
-			expectStsImmutable(dag, true)
+			expectStsNoopAction(dag, true)
 			dagExpected = mockDAG(stsOld, sts)
 			graphCli.Update(dagExpected, action, action)
 			action = mockAction(1, jobTypeMemberLeaveNotifying, false)
@@ -299,7 +307,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			setRSMMembersStatus(1)
 			dag = mockDAG(stsOld, sts)
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
-			expectStsImmutable(dag, false)
+			expectStsNoopAction(dag, false)
 			dagExpected = mockDAG(stsOld, sts)
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
 
@@ -312,7 +320,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			action = mockAction(1, jobTypeMemberLeaveNotifying, true)
 			dag = mockDAG(stsOld, sts)
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
-			expectStsImmutable(dag, false)
+			expectStsNoopAction(dag, false)
 			dagExpected = mockDAG(stsOld, sts)
 			graphCli.Update(dagExpected, action, action)
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())

@@ -41,7 +41,7 @@ func (c *SecretTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 	secrets = graphCli.FindAll(dag, &corev1.Secret{}, true)
 	noneClusterObjects = graphCli.FindAll(dag, &appsv1alpha1.Cluster{}, false)
 	for _, secret := range secrets {
-		graphCli.SetImmutability(dag, secret, true)
+		graphCli.Noop(dag, secret)
 		for _, object := range noneClusterObjects {
 			// manipulate all secrets first
 			if _, ok := object.(*corev1.Secret); !ok {

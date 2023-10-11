@@ -90,13 +90,13 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	}
 
 	sas := createServiceAccounts(serviceAccounts, graphCli, dag, parent)
-	stsList := graphCli.FindAll(dag, &appsv1.StatefulSet{})
+	stsList := graphCli.FindAll(dag, &appsv1.StatefulSet{}, true)
 	for _, sts := range stsList {
 		// serviceaccount must be created before statefulset
 		graphCli.DependOn(dag, sts, sas...)
 	}
 
-	deployList := graphCli.FindAll(dag, &appsv1.Deployment{})
+	deployList := graphCli.FindAll(dag, &appsv1.Deployment{}, true)
 	for _, deploy := range deployList {
 		// serviceaccount must be created before deployment
 		graphCli.DependOn(dag, deploy, sas...)

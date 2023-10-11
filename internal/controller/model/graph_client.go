@@ -49,6 +49,9 @@ type GraphWriter interface {
 	// Noop means not to commit any change made to this obj in the execute phase.
 	Noop(dag *graph.DAG, obj client.Object)
 
+	// IsNooped tells whether this obj is nooped.
+	IsNooped(dag *graph.DAG, obj client.Object) bool
+
 	// DependOn setups dependencies between 'object' and 'dependency',
 	// which will guarantee the Write Order to the K8s cluster of these objects.
 	DependOn(dag *graph.DAG, object client.Object, dependency ...client.Object)
@@ -98,6 +101,18 @@ func (r *realGraphClient) Status(dag *graph.DAG, objOld, objNew client.Object) {
 
 func (r *realGraphClient) Noop(dag *graph.DAG, obj client.Object) {
 	r.doWrite(dag, nil, obj, ActionNoopPtr())
+}
+
+func (r *realGraphClient) IsNooped(dag *graph.DAG, obj client.Object) bool {
+	vertex := r.findMatchedVertex(dag, obj)
+	if vertex == nil {
+		return false
+	}
+	v, _ := vertex.(*ObjectVertex)
+	if v.Action == nil {
+		return false
+	}
+	return *v.Action == NOOP
 }
 
 func (r *realGraphClient) DependOn(dag *graph.DAG, object client.Object, dependency ...client.Object) {

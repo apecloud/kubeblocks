@@ -25,14 +25,12 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
@@ -115,7 +113,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 	//		AddAppInstanceLabel(clusterName).
 	//		AddAppComponentLabel(componentName).
 	//		AddRoleLabel(podRole).
-	//		AddAppManangedByLabel().
+	//		AddAppManagedByLabel().
 	//		AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 	//		Create(&testCtx).GetObject()
 	// }
@@ -181,20 +179,12 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			By("watch warning event from StatefulSet, but mismatch condition ")
 			// wait for StatefulSet created by cluster controller
 			workloadName := clusterName + "-" + statefulMySQLCompName
-			var kd string
-			if controllerutil.IsRSMEnabled() {
-				kd = constant.RSMKind
-				Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: workloadName, Namespace: testCtx.DefaultNamespace},
-					func(g Gomega, fetched *workloads.ReplicatedStateMachine) {
-						g.Expect(fetched.Generation).To(BeEquivalentTo(1))
-					})).Should(Succeed())
-			} else {
-				kd = constant.StatefulSetKind
-				Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: workloadName, Namespace: testCtx.DefaultNamespace},
-					func(g Gomega, fetched *appsv1.StatefulSet) {
-						g.Expect(fetched.Generation).To(BeEquivalentTo(1))
-					})).Should(Succeed())
-			}
+			kd := constant.RSMKind
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: workloadName, Namespace: testCtx.DefaultNamespace},
+				func(g Gomega, fetched *workloads.ReplicatedStateMachine) {
+					g.Expect(fetched.Generation).To(BeEquivalentTo(1))
+				})).Should(Succeed())
+
 			stsInvolvedObject := corev1.ObjectReference{
 				Name:      workloadName,
 				Kind:      kd,

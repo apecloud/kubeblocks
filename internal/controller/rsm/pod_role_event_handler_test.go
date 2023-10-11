@@ -52,7 +52,7 @@ var _ = Describe("pod role label event handler test", func() {
 				Namespace:  pod.Namespace,
 				Name:       pod.Name,
 				UID:        pod.UID,
-				FieldPath:  roleProbeEventFieldPath,
+				FieldPath:  readinessProbeEventFieldPath,
 			}
 			role := workloads.ReplicaRole{
 				Name:       "leader",

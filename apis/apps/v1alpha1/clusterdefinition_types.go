@@ -23,6 +23,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
 // ClusterDefinitionSpec defines the desired state of ClusterDefinition
@@ -303,7 +305,7 @@ type ServiceRefDeclarationSpec struct {
 // ClusterComponentDefinition provides a workload component specification template,
 // with attributes that strongly work with stateful workloads and day-2 operations
 // behaviors.
-// +kubebuilder:validation:XValidation:rule="has(self.workloadType) && self.workloadType == 'Consensus' ?  has(self.consensusSpec) : !has(self.consensusSpec)",message="componentDefs.consensusSpec is required when componentDefs.workloadType is Consensus, and forbidden otherwise"
+// +kubebuilder:validation:XValidation:rule="has(self.workloadType) && self.workloadType == 'Consensus' ? (has(self.consensusSpec) || has(self.rsmSpec)) : !has(self.consensusSpec)",message="componentDefs.consensusSpec(deprecated) or componentDefs.rsmSpec(recommended) is required when componentDefs.workloadType is Consensus, and forbidden otherwise"
 type ClusterComponentDefinition struct {
 	// A component definition name, this name could be used as default name of `Cluster.spec.componentSpecs.name`,
 	// and so this name is need to conform with same validation rules as `Cluster.spec.componentSpecs.name`, that
@@ -378,19 +380,29 @@ type ClusterComponentDefinition struct {
 
 	// statelessSpec defines stateless related spec if workloadType is Stateless.
 	// +optional
+	//+kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
 	StatelessSpec *StatelessSetSpec `json:"statelessSpec,omitempty"`
 
 	// statefulSpec defines stateful related spec if workloadType is Stateful.
 	// +optional
+	//+kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
 	StatefulSpec *StatefulSetSpec `json:"statefulSpec,omitempty"`
 
 	// consensusSpec defines consensus related spec if workloadType is Consensus, required if workloadType is Consensus.
 	// +optional
+	//+kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
 	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
 
 	// replicationSpec defines replication related spec if workloadType is Replication.
 	// +optional
+	//+kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
 	ReplicationSpec *ReplicationSetSpec `json:"replicationSpec,omitempty"`
+
+	// RSMSpec defines workload related spec of this component.
+	// start from KB 0.7.0, RSM(ReplicatedStateMachineSpec) will be the underlying CR which powers all kinds of workload in KB.
+	// RSM is an enhanced stateful workload extension dedicated for heavy-state workloads like databases.
+	// +optional
+	RSMSpec *RSMSpec `json:"rsmSpec,omitempty"`
 
 	// horizontalScalePolicy controls the behavior of horizontal scale.
 	// +optional
@@ -701,6 +713,7 @@ type ClusterDefinitionProbes struct {
 
 	// Probe for DB role changed check.
 	// +optional
+	//+kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
 	RoleProbe *ClusterDefinitionProbe `json:"roleProbe,omitempty"`
 
 	// roleProbeTimeoutAfterPodsReady(in seconds), when all pods of the component are ready,
@@ -879,6 +892,30 @@ type ConsensusMember struct {
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
+}
+
+type RSMSpec struct {
+	// Roles, a list of roles defined in the system.
+	// +optional
+	Roles []workloads.ReplicaRole `json:"roles,omitempty"`
+
+	// RoleProbe provides method to probe role.
+	// +optional
+	RoleProbe *workloads.RoleProbe `json:"roleProbe,omitempty"`
+
+	// MembershipReconfiguration provides actions to do membership dynamic reconfiguration.
+	// +optional
+	MembershipReconfiguration *workloads.MembershipReconfiguration `json:"membershipReconfiguration,omitempty"`
+
+	// MemberUpdateStrategy, Members(Pods) update strategy.
+	// serial: update Members one by one that guarantee minimum component unavailable time.
+	// 		Learner -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly) -> Follower(with AccessMode=readWrite) -> Leader
+	// bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
+	//		Learner, Follower(minority) in parallel -> Follower(majority) -> Leader, keep majority online all the time.
+	// parallel: force parallel
+	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
+	// +optional
+	MemberUpdateStrategy *workloads.MemberUpdateStrategy `json:"memberUpdateStrategy,omitempty"`
 }
 
 type ReplicationSetSpec struct {

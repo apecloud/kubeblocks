@@ -56,3 +56,13 @@ func (builder *JobBuilder) SetSuspend(suspend bool) *JobBuilder {
 	builder.get().Spec.Suspend = &suspend
 	return builder
 }
+
+func (builder *JobBuilder) SetBackoffLimit(limit int32) *JobBuilder {
+	builder.get().Spec.BackoffLimit = &limit
+	return builder
+}
+
+func (builder *JobBuilder) SetTTLSecondsAfterFinished(ttl int32) *JobBuilder {
+	builder.get().Spec.TTLSecondsAfterFinished = &ttl
+	return builder
+}

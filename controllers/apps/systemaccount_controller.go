@@ -38,7 +38,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
@@ -292,7 +291,7 @@ func (r *SystemAccountReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.Cluster{}).
 		Owns(&corev1.Secret{}).
-		Watches(&source.Kind{Type: &batchv1.Job{}}, r.jobCompletionHandler()).
+		Watches(&batchv1.Job{}, r.jobCompletionHandler()).
 		Complete(r)
 }
 
@@ -469,7 +468,7 @@ func (r *SystemAccountReconciler) jobCompletionHandler() *handler.Funcs {
 	// 2. has completed (either successed or failed)
 	// 3. is under deletion (either by user or by TTL, where deletionTimestamp is set)
 	return &handler.Funcs{
-		UpdateFunc: func(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
 			var (
 				jobTerminated = false
 				job           *batchv1.Job
@@ -554,6 +553,6 @@ func (r *SystemAccountReconciler) jobCompletionHandler() *handler.Funcs {
 // existsOperations checks if the cluster is doing operations
 func existsOperations(cluster *appsv1alpha1.Cluster) bool {
 	opsRequestMap, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
-	_, isRestoring := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]
+	_, isRestoring := cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
 	return len(opsRequestMap) > 0 || isRestoring
 }

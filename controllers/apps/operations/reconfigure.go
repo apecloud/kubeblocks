@@ -28,7 +28,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -216,15 +215,11 @@ func (r *reconfigureAction) syncReconfigureOperatorStatus(ctx intctrlutil.Reques
 	}
 
 	item := fetcher.ConfigurationObj.Spec.GetConfigurationItem(configSpec.Name)
-	status := fetcher.ConfigurationObj.Status.GetItemStatus(configSpec.Name)
-	if status == nil || item == nil {
+	if item == nil {
 		return appsv1alpha1.OpsRunningPhase, nil
 	}
 
-	if !configuration.IsApplyConfigChanged(fetcher.ConfigMapObj, *item) {
-		return appsv1alpha1.OpsRunningPhase, nil
-	}
-	switch status.Phase {
+	switch intctrlutil.GetConfigSpecReconcilePhase(fetcher.ConfigMapObj, *item, fetcher.ConfigurationObj.Status.GetItemStatus(configSpec.Name)) {
 	default:
 		return appsv1alpha1.OpsRunningPhase, nil
 	case appsv1alpha1.CFailedAndPausePhase:

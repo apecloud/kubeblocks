@@ -15,17 +15,17 @@ kbcli cluster restore [flags]
   kbcli cluster restore new-cluster-name --backup backup-name
   
   # restore a new cluster from point in time
-  kbcli cluster restore new-cluster-name --restore-to-time "Apr 13,2023 18:40:35 UTC+0800" --source-cluster mycluster
-  kbcli cluster restore new-cluster-name --restore-to-time "2023-04-13T18:40:35+08:00" --source-cluster mycluster
+  kbcli cluster restore new-cluster-name --restore-to-time "Apr 13,2023 18:40:35 UTC+0800" --backup logfile-backup
+  kbcli cluster restore new-cluster-name --restore-to-time "2023-04-13T18:40:35+08:00" --backup logfile-backup
 ```
 
 ### Options
 
 ```
-      --backup string            Backup name
-  -h, --help                     help for restore
-      --restore-to-time string   point in time recovery(PITR)
-      --source-cluster string    source cluster name
+      --backup string                  Backup name
+  -h, --help                           help for restore
+      --restore-to-time string         point in time recovery(PITR)
+      --volume-restore-policy string   the volume claim restore policy, supported values: [Serial, Parallel] (default "Parallel")
 ```
 
 ### Options inherited from parent commands

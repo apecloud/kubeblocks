@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -91,6 +92,9 @@ func newMockStatefulSet(replicas int, name string, labels map[string]string) app
 			UID:       types.UID(uid),
 		},
 		Spec: appsv1.StatefulSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
 			Replicas: func() *int32 { i := int32(replicas); return &i }(),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -199,14 +203,20 @@ func withCDComponent(compType appsv1alpha1.WorkloadType, tpls []appsv1alpha1.Com
 			WorkloadType: compType,
 			Name:         string(compType),
 		}
-		if compType == appsv1alpha1.Consensus {
-			params.Component.ConsensusSpec = &appsv1alpha1.ConsensusSetSpec{
-				Leader: appsv1alpha1.ConsensusMember{
-					Name: "leader",
-				},
-				Followers: []appsv1alpha1.ConsensusMember{
+		if compType == appsv1alpha1.Consensus || compType == appsv1alpha1.Replication {
+			params.Component.RSMSpec = &appsv1alpha1.RSMSpec{
+				Roles: []workloads.ReplicaRole{
 					{
-						Name: "follower",
+						Name:       "leader",
+						IsLeader:   true,
+						AccessMode: workloads.ReadWriteMode,
+						CanVote:    true,
+					},
+					{
+						Name:       "follower",
+						IsLeader:   false,
+						AccessMode: workloads.ReadonlyMode,
+						CanVote:    true,
 					},
 				},
 			}

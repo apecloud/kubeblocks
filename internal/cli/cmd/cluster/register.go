@@ -26,9 +26,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
-	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 	"github.com/asaskevich/govalidator"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -36,6 +36,8 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 )
 
@@ -81,11 +83,12 @@ func newRegisterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 			o.clusterType = cluster.ClusterType(args[0])
 			cmdutil.CheckErr(o.validate())
 			cmdutil.CheckErr(o.run())
+			fmt.Fprint(streams.Out, buildRegisterSuccessExamples(o.clusterType))
 		},
 	}
 	cmd.Flags().StringVarP(&o.source, "source", "S", "", "Specify the cluster type chart source, support a URL or a local file path")
 	cmd.Flags().StringVar(&o.alias, "alias", "", "Set the cluster type alias")
-	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval when register an existed cluster type")
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval when registering an existed cluster type")
 
 	_ = cmd.MarkFlagRequired("source")
 
@@ -166,7 +169,7 @@ func (o *registerOption) run() error {
 		ChartName: o.cachedName,
 	}
 	if err := instance.PreCheck(); err != nil {
-		return fmt.Errorf("register helm chart pre-check failed: %s", err.Error())
+		return fmt.Errorf("the chart of %s pre-check unsuccssful: %s", o.clusterType, err.Error())
 	}
 
 	if o.replace {
@@ -209,4 +212,19 @@ func copyFile(src, dest string) error {
 
 	_, err = io.Copy(destFile, sourceFile)
 	return err
+}
+
+// buildCreateSubCmdsExamples builds the creation examples for the specified clusterType type.
+func buildRegisterSuccessExamples(t cluster.ClusterType) string {
+	exampleTpl := `
+
+cluster type "{{ .ClusterType }}" register successful.
+Use "kbcli cluster create {{ .ClusterType }}" to create a {{ .ClusterType }} cluster
+`
+
+	var builder strings.Builder
+	_ = util.PrintGoTemplate(&builder, exampleTpl, map[string]interface{}{
+		"ClusterType": t.String(),
+	})
+	return templates.Examples(builder.String())
 }

@@ -1,9 +1,0 @@
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: OpsRequest
-metadata:
-  generateName: redis-cluster-upgrade-
-spec:
-  clusterRef: redis-cluster
-  type: Upgrade
-  upgrade:
-    clusterVersionRef: redis-7.0.6-latest

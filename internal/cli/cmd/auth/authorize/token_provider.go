@@ -88,7 +88,6 @@ func (p *TokenProvider) Login(ctx context.Context) (*authenticator.UserInfoRespo
 	if err != nil {
 		return nil, "", errors.Wrap(err, "could not cache tokens")
 	}
-	fmt.Println(tokenResult.IDToken)
 
 	return userInfo, tokenResult.IDToken, nil
 }

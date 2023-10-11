@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: oriole-cluster-vscale-
+spec:
+  clusterRef: oriole-cluster
+  type: VerticalScaling
+  verticalScaling:
+    - componentName: orioledb
+      requests:
+        cpu: "1"
+        memory: 1Gi

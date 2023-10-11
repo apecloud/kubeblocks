@@ -1,0 +1,67 @@
+---
+# Source: openldap-cluster/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openldap-cluster
+  labels:
+    helm.sh/chart: openldap-cluster-0.1.0-alpha.0
+    app.kubernetes.io/name: openldap-cluster
+    app.kubernetes.io/instance: openldap-cluster
+    app.kubernetes.io/version: "2.4.57"
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: openldap-cluster/templates/cluster.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: openldap-cluster
+  labels:
+    helm.sh/chart: openldap-cluster-0.1.0-alpha.0
+    app.kubernetes.io/name: openldap-cluster
+    app.kubernetes.io/instance: openldap-cluster
+    app.kubernetes.io/version: "2.4.57"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  clusterDefinitionRef: openldap
+  clusterVersionRef: openldap-2.4.57
+  terminationPolicy: Halt
+  affinity:
+    topologyKeys: 
+      - kubernetes.io/hostname
+  componentSpecs:
+    - name: openldap
+      componentDefRef: openldap-compdef
+      replicas: 1
+      serviceAccountName: openldap-cluster
+---
+# Source: openldap-cluster/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "openldap-cluster-test-connection"
+  labels:
+    helm.sh/chart: openldap-cluster-0.1.0-alpha.0
+    app.kubernetes.io/name: openldap-cluster
+    app.kubernetes.io/instance: openldap-cluster
+    app.kubernetes.io/version: "2.4.57"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: test-openldap-cluster
+      image: "docker.io/osixia/openldap:1.5.0"
+      command:
+        - "ldapsearch"
+      args:
+        - "-x"
+        - "-H"
+        - "ldap://openldap-cluster-openldap-0.openldap-cluster-openldap-headless.default.svc.cluster.local"
+        - "-b"
+        - "dc=kubeblocks,dc=io"
+        - "-D"
+        - "cn=admin,dc=kubeblocks,dc=io"
+        - "-w"
+        - "admin"
+  restartPolicy: Never

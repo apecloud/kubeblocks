@@ -50,7 +50,7 @@ func MockStatelessPod(testCtx *testutil.TestContext, deploy *appsv1.Deployment, 
 		SetOwnerReferences("apps/v1", constant.ReplicaSetKind, newRs).
 		AddAppInstanceLabel(clusterName).
 		AddAppComponentLabel(componentName).
-		AddAppManangedByLabel().
+		AddAppManagedByLabel().
 		AddContainer(corev1.Container{Name: DefaultNginxContainerName, Image: NginxImage}).
 		Create(testCtx).GetObject()
 }

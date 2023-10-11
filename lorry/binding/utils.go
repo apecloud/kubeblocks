@@ -37,7 +37,9 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	ctlruntime "sigs.k8s.io/controller-runtime"
 
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	. "github.com/apecloud/kubeblocks/lorry/util"
 )
@@ -220,15 +222,26 @@ func String2RoleType(roleName string) RoleType {
 	return CustomizedRole
 }
 
-func SentProbeEvent(ctx context.Context, opsResult OpsResult, log logr.Logger) {
+func SentProbeEvent(ctx context.Context, opsResult OpsResult, resp *ProbeResponse, log logr.Logger) {
 	log.Info(fmt.Sprintf("send event: %v", opsResult))
-	event, err := createProbeEvent(opsResult)
-	if err != nil {
-		log.Error(err, "generate event failed")
-		return
+	roleUpdateMechanism := workloads.NoneUpdate
+	if viper.IsSet(rsmRoleUpdateMechanismVarName) {
+		roleUpdateMechanism = workloads.RoleUpdateMechanism(viper.GetString(rsmRoleUpdateMechanismVarName))
 	}
+	switch roleUpdateMechanism {
+	case workloads.ReadinessProbeEventUpdate:
+		resp.Metadata[StatusCode] = OperationFailedHTTPCode
+	case workloads.DirectAPIServerEventUpdate:
+		event, err := createProbeEvent(opsResult)
+		if err != nil {
+			log.Error(err, "generate event failed")
+			return
+		}
 
-	_ = sendEvent(ctx, log, event)
+		_ = sendEvent(ctx, log, event)
+	default:
+		log.Info(fmt.Sprintf("no event sent, RoleUpdateMechanism: %s", roleUpdateMechanism))
+	}
 }
 
 func createProbeEvent(opsResult OpsResult) (*corev1.Event, error) {

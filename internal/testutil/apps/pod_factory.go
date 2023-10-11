@@ -29,7 +29,7 @@ type MockPodFactory struct {
 
 func NewPodFactory(namespace, name string) *MockPodFactory {
 	f := &MockPodFactory{}
-	f.init(namespace, name,
+	f.Init(namespace, name,
 		&corev1.Pod{
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{},
@@ -39,13 +39,13 @@ func NewPodFactory(namespace, name string) *MockPodFactory {
 }
 
 func (factory *MockPodFactory) AddContainer(container corev1.Container) *MockPodFactory {
-	containers := &factory.get().Spec.Containers
+	containers := &factory.Get().Spec.Containers
 	*containers = append(*containers, container)
 	return factory
 }
 
 func (factory *MockPodFactory) AddVolume(volume corev1.Volume) *MockPodFactory {
-	volumes := &factory.get().Spec.Volumes
+	volumes := &factory.Get().Spec.Volumes
 	if volumes == nil {
 		volumes = &[]corev1.Volume{}
 	}
@@ -54,6 +54,6 @@ func (factory *MockPodFactory) AddVolume(volume corev1.Volume) *MockPodFactory {
 }
 
 func (factory *MockPodFactory) AddNodeName(nodeName string) *MockPodFactory {
-	factory.get().Spec.NodeName = nodeName
+	factory.Get().Spec.NodeName = nodeName
 	return factory
 }

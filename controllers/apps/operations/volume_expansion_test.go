@@ -24,7 +24,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -160,7 +159,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 			Count:   1,
 			Type:    corev1.EventTypeWarning,
 			Reason:  VolumeResizeFailed,
-			Message: "You've reached the maximum modification rate per volume limit. Wait at least 6 hours between modifications per EBS volume.",
+			Message: OptimisticLockErrorMsg,
 		}
 		stsInvolvedObject := corev1.ObjectReference{
 			Name:      pvcNames[0],
@@ -175,12 +174,24 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		event.Count = 5
 		event.FirstTimestamp = metav1.Time{Time: time.Now()}
 		event.LastTimestamp = metav1.Time{Time: time.Now().Add(61 * time.Second)}
+
+		By("expect for progressDetail is not failed")
 		Expect(pvcEventHandler.Handle(k8sClient, reqCtx, eventRecorder, event)).Should(Succeed())
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(newOps), func(g Gomega, tmpOps *appsv1alpha1.OpsRequest) {
 			progressDetails := tmpOps.Status.Components[consensusCompName].ProgressDetails
 			g.Expect(len(progressDetails) > 0).Should(BeTrue())
 			progressDetail := findStatusProgressDetail(progressDetails, getPVCProgressObjectKey(pvcNames[0]))
-			g.Expect(progressDetail.Status == appsv1alpha1.FailedProgressStatus).Should(BeTrue())
+			g.Expect(progressDetail.Status).ShouldNot(Equal(appsv1alpha1.FailedProgressStatus))
+		})).Should(Succeed())
+
+		By("expect for progressDetail is  failed")
+		event.Message = "You've reached the maximum modification rate per volume limit. Wait at least 6 hours between modifications per EBS volume."
+		Expect(pvcEventHandler.Handle(k8sClient, reqCtx, eventRecorder, event)).Should(Succeed())
+		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(newOps), func(g Gomega, tmpOps *appsv1alpha1.OpsRequest) {
+			progressDetails := tmpOps.Status.Components[consensusCompName].ProgressDetails
+			g.Expect(len(progressDetails) > 0).Should(BeTrue())
+			progressDetail := findStatusProgressDetail(progressDetails, getPVCProgressObjectKey(pvcNames[0]))
+			g.Expect(progressDetail.Status).Should(Equal(appsv1alpha1.FailedProgressStatus))
 		})).Should(Succeed())
 	}
 

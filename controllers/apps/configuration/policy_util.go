@@ -31,9 +31,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
+	"github.com/apecloud/kubeblocks/internal/common"
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
@@ -57,7 +59,13 @@ func getReplicationSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 func GetComponentPods(params reconfigureParams) ([]corev1.Pod, error) {
 	componentPods := make([]corev1.Pod, 0)
 	for i := range params.ComponentUnits {
-		pods, err := components.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, &params.ComponentUnits[i])
+		pods, err := common.GetPodListByStatefulSetWithSelector(params.Ctx.Ctx,
+			params.Client,
+			&params.ComponentUnits[i],
+			client.MatchingLabels{
+				constant.KBAppComponentLabelKey: params.ClusterComponent.Name,
+				constant.AppInstanceLabelKey:    params.Cluster.Name,
+			})
 		if err != nil {
 			return nil, err
 		}
@@ -87,8 +95,7 @@ func getStatefulSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 		return nil, core.MakeError("statefulSet component require only one statefulset, actual %d components", len(params.ComponentUnits))
 	}
 
-	stsObj := &params.ComponentUnits[0]
-	pods, err := components.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, stsObj)
+	pods, err := GetComponentPods(params)
 	if err != nil {
 		return nil, err
 	}
@@ -110,19 +117,21 @@ func getConsensusPods(params reconfigureParams) ([]corev1.Pod, error) {
 		return nil, nil
 	}
 
-	stsObj := &params.ComponentUnits[0]
-	pods, err := components.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, stsObj)
+	pods, err := GetComponentPods(params)
+	// stsObj := &params.ComponentUnits[0]
+	// pods, err := components.GetPodListByStatefulSetWithSelector(params.Ctx.Ctx, params.Client, stsObj, client.MatchingLabels{
+	//	constant.KBAppComponentLabelKey: params.ClusterComponent.Name,
+	//	constant.AppInstanceLabelKey:    params.Cluster.Name,
+	// })
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO: should resolve the dependency on consensus module
-	components.SortPods(pods, components.ComposeRolePriorityMap(params.Component.ConsensusSpec), constant.RoleLabelKey)
-	r := make([]corev1.Pod, 0, len(pods))
-	for i := len(pods); i > 0; i-- {
-		r = append(r, pods[i-1:i]...)
+	if params.Component.RSMSpec != nil {
+		rsm.SortPods(pods, rsm.ComposeRolePriorityMap(params.Component.RSMSpec.Roles), true)
 	}
-	return r, nil
+	return pods, nil
 }
 
 // TODO commonOnlineUpdateWithPod migrate to sql command pipeline

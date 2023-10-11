@@ -201,6 +201,7 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		StatefulSpec:          clusterCompDefObj.StatefulSpec,
 		ConsensusSpec:         clusterCompDefObj.ConsensusSpec,
 		ReplicationSpec:       clusterCompDefObj.ReplicationSpec,
+		RSMSpec:               clusterCompDefObj.RSMSpec,
 		PodSpec:               clusterCompDefObj.PodSpec,
 		Probes:                clusterCompDefObj.Probes,
 		LogConfigs:            clusterCompDefObj.LogConfigs,
@@ -243,7 +244,7 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		reqCtx.Log.Error(err, "build pod affinity failed.")
 		return nil, err
 	}
-	component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(cluster, affinity, component)
+	component.PodSpec.TopologySpreadConstraints = BuildPodTopologySpreadConstraints(cluster, affinity, component)
 	if component.PodSpec.Tolerations, err = BuildTolerations(cluster, clusterCompSpec); err != nil {
 		reqCtx.Log.Error(err, "build pod tolerations failed.")
 		return nil, err
@@ -278,18 +279,17 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
-	// probe container requires a service account with adequate privileges.
-	// If probes are required and the serviceAccountName is not set,
+	buildMonitorConfig(clusterCompDefObj, clusterCompSpec, component)
+
+	// lorry container requires a service account with adequate privileges.
+	// If lorry required and the serviceAccountName is not set,
 	// a default serviceAccountName will be assigned.
 	if component.ServiceAccountName == "" && component.Probes != nil {
 		component.ServiceAccountName = "kb-" + component.ClusterName
 	}
-
 	// set component.PodSpec.ServiceAccountName
 	component.PodSpec.ServiceAccountName = component.ServiceAccountName
-
-	buildMonitorConfig(clusterCompDefObj, clusterCompSpec, component)
-	if err = buildProbeContainers(reqCtx, component); err != nil {
+	if err = buildLorryContainers(reqCtx, component); err != nil {
 		reqCtx.Log.Error(err, "build probe container failed.")
 		return nil, err
 	}

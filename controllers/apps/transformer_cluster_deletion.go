@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -34,12 +33,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // ClusterDeletionTransformer handles cluster deletion
@@ -201,11 +199,8 @@ func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
 	nonNamespacedKindsPlus := []client.ObjectList{
 		&rbacv1.ClusterRoleBindingList{},
 	}
-	if intctrlutil.IsRSMEnabled() {
-		namespacedKindsPlus = append(namespacedKindsPlus, &workloads.ReplicatedStateMachineList{})
-	} else {
-		namespacedKindsPlus = append(namespacedKindsPlus, &corev1.ServiceList{}, &appsv1.StatefulSetList{}, &appsv1.DeploymentList{})
-	}
+	namespacedKindsPlus = append(namespacedKindsPlus, &workloads.ReplicatedStateMachineList{})
+
 	return append(namespacedKinds, namespacedKindsPlus...), append(nonNamespacedKinds, nonNamespacedKindsPlus...)
 }
 
@@ -215,8 +210,10 @@ func kindsForDelete() ([]client.ObjectList, []client.ObjectList) {
 		&corev1.SecretList{},
 		&corev1.ConfigMapList{},
 		&corev1.PersistentVolumeClaimList{},
-		&dataprotectionv1alpha1.BackupPolicyList{},
+		&dpv1alpha1.BackupPolicyList{},
+		&dpv1alpha1.BackupScheduleList{},
 		&batchv1.JobList{},
+		&dpv1alpha1.RestoreList{},
 	}
 	return append(namespacedKinds, namespacedKindsPlus...), nonNamespacedKinds
 }
@@ -224,7 +221,7 @@ func kindsForDelete() ([]client.ObjectList, []client.ObjectList) {
 func kindsForWipeOut() ([]client.ObjectList, []client.ObjectList) {
 	namespacedKinds, nonNamespacedKinds := kindsForDelete()
 	namespacedKindsPlus := []client.ObjectList{
-		&dataprotectionv1alpha1.BackupList{},
+		&dpv1alpha1.BackupList{},
 	}
 	return append(namespacedKinds, namespacedKindsPlus...), nonNamespacedKinds
 }

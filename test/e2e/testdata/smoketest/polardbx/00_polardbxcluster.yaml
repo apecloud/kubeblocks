@@ -1,0 +1,74 @@
+---
+# Source: polardbx-cluster/templates/cluster.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: pxc
+  labels:
+    
+    helm.sh/chart: polardbx-cluster-0.1.0
+    app.kubernetes.io/name: pxc
+    app.kubernetes.io/instance: pxc
+    app.kubernetes.io/version: "v1.4.1"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  clusterDefinitionRef: polardbx
+  clusterVersionRef: polardbx-v1.4.1
+  terminationPolicy: WipeOut
+  componentSpecs:
+    - name: gms
+      componentDefRef: gms
+      replicas: 3
+      resources:
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+        requests:
+          cpu: "1"
+          memory: "1Gi"
+      volumeClaimTemplates:
+        - name: data   # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+    - name: dn-0
+      componentDefRef: dn
+      replicas: 3
+      resources:
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+        requests:
+          cpu: "1"
+          memory: "1Gi"
+      volumeClaimTemplates:
+        - name: data   # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage:  20Gi
+    - name: cn
+      componentDefRef: cn
+      replicas: 2
+      resources:
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+        requests:
+          cpu: "1"
+          memory: "1Gi"
+    - name: cdc
+      componentDefRef: cdc
+      replicas: 2
+      resources:
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+        requests:
+          cpu: "1"
+          memory: "1Gi"

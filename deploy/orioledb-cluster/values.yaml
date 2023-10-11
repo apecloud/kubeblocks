@@ -32,3 +32,9 @@ requests:
 ## @param storage size, the unit is Gi
 ##
 storage: 20
+
+## @param patroni etcd cluster name, if not set will use the cluster name "etcd"
+## and the cluster must exist,
+etcd:
+  cluster: "etcd"
+  namespace: "default"

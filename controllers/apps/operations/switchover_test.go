@@ -153,7 +153,7 @@ var _ = Describe("", func() {
 				AddContainer(container).
 				AddAppInstanceLabel(clusterObj.Name).
 				AddAppComponentLabel(consensusComp).
-				AddAppManangedByLabel().
+				AddAppManagedByLabel().
 				SetReplicas(2).
 				Create(&testCtx).GetObject()
 

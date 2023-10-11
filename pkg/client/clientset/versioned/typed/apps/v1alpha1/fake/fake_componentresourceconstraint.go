@@ -24,7 +24,6 @@ import (
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -35,9 +34,9 @@ type FakeComponentResourceConstraints struct {
 	Fake *FakeAppsV1alpha1
 }
 
-var componentresourceconstraintsResource = schema.GroupVersionResource{Group: "apps.kubeblocks.io", Version: "v1alpha1", Resource: "componentresourceconstraints"}
+var componentresourceconstraintsResource = v1alpha1.SchemeGroupVersion.WithResource("componentresourceconstraints")
 
-var componentresourceconstraintsKind = schema.GroupVersionKind{Group: "apps.kubeblocks.io", Version: "v1alpha1", Kind: "ComponentResourceConstraint"}
+var componentresourceconstraintsKind = v1alpha1.SchemeGroupVersion.WithKind("ComponentResourceConstraint")
 
 // Get takes name of the componentResourceConstraint, and returns the corresponding componentResourceConstraint object, and an error if there is any.
 func (c *FakeComponentResourceConstraints) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ComponentResourceConstraint, err error) {

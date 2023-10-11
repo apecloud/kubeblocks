@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: official-pg-hscale-out-
+spec:
+  clusterRef: official-pg
+  type: HorizontalScaling
+  horizontalScaling:
+    - componentName: postgresql
+      replicas: 3

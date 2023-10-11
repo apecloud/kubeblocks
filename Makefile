@@ -477,8 +477,8 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v4.5.7
-CONTROLLER_TOOLS_VERSION ?= v0.9.0
+KUSTOMIZE_VERSION ?= v5.1.1
+CONTROLLER_TOOLS_VERSION ?= v0.12.1
 CUE_VERSION ?= v0.4.3
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "$(GITHUB_PROXY)https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
@@ -490,12 +490,15 @@ ifeq (, $(shell ls $(LOCALBIN)/kustomize 2>/dev/null))
 endif
 
 .PHONY: controller-gen
-controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
-$(CONTROLLER_GEN): $(LOCALBIN)
-ifeq (, $(shell ls $(LOCALBIN)/controller-gen 2>/dev/null))
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
-endif
-
+controller-gen: $(LOCALBIN) ## Download controller-gen locally if necessary.
+	@{ \
+	set -e ;\
+	if [ ! -f "$(CONTROLLER_GEN)" ] || [ "$$($(CONTROLLER_GEN) --version 2>&1 | awk '{print $$NF}')" != "$(CONTROLLER_TOOLS_VERSION)" ]; then \
+        echo 'Installing controller-gen@$(CONTROLLER_TOOLS_VERSION)...' ;\
+        GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION) ;\
+        echo 'Successfully installed' ;\
+    fi \
+	}
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
@@ -503,7 +506,6 @@ $(ENVTEST): $(LOCALBIN)
 ifeq (, $(shell ls $(LOCALBIN)/setup-envtest 2>/dev/null))
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 endif
-
 
 .PHONY: install-docker-buildx
 install-docker-buildx: ## Create `docker buildx` builder.
@@ -513,7 +515,6 @@ install-docker-buildx: ## Create `docker buildx` builder.
 	else \
 		echo "Buildx builder $(BUILDX_BUILDER) already exists"; \
 	fi
-
 
 .PHONY: golangci
 golangci: GOLANGCILINT_VERSION = v1.51.2
@@ -646,8 +647,39 @@ else ifeq ($(TEST_TYPE), kafka)
 	$(HELM) template kafka-cluster deploy/kafka-cluster > test/e2e/testdata/smoketest/kafka/00_kafkacluster.yaml
 else ifeq ($(TEST_TYPE), foxlake)
 	$(HELM) dependency build deploy/foxlake-cluster --skip-refresh
-	$(HELM) upgrade --install etcd deploy/foxlake
+	$(HELM) upgrade --install foxlake deploy/foxlake
 	$(HELM) template foxlake-cluster deploy/foxlake-cluster > test/e2e/testdata/smoketest/foxlake/00_foxlakecluster.yaml
+else ifeq ($(TEST_TYPE), oceanbase)
+	$(HELM) dependency build deploy/oceanbase-cluster --skip-refresh
+	$(HELM) upgrade --install oceanbase deploy/oceanbase
+	$(HELM) template oceanbase-cluster deploy/oceanbase-cluster > test/e2e/testdata/smoketest/oceanbase/00_oceanbasecluster.yaml
+else ifeq ($(TEST_TYPE), official-postgresql)
+	$(HELM) dependency build deploy/official-postgresql-cluster --skip-refresh
+	$(HELM) upgrade --install official-postgresql deploy/official-postgresql
+	$(HELM) template official-pg deploy/official-postgresql-cluster > test/e2e/testdata/smoketest/official-postgresql/00_official_pgcluster.yaml
+else ifeq ($(TEST_TYPE), openldap)
+	$(HELM) dependency build deploy/openldap-cluster --skip-refresh
+	$(HELM) upgrade --install openldap deploy/openldap
+	$(HELM) template openldap-cluster deploy/openldap-cluster > test/e2e/testdata/smoketest/openldap/00_openldapcluster.yaml
+else ifeq ($(TEST_TYPE), orioledb)
+	$(HELM) dependency build deploy/orioledb-cluster --skip-refresh
+	$(HELM) upgrade --install orioledb deploy/orioledb
+	$(HELM) template oriole-cluster deploy/orioledb-cluster > test/e2e/testdata/smoketest/orioledb/00_orioledbcluster.yaml
+else ifeq ($(TEST_TYPE), weaviate)
+	$(HELM) dependency build deploy/weaviate-cluster --skip-refresh
+	$(HELM) upgrade --install weaviate deploy/weaviate
+	$(HELM) template weaviate-cluster deploy/weaviate-cluster > test/e2e/testdata/smoketest/weaviate/00_weaviatecluster.yaml
+else ifeq ($(TEST_TYPE), mysql-80)
+	$(HELM) dependency build deploy/mysql-cluster --skip-refresh
+	$(HELM) upgrade --install mysql deploy/mysql
+	$(HELM) template mysqlcluster deploy/mysql-cluster > test/e2e/testdata/smoketest/mysql-80/00_mysqlcluster.yaml
+else ifeq ($(TEST_TYPE), mysql-57)
+	$(HELM) dependency build deploy/mysql-cluster --skip-refresh
+	$(HELM) upgrade --install mysql deploy/mysql
+else ifeq ($(TEST_TYPE), polardbx)
+	$(HELM) dependency build deploy/polardbx-cluster --skip-refresh
+	$(HELM) upgrade --install polardbx deploy/polardbx
+	$(HELM) template pxc deploy/polardbx-cluster > test/e2e/testdata/smoketest/polardbx/00_polardbxcluster.yaml
 else
 	$(error "test type does not exist")
 endif
@@ -685,6 +717,20 @@ else ifeq ($(TEST_TYPE), kafka)
 	$(HELM) upgrade --install kafka deploy/kafka
 else ifeq ($(TEST_TYPE), foxlake)
 	$(HELM) upgrade --install foxlake deploy/foxlake
+else ifeq ($(TEST_TYPE), oceanbase)
+	$(HELM) upgrade --install oceanbase deploy/oceanbase
+else ifeq ($(TEST_TYPE), oceanbase)
+	$(HELM) upgrade --install official-postgresql deploy/official-postgresql
+else ifeq ($(TEST_TYPE), openldap)
+	$(HELM) upgrade --install openldap deploy/openldap
+else ifeq ($(TEST_TYPE), weaviate)
+	$(HELM) upgrade --install weaviate deploy/weaviate
+else ifeq ($(TEST_TYPE), mysql-80)
+	$(HELM) upgrade --install mysql deploy/mysql
+else ifeq ($(TEST_TYPE), mysql-57)
+	$(HELM) upgrade --install mysql deploy/mysql
+else ifeq ($(TEST_TYPE), polardbx)
+	$(HELM) upgrade --install polardbx deploy/polardbx
 else
 	$(error "test type does not exist")
 endif

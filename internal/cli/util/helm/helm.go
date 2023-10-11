@@ -183,7 +183,7 @@ func (i *InstallOpts) Install(cfg *Config) (*release.Release, error) {
 	}
 
 	var rel *release.Release
-	if err := retry.IfNecessary(ctx, func() error {
+	if err = retry.IfNecessary(ctx, func() error {
 		release, err1 := i.tryInstall(actionCfg)
 		if err1 != nil {
 			return err1
@@ -213,7 +213,8 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (*release.Release, e
 	// If a release does not exist, install it.
 	histClient := action.NewHistory(cfg)
 	histClient.Max = 1
-	if _, err := histClient.Run(i.Name); err != nil && err != driver.ErrReleaseNotFound {
+	if _, err := histClient.Run(i.Name); err != nil &&
+		!errors.Is(err, driver.ErrReleaseNotFound) {
 		return nil, err
 	}
 

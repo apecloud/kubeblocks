@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -34,6 +35,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/configuration/validate"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -97,6 +99,7 @@ func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, localO
 func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent, localObjs []client.Object, configuration *appsv1alpha1.Configuration) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
+	revision := fromConfiguration(configuration)
 	for _, configSpec := range component.ConfigTemplates {
 		var item *appsv1alpha1.ConfigurationItemDetail
 		cmName := core.GetComponentCfgName(cluster.Name, component.Name, configSpec.Name)
@@ -121,8 +124,40 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster
 		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, newCMObj, scheme, configuration); err != nil {
 			return err
 		}
+		if err := updateConfigMetaForCM(newCMObj, item, revision); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+func fromConfiguration(configuration *appsv1alpha1.Configuration) string {
+	if configuration == nil {
+		return ""
+	}
+	return strconv.FormatInt(configuration.GetGeneration(), 10)
+}
+
+func updateConfigMetaForCM(newCMObj *corev1.ConfigMap, item *appsv1alpha1.ConfigurationItemDetail, revision string) (err error) {
+	if item == nil {
+		return
+	}
+
+	annotations := newCMObj.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	b, err := json.Marshal(item)
+	if err != nil {
+		return err
+	}
+	annotations[constant.ConfigAppliedVersionAnnotationKey] = string(b)
+	hash, _ := cfgutil.ComputeHash(newCMObj.Data)
+	annotations[constant.CMInsCurrentConfigurationHashLabelKey] = hash
+	annotations[constant.ConfigurationRevision] = revision
+	annotations[constant.CMConfigurationTemplateVersion] = item.Version
+	newCMObj.Annotations = annotations
+	return
 }
 
 func applyUpdatedParameters(item *appsv1alpha1.ConfigurationItemDetail, cm *corev1.ConfigMap, configSpec appsv1alpha1.ComponentConfigSpec, cli client.Client, ctx context.Context) (err error) {
@@ -309,7 +344,7 @@ func generateConfigMapFromTpl(cluster *appsv1alpha1.Cluster,
 	}
 
 	// Using ConfigMap cue template render to configmap of config
-	return factory.BuildConfigMapWithTemplate(cluster, component, configs, cmName, configConstraintName, templateSpec)
+	return factory.BuildConfigMapWithTemplate(cluster, component, configs, cmName, templateSpec), nil
 }
 
 // renderConfigMapTemplate renders config file using template engine

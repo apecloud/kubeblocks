@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/editor"
 
@@ -88,13 +87,8 @@ func (o *CustomEditOptions) Run(originalObj runtime.Object) error {
 		edited = original
 	}
 
-	dynamicClient, err := o.Factory.DynamicClient()
-	if err != nil {
-		return fmt.Errorf("failed to get dynamic client: %v", err)
-	}
 	// apply validation
-	fieldValidationVerifier := resource.NewQueryParamVerifier(dynamicClient, o.Factory.OpenAPIGetter(), resource.QueryParamFieldValidation)
-	schemaValidator, err := o.Factory.Validator(metav1.FieldValidationStrict, fieldValidationVerifier)
+	schemaValidator, err := o.Factory.Validator(metav1.FieldValidationStrict)
 	if err != nil {
 		return fmt.Errorf("failed to get validator: %v", err)
 	}

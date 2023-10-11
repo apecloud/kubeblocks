@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: openldap-cluster-vscale-
+spec:
+  clusterRef: openldap-cluster
+  type: VerticalScaling
+  verticalScaling:
+    - componentName: openldap
+      requests:
+        cpu: "1"
+        memory: 1Gi

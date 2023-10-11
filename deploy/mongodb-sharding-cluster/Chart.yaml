@@ -1,7 +1,7 @@
 annotations:
   category: Database
 apiVersion: v2
-name: mongodb-cluster
+name: mongodb-sharding-cluster
 type: application
 version: 0.7.0-alpha.0
 description: A MongoDB cluster Helm chart for KubeBlocks

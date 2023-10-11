@@ -30,9 +30,9 @@ kbcli cluster backup NAME [flags]
 
 ```
   -h, --help            help for backup
+      --method string   Backup method that defined in backup policy (required)
       --name string     Backup name
       --policy string   Backup policy name, this flag will be ignored when backup-type is snapshot
-      --type string     Backup type (default "snapshot")
 ```
 
 ### Options inherited from parent commands

@@ -106,7 +106,6 @@ func (mysqlOps *MysqlOperations) Init(metadata component.Properties) error {
 	mysqlOps.DBType = "mysql"
 	// mysqlOps.InitIfNeed = mysqlOps.initIfNeed
 	mysqlOps.BaseOperations.GetRole = mysqlOps.GetRole
-	mysqlOps.BaseOperations.GetGlobalInfo = mysqlOps.GetGlobalInfo
 	mysqlOps.DBPort = config.GetDBPort()
 
 	mysqlOps.RegisterOperationOnDBReady(GetRoleOperation, mysqlOps.GetRoleOps, manager)
@@ -115,7 +114,6 @@ func (mysqlOps *MysqlOperations) Init(metadata component.Properties) error {
 	mysqlOps.RegisterOperationOnDBReady(CheckStatusOperation, mysqlOps.CheckStatusOps, manager)
 	mysqlOps.RegisterOperationOnDBReady(ExecOperation, mysqlOps.ExecOps, manager)
 	mysqlOps.RegisterOperationOnDBReady(QueryOperation, mysqlOps.QueryOps, manager)
-	mysqlOps.RegisterOperationOnDBReady(GetGlobalInfoOperation, mysqlOps.GetGlobalInfoOps, manager)
 
 	// following are ops for account management
 	mysqlOps.RegisterOperationOnDBReady(ListUsersOp, mysqlOps.listUsersOps, manager)
@@ -161,7 +159,7 @@ func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, requ
 	cluster := k8sStore.GetClusterFromCache()
 	if cluster == nil || !cluster.IsLocked() {
 		return "", nil
-	} else if !dcsStore.HasLock() {
+	} else if !dcsStore.HasLease() {
 		return SECONDARY, nil
 	}
 

@@ -51,10 +51,14 @@ var _ = Describe("job builder", func() {
 		}
 		selectorKey, selectorValue := "foo", "bar"
 		suspend := true
+		limit := int32(5)
+		ttl := int32(12)
 		job := NewJobBuilder(ns, name).
 			SetPodTemplateSpec(template).
 			AddSelector(selectorKey, selectorValue).
 			SetSuspend(suspend).
+			SetBackoffLimit(limit).
+			SetTTLSecondsAfterFinished(ttl).
 			GetObject()
 
 		Expect(job.Name).Should(Equal(name))
@@ -65,5 +69,9 @@ var _ = Describe("job builder", func() {
 		Expect(job.Spec.Selector.MatchLabels[selectorKey]).Should(Equal(selectorValue))
 		Expect(job.Spec.Suspend).ShouldNot(BeNil())
 		Expect(*job.Spec.Suspend).Should(Equal(suspend))
+		Expect(job.Spec.BackoffLimit).ShouldNot(BeNil())
+		Expect(*job.Spec.BackoffLimit).Should(Equal(limit))
+		Expect(job.Spec.TTLSecondsAfterFinished).ShouldNot(BeNil())
+		Expect(*job.Spec.TTLSecondsAfterFinished).Should(Equal(ttl))
 	})
 })

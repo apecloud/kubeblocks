@@ -38,6 +38,8 @@ BackupRepo command.
 
 
 * [kbcli backuprepo create](kbcli_backuprepo_create.md)	 - Create a backup repo
+* [kbcli backuprepo describe](kbcli_backuprepo_describe.md)	 - Describe a backuprepo.
+* [kbcli backuprepo list](kbcli_backuprepo_list.md)	 - List BackupRepo.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package officalpostgres
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strings"
@@ -199,8 +200,6 @@ func TestIsCurrentMemberHealthy(t *testing.T) {
 	})
 
 	t.Run("current member is healthy", func(t *testing.T) {
-		mock.ExpectQuery("select").
-			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow("off"))
 		mock.ExpectExec(`create table if not exists`).
 			WillReturnResult(pgxmock.NewResult("CREATE TABLE", 0))
 		mock.ExpectQuery("select").
@@ -210,25 +209,7 @@ func TestIsCurrentMemberHealthy(t *testing.T) {
 		assert.True(t, isCurrentMemberHealthy)
 	})
 
-	t.Run("get replication mode failed", func(t *testing.T) {
-		mock.ExpectQuery("select").
-			WillReturnError(fmt.Errorf("some error"))
-
-		isCurrentMemberHealthy := manager.IsCurrentMemberHealthy(ctx, cluster)
-		assert.False(t, isCurrentMemberHealthy)
-	})
-
-	t.Run("not sync to leader", func(t *testing.T) {
-		mock.ExpectQuery("select").
-			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow("on"))
-
-		isCurrentMemberHealthy := manager.IsCurrentMemberHealthy(ctx, cluster)
-		assert.False(t, isCurrentMemberHealthy)
-	})
-
 	t.Run("write check failed", func(t *testing.T) {
-		mock.ExpectQuery("select").
-			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow("off"))
 		mock.ExpectExec(`create table if not exists`).
 			WillReturnError(fmt.Errorf("some error"))
 
@@ -238,8 +219,6 @@ func TestIsCurrentMemberHealthy(t *testing.T) {
 
 	t.Run("read check failed", func(t *testing.T) {
 		cluster.Leader.Name = "test"
-		mock.ExpectQuery("select").
-			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow("off"))
 		mock.ExpectQuery("select").
 			WillReturnError(fmt.Errorf("some error"))
 
@@ -301,6 +280,12 @@ func TestGetWalPositionWithHost(t *testing.T) {
 	manager, mock, _ := MockDatabase(t)
 	defer mock.Close()
 
+	t.Run("check is leader failed", func(t *testing.T) {
+		res, err := manager.getWalPositionWithHost(ctx, "test")
+		assert.NotNil(t, err)
+		assert.Zero(t, res)
+	})
+
 	t.Run("get primary wal position success", func(t *testing.T) {
 		manager.SetIsLeader(true)
 		mock.ExpectQuery("pg_catalog.pg_current_wal_lsn()").
@@ -311,7 +296,7 @@ func TestGetWalPositionWithHost(t *testing.T) {
 		assert.Equal(t, int64(23454272), res)
 	})
 
-	t.Run("get secondary wal position", func(t *testing.T) {
+	t.Run("get secondary wal position success", func(t *testing.T) {
 		manager.SetIsLeader(false)
 		mock.ExpectQuery("pg_last_wal_replay_lsn()").
 			WillReturnRows(pgxmock.NewRows([]string{"pg_wal_lsn_diff"}).AddRow(23454272))
@@ -331,7 +316,7 @@ func TestGetWalPositionWithHost(t *testing.T) {
 
 		res, err := manager.getWalPositionWithHost(ctx, "")
 		assert.NotNil(t, err)
-		assert.Equal(t, int64(0), res)
+		assert.Zero(t, res)
 	})
 
 	t.Run("get secondary wal position failed", func(t *testing.T) {
@@ -343,7 +328,7 @@ func TestGetWalPositionWithHost(t *testing.T) {
 
 		res, err := manager.getWalPositionWithHost(ctx, "")
 		assert.NotNil(t, err)
-		assert.Equal(t, int64(0), res)
+		assert.Zero(t, res)
 	})
 
 	t.Run("op time has been set", func(t *testing.T) {
@@ -369,14 +354,6 @@ func TestGetSyncStandbys(t *testing.T) {
 	t.Run("query failed", func(t *testing.T) {
 		mock.ExpectQuery("select").
 			WillReturnError(fmt.Errorf("some error"))
-
-		standbys := manager.getSyncStandbys(ctx)
-		assert.Nil(t, standbys)
-	})
-
-	t.Run("parse query failed", func(t *testing.T) {
-		mock.ExpectQuery("select").
-			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}))
 
 		standbys := manager.getSyncStandbys(ctx)
 		assert.Nil(t, standbys)
@@ -465,7 +442,7 @@ func TestGetReceivedTimeLine(t *testing.T) {
 		mock.ExpectQuery("select").
 			WillReturnRows(pgxmock.NewRows([]string{"received_tli"}).AddRow(1))
 
-		timeLine := manager.getReceivedTimeLine(ctx)
+		timeLine := manager.getReceivedTimeLine(ctx, "")
 		assert.Equal(t, int64(1), timeLine)
 	})
 
@@ -473,7 +450,7 @@ func TestGetReceivedTimeLine(t *testing.T) {
 		mock.ExpectQuery("select").
 			WillReturnError(fmt.Errorf("some error"))
 
-		timeLine := manager.getReceivedTimeLine(ctx)
+		timeLine := manager.getReceivedTimeLine(ctx, "")
 		assert.Equal(t, int64(0), timeLine)
 	})
 
@@ -481,19 +458,8 @@ func TestGetReceivedTimeLine(t *testing.T) {
 		mock.ExpectQuery("select").
 			WillReturnRows(pgxmock.NewRows([]string{"received_tli"}))
 
-		timeLine := manager.getReceivedTimeLine(ctx)
+		timeLine := manager.getReceivedTimeLine(ctx, "")
 		assert.Equal(t, int64(0), timeLine)
-	})
-
-	t.Run("received timeline has been set", func(t *testing.T) {
-		manager.DBState = &dcs.DBState{
-			Extra: map[string]string{
-				postgres.TimeLine: "1",
-			},
-		}
-
-		timeLine := manager.getReceivedTimeLine(ctx)
-		assert.Equal(t, int64(1), timeLine)
 	})
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -643,10 +609,59 @@ func TestIsMemberLagging(t *testing.T) {
 	cluster.Leader = &dcs.Leader{
 		DBState: &dcs.DBState{
 			OpTimestamp: 100,
+			Extra: map[string]string{
+				postgres.TimeLine: "1",
+			},
 		},
 	}
+
+	t.Run("get replication mode failed", func(t *testing.T) {
+		mock.ExpectQuery("select").
+			WillReturnError(fmt.Errorf("some error"))
+
+		isLagging, lag := manager.IsMemberLagging(ctx, cluster, currentMember)
+		assert.True(t, isLagging)
+		assert.Equal(t, int64(1), lag)
+	})
+
+	t.Run("not sync to leader", func(t *testing.T) {
+		mock.ExpectQuery("select").
+			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow("on"))
+
+		isLagging, lag := manager.IsMemberLagging(ctx, cluster, currentMember)
+		assert.True(t, isLagging)
+		assert.Equal(t, int64(1), lag)
+	})
+
+	t.Run("get timeline failed", func(t *testing.T) {
+		manager.SetIsLeader(true)
+		mock.ExpectQuery("select").
+			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow("off"))
+		mock.ExpectQuery("SELECT timeline_id").
+			WillReturnError(fmt.Errorf("some error"))
+
+		isLagging, lag := manager.IsMemberLagging(ctx, cluster, currentMember)
+		assert.True(t, isLagging)
+		assert.Equal(t, int64(1), lag)
+	})
+
+	t.Run("timeline not match", func(t *testing.T) {
+		manager.SetIsLeader(true)
+		mock.ExpectQuery("select").
+			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow("off"))
+		mock.ExpectQuery("SELECT timeline_id").
+			WillReturnRows(pgxmock.NewRows([]string{"timeline_id"}).AddRow(2))
+		isLagging, lag := manager.IsMemberLagging(ctx, cluster, currentMember)
+		assert.True(t, isLagging)
+		assert.Equal(t, int64(1), lag)
+	})
+
 	t.Run("get wal position failed", func(t *testing.T) {
 		manager.SetIsLeader(true)
+		mock.ExpectQuery("select").
+			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow("off"))
+		mock.ExpectQuery("SELECT timeline_id").
+			WillReturnRows(pgxmock.NewRows([]string{"timeline_id"}).AddRow(1))
 		mock.ExpectQuery("pg_catalog.pg_current_wal_lsn()").
 			WillReturnError(fmt.Errorf("some error"))
 
@@ -657,6 +672,10 @@ func TestIsMemberLagging(t *testing.T) {
 
 	t.Run("current member is not lagging", func(t *testing.T) {
 		manager.SetIsLeader(true)
+		mock.ExpectQuery("select").
+			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow("off"))
+		mock.ExpectQuery("SELECT timeline_id").
+			WillReturnRows(pgxmock.NewRows([]string{"timeline_id"}).AddRow(1))
 		mock.ExpectQuery("pg_catalog.pg_current_wal_lsn()").
 			WillReturnRows(pgxmock.NewRows([]string{"pg_wal_lsn_diff"}).AddRow(100))
 
@@ -679,7 +698,7 @@ func TestGetCurrentTimeLine(t *testing.T) {
 		mock.ExpectQuery("SELECT timeline_id").
 			WillReturnError(fmt.Errorf("some error"))
 
-		timeline := manager.getCurrentTimeLine(ctx)
+		timeline := manager.getCurrentTimeLine(ctx, "")
 		assert.Equal(t, int64(0), timeline)
 	})
 
@@ -687,7 +706,7 @@ func TestGetCurrentTimeLine(t *testing.T) {
 		mock.ExpectQuery("SELECT timeline_id").
 			WillReturnRows(pgxmock.NewRows([]string{"timeline_id"}))
 
-		timeline := manager.getCurrentTimeLine(ctx)
+		timeline := manager.getCurrentTimeLine(ctx, "")
 		assert.Equal(t, int64(0), timeline)
 	})
 
@@ -695,24 +714,35 @@ func TestGetCurrentTimeLine(t *testing.T) {
 		mock.ExpectQuery("SELECT timeline_id").
 			WillReturnRows(pgxmock.NewRows([]string{"timeline_id"}).AddRow(1))
 
-		timeline := manager.getCurrentTimeLine(ctx)
-		assert.Equal(t, int64(1), timeline)
-	})
-
-	t.Run("timeline has been set", func(t *testing.T) {
-		manager.DBState = &dcs.DBState{
-			Extra: map[string]string{
-				postgres.TimeLine: "1",
-			},
-		}
-
-		timeline := manager.getCurrentTimeLine(ctx)
+		timeline := manager.getCurrentTimeLine(ctx, "")
 		assert.Equal(t, int64(1), timeline)
 	})
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled expectations: %v", err)
 	}
+}
+
+func TestGetTimeLineWithHost(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := MockDatabase(t)
+	defer mock.Close()
+
+	t.Run("check is leader failed", func(t *testing.T) {
+		timeLine := manager.getTimeLineWithHost(ctx, "test")
+		assert.Zero(t, timeLine)
+	})
+
+	t.Run("timeLine has been set", func(t *testing.T) {
+		manager.DBState = &dcs.DBState{
+			Extra: map[string]string{
+				postgres.TimeLine: "1",
+			},
+		}
+
+		timeLine := manager.getTimeLineWithHost(ctx, "")
+		assert.Equal(t, int64(1), timeLine)
+	})
 }
 
 func TestGetLocalTimeLineAndLsn(t *testing.T) {
@@ -770,6 +800,9 @@ func TestGetDBState(t *testing.T) {
 	ctx := context.TODO()
 	manager, mock, _ := MockDatabase(t)
 	defer mock.Close()
+	defer func() {
+		postgres.LocalCommander = postgres.NewExecCommander
+	}()
 	cluster := &dcs.Cluster{}
 
 	t.Run("check is leader failed", func(t *testing.T) {
@@ -839,6 +872,28 @@ func TestGetDBState(t *testing.T) {
 		assert.Nil(t, dbState)
 	})
 
+	t.Run("get pg control data failed", func(t *testing.T) {
+		mock.ExpectQuery("select").
+			WillReturnRows(pgxmock.NewRows([]string{"pg_is_in_recovery"}).AddRow(true))
+		mock.ExpectQuery("select").
+			WillReturnRows(pgxmock.NewRows([]string{"current_setting"}).AddRow("off"))
+		mock.ExpectQuery("pg_last_wal_replay_lsn()").
+			WillReturnRows(pgxmock.NewRows([]string{"pg_wal_lsn_diff"}).AddRow(23454272))
+		mock.ExpectQuery("pg_catalog.pg_last_wal_receive_lsn()").
+			WillReturnRows(pgxmock.NewRows([]string{"pg_wal_lsn_diff"}).AddRow(23454273))
+		mock.ExpectQuery("select").
+			WillReturnRows(pgxmock.NewRows([]string{"received_tli"}).AddRow(1))
+		mock.ExpectQuery("pg_catalog.pg_settings").
+			WillReturnRows(pgxmock.NewRows([]string{"name", "setting", "context"}).
+				AddRow("primary_conninfo", "host=maple72-postgresql-0.maple72-postgresql-headless port=5432 application_name=my-application", "postmaster"))
+		postgres.LocalCommander = postgres.NewFakeCommander(func() error {
+			return fmt.Errorf("some error")
+		}, nil, nil)
+
+		dbState := manager.GetDBState(ctx, cluster)
+		assert.Nil(t, dbState)
+	})
+
 	t.Run("get db state success", func(t *testing.T) {
 		mock.ExpectQuery("select").
 			WillReturnRows(pgxmock.NewRows([]string{"pg_is_in_recovery"}).AddRow(true))
@@ -853,6 +908,13 @@ func TestGetDBState(t *testing.T) {
 		mock.ExpectQuery("pg_catalog.pg_settings").
 			WillReturnRows(pgxmock.NewRows([]string{"name", "setting", "context"}).
 				AddRow("primary_conninfo", "host=maple72-postgresql-0.maple72-postgresql-headless port=5432 application_name=my-application", "postmaster"))
+		fakeControlData := "WAL block size:                       8192\n" +
+			"Database cluster state:               shut down"
+
+		var stdout = bytes.NewBuffer([]byte(fakeControlData))
+		postgres.LocalCommander = postgres.NewFakeCommander(func() error {
+			return nil
+		}, stdout, nil)
 
 		dbState := manager.GetDBState(ctx, cluster)
 		isSet, isLeader := manager.GetIsLeader()
@@ -864,6 +926,8 @@ func TestGetDBState(t *testing.T) {
 		assert.Equal(t, "1", dbState.Extra[postgres.TimeLine])
 		assert.Equal(t, "maple72-postgresql-0.maple72-postgresql-headless", manager.recoveryParams[postgres.PrimaryConnInfo]["host"])
 		assert.Equal(t, "postmaster", manager.recoveryParams[postgres.PrimaryConnInfo]["context"])
+		assert.Equal(t, "shut down", manager.pgControlData["Database cluster state"])
+		assert.Equal(t, "8192", manager.pgControlData["WAL block size"])
 	})
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -939,4 +1003,46 @@ func TestHasOtherHealthyMembers(t *testing.T) {
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled expectations: %v", err)
 	}
+}
+
+func TestGetPgControlData(t *testing.T) {
+	manager, mock, _ := MockDatabase(t)
+	defer mock.Close()
+	defer func() {
+		postgres.LocalCommander = postgres.NewExecCommander
+	}()
+
+	t.Run("get pg control data failed", func(t *testing.T) {
+		postgres.LocalCommander = postgres.NewFakeCommander(func() error {
+			return fmt.Errorf("some error")
+		}, nil, nil)
+
+		data := manager.getPgControlData()
+		assert.Nil(t, data)
+	})
+
+	t.Run("get pg control data success", func(t *testing.T) {
+		fakeControlData := "pg_control version number:            1002\n" +
+			"Data page checksum version:           0"
+
+		var stdout = bytes.NewBuffer([]byte(fakeControlData))
+		postgres.LocalCommander = postgres.NewFakeCommander(func() error {
+			return nil
+		}, stdout, nil)
+
+		data := manager.getPgControlData()
+		assert.NotNil(t, data)
+		assert.Equal(t, "1002", data["pg_control version number"])
+		assert.Equal(t, "0", data["Data page checksum version"])
+	})
+
+	t.Run("pg control data has been set", func(t *testing.T) {
+		manager.pgControlData = map[string]string{
+			"Data page checksum version": "1",
+		}
+
+		data := manager.getPgControlData()
+		assert.NotNil(t, data)
+		assert.Equal(t, "1", data["Data page checksum version"])
+	})
 }

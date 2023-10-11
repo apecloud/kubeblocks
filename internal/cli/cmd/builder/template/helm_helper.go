@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
@@ -120,8 +120,8 @@ func createObjectsFromYaml(yamlBytes []byte) ([]client.Object, error) {
 			objects = append(objects, CreateTypedObjectFromYamlByte(doc, generics.ClusterVersionSignature))
 		case kindFromResource(appsv1alpha1.BackupPolicyTemplate{}):
 			objects = append(objects, CreateTypedObjectFromYamlByte(doc, generics.BackupPolicyTemplateSignature))
-		case kindFromResource(dataprotectionv1alpha1.BackupTool{}):
-			objects = append(objects, CreateTypedObjectFromYamlByte(doc, generics.BackupToolSignature))
+		case kindFromResource(dpv1alpha1.ActionSet{}):
+			objects = append(objects, CreateTypedObjectFromYamlByte(doc, generics.ActionSetSignature))
 		}
 	}
 	return objects, nil

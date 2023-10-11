@@ -1,0 +1,32 @@
+apiVersion: storage.kubeblocks.io/v1alpha1
+kind: StorageProvider
+metadata:
+  name: pvc
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+spec:
+  persistentVolumeClaimTemplate: |
+    spec:
+      {{- $scName := (include "kubeblocks.defaultStorageClass" .) }}
+      storageClassName: {{ printf `{{ .Parameters.storageClassName | default %q }}` $scName }}
+      accessModes:
+        - {{ `{{ .Parameters.accessMode | default "ReadWriteOnce" }}` }}
+      volumeMode: {{ `{{ .Parameters.volumeMode | default "Filesystem" }}` }}
+
+  parametersSchema:
+    openAPIV3Schema:
+      type: "object"
+      properties:
+        storageClassName:
+          type: string
+          description: "the name of the StorageClass used to create the PVC"
+        accessMode:
+          type: string
+          description: "the access mode used to create the PVC"
+          default: "ReadWriteOnce"
+          enum: ["ReadWriteOnce", "ReadWriteMany", "ReadWriteOncePod"]
+        volumeMode:
+          type: string
+          description: "the volume mode used to create the PVC"
+          default: "Filesystem"
+          enum: ["Filesystem", "Block"]

@@ -44,10 +44,10 @@ var _ = Describe("utils test", func() {
 			SetService(&corev1.Service{}).
 			SetRoles(roles).
 			GetObject()
-		priorityMap = composeRolePriorityMap(*rsm)
+		priorityMap = ComposeRolePriorityMap(rsm.Spec.Roles)
 	})
 
-	Context("composeRolePriorityMap function", func() {
+	Context("ComposeRolePriorityMap function", func() {
 		It("should work well", func() {
 			priorityList := []int{
 				leaderPriority,
@@ -63,7 +63,7 @@ var _ = Describe("utils test", func() {
 		})
 	})
 
-	Context("sortPods function", func() {
+	Context("SortPods function", func() {
 		It("should work well", func() {
 			pods := []corev1.Pod{
 				*builder.NewPodBuilder(namespace, "pod-0").AddLabels(roleLabelKey, "follower").GetObject(),
@@ -76,7 +76,7 @@ var _ = Describe("utils test", func() {
 			}
 			expectedOrder := []string{"pod-4", "pod-2", "pod-3", "pod-6", "pod-1", "pod-0", "pod-5"}
 
-			sortPods(pods, priorityMap, false)
+			SortPods(pods, priorityMap, false)
 			for i, pod := range pods {
 				Expect(pod.Name).Should(Equal(expectedOrder[i]))
 			}

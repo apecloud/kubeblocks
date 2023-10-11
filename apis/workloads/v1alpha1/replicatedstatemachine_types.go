@@ -149,7 +149,7 @@ type ReplicatedStateMachineStatus struct {
 // +kubebuilder:printcolumn:name="REPLICAS",type="string",JSONPath=".status.replicas",description="total replicas."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// ReplicatedStateMachine is the Schema for the replicatedstatemachines API
+// ReplicatedStateMachine is the Schema for the replicatedstatemachines API.
 type ReplicatedStateMachine struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -210,6 +210,16 @@ const (
 	ParallelUpdateStrategy           MemberUpdateStrategy = "Parallel"
 )
 
+// RoleUpdateMechanism defines the way how pod role label being updated.
+// +enum
+type RoleUpdateMechanism string
+
+const (
+	ReadinessProbeEventUpdate  RoleUpdateMechanism = "ReadinessProbeEventUpdate"
+	DirectAPIServerEventUpdate RoleUpdateMechanism = "DirectAPIServerEventUpdate"
+	NoneUpdate                 RoleUpdateMechanism = "None"
+)
+
 // RoleProbe defines how to observe role
 type RoleProbe struct {
 	// ProbeActions define Actions to be taken in serial.
@@ -255,6 +265,12 @@ type RoleProbe struct {
 	// +kubebuilder:validation:Minimum=1
 	// +optional
 	FailureThreshold int32 `json:"failureThreshold,omitempty"`
+
+	// RoleUpdateMechanism specifies the way how pod role label being updated.
+	// +kubebuilder:default=None
+	// +kubebuilder:validation:Enum={ReadinessProbeEventUpdate, DirectAPIServerEventUpdate, None}
+	// +optional
+	RoleUpdateMechanism RoleUpdateMechanism `json:"roleUpdateMechanism,omitempty"`
 }
 
 type Credential struct {

@@ -101,7 +101,7 @@ func GetRouter() func(writer http.ResponseWriter, request *http.Request) {
 		// get the character type
 		character := GetCharacter(request.URL.Path)
 		if character == "" {
-			Logger.Error(nil, "character type missing in path")
+			logger.Error(nil, "character type missing in path")
 			return
 		}
 
@@ -109,14 +109,14 @@ func GetRouter() func(writer http.ResponseWriter, request *http.Request) {
 		defer body.Close()
 		buf, err := io.ReadAll(request.Body)
 		if err != nil {
-			Logger.Error(err, "request body read failed")
+			logger.Error(err, "request body read failed")
 			return
 		}
 
 		meta := &RequestMeta{Metadata: map[string]string{}}
 		err = json.Unmarshal(buf, meta)
 		if err != nil {
-			Logger.Error(err, "request body unmarshal failed")
+			logger.Error(err, "request body unmarshal failed")
 			return
 		}
 		probeRequest := &ProbeRequest{Metadata: meta.Metadata}
@@ -124,14 +124,15 @@ func GetRouter() func(writer http.ResponseWriter, request *http.Request) {
 
 		// route the request to engine
 		probeResp, err := route(character, request.Context(), probeRequest)
+		logger.Info("request routed", "request", probeRequest, "response", probeResp)
 
 		if err != nil {
-			Logger.Error(err, "exec ops failed")
+			logger.Error(err, "exec ops failed")
 			msg := fmt.Sprintf("exec ops failed: %v", err)
 			writer.Header().Add(statusCodeHeader, OperationFailedHTTPCode)
 			_, err := writer.Write([]byte(msg))
 			if err != nil {
-				Logger.Error(err, "ResponseWriter writes error when router")
+				logger.Error(err, "ResponseWriter writes error when router")
 			}
 		} else {
 			code, ok := probeResp.Metadata[StatusCode]
@@ -142,7 +143,7 @@ func GetRouter() func(writer http.ResponseWriter, request *http.Request) {
 			writer.Header().Add(RespEndTimeKey, probeResp.Metadata[RespEndTimeKey])
 			_, err := writer.Write(probeResp.Data)
 			if err != nil {
-				Logger.Error(err, "ResponseWriter writes error when router")
+				logger.Error(err, "ResponseWriter writes error when router")
 			}
 		}
 	}
@@ -163,7 +164,7 @@ func route(character string, ctx context.Context, request *ProbeRequest) (*Probe
 	ops, ok := builtinMap[character]
 	// if there is no builtin type, use the custom
 	if !ok {
-		Logger.Info("No correspond builtin type, use the custom...")
+		logger.Info("No correspond builtin type, use the custom...")
 		return customOp.Invoke(ctx, request)
 	}
 	return ops.Invoke(ctx, request)

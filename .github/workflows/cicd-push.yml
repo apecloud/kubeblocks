@@ -11,7 +11,7 @@ on:
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   BASE_BRANCH: origin/main
-  GO_VERSION: "1.20.5"
+  GO_VERSION: "1.21"
 
 jobs:
   trigger-mode:
@@ -133,10 +133,6 @@ jobs:
       - uses: actions/checkout@v3
       - name: make manifests check
         run: |
-          mkdir -p ./bin
-          cp -r /go/bin/controller-gen ./bin/controller-gen
-          cp -r /go/bin/setup-envtest ./bin/setup-envtest
-
           make manifests
           FILE_CHANGES=`git diff --name-only ${{ github.sha }}`
           if [[ ! -z "$FILE_CHANGES" ]]; then
@@ -199,7 +195,7 @@ jobs:
     with:
       MAKE_OPS_PRE: "generate"
       IMG: "apecloud/kubeblocks"
-      GO_VERSION: "1.20.5"
+      GO_VERSION: "1.21"
       BUILDX_PLATFORMS: "linux/amd64"
       DOCKERFILE_PATH: "./docker/Dockerfile"
     secrets: inherit
@@ -209,9 +205,9 @@ jobs:
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') }}
     uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.24
     with:
-      MAKE_OPS_PRE: "generate test-go-generate"
+      MAKE_OPS_PRE: "module generate test-go-generate"
       IMG: "apecloud/kubeblocks-tools"
-      GO_VERSION: "1.20.5"
+      GO_VERSION: "1.21"
       BUILDX_PLATFORMS: "linux/amd64"
       DOCKERFILE_PATH: "./docker/Dockerfile-tools"
     secrets: inherit

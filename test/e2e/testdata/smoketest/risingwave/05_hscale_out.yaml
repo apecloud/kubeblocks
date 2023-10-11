@@ -1,0 +1,18 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: risingwave-cluster-hscale-out-
+spec:
+  clusterRef: risingwave-cluster
+  type: HorizontalScaling
+  horizontalScaling:
+    - componentName: frontend
+      replicas: 3
+    - componentName: meta
+      replicas: 3
+    - componentName: compute
+      replicas: 3
+    - componentName: compactor
+      replicas: 3
+    - componentName: connector
+      replicas: 3

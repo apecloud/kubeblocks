@@ -22,22 +22,18 @@ package factory
 import (
 	"encoding/json"
 	"fmt"
-	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/leaanthony/debme"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -46,20 +42,6 @@ import (
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
-
-var tlog = ctrl.Log.WithName("builder_testing")
-
-func TestReadCUETplFromEmbeddedFS(t *testing.T) {
-	cueFS, err := debme.FS(cueTemplates, "cue")
-	if err != nil {
-		t.Error("Expected no error", err)
-	}
-	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("conn_credential_template.cue"))
-	if err != nil {
-		t.Error("Expected no error", err)
-	}
-	tlog.Info("", "cueValue", cueTpl)
-}
 
 var _ = Describe("builder", func() {
 	const clusterDefName = "test-clusterdef"
@@ -191,8 +173,7 @@ var _ = Describe("builder", func() {
 				Namespace: "default",
 				Name:      "data-mysql-01-replicasets-0",
 			}
-			pvc, err := BuildPVC(cluster, synthesizedComponent, &synthesizedComponent.VolumeClaimTemplates[0], pvcKey, snapshotName)
-			Expect(err).Should(BeNil())
+			pvc := BuildPVC(cluster, synthesizedComponent, &synthesizedComponent.VolumeClaimTemplates[0], pvcKey, snapshotName)
 			Expect(pvc).ShouldNot(BeNil())
 			Expect(pvc.Spec.AccessModes).Should(Equal(sts.Spec.VolumeClaimTemplates[0].Spec.AccessModes))
 			Expect(pvc.Spec.Resources).Should(Equal(synthesizedComponent.VolumeClaimTemplates[0].Spec.Resources))
@@ -200,27 +181,18 @@ var _ = Describe("builder", func() {
 			Expect(pvc.Labels[constant.VolumeTypeLabelKey]).ShouldNot(BeEmpty())
 		})
 
-		It("builds Service correctly", func() {
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			svcList, err := BuildSvcListWithCustomAttributes(cluster, synthesizedComponent, nil)
-			Expect(err).Should(BeNil())
-			Expect(svcList).ShouldNot(BeEmpty())
-		})
-
 		It("builds Conn. Credential correctly", func() {
 			var (
 				clusterDefObj                             = testapps.NewClusterDefFactoryWithConnCredential("conn-cred").GetObject()
 				clusterDef, cluster, synthesizedComponent = newClusterObjs(clusterDefObj)
 			)
-			credential, err := BuildConnCredential(clusterDef, cluster, synthesizedComponent)
-			Expect(err).Should(BeNil())
+			credential := BuildConnCredential(clusterDef, cluster, synthesizedComponent)
 			Expect(credential).ShouldNot(BeNil())
 			Expect(credential.Labels["apps.kubeblocks.io/cluster-type"]).Should(BeEmpty())
 			By("setting type")
 			characterType := "test-character-type"
 			clusterDef.Spec.Type = characterType
-			credential, err = BuildConnCredential(clusterDef, cluster, synthesizedComponent)
-			Expect(err).Should(BeNil())
+			credential = BuildConnCredential(clusterDef, cluster, synthesizedComponent)
 			Expect(credential).ShouldNot(BeNil())
 			Expect(credential.Labels["apps.kubeblocks.io/cluster-type"]).Should(Equal(characterType))
 			// "username":      "root",
@@ -402,18 +374,9 @@ var _ = Describe("builder", func() {
 			Expect(*rsm.Spec.MemberUpdateStrategy).Should(BeEquivalentTo(workloads.BestEffortParallelUpdateStrategy))
 		})
 
-		It("builds Deploy correctly", func() {
-			reqCtx := newReqCtx()
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			deploy, err := BuildDeploy(reqCtx, cluster, synthesizedComponent, "")
-			Expect(err).Should(BeNil())
-			Expect(deploy).ShouldNot(BeNil())
-		})
-
 		It("builds PDB correctly", func() {
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			pdb, err := BuildPDB(cluster, synthesizedComponent)
-			Expect(err).Should(BeNil())
+			pdb := BuildPDB(cluster, synthesizedComponent)
 			Expect(pdb).ShouldNot(BeNil())
 		})
 
@@ -424,8 +387,7 @@ var _ = Describe("builder", func() {
 				Name:      "test-backup-job",
 			}
 			backupPolicyName := "test-backup-policy"
-			backupJob, err := BuildBackup(cluster, synthesizedComponent, backupPolicyName, backupJobKey, "snapshot")
-			Expect(err).Should(BeNil())
+			backupJob := BuildBackup(cluster, synthesizedComponent, backupPolicyName, backupJobKey, "snapshot")
 			Expect(backupJob).ShouldNot(BeNil())
 		})
 
@@ -439,15 +401,14 @@ var _ = Describe("builder", func() {
 				},
 				ConfigConstraintRef: "test-config-constraint",
 			}
-			configmap, err := BuildConfigMapWithTemplate(cluster, synthesizedComponent, config,
-				"test-cm", tplCfg.ConfigConstraintRef, tplCfg.ComponentTemplateSpec)
-			Expect(err).Should(BeNil())
+			configmap := BuildConfigMapWithTemplate(cluster, synthesizedComponent, config,
+				"test-cm", tplCfg.ComponentTemplateSpec)
 			Expect(configmap).ShouldNot(BeNil())
 		})
 
 		It("builds config manager sidecar container correctly", func() {
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
+			cfg := BuildEnvConfig(cluster, synthesizedComponent)
 			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
 				ManagerName:   "cfgmgr",
 				SecreteName:   "test-secret",
@@ -460,7 +421,6 @@ var _ = Describe("builder", func() {
 				Volumes:       []corev1.VolumeMount{},
 				Cluster:       cluster,
 			}
-			Expect(err).Should(BeNil())
 			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(configmap).ShouldNot(BeNil())
@@ -486,22 +446,6 @@ var _ = Describe("builder", func() {
 			Expect(configmap.SecurityContext).ShouldNot(BeNil())
 			Expect(configmap.SecurityContext.RunAsUser).ShouldNot(BeNil())
 			Expect(*configmap.SecurityContext.RunAsUser).Should(BeEquivalentTo(int64(0)))
-		})
-
-		It("builds backup manifests job correctly", func() {
-			backup := &dataprotectionv1alpha1.Backup{}
-			podSpec := &corev1.PodSpec{
-				Containers: []corev1.Container{
-					{
-						Command: []string{"sh"},
-					},
-				},
-			}
-			key := types.NamespacedName{Name: "backup", Namespace: "default"}
-			job, err := BuildBackupManifestsJob(key, backup, podSpec)
-			Expect(err).Should(BeNil())
-			Expect(job).ShouldNot(BeNil())
-			Expect(job.Name).Should(Equal(key.Name))
 		})
 
 		It("builds restore job correctly", func() {
@@ -534,20 +478,10 @@ var _ = Describe("builder", func() {
 		It("builds volume snapshot class correctly", func() {
 			className := "vsc-test"
 			driverName := "csi-driver-test"
-			obj, err := BuildVolumeSnapshotClass(className, driverName)
-			Expect(err).Should(BeNil())
+			obj := BuildVolumeSnapshotClass(className, driverName)
 			Expect(obj).ShouldNot(BeNil())
 			Expect(obj.Name).Should(Equal(className))
 			Expect(obj.Driver).Should(Equal(driverName))
-		})
-
-		It("builds headless svc correctly", func() {
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			expectSvcName := fmt.Sprintf("%s-%s-headless", cluster.Name, synthesizedComponent.Name)
-			obj, err := BuildHeadlessSvc(cluster, synthesizedComponent)
-			Expect(err).Should(BeNil())
-			Expect(obj).ShouldNot(BeNil())
-			Expect(obj.Name).Should(Equal(expectSvcName))
 		})
 
 		It("builds cfg manager tools  correctly", func() {
@@ -572,8 +506,7 @@ var _ = Describe("builder", func() {
 		It("builds serviceaccount correctly", func() {
 			_, cluster, _ := newClusterObjs(nil)
 			expectName := fmt.Sprintf("kb-%s", cluster.Name)
-			sa, err := BuildServiceAccount(cluster)
-			Expect(err).Should(BeNil())
+			sa := BuildServiceAccount(cluster)
 			Expect(sa).ShouldNot(BeNil())
 			Expect(sa.Name).Should(Equal(expectName))
 		})
@@ -581,8 +514,7 @@ var _ = Describe("builder", func() {
 		It("builds rolebinding correctly", func() {
 			_, cluster, _ := newClusterObjs(nil)
 			expectName := fmt.Sprintf("kb-%s", cluster.Name)
-			rb, err := BuildRoleBinding(cluster)
-			Expect(err).Should(BeNil())
+			rb := BuildRoleBinding(cluster)
 			Expect(rb).ShouldNot(BeNil())
 			Expect(rb.Name).Should(Equal(expectName))
 		})
@@ -590,8 +522,7 @@ var _ = Describe("builder", func() {
 		It("builds clusterrolebinding correctly", func() {
 			_, cluster, _ := newClusterObjs(nil)
 			expectName := fmt.Sprintf("kb-%s", cluster.Name)
-			crb, err := BuildClusterRoleBinding(cluster)
-			Expect(err).Should(BeNil())
+			crb := BuildClusterRoleBinding(cluster)
 			Expect(crb).ShouldNot(BeNil())
 			Expect(crb.Name).Should(Equal(expectName))
 		})

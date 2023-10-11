@@ -1,12 +1,12 @@
 #!/bin/bash
-mkdir -p ${BACKUP_DIR} && cd ${BACKUP_DIR}
+mkdir -p ${DP_BACKUP_DIR} && cd ${DP_BACKUP_DIR}
 # retention 8 days by default
 retention_minute=""
 if [ ! -z ${LOGFILE_TTL_SECOND} ];then
   retention_minute=$((${LOGFILE_TTL_SECOND}/60))
 fi
 export MONGODB_URI="mongodb://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:27017/?authSource=admin"
-export WALG_FILE_PREFIX=${BACKUP_DIR}
+export WALG_FILE_PREFIX=${DP_BACKUP_DIR}
 export OPLOG_ARCHIVE_TIMEOUT_INTERVAL=${ARCHIVE_INTERVAL}
 export OPLOG_ARCHIVE_AFTER_SIZE=${ARCHIVE_AFTER_SIZE}
 retryTimes=0
@@ -45,13 +45,13 @@ check_oplog_push_process(){
 }
 
 save_backup_status() {
-   TOTAL_SIZE=$(du -shx ${BACKUP_DIR}|awk '{print $1}')
-   OLDEST_FILE=$(ls -t ${BACKUP_DIR}/oplog_005 | tail -n 1) && OLDEST_FILE=${OLDEST_FILE#*_} && LOG_START_TIME=${OLDEST_FILE%%.*}
-   LATEST_FILE=$(ls -t ${BACKUP_DIR}/oplog_005 | head -n 1) && LATEST_FILE=${LATEST_FILE##*_} && LOG_STOP_TIME=${LATEST_FILE%%.*}
+   TOTAL_SIZE=$(du -shx ${DP_BACKUP_DIR}|awk '{print $1}')
+   OLDEST_FILE=$(ls -t ${DP_BACKUP_DIR}/oplog_005 | tail -n 1) && OLDEST_FILE=${OLDEST_FILE#*_} && LOG_START_TIME=${OLDEST_FILE%%.*}
+   LATEST_FILE=$(ls -t ${DP_BACKUP_DIR}/oplog_005 | head -n 1) && LATEST_FILE=${LATEST_FILE##*_} && LOG_STOP_TIME=${LATEST_FILE%%.*}
    if [ ! -z $LOG_START_TIME ]; then
        START_TIME=$(date -d "@${LOG_START_TIME}" -u '+%Y-%m-%dT%H:%M:%SZ')
        STOP_TIME=$(date -d "@${LOG_STOP_TIME}" -u '+%Y-%m-%dT%H:%M:%SZ')
-       echo "{\"totalSize\":\"$TOTAL_SIZE\",\"manifests\":{\"backupLog\":{\"startTime\":\"${START_TIME}\",\"stopTime\":\"${STOP_TIME}\"},\"backupTool\":{\"uploadTotalSize\":\"${TOTAL_SIZE}\"}}}" > ${BACKUP_DIR}/backup.info
+       echo "{\"totalSize\":\"$TOTAL_SIZE\",\"manifests\":{\"backupLog\":{\"startTime\":\"${START_TIME}\",\"stopTime\":\"${STOP_TIME}\"},\"backupTool\":{\"uploadTotalSize\":\"${TOTAL_SIZE}\"}}}" > ${DP_BACKUP_DIR}/backup.info
    fi
 }
 # purge the expired files
@@ -60,8 +60,8 @@ purge_expired_files() {
     purgeCounter=$((purgeCounter+3))
     if [ $purgeCounter -ge 60 ]; then
        purgeCounter=0
-       fileCount=$(find ${BACKUP_DIR}/oplog_005 -mmin +${retention_minute} -name "*.lz4" | wc -l)
-       find ${BACKUP_DIR}/oplog_005 -mmin +${retention_minute} -name "*.lz4" -exec rm -rf {} \;
+       fileCount=$(find ${DP_BACKUP_DIR}/oplog_005 -mmin +${retention_minute} -name "*.lz4" | wc -l)
+       find ${DP_BACKUP_DIR}/oplog_005 -mmin +${retention_minute} -name "*.lz4" -exec rm -rf {} \;
        if [ ${fileCount} -gt 0 ]; then
           echo "clean up expired oplog file successfully, file count: ${fileCount}"
        fi
@@ -75,7 +75,7 @@ trap "echo 'Terminating...' && kill $wal_g_pid" TERM
 while true; do
   check_oplog_push_process
   sleep 1
-  if [ -d ${BACKUP_DIR}/oplog_005 ];then
+  if [ -d ${DP_BACKUP_DIR}/oplog_005 ];then
     save_backup_status
     # purge the expired oplog
     purge_expired_files

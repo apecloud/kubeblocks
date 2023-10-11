@@ -33,8 +33,8 @@ func NewBackupRepoCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	cmd.AddCommand(
 		newCreateCommand(nil, f, streams),
 		// newUpdateCommand(f, streams), // TODO:
-		// newListCommand(f, streams), // TODO:
-		// newDescribeCmd(f, streams), // TODO:
+		newListCommand(f, streams),
+		newDescribeCmd(f, streams), // TODO:
 	)
 	return cmd
 }

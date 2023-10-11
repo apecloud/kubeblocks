@@ -103,7 +103,7 @@ const (
 	KindClusterVersion                  = "ClusterVersion"
 	KindConfigConstraint                = "ConfigConstraint"
 	KindBackup                          = "Backup"
-	KindRestoreJob                      = "RestoreJob"
+	KindRestore                         = "Restore"
 	KindBackupPolicy                    = "BackupPolicy"
 	KindOps                             = "OpsRequest"
 )
@@ -132,13 +132,15 @@ const (
 
 // DataProtection API group
 const (
-	DPAPIGroup             = "dataprotection.kubeblocks.io"
-	DPAPIVersion           = "v1alpha1"
-	ResourceBackups        = "backups"
-	ResourceBackupTools    = "backuptools"
-	ResourceRestoreJobs    = "restorejobs"
-	ResourceBackupPolicies = "backuppolicies"
-	ResourceBackupRepos    = "backuprepos"
+	DPAPIGroup              = "dataprotection.kubeblocks.io"
+	DPAPIVersion            = "v1alpha1"
+	ResourceBackups         = "backups"
+	ResourceActionSets      = "actionsets"
+	ResourceRestores        = "restores"
+	ResourceBackupPolicies  = "backuppolicies"
+	ResourceBackupRepos     = "backuprepos"
+	ResourceBackupSchedules = "backupschedules"
+	ResourceBackupTemplates = "backuppolicytemplates"
 )
 
 // Extensions API group
@@ -251,16 +253,24 @@ func BackupPolicyGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupPolicies}
 }
 
-func BackupToolGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupTools}
+func BackupPolicyTemplateGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupTemplates}
+}
+
+func BackupScheduleGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupSchedules}
+}
+
+func ActionSetGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceActionSets}
 }
 
 func BackupRepoGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupRepos}
 }
 
-func RestoreJobGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceRestoreJobs}
+func RestoreGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceRestores}
 }
 
 func AddonGVR() schema.GroupVersionResource {

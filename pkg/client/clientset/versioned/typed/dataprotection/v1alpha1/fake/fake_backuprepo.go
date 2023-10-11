@@ -24,7 +24,6 @@ import (
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -35,9 +34,9 @@ type FakeBackupRepos struct {
 	Fake *FakeDataprotectionV1alpha1
 }
 
-var backupreposResource = schema.GroupVersionResource{Group: "dataprotection.kubeblocks.io", Version: "v1alpha1", Resource: "backuprepos"}
+var backupreposResource = v1alpha1.SchemeGroupVersion.WithResource("backuprepos")
 
-var backupreposKind = schema.GroupVersionKind{Group: "dataprotection.kubeblocks.io", Version: "v1alpha1", Kind: "BackupRepo"}
+var backupreposKind = v1alpha1.SchemeGroupVersion.WithKind("BackupRepo")
 
 // Get takes name of the backupRepo, and returns the corresponding backupRepo object, and an error if there is any.
 func (c *FakeBackupRepos) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.BackupRepo, err error) {

@@ -1,0 +1,16 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: pulsar-volume-reconfigure-
+spec:
+  clusterRef: pulsar-cluster
+  reconfigure:
+    componentName: broker
+    configurations:
+      - keys:
+          - key: broker.conf
+            parameters:
+              - key: lostBookieRecoveryDelay
+                value: "1000"
+        name: broker-config
+  type: Reconfiguring

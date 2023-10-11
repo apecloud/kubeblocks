@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
@@ -45,12 +46,6 @@ import (
 type RBACTransformer struct{}
 
 var _ graph.Transformer = &RBACTransformer{}
-
-const (
-	RBACRoleName        = "kubeblocks-cluster-pod-role"
-	RBACClusterRoleName = "kubeblocks-volume-protection-pod-role"
-	ServiceAccountKind  = "ServiceAccount"
-)
 
 func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
@@ -87,18 +82,10 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 		return nil
 	}
 
-	rb, err := buildReloBinding(cluster, serviceAccounts)
-	if err != nil {
-		return err
-	}
-
+	rb := buildRoleBinding(cluster, serviceAccounts)
 	parentVertex = ictrltypes.LifecycleObjectCreate(dag, rb, parentVertex)
 	if len(serviceAccountsNeedCrb) > 0 {
-		crb, err := buildClusterReloBinding(cluster, serviceAccountsNeedCrb)
-		if err != nil {
-			return err
-		}
-
+		crb := buildClusterRoleBinding(cluster, serviceAccountsNeedCrb)
 		parentVertex = ictrltypes.LifecycleObjectCreate(dag, crb, parentVertex)
 	}
 
@@ -190,14 +177,14 @@ func isClusterRoleBindingExist(transCtx *ClusterTransformContext, serviceAccount
 		return false
 	}
 
-	if crb.RoleRef.Name != RBACClusterRoleName {
+	if crb.RoleRef.Name != constant.RBACClusterRoleName {
 		transCtx.Logger.V(1).Info("rbac manager: ClusterRole not match", "ClusterRole",
-			RBACClusterRoleName, "clusterrolebinding.RoleRef", crb.RoleRef.Name)
+			constant.RBACClusterRoleName, "clusterrolebinding.RoleRef", crb.RoleRef.Name)
 	}
 
 	isServiceAccountMatch := false
 	for _, sub := range crb.Subjects {
-		if sub.Kind == ServiceAccountKind && sub.Name == serviceAccountName {
+		if sub.Kind == rbacv1.ServiceAccountKind && sub.Name == serviceAccountName {
 			isServiceAccountMatch = true
 			break
 		}
@@ -228,14 +215,14 @@ func isRoleBindingExist(transCtx *ClusterTransformContext, serviceAccountName st
 		return false
 	}
 
-	if rb.RoleRef.Name != RBACClusterRoleName {
+	if rb.RoleRef.Name != constant.RBACClusterRoleName {
 		transCtx.Logger.V(1).Info("rbac manager: ClusterRole not match", "ClusterRole",
-			RBACRoleName, "rolebinding.RoleRef", rb.RoleRef.Name)
+			constant.RBACRoleName, "rolebinding.RoleRef", rb.RoleRef.Name)
 	}
 
 	isServiceAccountMatch := false
 	for _, sub := range rb.Subjects {
-		if sub.Kind == ServiceAccountKind && sub.Name == serviceAccountName {
+		if sub.Kind == rbacv1.ServiceAccountKind && sub.Name == serviceAccountName {
 			isServiceAccountMatch = true
 			break
 		}
@@ -287,7 +274,7 @@ func getDefaultBackupPolicyTemplate(transCtx *ClusterTransformContext, clusterDe
 		return nil, nil
 	}
 	for _, item := range backupPolicyTPLs.Items {
-		if item.Annotations[constant.DefaultBackupPolicyTemplateAnnotationKey] == trueVal {
+		if item.Annotations[dptypes.DefaultBackupPolicyTemplateAnnotationKey] == trueVal {
 			return &item, nil
 		}
 	}
@@ -321,11 +308,8 @@ func buildServiceAccounts(transCtx *ClusterTransformContext, componentSpecs []ap
 		if _, ok := serviceAccounts[serviceAccountName]; ok {
 			continue
 		}
-		serviceAccount, err := factory.BuildServiceAccount(cluster)
+		serviceAccount := factory.BuildServiceAccount(cluster)
 		serviceAccount.Name = serviceAccountName
-		if err != nil {
-			return nil, nil, err
-		}
 		serviceAccounts[serviceAccountName] = serviceAccount
 
 		if isVolumeProtectionEnabled(clusterDef, &compSpec) {
@@ -335,46 +319,40 @@ func buildServiceAccounts(transCtx *ClusterTransformContext, componentSpecs []ap
 	return serviceAccounts, serviceAccountsNeedCrb, nil
 }
 
-func buildReloBinding(cluster *appsv1alpha1.Cluster, serviceAccounts map[string]*corev1.ServiceAccount) (*rbacv1.RoleBinding, error) {
-	roleBinding, err := factory.BuildRoleBinding(cluster)
-	if err != nil {
-		return nil, err
-	}
+func buildRoleBinding(cluster *appsv1alpha1.Cluster, serviceAccounts map[string]*corev1.ServiceAccount) *rbacv1.RoleBinding {
+	roleBinding := factory.BuildRoleBinding(cluster)
 	roleBinding.Subjects = []rbacv1.Subject{}
 	for saName := range serviceAccounts {
 		subject := rbacv1.Subject{
 			Name:      saName,
 			Namespace: cluster.Namespace,
-			Kind:      "ServiceAccount",
+			Kind:      rbacv1.ServiceAccountKind,
 		}
 		roleBinding.Subjects = append(roleBinding.Subjects, subject)
 	}
-	return roleBinding, nil
+	return roleBinding
 }
 
-func buildClusterReloBinding(cluster *appsv1alpha1.Cluster, serviceAccounts map[string]*corev1.ServiceAccount) (*rbacv1.ClusterRoleBinding, error) {
-	clusterRoleBinding, err := factory.BuildClusterRoleBinding(cluster)
-	if err != nil {
-		return nil, err
-	}
+func buildClusterRoleBinding(cluster *appsv1alpha1.Cluster, serviceAccounts map[string]*corev1.ServiceAccount) *rbacv1.ClusterRoleBinding {
+	clusterRoleBinding := factory.BuildClusterRoleBinding(cluster)
 	clusterRoleBinding.Subjects = []rbacv1.Subject{}
 	for saName := range serviceAccounts {
 		subject := rbacv1.Subject{
 			Name:      saName,
 			Namespace: cluster.Namespace,
-			Kind:      "ServiceAccount",
+			Kind:      rbacv1.ServiceAccountKind,
 		}
 		clusterRoleBinding.Subjects = append(clusterRoleBinding.Subjects, subject)
 	}
-	return clusterRoleBinding, nil
+	return clusterRoleBinding
 }
 
 func createSaVertex(serviceAccounts map[string]*corev1.ServiceAccount, dag *graph.DAG, parentVertex *ictrltypes.LifecycleVertex) []*ictrltypes.LifecycleVertex {
-	saVertexs := []*ictrltypes.LifecycleVertex{}
+	var saVertexes []*ictrltypes.LifecycleVertex
 	for _, sa := range serviceAccounts {
 		// serviceaccount must be created before rolebinding and clusterrolebinding
 		saVertex := ictrltypes.LifecycleObjectCreate(dag, sa, parentVertex)
-		saVertexs = append(saVertexs, saVertex)
+		saVertexes = append(saVertexes, saVertex)
 	}
-	return saVertexs
+	return saVertexes
 }

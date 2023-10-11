@@ -2,9 +2,28 @@
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  creationTimestamp: null
   name: mutating-webhook-configuration
 webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine
+  failurePolicy: Fail
+  name: mreplicatedstatemachine.kb.io
+  rules:
+  - apiGroups:
+    - workloads.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - replicatedstatemachines
+  sideEffects: None
 - admissionReviewVersions:
   - v1
   clientConfig:
@@ -45,15 +64,21 @@ webhooks:
     resources:
     - servicedescriptors
   sideEffects: None
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: validating-webhook-configuration
+webhooks:
 - admissionReviewVersions:
   - v1
   clientConfig:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine
+      path: /validate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine
   failurePolicy: Fail
-  name: mreplicatedstatemachine.kb.io
+  name: vreplicatedstatemachine.kb.io
   rules:
   - apiGroups:
     - workloads.kubeblocks.io
@@ -65,13 +90,6 @@ webhooks:
     resources:
     - replicatedstatemachines
   sideEffects: None
----
-apiVersion: admissionregistration.k8s.io/v1
-kind: ValidatingWebhookConfiguration
-metadata:
-  creationTimestamp: null
-  name: validating-webhook-configuration
-webhooks:
 - admissionReviewVersions:
   - v1
   clientConfig:
@@ -171,24 +189,4 @@ webhooks:
     - UPDATE
     resources:
     - servicedescriptors
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /validate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine
-  failurePolicy: Fail
-  name: vreplicatedstatemachine.kb.io
-  rules:
-  - apiGroups:
-    - workloads.kubeblocks.io
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - replicatedstatemachines
   sideEffects: None

@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,16 +32,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/common"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
-
-// TODO(free6om): dedup copied funcs from event_controllers.go
-// TODO(free6om): refactor event_controller.go as it should NOT import controllers/apps/component/*
 
 type PodRoleEventHandler struct{}
 
 // probeEventType defines the type of probe event.
 type probeEventType string
+
+const (
+	successEvent     = "Success"
+	roleChangedEvent = "roleChanged"
+)
 
 type probeMessage struct {
 	Event        probeEventType `json:"event,omitempty"`
@@ -57,7 +62,10 @@ const (
 var roleMessageRegex = regexp.MustCompile(`Readiness probe failed: .*({.*})`)
 
 func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.InvolvedObject.FieldPath != roleProbeEventFieldPath {
+	if event.InvolvedObject.FieldPath != readinessProbeEventFieldPath &&
+		event.InvolvedObject.FieldPath != directAPIServerEventFieldPath &&
+		event.InvolvedObject.FieldPath != legacyEventFieldPath &&
+		event.Reason != checkRoleEventReason {
 		return nil
 	}
 	var (
@@ -93,50 +101,95 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 	}
 
 	// if probe event operation is not impl, check role failed or role invalid, ignore it
-	if message.Event != "Success" {
+	if message.Event != successEvent && message.Event != roleChangedEvent {
 		reqCtx.Log.Info("probe event failed", "message", message.Message)
 		return "", nil
 	}
 	role := strings.ToLower(message.Role)
 
-	podName := types.NamespacedName{
-		Namespace: event.InvolvedObject.Namespace,
-		Name:      event.InvolvedObject.Name,
-	}
-	// get pod
-	pod := &corev1.Pod{}
-	if err := cli.Get(reqCtx.Ctx, podName, pod); err != nil {
-		return role, err
-	}
-	// event belongs to old pod with the same name, ignore it
-	if pod.UID != event.InvolvedObject.UID {
-		return role, nil
-	}
-	name, _ := intctrlutil.GetParentNameAndOrdinal(pod)
-	rsm := &workloads.ReplicatedStateMachine{}
-	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pod.Namespace, Name: name}, rsm); err != nil {
-		return "", err
-	}
-	reqCtx.Log.V(1).Info("handle role change event", "pod", pod.Name, "role", role, "originalRole", message.OriginalRole)
+	snapshot := parseGlobalRoleSnapshot(role, event)
+	for _, pair := range snapshot.PodRoleNamePairs {
+		podName := types.NamespacedName{
+			Namespace: event.InvolvedObject.Namespace,
+			Name:      pair.PodName,
+		}
+		// get pod
+		pod := &corev1.Pod{}
+		if err := cli.Get(reqCtx.Ctx, podName, pod); err != nil {
+			return pair.RoleName, err
+		}
+		// event belongs to old pod with the same name, ignore it
+		if pod.Name == pair.PodName && pod.UID != event.InvolvedObject.UID {
+			return pair.RoleName, nil
+		}
 
-	return role, updatePodRoleLabel(cli, reqCtx, *rsm, pod, role)
+		// compare the version of the current role snapshot with the last version recorded in the pod annotation,
+		// stale role snapshot will be ignored.
+		lastSnapshotVersion, ok := pod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]
+		if ok {
+
+			if snapshot.Version <= lastSnapshotVersion {
+				reqCtx.Log.Info("stale role snapshot received, ignore it", "snapshot", snapshot)
+				return pair.RoleName, nil
+			}
+		}
+
+		name, _ := intctrlutil.GetParentNameAndOrdinal(pod)
+		rsm := &workloads.ReplicatedStateMachine{}
+		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pod.Namespace, Name: name}, rsm); err != nil {
+			return "", err
+		}
+		reqCtx.Log.V(1).Info("handle role change event", "pod", pod.Name, "role", role, "originalRole", message.OriginalRole)
+
+		if err := updatePodRoleLabel(cli, reqCtx, *rsm, pod, pair.RoleName, snapshot.Version); err != nil {
+			return "", err
+		}
+	}
+	return role, nil
+}
+
+func parseGlobalRoleSnapshot(role string, event *corev1.Event) *common.GlobalRoleSnapshot {
+	snapshot := &common.GlobalRoleSnapshot{}
+	if err := json.Unmarshal([]byte(role), snapshot); err == nil {
+		return snapshot
+	}
+	snapshot.Version = event.EventTime.Time.Format(time.RFC3339Nano)
+	pair := common.PodRoleNamePair{
+		PodName:  event.InvolvedObject.Name,
+		RoleName: role,
+	}
+	snapshot.PodRoleNamePairs = append(snapshot.PodRoleNamePairs, pair)
+	return snapshot
 }
 
 // parseProbeEventMessage parses probe event message.
 func parseProbeEventMessage(reqCtx intctrlutil.RequestCtx, event *corev1.Event) *probeMessage {
 	message := &probeMessage{}
 
-	matches := roleMessageRegex.FindStringSubmatch(event.Message)
-	if len(matches) != 2 {
-		reqCtx.Log.Info("parser Readiness probe event message failed", "message", event.Message)
+	tryUnmarshalDirectAPIServerEvent := func() error {
+		return json.Unmarshal([]byte(event.Message), message)
+	}
+	tryUnmarshalReadinessProbeEvent := func() error {
+		matches := roleMessageRegex.FindStringSubmatch(event.Message)
+		if len(matches) != 2 {
+			reqCtx.Log.Info("parser Readiness probe event message failed", "message", event.Message)
+			return fmt.Errorf("parser Readiness probe event message failed: %s", event.Message)
+		}
+		msg := matches[1]
+		err := json.Unmarshal([]byte(msg), message)
+		if err != nil {
+			// not role related message, ignore it
+			reqCtx.Log.Info("not role message", "message", event.Message, "error", err)
+			return err
+		}
 		return nil
 	}
-	msg := matches[1]
-	err := json.Unmarshal([]byte(msg), message)
-	if err != nil {
-		// not role related message, ignore it
-		reqCtx.Log.Info("not role message", "message", event.Message, "error", err)
-		return nil
+
+	if err := tryUnmarshalDirectAPIServerEvent(); err == nil {
+		return message
 	}
-	return message
+	if err := tryUnmarshalReadinessProbeEvent(); err == nil {
+		return message
+	}
+	return nil
 }

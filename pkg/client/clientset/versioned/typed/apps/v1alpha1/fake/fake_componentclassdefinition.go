@@ -24,7 +24,6 @@ import (
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -35,9 +34,9 @@ type FakeComponentClassDefinitions struct {
 	Fake *FakeAppsV1alpha1
 }
 
-var componentclassdefinitionsResource = schema.GroupVersionResource{Group: "apps.kubeblocks.io", Version: "v1alpha1", Resource: "componentclassdefinitions"}
+var componentclassdefinitionsResource = v1alpha1.SchemeGroupVersion.WithResource("componentclassdefinitions")
 
-var componentclassdefinitionsKind = schema.GroupVersionKind{Group: "apps.kubeblocks.io", Version: "v1alpha1", Kind: "ComponentClassDefinition"}
+var componentclassdefinitionsKind = v1alpha1.SchemeGroupVersion.WithKind("ComponentClassDefinition")
 
 // Get takes name of the componentClassDefinition, and returns the corresponding componentClassDefinition object, and an error if there is any.
 func (c *FakeComponentClassDefinitions) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ComponentClassDefinition, err error) {

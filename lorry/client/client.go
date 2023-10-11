@@ -39,7 +39,7 @@ import (
 )
 
 const (
-	urlTemplate = "http://localhost:%d/v1.0/bindings/%s"
+	urlTemplate = "http://%s:%d/v1.0/bindings/%s"
 )
 
 type Client interface {
@@ -100,9 +100,10 @@ func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, 
 		return nil, fmt.Errorf("pod %v has no ip", pod.Name)
 	}
 
-	port, err := intctrlutil.GetProbeHTTPPort(pod)
+	port, err := intctrlutil.GuessLorryHTTPPort(pod)
 	if err != nil {
-		return nil, err
+		// not lorry in the pod, just return nil without error
+		return nil, nil
 	}
 
 	// don't use default http-client
@@ -122,7 +123,7 @@ func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, 
 		Client:           client,
 		Port:             port,
 		CharacterType:    characterType,
-		URL:              fmt.Sprintf(urlTemplate, port, characterType),
+		URL:              fmt.Sprintf(urlTemplate, ip, port, characterType),
 		CacheTTL:         60 * time.Second,
 		RequestTimeout:   30 * time.Second,
 		ReconcileTimeout: 500 * time.Millisecond,

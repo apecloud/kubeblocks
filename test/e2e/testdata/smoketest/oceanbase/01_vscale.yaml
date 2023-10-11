@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: oceanbase-cluster-vscale-
+spec:
+  clusterRef: oceanbase-cluster
+  type: VerticalScaling
+  verticalScaling:
+    - componentName: ob-bundle
+      requests:
+        cpu: "1.5"
+        memory: 1Gi

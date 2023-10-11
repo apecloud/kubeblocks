@@ -110,12 +110,10 @@ var _ = Describe("object rbac transformer test.", func() {
 				&corev1.ServiceAccount{}, false)).Should(Succeed())
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
 
-			serviceAccount, err := factory.BuildServiceAccount(cluster)
-			Expect(err).Should(BeNil())
+			serviceAccount := factory.BuildServiceAccount(cluster)
 			serviceAccount.Name = serviceAccountName
 
-			roleBinding, err := factory.BuildRoleBinding(cluster)
-			Expect(err).Should(BeNil())
+			roleBinding := factory.BuildRoleBinding(cluster)
 			roleBinding.Subjects[0].Name = serviceAccountName
 
 			dagExpected := mockDAG(cluster)
@@ -130,16 +128,13 @@ var _ = Describe("object rbac transformer test.", func() {
 				&corev1.ServiceAccount{}, false)).Should(Succeed())
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
 
-			serviceAccount, err := factory.BuildServiceAccount(cluster)
-			Expect(err).Should(BeNil())
+			serviceAccount := factory.BuildServiceAccount(cluster)
 			serviceAccount.Name = serviceAccountName
 
-			roleBinding, err := factory.BuildRoleBinding(cluster)
-			Expect(err).Should(BeNil())
+			roleBinding := factory.BuildRoleBinding(cluster)
 			roleBinding.Subjects[0].Name = serviceAccountName
 
-			clusterRoleBinding, err := factory.BuildClusterRoleBinding(cluster)
-			Expect(err).Should(BeNil())
+			clusterRoleBinding := factory.BuildClusterRoleBinding(cluster)
 			clusterRoleBinding.Subjects[0].Name = serviceAccountName
 
 			dagExpected := mockDAG(cluster)

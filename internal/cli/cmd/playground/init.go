@@ -149,7 +149,9 @@ func (o *initOptions) complete(cmd *cobra.Command) error {
 		return nil
 	}
 	o.dockerVersion, err = util.GetDockerVersion()
-
+	if err != nil {
+		return err
+	}
 	// default write log to file
 	if err = util.EnableLogToFile(cmd.Flags()); err != nil {
 		fmt.Fprintf(o.Out, "Failed to enable the log file %s", err.Error())

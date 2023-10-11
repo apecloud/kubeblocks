@@ -210,7 +210,7 @@ var _ = Describe("PITR Functions", func() {
 				CompletionTimestamp:       baseStopTime,
 				PersistentVolumeClaimName: remotePVC.Name,
 			}
-			testdp.MockBackupStatusMethod(backup, testapps.DataVolumeName)
+			testdp.MockBackupStatusMethod(backup, testdp.VSBackupMethodName, testapps.DataVolumeName, testdp.ActionSetName)
 			patchBackupStatus(backup.Status, client.ObjectKeyFromObject(backup))
 		})
 

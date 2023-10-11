@@ -624,7 +624,7 @@ var _ = Describe("Cluster Controller", func() {
 				Expect(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(backup *dpv1alpha1.Backup) {
 					backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
 					backup.Status.PersistentVolumeClaimName = "backup-data"
-					testdp.MockBackupStatusMethod(backup, testapps.DataVolumeName)
+					testdp.MockBackupStatusMethod(backup, testdp.BackupMethodName, testapps.DataVolumeName, testdp.ActionSetName)
 				})()).Should(Succeed())
 
 				if testk8s.IsMockVolumeSnapshotEnabled(&testCtx, storageClassName) {
@@ -2324,7 +2324,7 @@ var _ = Describe("Cluster Controller", func() {
 			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(backup), func(backup *dpv1alpha1.Backup) {
 				backup.Status.PersistentVolumeClaimName = "backup-pvc"
 				backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
-				testdp.MockBackupStatusMethod(backup, testapps.DataVolumeName)
+				testdp.MockBackupStatusMethod(backup, testdp.BackupMethodName, testapps.DataVolumeName, testdp.ActionSetName)
 			})).Should(Succeed())
 
 			By("creating cluster with backup")

@@ -299,3 +299,9 @@ func fromFlattenName(flatten string) (name string, namespace string) {
 	}
 	return
 }
+
+// restore functions
+
+func getPopulatePVCName(pvcUID types.UID) string {
+	return fmt.Sprintf("%s-%s", populatePodPrefix, pvcUID)
+}

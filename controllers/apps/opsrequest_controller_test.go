@@ -500,7 +500,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			backup := &dpv1alpha1.Backup{}
 			Expect(k8sClient.Get(testCtx.Ctx, backupKey, backup)).Should(Succeed())
 			backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
-			testdp.MockBackupStatusMethod(backup, testapps.DataVolumeName)
+			testdp.MockBackupStatusMethod(backup, testdp.BackupMethodName, testapps.DataVolumeName, testdp.ActionSetName)
 			Expect(k8sClient.Status().Update(testCtx.Ctx, backup)).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.UpdatingClusterCompPhase))

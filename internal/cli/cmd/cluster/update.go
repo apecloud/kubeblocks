@@ -257,6 +257,11 @@ func (o *updateOptions) buildPatch(flags []*pflag.Flag) error {
 	}
 
 	if o.cluster != nil {
+		// if update the backup config, the backup method must have value
+		if o.cluster.Spec.Backup != nil && o.cluster.Spec.Backup.Method == "" {
+			return fmt.Errorf("backup method is required, use --backup-method to specify one, run \"kbcli cd describe cd-name\" to show all backup methods")
+		}
+
 		data, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&o.cluster.Spec)
 		if err != nil {
 			return err
@@ -310,6 +315,9 @@ func (o *updateOptions) buildBackup(field string, val string) error {
 			return err
 		}
 		o.cluster = c
+	}
+	if o.cluster.Spec.Backup == nil {
+		o.cluster.Spec.Backup = &appsv1alpha1.ClusterBackup{}
 	}
 
 	switch field {

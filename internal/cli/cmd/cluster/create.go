@@ -879,10 +879,6 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 
 // PreCreate before saving yaml to k8s, makes changes on Unstructured yaml
 func (o *CreateOptions) PreCreate(obj *unstructured.Unstructured) error {
-	if !o.EnableAllLogs {
-		// EnableAllLogs is false, nothing will change
-		return nil
-	}
 	c := &appsv1alpha1.Cluster{}
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, c); err != nil {
 		return err
@@ -892,7 +888,14 @@ func (o *CreateOptions) PreCreate(obj *unstructured.Unstructured) error {
 	if err != nil {
 		return err
 	}
-	setEnableAllLogs(c, cd)
+
+	if !o.EnableAllLogs {
+		setEnableAllLogs(c, cd)
+	}
+	if o.BackupConfig == nil {
+		// if backup config is not specified, set cluster's backup to nil
+		c.Spec.Backup = nil
+	}
 	data, e := runtime.DefaultUnstructuredConverter.ToUnstructured(c)
 	if e != nil {
 		return e
@@ -1213,7 +1216,7 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&f.Tenancy, "tenancy", "SharedNode", "Tenancy options, one of: (SharedNode, DedicatedNode)")
 	cmd.Flags().BoolVar(&f.BackupEnabled, "backup-enabled", false, "Specify whether enabled automated backup")
 	cmd.Flags().StringVar(&f.BackupRetentionPeriod, "backup-retention-period", "1d", "a time string ending with the 'd'|'D'|'h'|'H' character to describe how long the Backup should be retained")
-	cmd.Flags().StringVar(&f.BackupMethod, "backup-method", "snapshot", "the backup method, support: snapshot, backupTool")
+	cmd.Flags().StringVar(&f.BackupMethod, "backup-method", "volume-snapshot", "the backup method, view it by `kbcli cd describe <cluster-definition>`, default is volume-snapshot")
 	cmd.Flags().StringVar(&f.BackupCronExpression, "backup-cron-expression", "", "the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.")
 	cmd.Flags().Int64Var(&f.BackupStartingDeadlineMinutes, "backup-starting-deadline-minutes", 0, "the deadline in minutes for starting the backup job if it misses its scheduled time for any reason")
 	cmd.Flags().StringVar(&f.BackupRepoName, "backup-repo-name", "", "the backup repository name")
@@ -1379,9 +1382,6 @@ func (o *CreateOptions) buildAnnotation(cls *appsv1alpha1.Cluster) {
 }
 
 func (o *CreateOptions) buildBackupConfig(cls *appsv1alpha1.Cluster) error {
-	// set default backup config
-	o.BackupConfig = &appsv1alpha1.ClusterBackup{}
-
 	// if the cls.Backup isn't nil, use the backup config in cluster
 	if cls != nil && cls.Spec.Backup != nil {
 		o.BackupConfig = cls.Spec.Backup
@@ -1391,30 +1391,48 @@ func (o *CreateOptions) buildBackupConfig(cls *appsv1alpha1.Cluster) error {
 	var flags []*pflag.Flag
 	if o.Cmd != nil {
 		o.Cmd.Flags().Visit(func(flag *pflag.Flag) {
-			flags = append(flags, flag)
+			// only check the backup flags
+			if flag.Name == "backup-enabled" || flag.Name == "backup-retention-period" ||
+				flag.Name == "backup-method" || flag.Name == "backup-cron-expression" ||
+				flag.Name == "backup-starting-deadline-minutes" || flag.Name == "backup-repo-name" ||
+				flag.Name == "pitr-enabled" {
+				flags = append(flags, flag)
+			}
 		})
 	}
 
-	// if the flag is set by user, use the flag value
-	for _, flag := range flags {
-		switch flag.Name {
-		case "backup-enabled":
-			o.BackupConfig.Enabled = &o.BackupEnabled
-		case "backup-retention-period":
-			o.BackupConfig.RetentionPeriod = dpv1alpha1.RetentionPeriod(o.BackupRetentionPeriod)
-		case "backup-method":
-			o.BackupConfig.Method = o.BackupMethod
-		case "backup-cron-expression":
-			if _, err := cron.ParseStandard(o.BackupCronExpression); err != nil {
-				return fmt.Errorf("invalid cron expression: %s, please see https://en.wikipedia.org/wiki/Cron", o.BackupCronExpression)
+	// must set backup method when set backup config in cli
+	if len(flags) > 0 {
+		methodRequiredErr := fmt.Errorf("backup method is required, use --backup-method to specify one, run \"kbcli cd describe cd-name\" to show all backup methods")
+		if o.BackupConfig == nil {
+			o.BackupConfig = &appsv1alpha1.ClusterBackup{}
+		}
+
+		// if the flag is set by user, use the flag value
+		for _, flag := range flags {
+			switch flag.Name {
+			case "backup-enabled":
+				o.BackupConfig.Enabled = &o.BackupEnabled
+			case "backup-retention-period":
+				o.BackupConfig.RetentionPeriod = dpv1alpha1.RetentionPeriod(o.BackupRetentionPeriod)
+			case "backup-method":
+				o.BackupConfig.Method = o.BackupMethod
+				methodRequiredErr = nil
+			case "backup-cron-expression":
+				if _, err := cron.ParseStandard(o.BackupCronExpression); err != nil {
+					return fmt.Errorf("invalid cron expression: %s, please see https://en.wikipedia.org/wiki/Cron", o.BackupCronExpression)
+				}
+				o.BackupConfig.CronExpression = o.BackupCronExpression
+			case "backup-starting-deadline-minutes":
+				o.BackupConfig.StartingDeadlineMinutes = &o.BackupStartingDeadlineMinutes
+			case "backup-repo-name":
+				o.BackupConfig.RepoName = o.BackupRepoName
+			case "pitr-enabled":
+				o.BackupConfig.PITREnabled = &o.BackupPITREnabled
 			}
-			o.BackupConfig.CronExpression = o.BackupCronExpression
-		case "backup-starting-deadline-minutes":
-			o.BackupConfig.StartingDeadlineMinutes = &o.BackupStartingDeadlineMinutes
-		case "backup-repo-name":
-			o.BackupConfig.RepoName = o.BackupRepoName
-		case "pitr-enabled":
-			o.BackupConfig.PITREnabled = &o.BackupPITREnabled
+		}
+		if methodRequiredErr != nil {
+			return methodRequiredErr
 		}
 	}
 

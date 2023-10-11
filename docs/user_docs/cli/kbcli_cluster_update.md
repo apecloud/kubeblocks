@@ -57,28 +57,28 @@ kbcli cluster update NAME [flags]
 ### Options
 
 ```
-      --allow-missing-template-keys            If true, ignore any errors in templates when a field or map key is missing in the template. Only applies to golang and jsonpath output formats. (default true)
-      --backup-cron-expression string          the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
-      --backup-enabled                         Specify whether enabled automated backup
-      --backup-method string                   the backup method, support: snapshot, backupTool (default "snapshot")
-      --backup-repo-name string                the backup repository name
-      --backup-retention-period string         a time string ending with the 'd'|'D'|'h'|'H' character to describe how long the Backup should be retained (default "1d")
-      --backup-starting-deadline-minutes int   the deadline in minutes for starting the backup job if it misses its scheduled time for any reason
-      --dry-run string[="unchanged"]           Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
-      --edit                                   Edit the API resource
-      --enable-all-logs                        Enable advanced application all log extraction, set to true will ignore enabledLogs of component level, default is false
-  -h, --help                                   help for update
-      --monitoring-interval uint8              The monitoring interval of cluster, 0 is disabled, the unit is second, any non-zero value means enabling monitoring.
-      --node-labels stringToString             Node label selector (default [])
-  -o, --output string                          Output format. One of: (json, yaml, name, go-template, go-template-file, template, templatefile, jsonpath, jsonpath-as-json, jsonpath-file).
-      --pitr-enabled                           Specify whether enabled point in time recovery
-      --pod-anti-affinity string               Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
-      --show-managed-fields                    If true, keep the managedFields when printing objects in JSON or YAML format.
-      --template string                        Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
-      --tenancy string                         Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
-      --termination-policy string              Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
-      --tolerations strings                    Tolerations for cluster, such as "key=value:effect, key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'
-      --topology-keys stringArray              Topology keys for affinity
+      --allow-missing-template-keys                            If true, ignore any errors in templates when a field or map key is missing in the template. Only applies to golang and jsonpath output formats. (default true)
+      --backup-cron-expression string                          the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
+      --backup-enabled                                         Specify whether enabled automated backup
+      --backup-method kbcli cd describe <cluster-definition>   the backup method, view it by kbcli cd describe <cluster-definition>, default is volume-snapshot (default "volume-snapshot")
+      --backup-repo-name string                                the backup repository name
+      --backup-retention-period string                         a time string ending with the 'd'|'D'|'h'|'H' character to describe how long the Backup should be retained (default "1d")
+      --backup-starting-deadline-minutes int                   the deadline in minutes for starting the backup job if it misses its scheduled time for any reason
+      --dry-run string[="unchanged"]                           Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+      --edit                                                   Edit the API resource
+      --enable-all-logs                                        Enable advanced application all log extraction, set to true will ignore enabledLogs of component level, default is false
+  -h, --help                                                   help for update
+      --monitoring-interval uint8                              The monitoring interval of cluster, 0 is disabled, the unit is second, any non-zero value means enabling monitoring.
+      --node-labels stringToString                             Node label selector (default [])
+  -o, --output string                                          Output format. One of: (json, yaml, name, go-template, go-template-file, template, templatefile, jsonpath, jsonpath-as-json, jsonpath-file).
+      --pitr-enabled                                           Specify whether enabled point in time recovery
+      --pod-anti-affinity string                               Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
+      --show-managed-fields                                    If true, keep the managedFields when printing objects in JSON or YAML format.
+      --template string                                        Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
+      --tenancy string                                         Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
+      --termination-policy string                              Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
+      --tolerations strings                                    Tolerations for cluster, such as "key=value:effect, key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'
+      --topology-keys stringArray                              Topology keys for affinity
 ```
 
 ### Options inherited from parent commands

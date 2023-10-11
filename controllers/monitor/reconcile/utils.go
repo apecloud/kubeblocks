@@ -65,7 +65,7 @@ func buildPodSpecForOteld(config *types.Config, template *v1alpha1.OTeldCollecto
 	return &builder.NewPodBuilder("", "").
 		AddSerciveAccount("oteld-controller").
 		AddContainer(container).
-		SetVolumes(template.Spec.Volumes...).
+		AddVolumes(template.Spec.Volumes...).
 		GetObject().Spec
 }
 

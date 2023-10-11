@@ -100,6 +100,7 @@ type DBManager interface {
 	Unlock(context.Context) error
 
 	GetReplicaRole(context.Context) (string, error)
+	GetPort() (int, error)
 
 	MoveData(context.Context, *dcs.Cluster) error
 

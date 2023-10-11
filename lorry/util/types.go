@@ -64,10 +64,11 @@ const (
 	JoinMemberOperation  OperationKind = "joinMember"
 	LeaveMemberOperation OperationKind = "leaveMember"
 
-	OperationNotImplemented = "NotImplemented"
-	OperationInvalid        = "Invalid"
-	OperationSuccess        = "Success"
-	OperationFailed         = "Failed"
+	OperationNotImplemented    = "NotImplemented"
+	OperationInvalid           = "Invalid"
+	OperationSuccess           = "Success"
+	OperationFailed            = "Failed"
+	DefaultProbeTimeoutSeconds = 2
 
 	HTTPRequestPrefx string = "curl -X POST -H 'Content-Type: application/json' http://localhost:%d/v1.0/bindings/%s"
 

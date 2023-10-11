@@ -144,7 +144,7 @@ func (ops *BaseOperations) Operations() []util.OperationKind {
 }
 
 // getAddress returns component service address, if component is not listening on
-// 127.0.0.1, the LegacyOperation needs to overwrite this function and set ops.DBAddress
+// 127.0.0.1, the Operation needs to overwrite this function and set ops.DBAddress
 func (ops *BaseOperations) getAddress() string {
 	return "127.0.0.1"
 }

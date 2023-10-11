@@ -53,7 +53,6 @@ type CheckRole struct {
 	DBRoles                    map[string]AccessMode
 }
 
-var defaultRoleProbeTimeoutSeconds int = 2
 var checkrole operations.Operation = &CheckRole{}
 
 func init() {
@@ -83,7 +82,7 @@ func (s *CheckRole) Init(ctx context.Context) error {
 		s.FailedEventReportFrequency = 3600
 	}
 
-	timeoutSeconds := defaultRoleProbeTimeoutSeconds
+	timeoutSeconds := util.DefaultProbeTimeoutSeconds
 	if viper.IsSet(constant.KBEnvRoleProbeTimeout) {
 		timeoutSeconds = viper.GetInt(constant.KBEnvRoleProbeTimeout)
 	}

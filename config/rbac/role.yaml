@@ -443,6 +443,8 @@ rules:
   - persistentvolumeclaims/status
   verbs:
   - get
+  - patch
+  - update
 - apiGroups:
   - ""
   resources:

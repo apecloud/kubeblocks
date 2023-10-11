@@ -65,6 +65,8 @@ var SecretSignature = func(_ corev1.Secret, _ *corev1.Secret, _ corev1.SecretLis
 var ServiceSignature = func(_ corev1.Service, _ *corev1.Service, _ corev1.ServiceList, _ *corev1.ServiceList) {}
 var PersistentVolumeClaimSignature = func(_ corev1.PersistentVolumeClaim, _ *corev1.PersistentVolumeClaim, _ corev1.PersistentVolumeClaimList, _ *corev1.PersistentVolumeClaimList) {
 }
+var PersistentVolumeSignature = func(_ corev1.PersistentVolume, _ *corev1.PersistentVolume, _ corev1.PersistentVolumeList, _ *corev1.PersistentVolumeList) {
+}
 var PodSignature = func(_ corev1.Pod, _ *corev1.Pod, _ corev1.PodList, _ *corev1.PodList) {}
 var EventSignature = func(_ corev1.Event, _ *corev1.Event, _ corev1.EventList, _ *corev1.EventList) {}
 var ConfigMapSignature = func(_ corev1.ConfigMap, _ *corev1.ConfigMap, _ corev1.ConfigMapList, _ *corev1.ConfigMapList) {}

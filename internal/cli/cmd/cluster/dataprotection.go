@@ -91,7 +91,7 @@ var (
 
 		# create a datafile backup
 		# backup all files under the data directory and save them to the specified storage, only full backup is supported now.
-		kbcli cluster backup mycluster --type datafile
+		kbcli cluster backup mycluster --type datafile 
 
 		# create a backup with specified backup policy
 		kbcli cluster backup mycluster --policy <backup-policy-name>
@@ -109,8 +109,8 @@ var (
 		kbcli cluster restore new-cluster-name --backup backup-name
 
 		# restore a new cluster from point in time
-		kbcli cluster restore new-cluster-name --restore-to-time "Apr 13,2023 18:40:35 UTC+0800" --source-cluster mycluster
-        kbcli cluster restore new-cluster-name --restore-to-time "2023-04-13T18:40:35+08:00" --source-cluster mycluster
+		kbcli cluster restore new-cluster-name --restore-to-time "Apr 13,2023 18:40:35 UTC+0800" --backup logfile-backup
+        kbcli cluster restore new-cluster-name --restore-to-time "2023-04-13T18:40:35+08:00" --backup logfile-backup
 	`)
 	describeBackupExample = templates.Examples(`
 		# describe a backup
@@ -264,7 +264,7 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		},
 	}
 
-	cmd.Flags().StringVar(&o.BackupMethod, "method", "", "Backup method that defined in backup policy")
+	cmd.Flags().StringVar(&o.BackupMethod, "method", "", "Backup method that defined in backup policy (required)")
 	cmd.Flags().StringVar(&o.BackupName, "name", "", "Backup name")
 	cmd.Flags().StringVar(&o.BackupPolicy, "policy", "", "Backup policy name, this flag will be ignored when backup-type is snapshot")
 

@@ -99,7 +99,7 @@ func (t *MemberReconfigurationTransformer) Transform(ctx graph.TransformContext,
 		return nil
 	}
 
-	graphCli.SetImmutability(dag, sts, true)
+	graphCli.Noop(dag, sts)
 
 	// barrier: the underlying sts is ready and has enough replicas
 	if sts.Status.ReadyReplicas < *rsm.Spec.Replicas || !isStatefulSetReady(sts) {

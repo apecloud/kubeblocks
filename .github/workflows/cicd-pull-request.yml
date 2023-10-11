@@ -89,7 +89,7 @@ jobs:
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && github.event.pull_request.head.repo.full_name != github.repository }}
     outputs:
       runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
-    runs-on: [ self-hosted, kubeblocks-runner ]
+    runs-on: [ self-hosted, gke-runner-go1.21 ]
     steps:
       - uses: actions/checkout@v3
       - name: make mod-vendor

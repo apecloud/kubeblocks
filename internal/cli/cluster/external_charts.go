@@ -27,12 +27,14 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"k8s.io/klog"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
 )
 
 // CliClusterChartConfig is $HOME/.kbcli/cluster_types by default
@@ -186,7 +188,16 @@ func (h *TypeInstance) PreCheck() error {
 	if err := chartInfo.buildClusterSchema(); err != nil {
 		return err
 	}
-	return chartInfo.buildClusterDef()
+	if err := chartInfo.buildClusterDef(); err != nil {
+		return err
+	}
+
+	// pre-check build sub-command flags
+	if err := flags.BuildFlagsBySchema(&cobra.Command{}, chartInfo.Schema); err != nil {
+		return err
+	}
+
+	return flags.BuildFlagsBySchema(&cobra.Command{}, chartInfo.SubSchema)
 }
 
 func (h *TypeInstance) loadChart() (io.ReadCloser, error) {

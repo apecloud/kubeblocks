@@ -54,12 +54,12 @@ func addCreateFlags(cmd *cobra.Command, f cmdutil.Factory, c *cluster.ChartInfo)
 	}
 
 	// add the flags for the cluster schema
-	if err := flags.BuildFlagsBySchema(cmd, f, c.Schema); err != nil {
+	if err := flags.BuildFlagsBySchema(cmd, c.Schema); err != nil {
 		return err
 	}
 
 	// add the flags for sub helm chart
-	if err := flags.BuildFlagsBySchema(cmd, f, c.SubSchema); err != nil {
+	if err := flags.BuildFlagsBySchema(cmd, c.SubSchema); err != nil {
 		return err
 	}
 
@@ -81,12 +81,20 @@ func getValuesFromFlags(fs *flag.FlagSet) map[string]interface{} {
 		}
 		var val interface{}
 		switch f.Value.Type() {
-		case "bool":
+		case flags.CobraBool:
 			val, _ = fs.GetBool(f.Name)
-		case "int":
+		case flags.CobraInt:
 			val, _ = fs.GetInt(f.Name)
-		case "float64":
+		case flags.CobraFloat64:
 			val, _ = fs.GetFloat64(f.Name)
+		case flags.CobraStringArray:
+			val, _ = fs.GetStringArray(f.Name)
+		case flags.CobraIntSlice:
+			val, _ = fs.GetIntSlice(f.Name)
+		case flags.CobraFloat64Slice:
+			val, _ = fs.GetFloat64Slice(f.Name)
+		case flags.CobraBoolSlice:
+			val, _ = fs.GetBoolSlice(f.Name)
 		default:
 			val, _ = fs.GetString(f.Name)
 		}
@@ -185,12 +193,25 @@ func buildHelmValues(c *cluster.ChartInfo, values map[string]interface{}) map[st
 	newValues := map[string]interface{}{
 		c.SubChartName: map[string]interface{}{},
 	}
+	var build func(key []string, v interface{}, values *map[string]interface{})
+	build = func(key []string, v interface{}, values *map[string]interface{}) {
+		if len(key) == 1 {
+			(*values)[key[0]] = v
+			return
+		}
+		if (*values)[key[0]] == nil {
+			(*values)[key[0]] = make(map[string]interface{})
+		}
+		nextMap := (*values)[key[0]].(map[string]interface{})
+		build(key[1:], v, &nextMap)
+	}
 
 	for k, v := range values {
 		if slices.Contains(subSchemaKeys, k) {
 			newValues[c.SubChartName].(map[string]interface{})[k] = v
 		} else {
-			newValues[k] = v
+			// todo: fix "."
+			build(strings.Split(k, "."), v, &newValues)
 		}
 	}
 

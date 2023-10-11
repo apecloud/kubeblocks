@@ -146,7 +146,7 @@ func CreateVolumeSnapshotClass(testCtx *testutil.TestContext, storageProvisioner
 		Driver:         storageProvisioner,
 		DeletionPolicy: snapshotv1.VolumeSnapshotContentDelete,
 	}
-	gomega.Expect(testCtx.Cli.Create(testCtx.Ctx, vsc)).Should(gomega.Succeed())
+	gomega.Expect(testCtx.Create(testCtx.Ctx, vsc)).Should(gomega.Succeed())
 	return vsc
 }
 

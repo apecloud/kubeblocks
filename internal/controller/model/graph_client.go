@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package model
 
 import (
+	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -42,9 +43,15 @@ type GraphWriter interface {
 	// Status updates the given obj's status in the underlying DAG.
 	Status(dag *graph.DAG, objOld, objNew client.Object)
 
+	// Noop means not to commit any change made to this obj in the execute phase.
+	Noop(dag *graph.DAG, obj client.Object)
+
 	// DependOn setups dependencies between 'object' and 'dependency',
 	// which will guarantee the Write Order to the K8s cluster of these objects.
 	DependOn(dag *graph.DAG, object client.Object, dependency ...client.Object)
+
+	// FindAll finds all objects that have same(hasSameType is true) or different(hasSameType is false) type with obj in the underlying DAG.
+	FindAll(dag *graph.DAG, obj interface{}, hasSameType bool) []client.Object
 }
 
 type GraphClient interface {
@@ -61,25 +68,29 @@ func (r *realGraphClient) Root(dag *graph.DAG, objOld, objNew client.Object) {
 	vertex := &ObjectVertex{
 		Obj:    objNew,
 		OriObj: objOld,
-		Action: ActionPtr(STATUS),
+		Action: ActionStatusPtr(),
 	}
 	dag.AddVertex(vertex)
 }
 
 func (r *realGraphClient) Create(dag *graph.DAG, obj client.Object) {
-	r.doWrite(dag, nil, obj, ActionPtr(CREATE))
+	r.doWrite(dag, nil, obj, ActionCreatePtr())
 }
 
 func (r *realGraphClient) Update(dag *graph.DAG, objOld, objNew client.Object) {
-	r.doWrite(dag, objOld, objNew, ActionPtr(UPDATE))
+	r.doWrite(dag, objOld, objNew, ActionUpdatePtr())
 }
 
 func (r *realGraphClient) Delete(dag *graph.DAG, obj client.Object) {
-	r.doWrite(dag, nil, obj, ActionPtr(DELETE))
+	r.doWrite(dag, nil, obj, ActionDeletePtr())
 }
 
 func (r *realGraphClient) Status(dag *graph.DAG, objOld, objNew client.Object) {
-	r.doWrite(dag, objOld, objNew, ActionPtr(STATUS))
+	r.doWrite(dag, objOld, objNew, ActionStatusPtr())
+}
+
+func (r *realGraphClient) Noop(dag *graph.DAG, obj client.Object) {
+	r.doWrite(dag, nil, obj, ActionNoopPtr())
 }
 
 func (r *realGraphClient) DependOn(dag *graph.DAG, object client.Object, dependency ...client.Object) {
@@ -96,6 +107,19 @@ func (r *realGraphClient) DependOn(dag *graph.DAG, object client.Object, depende
 			dag.Connect(objectVertex, v)
 		}
 	}
+}
+
+func (r *realGraphClient) FindAll(dag *graph.DAG, obj interface{}, hasSameType bool) []client.Object {
+	objType := reflect.TypeOf(obj)
+	objects := make([]client.Object, 0)
+	for _, vertex := range dag.Vertices() {
+		v, _ := vertex.(*ObjectVertex)
+		vertexType := reflect.TypeOf(v.Obj)
+		if vertexType.AssignableTo(objType) == hasSameType {
+			objects = append(objects, v.Obj)
+		}
+	}
+	return objects
 }
 
 func (r *realGraphClient) doWrite(dag *graph.DAG, objOld, objNew client.Object, action *Action) {
@@ -115,7 +139,7 @@ func (r *realGraphClient) doWrite(dag *graph.DAG, objOld, objNew client.Object, 
 }
 
 func (r *realGraphClient) findMatchedVertex(dag *graph.DAG, object client.Object) graph.Vertex {
-	keyLookfor, err := GetGVKName(object)
+	keyLookFor, err := GetGVKName(object)
 	if err != nil {
 		return nil
 	}
@@ -125,7 +149,7 @@ func (r *realGraphClient) findMatchedVertex(dag *graph.DAG, object client.Object
 		if err != nil {
 			return nil
 		}
-		if *keyLookfor == *key {
+		if *keyLookFor == *key {
 			return vertex
 		}
 	}

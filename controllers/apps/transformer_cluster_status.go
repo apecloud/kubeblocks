@@ -21,12 +21,12 @@ package apps
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 )
 
 type ClusterStatusTransformer struct {
@@ -39,13 +39,10 @@ type ClusterStatusTransformer struct {
 var _ graph.Transformer = &ClusterStatusTransformer{}
 
 func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*ClusterTransformContext)
+	transCtx, _ := ctx.(*clusterTransformContext)
 	origCluster := transCtx.OrigCluster
 	cluster := transCtx.Cluster
-	rootVertex, err := ictrltypes.FindRootVertex(dag)
-	if err != nil {
-		return err
-	}
+	graphCli, _ := transCtx.Client.(model.GraphClient)
 
 	updateObservedGeneration := func() {
 		cluster.Status.ObservedGeneration = cluster.Generation
@@ -56,9 +53,9 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 	case origCluster.IsUpdating():
 		transCtx.Logger.Info(fmt.Sprintf("update cluster status after applying resources, generation: %d", cluster.Generation))
 		updateObservedGeneration()
-		rootVertex.Action = ictrltypes.ActionStatusPtr()
+		graphCli.Status(dag, origCluster, cluster)
 	case origCluster.IsStatusUpdating():
-		defer func() { rootVertex.Action = ictrltypes.ActionPtr(ictrltypes.STATUS) }()
+		defer func() { graphCli.Status(dag, origCluster, cluster) }()
 		// reconcile the phase and conditions of the Cluster.status
 		if err := t.reconcileClusterStatus(cluster); err != nil {
 			return err

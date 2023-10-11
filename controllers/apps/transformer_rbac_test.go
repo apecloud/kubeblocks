@@ -80,7 +80,7 @@ var _ = Describe("object rbac transformer test.", func() {
 			Name:      serviceAccountName,
 		}
 
-		transCtx = &ClusterTransformContext{
+		transCtx = &clusterTransformContext{
 			Context:       ctx,
 			Client:        k8sClient,
 			EventRecorder: nil,

@@ -22,6 +22,7 @@ package rsm
 import (
 	"fmt"
 	"regexp"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strconv"
 
 	apps "k8s.io/api/apps/v1"
@@ -53,6 +54,7 @@ func (t *MemberReconfigurationTransformer) Transform(ctx graph.TransformContext,
 		return nil
 	}
 	rsm := transCtx.rsm
+	graphCli, _ := transCtx.Client.(model.GraphClient)
 
 	if len(rsm.Spec.Roles) == 0 || rsm.Spec.RoleProbe == nil {
 		return nil
@@ -85,20 +87,19 @@ func (t *MemberReconfigurationTransformer) Transform(ctx graph.TransformContext,
 	}
 
 	// get the underlying sts
-	stsVertex, err := getUnderlyingStsVertex(dag)
-	if err != nil {
+	sts := &apps.StatefulSet{}
+	if err := graphCli.Get(transCtx.Context, client.ObjectKeyFromObject(rsm), sts); err != nil {
 		return err
 	}
 
 	// no enough replicas in scale out, tell sts to create them.
-	sts, _ := stsVertex.OriObj.(*apps.StatefulSet)
 	memberReadyReplicas := int32(len(rsm.Status.MembersStatus))
 	if memberReadyReplicas < *rsm.Spec.Replicas &&
 		sts.Status.ReadyReplicas < *rsm.Spec.Replicas {
 		return nil
 	}
 
-	stsVertex.Immutable = true
+	graphCli.SetImmutability(dag, sts, true)
 
 	// barrier: the underlying sts is ready and has enough replicas
 	if sts.Status.ReadyReplicas < *rsm.Spec.Replicas || !isStatefulSetReady(sts) {
@@ -306,15 +307,6 @@ func getActionOrdinal(actionName string) (int, error) {
 		return 0, fmt.Errorf("error actionName: %s", actionName)
 	}
 	return strconv.Atoi(subMatches[3])
-}
-
-func getUnderlyingStsVertex(dag *graph.DAG) (*model.ObjectVertex, error) {
-	vertices := model.FindAll[*apps.StatefulSet](dag)
-	if len(vertices) != 1 {
-		return nil, fmt.Errorf("unexpected sts found, expected 1, but found: %d", len(vertices))
-	}
-	stsVertex, _ := vertices[0].(*model.ObjectVertex)
-	return stsVertex, nil
 }
 
 // all members with ordinal less than action target pod should be in a good replication state:

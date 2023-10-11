@@ -20,13 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -38,7 +38,7 @@ type ComponentTransformer struct {
 var _ graph.Transformer = &ComponentTransformer{}
 
 func (c *ComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*ClusterTransformContext)
+	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster
 
 	clusterDef := transCtx.ClusterDef
@@ -64,7 +64,7 @@ func (c *ComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.
 
 	for _, subDag := range dags4Component {
 		for _, v := range subDag.Vertices() {
-			node, ok := v.(*ictrltypes.LifecycleVertex)
+			node, ok := v.(*model.ObjectVertex)
 			if !ok {
 				panic("runtime error, unexpected lifecycle vertex type")
 			}

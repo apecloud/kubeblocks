@@ -94,9 +94,10 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 		return d
 	}
 	expectStsImmutable := func(d *graph.DAG, immutable bool) {
-		stsVertex, err := getUnderlyingStsVertex(d)
-		Expect(err).Should(BeNil())
-		Expect(stsVertex.Immutable).Should(Equal(immutable))
+		stsList := graphCli.FindAll(d, &apps.StatefulSet{})
+		Expect(stsList).Should(HaveLen(1))
+		sts, _ := stsList[0].(*apps.StatefulSet)
+		Expect(graphCli.GetImmutability(d, sts)).Should(Equal(immutable))
 	}
 
 	BeforeEach(func() {

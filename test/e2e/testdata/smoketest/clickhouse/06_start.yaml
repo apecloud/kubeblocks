@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: milvus-cluster-start-
+spec:
+  clusterRef: milvus-cluster
+  ttlSecondsAfterSucceed: 27017
+  type: Start
+  restart:
+    - componentName: milvus
+    - componentName: etcd
+    - componentName: minio

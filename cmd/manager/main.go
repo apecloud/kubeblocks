@@ -361,15 +361,6 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&k8scorecontrollers.PersistentVolumeClaimReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("pvc-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "PersistentVolumeClaim")
-			os.Exit(1)
-		}
-
 		if err = (&appscontrollers.ComponentClassReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),

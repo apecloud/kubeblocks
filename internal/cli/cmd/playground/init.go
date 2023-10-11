@@ -148,8 +148,8 @@ func (o *initOptions) complete(cmd *cobra.Command) error {
 	if o.cloudProvider != cp.Local {
 		return nil
 	}
-	o.dockerVersion, err = util.GetDockerVersion()
-	if err != nil {
+
+	if o.dockerVersion, err = util.GetDockerVersion(); err != nil {
 		return err
 	}
 	// default write log to file
@@ -157,7 +157,7 @@ func (o *initOptions) complete(cmd *cobra.Command) error {
 		fmt.Fprintf(o.Out, "Failed to enable the log file %s", err.Error())
 	}
 
-	return err
+	return nil
 }
 
 func (o *initOptions) validate() error {

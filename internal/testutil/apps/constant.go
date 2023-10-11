@@ -60,8 +60,7 @@ const (
 	Class2c4gName                 = "general-2c4g"
 	DefaultResourceConstraintName = "kb-resource-constraint"
 
-	StogrageProvisioner = "kubernetes.io/no-provisioner"
-	StogrageClassName   = "test-sc"
+	StogrageClassName = "test-sc"
 )
 
 var (

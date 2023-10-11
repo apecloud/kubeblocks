@@ -175,7 +175,7 @@ func VolumeSnapshotEnabled(ctx context.Context, cli client.Client, pod *corev1.P
 			return false, err
 		}
 		if !enabled {
-			return false, fmt.Errorf(`cannot find CSI of persistentVolumeClaim "%s" to do volume snapshot on pod "%s"`, storageClassMap[k], pod.Name)
+			return false, fmt.Errorf(`cannot find any VolumeSnapshotClass of persistentVolumeClaim "%s" to do volume snapshot on pod "%s"`, storageClassMap[k], pod.Name)
 		}
 	}
 	return true, nil

@@ -37,8 +37,10 @@ import (
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	dputils "github.com/apecloud/kubeblocks/internal/dataprotection/utils"
 	"github.com/apecloud/kubeblocks/internal/generics"
+	"github.com/apecloud/kubeblocks/internal/testutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/internal/testutil/dataprotection"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 var _ = Describe("Backup Controller test", func() {
@@ -259,7 +261,7 @@ var _ = Describe("Backup Controller test", func() {
 
 			BeforeEach(func() {
 				// mock VolumeSnapshotClass for volume snapshot
-				testapps.CreateVolumeSnapshotClass(&testCtx)
+				testk8s.CreateVolumeSnapshotClass(&testCtx, testutil.DefaultStorageProvisoner)
 
 				By("create a backup from backupPolicy " + testdp.BackupPolicyName)
 				backup = testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {

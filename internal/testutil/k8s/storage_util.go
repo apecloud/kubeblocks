@@ -32,9 +32,9 @@ import (
 )
 
 var (
-	DefaultStorageClassName        string = "default-sc-for-testing"
-	defaultVolumeSnapshotClassName string = "default-vsc-for-testing"
-	defaultProvisioner             string = "testing.kubeblocks.io"
+	DefaultStorageClassName        = "default-sc-for-testing"
+	defaultVolumeSnapshotClassName = "default-vsc-for-testing"
+	defaultProvisioner             = "testing.kubeblocks.io"
 )
 
 func GetDefaultStorageClass(testCtx *testutil.TestContext) *storagev1.StorageClass {
@@ -75,7 +75,7 @@ func MockEnableVolumeSnapshot(testCtx *testutil.TestContext, storageClassName st
 	}
 	vsc := getVolumeSnapshotClass(testCtx, sc)
 	if vsc == nil {
-		createVolumeSnapshotClass(testCtx, sc)
+		CreateVolumeSnapshotClass(testCtx, sc.Provisioner)
 	}
 	gomega.Expect(IsMockVolumeSnapshotEnabled(testCtx, storageClassName)).Should(gomega.BeTrue())
 }
@@ -138,12 +138,12 @@ func getVolumeSnapshotClass(testCtx *testutil.TestContext, storageClass *storage
 	return nil
 }
 
-func createVolumeSnapshotClass(testCtx *testutil.TestContext, storageClass *storagev1.StorageClass) *snapshotv1.VolumeSnapshotClass {
+func CreateVolumeSnapshotClass(testCtx *testutil.TestContext, storageProvisioner string) *snapshotv1.VolumeSnapshotClass {
 	vsc := &snapshotv1.VolumeSnapshotClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: defaultVolumeSnapshotClassName,
 		},
-		Driver:         storageClass.Provisioner,
+		Driver:         storageProvisioner,
 		DeletionPolicy: snapshotv1.VolumeSnapshotContentDelete,
 	}
 	gomega.Expect(testCtx.Cli.Create(testCtx.Ctx, vsc)).Should(gomega.Succeed())

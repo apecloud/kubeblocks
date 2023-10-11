@@ -78,7 +78,7 @@ func CreateStorageClass(testCtx *testutil.TestContext, storageClassName string,
 				storage.IsDefaultStorageClassAnnotation: "false",
 			},
 		},
-		Provisioner:          StogrageProvisioner,
+		Provisioner:          testutil.DefaultStorageProvisoner,
 		AllowVolumeExpansion: &allowVolumeExpansion,
 	}
 	return CreateK8sResource(testCtx, storageClass).(*storagev1.StorageClass)
@@ -89,7 +89,7 @@ func CreateVolumeSnapshotClass(testCtx *testutil.TestContext) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "default-vs",
 		},
-		Driver:         StogrageProvisioner,
+		Driver:         testutil.DefaultStorageProvisoner,
 		DeletionPolicy: vsv1.VolumeSnapshotContentDelete,
 	}
 	CreateK8sResource(testCtx, volumeSnapshotClass)

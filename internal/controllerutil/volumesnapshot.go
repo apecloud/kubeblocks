@@ -171,8 +171,12 @@ func IsVolumeSnapshotEnabled(ctx context.Context, cli client.Client, storageClas
 		return false, client.IgnoreNotFound(err)
 	}
 
+	vsCli := VolumeSnapshotCompatClient{
+		Client: cli,
+		Ctx:    ctx,
+	}
 	vscList := snapshotv1.VolumeSnapshotClassList{}
-	if err := cli.List(ctx, &vscList); err != nil {
+	if err := vsCli.List(&vscList); err != nil {
 		return false, err
 	}
 	for _, vsc := range vscList.Items {

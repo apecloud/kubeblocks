@@ -222,9 +222,8 @@ func (o *createSubCmdsOptions) run() error {
 
 func (o *createSubCmdsOptions) validateVersion() error {
 	var err error
-
-	cv := o.values[cluster.VersionSchemaProp.String()].(string)
-	if cv != "" {
+	cv, ok := o.values[cluster.VersionSchemaProp.String()].(string)
+	if ok && cv != "" {
 		if err = cluster.ValidateClusterVersion(o.Dynamic, o.chartInfo.ClusterDef, cv); err != nil {
 			return fmt.Errorf("cluster version \"%s\" does not exist, run following command to get the available cluster versions\n\tkbcli cv list --cluster-definition=%s",
 				cv, o.chartInfo.ClusterDef)

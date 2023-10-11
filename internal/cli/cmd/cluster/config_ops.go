@@ -31,8 +31,6 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -40,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
+	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -241,7 +240,7 @@ func (o *configOpsOptions) buildReconfigureCommonFlags(cmd *cobra.Command, f cmd
 		"For available templates and configs, refer to: 'kbcli cluster describe-config'.")
 	cmd.Flags().StringVar(&o.CfgFile, "config-file", "", "Specify the name of the configuration file to be updated (e.g. for mysql: --config-file=my.cnf). "+
 		"For available templates and configs, refer to: 'kbcli cluster describe-config'.")
-	flags.AddComponentsFlag(f, cmd, false, &o.ComponentName, "Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.")
+	flags.AddComponentFlag(f, cmd, &o.ComponentName, "Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.")
 	cmd.Flags().BoolVar(&o.ForceRestart, "force-restart", false, "Boolean flag to restart component. Default with false.")
 	cmd.Flags().StringVar(&o.LocalFilePath, "local-file", "", "Specify the local configuration file to be updated.")
 	cmd.Flags().BoolVar(&o.replaceFile, "replace", false, "Boolean flag to enable replacing config file. Default with false.")

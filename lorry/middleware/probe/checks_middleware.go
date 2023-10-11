@@ -53,7 +53,7 @@ func init() {
 	logger = ctrl.Log.WithName("middleware")
 }
 
-func GetRequestBody(operation string, args map[string][]string) []byte {
+func getRequestBody(operation string, args map[string][]string) []byte {
 	metadata := make(map[string]string)
 	walkFunc := func(key string, value []string) {
 		if key == operationKey {
@@ -94,7 +94,7 @@ func SetMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 			operation := uri.Query().Get(operationKey)
 			if strings.HasPrefix(operation, "get") || strings.HasPrefix(operation, "check") || strings.HasPrefix(operation, "list") {
-				body := GetRequestBody(operation, uri.Query())
+				body := getRequestBody(operation, uri.Query())
 				request.Body = io.NopCloser(bytes.NewReader(body))
 			} else {
 				logger.Info("unknown probe operation", "operation", operation)

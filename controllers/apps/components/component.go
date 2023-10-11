@@ -379,22 +379,6 @@ func (c *rsmComponent) status(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 	return nil
 }
 
-func (c *rsmComponent) createResource(obj client.Object, parent *model.ObjectVertex) *model.ObjectVertex {
-	return ictrltypes.LifecycleObjectCreate(c.dag, obj, parent)
-}
-
-func (c *rsmComponent) deleteResource(obj client.Object, parent *model.ObjectVertex) *model.ObjectVertex {
-	return ictrltypes.LifecycleObjectDelete(c.dag, obj, parent)
-}
-
-func (c *rsmComponent) updateResource(obj client.Object, parent *model.ObjectVertex) *model.ObjectVertex {
-	return ictrltypes.LifecycleObjectUpdate(c.dag, obj, parent)
-}
-
-func (c *rsmComponent) patchResource(obj client.Object, objCopy client.Object, parent *model.ObjectVertex) *model.ObjectVertex {
-	return ictrltypes.LifecycleObjectPatch(c.dag, obj, objCopy, parent)
-}
-
 // validateObjectsAction validates the action of objects in dag has been determined.
 func (c *rsmComponent) validateObjectsAction() error {
 	for _, v := range c.dag.Vertices() {
@@ -436,11 +420,12 @@ func (c *rsmComponent) resolveObjectsAction(reqCtx intctrlutil.RequestCtx, cli c
 		}
 	}
 	if c.GetCluster().IsStatusUpdating() {
+		graphCli := model.NewGraphClient(c.Client)
 		for _, vertex := range c.dag.Vertices() {
 			v, _ := vertex.(*model.ObjectVertex)
 			// TODO(refactor): fix me, this is a workaround for h-scaling to update stateful set.
 			if _, ok := v.Obj.(*appsv1.StatefulSet); !ok {
-				v.Immutable = true
+				graphCli.Noop(c.dag, v.Obj)
 			}
 		}
 	}
@@ -836,6 +821,8 @@ func (c *rsmComponent) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli client.C
 		}
 	}
 
+	graphCli := model.NewGraphClient(c.Client)
+
 	type pvcRecreateStep int
 	const (
 		pvPolicyRetainStep pvcRecreateStep = iota
@@ -845,8 +832,8 @@ func (c *rsmComponent) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli client.C
 		pvRestorePolicyStep
 	)
 
-	addStepMap := map[pvcRecreateStep]func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex{
-		pvPolicyRetainStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
+	addStepMap := map[pvcRecreateStep]func(from client.Object, step pvcRecreateStep) client.Object{
+		pvPolicyRetainStep: func(from client.Object, step pvcRecreateStep) client.Object {
 			// step 1: update pv to retain
 			retainPV := pv.DeepCopy()
 			if retainPV.Labels == nil {
@@ -859,30 +846,40 @@ func (c *rsmComponent) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli client.C
 			}
 			retainPV.Annotations[constant.PVLastClaimPolicyAnnotationKey] = string(pv.Spec.PersistentVolumeReclaimPolicy)
 			retainPV.Spec.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimRetain
-			return c.patchResource(retainPV, pv, fromVertex)
+			graphCli.Patch(c.dag, pv, retainPV)
+			graphCli.DependOn(c.dag, from, retainPV)
+			return retainPV
 		},
-		deletePVCStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
+		deletePVCStep: func(from client.Object, step pvcRecreateStep) client.Object {
 			// step 2: delete pvc, this will not delete pv because policy is 'retain'
 			removeFinalizerPVC := pvc.DeepCopy()
 			removeFinalizerPVC.SetFinalizers([]string{})
-			removeFinalizerPVCVertex := c.patchResource(removeFinalizerPVC, pvc, fromVertex)
-			return c.deleteResource(pvc, removeFinalizerPVCVertex)
+			graphCli.Patch(c.dag, pvc, removeFinalizerPVC)
+			graphCli.DependOn(c.dag, from, removeFinalizerPVC)
+			// TODO(free6om): delete should make a new vertex to dag
+			graphCli.Delete(c.dag, removeFinalizerPVC)
+			graphCli.DependOn(c.dag, removeFinalizerPVC, removeFinalizerPVC)
+			return removeFinalizerPVC
 		},
-		removePVClaimRefStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
+		removePVClaimRefStep: func(from client.Object, step pvcRecreateStep) client.Object {
 			// step 3: remove claimRef in pv
 			removeClaimRefPV := pv.DeepCopy()
 			if removeClaimRefPV.Spec.ClaimRef != nil {
 				removeClaimRefPV.Spec.ClaimRef.UID = ""
 				removeClaimRefPV.Spec.ClaimRef.ResourceVersion = ""
 			}
-			return c.patchResource(removeClaimRefPV, pv, fromVertex)
+			graphCli.Patch(c.dag, pv, removeClaimRefPV)
+			graphCli.DependOn(c.dag, from, removeClaimRefPV)
+			return removeClaimRefPV
 		},
-		createPVCStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
+		createPVCStep: func(from client.Object, step pvcRecreateStep) client.Object {
 			// step 4: create new pvc
 			newPVC.SetResourceVersion("")
-			return c.createResource(newPVC, fromVertex)
+			graphCli.Create(c.dag, newPVC)
+			graphCli.DependOn(c.dag, from, newPVC)
+			return newPVC
 		},
-		pvRestorePolicyStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
+		pvRestorePolicyStep: func(from client.Object, step pvcRecreateStep) client.Object {
 			// step 5: restore to previous pv policy
 			restorePV := pv.DeepCopy()
 			policy := corev1.PersistentVolumeReclaimPolicy(restorePV.Annotations[constant.PVLastClaimPolicyAnnotationKey])
@@ -890,14 +887,16 @@ func (c *rsmComponent) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli client.C
 				policy = corev1.PersistentVolumeReclaimDelete
 			}
 			restorePV.Spec.PersistentVolumeReclaimPolicy = policy
-			return c.patchResource(restorePV, pv, fromVertex)
+			graphCli.Patch(c.dag, pv, restorePV)
+			graphCli.DependOn(c.dag, from, restorePV)
+			return restorePV
 		},
 	}
 
 	updatePVCByRecreateFromStep := func(fromStep pvcRecreateStep) {
-		lastVertex := c.workloadVertex
+		lastObj := c.workloadVertex.Obj
 		for step := pvRestorePolicyStep; step >= fromStep && step >= pvPolicyRetainStep; step-- {
-			lastVertex = addStepMap[step](lastVertex, step)
+			lastObj = addStepMap[step](lastObj, step)
 		}
 	}
 
@@ -925,7 +924,8 @@ func (c *rsmComponent) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli client.C
 	}
 	if pvcQuantity := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; pvcQuantity.Cmp(vctProto.Spec.Resources.Requests[corev1.ResourceStorage]) != 0 {
 		// use pvc's update without anything extra
-		c.updateResource(newPVC, c.workloadVertex)
+		graphCli.Update(c.dag, nil, newPVC)
+		graphCli.DependOn(c.dag, c.workloadVertex.Obj, newPVC)
 		return nil
 	}
 	// all the else means no need to update
@@ -1023,7 +1023,8 @@ func (c *rsmComponent) updatePodReplicaLabel4Scaling(reqCtx intctrlutil.RequestC
 			obj.Annotations = make(map[string]string)
 		}
 		obj.Annotations[constant.ComponentReplicasAnnotationKey] = strconv.Itoa(int(replicas))
-		c.updateResource(obj, c.workloadVertex)
+		graphCli.Update(c.dag, nil, obj)
+		graphCli.DependOn(c.dag, c.workloadVertex.Obj, obj)
 	}
 	return nil
 }
@@ -1082,6 +1083,7 @@ func (c *rsmComponent) leaveMember4ScaleIn(reqCtx intctrlutil.RequestCtx, cli cl
 }
 
 func (c *rsmComponent) deletePVCs4ScaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
+	graphCli := model.NewGraphClient(c.Client)
 	for i := c.component.Replicas; i < *stsObj.Spec.Replicas; i++ {
 		for _, vct := range stsObj.Spec.VolumeClaimTemplates {
 			pvcKey := types.NamespacedName{
@@ -1096,7 +1098,8 @@ func (c *rsmComponent) deletePVCs4ScaleIn(reqCtx intctrlutil.RequestCtx, cli cli
 			// after updating STS and before deleting PVCs, the PVCs intended to scale-in will be leaked.
 			// For simplicity, the updating dependency is added between them to guarantee that the PVCs to scale-in
 			// will be deleted or the scaling-in operation will be failed.
-			c.deleteResource(&pvc, c.workloadVertex)
+			graphCli.Delete(c.dag, &pvc)
+			graphCli.DependOn(c.dag, c.workloadVertex.Obj, &pvc)
 		}
 	}
 	return nil
@@ -1115,7 +1118,8 @@ func (c *rsmComponent) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client
 		return nil
 	}
 
-	c.workloadVertex.Immutable = true
+	graphCli := model.NewGraphClient(c.Client)
+	graphCli.Noop(c.dag, c.workloadVertex.Obj)
 	rsmProto := c.workloadVertex.Obj.(*workloads.ReplicatedStateMachine)
 	stsProto := ConvertRSMToSTS(rsmProto)
 	d, err := newDataClone(reqCtx, cli, c.Cluster, c.component, stsObj, stsProto, backupKey)
@@ -1133,10 +1137,10 @@ func (c *rsmComponent) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client
 	}
 	if succeed {
 		// pvcs are ready, rsm.replicas should be updated
-		c.workloadVertex.Immutable = false
+		graphCli.Update(c.dag, nil, c.workloadVertex.Obj)
 		return c.postScaleOut(reqCtx, cli, stsObj)
 	} else {
-		c.workloadVertex.Immutable = true
+		graphCli.Noop(c.dag, c.workloadVertex.Obj)
 		// update objs will trigger cluster reconcile, no need to requeue error
 		objs, err := d.cloneData(d)
 		if err != nil {
@@ -1169,8 +1173,9 @@ func (c *rsmComponent) postScaleOut(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		if err != nil {
 			return err
 		}
+		graphCli := model.NewGraphClient(c.Client)
 		for _, obj := range tmpObjs {
-			c.deleteResource(obj, nil)
+			graphCli.Delete(c.dag, obj)
 		}
 	}
 

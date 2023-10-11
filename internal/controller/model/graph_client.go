@@ -40,6 +40,9 @@ type GraphWriter interface {
 	// Update updates the given obj in the underlying DAG.
 	Update(dag *graph.DAG, objOld, objNew client.Object)
 
+	// Patch patches the given objOld by the new version objNew in the underlying DAG.
+	Patch(dag *graph.DAG, objOld, objNew client.Object)
+
 	// Status updates the given obj's status in the underlying DAG.
 	Status(dag *graph.DAG, objOld, objNew client.Object)
 
@@ -79,6 +82,10 @@ func (r *realGraphClient) Create(dag *graph.DAG, obj client.Object) {
 
 func (r *realGraphClient) Update(dag *graph.DAG, objOld, objNew client.Object) {
 	r.doWrite(dag, objOld, objNew, ActionUpdatePtr())
+}
+
+func (r *realGraphClient) Patch(dag *graph.DAG, objOld, objNew client.Object) {
+	r.doWrite(dag, objOld, objNew, ActionPatchPtr())
 }
 
 func (r *realGraphClient) Delete(dag *graph.DAG, obj client.Object) {
@@ -128,6 +135,9 @@ func (r *realGraphClient) doWrite(dag *graph.DAG, objOld, objNew client.Object, 
 	case vertex != nil:
 		objVertex, _ := vertex.(*ObjectVertex)
 		objVertex.Action = action
+		if objVertex.OriObj == nil {
+			objVertex.OriObj = objOld
+		}
 	default:
 		vertex = &ObjectVertex{
 			Obj:    objNew,

@@ -113,11 +113,9 @@ type ConnectionCredential struct {
 	PasswordKey string `json:"passwordKey,omitempty"`
 
 	// hostKey specifies the map key of the host in the connection credential secret.
-	// +kubebuilder:default=host
 	HostKey string `json:"hostKey,omitempty"`
 
 	// portKey specifies the map key of the port in the connection credential secret.
-	// +kubebuilder:default=port
 	PortKey string `json:"portKey,omitempty"`
 }
 

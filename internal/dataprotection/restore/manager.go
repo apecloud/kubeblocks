@@ -303,7 +303,7 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 			}
 		}
 		// build job and append
-		job := jobBuilder.build(i)
+		job := jobBuilder.setJobName(jobBuilder.builderRestoreJobName(i)).build()
 		if prepareDataConfig.IsSerialPolicy() &&
 			restoreJobHasCompleted(r.Restore.Status.Actions.PrepareData, job.Name) {
 			// if the job has completed and the restore policy is Serial, continue
@@ -336,7 +336,7 @@ func (r *RestoreManager) BuildVolumePopulateJob(
 	if err != nil {
 		return nil, err
 	}
-	job := jobBuilder.addToSpecificVolumesAndMounts(volume, volumeMount).build(index)
+	job := jobBuilder.addToSpecificVolumesAndMounts(volume, volumeMount).build()
 	return job, nil
 }
 
@@ -388,7 +388,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 			setCommand(actionSpec.Job.Command).
 			setToleration(targetPod.Spec.Tolerations).
 			addTargetPodAndCredentialEnv(&targetPod, r.Restore.Spec.ReadyConfig.ConnectionCredential).
-			build(0)
+			build()
 		return []*batchv1.Job{job}, nil
 	}
 
@@ -409,9 +409,10 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 			}
 			command := fmt.Sprintf("kubectl -n %s exec -it pod/%s -c %s -- %s", targetPodList[i].Namespace, targetPodList[i].Name, containerName, actionSpec.Exec.Command)
 			jobBuilder.setImage(constant.KBToolsImage).setCommand([]string{"sh", "-c", command}).
+				setJobName(jobBuilder.builderRestoreJobName(i)).
 				setToleration(targetPodList[i].Spec.Tolerations).
 				addTargetPodAndCredentialEnv(&targetPodList[i], r.Restore.Spec.ReadyConfig.ConnectionCredential)
-			restoreJobs = append(restoreJobs, jobBuilder.build(i))
+			restoreJobs = append(restoreJobs, jobBuilder.build())
 		}
 		return restoreJobs, nil
 	}

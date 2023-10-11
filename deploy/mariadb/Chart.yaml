@@ -1,0 +1,22 @@
+apiVersion: v2
+name: mariadb
+description: Mariadb is a widely used, open-source relational database management system (RDBMS)
+
+type: application
+
+# This is the version number of the helm chart.
+version: 0.6.0-alpha.22
+
+# This is the version number of the MARIADB being deployed,
+appVersion: "10.6.15"
+
+home: https://kubeblocks.io/
+icon: https://github.com/apecloud/kubeblocks/raw/main/img/logo.png
+
+maintainers:
+- name: ApeCloud
+  url: https://github.com/apecloud/kubeblocks/
+
+
+sources:
+- https://github.com/apecloud/kubeblocks/

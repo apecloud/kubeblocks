@@ -21,12 +21,14 @@ package reconcile
 
 import (
 	"fmt"
-	monitorv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/monitor/types"
-	"github.com/apecloud/kubeblocks/internal/constant"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	monitorv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/monitor/types"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 func ConfigMap(reqCtx types.ReconcileCtx, params types.OTeldParams) error {

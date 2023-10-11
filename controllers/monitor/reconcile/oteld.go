@@ -27,7 +27,7 @@ import (
 const OTeldName = "apecloudoteld"
 const DefaultMode = v1alpha1.ModeDaemonSet
 
-func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) (err error) {
+func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) error {
 	var (
 		ctx       = reqCtx.Ctx
 		k8sClient = params.Client
@@ -37,13 +37,13 @@ func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) (err
 
 	exporter := monitortype.Exporters{}
 	metricsExporters := &v1alpha1.MetricsExporterSinkList{}
-	if err = k8sClient.List(ctx, metricsExporters); err != nil {
+	if err := k8sClient.List(ctx, metricsExporters); err != nil {
 		return err
 	}
 	exporter.Metricsexporter = metricsExporters.Items
 
 	logsExporters := &v1alpha1.LogsExporterSinkList{}
-	if err = k8sClient.List(ctx, logsExporters); err != nil {
+	if err := k8sClient.List(ctx, logsExporters); err != nil {
 		return err
 	}
 	exporter.Logsexporter = logsExporters.Items
@@ -51,12 +51,12 @@ func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) (err
 	reqCtx.SetExporters(&exporter)
 
 	datasources := &v1alpha1.CollectorDataSourceList{}
-	if err = k8sClient.List(ctx, datasources); err != nil {
+	if err := k8sClient.List(ctx, datasources); err != nil {
 		return err
 	}
 
 	oteldTemplates := &v1alpha1.OTeldCollectorTemplateList{}
-	if err = k8sClient.List(ctx, oteldTemplates); err != nil {
+	if err := k8sClient.List(ctx, oteldTemplates); err != nil {
 		return err
 	}
 	instanceMap, err := buildOteldInstance(datasources, oteldTemplates)
@@ -75,10 +75,10 @@ func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) (err
 		return err
 	}
 
-	if err := reqCtx.VerifyOteldInstance(metricsExporters, logsExporters); err != nil {
+	if err = reqCtx.VerifyOteldInstance(metricsExporters, logsExporters); err != nil {
 		return err
 	}
-	return
+	return err
 }
 
 func buildOteldInstance(datasources *v1alpha1.CollectorDataSourceList, templates *v1alpha1.OTeldCollectorTemplateList) (map[v1alpha1.Mode]*monitortype.OteldInstance, error) {

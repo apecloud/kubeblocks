@@ -20,8 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
-	"cuelang.org/go/cue"
 	"embed"
+
+	"cuelang.org/go/cue"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/leaanthony/debme"
 	"gopkg.in/yaml.v2"

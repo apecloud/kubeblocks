@@ -21,6 +21,7 @@ package types
 
 import (
 	"context"
+
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -128,7 +129,7 @@ func (c *ReconcileCtx) VerifyOteldInstance(metricsExporterList *v1alpha1.Metrics
 	for _, instance := range c.OteldCfgRef.Config.OteldInstanceMap {
 		if instance.MetricsPipline != nil {
 			for _, pipline := range instance.MetricsPipline {
-				for key, _ := range pipline.ExporterMap {
+				for key := range pipline.ExporterMap {
 					if _, ok := metricsMap[key]; !ok {
 						return cfgcore.MakeError("not found exporter %s", key)
 					}
@@ -137,7 +138,7 @@ func (c *ReconcileCtx) VerifyOteldInstance(metricsExporterList *v1alpha1.Metrics
 		}
 		if instance.LogsPipline != nil {
 			for _, pipline := range instance.LogsPipline {
-				for key, _ := range pipline.ExporterMap {
+				for key := range pipline.ExporterMap {
 					if _, ok := logMap[key]; !ok {
 						return cfgcore.MakeError("not found exporter %s", key)
 					}

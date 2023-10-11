@@ -21,10 +21,10 @@ package types
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v2"
 
 	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/monitor/builder"
+	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -189,7 +189,7 @@ func (cg *OteldConfigGenerater) buildPiplineItem(instance *OteldInstance) yaml.M
 			receiverSlice = append(receiverSlice, fmt.Sprintf(ReceiverNamePattern, pipline.Name))
 			metricsSlice = append(metricsSlice, yaml.MapItem{Key: "receivers", Value: receiverSlice})
 			exporterSlice := []string{}
-			for name, _ := range pipline.ExporterMap {
+			for name := range pipline.ExporterMap {
 				exporterSlice = append(exporterSlice, name)
 			}
 			metricsSlice = append(metricsSlice, yaml.MapItem{Key: "exporters", Value: exporterSlice})
@@ -203,12 +203,10 @@ func (cg *OteldConfigGenerater) buildPiplineItem(instance *OteldInstance) yaml.M
 		logsSlice := yaml.MapSlice{}
 		for _, pipline := range instance.LogsPipline {
 			receiverSlice := []string{}
-			for _ = range pipline.ReceiverMap {
-				receiverSlice = append(receiverSlice, fmt.Sprintf(ReceiverNamePattern, pipline.Name))
-			}
+			receiverSlice = append(receiverSlice, fmt.Sprintf(ReceiverNamePattern, pipline.Name))
 			logsSlice = append(logsSlice, yaml.MapItem{Key: "receivers", Value: receiverSlice})
 			exporterSlice := []string{}
-			for name, _ := range pipline.ExporterMap {
+			for name := range pipline.ExporterMap {
 				exporterSlice = append(exporterSlice, name)
 			}
 

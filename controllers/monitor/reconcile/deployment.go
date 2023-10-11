@@ -20,17 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package reconcile
 
 import (
-	monitorv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
-	monitortypes "github.com/apecloud/kubeblocks/controllers/monitor/types"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"reflect"
+
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	monitorv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
+	monitortypes "github.com/apecloud/kubeblocks/controllers/monitor/types"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 )
 
 const OTeldAPIServerName = "grafana"

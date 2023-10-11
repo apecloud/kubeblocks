@@ -32,9 +32,7 @@ var _ = Describe("monitor_controller", func() {
 		Eventually(func(g Gomega) {
 			valMap := map[string]any{
 				"transport": "http",
-				//"meta.allow_native_password": false,
-				//"meta.endpoint":              "http://",
-				"password": "labels[\"pass\"]",
+				"password":  "labels[\"pass\"]",
 			}
 			tplName := "test.cue"
 			bytes, err := BuildFromCUEForOTel(tplName, valMap, "output")

@@ -109,7 +109,7 @@ func (r *VolumePopulatorReconciler) matchToPopulate(pvc *corev1.PersistentVolume
 	if dataSourceRef.APIGroup != nil {
 		apiGroup = *dataSourceRef.APIGroup
 	}
-	if dptypes.DataprotectionApiGroup != apiGroup || dptypes.RestoreKind != dataSourceRef.Kind || "" == dataSourceRef.Name {
+	if apiGroup != dptypes.DataprotectionAPIGroup || dataSourceRef.Kind != dptypes.RestoreKind || dataSourceRef.Name == "" {
 		// Ignore PVCs that aren't for this populator to handle
 		return false, nil
 	}

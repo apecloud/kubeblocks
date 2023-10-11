@@ -138,7 +138,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 				testCtx.DefaultNamespace, pvcName, testdp.ClusterName, testdp.ComponentName, testdp.DataVolumeName).
 				SetStorage(storageSize).
 				SetStorageClass(testdp.StorageClassName).
-				SetDataSourceRef(dptypes.DataprotectionApiGroup, dptypes.RestoreKind, restore.Name).
+				SetDataSourceRef(dptypes.DataprotectionAPIGroup, dptypes.RestoreKind, restore.Name).
 				Create(&testCtx).GetObject()
 			return pvc
 		}

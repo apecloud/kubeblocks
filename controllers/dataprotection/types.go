@@ -91,9 +91,6 @@ const (
 const (
 	populatePodPrefix = "kb-populate"
 
-	// context keys
-	nodeNameKey = "nodeName"
-
 	// annotation keys
 	annSelectedNode = "volume.kubernetes.io/selected-node"
 	annPopulateFrom = "dataprotections.kubeblocks.io/populate-from"
@@ -104,10 +101,11 @@ const (
 	reasonVolumePopulateFailed  = "VolumePopulateFailed"
 
 	// pvc condition type and reason
+	reasonPopulatingFailed     = "Failed"
+	reasonPopulatingProcessing = "Processing"
+	reasonPopulatingSucceed    = "Succeed"
+
 	PersistentVolumeClaimPopulating corev1.PersistentVolumeClaimConditionType = "Populating"
-	reasonPopulatingFailed                                                    = "Failed"
-	reasonPopulatingProcessing                                                = "Processing"
-	reasonPopulatingSucceed                                                   = "Succeed"
 )
 
 var reconcileInterval = time.Second

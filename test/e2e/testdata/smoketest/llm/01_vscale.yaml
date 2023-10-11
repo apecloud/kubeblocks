@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: llm-cluster-vscale-
+spec:
+  clusterRef: llm-cluster
+  type: VerticalScaling
+  verticalScaling:
+    - componentName: llm
+        requests:
+          cpu: "500m"
+          memory: 500Mi

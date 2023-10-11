@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: milvus-cluster-vscale-
+spec:
+  clusterRef: milvus-cluster
+  type: VerticalScaling
+  verticalScaling:
+    - componentName: milvus
+        requests:
+          cpu: "500m"
+          memory: 500Mi

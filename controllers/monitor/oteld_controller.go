@@ -23,6 +23,11 @@ import (
 	"context"
 	"fmt"
 
+	monitorv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
+	monitorreconsile "github.com/apecloud/kubeblocks/controllers/monitor/reconcile"
+	monitortypes "github.com/apecloud/kubeblocks/controllers/monitor/types"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
@@ -35,13 +40,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
-
-	monitorv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
-	monitorreconsile "github.com/apecloud/kubeblocks/controllers/monitor/reconcile"
-	monitortypes "github.com/apecloud/kubeblocks/controllers/monitor/types"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // OTeldReconciler reconciles a OTeld object
@@ -144,18 +142,18 @@ func (r *OTeldReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&monitorv1alpha1.LogsExporterSink{}).
 		Owns(&monitorv1alpha1.MetricsExporterSink{}).
 		Owns(&monitorv1alpha1.CollectorDataSource{}).
-		Watches(&source.Kind{Type: &corev1.ConfigMap{}},
+		Watches(&corev1.ConfigMap{},
 			handler.EnqueueRequestsFromMapFunc(r.filterOTelResources)).
-		Watches(&source.Kind{Type: &corev1.Secret{}},
+		Watches(&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.filterOTelResources)).
-		Watches(&source.Kind{Type: &appsv1.DaemonSet{}},
+		Watches(&appsv1.DaemonSet{},
 			handler.EnqueueRequestsFromMapFunc(r.filterOTelResources)).
-		Watches(&source.Kind{Type: &appsv1.Deployment{}},
+		Watches(&appsv1.Deployment{},
 			handler.EnqueueRequestsFromMapFunc(r.filterOTelResources)).
 		Complete(r)
 }
 
-func (r *OTeldReconciler) filterOTelResources(obj client.Object) []reconcile.Request {
+func (r *OTeldReconciler) filterOTelResources(ctx context.Context, obj client.Object) []reconcile.Request {
 	labels := obj.GetLabels()
 	if obj.GetNamespace() != viper.GetString("OTELD_NAMESPACE") {
 		return []reconcile.Request{}

@@ -144,7 +144,9 @@ func buildLorryServiceContainer(component *SynthesizedComponent, container *core
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	container.Command = []string{"lorry",
-		"--port", strconv.Itoa(probeSvcHTTPPort)}
+		"--port", strconv.Itoa(probeSvcHTTPPort),
+		"--grpcport", strconv.Itoa(probeSvcGRPCPort),
+	}
 
 	if len(component.PodSpec.Containers) > 0 {
 		mainContainer := component.PodSpec.Containers[0]

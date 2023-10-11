@@ -25,10 +25,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/go-errors/errors"
 
+	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/apecloud/kubeblocks/lorry/binding"
 	"github.com/apecloud/kubeblocks/lorry/binding/custom"
 	"github.com/apecloud/kubeblocks/lorry/binding/etcd"
@@ -43,66 +44,66 @@ import (
 var builtinMap = make(map[string]BaseInternalOps)
 var customOp *custom.HTTPCustom
 
-func RegisterBuiltin() error {
+func RegisterBuiltin(characterType string) error {
 	initErrFmt := "%s init err: %v"
-
-	mysqlOp := mysql.NewMysql()
-	builtinMap["mysql"] = mysqlOp
-	properties := component.GetProperties("mysql")
-	err := mysqlOp.Init(properties)
-	if err != nil {
-		return errors.Errorf(initErrFmt, "mysql", err)
+	switch characterType {
+	case "mysql":
+		mysqlOp := mysql.NewMysql()
+		builtinMap["mysql"] = mysqlOp
+		properties := component.GetProperties("mysql")
+		err := mysqlOp.Init(properties)
+		if err != nil {
+			return errors.Errorf(initErrFmt, "mysql", err)
+		}
+	case "redis":
+		redisOp := redis.NewRedis()
+		builtinMap["redis"] = redisOp
+		properties := component.GetProperties("redis")
+		err := redisOp.Init(properties)
+		if err != nil {
+			return errors.Errorf(initErrFmt, "redis", err)
+		}
+	case "postgres":
+		pgOp := postgres.NewPostgres()
+		builtinMap["postgres"] = pgOp
+		properties := component.GetProperties("postgres")
+		err := pgOp.Init(properties)
+		if err != nil {
+			return errors.Errorf(initErrFmt, "postgres", err)
+		}
+	case "etcd":
+		etcdOp := etcd.NewEtcd()
+		builtinMap["etcd"] = etcdOp
+		properties := component.GetProperties("etcd")
+		err := etcdOp.Init(properties)
+		if err != nil {
+			return errors.Errorf(initErrFmt, "etcd", err)
+		}
+	case "mongodb":
+		mongoOp := mongodb.NewMongoDB()
+		builtinMap["mongodb"] = mongoOp
+		properties := component.GetProperties("mongodb")
+		err := mongoOp.Init(properties)
+		if err != nil {
+			return errors.Errorf(initErrFmt, "mongodb", err)
+		}
+	default:
+		customOp = custom.NewHTTPCustom()
+		empty := make(component.Properties)
+		err := customOp.Init(empty)
+		if err != nil {
+			return errors.Errorf(initErrFmt, "custom", err)
+		}
 	}
-
-	redisOp := redis.NewRedis()
-	builtinMap["redis"] = redisOp
-	properties = component.GetProperties("redis")
-	err = redisOp.Init(properties)
-	if err != nil {
-		return errors.Errorf(initErrFmt, "redis", err)
-	}
-
-	pgOp := postgres.NewPostgres()
-	builtinMap["postgres"] = pgOp
-	properties = component.GetProperties("postgres")
-	err = pgOp.Init(properties)
-	if err != nil {
-		return errors.Errorf(initErrFmt, "postgres", err)
-	}
-
-	etcdOp := etcd.NewEtcd()
-	builtinMap["etcd"] = etcdOp
-	properties = component.GetProperties("etcd")
-	err = etcdOp.Init(properties)
-	if err != nil {
-		return errors.Errorf(initErrFmt, "etcd", err)
-	}
-
-	mongoOp := mongodb.NewMongoDB()
-	builtinMap["mongodb"] = mongoOp
-	properties = component.GetProperties("mongodb")
-	err = mongoOp.Init(properties)
-	if err != nil {
-		return errors.Errorf(initErrFmt, "mongodb", err)
-	}
-
-	customOp = custom.NewHTTPCustom()
-	empty := make(component.Properties)
-	err = customOp.Init(empty)
-	if err != nil {
-		return errors.Errorf(initErrFmt, "custom", err)
-	}
-
 	return nil
 }
 
 func GetRouter() func(writer http.ResponseWriter, request *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		// get the character type
-		character := GetCharacter(request.URL.Path)
-		if character == "" {
-			logger.Error(nil, "character type missing in path")
-			return
+		characterType := viper.GetString(constant.KBEnvCharacterType)
+		if len(characterType) == 0 {
+			characterType = "custom"
 		}
 
 		body := request.Body
@@ -123,7 +124,7 @@ func GetRouter() func(writer http.ResponseWriter, request *http.Request) {
 		probeRequest.Operation = util.OperationKind(meta.Operation)
 
 		// route the request to engine
-		probeResp, err := route(character, request.Context(), probeRequest)
+		probeResp, err := route(characterType, request.Context(), probeRequest)
 		logger.Info("request routed", "request", probeRequest, "response", probeResp)
 
 		if err != nil {
@@ -149,17 +150,6 @@ func GetRouter() func(writer http.ResponseWriter, request *http.Request) {
 	}
 }
 
-func GetCharacter(url string) string {
-	if !strings.HasPrefix(url, bindingPath) {
-		return ""
-	}
-	splits := strings.Split(url, "/")
-	if len(splits) < 4 {
-		return ""
-	}
-	return splits[3]
-}
-
 func route(character string, ctx context.Context, request *ProbeRequest) (*ProbeResponse, error) {
 	ops, ok := builtinMap[character]
 	// if there is no builtin type, use the custom
@@ -168,4 +158,11 @@ func route(character string, ctx context.Context, request *ProbeRequest) (*Probe
 		return customOp.Invoke(ctx, request)
 	}
 	return ops.Invoke(ctx, request)
+}
+
+func GetGrpcRouter(character string) func(ctx context.Context) (*ProbeResponse, error) {
+	return func(ctx context.Context) (*ProbeResponse, error) {
+		getRoleRequest := &ProbeRequest{Operation: util.CheckRoleOperation}
+		return route(character, ctx, getRoleRequest)
+	}
 }

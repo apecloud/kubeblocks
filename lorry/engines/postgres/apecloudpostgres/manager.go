@@ -35,15 +35,15 @@ import (
 )
 
 const (
-	SERVICE_TYPE = "postgresql"
-	PRIMARY      = "primary"
-	SECONDARY    = "secondary"
-	MASTER       = "master"
-	SLAVE        = "slave"
-	LEADER       = "Leader"
-	FOLLOWER     = "Follower"
-	LEARNER      = "Learner"
-	CANDIDATE    = "Candidate"
+	ServiceType = "postgresql"
+	PRIMARY     = "primary"
+	SECONDARY   = "secondary"
+	MASTER      = "master"
+	SLAVE       = "slave"
+	LEADER      = "Leader"
+	FOLLOWER    = "Follower"
+	LEARNER     = "Learner"
+	CANDIDATE   = "Candidate"
 )
 
 type Manager struct {

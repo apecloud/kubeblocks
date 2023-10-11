@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	POLARDBX_SERVICE_TYPE = "polardbx"
+	PolardbXServiceType = "polardbx"
 )
 
 type Manager struct {

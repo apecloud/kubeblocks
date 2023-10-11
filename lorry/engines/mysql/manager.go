@@ -35,7 +35,7 @@ import (
 )
 
 const (
-	MYSQL_SERVICE_TYPE = "mysql"
+	MysqlServiceType = "mysql"
 )
 
 type Manager struct {

@@ -43,7 +43,7 @@ const (
 	PrimaryPriority   = 2
 	SecondaryPriority = 1
 
-	SERVICE_TYPE = "mongodb"
+	ServiceType = "mongodb"
 )
 
 type Manager struct {

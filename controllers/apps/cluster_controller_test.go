@@ -2128,11 +2128,18 @@ var _ = Describe("Cluster Controller", func() {
 					}
 				}
 
-				By("checking backup policy exists")
+				checkPolicy := func(g Gomega, policy *dpv1alpha1.BackupPolicy) {
+					if backup != nil && backup.RepoName != "" {
+						Expect(*policy.Spec.BackupRepoName).Should(BeEquivalentTo(backup.RepoName))
+					}
+				}
+
+				By("checking backup policy")
 				backupPolicyName := generateBackupPolicyName(clusterKey.Name, compDefName, "")
 				backupPolicyKey := client.ObjectKey{Name: backupPolicyName, Namespace: clusterKey.Namespace}
 				backupPolicy := &dpv1alpha1.BackupPolicy{}
 				Eventually(testapps.CheckObjExists(&testCtx, backupPolicyKey, backupPolicy, true)).Should(Succeed())
+				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, checkPolicy)).Should(Succeed())
 
 				By("checking backup schedule")
 				backupScheduleName := generateBackupScheduleName(clusterKey.Name, compDefName, "")

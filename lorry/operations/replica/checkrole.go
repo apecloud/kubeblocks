@@ -31,10 +31,11 @@ import (
 	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/internal/contant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/lorry/dcs"
 	"github.com/apecloud/kubeblocks/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/lorry/operations"
+	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
 // AccessMode defines SVC access mode enums.
@@ -48,6 +49,7 @@ type CheckRole struct {
 	OriRole                    string
 	CheckRoleFailedCount       int
 	FailedEventReportFrequency int
+	ProbeTimeout               time.Duration
 	DBRoles                    map[string]AccessMode
 }
 
@@ -81,6 +83,13 @@ func (s *CheckRole) Init(ctx context.Context) error {
 		s.FailedEventReportFrequency = 3600
 	}
 
+	timeoutSeconds := defaultRoleProbeTimeoutSeconds
+	if viper.IsSet(constant.KBEnvRoleProbeTimeout) {
+		timeoutSeconds = viper.GetInt(constant.KBEnvRoleProbeTimeout)
+	}
+	// lorry utilizes the pod readiness probe to trigger role probe and 'timeoutSeconds' is directly copied from the 'probe.timeoutSeconds' field of pod.
+	// here we give 80% of the total time to role probe job and leave the remaining 20% to kubelet to handle the readiness probe related tasks.
+	s.ProbeTimeout = time.Duration(timeoutSeconds) * (800 * time.Millisecond)
 	s.logger = ctrl.Log.WithName("checkrole")
 	return nil
 }
@@ -91,40 +100,36 @@ func (s *CheckRole) Do(ctx context.Context, req *operations.OpsRequest) (*operat
 		return nil, errors.Wrap(err, "get manager failed")
 	}
 
-	timeoutSeconds := defaultRoleProbeTimeoutSeconds
-	if viper.IsSet(contant.KBEnvRoleProbeTimeout) {
-		timeoutSeconds = viper.GetInt(contant.KBEnvRoleProbeTimeout)
-	}
-	// lorry utilizes the pod readiness probe to trigger role probe and 'timeoutSeconds' is directly copied from the 'probe.timeoutSeconds' field of pod.
-	// here we give 80% of the total time to role probe job and leave the remaining 20% to kubelet to handle the readiness probe related tasks.
-	timeout := time.Duration(timeoutSeconds) * (800 * time.Millisecond)
-	ctx1, cancel := context.WithTimeout(ctx, timeout)
+	resp := &operations.OpsResponse{}
+	resp.Data["operation"] = util.CheckRoleOperation
+	resp.Data["originalRole"] = s.OriRole
+
+	ctx1, cancel := context.WithTimeout(ctx, s.ProbeTimeout)
 	defer cancel()
 	role, err := manager.GetReplicaRole(ctx1)
 	if err != nil {
 		s.logger.Error(err, "executing checkRole error")
 		if s.CheckRoleFailedCount%s.FailedEventReportFrequency == 0 {
 			s.logger.Info("role checks failed continuously", "times", s.CheckRoleFailedCount)
-			SentProbeEvent(ctx, opsRes, resp, s.logger)
-			return nil, err
+			err = util.SentEventForProbe(ctx, resp.Data)
 		}
 		s.CheckRoleFailedCount++
-		return nil, nil
+		return resp, err
 	}
 
-	resp := operations.OpsResponse{}
 	s.CheckRoleFailedCount = 0
 	if isValid, message := s.roleValidate(role); !isValid {
-		resp.Metadata["message"] = message
-		return &resp, nil
+		resp.Data["message"] = message
+		return resp, nil
 	}
 
-	resp["role"] = role
-	if ops.OriRole != role {
-		ops.OriRole = role
-		SentProbeEvent(ctx, opsRes, resp, ops.logger)
+	resp.Data["role"] = role
+	if s.OriRole == role {
+		return nil, nil
 	}
-	return nil, nil
+	s.OriRole = role
+	err = util.SentEventForProbe(ctx, resp.Data)
+	return resp, err
 }
 
 // Component may have some internal roles that needn't be exposed to end user,

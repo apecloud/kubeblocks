@@ -27,6 +27,7 @@ import (
 	"github.com/valyala/fasthttp"
 
 	"github.com/apecloud/kubeblocks/lorry/operations"
+	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
 const (
@@ -113,17 +114,23 @@ func OperationWrapper(op operations.Operation) fasthttp.RequestHandler {
 
 		resp, err := op.Do(ctx, opsReq)
 
+		statusCode := fasthttp.StatusOK
 		if err != nil {
-			msg := NewErrorResponse("ERR_OPERATION_FAILED", fmt.Sprintf("operation exec failed: %v", err))
-			respond(reqCtx, withError(fasthttp.StatusInternalServerError, msg))
-			logger.Error(err, "operation exec failed")
-			return
+			if _, ok := err.(util.ProbeError); ok {
+				statusCode = fasthttp.StatusUnavailableForLegalReasons
+			} else {
+				msg := NewErrorResponse("ERR_OPERATION_FAILED", fmt.Sprintf("operation exec failed: %v", err))
+				respond(reqCtx, withError(fasthttp.StatusInternalServerError, msg))
+				logger.Error(err, "operation exec failed")
+				return
+			}
 		}
 
 		if resp == nil {
 			respond(reqCtx, withEmpty())
 		} else {
-			respond(reqCtx, withMetadata(resp.Metadata), withJSON(fasthttp.StatusOK, resp.Data))
+			body, _ := json.Marshal(resp.Data)
+			respond(reqCtx, withMetadata(resp.Metadata), withJSON(statusCode, body))
 		}
 	}
 }
@@ -153,7 +160,7 @@ func withEmpty() option {
 func withMetadata(metadata map[string]string) option {
 	return func(ctx *fasthttp.RequestCtx) {
 		for k, v := range metadata {
-			ctx.Response.Header.Set("WS."+k, v)
+			ctx.Response.Header.Set("KB."+k, v)
 		}
 	}
 }

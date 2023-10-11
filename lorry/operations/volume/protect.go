@@ -122,7 +122,7 @@ func (p *Protection) Do(ctx context.Context, req *operations.OpsRequest) (*opera
 	msg, err := p.checkUsage(ctx)
 	rsp := operations.OpsResponse{}
 	if err == nil {
-		rsp.Data = []byte(msg)
+		rsp.Data["protect"] = msg
 	}
 	return &rsp, err
 }
@@ -314,7 +314,7 @@ func (o *Protection) buildVolumesMsg() string {
 
 func (o *Protection) sendEvent(ctx context.Context, reason, msg string) error {
 	if o.SendEvent {
-		return util.SendEvent(ctx, o.Logger, o.createEvent(reason, msg))
+		return util.SendEvent(ctx, o.createEvent(reason, msg))
 	}
 	return nil
 }

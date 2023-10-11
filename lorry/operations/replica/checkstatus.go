@@ -17,16 +17,16 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package operations
+package replica
 
-// OpsRequest is the request for Operation
-type OpsRequest struct {
-	Data       []byte         `json:"data"`
-	Parameters map[string]any `json:"parameters,omitempty"`
-}
+import (
+	"time"
 
-// OpsResponse is the response for Operation
-type OpsResponse struct {
-	Data     map[string]any    `json:"data,omitempty"`
-	Metadata map[string]string `json:"metadata,omitempty"`
+	"github.com/apecloud/kubeblocks/lorry/operations"
+)
+
+type CheckStatus struct {
+	operations.Base
+	FailedEventReportFrequency int
+	ProbeTimeout               time.Duration
 }

@@ -37,8 +37,8 @@ func init() {
 	RegisterManagerNewFunc("mysql", "", mysql.NewManager)
 	RegisterManagerNewFunc("mongodb", "", mongodb.NewManager)
 	RegisterManagerNewFunc("polardbx", "", polardbx.NewManager)
-	RegisterManagerNewFunc("apecloud-postgresql", "", apecloudpostgres.NewManager)
 	RegisterManagerNewFunc("postgresql", "", officalpostgres.NewManager)
+	RegisterManagerNewFunc("apecloud-postgresql", "", apecloudpostgres.NewManager)
 }
 
 func RegisterManagerNewFunc(characterType, workloadType string, newFunc managerNewFunc) {

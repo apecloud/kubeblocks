@@ -30,15 +30,17 @@ const (
 
 const (
 	// Lorry env names
-	KBEnvClusterName     = "KB_CLUSTER_NAME"
-	KBEnvComponentName   = "KB_COMP_NAME"
-	KBEnvClusterCompName = "KB_CLUSTER_COMP_NAME"
-	KBEnvWorkloadType    = "KB_WORKLOAD_TYPE"
-	KBEnvCharacterType   = "KB_SERVICE_CHARACTER_TYPE"
-	KBEnvServiceRoles    = "KB_SERVICE_ROLES"
-	KBEnvServicePort     = "KB_SERVICE_PORT"
-	KBEnvDataPath        = "KB_DATA_PATH"
-	KBEnvTTL             = "KB_TTL"
-	KBEnvMaxLag          = "KB_MAX_LAG"
-	KBEnvEnableHA        = "KB_ENABLE_HA"
+	KBEnvClusterName            = "KB_CLUSTER_NAME"
+	KBEnvComponentName          = "KB_COMP_NAME"
+	KBEnvClusterCompName        = "KB_CLUSTER_COMP_NAME"
+	KBEnvWorkloadType           = "KB_WORKLOAD_TYPE"
+	KBEnvCharacterType          = "KB_SERVICE_CHARACTER_TYPE"
+	KBEnvServiceRoles           = "KB_SERVICE_ROLES"
+	KBEnvServicePort            = "KB_SERVICE_PORT"
+	KBEnvDataPath               = "KB_DATA_PATH"
+	KBEnvTTL                    = "KB_TTL"
+	KBEnvMaxLag                 = "KB_MAX_LAG"
+	KBEnvEnableHA               = "KB_ENABLE_HA"
+	KBEnvRsmRoleUpdateMechanism = "KB_RSM_ROLE_UPDATE_MECHANISM"
+	KBEnvRoleProbeTimeout       = "KB_RSM_ROLE_PROBE_TIMEOUT"
 )

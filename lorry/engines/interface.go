@@ -99,6 +99,8 @@ type DBManager interface {
 	Lock(context.Context, string) error
 	Unlock(context.Context) error
 
+	GetReplicaRole(context.Context) (string, error)
+
 	MoveData(context.Context, *dcs.Cluster) error
 
 	GetLogger() logr.Logger

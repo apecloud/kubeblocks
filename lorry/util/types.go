@@ -173,3 +173,20 @@ func IsUnSupportedError(err error) bool {
 	}
 	return false
 }
+
+// ProbeError is the error for Lorry probe api, it implements error interface
+type ProbeError struct {
+	message string
+}
+
+var _ error = ProbeError{}
+
+func (e ProbeError) Error() string {
+	return e.message
+}
+
+func NewProbeError(msg string) error {
+	return ProbeError{
+		message: msg,
+	}
+}

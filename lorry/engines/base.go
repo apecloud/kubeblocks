@@ -159,6 +159,10 @@ func (mgr *DBManagerBase) MoveData(context.Context, *dcs.Cluster) error {
 	return nil
 }
 
+func (mgr *DBManagerBase) GetReplicaRole(context.Context) (string, error) {
+	return "", errors.New("not implemented")
+}
+
 func (mgr *DBManagerBase) IsRootCreated(context.Context) (bool, error) {
 	return true, nil
 }

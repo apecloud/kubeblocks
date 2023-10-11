@@ -494,7 +494,7 @@ func (ops *BaseOperations) LeaveMemberOps(ctx context.Context, req *ProbeRequest
 	// remove current member from db cluster
 	err = manager.LeaveMemberFromCluster(ctx, cluster, manager.GetCurrentMemberName())
 	if err != nil {
-		message := fmt.Sprintf("Leave member form cluster failed: %v", err)
+		message := fmt.Sprintf("Leave member from cluster failed: %v", err)
 		opsRes["event"] = util.OperationFailed
 		opsRes["message"] = message
 		return opsRes, err

@@ -202,7 +202,7 @@ mod-vendor: module ## Run go mod vendor against go modules.
 
 .PHONY: module
 module: ## Run go mod tidy->verify against go modules.
-	$(GO) mod tidy -compat=1.20
+	$(GO) mod tidy -compat=1.21
 	$(GO) mod verify
 
 TEST_PACKAGES ?= ./internal/... ./apis/... ./controllers/... ./cmd/...
@@ -397,7 +397,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 
 .PHONY: reviewable
 reviewable: generate build-checks test check-license-header ## Run code checks to proceed with PR reviews.
-	$(GO) mod tidy -compat=1.20
+	$(GO) mod tidy -compat=1.21
 
 .PHONY: check-diff
 check-diff: reviewable ## Run git code diff checker.

@@ -1,0 +1,88 @@
+---
+# Source: tdengine-cluster/templates/rbac.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kb-td-cluster
+  namespace: default
+  labels:
+    helm.sh/chart: tdengine-cluster-0.7.0-alpha.0
+    app.kubernetes.io/version: "3.0.5.0"
+    app.kubernetes.io/instance: td-cluster
+---
+# Source: tdengine-cluster/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kb-td-cluster
+  labels:
+    helm.sh/chart: tdengine-cluster-0.7.0-alpha.0
+    app.kubernetes.io/version: "3.0.5.0"
+    app.kubernetes.io/instance: td-cluster
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubeblocks-volume-protection-pod-role
+subjects:
+  - kind: ServiceAccount
+    name: kb-td-cluster
+    namespace: default
+---
+# Source: tdengine-cluster/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kb-td-cluster
+  labels:
+    helm.sh/chart: tdengine-cluster-0.7.0-alpha.0
+    app.kubernetes.io/version: "3.0.5.0"
+    app.kubernetes.io/instance: td-cluster
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubeblocks-cluster-pod-role
+subjects:
+  - kind: ServiceAccount
+    name: kb-td-cluster
+    namespace: default
+---
+# Source: tdengine-cluster/templates/cluster.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: td-cluster
+  labels: 
+    helm.sh/chart: tdengine-cluster-0.7.0-alpha.0
+    app.kubernetes.io/version: "3.0.5.0"
+    app.kubernetes.io/instance: td-cluster
+spec:
+  clusterVersionRef: tdengine-3.0.5.0
+  terminationPolicy: Delete  
+  affinity:
+    podAntiAffinity: Preferred
+    topologyKeys:
+      - kubernetes.io/hostname
+    tenancy: SharedNode
+  clusterDefinitionRef: tdengine # ref clusterdefinition.name
+  componentSpecs:
+    - name: tdengine
+      componentDefRef: tdengine # ref clusterdefinition componentDefs.name      
+      monitor: true      
+      replicas: 3
+      serviceAccountName: kb-td-cluster      
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "1Gi"
+        requests:
+          cpu: "0.5"
+          memory: "1Gi"      
+      volumeClaimTemplates:
+        - name: data # ref clusterDefinition components.containers.volumeMounts.name
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 10Gi      
+      services:

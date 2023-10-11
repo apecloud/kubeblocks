@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: elasticsearch-cluster-hscale-out-
+spec:
+  clusterRef: elasticsearch-cluster
+  type: HorizontalScaling
+  horizontalScaling:
+    - componentName: elasticsearch
+      replicas: 3
+    - componentName: metrics
+      replicas: 2

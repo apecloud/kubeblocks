@@ -42,6 +42,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/dataprotection/utils/boolptr"
 )
 
 var (
@@ -255,10 +256,6 @@ func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backupSchedule
 	tbl := newTbl(out, "\nData Protection:", "BACKUP-REPO", "AUTO-BACKUP", "BACKUP-SCHEDULE", "BACKUP-METHOD", "BACKUP-RETENTION")
 	for _, schedule := range backupSchedules {
 		backupRepo := defaultBackupRepo
-		backupMethod := printer.NoneString
-		backupSchedule := printer.NoneString
-		backupRetention := printer.NoneString
-		scheduleEnable := "Disabled"
 		for _, policy := range backupPolicies {
 			if policy.Name != schedule.Spec.BackupPolicyName {
 				continue
@@ -268,14 +265,11 @@ func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backupSchedule
 			}
 		}
 		for _, schedulePolicy := range schedule.Spec.Schedules {
-			if schedulePolicy.Enabled != nil && *schedulePolicy.Enabled == false {
+			if !boolptr.IsSetToTrue(schedulePolicy.Enabled) {
 				continue
 			}
-			scheduleEnable = "Enabled"
-			backupMethod = schedulePolicy.BackupMethod
-			backupSchedule = schedulePolicy.CronExpression
-			backupRetention = schedulePolicy.RetentionPeriod.String()
-			tbl.AddRow(backupRepo, scheduleEnable, backupSchedule, backupMethod, backupRetention)
+
+			tbl.AddRow(backupRepo, "Enabled", schedulePolicy.CronExpression, schedulePolicy.BackupMethod, schedulePolicy.RetentionPeriod.String())
 		}
 	}
 	tbl.Print()

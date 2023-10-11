@@ -1043,19 +1043,11 @@ var _ = Describe("Cluster Controller", func() {
 		const replicas = 3
 
 		By("Mock a StorageClass which allows resize")
-		allowVolumeExpansion := true
-		storageClass := &storagev1.StorageClass{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: storageClassName,
-			},
-			Provisioner:          "kubernetes.io/no-provisioner",
-			AllowVolumeExpansion: &allowVolumeExpansion,
-		}
-		Expect(testCtx.CreateObj(testCtx.Ctx, storageClass)).Should(Succeed())
+		sc := testapps.CreateStorageClass(&testCtx, storageClassName, true)
 
 		By("Creating a cluster with VolumeClaimTemplate")
 		pvcSpec := testapps.NewPVCSpec("1Gi")
-		pvcSpec.StorageClassName = &storageClass.Name
+		pvcSpec.StorageClassName = &sc.Name
 
 		By("Create cluster and waiting for the cluster initialized")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,

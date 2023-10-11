@@ -39,7 +39,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/internal/testutil/dataprotection"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 var _ = Describe("Backup Controller test", func() {
@@ -73,6 +72,7 @@ var _ = Describe("Backup Controller test", func() {
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupRepoSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageProviderSignature, ml)
+		testapps.ClearResources(&testCtx, generics.VolumeSnapshotClassSignature, ml)
 	}
 
 	var clusterInfo *testdp.BackupClusterInfo
@@ -258,7 +258,9 @@ var _ = Describe("Backup Controller test", func() {
 			)
 
 			BeforeEach(func() {
-				viper.Set("VOLUMESNAPSHOT", "true")
+				// mock VolumeSnapshotClass for volume snapshot
+				testapps.CreateVolumeSnapshotClass(&testCtx)
+
 				By("create a backup from backupPolicy " + testdp.BackupPolicyName)
 				backup = testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
 					backup.Spec.BackupMethod = testdp.VSBackupMethodName
@@ -268,10 +270,6 @@ var _ = Describe("Backup Controller test", func() {
 					Name:      dputils.GetBackupVolumeSnapshotName(backup.Name, "data"),
 					Namespace: backup.Namespace,
 				}
-			})
-
-			AfterEach(func() {
-				viper.Set("VOLUMESNAPSHOT", "false")
 			})
 
 			It("should success after all volume snapshot ready", func() {
@@ -306,7 +304,6 @@ var _ = Describe("Backup Controller test", func() {
 			var backupKey types.NamespacedName
 
 			BeforeEach(func() {
-				viper.Set("VOLUMESNAPSHOT", "true")
 				By("By remove persistent pvc")
 				// delete rest mocked objects
 				inNS := client.InNamespace(testCtx.DefaultNamespace)
@@ -316,7 +313,6 @@ var _ = Describe("Backup Controller test", func() {
 			})
 
 			It("should fail when disable volumesnapshot", func() {
-				viper.Set("VOLUMESNAPSHOT", "false")
 				By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
 				backup := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
 					backup.Spec.BackupMethod = testdp.VSBackupMethodName

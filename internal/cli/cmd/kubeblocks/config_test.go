@@ -60,10 +60,6 @@ var _ = Describe("backupconfig", func() {
 						Name:  "CM_NAMESPACE",
 						Value: "default",
 					},
-					{
-						Name:  "VOLUMESNAPSHOT",
-						Value: "true",
-					},
 				},
 			},
 		}

@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	rtclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
@@ -39,7 +40,6 @@ var _ = Describe("VolumeSnapshot compat client", func() {
 		snapClassName = "test-vsc-name"
 	)
 
-	viper.SetDefault("VOLUMESNAPSHOT", "true")
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", "true")
 
 	It("test create/get/list/patch/delete", func() {
@@ -91,5 +91,15 @@ var _ = Describe("VolumeSnapshot compat client", func() {
 		Eventually(func() error {
 			return compatClient.Get(snapKey, snapGet)
 		}).Should(Satisfy(apierrors.IsNotFound))
+
+		By("expect for  volume snapshot disabled")
+		sc := testapps.CreateStorageClass(&testCtx, testapps.StogrageClassName, true)
+		enabled, _ := IsVolumeSnapshotEnabled(ctx, k8sClient, sc.Name)
+		Expect(enabled).Should(BeFalse())
+
+		By("expect for volume snapshot enabled")
+		testapps.CreateVolumeSnapshotClass(&testCtx)
+		enabled, _ = IsVolumeSnapshotEnabled(ctx, k8sClient, sc.Name)
+		Expect(enabled).Should(BeTrue())
 	})
 })

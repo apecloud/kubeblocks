@@ -2,7 +2,7 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
   # major version of the component defined in values.yaml
-  name: postgresql-{{ .Values.image.tag }}
+  name: postgresql-14.7.2
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:

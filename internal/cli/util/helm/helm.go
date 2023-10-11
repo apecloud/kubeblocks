@@ -58,8 +58,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
-// const defaultTimeout = time.Second * 600
-const defaultTimeout = time.Second * 60
+const defaultTimeout = time.Second * 600
 
 type InstallOpts struct {
 	Name            string

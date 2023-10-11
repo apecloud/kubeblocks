@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package restore
 
-var volumeSnapshotGroup = "snapshot.storage.k8s.io"
+var VolumeSnapshotGroup = "snapshot.storage.k8s.io"
 
 // Restore condition constants
 const (
@@ -44,7 +44,8 @@ const (
 
 // labels key
 const (
-	DataProtectionLabelRestoreKey = "dataprotection.kubeblocks.io/restore"
+	DataProtectionLabelRestoreKey     = "dataprotection.kubeblocks.io/restore"
+	DataProtectionLabelPopulatePVCKey = "dataprotection.kubeblocks.io/populate-pvc"
 )
 
 // env name for restore

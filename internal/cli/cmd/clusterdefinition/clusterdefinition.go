@@ -43,6 +43,7 @@ func NewClusterDefinitionCmd(f cmdutil.Factory, streams genericclioptions.IOStre
 
 	cmd.AddCommand(NewListCmd(f, streams))
 	cmd.AddCommand(NewListComponentsCmd(f, streams))
+	cmd.AddCommand(NewDescribeCmd(f, streams))
 	return cmd
 }
 

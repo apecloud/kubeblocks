@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: weaviate-cluster-vscale-
+spec:
+  clusterRef: weaviate-cluster
+  type: VerticalScaling
+  verticalScaling:
+    - componentName: weaviate
+      requests:
+        cpu: "500m"
+        memory: 500Mi

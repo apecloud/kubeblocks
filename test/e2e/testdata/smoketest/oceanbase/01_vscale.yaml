@@ -7,6 +7,6 @@ spec:
   type: VerticalScaling
   verticalScaling:
     - componentName: ob-bundle
-        requests:
-          cpu: "1.5"
-          memory: 1Gi
+      requests:
+        cpu: "1.5"
+        memory: 1Gi

@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -90,7 +91,7 @@ var (
 
 		# create a datafile backup
 		# backup all files under the data directory and save them to the specified storage, only full backup is supported now.
-		kbcli cluster backup mycluster --type datafile
+		kbcli cluster backup mycluster --type datafile 
 
 		# create a backup with specified backup policy
 		kbcli cluster backup mycluster --policy <backup-policy-name>
@@ -108,12 +109,16 @@ var (
 		kbcli cluster restore new-cluster-name --backup backup-name
 
 		# restore a new cluster from point in time
-		kbcli cluster restore new-cluster-name --restore-to-time "Apr 13,2023 18:40:35 UTC+0800" --source-cluster mycluster
-        kbcli cluster restore new-cluster-name --restore-to-time "2023-04-13T18:40:35+08:00" --source-cluster mycluster
+		kbcli cluster restore new-cluster-name --restore-to-time "Apr 13,2023 18:40:35 UTC+0800" --backup logfile-backup
+        kbcli cluster restore new-cluster-name --restore-to-time "2023-04-13T18:40:35+08:00" --backup logfile-backup
 	`)
 	describeBackupExample = templates.Examples(`
 		# describe a backup
 		kbcli cluster describe-backup backup-default-mycluster-20230616190023
+	`)
+	describeBackupPolicyExample = templates.Examples(`
+		# describe a backup policy
+		kbcli cluster describe-backup-policy mycluster-mysql-backup-policy
 	`)
 )
 
@@ -259,7 +264,7 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		},
 	}
 
-	cmd.Flags().StringVar(&o.BackupMethod, "method", "", "Backup method that defined in backup policy")
+	cmd.Flags().StringVar(&o.BackupMethod, "method", "", "Backup method that defined in backup policy (required)")
 	cmd.Flags().StringVar(&o.BackupName, "name", "", "Backup name")
 	cmd.Flags().StringVar(&o.BackupPolicy, "policy", "", "Backup policy name, this flag will be ignored when backup-type is snapshot")
 
@@ -851,6 +856,93 @@ func (o *editBackupPolicyOptions) applyChanges(backupPolicy *dpv1alpha1.BackupPo
 	}
 	fmt.Fprintln(o.Out, "updated")
 	return nil
+}
+
+type describeBackupPolicyOptions struct {
+	namespace string
+	names     []string
+	dynamic   dynamic.Interface
+	Factory   cmdutil.Factory
+	client    clientset.Interface
+
+	genericclioptions.IOStreams
+}
+
+func (o *describeBackupPolicyOptions) Complete(args []string) error {
+	var err error
+
+	if len(args) == 0 {
+		return fmt.Errorf("backupPolicy name should be specified")
+	}
+
+	o.names = args
+
+	if o.client, err = o.Factory.KubernetesClientSet(); err != nil {
+		return err
+	}
+
+	if o.dynamic, err = o.Factory.DynamicClient(); err != nil {
+		return err
+	}
+
+	if o.namespace, _, err = o.Factory.ToRawKubeConfigLoader().Namespace(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (o *describeBackupPolicyOptions) Run() error {
+	for _, name := range o.names {
+		backupPolicyObj := &dpv1alpha1.BackupPolicy{}
+		if err := cluster.GetK8SClientObject(o.dynamic, backupPolicyObj, types.BackupPolicyGVR(), o.namespace, name); err != nil {
+			return err
+		}
+		if err := o.printBackupPolicyObj(backupPolicyObj); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (o *describeBackupPolicyOptions) printBackupPolicyObj(obj *dpv1alpha1.BackupPolicy) error {
+	printer.PrintLine("Summary:")
+	realPrintPairStringToLine("Name", obj.Name)
+	realPrintPairStringToLine("Cluster", obj.Labels[constant.AppInstanceLabelKey])
+	realPrintPairStringToLine("Namespace", obj.Namespace)
+	if obj.Spec.BackupRepoName != nil {
+		realPrintPairStringToLine("Backup Repo Name", *obj.Spec.BackupRepoName)
+	}
+
+	printer.PrintLine("\nBackup Methods:")
+	p := printer.NewTablePrinter(o.Out)
+	p.SetHeader("Name", "ActionSet", "snapshot-volumes")
+	for _, v := range obj.Spec.BackupMethods {
+		p.AddRow(v.Name, v.ActionSetName, strconv.FormatBool(*v.SnapshotVolumes))
+	}
+	p.Print()
+
+	return nil
+}
+
+func NewDescribeBackupPolicyCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := &describeBackupPolicyOptions{
+		Factory:   f,
+		IOStreams: streams,
+	}
+	cmd := &cobra.Command{
+		Use:                   "describe-backup-policy",
+		DisableFlagsInUseLine: true,
+		Aliases:               []string{"describe-bp"},
+		Short:                 "Describe backup policy",
+		Example:               describeBackupPolicyExample,
+		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, types.BackupPolicyGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
+			util.CheckErr(o.Complete(args))
+			util.CheckErr(o.Run())
+		},
+	}
+	return cmd
 }
 
 func (o *DescribeBackupOptions) Complete(args []string) error {

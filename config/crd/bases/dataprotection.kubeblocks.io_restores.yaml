@@ -2046,9 +2046,7 @@ spec:
                           in the connection credential secret.
                         type: string
                     required:
-                    - passwordKey
                     - secretName
-                    - usernameKey
                     type: object
                   execAction:
                     description: configuration for exec action.
@@ -2504,12 +2502,12 @@ spec:
                 type: string
               phase:
                 description: RestorePhase The current phase. Valid values are Running,
-                  Completed, Failed, Deleting.
+                  Completed, Failed, AsDataSource.
                 enum:
                 - Running
                 - Completed
                 - Failed
-                - Deleting
+                - AsDataSource
                 type: string
               startTimestamp:
                 description: Date/time when the restore started being processed.

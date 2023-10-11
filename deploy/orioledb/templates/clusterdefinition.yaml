@@ -84,12 +84,22 @@ spec:
           namespace: {{ .Release.Namespace }}
           volumeName: agamotto-configuration
           defaultMode: 0777
+        - name: etcd-env
+          templateRef: etcd-env
+          namespace: {{ .Release.Namespace }}
+          volumeName: patroni-dependency
+          defaultMode: 0777
       scriptSpecs:
         - name: orioledb-scripts
           templateRef: orioledb-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 0777
+      serviceRefDeclarations:
+        - name: etcdService
+          serviceRefDeclarationSpecs:
+            - serviceKind: etcd
+              serviceVersion: ^v3.\d...d$
       service:
         ports:
           - name: tcp-postgresql
@@ -140,6 +150,8 @@ spec:
                 mountPath: /kb-scripts
               - name: pod-info
                 mountPath: /kb-podinfo
+              - name: patroni-dependency
+                mountPath: /dependency
             ports:
               - name: tcp-postgresql
                 containerPort: 5432
@@ -148,8 +160,6 @@ spec:
             env: ## refer https://github.com/zalando/spilo/blob/master/ENVIRONMENT.rst
               - name: PGROOT
                 value: /home/postgres/pgdata/pgroot
-              - name: PATRONI_ETCD3_HOST
-                value: "etcd-etcd:2379" # todo : not hardcode
               - name: SCOPE
                 value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-patroni$(KB_CLUSTER_UID_POSTFIX_8)"
               - name: KUBERNETES_SCOPE_LABEL

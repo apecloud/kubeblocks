@@ -48,3 +48,9 @@ const (
 
 	KBToolImage = "apecloud/kubeblocks-tool:latest"
 )
+
+// Restore
+const (
+	RestoreName       = "test-restore"
+	MysqlTemplateName = "data-mysql-mysql"
+)

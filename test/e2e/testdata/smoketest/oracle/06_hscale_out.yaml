@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: oracle-cluster-hscale-out-
+spec:
+  clusterRef: oracle-cluster
+  type: HorizontalScaling
+  horizontalScaling:
+    - componentName: mysql-comp
+      replicas: 3

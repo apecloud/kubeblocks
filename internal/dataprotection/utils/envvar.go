@@ -39,12 +39,16 @@ func BuildEnvByCredential(pod *corev1.Pod, credential *dpv1alpha1.ConnectionCred
 	} else {
 		hostEnv = buildEnvBySecretKey(dptypes.DPDBHost, credential.SecretName, credential.HostKey)
 	}
-	envVars = append(envVars,
-		buildEnvBySecretKey(dptypes.DPDBUser, credential.SecretName, credential.UsernameKey),
-		buildEnvBySecretKey(dptypes.DPDBPassword, credential.SecretName, credential.PasswordKey),
-		buildEnvBySecretKey(dptypes.DPDBPort, credential.SecretName, credential.PortKey),
-		hostEnv,
-	)
+	envVars = append(envVars, hostEnv)
+	if credential.PasswordKey != "" {
+		envVars = append(envVars, buildEnvBySecretKey(dptypes.DPDBPassword, credential.SecretName, credential.PasswordKey))
+	}
+	if credential.UsernameKey != "" {
+		envVars = append(envVars, buildEnvBySecretKey(dptypes.DPDBUser, credential.SecretName, credential.UsernameKey))
+	}
+	if credential.PortKey != "" {
+		envVars = append(envVars, buildEnvBySecretKey(dptypes.DPDBPort, credential.SecretName, credential.PortKey))
+	}
 	return envVars
 }
 

@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: dn-vscale-out-
+spec:
+  clusterRef: pxc
+  type: VerticalScaling
+  verticalScaling:
+    - componentName: dn-0
+      requests:
+        cpu: "1.5"
+        memory: 1.5Gi

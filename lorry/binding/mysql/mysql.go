@@ -159,7 +159,7 @@ func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, requ
 	cluster := k8sStore.GetClusterFromCache()
 	if cluster == nil || !cluster.IsLocked() {
 		return "", nil
-	} else if !dcsStore.HasLock() {
+	} else if !dcsStore.HasLease() {
 		return SECONDARY, nil
 	}
 

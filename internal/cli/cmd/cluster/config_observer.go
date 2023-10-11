@@ -90,7 +90,7 @@ var (
 
 func (r *configObserverOptions) addCommonFlags(cmd *cobra.Command, f cmdutil.Factory) {
 	cmd.Flags().StringSliceVar(&r.configSpecs, "config-specs", nil, "Specify the name of the configuration template to describe. (e.g. for apecloud-mysql: --config-specs=mysql-3node-tpl)")
-	flags.AddComponentsFlag(f, cmd, true, &r.componentNames, "Specify the name of Component to describe (e.g. for apecloud-mysql: --component=mysql). If the cluster has only one component, unset the parameter.\"")
+	flags.AddComponentsFlag(f, cmd, &r.componentNames, "Specify the name of Component to describe (e.g. for apecloud-mysql: --component=mysql). If the cluster has only one component, unset the parameter.\"")
 }
 
 func (r *configObserverOptions) complete2(args []string) error {

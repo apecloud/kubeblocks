@@ -50,6 +50,7 @@ Cluster command.
 * [kbcli cluster describe](kbcli_cluster_describe.md)	 - Show details of a specific cluster.
 * [kbcli cluster describe-account](kbcli_cluster_describe-account.md)	 - Describe account roles and related information
 * [kbcli cluster describe-backup](kbcli_cluster_describe-backup.md)	 - Describe a backup.
+* [kbcli cluster describe-backup-policy](kbcli_cluster_describe-backup-policy.md)	 - Describe backup policy
 * [kbcli cluster describe-config](kbcli_cluster_describe-config.md)	 - Show details of a specific reconfiguring.
 * [kbcli cluster describe-ops](kbcli_cluster_describe-ops.md)	 - Show details of a specific OpsRequest.
 * [kbcli cluster diff-config](kbcli_cluster_diff-config.md)	 - Show the difference in parameters between the two submitted OpsRequest.

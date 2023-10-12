@@ -190,7 +190,6 @@ KubeBlocks operation commands.
 * [kbcli kubeblocks upgrade](kbcli_kubeblocks_upgrade.md)	 - Upgrade KubeBlocks.
 
 
-
 ## [migration](kbcli_migration.md)
 
 Data migration between two data sources.
@@ -206,6 +205,7 @@ Data migration between two data sources.
 ## [options](kbcli_options.md)
 
 Print the list of flags inherited by all commands.
+
 
 
 ## [playground](kbcli_playground.md)

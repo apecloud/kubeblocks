@@ -120,7 +120,7 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		Long:    initLong,
 		Example: initExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.complete())
+			util.CheckErr(o.complete(cmd))
 			util.CheckErr(o.validate())
 			util.CheckErr(o.run())
 		},
@@ -142,14 +142,22 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func (o *initOptions) complete() error {
+func (o *initOptions) complete(cmd *cobra.Command) error {
 	var err error
 
 	if o.cloudProvider != cp.Local {
 		return nil
 	}
-	o.dockerVersion, err = util.GetDockerVersion()
-	return err
+
+	if o.dockerVersion, err = util.GetDockerVersion(); err != nil {
+		return err
+	}
+	// default write log to file
+	if err = util.EnableLogToFile(cmd.Flags()); err != nil {
+		fmt.Fprintf(o.Out, "Failed to enable the log file %s", err.Error())
+	}
+
+	return nil
 }
 
 func (o *initOptions) validate() error {
@@ -281,8 +289,11 @@ func (o *initOptions) cloud() error {
 
 	// create a kubernetes cluster in the cloud
 	if err = provider.CreateK8sCluster(clusterInfo); err != nil {
+		klog.V(1).Infof("create K8S cluster failed: %s", err.Error())
 		return err
 	}
+	klog.V(1).Info("create K8S cluster success")
+
 	printer.PrintBlankLine(o.Out)
 
 	// write cluster info to state file and get new cluster info with kubeconfig
@@ -297,6 +308,7 @@ func (o *initOptions) cloud() error {
 	}
 
 	// install KubeBlocks and create a database cluster
+	klog.V(1).Info("start to install KubeBlocks in K8S cluster... ")
 	return o.installKBAndCluster(clusterInfo)
 }
 
@@ -402,7 +414,7 @@ func (o *initOptions) installKBAndCluster(info *cp.K8sClusterInfo) error {
 	if err = o.installKubeBlocks(info.ClusterName); err != nil {
 		return errors.Wrap(err, "failed to install KubeBlocks")
 	}
-
+	klog.V(1).Info("KubeBlocks installed successfully")
 	// install database cluster
 	clusterInfo := "ClusterDefinition: " + o.clusterDef
 	if o.clusterVersion != "" {

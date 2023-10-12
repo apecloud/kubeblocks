@@ -16,7 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package components
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -32,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
@@ -56,7 +56,6 @@ var _ = Describe("Component", func() {
 		clusterVerObj  *appsv1alpha1.ClusterVersion
 		clusterObj     *appsv1alpha1.Cluster
 		reqCtx         intctrlutil.RequestCtx
-		dag            *graph.DAG
 
 		defaultStorageClass *storagev1.StorageClass
 
@@ -109,18 +108,37 @@ var _ = Describe("Component", func() {
 			GetObject()
 
 		reqCtx = intctrlutil.RequestCtx{Ctx: ctx, Log: logger, Recorder: recorder}
-		dag = graph.NewDAG()
 	}
 
-	resetDag := func(comp Component) {
-		Expect(comp).ShouldNot(BeNil())
-		rsmComp, ok := comp.(*rsmComponent)
-		Expect(ok).Should(BeTrue())
-		dag = graph.NewDAG()
-		rsmComp.dag = dag
+	labels := func() client.MatchingLabels {
+		return client.MatchingLabels{
+			constant.AppManagedByLabelKey:   constant.AppName,
+			constant.AppInstanceLabelKey:    clusterObj.Name,
+			constant.KBAppComponentLabelKey: statefulCompName,
+		}
 	}
 
-	submitChanges := func(ctx context.Context, cli client.Client, dag *graph.DAG) error {
+	spec := func() *appsv1alpha1.ClusterComponentSpec {
+		for i, v := range clusterObj.Spec.ComponentSpecs {
+			if v.Name == statefulCompName {
+				return &clusterObj.Spec.ComponentSpecs[i]
+			}
+		}
+		return nil
+	}
+
+	status := func() appsv1alpha1.ClusterComponentStatus {
+		return clusterObj.Status.Components[statefulCompName]
+	}
+
+	rsmKey := func() types.NamespacedName {
+		return types.NamespacedName{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      fmt.Sprintf("%s-%s", clusterObj.GetName(), statefulCompName),
+		}
+	}
+
+	applyChanges := func(dag *graph.DAG) error {
 		walking := func(v graph.Vertex) error {
 			node, ok := v.(*ictrltypes.LifecycleVertex)
 			Expect(ok).Should(BeTrue())
@@ -130,7 +148,8 @@ var _ = Describe("Component", func() {
 
 			switch *node.Action {
 			case ictrltypes.CREATE:
-				err := cli.Create(ctx, node.Obj)
+				controllerutil.AddFinalizer(node.Obj, constant.DBClusterFinalizerName)
+				err := testCtx.Create(ctx, node.Obj)
 				if err != nil && !apierrors.IsAlreadyExists(err) {
 					return err
 				}
@@ -138,32 +157,32 @@ var _ = Describe("Component", func() {
 				if node.Immutable {
 					return nil
 				}
-				err := cli.Update(ctx, node.Obj)
+				err := testCtx.Cli.Update(ctx, node.Obj)
 				if err != nil && !apierrors.IsNotFound(err) {
 					return err
 				}
 			case ictrltypes.PATCH:
 				patch := client.MergeFrom(node.ObjCopy)
-				err := cli.Patch(ctx, node.Obj, patch)
+				err := testCtx.Cli.Patch(ctx, node.Obj, patch)
 				if err != nil && !apierrors.IsNotFound(err) {
 					return err
 				}
 			case ictrltypes.DELETE:
 				if controllerutil.RemoveFinalizer(node.Obj, constant.DBClusterFinalizerName) {
-					err := cli.Update(ctx, node.Obj)
+					err := testCtx.Cli.Update(ctx, node.Obj)
 					if err != nil && !apierrors.IsNotFound(err) {
 						return err
 					}
 				}
 				if _, ok := node.Obj.(*appsv1alpha1.Cluster); !ok {
-					err := cli.Delete(ctx, node.Obj)
+					err := testCtx.Cli.Delete(ctx, node.Obj)
 					if err != nil && !apierrors.IsNotFound(err) {
 						return err
 					}
 				}
 			case ictrltypes.STATUS:
 				patch := client.MergeFrom(node.ObjCopy)
-				if err := cli.Status().Patch(ctx, node.Obj, patch); err != nil {
+				if err := testCtx.Cli.Status().Patch(ctx, node.Obj, patch); err != nil {
 					return err
 				}
 			case ictrltypes.NOOP:
@@ -181,35 +200,55 @@ var _ = Describe("Component", func() {
 		}
 	}
 
-	newComponent := func(compName string) Component {
+	newComponent := func(compName string) (Component, *graph.DAG) {
+		dag := graph.NewDAG()
 		comp, err := NewComponent(reqCtx, testCtx.Cli, clusterDefObj, clusterVerObj, clusterObj, compName, dag)
 		Expect(comp).ShouldNot(BeNil())
 		Expect(err).Should(Succeed())
-		return comp
+		return comp, dag
 	}
 
-	createComponent := func(comp Component) error {
+	createComponent := func() error {
+		comp, dag := newComponent(statefulCompName)
 		if err := comp.Create(reqCtx, testCtx.Cli); err != nil {
 			return err
 		}
-		return submitChanges(testCtx.Ctx, testCtx.Cli, dag)
+		return applyChanges(dag)
 	}
 
-	deleteComponent := func(comp Component) error {
-		resetDag(comp)
+	deleteComponent := func() error {
+		comp, dag := newComponent(statefulCompName)
 		if err := comp.Delete(reqCtx, testCtx.Cli); err != nil {
 			return err
 		}
-		return submitChanges(testCtx.Ctx, testCtx.Cli, dag)
+		return applyChanges(dag)
 	}
 
-	updateComponent := func(comp Component) error {
-		resetDag(comp)
+	updateComponent := func() error {
+		comp, dag := newComponent(statefulCompName)
 		comp.GetCluster().Generation = comp.GetCluster().Status.ObservedGeneration + 1
 		if err := comp.Update(reqCtx, testCtx.Cli); err != nil {
 			return err
 		}
-		return submitChanges(testCtx.Ctx, testCtx.Cli, dag)
+		return applyChanges(dag)
+	}
+
+	retryUpdateComponent := func() error {
+		comp, dag := newComponent(statefulCompName)
+		// don't update the cluster generation
+		if err := comp.Update(reqCtx, testCtx.Cli); err != nil {
+			return err
+		}
+		return applyChanges(dag)
+	}
+
+	statusComponent := func() error {
+		comp, dag := newComponent(statefulCompName)
+		comp.GetCluster().Status.ObservedGeneration = comp.GetCluster().Generation
+		if err := comp.Status(reqCtx, testCtx.Cli); err != nil {
+			return err
+		}
+		return applyChanges(dag)
 	}
 
 	pvcKey := func(clusterName, compName, vctName string, ordinal int) types.NamespacedName {
@@ -226,15 +265,15 @@ var _ = Describe("Component", func() {
 		}
 	}
 
-	createPVCs := func(spec *appsv1alpha1.ClusterComponentSpec, labels client.MatchingLabels) {
-		for _, vct := range spec.VolumeClaimTemplates {
-			for i := 0; i < int(spec.Replicas); i++ {
+	createPVCs := func() {
+		for _, vct := range spec().VolumeClaimTemplates {
+			for i := 0; i < int(spec().Replicas); i++ {
 				var (
-					pvcName = pvcKey(clusterName, spec.Name, vct.Name, i).Name
-					pvName  = pvKey(clusterName, spec.Name, vct.Name, i).Name
+					pvcName = pvcKey(clusterName, statefulCompName, vct.Name, i).Name
+					pvName  = pvKey(clusterName, statefulCompName, vct.Name, i).Name
 				)
-				pvc := testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterName, spec.Name, vct.Name).
-					AddLabelsInMap(labels).
+				pvc := testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterName, statefulCompName, vct.Name).
+					AddLabelsInMap(labels()).
 					SetStorageClass(defaultStorageClass.Name).
 					SetStorage(defaultVolumeSize).
 					SetVolumeName(pvName).
@@ -244,7 +283,7 @@ var _ = Describe("Component", func() {
 					SetStorage(defaultVolumeSize).
 					SetClaimRef(pvc).
 					CheckedCreate(&testCtx)
-				Eventually(testapps.GetAndChangeObjStatus(&testCtx, pvcKey(clusterName, spec.Name, vct.Name, i),
+				Eventually(testapps.GetAndChangeObjStatus(&testCtx, pvcKey(clusterName, statefulCompName, vct.Name, i),
 					func(pvc *corev1.PersistentVolumeClaim) {
 						pvc.Status.Phase = corev1.ClaimBound
 						if pvc.Status.Capacity == nil {
@@ -252,11 +291,17 @@ var _ = Describe("Component", func() {
 						}
 						pvc.Status.Capacity[corev1.ResourceStorage] = pvc.Spec.Resources.Requests[corev1.ResourceStorage]
 					})).Should(Succeed())
-				Eventually(testapps.GetAndChangeObjStatus(&testCtx, pvKey(clusterName, spec.Name, vct.Name, i),
+				Eventually(testapps.GetAndChangeObjStatus(&testCtx, pvKey(clusterName, statefulCompName, vct.Name, i),
 					func(pv *corev1.PersistentVolume) {
 						pvc.Status.Phase = corev1.ClaimBound
 					})).Should(Succeed())
 			}
+		}
+	}
+
+	createPods := func() {
+		for i := 0; i < int(spec().Replicas); i++ {
+			// TODO
 		}
 	}
 
@@ -267,7 +312,7 @@ var _ = Describe("Component", func() {
 
 		It("ok", func() {
 			By("new cluster component ok")
-			comp := newComponent(statefulCompName)
+			comp, _ := newComponent(statefulCompName)
 			Expect(comp.GetNamespace()).Should(Equal(clusterObj.GetNamespace()))
 			Expect(comp.GetClusterName()).Should(Equal(clusterObj.GetName()))
 			Expect(comp.GetName()).Should(Equal(statefulCompName))
@@ -281,7 +326,7 @@ var _ = Describe("Component", func() {
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVerObj.Name).
 				AddComponent(statefulCompName, statefulCompDefName+random). // with a random component def name
 				GetObject()
-			_, err := NewComponent(reqCtx, testCtx.Cli, clusterDefObj, clusterVerObj, clusterObj, statefulCompName, dag)
+			_, err := NewComponent(reqCtx, testCtx.Cli, clusterDefObj, clusterVerObj, clusterObj, statefulCompName, graph.NewDAG())
 			Expect(err).ShouldNot(Succeed())
 		})
 
@@ -290,76 +335,140 @@ var _ = Describe("Component", func() {
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVerObj.Name).
 				AddComponent(statefulCompName+random, statefulCompDefName+random). // with a random component spec and def name
 				GetObject()
-			comp, err := NewComponent(reqCtx, testCtx.Cli, clusterDefObj, clusterVerObj, clusterObj, statefulCompName, dag)
+			comp, err := NewComponent(reqCtx, testCtx.Cli, clusterDefObj, clusterVerObj, clusterObj, statefulCompName, graph.NewDAG())
 			Expect(comp).Should(BeNil())
 			Expect(err).Should(BeNil())
 		})
 	})
 
 	Context("create and delete component", func() {
-		var (
-			comp   Component
-			labels client.MatchingLabels
-		)
-
 		BeforeEach(func() {
 			setup()
-
-			comp = newComponent(statefulCompName)
-			Expect(createComponent(comp)).Should(Succeed())
-
-			labels = client.MatchingLabels{
-				constant.AppManagedByLabelKey:   constant.AppName,
-				constant.AppInstanceLabelKey:    comp.GetClusterName(),
-				constant.KBAppComponentLabelKey: comp.GetName(),
-			}
+			Expect(createComponent()).Should(Succeed())
 		})
 
 		It("create component resources", func() {
 			By("check workload resources created")
-			Eventually(testapps.List(&testCtx, generics.RSMSignature, labels)).Should(HaveLen(1))
+			Eventually(testapps.List(&testCtx, generics.RSMSignature, labels())).Should(HaveLen(1))
 		})
 
 		It("delete component doesn't affect resources", func() {
 			By("delete the component")
-			Expect(deleteComponent(comp)).Should(Succeed())
+			Expect(deleteComponent()).Should(Succeed())
 
 			By("check workload resources still exist")
-			Eventually(testapps.List(&testCtx, generics.RSMSignature, labels)).Should(HaveLen(1))
+			Eventually(testapps.List(&testCtx, generics.RSMSignature, labels())).Should(HaveLen(1))
 		})
 	})
 
 	Context("update component", func() {
-		var (
-			comp   Component
-			labels client.MatchingLabels
-		)
-
-		spec := func() *appsv1alpha1.ClusterComponentSpec {
-			return clusterObj.Spec.GetComponentByName(comp.GetName())
-		}
-
-		// rsmKey := func() types.NamespacedName {
-		//	return types.NamespacedName{
-		//		Namespace: comp.GetNamespace(),
-		//		Name:      fmt.Sprintf("%s-%s", clusterObj.GetName(), comp.GetName()),
-		//	}
-		// }
-
 		BeforeEach(func() {
 			setup()
 
-			comp = newComponent(statefulCompName)
-			Expect(createComponent(comp)).Should(Succeed())
-
-			labels = client.MatchingLabels{
-				constant.AppManagedByLabelKey:   constant.AppName,
-				constant.AppInstanceLabelKey:    comp.GetClusterName(),
-				constant.KBAppComponentLabelKey: comp.GetName(),
-			}
+			Expect(createComponent()).Should(Succeed())
 
 			// create all PVCs ann PVs
-			createPVCs(spec(), labels)
+			createPVCs()
+		})
+
+		It("update w/o changes", func() {
+			By("update without change")
+			Expect(updateComponent()).Should(Succeed())
+
+			By("check the workload not updated")
+			Consistently(testapps.CheckObj(&testCtx, rsmKey(), func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+				g.Expect(rsm.GetGeneration()).Should(Equal(int64(1)))
+			})).Should(Succeed())
+		})
+
+		It("scale out", func() {
+			By("scale out replicas with 1")
+			replicas := spec().Replicas
+			spec().Replicas = spec().Replicas + 1
+
+			By("update to create new PVCs, the workload not updated")
+			// since we don't set backup policy, the dummy clone policy will be used
+			Expect(updateComponent()).Should(Succeed())
+			Consistently(testapps.CheckObj(&testCtx, rsmKey(), func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+				g.Expect(rsm.GetGeneration()).Should(Equal(int64(1)))
+				g.Expect(*rsm.Spec.Replicas).Should(Equal(replicas))
+			})).Should(Succeed())
+			expectedCnt := int(spec().Replicas) * len(spec().VolumeClaimTemplates)
+			Eventually(testapps.List(&testCtx, generics.PersistentVolumeClaimSignature, labels())).Should(HaveLen(expectedCnt))
+
+			By("update again to apply changes to the workload")
+			Expect(retryUpdateComponent()).Should(Succeed())
+
+			By("check the workload updated")
+			Eventually(testapps.CheckObj(&testCtx, rsmKey(), func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+				g.Expect(rsm.GetGeneration()).Should(Equal(int64(2)))
+				g.Expect(*rsm.Spec.Replicas).Should(Equal(spec().Replicas))
+			})).Should(Succeed())
+		})
+
+		It("TODO - scale out out-of-range", func() {
+		})
+
+		It("scale in", func() {
+			By("scale in replicas with 1")
+			Expect(spec().Replicas > 1).Should(BeTrue())
+			replicas := spec().Replicas
+			spec().Replicas = spec().Replicas - 1
+			Expect(updateComponent()).Should(Succeed())
+
+			By("check the workload updated")
+			Eventually(testapps.CheckObj(&testCtx, rsmKey(), func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+				g.Expect(rsm.GetGeneration()).Should(Equal(int64(2)))
+				g.Expect(*rsm.Spec.Replicas).Should(Equal(spec().Replicas))
+			})).Should(Succeed())
+
+			By("check the PVC logically deleted")
+			Eventually(func(g Gomega) {
+				objs, err := listObjWithLabelsInNamespace(testCtx.Ctx, testCtx.Cli,
+					generics.PersistentVolumeClaimSignature, testCtx.DefaultNamespace, labels())
+				g.Expect(err).Should(Succeed())
+				g.Expect(objs).Should(HaveLen(int(replicas) * len(spec().VolumeClaimTemplates)))
+				for _, pvc := range objs {
+					if strings.HasSuffix(pvc.GetName(), fmt.Sprintf("-%d", replicas-1)) {
+						g.Expect(pvc.GetDeletionTimestamp()).ShouldNot(BeNil())
+					} else {
+						g.Expect(pvc.GetDeletionTimestamp()).Should(BeNil())
+					}
+				}
+			}).Should(Succeed())
+		})
+
+		It("scale in to zero", func() {
+			By("scale in replicas to 0")
+			replicas := spec().Replicas
+			spec().Replicas = 0
+			Expect(updateComponent()).Should(Succeed())
+
+			By("check the workload updated")
+			Eventually(testapps.CheckObj(&testCtx, rsmKey(), func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+				g.Expect(rsm.GetGeneration()).Should(Equal(int64(2)))
+				g.Expect(*rsm.Spec.Replicas).Should(Equal(spec().Replicas))
+			})).Should(Succeed())
+
+			By("check all the PVCs unchanged")
+			Consistently(func(g Gomega) {
+				objs, err := listObjWithLabelsInNamespace(testCtx.Ctx, testCtx.Cli,
+					generics.PersistentVolumeClaimSignature, testCtx.DefaultNamespace, labels())
+				g.Expect(err).Should(Succeed())
+				g.Expect(objs).Should(HaveLen(int(replicas) * len(spec().VolumeClaimTemplates)))
+				for _, pvc := range objs {
+					g.Expect(pvc.GetDeletionTimestamp()).Should(BeNil())
+				}
+			}).Should(Succeed())
+		})
+
+		It("TODO - scale up", func() {
+		})
+
+		It("TODO - scale up out-of-limit", func() {
+		})
+
+		It("TODO - scale down", func() {
 		})
 
 		It("expand volume", func() {
@@ -368,11 +477,12 @@ var _ = Describe("Component", func() {
 			quantity := vct.Spec.Resources.Requests.Storage()
 			quantity.Add(apiresource.MustParse("1Gi"))
 			spec().VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = *quantity
-			Expect(updateComponent(comp)).Should(Succeed())
+			Expect(updateComponent()).Should(Succeed())
 
 			By("check all the log PVCs updated")
 			Eventually(func(g Gomega) {
-				objs, err := listObjWithLabelsInNamespace(testCtx.Ctx, testCtx.Cli, generics.PersistentVolumeClaimSignature, comp.GetNamespace(), labels)
+				objs, err := listObjWithLabelsInNamespace(testCtx.Ctx, testCtx.Cli,
+					generics.PersistentVolumeClaimSignature, testCtx.DefaultNamespace, labels())
 				g.Expect(err).Should(Succeed())
 				g.Expect(objs).Should(HaveLen(int(spec().Replicas) * len(spec().VolumeClaimTemplates)))
 				for _, pvc := range objs {
@@ -390,11 +500,12 @@ var _ = Describe("Component", func() {
 			quantity := spec().VolumeClaimTemplates[0].Spec.Resources.Requests.Storage()
 			quantity.Sub(apiresource.MustParse("1Gi"))
 			spec().VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = *quantity
-			Expect(updateComponent(comp)).Should(HaveOccurred())
+			Expect(updateComponent()).Should(HaveOccurred())
 
 			By("check all the PVCs unchanged")
 			Consistently(func(g Gomega) {
-				objs, err := listObjWithLabelsInNamespace(testCtx.Ctx, testCtx.Cli, generics.PersistentVolumeClaimSignature, comp.GetNamespace(), labels)
+				objs, err := listObjWithLabelsInNamespace(testCtx.Ctx, testCtx.Cli,
+					generics.PersistentVolumeClaimSignature, testCtx.DefaultNamespace, labels())
 				g.Expect(err).Should(Succeed())
 				g.Expect(objs).Should(HaveLen(int(spec().Replicas) * len(spec().VolumeClaimTemplates)))
 				for _, pvc := range objs {
@@ -403,17 +514,18 @@ var _ = Describe("Component", func() {
 			}).Should(Succeed())
 		})
 
-		It("recover volume size during expansion", func() {
+		It("rollback volume size during expansion", func() {
 			By("up the log volume size with 1Gi")
 			vct := spec().VolumeClaimTemplates[0]
 			quantity := vct.Spec.Resources.Requests.Storage()
 			quantity.Add(apiresource.MustParse("1Gi"))
 			spec().VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = *quantity
-			Expect(updateComponent(comp)).Should(Succeed())
+			Expect(updateComponent()).Should(Succeed())
 
 			By("check all the log PVCs updating")
 			Eventually(func(g Gomega) {
-				objs, err := listObjWithLabelsInNamespace(testCtx.Ctx, testCtx.Cli, generics.PersistentVolumeClaimSignature, comp.GetNamespace(), labels)
+				objs, err := listObjWithLabelsInNamespace(testCtx.Ctx, testCtx.Cli,
+					generics.PersistentVolumeClaimSignature, testCtx.DefaultNamespace, labels())
 				g.Expect(err).Should(Succeed())
 				g.Expect(objs).Should(HaveLen(int(spec().Replicas) * len(spec().VolumeClaimTemplates)))
 				for _, pvc := range objs {
@@ -427,17 +539,129 @@ var _ = Describe("Component", func() {
 
 			By("reset the log volumes as original size")
 			spec().VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = defaultVolumeQuantity
-			Expect(updateComponent(comp)).Should(Succeed())
+			Expect(updateComponent()).Should(Succeed())
 
 			By("check all the PVCs rolled-back")
 			Eventually(func(g Gomega) {
-				objs, err := listObjWithLabelsInNamespace(testCtx.Ctx, testCtx.Cli, generics.PersistentVolumeClaimSignature, comp.GetNamespace(), labels)
+				objs, err := listObjWithLabelsInNamespace(testCtx.Ctx, testCtx.Cli,
+					generics.PersistentVolumeClaimSignature, testCtx.DefaultNamespace, labels())
 				g.Expect(err).Should(Succeed())
 				g.Expect(objs).Should(HaveLen(int(spec().Replicas) * len(spec().VolumeClaimTemplates)))
 				for _, pvc := range objs {
 					g.Expect(pvc.Spec.Resources.Requests.Storage().Cmp(defaultVolumeQuantity)).Should(Equal(0))
 				}
 			}).Should(Succeed())
+		})
+
+		It("TODO- rollback volume size during expansion - recreate PVC error", func() {
+		})
+
+		It("TODO- general workload update", func() {
+			Expect(updateComponent()).Should(Succeed())
+		})
+
+		It("TODO- KB system images update", func() {
+			Expect(updateComponent()).Should(Succeed())
+		})
+
+		It("TODO- update strategy", func() {
+			Expect(updateComponent()).Should(Succeed())
+		})
+	})
+
+	Context("status component", func() {
+		BeforeEach(func() {
+			setup()
+
+			Expect(createComponent()).Should(Succeed())
+
+			// create all PVCs ann PVs
+			createPVCs()
+
+			// create all Pods
+			createPods()
+		})
+
+		It("provisioning", func() {
+			By("status component")
+			Expect(statusComponent()).Should(Succeed())
+
+			By("check component status as CREATING")
+			Expect(status().Phase).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
+		})
+
+		It("TODO - provisioning with temporary error", func() {
+			By("some pods have temporary failure")
+
+			By("status component")
+			Expect(statusComponent()).Should(Succeed())
+
+			By("check component status as CREATING")
+			Expect(status().Phase).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
+		})
+
+		It("TODO - pods not ready", func() {
+			Expect(statusComponent()).Should(Succeed())
+		})
+
+		It("pods ready, has no role", func() {
+			Expect(statusComponent()).Should(Succeed())
+		})
+
+		It("TODO - pods ready, role probe timed-out", func() {
+			Expect(statusComponent()).Should(Succeed())
+		})
+
+		It("TODO - all pods are ok", func() {
+			Expect(statusComponent()).Should(Succeed())
+		})
+
+		It("TODO - updating", func() {
+			Expect(statusComponent()).Should(Succeed())
+		})
+
+		It("TODO - updating with conditions", func() {
+			Expect(statusComponent()).Should(Succeed())
+		})
+
+		It("TODO - updating with temporary error", func() {
+			Expect(statusComponent()).Should(Succeed())
+		})
+
+		It("deleting", func() {
+			By("delete underlying workload w/o removing finalizers")
+			rsm := &workloads.ReplicatedStateMachine{}
+			Expect(testCtx.Cli.Get(testCtx.Ctx, rsmKey(), rsm)).Should(Succeed())
+			Expect(testCtx.Cli.Delete(testCtx.Ctx, rsm)).Should(Succeed())
+
+			By("status component")
+			Expect(statusComponent()).Should(Succeed())
+
+			By("check component status as DELETING")
+			Expect(status().Phase).Should(Equal(appsv1alpha1.DeletingClusterCompPhase))
+		})
+
+		It("TODO - stopping", func() {
+			Expect(statusComponent()).Should(Succeed())
+		})
+
+		It("stopped", func() {
+			By("set replicas as 0 (stop or scale-in to 0)")
+			spec().Replicas = 0
+			Expect(updateComponent()).Should(Succeed())
+
+			By("check the workload updated")
+			Eventually(testapps.CheckObj(&testCtx, rsmKey(), func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+				g.Expect(rsm.GetGeneration()).Should(Equal(int64(2)))
+				g.Expect(*rsm.Spec.Replicas).Should(Equal(spec().Replicas))
+			})).Should(Succeed())
+			Eventually(testapps.List(&testCtx, generics.PodSignature, labels())).Should(HaveLen(0))
+
+			By("status component")
+			Expect(statusComponent()).Should(Succeed())
+
+			By("check component status as STOPPED")
+			Expect(status().Phase).Should(Equal(appsv1alpha1.StoppedClusterCompPhase))
 		})
 	})
 })

@@ -1246,7 +1246,7 @@ func (c *rsmComponent) updateWorkload(rsmObj *workloads.ReplicatedStateMachine) 
 	if isTemplateUpdated || !reflect.DeepEqual(rsmObj.Annotations, rsmObjCopy.Annotations) {
 		c.workload = rsmObjCopy
 		graphCli := model.NewGraphClient(c.Client)
-		if graphCli.IsNooped(c.dag, c.workload) {
+		if graphCli.IsAction(c.dag, c.workload, model.NOOP) {
 			return false
 		}
 		graphCli.Update(c.dag, nil, c.workload, model.ReplaceIfExistingOption)

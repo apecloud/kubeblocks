@@ -21,6 +21,7 @@ package rsm
 
 import (
 	"context"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -97,7 +98,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 		stsList := graphCli.FindAll(d, &apps.StatefulSet{})
 		Expect(stsList).Should(HaveLen(1))
 		sts, _ := stsList[0].(*apps.StatefulSet)
-		Expect(graphCli.IsNooped(d, sts)).Should(Equal(noop))
+		Expect(graphCli.IsAction(d, sts, model.NOOP)).Should(Equal(noop))
 	}
 
 	BeforeEach(func() {

@@ -64,8 +64,8 @@ type GraphWriter interface {
 	// Noop means not to commit any change made to this obj in the execute phase.
 	Noop(dag *graph.DAG, obj client.Object)
 
-	// IsNooped tells whether this obj is nooped.
-	IsNooped(dag *graph.DAG, obj client.Object) bool
+	// IsAction tells whether the action of the vertex of this obj is same as 'action'.
+	IsAction(dag *graph.DAG, obj client.Object, action Action) bool
 
 	// Do does 'action' to 'obj'.
 	// WARN: this is a rather low-level API, will be refactored out in near future, avoid to use it.
@@ -142,7 +142,7 @@ func (r *realGraphClient) Noop(dag *graph.DAG, obj client.Object) {
 	r.doWrite(dag, nil, obj, ActionNoopPtr())
 }
 
-func (r *realGraphClient) IsNooped(dag *graph.DAG, obj client.Object) bool {
+func (r *realGraphClient) IsAction(dag *graph.DAG, obj client.Object, action Action) bool {
 	vertex := r.findMatchedVertex(dag, obj, true)
 	if vertex == nil {
 		return false
@@ -151,7 +151,7 @@ func (r *realGraphClient) IsNooped(dag *graph.DAG, obj client.Object) bool {
 	if v.Action == nil {
 		return false
 	}
-	return *v.Action == NOOP
+	return *v.Action == action
 }
 
 func (r *realGraphClient) Do(dag *graph.DAG, obj client.Object, action *Action) {

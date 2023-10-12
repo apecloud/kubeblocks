@@ -22,6 +22,7 @@ package model
 import (
 	"fmt"
 	"reflect"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -269,7 +270,7 @@ func (r *realGraphClient) findMatchedVertex(dag *graph.DAG, object client.Object
 			ov, _ := v.(*ObjectVertex)
 			key, err := GetGVKName(ov.Obj)
 			if err != nil {
-				return err
+				panic(fmt.Sprintf("parse gvk name failed, obj: %T, name: %s, err: %v", ov.Obj, ov.Obj.GetName(), err))
 			}
 			if *keyLookFor == *key {
 				found = v

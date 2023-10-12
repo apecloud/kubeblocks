@@ -67,9 +67,9 @@ type GVKNObjKey struct {
 // the root vertex(i.e. the cluster vertex) will be treated specially:
 // as all its meta, spec and status can be updated in one reconciliation loop
 type ObjectVertex struct {
-	Obj       client.Object
-	OriObj    client.Object
-	Action    *Action
+	Obj    client.Object
+	OriObj client.Object
+	Action *Action
 }
 
 func (v *ObjectVertex) String() string {

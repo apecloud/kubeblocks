@@ -21,7 +21,6 @@ package rsm
 
 import (
 	"context"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -35,6 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
 var _ = Describe("member reconfiguration transformer test.", func() {

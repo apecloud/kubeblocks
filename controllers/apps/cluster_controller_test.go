@@ -1798,7 +1798,7 @@ var _ = Describe("Cluster Controller", func() {
 				factory.SetReplicas(3)
 			}, true)
 
-			for compName, _ := range compNameNDef {
+			for compName := range compNameNDef {
 				By(fmt.Sprintf("Check %s workload has been created", compName))
 				Eventually(testapps.List(&testCtx, generics.RSMSignature,
 					client.MatchingLabels{

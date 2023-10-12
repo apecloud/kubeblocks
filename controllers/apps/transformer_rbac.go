@@ -21,7 +21,6 @@ package apps
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -37,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"

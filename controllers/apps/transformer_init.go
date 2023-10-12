@@ -26,7 +26,7 @@ import (
 )
 
 type initTransformer struct {
-	cluster       *appsv1alpha1.Cluster
+	cluster *appsv1alpha1.Cluster
 }
 
 var _ graph.Transformer = &initTransformer{}

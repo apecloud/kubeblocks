@@ -21,7 +21,6 @@ package apps
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
 
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +32,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )

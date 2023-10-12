@@ -207,7 +207,7 @@ var _ = Describe("plan builder test", func() {
 
 		It("should return nil and do nothing if action is Noop", func() {
 			v := &model.ObjectVertex{
-				Action:    model.ActionNoopPtr(),
+				Action: model.ActionNoopPtr(),
 			}
 			Expect(rsmBuilder.rsmWalkFunc(v)).Should(Succeed())
 		})

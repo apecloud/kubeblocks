@@ -22,11 +22,11 @@ package rsm
 import (
 	"fmt"
 	"regexp"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strconv"
 
 	apps "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"

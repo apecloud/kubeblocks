@@ -186,17 +186,40 @@ func buildLorryServiceContainer(component *SynthesizedComponent, container *core
 		}
 	}
 
-	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      constant.KBEnvCharacterType,
-		Value:     component.CharacterType,
-		ValueFrom: nil,
-	})
-
-	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      constant.KBEnvWorkloadType,
-		Value:     string(component.WorkloadType),
-		ValueFrom: nil,
-	})
+	secretName := fmt.Sprintf("%s-conn-credential", component.ClusterName)
+	container.Env = append(container.Env,
+		corev1.EnvVar{
+			Name:      constant.KBEnvCharacterType,
+			Value:     component.CharacterType,
+			ValueFrom: nil,
+		},
+		corev1.EnvVar{
+			Name:      constant.KBEnvWorkloadType,
+			Value:     string(component.WorkloadType),
+			ValueFrom: nil,
+		},
+		corev1.EnvVar{
+			Name: "KB_SERVICE_USER",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key: constant.AccountNameForSecret,
+				},
+			},
+		},
+		corev1.EnvVar{
+			Name: "KB_SERVICE_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key: constant.AccountPasswdForSecret,
+				},
+			},
+		})
 
 	container.Ports = []corev1.ContainerPort{
 		{

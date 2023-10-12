@@ -30,7 +30,7 @@ import (
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdlogs "k8s.io/kubectl/pkg/cmd/logs"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
@@ -85,7 +85,7 @@ type LogsOptions struct {
 }
 
 // NewLogsCmd returns the logic of accessing cluster log file
-func NewLogsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewLogsCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	l := &LogsOptions{
 		ExecOptions: exec.NewExecOptions(f, streams),
 		logOptions: cmdlogs.LogsOptions{

@@ -38,7 +38,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -61,7 +61,7 @@ const (
 )
 
 type Options struct {
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 
 	HelmCfg *helm.Config
 
@@ -119,7 +119,7 @@ var (
 	}
 )
 
-func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newInstallCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &InstallOptions{
 		Options: Options{
 			IOStreams: streams,

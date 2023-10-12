@@ -26,7 +26,7 @@ import (
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/connector"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/pipeline"
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -97,7 +97,7 @@ func (o *deleteOptions) buildDeleteInfraFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&o.deleteCRI, "delete-cri", "", false, "delete cri")
 }
 
-func NewDeleteKubernetesCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func NewDeleteKubernetesCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	o := &deleteOptions{
 		clusterOptions: clusterOptions{
 			IOStreams: streams,

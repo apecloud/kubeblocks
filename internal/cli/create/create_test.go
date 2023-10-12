@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
@@ -42,12 +42,12 @@ var _ = Describe("Create", func() {
 
 	var (
 		tf      *cmdtesting.TestFactory
-		streams genericclioptions.IOStreams
+		streams genericiooptions.IOStreams
 		options CreateOptions
 	)
 
 	BeforeEach(func() {
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		streams, _, _, _ = genericiooptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace(testing.Namespace)
 		tf.Client = &clientfake.RESTClient{}
 		clusterOptions := map[string]interface{}{

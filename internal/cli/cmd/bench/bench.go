@@ -32,7 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -93,7 +93,7 @@ type BenchBaseOptions struct {
 	client  clientset.Interface
 	dynamic dynamic.Interface
 	*cluster.ClusterObjects
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 func (o *BenchBaseOptions) BaseComplete() error {
@@ -151,7 +151,7 @@ func (o *BenchBaseOptions) AddFlags(cmd *cobra.Command) {
 }
 
 // NewBenchCmd creates the bench command
-func NewBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewBenchCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "bench",
 		Short: "Run a benchmark.",
@@ -178,7 +178,7 @@ type benchListOption struct {
 	Format        string
 	AllNamespaces bool
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 type benchDeleteOption struct {
@@ -187,7 +187,7 @@ type benchDeleteOption struct {
 	dynamic   dynamic.Interface
 	namespace string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 type benchDescribeOption struct {
@@ -197,10 +197,10 @@ type benchDescribeOption struct {
 	namespace string
 	benchs    []string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
-func newListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newListCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &benchListOption{
 		Factory:   f,
 		IOStreams: streams,
@@ -222,7 +222,7 @@ func newListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	return cmd
 }
 
-func newDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newDeleteCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &benchDeleteOption{
 		factory:   f,
 		IOStreams: streams,
@@ -244,7 +244,7 @@ func newDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	return cmd
 }
 
-func newDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newDescribeCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &benchDescribeOption{
 		factory:   f,
 		IOStreams: streams,
@@ -457,7 +457,7 @@ func registerBenchmarkCompletionFunc(cmd *cobra.Command, f cmdutil.Factory, args
 	return benchs, cobra.ShellCompDirectiveNoFileComp
 }
 
-func validateBenchmarkExist(factory cmdutil.Factory, streams genericclioptions.IOStreams, name string) error {
+func validateBenchmarkExist(factory cmdutil.Factory, streams genericiooptions.IOStreams, name string) error {
 	var infos []*resource.Info
 	for _, gvr := range benchGVRList {
 		bench := list.NewListOptions(factory, streams, gvr)

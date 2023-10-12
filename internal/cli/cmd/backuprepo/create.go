@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8stypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -65,7 +65,7 @@ var (
 )
 
 type createOptions struct {
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 	dynamic dynamic.Interface
 	client  kubernetes.Interface
 	factory cmdutil.Factory
@@ -100,7 +100,7 @@ var backupRepoCreateExamples = templates.Examples(`
       --secret-access-key <SECRET KEY>
 `)
 
-func newCreateCommand(o *createOptions, f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newCreateCommand(o *createOptions, f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	if o == nil {
 		o = &createOptions{}
 	}

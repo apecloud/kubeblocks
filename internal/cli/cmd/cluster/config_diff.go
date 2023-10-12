@@ -25,7 +25,7 @@ import (
 
 	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -257,7 +257,7 @@ func (o *configDiffOptions) diffConfig(tplName string) ([]core.VisualizedParam, 
 }
 
 // NewDiffConfigureCmd shows the difference between two configuration version.
-func NewDiffConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewDiffConfigureCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &configDiffOptions{baseOptions: newDescribeOpsOptions(f, streams)}
 	cmd := &cobra.Command{
 		Use:               "diff-config",

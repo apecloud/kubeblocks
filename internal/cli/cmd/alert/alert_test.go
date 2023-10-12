@@ -23,13 +23,13 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 var _ = Describe("alter", func() {
 	f := cmdtesting.NewTestFactory()
-	s, _, _, _ := genericclioptions.NewTestIOStreams()
+	s, _, _, _ := genericiooptions.NewTestIOStreams()
 	defer f.Cleanup()
 
 	It("create new alert cmd", func() {

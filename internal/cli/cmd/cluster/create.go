@@ -42,7 +42,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	rbacv1ac "k8s.io/client-go/applyconfigurations/rbac/v1"
 	"k8s.io/client-go/dynamic"
@@ -240,7 +240,7 @@ type CreateOptions struct {
 	create.CreateOptions `json:"-"`
 }
 
-func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCreateCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewCreateOptions(f, streams)
 	cmd := &cobra.Command{
 		Use:     "create [NAME]",
@@ -285,7 +285,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	return cmd
 }
 
-func NewCreateOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *CreateOptions {
+func NewCreateOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *CreateOptions {
 	o := &CreateOptions{CreateOptions: create.CreateOptions{
 		Factory:         f,
 		IOStreams:       streams,

@@ -32,7 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/class"
@@ -117,7 +117,7 @@ var _ = Describe("create", func() {
 
 	Context("multipleSourceComponent test", func() {
 		defer GinkgoRecover()
-		streams := genericclioptions.IOStreams{
+		streams := genericiooptions.IOStreams{
 			In:     os.Stdin,
 			Out:    os.Stdout,
 			ErrOut: os.Stdout,

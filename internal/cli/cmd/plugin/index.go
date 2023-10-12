@@ -26,7 +26,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -52,7 +52,7 @@ var (
 	`)
 )
 
-func NewPluginIndexCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func NewPluginIndexCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "index",
 		Short: "Manage custom plugin indexes",
@@ -70,7 +70,7 @@ type PluginIndexOptions struct {
 	IndexName string
 	URL       string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 func (o *PluginIndexOptions) ListIndex() error {
@@ -124,7 +124,7 @@ func (o *PluginIndexOptions) UpdateIndex() error {
 	return nil
 }
 
-func NewPluginIndexListCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func NewPluginIndexListCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	o := &PluginIndexOptions{
 		IOStreams: streams,
 	}
@@ -141,7 +141,7 @@ func NewPluginIndexListCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func NewPluginIndexAddCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func NewPluginIndexAddCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	o := &PluginIndexOptions{
 		IOStreams: streams,
 	}
@@ -161,7 +161,7 @@ func NewPluginIndexAddCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func NewPluginIndexDeleteCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func NewPluginIndexDeleteCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	o := &PluginIndexOptions{
 		IOStreams: streams,
 	}
@@ -180,7 +180,7 @@ func NewPluginIndexDeleteCmd(streams genericclioptions.IOStreams) *cobra.Command
 	return cmd
 }
 
-func NewPluginIndexUpdateCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func NewPluginIndexUpdateCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	o := &PluginIndexOptions{
 		IOStreams: streams,
 	}

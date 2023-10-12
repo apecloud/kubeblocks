@@ -23,7 +23,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -75,7 +75,7 @@ var (
 		kbcli cluster list-events mycluster`)
 )
 
-func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewListCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := list.NewListOptions(f, streams, types.ClusterGVR())
 	cmd := &cobra.Command{
 		Use:               "list [NAME]",
@@ -96,7 +96,7 @@ func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	return cmd
 }
 
-func NewListInstancesCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewListInstancesCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := list.NewListOptions(f, streams, types.ClusterGVR())
 	cmd := &cobra.Command{
 		Use:               "list-instances",
@@ -114,7 +114,7 @@ func NewListInstancesCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	return cmd
 }
 
-func NewListComponentsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewListComponentsCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := list.NewListOptions(f, streams, types.ClusterGVR())
 	cmd := &cobra.Command{
 		Use:               "list-components",
@@ -132,7 +132,7 @@ func NewListComponentsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 	return cmd
 }
 
-func NewListEventsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewListEventsCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := list.NewListOptions(f, streams, types.ClusterGVR())
 	cmd := &cobra.Command{
 		Use:               "list-events",

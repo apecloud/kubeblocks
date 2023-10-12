@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -57,10 +57,10 @@ type describeBackupRepoOptions struct {
 	gvr   schema.GroupVersionResource
 	names []string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
-func newDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newDescribeCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &describeBackupRepoOptions{
 		factory:   f,
 		IOStreams: streams,

@@ -28,7 +28,7 @@ import (
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -42,7 +42,7 @@ import (
 )
 
 type migrateOptions struct {
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 
 	Factory cmdutil.Factory
 	// dynamic dynamic.Interface
@@ -151,7 +151,7 @@ func (o *migrateOptions) buildFlags(cmd *cobra.Command) {
 var migrateExamples = templates.Examples(` 
 `)
 
-func NewMigrateHelmScriptsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewMigrateHelmScriptsCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &migrateOptions{
 		Factory:   f,
 		IOStreams: streams,

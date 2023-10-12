@@ -24,7 +24,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v3/pkg/repo"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -42,7 +42,7 @@ var (
 	kbcli kubeblocks compare 0.4.0 0.5.0`)
 )
 
-func newCompareCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newCompareCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &InstallOptions{
 		Options: Options{
 			IOStreams: streams,

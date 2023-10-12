@@ -26,8 +26,9 @@ import (
 	"io"
 	"net/http"
 
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/go-errors/errors"
+
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/apecloud/kubeblocks/lorry/binding"

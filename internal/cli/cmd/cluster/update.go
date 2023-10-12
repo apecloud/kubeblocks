@@ -37,7 +37,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -106,7 +106,7 @@ type updateOptions struct {
 	*patch.Options
 }
 
-func NewUpdateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewUpdateCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &updateOptions{Options: patch.NewOptions(f, streams, types.ClusterGVR())}
 	o.Options.OutputOperation = func(didPatch bool) string {
 		if didPatch {

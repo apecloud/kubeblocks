@@ -1,7 +1,7 @@
 {{- $clusterName := $.cluster.metadata.name }}
 {{- $namespace   := $.cluster.metadata.namespace }}
 {{- $userName := getEnvByName ( index $.podSpec.containers 0 ) "MINIO_ACCESS_KEY" }}
-{{- $secret := getEnvByName ( index $.podSpec.containers 0 ) "MINIO_SECRET_KEY" | b64dec }}
+{{- $secret := getEnvByName ( index $.podSpec.containers 0 ) "MINIO_SECRET_KEY" }}
 
 etcd:
   endpoints:

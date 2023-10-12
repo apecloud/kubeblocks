@@ -80,7 +80,7 @@ const (
 	shell2httpServePath           = "/role"
 	defaultRoleProbeAgentImage    = "apecloud/kubeblocks-tools:latest"
 	defaultRoleProbeDaemonPort    = 7373
-	defaultRoleProbeGRPCPort      = 50001
+	defaultRoleProbeGRPCPort      = 50101
 	roleProbeGRPCPortName         = "probe-grpc-port"
 	grpcHealthProbeBinaryPath     = "/bin/grpc_health_probe"
 	grpcHealthProbeArgsFormat     = "-addr=:%d"

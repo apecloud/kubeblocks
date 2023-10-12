@@ -202,7 +202,7 @@ mod-vendor: module ## Run go mod vendor against go modules.
 
 .PHONY: module
 module: ## Run go mod tidy->verify against go modules.
-	$(GO) mod tidy -compat=1.20
+	$(GO) mod tidy -compat=1.21
 	$(GO) mod verify
 
 TEST_PACKAGES ?= ./internal/... ./apis/... ./controllers/... ./cmd/...
@@ -397,7 +397,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 
 .PHONY: reviewable
 reviewable: generate build-checks test check-license-header ## Run code checks to proceed with PR reviews.
-	$(GO) mod tidy -compat=1.20
+	$(GO) mod tidy -compat=1.21
 
 .PHONY: check-diff
 check-diff: reviewable ## Run git code diff checker.
@@ -680,6 +680,30 @@ else ifeq ($(TEST_TYPE), polardbx)
 	$(HELM) dependency build deploy/polardbx-cluster --skip-refresh
 	$(HELM) upgrade --install polardbx deploy/polardbx
 	$(HELM) template pxc deploy/polardbx-cluster > test/e2e/testdata/smoketest/polardbx/00_polardbxcluster.yaml
+else ifeq ($(TEST_TYPE), opensearch)
+	$(HELM) dependency build deploy/opensearch-cluster --skip-refresh
+	$(HELM) upgrade --install opensearch deploy/opensearch
+	$(HELM) template opensearch-cluster deploy/opensearch-cluster > test/e2e/testdata/smoketest/opensearch/00_opensearchcluster.yaml
+else ifeq ($(TEST_TYPE), elasticsearch)
+	$(HELM) dependency build deploy/elasticsearch-cluster --skip-refresh
+	$(HELM) upgrade --install elasticsearch deploy/elasticsearch
+	$(HELM) template elasticsearch-cluster deploy/elasticsearch-cluster > test/e2e/testdata/smoketest/elasticsearch/00_elasticsearchcluster.yaml
+else ifeq ($(TEST_TYPE), llm)
+	$(HELM) dependency build deploy/llm-cluster --skip-refresh
+	$(HELM) upgrade --install llm deploy/llm
+	$(HELM) template llm-cluster deploy/llm-cluster > test/e2e/testdata/smoketest/llm/00_llmcluster.yaml
+else ifeq ($(TEST_TYPE), tdengine)
+	$(HELM) dependency build deploy/tdengine-cluster --skip-refresh
+	$(HELM) upgrade --install tdengine deploy/tdengine
+	$(HELM) template td-cluster deploy/tdengine-cluster > test/e2e/testdata/smoketest/tdengine/00_tdenginecluster.yaml
+else ifeq ($(TEST_TYPE), milvus)
+	$(HELM) dependency build deploy/milvus-cluster --skip-refresh
+	$(HELM) upgrade --install milvus deploy/milvus
+	$(HELM) template milvus-cluster deploy/milvus-cluster > test/e2e/testdata/smoketest/milvus/00_milvuscluster.yaml
+else ifeq ($(TEST_TYPE), clickhouse)
+	$(HELM) dependency build deploy/clickhouse-cluster --skip-refresh
+	$(HELM) upgrade --install clickhouse deploy/clickhouse
+	$(HELM) template c-cluster deploy/clickhouse-cluster > test/e2e/testdata/smoketest/clickhouse/00_clickhousecluster.yaml
 else
 	$(error "test type does not exist")
 endif
@@ -731,6 +755,16 @@ else ifeq ($(TEST_TYPE), mysql-57)
 	$(HELM) upgrade --install mysql deploy/mysql
 else ifeq ($(TEST_TYPE), polardbx)
 	$(HELM) upgrade --install polardbx deploy/polardbx
+else ifeq ($(TEST_TYPE), opensearch)
+	$(HELM) upgrade --install opensearch deploy/opensearch
+else ifeq ($(TEST_TYPE), elasticsearch)
+	$(HELM) upgrade --install elasticsearch deploy/elasticsearch
+else ifeq ($(TEST_TYPE), llm)
+	$(HELM) upgrade --install llm deploy/llm
+else ifeq ($(TEST_TYPE), milvus)
+	$(HELM) upgrade --install milvus deploy/milvus
+else ifeq ($(TEST_TYPE), clickhouse)
+	$(HELM) upgrade --install milvus deploy/clickhouse
 else
 	$(error "test type does not exist")
 endif

@@ -1,0 +1,94 @@
+---
+# Source: clickhouse-cluster/templates/rbac.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kb-c-cluster
+  namespace: default
+  labels:
+    helm.sh/chart: clickhouse-cluster-0.7.0-alpha.0
+    app.kubernetes.io/version: "22.9.4"
+    app.kubernetes.io/instance: c-cluster
+---
+# Source: clickhouse-cluster/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kb-c-cluster
+  labels:
+    helm.sh/chart: clickhouse-cluster-0.7.0-alpha.0
+    app.kubernetes.io/version: "22.9.4"
+    app.kubernetes.io/instance: c-cluster
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubeblocks-volume-protection-pod-role
+subjects:
+  - kind: ServiceAccount
+    name: kb-c-cluster
+    namespace: default
+---
+# Source: clickhouse-cluster/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kb-c-cluster
+  labels:
+    helm.sh/chart: clickhouse-cluster-0.7.0-alpha.0
+    app.kubernetes.io/version: "22.9.4"
+    app.kubernetes.io/instance: c-cluster
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubeblocks-cluster-pod-role
+subjects:
+  - kind: ServiceAccount
+    name: kb-c-cluster
+    namespace: default
+---
+# Source: clickhouse-cluster/templates/cluster.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: c-cluster-clickhouse-cluster
+  labels: 
+    helm.sh/chart: clickhouse-cluster-0.7.0-alpha.0
+    app.kubernetes.io/name: clickhouse-cluster
+    app.kubernetes.io/instance: c-cluster
+    app.kubernetes.io/version: "22.9.4"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  clusterDefinitionRef: clickhouse  # ref clusterdefinition.name
+  clusterVersionRef: clickhouse-22.9.4 # ref clusterversion.name
+  terminationPolicy: Halt
+  affinity:
+    topologyKeys: 
+      - kubernetes.io/hostname
+  componentSpecs:
+    - name: shard-0
+      componentDefRef: clickhouse
+      monitor: false
+      serviceType: ClusterIP
+      replicas: 2
+      serviceAccountName: kb-c-cluster-clickhouse-cluster
+---
+# Source: clickhouse-cluster/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "c-cluster-clickhouse-cluster-test-connection"
+  labels:
+    helm.sh/chart: clickhouse-cluster-0.7.0-alpha.0
+    app.kubernetes.io/name: clickhouse-cluster
+    app.kubernetes.io/instance: c-cluster
+    app.kubernetes.io/version: "22.9.4"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['c-cluster-clickhouse-cluster:']
+  restartPolicy: Never

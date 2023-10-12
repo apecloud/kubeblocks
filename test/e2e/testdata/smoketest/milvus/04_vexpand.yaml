@@ -1,0 +1,20 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: milvus-cluster-vexpand-
+spec:
+  clusterRef: milvus-cluster
+  type: VolumeExpansion
+  volumeExpansion:
+    - componentName: milvus
+      volumeClaimTemplates:
+        - name: data
+          storage: "15Gi"
+    - componentName: etcd
+      volumeClaimTemplates:
+        - name: data
+          storage: "15Gi"
+    - componentName: minio
+      volumeClaimTemplates:
+        - name: data
+          storage: "15Gi"

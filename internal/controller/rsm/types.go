@@ -80,7 +80,10 @@ const (
 	shell2httpServePath           = "/role"
 	defaultRoleProbeAgentImage    = "apecloud/kubeblocks-tools:latest"
 	defaultRoleProbeDaemonPort    = 7373
-	roleProbeURI                  = "/v1.0/bindings/custom?operation=checkRole"
+	defaultRoleProbeGRPCPort      = 50001
+	roleProbeGRPCPortName         = "probe-grpc-port"
+	grpcHealthProbeBinaryPath     = "/bin/grpc_health_probe"
+	grpcHealthProbeArgsFormat     = "-addr=:%d"
 	defaultActionImage            = "busybox:latest"
 	usernameCredentialVarName     = "KB_RSM_USERNAME"
 	passwordCredentialVarName     = "KB_RSM_PASSWORD"

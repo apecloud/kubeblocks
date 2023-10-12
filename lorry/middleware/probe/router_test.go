@@ -34,18 +34,6 @@ import (
 	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
-func TestGetCharacter(t *testing.T) {
-	t.Run("Wrong Prefix", func(t *testing.T) {
-		character := GetCharacter("/v2.0/bindings/mysql")
-		assert.Equal(t, "", character)
-	})
-
-	t.Run("mysql", func(t *testing.T) {
-		character := GetCharacter("/v1.0/bindings/mysql")
-		assert.Equal(t, "mysql", character)
-	})
-}
-
 func TestGetRouter(t *testing.T) {
 	t.Run("Use Custom to get role", func(t *testing.T) {
 		s := httptest.NewServer(
@@ -105,5 +93,5 @@ func emptyConfig() map[string]component.Properties {
 
 func mockRegister() error {
 	component.Name2Property = emptyConfig()
-	return RegisterBuiltin()
+	return RegisterBuiltin("custom")
 }

@@ -259,9 +259,9 @@ func (r *restoreJobBuilder) builderRestoreJobName(jobIndex int) string {
 }
 
 // build the restore job by this builder.
-func (r *restoreJobBuilder) build(jobIndex int) *batchv1.Job {
+func (r *restoreJobBuilder) build() *batchv1.Job {
 	if r.jobName == "" {
-		r.jobName = r.builderRestoreJobName(jobIndex)
+		r.jobName = r.builderRestoreJobName(0)
 	}
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{

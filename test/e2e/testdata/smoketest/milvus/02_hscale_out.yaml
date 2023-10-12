@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: milvus-cluster-hscale-out-
+spec:
+  clusterRef: milvus-cluster
+  type: HorizontalScaling
+  horizontalScaling:
+    - componentName: milvus
+      replicas: 2
+    - componentName: minio
+      replicas: 2

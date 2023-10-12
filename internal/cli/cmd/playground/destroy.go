@@ -66,14 +66,11 @@ type destroyOptions struct {
 	purge       bool
 	// timeout represents the timeout for the destruction process.
 	timeout time.Duration
-	// apiTimeout represents the timeout for interactions with the K8s API server.
-	apiTimeout time.Duration
 }
 
 func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	o := &destroyOptions{
-		IOStreams:  streams,
-		apiTimeout: 5 * time.Second,
+		IOStreams: streams,
 	}
 	cmd := &cobra.Command{
 		Use:     "destroy",
@@ -227,12 +224,11 @@ func (o *destroyOptions) deleteClustersAndUninstallKB() error {
 // delete all clusters created by KubeBlocks
 func (o *destroyOptions) deleteClusters(dynamic dynamic.Interface) error {
 	var err error
-	ctx, cancel := context.WithTimeout(context.Background(), o.apiTimeout)
-	defer cancel()
+	ctx := context.Background()
 	// get all clusters in all namespaces
 	getClusters := func() (*unstructured.UnstructuredList, error) {
 		return dynamic.Resource(types.ClusterGVR()).Namespace(metav1.NamespaceAll).
-			List(ctx, metav1.ListOptions{})
+			List(context.Background(), metav1.ListOptions{})
 	}
 
 	// get all clusters and check if satisfy the checkFn

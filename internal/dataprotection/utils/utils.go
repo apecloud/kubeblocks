@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -135,8 +136,49 @@ func MergeEnv(originalEnv, targetEnv []corev1.EnvVar) []corev1.EnvVar {
 	return originalEnv
 }
 
-func VolumeSnapshotEnabled() bool {
-	return viper.GetBool("VOLUMESNAPSHOT")
+// VolumeSnapshotEnabled checks if the volumes support snapshot.
+func VolumeSnapshotEnabled(ctx context.Context, cli client.Client, pod *corev1.Pod, volumes []string) (bool, error) {
+	if pod == nil {
+		return false, nil
+	}
+	var pvcNames []string
+	// get the pvcs by volumes
+	for _, v := range pod.Spec.Volumes {
+		for i := range volumes {
+			if v.Name != volumes[i] {
+				continue
+			}
+			if v.PersistentVolumeClaim == nil {
+				return false, fmt.Errorf(`the type of volume "%s" is not PersistentVolumeClaim on pod "%s"`, v.Name, pod.Name)
+			}
+			pvcNames = append(pvcNames, v.PersistentVolumeClaim.ClaimName)
+		}
+	}
+	if len(pvcNames) == 0 {
+		return false, fmt.Errorf(`can not find any volume by targetVolumes %v on pod "%s"`, volumes, pod.Name)
+	}
+	// get the storageClass by pvc
+	storageClassMap := map[string]string{}
+	for i := range pvcNames {
+		pvc := &corev1.PersistentVolumeClaim{}
+		if err := cli.Get(ctx, types.NamespacedName{Name: pvcNames[i], Namespace: pod.Namespace}, pvc); err != nil {
+			return false, nil
+		}
+		if pvc.Spec.StorageClassName == nil {
+			return false, nil
+		}
+		storageClassMap[*pvc.Spec.StorageClassName] = pvcNames[i]
+	}
+	for k := range storageClassMap {
+		enabled, err := intctrlutil.IsVolumeSnapshotEnabled(ctx, cli, k)
+		if err != nil {
+			return false, err
+		}
+		if !enabled {
+			return false, fmt.Errorf(`cannot find any VolumeSnapshotClass of persistentVolumeClaim "%s" to do volume snapshot on pod "%s"`, storageClassMap[k], pod.Name)
+		}
+	}
+	return true, nil
 }
 
 func SetControllerReference(owner, controlled metav1.Object, scheme *runtime.Scheme) error {

@@ -524,7 +524,6 @@ spec:
                       to connect to the target database cluster.
                     properties:
                       hostKey:
-                        default: host
                         description: hostKey specifies the map key of the host in
                           the connection credential secret.
                         type: string
@@ -534,7 +533,6 @@ spec:
                           in the connection credential secret.
                         type: string
                       portKey:
-                        default: port
                         description: portKey specifies the map key of the port in
                           the connection credential secret.
                         type: string

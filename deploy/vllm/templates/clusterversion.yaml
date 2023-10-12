@@ -16,7 +16,27 @@ spec:
               - name: MODEL_NAME
                 value: baichuan-inc/Baichuan-13B-Chat
               - name: EXTRA_ARGS
-                value: "--trust-remote-code --gpu-memory-utilization 0.95"
+                value: "--trust-remote-code"
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: vllm-baichuan2-13b
+  labels:
+    {{- include "llm.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: vllm
+  componentVersions:
+    - componentDefRef: vllm
+      versionsContext:
+        containers:
+          - name: vllm
+            image:  {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository}}:{{ default .Chart.AppVersion .Values.image.tag }}
+            env:
+              - name: MODEL_NAME
+                value: baichuan-inc/Baichuan2-13B-Chat
+              - name: EXTRA_ARGS
+                value: "--trust-remote-code"
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
@@ -35,6 +55,26 @@ spec:
             env:
               - name: MODEL_NAME
                 value: baichuan-inc/Baichuan-7B
+              - name: EXTRA_ARGS
+                value: "--trust-remote-code"
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: vllm-baichuan2-7b
+  labels:
+    {{- include "llm.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: vllm
+  componentVersions:
+    - componentDefRef: vllm
+      versionsContext:
+        containers:
+          - name: vllm
+            image:  {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository}}:{{ default .Chart.AppVersion .Values.image.tag }}
+            env:
+              - name: MODEL_NAME
+                value: baichuan-inc/Baichuan2-7B-Chat
               - name: EXTRA_ARGS
                 value: "--trust-remote-code"
 ---
@@ -96,4 +136,4 @@ spec:
               - name: MODEL_NAME
                 value: upstage/SOLAR-0-70b-16bit
               - name: EXTRA_ARGS
-                value: "--trust-remote-code --swap-space 1 --gpu-memory-utilization 0.95"
+                value: "--trust-remote-code --swap-space 1"

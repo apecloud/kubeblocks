@@ -1,0 +1,11 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: elasticsearch-cluster-stop-
+spec:
+  clusterRef: elasticsearch-cluster
+  ttlSecondsAfterSucceed: 27017
+  type: Stop
+  restart:
+    - componentName: elasticsearch
+    - componentName: metrics

@@ -59,6 +59,8 @@ const (
 	Class1c1gName                 = "general-1c1g"
 	Class2c4gName                 = "general-2c4g"
 	DefaultResourceConstraintName = "kb-resource-constraint"
+
+	StogrageClassName = "test-sc"
 )
 
 var (

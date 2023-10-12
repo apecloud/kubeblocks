@@ -92,6 +92,8 @@ var CSIDriverSignature = func(_ storagev1.CSIDriver, _ *storagev1.CSIDriver, _ s
 
 var VolumeSnapshotSignature = func(_ snapshotv1.VolumeSnapshot, _ *snapshotv1.VolumeSnapshot, _ snapshotv1.VolumeSnapshotList, _ *snapshotv1.VolumeSnapshotList) {
 }
+var VolumeSnapshotClassSignature = func(_ snapshotv1.VolumeSnapshotClass, _ *snapshotv1.VolumeSnapshotClass, _ snapshotv1.VolumeSnapshotClassList, _ *snapshotv1.VolumeSnapshotClassList) {
+}
 
 var ClusterSignature = func(_ appsv1alpha1.Cluster, _ *appsv1alpha1.Cluster, _ appsv1alpha1.ClusterList, _ *appsv1alpha1.ClusterList) {
 }

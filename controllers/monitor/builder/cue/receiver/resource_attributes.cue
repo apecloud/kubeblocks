@@ -16,8 +16,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 output:
-  resource_attributes:
-    pod: {
+  resource_attributes: {
+  	pod: {
     	app_kubernetes_io_component: "`labels[\"app.kubernetes.io/component\"]`"
 	    app_kubernetes_io_instance: "`labels[\"app.kubernetes.io/instance\"]`"
 	    app_kubernetes_io_managed_by: "`labels[\"app.kubernetes.io/managed-by\"]`"
@@ -37,3 +37,5 @@ output:
       hostname: "`hostname`"
       job: "oteld-system"
 	  }
+  }
+

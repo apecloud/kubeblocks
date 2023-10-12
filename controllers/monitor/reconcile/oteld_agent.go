@@ -86,7 +86,7 @@ func buildDaemonsetForOteld(config *types.Config, instance *types.OteldInstance,
 		constant.AppManagedByLabelKey: constant.AppName,
 		constant.AppNameLabelKey:      OTeldName,
 		constant.AppInstanceLabelKey:  name,
-		constant.MonitorManagedByKey:  "agamotto",
+		constant.MonitorManagedByKey:  "oteld",
 	}
 
 	labelSelector := &metav1.LabelSelector{

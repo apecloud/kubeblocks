@@ -63,6 +63,14 @@ type GraphWriter interface {
 	// IsNooped tells whether this obj is nooped.
 	IsNooped(dag *graph.DAG, obj client.Object) bool
 
+	// Do does 'action' to 'obj'.
+	// WARN: this is a rather low-level API, will be refactored out in near future, avoid to use it.
+	Do(dag *graph.DAG, obj client.Object, action *Action)
+
+	// IsNilAction tells whether the action field of the corresponding vertex of the given obj is nil.
+	// WARN: this is a rather low-level API, will be refactored out in near future, avoid to use it.
+	IsNilAction(dag *graph.DAG, obj client.Object) bool
+
 	// DependOn setups dependencies between 'object' and 'dependency',
 	// which will guarantee the Write Order to the K8s cluster of these objects.
 	// if multiple vertices exist(which can occur when ForceNewVertexOption being used), the one with the largest depth will be used.
@@ -84,12 +92,18 @@ type realGraphClient struct {
 }
 
 func (r *realGraphClient) Root(dag *graph.DAG, objOld, objNew client.Object) {
-	root := &ObjectVertex{
-		Obj:    objNew,
-		OriObj: objOld,
-		Action: ActionStatusPtr(),
+	// find root vertex if already exists
+	root := r.findMatchedVertex(dag, objNew, false)
+	// create one if root vertex not found
+	if root == nil {
+		root = &ObjectVertex{
+			Obj:    objNew,
+			OriObj: objOld,
+			Action: ActionStatusPtr(),
+		}
+		dag.AddVertex(root)
 	}
-	dag.AddVertex(root)
+	// setup dependencies
 	for _, vertex := range dag.Vertices() {
 		if vertex != root {
 			dag.Connect(root, vertex)
@@ -122,7 +136,7 @@ func (r *realGraphClient) Noop(dag *graph.DAG, obj client.Object) {
 }
 
 func (r *realGraphClient) IsNooped(dag *graph.DAG, obj client.Object) bool {
-	vertex := r.findMatchedVertex(dag, obj)
+	vertex := r.findMatchedVertex(dag, obj, true)
 	if vertex == nil {
 		return false
 	}
@@ -133,8 +147,30 @@ func (r *realGraphClient) IsNooped(dag *graph.DAG, obj client.Object) bool {
 	return *v.Action == NOOP
 }
 
+func (r *realGraphClient) Do(dag *graph.DAG, obj client.Object, action *Action) {
+	vertex := r.findMatchedVertex(dag, obj, false)
+	if vertex == nil {
+		vertex = &ObjectVertex{
+			Obj:    obj,
+			Action: action,
+		}
+		dag.AddVertex(vertex)
+	}
+	v, _ := vertex.(*ObjectVertex)
+	v.Action = action
+}
+
+func (r *realGraphClient) IsNilAction(dag *graph.DAG, obj client.Object) bool {
+	vertex := r.findMatchedVertex(dag, obj, false)
+	if vertex == nil {
+		return true
+	}
+	v, _ := vertex.(*ObjectVertex)
+	return v.Action == nil
+}
+
 func (r *realGraphClient) DependOn(dag *graph.DAG, object client.Object, dependency ...client.Object) {
-	objectVertex := r.findMatchedVertex(dag, object)
+	objectVertex := r.findMatchedVertex(dag, object, true)
 	if objectVertex == nil {
 		return
 	}
@@ -142,7 +178,7 @@ func (r *realGraphClient) DependOn(dag *graph.DAG, object client.Object, depende
 		if d == nil {
 			continue
 		}
-		v := r.findMatchedVertex(dag, d)
+		v := r.findMatchedVertex(dag, d, true)
 		if v != nil {
 			dag.Connect(objectVertex, v)
 		}
@@ -158,12 +194,18 @@ func (r *realGraphClient) FindAll(dag *graph.DAG, obj interface{}, opts ...Graph
 		}
 		return true
 	}()
+	assignableTo := func(src, dst reflect.Type) bool {
+		if dst == nil {
+			return src == nil
+		}
+		return src.AssignableTo(dst)
+	}
 	objType := reflect.TypeOf(obj)
 	objects := make([]client.Object, 0)
 	for _, vertex := range dag.Vertices() {
 		v, _ := vertex.(*ObjectVertex)
 		vertexType := reflect.TypeOf(v.Obj)
-		if vertexType.AssignableTo(objType) == hasSameType {
+		if assignableTo(vertexType, objType) == hasSameType {
 			objects = append(objects, v.Obj)
 		}
 	}
@@ -179,7 +221,7 @@ func (r *realGraphClient) doWrite(dag *graph.DAG, objOld, objNew client.Object, 
 		}
 		return false
 	}()
-	vertex := r.findMatchedVertex(dag, objNew)
+	vertex := r.findMatchedVertex(dag, objNew, true)
 	switch {
 	case vertex != nil && !forceNewVertex:
 		objVertex, _ := vertex.(*ObjectVertex)
@@ -197,32 +239,46 @@ func (r *realGraphClient) doWrite(dag *graph.DAG, objOld, objNew client.Object, 
 	}
 }
 
-func (r *realGraphClient) findMatchedVertex(dag *graph.DAG, object client.Object) graph.Vertex {
+func (r *realGraphClient) findMatchedVertex(dag *graph.DAG, object client.Object, deepest bool) graph.Vertex {
 	keyLookFor, err := GetGVKName(object)
 	if err != nil {
 		return nil
 	}
 
-	var found graph.Vertex
-	findVertex := func(v graph.Vertex) error {
-		if found != nil {
+	if deepest {
+		var found graph.Vertex
+		findVertex := func(v graph.Vertex) error {
+			if found != nil {
+				return nil
+			}
+			ov, _ := v.(*ObjectVertex)
+			key, err := GetGVKName(ov.Obj)
+			if err != nil {
+				return err
+			}
+			if *keyLookFor == *key {
+				found = v
+			}
 			return nil
 		}
-		ov, _ := v.(*ObjectVertex)
-		key, err := GetGVKName(ov.Obj)
+		err = dag.WalkReverseTopoOrder(findVertex, nil)
 		if err != nil {
-			return err
+			return nil
+		}
+		return found
+	}
+
+	for _, vertex := range dag.Vertices() {
+		v, _ := vertex.(*ObjectVertex)
+		key, err := GetGVKName(v.Obj)
+		if err != nil {
+			return nil
 		}
 		if *keyLookFor == *key {
-			found = v
+			return vertex
 		}
-		return nil
 	}
-	err = dag.WalkReverseTopoOrder(findVertex, nil)
-	if err != nil {
-		return nil
-	}
-	return found
+	return nil
 }
 
 var _ GraphClient = &realGraphClient{}

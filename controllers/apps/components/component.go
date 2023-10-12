@@ -22,7 +22,6 @@ package components
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
 	"reflect"
 	"strconv"
 	"strings"
@@ -53,6 +52,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 	rsmcore "github.com/apecloud/kubeblocks/internal/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
@@ -158,22 +158,14 @@ func (c *rsmComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	}
 }
 
-func (c *rsmComponent) setWorkload(obj client.Object, action *model.Action, parent client.Object) {
+func (c *rsmComponent) setWorkload(obj client.Object, action *model.Action) {
+	c.workload = obj
 	graphCli := model.NewGraphClient(c.Client)
 	// set workload object as root vertex
 	graphCli.Root(c.dag, obj, obj)
-	c.workload = c.addResource(obj, action, parent)
-}
-
-func (c *rsmComponent) addResource(obj client.Object, action *model.Action,
-	parent client.Object) client.Object {
-	if obj == nil {
-		panic("try to add nil object")
-	}
 	if action == nil {
-		panic("object action should be set")
+		return
 	}
-	graphCli := model.NewGraphClient(c.Client)
 	switch *action {
 	case model.CREATE:
 		graphCli.Create(c.dag, obj)
@@ -184,7 +176,15 @@ func (c *rsmComponent) addResource(obj client.Object, action *model.Action,
 	case model.NOOP:
 		graphCli.Noop(c.dag, obj)
 	}
+}
 
+func (c *rsmComponent) addResource(obj client.Object, action *model.Action,
+	parent client.Object) client.Object {
+	if obj == nil {
+		panic("try to add nil object")
+	}
+	graphCli := model.NewGraphClient(c.Client)
+	graphCli.Do(c.dag, obj, action)
 	if parent != nil {
 		graphCli.DependOn(c.dag, parent, obj)
 	}
@@ -393,19 +393,16 @@ func (c *rsmComponent) status(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 
 // validateObjectsAction validates the action of objects in dag has been determined.
 func (c *rsmComponent) validateObjectsAction() error {
-	for _, v := range c.dag.Vertices() {
-		node, ok := v.(*model.ObjectVertex)
-		if !ok {
-			return fmt.Errorf("unexpected vertex type, cluster: %s, component: %s, vertex: %T",
-				c.GetClusterName(), c.GetName(), v)
+	graphCli := model.NewGraphClient(c.Client)
+	objects := graphCli.FindAll(c.dag, nil, model.HaveDifferentTypeWithOption)
+	for _, object := range objects {
+		if object == nil {
+			return fmt.Errorf("unexpected nil object, cluster: %s, component: %s",
+				c.GetClusterName(), c.GetName())
 		}
-		if node.Obj == nil {
-			return fmt.Errorf("unexpected nil vertex object, cluster: %s, component: %s, vertex: %T",
-				c.GetClusterName(), c.GetName(), v)
-		}
-		if node.Action == nil {
-			return fmt.Errorf("unexpected nil vertex action, cluster: %s, component: %s, vertex: %T",
-				c.GetClusterName(), c.GetName(), v)
+		if graphCli.IsNilAction(c.dag, object) {
+			return fmt.Errorf("unexpected nil vertex action, cluster: %s, component: %s, object: %T",
+				c.GetClusterName(), c.GetName(), object)
 		}
 	}
 	return nil
@@ -417,28 +414,23 @@ func (c *rsmComponent) resolveObjectsAction(reqCtx intctrlutil.RequestCtx, cli c
 	if err != nil {
 		return err
 	}
-	for _, v := range c.dag.Vertices() {
-		node, ok := v.(*model.ObjectVertex)
-		if !ok {
-			return fmt.Errorf("unexpected vertex type, cluster: %s, component: %s, vertex: %T",
-				c.GetClusterName(), c.GetName(), v)
+	graphCli := model.NewGraphClient(c.Client)
+	objects := graphCli.FindAll(c.dag, nil, model.HaveDifferentTypeWithOption)
+	for _, object := range objects {
+		if !graphCli.IsNilAction(c.dag, object) {
+			continue
 		}
-		if node.Action == nil {
-			if action, err := resolveObjectAction(snapshot, node, cli.Scheme()); err != nil {
-				return err
-			} else {
-				node.Action = action
-			}
+		if action, err := resolveObjectAction(snapshot, object, cli.Scheme()); err != nil {
+			return err
+		} else {
+			graphCli.Do(c.dag, object, action)
 		}
 	}
 	if c.GetCluster().IsStatusUpdating() {
-		graphCli := model.NewGraphClient(c.Client)
-		for _, vertex := range c.dag.Vertices() {
-			v, _ := vertex.(*model.ObjectVertex)
-			// TODO(refactor): fix me, this is a workaround for h-scaling to update stateful set.
-			if _, ok := v.Obj.(*appsv1.StatefulSet); !ok {
-				graphCli.Noop(c.dag, v.Obj)
-			}
+		// TODO(refactor): fix me, this is a workaround for h-scaling to update stateful set.
+		objects = graphCli.FindAll(c.dag, &workloads.ReplicatedStateMachine{}, model.HaveDifferentTypeWithOption)
+		for _, object := range objects {
+			graphCli.Noop(c.dag, object)
 		}
 	}
 	return c.validateObjectsAction()
@@ -1212,7 +1204,8 @@ func (c *rsmComponent) updateUnderlyingResources(reqCtx intctrlutil.RequestCtx, 
 func (c *rsmComponent) createWorkload() {
 	rsmProto := c.workload.(*workloads.ReplicatedStateMachine)
 	buildWorkLoadAnnotations(rsmProto, c.Cluster)
-	c.workload = rsmProto
+	graphCli := model.NewGraphClient(c.Client)
+	graphCli.Create(c.dag, c.workload)
 }
 
 func (c *rsmComponent) updateWorkload(rsmObj *workloads.ReplicatedStateMachine) bool {
@@ -1252,6 +1245,8 @@ func (c *rsmComponent) updateWorkload(rsmObj *workloads.ReplicatedStateMachine) 
 	}
 	if isTemplateUpdated || !reflect.DeepEqual(rsmObj.Annotations, rsmObjCopy.Annotations) {
 		c.workload = rsmObjCopy
+		graphCli := model.NewGraphClient(c.Client)
+		graphCli.Update(c.dag, nil, c.workload)
 		return true
 	}
 	return false
@@ -1518,8 +1513,8 @@ func readCacheSnapshot(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster
 	return snapshot, nil
 }
 
-func resolveObjectAction(snapshot clusterSnapshot, vertex *model.ObjectVertex, scheme *runtime.Scheme) (*model.Action, error) {
-	gvk, err := getGVKName(vertex.Obj, scheme)
+func resolveObjectAction(snapshot clusterSnapshot, obj client.Object, scheme *runtime.Scheme) (*model.Action, error) {
+	gvk, err := getGVKName(obj, scheme)
 	if err != nil {
 		return nil, err
 	}

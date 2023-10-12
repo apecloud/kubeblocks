@@ -208,7 +208,7 @@ func (b *rsmComponentWorkloadBuilder) Complete() error {
 		return fmt.Errorf("fail to create component workloads, cluster: %s, component: %s",
 			b.comp.GetClusterName(), b.comp.GetName())
 	}
-	b.comp.setWorkload(b.workload, b.defaultAction, nil)
+	b.comp.setWorkload(b.workload, b.defaultAction)
 	return nil
 }
 

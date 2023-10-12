@@ -850,7 +850,7 @@ func (c *rsmComponent) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli client.C
 			}
 			retainPV.Annotations[constant.PVLastClaimPolicyAnnotationKey] = string(pv.Spec.PersistentVolumeReclaimPolicy)
 			retainPV.Spec.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimRetain
-			graphCli.Patch(c.dag, pv, retainPV, model.ForceNewVertexOption)
+			graphCli.Patch(c.dag, pv, retainPV, model.ForceCreatingVertexOption)
 			graphCli.DependOn(c.dag, from, retainPV)
 			return retainPV
 		},
@@ -858,9 +858,9 @@ func (c *rsmComponent) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli client.C
 			// step 2: delete pvc, this will not delete pv because policy is 'retain'
 			removeFinalizerPVC := pvc.DeepCopy()
 			removeFinalizerPVC.SetFinalizers([]string{})
-			graphCli.Patch(c.dag, pvc, removeFinalizerPVC, model.ForceNewVertexOption)
+			graphCli.Patch(c.dag, pvc, removeFinalizerPVC, model.ForceCreatingVertexOption)
 			graphCli.DependOn(c.dag, from, removeFinalizerPVC)
-			graphCli.Delete(c.dag, removeFinalizerPVC, model.ForceNewVertexOption)
+			graphCli.Delete(c.dag, removeFinalizerPVC, model.ForceCreatingVertexOption)
 			graphCli.DependOn(c.dag, removeFinalizerPVC, removeFinalizerPVC)
 			return removeFinalizerPVC
 		},
@@ -871,14 +871,14 @@ func (c *rsmComponent) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli client.C
 				removeClaimRefPV.Spec.ClaimRef.UID = ""
 				removeClaimRefPV.Spec.ClaimRef.ResourceVersion = ""
 			}
-			graphCli.Patch(c.dag, pv, removeClaimRefPV, model.ForceNewVertexOption)
+			graphCli.Patch(c.dag, pv, removeClaimRefPV, model.ForceCreatingVertexOption)
 			graphCli.DependOn(c.dag, from, removeClaimRefPV)
 			return removeClaimRefPV
 		},
 		createPVCStep: func(from client.Object, step pvcRecreateStep) client.Object {
 			// step 4: create new pvc
 			newPVC.SetResourceVersion("")
-			graphCli.Create(c.dag, newPVC, model.ForceNewVertexOption)
+			graphCli.Create(c.dag, newPVC, model.ForceCreatingVertexOption)
 			graphCli.DependOn(c.dag, from, newPVC)
 			return newPVC
 		},
@@ -890,7 +890,7 @@ func (c *rsmComponent) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli client.C
 				policy = corev1.PersistentVolumeReclaimDelete
 			}
 			restorePV.Spec.PersistentVolumeReclaimPolicy = policy
-			graphCli.Patch(c.dag, pv, restorePV, model.ForceNewVertexOption)
+			graphCli.Patch(c.dag, pv, restorePV, model.ForceCreatingVertexOption)
 			graphCli.DependOn(c.dag, from, restorePV)
 			return restorePV
 		},

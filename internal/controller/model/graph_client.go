@@ -32,8 +32,8 @@ import (
 type GraphOption string
 
 const (
-	// ForceNewVertexOption forces the GraphWriter methods to create a new vertex even if the object already exists in the underlying DAG.
-	ForceNewVertexOption = "ForceNewVertex"
+	// ForceCreatingVertexOption forces the GraphWriter methods to create a new vertex even if the object already exists in the underlying DAG.
+	ForceCreatingVertexOption = "ForceCreatingVertex"
 
 	// ReplaceIfExistingOption tells the GraphWriter methods to replace Obj and OriObj with the given ones if already existing.
 	ReplaceIfExistingOption = "ReplaceIfExisting"
@@ -77,7 +77,7 @@ type GraphWriter interface {
 
 	// DependOn setups dependencies between 'object' and 'dependency',
 	// which will guarantee the Write Order to the K8s cluster of these objects.
-	// if multiple vertices exist(which can occur when ForceNewVertexOption being used), the one with the largest depth will be used.
+	// if multiple vertices exist(which can occur when ForceCreatingVertexOption being used), the one with the largest depth will be used.
 	DependOn(dag *graph.DAG, object client.Object, dependency ...client.Object)
 
 	// FindAll finds all objects that have same type with obj in the underlying DAG.
@@ -223,7 +223,7 @@ func (r *realGraphClient) doWrite(dag *graph.DAG, objOld, objNew client.Object, 
 	forceNewVertex, replaceExisting := func() (bool, bool) {
 		var force, replace bool
 		for _, opt := range opts {
-			if opt == ForceNewVertexOption {
+			if opt == ForceCreatingVertexOption {
 				force = true
 			}
 			if opt == ReplaceIfExistingOption {

@@ -22,6 +22,7 @@ package preflight
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 
 	analyzerunner "github.com/replicatedhq/troubleshoot/pkg/analyze"

@@ -28,10 +28,10 @@ import (
 
 	"github.com/go-errors/errors"
 
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	. "github.com/apecloud/kubeblocks/lorry/binding"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
-	. "github.com/apecloud/kubeblocks/lorry/binding"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/binding/custom"
 	"github.com/apecloud/kubeblocks/lorry/binding/etcd"
 	"github.com/apecloud/kubeblocks/lorry/binding/mongodb"

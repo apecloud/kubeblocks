@@ -24,7 +24,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"k8s.io/cli-runtime/pkg/genericiooptions"
-
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 

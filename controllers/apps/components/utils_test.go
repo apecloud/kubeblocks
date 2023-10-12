@@ -318,7 +318,7 @@ var _ = Describe("Component Utils", func() {
 					},
 				}).
 				GetObject()
-			resolvePodSpecDefaultFields(pod.Spec, &ppod.Spec)
+			ResolvePodSpecDefaultFields(pod.Spec, &ppod.Spec)
 			Expect(reflect.DeepEqual(pod.Spec, ppod.Spec)).Should(BeTrue())
 		})
 	})

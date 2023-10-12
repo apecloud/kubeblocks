@@ -20,8 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 type MockComponentFactory struct {
@@ -30,7 +31,7 @@ type MockComponentFactory struct {
 
 func NewComponentFactory(namespace, name, componentDefinition string) *MockComponentFactory {
 	f := &MockComponentFactory{}
-	f.init(namespace, name,
+	f.Init(namespace, name,
 		&appsv1alpha1.Component{
 			Spec: appsv1alpha1.ComponentSpec{
 				CompDef: componentDefinition,
@@ -40,58 +41,58 @@ func NewComponentFactory(namespace, name, componentDefinition string) *MockCompo
 }
 
 func (factory *MockComponentFactory) SetAffinity(affinity *appsv1alpha1.Affinity) *MockComponentFactory {
-	factory.get().Spec.Affinity = affinity
+	factory.Get().Spec.Affinity = affinity
 	return factory
 }
 
 func (factory *MockComponentFactory) SetToleration(toleration corev1.Toleration) *MockComponentFactory {
-	tolerations := factory.get().Spec.Tolerations
+	tolerations := factory.Get().Spec.Tolerations
 	if len(tolerations) == 0 {
 		tolerations = []corev1.Toleration{}
 	}
 	tolerations = append(tolerations, toleration)
-	factory.get().Spec.Tolerations = tolerations
+	factory.Get().Spec.Tolerations = tolerations
 	return factory
 }
 
 func (factory *MockComponentFactory) SetReplicas(replicas int32) *MockComponentFactory {
-	factory.get().Spec.Replicas = replicas
+	factory.Get().Spec.Replicas = replicas
 	return factory
 }
 
 func (factory *MockComponentFactory) SetServiceAccountName(serviceAccountName string) *MockComponentFactory {
-	factory.get().Spec.ServiceAccountName = serviceAccountName
+	factory.Get().Spec.ServiceAccountName = serviceAccountName
 	return factory
 }
 
 func (factory *MockComponentFactory) SetResources(resources corev1.ResourceRequirements) *MockComponentFactory {
-	factory.get().Spec.Resources = resources
+	factory.Get().Spec.Resources = resources
 	return factory
 }
 
 func (factory *MockComponentFactory) SetEnabledLogs(logName ...string) *MockComponentFactory {
-	factory.get().Spec.EnabledLogs = logName
+	factory.Get().Spec.EnabledLogs = logName
 	return factory
 }
 
 func (factory *MockComponentFactory) SetMonitor(monitor bool) *MockComponentFactory {
-	factory.get().Spec.Monitor = monitor
+	factory.Get().Spec.Monitor = monitor
 	return factory
 }
 
 func (factory *MockComponentFactory) SetTLS(tls bool) *MockComponentFactory {
-	factory.get().Spec.TLS = tls
+	factory.Get().Spec.TLS = tls
 	return factory
 }
 
 func (factory *MockComponentFactory) SetIssuer(issuer *appsv1alpha1.Issuer) *MockComponentFactory {
-	factory.get().Spec.Issuer = issuer
+	factory.Get().Spec.Issuer = issuer
 	return factory
 }
 
 func (factory *MockComponentFactory) AddVolumeClaimTemplate(volumeName string,
 	pvcSpec appsv1alpha1.PersistentVolumeClaimSpec) *MockComponentFactory {
-	factory.get().Spec.VolumeClaimTemplates = append(factory.get().Spec.VolumeClaimTemplates, appsv1alpha1.ClusterComponentVolumeClaimTemplate{
+	factory.Get().Spec.VolumeClaimTemplates = append(factory.Get().Spec.VolumeClaimTemplates, appsv1alpha1.ClusterComponentVolumeClaimTemplate{
 		Name: volumeName,
 		Spec: pvcSpec,
 	})

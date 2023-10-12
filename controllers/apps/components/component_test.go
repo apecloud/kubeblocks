@@ -372,7 +372,7 @@ var _ = Describe("Component", func() {
 
 			By("check all the log PVCs updated")
 			Eventually(func(g Gomega) {
-				objs, err := listObjWithLabelsInNamespace(testCtx.Ctx, testCtx.Cli, generics.PersistentVolumeClaimSignature, comp.GetNamespace(), labels)
+				objs, err := ListObjWithLabelsInNamespace(testCtx.Ctx, testCtx.Cli, generics.PersistentVolumeClaimSignature, comp.GetNamespace(), labels)
 				g.Expect(err).Should(Succeed())
 				g.Expect(objs).Should(HaveLen(int(spec().Replicas) * len(spec().VolumeClaimTemplates)))
 				for _, pvc := range objs {
@@ -394,7 +394,7 @@ var _ = Describe("Component", func() {
 
 			By("check all the PVCs unchanged")
 			Consistently(func(g Gomega) {
-				objs, err := listObjWithLabelsInNamespace(testCtx.Ctx, testCtx.Cli, generics.PersistentVolumeClaimSignature, comp.GetNamespace(), labels)
+				objs, err := ListObjWithLabelsInNamespace(testCtx.Ctx, testCtx.Cli, generics.PersistentVolumeClaimSignature, comp.GetNamespace(), labels)
 				g.Expect(err).Should(Succeed())
 				g.Expect(objs).Should(HaveLen(int(spec().Replicas) * len(spec().VolumeClaimTemplates)))
 				for _, pvc := range objs {
@@ -413,7 +413,7 @@ var _ = Describe("Component", func() {
 
 			By("check all the log PVCs updating")
 			Eventually(func(g Gomega) {
-				objs, err := listObjWithLabelsInNamespace(testCtx.Ctx, testCtx.Cli, generics.PersistentVolumeClaimSignature, comp.GetNamespace(), labels)
+				objs, err := ListObjWithLabelsInNamespace(testCtx.Ctx, testCtx.Cli, generics.PersistentVolumeClaimSignature, comp.GetNamespace(), labels)
 				g.Expect(err).Should(Succeed())
 				g.Expect(objs).Should(HaveLen(int(spec().Replicas) * len(spec().VolumeClaimTemplates)))
 				for _, pvc := range objs {
@@ -431,7 +431,7 @@ var _ = Describe("Component", func() {
 
 			By("check all the PVCs rolled-back")
 			Eventually(func(g Gomega) {
-				objs, err := listObjWithLabelsInNamespace(testCtx.Ctx, testCtx.Cli, generics.PersistentVolumeClaimSignature, comp.GetNamespace(), labels)
+				objs, err := ListObjWithLabelsInNamespace(testCtx.Ctx, testCtx.Cli, generics.PersistentVolumeClaimSignature, comp.GetNamespace(), labels)
 				g.Expect(err).Should(Succeed())
 				g.Expect(objs).Should(HaveLen(int(spec().Replicas) * len(spec().VolumeClaimTemplates)))
 				for _, pvc := range objs {

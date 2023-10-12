@@ -40,7 +40,7 @@ func NewComponentDefinitionFactory(name string) *MockComponentDefinitionFactory 
 
 func NewComponentDefinitionFactoryExt(name, provider, description, serviceKind, serviceVersion string) *MockComponentDefinitionFactory {
 	f := &MockComponentDefinitionFactory{}
-	f.init("", name,
+	f.Init("", name,
 		&appsv1alpha1.ComponentDefinition{
 			Spec: appsv1alpha1.ComponentDefinitionSpec{
 				Provider:       provider,
@@ -58,23 +58,23 @@ func (f *MockComponentDefinitionFactory) SetRuntime(container *corev1.Container)
 	if container == nil {
 		container = &defaultMySQLContainer
 	}
-	if f.get().Spec.Runtime.Containers == nil {
-		f.get().Spec.Runtime.Containers = make([]corev1.Container, 0)
+	if f.Get().Spec.Runtime.Containers == nil {
+		f.Get().Spec.Runtime.Containers = make([]corev1.Container, 0)
 	}
-	for i, it := range f.get().Spec.Runtime.Containers {
+	for i, it := range f.Get().Spec.Runtime.Containers {
 		if it.Name == container.Name {
-			f.get().Spec.Runtime.Containers[i] = *container
+			f.Get().Spec.Runtime.Containers[i] = *container
 			return f
 		}
 	}
-	f.get().Spec.Runtime.Containers = append(f.get().Spec.Runtime.Containers, *container)
+	f.Get().Spec.Runtime.Containers = append(f.Get().Spec.Runtime.Containers, *container)
 	return f
 }
 
 func (f *MockComponentDefinitionFactory) AddEnv(containerName string, envVar corev1.EnvVar) *MockComponentDefinitionFactory {
-	for i, c := range f.get().Spec.Runtime.Containers {
+	for i, c := range f.Get().Spec.Runtime.Containers {
 		if c.Name == containerName {
-			f.get().Spec.Runtime.Containers[i].Env = append(f.get().Spec.Runtime.Containers[i].Env, envVar)
+			f.Get().Spec.Runtime.Containers[i].Env = append(f.Get().Spec.Runtime.Containers[i].Env, envVar)
 			break
 		}
 	}
@@ -82,9 +82,9 @@ func (f *MockComponentDefinitionFactory) AddEnv(containerName string, envVar cor
 }
 
 func (f *MockComponentDefinitionFactory) AddVolumeMounts(containerName string, volumeMounts []corev1.VolumeMount) *MockComponentDefinitionFactory {
-	for i, c := range f.get().Spec.Runtime.Containers {
+	for i, c := range f.Get().Spec.Runtime.Containers {
 		if c.Name == containerName {
-			mergedAddVolumeMounts(&f.get().Spec.Runtime.Containers[i], volumeMounts)
+			mergedAddVolumeMounts(&f.Get().Spec.Runtime.Containers[i], volumeMounts)
 			break
 		}
 	}
@@ -97,10 +97,10 @@ func (f *MockComponentDefinitionFactory) AddVolume(name string, snapshot bool, w
 		NeedSnapshot:  snapshot,
 		HighWatermark: watermark,
 	}
-	if f.get().Spec.Volumes == nil {
-		f.get().Spec.Volumes = make([]appsv1alpha1.ComponentVolume, 0)
+	if f.Get().Spec.Volumes == nil {
+		f.Get().Spec.Volumes = make([]appsv1alpha1.ComponentVolume, 0)
 	}
-	f.get().Spec.Volumes = append(f.get().Spec.Volumes, vol)
+	f.Get().Spec.Volumes = append(f.Get().Spec.Volumes, vol)
 	return f
 }
 
@@ -120,10 +120,10 @@ func (f *MockComponentDefinitionFactory) AddServiceExt(name, serviceName string,
 		ServiceSpec:  serviceSpec,
 		RoleSelector: roleSelector,
 	}
-	if f.get().Spec.Services == nil {
-		f.get().Spec.Services = make([]appsv1alpha1.ComponentService, 0)
+	if f.Get().Spec.Services == nil {
+		f.Get().Spec.Services = make([]appsv1alpha1.ComponentService, 0)
 	}
-	f.get().Spec.Services = append(f.get().Spec.Services, svc)
+	f.Get().Spec.Services = append(f.Get().Spec.Services, svc)
 	return f
 }
 
@@ -139,10 +139,10 @@ func (f *MockComponentDefinitionFactory) AddConfigTemplate(name, configTemplateR
 		ConfigConstraintRef: configConstraintRef,
 		AsEnvFrom:           asEnvFrom,
 	}
-	if f.get().Spec.Configs == nil {
-		f.get().Spec.Configs = make([]appsv1alpha1.ComponentConfigSpec, 0)
+	if f.Get().Spec.Configs == nil {
+		f.Get().Spec.Configs = make([]appsv1alpha1.ComponentConfigSpec, 0)
 	}
-	f.get().Spec.Configs = append(f.get().Spec.Configs, config)
+	f.Get().Spec.Configs = append(f.Get().Spec.Configs, config)
 	return f
 }
 
@@ -151,15 +151,15 @@ func (f *MockComponentDefinitionFactory) AddLogConfig(name, filePathPattern stri
 		FilePathPattern: filePathPattern,
 		Name:            name,
 	}
-	if f.get().Spec.LogConfigs == nil {
-		f.get().Spec.LogConfigs = make([]appsv1alpha1.LogConfig, 0)
+	if f.Get().Spec.LogConfigs == nil {
+		f.Get().Spec.LogConfigs = make([]appsv1alpha1.LogConfig, 0)
 	}
-	f.get().Spec.LogConfigs = append(f.get().Spec.LogConfigs, logConfig)
+	f.Get().Spec.LogConfigs = append(f.Get().Spec.LogConfigs, logConfig)
 	return f
 }
 
 func (f *MockComponentDefinitionFactory) SetMonitor(builtIn bool, scrapePort intstr.IntOrString, scrapePath string) *MockComponentDefinitionFactory {
-	f.get().Spec.Monitor = &appsv1alpha1.MonitorConfig{
+	f.Get().Spec.Monitor = &appsv1alpha1.MonitorConfig{
 		BuiltIn: builtIn,
 		Exporter: &appsv1alpha1.ExporterConfig{
 			ScrapePort: scrapePort,
@@ -178,20 +178,20 @@ func (f *MockComponentDefinitionFactory) AddScriptTemplate(name, configTemplateR
 		VolumeName:  volumeName,
 		DefaultMode: mode,
 	}
-	if f.get().Spec.Scripts == nil {
-		f.get().Spec.Scripts = make([]appsv1alpha1.ComponentTemplateSpec, 0)
+	if f.Get().Spec.Scripts == nil {
+		f.Get().Spec.Scripts = make([]appsv1alpha1.ComponentTemplateSpec, 0)
 	}
-	f.get().Spec.Scripts = append(f.get().Spec.Scripts, script)
+	f.Get().Spec.Scripts = append(f.Get().Spec.Scripts, script)
 	return f
 }
 
 func (f *MockComponentDefinitionFactory) SetPolicyRules(rules []rbacv1.PolicyRule) *MockComponentDefinitionFactory {
-	f.get().Spec.PolicyRules = rules
+	f.Get().Spec.PolicyRules = rules
 	return f
 }
 
 func (f *MockComponentDefinitionFactory) SetLabels(labels map[string]appsv1alpha1.BuiltInString) *MockComponentDefinitionFactory {
-	f.get().Spec.Labels = labels
+	f.Get().Spec.Labels = labels
 	return f
 }
 
@@ -201,10 +201,10 @@ func (f *MockComponentDefinitionFactory) AddSystemAccount(accountName string, is
 		IsSystemInitAccount: isSystemInitAccount,
 		Statement:           statement,
 	}
-	if f.get().Spec.SystemAccounts == nil {
-		f.get().Spec.SystemAccounts = make([]appsv1alpha1.ComponentSystemAccount, 0)
+	if f.Get().Spec.SystemAccounts == nil {
+		f.Get().Spec.SystemAccounts = make([]appsv1alpha1.ComponentSystemAccount, 0)
 	}
-	f.get().Spec.SystemAccounts = append(f.get().Spec.SystemAccounts, account)
+	f.Get().Spec.SystemAccounts = append(f.Get().Spec.SystemAccounts, account)
 	return f
 }
 
@@ -215,15 +215,15 @@ func (f *MockComponentDefinitionFactory) AddConnectionCredential(name, serviceNa
 		PortName:    portName,
 		AccountName: accountName,
 	}
-	if f.get().Spec.ConnectionCredentials == nil {
-		f.get().Spec.ConnectionCredentials = make([]appsv1alpha1.ConnectionCredential, 0)
+	if f.Get().Spec.ConnectionCredentials == nil {
+		f.Get().Spec.ConnectionCredentials = make([]appsv1alpha1.ConnectionCredential, 0)
 	}
-	f.get().Spec.ConnectionCredentials = append(f.get().Spec.ConnectionCredentials, credential)
+	f.Get().Spec.ConnectionCredentials = append(f.Get().Spec.ConnectionCredentials, credential)
 	return f
 }
 
 func (f *MockComponentDefinitionFactory) SetUpdateStrategy(strategy *appsv1alpha1.UpdateStrategy) *MockComponentDefinitionFactory {
-	f.get().Spec.UpdateStrategy = strategy
+	f.Get().Spec.UpdateStrategy = strategy
 	return f
 }
 
@@ -233,20 +233,20 @@ func (f *MockComponentDefinitionFactory) AddRole(name string, serviceable, writa
 		Serviceable: serviceable,
 		Writable:    writable,
 	}
-	if f.get().Spec.Roles == nil {
-		f.get().Spec.Roles = make([]appsv1alpha1.ComponentReplicaRole, 0)
+	if f.Get().Spec.Roles == nil {
+		f.Get().Spec.Roles = make([]appsv1alpha1.ComponentReplicaRole, 0)
 	}
-	f.get().Spec.Roles = append(f.get().Spec.Roles, role)
+	f.Get().Spec.Roles = append(f.Get().Spec.Roles, role)
 	return f
 }
 
 func (f *MockComponentDefinitionFactory) SetRoleArbitrator(arbitrator *appsv1alpha1.ComponentRoleArbitrator) *MockComponentDefinitionFactory {
-	f.get().Spec.RoleArbitrator = arbitrator
+	f.Get().Spec.RoleArbitrator = arbitrator
 	return f
 }
 
 func (f *MockComponentDefinitionFactory) SetLifecycleAction(name string, val interface{}) *MockComponentDefinitionFactory {
-	obj := &f.get().Spec.LifecycleActions
+	obj := &f.Get().Spec.LifecycleActions
 	t := reflect.TypeOf(reflect.ValueOf(obj).Elem())
 	for i := 0; i < t.NumField(); i++ {
 		fieldName := t.Field(i).Name

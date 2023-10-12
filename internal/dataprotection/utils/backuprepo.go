@@ -61,10 +61,6 @@ func InjectDatasafedWithPVC(podSpec *corev1.PodSpec, pvcName string, mountPath s
 	}
 	envs := []corev1.EnvVar{
 		{
-			Name:  dptypes.DPDatasafedBackendBasePath,
-			Value: backupPath,
-		},
-		{
 			// force datasafed to use local backend with the path
 			Name:  dptypes.DPDatasafedLocalBackendPath,
 			Value: mountPath,
@@ -89,13 +85,7 @@ func InjectDatasafedWithConfig(podSpec *corev1.PodSpec, configSecretName string,
 		ReadOnly:  true,
 		MountPath: datasafedConfigMountPath,
 	}
-	envs := []corev1.EnvVar{
-		{
-			Name:  dptypes.DPDatasafedBackendBasePath,
-			Value: backupPath,
-		},
-	}
-	injectElements(podSpec, toSlice(volume), toSlice(volumeMount), envs)
+	injectElements(podSpec, toSlice(volume), toSlice(volumeMount), nil)
 	injectDatasafedInstaller(podSpec)
 }
 
@@ -144,22 +134,4 @@ func injectElements(podSpec *corev1.PodSpec, volumes []corev1.Volume, volumeMoun
 
 func toSlice[T any](s ...T) []T {
 	return s
-}
-
-func injectBackupRepoEnvs(podSpec *corev1.PodSpec, repo *dpv1alpha1.BackupRepo, repoVolumeMountPath string, backupPath string) {
-	envs := []corev1.EnvVar{{
-		Name:  dptypes.DPDatasafedBackendBasePath,
-		Value: backupPath,
-	}}
-	if repo.AccessByMount() {
-		// force datasafed to use local backend with the path
-		envs = append(envs, corev1.EnvVar{
-			Name:  dptypes.DPDatasafedLocalBackendPath,
-			Value: repoVolumeMountPath,
-		})
-	}
-	for i := range podSpec.Containers {
-		container := &podSpec.Containers[i]
-		container.Env = append(container.Env, envs...)
-	}
 }

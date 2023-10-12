@@ -323,7 +323,7 @@ func (r *BackupReconciler) handleBackupRepo(request *dpbackup.Request) error {
 		if err == nil {
 			request.BackupRepoPVC = pvc
 		}
-	case repo.AccessByMount():
+	case repo.AccessByTool():
 		toolConfigSecretName := repo.Status.ToolConfigSecretName
 		if toolConfigSecretName == "" {
 			return dperrors.NewToolConfigSecretNameIsEmpty(repo.Name)

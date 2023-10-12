@@ -148,32 +148,31 @@ func (d *Deleter) createDeleteBackupFilesJob(
 	// this script first deletes the directory where the backup is located (including files
 	// in the directory), and then traverses up the path level by level to clean up empty directories.
 	deleteScript := fmt.Sprintf(`
-		export PATH="$PATH:%s";
-		# unset the base path for datasafed, so that we can access to the upper folders
-		unset %s;
-		targetPath="%s";
+set -x
+export PATH="$PATH:$%s";
+targetPath="%s";
 
-		echo "removing backup files in ${targetPath}";
-		datasafed rm -r "${targetPath}";
+echo "removing backup files in ${targetPath}";
+datasafed rm -r "${targetPath}";
 
-		curr="${targetPath}";
-		while true; do
-			parent=$(dirname "${curr}");
-			if [ "${parent}" == "/" ]; then
-				echo "reach to root, done";
-				break;
-			fi;
-			result=$(datasafed list "${parent}");
-			if [ -z "$result" ]; then
-				echo "${parent} is empty, removing it...";
-				datasafed rmdir "${parent}";
-			else
-				echo "${parent} is not empty, done";
-				break;
-			fi;
-			curr="${parent}";
-		done
-	`, dptypes.DPDatasafedBinPath, dptypes.DPDatasafedBackendBasePath, backupFilePath)
+curr="${targetPath}";
+while true; do
+	parent=$(dirname "${curr}");
+	if [ "${parent}" == "/" ]; then
+		echo "reach to root, done";
+		break;
+	fi;
+	result=$(datasafed list "${parent}");
+	if [ -z "$result" ]; then
+		echo "${parent} is empty, removing it...";
+		datasafed rmdir "${parent}";
+	else
+		echo "${parent} is not empty, done";
+		break;
+	fi;
+	curr="${parent}";
+done
+	`, dptypes.DPDatasafedBinPath, backupFilePath)
 
 	runAsUser := int64(0)
 	container := corev1.Container{

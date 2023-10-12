@@ -108,8 +108,6 @@ const (
 	DPBaseBackupStartTimestamp = "BASE_BACKUP_START_TIMESTAMP" // base backup start timestamp for pitr
 	// DPBackupStopTime backup stop time
 	DPBackupStopTime = "BACKUP_STOP_TIME" // backup stop time
-	// DPDatasafedBackendBasePath the base path of the backend for datasafed
-	DPDatasafedBackendBasePath = "DATASAFED_BACKEND_BASE_PATH"
 	// DPDatasafedLocalBackendPath force datasafed to use local backend with the path
 	DPDatasafedLocalBackendPath = "DATASAFED_LOCAL_BACKEND_PATH"
 	// DPDatasafedBinPath the path containing the datasafed binary

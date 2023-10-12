@@ -38,11 +38,13 @@ import (
 )
 
 const (
-	BackupDataJobNamePrefix   = "dp-backup"
-	prebackupJobNamePrefix    = "dp-prebackup"
-	postbackupJobNamePrefix   = "dp-postbackup"
-	backupDataContainerName   = "backupdata"
-	syncProgressContainerName = "sync-progress"
+	BackupDataJobNamePrefix      = "dp-backup"
+	prebackupJobNamePrefix       = "dp-prebackup"
+	postbackupJobNamePrefix      = "dp-postbackup"
+	backupDataContainerName      = "backupdata"
+	syncProgressContainerName    = "sync-progress"
+	syncProgressSharedVolumeName = "sync-progress-shared-volume"
+	syncProgressSharedMountPath  = "/dp-sync-progress"
 )
 
 // Request is a request for a backup, with all references to other objects.
@@ -279,6 +281,14 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 				Value: targetPod.Name,
 			},
 			{
+				Name:  dptypes.DPBackupBasePath,
+				Value: BuildBackupPath(r.Backup, r.BackupPolicy.Spec.PathPrefix),
+			},
+			{
+				Name:  dptypes.DPBackupInfoFile,
+				Value: syncProgressSharedMountPath + "/" + backupInfoFileName,
+			},
+			{
 				Name:  dptypes.DPTTL,
 				Value: r.Spec.RetentionPeriod.String(),
 			},
@@ -291,11 +301,27 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 	}
 
 	buildVolumes := func() []corev1.Volume {
-		return getVolumesByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)
+		return append(
+			[]corev1.Volume{
+				{
+					Name: syncProgressSharedVolumeName,
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				},
+			},
+			getVolumesByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)...)
 	}
 
 	buildVolumeMounts := func() []corev1.VolumeMount {
-		return getVolumeMountsByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)
+		return append(
+			[]corev1.VolumeMount{
+				{
+					Name:      syncProgressSharedVolumeName,
+					MountPath: syncProgressSharedMountPath,
+				},
+			},
+			getVolumeMountsByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)...)
 	}
 
 	runAsUser := int64(0)
@@ -353,22 +379,6 @@ func (r *Request) injectSyncProgressContainer(podSpec *corev1.PodSpec,
 		return
 	}
 
-	// the backup info file will be written to this shared dir
-	sharedVolumeName := "dp-shared-syncprogress"
-	mountPath := "/dpsyncprogress"
-	volume := corev1.Volume{
-		Name: sharedVolumeName,
-		VolumeSource: corev1.VolumeSource{
-			EmptyDir: &corev1.EmptyDirVolumeSource{},
-		},
-	}
-	volumeMount := corev1.VolumeMount{
-		Name:      sharedVolumeName,
-		MountPath: mountPath,
-	}
-	podSpec.Volumes = append(podSpec.Volumes, volume)
-	podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, volumeMount)
-
 	// build container to sync backup progress that will update the backup status
 	container := podSpec.Containers[0].DeepCopy()
 	container.Name = syncProgressContainerName
@@ -384,10 +394,6 @@ func (r *Request) injectSyncProgressContainer(podSpec *corev1.PodSpec,
 		checkIntervalSeconds = *sync.IntervalSeconds
 	}
 	container.Env = append(container.Env,
-		corev1.EnvVar{
-			Name:  dptypes.DPBackupInfoFile,
-			Value: mountPath + "/" + backupInfoFileName,
-		},
 		corev1.EnvVar{
 			Name:  dptypes.DPCheckInterval,
 			Value: fmt.Sprintf("%d", checkIntervalSeconds)},

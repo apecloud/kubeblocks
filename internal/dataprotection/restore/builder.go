@@ -166,6 +166,12 @@ func (r *restoreJobBuilder) addCommonEnv() *restoreJobBuilder {
 	backupName := r.backupSet.Backup.Name
 	// add backupName env
 	r.env = []corev1.EnvVar{{Name: dptypes.DPBackupName, Value: backupName}}
+	// add mount path env of backup dir
+	filePath := r.backupSet.Backup.Status.Path
+	if filePath != "" {
+		r.env = append(r.env, corev1.EnvVar{Name: dptypes.DPBackupBasePath, Value: filePath})
+		// TODO: add continuous file path env
+	}
 	// add time env
 	actionSetEnv := r.backupSet.ActionSet.Spec.Env
 	timeFormat := getTimeFormat(r.backupSet.ActionSet.Spec.Env)

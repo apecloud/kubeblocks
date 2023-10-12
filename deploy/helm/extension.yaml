@@ -30,5 +30,6 @@ provider:
     email: "kubeblocks@apecloud.com"
     url: "https://kubeblocks.io/"
 icon: ./static/logo.svg
-screenshots: []
+screenshots:
+  - ./static/screenshot/kbcli.png
 installationMode: Multicluster

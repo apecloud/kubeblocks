@@ -61,6 +61,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
+	"github.com/apecloud/kubeblocks/internal/dataprotection/utils/boolptr"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
@@ -1403,13 +1405,19 @@ func (o *CreateOptions) buildBackupConfig(cls *appsv1alpha1.Cluster) error {
 
 	// must set backup method when set backup config in cli
 	if len(flags) > 0 {
-		var methodRequiredErr error
 		if o.BackupConfig == nil {
 			o.BackupConfig = &appsv1alpha1.ClusterBackup{}
 		}
-		// if the backup method is not exist and the user does not set the backup method, return error
+
+		// get default backup method and all backup methods
+		defaultBackupMethod, backupMethodsMap, err := getBackupMethodsFromBackupPolicyTemplates(o.Dynamic, o.ClusterDefRef)
+		if err != nil {
+			return err
+		}
+
+		// if backup method is empty in backup config, use the default backup method
 		if o.BackupConfig.Method == "" {
-			methodRequiredErr = fmt.Errorf("backup method is required, please use --backup-method to set it")
+			o.BackupConfig.Method = defaultBackupMethod
 		}
 
 		// if the flag is set by user, use the flag value
@@ -1420,8 +1428,10 @@ func (o *CreateOptions) buildBackupConfig(cls *appsv1alpha1.Cluster) error {
 			case "backup-retention-period":
 				o.BackupConfig.RetentionPeriod = dpv1alpha1.RetentionPeriod(o.BackupRetentionPeriod)
 			case "backup-method":
+				if _, ok := backupMethodsMap[o.BackupMethod]; !ok {
+					return fmt.Errorf("backup method %s is not supported, please view supported backup methods by \"kbcli cd describe %s\"", o.BackupMethod, o.ClusterDefRef)
+				}
 				o.BackupConfig.Method = o.BackupMethod
-				methodRequiredErr = nil
 			case "backup-cron-expression":
 				if _, err := cron.ParseStandard(o.BackupCronExpression); err != nil {
 					return fmt.Errorf("invalid cron expression: %s, please see https://en.wikipedia.org/wiki/Cron", o.BackupCronExpression)
@@ -1435,12 +1445,60 @@ func (o *CreateOptions) buildBackupConfig(cls *appsv1alpha1.Cluster) error {
 				o.BackupConfig.PITREnabled = &o.BackupPITREnabled
 			}
 		}
-		if methodRequiredErr != nil {
-			return methodRequiredErr
-		}
 	}
 
 	return nil
+}
+
+// get backup methods from backup policy template
+// if method's snapshotVolumes is true, use the method as default method
+func getBackupMethodsFromBackupPolicyTemplates(dynamic dynamic.Interface, clusterDefRef string) (string, map[string]struct{}, error) {
+	var backupPolicyTemplates []appsv1alpha1.BackupPolicyTemplate
+	var defaultBackupPolicyTemplate appsv1alpha1.BackupPolicyTemplate
+
+	obj, err := dynamic.Resource(types.BackupPolicyTemplateGVR()).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, clusterDefRef),
+	})
+	if err != nil {
+		return "", nil, err
+	}
+	for _, item := range obj.Items {
+		var backupPolicyTemplate appsv1alpha1.BackupPolicyTemplate
+		err = runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, &backupPolicyTemplate)
+		if err != nil {
+			return "", nil, err
+		}
+		backupPolicyTemplates = append(backupPolicyTemplates, backupPolicyTemplate)
+	}
+
+	if len(backupPolicyTemplates) == 0 {
+		return "", nil, fmt.Errorf("failed to find backup policy template for cluster definition %s", clusterDefRef)
+	}
+	// if there is only one backup policy template, use it as default backup policy template
+	if len(backupPolicyTemplates) == 1 {
+		defaultBackupPolicyTemplate = backupPolicyTemplates[0]
+	}
+	for _, backupPolicyTemplate := range backupPolicyTemplates {
+		if backupPolicyTemplate.Annotations[dptypes.DefaultBackupPolicyTemplateAnnotationKey] == annotationTrueValue {
+			defaultBackupPolicyTemplate = backupPolicyTemplate
+			break
+		}
+	}
+
+	var defaultBackupMethod string
+	var backupMethodsMap = make(map[string]struct{})
+	for _, policy := range defaultBackupPolicyTemplate.Spec.BackupPolicies {
+		for _, method := range policy.BackupMethods {
+			if boolptr.IsSetToTrue(method.SnapshotVolumes) {
+				defaultBackupMethod = method.Name
+			}
+			backupMethodsMap[method.Name] = struct{}{}
+		}
+	}
+	if defaultBackupMethod == "" {
+		return "", nil, fmt.Errorf("failed to find default backup method which snapshotVolumes is true, please check backup policy template for cluster definition %s", clusterDefRef)
+	}
+	return defaultBackupMethod, backupMethodsMap, nil
 }
 
 // parse the cluster component spec

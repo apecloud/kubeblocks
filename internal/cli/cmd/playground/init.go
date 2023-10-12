@@ -308,7 +308,7 @@ func (o *initOptions) cloud() error {
 	}
 
 	// install KubeBlocks and create a database cluster
-	klog.V(1).Info("starting install KubeBlocks in K8S cluster... ")
+	klog.V(1).Info("start to install KubeBlocks in K8S cluster... ")
 	return o.installKBAndCluster(clusterInfo)
 }
 
@@ -414,7 +414,7 @@ func (o *initOptions) installKBAndCluster(info *cp.K8sClusterInfo) error {
 	if err = o.installKubeBlocks(info.ClusterName); err != nil {
 		return errors.Wrap(err, "failed to install KubeBlocks")
 	}
-	klog.V(1).Info("KubeBlocks install successfully")
+	klog.V(1).Info("KubeBlocks installed successfully")
 	// install database cluster
 	clusterInfo := "ClusterDefinition: " + o.clusterDef
 	if o.clusterVersion != "" {

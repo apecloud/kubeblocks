@@ -92,7 +92,7 @@ kbcli cluster create [NAME] [flags]
       --backup string                          Set a source backup to restore data
       --backup-cron-expression string          the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
       --backup-enabled                         Specify whether enabled automated backup
-      --backup-method string                   the backup method, support: snapshot, backupTool (default "snapshot")
+      --backup-method string                   the backup method, view it by "kbcli cd describe <cluster-definition>", if not specified, the default backup method will be to take snapshots of the volume
       --backup-repo-name string                the backup repository name
       --backup-retention-period string         a time string ending with the 'd'|'D'|'h'|'H' character to describe how long the Backup should be retained (default "1d")
       --backup-starting-deadline-minutes int   the deadline in minutes for starting the backup job if it misses its scheduled time for any reason
@@ -112,11 +112,11 @@ kbcli cluster create [NAME] [flags]
       --restore-to-time string                 Set a time for point in time recovery
       --set stringArray                        Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)
   -f, --set-file string                        Use yaml file, URL, or stdin to set the cluster resource
-      --source-cluster string                  Set a source cluster for point in time recovery
       --tenancy string                         Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
       --termination-policy string              Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
       --tolerations strings                    Tolerations for cluster, such as "key=value:effect, key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'
       --topology-keys stringArray              Topology keys for affinity
+      --volume-restore-policy string           the volume claim restore policy, supported values: [Serial, Parallel] (default "Parallel")
 ```
 
 ### Options inherited from parent commands

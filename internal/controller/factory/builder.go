@@ -40,7 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -48,6 +48,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
 
 const (
@@ -603,7 +604,7 @@ func buildActionFromCharacterType(characterType string, isConsensus bool) []work
 			{
 				Image: "registry.cn-hangzhou.aliyuncs.com/apecloud/mongo:5.0.14",
 				Command: []string{
-					"Status=$(export CLIENT=`which mongosh>/dev/null&&echo mongosh||echo mongo`; $CLIENT -u $KB_RSM_USERNAME -p $KB_RSM_PASSWORD 127.0.0.1:27017 --quiet --eval \"JSON.stringify(rs.status())\") &&",
+					"Status=$(export CLIENT=`which mongosh>/dev/null&&echo mongosh||echo mongo`; $CLIENT -u $KB_RSM_USERNAME -p $KB_RSM_PASSWORD 127.0.0.1:27017 --authenticationDatabase admin --quiet --eval \"JSON.stringify(rs.status())\") &&",
 					"MyState=$(echo $Status | jq '.myState') &&",
 					"echo $Status | jq \".members[] | select(.state == ($MyState | tonumber)) | .stateStr\" |tr '[:upper:]' '[:lower:]' | xargs echo -n",
 				},
@@ -761,17 +762,17 @@ func BuildBackup(cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
 	backupPolicyName string,
 	backupKey types.NamespacedName,
-	backupType string) *dataprotectionv1alpha1.Backup {
+	backupMethod string) *dpv1alpha1.Backup {
 	return builder.NewBackupBuilder(backupKey.Namespace, backupKey.Name).
-		AddLabels(constant.BackupTypeLabelKeyKey, backupType).
+		AddLabels(dptypes.DataProtectionLabelBackupMethodKey, backupMethod).
+		AddLabels(dptypes.DataProtectionLabelBackupPolicyKey, backupPolicyName).
 		AddLabels(constant.KBManagedByKey, "cluster").
-		AddLabels("backuppolicies.dataprotection.kubeblocks.io/name", backupPolicyName).
 		AddLabels(constant.AppNameLabelKey, component.ClusterDefName).
 		AddLabels(constant.AppInstanceLabelKey, cluster.Name).
 		AddLabels(constant.AppManagedByLabelKey, constant.AppName).
 		AddLabels(constant.KBAppComponentLabelKey, component.Name).
 		SetBackupPolicyName(backupPolicyName).
-		SetBackType(dataprotectionv1alpha1.BackupType(backupType)).
+		SetBackupMethod(backupMethod).
 		GetObject()
 }
 
@@ -854,24 +855,6 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams,
 	}
 	intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
 	return container, nil
-}
-
-func BuildBackupManifestsJob(key types.NamespacedName, backup *dataprotectionv1alpha1.Backup, podSpec *corev1.PodSpec) *batchv1.Job {
-	spec := podSpec.DeepCopy()
-	spec.RestartPolicy = corev1.RestartPolicyNever
-	ctx := spec.SecurityContext
-	if ctx == nil {
-		ctx = &corev1.PodSecurityContext{}
-	}
-	user := int64(0)
-	ctx.RunAsUser = &user
-	spec.SecurityContext = ctx
-	return builder.NewJobBuilder(key.Namespace, key.Name).
-		AddLabels(constant.AppManagedByLabelKey, constant.AppName).
-		SetPodTemplateSpec(corev1.PodTemplateSpec{Spec: *spec}).
-		SetBackoffLimit(3).
-		SetTTLSecondsAfterFinished(10).
-		GetObject()
 }
 
 func BuildRestoreJob(cluster *appsv1alpha1.Cluster, synthesizedComponent *component.SynthesizedComponent, name, image string, command []string,

@@ -142,7 +142,7 @@ func buildAffinitiesAndTolerations(cluster *appsv1alpha1.Cluster, synthesizeComp
 	if synthesizeComp.PodSpec.Affinity, err = BuildPodAffinity(cluster, affinity, synthesizeComp); err != nil {
 		return err
 	}
-	synthesizeComp.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(cluster, affinity, synthesizeComp)
+	synthesizeComp.PodSpec.TopologySpreadConstraints = BuildPodTopologySpreadConstraints(cluster, affinity, synthesizeComp)
 	if synthesizeComp.PodSpec.Tolerations, err = BuildTolerations(cluster, comp.Spec.Tolerations); err != nil {
 		return err
 	}

@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -65,6 +65,8 @@ var SecretSignature = func(_ corev1.Secret, _ *corev1.Secret, _ corev1.SecretLis
 var ServiceSignature = func(_ corev1.Service, _ *corev1.Service, _ corev1.ServiceList, _ *corev1.ServiceList) {}
 var PersistentVolumeClaimSignature = func(_ corev1.PersistentVolumeClaim, _ *corev1.PersistentVolumeClaim, _ corev1.PersistentVolumeClaimList, _ *corev1.PersistentVolumeClaimList) {
 }
+var PersistentVolumeSignature = func(_ corev1.PersistentVolume, _ *corev1.PersistentVolume, _ corev1.PersistentVolumeList, _ *corev1.PersistentVolumeList) {
+}
 var PodSignature = func(_ corev1.Pod, _ *corev1.Pod, _ corev1.PodList, _ *corev1.PodList) {}
 var EventSignature = func(_ corev1.Event, _ *corev1.Event, _ corev1.EventList, _ *corev1.EventList) {}
 var ConfigMapSignature = func(_ corev1.ConfigMap, _ *corev1.ConfigMap, _ corev1.ConfigMapList, _ *corev1.ConfigMapList) {}
@@ -90,6 +92,8 @@ var CSIDriverSignature = func(_ storagev1.CSIDriver, _ *storagev1.CSIDriver, _ s
 
 var VolumeSnapshotSignature = func(_ snapshotv1.VolumeSnapshot, _ *snapshotv1.VolumeSnapshot, _ snapshotv1.VolumeSnapshotList, _ *snapshotv1.VolumeSnapshotList) {
 }
+var VolumeSnapshotClassSignature = func(_ snapshotv1.VolumeSnapshotClass, _ *snapshotv1.VolumeSnapshotClass, _ snapshotv1.VolumeSnapshotClassList, _ *snapshotv1.VolumeSnapshotClassList) {
+}
 
 var ClusterSignature = func(_ appsv1alpha1.Cluster, _ *appsv1alpha1.Cluster, _ appsv1alpha1.ClusterList, _ *appsv1alpha1.ClusterList) {
 }
@@ -106,16 +110,19 @@ var ConfigConstraintSignature = func(_ appsv1alpha1.ConfigConstraint, _ *appsv1a
 
 var BackupPolicyTemplateSignature = func(_ appsv1alpha1.BackupPolicyTemplate, _ *appsv1alpha1.BackupPolicyTemplate, _ appsv1alpha1.BackupPolicyTemplateList, _ *appsv1alpha1.BackupPolicyTemplateList) {
 }
-var BackupPolicySignature = func(_ dataprotectionv1alpha1.BackupPolicy, _ *dataprotectionv1alpha1.BackupPolicy, _ dataprotectionv1alpha1.BackupPolicyList, _ *dataprotectionv1alpha1.BackupPolicyList) {
+var BackupPolicySignature = func(_ dpv1alpha1.BackupPolicy, _ *dpv1alpha1.BackupPolicy, _ dpv1alpha1.BackupPolicyList, _ *dpv1alpha1.BackupPolicyList) {
 }
-var BackupSignature = func(_ dataprotectionv1alpha1.Backup, _ *dataprotectionv1alpha1.Backup, _ dataprotectionv1alpha1.BackupList, _ *dataprotectionv1alpha1.BackupList) {
+var BackupSignature = func(_ dpv1alpha1.Backup, _ *dpv1alpha1.Backup, _ dpv1alpha1.BackupList, _ *dpv1alpha1.BackupList) {
 }
-var BackupToolSignature = func(_ dataprotectionv1alpha1.BackupTool, _ *dataprotectionv1alpha1.BackupTool, _ dataprotectionv1alpha1.BackupToolList, _ *dataprotectionv1alpha1.BackupToolList) {
+var BackupScheduleSignature = func(_ dpv1alpha1.BackupSchedule, _ *dpv1alpha1.BackupSchedule, _ dpv1alpha1.BackupScheduleList, _ *dpv1alpha1.BackupScheduleList) {
 }
-var RestoreJobSignature = func(_ dataprotectionv1alpha1.RestoreJob, _ *dataprotectionv1alpha1.RestoreJob, _ dataprotectionv1alpha1.RestoreJobList, _ *dataprotectionv1alpha1.RestoreJobList) {
+var RestoreSignature = func(_ dpv1alpha1.Restore, _ *dpv1alpha1.Restore, _ dpv1alpha1.RestoreList, _ *dpv1alpha1.RestoreList) {
 }
-var BackupRepoSignature = func(_ dataprotectionv1alpha1.BackupRepo, _ *dataprotectionv1alpha1.BackupRepo, _ dataprotectionv1alpha1.BackupRepoList, _ *dataprotectionv1alpha1.BackupRepoList) {
+var ActionSetSignature = func(_ dpv1alpha1.ActionSet, _ *dpv1alpha1.ActionSet, _ dpv1alpha1.ActionSetList, _ *dpv1alpha1.ActionSetList) {
 }
+var BackupRepoSignature = func(_ dpv1alpha1.BackupRepo, _ *dpv1alpha1.BackupRepo, _ dpv1alpha1.BackupRepoList, _ *dpv1alpha1.BackupRepoList) {
+}
+
 var AddonSignature = func(_ extensionsv1alpha1.Addon, _ *extensionsv1alpha1.Addon, _ extensionsv1alpha1.AddonList, _ *extensionsv1alpha1.AddonList) {
 }
 var ComponentResourceConstraintSignature = func(_ appsv1alpha1.ComponentResourceConstraint, _ *appsv1alpha1.ComponentResourceConstraint, _ appsv1alpha1.ComponentResourceConstraintList, _ *appsv1alpha1.ComponentResourceConstraintList) {

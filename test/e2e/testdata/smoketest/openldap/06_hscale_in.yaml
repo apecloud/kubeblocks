@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: openldap-cluster-hscale-in-
+spec:
+  clusterRef: openldap-cluster
+  type: HorizontalScaling
+  horizontalScaling:
+    - componentName: openldap
+      replicas: 2

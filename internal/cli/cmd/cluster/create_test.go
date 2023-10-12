@@ -35,11 +35,13 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/dataprotection/utils/boolptr"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
@@ -425,20 +427,6 @@ var _ = Describe("create", func() {
 		Expect(setBackup(o, components)).Should(Succeed())
 	})
 
-	It("set restoreTime", func() {
-		o := &CreateOptions{}
-		o.Namespace = testing.Namespace
-		o.RestoreTime = "Jun 16,2023 18:57:01 UTC+0800"
-		o.SourceCluster = testing.ClusterName
-		components := []map[string]interface{}{
-			{
-				"name": testing.ClusterName,
-			},
-		}
-		By("test setRestoreTime")
-		Expect(setRestoreTime(o, components)).Should(Succeed())
-	})
-
 	It("test fillClusterMetadataFromBackup", func() {
 		baseBackupName := "test-backup"
 		logBackupName := "test-logfile-backup"
@@ -452,49 +440,76 @@ var _ = Describe("create", func() {
 		o.Dynamic = dynamic
 		o.Namespace = testing.Namespace
 		o.RestoreTime = "Jun 16,2023 18:57:01 UTC+0800"
+		o.Backup = logBackupName
 		backupLogTime, _ := util.TimeParse(o.RestoreTime, time.Second)
-		o.SourceCluster = clusterName
 		buildBackupLogTime := func(d time.Duration) string {
 			return backupLogTime.Add(d).Format(time.RFC3339)
 		}
-		buildManifests := func(startTime, stopTime string) map[string]any {
+		buildTimeRange := func(startTime, stopTime string) map[string]any {
 			return map[string]any{
-				"backupLog": map[string]any{
-					"startTime": startTime,
-					"stopTime":  stopTime,
-				},
+				"start": startTime,
+				"end":   stopTime,
 			}
 		}
-		mockBackupInfo(dynamic, baseBackupName, clusterName, buildManifests(buildBackupLogTime(-30*time.Second), buildBackupLogTime(-10*time.Second)), "snapshot")
-		mockBackupInfo(dynamic, logBackupName, clusterName, buildManifests(buildBackupLogTime(-1*time.Minute), buildBackupLogTime(time.Minute)), "logfile")
+		mockBackupInfo(dynamic, baseBackupName, clusterName, buildTimeRange(buildBackupLogTime(-30*time.Second), buildBackupLogTime(-10*time.Second)), "snapshot")
+		mockBackupInfo(dynamic, logBackupName, clusterName, buildTimeRange(buildBackupLogTime(-1*time.Minute), buildBackupLogTime(time.Minute)), "logfile")
 		By("fill cluster from backup success")
 		Expect(fillClusterInfoFromBackup(o, &cluster)).Should(Succeed())
 		Expect(cluster.Spec.ClusterDefRef).Should(Equal(testing.ClusterDefName))
 		Expect(cluster.Spec.ClusterVersionRef).Should(Equal(testing.ClusterVersionName))
 
-		By("fill cluster definition does not matched")
+		By("fill cluster definition does not match")
 		o.ClusterDefRef = "test-not-match-cluster-definition"
 		Expect(fillClusterInfoFromBackup(o, &cluster)).Should(HaveOccurred())
 		o.ClusterDefRef = ""
 
-		By("fill cluster version does not matched")
+		By("fill cluster version does not match")
 		o.ClusterVersionRef = "test-not-match-cluster-version"
 		Expect(fillClusterInfoFromBackup(o, &cluster)).Should(HaveOccurred())
 	})
 
 	It("test build backup config", func() {
+		backupPolicyTemplate := testing.FakeBackupPolicyTemplate("backupPolicyTemplate-test", testing.ClusterDefName)
+		backupPolicy := appsv1alpha1.BackupPolicy{
+			BackupMethods: []v1alpha1.BackupMethod{
+				{
+					Name:            "volume-snapshot",
+					SnapshotVolumes: boolptr.True(),
+				},
+				{
+					Name: "xtrabackup",
+				},
+			},
+		}
+		backupPolicyTemplate.Spec.BackupPolicies = append(backupPolicyTemplate.Spec.BackupPolicies, backupPolicy)
+		dynamic := testing.FakeDynamicClient(backupPolicyTemplate)
+
 		o := &CreateOptions{}
 		o.Cmd = NewCreateCmd(o.Factory, o.IOStreams)
+		o.Dynamic = dynamic
+		o.ClusterDefRef = testing.ClusterDefName
 		cluster := testing.FakeCluster("clusterName", testing.Namespace)
 
 		By("test backup is not set")
 		Expect(o.buildBackupConfig(cluster)).To(Succeed())
 
-		By("test backup is with snapshot method")
-		o.BackupMethod = "snapshot"
-		Expect(o.Cmd.Flags().Set("backup", "snapshot")).To(Succeed())
+		By("test backup enable")
+		o.BackupEnabled = true
+		Expect(o.Cmd.Flags().Set("backup-enabled", "true")).To(Succeed())
 		Expect(o.buildBackupConfig(cluster)).To(Succeed())
-		Expect(string(o.BackupConfig.Method)).Should(Equal("snapshot"))
+		Expect(*o.BackupConfig.Enabled).Should(BeTrue())
+		Expect(o.BackupConfig.Method).Should(Equal("volume-snapshot"))
+
+		By("test backup with invalid method")
+		o.BackupMethod = "invalid-method"
+		Expect(o.Cmd.Flags().Set("backup-method", "invalid-method")).To(Succeed())
+		Expect(o.buildBackupConfig(cluster)).To(HaveOccurred())
+
+		By("test backup with xtrabackup method")
+		o.BackupMethod = "xtrabackup"
+		Expect(o.Cmd.Flags().Set("backup-method", "xtrabackup")).To(Succeed())
+		Expect(o.buildBackupConfig(cluster)).To(Succeed())
+		Expect(o.BackupConfig.Method).Should(Equal("xtrabackup"))
 
 		By("test backup is with wrong cron expression")
 		o.BackupCronExpression = "wrong-cron-expression"

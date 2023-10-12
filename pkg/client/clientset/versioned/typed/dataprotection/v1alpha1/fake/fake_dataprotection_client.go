@@ -28,6 +28,10 @@ type FakeDataprotectionV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeDataprotectionV1alpha1) ActionSets() v1alpha1.ActionSetInterface {
+	return &FakeActionSets{c}
+}
+
 func (c *FakeDataprotectionV1alpha1) Backups(namespace string) v1alpha1.BackupInterface {
 	return &FakeBackups{c, namespace}
 }
@@ -40,12 +44,12 @@ func (c *FakeDataprotectionV1alpha1) BackupRepos() v1alpha1.BackupRepoInterface 
 	return &FakeBackupRepos{c}
 }
 
-func (c *FakeDataprotectionV1alpha1) BackupTools() v1alpha1.BackupToolInterface {
-	return &FakeBackupTools{c}
+func (c *FakeDataprotectionV1alpha1) BackupSchedules(namespace string) v1alpha1.BackupScheduleInterface {
+	return &FakeBackupSchedules{c, namespace}
 }
 
-func (c *FakeDataprotectionV1alpha1) RestoreJobs(namespace string) v1alpha1.RestoreJobInterface {
-	return &FakeRestoreJobs{c, namespace}
+func (c *FakeDataprotectionV1alpha1) Restores(namespace string) v1alpha1.RestoreInterface {
+	return &FakeRestores{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

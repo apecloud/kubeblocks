@@ -38,7 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -179,12 +179,13 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&ValidateEnableLogsTransformer{},
 			// create cluster connection credential secret object
 			&ClusterCredentialTransformer{},
-			// handle restore
+			// handle restore before ComponentTransformer
 			&RestoreTransformer{Client: r.Client},
 			// create all components objects
 			&ComponentTransformer{Client: r.Client},
-			// transform backupPolicy tpl to backuppolicy.dataprotection.kubeblocks.io
-			&BackupPolicyTPLTransformer{},
+			// transform backupPolicyTemplate to backuppolicy.dataprotection.kubeblocks.io
+			// and backupschedule.dataprotection.kubeblocks.io
+			&BackupPolicyTplTransformer{},
 			// handle rbac for pod
 			&RBACTransformer{},
 			// add our finalizer to all objects
@@ -226,8 +227,10 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&policyv1.PodDisruptionBudget{}).
-		Owns(&dataprotectionv1alpha1.BackupPolicy{}).
-		Owns(&dataprotectionv1alpha1.Backup{}).
+		Owns(&dpv1alpha1.BackupPolicy{}).
+		Owns(&dpv1alpha1.BackupSchedule{}).
+		Owns(&dpv1alpha1.Backup{}).
+		Owns(&dpv1alpha1.Restore{}).
 		Owns(&batchv1.Job{}).
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources))
 

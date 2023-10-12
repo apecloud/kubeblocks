@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -77,8 +78,19 @@ func CreateStorageClass(testCtx *testutil.TestContext, storageClassName string,
 				storage.IsDefaultStorageClassAnnotation: "false",
 			},
 		},
-		Provisioner:          "kubernetes.io/no-provisioner",
+		Provisioner:          testutil.DefaultStorageProvisoner,
 		AllowVolumeExpansion: &allowVolumeExpansion,
 	}
 	return CreateK8sResource(testCtx, storageClass).(*storagev1.StorageClass)
+}
+
+func CreateVolumeSnapshotClass(testCtx *testutil.TestContext) {
+	volumeSnapshotClass := &vsv1.VolumeSnapshotClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "default-vs",
+		},
+		Driver:         testutil.DefaultStorageProvisoner,
+		DeletionPolicy: vsv1.VolumeSnapshotContentDelete,
+	}
+	CreateK8sResource(testCtx, volumeSnapshotClass)
 }

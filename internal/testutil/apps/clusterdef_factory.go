@@ -40,7 +40,7 @@ type MockClusterDefFactory struct {
 
 func NewClusterDefFactory(name string) *MockClusterDefFactory {
 	f := &MockClusterDefFactory{}
-	f.init("", name,
+	f.Init("", name,
 		&appsv1alpha1.ClusterDefinition{
 			Spec: appsv1alpha1.ClusterDefinitionSpec{
 				ComponentDefs: []appsv1alpha1.ClusterComponentDefinition{},
@@ -69,7 +69,7 @@ func (factory *MockClusterDefFactory) AddComponentDef(tplType ComponentDefTplTyp
 	case StatelessNginxComponent:
 		component = &statelessNginxComponent
 	}
-	factory.get().Spec.ComponentDefs = append(factory.get().Spec.ComponentDefs, *component)
+	factory.Get().Spec.ComponentDefs = append(factory.Get().Spec.ComponentDefs, *component)
 	comp := factory.getLastCompDef()
 	comp.Name = compDefName
 	return factory
@@ -165,24 +165,24 @@ func (factory *MockClusterDefFactory) AddHorizontalScalePolicy(policy appsv1alph
 
 func (factory *MockClusterDefFactory) SetConnectionCredential(
 	connectionCredential map[string]string, svc *appsv1alpha1.ServiceSpec) *MockClusterDefFactory {
-	factory.get().Spec.ConnectionCredential = connectionCredential
+	factory.Get().Spec.ConnectionCredential = connectionCredential
 	factory.SetServiceSpec(svc)
 	return factory
 }
 
 func (factory *MockClusterDefFactory) get1stCompDef() *appsv1alpha1.ClusterComponentDefinition {
-	if len(factory.get().Spec.ComponentDefs) == 0 {
+	if len(factory.Get().Spec.ComponentDefs) == 0 {
 		return nil
 	}
-	return &factory.get().Spec.ComponentDefs[0]
+	return &factory.Get().Spec.ComponentDefs[0]
 }
 
 func (factory *MockClusterDefFactory) getLastCompDef() *appsv1alpha1.ClusterComponentDefinition {
-	l := len(factory.get().Spec.ComponentDefs)
+	l := len(factory.Get().Spec.ComponentDefs)
 	if l == 0 {
 		return nil
 	}
-	comps := factory.get().Spec.ComponentDefs
+	comps := factory.Get().Spec.ComponentDefs
 	return &comps[l-1]
 }
 

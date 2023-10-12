@@ -46,7 +46,7 @@ import (
 	// +kubebuilder:scaffold:imports
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -77,7 +77,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(dataprotectionv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(dpv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(snapshotv1.AddToScheme(scheme))
 	utilruntime.Must(snapshotv1beta1.AddToScheme(scheme))
 	utilruntime.Must(extensionsv1alpha1.AddToScheme(scheme))
@@ -95,7 +95,6 @@ func init() {
 	viper.SetDefault(constant.CfgKeyCtrlrReconcileRetryDurationMS, 1000)
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
 	viper.SetDefault(constant.EnableRBACManager, true)
-	viper.SetDefault("VOLUMESNAPSHOT", false)
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
 	viper.SetDefault("PROBE_SERVICE_HTTP_PORT", 3501)
@@ -375,15 +374,6 @@ func main() {
 			Recorder: mgr.GetEventRecorderFor("event-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Event")
-			os.Exit(1)
-		}
-
-		if err = (&k8scorecontrollers.PersistentVolumeClaimReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("pvc-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "PersistentVolumeClaim")
 			os.Exit(1)
 		}
 

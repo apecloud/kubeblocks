@@ -92,7 +92,6 @@ func init() {
 
 	viper.SetDefault(constant.CfgKeyCtrlrReconcileRetryDurationMS, 1000)
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
-	viper.SetDefault("VOLUMESNAPSHOT", false)
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
 	viper.SetDefault("KUBEBLOCKS_SERVICEACCOUNT_NAME", "kubeblocks")
@@ -197,12 +196,40 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&dpcontrollers.BackupToolReconciler{
+	if err = (&dpcontrollers.ActionSetReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("backup-tool-controller"),
+		Recorder: mgr.GetEventRecorderFor("actionset-controller"),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BackupTool")
+		setupLog.Error(err, "unable to create controller", "controller", "ActionSet")
+		os.Exit(1)
+	}
+
+	if err = (&dpcontrollers.BackupReconciler{
+		Client:     mgr.GetClient(),
+		Scheme:     mgr.GetScheme(),
+		Recorder:   mgr.GetEventRecorderFor("backup-controller"),
+		RestConfig: mgr.GetConfig(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Backup")
+		os.Exit(1)
+	}
+
+	if err = (&dpcontrollers.RestoreReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("restore-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Restore")
+		os.Exit(1)
+	}
+
+	if err = (&dpcontrollers.VolumePopulatorReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("volume-populator-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "VolumePopulator")
 		os.Exit(1)
 	}
 
@@ -215,30 +242,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&dpcontrollers.CronJobReconciler{
+	if err = (&dpcontrollers.BackupScheduleReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("cronjob-controller"),
+		Recorder: mgr.GetEventRecorderFor("backup-schedule-controller"),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "CronJob")
-		os.Exit(1)
-	}
-
-	if err = (&dpcontrollers.BackupReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("backup-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Backup")
-		os.Exit(1)
-	}
-
-	if err = (&dpcontrollers.RestoreJobReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("restore-job-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "RestoreJob")
+		setupLog.Error(err, "unable to create controller", "controller", "BackupSchedule")
 		os.Exit(1)
 	}
 

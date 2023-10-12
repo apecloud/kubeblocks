@@ -495,6 +495,8 @@ rules:
   - persistentvolumeclaims/status
   verbs:
   - get
+  - patch
+  - update
 - apiGroups:
   - ""
   resources:
@@ -621,6 +623,32 @@ rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
+  - actionsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - actionsets/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - actionsets/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
   - backuppolicies
   verbs:
   - create
@@ -701,7 +729,7 @@ rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - backuptools
+  - backupschedules
   verbs:
   - create
   - delete
@@ -713,13 +741,13 @@ rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - backuptools/finalizers
+  - backupschedules/finalizers
   verbs:
   - update
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - backuptools/status
+  - backupschedules/status
   verbs:
   - get
   - patch
@@ -727,7 +755,7 @@ rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - restorejobs
+  - restores
   verbs:
   - create
   - delete
@@ -739,13 +767,13 @@ rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - restorejobs/finalizers
+  - restores/finalizers
   verbs:
   - update
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
-  - restorejobs/status
+  - restores/status
   verbs:
   - get
   - patch

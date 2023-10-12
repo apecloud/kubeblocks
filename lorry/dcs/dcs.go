@@ -47,12 +47,12 @@ type DCS interface {
 	DeleteSwitchover() error
 
 	// cluster scope leader lock
-	AttempAcquireLock() error
-	CreateLock() error
-	IsLockExist() (bool, error)
-	HasLock() bool
-	ReleaseLock() error
-	UpdateLock() error
+	AttempAcquireLease() error
+	CreateLease() error
+	IsLeaseExist() (bool, error)
+	HasLease() bool
+	ReleaseLease() error
+	UpdateLease() error
 
 	GetLeader() (*Leader, error)
 }

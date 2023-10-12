@@ -60,7 +60,7 @@ kbcli cluster update NAME [flags]
       --allow-missing-template-keys            If true, ignore any errors in templates when a field or map key is missing in the template. Only applies to golang and jsonpath output formats. (default true)
       --backup-cron-expression string          the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
       --backup-enabled                         Specify whether enabled automated backup
-      --backup-method string                   the backup method, support: snapshot, backupTool (default "snapshot")
+      --backup-method string                   the backup method, view it by "kbcli cd describe <cluster-definition>", if not specified, the default backup method will be to take snapshots of the volume
       --backup-repo-name string                the backup repository name
       --backup-retention-period string         a time string ending with the 'd'|'D'|'h'|'H' character to describe how long the Backup should be retained (default "1d")
       --backup-starting-deadline-minutes int   the deadline in minutes for starting the backup job if it misses its scheduled time for any reason

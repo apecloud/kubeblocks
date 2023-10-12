@@ -120,11 +120,11 @@ func MockConsensusComponentStsPod(
 	if sts != nil {
 		stsUpdateRevision = sts.Status.UpdateRevision
 	}
-	pod := NewPodFactory(testCtx.DefaultNamespace, podName).
+	podFactory := NewPodFactory(testCtx.DefaultNamespace, podName).
 		SetOwnerReferences("apps/v1", constant.StatefulSetKind, sts).
 		AddAppInstanceLabel(clusterName).
 		AddAppComponentLabel(consensusCompName).
-		AddAppManangedByLabel().
+		AddAppManagedByLabel().
 		AddRoleLabel(podRole).
 		AddConsensusSetAccessModeLabel(accessMode).
 		AddControllerRevisionHashLabel(stsUpdateRevision).
@@ -149,8 +149,11 @@ func MockConsensusComponentStsPod(
 					},
 				},
 			},
-		}).
-		CheckedCreate(testCtx).GetObject()
+		})
+	if sts != nil && sts.Labels[constant.AppNameLabelKey] != "" {
+		podFactory.AddAppNameLabel(sts.Labels[constant.AppNameLabelKey])
+	}
+	pod := podFactory.CheckedCreate(testCtx).GetObject()
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Status.Conditions = []corev1.PodCondition{
 		{

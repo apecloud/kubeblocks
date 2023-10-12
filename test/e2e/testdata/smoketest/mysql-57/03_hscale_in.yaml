@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: mysql-57-cluster-hscale-in-
+spec:
+  clusterRef: mysql-57-cluster
+  type: HorizontalScaling
+  horizontalScaling:
+    - componentName: mysql
+      replicas: 1

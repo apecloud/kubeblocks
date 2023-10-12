@@ -26,9 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/constant"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
 
 var _ = Describe("cluster util", func() {
@@ -42,7 +41,7 @@ var _ = Describe("cluster util", func() {
 	baseObjsWithBackupPods := func() []runtime.Object {
 		podsWithBackup := testing.FakePods(4, testing.Namespace, testing.ClusterName)
 		labels := podsWithBackup.Items[0].GetLabels()
-		labels[constant.DataProtectionLabelBackupNameKey] = string(dpv1alpha1.BackupTypeLogFile)
+		labels[dptypes.DataProtectionLabelBackupNameKey] = testing.BackupName
 		podsWithBackup.Items[0].SetLabels(labels)
 		return []runtime.Object{
 			podsWithBackup,

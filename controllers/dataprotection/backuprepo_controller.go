@@ -54,6 +54,7 @@ import (
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
@@ -108,7 +109,7 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// handle finalizer
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, repo, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, repo, dptypes.DataProtectionFinalizerName, func() (*ctrl.Result, error) {
 		return nil, r.deleteExternalResources(reqCtx, repo)
 	})
 	if res != nil {
@@ -202,7 +203,7 @@ func (r *BackupRepoReconciler) updateStatus(reqCtx intctrlutil.RequestCtx, repo 
 		}
 		repo.Status.Phase = phase
 	}
-	repo.Status.IsDefault = repo.Annotations[constant.DefaultBackupRepoAnnotationKey] == trueVal
+	repo.Status.IsDefault = repo.Annotations[dptypes.DefaultBackupRepoAnnotationKey] == trueVal
 
 	// update other fields
 	if repo.Status.BackupPVCName == "" {
@@ -566,7 +567,7 @@ func (r *BackupRepoReconciler) listAssociatedBackups(
 	var filtered []*dpv1alpha1.Backup
 	for idx := range backupList.Items {
 		backup := &backupList.Items[idx]
-		if backup.Status.Phase == dpv1alpha1.BackupFailed {
+		if backup.Status.Phase == dpv1alpha1.BackupPhaseFailed {
 			continue
 		}
 		filtered = append(filtered, backup)
@@ -873,7 +874,7 @@ func (r *BackupRepoReconciler) mapBackupToRepo(ctx context.Context, obj client.O
 		return nil
 	}
 	// ignore failed backups
-	if backup.Status.Phase == dpv1alpha1.BackupFailed {
+	if backup.Status.Phase == dpv1alpha1.BackupPhaseFailed {
 		return nil
 	}
 	// we should reconcile the BackupRepo when:

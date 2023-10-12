@@ -25,16 +25,6 @@ Manage alert receiver, include add, list and delete receiver.
 * [kbcli alert list-smtpserver](kbcli_alert_list-smtpserver.md)	 - List alert smtp servers config.
 
 
-## [backup](kbcli_backup.md)
-
-Backup command.
-
-* [kbcli backup create](kbcli_backup_create.md)	 - Create a backup for the cluster.
-* [kbcli backup delete](kbcli_backup_delete.md)	 - Delete a backup.
-* [kbcli backup describe](kbcli_backup_describe.md)	 - Describe a backup
-* [kbcli backup list](kbcli_backup_list.md)	 - List backups.
-
-
 ## [backuprepo](kbcli_backuprepo.md)
 
 BackupRepo command.
@@ -92,6 +82,7 @@ Cluster command.
 * [kbcli cluster describe](kbcli_cluster_describe.md)	 - Show details of a specific cluster.
 * [kbcli cluster describe-account](kbcli_cluster_describe-account.md)	 - Describe account roles and related information
 * [kbcli cluster describe-backup](kbcli_cluster_describe-backup.md)	 - Describe a backup.
+* [kbcli cluster describe-backup-policy](kbcli_cluster_describe-backup-policy.md)	 - Describe backup policy
 * [kbcli cluster describe-config](kbcli_cluster_describe-config.md)	 - Show details of a specific reconfiguring.
 * [kbcli cluster describe-ops](kbcli_cluster_describe-ops.md)	 - Show details of a specific OpsRequest.
 * [kbcli cluster diff-config](kbcli_cluster_diff-config.md)	 - Show the difference in parameters between the two submitted OpsRequest.
@@ -129,6 +120,7 @@ Cluster command.
 
 ClusterDefinition command.
 
+* [kbcli clusterdefinition describe](kbcli_clusterdefinition_describe.md)	 - Describe ClusterDefinition.
 * [kbcli clusterdefinition list](kbcli_clusterdefinition_list.md)	 - List ClusterDefinitions.
 * [kbcli clusterdefinition list-components](kbcli_clusterdefinition_list-components.md)	 - List cluster definition components.
 
@@ -142,22 +134,23 @@ ClusterVersion command.
 * [kbcli clusterversion unset-default](kbcli_clusterversion_unset-default.md)	 - Unset the clusterversion if it's default.
 
 
-## [context](kbcli_context.md)
-
-kbcli context allows you to manage cloud context. This command is currently only applicable to cloud, and currently does not support switching the context of the local k8s cluster.
-
-* [kbcli context current](kbcli_context_current.md)	 - Get the currently used context.
-* [kbcli context describe](kbcli_context_describe.md)	 - Get the description information of a context.
-* [kbcli context list](kbcli_context_list.md)	 - List all created contexts.
-* [kbcli context use](kbcli_context_use.md)	 - Use another context that you have already created.
-
-
 ## [dashboard](kbcli_dashboard.md)
 
 List and open the KubeBlocks dashboards.
 
 * [kbcli dashboard list](kbcli_dashboard_list.md)	 - List all dashboards.
 * [kbcli dashboard open](kbcli_dashboard_open.md)	 - Open one dashboard.
+
+
+## [dataprotection](kbcli_dataprotection.md)
+
+Data protection command.
+
+* [kbcli dataprotection backup](kbcli_dataprotection_backup.md)	 - Create a backup for the cluster.
+* [kbcli dataprotection delete-backup](kbcli_dataprotection_delete-backup.md)	 - Delete a backup.
+* [kbcli dataprotection describe-backup](kbcli_dataprotection_describe-backup.md)	 - Describe a backup
+* [kbcli dataprotection list-backups](kbcli_dataprotection_list-backups.md)	 - List backups.
+* [kbcli dataprotection restore](kbcli_dataprotection_restore.md)	 - Restore a new cluster from backup
 
 
 ## [fault](kbcli_fault.md)
@@ -197,18 +190,6 @@ KubeBlocks operation commands.
 * [kbcli kubeblocks upgrade](kbcli_kubeblocks_upgrade.md)	 - Upgrade KubeBlocks.
 
 
-## [login](kbcli_login.md)
-
-Authenticate with the KubeBlocks Cloud
-
-
-
-## [logout](kbcli_logout.md)
-
-Log out of the KubeBlocks Cloud
-
-
-
 ## [migration](kbcli_migration.md)
 
 Data migration between two data sources.
@@ -225,16 +206,6 @@ Data migration between two data sources.
 
 Print the list of flags inherited by all commands.
 
-
-
-## [org](kbcli_org.md)
-
-kbcli org is used to manage cloud organizations and is only suitable for interacting with cloud.
-
-* [kbcli org current](kbcli_org_current.md)	 - Get current organization.
-* [kbcli org describe](kbcli_org_describe.md)	 - Get the description information of an organization.
-* [kbcli org list](kbcli_org_list.md)	 - List all organizations you have joined.
-* [kbcli org switch](kbcli_org_switch.md)	 - Switch to another organization you are already a member of.
 
 
 ## [playground](kbcli_playground.md)

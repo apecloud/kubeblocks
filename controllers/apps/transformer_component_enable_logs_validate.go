@@ -33,7 +33,7 @@ func (e *ComponentEnableLogsValidationTransformer) Transform(ctx graph.Transform
 	comp := transCtx.Component
 
 	err := comp.ValidateEnabledLogs(transCtx.CompDef)
-	
+
 	setProvisioningStartedCondition(&comp.Status.Conditions, comp.Name, comp.Generation, err)
 	if err != nil {
 		return newRequeueError(requeueDuration, err.Error())

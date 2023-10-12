@@ -9,8 +9,8 @@ spec:
   clusterVersionRef: polardbx-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
   terminationPolicy: {{ .Values.polardbx.terminationPolicy }}
   componentSpecs:
-    - componentDefRef: gms
-      name: gms
+    - name: gms
+      componentDefRef: gms
       replicas: {{ .Values.gms.replicas }}
       {{- with  .Values.gms.resources }}
       resources:
@@ -37,8 +37,8 @@ spec:
       {{- end }}
     {{- $i := 0 }}
     {{- range .Values.dn }}
-    - componentDefRef: dn
-      name: dn-{{ $i }}
+    - name: dn-{{ $i }}
+      componentDefRef: dn
       replicas: {{ .replicas }}
       {{- with  .resources }}
       resources:
@@ -65,8 +65,8 @@ spec:
       {{- end }}
     {{- end }}
     {{- $i = add1 $i }}
-    - componentDefRef: cn
-      name: cn
+    - name: cn
+      componentDefRef: cn
       replicas: {{ .Values.cn.replicas }}
       {{- with  .Values.cn.resources }}
       resources:
@@ -81,8 +81,8 @@ spec:
           memory: {{ .memory | quote }}
         {{- end }}
       {{- end }}
-    - componentDefRef: cdc
-      name: cdc
+    - name: cdc
+      componentDefRef: cdc
       replicas: {{ .Values.cdc.replicas }}
       {{- with  .Values.cn.resources }}
       resources:

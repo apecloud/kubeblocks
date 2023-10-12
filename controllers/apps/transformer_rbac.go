@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
@@ -273,7 +274,7 @@ func getDefaultBackupPolicyTemplate(transCtx *ClusterTransformContext, clusterDe
 		return nil, nil
 	}
 	for _, item := range backupPolicyTPLs.Items {
-		if item.Annotations[constant.DefaultBackupPolicyTemplateAnnotationKey] == trueVal {
+		if item.Annotations[dptypes.DefaultBackupPolicyTemplateAnnotationKey] == trueVal {
 			return &item, nil
 		}
 	}

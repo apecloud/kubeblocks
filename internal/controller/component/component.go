@@ -244,7 +244,7 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		reqCtx.Log.Error(err, "build pod affinity failed.")
 		return nil, err
 	}
-	component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(cluster, affinity, component)
+	component.PodSpec.TopologySpreadConstraints = BuildPodTopologySpreadConstraints(cluster, affinity, component)
 	if component.PodSpec.Tolerations, err = BuildTolerations(cluster, clusterCompSpec.Tolerations); err != nil {
 		reqCtx.Log.Error(err, "build pod tolerations failed.")
 		return nil, err

@@ -47,7 +47,7 @@ type HTTPCustom struct {
 	BaseOperations
 }
 
-var perNodeRegx = regexp.MustCompile("[a-zA-Z0-9]+")
+var perNodeRegx = regexp.MustCompile("^[^,]*$")
 
 // NewHTTPCustom returns a new HTTPCustom.
 func NewHTTPCustom() *HTTPCustom {

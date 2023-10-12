@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: td-cluster-hscale-out-
+spec:
+  clusterRef: td-cluster
+  type: HorizontalScaling
+  horizontalScaling:
+    - componentName: tdengine
+      replicas: 4

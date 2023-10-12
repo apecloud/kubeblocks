@@ -39,7 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/operations"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -84,7 +84,8 @@ func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.OpsRequest{}).
 		Watches(&appsv1alpha1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.parseAllOpsRequest)).
-		Watches(&dataprotectionv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.parseBackupOpsRequest)).
+		Watches(&dpv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.parseBackupOpsRequest)).
+		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.parseVolumeExpansionOpsRequest)).
 		Complete(r)
 }
 
@@ -305,8 +306,34 @@ func (r *OpsRequestReconciler) parseAllOpsRequest(ctx context.Context, object cl
 	return requests
 }
 
+func (r *OpsRequestReconciler) parseVolumeExpansionOpsRequest(ctx context.Context, object client.Object) []reconcile.Request {
+	pvc := object.(*corev1.PersistentVolumeClaim)
+	if pvc.Labels[constant.AppManagedByLabelKey] != constant.AppName {
+		return nil
+	}
+	clusterName := pvc.Labels[constant.AppInstanceLabelKey]
+	if clusterName == "" {
+		return nil
+	}
+	opsRequestList, err := appsv1alpha1.GetRunningOpsByOpsType(ctx, r.Client,
+		pvc.Labels[constant.AppInstanceLabelKey], pvc.Namespace, string(appsv1alpha1.VolumeExpansionType))
+	if err != nil {
+		return nil
+	}
+	var requests []reconcile.Request
+	for _, v := range opsRequestList {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: v.Namespace,
+				Name:      v.Name,
+			},
+		})
+	}
+	return requests
+}
+
 func (r *OpsRequestReconciler) parseBackupOpsRequest(ctx context.Context, object client.Object) []reconcile.Request {
-	backup := object.(*dataprotectionv1alpha1.Backup)
+	backup := object.(*dpv1alpha1.Backup)
 	var (
 		requests []reconcile.Request
 	)

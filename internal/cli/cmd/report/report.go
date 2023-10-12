@@ -33,7 +33,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
-	klog "k8s.io/klog/v2"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -492,8 +492,9 @@ func (o *reportClusterOptions) handleManifests(ctx context.Context) error {
 			types.RoleBindingGVR(),
 			types.BackupGVR(),
 			types.BackupPolicyGVR(),
-			types.BackupToolGVR(),
-			types.RestoreJobGVR(),
+			types.BackupScheduleGVR(),
+			types.ActionSetGVR(),
+			types.RestoreGVR(),
 			types.PVCGVR(),
 		}
 		globalGvrs = []schema.GroupVersionResource{

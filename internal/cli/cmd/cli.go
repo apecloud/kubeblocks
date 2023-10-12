@@ -38,7 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/addon"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/alert"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/backup"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/backuprepo"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/bench"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/builder"
@@ -46,14 +45,13 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/clusterdefinition"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/clusterversion"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/context"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/dashboard"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/dataprotection"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/fault"
 	infras "github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/migration"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/options"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/organization"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/playground"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/plugin"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/report"
@@ -190,10 +188,10 @@ A Command Line Interface for KubeBlocks`,
 
 	// Add subcommands
 	cmd.AddCommand(
-		auth.NewLogin(ioStreams),
-		auth.NewLogout(ioStreams),
-		organization.NewOrganizationCmd(ioStreams),
-		context.NewContextCmd(ioStreams),
+		// auth.NewLogin(ioStreams),
+		// auth.NewLogout(ioStreams),
+		// organization.NewOrganizationCmd(ioStreams),
+		// context.NewContextCmd(ioStreams),
 		playground.NewPlaygroundCmd(ioStreams),
 		kubeblocks.NewKubeBlocksCmd(f, ioStreams),
 		bench.NewBenchCmd(f, ioStreams),
@@ -212,7 +210,7 @@ A Command Line Interface for KubeBlocks`,
 		report.NewReportCmd(f, ioStreams),
 		infras.NewInfraCmd(ioStreams),
 		backuprepo.NewBackupRepoCmd(f, ioStreams),
-		backup.NewBackupCmd(f, ioStreams),
+		dataprotection.NewDataProtectionCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}

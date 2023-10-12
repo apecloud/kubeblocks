@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: mongodb-cluster-hscale-out-
+spec:
+  clusterRef: mongodb-cluster
+  type: HorizontalScaling
+  horizontalScaling:
+    - componentName: mongodb
+      replicas: 3

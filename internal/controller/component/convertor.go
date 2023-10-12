@@ -200,7 +200,7 @@ func (c *volumeConvertor) convert(args ...any) (any, error) {
 
 	if clusterCompDef.VolumeProtectionSpec != nil {
 		defaultHighWatermark := clusterCompDef.VolumeProtectionSpec.HighWatermark
-		for i, _ := range volumes {
+		for i := range volumes {
 			volumes[i].HighWatermark = defaultHighWatermark
 		}
 		for _, v := range clusterCompDef.VolumeProtectionSpec.Volumes {

@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: oceanbase-cluster-hscale-in-
+spec:
+  clusterRef: oceanbase-cluster
+  type: HorizontalScaling
+  horizontalScaling:
+    - componentName: ob-bundle
+      replicas: 2

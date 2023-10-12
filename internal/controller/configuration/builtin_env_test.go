@@ -89,8 +89,8 @@ bootstrap:
 					Namespace: "default",
 				},
 				Data: map[string][]byte{
-					"password": []byte("NHpycWZsMnI="),
-					"username": []byte("cm9vdA=="),
+					"password": []byte("4zrqfl2r"),
+					"username": []byte("root"),
 				}},
 		}), testutil.WithAnyTimes()))
 

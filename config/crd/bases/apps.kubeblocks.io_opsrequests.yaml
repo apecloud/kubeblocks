@@ -63,16 +63,14 @@ spec:
               backupSpec:
                 description: backupSpec defines how to backup the cluster.
                 properties:
+                  backupMethod:
+                    description: Backup method name that is defined in backupPolicy.
+                    type: string
                   backupName:
                     description: backupName is the name of the backup.
                     type: string
                   backupPolicyName:
                     description: Which backupPolicy is applied to perform this backup
-                    type: string
-                  backupType:
-                    default: datafile
-                    description: Backup Type. datafile or logfile or snapshot. If
-                      not set, datafile is the default type.
                     type: string
                   parentBackupName:
                     description: if backupType is incremental, parentBackupName is

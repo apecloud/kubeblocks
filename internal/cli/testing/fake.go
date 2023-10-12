@@ -454,6 +454,27 @@ func FakeBackupSchedule(backupScheduleName, backupPolicyName string) *dpv1alpha1
 	return backupSchedule
 }
 
+func FakeBackupPolicyTemplate(backupPolicyTemplateName string, clusterDef string) *appsv1alpha1.BackupPolicyTemplate {
+	backupPolicyTemplate := &appsv1alpha1.BackupPolicyTemplate{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: fmt.Sprintf("%s/%s", types.AppsAPIGroup, types.AppsAPIVersion),
+			Kind:       types.KindBackupPolicyTemplate,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      backupPolicyTemplateName,
+			Namespace: Namespace,
+			Labels: map[string]string{
+				constant.ClusterDefLabelKey: ClusterDefName,
+			},
+		},
+		Spec: appsv1alpha1.BackupPolicyTemplateSpec{
+			ClusterDefRef: clusterDef,
+			Identifier:    "fake-identifier",
+		},
+	}
+	return backupPolicyTemplate
+}
+
 func FakeBackupWithCluster(cluster *appsv1alpha1.Cluster, backupName string) *dpv1alpha1.Backup {
 	backup := &dpv1alpha1.Backup{
 		TypeMeta: metav1.TypeMeta{

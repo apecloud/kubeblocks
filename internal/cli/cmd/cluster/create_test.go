@@ -35,11 +35,13 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/dataprotection/utils/boolptr"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
@@ -467,18 +469,47 @@ var _ = Describe("create", func() {
 	})
 
 	It("test build backup config", func() {
+		backupPolicyTemplate := testing.FakeBackupPolicyTemplate("backupPolicyTemplate-test", testing.ClusterDefName)
+		backupPolicy := appsv1alpha1.BackupPolicy{
+			BackupMethods: []v1alpha1.BackupMethod{
+				{
+					Name:            "volume-snapshot",
+					SnapshotVolumes: boolptr.True(),
+				},
+				{
+					Name: "xtrabackup",
+				},
+			},
+		}
+		backupPolicyTemplate.Spec.BackupPolicies = append(backupPolicyTemplate.Spec.BackupPolicies, backupPolicy)
+		dynamic := testing.FakeDynamicClient(backupPolicyTemplate)
+
 		o := &CreateOptions{}
 		o.Cmd = NewCreateCmd(o.Factory, o.IOStreams)
+		o.Dynamic = dynamic
+		o.ClusterDefRef = testing.ClusterDefName
 		cluster := testing.FakeCluster("clusterName", testing.Namespace)
 
 		By("test backup is not set")
 		Expect(o.buildBackupConfig(cluster)).To(Succeed())
 
-		By("test backup is with snapshot method")
-		o.BackupMethod = "snapshot"
-		Expect(o.Cmd.Flags().Set("backup-method", "snapshot")).To(Succeed())
+		By("test backup enable")
+		o.BackupEnabled = true
+		Expect(o.Cmd.Flags().Set("backup-enabled", "true")).To(Succeed())
 		Expect(o.buildBackupConfig(cluster)).To(Succeed())
-		Expect(o.BackupConfig.Method).Should(Equal("snapshot"))
+		Expect(*o.BackupConfig.Enabled).Should(BeTrue())
+		Expect(o.BackupConfig.Method).Should(Equal("volume-snapshot"))
+
+		By("test backup with invalid method")
+		o.BackupMethod = "invalid-method"
+		Expect(o.Cmd.Flags().Set("backup-method", "invalid-method")).To(Succeed())
+		Expect(o.buildBackupConfig(cluster)).To(HaveOccurred())
+
+		By("test backup with xtrabackup method")
+		o.BackupMethod = "xtrabackup"
+		Expect(o.Cmd.Flags().Set("backup-method", "xtrabackup")).To(Succeed())
+		Expect(o.buildBackupConfig(cluster)).To(Succeed())
+		Expect(o.BackupConfig.Method).Should(Equal("xtrabackup"))
 
 		By("test backup is with wrong cron expression")
 		o.BackupCronExpression = "wrong-cron-expression"

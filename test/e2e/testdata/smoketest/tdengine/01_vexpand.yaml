@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: td-cluster-vexpand-
+spec:
+  clusterRef: td-cluster
+  type: VolumeExpansion
+  volumeExpansion:
+    - componentName: tdengine
+      volumeClaimTemplates:
+        - name: data
+          storage: "15Gi"

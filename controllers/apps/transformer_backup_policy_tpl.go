@@ -260,6 +260,11 @@ func (r *BackupPolicyTplTransformer) syncBackupPolicy(backupPolicy *dpv1alpha1.B
 	mergeMap(backupPolicy.Annotations, r.buildAnnotations())
 	mergeMap(backupPolicy.Labels, r.buildLabels())
 
+	// update backup repo of the backup policy.
+	if r.Cluster.Spec.Backup != nil && r.Cluster.Spec.Backup.RepoName != "" {
+		backupPolicy.Spec.BackupRepoName = &r.Cluster.Spec.Backup.RepoName
+	}
+
 	// only update the role labelSelector of the backup target instance when
 	// component workload is Replication/Consensus. Because the replicas of
 	// component will change, such as 2->1. then if the target role is 'follower'
@@ -320,6 +325,10 @@ func (r *BackupPolicyTplTransformer) buildBackupPolicy(backupPolicyName string) 
 	}
 
 	bpSpec := backupPolicy.Spec
+	// if cluster have backup repo, set backup repo name to backup policy.
+	if cluster.Spec.Backup != nil && cluster.Spec.Backup.RepoName != "" {
+		bpSpec.BackupRepoName = &cluster.Spec.Backup.RepoName
+	}
 	bpSpec.BackupMethods = r.backupPolicy.BackupMethods
 	bpSpec.PathPrefix = buildBackupPathPrefix(cluster, comp.Name)
 	bpSpec.Target = r.buildBackupTarget(comp)

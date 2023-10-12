@@ -201,7 +201,7 @@ func (o *createOptions) parseProviderFlags(cmd *cobra.Command, args []string, f 
 		if err = json.Unmarshal(schemaData, schema); err != nil {
 			return err
 		}
-		if err = flags.BuildFlagsBySchema(cmd, f, schema); err != nil {
+		if err = flags.BuildFlagsBySchema(cmd, schema); err != nil {
 			return err
 		}
 	}

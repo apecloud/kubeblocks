@@ -187,8 +187,10 @@ func (r *Request) buildCreateVolumeSnapshotAction() (action.Action, error) {
 		return nil, fmt.Errorf("targetVolumes is required for snapshotVolumes")
 	}
 
-	if !utils.VolumeSnapshotEnabled() {
-		return nil, fmt.Errorf("volume snapshot is not enabled")
+	if volumeSnapshotEnabled, err := utils.VolumeSnapshotEnabled(r.Ctx, r.Client, targetPod, r.BackupMethod.TargetVolumes.Volumes); err != nil {
+		return nil, err
+	} else if !volumeSnapshotEnabled {
+		return nil, fmt.Errorf("current backup method depends on volume snapshot, but volume snapshot is not enabled")
 	}
 
 	pvcs, err := getPVCsByVolumeNames(r.Client, targetPod, r.BackupMethod.TargetVolumes.Volumes)

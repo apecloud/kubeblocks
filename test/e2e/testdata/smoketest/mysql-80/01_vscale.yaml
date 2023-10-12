@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: mysqlcluster-vscale-
+spec:
+  clusterRef: mysqlcluster
+  type: VerticalScaling
+  verticalScaling:
+    - componentName: mysql
+      requests:
+        cpu: "1.5"
+        memory: 1.5Gi

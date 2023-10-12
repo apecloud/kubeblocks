@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: gms-hscale-in-
+spec:
+  clusterRef: pxc
+  type: HorizontalScaling
+  horizontalScaling:
+    - componentName: gms
+      replicas: 1

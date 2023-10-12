@@ -65,6 +65,8 @@ var SecretSignature = func(_ corev1.Secret, _ *corev1.Secret, _ corev1.SecretLis
 var ServiceSignature = func(_ corev1.Service, _ *corev1.Service, _ corev1.ServiceList, _ *corev1.ServiceList) {}
 var PersistentVolumeClaimSignature = func(_ corev1.PersistentVolumeClaim, _ *corev1.PersistentVolumeClaim, _ corev1.PersistentVolumeClaimList, _ *corev1.PersistentVolumeClaimList) {
 }
+var PersistentVolumeSignature = func(_ corev1.PersistentVolume, _ *corev1.PersistentVolume, _ corev1.PersistentVolumeList, _ *corev1.PersistentVolumeList) {
+}
 var PodSignature = func(_ corev1.Pod, _ *corev1.Pod, _ corev1.PodList, _ *corev1.PodList) {}
 var EventSignature = func(_ corev1.Event, _ *corev1.Event, _ corev1.EventList, _ *corev1.EventList) {}
 var ConfigMapSignature = func(_ corev1.ConfigMap, _ *corev1.ConfigMap, _ corev1.ConfigMapList, _ *corev1.ConfigMapList) {}
@@ -89,6 +91,8 @@ var CSIDriverSignature = func(_ storagev1.CSIDriver, _ *storagev1.CSIDriver, _ s
 }
 
 var VolumeSnapshotSignature = func(_ snapshotv1.VolumeSnapshot, _ *snapshotv1.VolumeSnapshot, _ snapshotv1.VolumeSnapshotList, _ *snapshotv1.VolumeSnapshotList) {
+}
+var VolumeSnapshotClassSignature = func(_ snapshotv1.VolumeSnapshotClass, _ *snapshotv1.VolumeSnapshotClass, _ snapshotv1.VolumeSnapshotClassList, _ *snapshotv1.VolumeSnapshotClassList) {
 }
 
 var ClusterSignature = func(_ appsv1alpha1.Cluster, _ *appsv1alpha1.Cluster, _ appsv1alpha1.ClusterList, _ *appsv1alpha1.ClusterList) {

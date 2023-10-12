@@ -179,16 +179,16 @@ func (r RetentionPeriod) nextNumber(input string) (num int, rest string, err err
 	return num, rest, nil
 }
 
-// RestorePhase The current phase. Valid values are Running, Completed, Failed, Deleting.
+// RestorePhase The current phase. Valid values are Running, Completed, Failed, AsDataSource.
 // +enum
-// +kubebuilder:validation:Enum={Running,Completed,Failed,Deleting}
+// +kubebuilder:validation:Enum={Running,Completed,Failed,AsDataSource}
 type RestorePhase string
 
 const (
-	RestorePhaseRunning   RestorePhase = "Running"
-	RestorePhaseCompleted RestorePhase = "Completed"
-	RestorePhaseFailed    RestorePhase = "Failed"
-	RestorePhaseDeleting  RestorePhase = "Deleting"
+	RestorePhaseRunning      RestorePhase = "Running"
+	RestorePhaseCompleted    RestorePhase = "Completed"
+	RestorePhaseFailed       RestorePhase = "Failed"
+	RestorePhaseAsDataSource RestorePhase = "AsDataSource"
 )
 
 // RestoreActionStatus the status of restore action.

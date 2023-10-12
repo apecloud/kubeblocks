@@ -423,6 +423,58 @@ func FakeBackup(backupName string) *dpv1alpha1.Backup {
 	return backup
 }
 
+func FakeBackupSchedule(backupScheduleName, backupPolicyName string) *dpv1alpha1.BackupSchedule {
+	backupSchedule := &dpv1alpha1.BackupSchedule{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPAPIVersion),
+			Kind:       types.KindBackupSchedule,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      backupScheduleName,
+			Namespace: Namespace,
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey: ClusterName,
+			},
+		},
+		Spec: dpv1alpha1.BackupScheduleSpec{
+			BackupPolicyName: backupPolicyName,
+			Schedules: []dpv1alpha1.SchedulePolicy{
+				{
+					Enabled:         boolptr.True(),
+					CronExpression:  "0 0 * * *",
+					BackupMethod:    BackupMethodName,
+					RetentionPeriod: dpv1alpha1.RetentionPeriod("1d"),
+				},
+			},
+		},
+		Status: dpv1alpha1.BackupScheduleStatus{
+			Phase: dpv1alpha1.BackupSchedulePhaseAvailable,
+		},
+	}
+	return backupSchedule
+}
+
+func FakeBackupPolicyTemplate(backupPolicyTemplateName string, clusterDef string) *appsv1alpha1.BackupPolicyTemplate {
+	backupPolicyTemplate := &appsv1alpha1.BackupPolicyTemplate{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: fmt.Sprintf("%s/%s", types.AppsAPIGroup, types.AppsAPIVersion),
+			Kind:       types.KindBackupPolicyTemplate,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      backupPolicyTemplateName,
+			Namespace: Namespace,
+			Labels: map[string]string{
+				constant.ClusterDefLabelKey: ClusterDefName,
+			},
+		},
+		Spec: appsv1alpha1.BackupPolicyTemplateSpec{
+			ClusterDefRef: clusterDef,
+			Identifier:    "fake-identifier",
+		},
+	}
+	return backupPolicyTemplate
+}
+
 func FakeBackupWithCluster(cluster *appsv1alpha1.Cluster, backupName string) *dpv1alpha1.Backup {
 	backup := &dpv1alpha1.Backup{
 		TypeMeta: metav1.TypeMeta{

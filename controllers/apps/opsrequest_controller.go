@@ -85,6 +85,7 @@ func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&appsv1alpha1.OpsRequest{}).
 		Watches(&appsv1alpha1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.parseAllOpsRequest)).
 		Watches(&dpv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.parseBackupOpsRequest)).
+		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.parseVolumeExpansionOpsRequest)).
 		Complete(r)
 }
 
@@ -298,6 +299,32 @@ func (r *OpsRequestReconciler) parseAllOpsRequest(ctx context.Context, object cl
 		requests = append(requests, reconcile.Request{
 			NamespacedName: types.NamespacedName{
 				Namespace: cluster.Namespace,
+				Name:      v.Name,
+			},
+		})
+	}
+	return requests
+}
+
+func (r *OpsRequestReconciler) parseVolumeExpansionOpsRequest(ctx context.Context, object client.Object) []reconcile.Request {
+	pvc := object.(*corev1.PersistentVolumeClaim)
+	if pvc.Labels[constant.AppManagedByLabelKey] != constant.AppName {
+		return nil
+	}
+	clusterName := pvc.Labels[constant.AppInstanceLabelKey]
+	if clusterName == "" {
+		return nil
+	}
+	opsRequestList, err := appsv1alpha1.GetRunningOpsByOpsType(ctx, r.Client,
+		pvc.Labels[constant.AppInstanceLabelKey], pvc.Namespace, string(appsv1alpha1.VolumeExpansionType))
+	if err != nil {
+		return nil
+	}
+	var requests []reconcile.Request
+	for _, v := range opsRequestList {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: v.Namespace,
 				Name:      v.Name,
 			},
 		})

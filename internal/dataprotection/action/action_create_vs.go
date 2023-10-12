@@ -20,21 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package action
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/dataprotection/builder"
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	"github.com/apecloud/kubeblocks/internal/dataprotection/utils"
 )
@@ -157,14 +154,6 @@ func (c *CreateVolumeSnapshotAction) createVolumeSnapshotIfNotExist(ctx Context,
 		return nil
 	}
 
-	// create volume snapshot
-	if pvc.Spec.StorageClassName != nil && *pvc.Spec.StorageClassName != "" {
-		vsc, err = createVolumeSnapshotClassIfNotExist(ctx.Ctx, ctx.Client, vsCli, *pvc.Spec.StorageClassName)
-		if err != nil {
-			return err
-		}
-	}
-
 	c.ObjectMeta.Name = key.Name
 	c.ObjectMeta.Namespace = key.Namespace
 
@@ -193,36 +182,6 @@ func (c *CreateVolumeSnapshotAction) createVolumeSnapshotIfNotExist(ctx Context,
 		return err
 	}
 	return nil
-}
-
-func createVolumeSnapshotClassIfNotExist(
-	ctx context.Context,
-	cli client.Client,
-	vsCli intctrlutil.VolumeSnapshotCompatClient,
-	scName string) (*vsv1.VolumeSnapshotClass, error) {
-	scObj := storagev1.StorageClass{}
-	// ignore if not found storage class, use the default volume snapshot class
-	if err := cli.Get(ctx, client.ObjectKey{Name: scName}, &scObj); client.IgnoreNotFound(err) != nil {
-		return nil, err
-	}
-
-	vscList := vsv1.VolumeSnapshotClassList{}
-	if err := vsCli.List(&vscList); err != nil {
-		return nil, err
-	}
-	for _, item := range vscList.Items {
-		if item.Driver == scObj.Provisioner {
-			return item.DeepCopy(), nil
-		}
-	}
-
-	// not found matched volume snapshot class, create one
-	vscName := fmt.Sprintf("vsc-%s-%s", scName, scObj.UID[:8])
-	newVsc := builder.BuildVolumeSnapshotClass(vscName, scObj.Provisioner)
-	if err := vsCli.Create(newVsc); err != nil {
-		return nil, err
-	}
-	return newVsc, nil
 }
 
 func ensureVolumeSnapshotReady(

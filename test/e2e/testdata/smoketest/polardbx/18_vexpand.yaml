@@ -1,0 +1,16 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: pxc-cluster-vexpand-
+spec:
+  clusterRef: pxc
+  type: VolumeExpansion
+  volumeExpansion:
+    - componentName: gms
+      volumeClaimTemplates:
+        - name: data
+          storage: "21Gi"
+    - componentName: dn-0
+      volumeClaimTemplates:
+        - name: data
+          storage: "21Gi"

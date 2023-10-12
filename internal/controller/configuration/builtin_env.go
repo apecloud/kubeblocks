@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
-	b64 "encoding/base64"
 	"regexp"
 	"strings"
 
@@ -140,7 +139,7 @@ func (w *envWrapper) secretValue(secretRef *corev1.SecretKeySelector, container 
 	}
 	secretCiphertext := func(m map[string][]byte) (string, error) {
 		if v, ok := m[secretRef.Key]; ok {
-			return decodeString(v)
+			return string(v), nil
 		}
 		return "", nil
 	}
@@ -294,14 +293,6 @@ func getResourceObject[T generics.Object, PT generics.PObject[T]](w *envWrapper,
 	}
 	w.cache[gvk][key] = obj
 	return obj, nil
-}
-
-func decodeString(encoded []byte) (string, error) {
-	decoded, err := b64.StdEncoding.DecodeString(string(encoded))
-	if err != nil {
-		return "", err
-	}
-	return string(decoded), nil
 }
 
 func resourceRefValue(resourceRef *corev1.ResourceFieldSelector, containers []corev1.Container, curContainer *corev1.Container) (string, error) {

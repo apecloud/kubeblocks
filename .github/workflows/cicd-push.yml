@@ -125,7 +125,7 @@ jobs:
 
   make-test:
     needs: trigger-mode
-    runs-on: [self-hosted, kubeblocks-runner ]
+    runs-on: [self-hosted, gke-runner-go1.21]
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
     outputs:
       runner-name: ${{ steps.get_runner_name.outputs.runner_name }}

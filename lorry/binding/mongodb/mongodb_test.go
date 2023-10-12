@@ -45,6 +45,7 @@ func TestGetRole(t *testing.T) {
 				primitive.E{Key: "_id", Value: 0},
 				primitive.E{Key: "state", Value: 1},
 				primitive.E{Key: "stateStr", Value: "PRIMARY"},
+				primitive.E{Key: "self", Value: true},
 			},
 		}},
 	})

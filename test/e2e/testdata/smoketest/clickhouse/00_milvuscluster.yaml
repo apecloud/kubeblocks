@@ -1,0 +1,57 @@
+---
+# Source: milvus-cluster/templates/cluster.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: milvus-cluster
+  labels: 
+    helm.sh/chart: milvus-cluster-0.7.0-alpha.0
+    app.kubernetes.io/name: milvus-cluster
+    app.kubernetes.io/instance: milvus-cluster
+    app.kubernetes.io/version: "2.2.4"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  clusterDefinitionRef: milvus # ref clusterdefinition.name
+  clusterVersionRef: milvus-2.2.4 # ref clusterversion.name
+  terminationPolicy: Delete
+  affinity:
+  componentSpecs:
+    - name: milvus # user-defined
+      componentDefRef: milvus # ref clusterdefinition components.name
+      monitor: false
+      replicas: 1
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: 
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 10Gi
+    - name: etcd # user-defined
+      componentDefRef: etcd # ref clusterdefinition components.name
+      monitor: false
+      replicas: 1
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: 
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 10Gi
+    - name: minio # user-defined
+      componentDefRef: minio # ref clusterdefinition components.name
+      monitor: false
+      replicas: 1
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: 
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 10Gi

@@ -21,6 +21,7 @@ package postgres
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"strconv"
@@ -102,6 +103,12 @@ type PgxPoolIFace interface {
 	PgxIFace
 	Acquire(ctx context.Context) (*pgxpool.Conn, error)
 	Close()
+}
+
+type LocalCommand interface {
+	Run() error
+	GetStdout() *bytes.Buffer
+	GetStderr() *bytes.Buffer
 }
 
 type ConsensusMemberHealthStatus struct {

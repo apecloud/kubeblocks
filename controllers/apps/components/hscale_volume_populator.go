@@ -23,10 +23,8 @@ import (
 	"context"
 	"fmt"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -460,21 +458,7 @@ func isVolumeSnapshotEnabled(ctx context.Context, cli client.Client,
 		return false, nil
 	}
 
-	storageClass := storagev1.StorageClass{}
-	if err := cli.Get(ctx, types.NamespacedName{Name: *pvc.Spec.StorageClassName}, &storageClass); err != nil {
-		return false, client.IgnoreNotFound(err)
-	}
-
-	vscList := snapshotv1.VolumeSnapshotClassList{}
-	if err := cli.List(ctx, &vscList); err != nil {
-		return false, err
-	}
-	for _, vsc := range vscList.Items {
-		if vsc.Driver == storageClass.Provisioner {
-			return true, nil
-		}
-	}
-	return false, nil
+	return intctrlutil.IsVolumeSnapshotEnabled(ctx, cli, *pvc.Spec.StorageClassName)
 }
 
 func getBackupMethods(backupPolicy *dpv1alpha1.BackupPolicy, useVolumeSnapshot bool) []string {

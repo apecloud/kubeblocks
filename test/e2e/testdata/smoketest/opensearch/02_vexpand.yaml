@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: opensearch-cluster-vexpand-
+spec:
+  clusterRef: opensearch-cluster
+  type: VolumeExpansion
+  volumeExpansion:
+    - componentName: opensearch
+      volumeClaimTemplates:
+        - name: data
+          storage: "20Gi"

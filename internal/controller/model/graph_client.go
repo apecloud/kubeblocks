@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package model
 
 import (
+	"fmt"
 	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -33,6 +34,9 @@ type GraphOption string
 const (
 	// ForceNewVertexOption forces the GraphWriter methods to create a new vertex even if the object already exists in the underlying DAG.
 	ForceNewVertexOption = "ForceNewVertex"
+
+	// ReplaceIfExistingOption tells the GraphWriter methods to replace Obj and OriObj with the given ones if already existing.
+	ReplaceIfExistingOption = "ReplaceIfExisting"
 
 	// HaveDifferentTypeWithOption is used in FindAll method to find all objects have different type with the given one.
 	HaveDifferentTypeWithOption = "HaveDifferentTypeWith"
@@ -55,7 +59,7 @@ type GraphWriter interface {
 	Patch(dag *graph.DAG, objOld, objNew client.Object, opts ...GraphOption)
 
 	// Status updates the given obj's status in the underlying DAG.
-	Status(dag *graph.DAG, objOld, objNew client.Object)
+	Status(dag *graph.DAG, objOld, objNew client.Object, opts ...GraphOption)
 
 	// Noop means not to commit any change made to this obj in the execute phase.
 	Noop(dag *graph.DAG, obj client.Object)
@@ -116,6 +120,9 @@ func (r *realGraphClient) Create(dag *graph.DAG, obj client.Object, opts ...Grap
 }
 
 func (r *realGraphClient) Update(dag *graph.DAG, objOld, objNew client.Object, opts ...GraphOption) {
+	if objNew.GetResourceVersion() == "" {
+		fmt.Printf("got it")
+	}
 	r.doWrite(dag, objOld, objNew, ActionUpdatePtr(), opts...)
 }
 
@@ -127,8 +134,8 @@ func (r *realGraphClient) Delete(dag *graph.DAG, obj client.Object, opts ...Grap
 	r.doWrite(dag, nil, obj, ActionDeletePtr(), opts...)
 }
 
-func (r *realGraphClient) Status(dag *graph.DAG, objOld, objNew client.Object) {
-	r.doWrite(dag, objOld, objNew, ActionStatusPtr())
+func (r *realGraphClient) Status(dag *graph.DAG, objOld, objNew client.Object, opts ...GraphOption) {
+	r.doWrite(dag, objOld, objNew, ActionStatusPtr(), opts...)
 }
 
 func (r *realGraphClient) Noop(dag *graph.DAG, obj client.Object) {
@@ -213,13 +220,17 @@ func (r *realGraphClient) FindAll(dag *graph.DAG, obj interface{}, opts ...Graph
 }
 
 func (r *realGraphClient) doWrite(dag *graph.DAG, objOld, objNew client.Object, action *Action, opts ...GraphOption) {
-	forceNewVertex := func() bool {
+	forceNewVertex, replaceExisting := func() (bool, bool) {
+		var force, replace bool
 		for _, opt := range opts {
 			if opt == ForceNewVertexOption {
-				return true
+				force = true
+			}
+			if opt == ReplaceIfExistingOption {
+				replace = true
 			}
 		}
-		return false
+		return force, replace
 	}()
 	vertex := r.findMatchedVertex(dag, objNew, true)
 	switch {
@@ -227,6 +238,10 @@ func (r *realGraphClient) doWrite(dag *graph.DAG, objOld, objNew client.Object, 
 		objVertex, _ := vertex.(*ObjectVertex)
 		objVertex.Action = action
 		if objVertex.OriObj == nil {
+			objVertex.OriObj = objOld
+		}
+		if replaceExisting {
+			objVertex.Obj = objNew
 			objVertex.OriObj = objOld
 		}
 	default:
@@ -242,7 +257,7 @@ func (r *realGraphClient) doWrite(dag *graph.DAG, objOld, objNew client.Object, 
 func (r *realGraphClient) findMatchedVertex(dag *graph.DAG, object client.Object, deepest bool) graph.Vertex {
 	keyLookFor, err := GetGVKName(object)
 	if err != nil {
-		return nil
+		panic(fmt.Sprintf("parse gvk name failed, obj: %T, name: %s, err: %v", object, object.GetName(), err))
 	}
 
 	if deepest {

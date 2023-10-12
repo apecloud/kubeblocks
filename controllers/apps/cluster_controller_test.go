@@ -615,7 +615,7 @@ var _ = Describe("Cluster Controller", func() {
 			if policy != nil {
 				By(fmt.Sprintf("Checking backup of component %s created", comp.Name))
 				Eventually(testapps.List(&testCtx, generics.BackupSignature,
-					ml, client.InNamespace(clusterKey.Namespace))).WithTimeout(1000 * time.Second).Should(HaveLen(1))
+					ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(1))
 
 				backupKey := types.NamespacedName{Name: fmt.Sprintf("%s-%s-scaling",
 					clusterKey.Name, comp.Name),
@@ -2645,7 +2645,7 @@ func checkRestoreAndSetCompleted(clusterKey types.NamespacedName, compName strin
 		constant.KBManagedByKey:         "cluster",
 	}
 	Eventually(testapps.List(&testCtx, generics.RestoreSignature,
-		ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(scaleOutReplicas))
+		ml, client.InNamespace(clusterKey.Namespace))).WithTimeout(1000 * time.Second).Should(HaveLen(scaleOutReplicas))
 
 	By("Mocking restore phase to succeeded")
 	mockRestoreCompleted(ml)

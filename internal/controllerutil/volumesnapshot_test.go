@@ -39,7 +39,6 @@ var _ = Describe("VolumeSnapshot compat client", func() {
 		snapClassName = "test-vsc-name"
 	)
 
-	viper.SetDefault("VOLUMESNAPSHOT", "true")
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", "true")
 
 	It("test create/get/list/patch/delete", func() {

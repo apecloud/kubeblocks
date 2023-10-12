@@ -2003,7 +2003,7 @@ var _ = Describe("Cluster Controller", func() {
 			checkPreservedObjects(clusterObj.UID)
 		})
 
-		FIt("should successfully h-scale with multiple components", func() {
+		It("should successfully h-scale with multiple components", func() {
 			testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
 			viper.Set(constant.CfgKeyBackupPVCName, "")
 			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyCloneVolume)
@@ -2645,7 +2645,7 @@ func checkRestoreAndSetCompleted(clusterKey types.NamespacedName, compName strin
 		constant.KBManagedByKey:         "cluster",
 	}
 	Eventually(testapps.List(&testCtx, generics.RestoreSignature,
-		ml, client.InNamespace(clusterKey.Namespace))).WithTimeout(1000 * time.Second).Should(HaveLen(scaleOutReplicas))
+		ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(scaleOutReplicas))
 
 	By("Mocking restore phase to succeeded")
 	mockRestoreCompleted(ml)

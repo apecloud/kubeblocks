@@ -1,0 +1,37 @@
+annotations:
+  category: Database
+apiVersion: v2
+name: mariadb
+type: application
+version: 0.7.0-alpha.0
+description: ApeCloud MySQL is a database that is compatible with MySQL syntax and achieves high availability
+  through the utilization of the RAFT consensus protocol.
+dependencies:
+  - name: kblib
+    version: 0.1.0
+    repository: file://../kblib
+    alias: extra
+
+# This is the version number of the ApeCloud Mariadb being deployed,
+# rather than the version number of ApeCloud Mariadb-Scale itself.
+# From a user's perspective, the version  number of the frontend
+# proxy of the Mariadb being used is not relevant.
+appVersion: "10.6.15"
+
+keywords:
+  - mariadb
+  - database
+  - sql
+  - cluster
+  - raft
+
+home: https://github.com/apecloud/kubeblocks/tree/main/deploy/mariadb-cluster
+icon: https://kubeblocks.io/img/logo.png
+
+maintainers:
+  - name: ApeCloud
+    url: https://kubeblocks.io/
+
+sources:
+  - https://github.com/apecloud/kubeblocks/
+  - https://github.com/apecloud/kubeblocks/tree/main/deploy/mariadb

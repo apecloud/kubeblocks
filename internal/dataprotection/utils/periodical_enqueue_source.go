@@ -70,7 +70,7 @@ func NewPeriodicalEnqueueSource(
 
 func (p *PeriodicalEnqueueSource) Start(
 	ctx context.Context,
-	h handler.EventHandler,
+	_ handler.EventHandler,
 	q workqueue.RateLimitingInterface,
 	predicates ...predicate.Predicate) error {
 	go wait.Until(func() {

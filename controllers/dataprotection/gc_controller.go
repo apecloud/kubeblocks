@@ -93,7 +93,7 @@ func (r *GCReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 
 	// backup is being deleted, skip
 	if backup.Status.Phase == dpv1alpha1.BackupPhaseDeleting ||
-		backup.DeletionTimestamp.IsZero() {
+		!backup.DeletionTimestamp.IsZero() {
 		reqCtx.Log.V(1).Info("backup is being deleted, skipping")
 		return ctrlutil.Reconciled()
 	}

@@ -201,7 +201,7 @@ func buildLorryServiceContainer(component *SynthesizedComponent, container *core
 			ValueFrom: nil,
 		},
 		corev1.EnvVar{
-			Name: "KB_SERVICE_USER",
+			Name: constant.KBEnvServiceUser,
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
@@ -212,7 +212,7 @@ func buildLorryServiceContainer(component *SynthesizedComponent, container *core
 			},
 		},
 		corev1.EnvVar{
-			Name: "KB_SERVICE_PASSWORD",
+			Name: constant.KBEnvServicePassword,
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{

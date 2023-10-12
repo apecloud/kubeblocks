@@ -35,138 +35,132 @@ spec:
           spec:
             description: LogsExporterSinkSpec defines the desired state of LogsExporterSink
             properties:
-              inline:
-                description: SinkSource describes the config of the exporterSink
+              lokiConfig:
+                description: lokiConfig defines the config of the loki
                 properties:
-                  lokiConfig:
-                    description: lokiConfig defines the config of the loki
+                  clusterName:
+                    description: Specify the cluster of the referenced service.
+                    type: string
+                  endpoint:
+                    description: TODO the field for test Specify the endpoint of the
+                      referenced service.
+                    type: string
+                  namespace:
+                    default: default
+                    description: Specify the namespace of the referenced the serviceConnectionCredential
+                      object. An empty namespace is equivalent to the "default" namespace.
+                    maxLength: 63
+                    pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                    type: string
+                  retryPolicyOnFailure:
+                    description: Define retry strategy when loki service is unavailable.
+                      If not set, not retry sending batches in case of export failure.
                     properties:
-                      clusterName:
-                        description: Specify the cluster of the referenced service.
-                        type: string
-                      endpoint:
-                        description: TODO the field for test Specify the endpoint
-                          of the referenced service.
-                        type: string
-                      namespace:
-                        default: default
-                        description: Specify the namespace of the referenced the serviceConnectionCredential
-                          object. An empty namespace is equivalent to the "default"
-                          namespace.
-                        maxLength: 63
-                        pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
-                        type: string
-                      retryPolicyOnFailure:
-                        description: Define retry strategy when loki service is unavailable.
-                          If not set, not retry sending batches in case of export
-                          failure.
-                        properties:
-                          initialInterval:
-                            description: initialInterval the time to wait after the
-                              first failure before retrying.
-                            format: int64
-                            type: integer
-                          maxElapsedTime:
-                            description: maxElapsedTime is the maximum amount of time
-                              (including retries) spent trying to send a request/batch.
-                              Once this value is reached, the data is discarded.
-                            format: int64
-                            type: integer
-                          maxInterval:
-                            description: maxInterval is the upper bound on backoff
-                              interval. Once this value is reached the delay between
-                              consecutive retries will always be `MaxInterval`.
-                            format: int64
-                            type: integer
-                          multiplier:
-                            description: multiplier is the value multiplied by the
-                              backoff interval bounds
-                            format: int64
-                            type: integer
-                          randomizationFactor:
-                            description: randomizationFactor is a random factor used
-                              to calculate next backoffs Randomized interval = RetryInterval
-                              * (1 ± RandomizationFactor)
-                            format: int64
-                            type: integer
-                        type: object
-                      serviceConnectionCredential:
-                        description: Specify the name of the referenced the serviceConnectionCredential
-                          object.
-                        type: string
-                      sinkQueueConfig:
-                        description: Define whether to not enqueue batches before
-                          sending to the consumerSender.
-                        properties:
-                          numConsumers:
-                            description: numConsumers is the number of consumers from
-                              the queue.
-                            type: integer
-                          queueSize:
-                            description: queueSize is the maximum number of batches
-                              allowed in queue at a given time.
-                            type: integer
-                        type: object
-                    required:
-                    - serviceConnectionCredential
+                      initialInterval:
+                        description: initialInterval the time to wait after the first
+                          failure before retrying.
+                        format: int64
+                        type: integer
+                      maxElapsedTime:
+                        description: maxElapsedTime is the maximum amount of time
+                          (including retries) spent trying to send a request/batch.
+                          Once this value is reached, the data is discarded.
+                        format: int64
+                        type: integer
+                      maxInterval:
+                        description: maxInterval is the upper bound on backoff interval.
+                          Once this value is reached the delay between consecutive
+                          retries will always be `MaxInterval`.
+                        format: int64
+                        type: integer
+                      multiplier:
+                        description: multiplier is the value multiplied by the backoff
+                          interval bounds
+                        format: int64
+                        type: integer
+                      randomizationFactor:
+                        description: randomizationFactor is a random factor used to
+                          calculate next backoffs Randomized interval = RetryInterval
+                          * (1 ± RandomizationFactor)
+                        format: int64
+                        type: integer
                     type: object
-                  s3Config:
-                    description: s3Config defines the config of the s3
+                  serviceConnectionCredential:
+                    description: Specify the name of the referenced the serviceConnectionCredential
+                      object.
+                    type: string
+                  sinkQueueConfig:
+                    description: Define whether to not enqueue batches before sending
+                      to the consumerSender.
                     properties:
-                      accountConfig:
-                        description: accountConfig defines the config of the account
+                      numConsumers:
+                        description: numConsumers is the number of consumers from
+                          the queue.
+                        type: integer
+                      queueSize:
+                        description: queueSize is the maximum number of batches allowed
+                          in queue at a given time.
+                        type: integer
+                    type: object
+                required:
+                - serviceConnectionCredential
+                type: object
+              s3Config:
+                description: s3Config defines the config of the s3
+                properties:
+                  accountConfig:
+                    description: accountConfig defines the config of the account
+                    properties:
+                      accessKey:
+                        description: Specifies the access key to use to connect to
+                          the s3.
                         properties:
-                          accessKey:
-                            description: Specifies the access key to use to connect
-                              to the s3.
-                            properties:
-                              key:
-                                description: Specifies the key of the secret to select
-                                  from.  Must be a valid secret key.
-                                type: string
-                              name:
-                                description: Specifies the name of the secret.
-                                type: string
-                            required:
-                            - key
-                            - name
-                            type: object
-                          namespace:
-                            description: Specifies the namespace of the secret.
+                          key:
+                            description: Specifies the key of the secret to select
+                              from.  Must be a valid secret key.
                             type: string
-                          secretKey:
-                            description: Specifies the secret key to use to connect
-                              to the s3.
-                            properties:
-                              key:
-                                description: Specifies the key of the secret to select
-                                  from.  Must be a valid secret key.
-                                type: string
-                              name:
-                                description: Specifies the name of the secret.
-                                type: string
-                            required:
-                            - key
-                            - name
-                            type: object
+                          name:
+                            description: Specifies the name of the secret.
+                            type: string
                         required:
-                        - accessKey
-                        - secretKey
+                        - key
+                        - name
                         type: object
-                      bucket:
-                        description: bucket defines the bucket of the s3
+                      namespace:
+                        description: Specifies the namespace of the secret.
                         type: string
-                      partitionKey:
-                        description: partitionKey defines the prefix of the s3
-                        type: string
-                      region:
-                        description: region defines the region of the s3
-                        type: string
+                      secretKey:
+                        description: Specifies the secret key to use to connect to
+                          the s3.
+                        properties:
+                          key:
+                            description: Specifies the key of the secret to select
+                              from.  Must be a valid secret key.
+                            type: string
+                          name:
+                            description: Specifies the name of the secret.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
                     required:
-                    - bucket
-                    - partitionKey
-                    - region
+                    - accessKey
+                    - secretKey
                     type: object
+                  bucket:
+                    description: bucket defines the bucket of the s3
+                    type: string
+                  partitionKey:
+                    description: partitionKey defines the prefix of the s3
+                    type: string
+                  region:
+                    description: region defines the region of the s3
+                    type: string
+                required:
+                - bucket
+                - partitionKey
+                - region
                 type: object
               type:
                 description: type defines the type of the exporterSink
@@ -175,7 +169,6 @@ spec:
                 - loki
                 type: string
             required:
-            - inline
             - type
             type: object
           status:

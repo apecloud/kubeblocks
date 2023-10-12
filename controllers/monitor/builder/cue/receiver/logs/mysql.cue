@@ -16,34 +16,20 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 parameters: {
-	slow: {
-		type: *"slow" | string
-		include: *[ "/data/mysql/log/mysqld-slowquery.log"] | [...string]
-		include_file_name: *false | bool
-		start_at: *"beginning" | bool
-	}
-
-  error: {
-  	type: *"error" | string
-		include: *[ "/data/mysql/log/mysqld-error.log"] | [...string]
-		include_file_name: *false | bool
-		start_at: *"beginning" | bool
-  }
+	input_configs: *"'`config.LogsCollector`'" | string
+	container_id: *"'`container_id`'" | string
+	storage: *"file_storage/oteld" | string
 }
 
 
 output: {
-	"filelog/mysql/error": {
-		type: parameters.error.type
-		include: parameters.error.include
-		include_file_name: parameters.error.include_file_name
-		start_at: parameters.error.start_at
+	container_filelog: {
+		rule: "type == \"pod\" && config != nil && config.EnabledLogs"
+    config: {
+    	input_configs: parameters.input_configs
+      container_id: parameters.container_id
+      storage: parameters.storage
+     }
 	}
 
-	"filelog/mysql/slow":{
-		type: parameters.slow.type
-		include: parameters.slow.include
-		include_file_name: parameters.slow.include_file_name
-		start_at: parameters.slow.start_at
-	}
 }

@@ -125,7 +125,7 @@ type LogsExporterSinkSpec struct {
 
 	// SinkSource describes the config of the exporterSink
 	// +kubebuilder:validation:Required
-	SinkSource `json:"inline"`
+	SinkSource `json:",inline"`
 }
 
 // LogsExporterSinkStatus defines the observed state of LogsExporterSink

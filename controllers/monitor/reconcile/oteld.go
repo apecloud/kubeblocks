@@ -129,6 +129,9 @@ func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList) (
 			for _, data := range dataSource.Spec.DataSourceList {
 				pipline.ReceiverMap[data.Name] = monitortype.Receiver{Parameter: data.Parameter}
 			}
+			for _, exporter := range dataSource.Spec.ExporterNames {
+				pipline.ExporterMap[exporter] = true
+			}
 			oteldInstance.LogsPipline = append(oteldInstance.LogsPipline, pipline)
 		}
 		instanceMap[dataSource.Spec.Mode] = oteldInstance

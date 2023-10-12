@@ -75,11 +75,6 @@ func (cg *OteldConfigGenerater) appendReceiver(cfg yaml.MapSlice, instance *Otel
 		return nil, err
 	}
 	receiverSlice = append(receiverSlice, creatorSlice...)
-	attributesSlice, err := buildSliceFromCUE("receiver/resource_attributes.cue", map[string]any{})
-	if err != nil {
-		return nil, err
-	}
-	receiverSlice = append(receiverSlice, attributesSlice...)
 	return append(cfg, yaml.MapItem{Key: "receivers", Value: receiverSlice}), nil
 }
 
@@ -121,6 +116,11 @@ func newReceiverCreator(name string, datasourceType v1alpha1.DataSourceType, rec
 		receiverSlice = append(receiverSlice, receivers...)
 	}
 	creator = append(creator, yaml.MapItem{Key: "receivers", Value: receiverSlice})
+	attributesSlice, err := buildSliceFromCUE("receiver/resource_attributes.cue", map[string]any{})
+	if err != nil {
+		return yaml.MapItem{}, err
+	}
+	creator = append(creator, attributesSlice...)
 	return yaml.MapItem{Key: fmt.Sprintf(ReceiverNamePattern, name), Value: creator}, nil
 }
 
@@ -145,8 +145,10 @@ func (cg *OteldConfigGenerater) appendExporter(cfg yaml.MapSlice, metricsExporte
 	for _, exporter := range logsExporter {
 		switch exporter.Spec.Type {
 		case v1alpha1.LokiSinkType:
+			exporterConfig := exporter.Spec.LokiConfig
+			valueMap := map[string]any{"endpoint": exporterConfig.Endpoint}
 			tplName := fmt.Sprintf(ExporterTplPattern, v1alpha1.LokiSinkType)
-			logsExporter, err := buildSliceFromCUE(tplName, map[string]any{})
+			logsExporter, err := buildSliceFromCUE(tplName, valueMap)
 			if err != nil {
 				return nil, err
 			}
@@ -184,12 +186,12 @@ func (cg *OteldConfigGenerater) buildPiplineItem(instance *OteldInstance) yaml.M
 
 	if instance.MetricsPipline != nil {
 		metricsSlice := yaml.MapSlice{}
-		for _, pipline := range instance.MetricsPipline {
+		for _, mPipline := range instance.MetricsPipline {
 			receiverSlice := []string{}
-			receiverSlice = append(receiverSlice, fmt.Sprintf(ReceiverNamePattern, pipline.Name))
+			receiverSlice = append(receiverSlice, fmt.Sprintf(ReceiverNamePattern, mPipline.Name))
 			metricsSlice = append(metricsSlice, yaml.MapItem{Key: "receivers", Value: receiverSlice})
 			exporterSlice := []string{}
-			for name := range pipline.ExporterMap {
+			for name := range mPipline.ExporterMap {
 				exporterSlice = append(exporterSlice, name)
 			}
 			metricsSlice = append(metricsSlice, yaml.MapItem{Key: "exporters", Value: exporterSlice})
@@ -201,12 +203,12 @@ func (cg *OteldConfigGenerater) buildPiplineItem(instance *OteldInstance) yaml.M
 
 	if instance.LogsPipline != nil {
 		logsSlice := yaml.MapSlice{}
-		for _, pipline := range instance.LogsPipline {
+		for _, lPipline := range instance.LogsPipline {
 			receiverSlice := []string{}
-			receiverSlice = append(receiverSlice, fmt.Sprintf(ReceiverNamePattern, pipline.Name))
+			receiverSlice = append(receiverSlice, fmt.Sprintf(ReceiverNamePattern, lPipline.Name))
 			logsSlice = append(logsSlice, yaml.MapItem{Key: "receivers", Value: receiverSlice})
 			exporterSlice := []string{}
-			for name := range pipline.ExporterMap {
+			for name := range lPipline.ExporterMap {
 				exporterSlice = append(exporterSlice, name)
 			}
 
@@ -226,7 +228,7 @@ func (cg *OteldConfigGenerater) appendExtentions(cfg yaml.MapSlice) (yaml.MapSli
 		return nil, err
 	}
 	extensionSlice = append(extensionSlice, extension...)
-	return append(cfg, yaml.MapItem{Key: "extensions", Value: extensionSlice}), nil
+	return append(cfg, extensionSlice...), nil
 }
 
 func buildSliceFromCUE(tplName string, valMap map[string]any) (yaml.MapSlice, error) {

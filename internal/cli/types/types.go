@@ -106,6 +106,7 @@ const (
 	KindRestore                         = "Restore"
 	KindBackupPolicy                    = "BackupPolicy"
 	KindOps                             = "OpsRequest"
+	KindBackupSchedule                  = "BackupSchedule"
 )
 
 // K8S rbac API group

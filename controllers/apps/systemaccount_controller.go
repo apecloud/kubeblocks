@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -439,6 +440,10 @@ func (r *SystemAccountReconciler) getEngineFacts(reqCtx intctrlutil.RequestCtx, 
 	if err != nil {
 		return appsv1alpha1.KBAccountInvalid, err
 	}
+	if intctrlutil.IsNil(lorryClient) {
+		return appsv1alpha1.KBAccountInvalid, errors.New("not lorry service")
+	}
+
 	accounts, err := lorryClient.GetSystemAccounts()
 	if err != nil {
 		return appsv1alpha1.KBAccountInvalid, err

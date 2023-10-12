@@ -348,12 +348,12 @@ func GetPortByPortName(pod *corev1.Pod, portName string) (int32, error) {
 	return 0, fmt.Errorf("port %s not found", portName)
 }
 
-func GetProbeGRPCPort(pod *corev1.Pod) (int32, error) {
-	return GetPortByPortName(pod, constant.ProbeGRPCPortName)
+func GetLorryGRPCPort(pod *corev1.Pod) (int32, error) {
+	return GetPortByPortName(pod, constant.LorryGRPCPortName)
 }
 
-func GetProbeHTTPPort(pod *corev1.Pod) (int32, error) {
-	return GetPortByPortName(pod, constant.ProbeHTTPPortName)
+func GetLorryHTTPPort(pod *corev1.Pod) (int32, error) {
+	return GetPortByPortName(pod, constant.LorryHTTPPortName)
 }
 
 // GuessLorryHTTPPort guesses lorry container and serving port.

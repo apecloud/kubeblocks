@@ -221,6 +221,7 @@ const (
 	ProbeGRPCPortName                  = "probe-grpc-port"
 	ProbeInitContainerName             = "kb-initprobe"
 	WeSyncerContainerName              = "kb-we-syncer"
+	RoleProbeContainerName             = "kb-checkrole"
 	StatusProbeContainerName           = "kb-checkstatus"
 	RunningProbeContainerName          = "kb-checkrunning"
 	VolumeProtectionProbeContainerName = "kb-volume-protection"

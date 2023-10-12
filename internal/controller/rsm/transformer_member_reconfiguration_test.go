@@ -94,7 +94,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 		return d
 	}
 	expectStsNoopAction := func(d *graph.DAG, noop bool) {
-		stsList := graphCli.FindAll(d, &apps.StatefulSet{}, true)
+		stsList := graphCli.FindAll(d, &apps.StatefulSet{})
 		Expect(stsList).Should(HaveLen(1))
 		sts, _ := stsList[0].(*apps.StatefulSet)
 		Expect(graphCli.IsNooped(d, sts)).Should(Equal(noop))

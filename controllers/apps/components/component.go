@@ -1001,7 +1001,7 @@ func (c *rsmComponent) horizontalScaling(stsObj *appsv1.StatefulSet) int {
 
 func (c *rsmComponent) updatePodEnvConfig() {
 	graphCli := model.NewGraphClient(c.Client)
-	for _, cm := range graphCli.FindAll(c.dag, &corev1.ConfigMap{}, true) {
+	for _, cm := range graphCli.FindAll(c.dag, &corev1.ConfigMap{}) {
 		// TODO: need a way to reference the env config.
 		envConfigName := fmt.Sprintf("%s-%s-env", c.GetClusterName(), c.GetName())
 		if cm.GetName() == envConfigName {
@@ -1253,7 +1253,7 @@ func (c *rsmComponent) updatePDB(reqCtx intctrlutil.RequestCtx, cli client.Clien
 		return err
 	}
 	graphCli := model.NewGraphClient(c.Client)
-	for _, obj := range graphCli.FindAll(c.dag, &policyv1.PodDisruptionBudget{}, true) {
+	for _, obj := range graphCli.FindAll(c.dag, &policyv1.PodDisruptionBudget{}) {
 		pdbProto, _ := obj.(*policyv1.PodDisruptionBudget)
 		if pos := slices.IndexFunc(pdbObjList, func(pdbObj *policyv1.PodDisruptionBudget) bool {
 			return pdbObj.GetName() == pdbProto.GetName()
@@ -1290,7 +1290,7 @@ func (c *rsmComponent) updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.C
 	graphCli := model.NewGraphClient(c.Client)
 	// PVCs which have been added to the dag because of volume expansion.
 	pvcNameSet := sets.New[string]()
-	for _, obj := range graphCli.FindAll(c.dag, &corev1.PersistentVolumeClaim{}, true) {
+	for _, obj := range graphCli.FindAll(c.dag, &corev1.PersistentVolumeClaim{}) {
 		pvcNameSet.Insert(obj.GetName())
 	}
 

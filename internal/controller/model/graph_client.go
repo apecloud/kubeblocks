@@ -33,6 +33,9 @@ type GraphOption string
 const (
 	// ForceNewVertexOption forces the GraphWriter methods to create a new vertex even if the object already exists in the underlying DAG.
 	ForceNewVertexOption = "ForceNewVertex"
+
+	// HaveDifferentTypeWithOption is used in FindAll method to find all objects have different type with the given one.
+	HaveDifferentTypeWithOption = "HaveDifferentTypeWith"
 )
 
 type GraphWriter interface {
@@ -66,8 +69,9 @@ type GraphWriter interface {
 	// if multiple vertices exist(which can occur when ForceNewVertexOption being used), the one with the largest depth will be used.
 	DependOn(dag *graph.DAG, object client.Object, dependency ...client.Object)
 
-	// FindAll finds all objects that have same(hasSameType is true) or different(hasSameType is false) type with obj in the underlying DAG.
-	FindAll(dag *graph.DAG, obj interface{}, hasSameType bool) []client.Object
+	// FindAll finds all objects that have same type with obj in the underlying DAG.
+	// obey the GraphOption if provided.
+	FindAll(dag *graph.DAG, obj interface{}, opts ...GraphOption) []client.Object
 }
 
 type GraphClient interface {
@@ -141,7 +145,15 @@ func (r *realGraphClient) DependOn(dag *graph.DAG, object client.Object, depende
 	}
 }
 
-func (r *realGraphClient) FindAll(dag *graph.DAG, obj interface{}, hasSameType bool) []client.Object {
+func (r *realGraphClient) FindAll(dag *graph.DAG, obj interface{}, opts ...GraphOption) []client.Object {
+	hasSameType := func() bool {
+		for _, opt := range opts {
+			if opt == HaveDifferentTypeWithOption {
+				return false
+			}
+		}
+		return true
+	}()
 	objType := reflect.TypeOf(obj)
 	objects := make([]client.Object, 0)
 	for _, vertex := range dag.Vertices() {

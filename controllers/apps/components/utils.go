@@ -585,7 +585,7 @@ func updateComponentInfoToPods(
 	}
 	// list all pods in dag
 	graphCli := model.NewGraphClient(cli)
-	pods := graphCli.FindAll(dag, &corev1.Pod{}, true)
+	pods := graphCli.FindAll(dag, &corev1.Pod{})
 
 	replicasStr := strconv.Itoa(int(component.Replicas))
 	updateAnnotation := func(obj client.Object) {
@@ -629,7 +629,7 @@ func updateCustomLabelToPods(ctx context.Context,
 	}
 	// list all pods in dag
 	graphCli := model.NewGraphClient(cli)
-	pods := graphCli.FindAll(dag, &corev1.Pod{}, true)
+	pods := graphCli.FindAll(dag, &corev1.Pod{})
 
 	for _, customLabelSpec := range component.CustomLabelSpecs {
 		for _, resource := range customLabelSpec.Resources {

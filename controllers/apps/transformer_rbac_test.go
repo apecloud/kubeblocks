@@ -80,16 +80,16 @@ var _ = Describe("object rbac transformer test.", func() {
 			Name:      serviceAccountName,
 		}
 
+		graphCli = model.NewGraphClient(k8sClient)
+
 		transCtx = &clusterTransformContext{
 			Context:       ctx,
-			Client:        k8sClient,
+			Client:        graphCli,
 			EventRecorder: nil,
 			Logger:        logger,
 			Cluster:       cluster,
 			ClusterDef:    clusterDefObj,
 		}
-
-		graphCli = model.NewGraphClient(k8sClient)
 
 		dag = mockDAG(graphCli, cluster)
 		transformer = &RBACTransformer{}
@@ -121,6 +121,14 @@ var _ = Describe("object rbac transformer test.", func() {
 			dagExpected := mockDAG(graphCli, cluster)
 			graphCli.Create(dagExpected, serviceAccount)
 			graphCli.Create(dagExpected, roleBinding)
+			stsList := graphCli.FindAll(dagExpected, &appsv1.StatefulSet{})
+			for i := range stsList {
+				graphCli.DependOn(dagExpected, stsList[i], serviceAccount)
+			}
+			deployList := graphCli.FindAll(dagExpected, &appsv1.Deployment{})
+			for i := range deployList {
+				graphCli.DependOn(dagExpected, deployList[i], serviceAccount)
+			}
 			Expect(dag.Equals(dagExpected, model.DefaultLess)).Should(BeTrue())
 		})
 

@@ -245,7 +245,7 @@ var _ = Describe("Component", func() {
 				dag.AddVertex(&model.ObjectVertex{Obj: pods[0], Action: model.ActionUpdatePtr()})
 				Expect(updateCustomLabelToPods(testCtx.Ctx, k8sClient, cluster, comp, dag)).Should(Succeed())
 				graphCli := model.NewGraphClient(k8sClient)
-				podList := graphCli.FindAll(dag, &corev1.Pod{}, true)
+				podList := graphCli.FindAll(dag, &corev1.Pod{})
 				Expect(podList).Should(HaveLen(3))
 				for _, pod := range podList {
 					Expect(pod.GetLabels()).ShouldNot(BeNil())

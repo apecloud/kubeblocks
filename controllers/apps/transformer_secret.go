@@ -38,8 +38,8 @@ func (c *SecretTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
 	var secrets, noneClusterObjects []client.Object
-	secrets = graphCli.FindAll(dag, &corev1.Secret{}, true)
-	noneClusterObjects = graphCli.FindAll(dag, &appsv1alpha1.Cluster{}, false)
+	secrets = graphCli.FindAll(dag, &corev1.Secret{})
+	noneClusterObjects = graphCli.FindAll(dag, &appsv1alpha1.Cluster{}, model.HaveDifferentTypeWithOption)
 	for _, secret := range secrets {
 		graphCli.Noop(dag, secret)
 		for _, object := range noneClusterObjects {

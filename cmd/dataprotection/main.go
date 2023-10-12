@@ -38,6 +38,7 @@ import (
 	discoverycli "k8s.io/client-go/discovery"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -97,7 +98,7 @@ func init() {
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
 	viper.SetDefault("KUBEBLOCKS_SERVICEACCOUNT_NAME", "kubeblocks")
-	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
+	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "kb-system")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(dptypes.CfgKeyGCFrequencySeconds, dptypes.DefaultGCFrequencySeconds)
 }
@@ -260,6 +261,15 @@ func main() {
 		Recorder: mgr.GetEventRecorderFor("backup-repo-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "BackupRepo")
+		os.Exit(1)
+	}
+
+	if err = (&dpcontrollers.GCReconciler{
+		Client:   mgr.GetClient(),
+		Recorder: mgr.GetEventRecorderFor("gc-controller"),
+		Clock:    clock.RealClock{},
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "GarbageCollection")
 		os.Exit(1)
 	}
 

@@ -23,12 +23,15 @@ import (
 	"context"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -38,19 +41,18 @@ import (
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
-// GCReconciler deletes expired backups.
+// GCReconciler garbage collection reconciler, which periodically deletes expired backups.
 type GCReconciler struct {
 	client.Client
 	Recorder record.EventRecorder
-	clock    clock.WithTickerAndDelayedExecution
+	Clock    clock.WithTickerAndDelayedExecution
 }
 
 // SetupWithManager sets up the GCReconciler using the supplied manager.
 // GCController only watches on CreateEvent for ensuring every new backup will be
 // taken care of. Other events will be filtered to decrease the load on the controller.
 func (r *GCReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	s := dputils.NewPeriodicalEnqueueSource(mgr.GetClient(), &dpv1alpha1.BackupList{},
-		getGCFrequency(), dputils.PeriodicalEnqueueSourceOption{})
+	s := dputils.NewPeriodicalEnqueueSource(mgr.GetClient(), &dpv1alpha1.BackupList{}, getGCFrequency(), dputils.PeriodicalEnqueueSourceOption{})
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dpv1alpha1.Backup{}, builder.WithPredicates(predicate.Funcs{
 			UpdateFunc: func(_ event.UpdateEvent) bool {
@@ -67,7 +69,52 @@ func (r *GCReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;watch;delete
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups/status,verbs=get
+
+// Reconcile is part of the main kubernetes reconciliation loop which aims to
+// delete expired backups.
 func (r *GCReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	reqCtx := ctrlutil.RequestCtx{
+		Ctx:      ctx,
+		Req:      req,
+		Log:      log.FromContext(ctx).WithValues("gc backup", req.NamespacedName),
+		Recorder: r.Recorder,
+	}
+	reqCtx.Log.V(1).Info("gcController getting backup")
+
+	backup := &dpv1alpha1.Backup{}
+	if err := r.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, backup); err != nil {
+		if apierrors.IsNotFound(err) {
+			reqCtx.Log.Error(err, "backup ont found")
+			return ctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+	}
+
+	// backup is being deleted, skip
+	if backup.Status.Phase == dpv1alpha1.BackupPhaseDeleting ||
+		backup.DeletionTimestamp.IsZero() {
+		reqCtx.Log.V(1).Info("backup is being deleted, skipping")
+		return ctrlutil.Reconciled()
+	}
+
+	reqCtx.Log.V(1).Info("gc reconcile", "backup", req.String(),
+		"phase", backup.Status.Phase, "expiration", backup.Status.Expiration)
+	reqCtx.Log = reqCtx.Log.WithValues("expiration", backup.Status.Expiration)
+
+	now := r.Clock.Now()
+	if backup.Status.Expiration == nil || backup.Status.Expiration.After(now) {
+		reqCtx.Log.V(1).Info("backup is not expired yet, skipping")
+		return ctrlutil.Reconciled()
+	}
+
+	reqCtx.Log.Info("backup has expired, delete it", "backup", req.String())
+	if err := ctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, backup); err != nil {
+		reqCtx.Log.Error(err, "failed to delete backup")
+		r.Recorder.Event(backup, corev1.EventTypeWarning, "RemoveExpiredBackupsFailed", err.Error())
+		return ctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
 	return ctrlutil.Reconciled()
 }
 

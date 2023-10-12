@@ -1403,9 +1403,13 @@ func (o *CreateOptions) buildBackupConfig(cls *appsv1alpha1.Cluster) error {
 
 	// must set backup method when set backup config in cli
 	if len(flags) > 0 {
-		methodRequiredErr := fmt.Errorf("backup method is required, use --backup-method to specify one, run \"kbcli cd describe cd-name\" to show all backup methods")
+		var methodRequiredErr error
 		if o.BackupConfig == nil {
 			o.BackupConfig = &appsv1alpha1.ClusterBackup{}
+		}
+		// if the backup method is not exist and the user does not set the backup method, return error
+		if o.BackupConfig.Method == "" {
+			methodRequiredErr = fmt.Errorf("backup method is required, please use --backup-method to set it")
 		}
 
 		// if the flag is set by user, use the flag value

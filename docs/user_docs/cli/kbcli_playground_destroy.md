@@ -21,7 +21,7 @@ kbcli playground destroy [flags]
       --auto-approve       Skip interactive approval before destroying the playground
   -h, --help               help for destroy
       --purge              Purge all resources before destroying kubernetes cluster, delete all clusters created by KubeBlocks and uninstall KubeBlocks. (default true)
-      --timeout duration   Time to wait for installing KubeBlocks, such as --timeout=10m (default 5m0s)
+      --timeout duration   Time to wait for destroying KubeBlocks, such as --timeout=10m (default 5m0s)
 ```
 
 ### Options inherited from parent commands

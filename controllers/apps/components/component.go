@@ -79,7 +79,7 @@ type rsmComponent struct {
 	clusterVersion *appsv1alpha1.ClusterVersion    // building config needs the cluster version
 	component      *component.SynthesizedComponent // built synthesized component, replace it with component workload proto
 	dag            *graph.DAG
-	workloadVertex *model.ObjectVertex // DAG vertex of main workload object
+	workload       client.Object // main workload object
 	// runningWorkload can be nil, and the replicas of workload can be nil (zero)
 	runningWorkload *workloads.ReplicatedStateMachine
 }
@@ -99,7 +99,7 @@ func newRSMComponent(cli client.Client,
 		clusterVersion: clusterVersion,
 		component:      synthesizedComponent,
 		dag:            dag,
-		workloadVertex: nil,
+		workload:       nil,
 	}
 	return comp
 }
@@ -158,25 +158,37 @@ func (c *rsmComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	}
 }
 
-func (c *rsmComponent) setWorkload(obj client.Object, action *model.Action, parent *model.ObjectVertex) {
-	c.workloadVertex = c.addResource(obj, action, parent)
+func (c *rsmComponent) setWorkload(obj client.Object, action *model.Action, parent client.Object) {
+	graphCli := model.NewGraphClient(c.Client)
+	// set workload object as root vertex
+	graphCli.Root(c.dag, obj, obj)
+	c.workload = c.addResource(obj, action, parent)
 }
 
 func (c *rsmComponent) addResource(obj client.Object, action *model.Action,
-	parent *model.ObjectVertex) *model.ObjectVertex {
+	parent client.Object) client.Object {
 	if obj == nil {
 		panic("try to add nil object")
 	}
-	vertex := &model.ObjectVertex{
-		Obj:    obj,
-		Action: action,
+	if action == nil {
+		panic("object action should be set")
 	}
-	c.dag.AddVertex(vertex)
+	graphCli := model.NewGraphClient(c.Client)
+	switch *action {
+	case model.CREATE:
+		graphCli.Create(c.dag, obj)
+	case model.UPDATE:
+		graphCli.Update(c.dag, nil, obj)
+	case model.DELETE:
+		graphCli.Delete(c.dag, obj)
+	case model.NOOP:
+		graphCli.Noop(c.dag, obj)
+	}
 
 	if parent != nil {
-		c.dag.Connect(parent, vertex)
+		graphCli.DependOn(c.dag, parent, obj)
 	}
-	return vertex
+	return obj
 }
 
 func (c *rsmComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Client, builder componentWorkloadBuilder, load bool) error {
@@ -691,11 +703,11 @@ func (c *rsmComponent) isScaleOutFailed(reqCtx intctrlutil.RequestCtx, cli clien
 	if c.component.Replicas <= *c.runningWorkload.Spec.Replicas {
 		return false, nil
 	}
-	if c.workloadVertex == nil {
+	if c.workload == nil {
 		return false, nil
 	}
 	stsObj := ConvertRSMToSTS(c.runningWorkload)
-	rsmProto := c.workloadVertex.Obj.(*workloads.ReplicatedStateMachine)
+	rsmProto := c.workload.(*workloads.ReplicatedStateMachine)
 	stsProto := ConvertRSMToSTS(rsmProto)
 	backupKey := types.NamespacedName{
 		Namespace: stsObj.Namespace,
@@ -893,7 +905,7 @@ func (c *rsmComponent) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli client.C
 	}
 
 	updatePVCByRecreateFromStep := func(fromStep pvcRecreateStep) {
-		lastObj := c.workloadVertex.Obj
+		lastObj := c.workload
 		for step := pvRestorePolicyStep; step >= fromStep && step >= pvPolicyRetainStep; step-- {
 			lastObj = addStepMap[step](lastObj, step)
 		}
@@ -924,7 +936,7 @@ func (c *rsmComponent) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli client.C
 	if pvcQuantity := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; pvcQuantity.Cmp(vctProto.Spec.Resources.Requests[corev1.ResourceStorage]) != 0 {
 		// use pvc's update without anything extra
 		graphCli.Update(c.dag, nil, newPVC)
-		graphCli.DependOn(c.dag, c.workloadVertex.Obj, newPVC)
+		graphCli.DependOn(c.dag, c.workload, newPVC)
 		return nil
 	}
 	// all the else means no need to update
@@ -1023,7 +1035,7 @@ func (c *rsmComponent) updatePodReplicaLabel4Scaling(reqCtx intctrlutil.RequestC
 		}
 		obj.Annotations[constant.ComponentReplicasAnnotationKey] = strconv.Itoa(int(replicas))
 		graphCli.Update(c.dag, nil, obj)
-		graphCli.DependOn(c.dag, c.workloadVertex.Obj, obj)
+		graphCli.DependOn(c.dag, c.workload, obj)
 	}
 	return nil
 }
@@ -1098,7 +1110,7 @@ func (c *rsmComponent) deletePVCs4ScaleIn(reqCtx intctrlutil.RequestCtx, cli cli
 			// For simplicity, the updating dependency is added between them to guarantee that the PVCs to scale-in
 			// will be deleted or the scaling-in operation will be failed.
 			graphCli.Delete(c.dag, &pvc)
-			graphCli.DependOn(c.dag, c.workloadVertex.Obj, &pvc)
+			graphCli.DependOn(c.dag, c.workload, &pvc)
 		}
 	}
 	return nil
@@ -1118,8 +1130,8 @@ func (c *rsmComponent) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client
 	}
 
 	graphCli := model.NewGraphClient(c.Client)
-	graphCli.Noop(c.dag, c.workloadVertex.Obj)
-	rsmProto := c.workloadVertex.Obj.(*workloads.ReplicatedStateMachine)
+	graphCli.Noop(c.dag, c.workload)
+	rsmProto := c.workload.(*workloads.ReplicatedStateMachine)
 	stsProto := ConvertRSMToSTS(rsmProto)
 	d, err := newDataClone(reqCtx, cli, c.Cluster, c.component, stsObj, stsProto, backupKey)
 	if err != nil {
@@ -1136,10 +1148,10 @@ func (c *rsmComponent) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client
 	}
 	if succeed {
 		// pvcs are ready, rsm.replicas should be updated
-		graphCli.Update(c.dag, nil, c.workloadVertex.Obj)
+		graphCli.Update(c.dag, nil, c.workload)
 		return c.postScaleOut(reqCtx, cli, stsObj)
 	} else {
-		graphCli.Noop(c.dag, c.workloadVertex.Obj)
+		graphCli.Noop(c.dag, c.workload)
 		// update objs will trigger cluster reconcile, no need to requeue error
 		objs, err := d.cloneData(d)
 		if err != nil {
@@ -1198,15 +1210,14 @@ func (c *rsmComponent) updateUnderlyingResources(reqCtx intctrlutil.RequestCtx, 
 }
 
 func (c *rsmComponent) createWorkload() {
-	rsmProto := c.workloadVertex.Obj.(*workloads.ReplicatedStateMachine)
+	rsmProto := c.workload.(*workloads.ReplicatedStateMachine)
 	buildWorkLoadAnnotations(rsmProto, c.Cluster)
-	c.workloadVertex.Obj = rsmProto
-	c.workloadVertex.Action = model.ActionCreatePtr()
+	c.workload = rsmProto
 }
 
 func (c *rsmComponent) updateWorkload(rsmObj *workloads.ReplicatedStateMachine) bool {
 	rsmObjCopy := rsmObj.DeepCopy()
-	rsmProto := c.workloadVertex.Obj.(*workloads.ReplicatedStateMachine)
+	rsmProto := c.workload.(*workloads.ReplicatedStateMachine)
 
 	// remove original monitor annotations
 	if len(rsmObjCopy.Annotations) > 0 {
@@ -1240,8 +1251,7 @@ func (c *rsmComponent) updateWorkload(rsmObj *workloads.ReplicatedStateMachine) 
 		updatePodSpecSystemFields(&rsmObjCopy.Spec.Template.Spec)
 	}
 	if isTemplateUpdated || !reflect.DeepEqual(rsmObj.Annotations, rsmObjCopy.Annotations) {
-		c.workloadVertex.Obj = rsmObjCopy
-		c.workloadVertex.Action = model.ActionUpdatePtr()
+		c.workload = rsmObjCopy
 		return true
 	}
 	return false
@@ -1304,7 +1314,7 @@ func (c *rsmComponent) updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.C
 				continue
 			}
 			graphCli.Noop(c.dag, pvc)
-			graphCli.DependOn(c.dag, c.workloadVertex.Obj, pvc)
+			graphCli.DependOn(c.dag, c.workload, pvc)
 		}
 	}
 	return nil

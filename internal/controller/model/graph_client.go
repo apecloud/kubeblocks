@@ -40,7 +40,6 @@ const (
 
 type GraphWriter interface {
 	// Root setups the given obj as root vertex of the underlying DAG.
-	// this func should be called once before any others.
 	Root(dag *graph.DAG, objOld, objNew client.Object)
 
 	// Create saves the object obj in the underlying DAG.
@@ -85,12 +84,17 @@ type realGraphClient struct {
 }
 
 func (r *realGraphClient) Root(dag *graph.DAG, objOld, objNew client.Object) {
-	vertex := &ObjectVertex{
+	root := &ObjectVertex{
 		Obj:    objNew,
 		OriObj: objOld,
 		Action: ActionStatusPtr(),
 	}
-	dag.AddVertex(vertex)
+	dag.AddVertex(root)
+	for _, vertex := range dag.Vertices() {
+		if vertex != root {
+			dag.Connect(root, vertex)
+		}
+	}
 }
 
 func (r *realGraphClient) Create(dag *graph.DAG, obj client.Object, opts ...GraphOption) {

@@ -121,6 +121,7 @@ var _ = Describe("object rbac transformer test.", func() {
 			dagExpected := mockDAG(graphCli, cluster)
 			graphCli.Create(dagExpected, serviceAccount)
 			graphCli.Create(dagExpected, roleBinding)
+			graphCli.DependOn(dagExpected, roleBinding, serviceAccount)
 			stsList := graphCli.FindAll(dagExpected, &appsv1.StatefulSet{})
 			for i := range stsList {
 				graphCli.DependOn(dagExpected, stsList[i], serviceAccount)
@@ -151,6 +152,16 @@ var _ = Describe("object rbac transformer test.", func() {
 			graphCli.Create(dagExpected, serviceAccount)
 			graphCli.Create(dagExpected, roleBinding)
 			graphCli.Create(dagExpected, clusterRoleBinding)
+			graphCli.DependOn(dagExpected, roleBinding, clusterRoleBinding)
+			graphCli.DependOn(dagExpected, clusterRoleBinding, serviceAccount)
+			stsList := graphCli.FindAll(dagExpected, &appsv1.StatefulSet{})
+			for i := range stsList {
+				graphCli.DependOn(dagExpected, stsList[i], serviceAccount)
+			}
+			deployList := graphCli.FindAll(dagExpected, &appsv1.Deployment{})
+			for i := range deployList {
+				graphCli.DependOn(dagExpected, deployList[i], serviceAccount)
+			}
 			Expect(dag.Equals(dagExpected, model.DefaultLess)).Should(BeTrue())
 		})
 	})

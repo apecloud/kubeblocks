@@ -22,7 +22,6 @@ package apps
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
 	"reflect"
 
 	"github.com/go-logr/logr"
@@ -41,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -100,6 +100,10 @@ func (c *clusterTransformContext) GetRecorder() record.EventRecorder {
 
 func (c *clusterTransformContext) GetLogger() logr.Logger {
 	return c.Logger
+}
+
+func init() {
+	model.AddScheme(appsv1alpha1.AddToScheme)
 }
 
 // PlanBuilder implementation

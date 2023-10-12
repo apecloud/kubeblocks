@@ -57,8 +57,9 @@ type TestContext struct {
 var ErrUninitError = fmt.Errorf("cli uninitialized error")
 
 const (
-	envExistingClusterType = "EXISTING_CLUSTER_TYPE"
-	envUseExistingCluster  = "USE_EXISTING_CLUSTER"
+	envExistingClusterType   = "EXISTING_CLUSTER_TYPE"
+	envUseExistingCluster    = "USE_EXISTING_CLUSTER"
+	DefaultStorageProvisoner = "kubernetes.io/no-provisioner"
 )
 
 func init() {

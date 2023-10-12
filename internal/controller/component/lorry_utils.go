@@ -79,7 +79,7 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		return err
 	}
 
-	if componentProbes.RoleProbe != nil && component.RSMSpec.RoleProbe == nil {
+	if componentProbes.RoleProbe != nil && (component.RSMSpec == nil || component.RSMSpec.RoleProbe == nil) {
 		roleChangedContainer := container.DeepCopy()
 		buildRoleProbeContainer(component, roleChangedContainer, componentProbes.RoleProbe, int(lorrySvcHTTPPort))
 		lorryContainers = append(lorryContainers, *roleChangedContainer)

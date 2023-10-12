@@ -1508,7 +1508,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		// trigger rsm to reconcile as the underlying sts is not created
 		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(sts), func(rsm *workloads.ReplicatedStateMachine) {
-			rsm.Annotations = map[string]string{"time": time.Now().Format(time.RFC3339)}
+			rsm.Annotations["time"] = time.Now().Format(time.RFC3339)
 		})()).Should(Succeed())
 		By("Checking pods' annotations")
 		Eventually(func(g Gomega) {
@@ -1913,10 +1913,10 @@ var _ = Describe("Cluster Controller", func() {
 
 		It("should create all sub-resources successfully, with terminationPolicy=Halt lifecycle", func() {
 			compNameNDef := map[string]string{
-				//statelessCompName:   statelessCompDefName,
+				statelessCompName:   statelessCompDefName,
 				consensusCompName:   consensusCompDefName,
-				//statefulCompName:    statefulCompDefName,
-				//replicationCompName: replicationCompDefName,
+				statefulCompName:    statefulCompDefName,
+				replicationCompName: replicationCompDefName,
 			}
 			checkAllResourcesCreated(compNameNDef)
 

@@ -25,6 +25,8 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
+	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -37,6 +39,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
+	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -104,6 +110,12 @@ func (c *clusterTransformContext) GetLogger() logr.Logger {
 
 func init() {
 	model.AddScheme(appsv1alpha1.AddToScheme)
+	model.AddScheme(dpv1alpha1.AddToScheme)
+	model.AddScheme(snapshotv1.AddToScheme)
+	model.AddScheme(snapshotv1beta1.AddToScheme)
+	model.AddScheme(extensionsv1alpha1.AddToScheme)
+	model.AddScheme(workloadsv1alpha1.AddToScheme)
+	model.AddScheme(storagev1alpha1.AddToScheme)
 }
 
 // PlanBuilder implementation

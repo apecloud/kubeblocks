@@ -1205,7 +1205,7 @@ func (c *rsmComponent) createWorkload() {
 	rsmProto := c.workload.(*workloads.ReplicatedStateMachine)
 	buildWorkLoadAnnotations(rsmProto, c.Cluster)
 	graphCli := model.NewGraphClient(c.Client)
-	graphCli.Create(c.dag, c.workload)
+	graphCli.Create(c.dag, c.workload, model.ReplaceIfExistingOption)
 }
 
 func (c *rsmComponent) updateWorkload(rsmObj *workloads.ReplicatedStateMachine) bool {

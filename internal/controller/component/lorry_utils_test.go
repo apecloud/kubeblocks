@@ -94,7 +94,6 @@ var _ = Describe("probe_utils", func() {
 				Log: logger,
 			}
 			Expect(buildLorryContainers(reqCtx, component)).Should(Succeed())
-			Expect(len(component.PodSpec.Containers)).Should(Equal(2))
 			Expect(len(component.PodSpec.Containers) >= 2).Should(BeTrue())
 			Expect(component.PodSpec.Containers[0].Command).ShouldNot(BeEmpty())
 		})

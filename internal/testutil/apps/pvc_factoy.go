@@ -71,6 +71,11 @@ func (factory *MockPersistentVolumeClaimFactory) SetStorage(storageSize string) 
 	return factory
 }
 
+func (factory *MockPersistentVolumeClaimFactory) SetVolumeName(volName string) *MockPersistentVolumeClaimFactory {
+	factory.Get().Spec.VolumeName = volName
+	return factory
+}
+
 func (factory *MockPersistentVolumeClaimFactory) SetAnnotations(annotations map[string]string) *MockPersistentVolumeClaimFactory {
 	factory.Get().Annotations = annotations
 	return factory

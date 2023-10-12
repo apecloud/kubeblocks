@@ -14,7 +14,7 @@ spec:
   type: Helm
 
   helm:
-    chartLocationURL: oci://registry-1.docker.io/bitnamicharts/minio
+    chartLocationURL: https://jihulab.com/api/v4/projects/152630/packages/helm/stable/charts/minio-12.8.12.tgz
 
     installValues:
       setValues:

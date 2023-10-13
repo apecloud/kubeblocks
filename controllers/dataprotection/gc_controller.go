@@ -44,15 +44,25 @@ import (
 // GCReconciler garbage collection reconciler, which periodically deletes expired backups.
 type GCReconciler struct {
 	client.Client
-	Recorder record.EventRecorder
-	Clock    clock.WithTickerAndDelayedExecution
+	Recorder  record.EventRecorder
+	clock     clock.WithTickerAndDelayedExecution
+	frequency time.Duration
+}
+
+func NewGCReconciler(mgr ctrl.Manager) *GCReconciler {
+	return &GCReconciler{
+		Client:    mgr.GetClient(),
+		Recorder:  mgr.GetEventRecorderFor("gc-controller"),
+		clock:     clock.RealClock{},
+		frequency: getGCFrequency(),
+	}
 }
 
 // SetupWithManager sets up the GCReconciler using the supplied manager.
 // GCController only watches on CreateEvent for ensuring every new backup will be
 // taken care of. Other events will be filtered to decrease the load on the controller.
 func (r *GCReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	s := dputils.NewPeriodicalEnqueueSource(mgr.GetClient(), &dpv1alpha1.BackupList{}, getGCFrequency(), dputils.PeriodicalEnqueueSourceOption{})
+	s := dputils.NewPeriodicalEnqueueSource(mgr.GetClient(), &dpv1alpha1.BackupList{}, r.frequency, dputils.PeriodicalEnqueueSourceOption{})
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dpv1alpha1.Backup{}, builder.WithPredicates(predicate.Funcs{
 			UpdateFunc: func(_ event.UpdateEvent) bool {
@@ -102,7 +112,7 @@ func (r *GCReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 		"phase", backup.Status.Phase, "expiration", backup.Status.Expiration)
 	reqCtx.Log = reqCtx.Log.WithValues("expiration", backup.Status.Expiration)
 
-	now := r.Clock.Now()
+	now := r.clock.Now()
 	if backup.Status.Expiration == nil || backup.Status.Expiration.After(now) {
 		reqCtx.Log.V(1).Info("backup is not expired yet, skipping")
 		return ctrlutil.Reconciled()

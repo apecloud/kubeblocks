@@ -43,7 +43,7 @@ type BackupSpec struct {
 	DeletionPolicy BackupDeletionPolicy `json:"deletionPolicy,omitempty"`
 
 	// retentionPeriod determines a duration up to which the backup should be kept.
-	// controller will remove all backups that are older than the RetentionPeriod.
+	// Controller will remove all backups that are older than the RetentionPeriod.
 	// For example, RetentionPeriod of `30d` will keep only the backups of last 30 days.
 	// Sample duration format:
 	// - years: 	2y
@@ -52,7 +52,7 @@ type BackupSpec struct {
 	// - hours: 	12h
 	// - minutes: 	30m
 	// You can also combine the above durations. For example: 30d12h30m
-	// +kubebuilder:default="7d"
+	// If not set, the backup will be kept forever.
 	// +optional
 	RetentionPeriod RetentionPeriod `json:"retentionPeriod,omitempty"`
 

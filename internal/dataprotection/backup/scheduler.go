@@ -269,6 +269,7 @@ kind: Backup
 metadata:
   labels:
     dataprotection.kubeblocks.io/autobackup: "true"
+    dataprotection.kubeblocks.io/backup-schedule: "%s"
   name: %s
   namespace: %s
 spec:
@@ -276,7 +277,7 @@ spec:
   backupMethod: %s
   retentionPeriod: %s
 EOF
-`, s.generateBackupName(), s.BackupSchedule.Namespace,
+`, s.BackupSchedule.Name, s.generateBackupName(), s.BackupSchedule.Namespace,
 		s.BackupPolicy.Name, schedulePolicy.BackupMethod,
 		schedulePolicy.RetentionPeriod)
 

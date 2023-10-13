@@ -28,7 +28,7 @@ const (
 // config default values
 const (
 	// DefaultGCFrequencySeconds is the default gc frequency, its unit is second
-	DefaultGCFrequencySeconds = 60
+	DefaultGCFrequencySeconds = 60 * 60
 )
 
 const (

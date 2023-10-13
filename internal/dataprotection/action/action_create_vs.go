@@ -117,7 +117,6 @@ func (c *CreateVolumeSnapshotAction) Execute(ctx Context) (*dpv1alpha1.ActionSta
 	// volume snapshot is ready and status is not error
 	// TODO(ldm): now only support one volume to take snapshot, set its time, size to status
 	return sb.phase(dpv1alpha1.ActionPhaseCompleted).
-		phase(dpv1alpha1.ActionPhaseCompleted).
 		totalSize(snap.Status.RestoreSize.String()).
 		timeRange(snap.Status.CreationTime, snap.Status.CreationTime).
 		build(), nil

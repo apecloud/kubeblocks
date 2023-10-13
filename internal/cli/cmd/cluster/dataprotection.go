@@ -75,26 +75,18 @@ var (
 		# edit backup policy
 		kbcli cluster edit-backup-policy <backup-policy-name>
 
-        # enable pitr
-		kbcli cluster edit-backup-policy <backup-policy-name> --set schedule.logfile.enable=true
+        # update backup Repo
+		kbcli cluster edit-backup-policy <backup-policy-name> --set backupRepoName=<backup-repo-name>
 
 	    # using short cmd to edit backup policy
         kbcli cluster edit-bp <backup-policy-name>
 	`)
 	createBackupExample = templates.Examples(`
-		# create a backup, the default type is snapshot.
-		kbcli cluster backup mycluster
-
-		# create a snapshot backup
-		# create a snapshot of the cluster's persistent volume for backup
-		kbcli cluster backup mycluster --type snapshot
-
-		# create a datafile backup
-		# backup all files under the data directory and save them to the specified storage, only full backup is supported now.
-		kbcli cluster backup mycluster --type datafile 
+		# create a backup with method 
+		kbcli cluster backup mycluster --method volume-snapshot
 
 		# create a backup with specified backup policy
-		kbcli cluster backup mycluster --policy <backup-policy-name>
+		kbcli cluster backup mycluster --method volume-snapshot --policy <backup-policy-name>
 	`)
 	listBackupExample = templates.Examples(`
 		# list all backups
@@ -107,10 +99,6 @@ var (
 	createRestoreExample = templates.Examples(`
 		# restore a new cluster from a backup
 		kbcli cluster restore new-cluster-name --backup backup-name
-
-		# restore a new cluster from point in time
-		kbcli cluster restore new-cluster-name --restore-to-time "Apr 13,2023 18:40:35 UTC+0800" --backup logfile-backup
-        kbcli cluster restore new-cluster-name --restore-to-time "2023-04-13T18:40:35+08:00" --backup logfile-backup
 	`)
 	describeBackupExample = templates.Examples(`
 		# describe a backup

@@ -2,8 +2,6 @@ module github.com/apecloud/kubeblocks
 
 go 1.21
 
-toolchain go1.21.3
-
 require (
 	cuelang.org/go v0.6.0
 	github.com/99designs/keyring v1.2.2

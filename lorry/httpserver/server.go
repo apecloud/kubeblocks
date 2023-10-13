@@ -108,7 +108,7 @@ func (s *server) StartNonBlocking() error {
 
 func (s *server) apiLogger(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
-		reqLogger :=
+		reqLogger := logger
 		if userAgent := string(ctx.Request.Header.Peek("User-Agent")); userAgent != "" {
 			reqLogger = logger.WithValues("useragent", userAgent)
 		}

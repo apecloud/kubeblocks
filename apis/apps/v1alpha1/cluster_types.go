@@ -194,38 +194,44 @@ type ResourceMeta struct {
 	// +optional
 	SubPath string `json:"subPath,omitempty"`
 
-	// asVolumeFrom is optional: the list of containers will be injected into volumeMounts.
+	// asVolumeFrom defines the list of containers will be injected into volumeMounts.
 	// +listType=set
 	// +optional
 	AsVolumeFrom []string `json:"asVolumeFrom,omitempty"`
 }
 
 type SecretRef struct {
-	ResourceMeta              `json:",inline"`
-	corev1.SecretVolumeSource `json:",inline"`
+	ResourceMeta `json:",inline"`
+
+	// secret defines the secret volume source.
+	// +kubebuilder:validation:Required
+	Secret corev1.SecretVolumeSource `json:"secret"`
 }
 
 type ConfigMapRef struct {
-	ResourceMeta                 `json:",inline"`
-	corev1.ConfigMapVolumeSource `json:",inline"`
+	ResourceMeta `json:",inline"`
+
+	// configMap defines the configmap volume source.
+	// +kubebuilder:validation:Required
+	ConfigMap corev1.ConfigMapVolumeSource `json:"configMap"`
 }
 
 type UserResourceRefs struct {
-	// secrets defines the user-defined secrets.
+	// secretRefs defines the user-defined secrets.
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
 	// +optional
-	Secrets []SecretRef `json:"secrets,omitempty"`
+	SecretRefs []SecretRef `json:"secretRefs,omitempty"`
 
-	// secrets defines the user-defined configmaps.
+	// configMapRefs defines the user-defined configmaps.
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
 	// +optional
-	ConfigMaps []ConfigMapRef `json:"configMaps,omitempty"`
+	ConfigMapRefs []ConfigMapRef `json:"configMapRefs,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster.

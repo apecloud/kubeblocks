@@ -350,11 +350,11 @@ func doBuildCustomVolumes(podSpec *corev1.PodSpec, cluster *appsv1alpha1.Cluster
 	}
 
 	volumes := podSpec.Volumes
-	for _, configMap := range comp.UserResourceRefs.ConfigMaps {
-		volumes = append(volumes, newSourceFromResource(configMap.Name, configMap.ConfigMapVolumeSource.DeepCopy()))
+	for _, configMap := range comp.UserResourceRefs.ConfigMapRefs {
+		volumes = append(volumes, newSourceFromResource(configMap.Name, configMap.ConfigMap.DeepCopy()))
 	}
-	for _, secret := range comp.UserResourceRefs.Secrets {
-		volumes = append(volumes, newSourceFromResource(secret.Name, secret.SecretVolumeSource.DeepCopy()))
+	for _, secret := range comp.UserResourceRefs.SecretRefs {
+		volumes = append(volumes, newSourceFromResource(secret.Name, secret.Secret.DeepCopy()))
 	}
 	podSpec.Volumes = volumes
 	buildVolumeMountForContainers(podSpec, *comp.UserResourceRefs)
@@ -362,10 +362,10 @@ func doBuildCustomVolumes(podSpec *corev1.PodSpec, cluster *appsv1alpha1.Cluster
 }
 
 func buildVolumeMountForContainers(podSpec *corev1.PodSpec, resourceRefs appsv1alpha1.UserResourceRefs) {
-	for _, configMap := range resourceRefs.ConfigMaps {
+	for _, configMap := range resourceRefs.ConfigMapRefs {
 		newVolumeMount(podSpec, configMap.ResourceMeta)
 	}
-	for _, secret := range resourceRefs.Secrets {
+	for _, secret := range resourceRefs.SecretRefs {
 		newVolumeMount(podSpec, secret.ResourceMeta)
 	}
 }

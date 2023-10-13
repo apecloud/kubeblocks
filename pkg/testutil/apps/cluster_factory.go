@@ -188,7 +188,7 @@ func (factory *MockClusterFactory) AddUserSecretVolume(name, mountPoint, resName
 			MountPoint:   mountPoint,
 			AsVolumeFrom: []string{containerName},
 		},
-		SecretVolumeSource: corev1.SecretVolumeSource{
+		Secret: corev1.SecretVolumeSource{
 			SecretName: resName,
 		},
 	}
@@ -199,7 +199,7 @@ func (factory *MockClusterFactory) AddUserSecretVolume(name, mountPoint, resName
 			userResourcesRefs = &appsv1alpha1.UserResourceRefs{}
 			comps[len(comps)-1].UserResourceRefs = userResourcesRefs
 		}
-		userResourcesRefs.Secrets = append(userResourcesRefs.Secrets, secretResource)
+		userResourcesRefs.SecretRefs = append(userResourcesRefs.SecretRefs, secretResource)
 	}
 	factory.Get().Spec.ComponentSpecs = comps
 	return factory
@@ -212,7 +212,7 @@ func (factory *MockClusterFactory) AddUserConfigmapVolume(name, mountPoint, resN
 			MountPoint:   mountPoint,
 			AsVolumeFrom: []string{containerName},
 		},
-		ConfigMapVolumeSource: corev1.ConfigMapVolumeSource{
+		ConfigMap: corev1.ConfigMapVolumeSource{
 			LocalObjectReference: corev1.LocalObjectReference{
 				Name: resName,
 			},
@@ -225,7 +225,7 @@ func (factory *MockClusterFactory) AddUserConfigmapVolume(name, mountPoint, resN
 			userResourcesRefs = &appsv1alpha1.UserResourceRefs{}
 			comps[len(comps)-1].UserResourceRefs = userResourcesRefs
 		}
-		userResourcesRefs.ConfigMaps = append(userResourcesRefs.ConfigMaps, cmResource)
+		userResourcesRefs.ConfigMapRefs = append(userResourcesRefs.ConfigMapRefs, cmResource)
 	}
 	factory.Get().Spec.ComponentSpecs = comps
 	return factory

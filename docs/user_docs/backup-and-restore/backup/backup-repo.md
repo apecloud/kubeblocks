@@ -71,10 +71,44 @@ There are various ways to create a BackupRepo. Make sure you have done all the n
 
 1. Install MinIO.
 
+   <Tabs>
+
+   <TabItem value="kbcli" label="kbcli" default>
+
    ```bash
-   helm install minio oci://registry-1.docker.io/bitnamicharts/minio
+   # Install via add-on
+   kbcli addon enable minio
+
+   # Access MinIO dashboard
+   kbcli dashboard open minio
    ```
+
+   </TabItem>
+
+   <TabItem value="Helm" label="Helm">
+
+   ```bash
+   helm install minio oci://registry-1.docker.io/   bitnamicharts/minio
+   ```
+
+   </TabItem>
+
+   </Tabs>
+
    To get initial username and password, try the following.
+
+   <Tabs>
+
+   <TabItem value="kbcli" label="kbcli" default>
+
+   ``` bash
+   Initial username: kubeblocks
+   Initial password: kubeblocks
+   ```
+
+   </TabItem>
+
+   <TabItem value="Helm" label="Helm">
 
    ```bash
    # Initial username
@@ -83,6 +117,17 @@ There are various ways to create a BackupRepo. Make sure you have done all the n
    # Initial password
    echo $(kubectl get secret --namespace default minio -o jsonpath="{.data.root-password}" | base64 -d)       
    ```
+
+   </TabItem>
+
+   </Tabs>
+
+:::note
+
+If you encounter connection issues while logging in to MinIO with `kbcli dashboard open minio`, try running the command `kubectl port-forward --namespace kb-system svc/kb-addon-minio 9001:9001` (You may need to retry a few times) and then access the dashboard.
+
+:::
+
 
 2. Generate credentials.
 

@@ -51,7 +51,7 @@ kbcli kubeblocks install
 
 If you want to install KubeBlocks with a specified version, follow the steps below.
 
-1. View the available version.
+1. View the available versions.
 
    ```bash
    kbcli kubeblocks list-versions

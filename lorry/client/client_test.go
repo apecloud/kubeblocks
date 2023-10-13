@@ -51,12 +51,12 @@ func TestNewClientWithPod(t *testing.T) {
 		GetObject()
 	pod.Spec.Containers[0].Ports = []corev1.ContainerPort{{
 		ContainerPort: int32(3501),
-		Name:          constant.ProbeHTTPPortName,
+		Name:          constant.LorryHTTPPortName,
 		Protocol:      "TCP",
 	},
 		{
 			ContainerPort: int32(port),
-			Name:          constant.ProbeGRPCPortName,
+			Name:          constant.LorryGRPCPortName,
 			Protocol:      "TCP",
 		},
 	}
@@ -319,12 +319,12 @@ func initSQLChannelClient(httpPort int, t *testing.T) (*OperationClient, func(),
 	pod.Spec.Containers[0].Ports = []corev1.ContainerPort{
 		{
 			ContainerPort: int32(httpPort),
-			Name:          constant.ProbeHTTPPortName,
+			Name:          constant.LorryHTTPPortName,
 			Protocol:      "TCP",
 		},
 		{
 			ContainerPort: int32(port),
-			Name:          constant.ProbeGRPCPortName,
+			Name:          constant.LorryGRPCPortName,
 			Protocol:      "TCP",
 		},
 	}

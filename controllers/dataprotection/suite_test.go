@@ -73,11 +73,11 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	// if viper.GetBool("ENABLE_DEBUG_LOG") {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true), func(o *zap.Options) {
-		o.TimeEncoder = zapcore.ISO8601TimeEncoder
-	}))
-	// }
+	if viper.GetBool("ENABLE_DEBUG_LOG") {
+		logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true), func(o *zap.Options) {
+			o.TimeEncoder = zapcore.ISO8601TimeEncoder
+		}))
+	}
 	reconcileInterval = time.Millisecond
 
 	ctx, cancel = context.WithCancel(context.TODO())

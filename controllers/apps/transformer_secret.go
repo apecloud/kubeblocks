@@ -41,13 +41,13 @@ func (c *SecretTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 	secrets = graphCli.FindAll(dag, &corev1.Secret{})
 	noneClusterObjects = graphCli.FindAll(dag, &appsv1alpha1.Cluster{}, model.HaveDifferentTypeWithOption)
 	for _, secret := range secrets {
-		if graphCli.IsAction(dag, secret, model.UPDATE) {
+		if graphCli.IsAction(dag, secret, model.ActionUpdatePtr()) {
 			graphCli.Noop(dag, secret)
 		}
 		for _, object := range noneClusterObjects {
 			// manipulate all secrets first
 			if _, ok := object.(*corev1.Secret); !ok {
-				if !graphCli.IsAction(dag, secret, model.DELETE) {
+				if !graphCli.IsAction(dag, secret, model.ActionDeletePtr()) {
 					graphCli.DependOn(dag, object, secret)
 				}
 			}

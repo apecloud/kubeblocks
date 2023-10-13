@@ -1,6 +1,8 @@
 module github.com/apecloud/kubeblocks
 
-go 1.20
+go 1.21
+
+toolchain go1.21.3
 
 require (
 	cuelang.org/go v0.6.0

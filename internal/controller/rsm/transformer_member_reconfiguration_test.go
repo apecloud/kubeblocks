@@ -98,7 +98,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 		stsList := graphCli.FindAll(d, &apps.StatefulSet{})
 		Expect(stsList).Should(HaveLen(1))
 		sts, _ := stsList[0].(*apps.StatefulSet)
-		Expect(graphCli.IsAction(d, sts, model.NOOP)).Should(Equal(noop))
+		Expect(graphCli.IsAction(d, sts, model.ActionNoopPtr())).Should(Equal(noop))
 	}
 
 	BeforeEach(func() {

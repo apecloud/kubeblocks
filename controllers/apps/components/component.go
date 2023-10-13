@@ -184,7 +184,7 @@ func (c *rsmComponent) addResource(obj client.Object, action *model.Action,
 		panic("try to add nil object")
 	}
 	graphCli := model.NewGraphClient(c.Client)
-	graphCli.Do(c.dag, obj, action)
+	graphCli.Do(c.dag, nil, obj, action, nil)
 	if parent != nil {
 		graphCli.DependOn(c.dag, parent, obj)
 	}
@@ -400,7 +400,7 @@ func (c *rsmComponent) validateObjectsAction() error {
 			return fmt.Errorf("unexpected nil object, cluster: %s, component: %s",
 				c.GetClusterName(), c.GetName())
 		}
-		if graphCli.IsNilAction(c.dag, object) {
+		if graphCli.IsAction(c.dag, object, nil) {
 			return fmt.Errorf("unexpected nil vertex action, cluster: %s, component: %s, object: %T",
 				c.GetClusterName(), c.GetName(), object)
 		}
@@ -417,13 +417,13 @@ func (c *rsmComponent) resolveObjectsAction(reqCtx intctrlutil.RequestCtx, cli c
 	graphCli := model.NewGraphClient(c.Client)
 	objects := graphCli.FindAll(c.dag, nil, model.HaveDifferentTypeWithOption)
 	for _, object := range objects {
-		if !graphCli.IsNilAction(c.dag, object) {
+		if !graphCli.IsAction(c.dag, object, nil) {
 			continue
 		}
 		if action, err := resolveObjectAction(snapshot, object, cli.Scheme()); err != nil {
 			return err
 		} else {
-			graphCli.Do(c.dag, object, action)
+			graphCli.Do(c.dag, nil, object, action, nil)
 		}
 	}
 	if c.GetCluster().IsStatusUpdating() {
@@ -836,8 +836,8 @@ func (c *rsmComponent) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli client.C
 		pvRestorePolicyStep
 	)
 
-	addStepMap := map[pvcRecreateStep]func(from client.Object, step pvcRecreateStep) client.Object{
-		pvPolicyRetainStep: func(from client.Object, step pvcRecreateStep) client.Object {
+	addStepMap := map[pvcRecreateStep]func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex{
+		pvPolicyRetainStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 1: update pv to retain
 			retainPV := pv.DeepCopy()
 			if retainPV.Labels == nil {
@@ -850,39 +850,30 @@ func (c *rsmComponent) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli client.C
 			}
 			retainPV.Annotations[constant.PVLastClaimPolicyAnnotationKey] = string(pv.Spec.PersistentVolumeReclaimPolicy)
 			retainPV.Spec.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimRetain
-			graphCli.Patch(c.dag, pv, retainPV, model.ForceCreatingVertexOption)
-			graphCli.DependOn(c.dag, from, retainPV)
-			return retainPV
+			return graphCli.Do(c.dag, pv, retainPV, model.ActionPatchPtr(), fromVertex)
 		},
-		deletePVCStep: func(from client.Object, step pvcRecreateStep) client.Object {
+		deletePVCStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 2: delete pvc, this will not delete pv because policy is 'retain'
 			removeFinalizerPVC := pvc.DeepCopy()
 			removeFinalizerPVC.SetFinalizers([]string{})
-			graphCli.Patch(c.dag, pvc, removeFinalizerPVC, model.ForceCreatingVertexOption)
-			graphCli.DependOn(c.dag, from, removeFinalizerPVC)
-			graphCli.Delete(c.dag, removeFinalizerPVC, model.ForceCreatingVertexOption)
-			graphCli.DependOn(c.dag, from, removeFinalizerPVC)
-			return removeFinalizerPVC
+			removeFinalizerPVCVertex := graphCli.Do(c.dag, pvc, removeFinalizerPVC, model.ActionPatchPtr(), fromVertex)
+			return graphCli.Do(c.dag, nil, removeFinalizerPVC, model.ActionDeletePtr(), removeFinalizerPVCVertex)
 		},
-		removePVClaimRefStep: func(from client.Object, step pvcRecreateStep) client.Object {
+		removePVClaimRefStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 3: remove claimRef in pv
 			removeClaimRefPV := pv.DeepCopy()
 			if removeClaimRefPV.Spec.ClaimRef != nil {
 				removeClaimRefPV.Spec.ClaimRef.UID = ""
 				removeClaimRefPV.Spec.ClaimRef.ResourceVersion = ""
 			}
-			graphCli.Patch(c.dag, pv, removeClaimRefPV, model.ForceCreatingVertexOption)
-			graphCli.DependOn(c.dag, from, removeClaimRefPV)
-			return removeClaimRefPV
+			return graphCli.Do(c.dag, pv, removeClaimRefPV, model.ActionPatchPtr(), fromVertex)
 		},
-		createPVCStep: func(from client.Object, step pvcRecreateStep) client.Object {
+		createPVCStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 4: create new pvc
 			newPVC.SetResourceVersion("")
-			graphCli.Create(c.dag, newPVC, model.ForceCreatingVertexOption)
-			graphCli.DependOn(c.dag, from, newPVC)
-			return newPVC
+			return graphCli.Do(c.dag, nil, newPVC, model.ActionCreatePtr(), fromVertex)
 		},
-		pvRestorePolicyStep: func(from client.Object, step pvcRecreateStep) client.Object {
+		pvRestorePolicyStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 5: restore to previous pv policy
 			restorePV := pv.DeepCopy()
 			policy := corev1.PersistentVolumeReclaimPolicy(restorePV.Annotations[constant.PVLastClaimPolicyAnnotationKey])
@@ -890,16 +881,17 @@ func (c *rsmComponent) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli client.C
 				policy = corev1.PersistentVolumeReclaimDelete
 			}
 			restorePV.Spec.PersistentVolumeReclaimPolicy = policy
-			graphCli.Patch(c.dag, pv, restorePV, model.ForceCreatingVertexOption)
-			graphCli.DependOn(c.dag, from, restorePV)
-			return restorePV
+			return graphCli.Do(c.dag, pv, restorePV, model.ActionPatchPtr(), fromVertex)
 		},
 	}
 
 	updatePVCByRecreateFromStep := func(fromStep pvcRecreateStep) {
-		lastObj := c.workload
+		var lastVertex *model.ObjectVertex
+		if root := c.dag.Root(); root != nil {
+			lastVertex, _ = root.(*model.ObjectVertex)
+		}
 		for step := pvRestorePolicyStep; step >= fromStep && step >= pvPolicyRetainStep; step-- {
-			lastObj = addStepMap[step](lastObj, step)
+			lastVertex = addStepMap[step](lastVertex, step)
 		}
 	}
 
@@ -1246,7 +1238,7 @@ func (c *rsmComponent) updateWorkload(rsmObj *workloads.ReplicatedStateMachine) 
 	if isTemplateUpdated || !reflect.DeepEqual(rsmObj.Annotations, rsmObjCopy.Annotations) {
 		c.workload = rsmObjCopy
 		graphCli := model.NewGraphClient(c.Client)
-		if graphCli.IsAction(c.dag, c.workload, model.NOOP) {
+		if graphCli.IsAction(c.dag, c.workload, model.ActionNoopPtr()) {
 			return false
 		}
 		graphCli.Update(c.dag, nil, c.workload, model.ReplaceIfExistingOption)

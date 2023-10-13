@@ -77,9 +77,18 @@ var _ = Describe("graph client test.", func() {
 			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeTrue())
 
 			By("force creating a duplicate object")
-			graphCli.Create(dag, obj0, ForceCreatingVertexOption)
-			fv0 := &ObjectVertex{Obj: obj0, Action: ActionCreatePtr()}
-			dagExpected.AddConnectRoot(fv0)
+			var oldV0 *ObjectVertex
+			for _, vertex := range dag.Vertices() {
+				v, _ := vertex.(*ObjectVertex)
+				if v.Obj == obj0 {
+					oldV0 = v
+				}
+			}
+			Expect(oldV0).ShouldNot(BeNil())
+			graphCli.Do(dag, obj0, obj0, ActionCreatePtr(), oldV0)
+			nv0 := &ObjectVertex{OriObj: obj0, Obj: obj0, Action: ActionCreatePtr()}
+			dagExpected.AddVertex(nv0)
+			dagExpected.Connect(v0, nv0)
 			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeTrue())
 
 			By("replace an existing object")
@@ -95,13 +104,13 @@ var _ = Describe("graph client test.", func() {
 			By("noop")
 			graphCli.Noop(dag, obj0)
 			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeFalse())
-			fv0.Action = ActionNoopPtr()
+			nv0.Action = ActionNoopPtr()
 			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeTrue())
 
 			By("patch")
 			graphCli.Patch(dag, obj0.DeepCopy(), obj0)
 			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeFalse())
-			fv0.Action = ActionPatchPtr()
+			nv0.Action = ActionPatchPtr()
 			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeTrue())
 
 			By("find objects exist")
@@ -154,8 +163,8 @@ var _ = Describe("graph client test.", func() {
 
 			By("create none root vertex first")
 			obj := builder.NewPodBuilder(namespace, name+"0").GetObject()
-			graphCli.Do(dag, obj, ActionCreatePtr())
-			v := &ObjectVertex{Obj: obj, Action: ActionCreatePtr()}
+			graphCli.Do(dag, obj, obj, ActionCreatePtr(), nil)
+			v := &ObjectVertex{OriObj: obj, Obj: obj, Action: ActionCreatePtr()}
 			dagExpected.AddVertex(v)
 			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeTrue())
 
@@ -166,6 +175,29 @@ var _ = Describe("graph client test.", func() {
 			dagExpected.AddVertex(rootVertex)
 			dagExpected.Connect(rootVertex, v)
 			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeTrue())
+		})
+
+		It("IsAction should work", func() {
+			graphCli := NewGraphClient(nil)
+			dag := graph.NewDAG()
+			namespace := "foo"
+			name := "bar"
+
+			By("create root vertex")
+			obj := builder.NewPodBuilder(namespace, name+"0").GetObject()
+			graphCli.Root(dag, obj, obj)
+			Expect(graphCli.IsAction(dag, obj, ActionStatusPtr())).Should(BeTrue())
+			Expect(graphCli.IsAction(dag, obj, ActionCreatePtr())).Should(BeFalse())
+
+			By("vertex not existing")
+			Expect(graphCli.IsAction(dag, &corev1.Pod{}, ActionStatusPtr())).Should(BeFalse())
+			Expect(graphCli.IsAction(dag, &corev1.Pod{}, ActionCreatePtr())).Should(BeFalse())
+
+			By("nil action")
+			dag = graph.NewDAG()
+			graphCli.Do(dag, obj, obj, nil, nil)
+			Expect(graphCli.IsAction(dag, obj, nil)).Should(BeTrue())
+			Expect(graphCli.IsAction(dag, obj, ActionCreatePtr())).Should(BeFalse())
 		})
 	})
 })

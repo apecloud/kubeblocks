@@ -108,14 +108,15 @@ func (s *server) StartNonBlocking() error {
 
 func (s *server) apiLogger(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
+		reqLogger :=
 		if userAgent := string(ctx.Request.Header.Peek("User-Agent")); userAgent != "" {
-			logger = logger.WithValues("useragent", userAgent)
+			reqLogger = logger.WithValues("useragent", userAgent)
 		}
 		start := time.Now()
-		logger.Info("HTTP API Called", "method", string(ctx.Method()), "path", string(ctx.Path()))
+		reqLogger.Info("HTTP API Called", "method", string(ctx.Method()), "path", string(ctx.Path()))
 		next(ctx)
 		elapsed := float64(time.Since(start) / time.Millisecond)
-		logger.Info("HTTP API Response", "status code", ctx.Response.StatusCode(), "cost", elapsed)
+		reqLogger.Info("HTTP API Response", "status code", ctx.Response.StatusCode(), "cost", elapsed)
 	}
 }
 

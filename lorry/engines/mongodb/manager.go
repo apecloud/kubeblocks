@@ -273,7 +273,7 @@ func (mgr *Manager) IsDBStartupReady() bool {
 
 	err := mgr.Client.Ping(ctx, readpref.Primary())
 	if err != nil {
-		mgr.Logger.Error(err, "DB is not ready")
+		mgr.Logger.Info("DB is not ready", "error", err)
 		return false
 	}
 	mgr.DBStartupReady = true

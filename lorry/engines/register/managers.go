@@ -50,7 +50,7 @@ var dbManager engines.DBManager
 var configDir string
 
 func init() {
-	pflag.StringVar(&configDir, "config-path", "/config/components/", "Lorry default config directory for builtin type")
+	pflag.StringVar(&configDir, "config-path", "/config/lorry/components/", "Lorry default config directory for builtin type")
 
 	RegisterManagerNewFunc("wesql", "", wesql.NewManager)
 	RegisterManagerNewFunc("mysql", "", mysql.NewManager)

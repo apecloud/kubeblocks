@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -37,7 +36,8 @@ import (
 
 const (
 	// http://localhost:<port>/v1.0/bindings/<binding_type>
-	checkRoleURIFormat        = "/v1.0/bindings/%s?operation=checkRole&workloadType=%s"
+	// checkRoleURIFormat        = "/v1.0/bindings/%s?operation=checkRole&workloadType=%s"
+	checkRoleURIFormat        = "/v1.0/checkrole"
 	checkRunningURIFormat     = "/v1.0/bindings/%s?operation=checkRunning"
 	checkStatusURIFormat      = "/v1.0/bindings/%s?operation=checkStatus"
 	volumeProtectionURIFormat = "/v1.0/bindings/%s?operation=volumeProtection"
@@ -148,6 +148,7 @@ func buildLorryServiceContainer(component *SynthesizedComponent, container *core
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	container.Command = []string{"lorry",
 		"--port", strconv.Itoa(lorrySvcHTTPPort),
+		"--config-path", "/config/lorry/components/",
 	}
 
 	if len(component.PodSpec.Containers) > 0 {
@@ -238,10 +239,8 @@ func buildWeSyncerContainer(weSyncerContainer *corev1.Container, probeSvcHTTPPor
 func buildRoleProbeContainer(component *SynthesizedComponent, roleChangedContainer *corev1.Container,
 	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	roleChangedContainer.Name = constant.RoleProbeContainerName
-	bindingType := strings.ToLower(component.CharacterType)
-	workloadType := component.WorkloadType
 	httpGet := &corev1.HTTPGetAction{}
-	httpGet.Path = fmt.Sprintf(checkRoleURIFormat, bindingType, workloadType)
+	httpGet.Path = checkRoleURIFormat
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
 	probe := &corev1.Probe{}
 	probe.Exec = nil

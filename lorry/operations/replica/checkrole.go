@@ -109,6 +109,11 @@ func (s *CheckRole) Do(ctx context.Context, req *operations.OpsRequest) (*operat
 	resp.Data["operation"] = util.CheckRoleOperation
 	resp.Data["originalRole"] = s.OriRole
 
+	if !manager.IsDBStartupReady() {
+		resp.Data["message"] = "db not ready"
+		return resp, nil
+	}
+
 	ctx1, cancel := context.WithTimeout(ctx, s.ProbeTimeout)
 	defer cancel()
 	role, err := manager.GetReplicaRole(ctx1)

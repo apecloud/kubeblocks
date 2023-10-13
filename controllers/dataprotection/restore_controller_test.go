@@ -193,7 +193,7 @@ var _ = Describe("Restore Controller test", func() {
 				})).Should(Succeed())
 			})
 
-			FIt("test restore is Failed when restore job is not Failed", func() {
+			It("test restore is Failed when restore job is not Failed", func() {
 				By("expect for restore is Failed ")
 				restore := initResourcesAndWaitRestore(true, false, true, dpv1alpha1.RestorePhaseRunning,
 					func(f *testdp.MockRestoreFactory) {

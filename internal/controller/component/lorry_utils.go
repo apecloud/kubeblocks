@@ -63,17 +63,12 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 	}
 	reqCtx.Log.V(3).Info("lorry", "settings", componentProbes)
 	lorrySvcHTTPPort := viper.GetInt32("PROBE_SERVICE_HTTP_PORT")
-	lorrySvcGRPCPort := viper.GetInt32("PROBE_SERVICE_GRPC_PORT")
 	// override by new env name
 	if viper.IsSet("LORRY_SERVICE_HTTP_PORT") {
 		lorrySvcHTTPPort = viper.GetInt32("LORRY_SERVICE_HTTP_PORT")
 	}
-	if viper.IsSet("LORRY_SERVICE_GRPC_PORT") {
-		lorrySvcGRPCPort = viper.GetInt32("LORRY_SERVICE_GRPC_PORT")
-	}
-	availablePorts, err := getAvailableContainerPorts(component.PodSpec.Containers, []int32{lorrySvcHTTPPort, lorrySvcGRPCPort})
+	availablePorts, err := getAvailableContainerPorts(component.PodSpec.Containers, []int32{lorrySvcHTTPPort})
 	lorrySvcHTTPPort = availablePorts[0]
-	lorrySvcGRPCPort = availablePorts[1]
 	if err != nil {
 		reqCtx.Log.Info("get lorry container port failed", "error", err)
 		return err
@@ -112,7 +107,7 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		lorryContainers = append(lorryContainers, *weSyncerContainer)
 	}
 
-	buildLorryServiceContainer(component, &lorryContainers[0], int(lorrySvcHTTPPort), int(lorrySvcGRPCPort))
+	buildLorryServiceContainer(component, &lorryContainers[0], int(lorrySvcHTTPPort))
 
 	reqCtx.Log.V(1).Info("lorry", "containers", lorryContainers)
 	component.PodSpec.Containers = append(component.PodSpec.Containers, lorryContainers...)
@@ -148,12 +143,11 @@ func buildBasicContainer() *corev1.Container {
 		GetObject()
 }
 
-func buildLorryServiceContainer(component *SynthesizedComponent, container *corev1.Container, probeSvcHTTPPort int, probeSvcGRPCPort int) {
+func buildLorryServiceContainer(component *SynthesizedComponent, container *corev1.Container, lorrySvcHTTPPort int) {
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	container.Command = []string{"lorry",
-		"--port", strconv.Itoa(probeSvcHTTPPort),
-		"--grpcport", strconv.Itoa(probeSvcGRPCPort),
+		"--port", strconv.Itoa(lorrySvcHTTPPort),
 	}
 
 	if len(component.PodSpec.Containers) > 0 {
@@ -225,13 +219,8 @@ func buildLorryServiceContainer(component *SynthesizedComponent, container *core
 
 	container.Ports = []corev1.ContainerPort{
 		{
-			ContainerPort: int32(probeSvcHTTPPort),
-			Name:          constant.ProbeHTTPPortName,
-			Protocol:      "TCP",
-		},
-		{
-			ContainerPort: int32(probeSvcGRPCPort),
-			Name:          constant.ProbeGRPCPortName,
+			ContainerPort: int32(lorrySvcHTTPPort),
+			Name:          constant.LorryHTTPPortName,
 			Protocol:      "TCP",
 		}}
 

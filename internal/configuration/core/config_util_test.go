@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
@@ -313,6 +314,36 @@ func TestFromValueToString(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := FromValueToString(tt.args.val); got != tt.want {
 				t.Errorf("FromValueToString() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFromStringMap(t *testing.T) {
+	type args struct {
+		m map[string]*string
+	}
+	tests := []struct {
+		name string
+		args args
+		want map[string]interface{}
+	}{{
+		name: "test",
+		args: args{
+			m: map[string]*string{
+				"abcd":       cfgutil.ToPointer("test"),
+				"null_field": nil,
+			},
+		},
+		want: map[string]interface{}{
+			"abcd":       "test",
+			"null_field": nil,
+		},
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := FromStringMap(tt.args.m); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("FromStringMap() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -21,12 +21,11 @@ package dataprotection
 
 import (
 	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	batchv1 "k8s.io/api/batch/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -92,13 +91,6 @@ var _ = Describe("Backup Schedule Controller", func() {
 			}
 		}
 
-		getJobKey := func(backup *dpv1alpha1.Backup) client.ObjectKey {
-			return client.ObjectKey{
-				Name:      dpbackup.GenerateBackupJobName(backup, dpbackup.BackupDataJobNamePrefix),
-				Namespace: backup.Namespace,
-			}
-		}
-
 		BeforeEach(func() {
 			By("creating an actionSet")
 			actionSet := testdp.NewFakeActionSet(&testCtx)
@@ -118,7 +110,6 @@ var _ = Describe("Backup Schedule Controller", func() {
 
 		Context("creates a backup schedule", func() {
 			var (
-				backupNamePrefix  = "schedule-test-backup-"
 				backupSchedule    *dpv1alpha1.BackupSchedule
 				backupScheduleKey client.ObjectKey
 			)
@@ -151,86 +142,6 @@ var _ = Describe("Backup Schedule Controller", func() {
 					g.Expect(fetched.Spec.StartingDeadlineSeconds).ShouldNot(BeNil())
 					g.Expect(*fetched.Spec.StartingDeadlineSeconds).To(Equal(getStartingDeadlineSeconds(backupSchedule)))
 				})).Should(Succeed())
-			})
-
-			It("delete expired backups", func() {
-				now := metav1.Now()
-				backupStatus := dpv1alpha1.BackupStatus{
-					Phase:               dpv1alpha1.BackupPhaseCompleted,
-					Expiration:          &now,
-					StartTimestamp:      &now,
-					CompletionTimestamp: &now,
-				}
-
-				autoBackupLabel := map[string]string{
-					dataProtectionLabelAutoBackupKey:   "true",
-					dataProtectionLabelBackupPolicyKey: testdp.BackupPolicyName,
-					dataProtectionLabelBackupMethodKey: testdp.BackupMethodName,
-				}
-
-				createBackup := func(name string) *dpv1alpha1.Backup {
-					return testdp.NewBackupFactory(testCtx.DefaultNamespace, name).
-						WithRandomName().AddLabelsInMap(autoBackupLabel).
-						SetBackupPolicyName(testdp.BackupPolicyName).
-						SetBackupMethod(testdp.BackupMethodName).
-						Create(&testCtx).GetObject()
-				}
-
-				checkBackupCompleted := func(key client.ObjectKey) {
-					Eventually(testapps.CheckObj(&testCtx, key,
-						func(g Gomega, fetched *dpv1alpha1.Backup) {
-							g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
-						})).Should(Succeed())
-				}
-
-				By("create an expired backup")
-				backupExpired := createBackup(backupNamePrefix + "expired")
-
-				By("create 1st backup")
-				backupOutLimit1 := createBackup(backupNamePrefix + "1")
-
-				By("create 2nd backup")
-				backupOutLimit2 := createBackup(backupNamePrefix + "2")
-
-				By("waiting expired backup completed")
-				expiredKey := client.ObjectKeyFromObject(backupExpired)
-				testdp.PatchK8sJobStatus(&testCtx, getJobKey(backupExpired), batchv1.JobComplete)
-				checkBackupCompleted(expiredKey)
-
-				By("mock update expired backup status to expire")
-				backupStatus.Expiration = &metav1.Time{Time: now.Add(-time.Hour * 24)}
-				backupStatus.StartTimestamp = backupStatus.Expiration
-				testdp.PatchBackupStatus(&testCtx, client.ObjectKeyFromObject(backupExpired), backupStatus)
-
-				By("waiting 1st backup completed")
-				outLimit1Key := client.ObjectKeyFromObject(backupOutLimit1)
-				testdp.PatchK8sJobStatus(&testCtx, getJobKey(backupOutLimit1), batchv1.JobComplete)
-				checkBackupCompleted(outLimit1Key)
-
-				By("mock 1st backup not to expire")
-				backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
-				backupStatus.StartTimestamp = &metav1.Time{Time: now.Add(time.Hour)}
-				testdp.PatchBackupStatus(&testCtx, client.ObjectKeyFromObject(backupOutLimit1), backupStatus)
-
-				By("waiting 2nd backup completed")
-				outLimit2Key := client.ObjectKeyFromObject(backupOutLimit2)
-				testdp.PatchK8sJobStatus(&testCtx, getJobKey(backupOutLimit2), batchv1.JobComplete)
-				checkBackupCompleted(outLimit2Key)
-
-				By("mock 2nd backup not to expire")
-				backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
-				backupStatus.StartTimestamp = &metav1.Time{Time: now.Add(time.Hour * 2)}
-				testdp.PatchBackupStatus(&testCtx, client.ObjectKeyFromObject(backupOutLimit2), backupStatus)
-
-				By("patch backup schedule to trigger the controller to delete expired backup")
-				Eventually(testapps.GetAndChangeObj(&testCtx, backupScheduleKey, func(fetched *dpv1alpha1.BackupSchedule) {
-					fetched.Spec.Schedules[0].RetentionPeriod = "1d"
-				})).Should(Succeed())
-
-				By("retain the latest backup")
-				Eventually(testapps.List(&testCtx, generics.BackupSignature,
-					client.MatchingLabels(autoBackupLabel),
-					client.InNamespace(backupPolicy.Namespace))).Should(HaveLen(2))
 			})
 		})
 

@@ -34,8 +34,7 @@ func BuildEnvByCredential(pod *corev1.Pod, credential *dpv1alpha1.ConnectionCred
 	}
 	var hostEnv corev1.EnvVar
 	if credential.HostKey == "" {
-		hostEnv = corev1.EnvVar{Name: dptypes.DPDBHost,
-			Value: intctrlutil.BuildPodHostDNS(pod)}
+		hostEnv = corev1.EnvVar{Name: dptypes.DPDBHost, Value: intctrlutil.BuildPodHostDNS(pod)}
 	} else {
 		hostEnv = buildEnvBySecretKey(dptypes.DPDBHost, credential.SecretName, credential.HostKey)
 	}

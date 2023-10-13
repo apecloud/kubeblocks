@@ -31,6 +31,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	cmdflags "github.com/apecloud/kubeblocks/internal/cli/util/flags"
 )
 
 var _ = Describe("cluster create util", func() {
@@ -112,35 +113,62 @@ metadata:
 			value interface{}
 		}{
 			{
-				tpe:   "int",
+				tpe:   cmdflags.CobraInt,
 				name:  "int",
 				value: 1,
 			},
 			{
-				tpe:   "bool",
+				tpe:   cmdflags.CobraBool,
 				name:  "bool",
 				value: true,
 			},
 			{
-				tpe:   "float64",
+				tpe:   cmdflags.CobraFloat64,
 				name:  "float64",
 				value: 1.1,
 			},
 			{
-				tpe:   "string",
+				tpe:   cmdflags.CobraSting,
 				name:  "hello",
 				value: "Hello, KubeBlocks",
+			}, {
+				tpe:   cmdflags.CobraStringArray,
+				name:  "clusters",
+				value: []string{"mysql", "etcd"},
+			},
+			{
+				tpe:   cmdflags.CobraIntSlice,
+				name:  "ports",
+				value: []int{3303, 2379},
+			},
+			{
+				tpe:   cmdflags.CobraFloat64Slice,
+				name:  "resource",
+				value: []float64{0.5, 1.8},
+			},
+			{
+				tpe:   cmdflags.CobraBoolSlice,
+				name:  "enable",
+				value: []bool{false, true},
 			},
 		}
 
 		for _, f := range flags {
 			switch f.tpe {
-			case "int":
+			case cmdflags.CobraInt:
 				fs.Int(f.name, f.value.(int), f.name)
-			case "bool":
+			case cmdflags.CobraBool:
 				fs.Bool(f.name, f.value.(bool), f.name)
-			case "float64":
+			case cmdflags.CobraFloat64:
 				fs.Float64(f.name, f.value.(float64), f.name)
+			case cmdflags.CobraStringArray:
+				fs.StringArray(f.name, f.value.([]string), f.name)
+			case cmdflags.CobraIntSlice:
+				fs.IntSlice(f.name, f.value.([]int), f.name)
+			case cmdflags.CobraFloat64Slice:
+				fs.Float64Slice(f.name, f.value.([]float64), f.name)
+			case cmdflags.CobraBoolSlice:
+				fs.BoolSlice(f.name, f.value.([]bool), f.name)
 			default:
 				fs.String(f.name, f.value.(string), f.name)
 			}
@@ -170,5 +198,31 @@ metadata:
 		Expect(helmValues["version"]).Should(Equal("1.0.0"))
 		Expect(helmValues[c.SubChartName]).ShouldNot(BeNil())
 		Expect(helmValues[c.SubChartName].(map[string]interface{})["terminationPolicy"]).Should(Equal("Halt"))
+
+		By("build object helm values")
+		values = map[string]interface{}{
+			"etcd.cluster":   "etcd",
+			"etcd.namespace": "default",
+		}
+		helmValues = buildHelmValues(c, values)
+		Expect(helmValues).ShouldNot(BeNil())
+		Expect(helmValues["etcd"]).ShouldNot(BeNil())
+		Expect(helmValues["etcd"].(map[string]interface{})).Should(Equal(map[string]interface{}{
+			"cluster":   "etcd",
+			"namespace": "default",
+		}))
+
+		By("build array helm values")
+		values = map[string]interface{}{
+			"servers.name": []string{"mysql", "etcd"},
+			"servers.port": []int{3306, 2379},
+		}
+		helmValues = buildHelmValues(c, values)
+		Expect(helmValues).ShouldNot(BeNil())
+		Expect(helmValues["servers"]).ShouldNot(BeNil())
+		Expect(helmValues["servers"].(map[string]interface{})).Should(Equal(map[string]interface{}{
+			"name": []string{"mysql", "etcd"},
+			"port": []int{3306, 2379},
+		}))
 	})
 })

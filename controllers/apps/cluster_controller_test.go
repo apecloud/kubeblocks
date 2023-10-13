@@ -388,7 +388,10 @@ var _ = Describe("Cluster Controller", func() {
 		backup := testdp.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 			SetBackupPolicyName(backupPolicyName).
 			SetBackupMethod(backupMethod).
-			SetLabels(map[string]string{constant.AppInstanceLabelKey: clusterKey.Name, constant.BackupProtectionLabelKey: constant.BackupRetain}).
+			SetLabels(map[string]string{
+				constant.AppInstanceLabelKey:      clusterKey.Name,
+				constant.BackupProtectionLabelKey: constant.BackupRetain,
+			}).
 			WithRandomName().
 			Create(&testCtx).GetObject()
 		backupKey := client.ObjectKeyFromObject(backup)

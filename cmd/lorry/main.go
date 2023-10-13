@@ -38,7 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/lorry/highavailability"
 	"github.com/apecloud/kubeblocks/lorry/httpserver"
-	"github.com/apecloud/kubeblocks/lorry/operations"
+	opsregister "github.com/apecloud/kubeblocks/lorry/operations/register"
 	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
@@ -112,9 +112,9 @@ func main() {
 	// }
 
 	// Start HTTP Server
-	ops := operations.Operations()
-	hServer := httpserver.NewServer(ops)
-	err = hServer.StartNonBlocking()
+	ops := opsregister.Operations()
+	httpServer := httpserver.NewServer(ops)
+	err = httpServer.StartNonBlocking()
 	if err != nil {
 		panic(errors.Wrap(err, "HTTP server initialize failed"))
 	}

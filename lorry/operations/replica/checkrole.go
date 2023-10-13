@@ -99,7 +99,9 @@ func (s *CheckRole) Do(ctx context.Context, req *operations.OpsRequest) (*operat
 		return nil, errors.Wrap(err, "get manager failed")
 	}
 
-	resp := &operations.OpsResponse{}
+	resp := &operations.OpsResponse{
+		Data: map[string]any{},
+	}
 	resp.Data["operation"] = util.CheckRoleOperation
 	resp.Data["originalRole"] = s.OriRole
 

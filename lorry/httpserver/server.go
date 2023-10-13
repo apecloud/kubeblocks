@@ -112,9 +112,10 @@ func (s *server) apiLogger(next fasthttp.RequestHandler) fasthttp.RequestHandler
 			logger = logger.WithValues("useragent", userAgent)
 		}
 		start := time.Now()
+		logger.Info("HTTP API Called", "method", string(ctx.Method()), "path", string(ctx.Path()))
 		next(ctx)
 		elapsed := float64(time.Since(start) / time.Millisecond)
-		logger.Info("HTTP API Called ", "method", ctx.Method(), "path", ctx.Path(), "cost", elapsed)
+		logger.Info("HTTP API Response", "status code", ctx.Response.StatusCode(), "cost", elapsed)
 	}
 }
 

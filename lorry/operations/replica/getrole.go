@@ -58,7 +58,9 @@ func (s *GetRole) Do(ctx context.Context, req *operations.OpsRequest) (*operatio
 		return nil, errors.Wrap(err, "get manager failed")
 	}
 
-	resp := &operations.OpsResponse{}
+	resp := &operations.OpsResponse{
+		Data: map[string]any{},
+	}
 	resp.Data["operation"] = util.GetRoleOperation
 
 	role, err := manager.GetReplicaRole(ctx)

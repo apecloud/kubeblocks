@@ -17,27 +17,17 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package httpserver
+package register
 
 import (
-	"github.com/spf13/pflag"
-	ctrl "sigs.k8s.io/controller-runtime"
+	"github.com/apecloud/kubeblocks/lorry/operations"
+	_ "github.com/apecloud/kubeblocks/lorry/operations/replica"
 )
 
-type Config struct {
-	Port               int
-	Address            string
-	MaxRequestBodySize int
-	UnixDomainSocket   string
-	ReadBufferSize     int
-	APILogging         bool
+func Register(name string, op operations.Operation) error {
+	return operations.Register(name, op)
 }
 
-var config Config
-var logger = ctrl.Log.WithName("HTTPServer")
-
-func init() {
-	pflag.IntVar(&config.Port, "port", 3501, "The HTTP Server listen port for Lorry service.")
-	pflag.StringVar(&config.Address, "address", "0.0.0.0", "The HTTP Server listen address for Lorry service.")
-	pflag.BoolVar(&config.APILogging, "api-logging", true, "Enable api logging for Lorry request.")
+func Operations() map[string]operations.Operation {
+	return operations.Operations()
 }

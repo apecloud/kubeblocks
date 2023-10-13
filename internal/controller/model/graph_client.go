@@ -121,9 +121,6 @@ func (r *realGraphClient) Create(dag *graph.DAG, obj client.Object, opts ...Grap
 }
 
 func (r *realGraphClient) Update(dag *graph.DAG, objOld, objNew client.Object, opts ...GraphOption) {
-	if objNew.GetResourceVersion() == "" {
-		fmt.Printf("got it")
-	}
 	r.doWrite(dag, objOld, objNew, ActionUpdatePtr(), opts...)
 }
 

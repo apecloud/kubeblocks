@@ -99,32 +99,32 @@ func IsOwnerOf(owner, obj client.Object) bool {
 	return false
 }
 
-func ActionPtr(action Action) *Action {
+func actionPtr(action Action) *Action {
 	return &action
 }
 
 func ActionCreatePtr() *Action {
-	return ActionPtr(CREATE)
+	return actionPtr(CREATE)
 }
 
 func ActionDeletePtr() *Action {
-	return ActionPtr(DELETE)
+	return actionPtr(DELETE)
 }
 
 func ActionUpdatePtr() *Action {
-	return ActionPtr(UPDATE)
+	return actionPtr(UPDATE)
 }
 
 func ActionPatchPtr() *Action {
-	return ActionPtr(PATCH)
+	return actionPtr(PATCH)
 }
 
 func ActionStatusPtr() *Action {
-	return ActionPtr(STATUS)
+	return actionPtr(STATUS)
 }
 
 func ActionNoopPtr() *Action {
-	return ActionPtr(NOOP)
+	return actionPtr(NOOP)
 }
 
 func NewRequeueError(after time.Duration, reason string) error {

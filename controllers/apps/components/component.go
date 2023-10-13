@@ -861,7 +861,7 @@ func (c *rsmComponent) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli client.C
 			graphCli.Patch(c.dag, pvc, removeFinalizerPVC, model.ForceCreatingVertexOption)
 			graphCli.DependOn(c.dag, from, removeFinalizerPVC)
 			graphCli.Delete(c.dag, removeFinalizerPVC, model.ForceCreatingVertexOption)
-			graphCli.DependOn(c.dag, removeFinalizerPVC, removeFinalizerPVC)
+			graphCli.DependOn(c.dag, from, removeFinalizerPVC)
 			return removeFinalizerPVC
 		},
 		removePVClaimRefStep: func(from client.Object, step pvcRecreateStep) client.Object {

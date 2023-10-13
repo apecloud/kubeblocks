@@ -37,7 +37,7 @@ var _ = Describe("transform types test", func() {
 			root := builder.NewStatefulSetBuilder(namespace, name).GetObject()
 			vertex := &ObjectVertex{Obj: root}
 			Expect(vertex.String()).Should(Equal("{obj:*v1.StatefulSet, name: bar, action: nil}"))
-			vertex.Action = ActionPtr(CREATE)
+			vertex.Action = ActionCreatePtr()
 			Expect(vertex.String()).Should(Equal("{obj:*v1.StatefulSet, name: bar, action: CREATE}"))
 		})
 	})

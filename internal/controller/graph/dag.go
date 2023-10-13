@@ -236,7 +236,7 @@ func (d *DAG) Equals(other *DAG, less func(v1, v2 Vertex) bool) bool {
 		return false
 	}
 	for i := range vertices1 {
-		if less(vertices1[i], vertices2[i]) {
+		if less(vertices1[i], vertices2[i]) || less(vertices2[i], vertices1[i]) {
 			return false
 		}
 	}

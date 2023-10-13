@@ -76,10 +76,10 @@ type GraphWriter interface {
 	// WARN: this is a rather low-level API, will be refactored out in near future, avoid to use it.
 	IsNilAction(dag *graph.DAG, obj client.Object) bool
 
-	// DependOn setups dependencies between 'object' and 'dependency',
+	// DependOn setups dependencies between 'object' and 'dependencies',
 	// which will guarantee the Write Order to the K8s cluster of these objects.
 	// if multiple vertices exist(which can occur when ForceCreatingVertexOption being used), the one with the largest depth will be used.
-	DependOn(dag *graph.DAG, object client.Object, dependency ...client.Object)
+	DependOn(dag *graph.DAG, object client.Object, dependencies ...client.Object)
 
 	// FindAll finds all objects that have same type with obj in the underlying DAG.
 	// obey the GraphOption if provided.

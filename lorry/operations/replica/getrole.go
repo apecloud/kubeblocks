@@ -52,6 +52,10 @@ func (s *GetRole) Init(ctx context.Context) error {
 	return nil
 }
 
+func (s *GetRole) IsReadonly(ctx context.Context) bool {
+	return true
+}
+
 func (s *GetRole) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
 	manager, err := register.GetDBManager()
 	if err != nil {

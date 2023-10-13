@@ -26,7 +26,7 @@ var logger = ctlruntime.Log.WithName("event")
 
 func SentEventForProbe(ctx context.Context, data map[string]any) error {
 	logger.Info(fmt.Sprintf("send event: %v", data))
-	roleUpdateMechanism := workloads.NoneUpdate
+	roleUpdateMechanism := workloads.DirectAPIServerEventUpdate
 	if viper.IsSet(constant.KBEnvRsmRoleUpdateMechanism) {
 		roleUpdateMechanism = workloads.RoleUpdateMechanism(viper.GetString(constant.KBEnvRsmRoleUpdateMechanism))
 	}

@@ -86,11 +86,13 @@ func OperationWrapper(op operations.Operation) fasthttp.RequestHandler {
 		body := reqCtx.PostBody()
 
 		var req Request
-		err := json.Unmarshal(body, &req)
-		if err != nil {
-			msg := NewErrorResponse("ERR_MALFORMED_REQUEST", fmt.Sprintf("unmarshal HTTP body failed: %v", err))
-			respond(reqCtx, withError(fasthttp.StatusBadRequest, msg))
-			return
+		if len(body) > 0 {
+			err := json.Unmarshal(body, &req)
+			if err != nil {
+				msg := NewErrorResponse("ERR_MALFORMED_REQUEST", fmt.Sprintf("unmarshal HTTP body failed: %v", err))
+				respond(reqCtx, withError(fasthttp.StatusBadRequest, msg))
+				return
+			}
 		}
 
 		b, err := json.Marshal(req.Data)

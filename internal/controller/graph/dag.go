@@ -260,9 +260,10 @@ func (d *DAG) Root() Vertex {
 
 func (d *DAG) Merge(subDag *DAG) {
 	for v := range subDag.vertices {
-		if len(d.inAdj(v)) == 0 {
-			d.AddConnectRoot(v)
-		}
+		d.AddConnectRoot(v)
+	}
+	for e := range subDag.edges {
+		d.AddEdge(e)
 	}
 }
 

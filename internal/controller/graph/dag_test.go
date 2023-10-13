@@ -310,9 +310,9 @@ func TestMerge(t *testing.T) {
 	dag1.AddVertex(v1)
 	dag1.AddVertex(v2)
 	dag1.Connect(v1, v2)
-	dag2.AddVertex(v2)
 	dag2.AddVertex(v3)
-	dag2.Connect(v2, v3)
+	dag2.AddVertex(v2)
+	dag2.Connect(v3, v2)
 
 	dagExpected := NewDAG()
 	dagExpected.AddVertex(v1)
@@ -320,6 +320,7 @@ func TestMerge(t *testing.T) {
 	dagExpected.AddVertex(v3)
 	dagExpected.Connect(v1, v2)
 	dagExpected.Connect(v1, v3)
+	dagExpected.Connect(v3, v2)
 
 	dag1.Merge(dag2)
 	if !dag1.Equals(dagExpected, less) {

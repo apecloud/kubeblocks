@@ -35,7 +35,6 @@ import (
 	. "github.com/apecloud/kubeblocks/lorry/binding"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/component/mysql"
-	"github.com/apecloud/kubeblocks/lorry/dcs"
 	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
@@ -104,11 +103,8 @@ func (mysqlOps *MysqlOperations) Init(metadata component.Properties) error {
 	mysqlOps.Manager = manager
 	mysqlOps.DBType = "mysql"
 	// mysqlOps.InitIfNeed = mysqlOps.initIfNeed
-	mysqlOps.BaseOperations.GetRole = mysqlOps.GetRole
 	mysqlOps.DBPort = config.GetDBPort()
 
-	mysqlOps.RegisterOperationOnDBReady(util.GetRoleOperation, mysqlOps.GetRoleOps, manager)
-	mysqlOps.RegisterOperationOnDBReady(util.CheckRoleOperation, mysqlOps.CheckRoleOps, manager)
 	mysqlOps.RegisterOperationOnDBReady(util.GetLagOperation, mysqlOps.GetLagOps, manager)
 	mysqlOps.RegisterOperationOnDBReady(util.CheckStatusOperation, mysqlOps.CheckStatusOps, manager)
 	mysqlOps.RegisterOperationOnDBReady(util.ExecOperation, mysqlOps.ExecOps, manager)
@@ -123,26 +119,6 @@ func (mysqlOps *MysqlOperations) Init(metadata component.Properties) error {
 	mysqlOps.RegisterOperationOnDBReady(util.RevokeUserRoleOp, mysqlOps.revokeUserRoleOps, manager)
 	mysqlOps.RegisterOperationOnDBReady(util.ListSystemAccountsOp, mysqlOps.listSystemAccountsOps, manager)
 	return nil
-}
-
-func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (string, error) {
-	workloadType := viper.GetString(constant.KBEnvWorkloadType)
-	if strings.EqualFold(workloadType, "Replication") {
-		dcsStore := dcs.GetStore()
-		if dcsStore == nil {
-			return "", nil
-		}
-		k8sStore := dcsStore.(*dcs.KubernetesStore)
-		cluster := k8sStore.GetClusterFromCache()
-		if cluster == nil || !cluster.IsLocked() {
-			return "", nil
-		}
-
-		manager := mysqlOps.Manager.(*mysql.Manager)
-		return manager.GetRole(ctx)
-	}
-	manager := mysqlOps.Manager.(*mysql.WesqlManager)
-	return manager.GetRole(ctx)
 }
 
 func (mysqlOps *MysqlOperations) GetRunningPort() int {

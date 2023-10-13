@@ -36,17 +36,13 @@ var _ = Describe("graph client test.", func() {
 		It("should work well", func() {
 			graphCli := NewGraphClient(nil)
 			dag := graph.NewDAG()
-
-			By("create without root vertex")
+			dagExpected := graph.NewDAG()
 			namespace := "foo"
 			name := "bar"
 			root := builder.NewStatefulSetBuilder(namespace, name).GetObject()
-			graphCli.Create(dag, root)
-			dagExpected := graph.NewDAG()
-			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeTrue())
 
 			By("init root vertex")
-			graphCli.Root(dag, root.DeepCopy(), root)
+			graphCli.Root(dag, root.DeepCopy(), root, ActionStatusPtr())
 			dagExpected.AddVertex(&ObjectVertex{Obj: root, OriObj: root, Action: ActionStatusPtr()})
 			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeTrue())
 
@@ -148,14 +144,14 @@ var _ = Describe("graph client test.", func() {
 
 			By("create none root vertex first")
 			obj := builder.NewPodBuilder(namespace, name+"0").GetObject()
-			graphCli.Do(dag, obj, obj, ActionCreatePtr(), nil)
+			graphCli.Root(dag, obj, obj, ActionCreatePtr())
 			v := &ObjectVertex{OriObj: obj, Obj: obj, Action: ActionCreatePtr()}
 			dagExpected.AddVertex(v)
 			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeTrue())
 
 			By("post create root vertex")
 			root := builder.NewStatefulSetBuilder(namespace, name).GetObject()
-			graphCli.Root(dag, root.DeepCopy(), root)
+			graphCli.Root(dag, root.DeepCopy(), root, ActionStatusPtr())
 			rootVertex := &ObjectVertex{Obj: root, OriObj: root, Action: ActionStatusPtr()}
 			dagExpected.AddVertex(rootVertex)
 			dagExpected.Connect(rootVertex, v)
@@ -170,7 +166,7 @@ var _ = Describe("graph client test.", func() {
 
 			By("create root vertex")
 			obj := builder.NewPodBuilder(namespace, name+"0").GetObject()
-			graphCli.Root(dag, obj, obj)
+			graphCli.Root(dag, obj, obj, ActionStatusPtr())
 			Expect(graphCli.IsAction(dag, obj, ActionStatusPtr())).Should(BeTrue())
 			Expect(graphCli.IsAction(dag, obj, ActionCreatePtr())).Should(BeFalse())
 
@@ -179,8 +175,7 @@ var _ = Describe("graph client test.", func() {
 			Expect(graphCli.IsAction(dag, &corev1.Pod{}, ActionCreatePtr())).Should(BeFalse())
 
 			By("nil action")
-			dag = graph.NewDAG()
-			graphCli.Do(dag, obj, obj, nil, nil)
+			graphCli.Root(dag, obj, obj, nil)
 			Expect(graphCli.IsAction(dag, obj, nil)).Should(BeTrue())
 			Expect(graphCli.IsAction(dag, obj, ActionCreatePtr())).Should(BeFalse())
 		})

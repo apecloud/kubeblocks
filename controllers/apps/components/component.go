@@ -160,7 +160,8 @@ func (c *rsmComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli client.Clie
 
 func (c *rsmComponent) setWorkload(obj client.Object, action *model.Action) {
 	c.workload = obj
-	c.addResource(obj, action)
+	graphCli := model.NewGraphClient(c.Client)
+	graphCli.Root(c.dag, nil, obj, action)
 }
 
 func (c *rsmComponent) addResource(obj client.Object, action *model.Action) client.Object {
@@ -410,10 +411,14 @@ func (c *rsmComponent) resolveObjectsAction(reqCtx intctrlutil.RequestCtx, cli c
 		if !graphCli.IsAction(c.dag, object, nil) {
 			continue
 		}
-		if action, err := resolveObjectAction(snapshot, object, cli.Scheme()); err != nil {
+		switch action, err := resolveObjectAction(snapshot, object, cli.Scheme()); {
+		case err != nil:
 			return err
-		} else {
-			graphCli.Do(c.dag, nil, object, action, nil)
+		case *action == model.UPDATE:
+			graphCli.Update(c.dag, nil, object)
+		default:
+			graphCli.Noop(c.dag, object)
+
 		}
 	}
 	if c.GetCluster().IsStatusUpdating() {
@@ -906,7 +911,7 @@ func (c *rsmComponent) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli client.C
 	}
 	if pvcQuantity := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; pvcQuantity.Cmp(vctProto.Spec.Resources.Requests[corev1.ResourceStorage]) != 0 {
 		// use pvc's update without anything extra
-		graphCli.Do(c.dag, nil, newPVC, model.ActionUpdatePtr(), c.workloadVertex())
+		graphCli.Update(c.dag, nil, newPVC)
 		return nil
 	}
 	// all the else means no need to update
@@ -1004,7 +1009,7 @@ func (c *rsmComponent) updatePodReplicaLabel4Scaling(reqCtx intctrlutil.RequestC
 			obj.Annotations = make(map[string]string)
 		}
 		obj.Annotations[constant.ComponentReplicasAnnotationKey] = strconv.Itoa(int(replicas))
-		graphCli.Do(c.dag, nil, obj, model.ActionUpdatePtr(), c.workloadVertex())
+		graphCli.Update(c.dag, nil, obj)
 	}
 	return nil
 }
@@ -1078,7 +1083,7 @@ func (c *rsmComponent) deletePVCs4ScaleIn(reqCtx intctrlutil.RequestCtx, cli cli
 			// after updating STS and before deleting PVCs, the PVCs intended to scale-in will be leaked.
 			// For simplicity, the updating dependency is added between them to guarantee that the PVCs to scale-in
 			// will be deleted or the scaling-in operation will be failed.
-			graphCli.Do(c.dag, nil, &pvc, model.ActionDeletePtr(), c.workloadVertex())
+			graphCli.Delete(c.dag, &pvc)
 		}
 	}
 	return nil
@@ -1127,7 +1132,7 @@ func (c *rsmComponent) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client
 		}
 		graphCli := model.NewGraphClient(c.Client)
 		for _, obj := range objs {
-			graphCli.Create(c.dag, obj)
+			graphCli.Do(c.dag, nil, obj, model.ActionCreatePtr(), nil)
 		}
 		return nil
 	}
@@ -1154,7 +1159,7 @@ func (c *rsmComponent) postScaleOut(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		}
 		graphCli := model.NewGraphClient(c.Client)
 		for _, obj := range tmpObjs {
-			graphCli.Delete(c.dag, obj)
+			graphCli.Do(c.dag, nil, obj, model.ActionDeletePtr(), nil)
 		}
 	}
 
@@ -1286,7 +1291,7 @@ func (c *rsmComponent) updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.C
 			if pvcNameSet.Has(pvc.Name) {
 				continue
 			}
-			graphCli.Do(c.dag, nil, pvc, model.ActionNoopPtr(), c.workloadVertex())
+			graphCli.Noop(c.dag, pvc)
 		}
 	}
 	return nil

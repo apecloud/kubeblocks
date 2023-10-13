@@ -37,6 +37,6 @@ func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
 	// init dag
-	graphCli.Root(dag, transCtx.OrigCluster, transCtx.Cluster)
+	graphCli.Root(dag, transCtx.OrigCluster, transCtx.Cluster, model.ActionStatusPtr())
 	return nil
 }

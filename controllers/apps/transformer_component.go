@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"fmt"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -100,7 +102,7 @@ func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx,
 	deleteSet := compStatus.Difference(compProto)
 
 	for compName := range createSet {
-		dag := graph.NewDAG()
+		dag := newDAGWithPlaceholder(cluster.Namespace, cluster.Name, compName)
 		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compName, dag)
 		if err != nil {
 			return err
@@ -115,7 +117,7 @@ func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx,
 	}
 
 	for compName := range deleteSet {
-		dag := graph.NewDAG()
+		dag := newDAGWithPlaceholder(cluster.Namespace, cluster.Name, compName)
 		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compName, dag)
 		if err != nil {
 			return err
@@ -129,7 +131,7 @@ func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx,
 	}
 
 	for compName := range updateSet {
-		dag := graph.NewDAG()
+		dag := newDAGWithPlaceholder(cluster.Namespace, cluster.Name, compName)
 		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compName, dag)
 		if err != nil {
 			return err
@@ -147,7 +149,7 @@ func (c *ComponentTransformer) transform4StatusUpdate(reqCtx ictrlutil.RequestCt
 	clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster, dags *[]*graph.DAG) error {
 	var delayedError error
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		dag := graph.NewDAG()
+		dag := newDAGWithPlaceholder(cluster.Namespace, cluster.Name, compSpec.Name)
 		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compSpec.Name, dag)
 		if err != nil {
 			return err
@@ -163,4 +165,11 @@ func (c *ComponentTransformer) transform4StatusUpdate(reqCtx ictrlutil.RequestCt
 		*dags = append(*dags, dag)
 	}
 	return delayedError
+}
+
+func newDAGWithPlaceholder(namespace, clusterName, compName string) *graph.DAG {
+	root := builder.NewReplicatedStateMachineBuilder(namespace, fmt.Sprintf("%s-%s", clusterName, compName)).GetObject()
+	dag := graph.NewDAG()
+	model.NewGraphClient(nil).Root(dag, nil, root, nil)
+	return dag
 }

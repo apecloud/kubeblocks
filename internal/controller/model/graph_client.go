@@ -43,7 +43,7 @@ const (
 
 type GraphWriter interface {
 	// Root setups the given obj as root vertex of the underlying DAG.
-	Root(dag *graph.DAG, objOld, objNew client.Object)
+	Root(dag *graph.DAG, objOld, objNew client.Object, action *Action)
 
 	// Create saves the object obj in the underlying DAG.
 	Create(dag *graph.DAG, obj client.Object, opts ...GraphOption)
@@ -91,18 +91,20 @@ type realGraphClient struct {
 	client.Client
 }
 
-func (r *realGraphClient) Root(dag *graph.DAG, objOld, objNew client.Object) {
+func (r *realGraphClient) Root(dag *graph.DAG, objOld, objNew client.Object, action *Action) {
+	var root *ObjectVertex
 	// find root vertex if already exists
-	root := r.findMatchedVertex(dag, objNew)
+	if len(dag.Vertices()) > 0 {
+		if vertex := r.findMatchedVertex(dag, objNew); vertex != nil {
+			root, _ = vertex.(*ObjectVertex)
+		}
+	}
 	// create one if root vertex not found
 	if root == nil {
-		root = &ObjectVertex{
-			Obj:    objNew,
-			OriObj: objOld,
-			Action: ActionStatusPtr(),
-		}
+		root = &ObjectVertex{}
 		dag.AddVertex(root)
 	}
+	root.Obj, root.OriObj, root.Action = objNew, objOld, action
 	// setup dependencies
 	for _, vertex := range dag.Vertices() {
 		if vertex != root {
@@ -136,6 +138,9 @@ func (r *realGraphClient) Noop(dag *graph.DAG, obj client.Object, opts ...GraphO
 }
 
 func (r *realGraphClient) Do(dag *graph.DAG, objOld, objNew client.Object, action *Action, parent *ObjectVertex) *ObjectVertex {
+	if dag.Root() == nil {
+		panic(fmt.Sprintf("root vertex not found. obj: %T, name: %s", objNew, objNew.GetName()))
+	}
 	vertex := &ObjectVertex{
 		OriObj: objOld,
 		Obj:    objNew,
@@ -143,7 +148,7 @@ func (r *realGraphClient) Do(dag *graph.DAG, objOld, objNew client.Object, actio
 	}
 	switch {
 	case parent == nil:
-		dag.AddVertex(vertex)
+		dag.AddConnectRoot(vertex)
 	default:
 		dag.AddConnect(parent, vertex)
 	}
@@ -241,17 +246,26 @@ func (r *realGraphClient) findMatchedVertex(dag *graph.DAG, object client.Object
 	if err != nil {
 		panic(fmt.Sprintf("parse gvk name failed, obj: %T, name: %s, err: %v", object, object.GetName(), err))
 	}
-	for _, vertex := range dag.Vertices() {
-		v, _ := vertex.(*ObjectVertex)
-		key, err := GetGVKName(v.Obj)
+	var found graph.Vertex
+	findVertex := func(v graph.Vertex) error {
+		if found != nil {
+			return nil
+		}
+		ov, _ := v.(*ObjectVertex)
+		key, err := GetGVKName(ov.Obj)
 		if err != nil {
-			panic(fmt.Sprintf("parse gvk name failed, obj: %T, name: %s, err: %v", v.Obj, v.Obj.GetName(), err))
+			panic(fmt.Sprintf("parse gvk name failed, obj: %T, name: %s, err: %v", ov.Obj, ov.Obj.GetName(), err))
 		}
 		if *keyLookFor == *key {
-			return vertex
+			found = v
 		}
+		return nil
 	}
-	return nil
+	err = dag.WalkReverseTopoOrder(findVertex, nil)
+	if err != nil {
+		panic(fmt.Sprintf("walk DAG failed, err: %v", err))
+	}
+	return found
 }
 
 var _ GraphClient = &realGraphClient{}

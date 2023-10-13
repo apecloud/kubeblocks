@@ -169,7 +169,7 @@ var _ = Describe("object rbac transformer test.", func() {
 
 func mockDAG(graphCli model.GraphClient, cluster *appsv1alpha1.Cluster) *graph.DAG {
 	d := graph.NewDAG()
-	graphCli.Root(d, cluster, cluster)
+	graphCli.Root(d, cluster, cluster, model.ActionStatusPtr())
 	sts := &appsv1.StatefulSet{}
 	graphCli.Create(d, sts)
 	deploy := &appsv1.Deployment{}

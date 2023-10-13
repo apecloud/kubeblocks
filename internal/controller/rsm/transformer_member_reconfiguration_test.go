@@ -90,7 +90,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 	}
 	mockDAG := func(stsOld, stsNew *apps.StatefulSet) *graph.DAG {
 		d := graph.NewDAG()
-		graphCli.Root(d, transCtx.rsmOrig, transCtx.rsm)
+		graphCli.Root(d, transCtx.rsmOrig, transCtx.rsm, model.ActionStatusPtr())
 		graphCli.Update(d, stsOld, stsNew)
 		return d
 	}
@@ -123,7 +123,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 		}
 
 		dag = graph.NewDAG()
-		graphCli.Root(dag, transCtx.rsmOrig, transCtx.rsm)
+		graphCli.Root(dag, transCtx.rsmOrig, transCtx.rsm, model.ActionStatusPtr())
 		transformer = &MemberReconfigurationTransformer{}
 	})
 

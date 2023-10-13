@@ -251,11 +251,7 @@ func (r *restoreJobBuilder) addTargetPodAndCredentialEnv(pod *corev1.Pod,
 // builderRestoreJobName builds restore job name.
 func (r *restoreJobBuilder) builderRestoreJobName(jobIndex int) string {
 	jobName := fmt.Sprintf("restore-%s-%s-%s-%d", strings.ToLower(string(r.stage)), r.restore.UID[:8], r.backupSet.Backup.Name, jobIndex)
-	l := len(jobName)
-	if l > 63 {
-		return fmt.Sprintf("%s-%s", jobName[:57], jobName[l-5:l])
-	}
-	return jobName
+	return cutJobName(jobName)
 }
 
 // build the restore job by this builder.

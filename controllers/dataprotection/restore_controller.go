@@ -267,7 +267,7 @@ func (r *RestoreReconciler) postReady(reqCtx intctrlutil.RequestCtx, restoreMgr 
 		r.handleRestoreStageError(restoreMgr.Restore, dpv1alpha1.PrepareData, err)
 	}()
 	if readyConfig.ReadinessProbe != nil && !meta.IsStatusConditionTrue(restoreMgr.Restore.Status.Conditions, dprestore.ConditionTypeReadinessProbe) {
-		// TODO: check readiness probe, use a job or exec?
+		// TODO: check readiness probe, use a job and kubectl exec?
 		_ = klog.TODO()
 	}
 	for _, v := range restoreMgr.PostReadyBackupSets {
@@ -320,14 +320,14 @@ func (r *RestoreReconciler) handleBackupActionSet(reqCtx intctrlutil.RequestCtx,
 	switch stage {
 	case dpv1alpha1.PrepareData:
 		if backupSet.UseVolumeSnapshot {
-			if err = restoreMgr.RestorePVCFromSnapshot(reqCtx, r.Client, backupSet, actionName); err != nil {
+			if err = restoreMgr.RestorePVCFromSnapshot(reqCtx, r.Client, backupSet); err != nil {
 				return false, nil
 			}
 		}
 		jobs, err = restoreMgr.BuildPrepareDataJobs(reqCtx, r.Client, backupSet, actionName)
 	case dpv1alpha1.PostReady:
 		// 2. build jobs for postReady action
-		jobs, err = restoreMgr.BuildPostReadyActionJobs(reqCtx, r.Client, backupSet, backupSet.ActionSet.Spec.Restore.PostReady[step])
+		jobs, err = restoreMgr.BuildPostReadyActionJobs(reqCtx, r.Client, backupSet, step)
 	}
 	if err != nil {
 		return false, err

@@ -113,10 +113,7 @@ var _ = Describe("object rbac transformer test.", func() {
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
 
 			serviceAccount := factory.BuildServiceAccount(cluster)
-			serviceAccount.Name = serviceAccountName
-
 			roleBinding := factory.BuildRoleBinding(cluster)
-			roleBinding.Subjects[0].Name = serviceAccountName
 
 			dagExpected := mockDAG(graphCli, cluster)
 			graphCli.Create(dagExpected, serviceAccount)
@@ -140,13 +137,8 @@ var _ = Describe("object rbac transformer test.", func() {
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
 
 			serviceAccount := factory.BuildServiceAccount(cluster)
-			serviceAccount.Name = serviceAccountName
-
 			roleBinding := factory.BuildRoleBinding(cluster)
-			roleBinding.Subjects[0].Name = serviceAccountName
-
 			clusterRoleBinding := factory.BuildClusterRoleBinding(cluster)
-			clusterRoleBinding.Subjects[0].Name = serviceAccountName
 
 			dagExpected := mockDAG(graphCli, cluster)
 			graphCli.Create(dagExpected, serviceAccount)

@@ -3,8 +3,8 @@ Define the cluster componnets with proxy.
 The proxy cpu cores is 1/6 of the cluster total cpu cores and is multiple of 0.5.
 The minimum proxy cpu cores is 0.5 and the maximum cpu cores is 64.
 */}}
-{{- define "apecloud-mysql-cluster.proxyComponents" }}
-{{- $replicas := (include "apecloud-mysql-cluster.replicas" .) }}
+{{- define "mariadb-cluster.proxyComponents" }}
+{{- $replicas := (include "mariadb-cluster.replicas" .) }}
 {{- $proxyCPU := divf (mulf $replicas .Values.cpu) 6.0 }}
 {{- $proxyCPU = divf $proxyCPU 0.5 | ceil | mulf 0.5 }}
 {{- if lt $proxyCPU 0.5 }}
@@ -51,7 +51,7 @@ Define replicas.
 standalone mode: 1
 raftGroup mode: max(replicas, 3)
 */}}
-{{- define "apecloud-mysql-cluster.replicas" }}
+{{- define "mariadb-cluster.replicas" }}
 {{- if eq .Values.mode "standalone" }}
 {{- 1 }}
 {{- else if eq .Values.mode "raftGroup" }}

@@ -635,6 +635,8 @@ spec:
                                   or its keys must be defined
                                 type: boolean
                               subPath:
+                                description: subPath is a relative file path within
+                                  the volume to mount.
                                 type: string
                             required:
                             - mountPoint
@@ -732,6 +734,8 @@ spec:
                                   in the pod''s namespace to use. More info: https://kubernetes.io/docs/concepts/storage/volumes#secret'
                                 type: string
                               subPath:
+                                description: subPath is a relative file path within
+                                  the volume to mount.
                                 type: string
                             required:
                             - mountPoint

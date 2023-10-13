@@ -190,7 +190,7 @@ type ResourceMeta struct {
 	// +kubebuilder:validation:Pattern:=`^/[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	MountPoint string `json:"mountPoint"`
 
-	//
+	// subPath is a relative file path within the volume to mount.
 	// +optional
 	SubPath string `json:"subPath,omitempty"`
 

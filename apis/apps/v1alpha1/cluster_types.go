@@ -177,21 +177,12 @@ type ClusterStorage struct {
 	Size resource.Quantity `json:"size,omitempty"`
 }
 
-type ResourceRefMount struct {
+type ResourceMeta struct {
 	// name is the name of the referenced the Configmap/Secret object.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
-
-	// TODO support different namespace of the referenced ConfigMap/Secret object and cluster.
-	// Specify the namespace of the referenced the ConfigMap/Secret object.
-	// An empty namespace is equivalent to the same namespace with cluster.
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^/[-\w/]+$`
-	// +kubebuilder:default="default"
-	// +optional
-	Namespace string `json:"namespace,omitempty"`
 
 	// mountPath is the path at which to mount the volume.
 	// +kubebuilder:validation:Required
@@ -199,15 +190,24 @@ type ResourceRefMount struct {
 	// +kubebuilder:validation:Pattern:=`^/[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	MountPoint string `json:"mountPoint"`
 
-	// defaultMode is optional: mode bits used to set permissions on created files by default.
-	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
-	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
-	// Defaults to 0644.
-	// Directories within the path are not affected by this setting.
-	// This might be in conflict with other options that affect the file
-	// mode, like fsGroup, and the result can be other mode bits set.
+	//
 	// +optional
-	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
+	SubPath string `json:"subPath,omitempty"`
+
+	// asVolumeFrom is optional: the list of containers will be injected into volumeMounts.
+	// +listType=set
+	// +optional
+	AsVolumeFrom []string `json:"asVolumeFrom,omitempty"`
+}
+
+type SecretRef struct {
+	ResourceMeta              `json:",inline"`
+	corev1.SecretVolumeSource `json:",inline"`
+}
+
+type ConfigMapRef struct {
+	ResourceMeta                 `json:",inline"`
+	corev1.ConfigMapVolumeSource `json:",inline"`
 }
 
 type UserResourceRefs struct {
@@ -217,7 +217,7 @@ type UserResourceRefs struct {
 	// +listType=map
 	// +listMapKey=name
 	// +optional
-	Secrets []ResourceRefMount `json:"secrets,omitempty"`
+	Secrets []SecretRef `json:"secrets,omitempty"`
 
 	// secrets defines the user-defined configmaps.
 	// +patchMergeKey=name
@@ -225,7 +225,7 @@ type UserResourceRefs struct {
 	// +listType=map
 	// +listMapKey=name
 	// +optional
-	ConfigMaps []ResourceRefMount `json:"configMaps,omitempty"`
+	ConfigMaps []ConfigMapRef `json:"configMaps,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster.

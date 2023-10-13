@@ -115,6 +115,8 @@ var _ = Describe("Component", func() {
 			SetReplicas(int32(defaultReplicas)).
 			AddVolumeClaimTemplate(testapps.LogVolumeName, testapps.NewPVCSpec(defaultVolumeSize)).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, testapps.NewPVCSpec(defaultVolumeSize)).
+			AddUserSecretVolume("secret_volumes", "/opt/secrets", "secret_name", "mysql").
+			AddUserConfigmapVolume("configmap_volumes", "/opt/scripts", "user_config_name", "mysql").
 			GetObject()
 
 		reqCtx = intctrlutil.RequestCtx{Ctx: ctx, Log: logger, Recorder: recorder}

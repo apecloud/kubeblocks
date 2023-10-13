@@ -6,8 +6,8 @@ set -o nounset
 
 export POSTGRESQL_INIT_MAX_TIMEOUT="${POSTGRESQL_INIT_MAX_TIMEOUT:-60}"
 export POSTGRESQL_BIN_DIR="/usr/bin"
-export POSTGRESQL_CONF_DIR="/kubeblocks/conf"
-export POSTGRESQL_CONF_FILE="/kubeblocks/conf/postgresql.conf"
+export POSTGRESQL_CONF_DIR="/kubeblocks"
+export POSTGRESQL_CONF_FILE="$POSTGRESQL_CONF_DIR/postgresql.conf"
 export POSTGRESQL_MASTER_HOST=$KB_0_HOSTNAME
 KB_0_POD_NAME_PREFIX="${KB_0_HOSTNAME%%\.*}"
 
@@ -29,4 +29,4 @@ else
     touch "$PGDATA"/standby.signal
   fi
 fi
-docker-entrypoint.sh --config-file="$POSTGRESQL_CONF_FILE" --hba_file=/kubeblocks/conf/pg_hba.conf
+docker-entrypoint.sh --config-file="$POSTGRESQL_CONF_FILE" --hba_file="$POSTGRESQL_CONF_DIR/pg_hba.conf"

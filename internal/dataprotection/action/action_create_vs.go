@@ -170,7 +170,9 @@ func (c *CreateVolumeSnapshotAction) createVolumeSnapshotIfNotExist(ctx Context,
 	}
 
 	if pvc.Spec.StorageClassName != nil && *pvc.Spec.StorageClassName != "" {
-		vscName, err = c.getVolumeSnapshotClassName(ctx.Ctx, ctx.Client, vsCli, *pvc.Spec.StorageClassName)
+		if vscName, err = c.getVolumeSnapshotClassName(ctx.Ctx, ctx.Client, vsCli, *pvc.Spec.StorageClassName); err != nil {
+			return err
+		}
 	}
 
 	if vscName != "" {

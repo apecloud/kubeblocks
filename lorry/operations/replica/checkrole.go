@@ -137,6 +137,7 @@ func (s *CheckRole) Do(ctx context.Context, req *operations.OpsRequest) (*operat
 	if s.OriRole == role {
 		return nil, nil
 	}
+	resp.Data["event"] = util.OperationSuccess
 	s.OriRole = role
 	err = util.SentEventForProbe(ctx, resp.Data)
 	return resp, err

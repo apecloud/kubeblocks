@@ -166,22 +166,22 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 
 	members, err := store.GetMembers()
 	if err != nil {
-		store.logger.Error(err, "get members error")
+		store.logger.Info("get members error", "error", err)
 	}
 
 	leader, err := store.GetLeader()
 	if err != nil {
-		store.logger.Error(err, "get leader error")
+		store.logger.Info("get leader error", "error", err)
 	}
 
 	switchover, err := store.GetSwitchover()
 	if err != nil {
-		store.logger.Error(err, "get switchover error")
+		store.logger.Info("get switchover error", "error", err)
 	}
 
 	haConfig, err := store.GetHaConfig()
 	if err != nil {
-		store.logger.Error(err, "get HaConfig error")
+		store.logger.Info("get HaConfig error", "error", err)
 	}
 
 	cluster := &Cluster{
@@ -238,7 +238,7 @@ func (store *KubernetesStore) GetLeaderConfigMap() (*corev1.ConfigMap, error) {
 	leaderConfigMap, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Get(store.ctx, leaderName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			store.logger.Error(err, fmt.Sprintf("Leader configmap [%s] is not found", leaderName))
+			store.logger.Info("Leader configmap is not found", "configmap", leaderName)
 			return nil, nil
 		}
 		store.logger.Error(err, "Get Leader configmap failed")

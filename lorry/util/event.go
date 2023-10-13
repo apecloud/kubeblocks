@@ -58,14 +58,14 @@ metadata:
   namespace: {{ .Namespace }}
 involvedObject:
   apiVersion: v1
-  fieldPath: spec.containers{sqlchannel}
+  fieldPath: spec.containers{kb-checkrole}
   kind: Pod
   name: {{ .PodName }}
   namespace: {{ .Namespace }}
 reason: RoleChanged
 type: Normal
 source:
-  component: sqlchannel
+  component: lorry
 `
 
 	// get pod object

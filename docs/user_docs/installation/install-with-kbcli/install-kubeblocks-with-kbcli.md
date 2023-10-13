@@ -86,7 +86,7 @@ If the KubeBlocks Workloads are all ready, KubeBlocks has been installed success
 
 ```bash
 KubeBlocks is deployed in namespace: kb-system,version: x.x.x
-
+>
 KubeBlocks Workloads:
 NAMESPACE   KIND         NAME                           READY PODS   CPU(CORES)   MEMORY(BYTES)   CREATED-AT
 kb-system   Deployment   kb-addon-snapshot-controller   1/1          N/A          N/A             Oct 13,2023 14:27 UTC+0800

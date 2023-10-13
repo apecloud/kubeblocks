@@ -74,8 +74,7 @@ If you want to install KubeBlocks with a specified version, follow the steps bel
 
    ```bash
    helm install kubeblocks kubeblocks/kubeblocks \
-    --namespace kb-system --create-namespace \
-	--version="0.6.3"
+    --namespace kb-system --create-namespace --version="x.x.x"
    ```
 
   :::note
@@ -96,11 +95,11 @@ kbcli kubeblocks status
 
 ***Result***
 
-If the KubeBlocks Workloads are all ready`, KubeBlocks has been installed successfully.
+If the KubeBlocks Workloads are all ready, KubeBlocks has been installed successfully.
 
 ```bash
 KubeBlocks is deployed in namespace: kb-system,version: x.x.x
-
+>
 KubeBlocks Workloads:
 NAMESPACE   KIND         NAME                           READY PODS   CPU(CORES)   MEMORY(BYTES)   CREATED-AT
 kb-system   Deployment   kb-addon-snapshot-controller   1/1          N/A          N/A             Oct 13,2023 14:27 UTC+0800

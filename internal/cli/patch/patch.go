@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -72,10 +73,10 @@ type Options struct {
 
 	EditBeforeUpdate bool
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
-func NewOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, gvr schema.GroupVersionResource) *Options {
+func NewOptions(f cmdutil.Factory, streams genericiooptions.IOStreams, gvr schema.GroupVersionResource) *Options {
 	return &Options{
 		Factory:         f,
 		GVR:             gvr,

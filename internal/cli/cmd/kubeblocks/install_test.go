@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
@@ -39,12 +39,12 @@ const namespace = "test"
 var _ = Describe("kubeblocks install", func() {
 	var (
 		cmd     *cobra.Command
-		streams genericclioptions.IOStreams
+		streams genericiooptions.IOStreams
 		tf      *cmdtesting.TestFactory
 	)
 
 	BeforeEach(func() {
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		streams, _, _, _ = genericiooptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
 		tf.Client = &clientfake.RESTClient{}
 	})
@@ -95,7 +95,7 @@ var _ = Describe("kubeblocks install", func() {
 	It("checkVersion", func() {
 		o := &InstallOptions{
 			Options: Options{
-				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
+				IOStreams: genericiooptions.NewTestIOStreamsDiscard(),
 				Client:    testing.FakeClientSet(),
 			},
 			Check: true,

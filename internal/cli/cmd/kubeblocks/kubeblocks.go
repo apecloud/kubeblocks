@@ -21,12 +21,12 @@ package kubeblocks
 
 import (
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 // NewKubeBlocksCmd creates the kubeblocks command
-func NewKubeBlocksCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewKubeBlocksCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "kubeblocks [install | upgrade | list-versions | uninstall]",
 		Short:   "KubeBlocks operation commands.",

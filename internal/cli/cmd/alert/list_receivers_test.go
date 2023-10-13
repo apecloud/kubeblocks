@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 	clientfake "k8s.io/client-go/rest/fake"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
@@ -32,12 +32,12 @@ import (
 
 var _ = Describe("alert", func() {
 	var f *cmdtesting.TestFactory
-	var s genericclioptions.IOStreams
+	var s genericiooptions.IOStreams
 
 	BeforeEach(func() {
 		f = cmdtesting.NewTestFactory()
 		f.Client = &clientfake.RESTClient{}
-		s, _, _, _ = genericclioptions.NewTestIOStreams()
+		s, _, _, _ = genericiooptions.NewTestIOStreams()
 	})
 
 	AfterEach(func() {

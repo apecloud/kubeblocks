@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/kubernetes/scheme"
 	cmdTest "k8s.io/kubectl/pkg/cmd/testing"
 
@@ -35,7 +35,7 @@ import (
 )
 
 var (
-	streams genericclioptions.IOStreams
+	streams genericiooptions.IOStreams
 	out     *bytes.Buffer
 	tf      *cmdTest.TestFactory
 )
@@ -48,7 +48,7 @@ var _ = Describe("create", func() {
 	o := &CreateMigrationOptions{}
 
 	BeforeEach(func() {
-		streams, _, out, _ = genericclioptions.NewTestIOStreams()
+		streams, _, out, _ = genericiooptions.NewTestIOStreams()
 		tf = testing.NewTestFactory(namespace)
 
 		_ = app.AddToScheme(scheme.Scheme)

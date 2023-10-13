@@ -30,7 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes/scheme"
 	clientfake "k8s.io/client-go/rest/fake"
@@ -44,7 +44,7 @@ import (
 
 var _ = Describe("list", func() {
 	var (
-		streams genericclioptions.IOStreams
+		streams genericiooptions.IOStreams
 		out     *bytes.Buffer
 		tf      *cmdtesting.TestFactory
 	)
@@ -58,7 +58,7 @@ var _ = Describe("list", func() {
 	)
 
 	BeforeEach(func() {
-		streams, _, out, _ = genericclioptions.NewTestIOStreams()
+		streams, _, out, _ = genericiooptions.NewTestIOStreams()
 		tf = testing.NewTestFactory(namespace)
 
 		_ = appsv1alpha1.AddToScheme(scheme.Scheme)

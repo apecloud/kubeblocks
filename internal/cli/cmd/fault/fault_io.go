@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -93,7 +93,7 @@ type IOChaosOptions struct {
 	FaultBaseOptions
 }
 
-func NewIOChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewIOChaosCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "io",
 		Short: "IO chaos.",
@@ -107,7 +107,7 @@ func NewIOChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	return cmd
 }
 
-func NewIOChaosOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, action string) *IOChaosOptions {
+func NewIOChaosOptions(f cmdutil.Factory, streams genericiooptions.IOStreams, action string) *IOChaosOptions {
 	o := &IOChaosOptions{
 		FaultBaseOptions: FaultBaseOptions{
 			CreateOptions: create.CreateOptions{
@@ -124,7 +124,7 @@ func NewIOChaosOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, a
 	return o
 }
 
-func NewIOLatencyCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewIOLatencyCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewIOChaosOptions(f, streams, string(v1alpha1.IoLatency))
 	cmd := o.NewCobraCommand(Latency, LatencyShort)
 
@@ -135,7 +135,7 @@ func NewIOLatencyCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	return cmd
 }
 
-func NewIOFaultCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewIOFaultCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewIOChaosOptions(f, streams, string(v1alpha1.IoFaults))
 	cmd := o.NewCobraCommand(Errno, ErrnoShort)
 
@@ -146,7 +146,7 @@ func NewIOFaultCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	return cmd
 }
 
-func NewIOAttributeOverrideCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewIOAttributeOverrideCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewIOChaosOptions(f, streams, string(v1alpha1.IoAttrOverride))
 	cmd := o.NewCobraCommand(Attribute, AttributeShort)
 
@@ -162,7 +162,7 @@ func NewIOAttributeOverrideCmd(f cmdutil.Factory, streams genericclioptions.IOSt
 	return cmd
 }
 
-func NewIOMistakeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewIOMistakeCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewIOChaosOptions(f, streams, string(v1alpha1.IoMistake))
 	cmd := o.NewCobraCommand(Mistake, MistakeShort)
 

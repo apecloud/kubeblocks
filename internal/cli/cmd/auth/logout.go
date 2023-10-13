@@ -26,7 +26,7 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/authorize"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/utils"
@@ -39,7 +39,7 @@ type LogOutOptions struct {
 	Provider authorize.Provider
 }
 
-func NewLogout(streams genericclioptions.IOStreams) *cobra.Command {
+func NewLogout(streams genericiooptions.IOStreams) *cobra.Command {
 	o := &LogOutOptions{Options: authorize.Options{IOStreams: streams}}
 	cmd := &cobra.Command{
 		Use:   "logout",

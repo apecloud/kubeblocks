@@ -27,11 +27,12 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic/fake"
 	clientfake "k8s.io/client-go/rest/fake"
@@ -42,13 +43,13 @@ import (
 )
 
 var _ = Describe("backuprepo create command", func() {
-	var streams genericclioptions.IOStreams
+	var streams genericiooptions.IOStreams
 	var tf *cmdtesting.TestFactory
 	var cmd *cobra.Command
 	var options *createOptions
 
 	BeforeEach(func() {
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		streams, _, _, _ = genericiooptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace(testing.Namespace)
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 		httpResp := func(obj runtime.Object) *http.Response {

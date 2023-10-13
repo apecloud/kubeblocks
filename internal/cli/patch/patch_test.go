@@ -22,19 +22,20 @@ package patch
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 var _ = Describe("Patch", func() {
-	var streams genericclioptions.IOStreams
+	var streams genericiooptions.IOStreams
 	var tf *cmdtesting.TestFactory
 
 	BeforeEach(func() {
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		streams, _, _, _ = genericiooptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace("default")
 	})
 

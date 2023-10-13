@@ -22,7 +22,7 @@ package context
 import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -57,10 +57,10 @@ type ContextOptions struct {
 	Context      Context
 	OutputFormat string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
-func NewContextCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func NewContextCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "context",
 		Short: "kbcli context allows you to manage cloud context. This command is currently only applicable to cloud," +
@@ -76,7 +76,7 @@ func NewContextCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func newContextListCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func newContextListCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	o := &ContextOptions{IOStreams: streams}
 
 	cmd := &cobra.Command{
@@ -91,7 +91,7 @@ func newContextListCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func newContextCurrentCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func newContextCurrentCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	o := &ContextOptions{IOStreams: streams}
 
 	cmd := &cobra.Command{
@@ -106,7 +106,7 @@ func newContextCurrentCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func newContextDescribeCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func newContextDescribeCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	o := &ContextOptions{IOStreams: streams}
 
 	cmd := &cobra.Command{
@@ -124,7 +124,7 @@ func newContextDescribeCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func newContextUseCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func newContextUseCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	o := &ContextOptions{IOStreams: streams}
 
 	cmd := &cobra.Command{

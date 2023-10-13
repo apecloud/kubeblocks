@@ -33,7 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
@@ -47,7 +47,7 @@ import (
 )
 
 type CreateOptions struct {
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 
 	// REVIEW: make this field a parameter which can be set by user
 	objectName string
@@ -70,7 +70,7 @@ var classCreateExamples = templates.Examples(`
     kbcli class create --cluster-definition apecloud-mysql --type mysql --file ./classes.yaml
 `)
 
-func NewCreateCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCreateCommand(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := CreateOptions{IOStreams: streams}
 	cmd := &cobra.Command{
 		Use:     "create [NAME]",

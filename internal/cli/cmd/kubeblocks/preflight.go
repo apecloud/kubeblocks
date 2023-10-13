@@ -33,7 +33,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 	"helm.sh/helm/v3/pkg/cli/values"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -87,7 +87,7 @@ var (
 // PreflightOptions declares the arguments accepted by the preflight command
 type PreflightOptions struct {
 	factory cmdutil.Factory
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 	*preflight.PreflightFlags
 	checkFileList []string
 	checkYamlData [][]byte
@@ -97,7 +97,7 @@ type PreflightOptions struct {
 	ValueOpts     values.Options
 }
 
-func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewPreflightCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	p := &PreflightOptions{
 		factory:        f,
 		IOStreams:      streams,

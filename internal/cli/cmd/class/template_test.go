@@ -25,17 +25,17 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 )
 
 var _ = Describe("template", func() {
 	var (
 		out     *bytes.Buffer
-		streams genericclioptions.IOStreams
+		streams genericiooptions.IOStreams
 	)
 
 	BeforeEach(func() {
-		streams, _, out, _ = genericclioptions.NewTestIOStreams()
+		streams, _, out, _ = genericiooptions.NewTestIOStreams()
 	})
 
 	It("command should succeed", func() {

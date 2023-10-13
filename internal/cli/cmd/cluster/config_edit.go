@@ -29,7 +29,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/editor"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -223,7 +223,7 @@ func (o *editConfigOptions) getReaderWrapper() (io.Reader, error) {
 }
 
 // NewEditConfigureCmd shows the difference between two configuration version.
-func NewEditConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewEditConfigureCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &editConfigOptions{
 		configOpsOptions: configOpsOptions{
 			editMode:          true,

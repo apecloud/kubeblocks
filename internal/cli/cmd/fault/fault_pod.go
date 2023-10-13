@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -75,7 +75,7 @@ type PodChaosOptions struct {
 	FaultBaseOptions
 }
 
-func NewPodChaosOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, action string) *PodChaosOptions {
+func NewPodChaosOptions(f cmdutil.Factory, streams genericiooptions.IOStreams, action string) *PodChaosOptions {
 	o := &PodChaosOptions{
 		FaultBaseOptions: FaultBaseOptions{
 			CreateOptions: create.CreateOptions{
@@ -92,7 +92,7 @@ func NewPodChaosOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, 
 	return o
 }
 
-func NewPodChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewPodChaosCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "pod",
 		Short: "Pod chaos.",
@@ -105,7 +105,7 @@ func NewPodChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	return cmd
 }
 
-func NewPodKillCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewPodKillCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewPodChaosOptions(f, streams, string(v1alpha1.PodKillAction))
 	cmd := o.NewCobraCommand(Kill, KillShort)
 
@@ -118,7 +118,7 @@ func NewPodKillCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	return cmd
 }
 
-func NewPodFailureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewPodFailureCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewPodChaosOptions(f, streams, string(v1alpha1.PodFailureAction))
 	cmd := o.NewCobraCommand(Failure, FailureShort)
 
@@ -129,7 +129,7 @@ func NewPodFailureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	return cmd
 }
 
-func NewContainerKillCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewContainerKillCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewPodChaosOptions(f, streams, string(v1alpha1.ContainerKillAction))
 	cmd := o.NewCobraCommand(KillContainer, KillContainerShort)
 

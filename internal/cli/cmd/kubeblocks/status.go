@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -105,7 +105,7 @@ var (
 )
 
 type statusOptions struct {
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 	client       kubernetes.Interface
 	dynamic      dynamic.Interface
 	mc           metrics.Interface
@@ -115,7 +115,7 @@ type statusOptions struct {
 	selectorList []metav1.ListOptions
 }
 
-func newStatusCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newStatusCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := statusOptions{IOStreams: streams}
 	cmd := &cobra.Command{
 		Use:     "status",

@@ -31,7 +31,7 @@ import (
 
 	"github.com/asaskevich/govalidator"
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -51,7 +51,7 @@ var clusterRegisterExample = templates.Examples(`
 
 type registerOption struct {
 	Factory cmdutil.Factory
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 
 	clusterType cluster.ClusterType
 	source      string
@@ -64,7 +64,7 @@ type registerOption struct {
 	replace bool
 }
 
-func newRegisterOption(f cmdutil.Factory, streams genericclioptions.IOStreams) *registerOption {
+func newRegisterOption(f cmdutil.Factory, streams genericiooptions.IOStreams) *registerOption {
 	o := &registerOption{
 		Factory:   f,
 		IOStreams: streams,
@@ -72,7 +72,7 @@ func newRegisterOption(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 	return o
 }
 
-func newRegisterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newRegisterCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := newRegisterOption(f, streams)
 	cmd := &cobra.Command{
 		Use:     "register [NAME] --source [CHART-URL]",

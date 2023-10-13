@@ -28,14 +28,14 @@ import (
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 var _ = Describe("describe", func() {
 
 	var (
-		streams genericclioptions.IOStreams
+		streams genericiooptions.IOStreams
 		tf      *cmdtesting.TestFactory
 	)
 

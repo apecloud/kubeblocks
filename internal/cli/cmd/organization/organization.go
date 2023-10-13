@@ -28,7 +28,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -85,16 +85,16 @@ type OrganizationOption struct {
 	OutputFormat string
 	Organization Organization
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
-func newOrganizationOption(streams genericclioptions.IOStreams) *OrganizationOption {
+func newOrganizationOption(streams genericiooptions.IOStreams) *OrganizationOption {
 	return &OrganizationOption{
 		IOStreams: streams,
 	}
 }
 
-func NewOrganizationCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func NewOrganizationCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "org",
 		Short:   "kbcli org is used to manage cloud organizations and is only suitable for interacting with cloud.",
@@ -110,7 +110,7 @@ func NewOrganizationCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func newOrgListCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func newOrgListCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	o := newOrganizationOption(streams)
 
 	cmd := &cobra.Command{
@@ -126,7 +126,7 @@ func newOrgListCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func newOrgSwitchCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func newOrgSwitchCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	o := newOrganizationOption(streams)
 
 	cmd := &cobra.Command{
@@ -142,7 +142,7 @@ func newOrgSwitchCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func newOrgCurrentCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func newOrgCurrentCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	o := newOrganizationOption(streams)
 
 	cmd := &cobra.Command{
@@ -158,7 +158,7 @@ func newOrgCurrentCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func newOrgDescribeCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func newOrgDescribeCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	o := newOrganizationOption(streams)
 
 	cmd := &cobra.Command{

@@ -29,7 +29,7 @@ import (
 	"helm.sh/helm/v3/pkg/cli/values"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
@@ -41,7 +41,7 @@ import (
 )
 
 var _ = Describe("backupconfig", func() {
-	var streams genericclioptions.IOStreams
+	var streams genericiooptions.IOStreams
 	var tf *cmdtesting.TestFactory
 	var o *InstallOptions
 	var out *bytes.Buffer
@@ -105,7 +105,7 @@ var _ = Describe("backupconfig", func() {
 	}
 
 	BeforeEach(func() {
-		streams, _, out, _ = genericclioptions.NewTestIOStreams()
+		streams, _, out, _ = genericiooptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace(testing.Namespace)
 		tf.Client = &clientfake.RESTClient{}
 		// use a fake URL to test

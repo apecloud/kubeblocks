@@ -26,7 +26,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
@@ -36,11 +36,11 @@ import (
 var _ = Describe("template", func() {
 	var (
 		tf      *cmdtesting.TestFactory
-		streams genericclioptions.IOStreams
+		streams genericiooptions.IOStreams
 	)
 
 	BeforeEach(func() {
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		streams, _, _, _ = genericiooptions.NewTestIOStreams()
 		tf = testing.NewTestFactory("default")
 	})
 

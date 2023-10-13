@@ -28,7 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -50,13 +50,13 @@ var _ = Describe("Expose", func() {
 	)
 
 	var (
-		streams genericclioptions.IOStreams
+		streams genericiooptions.IOStreams
 		tf      *cmdtesting.TestFactory
 		opsName string
 	)
 
 	BeforeEach(func() {
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		streams, _, _, _ = genericiooptions.NewTestIOStreams()
 		tf = clitesting.NewTestFactory(namespace)
 	})
 
@@ -113,7 +113,7 @@ var _ = Describe("Expose", func() {
 	}
 
 	initOpsOption := func(status []string, opsTypes []string) *opsListOptions {
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		streams, _, _, _ = genericiooptions.NewTestIOStreams()
 		return &opsListOptions{
 			ListOptions: list.NewListOptions(tf, streams, types.OpsGVR()),
 			status:      status,

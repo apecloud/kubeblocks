@@ -23,13 +23,13 @@ import (
 	ginkgo_context "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/organization"
 )
 
 type MockContext struct {
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 func (m *MockContext) showContext() error {
@@ -54,11 +54,11 @@ func (m *MockContext) showRemoveContext() error {
 
 var _ = ginkgo_context.Describe("Test Cloud Context", func() {
 	var (
-		streams genericclioptions.IOStreams
+		streams genericiooptions.IOStreams
 		o       *ContextOptions
 	)
 	ginkgo_context.BeforeEach(func() {
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		streams, _, _, _ = genericiooptions.NewTestIOStreams()
 		o = &ContextOptions{
 			ContextName: "test_context",
 			Context: &MockContext{

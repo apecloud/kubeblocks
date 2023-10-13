@@ -26,7 +26,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -50,7 +50,7 @@ type listBackupRepoOptions struct {
 	*list.ListOptions
 }
 
-func newListCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newListCommand(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &listBackupRepoOptions{
 		ListOptions: list.NewListOptions(f, streams, types.BackupRepoGVR()),
 	}

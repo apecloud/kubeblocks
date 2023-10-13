@@ -27,7 +27,7 @@ import (
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
@@ -61,7 +61,7 @@ var (
 	errClusterNameorInstName = fmt.Errorf("specify either cluster name or --instance")
 )
 
-func NewAccountBaseOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, op lorryutil.OperationKind) *AccountBaseOptions {
+func NewAccountBaseOptions(f cmdutil.Factory, streams genericiooptions.IOStreams, op lorryutil.OperationKind) *AccountBaseOptions {
 	return &AccountBaseOptions{
 		ExecOptions: exec.NewExecOptions(f, streams),
 		AccountOp:   op,
@@ -147,7 +147,7 @@ func (o *AccountBaseOptions) Complete(f cmdutil.Factory) error {
 	return nil
 }
 
-func (o *AccountBaseOptions) Run(cmd *cobra.Command, f cmdutil.Factory, streams genericclioptions.IOStreams) error {
+func (o *AccountBaseOptions) Run(cmd *cobra.Command, f cmdutil.Factory, streams genericiooptions.IOStreams) error {
 	var err error
 	response, err := o.Do()
 	if err != nil {

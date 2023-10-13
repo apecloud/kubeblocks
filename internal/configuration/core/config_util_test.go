@@ -232,6 +232,23 @@ test=test
 		},
 		want:    "a b\nc d e f g",
 		wantErr: false,
+	}, {
+		name: "badcase_test",
+		args: args{
+			baseCfg: []byte(` `),
+			updatedParameters: map[string]string{
+				"ENABLE_MODULES":     "true",
+				"HUGGINGFACE_APIKEY": "kssdlsdjskwssl",
+			},
+			formatConfig: &v1alpha1.FormatterConfig{
+				Format: v1alpha1.Dotenv,
+			},
+		},
+		// fix begin
+		// ENABLE_MODULES=0x1400004f130
+		// HUGGINGFACE_APIKEY=0x1400004f140
+		want:    "ENABLE_MODULES=true\nHUGGINGFACE_APIKEY=kssdlsdjskwssl\n",
+		wantErr: false,
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

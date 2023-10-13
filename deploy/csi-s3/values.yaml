@@ -76,3 +76,6 @@ csiName: s3
 
 # Check if this CSI has been installed multiple times. if true, only install storageClass and secret.
 multiCSI: false
+
+# kubelet path in the host
+kubeletPath: /var/lib/kubelet

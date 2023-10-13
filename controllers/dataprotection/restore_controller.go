@@ -40,7 +40,6 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	dperrors "github.com/apecloud/kubeblocks/internal/dataprotection/errors"
 	dprestore "github.com/apecloud/kubeblocks/internal/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
@@ -135,10 +134,14 @@ func (r *RestoreReconciler) newAction(reqCtx intctrlutil.RequestCtx, restore *dp
 		}
 		return intctrlutil.Reconciled()
 	}
-	// patch status
-	restore.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
-	restore.Status.Phase = dpv1alpha1.RestorePhaseRunning
-	r.Recorder.Event(restore, corev1.EventTypeNormal, dprestore.ReasonRestoreStarting, "start to restore")
+	if restore.Spec.PrepareDataConfig != nil && restore.Spec.PrepareDataConfig.DataSourceRef != nil {
+		restore.Status.Phase = dpv1alpha1.RestorePhaseAsDataSource
+	} else {
+		// patch status
+		restore.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
+		restore.Status.Phase = dpv1alpha1.RestorePhaseRunning
+		r.Recorder.Event(restore, corev1.EventTypeNormal, dprestore.ReasonRestoreStarting, "start to restore")
+	}
 	if err := r.Client.Status().Patch(reqCtx.Ctx, restore, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -207,39 +210,7 @@ func (r *RestoreReconciler) validateAndBuildMGR(reqCtx intctrlutil.RequestCtx, r
 		}
 	}()
 
-	// get backupActionSet based on the specified backup name.
-	backupName := restoreMgr.Restore.Spec.Backup.Name
-	backupSet, err := restoreMgr.GetBackupActionSetByNamespaced(reqCtx, r.Client, backupName, restoreMgr.Restore.Spec.Backup.Namespace)
-	if err != nil {
-		return err
-	}
-
-	// check if the backup is completed exclude continuous backup.
-	var backupType dpv1alpha1.BackupType
-	if backupSet.ActionSet != nil {
-		backupType = backupSet.ActionSet.Spec.BackupType
-	} else if backupSet.UseVolumeSnapshot {
-		backupType = dpv1alpha1.BackupTypeFull
-	}
-	if backupType != dpv1alpha1.BackupTypeContinuous && backupSet.Backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
-		err = intctrlutil.NewFatalError(fmt.Sprintf(`phase of backup "%s" is not completed`, backupName))
-		return err
-	}
-
-	// build backupActionSets of prepareData and postReady stage based on the specified backup's type.
-	switch backupType {
-	case dpv1alpha1.BackupTypeFull:
-		restoreMgr.SetBackupSets(*backupSet)
-	case dpv1alpha1.BackupTypeIncremental:
-		err = restoreMgr.BuildIncrementalBackupActionSets(reqCtx, r.Client, *backupSet)
-	case dpv1alpha1.BackupTypeDifferential:
-		err = restoreMgr.BuildDifferentialBackupActionSets(reqCtx, r.Client, *backupSet)
-	case dpv1alpha1.BackupTypeContinuous:
-		err = intctrlutil.NewErrorf(dperrors.ErrorTypeWaitForExternalHandler, "wait for external handler to do handle the Point-In-Time recovery.")
-		r.Recorder.Event(restoreMgr.Restore, corev1.EventTypeWarning, string(dperrors.ErrorTypeWaitForExternalHandler), err.Error())
-	default:
-		err = intctrlutil.NewFatalError(fmt.Sprintf("backup type of %s is empty", backupName))
-	}
+	err = dprestore.ValidateAndInitRestoreMGR(reqCtx, r.Client, r.Recorder, restoreMgr)
 	return err
 }
 
@@ -365,7 +336,7 @@ func (r *RestoreReconciler) handleBackupActionSet(reqCtx intctrlutil.RequestCtx,
 		return true, nil
 	}
 	// 3. create jobs
-	jobs, err = restoreMgr.CreateJobsIfNotExist(reqCtx, r.Client, jobs)
+	jobs, err = restoreMgr.CreateJobsIfNotExist(reqCtx, r.Client, restoreMgr.Restore, jobs)
 	if err != nil {
 		return false, err
 	}

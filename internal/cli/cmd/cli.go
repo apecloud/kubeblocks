@@ -26,7 +26,7 @@ import (
 
 	"github.com/spf13/cobra"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
 	kccmd "k8s.io/kubectl/pkg/cmd"
@@ -45,7 +45,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/clusterdefinition"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/clusterversion"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/context"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/dashboard"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/dataprotection"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/fault"
@@ -53,7 +52,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/migration"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/options"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/organization"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/playground"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/plugin"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/report"
@@ -186,14 +184,14 @@ A Command Line Interface for KubeBlocks`,
 	util.AddKlogFlags(flags)
 
 	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
-	ioStreams := genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}
+	ioStreams := genericiooptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}
 
 	// Add subcommands
 	cmd.AddCommand(
-		auth.NewLogin(ioStreams),
-		auth.NewLogout(ioStreams),
-		organization.NewOrganizationCmd(ioStreams),
-		context.NewContextCmd(ioStreams),
+		// auth.NewLogin(ioStreams),
+		// auth.NewLogout(ioStreams),
+		// organization.NewOrganizationCmd(ioStreams),
+		// context.NewContextCmd(ioStreams),
 		playground.NewPlaygroundCmd(ioStreams),
 		kubeblocks.NewKubeBlocksCmd(f, ioStreams),
 		bench.NewBenchCmd(f, ioStreams),

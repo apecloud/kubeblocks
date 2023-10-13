@@ -388,7 +388,10 @@ var _ = Describe("Cluster Controller", func() {
 		backup := testdp.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 			SetBackupPolicyName(backupPolicyName).
 			SetBackupMethod(backupMethod).
-			SetLabels(map[string]string{constant.AppInstanceLabelKey: clusterKey.Name, constant.BackupProtectionLabelKey: constant.BackupRetain}).
+			SetLabels(map[string]string{
+				constant.AppInstanceLabelKey:      clusterKey.Name,
+				constant.BackupProtectionLabelKey: constant.BackupRetain,
+			}).
 			WithRandomName().
 			Create(&testCtx).GetObject()
 		backupKey := client.ObjectKeyFromObject(backup)
@@ -624,7 +627,7 @@ var _ = Describe("Cluster Controller", func() {
 				Expect(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(backup *dpv1alpha1.Backup) {
 					backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
 					backup.Status.PersistentVolumeClaimName = "backup-data"
-					testdp.MockBackupStatusMethod(backup, testapps.DataVolumeName)
+					testdp.MockBackupStatusMethod(backup, testdp.BackupMethodName, testapps.DataVolumeName, testdp.ActionSetName)
 				})()).Should(Succeed())
 
 				if testk8s.IsMockVolumeSnapshotEnabled(&testCtx, storageClassName) {
@@ -1043,19 +1046,11 @@ var _ = Describe("Cluster Controller", func() {
 		const replicas = 3
 
 		By("Mock a StorageClass which allows resize")
-		allowVolumeExpansion := true
-		storageClass := &storagev1.StorageClass{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: storageClassName,
-			},
-			Provisioner:          "kubernetes.io/no-provisioner",
-			AllowVolumeExpansion: &allowVolumeExpansion,
-		}
-		Expect(testCtx.CreateObj(testCtx.Ctx, storageClass)).Should(Succeed())
+		sc := testapps.CreateStorageClass(&testCtx, storageClassName, true)
 
 		By("Creating a cluster with VolumeClaimTemplate")
 		pvcSpec := testapps.NewPVCSpec("1Gi")
-		pvcSpec.StorageClassName = &storageClass.Name
+		pvcSpec.StorageClassName = &sc.Name
 
 		By("Create cluster and waiting for the cluster initialized")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
@@ -2141,11 +2136,18 @@ var _ = Describe("Cluster Controller", func() {
 					}
 				}
 
-				By("checking backup policy exists")
+				checkPolicy := func(g Gomega, policy *dpv1alpha1.BackupPolicy) {
+					if backup != nil && backup.RepoName != "" {
+						Expect(*policy.Spec.BackupRepoName).Should(BeEquivalentTo(backup.RepoName))
+					}
+				}
+
+				By("checking backup policy")
 				backupPolicyName := generateBackupPolicyName(clusterKey.Name, compDefName, "")
 				backupPolicyKey := client.ObjectKey{Name: backupPolicyName, Namespace: clusterKey.Namespace}
 				backupPolicy := &dpv1alpha1.BackupPolicy{}
 				Eventually(testapps.CheckObjExists(&testCtx, backupPolicyKey, backupPolicy, true)).Should(Succeed())
+				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, checkPolicy)).Should(Succeed())
 
 				By("checking backup schedule")
 				backupScheduleName := generateBackupScheduleName(clusterKey.Name, compDefName, "")
@@ -2337,7 +2339,7 @@ var _ = Describe("Cluster Controller", func() {
 			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(backup), func(backup *dpv1alpha1.Backup) {
 				backup.Status.PersistentVolumeClaimName = "backup-pvc"
 				backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
-				testdp.MockBackupStatusMethod(backup, testapps.DataVolumeName)
+				testdp.MockBackupStatusMethod(backup, testdp.BackupMethodName, testapps.DataVolumeName, testdp.ActionSetName)
 			})).Should(Succeed())
 
 			By("creating cluster with backup")

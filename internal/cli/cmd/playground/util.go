@@ -146,7 +146,7 @@ func getKubeClient() (kubernetes.Interface, dynamic.Interface, error) {
 	f := util.NewFactory()
 	client, err := f.KubernetesClientSet()
 	errMsg := kubeClusterUnreachableErr.Error()
-	if err == genericclioptions.ErrEmptyConfig {
+	if errors.Is(err, genericclioptions.ErrEmptyConfig) {
 		return nil, nil, kubeClusterUnreachableErr
 	}
 	if err != nil {

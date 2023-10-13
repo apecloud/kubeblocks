@@ -27,7 +27,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	k8sver "k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -48,10 +48,10 @@ type UpgradeOptions struct {
 	all bool
 
 	pluginNames []string
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
-func NewPluginUpgradeCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func NewPluginUpgradeCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	o := &UpgradeOptions{
 		IOStreams: streams,
 	}

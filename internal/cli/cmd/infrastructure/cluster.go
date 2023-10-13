@@ -32,7 +32,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
@@ -44,7 +44,7 @@ import (
 
 type clusterOptions struct {
 	types.Cluster
-	IOStreams genericclioptions.IOStreams
+	IOStreams genericiooptions.IOStreams
 
 	clusterConfig string
 	clusterName   string

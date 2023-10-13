@@ -25,8 +25,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes/scheme"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
@@ -39,7 +39,7 @@ var _ = Describe("create", func() {
 		createOptions *CreateOptions
 		out           *bytes.Buffer
 		tf            *cmdtesting.TestFactory
-		streams       genericclioptions.IOStreams
+		streams       genericiooptions.IOStreams
 	)
 
 	fillResources := func(o *CreateOptions, cpu string, memory string) {
@@ -49,7 +49,7 @@ var _ = Describe("create", func() {
 	}
 
 	BeforeEach(func() {
-		streams, _, out, _ = genericclioptions.NewTestIOStreams()
+		streams, _, out, _ = genericiooptions.NewTestIOStreams()
 		tf = testing.NewTestFactory(namespace)
 		_ = appsv1alpha1.AddToScheme(scheme.Scheme)
 		createOptions = &CreateOptions{

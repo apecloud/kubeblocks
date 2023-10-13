@@ -271,12 +271,6 @@ func (r *BackupReconciler) prepareBackupRequest(
 		return nil, fmt.Errorf("backup method %s should specify snapshotVolumes or actionSetName", backupMethod.Name)
 	}
 
-	// if backup method use volume snapshots to back up, the volume snapshot
-	// feature should be enabled.
-	if snapshotVolumes && !dputils.VolumeSnapshotEnabled() {
-		return nil, fmt.Errorf("current backup method depends on volume snapshot, but volume snapshot is not enabled")
-	}
-
 	if backupMethod.ActionSetName != "" {
 		actionSet, err := getActionSetByName(reqCtx, r.Client, backupMethod.ActionSetName)
 		if err != nil {
@@ -358,7 +352,7 @@ func (r *BackupReconciler) patchBackupStatus(
 	if err != nil {
 		return fmt.Errorf("failed to parse retention period %s, %v", original.Spec.RetentionPeriod, err)
 	}
-	if original.Spec.RetentionPeriod != "" {
+	if duration.Seconds() > 0 {
 		request.Status.Expiration = &metav1.Time{
 			Time: request.Status.StartTimestamp.Add(duration),
 		}

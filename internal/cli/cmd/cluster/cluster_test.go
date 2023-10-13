@@ -27,7 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes/scheme"
 	clientfake "k8s.io/client-go/rest/fake"
@@ -55,7 +55,7 @@ var _ = Describe("Cluster", func() {
 		clusterName = "test"
 		namespace   = "default"
 	)
-	var streams genericclioptions.IOStreams
+	var streams genericiooptions.IOStreams
 	var tf *cmdtesting.TestFactory
 	// test if DEFAULT_STORAGE_CLASS is not set in config.yaml
 	fakeNilConfigData := map[string]string{
@@ -71,7 +71,7 @@ var _ = Describe("Cluster", func() {
     DEFAULT_STORAGE_CLASS: kb-default-sc`,
 	}
 	BeforeEach(func() {
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		streams, _, _, _ = genericiooptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
 		cd := testing.FakeClusterDef()
 		fakeDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName, testing.IsDefault)

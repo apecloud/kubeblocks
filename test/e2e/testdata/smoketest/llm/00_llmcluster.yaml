@@ -1,0 +1,31 @@
+---
+# Source: llm-cluster/templates/cluster.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: llm-cluster
+  labels: 
+    helm.sh/chart: llm-cluster-0.1.0
+    app.kubernetes.io/name: llm-cluster
+    app.kubernetes.io/instance: llm-cluster
+    app.kubernetes.io/version: "1.16.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  clusterDefinitionRef: llm # ref clusterdefinition.name
+  clusterVersionRef: llm-vicuna-13b
+  terminationPolicy: Delete
+  affinity:
+  componentSpecs:
+  - name: llm
+    componentDefRef: llm
+    monitor: false
+    replicas: 1
+    volumeClaimTemplates:
+    - name: data # ref clusterdefinition components.containers.volumeMounts.name
+      spec:
+        storageClassName: efs-sc1
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi

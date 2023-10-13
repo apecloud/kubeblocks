@@ -217,10 +217,11 @@ const (
 
 const (
 	// Container port name
-	ProbeHTTPPortName                  = "probe-http-port"
-	ProbeGRPCPortName                  = "probe-grpc-port"
+	LorryHTTPPortName                  = "lorry-http-port"
+	LorryGRPCPortName                  = "lorry-grpc-port"
 	ProbeInitContainerName             = "kb-initprobe"
 	WeSyncerContainerName              = "kb-we-syncer"
+	RoleProbeContainerName             = "kb-checkrole"
 	StatusProbeContainerName           = "kb-checkstatus"
 	RunningProbeContainerName          = "kb-checkrunning"
 	VolumeProtectionProbeContainerName = "kb-volume-protection"

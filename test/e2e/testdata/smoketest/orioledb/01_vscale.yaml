@@ -7,6 +7,6 @@ spec:
   type: VerticalScaling
   verticalScaling:
     - componentName: orioledb
-        requests:
-          cpu: "1"
-          memory: 1Gi
+      requests:
+        cpu: "1"
+        memory: 1Gi

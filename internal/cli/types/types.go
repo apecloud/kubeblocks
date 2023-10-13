@@ -106,6 +106,8 @@ const (
 	KindRestore                         = "Restore"
 	KindBackupPolicy                    = "BackupPolicy"
 	KindOps                             = "OpsRequest"
+	KindBackupSchedule                  = "BackupSchedule"
+	KindBackupPolicyTemplate            = "BackupPolicyTemplate"
 )
 
 // K8S rbac API group
@@ -140,6 +142,7 @@ const (
 	ResourceBackupPolicies  = "backuppolicies"
 	ResourceBackupRepos     = "backuprepos"
 	ResourceBackupSchedules = "backupschedules"
+	ResourceBackupTemplates = "backuppolicytemplates"
 )
 
 // Extensions API group
@@ -250,6 +253,10 @@ func BackupGVR() schema.GroupVersionResource {
 
 func BackupPolicyGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupPolicies}
+}
+
+func BackupPolicyTemplateGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupTemplates}
 }
 
 func BackupScheduleGVR() schema.GroupVersionResource {

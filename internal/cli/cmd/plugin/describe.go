@@ -24,7 +24,7 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -37,7 +37,7 @@ var pluginDescribeExample = templates.Examples(`
 	kbcli plugin describe [INDEX/PLUGIN]
 	`)
 
-func NewPluginDescribeCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func NewPluginDescribeCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "describe",
 		Short:   "Describe a plugin",

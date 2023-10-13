@@ -34,7 +34,6 @@ import (
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/dataprotection/builder"
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	"github.com/apecloud/kubeblocks/internal/dataprotection/utils"
 )
@@ -120,7 +119,6 @@ func (c *CreateVolumeSnapshotAction) Execute(ctx Context) (*dpv1alpha1.ActionSta
 	// volume snapshot is ready and status is not error
 	// TODO(ldm): now only support one volume to take snapshot, set its time, size to status
 	return sb.phase(dpv1alpha1.ActionPhaseCompleted).
-		phase(dpv1alpha1.ActionPhaseCompleted).
 		totalSize(snap.Status.RestoreSize.String()).
 		timeRange(snap.Status.CreationTime, snap.Status.CreationTime).
 		build(), nil
@@ -142,8 +140,8 @@ func (c *CreateVolumeSnapshotAction) createVolumeSnapshotIfNotExist(ctx Context,
 	pvc *corev1.PersistentVolumeClaim,
 	key client.ObjectKey) error {
 	var (
-		err error
-		vsc *vsv1.VolumeSnapshotClass
+		err     error
+		vscName string
 	)
 
 	snap := &vsv1.VolumeSnapshot{}
@@ -155,14 +153,6 @@ func (c *CreateVolumeSnapshotAction) createVolumeSnapshotIfNotExist(ctx Context,
 	// if the volume snapshot already exists, skip creating it.
 	if exists {
 		return nil
-	}
-
-	// create volume snapshot
-	if pvc.Spec.StorageClassName != nil && *pvc.Spec.StorageClassName != "" {
-		vsc, err = createVolumeSnapshotClassIfNotExist(ctx.Ctx, ctx.Client, vsCli, *pvc.Spec.StorageClassName)
-		if err != nil {
-			return err
-		}
 	}
 
 	c.ObjectMeta.Name = key.Name
@@ -178,8 +168,14 @@ func (c *CreateVolumeSnapshotAction) createVolumeSnapshotIfNotExist(ctx Context,
 		},
 	}
 
-	if vsc != nil {
-		snap.Spec.VolumeSnapshotClassName = &vsc.Name
+	if pvc.Spec.StorageClassName != nil && *pvc.Spec.StorageClassName != "" {
+		if vscName, err = c.getVolumeSnapshotClassName(ctx.Ctx, ctx.Client, vsCli, *pvc.Spec.StorageClassName); err != nil {
+			return err
+		}
+	}
+
+	if vscName != "" {
+		snap.Spec.VolumeSnapshotClassName = &vscName
 	}
 
 	controllerutil.AddFinalizer(snap, dptypes.DataProtectionFinalizerName)
@@ -195,34 +191,27 @@ func (c *CreateVolumeSnapshotAction) createVolumeSnapshotIfNotExist(ctx Context,
 	return nil
 }
 
-func createVolumeSnapshotClassIfNotExist(
+func (c *CreateVolumeSnapshotAction) getVolumeSnapshotClassName(
 	ctx context.Context,
 	cli client.Client,
 	vsCli intctrlutil.VolumeSnapshotCompatClient,
-	scName string) (*vsv1.VolumeSnapshotClass, error) {
+	scName string) (string, error) {
 	scObj := storagev1.StorageClass{}
 	// ignore if not found storage class, use the default volume snapshot class
 	if err := cli.Get(ctx, client.ObjectKey{Name: scName}, &scObj); client.IgnoreNotFound(err) != nil {
-		return nil, err
+		return "", err
 	}
 
 	vscList := vsv1.VolumeSnapshotClassList{}
 	if err := vsCli.List(&vscList); err != nil {
-		return nil, err
+		return "", err
 	}
 	for _, item := range vscList.Items {
 		if item.Driver == scObj.Provisioner {
-			return item.DeepCopy(), nil
+			return item.Name, nil
 		}
 	}
-
-	// not found matched volume snapshot class, create one
-	vscName := fmt.Sprintf("vsc-%s-%s", scName, scObj.UID[:8])
-	newVsc := builder.BuildVolumeSnapshotClass(vscName, scObj.Provisioner)
-	if err := vsCli.Create(newVsc); err != nil {
-		return nil, err
-	}
-	return newVsc, nil
+	return "", nil
 }
 
 func ensureVolumeSnapshotReady(

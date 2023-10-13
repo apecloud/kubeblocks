@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package accounts
 
 import (
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
@@ -30,7 +30,7 @@ type ListUserOptions struct {
 	*AccountBaseOptions
 }
 
-func NewListUserOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *ListUserOptions {
+func NewListUserOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *ListUserOptions {
 	return &ListUserOptions{
 		AccountBaseOptions: NewAccountBaseOptions(f, streams, lorryutil.ListUsersOp),
 	}

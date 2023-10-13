@@ -746,13 +746,13 @@ func (c *rsmComponent) expandVolume(reqCtx intctrlutil.RequestCtx, cli client.Cl
 
 func (c *rsmComponent) expandVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	vctName string, proto *corev1.PersistentVolumeClaimTemplate) error {
-	pvcNotFound := false
 	for i := *c.runningWorkload.Spec.Replicas - 1; i >= 0; i-- {
 		pvc := &corev1.PersistentVolumeClaim{}
 		pvcKey := types.NamespacedName{
 			Namespace: c.GetNamespace(),
 			Name:      fmt.Sprintf("%s-%s-%d", vctName, c.runningWorkload.Name, i),
 		}
+		pvcNotFound := false
 		if err := cli.Get(reqCtx.Ctx, pvcKey, pvc); err != nil {
 			if apierrors.IsNotFound(err) {
 				pvcNotFound = true
@@ -760,6 +760,18 @@ func (c *rsmComponent) expandVolumes(reqCtx intctrlutil.RequestCtx, cli client.C
 				return err
 			}
 		}
+
+		if !pvcNotFound {
+			quantity := pvc.Spec.Resources.Requests.Storage()
+			newQuantity := proto.Spec.Resources.Requests.Storage()
+			if quantity.Cmp(*pvc.Status.Capacity.Storage()) == 0 && newQuantity.Cmp(*quantity) < 0 {
+				errMsg := fmt.Sprintf("shrinking the volume is not supported, volume: %s, quantity: %s, new quantity: %s",
+					pvc.GetName(), quantity.String(), newQuantity.String())
+				reqCtx.Event(c.Cluster, corev1.EventTypeWarning, "VolumeExpansionFailed", errMsg)
+				return fmt.Errorf("%s", errMsg)
+			}
+		}
+
 		if err := c.updatePVCSize(reqCtx, cli, pvcKey, pvc, pvcNotFound, proto); err != nil {
 			return err
 		}

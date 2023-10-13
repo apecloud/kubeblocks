@@ -42,7 +42,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	rbacv1ac "k8s.io/client-go/applyconfigurations/rbac/v1"
 	"k8s.io/client-go/dynamic"
@@ -61,6 +61,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
+	"github.com/apecloud/kubeblocks/internal/dataprotection/utils/boolptr"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
@@ -240,7 +242,7 @@ type CreateOptions struct {
 	create.CreateOptions `json:"-"`
 }
 
-func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCreateCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewCreateOptions(f, streams)
 	cmd := &cobra.Command{
 		Use:     "create [NAME]",
@@ -285,7 +287,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	return cmd
 }
 
-func NewCreateOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *CreateOptions {
+func NewCreateOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *CreateOptions {
 	o := &CreateOptions{CreateOptions: create.CreateOptions{
 		Factory:         f,
 		IOStreams:       streams,
@@ -879,10 +881,6 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 
 // PreCreate before saving yaml to k8s, makes changes on Unstructured yaml
 func (o *CreateOptions) PreCreate(obj *unstructured.Unstructured) error {
-	if !o.EnableAllLogs {
-		// EnableAllLogs is false, nothing will change
-		return nil
-	}
 	c := &appsv1alpha1.Cluster{}
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, c); err != nil {
 		return err
@@ -892,7 +890,14 @@ func (o *CreateOptions) PreCreate(obj *unstructured.Unstructured) error {
 	if err != nil {
 		return err
 	}
-	setEnableAllLogs(c, cd)
+
+	if !o.EnableAllLogs {
+		setEnableAllLogs(c, cd)
+	}
+	if o.BackupConfig == nil {
+		// if backup config is not specified, set cluster's backup to nil
+		c.Spec.Backup = nil
+	}
 	data, e := runtime.DefaultUnstructuredConverter.ToUnstructured(c)
 	if e != nil {
 		return e
@@ -1213,7 +1218,7 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&f.Tenancy, "tenancy", "SharedNode", "Tenancy options, one of: (SharedNode, DedicatedNode)")
 	cmd.Flags().BoolVar(&f.BackupEnabled, "backup-enabled", false, "Specify whether enabled automated backup")
 	cmd.Flags().StringVar(&f.BackupRetentionPeriod, "backup-retention-period", "1d", "a time string ending with the 'd'|'D'|'h'|'H' character to describe how long the Backup should be retained")
-	cmd.Flags().StringVar(&f.BackupMethod, "backup-method", "snapshot", "the backup method, support: snapshot, backupTool")
+	cmd.Flags().StringVar(&f.BackupMethod, "backup-method", "", "the backup method, view it by \"kbcli cd describe <cluster-definition>\", if not specified, the default backup method will be to take snapshots of the volume")
 	cmd.Flags().StringVar(&f.BackupCronExpression, "backup-cron-expression", "", "the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.")
 	cmd.Flags().Int64Var(&f.BackupStartingDeadlineMinutes, "backup-starting-deadline-minutes", 0, "the deadline in minutes for starting the backup job if it misses its scheduled time for any reason")
 	cmd.Flags().StringVar(&f.BackupRepoName, "backup-repo-name", "", "the backup repository name")
@@ -1379,9 +1384,6 @@ func (o *CreateOptions) buildAnnotation(cls *appsv1alpha1.Cluster) {
 }
 
 func (o *CreateOptions) buildBackupConfig(cls *appsv1alpha1.Cluster) error {
-	// set default backup config
-	o.BackupConfig = &appsv1alpha1.ClusterBackup{}
-
 	// if the cls.Backup isn't nil, use the backup config in cluster
 	if cls != nil && cls.Spec.Backup != nil {
 		o.BackupConfig = cls.Spec.Backup
@@ -1391,34 +1393,112 @@ func (o *CreateOptions) buildBackupConfig(cls *appsv1alpha1.Cluster) error {
 	var flags []*pflag.Flag
 	if o.Cmd != nil {
 		o.Cmd.Flags().Visit(func(flag *pflag.Flag) {
-			flags = append(flags, flag)
+			// only check the backup flags
+			if flag.Name == "backup-enabled" || flag.Name == "backup-retention-period" ||
+				flag.Name == "backup-method" || flag.Name == "backup-cron-expression" ||
+				flag.Name == "backup-starting-deadline-minutes" || flag.Name == "backup-repo-name" ||
+				flag.Name == "pitr-enabled" {
+				flags = append(flags, flag)
+			}
 		})
 	}
 
-	// if the flag is set by user, use the flag value
-	for _, flag := range flags {
-		switch flag.Name {
-		case "backup-enabled":
-			o.BackupConfig.Enabled = &o.BackupEnabled
-		case "backup-retention-period":
-			o.BackupConfig.RetentionPeriod = dpv1alpha1.RetentionPeriod(o.BackupRetentionPeriod)
-		case "backup-method":
-			o.BackupConfig.Method = o.BackupMethod
-		case "backup-cron-expression":
-			if _, err := cron.ParseStandard(o.BackupCronExpression); err != nil {
-				return fmt.Errorf("invalid cron expression: %s, please see https://en.wikipedia.org/wiki/Cron", o.BackupCronExpression)
+	// must set backup method when set backup config in cli
+	if len(flags) > 0 {
+		if o.BackupConfig == nil {
+			o.BackupConfig = &appsv1alpha1.ClusterBackup{}
+		}
+
+		// get default backup method and all backup methods
+		defaultBackupMethod, backupMethodsMap, err := getBackupMethodsFromBackupPolicyTemplates(o.Dynamic, o.ClusterDefRef)
+		if err != nil {
+			return err
+		}
+
+		// if backup method is empty in backup config, use the default backup method
+		if o.BackupConfig.Method == "" {
+			o.BackupConfig.Method = defaultBackupMethod
+		}
+
+		// if the flag is set by user, use the flag value
+		for _, flag := range flags {
+			switch flag.Name {
+			case "backup-enabled":
+				o.BackupConfig.Enabled = &o.BackupEnabled
+			case "backup-retention-period":
+				o.BackupConfig.RetentionPeriod = dpv1alpha1.RetentionPeriod(o.BackupRetentionPeriod)
+			case "backup-method":
+				if _, ok := backupMethodsMap[o.BackupMethod]; !ok {
+					return fmt.Errorf("backup method %s is not supported, please view supported backup methods by \"kbcli cd describe %s\"", o.BackupMethod, o.ClusterDefRef)
+				}
+				o.BackupConfig.Method = o.BackupMethod
+			case "backup-cron-expression":
+				if _, err := cron.ParseStandard(o.BackupCronExpression); err != nil {
+					return fmt.Errorf("invalid cron expression: %s, please see https://en.wikipedia.org/wiki/Cron", o.BackupCronExpression)
+				}
+				o.BackupConfig.CronExpression = o.BackupCronExpression
+			case "backup-starting-deadline-minutes":
+				o.BackupConfig.StartingDeadlineMinutes = &o.BackupStartingDeadlineMinutes
+			case "backup-repo-name":
+				o.BackupConfig.RepoName = o.BackupRepoName
+			case "pitr-enabled":
+				o.BackupConfig.PITREnabled = &o.BackupPITREnabled
 			}
-			o.BackupConfig.CronExpression = o.BackupCronExpression
-		case "backup-starting-deadline-minutes":
-			o.BackupConfig.StartingDeadlineMinutes = &o.BackupStartingDeadlineMinutes
-		case "backup-repo-name":
-			o.BackupConfig.RepoName = o.BackupRepoName
-		case "pitr-enabled":
-			o.BackupConfig.PITREnabled = &o.BackupPITREnabled
 		}
 	}
 
 	return nil
+}
+
+// get backup methods from backup policy template
+// if method's snapshotVolumes is true, use the method as default method
+func getBackupMethodsFromBackupPolicyTemplates(dynamic dynamic.Interface, clusterDefRef string) (string, map[string]struct{}, error) {
+	var backupPolicyTemplates []appsv1alpha1.BackupPolicyTemplate
+	var defaultBackupPolicyTemplate appsv1alpha1.BackupPolicyTemplate
+
+	obj, err := dynamic.Resource(types.BackupPolicyTemplateGVR()).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, clusterDefRef),
+	})
+	if err != nil {
+		return "", nil, err
+	}
+	for _, item := range obj.Items {
+		var backupPolicyTemplate appsv1alpha1.BackupPolicyTemplate
+		err = runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, &backupPolicyTemplate)
+		if err != nil {
+			return "", nil, err
+		}
+		backupPolicyTemplates = append(backupPolicyTemplates, backupPolicyTemplate)
+	}
+
+	if len(backupPolicyTemplates) == 0 {
+		return "", nil, fmt.Errorf("failed to find backup policy template for cluster definition %s", clusterDefRef)
+	}
+	// if there is only one backup policy template, use it as default backup policy template
+	if len(backupPolicyTemplates) == 1 {
+		defaultBackupPolicyTemplate = backupPolicyTemplates[0]
+	}
+	for _, backupPolicyTemplate := range backupPolicyTemplates {
+		if backupPolicyTemplate.Annotations[dptypes.DefaultBackupPolicyTemplateAnnotationKey] == annotationTrueValue {
+			defaultBackupPolicyTemplate = backupPolicyTemplate
+			break
+		}
+	}
+
+	var defaultBackupMethod string
+	var backupMethodsMap = make(map[string]struct{})
+	for _, policy := range defaultBackupPolicyTemplate.Spec.BackupPolicies {
+		for _, method := range policy.BackupMethods {
+			if boolptr.IsSetToTrue(method.SnapshotVolumes) {
+				defaultBackupMethod = method.Name
+			}
+			backupMethodsMap[method.Name] = struct{}{}
+		}
+	}
+	if defaultBackupMethod == "" {
+		return "", nil, fmt.Errorf("failed to find default backup method which snapshotVolumes is true, please check backup policy template for cluster definition %s", clusterDefRef)
+	}
+	return defaultBackupMethod, backupMethodsMap, nil
 }
 
 // parse the cluster component spec

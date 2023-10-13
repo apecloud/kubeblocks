@@ -100,7 +100,7 @@ func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, 
 		return nil, fmt.Errorf("pod %v has no ip", pod.Name)
 	}
 
-	port, err := intctrlutil.GuessLorryHTTPPort(pod)
+	port, err := intctrlutil.GetLorryHTTPPort(pod)
 	if err != nil {
 		// not lorry in the pod, just return nil without error
 		return nil, nil
@@ -322,7 +322,7 @@ func NewHTTPClientWithChannelPod(pod *corev1.Pod, characterType string) (*Operat
 	if err != nil {
 		return nil, err
 	}
-	port, err := intctrlutil.GetProbeHTTPPort(pod)
+	port, err := intctrlutil.GetLorryHTTPPort(pod)
 	if err != nil {
 		return nil, err
 	}

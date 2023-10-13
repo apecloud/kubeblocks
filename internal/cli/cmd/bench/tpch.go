@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -55,7 +55,7 @@ type TpchOptions struct {
 	BenchBaseOptions
 }
 
-func NewTpchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewTpchCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &TpchOptions{
 		BenchBaseOptions: BenchBaseOptions{
 			IOStreams: streams,

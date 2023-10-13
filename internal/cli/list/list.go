@@ -36,6 +36,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -65,10 +66,10 @@ type ListOptions struct {
 	// only return the result to caller.
 	Print  bool
 	SortBy string
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
-func NewListOptions(f cmdutil.Factory, streams genericclioptions.IOStreams,
+func NewListOptions(f cmdutil.Factory, streams genericiooptions.IOStreams,
 	gvr schema.GroupVersionResource) *ListOptions {
 	return &ListOptions{
 		Factory:   f,
@@ -85,7 +86,7 @@ func (o *ListOptions) AddFlags(cmd *cobra.Command, isClusterScope ...bool) {
 	}
 	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.")
 	cmd.Flags().BoolVar(&o.ShowLabels, "show-labels", false, "When printing, show all labels as the last column (default hide labels column)")
-	//Todo: --sortBy supports custom field sorting, now `list` is to sort using the `.metadata.name` field in default
+	// Todo: --sortBy supports custom field sorting, now `list` is to sort using the `.metadata.name` field in default
 	printer.AddOutputFlag(cmd, &o.Format)
 }
 

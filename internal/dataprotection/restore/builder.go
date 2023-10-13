@@ -51,6 +51,8 @@ type restoreJobBuilder struct {
 	command              []string
 	tolerations          []corev1.Toleration
 	nodeSelector         map[string]string
+	jobName              string
+	labels               map[string]string
 }
 
 func newRestoreJobBuilder(restore *dpv1alpha1.Restore, backupSet BackupActionSet, stage dpv1alpha1.RestoreStage) *restoreJobBuilder {
@@ -60,16 +62,18 @@ func newRestoreJobBuilder(restore *dpv1alpha1.Restore, backupSet BackupActionSet
 		stage:              stage,
 		commonVolumes:      []corev1.Volume{},
 		commonVolumeMounts: []corev1.VolumeMount{},
+		labels:             BuildRestoreLabels(restore.Name),
 	}
 }
 
 func (r *restoreJobBuilder) buildPVCVolumeAndMount(
-	claim dpv1alpha1.RestoreVolumeClaim,
+	claim dpv1alpha1.VolumeConfig,
+	claimName,
 	identifier string) (*corev1.Volume, *corev1.VolumeMount, error) {
-	volumeName := fmt.Sprintf("%s-%s", identifier, claim.Name)
+	volumeName := fmt.Sprintf("%s-%s", identifier, claimName)
 	volume := &corev1.Volume{
 		Name:         volumeName,
-		VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: claim.Name}},
+		VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: claimName}},
 	}
 	volumeMount := &corev1.VolumeMount{Name: volumeName}
 	if claim.MountPath != "" {
@@ -154,6 +158,16 @@ func (r *restoreJobBuilder) setNodeNameToNodeSelector(nodeName string) *restoreJ
 	r.nodeSelector = map[string]string{
 		corev1.LabelHostname: nodeName,
 	}
+	return r
+}
+
+func (r *restoreJobBuilder) setJobName(jobName string) *restoreJobBuilder {
+	r.jobName = jobName
+	return r
+}
+
+func (r *restoreJobBuilder) addLabel(key, value string) *restoreJobBuilder {
+	r.labels[key] = value
 	return r
 }
 
@@ -245,12 +259,15 @@ func (r *restoreJobBuilder) builderRestoreJobName(jobIndex int) string {
 }
 
 // build the restore job by this builder.
-func (r *restoreJobBuilder) build(jobIndex int) *batchv1.Job {
+func (r *restoreJobBuilder) build() *batchv1.Job {
+	if r.jobName == "" {
+		r.jobName = r.builderRestoreJobName(0)
+	}
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      r.builderRestoreJobName(jobIndex),
+			Name:      r.jobName,
 			Namespace: r.restore.Namespace,
-			Labels:    BuildRestoreLabels(r.restore.Name),
+			Labels:    r.labels,
 		},
 	}
 	podSpec := job.Spec.Template.Spec
@@ -259,7 +276,7 @@ func (r *restoreJobBuilder) build(jobIndex int) *batchv1.Job {
 	podSpec.SecurityContext = &corev1.PodSecurityContext{
 		RunAsUser: &runUser,
 	}
-	podSpec.RestartPolicy = corev1.RestartPolicyOnFailure
+	podSpec.RestartPolicy = corev1.RestartPolicyNever
 	if r.stage == dpv1alpha1.PrepareData {
 		// set scheduling spec
 		schedulingSpec := r.restore.Spec.PrepareDataConfig.SchedulingSpec

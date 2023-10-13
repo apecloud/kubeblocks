@@ -29,12 +29,14 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	dperrors "github.com/apecloud/kubeblocks/internal/dataprotection/errors"
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
 
@@ -144,9 +146,9 @@ func getTimeFormat(envs []corev1.EnvVar) string {
 	return time.RFC3339
 }
 
-// checkJobDone if the job is completed or failed, return true.
+// CheckJobDone if the job is completed or failed, return true.
 // if the job is failed, return an error to describe the failed message.
-func checkJobDone(job *batchv1.Job) (bool, error) {
+func CheckJobDone(job *batchv1.Job) (bool, error) {
 	if job == nil {
 		return false, nil
 	}
@@ -215,4 +217,48 @@ func deleteRestoreJob(reqCtx intctrlutil.RequestCtx, cli client.Client, jobKey s
 		}
 	}
 	return intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, job)
+}
+
+// ValidateAndInitRestoreMGR validate if the restore CR is valid and init the restore manager.
+func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	recorder record.EventRecorder,
+	restoreMgr *RestoreManager) error {
+
+	// get backupActionSet based on the specified backup name.
+	backupName := restoreMgr.Restore.Spec.Backup.Name
+	backupSet, err := restoreMgr.GetBackupActionSetByNamespaced(reqCtx, cli, backupName, restoreMgr.Restore.Spec.Backup.Namespace)
+	if err != nil {
+		return err
+	}
+
+	// TODO: check if there is permission for cross namespace recovery.
+
+	// check if the backup is completed exclude continuous backup.
+	var backupType dpv1alpha1.BackupType
+	if backupSet.ActionSet != nil {
+		backupType = backupSet.ActionSet.Spec.BackupType
+	} else if backupSet.UseVolumeSnapshot {
+		backupType = dpv1alpha1.BackupTypeFull
+	}
+	if backupType != dpv1alpha1.BackupTypeContinuous && backupSet.Backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
+		err = intctrlutil.NewFatalError(fmt.Sprintf(`phase of backup "%s" is not completed`, backupName))
+		return err
+	}
+
+	// build backupActionSets of prepareData and postReady stage based on the specified backup's type.
+	switch backupType {
+	case dpv1alpha1.BackupTypeFull:
+		restoreMgr.SetBackupSets(*backupSet)
+	case dpv1alpha1.BackupTypeIncremental:
+		err = restoreMgr.BuildIncrementalBackupActionSets(reqCtx, cli, *backupSet)
+	case dpv1alpha1.BackupTypeDifferential:
+		err = restoreMgr.BuildDifferentialBackupActionSets(reqCtx, cli, *backupSet)
+	case dpv1alpha1.BackupTypeContinuous:
+		err = intctrlutil.NewErrorf(dperrors.ErrorTypeWaitForExternalHandler, "wait for external handler to do handle the Point-In-Time recovery.")
+		recorder.Event(restoreMgr.Restore, corev1.EventTypeWarning, string(dperrors.ErrorTypeWaitForExternalHandler), err.Error())
+	default:
+		err = intctrlutil.NewFatalError(fmt.Sprintf("backup type of %s is empty", backupName))
+	}
+	return err
 }

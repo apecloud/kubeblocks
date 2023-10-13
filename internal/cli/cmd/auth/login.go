@@ -28,11 +28,11 @@ import (
 	"net/url"
 
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/authorize"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/utils"
-	cloud_context "github.com/apecloud/kubeblocks/internal/cli/cmd/context"
+	cloudctx "github.com/apecloud/kubeblocks/internal/cli/cmd/context"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/organization"
 )
 
@@ -49,7 +49,7 @@ type LoginOptions struct {
 	Provider authorize.Provider
 }
 
-func NewLogin(streams genericclioptions.IOStreams) *cobra.Command {
+func NewLogin(streams genericiooptions.IOStreams) *cobra.Command {
 	o := &LoginOptions{Options: authorize.Options{IOStreams: streams}}
 	cmd := &cobra.Command{
 		Use:   "login",
@@ -240,7 +240,7 @@ func getFirstOrg(token string) string {
 }
 
 func getFirstContext(token string, orgName string) string {
-	c := &cloud_context.CloudContext{
+	c := &cloudctx.CloudContext{
 		OrgName: orgName,
 		Token:   token,
 		APIURL:  organization.APIURL,

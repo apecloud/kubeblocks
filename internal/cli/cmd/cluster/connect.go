@@ -29,7 +29,7 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -95,7 +95,7 @@ type ConnectOptions struct {
 }
 
 // NewConnectCmd returns the cmd of connecting to a cluster
-func NewConnectCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewConnectCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &ConnectOptions{ExecOptions: exec.NewExecOptions(f, streams)}
 	cmd := &cobra.Command{
 		Use:               "connect (NAME | -i INSTANCE-NAME)",
@@ -113,7 +113,7 @@ func NewConnectCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		},
 	}
 	cmd.Flags().StringVarP(&o.PodName, "instance", "i", "", "The instance name to connect.")
-	flags.AddComponentsFlag(f, cmd, false, &o.componentName, "The component to connect. If not specified, pick up the first one.")
+	flags.AddComponentFlag(f, cmd, &o.componentName, "The component to connect. If not specified, pick up the first one.")
 	cmd.Flags().BoolVar(&o.showExample, "show-example", false, "Show how to connect to cluster/instance from different clients.")
 	cmd.Flags().BoolVar(&o.showPassword, "show-password", false, "Show password in example.")
 

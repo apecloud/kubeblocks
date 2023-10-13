@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -57,17 +57,18 @@ var (
 )
 
 type destroyOptions struct {
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 	baseOptions
 
 	// purge resources, before destroying kubernetes cluster we should delete cluster and
 	// uninstall KubeBlocks
 	autoApprove bool
 	purge       bool
-	timeout     time.Duration
+	// timeout represents the timeout for the destruction process.
+	timeout time.Duration
 }
 
-func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func newDestroyCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	o := &destroyOptions{
 		IOStreams: streams,
 	}
@@ -76,13 +77,14 @@ func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		Short:   "Destroy the playground KubeBlocks and kubernetes cluster.",
 		Example: destroyExample,
 		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(o.complete(cmd))
 			util.CheckErr(o.validate())
 			util.CheckErr(o.destroy())
 		},
 	}
 
 	cmd.Flags().BoolVar(&o.purge, "purge", true, "Purge all resources before destroying kubernetes cluster, delete all clusters created by KubeBlocks and uninstall KubeBlocks.")
-	cmd.Flags().DurationVar(&o.timeout, "timeout", 300*time.Second, "Time to wait for installing KubeBlocks, such as --timeout=10m")
+	cmd.Flags().DurationVar(&o.timeout, "timeout", 300*time.Second, "Time to wait for destroying KubeBlocks, such as --timeout=10m")
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before destroying the playground")
 	return cmd
 }
@@ -223,7 +225,6 @@ func (o *destroyOptions) deleteClustersAndUninstallKB() error {
 func (o *destroyOptions) deleteClusters(dynamic dynamic.Interface) error {
 	var err error
 	ctx := context.Background()
-
 	// get all clusters in all namespaces
 	getClusters := func() (*unstructured.UnstructuredList, error) {
 		return dynamic.Resource(types.ClusterGVR()).Namespace(metav1.NamespaceAll).
@@ -297,14 +298,15 @@ func (o *destroyOptions) deleteClusters(dynamic dynamic.Interface) error {
 
 	// check all clusters termination policy is WipeOut
 	if checkWipeOut {
-		if err = wait.PollImmediate(5*time.Second, o.timeout, func() (bool, error) {
-			return checkClusters(func(cluster *appsv1alpha1.Cluster) bool {
-				if cluster.Spec.TerminationPolicy != appsv1alpha1.WipeOut {
-					klog.V(1).Infof("Cluster %s termination policy is %s", cluster.Name, cluster.Spec.TerminationPolicy)
-				}
-				return cluster.Spec.TerminationPolicy == appsv1alpha1.WipeOut
-			})
-		}); err != nil {
+		if err = wait.PollUntilContextTimeout(context.Background(), 5*time.Second,
+			o.timeout, true, func(_ context.Context) (bool, error) {
+				return checkClusters(func(cluster *appsv1alpha1.Cluster) bool {
+					if cluster.Spec.TerminationPolicy != appsv1alpha1.WipeOut {
+						klog.V(1).Infof("Cluster %s termination policy is %s", cluster.Name, cluster.Spec.TerminationPolicy)
+					}
+					return cluster.Spec.TerminationPolicy == appsv1alpha1.WipeOut
+				})
+			}); err != nil {
 			return err
 		}
 	}
@@ -315,13 +317,14 @@ func (o *destroyOptions) deleteClusters(dynamic dynamic.Interface) error {
 	}
 
 	// check and wait all clusters are deleted
-	if err = wait.PollImmediate(5*time.Second, o.timeout, func() (bool, error) {
-		return checkClusters(func(cluster *appsv1alpha1.Cluster) bool {
-			// always return false if any cluster is not deleted
-			klog.V(1).Infof("Cluster %s is not deleted", cluster.Name)
-			return false
-		})
-	}); err != nil {
+	if err = wait.PollUntilContextTimeout(context.Background(), 5*time.Second,
+		o.timeout, true, func(_ context.Context) (bool, error) {
+			return checkClusters(func(cluster *appsv1alpha1.Cluster) bool {
+				// always return false if any cluster is not deleted
+				klog.V(1).Infof("Cluster %s is not deleted", cluster.Name)
+				return false
+			})
+		}); err != nil {
 		return err
 	}
 
@@ -392,5 +395,13 @@ func (o *destroyOptions) removeStateFile() error {
 		return err
 	}
 	s.Success()
+	return nil
+}
+
+func (o *destroyOptions) complete(cmd *cobra.Command) error {
+	// enable log
+	if err := util.EnableLogToFile(cmd.Flags()); err != nil {
+		return fmt.Errorf("failed to enable the log file %s", err.Error())
+	}
 	return nil
 }

@@ -35,9 +35,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -49,7 +50,10 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/configuration"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
+	"github.com/apecloud/kubeblocks/internal/dataprotection/utils/boolptr"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
@@ -106,7 +110,7 @@ type updateOptions struct {
 	*patch.Options
 }
 
-func NewUpdateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewUpdateCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &updateOptions{Options: patch.NewOptions(f, streams, types.ClusterGVR())}
 	o.Options.OutputOperation = func(didPatch bool) string {
 		if didPatch {
@@ -257,6 +261,20 @@ func (o *updateOptions) buildPatch(flags []*pflag.Flag) error {
 	}
 
 	if o.cluster != nil {
+		// if update the backup config, the backup method must have value
+		if o.cluster.Spec.Backup != nil {
+			defaultBackupMethod, backupMethodMap, err := o.getBackupMethodsFromBackupPolicy()
+			if err != nil {
+				return err
+			}
+			if o.cluster.Spec.Backup.Method == "" {
+				o.cluster.Spec.Backup.Method = defaultBackupMethod
+			}
+			if _, ok := backupMethodMap[o.cluster.Spec.Backup.Method]; !ok {
+				return fmt.Errorf("backup method %s is not supported, please view the supported backup methods by `kbcli cd describe %s`", o.cluster.Spec.Backup.Method, o.cluster.Spec.ClusterDefRef)
+			}
+		}
+
 		data, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&o.cluster.Spec)
 		if err != nil {
 			return err
@@ -310,6 +328,9 @@ func (o *updateOptions) buildBackup(field string, val string) error {
 			return err
 		}
 		o.cluster = c
+	}
+	if o.cluster.Spec.Backup == nil {
+		o.cluster.Spec.Backup = &appsv1alpha1.ClusterBackup{}
 	}
 
 	switch field {
@@ -594,4 +615,48 @@ func (o *updateOptions) updateBackupPitrEnabled(val string) error {
 	}
 	o.cluster.Spec.Backup.PITREnabled = &boolVal
 	return nil
+}
+
+// get backup methods from cluster's backup policy
+// if method's snapshotVolumes is true, use the method as the default backup method
+func (o *updateOptions) getBackupMethodsFromBackupPolicy() (string, map[string]struct{}, error) {
+	if o.cluster == nil {
+		return "", nil, fmt.Errorf("cluster is nil")
+	}
+
+	var backupPolicy []dpv1alpha1.BackupPolicy
+	obj, err := o.dynamic.Resource(types.BackupPolicyGVR()).Namespace(o.namespace).List(context.Background(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", constant.AppInstanceLabelKey, o.cluster.Name),
+	})
+	if err != nil {
+		return "", nil, err
+	}
+	for _, item := range obj.Items {
+		var bp dpv1alpha1.BackupPolicy
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, &bp); err != nil {
+			return "", nil, err
+		}
+		backupPolicy = append(backupPolicy, bp)
+	}
+
+	var defaultBackupMethod string
+	var backupMethodsMap = make(map[string]struct{})
+	for _, policy := range backupPolicy {
+		if policy.Annotations[dptypes.DefaultBackupPolicyAnnotationKey] != annotationTrueValue {
+			continue
+		}
+		if policy.Status.Phase != dpv1alpha1.AvailablePhase {
+			continue
+		}
+		for _, method := range policy.Spec.BackupMethods {
+			if boolptr.IsSetToTrue(method.SnapshotVolumes) {
+				defaultBackupMethod = method.Name
+			}
+			backupMethodsMap[method.Name] = struct{}{}
+		}
+	}
+	if defaultBackupMethod == "" {
+		return "", nil, fmt.Errorf("failed to find default backup method which snapshotVolumes is true, please check cluster's backup policy")
+	}
+	return defaultBackupMethod, backupMethodsMap, nil
 }

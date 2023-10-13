@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: dn-hscale-in-
+spec:
+  clusterRef: pxc
+  type: HorizontalScaling
+  horizontalScaling:
+    - componentName: dn-0
+      replicas: 1

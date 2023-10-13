@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
@@ -46,13 +46,13 @@ var _ = Describe("operations", func() {
 		clusterName1 = "cluster-ops1"
 	)
 	var (
-		streams genericclioptions.IOStreams
+		streams genericiooptions.IOStreams
 		tf      *cmdtesting.TestFactory
 		in      *bytes.Buffer
 	)
 
 	BeforeEach(func() {
-		streams, in, _, _ = genericclioptions.NewTestIOStreams()
+		streams, in, _, _ = genericiooptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace(testing.Namespace)
 		clusterWithTwoComps := testing.FakeCluster(clusterName, testing.Namespace)
 		clusterWithOneComp := clusterWithTwoComps.DeepCopy()

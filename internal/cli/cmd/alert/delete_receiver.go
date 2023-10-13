@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -43,7 +43,7 @@ type deleteReceiverOptions struct {
 	names []string
 }
 
-func newDeleteReceiverCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newDeleteReceiverCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &deleteReceiverOptions{baseOptions: baseOptions{IOStreams: streams}}
 	cmd := &cobra.Command{
 		Use:     "delete-receiver NAME",

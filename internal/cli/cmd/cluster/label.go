@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	ktypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -82,10 +82,10 @@ type LabelOptions struct {
 	builder                      *resource.Builder
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
-func NewLabelOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, gvr schema.GroupVersionResource) *LabelOptions {
+func NewLabelOptions(f cmdutil.Factory, streams genericiooptions.IOStreams, gvr schema.GroupVersionResource) *LabelOptions {
 	return &LabelOptions{
 		Factory:   f,
 		GVR:       gvr,
@@ -93,7 +93,7 @@ func NewLabelOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, gvr
 	}
 }
 
-func NewLabelCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewLabelCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewLabelOptions(f, streams, types.ClusterGVR())
 	cmd := &cobra.Command{
 		Use:               "label NAME",

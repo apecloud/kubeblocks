@@ -30,7 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -69,7 +69,7 @@ var (
 )
 
 type baseOptions struct {
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 	alertConfigMap   *corev1.ConfigMap
 	webhookConfigMap *corev1.ConfigMap
 	client           kubernetes.Interface
@@ -90,7 +90,7 @@ type addReceiverOptions struct {
 	webhookAdaptorReceivers []webhookAdaptorReceiver
 }
 
-func newAddReceiverCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newAddReceiverCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := addReceiverOptions{baseOptions: baseOptions{IOStreams: streams}}
 	cmd := &cobra.Command{
 		Use:     "add-receiver",

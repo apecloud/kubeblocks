@@ -30,7 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -60,14 +60,14 @@ type describeOpsOptions struct {
 	gvr   schema.GroupVersionResource
 	names []string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 type opsObject interface {
 	appsv1alpha1.VerticalScaling | appsv1alpha1.HorizontalScaling | appsv1alpha1.OpsRequestVolumeClaimTemplate | appsv1alpha1.VolumeExpansion
 }
 
-func newDescribeOpsOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *describeOpsOptions {
+func newDescribeOpsOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *describeOpsOptions {
 	return &describeOpsOptions{
 		factory:   f,
 		IOStreams: streams,
@@ -75,7 +75,7 @@ func newDescribeOpsOptions(f cmdutil.Factory, streams genericclioptions.IOStream
 	}
 }
 
-func NewDescribeOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewDescribeOpsCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := newDescribeOpsOptions(f, streams)
 	cmd := &cobra.Command{
 		Use:               "describe-ops",

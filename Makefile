@@ -710,7 +710,7 @@ endif
 
 .PHONY: test-e2e
 test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
-	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) TEST_TYPE=$(TEST_TYPE) SKIP_CASE=$(SKIP_CASE) -C test/e2e run
+	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) TEST_TYPE=$(TEST_TYPE) SKIP_CASE=$(SKIP_CASE) CONFIG_TYPE=$(CONFIG_TYPE) -C test/e2e run
 
 .PHONY: render-smoke-testdata-manifests-local
 render-smoke-testdata-manifests-local: ## Helm Install CD And CV
@@ -770,12 +770,16 @@ else
 endif
 
 .PHONY: test-e2e-local
-test-e2e-local: generate-cluster-role render-smoke-testdata-manifests-local render-smoke-testdata-manifests ## Run E2E tests on local.
+test-e2e-local: generate-cluster-role install-s3-csi-driver render-smoke-testdata-manifests-local render-smoke-testdata-manifests ## Run E2E tests on local.
 	$(MAKE) -e TEST_TYPE=$(TEST_TYPE) -C test/e2e run
 
 .PHONY: generate-cluster-role
 generate-cluster-role:
 	$(HELM) template -s templates/rbac/cluster_pod_required_role.yaml deploy/helm | kubectl apply -f -
+
+.PHONY: install-s3-csi-driver
+install-s3-csi-driver:
+	$(HELM) upgrade --install csi-s3 deploy/csi-s3
 
 # NOTE: include must be placed at the end
 include docker/docker.mk

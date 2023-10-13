@@ -30,7 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes/scheme"
 	clientfake "k8s.io/client-go/rest/fake"
@@ -43,7 +43,7 @@ import (
 )
 
 var _ = Describe("clusterversion", func() {
-	var streams genericclioptions.IOStreams
+	var streams genericiooptions.IOStreams
 	var tf *cmdtesting.TestFactory
 	out := new(bytes.Buffer)
 	var CreateTime string
@@ -63,7 +63,7 @@ var _ = Describe("clusterversion", func() {
 	BeforeEach(func() {
 		_ = appsv1alpha1.AddToScheme(scheme.Scheme)
 		_ = metav1.AddMetaToScheme(scheme.Scheme)
-		streams, _, out, _ = genericclioptions.NewTestIOStreams()
+		streams, _, out, _ = genericiooptions.NewTestIOStreams()
 		fakeCV := testing.FakeClusterVersion()
 		CreateTime = util.TimeFormat(&fakeCV.CreationTimestamp)
 		tf = mockClient(fakeCV)

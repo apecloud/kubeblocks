@@ -26,7 +26,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	gv "github.com/hashicorp/go-version"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	clitesting "github.com/apecloud/kubeblocks/internal/cli/testing"
@@ -40,10 +40,10 @@ var _ = Describe("playground", func() {
 		testKubeConfigPath = "./testdata/kubeconfig"
 	)
 
-	var streams genericclioptions.IOStreams
+	var streams genericiooptions.IOStreams
 
 	BeforeEach(func() {
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		streams, _, _, _ = genericiooptions.NewTestIOStreams()
 		Expect(os.Setenv(types.CliHomeEnv, "./testdata")).Should(Succeed())
 	})
 

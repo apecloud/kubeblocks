@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -101,7 +102,7 @@ var _ reportInterface = &reportKubeblocksOptions{}
 var _ reportInterface = &reportClusterOptions{}
 
 // NewReportCmd creates command for reports.
-func NewReportCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewReportCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "report [kubeblocks | cluster]",
 		Short: "report kubeblocks or cluster info.",
@@ -119,7 +120,7 @@ type reportInterface interface {
 	handleManifests(ctx context.Context) error
 }
 type reportOptions struct {
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 	// file name to output
 	file string
 	// namespace of resource
@@ -161,7 +162,7 @@ type reportClusterOptions struct {
 	cluster         *appsv1alpha1.Cluster
 }
 
-func newReportOptions(f genericclioptions.IOStreams) reportOptions {
+func newReportOptions(f genericiooptions.IOStreams) reportOptions {
 	return reportOptions{
 		IOStreams:          f,
 		JSONYamlPrintFlags: genericclioptions.NewJSONYamlPrintFlags(),
@@ -256,7 +257,7 @@ func (o *reportOptions) parsePrinter() (printers.ResourcePrinterFunc, error) {
 	return printer.PrintObj, nil
 }
 
-func newKubeblocksReportCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newKubeblocksReportCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &reportKubeblocksOptions{reportOptions: newReportOptions(streams)}
 	cmd := &cobra.Command{
 		Use:     "kubeblocks [-f file] [--with-logs] [--mask]",
@@ -289,7 +290,7 @@ func (o *reportKubeblocksOptions) complete(f cmdutil.Factory) error {
 	return nil
 }
 
-func (o *reportKubeblocksOptions) run(f cmdutil.Factory, streams genericclioptions.IOStreams) error {
+func (o *reportKubeblocksOptions) run(f cmdutil.Factory, streams genericiooptions.IOStreams) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -394,7 +395,7 @@ func (o *reportKubeblocksOptions) handleLogs(ctx context.Context) error {
 	return nil
 }
 
-func newClusterReportCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newClusterReportCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &reportClusterOptions{reportOptions: newReportOptions(streams)}
 
 	cmd := &cobra.Command{
@@ -445,7 +446,7 @@ func (o *reportClusterOptions) complete(f cmdutil.Factory) error {
 	return nil
 }
 
-func (o *reportClusterOptions) run(f cmdutil.Factory, streams genericclioptions.IOStreams) error {
+func (o *reportClusterOptions) run(f cmdutil.Factory, streams genericiooptions.IOStreams) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	var err error

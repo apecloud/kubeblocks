@@ -34,7 +34,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -65,10 +65,10 @@ type describeOptions struct {
 	names []string
 
 	*v1alpha1.MigrationObjects
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
-func newOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *describeOptions {
+func newOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *describeOptions {
 	return &describeOptions{
 		factory:   f,
 		IOStreams: streams,
@@ -76,7 +76,7 @@ func newOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *describ
 	}
 }
 
-func NewMigrationDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewMigrationDescribeCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := newOptions(f, streams)
 	cmd := &cobra.Command{
 		Use:               "describe NAME",

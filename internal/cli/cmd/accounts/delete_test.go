@@ -27,7 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes/scheme"
 	clientfake "k8s.io/client-go/rest/fake"
@@ -45,7 +45,7 @@ var _ = Describe("Delete Account Options", func() {
 	)
 
 	var (
-		streams genericclioptions.IOStreams
+		streams genericiooptions.IOStreams
 		in      *bytes.Buffer
 		tf      *cmdtesting.TestFactory
 		cluster = testing.FakeCluster(clusterName, namespace)
@@ -53,7 +53,7 @@ var _ = Describe("Delete Account Options", func() {
 	)
 
 	BeforeEach(func() {
-		streams, in, _, _ = genericclioptions.NewTestIOStreams()
+		streams, in, _, _ = genericiooptions.NewTestIOStreams()
 		tf = testing.NewTestFactory(namespace)
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 		httpResp := func(obj runtime.Object) *http.Response {

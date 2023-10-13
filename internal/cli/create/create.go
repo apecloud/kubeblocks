@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -101,7 +102,7 @@ type CreateOptions struct {
 	// Quiet minimize unnecessary output
 	Quiet bool
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 func (o *CreateOptions) Complete() error {
@@ -210,11 +211,11 @@ func (o *CreateOptions) Run() error {
 			return nil
 		}
 	}
-	printer, err := o.ToPrinter(nil, false)
+	p, err := o.ToPrinter(nil, false)
 	if err != nil {
 		return err
 	}
-	return printer.PrintObj(resObj, o.Out)
+	return p.PrintObj(resObj, o.Out)
 }
 
 func (o *CreateOptions) CleanUp() error {

@@ -30,7 +30,7 @@ import (
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -376,7 +376,7 @@ func isDynamicType(pt *parameterSchema, staticParameters, dynamicParameters *cfg
 }
 
 // NewDescribeReconfigureCmd shows details of history modifications or configuration file of reconfiguring operations
-func NewDescribeReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewDescribeReconfigureCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &configObserverOptions{
 		isExplain:          false,
 		showDetail:         false,
@@ -400,7 +400,7 @@ func NewDescribeReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOSt
 }
 
 // NewExplainReconfigureCmd shows details of modifiable parameters.
-func NewExplainReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewExplainReconfigureCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &configObserverOptions{
 		isExplain:          true,
 		truncEnum:          true,

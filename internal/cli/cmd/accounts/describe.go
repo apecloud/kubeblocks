@@ -21,7 +21,7 @@ package accounts
 
 import (
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
@@ -32,7 +32,7 @@ type DescribeUserOptions struct {
 	info lorryutil.UserInfo
 }
 
-func NewDescribeUserOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *DescribeUserOptions {
+func NewDescribeUserOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *DescribeUserOptions {
 	return &DescribeUserOptions{
 		AccountBaseOptions: NewAccountBaseOptions(f, streams, lorryutil.DescribeUserOp),
 	}

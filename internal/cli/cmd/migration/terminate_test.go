@@ -23,14 +23,14 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 var _ = Describe("terminate", func() {
 
 	var (
-		streams genericclioptions.IOStreams
+		streams genericiooptions.IOStreams
 		tf      *cmdtesting.TestFactory
 	)
 

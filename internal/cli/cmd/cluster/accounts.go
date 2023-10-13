@@ -21,7 +21,7 @@ package cluster
 
 import (
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -87,7 +87,7 @@ var (
 	`)
 )
 
-func NewCreateAccountCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCreateAccountCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := accounts.NewCreateUserOptions(f, streams)
 	cmd := &cobra.Command{
 		Use:               "create-account",
@@ -104,7 +104,7 @@ func NewCreateAccountCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	return cmd
 }
 
-func NewDeleteAccountCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewDeleteAccountCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := accounts.NewDeleteUserOptions(f, streams)
 	cmd := &cobra.Command{
 		Use:               "delete-account",
@@ -122,7 +122,7 @@ func NewDeleteAccountCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	return cmd
 }
 
-func NewDescAccountCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewDescAccountCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := accounts.NewDescribeUserOptions(f, streams)
 	cmd := &cobra.Command{
 		Use:               "describe-account",
@@ -139,7 +139,7 @@ func NewDescAccountCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 	return cmd
 }
 
-func NewListAccountsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewListAccountsCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := accounts.NewListUserOptions(f, streams)
 
 	cmd := &cobra.Command{
@@ -158,7 +158,7 @@ func NewListAccountsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	return cmd
 }
 
-func NewGrantOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewGrantOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := accounts.NewGrantOptions(f, streams, lorryutil.GrantUserRoleOp)
 
 	cmd := &cobra.Command{
@@ -177,7 +177,7 @@ func NewGrantOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	return cmd
 }
 
-func NewRevokeOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewRevokeOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := accounts.NewGrantOptions(f, streams, lorryutil.RevokeUserRoleOp)
 
 	cmd := &cobra.Command{

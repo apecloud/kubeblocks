@@ -39,7 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -148,7 +148,7 @@ type DescribeBackupOptions struct {
 	Gvr   schema.GroupVersionResource
 	names []string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 func (o *CreateBackupOptions) CompleteBackup() error {
@@ -231,7 +231,7 @@ func (o *CreateBackupOptions) getDefaultBackupPolicy() (string, error) {
 	return defaultBackupPolicies[0].GetName(), nil
 }
 
-func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCreateBackupCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	customOutPut := func(opt *create.CreateOptions) {
 		output := fmt.Sprintf("Backup %s created successfully, you can view the progress:", opt.Name)
 		printer.PrintLine(output)
@@ -332,7 +332,7 @@ func PrintBackupList(o ListBackupOptions) error {
 	return nil
 }
 
-func NewListBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewListBackupCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &ListBackupOptions{ListOptions: list.NewListOptions(f, streams, types.BackupGVR())}
 	cmd := &cobra.Command{
 		Use:               "list-backups",
@@ -355,7 +355,7 @@ func NewListBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	return cmd
 }
 
-func NewDescribeBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewDescribeBackupCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &DescribeBackupOptions{
 		Factory:   f,
 		IOStreams: streams,
@@ -376,7 +376,7 @@ func NewDescribeBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 	return cmd
 }
 
-func NewDeleteBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewDeleteBackupCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := delete.NewDeleteOptions(f, streams, types.BackupGVR())
 	cmd := &cobra.Command{
 		Use:               "delete-backup",
@@ -526,7 +526,7 @@ func (o *CreateRestoreOptions) Validate() error {
 	return nil
 }
 
-func NewCreateRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCreateRestoreCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &CreateRestoreOptions{}
 	o.CreateOptions = create.CreateOptions{
 		IOStreams: streams,
@@ -552,7 +552,7 @@ func NewCreateRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	return cmd
 }
 
-func NewListBackupPolicyCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewListBackupPolicyCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := list.NewListOptions(f, streams, types.BackupPolicyGVR())
 	cmd := &cobra.Command{
 		Use:               "list-backup-policy",
@@ -627,7 +627,7 @@ type editBackupPolicyOptions struct {
 	Factory   cmdutil.Factory
 
 	GVR schema.GroupVersionResource
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 	editContent       []editorRow
 	editContentKeyMap map[string]updateBackupPolicyFieldFunc
 	original          string
@@ -645,7 +645,7 @@ type editorRow struct {
 	updateFunc updateBackupPolicyFieldFunc
 }
 
-func NewEditBackupPolicyCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewEditBackupPolicyCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := editBackupPolicyOptions{Factory: f, IOStreams: streams, GVR: types.BackupPolicyGVR()}
 	cmd := &cobra.Command{
 		Use:                   "edit-backup-policy",
@@ -865,7 +865,7 @@ type describeBackupPolicyOptions struct {
 	Factory   cmdutil.Factory
 	client    clientset.Interface
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 func (o *describeBackupPolicyOptions) Complete(args []string) error {
@@ -924,7 +924,7 @@ func (o *describeBackupPolicyOptions) printBackupPolicyObj(obj *dpv1alpha1.Backu
 	return nil
 }
 
-func NewDescribeBackupPolicyCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewDescribeBackupPolicyCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &describeBackupPolicyOptions{
 		Factory:   f,
 		IOStreams: streams,

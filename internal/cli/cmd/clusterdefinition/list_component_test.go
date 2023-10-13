@@ -30,7 +30,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -45,7 +45,7 @@ import (
 var _ = Describe("clusterdefinition list components", func() {
 	var (
 		cmd     *cobra.Command
-		streams genericclioptions.IOStreams
+		streams genericiooptions.IOStreams
 		out     *bytes.Buffer
 		tf      *cmdtesting.TestFactory
 	)
@@ -72,7 +72,7 @@ var _ = Describe("clusterdefinition list components", func() {
 		_ = appsv1alpha1.AddToScheme(scheme.Scheme)
 		clusterDef := testing.FakeClusterDef()
 		tf = mockClient(clusterDef)
-		streams, _, out, _ = genericclioptions.NewTestIOStreams()
+		streams, _, out, _ = genericiooptions.NewTestIOStreams()
 		cmd = NewListComponentsCmd(tf, streams)
 	})
 

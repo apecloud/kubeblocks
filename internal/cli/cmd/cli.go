@@ -26,7 +26,7 @@ import (
 
 	"github.com/spf13/cobra"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
 	kccmd "k8s.io/kubectl/pkg/cmd"
@@ -184,7 +184,7 @@ A Command Line Interface for KubeBlocks`,
 	util.AddKlogFlags(flags)
 
 	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
-	ioStreams := genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}
+	ioStreams := genericiooptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}
 
 	// Add subcommands
 	cmd.AddCommand(

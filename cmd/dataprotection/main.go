@@ -96,7 +96,7 @@ func init() {
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
 	viper.SetDefault("KUBEBLOCKS_SERVICEACCOUNT_NAME", "kubeblocks")
-	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "kb-system")
+	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(dptypes.CfgKeyGCFrequencySeconds, dptypes.DefaultGCFrequencySeconds)
 }
@@ -262,8 +262,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = dpcontrollers.NewGCReconciler(mgr).
-		SetupWithManager(mgr); err != nil {
+	if err = dpcontrollers.NewGCReconciler(mgr).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "GarbageCollection")
 		os.Exit(1)
 	}

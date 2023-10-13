@@ -167,6 +167,8 @@ var _ = Describe("Data Protection Garbage Collection Controller", func() {
 			Eventually(testapps.List(&testCtx, generics.BackupSignature,
 				client.MatchingLabels(autoBackupLabel),
 				client.InNamespace(backupPolicy.Namespace))).Should(HaveLen(1))
+			Eventually(testapps.CheckObjExists(&testCtx, backup1Key, &dpv1alpha1.Backup{}, true)).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, expiredKey, &dpv1alpha1.Backup{}, false)).Should(Succeed())
 		})
 	})
 })

@@ -45,7 +45,7 @@ You can install kbcli with `curl` or `brew`.
 
   :::note
 
-  By default, kbcli installs KubeBlocks with the same version. If you want to install KubeBlocks with a different version, ensure that the minor versions of kbcli and KubeBlocks match.
+  By default, kbcli installs the latest release version and then when installing KubeBlocks, kbcli installs the matched version. Ensure that the major versions of kbcli and KubeBlocks match.
 
   For instance, you can install kbcli v0.6.1 and KubeBlocks v0.6.3, but mismatched versions like kbcli v0.5.0 and KubeBlocks v0.6.0 may result in errors.
 

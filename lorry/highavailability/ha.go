@@ -52,7 +52,7 @@ func NewHa() *Ha {
 	logger := ctrl.Log.WithName("HA")
 
 	dcs, _ := dcs3.NewKubernetesStore()
-	manager, err := register.GetOrCreateManager()
+	manager, err := register.GetDBManager()
 	if err != nil {
 		logger.Error(err, "No DB Manager")
 		return nil

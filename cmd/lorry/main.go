@@ -21,8 +21,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
-	"net"
 	"os"
 	"os/signal"
 	"strings"
@@ -32,8 +30,6 @@ import (
 	"github.com/spf13/pflag"
 	"go.uber.org/automaxprocs/maxprocs"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
-	health "google.golang.org/grpc/health/grpc_health_v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	kzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -42,29 +38,22 @@ import (
 	"github.com/apecloud/kubeblocks/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/lorry/highavailability"
 	"github.com/apecloud/kubeblocks/lorry/httpserver"
-	customgrpc "github.com/apecloud/kubeblocks/lorry/middleware/grpc"
 	"github.com/apecloud/kubeblocks/lorry/operations"
 	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
 var (
-	port      int
-	grpcPort  int
-	configDir string
+	grpcPort int
 )
 
 const (
-	DefaultPort       = 3501
-	DefaultGRPCPort   = 50001
-	DefaultConfigPath = "/config/lorry/components"
+	DefaultGRPCPort = 50001
 )
 
 func init() {
 	viper.AutomaticEnv()
 	viper.SetDefault(constant.KBEnvCharacterType, "custom")
-	flag.IntVar(&port, "port", DefaultPort, "lorry http default port")
 	flag.IntVar(&grpcPort, "grpcport", DefaultGRPCPort, "lorry grpc default port")
-	flag.StringVar(&configDir, "config-path", DefaultConfigPath, "lorry default config directory for builtin type")
 }
 
 func main() {
@@ -78,7 +67,6 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
-	viper.AutomaticEnv()
 	err := viper.BindPFlags(pflag.CommandLine)
 	if err != nil {
 		panic(errors.Wrap(err, "fatal error viper bindPFlags"))
@@ -92,7 +80,7 @@ func main() {
 	ctrl.SetLogger(kzap.New(kopts...))
 
 	// Initialize DB Manager
-	_, err = register.GetOrCreateManager()
+	err = register.InitDBManager()
 	if err != nil {
 		panic(errors.Wrap(err, "DB manager initialize failed"))
 	}
@@ -108,20 +96,20 @@ func main() {
 		}
 	}
 
-	// start grpc server for role probe
-	listen, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
-	if err != nil {
-		panic(fmt.Errorf("fatal error listen on port %d: %v", grpcPort, err))
-	}
+	// // start grpc server for role probe
+	// listen, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
+	// if err != nil {
+	// 	panic(fmt.Errorf("fatal error listen on port %d: %v", grpcPort, err))
+	// }
 
-	healthServer := customgrpc.NewGRPCServer()
-	server := grpc.NewServer()
-	health.RegisterHealthServer(server, healthServer)
+	// healthServer := customgrpc.NewGRPCServer()
+	// server := grpc.NewServer()
+	// health.RegisterHealthServer(server, healthServer)
 
-	err = server.Serve(listen)
-	if err != nil {
-		panic(fmt.Errorf("fatal error grpcserver serve failed: %v", err))
-	}
+	// err = server.Serve(listen)
+	// if err != nil {
+	// 	panic(fmt.Errorf("fatal error grpcserver serve failed: %v", err))
+	// }
 
 	// Start HTTP Server
 	ops := operations.Operations()

@@ -274,7 +274,7 @@ func (o *Protection) lowWatermark(ctx context.Context, msg string) error {
 }
 
 func (o *Protection) lockInstance(ctx context.Context) error {
-	manager, err := register.GetOrCreateManager()
+	manager, err := register.GetDBManager()
 	if err != nil || manager == nil {
 		o.Logger.Error(err, "Get DB manager failed")
 	}
@@ -282,7 +282,7 @@ func (o *Protection) lockInstance(ctx context.Context) error {
 }
 
 func (o *Protection) unlockInstance(ctx context.Context) error {
-	manager, err := register.GetOrCreateManager()
+	manager, err := register.GetDBManager()
 	if err != nil || manager == nil {
 		o.Logger.Error(err, "Get DB manager failed")
 	}

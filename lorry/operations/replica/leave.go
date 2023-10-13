@@ -57,7 +57,7 @@ func (s *Leave) Init(ctx context.Context) error {
 }
 
 func (s *Leave) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	manager, err := register.GetOrCreateManager()
+	manager, err := register.GetDBManager()
 	if err != nil {
 		return nil, errors.Wrap(err, "get manager failed")
 	}

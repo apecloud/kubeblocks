@@ -51,39 +51,47 @@ func GetManagerNewFunc(characterType, workloadType string) managerNewFunc {
 	return managerNewFuncs[key]
 }
 
-func GetOrCreateManager() (engines.DBManager, error) {
+func GetDBManager() (engines.DBManager, error) {
 	if dbManager != nil {
 		return dbManager, nil
+	}
+
+	return nil, errors.Errorf("no db manager")
+}
+
+func InitDBManager() error {
+	if dbManager != nil {
+		return nil
 	}
 
 	ctrl.Log.Info("Initialize DB manager")
 	characterType := viper.GetString(constant.KBEnvCharacterType)
 	if characterType == "" {
-		return nil, fmt.Errorf("%s not set", constant.KBEnvCharacterType)
+		return fmt.Errorf("%s not set", constant.KBEnvCharacterType)
 	}
 
 	workloadType := viper.GetString(constant.KBEnvWorkloadType)
 	if workloadType == "" {
-		return nil, fmt.Errorf("%s not set", constant.KBEnvWorkloadType)
+		return fmt.Errorf("%s not set", constant.KBEnvWorkloadType)
 	}
 
 	err := GetAllComponent(configDir) // find all builtin config file and read
 	if err != nil {                   // Handle errors reading the config file
-		return nil, fmt.Errorf("fatal error config file: %v", err)
+		return errors.Wrap(err, "fatal error config file")
 	}
 
 	properties := GetProperties(characterType)
 	newFunc := GetManagerNewFunc(characterType, workloadType)
 	if newFunc == nil {
-		return nil, errors.Errorf("no db manager for characterType %s and workloadType %s", characterType, workloadType)
+		return errors.Errorf("no db manager for characterType %s and workloadType %s", characterType, workloadType)
 	}
 	mgr, err := newFunc(properties)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	dbManager = mgr
-	return dbManager, nil
+	return nil
 }
 
 type Component struct {

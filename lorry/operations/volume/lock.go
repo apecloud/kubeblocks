@@ -33,7 +33,7 @@ type Lock struct {
 }
 
 func (ops *Lock) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	manager, err := register.GetOrCreateManager()
+	manager, err := register.GetDBManager()
 	if err != nil {
 		return nil, errors.Wrap(err, "Get DB manager failed")
 	}

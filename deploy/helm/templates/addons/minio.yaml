@@ -14,7 +14,13 @@ spec:
   type: Helm
 
   helm:
-    chartLocationURL: https://jihulab.com/api/v4/projects/152630/packages/helm/stable/charts/minio-12.8.12.tgz
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "minio" "version" "12.8.12" "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: 12.8.12
+      {{- end }}
 
     installValues:
       setValues:

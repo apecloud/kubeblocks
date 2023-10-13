@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: cdc-hscale-in-
+spec:
+  clusterRef: pxc
+  type: HorizontalScaling
+  horizontalScaling:
+    - componentName: cdc
+      replicas: 1

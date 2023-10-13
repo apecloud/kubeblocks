@@ -1,0 +1,13 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: pxc-cluster-stop-
+spec:
+  clusterRef: pxc
+  ttlSecondsAfterSucceed: 27017
+  type: Stop
+  restart:
+    - componentName: gms
+    - componentName: dn-0
+    - componentName: cn
+    - componentName: cdc

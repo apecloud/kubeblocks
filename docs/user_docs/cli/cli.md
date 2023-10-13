@@ -120,6 +120,7 @@ Cluster command.
 
 ClusterDefinition command.
 
+* [kbcli clusterdefinition describe](kbcli_clusterdefinition_describe.md)	 - Describe ClusterDefinition.
 * [kbcli clusterdefinition list](kbcli_clusterdefinition_list.md)	 - List ClusterDefinitions.
 * [kbcli clusterdefinition list-components](kbcli_clusterdefinition_list-components.md)	 - List cluster definition components.
 
@@ -131,16 +132,6 @@ ClusterVersion command.
 * [kbcli clusterversion list](kbcli_clusterversion_list.md)	 - List ClusterVersions.
 * [kbcli clusterversion set-default](kbcli_clusterversion_set-default.md)	 - Set the clusterversion to the default clusterversion for its clusterdefinition.
 * [kbcli clusterversion unset-default](kbcli_clusterversion_unset-default.md)	 - Unset the clusterversion if it's default.
-
-
-## [context](kbcli_context.md)
-
-kbcli context allows you to manage cloud context. This command is currently only applicable to cloud, and currently does not support switching the context of the local k8s cluster.
-
-* [kbcli context current](kbcli_context_current.md)	 - Get the currently used context.
-* [kbcli context describe](kbcli_context_describe.md)	 - Get the description information of a context.
-* [kbcli context list](kbcli_context_list.md)	 - List all created contexts.
-* [kbcli context use](kbcli_context_use.md)	 - Use another context that you have already created.
 
 
 ## [dashboard](kbcli_dashboard.md)
@@ -199,18 +190,6 @@ KubeBlocks operation commands.
 * [kbcli kubeblocks upgrade](kbcli_kubeblocks_upgrade.md)	 - Upgrade KubeBlocks.
 
 
-## [login](kbcli_login.md)
-
-Authenticate with the KubeBlocks Cloud
-
-
-
-## [logout](kbcli_logout.md)
-
-Log out of the KubeBlocks Cloud
-
-
-
 ## [migration](kbcli_migration.md)
 
 Data migration between two data sources.
@@ -227,16 +206,6 @@ Data migration between two data sources.
 
 Print the list of flags inherited by all commands.
 
-
-
-## [org](kbcli_org.md)
-
-kbcli org is used to manage cloud organizations and is only suitable for interacting with cloud.
-
-* [kbcli org current](kbcli_org_current.md)	 - Get current organization.
-* [kbcli org describe](kbcli_org_describe.md)	 - Get the description information of an organization.
-* [kbcli org list](kbcli_org_list.md)	 - List all organizations you have joined.
-* [kbcli org switch](kbcli_org_switch.md)	 - Switch to another organization you are already a member of.
 
 
 ## [playground](kbcli_playground.md)

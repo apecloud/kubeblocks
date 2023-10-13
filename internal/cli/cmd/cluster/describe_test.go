@@ -23,12 +23,10 @@ import (
 	"bytes"
 	"net/http"
 	"strings"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -118,29 +116,12 @@ var _ = Describe("Expose", func() {
 		fakeBackupPolicies := []dpv1alpha1.BackupPolicy{
 			*testing.FakeBackupPolicy("backup-policy-test", "test-cluster"),
 		}
-		fakeBackups := []dpv1alpha1.Backup{
-			*testing.FakeBackup("backup-test"),
-			*testing.FakeBackup("backup-test2"),
+		fakeBackupSchedules := []dpv1alpha1.BackupSchedule{
+			*testing.FakeBackupSchedule("backup-schedule-test", "backup-policy-test"),
 		}
-		now := metav1.Now()
-		fakeBackups[0].Status = dpv1alpha1.BackupStatus{
-			Phase: dpv1alpha1.BackupPhaseCompleted,
-			TimeRange: &dpv1alpha1.BackupTimeRange{
-				Start: &now,
-				End:   &now,
-			},
-		}
-		after := metav1.Time{Time: now.Add(time.Hour)}
-		fakeBackups[1].Status = dpv1alpha1.BackupStatus{
-			Phase: dpv1alpha1.BackupPhaseCompleted,
-			TimeRange: &dpv1alpha1.BackupTimeRange{
-				Start: &now,
-				End:   &after,
-			},
-		}
-		showDataProtection(fakeBackupPolicies, fakeBackups, out)
-		strs := strings.Split(out.String(), "\n")
 
+		showDataProtection(fakeBackupPolicies, fakeBackupSchedules, "test-repository", out)
+		strs := strings.Split(out.String(), "\n")
 		Expect(strs).ShouldNot(BeEmpty())
 	})
 })

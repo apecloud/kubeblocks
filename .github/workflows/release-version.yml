@@ -16,13 +16,6 @@ env:
 
 
 jobs:
-  merge-releasing-branch:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Auto merge releasing PR
-        run: ./.github/utils/merge_releasing_pr.sh
-
   release-message:
     runs-on: ubuntu-latest
     outputs:

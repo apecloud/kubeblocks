@@ -71,7 +71,21 @@ func (factory *MockPersistentVolumeClaimFactory) SetStorage(storageSize string) 
 	return factory
 }
 
+func (factory *MockPersistentVolumeClaimFactory) SetVolumeName(volName string) *MockPersistentVolumeClaimFactory {
+	factory.Get().Spec.VolumeName = volName
+	return factory
+}
+
 func (factory *MockPersistentVolumeClaimFactory) SetAnnotations(annotations map[string]string) *MockPersistentVolumeClaimFactory {
 	factory.Get().Annotations = annotations
+	return factory
+}
+
+func (factory *MockPersistentVolumeClaimFactory) SetDataSourceRef(apiGroup, kind, name string) *MockPersistentVolumeClaimFactory {
+	factory.Get().Spec.DataSourceRef = &corev1.TypedObjectReference{
+		Name:     name,
+		APIGroup: &apiGroup,
+		Kind:     kind,
+	}
 	return factory
 }

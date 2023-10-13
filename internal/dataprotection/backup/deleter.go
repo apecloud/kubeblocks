@@ -65,6 +65,11 @@ type Deleter struct {
 // If the deletion job exists, it will check the job status and return the corresponding
 // deletion status.
 func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, error) {
+	backupMethod := backup.Status.BackupMethod
+	if backupMethod != nil && boolptr.IsSetToTrue(backupMethod.SnapshotVolumes) {
+		// if the backup is volume snapshot, ignore to delete files
+		return DeletionStatusSucceeded, nil
+	}
 	jobKey := BuildDeleteBackupFilesJobKey(backup)
 	job := &batchv1.Job{}
 	exists, err := ctrlutil.CheckResourceExists(d.Ctx, d.Client, jobKey, job)

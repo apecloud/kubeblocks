@@ -29,7 +29,6 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/dataprotection/utils"
 	"github.com/apecloud/kubeblocks/internal/dataprotection/utils/boolptr"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -204,15 +203,15 @@ func EnableBackupSchedule(testCtx *testutil.TestContext,
 	})).Should(Succeed())
 }
 
-func MockBackupStatusMethod(backup *dpv1alpha1.Backup, targetVolume string) {
-	snapshot := utils.VolumeSnapshotEnabled()
-	backupMethod := BackupMethodName
-	if snapshot {
-		backupMethod = VSBackupMethodName
+func MockBackupStatusMethod(backup *dpv1alpha1.Backup, backupMethodName, targetVolume, actionSetName string) {
+	var snapshot bool
+	if backupMethodName == VSBackupMethodName {
+		snapshot = true
 	}
 	backup.Status.BackupMethod = &dpv1alpha1.BackupMethod{
-		Name:            backupMethod,
+		Name:            backupMethodName,
 		SnapshotVolumes: &snapshot,
+		ActionSetName:   actionSetName,
 		TargetVolumes: &dpv1alpha1.TargetVolumeInfo{
 			Volumes: []string{targetVolume},
 			VolumeMounts: []corev1.VolumeMount{

@@ -242,6 +242,9 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 		if err = listResources(o.Dynamic, types.BackupPolicyGVR(), o.Namespace, dpListOpts, &objs.BackupPolicies); err != nil {
 			return nil, err
 		}
+		if err = listResources(o.Dynamic, types.BackupScheduleGVR(), o.Namespace, dpListOpts, &objs.BackupSchedules); err != nil {
+			return nil, err
+		}
 		var backups []dpv1alpha1.Backup
 		if err = listResources(o.Dynamic, types.BackupGVR(), o.Namespace, dpListOpts, &backups); err != nil {
 			return nil, err

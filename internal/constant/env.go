@@ -35,6 +35,8 @@ const (
 	KBEnvClusterCompName        = "KB_CLUSTER_COMP_NAME"
 	KBEnvWorkloadType           = "KB_WORKLOAD_TYPE"
 	KBEnvCharacterType          = "KB_SERVICE_CHARACTER_TYPE"
+	KBEnvServiceUser            = "KB_SERVICE_USER"
+	KBEnvServicePassword        = "KB_SERVICE_PASSWORD"
 	KBEnvServiceRoles           = "KB_SERVICE_ROLES"
 	KBEnvServicePort            = "KB_SERVICE_PORT"
 	KBEnvDataPath               = "KB_DATA_PATH"

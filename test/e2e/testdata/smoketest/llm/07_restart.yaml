@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: llm-cluster-restart-
+spec:
+  clusterRef: llm-cluster
+  ttlSecondsAfterSucceed: 27017
+  type: Restart
+  restart:
+    - componentName: llm

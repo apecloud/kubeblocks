@@ -89,6 +89,7 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 	mgr := &Manager{
 		DBManagerBase: *managerBase,
 		serverID:      uint(serverID) + 1,
+		DB:            db,
 	}
 
 	return mgr, nil
@@ -476,19 +477,19 @@ func (mgr *Manager) EnsureServerID(ctx context.Context) (bool, error) {
 	var serverID uint
 	err := mgr.DB.QueryRowContext(ctx, "select @@global.server_id").Scan(&serverID)
 	if err != nil {
-		mgr.Logger.Error(err, "Get global server id failed: %v")
+		mgr.Logger.Info("Get global server id failed", "error", err)
 		return false, err
 	}
 	if serverID == mgr.serverID {
 		return true, nil
 	}
-	mgr.Logger.Info("Set global server id : ")
+	mgr.Logger.Info("Set global server id", "server_id", serverID)
 
 	setServerID := fmt.Sprintf(`set global server_id = %d`, mgr.serverID)
 	mgr.Logger.Info("Set global server id", "server-id", setServerID)
 	_, err = mgr.DB.Exec(setServerID)
 	if err != nil {
-		mgr.Logger.Error(err, "set server id err")
+		mgr.Logger.Info("set server id failed", "error", err)
 		return false, err
 	}
 
@@ -569,40 +570,6 @@ func (mgr *Manager) isRecoveryConfOutdate(ctx context.Context, leader string) bo
 
 	masterHost := rowMap.GetString("Master_Host")
 	return !strings.HasPrefix(masterHost, leader)
-}
-
-func (mgr *Manager) isSlaveRunning(ctx context.Context) (bool, error) {
-	var rowMap = mgr.slaveStatus
-
-	if len(rowMap) == 0 {
-		return false, nil
-	}
-	ioRunning := rowMap.GetString("Slave_IO_Running")
-	sqlRunning := rowMap.GetString("Slave_SQL_Running")
-	if ioRunning == "Yes" || sqlRunning == "Yes" {
-		return true, nil
-	}
-	return false, nil
-}
-
-func (mgr *Manager) hasSlaveHosts(ctx context.Context) (bool, error) {
-	sql := "show slave hosts"
-	var rowMap RowMap
-
-	err := QueryRowsMap(mgr.DB, sql, func(rMap RowMap) error {
-		rowMap = rMap
-		return nil
-	})
-	if err != nil {
-		mgr.Logger.Error(err, fmt.Sprintf("error executing %s", sql))
-		return false, err
-	}
-
-	if len(rowMap) == 0 {
-		return false, nil
-	}
-
-	return true, nil
 }
 
 func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) *dcs.Member {

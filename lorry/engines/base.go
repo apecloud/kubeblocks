@@ -159,7 +159,7 @@ func (mgr *DBManagerBase) MoveData(context.Context, *dcs.Cluster) error {
 	return nil
 }
 
-func (mgr *DBManagerBase) GetReplicaRole(context.Context) (string, error) {
+func (mgr *DBManagerBase) GetReplicaRole(context.Context, *dcs.Cluster) (string, error) {
 	return "", errors.New("not implemented")
 }
 

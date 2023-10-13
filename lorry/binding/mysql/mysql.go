@@ -27,7 +27,6 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -148,53 +147,6 @@ func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *ProbeRequ
 
 func (mysqlOps *MysqlOperations) GetRunningPort() int {
 	return 0
-}
-
-func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (string, error) {
-	dcsStore := dcs.GetStore()
-	if dcsStore == nil {
-		return "", nil
-	}
-	k8sStore := dcsStore.(*dcs.KubernetesStore)
-	cluster := k8sStore.GetClusterFromCache()
-	if cluster == nil || !cluster.IsLocked() {
-		return "", nil
-	} else if !dcsStore.HasLease() {
-		return SECONDARY, nil
-	}
-
-	return PRIMARY, nil
-}
-
-func (mysqlOps *MysqlOperations) GetRoleForConsensus(ctx context.Context, request *ProbeRequest, response *ProbeResponse) (string, error) {
-	sql := "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
-	manager := mysqlOps.Manager.(*mysql.WesqlManager)
-	rows, err := manager.DB.QueryContext(ctx, sql)
-	if err != nil {
-		mysqlOps.Logger.Error(err, fmt.Sprintf("error executing %s", sql))
-		return "", errors.Wrapf(err, "error executing %s", sql)
-	}
-
-	defer func() {
-		_ = rows.Close()
-		_ = rows.Err()
-	}()
-
-	var curLeader string
-	var role string
-	var serverID string
-	var isReady bool
-	for rows.Next() {
-		if err = rows.Scan(&curLeader, &role, &serverID); err != nil {
-			mysqlOps.Logger.Error(err, "Role query error")
-			return role, err
-		}
-		isReady = true
-	}
-	if isReady {
-		return role, nil
-	}
-	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
 }
 
 func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {

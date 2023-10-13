@@ -52,12 +52,12 @@ var configDir string
 func init() {
 	pflag.StringVar(&configDir, "config-path", "/config/lorry/components/", "Lorry default config directory for builtin type")
 
-	RegisterManagerNewFunc("wesql", "", wesql.NewManager)
-	RegisterManagerNewFunc("mysql", "", mysql.NewManager)
+	RegisterManagerNewFunc("mysql", "consensus", wesql.NewManager)
+	RegisterManagerNewFunc("mysql", "replication", mysql.NewManager)
 	RegisterManagerNewFunc("mongodb", "consensus", mongodb.NewManager)
-	RegisterManagerNewFunc("polardbx", "", polardbx.NewManager)
-	RegisterManagerNewFunc("postgresql", "", officalpostgres.NewManager)
-	RegisterManagerNewFunc("apecloud-postgresql", "", apecloudpostgres.NewManager)
+	RegisterManagerNewFunc("polardbx", "consensus", polardbx.NewManager)
+	RegisterManagerNewFunc("postgresql", "replication", officalpostgres.NewManager)
+	RegisterManagerNewFunc("postgresql", "consensus", apecloudpostgres.NewManager)
 }
 
 func RegisterManagerNewFunc(characterType, workloadType string, newFunc managerNewFunc) {

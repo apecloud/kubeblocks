@@ -27,6 +27,7 @@ import (
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/lorry/dcs"
 	"github.com/apecloud/kubeblocks/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/lorry/operations"
 	"github.com/apecloud/kubeblocks/lorry/util"
@@ -34,8 +35,9 @@ import (
 
 type GetRole struct {
 	operations.Base
-	logger  logr.Logger
-	Timeout time.Duration
+	dcsStore dcs.DCS
+	logger   logr.Logger
+	Timeout  time.Duration
 }
 
 var getrole operations.Operation = &GetRole{}
@@ -48,6 +50,11 @@ func init() {
 }
 
 func (s *GetRole) Init(ctx context.Context) error {
+	s.dcsStore = dcs.GetStore()
+	if s.dcsStore == nil {
+		return errors.New("dcs store init failed")
+	}
+
 	s.logger = ctrl.Log.WithName("getrole")
 	return nil
 }
@@ -67,9 +74,11 @@ func (s *GetRole) Do(ctx context.Context, req *operations.OpsRequest) (*operatio
 	}
 	resp.Data["operation"] = util.GetRoleOperation
 
-	role, err := manager.GetReplicaRole(ctx)
+	k8sStore := s.dcsStore.(*dcs.KubernetesStore)
+	cluster := k8sStore.GetClusterFromCache()
+	role, err := manager.GetReplicaRole(ctx, cluster)
 	if err != nil {
-		s.logger.Error(err, "executing getrole error")
+		s.logger.Info("executing getrole error", "error", err)
 		return resp, err
 	}
 

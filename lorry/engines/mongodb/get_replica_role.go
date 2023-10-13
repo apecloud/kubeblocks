@@ -19,8 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package mongodb
 
-import "context"
+import (
+	"context"
 
-func (mgr *Manager) GetReplicaRole(ctx context.Context) (string, error) {
+	"github.com/apecloud/kubeblocks/lorry/dcs"
+)
+
+func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (string, error) {
 	return mgr.GetMemberState(ctx)
 }

@@ -61,10 +61,11 @@ type DBManager interface {
 	HasOtherHealthyLeader(context.Context, *dcs.Cluster) *dcs.Member
 	HasOtherHealthyMembers(context.Context, *dcs.Cluster, string) []*dcs.Member
 
-	// Functions related to member check.
+	// Functions related to replica member relationship.
 	IsLeader(context.Context, *dcs.Cluster) (bool, error)
 	IsLeaderMember(context.Context, *dcs.Cluster, *dcs.Member) (bool, error)
 	IsFirstMember() bool
+	GetReplicaRole(context.Context, *dcs.Cluster) (string, error)
 
 	JoinCurrentMemberToCluster(context.Context, *dcs.Cluster) error
 	LeaveMemberFromCluster(context.Context, *dcs.Cluster, string) error
@@ -99,7 +100,6 @@ type DBManager interface {
 	Lock(context.Context, string) error
 	Unlock(context.Context) error
 
-	GetReplicaRole(context.Context) (string, error)
 	GetPort() (int, error)
 
 	MoveData(context.Context, *dcs.Cluster) error

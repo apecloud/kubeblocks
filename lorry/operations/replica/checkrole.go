@@ -114,13 +114,19 @@ func (s *CheckRole) Do(ctx context.Context, req *operations.OpsRequest) (*operat
 		return resp, nil
 	}
 
+	k8sStore := s.dcsStore.(*dcs.KubernetesStore)
+	cluster := k8sStore.GetClusterFromCache()
+
 	ctx1, cancel := context.WithTimeout(ctx, s.ProbeTimeout)
 	defer cancel()
-	role, err := manager.GetReplicaRole(ctx1)
+	role, err := manager.GetReplicaRole(ctx1, cluster)
 	if err != nil {
-		s.logger.Error(err, "executing checkRole error")
+		// do not return err, as it will cause readinessprobe to fail
+		err = nil
+		s.logger.Info("executing checkRole error", "error", err)
 		if s.CheckRoleFailedCount%s.FailedEventReportFrequency == 0 {
 			s.logger.Info("role checks failed continuously", "times", s.CheckRoleFailedCount)
+			// if err is not nil, send event through kubelet readinessprobe
 			err = util.SentEventForProbe(ctx, resp.Data)
 		}
 		s.CheckRoleFailedCount++

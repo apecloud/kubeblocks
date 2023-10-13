@@ -70,7 +70,7 @@ func (mgr *Manager) InitializeCluster(ctx context.Context, cluster *dcs.Cluster)
 }
 
 func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
-	role, err := mgr.GetRole(ctx)
+	role, err := mgr.GetReplicaRole(ctx, cluster)
 
 	if err != nil {
 		return false, err

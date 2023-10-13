@@ -138,7 +138,11 @@ func (store *KubernetesStore) GetClusterName() string {
 }
 
 func (store *KubernetesStore) GetClusterFromCache() *Cluster {
-	return store.cluster
+	if store.cluster != nil {
+		return store.cluster
+	}
+	cluster, _ := store.GetCluster()
+	return cluster
 }
 
 func (store *KubernetesStore) GetCluster() (*Cluster, error) {

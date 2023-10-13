@@ -42,14 +42,17 @@ import (
 
 var (
 	createBackupExample = templates.Examples(`
-		# Create a backup for the cluster
+		# Create a backup for the cluster, use the default backup policy and volume snapshot backup method
 		kbcli dp backup mybackup --cluster mycluster
 
-		# create a snapshot backup
-		kbcli dp backup mybackup --cluster mycluster --method volume-snapshot
+		# create a backup with a specified method, run "kbcli cluster desc-backup-policy mycluster" to show supported backup methods
+		kbcli dp backup mybackup --cluster mycluster --method mymethod
 
-		# create a backup with specified policy
+		# create a backup with specified backup policy, run "kbcli cluster list-backup-policy mycluster" to show the cluster supported backup policies
 		kbcli dp backup mybackup --cluster mycluster --policy mypolicy
+
+		# create a backup from a parent backup
+		kbcli dp backup mybackup --cluster mycluster --parent-backup myparentbackup
 	`)
 
 	deleteBackupExample = templates.Examples(`
@@ -110,9 +113,12 @@ func newBackupCommand(f cmdutil.Factory, streams genericiooptions.IOStreams) *co
 		},
 	}
 
-	cmd.Flags().StringVar(&o.BackupMethod, "method", "volume-snapshot", "Backup method")
+	cmd.Flags().StringVar(&o.BackupMethod, "method", "", "Backup method that defined in backup policy (required), if only one backup method in backup policy, use it as default backup method, if multiple backup methods in backup policy, use method which volume snapshot is true as default backup method")
 	cmd.Flags().StringVar(&clusterName, "cluster", "", "Cluster name")
 	cmd.Flags().StringVar(&o.BackupPolicy, "policy", "", "Backup policy name, this flag will be ignored when backup-type is snapshot")
+	cmd.Flags().StringVar(&o.DeletionPolicy, "deletion-policy", "Delete", "Deletion policy for backup, determine whether the backup content in backup repo will be deleted after the backup is deleted, supported values: [Delete, Retain]")
+	cmd.Flags().StringVar(&o.RetentionPeriod, "retention-period", "", "Retention period for backup, supported values: [1y, 1m, 1d, 1h, 1m] or combine them [1y1m1d1h1m]")
+	cmd.Flags().StringVar(&o.ParentBackupName, "parent-backup", "", "Parent backup name, used for incremental backup")
 	util.RegisterClusterCompletionFunc(cmd, f)
 	registerBackupFlagCompletionFunc(cmd, f)
 

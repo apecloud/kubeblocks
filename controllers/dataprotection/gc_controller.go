@@ -65,6 +65,9 @@ func (r *GCReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	s := dputils.NewPeriodicalEnqueueSource(mgr.GetClient(), &dpv1alpha1.BackupList{}, r.frequency, dputils.PeriodicalEnqueueSourceOption{})
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dpv1alpha1.Backup{}, builder.WithPredicates(predicate.Funcs{
+			CreateFunc: func(_ event.CreateEvent) bool {
+				return false
+			},
 			UpdateFunc: func(_ event.UpdateEvent) bool {
 				return false
 			},

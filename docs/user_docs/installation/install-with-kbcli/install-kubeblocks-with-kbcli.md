@@ -54,7 +54,7 @@ If you want to install KubeBlocks with a specified version, follow the steps bel
 1. View the available version.
 
    ```bash
-   kbcli kubeblocks list-verisons
+   kbcli kubeblocks list-versions
    ```
 
    Or you can view the available versions in [KubeBlocks Release](https://github.com/apecloud/kubeblocks/releases/).

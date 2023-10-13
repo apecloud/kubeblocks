@@ -613,7 +613,7 @@ func updateComponentInfoToPods(
 		}
 		// pod not in dag, add a new vertex
 		updateAnnotation(pod)
-		graphCli.Update(dag, nil, pod)
+		graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), nil)
 	}
 	return nil
 }
@@ -661,7 +661,7 @@ func updateCustomLabelToPods(ctx context.Context,
 				}
 				pod := &podList.Items[i]
 				updateObjLabel(cluster.Name, string(cluster.UID), component.Name, customLabelSpec, pod)
-				graphCli.Update(dag, nil, pod)
+				graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), nil)
 			}
 		}
 	}

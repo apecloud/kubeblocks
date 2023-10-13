@@ -93,22 +93,7 @@ type realGraphClient struct {
 
 func (r *realGraphClient) Root(dag *graph.DAG, objOld, objNew client.Object) {
 	// find root vertex if already exists
-	var root graph.Vertex
-	keyLookFor, err := GetGVKName(objNew)
-	if err != nil {
-		panic(fmt.Sprintf("parse gvk name failed, obj: %T, name: %s, err: %v", objNew, objNew.GetName(), err))
-	}
-	for _, vertex := range dag.Vertices() {
-		v, _ := vertex.(*ObjectVertex)
-		key, err := GetGVKName(v.Obj)
-		if err != nil {
-			panic(fmt.Sprintf("parse gvk name failed, obj: %T, name: %s, err: %v", v.Obj, v.Obj.GetName(), err))
-		}
-		if *keyLookFor == *key {
-			root = vertex
-			break
-		}
-	}
+	root := r.findMatchedVertex(dag, objNew)
 	// create one if root vertex not found
 	if root == nil {
 		root = &ObjectVertex{
@@ -158,9 +143,7 @@ func (r *realGraphClient) Do(dag *graph.DAG, objOld, objNew client.Object, actio
 	}
 	switch {
 	case parent == nil:
-		if !dag.AddConnectRoot(vertex) {
-			dag.AddVertex(vertex)
-		}
+		dag.AddVertex(vertex)
 	default:
 		dag.AddConnect(parent, vertex)
 	}
@@ -258,29 +241,17 @@ func (r *realGraphClient) findMatchedVertex(dag *graph.DAG, object client.Object
 	if err != nil {
 		panic(fmt.Sprintf("parse gvk name failed, obj: %T, name: %s, err: %v", object, object.GetName(), err))
 	}
-	if len(dag.Vertices()) == 0 {
-		return nil
-	}
-	var found graph.Vertex
-	findVertex := func(v graph.Vertex) error {
-		if found != nil {
-			return nil
-		}
-		ov, _ := v.(*ObjectVertex)
-		key, err := GetGVKName(ov.Obj)
+	for _, vertex := range dag.Vertices() {
+		v, _ := vertex.(*ObjectVertex)
+		key, err := GetGVKName(v.Obj)
 		if err != nil {
-			panic(fmt.Sprintf("parse gvk name failed, obj: %T, name: %s, err: %v", ov.Obj, ov.Obj.GetName(), err))
+			panic(fmt.Sprintf("parse gvk name failed, obj: %T, name: %s, err: %v", v.Obj, v.Obj.GetName(), err))
 		}
 		if *keyLookFor == *key {
-			found = v
+			return vertex
 		}
-		return nil
 	}
-	err = dag.WalkReverseTopoOrder(findVertex, nil)
-	if err != nil {
-		panic(fmt.Sprintf("walk DAG failed, err: %v", err))
-	}
-	return found
+	return nil
 }
 
 var _ GraphClient = &realGraphClient{}

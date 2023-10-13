@@ -76,27 +76,12 @@ var _ = Describe("graph client test.", func() {
 			v2.Action = ActionDeletePtr()
 			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeTrue())
 
-			By("force creating a duplicate object")
-			var oldV0 *ObjectVertex
-			for _, vertex := range dag.Vertices() {
-				v, _ := vertex.(*ObjectVertex)
-				if v.Obj == obj0 {
-					oldV0 = v
-				}
-			}
-			Expect(oldV0).ShouldNot(BeNil())
-			graphCli.Do(dag, obj0, obj0, ActionCreatePtr(), oldV0)
-			nv0 := &ObjectVertex{OriObj: obj0, Obj: obj0, Action: ActionCreatePtr()}
-			dagExpected.AddVertex(nv0)
-			dagExpected.Connect(v0, nv0)
-			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeTrue())
-
 			By("replace an existing object")
 			newObj1 := builder.NewPodBuilder(namespace, name+"1").GetObject()
 			graphCli.Update(dag, nil, newObj1, ReplaceIfExistingOption)
 			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeTrue())
 			podList := graphCli.FindAll(dag, &corev1.Pod{})
-			Expect(podList).Should(HaveLen(4))
+			Expect(podList).Should(HaveLen(3))
 			Expect(slices.IndexFunc(podList, func(obj client.Object) bool {
 				return obj == newObj1
 			})).Should(BeNumerically(">=", 0))
@@ -104,18 +89,18 @@ var _ = Describe("graph client test.", func() {
 			By("noop")
 			graphCli.Noop(dag, obj0)
 			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeFalse())
-			nv0.Action = ActionNoopPtr()
+			v0.Action = ActionNoopPtr()
 			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeTrue())
 
 			By("patch")
 			graphCli.Patch(dag, obj0.DeepCopy(), obj0)
 			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeFalse())
-			nv0.Action = ActionPatchPtr()
+			v0.Action = ActionPatchPtr()
 			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeTrue())
 
 			By("find objects exist")
 			podList = graphCli.FindAll(dag, &corev1.Pod{})
-			Expect(podList).Should(HaveLen(4))
+			Expect(podList).Should(HaveLen(3))
 			for _, object := range []client.Object{obj0, newObj1, obj2} {
 				Expect(slices.IndexFunc(podList, func(obj client.Object) bool {
 					return obj == object
@@ -130,7 +115,7 @@ var _ = Describe("graph client test.", func() {
 
 			By("find objects different with the given type")
 			newPodList := graphCli.FindAll(dag, &appsv1.StatefulSet{}, HaveDifferentTypeWithOption)
-			Expect(newPodList).Should(HaveLen(4))
+			Expect(newPodList).Should(HaveLen(3))
 			// should have same result as podList
 			for _, object := range podList {
 				Expect(slices.IndexFunc(newPodList, func(obj client.Object) bool {
@@ -143,7 +128,7 @@ var _ = Describe("graph client test.", func() {
 
 			By("find all objects")
 			objectList := graphCli.FindAll(dag, nil, HaveDifferentTypeWithOption)
-			Expect(objectList).Should(HaveLen(5))
+			Expect(objectList).Should(HaveLen(4))
 			allObjects := podList
 			allObjects = append(allObjects, root)
 			for _, object := range allObjects {

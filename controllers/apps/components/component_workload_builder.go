@@ -226,7 +226,7 @@ func (b *rsmComponentWorkloadBuilder) BuildWrapper(buildfn func() ([]client.Obje
 			b.error = err
 		}
 		for _, obj := range objs {
-			b.comp.addResource(obj, b.defaultAction, nil)
+			b.comp.addResource(obj, b.defaultAction)
 		}
 	}
 	return b

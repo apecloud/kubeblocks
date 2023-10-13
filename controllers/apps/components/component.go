@@ -160,35 +160,25 @@ func (c *rsmComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli client.Clie
 
 func (c *rsmComponent) setWorkload(obj client.Object, action *model.Action) {
 	c.workload = obj
-	graphCli := model.NewGraphClient(c.Client)
-	// set workload object as root vertex
-	graphCli.Root(c.dag, obj, obj)
-	if action == nil {
-		return
-	}
-	switch *action {
-	case model.CREATE:
-		graphCli.Create(c.dag, obj)
-	case model.UPDATE:
-		graphCli.Update(c.dag, nil, obj)
-	case model.DELETE:
-		graphCli.Delete(c.dag, obj)
-	case model.NOOP:
-		graphCli.Noop(c.dag, obj)
-	}
+	c.addResource(obj, action)
 }
 
-func (c *rsmComponent) addResource(obj client.Object, action *model.Action,
-	parent client.Object) client.Object {
+func (c *rsmComponent) addResource(obj client.Object, action *model.Action) client.Object {
 	if obj == nil {
 		panic("try to add nil object")
 	}
-	graphCli := model.NewGraphClient(c.Client)
-	graphCli.Do(c.dag, nil, obj, action, nil)
-	if parent != nil {
-		graphCli.DependOn(c.dag, parent, obj)
-	}
+	model.NewGraphClient(c.Client).Do(c.dag, nil, obj, action, nil)
 	return obj
+}
+
+func (c *rsmComponent) workloadVertex() *model.ObjectVertex {
+	for _, vertex := range c.dag.Vertices() {
+		v, _ := vertex.(*model.ObjectVertex)
+		if v.Obj == c.workload {
+			return v
+		}
+	}
+	return nil
 }
 
 func (c *rsmComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Client, builder componentWorkloadBuilder, load bool) error {
@@ -886,10 +876,7 @@ func (c *rsmComponent) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli client.C
 	}
 
 	updatePVCByRecreateFromStep := func(fromStep pvcRecreateStep) {
-		var lastVertex *model.ObjectVertex
-		if root := c.dag.Root(); root != nil {
-			lastVertex, _ = root.(*model.ObjectVertex)
-		}
+		lastVertex := c.workloadVertex()
 		for step := pvRestorePolicyStep; step >= fromStep && step >= pvPolicyRetainStep; step-- {
 			lastVertex = addStepMap[step](lastVertex, step)
 		}
@@ -919,8 +906,7 @@ func (c *rsmComponent) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli client.C
 	}
 	if pvcQuantity := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; pvcQuantity.Cmp(vctProto.Spec.Resources.Requests[corev1.ResourceStorage]) != 0 {
 		// use pvc's update without anything extra
-		graphCli.Update(c.dag, nil, newPVC)
-		graphCli.DependOn(c.dag, c.workload, newPVC)
+		graphCli.Do(c.dag, nil, newPVC, model.ActionUpdatePtr(), c.workloadVertex())
 		return nil
 	}
 	// all the else means no need to update
@@ -1018,8 +1004,7 @@ func (c *rsmComponent) updatePodReplicaLabel4Scaling(reqCtx intctrlutil.RequestC
 			obj.Annotations = make(map[string]string)
 		}
 		obj.Annotations[constant.ComponentReplicasAnnotationKey] = strconv.Itoa(int(replicas))
-		graphCli.Update(c.dag, nil, obj)
-		graphCli.DependOn(c.dag, c.workload, obj)
+		graphCli.Do(c.dag, nil, obj, model.ActionUpdatePtr(), c.workloadVertex())
 	}
 	return nil
 }
@@ -1093,8 +1078,7 @@ func (c *rsmComponent) deletePVCs4ScaleIn(reqCtx intctrlutil.RequestCtx, cli cli
 			// after updating STS and before deleting PVCs, the PVCs intended to scale-in will be leaked.
 			// For simplicity, the updating dependency is added between them to guarantee that the PVCs to scale-in
 			// will be deleted or the scaling-in operation will be failed.
-			graphCli.Delete(c.dag, &pvc)
-			graphCli.DependOn(c.dag, c.workload, &pvc)
+			graphCli.Do(c.dag, nil, &pvc, model.ActionDeletePtr(), c.workloadVertex())
 		}
 	}
 	return nil
@@ -1196,8 +1180,7 @@ func (c *rsmComponent) updateUnderlyingResources(reqCtx intctrlutil.RequestCtx, 
 func (c *rsmComponent) createWorkload() {
 	rsmProto := c.workload.(*workloads.ReplicatedStateMachine)
 	buildWorkLoadAnnotations(rsmProto, c.Cluster)
-	graphCli := model.NewGraphClient(c.Client)
-	graphCli.Create(c.dag, c.workload, model.ReplaceIfExistingOption)
+	model.NewGraphClient(c.Client).Create(c.dag, c.workload, model.ReplaceIfExistingOption)
 }
 
 func (c *rsmComponent) updateWorkload(rsmObj *workloads.ReplicatedStateMachine) bool {
@@ -1303,8 +1286,7 @@ func (c *rsmComponent) updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.C
 			if pvcNameSet.Has(pvc.Name) {
 				continue
 			}
-			graphCli.Noop(c.dag, pvc)
-			graphCli.DependOn(c.dag, c.workload, pvc)
+			graphCli.Do(c.dag, nil, pvc, model.ActionNoopPtr(), c.workloadVertex())
 		}
 	}
 	return nil

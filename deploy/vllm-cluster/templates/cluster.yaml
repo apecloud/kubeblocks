@@ -8,6 +8,6 @@
       serviceAccountName: {{ include "kblib.serviceAccountName" . }}
       resources:
         limits:
-          nvidia.com/gpu: 1
+          nvidia.com/gpu: {{ .Values.gpu }}
         requests:
-          nvidia.com/gpu: 1
+          nvidia.com/gpu: {{ .Values.gpu }}

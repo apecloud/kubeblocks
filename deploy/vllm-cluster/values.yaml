@@ -21,3 +21,7 @@ memory: 0.5
 ## @param storage size, the unit is Gi
 ##
 storage: 20
+
+## @param gpu
+##
+gpu: 1

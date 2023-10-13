@@ -352,7 +352,7 @@ func (r *BackupReconciler) patchBackupStatus(
 	if err != nil {
 		return fmt.Errorf("failed to parse retention period %s, %v", original.Spec.RetentionPeriod, err)
 	}
-	if original.Spec.RetentionPeriod != "" {
+	if duration.Seconds() > 0 {
 		request.Status.Expiration = &metav1.Time{
 			Time: request.Status.StartTimestamp.Add(duration),
 		}

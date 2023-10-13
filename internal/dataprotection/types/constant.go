@@ -19,6 +19,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package types
 
+// config keys used in viper
+const (
+	// CfgKeyGCFrequencySeconds is the key of gc frequency, its unit is second
+	CfgKeyGCFrequencySeconds = "GC_FREQUENCY_SECONDS"
+)
+
+// config default values
+const (
+	// DefaultGCFrequencySeconds is the default gc frequency, its unit is second
+	DefaultGCFrequencySeconds = 60 * 60
+)
+
 const (
 	// DataProtectionFinalizerName is the name of our custom finalizer
 	DataProtectionFinalizerName = "dataprotection.kubeblocks.io/finalizer"

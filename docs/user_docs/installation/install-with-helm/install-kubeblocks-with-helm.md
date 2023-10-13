@@ -78,32 +78,15 @@ If you want to install KubeBlocks with a specified version, follow the steps bel
 	--version="0.6.3"
    ```
 
-:::note
+  :::note
 
-By default, kbcli installs KubeBlocks with the same version. If you want to install KubeBlocks with a different version, ensure that the major versions of kbcli and KubeBlocks match.
+  By default, kbcli installs KubeBlocks with the same version. If you want to install KubeBlocks with a different version, ensure that the minor versions of kbcli and KubeBlocks match.
 
-For instance, you can install kbcli v0.6.1 and KubeBlocks v0.6.3, but mismatched versions like kbcli v0.5.0 and KubeBlocks v0.6.0 may result in errors.
+  For instance, you can install kbcli v0.6.1 and KubeBlocks v0.6.3, but mismatched versions like kbcli v0.5.0 and KubeBlocks v0.6.0 may result in errors.
 
-:::
+  :::
 
 ## Verify KubeBlocks installation
-
-Run the following command to check whether KubeBlocks is installed successfully.
-
-```bash
-kubectl get pods --all-namespaces -l "app.kubernetes.io/instance=kubeblocks" -w
-
-NAME                                                     READY   STATUS      RESTARTS   AGE
-kubeblocks-846b8878d9-q8g2w                              1/1     Running     0          98s
-```
-
-If the operator pods are all `Running`, KubeBlocks has been installed successfully. You can cancel the above command by typing `Ctrl+C`.
-
-:::note
-
-Clusters installed through `helm` need to be deleted using `helm` to avoid resource residue.
-
-:::
 
 Run the following command to check whether KubeBlocks is installed successfully.
 

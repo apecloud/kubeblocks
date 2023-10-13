@@ -40,24 +40,24 @@ You can install kbcli with `curl` or `brew`.
    2. Specify a version with `-s` and run the command below.
 
       ```bash
-      curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.6.3
+      curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s x.x.x
       ```
 
-:::note
+  :::note
 
-By default, kbcli installs KubeBlocks with the same version. If you want to install KubeBlocks with a different version, ensure that the major versions of kbcli and KubeBlocks match.
+  By default, kbcli installs KubeBlocks with the same version. If you want to install KubeBlocks with a different version, ensure that the minor versions of kbcli and KubeBlocks match.
 
-For instance, you can install kbcli v0.6.1 and KubeBlocks v0.6.3, but mismatched versions like kbcli v0.5.0 and KubeBlocks v0.6.0 may result in errors.
+  For instance, you can install kbcli v0.6.1 and KubeBlocks v0.6.3, but mismatched versions like kbcli v0.5.0 and KubeBlocks v0.6.0 may result in errors.
 
-:::
+  :::
 
 2. Run `kbcli version` to check the version of kbcli and ensure that it is successfully installed.
 
-:::note
+  :::note
 
-- If a timeout exception occurs during installation, please check your network settings and retry.
+  If a timeout exception occurs during installation, please check your network settings and retry.
 
-:::
+  :::
 
 - Option 2: Install kbcli using Homebrew.
 

@@ -110,15 +110,15 @@ func main() {
 	if err != nil {
 		panic(fmt.Errorf("fatal error listen on port %d: %v", grpcPort, err))
 	}
-
 	healthServer := customgrpc.NewGRPCServer()
 	server := grpc.NewServer()
 	health.RegisterHealthServer(server, healthServer)
-
-	err = server.Serve(listen)
-	if err != nil {
-		panic(fmt.Errorf("fatal error grpcserver serve failed: %v", err))
-	}
+	go func() {
+		err = server.Serve(listen)
+		if err != nil {
+			panic(fmt.Errorf("fatal error grpcserver serve failed: %v", err))
+		}
+	}()
 
 	// ha dependent on dbmanager which is initialized by rt.Run
 	logHa := ctrl.Log.WithName("HA")

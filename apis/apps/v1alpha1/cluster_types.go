@@ -177,6 +177,57 @@ type ClusterStorage struct {
 	Size resource.Quantity `json:"size,omitempty"`
 }
 
+type ResourceRefMount struct {
+	// name is the name of the referenced the Configmap/Secret object.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// TODO support different namespace of the referenced ConfigMap/Secret object and cluster.
+	// Specify the namespace of the referenced the ConfigMap/Secret object.
+	// An empty namespace is equivalent to the same namespace with cluster.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^/[-\w/]+$`
+	// +kubebuilder:default="default"
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+
+	// mountPath is the path at which to mount the volume.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=256
+	// +kubebuilder:validation:Pattern:=`^/[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	MountPoint string `json:"mountPoint"`
+
+	// defaultMode is optional: mode bits used to set permissions on created files by default.
+	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
+	// Defaults to 0644.
+	// Directories within the path are not affected by this setting.
+	// This might be in conflict with other options that affect the file
+	// mode, like fsGroup, and the result can be other mode bits set.
+	// +optional
+	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
+}
+
+type UserResourceRefs struct {
+	// secrets defines the user-defined secrets.
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	Secrets []ResourceRefMount `json:"secrets,omitempty"`
+
+	// secrets defines the user-defined configmaps.
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	ConfigMaps []ResourceRefMount `json:"configMaps,omitempty"`
+}
+
 // ClusterStatus defines the observed state of Cluster.
 type ClusterStatus struct {
 	// observedGeneration is the most recent generation observed for this
@@ -312,6 +363,10 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:default=false
 	// +optional
 	NoCreatePDB bool `json:"noCreatePDB,omitempty"`
+
+	// userVolumes defines the user-defined volumes.
+	// +optional
+	UserResourceRefs *UserResourceRefs `json:"userResourceRefs,omitempty"`
 }
 
 // GetMinAvailable wraps the 'prefer' value return. As for component replicaCount <= 1, it will return 0,

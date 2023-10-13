@@ -549,6 +549,104 @@ spec:
                         type: object
                       type: array
                       x-kubernetes-preserve-unknown-fields: true
+                    userResourceRefs:
+                      description: userVolumes defines the user-defined volumes.
+                      properties:
+                        configMaps:
+                          description: secrets defines the user-defined configmaps.
+                          items:
+                            properties:
+                              defaultMode:
+                                description: 'defaultMode is optional: mode bits used
+                                  to set permissions on created files by default.
+                                  Must be an octal value between 0000 and 0777 or
+                                  a decimal value between 0 and 511. YAML accepts
+                                  both octal and decimal values, JSON requires decimal
+                                  values for mode bits. Defaults to 0644. Directories
+                                  within the path are not affected by this setting.
+                                  This might be in conflict with other options that
+                                  affect the file mode, like fsGroup, and the result
+                                  can be other mode bits set.'
+                                format: int32
+                                type: integer
+                              mountPoint:
+                                description: mountPath is the path at which to mount
+                                  the volume.
+                                maxLength: 256
+                                pattern: ^/[a-z]([a-z0-9\-]*[a-z0-9])?$
+                                type: string
+                              name:
+                                description: name is the name of the referenced the
+                                  Configmap/Secret object.
+                                maxLength: 63
+                                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                type: string
+                              namespace:
+                                default: default
+                                description: TODO support different namespace of the
+                                  referenced ConfigMap/Secret object and cluster.
+                                  Specify the namespace of the referenced the ConfigMap/Secret
+                                  object. An empty namespace is equivalent to the
+                                  same namespace with cluster.
+                                maxLength: 63
+                                pattern: ^/[-\w/]+$
+                                type: string
+                            required:
+                            - mountPoint
+                            - name
+                            type: object
+                          type: array
+                          x-kubernetes-list-map-keys:
+                          - name
+                          x-kubernetes-list-type: map
+                        secrets:
+                          description: secrets defines the user-defined secrets.
+                          items:
+                            properties:
+                              defaultMode:
+                                description: 'defaultMode is optional: mode bits used
+                                  to set permissions on created files by default.
+                                  Must be an octal value between 0000 and 0777 or
+                                  a decimal value between 0 and 511. YAML accepts
+                                  both octal and decimal values, JSON requires decimal
+                                  values for mode bits. Defaults to 0644. Directories
+                                  within the path are not affected by this setting.
+                                  This might be in conflict with other options that
+                                  affect the file mode, like fsGroup, and the result
+                                  can be other mode bits set.'
+                                format: int32
+                                type: integer
+                              mountPoint:
+                                description: mountPath is the path at which to mount
+                                  the volume.
+                                maxLength: 256
+                                pattern: ^/[a-z]([a-z0-9\-]*[a-z0-9])?$
+                                type: string
+                              name:
+                                description: name is the name of the referenced the
+                                  Configmap/Secret object.
+                                maxLength: 63
+                                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                type: string
+                              namespace:
+                                default: default
+                                description: TODO support different namespace of the
+                                  referenced ConfigMap/Secret object and cluster.
+                                  Specify the namespace of the referenced the ConfigMap/Secret
+                                  object. An empty namespace is equivalent to the
+                                  same namespace with cluster.
+                                maxLength: 63
+                                pattern: ^/[-\w/]+$
+                                type: string
+                            required:
+                            - mountPoint
+                            - name
+                            type: object
+                          type: array
+                          x-kubernetes-list-map-keys:
+                          - name
+                          x-kubernetes-list-type: map
+                      type: object
                     volumeClaimTemplates:
                       description: volumeClaimTemplates information for statefulset.spec.volumeClaimTemplates.
                       items:

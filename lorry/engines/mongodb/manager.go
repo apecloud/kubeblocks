@@ -144,7 +144,7 @@ func (mgr *Manager) InitiateReplSet(ctx context.Context, cluster *dcs.Cluster) e
 func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	client, err := mgr.GetReplSetClient(ctx, cluster)
 	if err != nil {
-		mgr.Logger.Error(err, "Get leader client failed")
+		mgr.Logger.Info("Get leader client failed", "error", err)
 		return false, err
 	}
 	defer client.Disconnect(ctx) //nolint:errcheck
@@ -155,7 +155,7 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 	if rsStatus != nil {
 		return rsStatus.Set != "", nil
 	}
-	mgr.Logger.Error(err, "Get replSet status failed")
+	mgr.Logger.Info("Get replSet status failed", "error", err)
 
 	if !mgr.IsFirstMember() {
 		return false, nil
@@ -163,7 +163,7 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 
 	client, err = NewLocalUnauthClient(ctx)
 	if err != nil {
-		mgr.Logger.Error(err, "Get local unauth client failed")
+		mgr.Logger.Info("Get local unauth client failed", "error", err)
 		return false, err
 	}
 	defer client.Disconnect(ctx) //nolint:errcheck
@@ -177,18 +177,18 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 	if cmdErr, ok := err.(mongo.CommandError); ok && cmdErr.Name == "NotYetInitialized" {
 		return false, nil
 	}
-	mgr.Logger.Error(err, "Get replSet status with local unauth client failed")
+	mgr.Logger.Info("Get replSet status with local unauth client failed", "error", err)
 
 	rsStatus, err = mgr.GetReplSetStatus(ctx)
 	if rsStatus != nil {
 		return rsStatus.Set != "", nil
 	}
 	if err != nil {
-		mgr.Logger.Error(err, "Get replSet status with local auth client failed")
+		mgr.Logger.Info("Get replSet status with local auth client failed", "error", err)
 		return false, err
 	}
 
-	mgr.Logger.Error(err, "Get replSet status failed")
+	mgr.Logger.Info("Get replSet status failed", "error", err)
 	return false, err
 }
 
@@ -199,7 +199,7 @@ func (mgr *Manager) IsRootCreated(ctx context.Context) (bool, error) {
 
 	client, err := NewLocalUnauthClient(ctx)
 	if err != nil {
-		mgr.Logger.Error(err, "Get local unauth client failed")
+		mgr.Logger.Info("Get local unauth client failed", "error", err)
 		return false, err
 	}
 	defer client.Disconnect(ctx) //nolint:errcheck
@@ -213,14 +213,14 @@ func (mgr *Manager) IsRootCreated(ctx context.Context) (bool, error) {
 		return true, nil
 	}
 
-	mgr.Logger.Error(err, "Get replSet status with local unauth client failed")
+	mgr.Logger.Info("Get replSet status with local unauth client failed", "error", err)
 
 	_, err = mgr.GetReplSetStatus(ctx)
 	if err == nil {
 		return true, nil
 	}
 
-	mgr.Logger.Error(err, "Get replSet status with local auth client failed")
+	mgr.Logger.Info("Get replSet status with local auth client failed", "error", err)
 	return false, err
 
 }
@@ -232,7 +232,7 @@ func (mgr *Manager) CreateRoot(ctx context.Context) error {
 
 	client, err := NewLocalUnauthClient(ctx)
 	if err != nil {
-		mgr.Logger.Error(err, "Get local unauth client failed")
+		mgr.Logger.Info("Get local unauth client failed", "error", err)
 		return err
 	}
 	defer client.Disconnect(ctx) //nolint:errcheck
@@ -245,7 +245,7 @@ func (mgr *Manager) CreateRoot(ctx context.Context) error {
 	mgr.Logger.Info(fmt.Sprintf("Create user: %s, passwd: %s, roles: %v", config.username, config.password, role))
 	err = CreateUser(ctx, client, config.username, config.password, role)
 	if err != nil {
-		mgr.Logger.Error(err, "Create Root failed")
+		mgr.Logger.Info("Create Root failed", "error", err)
 		return err
 	}
 

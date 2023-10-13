@@ -33,7 +33,6 @@ import (
 	. "github.com/apecloud/kubeblocks/lorry/binding"
 	"github.com/apecloud/kubeblocks/lorry/binding/custom"
 	"github.com/apecloud/kubeblocks/lorry/binding/etcd"
-	"github.com/apecloud/kubeblocks/lorry/binding/mongodb"
 	"github.com/apecloud/kubeblocks/lorry/binding/mysql"
 	"github.com/apecloud/kubeblocks/lorry/binding/postgres"
 	"github.com/apecloud/kubeblocks/lorry/binding/redis"
@@ -78,14 +77,6 @@ func RegisterBuiltin(characterType string) error {
 		err := etcdOp.Init(properties)
 		if err != nil {
 			return errors.Errorf(initErrFmt, "etcd", err)
-		}
-	case "mongodb":
-		mongoOp := mongodb.NewMongoDB()
-		builtinMap["mongodb"] = mongoOp
-		properties := component.GetProperties("mongodb")
-		err := mongoOp.Init(properties)
-		if err != nil {
-			return errors.Errorf(initErrFmt, "mongodb", err)
 		}
 	default:
 		customOp = custom.NewHTTPCustom()

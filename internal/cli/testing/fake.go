@@ -992,7 +992,7 @@ func FakeEventForObject(name string, namespace string, object string) *corev1.Ev
 	}
 }
 
-func FakeStorageProvider(name string) *storagev1alpha1.StorageProvider {
+func FakeStorageProvider(name string, mutateFunc func(obj *storagev1alpha1.StorageProvider)) *storagev1alpha1.StorageProvider {
 	storageProvider := &storagev1alpha1.StorageProvider{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: fmt.Sprintf("%s/%s", types.StorageAPIGroup, types.StorageAPIVersion),
@@ -1040,6 +1040,9 @@ mountOptions: {{ index .Parameters "mountOptions" | default "" }}
 		},
 	}
 	storageProvider.SetCreationTimestamp(metav1.Now())
+	if mutateFunc != nil {
+		mutateFunc(storageProvider)
+	}
 	return storageProvider
 }
 

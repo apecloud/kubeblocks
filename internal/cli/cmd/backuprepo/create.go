@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -45,7 +46,6 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/stoewer/go-strcase"
 	"github.com/xeipuuv/gojsonschema"
-	"golang.org/x/exp/slices"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
@@ -61,7 +61,14 @@ const (
 )
 
 var (
-	allowedPVReclaimPolicies = []string{"Retain", "Delete"}
+	allowedAccessMethods = []string{
+		string(dpv1alpha1.AccessMethodMount),
+		string(dpv1alpha1.AccessMethodTool),
+	}
+	allowedPVReclaimPolicies = []string{
+		string(corev1.PersistentVolumeReclaimRetain),
+		string(corev1.PersistentVolumeReclaimDelete),
+	}
 )
 
 type createOptions struct {
@@ -70,6 +77,7 @@ type createOptions struct {
 	client  kubernetes.Interface
 	factory cmdutil.Factory
 
+	accessMethod    string
 	storageProvider string
 	providerObject  *storagev1alpha1.StorageProvider
 	isDefault       bool
@@ -124,6 +132,8 @@ func newCreateCommand(o *createOptions, f cmdutil.Factory, streams genericioopti
 		},
 		DisableFlagParsing: true,
 	}
+	cmd.Flags().StringVar(&o.accessMethod, "access-method", "",
+		fmt.Sprintf("Specify the access method for the backup repository, \"Tool\" is preferred if not specified. options: %q", allowedAccessMethods))
 	cmd.Flags().StringVar(&o.storageProvider, providerFlagName, "", "Specify storage provider")
 	util.CheckErr(cmd.MarkFlagRequired(providerFlagName))
 	cmd.Flags().BoolVar(&o.isDefault, "default", false, "Specify whether to set the created backup repo as default")
@@ -164,12 +174,23 @@ func flagsToValues(fs *pflag.FlagSet) map[string]string {
 
 func (o *createOptions) parseProviderFlags(cmd *cobra.Command, args []string, f cmdutil.Factory) error {
 	// Since we disabled the flag parsing of the cmd, we need to parse it from args
+	help := false
 	tmpFlags := pflag.NewFlagSet("tmp", pflag.ContinueOnError)
 	tmpFlags.StringVar(&o.storageProvider, providerFlagName, "", "")
-	tmpFlags.BoolP("help", "h", false, "") // eat --help and -h
+	tmpFlags.BoolVarP(&help, "help", "h", false, "") // eat --help and -h
 	tmpFlags.ParseErrorsWhitelist.UnknownFlags = true
 	_ = tmpFlags.Parse(args)
 	if o.storageProvider == "" {
+		if help {
+			cmd.Long = templates.LongDesc(`
+                Note: This help information only shows the common flags for creating a 
+                backup repository, to show provider-specific flags, please specify 
+                the --provider flag. For example:
+
+                    kbcli backuprepo create --provider s3 --help
+            `)
+			return pflag.ErrHelp
+		}
 		return fmt.Errorf("please specify the --%s flag", providerFlagName)
 	}
 
@@ -255,6 +276,17 @@ func (o *createOptions) complete(cmd *cobra.Command) error {
 	return nil
 }
 
+func (o *createOptions) supportedAccessMethods() []string {
+	var methods []string
+	if o.providerObject.Spec.StorageClassTemplate != "" || o.providerObject.Spec.PersistentVolumeClaimTemplate != "" {
+		methods = append(methods, string(dpv1alpha1.AccessMethodMount))
+	}
+	if o.providerObject.Spec.DatasafedConfigTemplate != "" {
+		methods = append(methods, string(dpv1alpha1.AccessMethodTool))
+	}
+	return methods
+}
+
 func (o *createOptions) validate(cmd *cobra.Command) error {
 	// Validate values by the json schema
 	schema := o.providerObject.Spec.ParametersSchema
@@ -272,6 +304,24 @@ func (o *createOptions) validate(cmd *cobra.Command) error {
 					err.Value(), flagName, err.Description())
 			}
 			return fmt.Errorf("invalid flags")
+		}
+	}
+
+	// Validate access method
+	supportedAccessMethods := o.supportedAccessMethods()
+	if len(supportedAccessMethods) == 0 {
+		return fmt.Errorf("invalid provider \"%s\", it doesn't support any access method", o.storageProvider)
+	}
+	if o.accessMethod != "" && !slices.Contains(supportedAccessMethods, o.accessMethod) {
+		return fmt.Errorf("provider \"%s\" doesn't support \"%s\" access method, supported methods: %q",
+			o.storageProvider, o.accessMethod, supportedAccessMethods)
+	}
+	if o.accessMethod == "" {
+		// Prefer using AccessMethodTool if it's supported
+		if slices.Contains(supportedAccessMethods, string(dpv1alpha1.AccessMethodTool)) {
+			o.accessMethod = string(dpv1alpha1.AccessMethodTool)
+		} else {
+			o.accessMethod = supportedAccessMethods[0]
 		}
 	}
 
@@ -352,6 +402,7 @@ func (o *createOptions) buildBackupRepoObject(secret *corev1.Secret) (*unstructu
 			Kind:       "BackupRepo",
 		},
 		Spec: dpv1alpha1.BackupRepoSpec{
+			AccessMethod:       dpv1alpha1.AccessMethod(o.accessMethod),
 			StorageProviderRef: o.storageProvider,
 			PVReclaimPolicy:    corev1.PersistentVolumeReclaimPolicy(o.pvReclaimPolicy),
 			VolumeCapacity:     resource.MustParse(o.volumeCapacity),
@@ -454,6 +505,9 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return utilcomp.CompGetResource(f, util.GVRToString(types.StorageProviderGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"access-method",
+		cobra.FixedCompletions(allowedAccessMethods, cobra.ShellCompDirectiveNoFileComp)))
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"pv-reclaim-policy",
 		cobra.FixedCompletions(allowedPVReclaimPolicies, cobra.ShellCompDirectiveNoFileComp)))

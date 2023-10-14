@@ -517,7 +517,7 @@ install-docker-buildx: ## Create `docker buildx` builder.
 	fi
 
 .PHONY: golangci
-golangci: GOLANGCILINT_VERSION = v1.54.2
+golangci: GOLANGCILINT_VERSION = v1.51.2
 golangci: ## Download golangci-lint locally if necessary.
 ifneq ($(shell which golangci-lint),)
 	@echo golangci-lint is already installed

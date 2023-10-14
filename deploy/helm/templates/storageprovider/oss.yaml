@@ -41,6 +41,7 @@ spec:
     secret_access_key = {{ `{{ index .Parameters "secretAccessKey" }}` }}
     endpoint = {{ `{{- printf "oss-%s.aliyuncs.com" .Parameters.region) }}` }}
     root = {{ `{{ index .Parameters "bucket" }}` }}
+    chunk_size = 50Mi
 
   parametersSchema:
     openAPIV3Schema:

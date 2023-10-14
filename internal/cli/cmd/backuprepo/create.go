@@ -492,7 +492,7 @@ func (o *createOptions) run() error {
 
 	// set ownership of the secret to the repo object
 	if createdSecret != nil {
-		_ = o.setSecretOwnership(createdSecret, backupRepoObj)
+		_ = o.setSecretOwnership(createdSecret, createdBackupRepo)
 	}
 
 	printer.PrintLine(fmt.Sprintf("Successfully create backup repo \"%s\".", createdBackupRepo.GetName()))

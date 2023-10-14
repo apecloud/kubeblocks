@@ -192,17 +192,14 @@ func (factory *MockClusterFactory) AddUserSecretVolume(name, mountPoint, resName
 			SecretName: resName,
 		},
 	}
-	comps := factory.Get().Spec.ComponentSpecs
-	if len(comps) > 0 {
-		userResourcesRefs := comps[len(comps)-1].UserResourceRefs
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+		userResourcesRefs := comp.UserResourceRefs
 		if userResourcesRefs == nil {
 			userResourcesRefs = &appsv1alpha1.UserResourceRefs{}
-			comps[len(comps)-1].UserResourceRefs = userResourcesRefs
+			comp.UserResourceRefs = userResourcesRefs
 		}
 		userResourcesRefs.SecretRefs = append(userResourcesRefs.SecretRefs, secretResource)
-	}
-	factory.Get().Spec.ComponentSpecs = comps
-	return factory
+	})
 }
 
 func (factory *MockClusterFactory) AddUserConfigmapVolume(name, mountPoint, resName, containerName string) *MockClusterFactory {
@@ -218,15 +215,12 @@ func (factory *MockClusterFactory) AddUserConfigmapVolume(name, mountPoint, resN
 			},
 		},
 	}
-	comps := factory.Get().Spec.ComponentSpecs
-	if len(comps) > 0 {
-		userResourcesRefs := comps[len(comps)-1].UserResourceRefs
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+		userResourcesRefs := comp.UserResourceRefs
 		if userResourcesRefs == nil {
 			userResourcesRefs = &appsv1alpha1.UserResourceRefs{}
-			comps[len(comps)-1].UserResourceRefs = userResourcesRefs
+			comp.UserResourceRefs = userResourcesRefs
 		}
 		userResourcesRefs.ConfigMapRefs = append(userResourcesRefs.ConfigMapRefs, cmResource)
-	}
-	factory.Get().Spec.ComponentSpecs = comps
-	return factory
+	})
 }

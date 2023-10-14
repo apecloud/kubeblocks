@@ -68,7 +68,7 @@ func newDescribeCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobr
 	}
 	cmd := &cobra.Command{
 		Use:               "describe",
-		Short:             "Describe a backuprepo.",
+		Short:             "Describe a backup repository.",
 		Example:           describeExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.BackupRepoGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -127,23 +127,22 @@ func (o *describeBackupRepoOptions) printBackupRepo(backupRepo *dpv1alpha1.Backu
 	printer.PrintLine("Summary:")
 	printer.PrintPairStringToLine("Name", backupRepo.Name)
 	printer.PrintPairStringToLine("Provider", backupRepo.Spec.StorageProviderRef)
-	printer.PrintPairStringToLine("Bucket", backupRepo.Spec.Config["bucket"])
-	if backupRepo.Spec.StorageProviderRef == "minio" {
-		printer.PrintPairStringToLine("Endpoint", backupRepo.Spec.Config["endpoint"])
-	} else {
-		printer.PrintPairStringToLine("Region", backupRepo.Spec.Config["region"])
-	}
 	backups, backupSize, err := countBackupNumsAndSize(o.dynamic, backupRepo)
 	if err != nil {
 		return err
 	}
 	printer.PrintPairStringToLine("Backups", fmt.Sprintf("%d", backups))
-	printer.PrintPairStringToLine("Total data size", backupSize)
+	printer.PrintPairStringToLine("Total Data Size", backupSize)
 
 	printer.PrintLine("\nSpec:")
+	printer.PrintPairStringToLine("AccessMethod", string(backupRepo.Spec.AccessMethod))
 	printer.PrintPairStringToLine("PvReclaimPolicy", string(backupRepo.Spec.PVReclaimPolicy))
 	printer.PrintPairStringToLine("StorageProviderRef", backupRepo.Spec.StorageProviderRef)
 	printer.PrintPairStringToLine("VolumeCapacity", backupRepo.Spec.VolumeCapacity.String())
+	printer.PrintLine("  Config:")
+	for k, v := range backupRepo.Spec.Config {
+		printer.PrintPairStringToLine(k, v, 4)
+	}
 
 	printer.PrintLine("\nStatus:")
 	printer.PrintPairStringToLine("Phase", string(backupRepo.Status.Phase))

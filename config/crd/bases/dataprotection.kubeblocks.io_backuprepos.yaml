@@ -24,6 +24,9 @@ spec:
     - jsonPath: .spec.storageProviderRef
       name: STORAGEPROVIDER
       type: string
+    - jsonPath: .spec.accessMethod
+      name: ACCESSMETHOD
+      type: string
     - jsonPath: .status.isDefault
       name: DEFAULT
       type: boolean

@@ -20,12 +20,14 @@ spec:
       - bash
       - -c
       - |
-        set -e;
-        mkdir -p ${DP_BACKUP_DIR};
+        set -e
+        set -o pipefail
+        export PATH="$PATH:$DP_DATASAFED_BIN_PATH"
+        export DATASAFED_BACKEND_BASE_PATH="$DP_BACKUP_BASE_PATH"
         xtrabackup --backup --safe-slave-backup --slave-info --stream=xbstream \
-        --host=${DP_DB_HOST} --user=${DP_DB_USER} --password=${DP_DB_PASSWORD} --datadir=${DATA_DIR} > ${DP_BACKUP_DIR}/${DP_BACKUP_NAME}.xbstream
-        TOTAL_SIZE=$(du -shx ${DP_BACKUP_DIR}|awk '{print $1}')
-        echo "{\"totalSize\":\"$TOTAL_SIZE\"}" > ${DP_BACKUP_DIR}/backup.info
+        --host=${DP_DB_HOST} --user=${DP_DB_USER} --password=${DP_DB_PASSWORD} --datadir=${DATA_DIR} | datasafed push - "/${DP_BACKUP_NAME}.xbstream"
+        TOTAL_SIZE=$(datasafed stat / | grep TotalSize | awk '{print $2}')
+        echo "{\"totalSize\":\"$TOTAL_SIZE\"}" > "${DP_BACKUP_INFO_FILE}"
       syncProgress:
         enabled: true
         intervalSeconds: 5
@@ -36,11 +38,14 @@ spec:
       - bash
       - -c
       - |
-        set -e;
+        set -e
+        set -o pipefail
+        export PATH="$PATH:$DP_DATASAFED_BIN_PATH"
+        export DATASAFED_BACKEND_BASE_PATH="$DP_BACKUP_BASE_PATH"
         mkdir -p ${DATA_DIR}
         TMP_DIR=/data/mysql/temp
         mkdir -p ${TMP_DIR} && cd ${TMP_DIR}
-        xbstream -x < ${DP_BACKUP_DIR}/${DP_BACKUP_NAME}.xbstream
+        datasafed pull "${DP_BACKUP_NAME}.xbstream" - | xbstream -x
         xtrabackup --decompress --remove-original --target-dir=${TMP_DIR}
         xtrabackup --prepare --target-dir=${TMP_DIR}
         xtrabackup --move-back --target-dir=${TMP_DIR} --datadir=${DATA_DIR}/

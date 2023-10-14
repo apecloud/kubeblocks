@@ -221,6 +221,7 @@ var _ = Describe("backuprepo create command", func() {
 			Expect(err).Should(MatchError(ContainSubstring("there is already a default backup repo")))
 		})
 		Context("validate access method", func() {
+			const supported = "supported"
 			BeforeEach(func() {
 				options.providerObject.Spec.StorageClassTemplate = ""
 				options.providerObject.Spec.PersistentVolumeClaimTemplate = ""
@@ -233,26 +234,26 @@ var _ = Describe("backuprepo create command", func() {
 				Expect(err).Should(MatchError(ContainSubstring("it doesn't support any access method")))
 			})
 			It("should use the mount method if it's the only supported access method", func() {
-				options.providerObject.Spec.StorageClassTemplate = "supported"
+				options.providerObject.Spec.StorageClassTemplate = supported
 				err := options.validate(cmd)
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(options.accessMethod).Should(Equal("Mount"))
 			})
 			It("should use the tool method if it's the only supported access method", func() {
-				options.providerObject.Spec.DatasafedConfigTemplate = "supported"
+				options.providerObject.Spec.DatasafedConfigTemplate = supported
 				err := options.validate(cmd)
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(options.accessMethod).Should(Equal("Tool"))
 			})
 			It("should return error if the specified access method is not supported", func() {
-				options.providerObject.Spec.StorageClassTemplate = "supported"
+				options.providerObject.Spec.StorageClassTemplate = supported
 				options.accessMethod = "Tool"
 				err := options.validate(cmd)
 				Expect(err).Should(MatchError(ContainSubstring("doesn't support \"Tool\" access method")))
 			})
 			It("should prefer using the tool method", func() {
-				options.providerObject.Spec.StorageClassTemplate = "supported"
-				options.providerObject.Spec.DatasafedConfigTemplate = "supported"
+				options.providerObject.Spec.StorageClassTemplate = supported
+				options.providerObject.Spec.DatasafedConfigTemplate = supported
 				options.accessMethod = ""
 				err := options.validate(cmd)
 				Expect(err).ShouldNot(HaveOccurred())

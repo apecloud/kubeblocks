@@ -1,0 +1,48 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ include "clustername" . }}
+  labels: {{ include "llm-cluster.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: llm # ref clusterdefinition.name
+  clusterVersionRef: llm-vicuna-13b
+  terminationPolicy: {{ .Values.terminationPolicy }}
+  affinity:
+    {{- with .Values.topologyKeys }}
+    topologyKeys: {{ . | toYaml | nindent 6 }}
+    {{- end }}
+  {{- with $.Values.tolerations }}
+  tolerations: {{ . | toYaml | nindent 4 }}
+  {{- end }}
+  componentSpecs:
+  - name: llm
+    componentDefRef: llm
+    monitor: {{ .Values.monitor.enabled | default false }}
+    replicas: {{ .Values.replicaCount | default 1 }}
+      {{- with  .Values.resources }}
+    resources:
+        {{- with .limits }}
+      limits:
+        cpu: {{ .cpu | quote }}
+        memory: {{ .memory | quote }}
+        nvidia.com/gpu: 1
+        {{- end }}
+        {{- with .requests }}
+      requests:
+        cpu: {{ .cpu | quote }}
+        memory: {{ .memory | quote }}
+        nvidia.com/gpu: 1
+        {{- end }}
+      {{- end }}
+      {{- if .Values.persistence.enabled }}
+    volumeClaimTemplates:
+    - name: data # ref clusterdefinition components.containers.volumeMounts.name
+      spec:
+        storageClassName: {{ .Values.persistence.data.storageClassName }}
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.persistence.data.size }}
+      {{- end }}
+

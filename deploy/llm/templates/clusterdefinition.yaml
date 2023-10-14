@@ -1,0 +1,100 @@
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: llm
+  labels:
+    {{- include "llm.labels" . | nindent 4 }}
+spec:
+  type: llm
+  connectionCredential:
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_ts)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_ts)"
+  componentDefs:
+    - name: llm
+      workloadType: Stateful
+      characterType: llm
+      probes:
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 8082
+      logConfigs:
+      configSpecs:
+        - name: llm-config-template
+          templateRef: llm-config-template
+          volumeName: config
+          namespace: {{ .Release.Namespace }}
+      service:
+        ports:
+          - name: ts
+            port: 8080
+            targetPort: ts
+          - name: ts-management
+            port: 8081
+            targetPort: ts-management
+          - name: ts-metrics
+            port: 8082
+            targetPort: ts-metrics
+      podSpec:
+        volumes:
+        - name: model-store
+          persistentVolumeClaim:
+            claimName: llmserver-efs-claim
+        containers:
+          - name: llm
+            imagePullPolicy: {{default .Values.image.pullPolicy "IfNotPresent"}}
+            securityContext:
+              runAsUser: 0
+            startupProbe:
+              failureThreshold: 18
+              httpGet:
+                path: /
+                port: ts
+                scheme: HTTP
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 3
+            livenessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /
+                port: ts
+                scheme: HTTP
+              periodSeconds: 15
+              successThreshold: 1
+              timeoutSeconds: 10
+            readinessProbe:
+              failureThreshold: 18
+              httpGet:
+                path: /
+                port: ts
+                scheme: HTTP
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 3
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+              - mountPath: /llm/config/
+                name: config
+              - mountPath: /llm/storage
+                name: model-store
+            command:
+            - /bin/sh
+            - -c
+            - |
+              cp /llm/config/config.properties /config.properties
+              sed -i "s/KB_LLM_MODEL_NAME_PLACEHOLDER/${MODEL_NAME}/g" /config.properties
+              echo "running config:"
+              cat /config.properties
+              torchserve --start --foreground --model-store /llm/storage/model-store/ --ts-config /config.properties
+            ports:
+            - name: ts
+              containerPort: 8080
+            - name: ts-management
+              containerPort: 8081
+            - name: ts-metrics
+              containerPort: 8082

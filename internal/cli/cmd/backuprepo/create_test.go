@@ -267,7 +267,7 @@ var _ = Describe("backuprepo create command", func() {
 			By("preparing the options")
 			err := options.parseProviderFlags(cmd, []string{
 				"--provider", "fake-s3", "--access-key-id", "abc", "--secret-access-key", "def",
-				"--region", "us-west-1", "--bucket", "test-bucket", "--default", "--access-method", "Tool",
+				"--region", "us-west-1", "--bucket", "test-bucket", "--default", "--access-method", "Mount",
 			}, tf)
 			Expect(err).ShouldNot(HaveOccurred())
 			err = options.complete(cmd)

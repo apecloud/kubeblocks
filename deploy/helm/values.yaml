@@ -330,6 +330,7 @@ dataProtection:
 ##
 ## @param backupRepo.create - creates a backup repo during installation
 ## @param backupRepo.default - set the created repo as the default
+## @param backupRepo.accessMethod - the access method for the backup repo, options: [Mount, Tool]
 ## @param backupRepo.storageProvider - the storage provider used by the repo, options: [s3, oss, minio]
 ## @param backupRepo.pvReclaimPolicy - the PV reclaim policy, options: [Retain, Delete]
 ## @param backupRepo.volumeCapacity - the capacity for creating PVC
@@ -338,6 +339,7 @@ dataProtection:
 backupRepo:
   create: false
   default: true
+  accessMethod: Tool
   storageProvider: ""
   pvReclaimPolicy: "Retain"
   volumeCapacity: ""

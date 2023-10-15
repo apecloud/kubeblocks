@@ -140,6 +140,15 @@ var clusterCreateExample = templates.Examples(`
 
 	# Create a cluster with auto backup
 	kbcli cluster create --cluster-definition apecloud-mysql --backup-enabled
+
+	# Create a cluster with default component having multiple storage volumes
+	kbcli cluster create --cluster-definition oceanbase --pvc name=data-file,size=50Gi --pvc name=data-log,size=50Gi --pvc name=log,size=20Gi
+
+	# Create a cluster with specifying a component having multiple storage volumes
+	kbcli cluster create --cluster-definition pulsar --pvc type=bookies,name=ledgers,size=20Gi --pvc type=bookies,name=journal,size=20Gi
+
+	# Create a cluster with using a service reference to another KubeBlocks cluster
+	cluster create --cluster-definition pulsar --service-reference name=pulsarZookeeper,cluster=zookeeper,namespace=default
 `)
 
 const (
@@ -228,6 +237,7 @@ type CreateOptions struct {
 	Values            []string                 `json:"-"`
 	RBACEnabled       bool                     `json:"-"`
 	Storages          []string                 `json:"-"`
+	ServiceRef        []string                 `json:"-"`
 	// backup name to restore in creation
 	Backup                  string `json:"backup,omitempty"`
 	RestoreTime             string `json:"restoreTime,omitempty"`
@@ -262,6 +272,8 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().StringVarP(&o.SetFile, "set-file", "f", "", "Use yaml file, URL, or stdin to set the cluster resource")
 	cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)")
 	cmd.Flags().StringArrayVar(&o.Storages, "pvc", []string{}, "Set the cluster detail persistent volume claim, each '--pvc' corresponds to a component, and will override the simple configurations about storage by --set (e.g. --pvc type=mysql,name=data,mode=ReadWriteOnce,size=20Gi --pvc type=mysql,name=log,mode=ReadWriteOnce,size=1Gi)")
+	cmd.Flags().StringArrayVar(&o.ServiceRef, "service-reference", []string{}, "Set the other KubeBlocks cluster dependencies, each '--service-reference' corresponds to a cluster service. (e.g --service-reference name=pulsarZookeeper,cluster=zookeeper,namespace=default)")
+
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 	cmd.Flags().StringVar(&o.RestoreTime, "restore-to-time", "", "Set a time for point in time recovery")
 	cmd.Flags().StringVar(&o.RestoreManagementPolicy, "volume-restore-policy", "Parallel", "the volume claim restore policy, supported values: [Serial, Parallel]")
@@ -631,6 +643,14 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 
 	if len(storages) != 0 {
 		compSpecs = rebuildCompStorage(storages, compSpecs)
+	}
+
+	// build service reference if --service-reference not empty
+	if len(o.ServiceRef) != 0 {
+		compSpecs, err = buildServiceRefs(o.ServiceRef, cd, compSpecs)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var comps []map[string]interface{}
@@ -1591,13 +1611,13 @@ func buildCompStorages(pvcs []string, cd *appsv1alpha1.ClusterDefinition) (map[s
 		for _, set := range sets {
 			kv := strings.Split(set, "=")
 			if len(kv) != 2 {
-				return nil, fmt.Errorf("unknown set format \"%s\", should be like key1=value1", set)
+				return nil, fmt.Errorf("unknown --pvc format \"%s\", should be like key1=value1", set)
 			}
 
 			// only record the supported key
 			k := parseKey(kv[0])
 			if k == storageKeyUnknown {
-				return nil, fmt.Errorf("unknown set key \"%s\", should be one of [%s]", kv[0], strings.Join(storageSetKey(), ","))
+				return nil, fmt.Errorf("unknown --pvc key \"%s\", should be one of [%s]", kv[0], strings.Join(storageSetKey(), ","))
 			}
 			res[k] = kv[1]
 		}
@@ -1703,4 +1723,140 @@ func rebuildCompStorage(pvcMaps map[string][]map[storageKey]string, specs []*app
 		}
 	}
 	return specs
+}
+
+// serviceRefKey declares --service-reference validate keyword
+type serviceRefKey string
+
+const (
+	serviceRefKeyName      serviceRefKey = "name"
+	serviceRefKeyCluster   serviceRefKey = "cluster"
+	serviceRefKeyNamespace serviceRefKey = "namespace"
+	serviceRefKeyUnknown   serviceRefKey = "unknown"
+)
+
+func serviceRefSetKey() []string {
+	return []string{
+		string(serviceRefKeyName),
+		string(serviceRefKeyCluster),
+		string(serviceRefKeyNamespace),
+	}
+}
+
+// getServiceRefs parses the serviceRef from flag --service-reference and performs basic validation, then return all valid serviceRefs
+func getServiceRefs(serviceRef []string, cd *appsv1alpha1.ClusterDefinition) ([]map[serviceRefKey]string, error) {
+	var serviceRefSets []map[serviceRefKey]string
+
+	parseKey := func(key string) serviceRefKey {
+		for _, k := range serviceRefSetKey() {
+			if strings.EqualFold(k, key) {
+				return serviceRefKey(k)
+			}
+		}
+		return serviceRefKeyUnknown
+	}
+
+	buildServiceRefMap := func(sets []string) (map[serviceRefKey]string, error) {
+		res := map[serviceRefKey]string{}
+		for _, set := range sets {
+			kv := strings.Split(set, "=")
+			if len(kv) != 2 {
+				return nil, fmt.Errorf("unknown --service-reference format \"%s\", should be like key1=value1", set)
+			}
+
+			// only record the supported key
+			k := parseKey(kv[0])
+			if k == serviceRefKeyUnknown {
+				return nil, fmt.Errorf("unknown --service-reference key \"%s\", should be one of [%s]", kv[0], strings.Join(serviceRefSetKey(), ","))
+			}
+			res[k] = kv[1]
+		}
+		return res, nil
+	}
+
+	for _, ref := range serviceRef {
+		refMap, err := buildServiceRefMap(strings.Split(ref, ","))
+		if err != nil {
+			return nil, err
+		}
+		if len(refMap) == 0 {
+			continue
+		}
+		serviceRefName := refMap[serviceRefKeyName]
+
+		if len(serviceRefName) == 0 {
+			name, err := cluster.GetDefaultServiceRef(cd)
+			if err != nil {
+				return nil, err
+			}
+			refMap[serviceRefKeyName] = name
+		} else {
+			// check if the serviceRefName is defined in the cluster-definition
+			valid := false
+			for _, c := range cluster.GetServiceRefs(cd) {
+				if c == serviceRefName {
+					valid = true
+					break
+				}
+			}
+			if !valid {
+				// todo:  kbcli cluster list-serviceRef
+				return nil, fmt.Errorf("the service reference name \"%s\" is not declared in the cluster components,use `kbcli cluster list-serviceRef %s` to show all available service reference names", serviceRefName, cd.Name)
+			}
+		}
+		serviceRefSets = append(serviceRefSets, refMap)
+	}
+	return serviceRefSets, nil
+}
+
+// buildServiceRefs supplements the serviceRef content for compSpecs based on the input flags --service-reference
+func buildServiceRefs(serviceRef []string, cd *appsv1alpha1.ClusterDefinition, compSpecs []*appsv1alpha1.ClusterComponentSpec) ([]*appsv1alpha1.ClusterComponentSpec, error) {
+	refSet, err := getServiceRefs(serviceRef, cd)
+	if err != nil {
+		return nil, err
+	}
+	// Check if the ServiceRefDeclarations for the current refName have been declared in the cluster-definition corresponding to comp
+	check := func(comp *appsv1alpha1.ClusterComponentSpec, refName string) bool {
+		valid := false
+		for _, cdSpec := range cd.Spec.ComponentDefs {
+			if cdSpec.Name != comp.Name {
+				continue
+			}
+			for i := range cdSpec.ServiceRefDeclarations {
+				if cdSpec.ServiceRefDeclarations[i].Name == refName {
+					// serviceRefName has been declared in cluster-definition
+					valid = true
+					break
+				}
+			}
+		}
+		return valid
+	}
+
+	for _, ref := range refSet {
+		name := ref[serviceRefKeyName]
+		for i, comp := range compSpecs {
+			if !check(comp, name) {
+				continue
+			}
+			// if cluster-definition ComponentDef have the correct ServiceRefDeclarations，add the ServiceRefs to the cluster compSpecs
+			if compSpecs[i].ServiceRefs == nil {
+				compSpecs[i].ServiceRefs = []appsv1alpha1.ServiceRef{
+					{
+						Name:      ref[serviceRefKeyName],
+						Namespace: ref[serviceRefKeyNamespace],
+						Cluster:   ref[serviceRefKeyCluster],
+					},
+				}
+			} else {
+				compSpecs[i].ServiceRefs = append(compSpecs[i].ServiceRefs,
+					appsv1alpha1.ServiceRef{
+						Name:      ref[serviceRefKeyName],
+						Namespace: ref[serviceRefKeyNamespace],
+						Cluster:   ref[serviceRefKeyCluster],
+					})
+			}
+		}
+	}
+	return compSpecs, nil
 }

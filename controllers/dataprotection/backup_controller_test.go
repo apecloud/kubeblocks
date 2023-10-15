@@ -476,6 +476,7 @@ var _ = Describe("Backup Controller test", func() {
 					Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(sp),
 						func(fetched *storagev1alpha1.StorageProvider) {
 							fetched.Status.Phase = storagev1alpha1.StorageProviderNotReady
+							fetched.Status.Conditions = nil
 						})).ShouldNot(HaveOccurred())
 					Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(repo),
 						func(g Gomega, repo *dpv1alpha1.BackupRepo) {

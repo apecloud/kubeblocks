@@ -11,10 +11,10 @@ kbcli cluster backup NAME [flags]
 ### Examples
 
 ```
-  # create a backup with method
+  # create a backup with a specified method, run "kbcli cluster desc-backup-policy mycluster" to show supported backup methods
   kbcli cluster backup mycluster --method volume-snapshot
   
-  # create a backup with specified backup policy
+  # create a backup with specified backup policy, run "kbcli cluster list-backup-policy mycluster" to show the cluster supported backup policies
   kbcli cluster backup mycluster --method volume-snapshot --policy <backup-policy-name>
 ```
 

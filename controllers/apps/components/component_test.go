@@ -364,7 +364,7 @@ var _ = Describe("Component", func() {
 					}},
 				},
 			}
-			testCtx.CheckedCreateObj(testCtx.Ctx, pod)
+			Expect(testCtx.CheckedCreateObj(testCtx.Ctx, pod)).Should(Succeed())
 		}
 	}
 
@@ -415,7 +415,7 @@ var _ = Describe("Component", func() {
 		// mock isRunning as false
 		Eventually(testapps.GetAndChangeObjStatus(&testCtx, rsmKey(), func(rsm *workloads.ReplicatedStateMachine) {
 			if rsm.Status.ReadyReplicas == *rsm.Spec.Replicas {
-				rsm.Status.ReadyReplicas = rsm.Status.ReadyReplicas - 1
+				rsm.Status.ReadyReplicas--
 			}
 		})).Should(Succeed())
 	}
@@ -443,7 +443,7 @@ var _ = Describe("Component", func() {
 
 		// mock isRunning as false
 		Eventually(testapps.GetAndChangeObjStatus(&testCtx, rsmKey(), func(rsm *workloads.ReplicatedStateMachine) {
-			rsm.Status.ReadyReplicas = rsm.Status.ReadyReplicas - 1
+			rsm.Status.ReadyReplicas--
 		})).Should(Succeed())
 	}
 

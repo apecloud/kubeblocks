@@ -50,6 +50,7 @@ type DBManager interface {
 	IsCurrentMemberHealthy(context.Context, *dcs.Cluster) bool
 	// IsMemberLagging focuses on the latency between the leader and standby
 	IsMemberLagging(context.Context, *dcs.Cluster, *dcs.Member) (bool, int64)
+	GetLag(context.Context, *dcs.Cluster) (int64, error)
 
 	// GetDBState will get most required database kernel states of current member in one HA loop to Avoiding duplicate queries and conserve I/O.
 	// We believe that the states of database kernel remains unchanged within a single HA loop.

@@ -150,6 +150,10 @@ func (mgr *DBManagerBase) IsMemberLagging(context.Context, *dcs.Cluster, *dcs.Me
 	return false, 0
 }
 
+func (mgr *DBManagerBase) GetLag(context.Context, *dcs.Cluster) (int64, error) {
+	return 0, errors.New("not implemented")
+}
+
 func (mgr *DBManagerBase) GetDBState(context.Context, *dcs.Cluster) *dcs.DBState {
 	// mgr.DBState = DBState
 	return nil

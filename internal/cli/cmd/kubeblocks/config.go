@@ -26,7 +26,7 @@ import (
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -95,7 +95,7 @@ var describeConfigExample = templates.Examples(`
 `)
 
 // NewConfigCmd creates the config command
-func NewConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewConfigCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &InstallOptions{
 		Options: Options{
 			IOStreams: streams,
@@ -118,7 +118,7 @@ func NewConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	return cmd
 }
 
-func NewDescribeConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewDescribeConfigCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &InstallOptions{
 		Options: Options{
 			IOStreams: streams,

@@ -27,7 +27,7 @@ import (
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/cli/create"
@@ -70,7 +70,7 @@ type CreateMigrationOptions struct {
 	create.CreateOptions `json:"-"`
 }
 
-func NewMigrationCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewMigrationCreateCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &CreateMigrationOptions{
 		CreateOptions: create.CreateOptions{
 			Factory:         f,

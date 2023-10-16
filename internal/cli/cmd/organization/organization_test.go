@@ -26,11 +26,11 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 )
 
 type MockOrganization struct {
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 func (m *MockOrganization) getOrganization(name string) (*OrgItem, error) {
@@ -86,11 +86,11 @@ func (m *MockOrganization) IsValidOrganization(name string) (bool, error) {
 
 var _ = Describe("Test Organization", func() {
 	var (
-		streams genericclioptions.IOStreams
+		streams genericiooptions.IOStreams
 		o       *OrganizationOption
 	)
 	BeforeEach(func() {
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		streams, _, _, _ = genericiooptions.NewTestIOStreams()
 		o = &OrganizationOption{IOStreams: streams, Organization: &MockOrganization{}}
 		os.Setenv("TEST_ENV", "true")
 	})

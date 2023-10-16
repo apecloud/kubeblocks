@@ -20,12 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package action
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -117,7 +119,6 @@ func (c *CreateVolumeSnapshotAction) Execute(ctx Context) (*dpv1alpha1.ActionSta
 	// volume snapshot is ready and status is not error
 	// TODO(ldm): now only support one volume to take snapshot, set its time, size to status
 	return sb.phase(dpv1alpha1.ActionPhaseCompleted).
-		phase(dpv1alpha1.ActionPhaseCompleted).
 		totalSize(snap.Status.RestoreSize.String()).
 		timeRange(snap.Status.CreationTime, snap.Status.CreationTime).
 		build(), nil
@@ -139,8 +140,8 @@ func (c *CreateVolumeSnapshotAction) createVolumeSnapshotIfNotExist(ctx Context,
 	pvc *corev1.PersistentVolumeClaim,
 	key client.ObjectKey) error {
 	var (
-		err error
-		vsc *vsv1.VolumeSnapshotClass
+		err     error
+		vscName string
 	)
 
 	snap := &vsv1.VolumeSnapshot{}
@@ -167,8 +168,14 @@ func (c *CreateVolumeSnapshotAction) createVolumeSnapshotIfNotExist(ctx Context,
 		},
 	}
 
-	if vsc != nil {
-		snap.Spec.VolumeSnapshotClassName = &vsc.Name
+	if pvc.Spec.StorageClassName != nil && *pvc.Spec.StorageClassName != "" {
+		if vscName, err = c.getVolumeSnapshotClassName(ctx.Ctx, ctx.Client, vsCli, *pvc.Spec.StorageClassName); err != nil {
+			return err
+		}
+	}
+
+	if vscName != "" {
+		snap.Spec.VolumeSnapshotClassName = &vscName
 	}
 
 	controllerutil.AddFinalizer(snap, dptypes.DataProtectionFinalizerName)
@@ -182,6 +189,29 @@ func (c *CreateVolumeSnapshotAction) createVolumeSnapshotIfNotExist(ctx Context,
 		return err
 	}
 	return nil
+}
+
+func (c *CreateVolumeSnapshotAction) getVolumeSnapshotClassName(
+	ctx context.Context,
+	cli client.Client,
+	vsCli intctrlutil.VolumeSnapshotCompatClient,
+	scName string) (string, error) {
+	scObj := storagev1.StorageClass{}
+	// ignore if not found storage class, use the default volume snapshot class
+	if err := cli.Get(ctx, client.ObjectKey{Name: scName}, &scObj); client.IgnoreNotFound(err) != nil {
+		return "", err
+	}
+
+	vscList := vsv1.VolumeSnapshotClassList{}
+	if err := vsCli.List(&vscList); err != nil {
+		return "", err
+	}
+	for _, item := range vscList.Items {
+		if item.Driver == scObj.Provisioner {
+			return item.Name, nil
+		}
+	}
+	return "", nil
 }
 
 func ensureVolumeSnapshotReady(

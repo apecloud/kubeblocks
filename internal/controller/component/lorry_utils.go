@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -36,6 +37,7 @@ import (
 
 const (
 	// http://localhost:<port>/v1.0/bindings/<binding_type>
+	checkRoleURIFormat        = "/v1.0/bindings/%s?operation=checkRole&workloadType=%s"
 	checkRunningURIFormat     = "/v1.0/bindings/%s?operation=checkRunning"
 	checkStatusURIFormat      = "/v1.0/bindings/%s?operation=checkStatus"
 	volumeProtectionURIFormat = "/v1.0/bindings/%s?operation=volumeProtection"
@@ -55,37 +57,38 @@ var (
 func buildLorryContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedComponent) error {
 	container := buildBasicContainer()
 	var lorryContainers []corev1.Container
-	componentLorry := component.Probes
-	if componentLorry == nil {
+	componentProbes := component.Probes
+	if componentProbes == nil {
 		return nil
 	}
-	reqCtx.Log.V(3).Info("lorry", "settings", componentLorry)
+	reqCtx.Log.V(3).Info("lorry", "settings", componentProbes)
 	lorrySvcHTTPPort := viper.GetInt32("PROBE_SERVICE_HTTP_PORT")
-	lorrySvcGRPCPort := viper.GetInt32("PROBE_SERVICE_GRPC_PORT")
 	// override by new env name
 	if viper.IsSet("LORRY_SERVICE_HTTP_PORT") {
 		lorrySvcHTTPPort = viper.GetInt32("LORRY_SERVICE_HTTP_PORT")
 	}
-	if viper.IsSet("LORRY_SERVICE_GRPC_PORT") {
-		lorrySvcGRPCPort = viper.GetInt32("LORRY_SERVICE_GRPC_PORT")
-	}
-	availablePorts, err := getAvailableContainerPorts(component.PodSpec.Containers, []int32{lorrySvcHTTPPort, lorrySvcGRPCPort})
+	availablePorts, err := getAvailableContainerPorts(component.PodSpec.Containers, []int32{lorrySvcHTTPPort})
 	lorrySvcHTTPPort = availablePorts[0]
-	lorrySvcGRPCPort = availablePorts[1]
 	if err != nil {
 		reqCtx.Log.Info("get lorry container port failed", "error", err)
 		return err
 	}
 
-	if componentLorry.StatusProbe != nil {
+	if componentProbes.RoleProbe != nil && (component.RSMSpec == nil || component.RSMSpec.RoleProbe == nil) {
+		roleChangedContainer := container.DeepCopy()
+		buildRoleProbeContainer(component, roleChangedContainer, componentProbes.RoleProbe, int(lorrySvcHTTPPort))
+		lorryContainers = append(lorryContainers, *roleChangedContainer)
+	}
+
+	if componentProbes.StatusProbe != nil {
 		statusProbeContainer := container.DeepCopy()
-		buildStatusProbeContainer(component.CharacterType, statusProbeContainer, componentLorry.StatusProbe, int(lorrySvcHTTPPort))
+		buildStatusProbeContainer(component.CharacterType, statusProbeContainer, componentProbes.StatusProbe, int(lorrySvcHTTPPort))
 		lorryContainers = append(lorryContainers, *statusProbeContainer)
 	}
 
-	if componentLorry.RunningProbe != nil {
+	if componentProbes.RunningProbe != nil {
 		runningProbeContainer := container.DeepCopy()
-		buildRunningProbeContainer(component.CharacterType, runningProbeContainer, componentLorry.RunningProbe, int(lorrySvcHTTPPort))
+		buildRunningProbeContainer(component.CharacterType, runningProbeContainer, componentProbes.RunningProbe, int(lorrySvcHTTPPort))
 		lorryContainers = append(lorryContainers, *runningProbeContainer)
 	}
 
@@ -104,7 +107,7 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		lorryContainers = append(lorryContainers, *weSyncerContainer)
 	}
 
-	buildLorryServiceContainer(component, &lorryContainers[0], int(lorrySvcHTTPPort), int(lorrySvcGRPCPort))
+	buildLorryServiceContainer(component, &lorryContainers[0], int(lorrySvcHTTPPort))
 
 	reqCtx.Log.V(1).Info("lorry", "containers", lorryContainers)
 	component.PodSpec.Containers = append(component.PodSpec.Containers, lorryContainers...)
@@ -140,12 +143,11 @@ func buildBasicContainer() *corev1.Container {
 		GetObject()
 }
 
-func buildLorryServiceContainer(component *SynthesizedComponent, container *corev1.Container, probeSvcHTTPPort int, probeSvcGRPCPort int) {
+func buildLorryServiceContainer(component *SynthesizedComponent, container *corev1.Container, lorrySvcHTTPPort int) {
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	container.Command = []string{"lorry",
-		"--port", strconv.Itoa(probeSvcHTTPPort),
-		"--grpcport", strconv.Itoa(probeSvcGRPCPort),
+		"--port", strconv.Itoa(lorrySvcHTTPPort),
 	}
 
 	if len(component.PodSpec.Containers) > 0 {
@@ -180,27 +182,45 @@ func buildLorryServiceContainer(component *SynthesizedComponent, container *core
 		}
 	}
 
-	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      constant.KBEnvCharacterType,
-		Value:     component.CharacterType,
-		ValueFrom: nil,
-	})
-
-	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      constant.KBEnvWorkloadType,
-		Value:     string(component.WorkloadType),
-		ValueFrom: nil,
-	})
+	secretName := fmt.Sprintf("%s-conn-credential", component.ClusterName)
+	container.Env = append(container.Env,
+		corev1.EnvVar{
+			Name:      constant.KBEnvCharacterType,
+			Value:     component.CharacterType,
+			ValueFrom: nil,
+		},
+		corev1.EnvVar{
+			Name:      constant.KBEnvWorkloadType,
+			Value:     string(component.WorkloadType),
+			ValueFrom: nil,
+		},
+		corev1.EnvVar{
+			Name: constant.KBEnvServiceUser,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key: constant.AccountNameForSecret,
+				},
+			},
+		},
+		corev1.EnvVar{
+			Name: constant.KBEnvServicePassword,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key: constant.AccountPasswdForSecret,
+				},
+			},
+		})
 
 	container.Ports = []corev1.ContainerPort{
 		{
-			ContainerPort: int32(probeSvcHTTPPort),
-			Name:          constant.ProbeHTTPPortName,
-			Protocol:      "TCP",
-		},
-		{
-			ContainerPort: int32(probeSvcGRPCPort),
-			Name:          constant.ProbeGRPCPortName,
+			ContainerPort: int32(lorrySvcHTTPPort),
+			Name:          constant.LorryHTTPPortName,
 			Protocol:      "TCP",
 		}}
 
@@ -213,6 +233,24 @@ func buildLorryServiceContainer(component *SynthesizedComponent, container *core
 func buildWeSyncerContainer(weSyncerContainer *corev1.Container, probeSvcHTTPPort int) {
 	weSyncerContainer.Name = constant.WeSyncerContainerName
 	weSyncerContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
+}
+
+func buildRoleProbeContainer(component *SynthesizedComponent, roleChangedContainer *corev1.Container,
+	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
+	roleChangedContainer.Name = constant.RoleProbeContainerName
+	bindingType := strings.ToLower(component.CharacterType)
+	workloadType := component.WorkloadType
+	httpGet := &corev1.HTTPGetAction{}
+	httpGet.Path = fmt.Sprintf(checkRoleURIFormat, bindingType, workloadType)
+	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
+	probe := &corev1.Probe{}
+	probe.Exec = nil
+	probe.HTTPGet = httpGet
+	probe.PeriodSeconds = probeSetting.PeriodSeconds
+	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
+	probe.FailureThreshold = probeSetting.FailureThreshold
+	roleChangedContainer.ReadinessProbe = probe
+	roleChangedContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
 func buildStatusProbeContainer(characterType string, statusProbeContainer *corev1.Container,

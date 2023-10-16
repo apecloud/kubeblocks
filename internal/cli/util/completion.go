@@ -28,7 +28,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -69,7 +69,7 @@ func CompGetResourceWithLabels(f cmdutil.Factory, cmd *cobra.Command, resourceNa
 // will get the output of `kubectl get pods --template=template -l app=nginx`, and split the output by space and return
 func CompGetFromTemplateWithLabels(template *string, f cmdutil.Factory, namespace string, cmd *cobra.Command, args []string, labels []string, toComplete string) []string {
 	buf := new(bytes.Buffer)
-	streams := genericclioptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: ioutil.Discard}
+	streams := genericiooptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: ioutil.Discard}
 	o := get.NewGetOptions("kubectl", streams)
 
 	// Get the list of names of the specified resource

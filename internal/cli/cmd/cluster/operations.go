@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -101,7 +101,7 @@ type OperationsOptions struct {
 	Instance  string `json:"instance"`
 }
 
-func newBaseOperationsOptions(f cmdutil.Factory, streams genericclioptions.IOStreams,
+func newBaseOperationsOptions(f cmdutil.Factory, streams genericiooptions.IOStreams,
 	opsType appsv1alpha1.OpsType, hasComponentNamesFlag bool) *OperationsOptions {
 	customOutPut := func(opt *create.CreateOptions) {
 		output := fmt.Sprintf("OpsRequest %s created successfully, you can view the progress:", opt.Name)
@@ -513,7 +513,7 @@ var restartExample = templates.Examples(`
 `)
 
 // NewRestartCmd creates a restart command
-func NewRestartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewRestartCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(f, streams, appsv1alpha1.RestartType, true)
 	cmd := &cobra.Command{
 		Use:               "restart NAME",
@@ -540,7 +540,7 @@ var upgradeExample = templates.Examples(`
 `)
 
 // NewUpgradeCmd creates an upgrade command
-func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewUpgradeCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(f, streams, appsv1alpha1.UpgradeType, false)
 	cmd := &cobra.Command{
 		Use:               "upgrade NAME",
@@ -571,7 +571,7 @@ var verticalScalingExample = templates.Examples(`
 `)
 
 // NewVerticalScalingCmd creates a vertical scaling command
-func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewVerticalScalingCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(f, streams, appsv1alpha1.VerticalScalingType, true)
 	cmd := &cobra.Command{
 		Use:               "vscale NAME",
@@ -602,7 +602,7 @@ var horizontalScalingExample = templates.Examples(`
 `)
 
 // NewHorizontalScalingCmd creates a horizontal scaling command
-func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(f, streams, appsv1alpha1.HorizontalScalingType, true)
 	cmd := &cobra.Command{
 		Use:               "hscale NAME",
@@ -633,7 +633,7 @@ var volumeExpansionExample = templates.Examples(`
 `)
 
 // NewVolumeExpansionCmd creates a volume expanding command
-func NewVolumeExpansionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewVolumeExpansionCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(f, streams, appsv1alpha1.VolumeExpansionType, true)
 	cmd := &cobra.Command{
 		Use:               "volume-expand NAME",
@@ -673,7 +673,7 @@ var (
 )
 
 // NewExposeCmd creates an expose command
-func NewExposeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewExposeCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(f, streams, appsv1alpha1.ExposeType, true)
 	cmd := &cobra.Command{
 		Use:               "expose NAME --enable=[true|false] --type=[vpc|internet]",
@@ -712,7 +712,7 @@ var stopExample = templates.Examples(`
 `)
 
 // NewStopCmd creates a stop command
-func NewStopCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewStopCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(f, streams, appsv1alpha1.StopType, false)
 	cmd := &cobra.Command{
 		Use:               "stop NAME",
@@ -738,7 +738,7 @@ var startExample = templates.Examples(`
 `)
 
 // NewStartCmd creates a start command
-func NewStartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewStartCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(f, streams, appsv1alpha1.StartType, false)
 	o.autoApprove = true
 	cmd := &cobra.Command{
@@ -806,7 +806,7 @@ func cancelOps(o *OperationsOptions) error {
 	return nil
 }
 
-func NewCancelCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCancelCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(f, streams, "", false)
 	cmd := &cobra.Command{
 		Use:               "cancel-ops NAME",
@@ -836,7 +836,7 @@ var promoteExample = templates.Examples(`
 `)
 
 // NewPromoteCmd creates a promote command
-func NewPromoteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewPromoteCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(f, streams, appsv1alpha1.SwitchoverType, false)
 	cmd := &cobra.Command{
 		Use:               "promote NAME [--component=<comp-name>] [--instance <instance-name>]",

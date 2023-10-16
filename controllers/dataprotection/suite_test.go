@@ -36,6 +36,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	testclocks "k8s.io/utils/clock/testing"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -59,6 +60,7 @@ var testEnv *envtest.Environment
 var ctx context.Context
 var cancel context.CancelFunc
 var testCtx testutil.TestContext
+var fakeClock *testclocks.FakeClock
 
 func init() {
 	viper.AutomaticEnv()
@@ -186,6 +188,9 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	err = mockGCReconciler(k8sManager).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
 	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)
 
 	go func() {
@@ -201,3 +206,13 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
+
+func mockGCReconciler(mgr ctrl.Manager) *GCReconciler {
+	fakeClock = testclocks.NewFakeClock(time.Now())
+	return &GCReconciler{
+		Client:    mgr.GetClient(),
+		Recorder:  mgr.GetEventRecorderFor("gc-controller"),
+		clock:     fakeClock,
+		frequency: time.Duration(1) * time.Second,
+	}
+}

@@ -28,7 +28,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -53,7 +53,7 @@ var (
 	paths                       = GetKbcliPluginPath()
 )
 
-func NewPluginCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func NewPluginCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "plugin",
 		Short: "Provides utilities for interacting with plugins.",
@@ -80,10 +80,10 @@ type PluginListOptions struct {
 
 	PluginPaths []string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
-func NewPluginListCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func NewPluginListCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	o := &PluginListOptions{
 		IOStreams: streams,
 	}

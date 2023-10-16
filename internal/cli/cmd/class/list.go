@@ -26,7 +26,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -41,7 +41,7 @@ type ListOptions struct {
 	ClusterDefRef string
 	Factory       cmdutil.Factory
 	dynamic       dynamic.Interface
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 var listClassExamples = templates.Examples(`
@@ -49,7 +49,7 @@ var listClassExamples = templates.Examples(`
     kbcli class list --cluster-definition apecloud-mysql
 `)
 
-func NewListCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewListCommand(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &ListOptions{IOStreams: streams}
 	cmd := &cobra.Command{
 		Use:     "list",

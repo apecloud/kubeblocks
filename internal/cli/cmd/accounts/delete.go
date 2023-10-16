@@ -21,7 +21,7 @@ package accounts
 
 import (
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
@@ -34,7 +34,7 @@ type DeleteUserOptions struct {
 	info        lorryutil.UserInfo
 }
 
-func NewDeleteUserOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *DeleteUserOptions {
+func NewDeleteUserOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *DeleteUserOptions {
 	return &DeleteUserOptions{
 		AccountBaseOptions: NewAccountBaseOptions(f, streams, lorryutil.DeleteUserOp),
 	}

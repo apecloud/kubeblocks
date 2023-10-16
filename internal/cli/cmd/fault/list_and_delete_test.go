@@ -28,7 +28,7 @@ import (
 	"github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -41,14 +41,14 @@ import (
 var _ = Describe("Chaos resources list and delete", func() {
 	var (
 		tf           *cmdtesting.TestFactory
-		streams      genericclioptions.IOStreams
+		streams      genericiooptions.IOStreams
 		namespace    = "test"
 		podChaosName = "testPodChaos"
 		podChaos     = testing.FakePodChaos(podChaosName, namespace)
 	)
 
 	BeforeEach(func() {
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		streams, _, _, _ = genericiooptions.NewTestIOStreams()
 		tf = testing.NewTestFactory(namespace)
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 		httpResp := func(obj runtime.Object) *http.Response {

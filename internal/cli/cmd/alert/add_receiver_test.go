@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
@@ -43,7 +43,7 @@ var mockConfigmap = func(name string, key string, value string) *corev1.ConfigMa
 	return cm
 }
 
-var mockBaseOptions = func(s genericclioptions.IOStreams) baseOptions {
+var mockBaseOptions = func(s genericiooptions.IOStreams) baseOptions {
 	o := baseOptions{IOStreams: s}
 	alertManagerConfig := `
     global:
@@ -84,12 +84,12 @@ var mockBaseOptions = func(s genericclioptions.IOStreams) baseOptions {
 
 var _ = Describe("add receiver", func() {
 	var f *cmdtesting.TestFactory
-	var s genericclioptions.IOStreams
+	var s genericiooptions.IOStreams
 
 	BeforeEach(func() {
 		f = cmdtesting.NewTestFactory()
 		f.Client = &clientfake.RESTClient{}
-		s, _, _, _ = genericclioptions.NewTestIOStreams()
+		s, _, _, _ = genericiooptions.NewTestIOStreams()
 	})
 
 	AfterEach(func() {

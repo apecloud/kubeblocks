@@ -36,7 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -99,7 +99,7 @@ type NodeChaoOptions struct {
 	create.CreateOptions `json:"-"`
 }
 
-func NewNodeOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *NodeChaoOptions {
+func NewNodeOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *NodeChaoOptions {
 	o := &NodeChaoOptions{
 		CreateOptions: create.CreateOptions{
 			Factory:         f,
@@ -112,7 +112,7 @@ func NewNodeOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *Nod
 	return o
 }
 
-func NewNodeChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewNodeChaosCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "node",
 		Short: "Node chaos.",
@@ -126,7 +126,7 @@ func NewNodeChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	return cmd
 }
 
-func NewStopCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewStopCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewNodeOptions(f, streams)
 	cmd := o.NewCobraCommand(Stop, StopShort)
 
@@ -134,7 +134,7 @@ func NewStopCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	return cmd
 }
 
-func NewRestartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewRestartCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewNodeOptions(f, streams)
 	cmd := o.NewCobraCommand(Restart, RestartShort)
 
@@ -142,7 +142,7 @@ func NewRestartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	return cmd
 }
 
-func NewDetachVolumeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewDetachVolumeCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewNodeOptions(f, streams)
 	cmd := o.NewCobraCommand(DetachVolume, DetachVolumeShort)
 

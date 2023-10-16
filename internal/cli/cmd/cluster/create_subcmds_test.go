@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -52,7 +52,7 @@ var _ = Describe("create cluster by cluster type", func() {
 
 	var (
 		tf            *cmdtesting.TestFactory
-		streams       genericclioptions.IOStreams
+		streams       genericiooptions.IOStreams
 		createOptions *create.CreateOptions
 		mockClient    = func(data runtime.Object) *cmdtesting.TestFactory {
 			tf = testing.NewTestFactory(testing.Namespace)
@@ -72,7 +72,7 @@ var _ = Describe("create cluster by cluster type", func() {
 	BeforeEach(func() {
 		_ = appsv1alpha1.AddToScheme(scheme.Scheme)
 		_ = metav1.AddMetaToScheme(scheme.Scheme)
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		streams, _, _, _ = genericiooptions.NewTestIOStreams()
 		tf = mockClient(testing.FakeClusterVersion())
 		createOptions = &create.CreateOptions{
 			IOStreams: streams,

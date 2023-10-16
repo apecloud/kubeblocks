@@ -25,7 +25,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -40,7 +40,7 @@ var (
 	`)
 )
 
-func NewPluginUninstallCmd(_ genericclioptions.IOStreams) *cobra.Command {
+func NewPluginUninstallCmd(_ genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "uninstall",
 		Short:   "Uninstall kbcli or kubectl plugins",

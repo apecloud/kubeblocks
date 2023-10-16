@@ -1,0 +1,3 @@
+{{/*
+Define vllm cluster component.
+*/}}

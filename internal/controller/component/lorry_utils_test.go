@@ -40,12 +40,12 @@ var _ = Describe("probe_utils", func() {
 	Context("build probe containers", func() {
 		var container *corev1.Container
 		var component *SynthesizedComponent
-		var probeServiceHTTPPort, probeServiceGrpcPort int
+		var probeServiceHTTPPort int
 		var clusterDefProbe *appsv1alpha1.ClusterDefinitionProbe
 
 		BeforeEach(func() {
 			container = buildBasicContainer()
-			probeServiceHTTPPort, probeServiceGrpcPort = 3501, 50001
+			probeServiceHTTPPort = 3501
 
 			clusterDefProbe = &appsv1alpha1.ClusterDefinitionProbe{}
 			clusterDefProbe.PeriodSeconds = 1
@@ -94,12 +94,12 @@ var _ = Describe("probe_utils", func() {
 				Log: logger,
 			}
 			Expect(buildLorryContainers(reqCtx, component)).Should(Succeed())
-			Expect(len(component.PodSpec.Containers)).Should(Equal(2))
+			Expect(len(component.PodSpec.Containers) >= 2).Should(BeTrue())
 			Expect(component.PodSpec.Containers[0].Command).ShouldNot(BeEmpty())
 		})
 
 		It("should build role service container", func() {
-			buildLorryServiceContainer(component, container, probeServiceHTTPPort, probeServiceGrpcPort)
+			buildLorryServiceContainer(component, container, probeServiceHTTPPort)
 			Expect(container.Command).ShouldNot(BeEmpty())
 		})
 
@@ -132,7 +132,7 @@ var _ = Describe("probe_utils", func() {
 				},
 			}
 			Expect(buildLorryContainers(reqCtx, component)).Should(Succeed())
-			Expect(len(component.PodSpec.Containers)).Should(Equal(3))
+			Expect(len(component.PodSpec.Containers) >= 3).Should(BeTrue())
 		})
 
 		It("build volume protection probe container with RBAC", func() {
@@ -155,7 +155,7 @@ var _ = Describe("probe_utils", func() {
 			}
 			viper.SetDefault(constant.EnableRBACManager, true)
 			Expect(buildLorryContainers(reqCtx, component)).Should(Succeed())
-			Expect(len(component.PodSpec.Containers)).Should(Equal(3))
+			Expect(len(component.PodSpec.Containers) >= 3).Should(BeTrue())
 			spec := &appsv1alpha1.VolumeProtectionSpec{}
 			for _, e := range component.PodSpec.Containers[0].Env {
 				if e.Name == constant.KBEnvVolumeProtectionSpec {

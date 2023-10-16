@@ -26,7 +26,7 @@ import (
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -71,7 +71,7 @@ var (
 	`)
 )
 
-func newBackupCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newBackupCommand(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	customOutPut := func(opt *create.CreateOptions) {
 		output := fmt.Sprintf("Backup %s created successfully, you can view the progress:", opt.Name)
 		printer.PrintLine(output)
@@ -119,7 +119,7 @@ func newBackupCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	return cmd
 }
 
-func newBackupDeleteCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newBackupDeleteCommand(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := delete.NewDeleteOptions(f, streams, types.BackupGVR())
 	clusterName := ""
 	cmd := &cobra.Command{
@@ -152,7 +152,7 @@ func completeForDeleteBackup(o *delete.DeleteOptions, cluster string) error {
 	return nil
 }
 
-func newBackupDescribeCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newBackupDescribeCommand(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := cluster.DescribeBackupOptions{
 		Factory:   f,
 		IOStreams: streams,
@@ -173,7 +173,7 @@ func newBackupDescribeCommand(f cmdutil.Factory, streams genericclioptions.IOStr
 	return cmd
 }
 
-func newListBackupCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newListBackupCommand(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &cluster.ListBackupOptions{ListOptions: list.NewListOptions(f, streams, types.BackupGVR())}
 	clusterName := ""
 	cmd := &cobra.Command{

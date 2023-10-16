@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
@@ -59,10 +59,10 @@ type DeleteOptions struct {
 	PreDeleteHook  DeleteHook
 	PostDeleteHook DeleteHook
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
-func NewDeleteOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, gvr schema.GroupVersionResource) *DeleteOptions {
+func NewDeleteOptions(f cmdutil.Factory, streams genericiooptions.IOStreams, gvr schema.GroupVersionResource) *DeleteOptions {
 	return &DeleteOptions{
 		Factory:   f,
 		IOStreams: streams,

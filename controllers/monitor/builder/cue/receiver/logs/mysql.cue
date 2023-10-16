@@ -16,8 +16,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 parameters: {
-	input_configs: *"'`config.LogsCollector`'" | string
-	container_id: *"'`container_id`'" | string
+	input_configs: *"`config.LogsCollector`" | string
+	container_id: *"`container_id`" | string
 	storage: *"file_storage/oteld" | string
 }
 
@@ -28,11 +28,11 @@ output: {
     config: {
     	input_configs: parameters.input_configs
       container_id: parameters.container_id
-      pod_id: "'`endpoint`'"
+      pod_id: "`endpoint`"
       storage: parameters.storage
-      cluster_name: "'`config.ClusterName`'"
-			component_name: "'`config.ComponentName`'"
-			character_type: "'`config.CharacterType`'"
+      cluster_name: "`config.ClusterName`"
+			component_name: "`config.ComponentName`"
+			character_type: "`config.CharacterType`"
     }
 	}
 

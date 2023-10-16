@@ -81,7 +81,7 @@ func (f *MockRestoreFactory) initReadyConfig() {
 	}
 }
 
-func (f *MockRestoreFactory) buildRestoreVolumeClaim(name, volumeSource, mountPath, storageClass string) dpv1alpha1.RestoreVolumeClaim {
+func (f *MockRestoreFactory) buildRestoreVolumeClaim(name, volumeSource, mountPath, devicePath, storageClass string) dpv1alpha1.RestoreVolumeClaim {
 	return dpv1alpha1.RestoreVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -92,6 +92,7 @@ func (f *MockRestoreFactory) buildRestoreVolumeClaim(name, volumeSource, mountPa
 		VolumeConfig: dpv1alpha1.VolumeConfig{
 			VolumeSource: volumeSource,
 			MountPath:    mountPath,
+			DevicePath:   devicePath,
 		},
 		VolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
 			StorageClassName: &storageClass,
@@ -117,31 +118,32 @@ func (f *MockRestoreFactory) SetShedulingSpec(schedulingSpec dpv1alpha1.Scheduli
 	return f
 }
 
-func (f *MockRestoreFactory) SetDataSourceRef(volumeSource, mountPath string) *MockRestoreFactory {
+func (f *MockRestoreFactory) SetDataSourceRef(volumeSource, mountPath, devicePath string) *MockRestoreFactory {
 	f.initPrepareDataConfig()
 	f.Get().Spec.PrepareDataConfig.DataSourceRef = &dpv1alpha1.VolumeConfig{
 		VolumeSource: volumeSource,
 		MountPath:    mountPath,
+		DevicePath:   devicePath,
 	}
 	return f
 }
 
-func (f *MockRestoreFactory) SetVolumeClaimsTemplate(templateName, volumeSource, mountPath, storageClass string, replicas, startingIndex int32) *MockRestoreFactory {
+func (f *MockRestoreFactory) SetVolumeClaimsTemplate(templateName, volumeSource, mountPath, devicePath, storageClass string, replicas, startingIndex int32) *MockRestoreFactory {
 	f.initPrepareDataConfig()
 	f.Get().Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate = &dpv1alpha1.RestoreVolumeClaimsTemplate{
 		Replicas:      replicas,
 		StartingIndex: startingIndex,
 		Templates: []dpv1alpha1.RestoreVolumeClaim{
-			f.buildRestoreVolumeClaim(templateName, volumeSource, mountPath, storageClass),
+			f.buildRestoreVolumeClaim(templateName, volumeSource, mountPath, devicePath, storageClass),
 		},
 	}
 	return f
 }
 
-func (f *MockRestoreFactory) AddVolumeClaim(claimName, volumeSource, mountPath, storageClass string) *MockRestoreFactory {
+func (f *MockRestoreFactory) AddVolumeClaim(claimName, volumeSource, mountPath, devicePath, storageClass string) *MockRestoreFactory {
 	f.initPrepareDataConfig()
 	f.Get().Spec.PrepareDataConfig.RestoreVolumeClaims = append(f.Get().Spec.PrepareDataConfig.RestoreVolumeClaims,
-		f.buildRestoreVolumeClaim(claimName, volumeSource, mountPath, storageClass))
+		f.buildRestoreVolumeClaim(claimName, volumeSource, mountPath, devicePath, storageClass))
 	return f
 }
 

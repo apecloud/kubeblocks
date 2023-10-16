@@ -33,10 +33,11 @@ const (
 	ActionSetName      = "xtrabackup"
 	VSActionSetName    = "volume-snapshot"
 
-	DataVolumeName      = "data"
-	DataVolumeMountPath = "/data"
-	LogVolumeName       = "log"
-	LogVolumeMountPath  = "/log"
+	DataVolumeName       = "data"
+	DataVolumeMountPath  = "/data"
+	DataVolumeDevicePath = "/data"
+	LogVolumeName        = "log"
+	LogVolumeMountPath   = "/log"
 
 	StorageProviderName = "test-sp"
 	StorageClassName    = "test-sc"

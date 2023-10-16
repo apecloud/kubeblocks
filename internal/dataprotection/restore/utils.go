@@ -181,16 +181,21 @@ func buildJobKeyForActionStatus(jobName string) string {
 	return fmt.Sprintf("%s/%s", constant.JobKind, jobName)
 }
 
-func getMountPathWithSourceVolume(backup *dpv1alpha1.Backup, volumeSource string) string {
+func getFilePathWithSourceVolume(backup *dpv1alpha1.Backup, volumeSource string) (mountPath string, devicePath string) {
 	backupMethod := backup.Status.BackupMethod
 	if backupMethod != nil && backupMethod.TargetVolumes != nil {
 		for _, v := range backupMethod.TargetVolumes.VolumeMounts {
 			if v.Name == volumeSource {
-				return v.MountPath
+				return v.MountPath, ""
+			}
+		}
+		for _, v := range backupMethod.TargetVolumes.VolumeDevices {
+			if v.Name == volumeSource {
+				return "", v.DevicePath
 			}
 		}
 	}
-	return ""
+	return
 }
 
 func restoreJobHasCompleted(statusActions []dpv1alpha1.RestoreStatusAction, jobName string) bool {

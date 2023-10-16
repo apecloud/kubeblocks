@@ -186,6 +186,10 @@ type TargetVolumeInfo struct {
 	// volumeMounts specifies the mount for the volumes specified in `Volumes` section.
 	// +optional
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
+
+	// volumeDevices describes a mapping of a raw block device within a container of the backup pod.
+	// +optional
+	VolumeDevices []corev1.VolumeDevice `json:"volumeDevices,omitempty"`
 }
 
 type RuntimeSettings struct {

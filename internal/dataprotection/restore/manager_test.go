@@ -169,7 +169,7 @@ var _ = Describe("Backup Deleter Test", func() {
 			useVolumeSnapshot := true
 			restoreMGR, backupSet := initResources(reqCtx, startingIndex, useVolumeSnapshot, func(f *testdp.MockRestoreFactory) {
 				f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
-					testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex))
+					testdp.DataVolumeMountPath, "", "", int32(replicas), int32(startingIndex))
 			})
 
 			By("test RestorePVCFromSnapshot function")
@@ -183,7 +183,7 @@ var _ = Describe("Backup Deleter Test", func() {
 			startingIndex := 1
 			restoreMGR, backupSet := initResources(reqCtx, startingIndex, false, func(f *testdp.MockRestoreFactory) {
 				f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
-					testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex))
+					testdp.DataVolumeMountPath, "", "", int32(replicas), int32(startingIndex))
 			})
 
 			By(fmt.Sprintf("test BuildPrepareDataJobs function, expect for %d jobs", replicas))
@@ -200,7 +200,7 @@ var _ = Describe("Backup Deleter Test", func() {
 			startingIndex := 1
 			restoreMGR, backupSet := initResources(reqCtx, startingIndex, false, func(f *testdp.MockRestoreFactory) {
 				f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
-					testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex)).
+					testdp.DataVolumeMountPath, "", "", int32(replicas), int32(startingIndex)).
 					SetVolumeRestoreManagementPolicy(dpv1alpha1.SerialManagementPolicy)
 			})
 
@@ -250,10 +250,10 @@ var _ = Describe("Backup Deleter Test", func() {
 
 		})
 
-		It("test with BuildVolumePopulateJob function", func() {
+		testWitheDiffVolumeForPopulateJob := func(mountPath, devicePath string) {
 			reqCtx := getReqCtx()
 			restoreMGR, backupSet := initResources(reqCtx, 0, true, func(f *testdp.MockRestoreFactory) {
-				f.SetDataSourceRef(testdp.DataVolumeName, testdp.DataVolumeMountPath)
+				f.SetDataSourceRef(testdp.DataVolumeName, mountPath, devicePath)
 			})
 
 			By("test BuildVolumePopulateJob function, expect for 1 job")
@@ -265,6 +265,37 @@ var _ = Describe("Backup Deleter Test", func() {
 			job, err := restoreMGR.BuildVolumePopulateJob(reqCtx, k8sClient, *backupSet, populatePVC, 0)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(job).ShouldNot(BeNil())
+			if mountPath != "" {
+				volumeMounts := job.Spec.Template.Spec.Containers[0].VolumeMounts
+				Expect(volumeMounts).ShouldNot(BeEmpty())
+				var existDataVolumeMount bool
+				for _, v := range volumeMounts {
+					if v.MountPath == mountPath {
+						existDataVolumeMount = true
+						break
+					}
+				}
+				Expect(existDataVolumeMount).Should(BeTrue())
+			} else {
+				VolumeDevices := job.Spec.Template.Spec.Containers[0].VolumeDevices
+				Expect(VolumeDevices).ShouldNot(BeEmpty())
+				var existDataVolumeDevice bool
+				for _, v := range VolumeDevices {
+					if v.DevicePath == testdp.DataVolumeDevicePath {
+						existDataVolumeDevice = true
+						break
+					}
+				}
+				Expect(existDataVolumeDevice).Should(BeTrue())
+			}
+		}
+
+		It("test with BuildVolumePopulateJob function", func() {
+			testWitheDiffVolumeForPopulateJob(testdp.DataVolumeMountPath, "")
+		})
+
+		It("test with BuildVolumePopulateJob function with block device", func() {
+			testWitheDiffVolumeForPopulateJob("", testdp.DataVolumeDevicePath)
 		})
 
 		It("test with BuildPostReadyActionJobs function", func() {

@@ -103,7 +103,7 @@ type IncludeResource struct {
 type PrepareDataConfig struct {
 	// dataSourceRef describes the configuration when using `persistentVolumeClaim.spec.dataSourceRef` method for restoring.
 	// it describes the source volume of the backup targetVolumes and how to mount path in the restoring container.
-	// +kubebuilder:validation:XValidation:rule="self.volumeSource != '' || self.mountPath !=''",message="at least one exists for volumeSource and mountPath."
+	// +kubebuilder:validation:XValidation:rule="self.volumeSource != '' || self.mountPath !='' || self.devicePath !=''",message="at least one exists for [volumeSource, mountPath, devicePath]."
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.prepareDataConfig.dataSourceRef"
 	// +optional
 	DataSourceRef *VolumeConfig `json:"dataSourceRef,omitempty"`
@@ -187,6 +187,12 @@ type JobActionTarget struct {
 	// +patchStrategy=merge,retainKeys
 	// +optional
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
+
+	// volumeDevices describes a mapping of a raw block device within a container of restoring pod.
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +optional
+	VolumeDevices []corev1.VolumeDevice `json:"volumeDevices,omitempty"`
 }
 
 type VolumeConfig struct {
@@ -198,6 +204,10 @@ type VolumeConfig struct {
 	// mountPath path within the restoring container at which the volume should be mounted.
 	// +optional
 	MountPath string `json:"mountPath,omitempty"`
+
+	// devicePath is the path of the block device.
+	// +optional
+	DevicePath string `json:"devicePath,omitempty"`
 }
 
 type RestoreVolumeClaim struct {
@@ -211,7 +221,7 @@ type RestoreVolumeClaim struct {
 	VolumeClaimSpec corev1.PersistentVolumeClaimSpec `json:"volumeClaimSpec"`
 
 	// describing the source volume of the backup targetVolumes and how to mount path in the restoring container.
-	// +kubebuilder:validation:XValidation:rule="self.volumeSource != '' || self.mountPath !=''",message="at least one exists for volumeSource and mountPath."
+	// +kubebuilder:validation:XValidation:rule="self.volumeSource != '' || self.mountPath !='' || self.devicePath !=''",message="at least one exists for [volumeSource, mountPath, devicePath]."
 	VolumeConfig `json:",inline"`
 }
 

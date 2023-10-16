@@ -113,7 +113,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 			By("create restore ")
 			restore := testdp.NewRestoreactory(testCtx.DefaultNamespace, testdp.RestoreName).
 				SetBackup(backup.Name, testCtx.DefaultNamespace).
-				SetDataSourceRef(testdp.DataVolumeName, testdp.DataVolumeMountPath).
+				SetDataSourceRef(testdp.DataVolumeName, testdp.DataVolumeMountPath, "").
 				Create(&testCtx).GetObject()
 
 			By("create PVC and set spec.dataSourceRef to restore")

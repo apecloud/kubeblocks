@@ -258,6 +258,28 @@ spec:
                             description: targetVolumes specifies which volumes from
                               the target should be mounted in the backup workload.
                             properties:
+                              volumeDevices:
+                                description: volumeDevices describes a mapping of
+                                  a raw block device within a container of the backup
+                                  pod.
+                                items:
+                                  description: volumeDevice describes a mapping of
+                                    a raw block device within a container.
+                                  properties:
+                                    devicePath:
+                                      description: devicePath is the path inside of
+                                        the container that the device will be mapped
+                                        to.
+                                      type: string
+                                    name:
+                                      description: name must match the name of a persistentVolumeClaim
+                                        in the pod
+                                      type: string
+                                  required:
+                                  - devicePath
+                                  - name
+                                  type: object
+                                type: array
                               volumeMounts:
                                 description: volumeMounts specifies the mount for
                                   the volumes specified in `Volumes` section.

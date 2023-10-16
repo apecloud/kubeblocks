@@ -263,20 +263,20 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 		addCommonEnv().
 		attachBackupRepo()
 
-	createPVCIfNotExistsAndBuildVolume := func(claim dpv1alpha1.RestoreVolumeClaim, identifier string) (*corev1.Volume, *corev1.VolumeMount, error) {
+	createPVCIfNotExistsAndBuildVolume := func(claim dpv1alpha1.RestoreVolumeClaim, identifier string) (*corev1.Volume, *corev1.VolumeMount, *corev1.VolumeDevice, error) {
 		if err := r.createPVCIfNotExist(reqCtx, cli, claim.ObjectMeta, claim.VolumeClaimSpec); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
-		return jobBuilder.buildPVCVolumeAndMount(claim.VolumeConfig, claim.Name, identifier)
+		return jobBuilder.buildPVCVolumeInfo(claim.VolumeConfig, claim.Name, identifier)
 	}
 
 	// create pvc from volumeClaims, set volume and volumeMount to jobBuilder
 	for _, claim := range prepareDataConfig.RestoreVolumeClaims {
-		volume, volumeMount, err := createPVCIfNotExistsAndBuildVolume(claim, "dp-claim")
+		volume, volumeMount, volumeDevice, err := createPVCIfNotExistsAndBuildVolume(claim, "dp-claim")
 		if err != nil {
 			return nil, err
 		}
-		jobBuilder.addToCommonVolumesAndMounts(volume, volumeMount)
+		jobBuilder.addToCommonVolumeInfos(volume, volumeMount, volumeDevice)
 	}
 
 	var (
@@ -309,16 +309,16 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 	// build restore job to prepare pvc's data
 	for i := 0; i < restoreJobReplicas; i++ {
 		// reset specific volumes and volumeMounts
-		jobBuilder.resetSpecificVolumesAndMounts()
+		jobBuilder.resetSpecificVolumesInfos()
 		if claimsTemplate != nil {
 			//  create pvc from claims template, build volumes and volumeMounts
 			for _, claim := range claimsTemplate.Templates {
 				claim.Name = fmt.Sprintf("%s-%d", claim.Name, i+int(claimsTemplate.StartingIndex))
-				volume, volumeMount, err := createPVCIfNotExistsAndBuildVolume(claim, "dp-claim-tpl")
+				volume, volumeMount, volumeDevice, err := createPVCIfNotExistsAndBuildVolume(claim, "dp-claim-tpl")
 				if err != nil {
 					return nil, err
 				}
-				jobBuilder.addToSpecificVolumesAndMounts(volume, volumeMount)
+				jobBuilder.addToSpecificVolumeInfos(volume, volumeMount, volumeDevice)
 			}
 		}
 		// build job and append
@@ -357,11 +357,11 @@ func (r *RestoreManager) BuildVolumePopulateJob(
 		setCommand(backupSet.ActionSet.Spec.Restore.PrepareData.Command).
 		attachBackupRepo().
 		addCommonEnv()
-	volume, volumeMount, err := jobBuilder.buildPVCVolumeAndMount(*prepareDataConfig.DataSourceRef, populatePVC.Name, "dp-claim")
+	volume, volumeMount, volumeDevice, err := jobBuilder.buildPVCVolumeInfo(*prepareDataConfig.DataSourceRef, populatePVC.Name, "dp-claim")
 	if err != nil {
 		return nil, err
 	}
-	job := jobBuilder.addToSpecificVolumesAndMounts(volume, volumeMount).build()
+	job := jobBuilder.addToSpecificVolumeInfos(volume, volumeMount, volumeDevice).build()
 	return job, nil
 }
 
@@ -407,12 +407,21 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 			return nil, err
 		}
 		targetPod := targetPodList[0]
+		// build volumes info
 		for _, volumeMount := range jobAction.Target.VolumeMounts {
 			for _, volume := range targetPod.Spec.Volumes {
 				if volume.Name != volumeMount.Name {
 					continue
 				}
-				jobBuilder.addToSpecificVolumesAndMounts(&volume, &volumeMount)
+				jobBuilder.addToSpecificVolumeInfos(&volume, &volumeMount, nil)
+			}
+		}
+		for _, volumeDevice := range jobAction.Target.VolumeDevices {
+			for _, volume := range targetPod.Spec.Volumes {
+				if volume.Name != volumeDevice.Name {
+					continue
+				}
+				jobBuilder.addToSpecificVolumeInfos(&volume, nil, &volumeDevice)
 			}
 		}
 		if boolptr.IsSetToTrue(actionSpec.Job.RunOnTargetPodNode) {

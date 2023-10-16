@@ -37,89 +37,102 @@ import (
 )
 
 type restoreJobBuilder struct {
-	restore            *dpv1alpha1.Restore
-	stage              dpv1alpha1.RestoreStage
-	backupSet          BackupActionSet
-	backupRepo         *dpv1alpha1.BackupRepo
-	buildWithRepo      bool
-	env                []corev1.EnvVar
-	commonVolumes      []corev1.Volume
-	commonVolumeMounts []corev1.VolumeMount
+	restore             *dpv1alpha1.Restore
+	stage               dpv1alpha1.RestoreStage
+	backupSet           BackupActionSet
+	backupRepo          *dpv1alpha1.BackupRepo
+	buildWithRepo       bool
+	env                 []corev1.EnvVar
+	commonVolumes       []corev1.Volume
+	commonVolumeMounts  []corev1.VolumeMount
+	commonVolumeDevices []corev1.VolumeDevice
 	// specificVolumes should be rebuilt for each job.
 	specificVolumes []corev1.Volume
 	// specificVolumeMounts should be rebuilt for each job.
-	specificVolumeMounts []corev1.VolumeMount
-	image                string
-	command              []string
-	tolerations          []corev1.Toleration
-	nodeSelector         map[string]string
-	jobName              string
-	labels               map[string]string
+	specificVolumeMounts  []corev1.VolumeMount
+	specificVolumeDevices []corev1.VolumeDevice
+	image                 string
+	command               []string
+	tolerations           []corev1.Toleration
+	nodeSelector          map[string]string
+	jobName               string
+	labels                map[string]string
 }
 
 func newRestoreJobBuilder(restore *dpv1alpha1.Restore, backupSet BackupActionSet, backupRepo *dpv1alpha1.BackupRepo, stage dpv1alpha1.RestoreStage) *restoreJobBuilder {
 	return &restoreJobBuilder{
-		restore:            restore,
-		backupSet:          backupSet,
-		backupRepo:         backupRepo,
-		stage:              stage,
-		commonVolumes:      []corev1.Volume{},
-		commonVolumeMounts: []corev1.VolumeMount{},
-		labels:             BuildRestoreLabels(restore.Name),
+		restore:             restore,
+		backupSet:           backupSet,
+		backupRepo:          backupRepo,
+		stage:               stage,
+		commonVolumes:       []corev1.Volume{},
+		commonVolumeMounts:  []corev1.VolumeMount{},
+		commonVolumeDevices: []corev1.VolumeDevice{},
+		labels:              BuildRestoreLabels(restore.Name),
 	}
 }
 
-func (r *restoreJobBuilder) buildPVCVolumeAndMount(
+func (r *restoreJobBuilder) buildPVCVolumeInfo(
 	claim dpv1alpha1.VolumeConfig,
 	claimName,
-	identifier string) (*corev1.Volume, *corev1.VolumeMount, error) {
+	identifier string) (*corev1.Volume, *corev1.VolumeMount, *corev1.VolumeDevice, error) {
+	if r.backupSet.UseVolumeSnapshot && !r.backupSet.ActionSet.HasPrepareDataStage() {
+		return nil, nil, nil, nil
+	}
 	volumeName := fmt.Sprintf("%s-%s", identifier, claimName)
 	volume := &corev1.Volume{
 		Name:         volumeName,
 		VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: claimName}},
 	}
-	volumeMount := &corev1.VolumeMount{Name: volumeName}
-	if claim.MountPath != "" {
-		volumeMount.MountPath = claim.MountPath
-		return volume, volumeMount, nil
+	switch {
+	case claim.MountPath != "":
+		return volume, &corev1.VolumeMount{Name: volumeName, MountPath: claim.MountPath}, nil, nil
+	case claim.DevicePath != "":
+		return volume, nil, &corev1.VolumeDevice{Name: volumeName, DevicePath: claim.DevicePath}, nil
 	}
-	mountPath := getMountPathWithSourceVolume(r.backupSet.Backup, claim.VolumeSource)
-	if mountPath != "" {
-		volumeMount.MountPath = mountPath
-		return volume, volumeMount, nil
+	// build volumeMount or volumeDevice by volumeSource
+	mountPath, devicePath := getFilePathWithSourceVolume(r.backupSet.Backup, claim.VolumeSource)
+	switch {
+	case mountPath != "":
+		return volume, &corev1.VolumeMount{Name: volumeName, MountPath: mountPath}, nil, nil
+	case devicePath != "":
+		return volume, nil, &corev1.VolumeDevice{Name: volumeName, DevicePath: devicePath}, nil
 	}
-
-	if r.backupSet.UseVolumeSnapshot && !r.backupSet.ActionSet.HasPrepareDataStage() {
-		return nil, nil, nil
-	}
-	return nil, nil, intctrlutil.NewFatalError(fmt.Sprintf(`unable to find the mountPath corresponding to volumeSource "%s" from status.backupMethod.targetVolumes.volumeMounts of backup "%s"`,
+	return nil, nil, nil, intctrlutil.NewFatalError(fmt.Sprintf(`unable to find the mountPath/devicePath corresponding to volumeSource "%s" from status.backupMethod.targetVolumes of backup "%s"`,
 		claim.VolumeSource, r.backupSet.Backup.Name))
 }
 
-// addToCommonVolumesAndMounts adds the volume and volumeMount to common volumes and volumeMounts slice.
-func (r *restoreJobBuilder) addToCommonVolumesAndMounts(volume *corev1.Volume, volumeMount *corev1.VolumeMount) *restoreJobBuilder {
+// addToCommonVolumeInfos adds the volume, volumeMount, volumeDevice to common volumes, volumeMounts and volumeDevices slice.
+func (r *restoreJobBuilder) addToCommonVolumeInfos(volume *corev1.Volume, volumeMount *corev1.VolumeMount, volumeDevice *corev1.VolumeDevice) *restoreJobBuilder {
 	if volume != nil {
 		r.commonVolumes = append(r.commonVolumes, *volume)
 	}
 	if volumeMount != nil {
 		r.commonVolumeMounts = append(r.commonVolumeMounts, *volumeMount)
 	}
+	if volumeDevice != nil {
+		r.commonVolumeDevices = append(r.commonVolumeDevices, *volumeDevice)
+	}
 	return r
 }
 
-// resetSpecificVolumesAndMounts resets the specific volumes and volumeMounts slice.
-func (r *restoreJobBuilder) resetSpecificVolumesAndMounts() {
+// resetSpecificVolumesInfos resets the specific volumes, volumeMounts and volumeDevices slice.
+func (r *restoreJobBuilder) resetSpecificVolumesInfos() {
 	r.specificVolumes = []corev1.Volume{}
 	r.specificVolumeMounts = []corev1.VolumeMount{}
+	r.specificVolumeDevices = []corev1.VolumeDevice{}
 }
 
-// addToSpecificVolumesAndMounts adds the volume and volumeMount to specific volumes and volumeMounts slice.
-func (r *restoreJobBuilder) addToSpecificVolumesAndMounts(volume *corev1.Volume, volumeMount *corev1.VolumeMount) *restoreJobBuilder {
+// addToSpecificVolumeInfos adds volume, volumeMount, volumeDevice to specific volumes, volumeMounts and volumeDevices slice.
+func (r *restoreJobBuilder) addToSpecificVolumeInfos(volume *corev1.Volume, volumeMount *corev1.VolumeMount, volumeDevice *corev1.VolumeDevice) *restoreJobBuilder {
 	if volume != nil {
 		r.specificVolumes = append(r.specificVolumes, *volume)
 	}
 	if volumeMount != nil {
 		r.specificVolumeMounts = append(r.specificVolumeMounts, *volumeMount)
+	}
+	if volumeDevice != nil {
+		r.specificVolumeDevices = append(r.specificVolumeDevices, *volumeDevice)
 	}
 	return r
 }
@@ -283,11 +296,13 @@ func (r *restoreJobBuilder) build() *batchv1.Job {
 
 	// 2. set restore container
 	r.specificVolumeMounts = append(r.specificVolumeMounts, r.commonVolumeMounts...)
+	r.specificVolumeDevices = append(r.specificVolumeDevices, r.commonVolumeDevices...)
 	container := corev1.Container{
 		Name:            Restore,
 		Resources:       r.restore.Spec.ContainerResources,
 		Env:             r.env,
 		VolumeMounts:    r.specificVolumeMounts,
+		VolumeDevices:   r.specificVolumeDevices,
 		Command:         r.command,
 		Image:           r.image,
 		ImagePullPolicy: corev1.PullIfNotPresent,

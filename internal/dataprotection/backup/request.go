@@ -331,6 +331,7 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 		Command:         job.Command,
 		Env:             buildEnv(),
 		VolumeMounts:    buildVolumeMounts(),
+		VolumeDevices:   getVolumeDevicesByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes),
 		ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)),
 		SecurityContext: &corev1.SecurityContext{
 			AllowPrivilegeEscalation: boolptr.False(),

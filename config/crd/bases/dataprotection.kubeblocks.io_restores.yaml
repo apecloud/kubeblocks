@@ -253,6 +253,9 @@ spec:
                       it describes the source volume of the backup targetVolumes and
                       how to mount path in the restoring container.
                     properties:
+                      devicePath:
+                        description: devicePath is the path of the block device.
+                        type: string
                       mountPath:
                         description: mountPath path within the restoring container
                           at which the volume should be mounted.
@@ -264,8 +267,9 @@ spec:
                         type: string
                     type: object
                     x-kubernetes-validations:
-                    - message: at least one exists for volumeSource and mountPath.
-                      rule: self.volumeSource != '' || self.mountPath !=''
+                    - message: at least one exists for [volumeSource, mountPath, devicePath].
+                      rule: self.volumeSource != '' || self.mountPath !='' || self.devicePath
+                        !=''
                     - message: forbidden to update spec.prepareDataConfig.dataSourceRef
                       rule: self == oldSelf
                   schedulingSpec:
@@ -1448,6 +1452,9 @@ spec:
                       job. these persistent Volume claims will be created if not exist.
                     items:
                       properties:
+                        devicePath:
+                          description: devicePath is the path of the block device.
+                          type: string
                         metadata:
                           description: 'Standard object''s metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata'
                           properties:
@@ -1702,8 +1709,10 @@ spec:
                       - volumeClaimSpec
                       type: object
                       x-kubernetes-validations:
-                      - message: at least one exists for volumeSource and mountPath.
-                        rule: self.volumeSource != '' || self.mountPath !=''
+                      - message: at least one exists for [volumeSource, mountPath,
+                          devicePath].
+                        rule: self.volumeSource != '' || self.mountPath !='' || self.devicePath
+                          !=''
                     type: array
                     x-kubernetes-validations:
                     - message: forbidden to update spec.prepareDataConfig.volumeClaims
@@ -1731,6 +1740,9 @@ spec:
                         description: templates is a list of volume claims.
                         items:
                           properties:
+                            devicePath:
+                              description: devicePath is the path of the block device.
+                              type: string
                             metadata:
                               description: 'Standard object''s metadata. More info:
                                 https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata'
@@ -2000,8 +2012,10 @@ spec:
                           - volumeClaimSpec
                           type: object
                           x-kubernetes-validations:
-                          - message: at least one exists for volumeSource and mountPath.
-                            rule: self.volumeSource != '' || self.mountPath !=''
+                          - message: at least one exists for [volumeSource, mountPath,
+                              devicePath].
+                            rule: self.volumeSource != '' || self.mountPath !='' ||
+                              self.devicePath !=''
                         type: array
                     required:
                     - replicas
@@ -2160,6 +2174,26 @@ spec:
                                 type: object
                             type: object
                             x-kubernetes-map-type: atomic
+                          volumeDevices:
+                            description: volumeDevices describes a mapping of a raw
+                              block device within a container of restoring pod.
+                            items:
+                              description: volumeDevice describes a mapping of a raw
+                                block device within a container.
+                              properties:
+                                devicePath:
+                                  description: devicePath is the path inside of the
+                                    container that the device will be mapped to.
+                                  type: string
+                                name:
+                                  description: name must match the name of a persistentVolumeClaim
+                                    in the pod
+                                  type: string
+                              required:
+                              - devicePath
+                              - name
+                              type: object
+                            type: array
                           volumeMounts:
                             description: volumeMounts defines which volumes of the
                               selected pod need to be mounted on the restoring pod.

@@ -34,23 +34,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
 
-// GetBackupPolicy returns the BackupPolicy with the given namespace and name.
-func GetBackupPolicy(ctx context.Context, cli client.Client, namespace, name string) (*dpv1alpha1.BackupPolicy, error) {
-	backupPolicy := &dpv1alpha1.BackupPolicy{}
-	if err := cli.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, backupPolicy); err != nil {
-		return nil, err
-	}
-	return backupPolicy, nil
-}
-
-func GetActionSet(ctx context.Context, cli client.Client, namespace, name string) (*dpv1alpha1.ActionSet, error) {
-	actionSet := &dpv1alpha1.ActionSet{}
-	if err := cli.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, actionSet); err != nil {
-		return nil, err
-	}
-	return actionSet, nil
-}
-
 func getVolumesByNames(pod *corev1.Pod, volumeNames []string) []corev1.Volume {
 	var volumes []corev1.Volume
 	for _, v := range pod.Spec.Volumes {
@@ -75,6 +58,18 @@ func getVolumesByMounts(pod *corev1.Pod, mounts []corev1.VolumeMount) []corev1.V
 	return volumes
 }
 
+func getVolumesByDevices(pod *corev1.Pod, mounts []corev1.VolumeDevice) []corev1.Volume {
+	var volumes []corev1.Volume
+	for _, v := range pod.Spec.Volumes {
+		for _, m := range mounts {
+			if v.Name == m.Name {
+				volumes = append(volumes, v)
+			}
+		}
+	}
+	return volumes
+}
+
 // TODO: if the result is empty, should we return the pod's volumes?
 //
 //	if volumes can not found in the pod spec, maybe output a warning log?
@@ -83,10 +78,13 @@ func getVolumesByVolumeInfo(pod *corev1.Pod, volumeInfo *dpv1alpha1.TargetVolume
 		return nil
 	}
 	var volumes []corev1.Volume
-	if len(volumeInfo.Volumes) > 0 {
+	switch {
+	case len(volumeInfo.Volumes) > 0:
 		volumes = getVolumesByNames(pod, volumeInfo.Volumes)
-	} else if len(volumeInfo.VolumeMounts) > 0 {
+	case len(volumeInfo.VolumeMounts) > 0:
 		volumes = getVolumesByMounts(pod, volumeInfo.VolumeMounts)
+	case len(volumeInfo.VolumeDevices) > 0:
+		volumes = getVolumesByDevices(pod, volumeInfo.VolumeDevices)
 	}
 	return volumes
 }
@@ -104,6 +102,21 @@ func getVolumeMountsByVolumeInfo(pod *corev1.Pod, info *dpv1alpha1.TargetVolumeI
 		}
 	}
 	return mounts
+}
+
+func getVolumeDevicesByVolumeInfo(pod *corev1.Pod, info *dpv1alpha1.TargetVolumeInfo) []corev1.VolumeDevice {
+	if info == nil || len(info.VolumeDevices) == 0 {
+		return nil
+	}
+	var volumeDevices []corev1.VolumeDevice
+	for _, v := range pod.Spec.Volumes {
+		for _, d := range info.VolumeDevices {
+			if v.Name == d.Name {
+				volumeDevices = append(volumeDevices, d)
+			}
+		}
+	}
+	return volumeDevices
 }
 
 func getPVCsByVolumeNames(cli client.Client,

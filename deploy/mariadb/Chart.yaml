@@ -1,6 +1,6 @@
 apiVersion: v2
 name: mariadb
-description: Mariadb is a widely used, open-source relational database management system (RDBMS)
+description: MariaDB is a high performance open source relational database management system that is widely used for web and application servers
 
 type: application
 

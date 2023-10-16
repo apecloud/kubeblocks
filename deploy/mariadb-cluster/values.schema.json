@@ -14,17 +14,16 @@
       "type": "string",
       "default": "standalone",
       "enum": [
-        "standalone",
-        "raftGroup"
+        "standalone"
       ]
     },
     "replicas": {
       "title": "Replicas",
-      "description": "The number of replicas, for standalone mode, the replicas is 1, for raftGroup mode, the default replicas is 3.",
+      "description": "The number of replicas, for standalone mode, the replicas is 1.",
       "type": "integer",
       "default": 1,
       "minimum": 1,
-      "maximum": 5
+      "maximum": 1
     },
     "cpu": {
       "title": "CPU",

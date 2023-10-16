@@ -998,7 +998,12 @@ func (o *DescribeBackupOptions) printBackupObj(obj *dpv1alpha1.Backup) error {
 	if obj.Status.BackupMethod != nil {
 		realPrintPairStringToLine("ActionSet Name", obj.Status.BackupMethod.ActionSetName)
 	}
-	realPrintPairStringToLine("PVC Name", obj.Status.PersistentVolumeClaimName)
+	if obj.Status.BackupRepoName != "" {
+		realPrintPairStringToLine("Repository", obj.Status.BackupRepoName)
+	}
+	if obj.Status.PersistentVolumeClaimName != "" {
+		realPrintPairStringToLine("PVC Name", obj.Status.PersistentVolumeClaimName)
+	}
 	if obj.Status.Duration != nil {
 		realPrintPairStringToLine("Duration", duration.HumanDuration(obj.Status.Duration.Duration))
 	}

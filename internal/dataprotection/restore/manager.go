@@ -229,6 +229,21 @@ func (r *RestoreManager) RestorePVCFromSnapshot(reqCtx intctrlutil.RequestCtx, c
 	return nil
 }
 
+func (r *RestoreManager) prepareBackupRepo(reqCtx intctrlutil.RequestCtx, cli client.Client, backupSet BackupActionSet) (*dpv1alpha1.BackupRepo, error) {
+	if backupSet.Backup.Status.BackupRepoName != "" {
+		backupRepo := &dpv1alpha1.BackupRepo{}
+		err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: backupSet.Backup.Status.BackupRepoName}, backupRepo)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				err = intctrlutil.NewFatalError(err.Error())
+			}
+			return nil, err
+		}
+		return backupRepo, nil
+	}
+	return nil, nil
+}
+
 // BuildPrepareDataJobs builds the restore jobs for prepare pvc's data, and will create the target pvcs if not exist.
 func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, backupSet BackupActionSet, actionName string) ([]*batchv1.Job, error) {
 	prepareDataConfig := r.Restore.Spec.PrepareDataConfig
@@ -238,11 +253,15 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 	if !backupSet.ActionSet.HasPrepareDataStage() {
 		return nil, nil
 	}
-	jobBuilder := newRestoreJobBuilder(r.Restore, backupSet, dpv1alpha1.PrepareData).
+	backupRepo, err := r.prepareBackupRepo(reqCtx, cli, backupSet)
+	if err != nil {
+		return nil, err
+	}
+	jobBuilder := newRestoreJobBuilder(r.Restore, backupSet, backupRepo, dpv1alpha1.PrepareData).
 		setImage(backupSet.ActionSet.Spec.Restore.PrepareData.Image).
 		setCommand(backupSet.ActionSet.Spec.Restore.PrepareData.Command).
-		addBackupVolumeAndMount().
-		addCommonEnv()
+		addCommonEnv().
+		attachBackupRepo()
 
 	createPVCIfNotExistsAndBuildVolume := func(claim dpv1alpha1.RestoreVolumeClaim, identifier string) (*corev1.Volume, *corev1.VolumeMount, error) {
 		if err := r.createPVCIfNotExist(reqCtx, cli, claim.ObjectMeta, claim.VolumeClaimSpec); err != nil {
@@ -315,6 +334,8 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 }
 
 func (r *RestoreManager) BuildVolumePopulateJob(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
 	backupSet BackupActionSet,
 	populatePVC *corev1.PersistentVolumeClaim,
 	index int) (*batchv1.Job, error) {
@@ -325,12 +346,16 @@ func (r *RestoreManager) BuildVolumePopulateJob(
 	if !backupSet.ActionSet.HasPrepareDataStage() {
 		return nil, nil
 	}
-	jobBuilder := newRestoreJobBuilder(r.Restore, backupSet, dpv1alpha1.PrepareData).
+	backupRepo, err := r.prepareBackupRepo(reqCtx, cli, backupSet)
+	if err != nil {
+		return nil, err
+	}
+	jobBuilder := newRestoreJobBuilder(r.Restore, backupSet, backupRepo, dpv1alpha1.PrepareData).
 		setJobName(fmt.Sprintf("%s-%d", populatePVC.Name, index)).
 		addLabel(DataProtectionLabelPopulatePVCKey, populatePVC.Name).
 		setImage(backupSet.ActionSet.Spec.Restore.PrepareData.Image).
 		setCommand(backupSet.ActionSet.Spec.Restore.PrepareData.Command).
-		addBackupVolumeAndMount().
+		attachBackupRepo().
 		addCommonEnv()
 	volume, volumeMount, err := jobBuilder.buildPVCVolumeAndMount(*prepareDataConfig.DataSourceRef, populatePVC.Name, "dp-claim")
 	if err != nil {
@@ -349,6 +374,10 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 	if !backupSet.ActionSet.HasPostReadyStage() {
 		return nil, nil
 	}
+	backupRepo, err := r.prepareBackupRepo(reqCtx, cli, backupSet)
+	if err != nil {
+		return nil, err
+	}
 	actionSpec := backupSet.ActionSet.Spec.Restore.PostReady[step]
 	getTargetPodList := func(labelSelector metav1.LabelSelector, msgKey string) ([]corev1.Pod, error) {
 		targetPodList, err := utils.GetPodListByLabelSelector(reqCtx, cli, labelSelector)
@@ -361,7 +390,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 		return targetPodList.Items, nil
 	}
 
-	jobBuilder := newRestoreJobBuilder(r.Restore, backupSet, dpv1alpha1.PostReady).addCommonEnv()
+	jobBuilder := newRestoreJobBuilder(r.Restore, backupSet, backupRepo, dpv1alpha1.PostReady).addCommonEnv()
 
 	buildJobName := func(index int) string {
 		jobName := fmt.Sprintf("restore-post-ready-%s-%s-%d-%d", r.Restore.UID[:8], backupSet.Backup.Name, step, index)
@@ -391,7 +420,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 		}
 		job := jobBuilder.setImage(actionSpec.Job.Image).
 			setJobName(buildJobName(0)).
-			addBackupVolumeAndMount().
+			attachBackupRepo().
 			setCommand(actionSpec.Job.Command).
 			setToleration(targetPod.Spec.Tolerations).
 			addTargetPodAndCredentialEnv(&targetPod, r.Restore.Spec.ReadyConfig.ConnectionCredential).

@@ -17,15 +17,19 @@ package components
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -62,6 +66,8 @@ var _ = Describe("Component", func() {
 		defaultReplicas       = 2
 		defaultVolumeSize     = "2Gi"
 		defaultVolumeQuantity = apiresource.MustParse(defaultVolumeSize)
+
+		podAnnotationKey4Test = fmt.Sprintf("%s-test", constant.ComponentReplicasAnnotationKey)
 	)
 
 	cleanAll := func() {
@@ -78,6 +84,8 @@ var _ = Describe("Component", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.RSMSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.StatefulSetSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
 		// non-namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeSignature, true, inNS, ml)
@@ -129,13 +137,6 @@ var _ = Describe("Component", func() {
 
 	status := func() appsv1alpha1.ClusterComponentStatus {
 		return clusterObj.Status.Components[statefulCompName]
-	}
-
-	rsmKey := func() types.NamespacedName {
-		return types.NamespacedName{
-			Namespace: testCtx.DefaultNamespace,
-			Name:      fmt.Sprintf("%s-%s", clusterObj.GetName(), statefulCompName),
-		}
 	}
 
 	applyChanges := func(dag *graph.DAG) error {
@@ -299,10 +300,151 @@ var _ = Describe("Component", func() {
 		}
 	}
 
+	rsmKey := func() types.NamespacedName {
+		return types.NamespacedName{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      fmt.Sprintf("%s-%s", clusterObj.GetName(), statefulCompName),
+		}
+	}
+
+	rsm := func() *workloads.ReplicatedStateMachine {
+		rsm := &workloads.ReplicatedStateMachine{}
+		Expect(testCtx.Cli.Get(testCtx.Ctx, rsmKey(), rsm)).Should(Succeed())
+		return rsm
+	}
+
+	stsKey := func() types.NamespacedName {
+		return types.NamespacedName{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      fmt.Sprintf("%s-%s", clusterObj.GetName(), statefulCompName),
+		}
+	}
+
+	sts := func() *appsv1.StatefulSet {
+		sts := &appsv1.StatefulSet{}
+		Expect(testCtx.Cli.Get(testCtx.Ctx, stsKey(), sts)).Should(Succeed())
+		return sts
+	}
+
+	createSts := func() {
+		rsmKey := rsmKey()
+		testapps.NewStatefulSetFactory(rsmKey.Namespace, rsmKey.Name, clusterName, statefulCompName).
+			SetReplicas(spec().Replicas).
+			CheckedCreate(&testCtx)
+	}
+
+	pods := func() []*corev1.Pod {
+		objs, err := listObjWithLabelsInNamespace(testCtx.Ctx, testCtx.Cli,
+			generics.PodSignature, testCtx.DefaultNamespace, labels())
+		Expect(err).Should(Succeed())
+		return objs
+	}
+
 	createPods := func() {
 		for i := 0; i < int(spec().Replicas); i++ {
-			// TODO
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      stsKey().Name + "-" + strconv.Itoa(i),
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						constant.AppManagedByLabelKey:   constant.AppName,
+						constant.AppNameLabelKey:        clusterDefName,
+						constant.AppInstanceLabelKey:    clusterName,
+						constant.KBAppComponentLabelKey: statefulCompName,
+						// appsv1.ControllerRevisionHashLabelKey: "mock-version",
+					},
+					Annotations: map[string]string{
+						podAnnotationKey4Test: fmt.Sprintf("%d", spec().Replicas),
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Name:  "mock-container",
+						Image: "mock-container",
+					}},
+				},
+			}
+			testCtx.CheckedCreateObj(testCtx.Ctx, pod)
 		}
+	}
+
+	createWorkloads := func() {
+		createSts()
+		createPods()
+	}
+
+	mockWorkloadsReady := func() {
+		rsmObj := rsm()
+		stsObj := sts()
+		podObjs := pods()
+		Expect(testapps.ChangeObjStatus(&testCtx, rsmObj, func() { testk8s.MockRSMReady(rsmObj, podObjs...) })).Should(Succeed())
+		Expect(testapps.ChangeObjStatus(&testCtx, stsObj, func() { testk8s.MockStatefulSetReady(stsObj) })).Should(Succeed())
+		for _, pod := range podObjs {
+			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() { testk8s.MockPodAvailable(pod, metav1.NewTime(time.Now())) })).Should(Succeed())
+		}
+	}
+
+	mockWorkloadsUpdating := func() {
+		vct := spec().VolumeClaimTemplates[0]
+		quantity := vct.Spec.Resources.Requests.Storage()
+		quantity.Add(apiresource.MustParse("1Gi"))
+		for i := 0; i < int(spec().Replicas); i++ {
+			Eventually(testapps.GetAndChangeObj(&testCtx, pvcKey(clusterName, statefulCompName, vct.Name, i),
+				func(pvc *corev1.PersistentVolumeClaim) {
+					pvc.Spec.Resources.Requests[corev1.ResourceStorage] = *quantity
+				})).Should(Succeed())
+		}
+	}
+
+	mockWorkloadsAbnormal := func() {
+		// mock pods failure
+		for _, pod := range pods() {
+			podKey := types.NamespacedName{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      pod.GetName(),
+			}
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, podKey, func(pod *corev1.Pod) {
+				cond := corev1.PodCondition{
+					Type:               corev1.PodScheduled,
+					Status:             corev1.ConditionFalse,
+					LastTransitionTime: metav1.NewTime(time.Now().Add(podScheduledFailedTimeout * -2)),
+				}
+				pod.Status.Conditions = append(pod.Status.Conditions, cond)
+			})).Should(Succeed())
+		}
+		// mock isRunning as false
+		Eventually(testapps.GetAndChangeObjStatus(&testCtx, rsmKey(), func(rsm *workloads.ReplicatedStateMachine) {
+			if rsm.Status.ReadyReplicas == *rsm.Spec.Replicas {
+				rsm.Status.ReadyReplicas = rsm.Status.ReadyReplicas - 1
+			}
+		})).Should(Succeed())
+	}
+
+	mockWorkloadsFailed := func() {
+		// mock pods failure and isAvailable as false
+		for _, pod := range pods() {
+			podKey := types.NamespacedName{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      pod.GetName(),
+			}
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, podKey, func(pod *corev1.Pod) {
+				cond1 := corev1.PodCondition{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionFalse,
+				}
+				cond2 := corev1.PodCondition{
+					Type:               corev1.PodScheduled,
+					Status:             corev1.ConditionFalse,
+					LastTransitionTime: metav1.NewTime(time.Now().Add(podScheduledFailedTimeout * -2)),
+				}
+				pod.Status.Conditions = []corev1.PodCondition{cond1, cond2}
+			})).Should(Succeed())
+		}
+
+		// mock isRunning as false
+		Eventually(testapps.GetAndChangeObjStatus(&testCtx, rsmKey(), func(rsm *workloads.ReplicatedStateMachine) {
+			rsm.Status.ReadyReplicas = rsm.Status.ReadyReplicas - 1
+		})).Should(Succeed())
 	}
 
 	Context("new component object", func() {
@@ -553,7 +695,7 @@ var _ = Describe("Component", func() {
 			}).Should(Succeed())
 		})
 
-		It("TODO- rollback volume size during expansion - recreate PVC error", func() {
+		It("TODO- rollback volume size during expansion - re-create PVC error", func() {
 		})
 
 		It("TODO- general workload update", func() {
@@ -578,90 +720,173 @@ var _ = Describe("Component", func() {
 			// create all PVCs ann PVs
 			createPVCs()
 
-			// create all Pods
-			createPods()
+			// create sts and all Pods
+			createWorkloads()
 		})
 
 		It("provisioning", func() {
-			By("status component")
-			Expect(statusComponent()).Should(Succeed())
-
 			By("check component status as CREATING")
+			Expect(statusComponent()).Should(Succeed())
 			Expect(status().Phase).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
-		})
-
-		It("TODO - provisioning with temporary error", func() {
-			By("some pods have temporary failure")
-
-			By("status component")
-			Expect(statusComponent()).Should(Succeed())
-
-			By("check component status as CREATING")
-			Expect(status().Phase).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
-		})
-
-		It("TODO - pods not ready", func() {
-			Expect(statusComponent()).Should(Succeed())
-		})
-
-		It("pods ready, has no role", func() {
-			Expect(statusComponent()).Should(Succeed())
-		})
-
-		It("TODO - pods ready, role probe timed-out", func() {
-			Expect(statusComponent()).Should(Succeed())
-		})
-
-		It("TODO - all pods are ok", func() {
-			Expect(statusComponent()).Should(Succeed())
-		})
-
-		It("TODO - updating", func() {
-			Expect(statusComponent()).Should(Succeed())
-		})
-
-		It("TODO - updating with conditions", func() {
-			Expect(statusComponent()).Should(Succeed())
-		})
-
-		It("TODO - updating with temporary error", func() {
-			Expect(statusComponent()).Should(Succeed())
 		})
 
 		It("deleting", func() {
 			By("delete underlying workload w/o removing finalizers")
-			rsm := &workloads.ReplicatedStateMachine{}
-			Expect(testCtx.Cli.Get(testCtx.Ctx, rsmKey(), rsm)).Should(Succeed())
-			Expect(testCtx.Cli.Delete(testCtx.Ctx, rsm)).Should(Succeed())
-
-			By("status component")
-			Expect(statusComponent()).Should(Succeed())
+			Expect(testCtx.Cli.Delete(testCtx.Ctx, rsm())).Should(Succeed())
 
 			By("check component status as DELETING")
+			Expect(statusComponent()).Should(Succeed())
 			Expect(status().Phase).Should(Equal(appsv1alpha1.DeletingClusterCompPhase))
 		})
 
-		It("TODO - stopping", func() {
+		It("running", func() {
+			By("mock workloads ready")
+			mockWorkloadsReady()
+
+			By("check component status as RUNNING")
 			Expect(statusComponent()).Should(Succeed())
+			Expect(status().Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 		})
 
-		It("stopped", func() {
+		It("updating", func() {
+			By("mock workloads ready and component status as RUNNING")
+			mockWorkloadsReady()
+			Expect(statusComponent()).Should(Succeed())
+
+			By("mock workloads updating")
+			mockWorkloadsUpdating()
+
+			By("check component status as UPDATING")
+			Expect(statusComponent()).Should(Succeed())
+			Expect(status().Phase).Should(Equal(appsv1alpha1.UpdatingClusterCompPhase))
+		})
+
+		It("stopping", func() {
 			By("set replicas as 0 (stop or scale-in to 0)")
+			replicas := spec().Replicas
 			spec().Replicas = 0
 			Expect(updateComponent()).Should(Succeed())
 
-			By("check the workload updated")
+			By("wait and check the workload updated")
 			Eventually(testapps.CheckObj(&testCtx, rsmKey(), func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
 				g.Expect(rsm.GetGeneration()).Should(Equal(int64(2)))
 				g.Expect(*rsm.Spec.Replicas).Should(Equal(spec().Replicas))
 			})).Should(Succeed())
+			Eventually(testapps.List(&testCtx, generics.PodSignature, labels())).Should(HaveLen(int(replicas)))
+
+			By("check component status as STOPPING")
+			Expect(statusComponent()).Should(Succeed())
+			Expect(status().Phase).Should(Equal(appsv1alpha1.StoppingClusterCompPhase))
+		})
+
+		It("stopped", func() {
+			By("set replicas as 0 (stop or scale-in to 0)")
+			replicas := spec().Replicas
+			spec().Replicas = 0
+			Expect(updateComponent()).Should(Succeed())
+
+			By("wait and check the workload updated")
+			Eventually(testapps.CheckObj(&testCtx, rsmKey(), func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+				g.Expect(rsm.GetGeneration()).Should(Equal(int64(2)))
+				g.Expect(*rsm.Spec.Replicas).Should(Equal(spec().Replicas))
+			})).Should(Succeed())
+			Eventually(testapps.List(&testCtx, generics.PodSignature, labels())).Should(HaveLen(int(replicas)))
+
+			By("delete all pods")
+			inNS := client.InNamespace(testCtx.DefaultNamespace)
+			ml := client.HasLabels{testCtx.TestObjLabelKey}
+			testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
 			Eventually(testapps.List(&testCtx, generics.PodSignature, labels())).Should(HaveLen(0))
 
-			By("status component")
+			By("check component status as STOPPED")
+			Expect(statusComponent()).Should(Succeed())
+			Expect(status().Phase).Should(Equal(appsv1alpha1.StoppedClusterCompPhase))
+		})
+
+		It("failure at provisioning", func() {
+			By("check component status as CREATING")
+			Expect(statusComponent()).Should(Succeed())
+			Expect(status().Phase).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
+
+			By("mock workloads abnormal")
+			mockWorkloadsAbnormal()
+
+			By("check component status as CREATING")
+			Expect(statusComponent()).Should(Succeed())
+			Expect(status().Phase).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
+		})
+
+		It("failure at deleting", func() {
+			By("mock workloads deleting and component status as DELETING")
+			Expect(testCtx.Cli.Delete(testCtx.Ctx, rsm())).Should(Succeed())
 			Expect(statusComponent()).Should(Succeed())
 
-			By("check component status as STOPPED")
-			Expect(status().Phase).Should(Equal(appsv1alpha1.StoppedClusterCompPhase))
+			By("mock workloads abnormal")
+			mockWorkloadsAbnormal()
+
+			By("check component status as DELETING")
+			Expect(statusComponent()).Should(Succeed())
+			Expect(status().Phase).Should(Equal(appsv1alpha1.DeletingClusterCompPhase))
+		})
+
+		It("failure at running - abnormal", func() {
+			By("mock workloads ready and component status as RUNNING")
+			mockWorkloadsReady()
+			Expect(statusComponent()).Should(Succeed())
+
+			By("mock workloads abnormal")
+			mockWorkloadsAbnormal()
+
+			By("check component status as ABNORMAL")
+			Expect(statusComponent()).Should(Succeed())
+			Expect(status().Phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
+		})
+
+		It("failure at running - failed", func() {
+			By("mock workloads ready and component status as RUNNING")
+			mockWorkloadsReady()
+			Expect(statusComponent()).Should(Succeed())
+
+			By("mock workloads failed")
+			mockWorkloadsFailed()
+
+			By("check component status as FAILED")
+			Expect(statusComponent()).Should(Succeed())
+			Expect(status().Phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
+		})
+
+		It("failure at updating - abnormal", func() {
+			By("mock workloads ready and component status as RUNNING")
+			mockWorkloadsReady()
+			Expect(statusComponent()).Should(Succeed())
+
+			By("mock workloads updating")
+			mockWorkloadsUpdating()
+			Expect(statusComponent()).Should(Succeed())
+
+			By("mock workloads abnormal")
+			mockWorkloadsAbnormal()
+
+			By("check component status as ABNORMAL")
+			Expect(statusComponent()).Should(Succeed())
+			Expect(status().Phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
+		})
+
+		It("failure at updating - failed", func() {
+			By("mock workloads ready and component status as RUNNING")
+			mockWorkloadsReady()
+			Expect(statusComponent()).Should(Succeed())
+
+			By("mock workloads updating")
+			mockWorkloadsUpdating()
+			Expect(statusComponent()).Should(Succeed())
+
+			By("mock workloads failed")
+			mockWorkloadsFailed()
+
+			By("check component status as FAILED")
+			Expect(statusComponent()).Should(Succeed())
+			Expect(status().Phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 		})
 	})
 })

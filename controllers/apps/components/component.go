@@ -546,10 +546,7 @@ func (c *rsmComponent) isAvailable(reqCtx intctrlutil.RequestCtx, cli client.Cli
 			continue
 		}
 		if !shouldCheckLeader {
-			continue
-		}
-		if _, ok := pod.Labels[constant.RoleLabelKey]; ok {
-			continue
+			return true, nil
 		}
 		if hasLeaderRoleLabel(pod) {
 			return true, nil

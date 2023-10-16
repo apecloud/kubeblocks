@@ -28,6 +28,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/lorry/dcs"
+	"github.com/apecloud/kubeblocks/lorry/engines"
 	"github.com/apecloud/kubeblocks/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/lorry/operations"
 	"github.com/apecloud/kubeblocks/lorry/util"
@@ -35,9 +36,10 @@ import (
 
 type GetRole struct {
 	operations.Base
-	dcsStore dcs.DCS
-	logger   logr.Logger
-	Timeout  time.Duration
+	dcsStore  dcs.DCS
+	dbManager engines.DBManager
+	logger    logr.Logger
+	Timeout   time.Duration
 }
 
 var getrole operations.Operation = &GetRole{}
@@ -55,6 +57,12 @@ func (s *GetRole) Init(ctx context.Context) error {
 		return errors.New("dcs store init failed")
 	}
 
+	dbManager, err := register.GetDBManager()
+	if err != nil {
+		return errors.Wrap(err, "get manager failed")
+	}
+
+	s.dbManager = dbManager
 	s.logger = ctrl.Log.WithName("getrole")
 	return nil
 }
@@ -64,11 +72,6 @@ func (s *GetRole) IsReadonly(ctx context.Context) bool {
 }
 
 func (s *GetRole) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	manager, err := register.GetDBManager()
-	if err != nil {
-		return nil, errors.Wrap(err, "get manager failed")
-	}
-
 	resp := &operations.OpsResponse{
 		Data: map[string]any{},
 	}
@@ -76,7 +79,7 @@ func (s *GetRole) Do(ctx context.Context, req *operations.OpsRequest) (*operatio
 
 	k8sStore := s.dcsStore.(*dcs.KubernetesStore)
 	cluster := k8sStore.GetClusterFromCache()
-	role, err := manager.GetReplicaRole(ctx, cluster)
+	role, err := s.dbManager.GetReplicaRole(ctx, cluster)
 	if err != nil {
 		s.logger.Info("executing getrole error", "error", err)
 		return resp, err

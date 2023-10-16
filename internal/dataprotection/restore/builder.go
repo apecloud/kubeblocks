@@ -40,6 +40,8 @@ type restoreJobBuilder struct {
 	restore            *dpv1alpha1.Restore
 	stage              dpv1alpha1.RestoreStage
 	backupSet          BackupActionSet
+	backupRepo         *dpv1alpha1.BackupRepo
+	buildWithRepo      bool
 	env                []corev1.EnvVar
 	commonVolumes      []corev1.Volume
 	commonVolumeMounts []corev1.VolumeMount
@@ -55,10 +57,11 @@ type restoreJobBuilder struct {
 	labels               map[string]string
 }
 
-func newRestoreJobBuilder(restore *dpv1alpha1.Restore, backupSet BackupActionSet, stage dpv1alpha1.RestoreStage) *restoreJobBuilder {
+func newRestoreJobBuilder(restore *dpv1alpha1.Restore, backupSet BackupActionSet, backupRepo *dpv1alpha1.BackupRepo, stage dpv1alpha1.RestoreStage) *restoreJobBuilder {
 	return &restoreJobBuilder{
 		restore:            restore,
 		backupSet:          backupSet,
+		backupRepo:         backupRepo,
 		stage:              stage,
 		commonVolumes:      []corev1.Volume{},
 		commonVolumeMounts: []corev1.VolumeMount{},
@@ -91,24 +94,6 @@ func (r *restoreJobBuilder) buildPVCVolumeAndMount(
 	}
 	return nil, nil, intctrlutil.NewFatalError(fmt.Sprintf(`unable to find the mountPath corresponding to volumeSource "%s" from status.backupMethod.targetVolumes.volumeMounts of backup "%s"`,
 		claim.VolumeSource, r.backupSet.Backup.Name))
-}
-
-// addBackupVolumeAndMount adds the volume and volumeMount of backup pvc to common volumes and volumeMounts slice.
-func (r *restoreJobBuilder) addBackupVolumeAndMount() *restoreJobBuilder {
-	if r.backupSet.Backup.Status.PersistentVolumeClaimName != "" {
-		backupName := r.backupSet.Backup.Name
-		r.commonVolumes = append(r.commonVolumes, corev1.Volume{
-			Name: backupName,
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: r.backupSet.Backup.Status.PersistentVolumeClaimName},
-			},
-		})
-		r.commonVolumeMounts = append(r.commonVolumeMounts, corev1.VolumeMount{
-			Name:      backupName,
-			MountPath: "/" + backupName,
-		})
-	}
-	return r
 }
 
 // addToCommonVolumesAndMounts adds the volume and volumeMount to common volumes and volumeMounts slice.
@@ -171,17 +156,16 @@ func (r *restoreJobBuilder) addLabel(key, value string) *restoreJobBuilder {
 	return r
 }
 
+func (r *restoreJobBuilder) attachBackupRepo() *restoreJobBuilder {
+	r.buildWithRepo = true
+	return r
+}
+
 // addCommonEnv adds the common envs for each restore job.
 func (r *restoreJobBuilder) addCommonEnv() *restoreJobBuilder {
 	backupName := r.backupSet.Backup.Name
 	// add backupName env
 	r.env = []corev1.EnvVar{{Name: dptypes.DPBackupName, Value: backupName}}
-	// add mount path env of backup dir
-	filePath := r.backupSet.Backup.Status.Path
-	if filePath != "" {
-		r.env = append(r.env, corev1.EnvVar{Name: dptypes.DPBackupDIR, Value: fmt.Sprintf("/%s%s", backupName, filePath)})
-		// TODO: add continuous file path env
-	}
 	// add time env
 	actionSetEnv := r.backupSet.ActionSet.Spec.Env
 	timeFormat := getTimeFormat(r.backupSet.ActionSet.Spec.Env)
@@ -305,5 +289,18 @@ func (r *restoreJobBuilder) build() *batchv1.Job {
 	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 	job.Spec.Template.Spec.Containers = []corev1.Container{container}
 	controllerutil.AddFinalizer(job, dptypes.DataProtectionFinalizerName)
+
+	// 3. inject datasafed if needed
+	if r.buildWithRepo {
+		mountPath := "/backupdata"
+		backupPath := r.backupSet.Backup.Status.Path
+		if r.backupRepo != nil {
+			utils.InjectDatasafed(&job.Spec.Template.Spec, r.backupRepo, mountPath, backupPath)
+		} else if pvcName := r.backupSet.Backup.Status.PersistentVolumeClaimName; pvcName != "" {
+			// If the backup object was created in an old version that doesn't have the backupRepo field,
+			// use the PVC name field as a fallback.
+			utils.InjectDatasafedWithPVC(&job.Spec.Template.Spec, pvcName, mountPath, backupPath)
+		}
+	}
 	return job
 }

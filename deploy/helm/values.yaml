@@ -322,6 +322,9 @@ dataProtection:
     # Overrides the image tag whose default is the chart appVersion.
     tag: ""
     imagePullSecrets: []
+    datasafed:
+      repository: apecloud/datasafed
+      tag: ""
 
 ## BackupRepo settings
 ##

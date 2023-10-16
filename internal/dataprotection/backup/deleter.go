@@ -90,21 +90,35 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 		return DeletionStatusDeleting, nil
 	}
 
-	// if deletion job not exists, create it
-	pvcName := backup.Status.PersistentVolumeClaimName
-	if pvcName == "" {
-		d.Log.Info("skip deleting backup files because PersistentVolumeClaimName is empty",
-			"backup", backup.Name)
-		return DeletionStatusSucceeded, nil
+	var backupRepo *dpv1alpha1.BackupRepo
+	if backup.Status.BackupRepoName != "" {
+		backupRepo = &dpv1alpha1.BackupRepo{}
+		if err = d.Client.Get(d.Ctx, client.ObjectKey{Name: backup.Status.BackupRepoName}, backupRepo); err != nil {
+			if apierrors.IsNotFound(err) {
+				return DeletionStatusSucceeded, nil
+			}
+			return DeletionStatusUnknown, err
+		}
 	}
 
-	// check if backup repo PVC exists, if not, skip to delete backup files
-	pvcKey := client.ObjectKey{Namespace: backup.Namespace, Name: pvcName}
-	if err = d.Client.Get(d.Ctx, pvcKey, &corev1.PersistentVolumeClaim{}); err != nil {
-		if apierrors.IsNotFound(err) {
+	// if backupRepo is nil (likely because it's a legacy backup object), check the backup PVC
+	var legacyPVCName string
+	if backupRepo == nil {
+		legacyPVCName = backup.Status.PersistentVolumeClaimName
+		if legacyPVCName == "" {
+			d.Log.Info("skip deleting backup files because PersistentVolumeClaimName is empty",
+				"backup", backup.Name)
 			return DeletionStatusSucceeded, nil
 		}
-		return DeletionStatusUnknown, err
+
+		// check if the backup PVC exists, if not, skip to delete backup files
+		pvcKey := client.ObjectKey{Namespace: backup.Namespace, Name: legacyPVCName}
+		if err = d.Client.Get(d.Ctx, pvcKey, &corev1.PersistentVolumeClaim{}); err != nil {
+			if apierrors.IsNotFound(err) {
+				return DeletionStatusSucceeded, nil
+			}
+			return DeletionStatusUnknown, err
+		}
 	}
 
 	backupFilePath := backup.Status.Path
@@ -117,13 +131,14 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 			"backupFilePath", backupFilePath, "backup", backup.Name)
 		return DeletionStatusSucceeded, nil
 	}
-	return DeletionStatusDeleting, d.createDeleteBackupFilesJob(jobKey, backup, pvcName, backup.Status.Path)
+	return DeletionStatusDeleting, d.createDeleteBackupFilesJob(jobKey, backup, backupRepo, legacyPVCName, backup.Status.Path)
 }
 
 func (d *Deleter) createDeleteBackupFilesJob(
 	jobKey types.NamespacedName,
 	backup *dpv1alpha1.Backup,
-	backupPVCName string,
+	backupRepo *dpv1alpha1.BackupRepo,
+	legacyPVCName string,
 	backupFilePath string) error {
 	// make sure the path has a leading slash
 	if !strings.HasPrefix(backupFilePath, "/") {
@@ -133,30 +148,32 @@ func (d *Deleter) createDeleteBackupFilesJob(
 	// this script first deletes the directory where the backup is located (including files
 	// in the directory), and then traverses up the path level by level to clean up empty directories.
 	deleteScript := fmt.Sprintf(`
-		backupPathBase=%s;
-		targetPath="${backupPathBase}%s";
+		export PATH="$PATH:%s";
+		# unset the base path for datasafed, so that we can access to the upper folders
+		unset %s;
+		targetPath="%s";
 
 		echo "removing backup files in ${targetPath}";
-		rm -rf "${targetPath}";
+		datasafed rm -r "${targetPath}";
 
-		absBackupPathBase=$(realpath "${backupPathBase}");
-		curr=$(realpath "${targetPath}");
+		curr="${targetPath}";
 		while true; do
 			parent=$(dirname "${curr}");
-			if [ "${parent}" == "${absBackupPathBase}" ]; then
-				echo "reach backupPathBase ${backupPathBase}, done";
+			if [ "${parent}" == "/" ]; then
+				echo "reach to root, done";
 				break;
 			fi;
-			if [ ! "$(ls -A "${parent}")" ]; then
+			result=$(datasafed list "${parent}");
+			if [ -z "$result" ]; then
 				echo "${parent} is empty, removing it...";
-				rmdir "${parent}";
+				datasafed rmdir "${parent}";
 			else
 				echo "${parent} is not empty, done";
 				break;
 			fi;
 			curr="${parent}";
 		done
-	`, RepoVolumeMountPath, backupFilePath)
+	`, dptypes.DPDatasafedBinPath, dptypes.DPDatasafedBackendBasePath, backupFilePath)
 
 	runAsUser := int64(0)
 	container := corev1.Container{
@@ -169,9 +186,6 @@ func (d *Deleter) createDeleteBackupFilesJob(
 			AllowPrivilegeEscalation: boolptr.False(),
 			RunAsUser:                &runAsUser,
 		},
-		VolumeMounts: []corev1.VolumeMount{
-			buildBackupRepoVolumeMount(backupPVCName),
-		},
 	}
 	ctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 
@@ -179,13 +193,14 @@ func (d *Deleter) createDeleteBackupFilesJob(
 	podSpec := corev1.PodSpec{
 		Containers:    []corev1.Container{container},
 		RestartPolicy: corev1.RestartPolicyNever,
-		Volumes: []corev1.Volume{
-			buildBackupRepoVolume(backupPVCName),
-		},
 	}
-
 	if err := utils.AddTolerations(&podSpec); err != nil {
 		return err
+	}
+	if backupRepo != nil {
+		utils.InjectDatasafed(&podSpec, backupRepo, RepoVolumeMountPath, backupFilePath)
+	} else {
+		utils.InjectDatasafedWithPVC(&podSpec, legacyPVCName, RepoVolumeMountPath, backupFilePath)
 	}
 
 	// build job

@@ -208,7 +208,7 @@ var _ = Describe("Backup Controller test", func() {
 				jobKey := dpbackup.BuildDeleteBackupFilesJobKey(backup)
 				job := &batchv1.Job{}
 				Eventually(testapps.CheckObjExists(&testCtx, jobKey, job, true)).Should(Succeed())
-				volumeName := dpbackup.GenerateBackupRepoVolumeName(repoPVCName)
+				volumeName := "dp-backup-data"
 				Eventually(testapps.CheckObj(&testCtx, jobKey, func(g Gomega, job *batchv1.Job) {
 					Expect(job.Spec.Template.Spec.Volumes).
 						Should(ContainElement(corev1.Volume{

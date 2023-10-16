@@ -302,20 +302,42 @@ func (r *BackupReconciler) handleBackupRepo(request *dpbackup.Request) error {
 	}
 	request.BackupRepo = repo
 
-	pvcName := repo.Status.BackupPVCName
-	if pvcName == "" {
-		return dperrors.NewBackupPVCNameIsEmpty(repo.Name, request.Spec.BackupPolicyName)
+	if repo.Status.Phase != dpv1alpha1.BackupRepoReady {
+		return dperrors.NewBackupRepoIsNotReady(repo.Name)
 	}
 
-	pvc := &corev1.PersistentVolumeClaim{}
-	pvcKey := client.ObjectKey{Namespace: request.Req.Namespace, Name: pvcName}
-	if err = r.Client.Get(request.Ctx, pvcKey, pvc); err != nil {
-		return client.IgnoreNotFound(err)
-	}
-
-	// backupRepo PVC exists, record the PVC name
-	if err == nil {
-		request.BackupRepoPVC = pvc
+	switch {
+	case repo.AccessByMount():
+		pvcName := repo.Status.BackupPVCName
+		if pvcName == "" {
+			return dperrors.NewBackupPVCNameIsEmpty(repo.Name, request.Spec.BackupPolicyName)
+		}
+		pvc := &corev1.PersistentVolumeClaim{}
+		pvcKey := client.ObjectKey{Namespace: request.Req.Namespace, Name: pvcName}
+		if err = r.Client.Get(request.Ctx, pvcKey, pvc); err != nil {
+			// will wait for the backuprepo controller to create the PVC,
+			// so ignore the NotFound error
+			return client.IgnoreNotFound(err)
+		}
+		// backupRepo PVC exists, record the PVC name
+		if err == nil {
+			request.BackupRepoPVC = pvc
+		}
+	case repo.AccessByMount():
+		toolConfigSecretName := repo.Status.ToolConfigSecretName
+		if toolConfigSecretName == "" {
+			return dperrors.NewToolConfigSecretNameIsEmpty(repo.Name)
+		}
+		secret := &corev1.Secret{}
+		secretKey := client.ObjectKey{Namespace: request.Req.Namespace, Name: toolConfigSecretName}
+		if err = r.Client.Get(request.Ctx, secretKey, secret); err != nil {
+			// will wait for the backuprepo controller to create the secret,
+			// so ignore the NotFound error
+			return client.IgnoreNotFound(err)
+		}
+		if err == nil {
+			request.ToolConfigSecret = secret
+		}
 	}
 	return nil
 }
@@ -327,8 +349,10 @@ func (r *BackupReconciler) patchBackupStatus(
 	request.Status.Path = dpbackup.BuildBackupPath(request.Backup, request.BackupPolicy.Spec.PathPrefix)
 	request.Status.Target = request.BackupPolicy.Spec.Target
 	request.Status.BackupMethod = request.BackupMethod
-	request.Status.PersistentVolumeClaimName = request.BackupRepoPVC.Name
 	request.Status.BackupRepoName = request.BackupRepo.Name
+	if request.BackupRepoPVC != nil {
+		request.Status.PersistentVolumeClaimName = request.BackupRepoPVC.Name
+	}
 
 	// init action status
 	actions, err := request.BuildActions()
@@ -383,10 +407,10 @@ func (r *BackupReconciler) patchBackupObjectMeta(
 	request.Labels[constant.AppManagedByLabelKey] = constant.AppName
 	request.Labels[dataProtectionLabelBackupTypeKey] = request.GetBackupType()
 
-	// if the backupRepo PVC is not present, add a special label and wait for the
-	// backup repo controller to create the PVC.
+	// wait for the backup repo controller to prepare the essential resource.
 	wait := false
-	if request.BackupRepoPVC == nil {
+	if (request.BackupRepo.AccessByMount() && request.BackupRepoPVC == nil) ||
+		(request.BackupRepo.AccessByTool() && request.ToolConfigSecret == nil) {
 		request.Labels[dataProtectionWaitRepoPreparationKey] = trueVal
 		wait = true
 	}

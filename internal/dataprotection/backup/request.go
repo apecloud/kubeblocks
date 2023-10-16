@@ -50,13 +50,14 @@ type Request struct {
 	*dpv1alpha1.Backup
 	intctrlutil.RequestCtx
 
-	Client        client.Client
-	BackupPolicy  *dpv1alpha1.BackupPolicy
-	BackupMethod  *dpv1alpha1.BackupMethod
-	ActionSet     *dpv1alpha1.ActionSet
-	TargetPods    []*corev1.Pod
-	BackupRepoPVC *corev1.PersistentVolumeClaim
-	BackupRepo    *dpv1alpha1.BackupRepo
+	Client           client.Client
+	BackupPolicy     *dpv1alpha1.BackupPolicy
+	BackupMethod     *dpv1alpha1.BackupMethod
+	ActionSet        *dpv1alpha1.ActionSet
+	TargetPods       []*corev1.Pod
+	BackupRepoPVC    *corev1.PersistentVolumeClaim
+	BackupRepo       *dpv1alpha1.BackupRepo
+	ToolConfigSecret *corev1.Secret
 }
 
 func (r *Request) GetBackupType() string {
@@ -274,10 +275,6 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 				Value: r.Backup.Name,
 			},
 			{
-				Name:  dptypes.DPBackupDIR,
-				Value: buildBackupPathInContainer(r.Backup, r.BackupPolicy.Spec.PathPrefix),
-			},
-			{
 				Name:  dptypes.DPTargetPodName,
 				Value: targetPod.Name,
 			},
@@ -294,15 +291,11 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 	}
 
 	buildVolumes := func() []corev1.Volume {
-		return append([]corev1.Volume{
-			buildBackupRepoVolume(r.BackupRepoPVC.Name),
-		}, getVolumesByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)...)
+		return getVolumesByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)
 	}
 
 	buildVolumeMounts := func() []corev1.VolumeMount {
-		return append([]corev1.VolumeMount{
-			buildBackupRepoVolumeMount(r.BackupRepoPVC.Name),
-		}, getVolumeMountsByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)...)
+		return getVolumeMountsByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)
 	}
 
 	runAsUser := int64(0)
@@ -348,6 +341,8 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 			corev1.LabelHostname: targetPod.Spec.NodeName,
 		}
 	}
+	utils.InjectDatasafed(podSpec, r.BackupRepo, RepoVolumeMountPath,
+		BuildBackupPath(r.Backup, r.BackupPolicy.Spec.PathPrefix))
 	return podSpec
 }
 
@@ -357,6 +352,22 @@ func (r *Request) injectSyncProgressContainer(podSpec *corev1.PodSpec,
 	if !boolptr.IsSetToTrue(sync.Enabled) {
 		return
 	}
+
+	// the backup info file will be written to this shared dir
+	sharedVolumeName := "dp-shared-syncprogress"
+	mountPath := "/dpsyncprogress"
+	volume := corev1.Volume{
+		Name: sharedVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	}
+	volumeMount := corev1.VolumeMount{
+		Name:      sharedVolumeName,
+		MountPath: mountPath,
+	}
+	podSpec.Volumes = append(podSpec.Volumes, volume)
+	podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, volumeMount)
 
 	// build container to sync backup progress that will update the backup status
 	container := podSpec.Containers[0].DeepCopy()
@@ -375,7 +386,7 @@ func (r *Request) injectSyncProgressContainer(podSpec *corev1.PodSpec,
 	container.Env = append(container.Env,
 		corev1.EnvVar{
 			Name:  dptypes.DPBackupInfoFile,
-			Value: buildBackupInfoFilePath(r.Backup, r.BackupPolicy.Spec.PathPrefix),
+			Value: mountPath + "/" + backupInfoFileName,
 		},
 		corev1.EnvVar{
 			Name:  dptypes.DPCheckInterval,

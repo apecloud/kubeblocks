@@ -54,7 +54,7 @@ func NewListComponentsCmd(f cmdutil.Factory, streams genericiooptions.IOStreams)
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(validate(args))
 			o.Names = args
-			util.CheckErr(run(o))
+			util.CheckErr(listComponents(o))
 		},
 	}
 	return cmd
@@ -67,7 +67,7 @@ func validate(args []string) error {
 	return nil
 }
 
-func run(o *list.ListOptions) error {
+func listComponents(o *list.ListOptions) error {
 	o.Print = false
 
 	r, err := o.Run()

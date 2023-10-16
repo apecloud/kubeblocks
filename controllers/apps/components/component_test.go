@@ -803,7 +803,7 @@ var _ = Describe("Component", func() {
 			Expect(status().Phase).Should(Equal(appsv1alpha1.StoppedClusterCompPhase))
 		})
 
-		FIt("failure at provisioning", func() {
+		It("failure at provisioning", func() {
 			By("mock workloads ready, but keep status phase as CREATING")
 			mockWorkloadsReady()
 
@@ -817,7 +817,7 @@ var _ = Describe("Component", func() {
 			Expect(status().Phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 		})
 
-		FIt("failure at deleting", func() {
+		It("failure at deleting", func() {
 			By("mock workloads ready and component status as RUNNING")
 			mockWorkloadsReady()
 			Expect(statusComponent()).Should(Succeed())

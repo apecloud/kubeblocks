@@ -40,7 +40,7 @@ import (
 
 var (
 	listExample = templates.Examples(`
-	# List all backuprepos
+	# List all backup repositories
 	kbcli backuprepo list
 	`)
 )
@@ -56,7 +56,7 @@ func newListCommand(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobr
 	}
 	cmd := &cobra.Command{
 		Use:               "list",
-		Short:             "List BackupRepo.",
+		Short:             "List Backup Repositories.",
 		Aliases:           []string{"ls"},
 		Example:           listExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.BackupRepoGVR()),
@@ -99,7 +99,7 @@ func printBackupRepoList(o *listBackupRepoOptions) error {
 	}
 
 	if len(infos) == 0 {
-		fmt.Fprintln(o.IOStreams.Out, "No backup Repo found")
+		fmt.Fprintln(o.IOStreams.Out, "No backup repository found")
 		return nil
 	}
 
@@ -134,6 +134,7 @@ func printBackupRepoList(o *listBackupRepoOptions) error {
 			tbl.AddRow(backupRepo.Name,
 				backupRepo.Status.Phase,
 				backupRepo.Spec.StorageProviderRef,
+				backupRepo.Spec.AccessMethod,
 				backupRepo.Status.IsDefault,
 				fmt.Sprintf("%d", backups),
 				backupSize,
@@ -143,7 +144,7 @@ func printBackupRepoList(o *listBackupRepoOptions) error {
 	}
 
 	if err = printer.PrintTable(o.Out, nil, printRows,
-		"NAME", "STATUS", "STORAGE-PROVIDER", "DEFAULT", "BACKUPS", "TOTAL-SIZE"); err != nil {
+		"NAME", "STATUS", "STORAGE-PROVIDER", "ACCESS-METHOD", "DEFAULT", "BACKUPS", "TOTAL-SIZE"); err != nil {
 		return err
 	}
 	return nil

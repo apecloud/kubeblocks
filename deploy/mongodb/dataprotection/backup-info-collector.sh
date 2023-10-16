@@ -6,11 +6,13 @@ function get_current_time() {
 }
 
 function stat_and_save_backup_info() {
+  export PATH="$PATH:$DP_DATASAFED_BIN_PATH"
+  export DATASAFED_BACKEND_BASE_PATH="$DP_BACKUP_BASE_PATH"
   START_TIME=$1
   STOP_TIME=$2
   if [ -z $STOP_TIME ]; then
     STOP_TIME=`get_current_time`
   fi
-  TOTAL_SIZE=$(du -shx ${DP_BACKUP_DIR}|awk '{print $1}')
-  echo "{\"totalSize\":\"$TOTAL_SIZE\",\"timeRange\":{\"start\":\"${START_TIME}\",\"end\":\"${STOP_TIME}\"}}" > ${DP_BACKUP_DIR}/backup.info
+  TOTAL_SIZE=$(datasafed stat / | grep TotalSize | awk '{print $2}')
+  echo "{\"totalSize\":\"$TOTAL_SIZE\",\"timeRange\":{\"start\":\"${START_TIME}\",\"end\":\"${STOP_TIME}\"}}" > "${DP_BACKUP_INFO_FILE}"
 }

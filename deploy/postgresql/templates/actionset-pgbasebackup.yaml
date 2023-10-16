@@ -10,8 +10,6 @@ spec:
   env:
     - name: DATA_DIR
       value: {{ .Values.dataMountPath }}/pgroot/data
-    - name: COMPRESS_LEVEL
-      value: "0"
   backup:
     preBackup: []
     postBackup: []

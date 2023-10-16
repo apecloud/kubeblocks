@@ -33,6 +33,10 @@ const (
 	ErrorTypeBackupNotCompleted intctrlutil.ErrorType = "BackupNotCompleted"
 	// ErrorTypeBackupPVCNameIsEmpty pvc name for backup is empty
 	ErrorTypeBackupPVCNameIsEmpty intctrlutil.ErrorType = "BackupPVCNameIsEmpty"
+	// ErrorTypeBackupRepoIsNotReady the backup repository is not ready
+	ErrorTypeBackupRepoIsNotReady intctrlutil.ErrorType = "BackupRepoIsNotReady"
+	// ErrorTypeToolConfigSecretNameIsEmpty the name of  repository is not ready
+	ErrorTypeToolConfigSecretNameIsEmpty intctrlutil.ErrorType = "ToolConfigSecretNameIsEmpty"
 	// ErrorTypeBackupJobFailed backup job failed
 	ErrorTypeBackupJobFailed intctrlutil.ErrorType = "BackupJobFailed"
 	// ErrorTypeStorageNotMatch storage not match
@@ -57,6 +61,16 @@ func NewBackupNotSupported(backupType, backupPolicyName string) *intctrlutil.Err
 // NewBackupPVTemplateNotFound returns a new Error with ErrorTypeBackupPVTemplateNotFound.
 func NewBackupPVTemplateNotFound(cmName, cmNamespace string) *intctrlutil.Error {
 	return intctrlutil.NewErrorf(ErrorTypeBackupPVTemplateNotFound, `"the persistentVolume template is empty in the configMap %s/%s", pvConfig.Namespace, pvConfig.Name`, cmNamespace, cmName)
+}
+
+// NewBackupRepoIsNotReady returns a new Error with ErrorTypeBackupRepoIsNotReady.
+func NewBackupRepoIsNotReady(backupRepo string) *intctrlutil.Error {
+	return intctrlutil.NewErrorf(ErrorTypeBackupRepoIsNotReady, `the backup repository %s is not ready`, backupRepo)
+}
+
+// NewToolConfigSecretNameIsEmpty returns a new Error with ErrorTypeToolConfigSecretNameIsEmpty.
+func NewToolConfigSecretNameIsEmpty(backupRepo string) *intctrlutil.Error {
+	return intctrlutil.NewErrorf(ErrorTypeToolConfigSecretNameIsEmpty, `the secret name of tool config from %s is empty`, backupRepo)
 }
 
 // NewBackupPVCNameIsEmpty returns a new Error with ErrorTypeBackupPVCNameIsEmpty.

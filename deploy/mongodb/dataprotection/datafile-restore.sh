@@ -1,4 +1,7 @@
 set -e
+set -o pipefail
+export PATH="$PATH:$DP_DATASAFED_BIN_PATH"
+export DATASAFED_BACKEND_BASE_PATH="$DP_BACKUP_BASE_PATH"
 mkdir -p ${DATA_DIR}
 res=`ls -A ${DATA_DIR}`
 data_protection_file=${DATA_DIR}/.kb-data-protection
@@ -8,5 +11,5 @@ if [ ! -z "${res}" ] && [ ! -f ${data_protection_file} ]; then
 fi
 cd ${DATA_DIR} && touch mongodb.backup
 touch ${data_protection_file}
-tar -xvf ${DP_BACKUP_DIR}/${DP_BACKUP_NAME}.tar.gz -C ${DATA_DIR}
+datasafed pull "${DP_BACKUP_NAME}.tar.gz" - | tar -xzvf - -C ${DATA_DIR}
 rm -rf ${data_protection_file} && sync

@@ -85,7 +85,7 @@ var _ = Describe("backuprepo create command", func() {
 		err := options.init(tf)
 		Expect(err).ShouldNot(HaveOccurred())
 
-		providerObj := testing.FakeStorageProvider("fake-s3")
+		providerObj := testing.FakeStorageProvider("fake-s3", nil)
 		repoObj := testing.FakeBackupRepo("test-backuprepo", false)
 		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
 			scheme.Scheme, providerObj, repoObj)
@@ -208,7 +208,7 @@ var _ = Describe("backuprepo create command", func() {
 		})
 		It("should validate if there is a default backup repo", func() {
 			By("setting up a default backup repo")
-			providerObj := testing.FakeStorageProvider("fake-s3")
+			providerObj := testing.FakeStorageProvider("fake-s3", nil)
 			repoObj := testing.FakeBackupRepo("test-backuprepo", true)
 			tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
 				scheme.Scheme, providerObj, repoObj)
@@ -220,6 +220,46 @@ var _ = Describe("backuprepo create command", func() {
 			err = options.validate(cmd)
 			Expect(err).Should(MatchError(ContainSubstring("there is already a default backup repo")))
 		})
+		Context("validate access method", func() {
+			const supported = "supported"
+			BeforeEach(func() {
+				options.providerObject.Spec.StorageClassTemplate = ""
+				options.providerObject.Spec.PersistentVolumeClaimTemplate = ""
+				options.providerObject.Spec.DatasafedConfigTemplate = ""
+				options.accessMethod = "" // unspecified
+			})
+			It("should return error if the provider doesn't support any access method", func() {
+				Expect(options.supportedAccessMethods()).Should(BeEmpty())
+				err := options.validate(cmd)
+				Expect(err).Should(MatchError(ContainSubstring("it doesn't support any access method")))
+			})
+			It("should use the mount method if it's the only supported access method", func() {
+				options.providerObject.Spec.StorageClassTemplate = supported
+				err := options.validate(cmd)
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(options.accessMethod).Should(Equal("Mount"))
+			})
+			It("should use the tool method if it's the only supported access method", func() {
+				options.providerObject.Spec.DatasafedConfigTemplate = supported
+				err := options.validate(cmd)
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(options.accessMethod).Should(Equal("Tool"))
+			})
+			It("should return error if the specified access method is not supported", func() {
+				options.providerObject.Spec.StorageClassTemplate = supported
+				options.accessMethod = "Tool"
+				err := options.validate(cmd)
+				Expect(err).Should(MatchError(ContainSubstring("doesn't support \"Tool\" access method")))
+			})
+			It("should prefer using the tool method", func() {
+				options.providerObject.Spec.StorageClassTemplate = supported
+				options.providerObject.Spec.DatasafedConfigTemplate = supported
+				options.accessMethod = ""
+				err := options.validate(cmd)
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(options.accessMethod).Should(Equal("Tool"))
+			})
+		})
 	})
 
 	Describe("run", func() {
@@ -227,7 +267,7 @@ var _ = Describe("backuprepo create command", func() {
 			By("preparing the options")
 			err := options.parseProviderFlags(cmd, []string{
 				"--provider", "fake-s3", "--access-key-id", "abc", "--secret-access-key", "def",
-				"--region", "us-west-1", "--bucket", "test-bucket", "--default",
+				"--region", "us-west-1", "--bucket", "test-bucket", "--default", "--access-method", "Mount",
 			}, tf)
 			Expect(err).ShouldNot(HaveOccurred())
 			err = options.complete(cmd)

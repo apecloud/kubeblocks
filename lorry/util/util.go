@@ -40,7 +40,7 @@ func IsHAAvailable(characterType, workloadType string) bool {
 			return true
 		}
 	case "official-postgresql":
-		if strings.EqualFold(workloadType, Consensus) {
+		if strings.EqualFold(workloadType, Replication) {
 			return true
 		}
 	}

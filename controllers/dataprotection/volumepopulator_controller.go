@@ -173,7 +173,7 @@ func (r *VolumePopulatorReconciler) populate(reqCtx intctrlutil.RequestCtx, pvc 
 		}
 
 		// 1. build populate job
-		job, err := restoreMgr.BuildVolumePopulateJob(v, populatePVC, i)
+		job, err := restoreMgr.BuildVolumePopulateJob(reqCtx, r.Client, v, populatePVC, i)
 		if err != nil {
 			return err
 		}

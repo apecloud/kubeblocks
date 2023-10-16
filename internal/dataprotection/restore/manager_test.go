@@ -262,7 +262,7 @@ var _ = Describe("Backup Deleter Test", func() {
 					Name: "test-populate-pvc",
 				},
 			}
-			job, err := restoreMGR.BuildVolumePopulateJob(*backupSet, populatePVC, 0)
+			job, err := restoreMGR.BuildVolumePopulateJob(reqCtx, k8sClient, *backupSet, populatePVC, 0)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(job).ShouldNot(BeNil())
 		})

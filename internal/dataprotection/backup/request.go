@@ -38,11 +38,13 @@ import (
 )
 
 const (
-	BackupDataJobNamePrefix   = "dp-backup"
-	prebackupJobNamePrefix    = "dp-prebackup"
-	postbackupJobNamePrefix   = "dp-postbackup"
-	backupDataContainerName   = "backupdata"
-	syncProgressContainerName = "sync-progress"
+	BackupDataJobNamePrefix      = "dp-backup"
+	prebackupJobNamePrefix       = "dp-prebackup"
+	postbackupJobNamePrefix      = "dp-postbackup"
+	backupDataContainerName      = "backupdata"
+	syncProgressContainerName    = "sync-progress"
+	syncProgressSharedVolumeName = "sync-progress-shared-volume"
+	syncProgressSharedMountPath  = "/dp-sync-progress"
 )
 
 // Request is a request for a backup, with all references to other objects.
@@ -50,13 +52,14 @@ type Request struct {
 	*dpv1alpha1.Backup
 	intctrlutil.RequestCtx
 
-	Client        client.Client
-	BackupPolicy  *dpv1alpha1.BackupPolicy
-	BackupMethod  *dpv1alpha1.BackupMethod
-	ActionSet     *dpv1alpha1.ActionSet
-	TargetPods    []*corev1.Pod
-	BackupRepoPVC *corev1.PersistentVolumeClaim
-	BackupRepo    *dpv1alpha1.BackupRepo
+	Client           client.Client
+	BackupPolicy     *dpv1alpha1.BackupPolicy
+	BackupMethod     *dpv1alpha1.BackupMethod
+	ActionSet        *dpv1alpha1.ActionSet
+	TargetPods       []*corev1.Pod
+	BackupRepoPVC    *corev1.PersistentVolumeClaim
+	BackupRepo       *dpv1alpha1.BackupRepo
+	ToolConfigSecret *corev1.Secret
 }
 
 func (r *Request) GetBackupType() string {
@@ -274,12 +277,16 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 				Value: r.Backup.Name,
 			},
 			{
-				Name:  dptypes.DPBackupDIR,
-				Value: buildBackupPathInContainer(r.Backup, r.BackupPolicy.Spec.PathPrefix),
-			},
-			{
 				Name:  dptypes.DPTargetPodName,
 				Value: targetPod.Name,
+			},
+			{
+				Name:  dptypes.DPBackupBasePath,
+				Value: BuildBackupPath(r.Backup, r.BackupPolicy.Spec.PathPrefix),
+			},
+			{
+				Name:  dptypes.DPBackupInfoFile,
+				Value: syncProgressSharedMountPath + "/" + backupInfoFileName,
 			},
 			{
 				Name:  dptypes.DPTTL,
@@ -294,15 +301,27 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 	}
 
 	buildVolumes := func() []corev1.Volume {
-		return append([]corev1.Volume{
-			buildBackupRepoVolume(r.BackupRepoPVC.Name),
-		}, getVolumesByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)...)
+		return append(
+			[]corev1.Volume{
+				{
+					Name: syncProgressSharedVolumeName,
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				},
+			},
+			getVolumesByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)...)
 	}
 
 	buildVolumeMounts := func() []corev1.VolumeMount {
-		return append([]corev1.VolumeMount{
-			buildBackupRepoVolumeMount(r.BackupRepoPVC.Name),
-		}, getVolumeMountsByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)...)
+		return append(
+			[]corev1.VolumeMount{
+				{
+					Name:      syncProgressSharedVolumeName,
+					MountPath: syncProgressSharedMountPath,
+				},
+			},
+			getVolumeMountsByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)...)
 	}
 
 	runAsUser := int64(0)
@@ -348,6 +367,8 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 			corev1.LabelHostname: targetPod.Spec.NodeName,
 		}
 	}
+	utils.InjectDatasafed(podSpec, r.BackupRepo, RepoVolumeMountPath,
+		BuildBackupPath(r.Backup, r.BackupPolicy.Spec.PathPrefix))
 	return podSpec
 }
 
@@ -373,10 +394,6 @@ func (r *Request) injectSyncProgressContainer(podSpec *corev1.PodSpec,
 		checkIntervalSeconds = *sync.IntervalSeconds
 	}
 	container.Env = append(container.Env,
-		corev1.EnvVar{
-			Name:  dptypes.DPBackupInfoFile,
-			Value: buildBackupInfoFilePath(r.Backup, r.BackupPolicy.Spec.PathPrefix),
-		},
 		corev1.EnvVar{
 			Name:  dptypes.DPCheckInterval,
 			Value: fmt.Sprintf("%d", checkIntervalSeconds)},

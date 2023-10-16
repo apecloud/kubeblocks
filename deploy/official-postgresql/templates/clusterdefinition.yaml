@@ -15,7 +15,7 @@ spec:
   componentDefs:
     - name: postgresql
       workloadType: Replication
-      characterType: postgresql
+      characterType: official-postgresql
       probes:
         roleProbe:
           failureThreshold: {{ .Values.roleProbe.failureThreshold }}

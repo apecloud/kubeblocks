@@ -16,10 +16,6 @@ var _ = Describe("clusterdefinition list components", func() {
 		tf      *cmdtesting.TestFactory
 	)
 
-	AfterEach(func() {
-		tf.Cleanup()
-	})
-
 	It("create list-components cmd", func() {
 		cmd := NewListComponentsCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())

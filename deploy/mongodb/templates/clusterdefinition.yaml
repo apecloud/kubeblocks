@@ -58,6 +58,7 @@ spec:
             accessMode: Readonly
         updateStrategy: Serial
       rsmSpec:
+        memberUpdateStrategy: Serial
         roles:
         - accessMode: ReadWrite
           canVote: true

@@ -433,12 +433,6 @@ func resolvePodSpecDefaultFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 			resolveContainerProbe(*c.StartupProbe, cc.StartupProbe)
 		}
 	}
-	min := func(a, b int) int {
-		if a < b {
-			return a
-		}
-		return b
-	}
 	for i := 0; i < min(len(obj.Volumes), len(pobj.Volumes)); i++ {
 		resolveVolume(obj.Volumes[i], &pobj.Volumes[i])
 	}

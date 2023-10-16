@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -119,6 +120,10 @@ func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *a
 	if err != nil {
 		return nil, err
 	}
+	backupSpec.BackupMethod, err = getDefaultBackupMethod(reqCtx, cli, cluster, backupSpec.BackupPolicyName, backupSpec.BackupMethod)
+	if err != nil {
+		return nil, err
+	}
 
 	backup := &dpv1alpha1.Backup{
 		ObjectMeta: metav1.ObjectMeta{
@@ -130,6 +135,32 @@ func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *a
 			BackupPolicyName: backupSpec.BackupPolicyName,
 			BackupMethod:     backupSpec.BackupMethod,
 		},
+	}
+
+	if backupSpec.DeletionPolicy != "" {
+		backup.Spec.DeletionPolicy = dpv1alpha1.BackupDeletionPolicy(backupSpec.DeletionPolicy)
+	}
+	if backupSpec.RetentionPeriod != "" {
+		retentionPeriod := dpv1alpha1.RetentionPeriod(backupSpec.RetentionPeriod)
+		if _, err := retentionPeriod.ToDuration(); err != nil {
+			return nil, err
+		}
+		backup.Spec.RetentionPeriod = retentionPeriod
+	}
+	if backupSpec.ParentBackupName != "" {
+		parentBackup := dpv1alpha1.Backup{}
+		if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: backupSpec.ParentBackupName, Namespace: cluster.Namespace}, &parentBackup); err != nil {
+			return nil, err
+		}
+		// check parent backup exists and completed
+		if parentBackup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
+			return nil, fmt.Errorf("parent backup %s is not completed", backupSpec.ParentBackupName)
+		}
+		// check parent backup belongs to the cluster of the backup
+		if parentBackup.Labels[constant.AppInstanceLabelKey] != cluster.Name {
+			return nil, fmt.Errorf("parent backup %s is not belong to cluster %s", backupSpec.ParentBackupName, cluster.Name)
+		}
+		backup.Spec.ParentBackupName = backupSpec.ParentBackupName
 	}
 
 	return backup, nil
@@ -163,6 +194,38 @@ func getDefaultBackupPolicy(reqCtx intctrlutil.RequestCtx, cli client.Client, cl
 	}
 
 	return defaultBackupPolices.Items[0].GetName(), nil
+}
+
+func getDefaultBackupMethod(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster, backupPolicyName string, backupMethod string) (string, error) {
+	// if backupMethod is not empty, return it directly
+	if backupMethod != "" {
+		return backupMethod, nil
+	}
+
+	// if backupPolicy is empty, return error
+	if backupPolicyName == "" {
+		return "", fmt.Errorf("backup policy is empty")
+	}
+
+	backupPolicy := &dpv1alpha1.BackupPolicy{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: backupPolicyName, Namespace: cluster.Namespace}, backupPolicy); err != nil {
+		return "", err
+	}
+
+	if len(backupPolicy.Spec.BackupMethods) == 0 {
+		return "", fmt.Errorf(`backup policy "%s" has no backup method`, backupPolicyName)
+	}
+
+	// select the first backup method as default
+	// and if there are multiple backup methods, use the one with snapshotVolumes=true as default.
+	backupMethod = backupPolicy.Spec.BackupMethods[0].Name
+	for _, method := range backupPolicy.Spec.BackupMethods {
+		if boolptr.IsSetToTrue(method.SnapshotVolumes) {
+			backupMethod = method.Name
+		}
+	}
+
+	return backupMethod, nil
 }
 
 func getBackupLabels(cluster, request string) map[string]string {

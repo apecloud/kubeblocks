@@ -45,7 +45,7 @@ metadata:
   namespace: default
 spec:
   clusterDefinitionRef: mongodb
-  clusterVersionRef: mongodb-5.0.14
+  clusterVersionRef: mongodb-5.0
   componentSpecs:
   - name: mongodb 
     componentDefRef: mongodb

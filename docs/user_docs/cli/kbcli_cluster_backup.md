@@ -29,11 +29,11 @@ kbcli cluster backup NAME [flags]
 ```
       --deletion-policy string    Deletion policy for backup, determine whether the backup content in backup repo will be deleted after the backup is deleted, supported values: [Delete, Retain] (default "Delete")
   -h, --help                      help for backup
-      --method string             Backup method that defined in backup policy (required), if only one backup method in backup policy, use it as default backup method, if multiple backup methods in backup policy, use method which volume snapshot is true as default backup method
+      --method string             Backup methods are defined in backup policy (required), if only one backup method in backup policy, use it as default backup method, if multiple backup methods in backup policy, use method which volume snapshot is true as default backup method
       --name string               Backup name
       --parent-backup string      Parent backup name, used for incremental backup
-      --policy string             Backup policy name, this flag will be ignored when backup-type is snapshot
-      --retention-period string   Retention period for backup, supported values: [1y, 1m, 1d, 1h, 1m] or combine them [1y1m1d1h1m]
+      --policy string             Backup policy name, if not specified, use the cluster default backup policy
+      --retention-period string   Retention period for backup, supported values: [1y, 1mo, 1d, 1h, 1m] or combine them [1y1mo1d1h1m], if not specified, the backup will not be automatically deleted, you need to manually delete it.
 ```
 
 ### Options inherited from parent commands

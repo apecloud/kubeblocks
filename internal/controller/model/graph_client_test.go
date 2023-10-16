@@ -20,25 +20,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package model
 
 import (
+	"slices"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"slices"
 
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
 var _ = Describe("graph client test.", func() {
+	const (
+		namespace = "foo"
+		name      = "bar"
+	)
+
 	Context("GraphWriter", func() {
 		It("should work well", func() {
 			graphCli := NewGraphClient(nil)
 			dag := graph.NewDAG()
 			dagExpected := graph.NewDAG()
-			namespace := "foo"
-			name := "bar"
 			root := builder.NewStatefulSetBuilder(namespace, name).GetObject()
 
 			By("init root vertex")
@@ -139,8 +144,6 @@ var _ = Describe("graph client test.", func() {
 			graphCli := NewGraphClient(nil)
 			dag := graph.NewDAG()
 			dagExpected := graph.NewDAG()
-			namespace := "foo"
-			name := "bar"
 
 			By("create none root vertex first")
 			obj := builder.NewPodBuilder(namespace, name+"0").GetObject()
@@ -161,8 +164,6 @@ var _ = Describe("graph client test.", func() {
 		It("IsAction should work", func() {
 			graphCli := NewGraphClient(nil)
 			dag := graph.NewDAG()
-			namespace := "foo"
-			name := "bar"
 
 			By("create root vertex")
 			obj := builder.NewPodBuilder(namespace, name+"0").GetObject()

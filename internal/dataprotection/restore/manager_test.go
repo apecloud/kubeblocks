@@ -42,12 +42,6 @@ import (
 )
 
 var _ = Describe("Backup Deleter Test", func() {
-	const (
-		backupRepoPVCName = "backup-repo-pvc"
-		backupPath        = "/backup/test-backup"
-		backupVSName      = "backup-vs"
-		backupPVCName     = "backup-pvc"
-	)
 
 	cleanEnv := func() {
 		By("clean resources")

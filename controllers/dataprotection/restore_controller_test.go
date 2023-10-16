@@ -161,7 +161,7 @@ var _ = Describe("Restore Controller test", func() {
 			}
 		}
 
-		testRestoreWitVolumeClaimsTemplate := func(replicas, startingIndex int) {
+		testRestoreWithVolumeClaimsTemplate := func(replicas, startingIndex int) {
 			restore := initResourcesAndWaitRestore(true, false, false, dpv1alpha1.RestorePhaseRunning,
 				func(f *testdp.MockRestoreFactory) {
 					f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
@@ -222,11 +222,11 @@ var _ = Describe("Restore Controller test", func() {
 
 		Context("test prepareData stage", func() {
 			It("test volumeClaimsTemplate when startingIndex is 0", func() {
-				testRestoreWitVolumeClaimsTemplate(3, 0)
+				testRestoreWithVolumeClaimsTemplate(3, 0)
 			})
 
 			It("test volumeClaimsTemplate when startingIndex is 1", func() {
-				testRestoreWitVolumeClaimsTemplate(2, 1)
+				testRestoreWithVolumeClaimsTemplate(2, 1)
 			})
 
 			It("test volumeClaimsTemplate when volumeClaimManagementPolicy is Serial", func() {

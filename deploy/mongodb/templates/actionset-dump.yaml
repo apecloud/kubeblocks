@@ -33,7 +33,7 @@ spec:
         image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
         runOnTargetPodNode: false
         command:
-        - sh
+        - bash
         - -c
         - |
           {{- .Files.Get "dataprotection/mongodump-restore.sh" | nindent 10 }}

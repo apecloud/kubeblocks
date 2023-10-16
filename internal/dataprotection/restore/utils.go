@@ -262,3 +262,11 @@ func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 	}
 	return err
 }
+
+func cutJobName(jobName string) string {
+	l := len(jobName)
+	if l > 63 {
+		return fmt.Sprintf("%s-%s", jobName[:57], jobName[l-5:l])
+	}
+	return jobName
+}

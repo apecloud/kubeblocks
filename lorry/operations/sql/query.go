@@ -58,7 +58,7 @@ func (s *Query) Init(ctx context.Context) error {
 }
 
 func (s *Query) IsReadonly(ctx context.Context) bool {
-	return false
+	return true
 }
 
 func (s *Query) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {

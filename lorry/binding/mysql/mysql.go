@@ -23,7 +23,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -105,11 +104,6 @@ func (mysqlOps *MysqlOperations) Init(metadata component.Properties) error {
 	// mysqlOps.InitIfNeed = mysqlOps.initIfNeed
 	mysqlOps.DBPort = config.GetDBPort()
 
-	mysqlOps.RegisterOperationOnDBReady(util.GetLagOperation, mysqlOps.GetLagOps, manager)
-	mysqlOps.RegisterOperationOnDBReady(util.CheckStatusOperation, mysqlOps.CheckStatusOps, manager)
-	mysqlOps.RegisterOperationOnDBReady(util.ExecOperation, mysqlOps.ExecOps, manager)
-	mysqlOps.RegisterOperationOnDBReady(util.QueryOperation, mysqlOps.QueryOps, manager)
-
 	// following are ops for account management
 	mysqlOps.RegisterOperationOnDBReady(util.ListUsersOp, mysqlOps.listUsersOps, manager)
 	mysqlOps.RegisterOperationOnDBReady(util.CreateUserOp, mysqlOps.createUserOps, manager)
@@ -123,31 +117,6 @@ func (mysqlOps *MysqlOperations) Init(metadata component.Properties) error {
 
 func (mysqlOps *MysqlOperations) GetRunningPort() int {
 	return 0
-}
-
-func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
-	result := OpsResult{}
-	sql, ok := req.Metadata["sql"]
-	if !ok || sql == "" {
-		result["event"] = "ExecFailed"
-		result["message"] = ErrNoSQL
-		return result, nil
-	}
-
-	manager, ok := mysqlOps.Manager.(*mysql.Manager)
-	if !ok {
-		manager = &mysqlOps.Manager.(*mysql.WesqlManager).Manager
-	}
-	count, err := manager.Exec(ctx, sql)
-	if err != nil {
-		mysqlOps.Logger.Error(err, "sql exec error")
-		result["event"] = util.OperationFailed
-		result["message"] = err.Error()
-	} else {
-		result["event"] = util.OperationSuccess
-		result["count"] = count
-	}
-	return result, nil
 }
 
 func (mysqlOps *MysqlOperations) GetLagOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
@@ -214,51 +183,6 @@ func (mysqlOps *MysqlOperations) QueryOps(ctx context.Context, req *ProbeRequest
 	} else {
 		result["event"] = util.OperationSuccess
 		result["message"] = string(data)
-	}
-	return result, nil
-}
-
-func (mysqlOps *MysqlOperations) CheckStatusOps(ctx context.Context, req *ProbeRequest, resp *ProbeResponse) (OpsResult, error) {
-	rwSQL := fmt.Sprintf(`begin;
-	create table if not exists kb_health_check(type int, check_ts bigint, primary key(type));
-	insert into kb_health_check values(%d, now()) on duplicate key update check_ts = now();
-	commit;
-	select check_ts from kb_health_check where type=%d limit 1;`, component.CheckStatusType, component.CheckStatusType)
-	roSQL := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, component.CheckStatusType)
-	var err error
-	var data []byte
-
-	manager, ok := mysqlOps.Manager.(*mysql.Manager)
-	if !ok {
-		manager = &mysqlOps.Manager.(*mysql.WesqlManager).Manager
-	}
-	switch mysqlOps.DBRoles[strings.ToLower(mysqlOps.OriRole)] {
-	case ReadWrite:
-		var count int64
-		count, err = manager.Exec(ctx, rwSQL)
-		data = []byte(strconv.FormatInt(count, 10))
-	case Readonly:
-		data, err = manager.Query(ctx, roSQL)
-	default:
-		msg := fmt.Sprintf("unknown access mode for role %s: %v", mysqlOps.OriRole, mysqlOps.DBRoles)
-		mysqlOps.Logger.Info(msg)
-		data = []byte(msg)
-	}
-
-	result := OpsResult{}
-	if err != nil {
-		mysqlOps.Logger.Error(err, "CheckStatus error")
-		result["event"] = util.OperationFailed
-		result["message"] = err.Error()
-		if mysqlOps.CheckStatusFailedCount%mysqlOps.FailedEventReportFrequency == 0 {
-			mysqlOps.Logger.Info("status check failed continuously", "times", mysqlOps.CheckStatusFailedCount)
-			resp.Metadata[StatusCode] = OperationFailedHTTPCode
-		}
-		mysqlOps.CheckStatusFailedCount++
-	} else {
-		result["event"] = util.OperationSuccess
-		result["message"] = string(data)
-		mysqlOps.CheckStatusFailedCount = 0
 	}
 	return result, nil
 }

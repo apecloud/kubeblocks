@@ -80,7 +80,7 @@ This tutorial shows how to create and connect to a MongoDB cluster.
   kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=mongodb
   >
   NAME             CLUSTER-DEFINITION   STATUS      AGE
-  mongodb-5.0.14   mongodb              Available   118m
+  mongodb-5.0   mongodb              Available   118m
   ```
 
   </TabItem>
@@ -147,10 +147,10 @@ KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of
     namespace: demo
     labels: 
       helm.sh/chart: mongodb-cluster-0.6.0-alpha.36
-      app.kubernetes.io/version: "5.0.14"
+      app.kubernetes.io/version: "5.0"
       app.kubernetes.io/instance: mongodb
   spec:
-    clusterVersionRef: mongodb-5.0.14
+    clusterVersionRef: mongodb-5.0
     terminationPolicy: Delete  
     affinity:
       podAntiAffinity: Preferred
@@ -215,16 +215,16 @@ kind: Cluster
 metadata:
   annotations:
     kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"apps.kubeblocks.io/v1alpha1","kind":"Cluster","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"mongodb","app.kubernetes.io/version":"5.0.14","helm.sh/chart":"mongodb-cluster-0.6.0-alpha.36"},"name":"mongodb-cluster","namespace":"demo"},"spec":{"affinity":{"podAntiAffinity":"Preferred","tenancy":"SharedNode","topologyKeys":["kubernetes.io/hostname"]},"clusterDefinitionRef":"mongodb","clusterVersionRef":"mongodb-5.0.14","componentSpecs":[{"componentDefRef":"mongodb","monitor":false,"name":"mongodb","replicas":1,"resources":{"limits":{"cpu":"0.5","memory":"0.5Gi"},"requests":{"cpu":"0.5","memory":"0.5Gi"}},"serviceAccountName":"kb-mongodb","services":null,"volumeClaimTemplates":[{"name":"data","spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"20Gi"}}}}]}],"terminationPolicy":"Delete"}}
+      {"apiVersion":"apps.kubeblocks.io/v1alpha1","kind":"Cluster","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"mongodb","app.kubernetes.io/version":"5.0","helm.sh/chart":"mongodb-cluster-0.6.0-alpha.36"},"name":"mongodb-cluster","namespace":"demo"},"spec":{"affinity":{"podAntiAffinity":"Preferred","tenancy":"SharedNode","topologyKeys":["kubernetes.io/hostname"]},"clusterDefinitionRef":"mongodb","clusterVersionRef":"mongodb-5.0","componentSpecs":[{"componentDefRef":"mongodb","monitor":false,"name":"mongodb","replicas":1,"resources":{"limits":{"cpu":"0.5","memory":"0.5Gi"},"requests":{"cpu":"0.5","memory":"0.5Gi"}},"serviceAccountName":"kb-mongodb","services":null,"volumeClaimTemplates":[{"name":"data","spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"20Gi"}}}}]}],"terminationPolicy":"Delete"}}
   creationTimestamp: "2023-07-19T08:59:48Z"
   finalizers:
   - cluster.kubeblocks.io/finalizer
   generation: 1
   labels:
     app.kubernetes.io/instance: mongodb
-    app.kubernetes.io/version: 5.0.14
+    app.kubernetes.io/version: 5.0
     clusterdefinition.kubeblocks.io/name: mongodb
-    clusterversion.kubeblocks.io/name: mongodb-5.0.14
+    clusterversion.kubeblocks.io/name: mongodb-5.0
     helm.sh/chart: mongodb-cluster-0.6.0-alpha.36
   name: mongodb-cluster
   namespace: demo
@@ -237,7 +237,7 @@ spec:
     topologyKeys:
     - kubernetes.io/hostname
   clusterDefinitionRef: mongodb
-  clusterVersionRef: mongodb-5.0.14
+  clusterVersionRef: mongodb-5.0
   componentSpecs:
   - componentDefRef: mongodb
     monitor: false

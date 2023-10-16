@@ -74,7 +74,7 @@ jobs:
           
           CLUSTER_REGION=""
           if [[ "${{ inputs.CLOUD_PROVIDER }}" == 'eks' && -z "$CLUSTER_REGION" ]]; then
-              CLUSTER_REGION="${{ vars.REGION_AWK_EKS }}"
+              CLUSTER_REGION="${{ vars.REGION_AWS_EKS }}"
           elif [[ "${{ inputs.CLOUD_PROVIDER }}" == 'gke' && -z "$CLUSTER_REGION" ]]; then
               CLUSTER_REGION="${{ vars.REGION_GCP_GEK }}"
           fi

@@ -120,9 +120,23 @@ func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *a
 	if err != nil {
 		return nil, err
 	}
-	backupSpec.BackupMethod, err = getDefaultBackupMethod(reqCtx, cli, cluster, backupSpec.BackupPolicyName, backupSpec.BackupMethod)
+
+	backupPolicyList := &dpv1alpha1.BackupPolicyList{}
+	if err := cli.List(reqCtx.Ctx, backupPolicyList, client.InNamespace(cluster.Namespace),
+		client.MatchingLabels(map[string]string{
+			constant.AppInstanceLabelKey: cluster.Name,
+		})); err != nil {
+		return nil, err
+	}
+	defaultBackupMethod, backupMethodMap, err := GetBackupMethodsFromBackupPolicy(backupPolicyList, backupSpec.BackupPolicyName)
 	if err != nil {
 		return nil, err
+	}
+	if backupSpec.BackupMethod == "" {
+		backupSpec.BackupMethod = defaultBackupMethod
+	}
+	if _, ok := backupMethodMap[backupSpec.BackupMethod]; !ok {
+		return nil, fmt.Errorf("backup method %s is not supported, please check cluster's backup policy", backupSpec.BackupMethod)
 	}
 
 	backup := &dpv1alpha1.Backup{
@@ -196,36 +210,36 @@ func getDefaultBackupPolicy(reqCtx intctrlutil.RequestCtx, cli client.Client, cl
 	return defaultBackupPolices.Items[0].GetName(), nil
 }
 
-func getDefaultBackupMethod(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster, backupPolicyName string, backupMethod string) (string, error) {
-	// if backupMethod is not empty, return it directly
-	if backupMethod != "" {
-		return backupMethod, nil
-	}
-
-	// if backupPolicy is empty, return error
-	if backupPolicyName == "" {
-		return "", fmt.Errorf("backup policy is empty")
-	}
-
-	backupPolicy := &dpv1alpha1.BackupPolicy{}
-	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: backupPolicyName, Namespace: cluster.Namespace}, backupPolicy); err != nil {
-		return "", err
-	}
-
-	if len(backupPolicy.Spec.BackupMethods) == 0 {
-		return "", fmt.Errorf(`backup policy "%s" has no backup method`, backupPolicyName)
-	}
-
-	// select the first backup method as default
-	// and if there are multiple backup methods, use the one with snapshotVolumes=true as default.
-	backupMethod = backupPolicy.Spec.BackupMethods[0].Name
-	for _, method := range backupPolicy.Spec.BackupMethods {
-		if boolptr.IsSetToTrue(method.SnapshotVolumes) {
-			backupMethod = method.Name
+// GetBackupMethodsFromBackupPolicy get backup methods from backup policy
+// if backup policy is specified, search the backup policy with the name
+// if backup policy is not specified, search the default backup policy
+// if method's snapshotVolumes is true, use the method as the default backup method
+func GetBackupMethodsFromBackupPolicy(backupPolicyList *dpv1alpha1.BackupPolicyList, backupPolicyName string) (string, map[string]struct{}, error) {
+	var defaultBackupMethod string
+	var backupMethodsMap = make(map[string]struct{})
+	for _, policy := range backupPolicyList.Items {
+		// if backupPolicyName is not empty, only use the backup policy with the name
+		if backupPolicyName != "" && policy.Name != backupPolicyName {
+			continue
+		}
+		// if backupPolicyName is empty, only use the default backup policy
+		if backupPolicyName == "" && policy.Annotations[dptypes.DefaultBackupPolicyAnnotationKey] != "true" {
+			continue
+		}
+		if policy.Status.Phase != dpv1alpha1.AvailablePhase {
+			continue
+		}
+		for _, method := range policy.Spec.BackupMethods {
+			if boolptr.IsSetToTrue(method.SnapshotVolumes) {
+				defaultBackupMethod = method.Name
+			}
+			backupMethodsMap[method.Name] = struct{}{}
 		}
 	}
-
-	return backupMethod, nil
+	if defaultBackupMethod == "" {
+		return "", nil, fmt.Errorf("failed to find default backup method which snapshotVolumes is true, please check cluster's backup policy")
+	}
+	return defaultBackupMethod, backupMethodsMap, nil
 }
 
 func getBackupLabels(cluster, request string) map[string]string {

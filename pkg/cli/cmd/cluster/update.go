@@ -45,6 +45,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/operations"
 	"github.com/apecloud/kubeblocks/pkg/cli/cluster"
 	"github.com/apecloud/kubeblocks/pkg/cli/patch"
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
@@ -52,8 +53,6 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
-	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
-	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
 	"github.com/apecloud/kubeblocks/pkg/gotemplate"
 )
 
@@ -263,7 +262,18 @@ func (o *updateOptions) buildPatch(flags []*pflag.Flag) error {
 	if o.cluster != nil {
 		// if update the backup config, the backup method must have value
 		if o.cluster.Spec.Backup != nil {
-			defaultBackupMethod, backupMethodMap, err := o.getBackupMethodsFromBackupPolicy()
+			backupPolicyListObj, err := o.dynamic.Resource(types.BackupPolicyGVR()).Namespace(o.namespace).List(context.Background(), metav1.ListOptions{
+				LabelSelector: fmt.Sprintf("%s=%s", constant.AppInstanceLabelKey, o.cluster.Name),
+			})
+			if err != nil {
+				return err
+			}
+			backupPolicyList := &dpv1alpha1.BackupPolicyList{}
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(backupPolicyListObj.UnstructuredContent(), backupPolicyList); err != nil {
+				return err
+			}
+
+			defaultBackupMethod, backupMethodMap, err := operations.GetBackupMethodsFromBackupPolicy(backupPolicyList, "")
 			if err != nil {
 				return err
 			}
@@ -615,48 +625,4 @@ func (o *updateOptions) updateBackupPitrEnabled(val string) error {
 	}
 	o.cluster.Spec.Backup.PITREnabled = &boolVal
 	return nil
-}
-
-// get backup methods from cluster's backup policy
-// if method's snapshotVolumes is true, use the method as the default backup method
-func (o *updateOptions) getBackupMethodsFromBackupPolicy() (string, map[string]struct{}, error) {
-	if o.cluster == nil {
-		return "", nil, fmt.Errorf("cluster is nil")
-	}
-
-	var backupPolicy []dpv1alpha1.BackupPolicy
-	obj, err := o.dynamic.Resource(types.BackupPolicyGVR()).Namespace(o.namespace).List(context.Background(), metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", constant.AppInstanceLabelKey, o.cluster.Name),
-	})
-	if err != nil {
-		return "", nil, err
-	}
-	for _, item := range obj.Items {
-		var bp dpv1alpha1.BackupPolicy
-		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, &bp); err != nil {
-			return "", nil, err
-		}
-		backupPolicy = append(backupPolicy, bp)
-	}
-
-	var defaultBackupMethod string
-	var backupMethodsMap = make(map[string]struct{})
-	for _, policy := range backupPolicy {
-		if policy.Annotations[dptypes.DefaultBackupPolicyAnnotationKey] != annotationTrueValue {
-			continue
-		}
-		if policy.Status.Phase != dpv1alpha1.AvailablePhase {
-			continue
-		}
-		for _, method := range policy.Spec.BackupMethods {
-			if boolptr.IsSetToTrue(method.SnapshotVolumes) {
-				defaultBackupMethod = method.Name
-			}
-			backupMethodsMap[method.Name] = struct{}{}
-		}
-	}
-	if defaultBackupMethod == "" {
-		return "", nil, fmt.Errorf("failed to find default backup method which snapshotVolumes is true, please check cluster's backup policy")
-	}
-	return defaultBackupMethod, backupMethodsMap, nil
 }

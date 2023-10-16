@@ -22,6 +22,7 @@ spec:
           timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
       workloadType: Replication
       rsmSpec:
+        memberUpdateStrategy: Serial
         roles:
         - accessMode: ReadWrite
           canVote: true

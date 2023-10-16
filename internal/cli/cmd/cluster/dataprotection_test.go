@@ -405,12 +405,25 @@ var _ = Describe("DataProtection", func() {
 		Expect(o.Complete()).Should(Succeed())
 		Expect(o.Validate()).Should(HaveOccurred())
 
-		By("test describe-backup-policy")
+		By("test describe-backup-policy with cluster")
 		policyName := "test1"
 		policy1 := testing.FakeBackupPolicy(policyName, testing.ClusterName)
 		tf.FakeDynamicClient = testing.FakeDynamicClient(policy1)
-		Expect(o.Complete()).Should(Succeed())
 		o.client = testing.FakeClientSet()
+		o.ClusterNames = []string{testing.ClusterName}
+		Expect(o.Complete()).Should(Succeed())
+		Expect(o.Validate()).Should(Succeed())
+		Expect(o.Run()).Should(Succeed())
+
+		By("test describe-backup-policy with backupPolicy")
+		o = describeBackupPolicyOptions{
+			Factory:   tf,
+			IOStreams: streams,
+		}
+		o.Names = []string{policyName}
+		o.client = testing.FakeClientSet()
+		Expect(o.Complete()).Should(Succeed())
+		Expect(o.Validate()).Should(Succeed())
 		Expect(o.Run()).Should(Succeed())
 	})
 

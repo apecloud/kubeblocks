@@ -138,7 +138,7 @@ func (c *rsmComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) 
 
 func (c *rsmComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	// TODO(impl): delete component owned resources
-	return nil
+	return c.newBuilder(reqCtx, cli, model.ActionNoopPtr()).BuildEnv().BuildWorkload().Complete()
 }
 
 func (c *rsmComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error {

@@ -118,7 +118,7 @@ func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx,
 	}
 
 	for compName := range deleteSet {
-		dag := graph.NewDAG()
+		dag := newDAGWithPlaceholder(cluster.Namespace, cluster.Name, compName)
 		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compName, dag)
 		if err != nil {
 			return err

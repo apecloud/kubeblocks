@@ -18,11 +18,9 @@ package components
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"strings"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -34,6 +32,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -124,7 +123,8 @@ var _ = Describe("Component", func() {
 		Expect(comp).ShouldNot(BeNil())
 		rsmComp, ok := comp.(*rsmComponent)
 		Expect(ok).Should(BeTrue())
-		rsmComp.dag = newDAGWithPlaceholder(clusterObj.Namespace, clusterName, rsmComp.GetName())
+		dag = newDAGWithPlaceholder(clusterObj.Namespace, clusterName, rsmComp.GetName())
+		rsmComp.dag = dag
 	}
 
 	submitChanges := func(ctx context.Context, cli client.Client, dag *graph.DAG) error {

@@ -123,10 +123,11 @@ func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx,
 		if err != nil {
 			return err
 		}
-		if comp != nil {
-			if err := comp.Delete(reqCtx, c.Client); err != nil {
-				return err
-			}
+		if comp == nil {
+			continue
+		}
+		if err := comp.Delete(reqCtx, c.Client); err != nil {
+			return err
 		}
 		*dags = append(*dags, dag)
 	}

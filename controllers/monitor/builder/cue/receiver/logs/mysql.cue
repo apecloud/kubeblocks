@@ -24,12 +24,16 @@ parameters: {
 
 output: {
 	container_filelog: {
-		rule: "type == \"pod\" && config != nil && config.EnabledLogs"
+		rule: "type == \"container\" && config != nil && config.EnabledLogs"
     config: {
     	input_configs: parameters.input_configs
       container_id: parameters.container_id
+      pod_id: "'`endpoint`'"
       storage: parameters.storage
-     }
+      cluster_name: "'`config.ClusterName`'"
+			component_name: "'`config.ComponentName`'"
+			character_type: "'`config.CharacterType`'"
+    }
 	}
 
 }

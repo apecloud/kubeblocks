@@ -18,7 +18,7 @@
 parameters: {
 	endpoint: *"`endpoint`:3306" | string
 	username: *"`envs[\"MYSQL_ROOT_USER\"]`" | string
-  password: *"`envs[\"MYSQL_ROOT_PASSWORD\"]" | string
+  password: *"`envs[\"MYSQL_ROOT_PASSWORD\"]`" | string
   allow_native_passwords: *true | bool
   transport: *"tcp" | string
   collection_interval: *"`settings.CollectionInterval`" | string
@@ -26,14 +26,14 @@ parameters: {
 
 output:
   apecloudmysql: {
-  	rule: "type == \"pod\" && monitor_type == \"mysql\""
+  	rule: "type == \"container\" && monitor_type == \"mysql\" && config != nil && config.EnabledMetrics"
   	config:{
   		endpoint: parameters.endpoint
   		username: parameters.username
       password: parameters.password
       allow_native_passwords: parameters.allow_native_passwords
       transport: parameters.transport
-      collection_interval: parameters.collection_interval
+      collection_interval: "`settings.CollectionInterval`"
   	}
     resource_attributes:
       receiver: "apecloudmysql"

@@ -17,10 +17,10 @@
 
 parameters: {
 	endpoint: *"${env:HOST_IP}:1234" | string
-	send_timestamps: *true | bool
-	metric_expiration: *60 | int
+	send_timestamps: *false | bool
+	metric_expiration: *"20s" | string
 	enable_open_metrics: *false | bool
-	resource_to_telemetry_conversion_enabled: *false | bool
+	resource_to_telemetry_conversion_enabled: *true | bool
 }
 
 output: {

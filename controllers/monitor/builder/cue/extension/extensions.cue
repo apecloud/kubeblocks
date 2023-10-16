@@ -28,12 +28,6 @@ output: {
     	auth_type: "kubeConfig"
       node: "${env:NODE_NAME}"
       observe_pods: true
-      observe_nodes: false
-    }
-    "apecloud_k8s_observer/node": {
-    	auth_type: "kubeConfig"
-      node: "${env:NODE_NAME}"
-      observe_pods: false
       observe_nodes: true
     }
     runtime_container: {
@@ -44,7 +38,18 @@ output: {
     apecloud_engine_observer: {
     	pod_observer: "apecloud_k8s_observer"
       container_observer: "runtime_container"
-      scraper_config_file: "/tmp/oteld_test_work/kb_engine.yaml"
+      scraper_config_file: "/opt/apecloud/apps/kb_engine.yaml"
+      observe_pods: true
+      observe_nodes: true
+    }
+    "file_storage/oteld": {
+    	directory: "/var/log/oteld"
+    	timeout: "1s"
+    	compaction: {
+    		on_start: true
+      	directory: "/var/log/oteld"
+      	max_transaction_size: 65536
+    	}
     }
   }
 }

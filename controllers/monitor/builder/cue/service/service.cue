@@ -31,5 +31,5 @@ output: {
       job: "oteld-telemetry"
     }
   }
-  extensions: ["memory_ballast", "apecloud_k8s_observer", "apecloud_k8s_observer/node", "runtime_container", "apecloud_engine_observer"]
+  extensions: ["memory_ballast", "apecloud_k8s_observer", "runtime_container", "apecloud_engine_observer"]
 }

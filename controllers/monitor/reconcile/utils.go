@@ -59,14 +59,16 @@ func buildPodSpecForOteld(config *types.Config, template *v1alpha1.OTeldCollecto
 				//HostPort:      1234,
 			},
 		},
-		Resources:    template.Spec.Resources,
-		VolumeMounts: template.Spec.VolumeMounts,
+		Resources:       template.Spec.Resources,
+		VolumeMounts:    template.Spec.VolumeMounts,
+		SecurityContext: &template.Spec.SecurityContext,
 	}
 
 	return &builder.NewPodBuilder("", "").
 		AddSerciveAccount("oteld-controller").
 		AddContainer(container).
 		AddVolumes(template.Spec.Volumes...).
+		SetSecurityContext(template.Spec.PodSecurityContext).
 		GetObject().Spec
 }
 

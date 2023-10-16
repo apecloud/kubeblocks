@@ -100,7 +100,7 @@ func newReceiverCreatorSlice(instance *OteldInstance) (yaml.MapSlice, error) {
 
 func newReceiverCreator(name string, datasourceType v1alpha1.DataSourceType, receiverMap map[string]Receiver) (yaml.MapItem, error) {
 	creator := yaml.MapSlice{}
-	creator = append(creator, yaml.MapItem{Key: "watch_observers", Value: []string{"apecloud_engine_observer", "apecloud_k8s_observer/node"}})
+	creator = append(creator, yaml.MapItem{Key: "watch_observers", Value: []string{"apecloud_engine_observer"}})
 	receiverSlice := yaml.MapSlice{}
 	for name, params := range receiverMap {
 		tplName := fmt.Sprintf(CUEPathPattern, datasourceType, name)

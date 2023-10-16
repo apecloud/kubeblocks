@@ -71,7 +71,7 @@ kbcli cluster list mongodb-cluster
      namespace: default
    spec:
      clusterDefinitionRef: mongodb
-     clusterVersionRef: mongodb-5.0.14
+     clusterVersionRef: mongodb-5.0
      componentSpecs:
      - name: mongodb
        componentDefRef: mongodb
@@ -100,7 +100,7 @@ kbcli cluster list mongodb-cluster
     kbcli cluster list mongodb-cluster
     >
     NAME              NAMESPACE   CLUSTER-DEFINITION   VERSION          TERMINATION-POLICY   STATUS    CREATED-TIME                 
-    mongodb-cluster   default     mongodb              mongodb-5.0.14   WipeOut              Running   Apr 26,2023 11:50 UTC+0800  
+    mongodb-cluster   default     mongodb              mongodb-5.0   WipeOut              Running   Apr 26,2023 11:50 UTC+0800  
     ```
 
    - STATUS=VerticalScaling: it means the vertical scaling is in progress.

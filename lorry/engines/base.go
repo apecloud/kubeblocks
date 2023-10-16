@@ -163,6 +163,14 @@ func (mgr *DBManagerBase) GetReplicaRole(context.Context, *dcs.Cluster) (string,
 	return "", errors.New("not implemented")
 }
 
+func (mgr *DBManagerBase) Exec(context.Context, string) (int64, error) {
+	return 0, errors.New("not implemented")
+}
+
+func (mgr *DBManagerBase) Query(context.Context, string) ([]byte, error) {
+	return []byte{}, errors.New("not implemented")
+}
+
 func (mgr *DBManagerBase) GetPort() (int, error) {
 	return 0, errors.New("not implemented")
 }

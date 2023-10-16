@@ -100,6 +100,10 @@ type DBManager interface {
 	Lock(context.Context, string) error
 	Unlock(context.Context) error
 
+	// sql query
+	Exec(context.Context, string) (int64, error)
+	Query(context.Context, string) ([]byte, error)
+
 	GetPort() (int, error)
 
 	MoveData(context.Context, *dcs.Cluster) error

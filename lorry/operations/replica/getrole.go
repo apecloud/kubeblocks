@@ -21,7 +21,6 @@ package replica
 
 import (
 	"context"
-	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -39,7 +38,6 @@ type GetRole struct {
 	dcsStore  dcs.DCS
 	dbManager engines.DBManager
 	logger    logr.Logger
-	Timeout   time.Duration
 }
 
 var getrole operations.Operation = &GetRole{}

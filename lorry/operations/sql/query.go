@@ -20,9 +20,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package sql
 
 import (
+	"context"
+
+	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
+	ctrl "sigs.k8s.io/controller-runtime"
+
+	"github.com/apecloud/kubeblocks/lorry/engines"
+	"github.com/apecloud/kubeblocks/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/lorry/operations"
+	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
 type Query struct {
 	operations.Base
+	dbManager engines.DBManager
+	logger    logr.Logger
+}
+
+var query operations.Operation = &Query{}
+
+func init() {
+	err := operations.Register("query", query)
+	if err != nil {
+		panic(err.Error())
+	}
+}
+
+func (s *Query) Init(ctx context.Context) error {
+	dbManager, err := register.GetDBManager()
+	if err != nil {
+		return errors.Wrap(err, "get manager failed")
+	}
+	s.dbManager = dbManager
+	s.logger = ctrl.Log.WithName("query")
+	return nil
+}
+
+func (s *Query) IsReadonly(ctx context.Context) bool {
+	return false
+}
+
+func (s *Query) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
+	sql := req.Parameters["sql"].(string)
+	if sql == "" {
+		return nil, errors.New("no sql provided")
+	}
+
+	resp := &operations.OpsResponse{
+		Data: map[string]any{},
+	}
+	resp.Data["operation"] = util.ExecOperation
+
+	result, err := s.dbManager.Query(ctx, sql)
+	if err != nil {
+		s.logger.Info("executing query error", "error", err)
+		return resp, err
+	}
+
+	resp.Data["result"] = string(result)
+	return resp, err
 }

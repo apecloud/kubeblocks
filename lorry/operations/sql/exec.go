@@ -20,9 +20,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package sql
 
 import (
+	"context"
+
+	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
+	ctrl "sigs.k8s.io/controller-runtime"
+
+	"github.com/apecloud/kubeblocks/lorry/engines"
+	"github.com/apecloud/kubeblocks/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/lorry/operations"
+	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
 type Exec struct {
 	operations.Base
+	dbManager engines.DBManager
+	logger    logr.Logger
+}
+
+var exec operations.Operation = &Exec{}
+
+func init() {
+	err := operations.Register("exec", exec)
+	if err != nil {
+		panic(err.Error())
+	}
+}
+
+func (s *Exec) Init(ctx context.Context) error {
+	dbManager, err := register.GetDBManager()
+	if err != nil {
+		return errors.Wrap(err, "get manager failed")
+	}
+	s.dbManager = dbManager
+	s.logger = ctrl.Log.WithName("exec")
+	return nil
+}
+
+func (s *Exec) IsReadonly(ctx context.Context) bool {
+	return false
+}
+
+func (s *Exec) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
+	sql := req.Parameters["sql"].(string)
+	if sql == "" {
+		return nil, errors.New("no sql provided")
+	}
+
+	resp := &operations.OpsResponse{
+		Data: map[string]any{},
+	}
+	resp.Data["operation"] = util.ExecOperation
+
+	count, err := s.dbManager.Exec(ctx, sql)
+	if err != nil {
+		s.logger.Info("executing exec error", "error", err)
+		return resp, err
+	}
+
+	resp.Data["count"] = count
+	return resp, err
 }

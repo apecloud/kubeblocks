@@ -64,8 +64,10 @@ type ClusterSpec struct {
 	// +listMapKey=name
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:XValidation:rule="self.all(x, x in oldSelf)",message="component can not be added dynamically"
-	// +kubebuilder:validation:XValidation:rule="oldSelf.all(x, x in self)",message="component can not be removed dynamically"
+	// +kubebuilder:validation:MaxItems=128
+	// +kubebuilder:validation:XValidation:rule="self.all(x, size(self.filter(c, c.name == x.name)) == 1)",message="duplicated component"
+	// +kubebuilder:validation:XValidation:rule="self.all(x, oldSelf.exists(y, y.name == x.name))",message="component can not be added dynamically"
+	// +kubebuilder:validation:XValidation:rule="oldSelf.all(x, self.exists(y, y.name == x.name))",message="component can not be removed dynamically"
 	ComponentSpecs []ClusterComponentSpec `json:"componentSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// tenancy describes how pods are distributed across node.

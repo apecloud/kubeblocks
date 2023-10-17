@@ -15,24 +15,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-parameters: {
-	input_configs: *"`config.LogsCollector`" | string
-	container_id: *"`container_id`" | string
-	storage: *"file_storage/oteld" | string
-}
-
-
-output: {
-	container_filelog: {
-		rule: "type == \"container\" && config != nil && config.EnabledLogs"
-    config: {
-    	input_configs: parameters.input_configs
-      container_id: parameters.container_id
-      pod_ip: "`endpoint`"
-      cluster_name: "`config.ClusterName`"
-			component_name: "`config.ComponentName`"
-			character_type: "`config.CharacterType`"
-    }
-	}
-
-}
+output:
+  resource_attributes: {
+  	container: {
+  		app_kubernetes_io_component: "`labels[\"app.kubernetes.io/component\"]`"
+	    app_kubernetes_io_instance: "`labels[\"app.kubernetes.io/instance\"]`"
+	    app_kubernetes_io_managed_by: "`labels[\"app.kubernetes.io/managed-by\"]`"
+	    app_kubernetes_io_name: "`labels[\"app.kubernetes.io/name\"]`"
+	    app_kubernetes_io_version: "`labels[\"app.kubernetes.io/version\"]`"
+	    apps_kubeblocks_io_component_name: "`labels[\"apps.kubeblocks.io/component-name\"]`"
+	    node: "${env:NODE_NAME}"
+	    namespace: "`namespace`"
+	    pod: "`name`"
+	    job: "oteld-app-metrics"
+  	}
+  }

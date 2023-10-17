@@ -116,7 +116,7 @@ func newReceiverCreator(name string, datasourceType v1alpha1.DataSourceType, rec
 		receiverSlice = append(receiverSlice, receivers...)
 	}
 	creator = append(creator, yaml.MapItem{Key: "receivers", Value: receiverSlice})
-	attributesSlice, err := buildSliceFromCUE("receiver/resource_attributes.cue", map[string]any{})
+	attributesSlice, err := buildSliceFromCUE(fmt.Sprintf("receiver/%s_resource_attributes.cue", string(datasourceType)), map[string]any{})
 	if err != nil {
 		return yaml.MapItem{}, err
 	}

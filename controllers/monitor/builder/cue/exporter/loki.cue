@@ -16,7 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 parameters: {
-	endpoint: *"http://loki-gateway/loki/api/v1/push" | string
+	endpoint: *"http://10.110.97.135/loki/api/v1/push" | string
 	sending_queue: {
 		enabled: *true | bool
 		num_consumers: *3 | int

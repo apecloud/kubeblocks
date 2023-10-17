@@ -60,7 +60,7 @@ type DCS interface {
 var dcs DCS
 
 func init() {
-	viper.SetDefault("KB_TTL", 5)
+	viper.SetDefault("KB_TTL", 15)
 	viper.SetDefault("KB_MAX_LAG", 10)
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 }

@@ -76,5 +76,5 @@ func (s *Query) Do(ctx context.Context, req *operations.OpsRequest) (*operations
 	}
 
 	resp.Data["result"] = string(result)
-	return resp, nil
+	return resp.WithSuccess("")
 }

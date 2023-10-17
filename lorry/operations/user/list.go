@@ -18,3 +18,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package user
+
+import (
+	"context"
+
+	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
+	ctrl "sigs.k8s.io/controller-runtime"
+
+	"github.com/apecloud/kubeblocks/lorry/engines"
+	"github.com/apecloud/kubeblocks/lorry/engines/register"
+	"github.com/apecloud/kubeblocks/lorry/operations"
+	"github.com/apecloud/kubeblocks/lorry/util"
+)
+
+type ListUsers struct {
+	operations.Base
+	dbManager engines.DBManager
+	logger    logr.Logger
+}
+
+var listusers operations.Operation = &ListUsers{}
+
+func init() {
+	err := operations.Register("listusers", listusers)
+	if err != nil {
+		panic(err.Error())
+	}
+}
+
+func (s *ListUsers) Init(ctx context.Context) error {
+	dbManager, err := register.GetDBManager()
+	if err != nil {
+		return errors.Wrap(err, "get manager failed")
+	}
+	s.dbManager = dbManager
+	s.logger = ctrl.Log.WithName("listusers")
+	return nil
+}
+
+func (s *ListUsers) IsReadonly(ctx context.Context) bool {
+	return true
+}
+
+func (s *ListUsers) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
+	resp := operations.NewOpsResponse(util.ListUsersOp)
+
+	result, err := s.dbManager.ListUsers(ctx)
+	if err != nil {
+		s.logger.Info("executing listusers error", "error", err)
+		return resp, err
+	}
+
+	resp.Data["users"] = result
+	return resp.WithSuccess("")
+}

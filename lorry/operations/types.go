@@ -59,10 +59,13 @@ func NewOpsResponse(operation util.OperationKind) *OpsResponse {
 	return resp
 }
 
-func (resp *OpsResponse) WithSuccess(msg interface{}) (*OpsResponse, error) {
+func (resp *OpsResponse) WithSuccess(msg string) (*OpsResponse, error) {
 	resp.Metadata["endTime"] = getAndFormatNow()
 	resp.Data[util.RespFieldEvent] = util.OperationSuccess
-	resp.Data[util.RespFieldMessage] = msg
+	if msg != "" {
+		resp.Data[util.RespFieldMessage] = msg
+	}
+
 	return resp, nil
 }
 

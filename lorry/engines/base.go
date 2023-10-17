@@ -30,6 +30,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/lorry/dcs"
+	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
 type DBManagerBase struct {
@@ -181,6 +182,34 @@ func (mgr *DBManagerBase) GetPort() (int, error) {
 
 func (mgr *DBManagerBase) IsRootCreated(context.Context) (bool, error) {
 	return true, nil
+}
+
+func (mgr *DBManagerBase) ListUsers(context.Context) ([]util.UserInfo, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (mgr *DBManagerBase) ListSystemAccounts(context.Context) ([]util.UserInfo, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (mgr *DBManagerBase) CreateUser(context.Context, string, string) error {
+	return errors.New("not implemented")
+}
+
+func (mgr *DBManagerBase) DeleteUser(context.Context, string) error {
+	return errors.New("not implemented")
+}
+
+func (mgr *DBManagerBase) DescribeUser(context.Context, string) (*util.UserInfo, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (mgr *DBManagerBase) GrantUserRole(context.Context, string, string) error {
+	return errors.New("not implemented")
+}
+
+func (mgr *DBManagerBase) RevokeUserRole(context.Context, string, string) error {
+	return errors.New("not implemented")
 }
 
 // Start does not directly mean to start a database instance,

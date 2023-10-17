@@ -25,6 +25,7 @@ import (
 	"github.com/go-logr/logr"
 
 	"github.com/apecloud/kubeblocks/lorry/dcs"
+	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
 type DBManager interface {
@@ -104,6 +105,15 @@ type DBManager interface {
 	// sql query
 	Exec(context.Context, string) (int64, error)
 	Query(context.Context, string) ([]byte, error)
+
+	// user management
+	ListUsers(context.Context) ([]util.UserInfo, error)
+	ListSystemAccounts(context.Context) ([]util.UserInfo, error)
+	CreateUser(context.Context, string, string) error
+	DeleteUser(context.Context, string) error
+	DescribeUser(context.Context, string) (*util.UserInfo, error)
+	GrantUserRole(context.Context, string, string) error
+	RevokeUserRole(context.Context, string, string) error
 
 	GetPort() (int, error)
 

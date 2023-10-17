@@ -30,7 +30,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/lorry/dcs"
-	"github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/lorry/engines/models"
 )
 
 type DBManagerBase struct {
@@ -184,11 +184,11 @@ func (mgr *DBManagerBase) IsRootCreated(context.Context) (bool, error) {
 	return true, nil
 }
 
-func (mgr *DBManagerBase) ListUsers(context.Context) ([]util.UserInfo, error) {
+func (mgr *DBManagerBase) ListUsers(context.Context) ([]models.UserInfo, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (mgr *DBManagerBase) ListSystemAccounts(context.Context) ([]util.UserInfo, error) {
+func (mgr *DBManagerBase) ListSystemAccounts(context.Context) ([]models.UserInfo, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -200,7 +200,7 @@ func (mgr *DBManagerBase) DeleteUser(context.Context, string) error {
 	return errors.New("not implemented")
 }
 
-func (mgr *DBManagerBase) DescribeUser(context.Context, string) (*util.UserInfo, error) {
+func (mgr *DBManagerBase) DescribeUser(context.Context, string) (*models.UserInfo, error) {
 	return nil, errors.New("not implemented")
 }
 

@@ -21,8 +21,11 @@ package mysql
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
-	"github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/lorry/engines/models"
+	"golang.org/x/exp/slices"
 )
 
 const (
@@ -45,11 +48,11 @@ const (
 	listSystemAccountsSQL = "SELECT user AS userName FROM mysql.user WHERE host = '%' and user like 'kb%';"
 )
 
-func (mgr *Manager) ListUsers(ctx context.Context) ([]util.UserInfo, error) {
-	users := []util.UserInfo{}
+func (mgr *Manager) ListUsers(ctx context.Context) ([]models.UserInfo, error) {
+	users := []models.UserInfo{}
 
 	err := QueryRowsMap(mgr.DB, listUserSQL, func(rMap RowMap) error {
-		user := util.UserInfo{
+		user := models.UserInfo{
 			UserName: rMap.GetString("userName"),
 			Expired:  rMap.GetString("expired"),
 		}
@@ -63,11 +66,11 @@ func (mgr *Manager) ListUsers(ctx context.Context) ([]util.UserInfo, error) {
 	return users, nil
 }
 
-func (mgr *Manager) ListSystemAccounts(ctx context.Context) ([]util.UserInfo, error) {
-	users := []util.UserInfo{}
+func (mgr *Manager) ListSystemAccounts(ctx context.Context) ([]models.UserInfo, error) {
+	users := []models.UserInfo{}
 
 	err := QueryRowsMap(mgr.DB, listSystemAccountsSQL, func(rMap RowMap) error {
-		user := util.UserInfo{
+		user := models.UserInfo{
 			UserName: rMap.GetString("userName"),
 		}
 		users = append(users, user)
@@ -78,4 +81,61 @@ func (mgr *Manager) ListSystemAccounts(ctx context.Context) ([]util.UserInfo, er
 		return nil, err
 	}
 	return users, nil
+}
+
+func (mgr *Manager) DescribeUser(ctx context.Context, userName string) (*models.UserInfo, error) {
+	user := &models.UserInfo{}
+	// only keep one role name of the highest privilege
+	userRoles := make([]models.RoleType, 0)
+
+	err := QueryRowsMap(mgr.DB, listUserSQL, func(rMap RowMap) error {
+		for k, v := range rMap {
+			if user.UserName == "" {
+				user.UserName = strings.TrimPrefix(strings.TrimSuffix(k, "@%"), "Grants for ")
+			}
+			mysqlRoleType := priv2Role(strings.TrimPrefix(v.String, "GRANT "))
+			userRoles = append(userRoles, mysqlRoleType)
+		}
+
+		return nil
+	})
+	if err != nil {
+		mgr.Logger.Error(err, "error executing %s")
+		return nil, err
+	}
+
+	slices.SortFunc(userRoles, models.SortRoleByWeight)
+	if len(userRoles) > 0 {
+		user.RoleName = (string)(userRoles[0])
+	}
+	return user, nil
+}
+
+func role2Priv(roleName string) (string, error) {
+	roleType := models.String2RoleType(roleName)
+	switch roleType {
+	case models.SuperUserRole:
+		return superUserPriv, nil
+	case models.ReadWriteRole:
+		return readWritePriv, nil
+	case models.ReadOnlyRole:
+		return readOnlyRPriv, nil
+	}
+	return "", fmt.Errorf("role name: %s is not supported", roleName)
+}
+
+func priv2Role(priv string) models.RoleType {
+	if strings.HasPrefix(priv, readOnlyRPriv) {
+		return models.ReadOnlyRole
+	}
+	if strings.HasPrefix(priv, readWritePriv) {
+		return models.ReadWriteRole
+	}
+	if strings.HasPrefix(priv, superUserPriv) {
+		return models.SuperUserRole
+	}
+	if strings.HasPrefix(priv, noPriv) {
+		return models.NoPrivileges
+	}
+	return models.CustomizedRole
 }

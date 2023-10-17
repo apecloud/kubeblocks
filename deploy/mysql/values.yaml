@@ -71,7 +71,7 @@ roleProbe:
 
 metrics:
   image:
-    registry: registry.cn-hangzhou.aliyuncs.com
+    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
     repository: apecloud/agamotto
     tag: 0.1.2-beta.1
     pullPolicy: IfNotPresent

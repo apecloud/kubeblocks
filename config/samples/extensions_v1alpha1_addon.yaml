@@ -42,17 +42,17 @@ spec:
 #          namespace:
 #          key:
       setValues:
-        - "alertmanager.image.repository=registry.cn-hangzhou.aliyuncs.com/apecloud/alertmanager"
+        - "alertmanager.image.repository=infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/alertmanager"
         - "alertmanager.image.tag=v0.24.0"
         - "kubeStateMetrics.enabled=false"
         - "nodeExporter.enabled=false"
-        - "nodeExporter.image.repository=registry.cn-hangzhou.aliyuncs.com/apecloud/node-exporter"
+        - "nodeExporter.image.repository=infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/node-exporter"
         - "nodeExporter.image.tag=v1.3.1"
-        - "configmapReload.prometheus.image.repository=registry.cn-hangzhou.aliyuncs.com/apecloud/configmap-reload"
+        - "configmapReload.prometheus.image.repository=infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/configmap-reload"
         - "configmapReload.prometheus.image.tag=v0.5.0"
-        - "configmapReload.alertmanager.image.repository=registry.cn-hangzhou.aliyuncs.com/apecloud/configmap-reload"
+        - "configmapReload.alertmanager.image.repository=infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/configmap-reload"
         - "configmapReload.alertmanager.image.tag=v0.5.0"
-        - "server.image.repository=registry.cn-hangzhou.aliyuncs.com/apecloud/prometheus"
+        - "server.image.repository=infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/prometheus"
         - "server.image.tag=v2.39.1"
         - "pushgateway.enabled=false"
 

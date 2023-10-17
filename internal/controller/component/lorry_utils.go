@@ -116,7 +116,7 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 
 func buildBasicContainer() *corev1.Container {
 	return builder.NewContainerBuilder("string").
-		SetImage("registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.6").
+		SetImage("infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/google_containers/pause:3.6").
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddCommands("/pause").
 		AddEnv(corev1.EnvVar{

@@ -431,3 +431,26 @@ func GetConfigConstraintByName(dynamic dynamic.Interface, name string) (*appsv1a
 	}
 	return ccObj, nil
 }
+
+func GetServiceRefs(cd *appsv1alpha1.ClusterDefinition) []string {
+	var serviceRefs []string
+	for _, compDef := range cd.Spec.ComponentDefs {
+		if compDef.ServiceRefDeclarations == nil {
+			continue
+		}
+
+		for _, ref := range compDef.ServiceRefDeclarations {
+			serviceRefs = append(serviceRefs, ref.Name)
+		}
+	}
+	return serviceRefs
+}
+
+// GetDefaultServiceRef will return the ServiceRefDeclarations in cluster-definition when the cluster-definition contains only one ServiceRefDeclaration
+func GetDefaultServiceRef(cd *appsv1alpha1.ClusterDefinition) (string, error) {
+	serviceRefs := GetServiceRefs(cd)
+	if len(serviceRefs) != 1 {
+		return "", fmt.Errorf("failed to get the cluster default service reference name")
+	}
+	return serviceRefs[0], nil
+}

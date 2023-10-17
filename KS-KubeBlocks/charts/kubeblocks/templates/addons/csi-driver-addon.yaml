@@ -1,0 +1,69 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: kubeblocks-csi-driver
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: 'KubeBlocks CSI driver provides a container storage interface used by Container Orchestrators
+    to manage the lifecycle of block storage for cloud vendors.'
+  type: Helm
+
+  helm:
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "kubeblocks-csi-driver" "version" "0.1.0" "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
+
+    installOptions:
+     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: 0.1.0
+     {{- end }}
+
+    valuesMapping:
+      valueMap:
+        replicaCount: controller.replicaCount
+      jsonMap:
+        tolerations: controller.tolerations
+
+      resources:
+        cpu:
+          requests: controller.resources.requests.cpu
+          limits: controller.resources.limits.cpu
+        memory:
+          requests: controller.resources.requests.memory
+          limits: controller.resources.limits.memory
+      extras:
+        - name: node
+          jsonMap:
+            tolerations: node.tolerations
+
+          resources:
+            cpu:
+              requests: node.resources.requests.cpu
+              limits: node.resources.limits.cpu
+            memory:
+              requests: node.resources.requests.memory
+              limits: node.resources.limits.memory
+
+  defaultInstallValues:
+    - enabled: false
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
+      extras:
+        - name: node
+          {{- with .Values.tolerations }}
+          tolerations: {{ toJson . | quote }}
+          {{- end }}
+
+
+  installable:
+    autoInstall: {{ get ( get ( .Values | toYaml | fromYaml ) "kubeblocks-csi-driver" ) "enabled" }}
+    selectors:
+      - key: KubeGitVersion
+        operator: Contains
+        values:
+          - eks

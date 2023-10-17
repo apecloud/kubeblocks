@@ -1,0 +1,30 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: pulsar
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": community
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: "Apache® Pulsar™ is an open-source, distributed messaging and streaming platform built for the cloud."
+
+  type: Helm
+
+  helm:
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "pulsar" "version" (default .Chart.Version .Values.versionOverride) "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: {{ default .Chart.Version .Values.versionOverride }}
+      {{- end }}
+
+  installable:
+    autoInstall: true
+
+  defaultInstallValues:
+    - enabled: true

@@ -1,0 +1,52 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: csi-s3
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": community
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: Container Storage Interface (CSI) driver for S3 volumes
+  type: Helm
+
+  helm:
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "csi-s3" "version" (default .Chart.Version .Values.versionOverride) "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: {{ default .Chart.Version .Values.versionOverride }}
+      {{- end }}
+
+    installValues:
+      secretRefs:
+        - name: {{ include "kubeblocks.fullname" . }}-cloud-provider
+          key: csi-s3
+
+    valuesMapping:
+      jsonMap:
+        tolerations: tolerations
+      extras:
+      - name: daemonset
+        jsonMap:
+          tolerations: daemonsetTolerations
+
+  defaultInstallValues:
+    - enabled: true
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
+
+  installable:
+    {{- $autoInstall := (get ( get ( .Values | toYaml | fromYaml ) "csi-s3" ) "enabled") }}
+    {{- /* auto install csi-s3 if it's required by backup repos */ -}}
+    {{- if .Values.backupRepo.create }}
+      {{- if eq .Values.backupRepo.storageProvider "s3" "oss" "minio" }}
+        {{- $autoInstall = true }}
+      {{- end }}
+    {{- end }}
+    autoInstall: {{ $autoInstall }}

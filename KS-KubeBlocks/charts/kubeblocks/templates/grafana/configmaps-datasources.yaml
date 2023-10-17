@@ -1,0 +1,53 @@
+{{- if .Values.grafana.sidecar.datasources.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "kubeblocks.fullname" . }}-grafana-datasource
+  namespace: {{ template "kubeblocks.grafana.namespace" . }}
+  annotations:
+{{ toYaml .Values.grafana.sidecar.datasources.annotations | indent 4 }}
+  labels:
+    {{- if $.Values.grafana.sidecar.datasources.label }}
+    {{ $.Values.grafana.sidecar.datasources.label }}: {{ ternary $.Values.grafana.sidecar.datasources.labelValue "1" (not (empty $.Values.grafana.sidecar.datasources.labelValue)) | quote }}
+    {{- end }}
+    app: {{ template "kubeblocks.name" $ }}-grafana-datasource
+{{ include "kubeblocks.labels" $ | indent 4 }}
+data:
+  datasource.yaml: |-
+    apiVersion: 1
+    datasources:
+{{- $scrapeInterval := default .Values.prometheus.server.global.scrape_interval | default "30s" }}
+{{- if .Values.grafana.sidecar.datasources.defaultDatasourceEnabled }}
+    - name: Prometheus
+      type: prometheus
+      uid: {{ .Values.grafana.sidecar.datasources.uid }}
+      {{- if .Values.grafana.sidecar.datasources.url }}
+      url: {{ .Values.grafana.sidecar.datasources.url }}
+      {{- else }}
+      url: http://kb-addon-{{ include "addon.prometheus.name" . }}-server.{{ template "kubeblocks.prometheus.namespace" . }}:{{ .Values.prometheus.server.service.servicePort }}/{{ trimPrefix "/" .Values.prometheus.server.routePrefix }}
+      {{- end }}
+      access: proxy
+      isDefault: true
+      jsonData:
+        timeInterval: {{ $scrapeInterval }}
+    - name: Prometheus-15s
+      type: prometheus
+      uid: {{ .Values.grafana.sidecar.datasources.uid }}-15
+      {{- if .Values.grafana.sidecar.datasources.url }}
+      url: {{ .Values.grafana.sidecar.datasources.url }}
+      {{- else }}
+      url: http://kb-addon-{{ include "addon.prometheus.name" . }}-server.{{ template "kubeblocks.prometheus.namespace" . }}:{{ .Values.prometheus.server.service.servicePort }}/{{ trimPrefix "/" .Values.prometheus.server.routePrefix }}
+      {{- end }}
+      access: proxy
+      isDefault: false
+      jsonData:
+        timeInterval: 15s
+    - name: Loki
+      type: loki
+      uid: loki-kubeblocks
+      access: proxy
+      url: http://loki-gateway:80
+      jsonData:
+        maxLines: 1000
+{{- end }}
+{{- end }}

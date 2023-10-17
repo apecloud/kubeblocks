@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: external-dns-chart-kubeblocks-values
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+data:
+  values-kubeblocks-override.yaml: |-
+     {{- get ( .Values | toYaml | fromYaml ) "external-dns" | toYaml | nindent 4 }}

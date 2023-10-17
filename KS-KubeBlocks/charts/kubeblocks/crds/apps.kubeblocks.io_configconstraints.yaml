@@ -1,0 +1,440 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.9.0
+  creationTimestamp: null
+  name: configconstraints.apps.kubeblocks.io
+spec:
+  group: apps.kubeblocks.io
+  names:
+    categories:
+    - kubeblocks
+    kind: ConfigConstraint
+    listKind: ConfigConstraintList
+    plural: configconstraints
+    shortNames:
+    - cc
+    singular: configconstraint
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - description: status phase
+      jsonPath: .status.phase
+      name: PHASE
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ConfigConstraint is the Schema for the configconstraint API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ConfigConstraintSpec defines the desired state of ConfigConstraint
+            properties:
+              cfgSchemaTopLevelName:
+                description: cfgSchemaTopLevelName is cue type name, which generates
+                  openapi schema.
+                type: string
+              configurationSchema:
+                description: configurationSchema imposes restrictions on database
+                  parameter's rule.
+                properties:
+                  cue:
+                    description: cue that to let provider verify user configuration
+                      through cue language.
+                    type: string
+                  schema:
+                    description: schema provides a way for providers to validate the
+                      changed parameters through json.
+                    x-kubernetes-preserve-unknown-fields: true
+                type: object
+              downwardAPIOptions:
+                description: downwardAPIOptions is used to watch pod fields.
+                items:
+                  properties:
+                    command:
+                      description: command used to execute for downwrad api.
+                      items:
+                        type: string
+                      type: array
+                    items:
+                      description: Items is a list of downward API volume file
+                      items:
+                        description: DownwardAPIVolumeFile represents information
+                          to create the file containing the pod field
+                        properties:
+                          fieldRef:
+                            description: 'Required: Selects a field of the pod: only
+                              annotations, labels, name and namespace are supported.'
+                            properties:
+                              apiVersion:
+                                description: Version of the schema the FieldPath is
+                                  written in terms of, defaults to "v1".
+                                type: string
+                              fieldPath:
+                                description: Path of the field to select in the specified
+                                  API version.
+                                type: string
+                            required:
+                            - fieldPath
+                            type: object
+                          mode:
+                            description: 'Optional: mode bits used to set permissions
+                              on this file, must be an octal value between 0000 and
+                              0777 or a decimal value between 0 and 511. YAML accepts
+                              both octal and decimal values, JSON requires decimal
+                              values for mode bits. If not specified, the volume defaultMode
+                              will be used. This might be in conflict with other options
+                              that affect the file mode, like fsGroup, and the result
+                              can be other mode bits set.'
+                            format: int32
+                            type: integer
+                          path:
+                            description: 'Required: Path is  the relative path name
+                              of the file to be created. Must not be absolute or contain
+                              the ''..'' path. Must be utf-8 encoded. The first item
+                              of the relative path must not start with ''..'''
+                            type: string
+                          resourceFieldRef:
+                            description: 'Selects a resource of the container: only
+                              resources limits and requests (limits.cpu, limits.memory,
+                              requests.cpu and requests.memory) are currently supported.'
+                            properties:
+                              containerName:
+                                description: 'Container name: required for volumes,
+                                  optional for env vars'
+                                type: string
+                              divisor:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: Specifies the output format of the exposed
+                                  resources, defaults to "1"
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
+                              resource:
+                                description: 'Required: resource to select'
+                                type: string
+                            required:
+                            - resource
+                            type: object
+                        required:
+                        - path
+                        type: object
+                      type: array
+                    mountPoint:
+                      description: mountPoint is the mount point of the scripts file.
+                      maxLength: 128
+                      type: string
+                    name:
+                      description: Specify the name of the field.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
+                  required:
+                  - items
+                  - mountPoint
+                  - name
+                  type: object
+                type: array
+              dynamicParameters:
+                description: dynamicParameters, list of DynamicParameter, modifications
+                  of them trigger a config dynamic reload without process restart.
+                items:
+                  type: string
+                type: array
+                x-kubernetes-list-type: set
+              formatterConfig:
+                description: formatterConfig describes the format of the configuration
+                  file, the controller 1. parses configuration file 2. analyzes the
+                  modified parameters 3. applies corresponding policies.
+                properties:
+                  format:
+                    description: "The configuration file format. Valid values are
+                      ini, xml, yaml, json, hcl, dotenv, properties and toml. \n ini:
+                      a configuration file that consists of a text-based content with
+                      a structure and syntax comprising key–value pairs for properties,
+                      reference wiki: https://en.wikipedia.org/wiki/INI_file xml:
+                      reference wiki: https://en.wikipedia.org/wiki/XML yaml: a configuration
+                      file support for complex data types and structures. json: reference
+                      wiki: https://en.wikipedia.org/wiki/JSON hcl: : The HashiCorp
+                      Configuration Language (HCL) is a configuration language authored
+                      by HashiCorp, reference url: https://www.linode.com/docs/guides/introduction-to-hcl/
+                      dotenv: this was a plain text file with simple key–value pairs,
+                      reference wiki: https://en.wikipedia.org/wiki/Configuration_file#MS-DOS
+                      properties: a file extension mainly used in Java, reference
+                      wiki: https://en.wikipedia.org/wiki/.properties toml: reference
+                      wiki: https://en.wikipedia.org/wiki/TOML props-plus: a file
+                      extension mainly used in Java, support CamelCase(e.g: brokerMaxConnectionsPerIp)"
+                    enum:
+                    - xml
+                    - ini
+                    - yaml
+                    - json
+                    - hcl
+                    - dotenv
+                    - toml
+                    - properties
+                    - redis
+                    - props-plus
+                    type: string
+                  iniConfig:
+                    description: iniConfig represents the ini options.
+                    properties:
+                      sectionName:
+                        description: sectionName describes ini section.
+                        type: string
+                    type: object
+                required:
+                - format
+                type: object
+              immutableParameters:
+                description: immutableParameters describes parameters that prohibit
+                  user from modification.
+                items:
+                  type: string
+                type: array
+                x-kubernetes-list-type: set
+              reloadOptions:
+                description: reloadOptions indicates whether the process supports
+                  reload. if set, the controller will determine the behavior of the
+                  engine instance based on the configuration templates, restart or
+                  reload depending on whether any parameters in the StaticParameters
+                  have been modified.
+                properties:
+                  shellTrigger:
+                    description: shellTrigger performs the reload command.
+                    properties:
+                      command:
+                        description: command used to execute for reload.
+                        items:
+                          type: string
+                        type: array
+                      sync:
+                        description: Specify synchronize updates parameters to the
+                          config manager.
+                        type: boolean
+                    required:
+                    - command
+                    type: object
+                  tplScriptTrigger:
+                    description: goTplTrigger performs the reload command.
+                    properties:
+                      namespace:
+                        default: default
+                        description: Specify the namespace of the referenced the tpl
+                          script ConfigMap object. An empty namespace is equivalent
+                          to the "default" namespace.
+                        maxLength: 63
+                        pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                        type: string
+                      scriptConfigMapRef:
+                        description: scriptConfigMapRef used to execute for reload.
+                        type: string
+                      sync:
+                        description: Specify synchronize updates parameters to the
+                          config manager.
+                        type: boolean
+                    required:
+                    - scriptConfigMapRef
+                    type: object
+                  unixSignalTrigger:
+                    description: unixSignalTrigger used to reload by sending a signal.
+                    properties:
+                      processName:
+                        description: processName is process name, sends unix signal
+                          to proc.
+                        type: string
+                      signal:
+                        description: 'signal is valid for unix signal. e.g: SIGHUP
+                          url: ../../internal/configuration/configmap/handler.go:allUnixSignals'
+                        enum:
+                        - SIGHUP
+                        - SIGINT
+                        - SIGQUIT
+                        - SIGILL
+                        - SIGTRAP
+                        - SIGABRT
+                        - SIGBUS
+                        - SIGFPE
+                        - SIGKILL
+                        - SIGUSR1
+                        - SIGSEGV
+                        - SIGUSR2
+                        - SIGPIPE
+                        - SIGALRM
+                        - SIGTERM
+                        - SIGSTKFLT
+                        - SIGCHLD
+                        - SIGCONT
+                        - SIGSTOP
+                        - SIGTSTP
+                        - SIGTTIN
+                        - SIGTTOU
+                        - SIGURG
+                        - SIGXCPU
+                        - SIGXFSZ
+                        - SIGVTALRM
+                        - SIGPROF
+                        - SIGWINCH
+                        - SIGIO
+                        - SIGPWR
+                        - SIGSYS
+                        type: string
+                    required:
+                    - processName
+                    - signal
+                    type: object
+                type: object
+              scriptConfigs:
+                description: scriptConfigs, list of ScriptConfig, witch these scripts
+                  can be used by volume trigger,downward trigger, or tool image
+                items:
+                  properties:
+                    namespace:
+                      default: default
+                      description: Specify the namespace of the referenced the tpl
+                        script ConfigMap object. An empty namespace is equivalent
+                        to the "default" namespace.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                      type: string
+                    scriptConfigMapRef:
+                      description: scriptConfigMapRef used to execute for reload.
+                      type: string
+                  required:
+                  - scriptConfigMapRef
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - scriptConfigMapRef
+                x-kubernetes-list-type: map
+              selector:
+                description: selector is used to match the label on the pod, for example,
+                  a pod of the primary is match on the patroni cluster.
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
+                    items:
+                      description: A label selector requirement is a selector that
+                        contains values, a key, and an operator that relates the key
+                        and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies
+                            to.
+                          type: string
+                        operator:
+                          description: operator represents a key's relationship to
+                            a set of values. Valid operators are In, NotIn, Exists
+                            and DoesNotExist.
+                          type: string
+                        values:
+                          description: values is an array of string values. If the
+                            operator is In or NotIn, the values array must be non-empty.
+                            If the operator is Exists or DoesNotExist, the values
+                            array must be empty. This array is replaced during a strategic
+                            merge patch.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: matchLabels is a map of {key,value} pairs. A single
+                      {key,value} in the matchLabels map is equivalent to an element
+                      of matchExpressions, whose key field is "key", the operator
+                      is "In", and the values array contains only "value". The requirements
+                      are ANDed.
+                    type: object
+                type: object
+              staticParameters:
+                description: staticParameters, list of StaticParameter, modifications
+                  of them trigger a process restart.
+                items:
+                  type: string
+                type: array
+                x-kubernetes-list-type: set
+              toolsImageSpec:
+                description: toolConfig used to config init container.
+                properties:
+                  mountPoint:
+                    description: mountPoint is the mount point of the scripts file.
+                    maxLength: 128
+                    type: string
+                  toolConfigs:
+                    description: toolConfig used to config init container.
+                    items:
+                      properties:
+                        command:
+                          description: exec used to execute for init containers.
+                          items:
+                            type: string
+                          type: array
+                        image:
+                          description: tools Container image name.
+                          type: string
+                        name:
+                          description: Specify the name of initContainer. Must be
+                            a DNS_LABEL name.
+                          maxLength: 63
+                          pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
+                          type: string
+                      required:
+                      - command
+                      type: object
+                    type: array
+                required:
+                - mountPoint
+                type: object
+            required:
+            - formatterConfig
+            type: object
+          status:
+            description: ConfigConstraintStatus defines the observed state of ConfigConstraint.
+            properties:
+              message:
+                description: message field describes the reasons of abnormal status.
+                type: string
+              observedGeneration:
+                description: observedGeneration is the latest generation observed
+                  for this ClusterDefinition. It refers to the ConfigConstraint's
+                  generation, which is updated by the API Server.
+                format: int64
+                type: integer
+              phase:
+                description: phase is status of configuration template, when set to
+                  CCAvailablePhase, it can be referenced by ClusterDefinition or ClusterVersion.
+                enum:
+                - Available
+                - Unavailable
+                - Deleting
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

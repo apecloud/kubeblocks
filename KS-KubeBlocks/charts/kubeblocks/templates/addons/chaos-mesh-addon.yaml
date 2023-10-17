@@ -1,0 +1,94 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: fault-chaos-mesh
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": community
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: 'Chaos Mesh is an open-source chaos engineering tool that facilitates testing the resiliency and reliability of distributed systems by introducing various failure scenarios in a controlled manner.'
+
+  type: Helm
+
+  helm:
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "chaos-mesh" "version" "2.5.2" "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: 2.5.2
+      {{- end }}
+
+    installValues:
+      setValues:
+        - "version=2.5.2"
+        - "chaosDaemon.privileged=true"
+        - "dnsServer.create=true"
+        - "chaosDaemon.runtime=containerd"
+        - "chaosDaemon.socketPath=/run/containerd/containerd.sock"
+        - "images.registry=registry.cn-hangzhou.aliyuncs.com"
+        - "controllerManager.image.repository=apecloud/chaos-mesh"
+        - "chaosDaemon.image.repository=apecloud/chaos-daemon"
+        - "dashboard.image.repository=apecloud/chaos-dashboard"
+
+    valuesMapping:
+      valueMap:
+        replicaCount: controllerManager.replicaCount
+      jsonMap:
+        tolerations: controllerManager.tolerations
+      resources:
+        cpu:
+          requests: controllerManager.resources.requests.cpu
+        memory:
+          requests: controllerManager.resources.requests.memory
+
+      extras:
+        - name: chaosDaemon
+          jsonMap:
+            tolerations: chaosDaemon.tolerations
+
+        - name: dashboard
+          valueMap:
+            replicaCount: dashboard.replicaCount
+          jsonMap:
+            tolerations: dashboard.tolerations
+          resources:
+            cpu:
+              requests: dashboard.resources.requests.cpu
+            memory:
+              requests: dashboard.resources.requests.memory
+
+        - name: dnsServer
+          jsonMap:
+            tolerations: dnsServer.tolerations
+          resources:
+            cpu:
+              requests: dnsServer.resources.requests.cpu
+            memory:
+              requests: dnsServer.resources.requests.memory
+
+  installable:
+    autoInstall: false
+
+  defaultInstallValues:
+    - enabled: false
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
+      extras:
+        - name: chaosDaemon
+          {{- with .Values.tolerations }}
+          tolerations: {{ toJson . | quote }}
+          {{- end }}
+        - name: dashboard
+          {{- with .Values.tolerations }}
+          tolerations: {{ toJson . | quote }}
+          {{- end }}
+        - name: dnsServer
+          {{- with .Values.tolerations }}
+          tolerations: {{ toJson . | quote }}
+          {{- end }}

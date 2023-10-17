@@ -1,0 +1,24 @@
+{{- if not (empty .Values.prometheus.alertmanager.configMapOverrideName) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+  name: kb-addon-{{ include "addon.prometheus.name" . }}-{{ .Values.prometheus.alertmanager.configMapOverrideName }}
+data:
+  alertmanager.yml: |
+    global: { }
+    receivers:
+      - name: default-receiver
+    route:
+      group_by: [ 'alertname', 'namespace', 'app_kubernetes_io_instance' ]
+      group_interval: 30s
+      group_wait: 5s
+      receiver: default-receiver
+      repeat_interval: 10m
+      routes:
+        - receiver: default-receiver
+          group_by: ['alertname', 'instance', 'pod']
+          matchers:
+            - alertname=~"Container.*"
+    {{- end -}}

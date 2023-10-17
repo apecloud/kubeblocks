@@ -1,0 +1,147 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: external-dns
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: >-
+    ExternalDNS synchronizes exposed Kubernetes Services and Ingresses with DNS providers.
+
+{{- if (.Capabilities.KubeVersion.GitVersion | contains "-eks") }}
+    Before enabling this addon, you should enable the aws-load-balancer-controller addon and create the hosted zone {{ index .Values "external-dns" "domain" }} in the Route53 first.
+
+    Then you should properly setup permissions for external-dns to call the OpenAPI, please refer to this guide: https://github.com/kubernetes-sigs/external-dns/blob/master/docs/tutorials/aws.md
+
+    Finally, you can enable this addon by executing the following command, please note replacing the variables.
+
+    kbcli addon enable external-dns --set provider=aws \
+        --set source=service \
+        --set policy=sync \
+        --set triggerLoopOnEvent=true \
+        --set interval=5m \
+        --set registry=txt \
+        --set labelFilter=app.kubernetes.io/managed-by=kubeblocks \
+        --set domainFilters={{ index .Values "external-dns" "domain" }} \
+        --set aws.credentials.accessKey=${accessKey} \
+        --set aws.credentials.secretKey=${secretKey} \
+        --set aws.region=${region}
+
+{{- else if (.Capabilities.KubeVersion.GitVersion | contains "-ack") }}
+    Before enabling this addon, you should create the domain {{ index .Values "external-dns" "domain" }} in the Cloud DNS service or Private Zone service first.
+
+    Then you should properly setup permissions for external-dns to call the OpenAPI, please refer to this guide: https://github.com/kubernetes-sigs/external-dns/blob/master/docs/tutorials/alibabacloud.md
+
+    Finally, you can enable this addon by executing the following command, please note replacing the variables.
+
+    kbcli addon enable external-dns --set provider=alibabacloud \
+        --set source=service \
+        --set policy=sync \
+        --set triggerLoopOnEvent=true \
+        --set interval=5m \
+        --set registry=txt \
+        --set labelFilter=app.kubernetes.io/managed-by=kubeblocks \
+        --set domainFilters={{ index .Values "external-dns" "domain" }} \
+        --set alibabacloud.accessKeyId=${accessKeyId} \
+        --set alibabacloud.accessKeySecret=${accessKeySecret} \
+        --set alibabacloud.vpcId=${vpcId}
+
+{{- else if (.Capabilities.KubeVersion.GitVersion | contains "-gke") }}
+    Before enabling this addon, you should create the zone {{ index .Values "external-dns" "domain" }} in the Cloud DNS service first.
+
+    Then you should properly setup permissions for external-dns to call the OpenAPI, please refer to this guide: https://github.com/kubernetes-sigs/external-dns/blob/master/docs/tutorials/gke.md
+
+    Finally, you can enable this addon by executing the following command, please note replacing the variables.
+
+    kbcli addon enable external-dns --set provider=google \
+        --set source=service \
+        --set policy=sync \
+        --set triggerLoopOnEvent=true \
+        --set interval=5m \
+        --set registry=txt \
+        --set labelFilter=app.kubernetes.io/managed-by=kubeblocks \
+        --set domainFilters={{ index .Values "external-dns" "domain" }} \
+        --set google.project=${project} \
+        --set google.serviceAccountSecret=${serviceAccountSecret} \
+        --set google.serviceAccountSecretKey=${serviceAccountSecretKey} \
+        --set google.serviceAccountKey=${serviceAccountKey}
+
+{{/* FIXME: Azure AKS does not have unique identifier in the git version, we should use other method to identify AKS */}}
+{{- else if (.Capabilities.KubeVersion.GitVersion | contains "-aks") }}
+    Before enabling this addon, you should create the zone {{ index .Values "external-dns" "domain" }} in the Azure DNS or Azure Private Zone service first.
+
+    Then you should properly setup permissions for external-dns to call the OpenAPI, please refer to these guides:
+    https://github.com/kubernetes-sigs/external-dns/blob/master/docs/tutorials/azure.md
+    https://github.com/kubernetes-sigs/external-dns/blob/master/docs/tutorials/azure-private-dns.md
+
+    If it's a zone in Azure Private Zone service, you can enable this addon by executing the following command, please note replacing the variables.
+
+    kbcli addon enable external-dns --set provider=azure-private-dns \
+        --set source=service \
+        --set policy=sync \
+        --set triggerLoopOnEvent=true \
+        --set interval=5m \
+        --set registry=txt \
+        --set labelFilter=app.kubernetes.io/managed-by=kubeblocks \
+        --set domainFilters={{ index .Values "external-dns" "domain" }} \
+        --set azure.subscriptionId=${subscriptionId} \
+        --set azure.resourceGroup=${resourceGroup}
+
+    If it's a zone in Azure DNS, please follow the command below.
+
+    kbcli addon enable external-dns --set provider=azure \
+        --set source=service \
+        --set policy=sync \
+        --set triggerLoopOnEvent=true \
+        --set interval=5m \
+        --set registry=txt \
+        --set labelFilter=app.kubernetes.io/managed-by=kubeblocks \
+        --set domainFilters={{ index .Values "external-dns" "domain" }} \
+        --set azure.subscriptionId=${subscriptionId} \
+        --set azure.resourceGroup=${resourceGroup}
+
+{{- end }}
+
+  type: Helm
+
+  helm:
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "external-dns" "version" "6.20.4" "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: 6.20.4
+      {{- end }}
+
+    installValues:
+      configMapRefs:
+      - name: external-dns-chart-kubeblocks-values
+        key: values-kubeblocks-override.yaml
+
+    valuesMapping:
+      valueMap:
+        replicaCount: replicaCount
+
+      jsonMap:
+        tolerations: tolerations
+
+      resources:
+        cpu:
+          requests: resources.requests.cpu
+          limits: resources.limits.cpu
+        memory:
+          requests: resources.requests.memory
+          limits: resources.limits.memory
+
+  defaultInstallValues:
+  - replicas: 1
+    {{- with .Values.tolerations }}
+    tolerations: {{ toJson . | quote }}
+    {{- end }}
+
+  installable:
+    autoInstall: {{ index .Values "external-dns" "enabled" }}

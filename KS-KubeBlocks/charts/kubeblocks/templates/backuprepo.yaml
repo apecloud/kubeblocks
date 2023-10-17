@@ -1,0 +1,34 @@
+{{- $spName := .Values.backupRepo.storageProvider }}
+{{ if and $spName .Values.backupRepo.create }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "kubeblocks.fullname" . }}-backuprepo-secret
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+stringData:
+  {{- .Values.backupRepo.secrets | toYaml | nindent 2 }}
+---
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupRepo
+metadata:
+  name: {{ include "kubeblocks.fullname" . }}-backuprepo
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+  {{- if .Values.backupRepo.default }}
+  annotations:
+    dataprotection.kubeblocks.io/is-default-repo: "true"
+  {{- end }}
+spec:
+  storageProviderRef: {{ $spName }}
+  pvReclaimPolicy: {{ .Values.backupRepo.pvReclaimPolicy | default "Retain" }}
+  volumeCapacity: {{ .Values.backupRepo.volumeCapacity | default "100Gi" }}
+  config:
+    {{- .Values.backupRepo.config | toYaml | nindent 4 }}
+  credential:
+    name: {{ include "kubeblocks.fullname" . }}-backuprepo-secret
+    namespace: {{ .Release.Namespace }}
+---
+{{ end }}

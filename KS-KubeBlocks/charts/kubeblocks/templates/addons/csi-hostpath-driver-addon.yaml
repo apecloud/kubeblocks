@@ -1,0 +1,50 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: csi-hostpath-driver
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": community
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: Container Storage Interface (CSI) driver for HostPath volumes
+  type: Helm
+
+  helm:
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "csi-hostpath-driver" "version" (default .Chart.Version .Values.versionOverride) "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: {{ default .Chart.Version .Values.versionOverride }}
+      {{- end }}
+
+    installValues:
+      configMapRefs:
+        - name: csi-hostpath-driver-chart-kubeblocks-values
+          key: values-kubeblocks-override.yaml
+
+    valuesMapping:
+      jsonMap:
+        tolerations: tolerations
+
+  defaultInstallValues:
+    - enabled: true
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
+
+  installable:
+    autoInstall: {{ get ( get ( .Values | toYaml | fromYaml ) "csi-hostpath-driver" ) "enabled" }}
+    selectors:
+      - key: KubeGitVersion
+        operator: DoesNotContain
+        values:
+          - eks
+          - aliyun
+          - gke
+          - tke
+          - aks

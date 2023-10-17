@@ -1,0 +1,215 @@
+{{- if .Values.admissionWebhooks.enabled }}
+{{- $ca := genCA (printf "*.%s.svc" ( .Release.Namespace )) 36500 }}
+{{- $svcName := (printf "%s.%s.svc" (include "kubeblocks.svcName" .) ( .Release.Namespace )) -}}
+{{- $cert := genSignedCert $svcName nil (list $svcName (include "kubeblocks.svcName" .) (printf "%s.%s" (include "kubeblocks.svcName" .) ( .Release.Namespace ))) 36500 $ca -}}
+{{- if .Values.admissionWebhooks.createSelfSignedCert }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "kubeblocks.fullname" . }}.{{ .Release.Namespace }}.svc.tls-ca
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+  annotations:
+    self-signed-cert: "true"
+type: kubernetes.io/tls
+data:
+  tls.key: {{ $ca.Key | b64enc }}
+  tls.crt: {{ $ca.Cert | b64enc }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "kubeblocks.fullname" . }}.{{ .Release.Namespace }}.svc.tls-pair
+  labels: {{ include "kubeblocks.labels" . | nindent 4 }}
+  annotations:
+    self-signed-cert: "true"
+type: kubernetes.io/tls
+data:
+  tls.key: {{ $cert.Key | b64enc }}
+  tls.crt: {{ $cert.Cert | b64enc }}
+{{- end }}
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: {{ include "kubeblocks.fullname" . }}-mutating-webhook-configuration
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ include "kubeblocks.svcName" . }}
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-apps-kubeblocks-io-v1alpha1-clusterdefinition
+      port: {{ .Values.service.port }}
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}
+    caBundle: {{ $ca.Cert | b64enc }}
+    {{- end }}
+  failurePolicy: Fail
+  name: mclusterdefinition.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clusterdefinitions
+  sideEffects: None
+- admissionReviewVersions:
+    - v1
+  clientConfig:
+    service:
+      name: {{ include "kubeblocks.svcName" . }}
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine
+      port: {{ .Values.service.port }}
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}
+    caBundle: {{ $ca.Cert | b64enc }}
+    {{- end }}
+  failurePolicy: Fail
+  name: mreplicatedstatemachine.kb.io
+  rules:
+    - apiGroups:
+        - workloads.kubeblocks.io
+      apiVersions:
+        - v1alpha1
+      operations:
+        - CREATE
+        - UPDATE
+      resources:
+        - replicatedstatemachines
+  sideEffects: None
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{ include "kubeblocks.fullname" . }}-validating-webhook-configuration
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ include "kubeblocks.svcName" . }}
+      namespace: {{ .Release.Namespace }}
+      path: /validate-apps-kubeblocks-io-v1alpha1-clusterversion
+      port: {{ .Values.service.port }}
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}
+    caBundle: {{ $ca.Cert | b64enc }}
+    {{- end }}
+  failurePolicy: Fail
+  name: vclusterversion.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clusterversions
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ include "kubeblocks.svcName" . }}
+      namespace: {{ .Release.Namespace }}
+      path: /validate-apps-kubeblocks-io-v1alpha1-cluster
+      port: {{ .Values.service.port }}
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}
+    caBundle: {{ $ca.Cert | b64enc }}
+    {{- end }}
+  failurePolicy: Fail
+  name: vcluster.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clusters
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ include "kubeblocks.svcName" . }}
+      namespace: {{ .Release.Namespace }}
+      path: /validate-apps-kubeblocks-io-v1alpha1-clusterdefinition
+      port: {{ .Values.service.port }}
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}
+    caBundle: {{ $ca.Cert | b64enc }}
+    {{- end }}
+  failurePolicy: Fail
+  name: vclusterdefinition.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clusterdefinitions
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ include "kubeblocks.svcName" . }}
+      namespace: {{ .Release.Namespace }}
+      path: /validate-apps-kubeblocks-io-v1alpha1-opsrequest
+      port: {{ .Values.service.port }}
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}
+    caBundle: {{ $ca.Cert | b64enc }}
+    {{- end }}
+  failurePolicy: Fail
+  name: vopsrequest.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - opsrequests
+  sideEffects: None
+- admissionReviewVersions:
+    - v1
+  clientConfig:
+    service:
+      name: {{ include "kubeblocks.svcName" . }}
+      namespace: {{ .Release.Namespace }}
+      path: /validate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine
+      port: {{ .Values.service.port }}
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}
+    caBundle: {{ $ca.Cert | b64enc }}
+    {{- end }}
+  failurePolicy: Fail
+  name: vreplicatedstatemachine.kb.io
+  rules:
+    - apiGroups:
+        - workloads.kubeblocks.io
+      apiVersions:
+        - v1alpha1
+      operations:
+        - CREATE
+        - UPDATE
+      resources:
+        - replicatedstatemachines
+  sideEffects: None
+{{- end }}

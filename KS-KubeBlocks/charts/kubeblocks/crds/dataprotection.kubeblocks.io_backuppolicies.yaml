@@ -1,0 +1,694 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.9.0
+  creationTimestamp: null
+  name: backuppolicies.dataprotection.kubeblocks.io
+spec:
+  group: dataprotection.kubeblocks.io
+  names:
+    categories:
+    - kubeblocks
+    kind: BackupPolicy
+    listKind: BackupPolicyList
+    plural: backuppolicies
+    shortNames:
+    - bp
+    singular: backuppolicy
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: STATUS
+      type: string
+    - jsonPath: .status.lastScheduleTime
+      name: LAST SCHEDULE
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: BackupPolicy is the Schema for the backuppolicies API (defined
+          by User)
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: BackupPolicySpec defines the desired state of BackupPolicy
+            properties:
+              datafile:
+                description: the policy for datafile backup.
+                properties:
+                  backupRepoName:
+                    description: refer to BackupRepo and the backup data will be stored
+                      in the corresponding repo.
+                    pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                    type: string
+                  backupStatusUpdates:
+                    description: define how to update metadata for backup status.
+                    items:
+                      properties:
+                        containerName:
+                          description: which container name that kubectl can execute.
+                          type: string
+                        path:
+                          description: 'specify the json path of backup object for
+                            patch. example: manifests.backupLog -- means patch the
+                            backup json path of status.manifests.backupLog.'
+                          type: string
+                        script:
+                          description: the shell Script commands to collect backup
+                            status metadata. The script must exist in the container
+                            of ContainerName and the output format must be set to
+                            JSON. Note that outputting to stderr may cause the result
+                            format to not be in JSON.
+                          type: string
+                        updateStage:
+                          description: 'when to update the backup status, pre: before
+                            backup, post: after backup'
+                          enum:
+                          - pre
+                          - post
+                          type: string
+                        useTargetPodServiceAccount:
+                          description: useTargetPodServiceAccount defines whether
+                            this job requires the service account of the backup target
+                            pod. if true, will use the service account of the backup
+                            target pod. otherwise, will use the system service account.
+                          type: boolean
+                      required:
+                      - updateStage
+                      type: object
+                    type: array
+                  backupToolName:
+                    description: which backup tool to perform database backup, only
+                      support one tool.
+                    pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                    type: string
+                  backupsHistoryLimit:
+                    default: 7
+                    description: the number of automatic backups to retain. Value
+                      must be non-negative integer. 0 means NO limit on the number
+                      of backups.
+                    format: int32
+                    type: integer
+                  onFailAttempted:
+                    description: count of backup stop retries on fail.
+                    format: int32
+                    type: integer
+                  persistentVolumeClaim:
+                    description: refer to PersistentVolumeClaim and the backup data
+                      will be stored in the corresponding persistent volume.
+                    properties:
+                      createPolicy:
+                        default: IfNotPresent
+                        description: 'createPolicy defines the policy for creating
+                          the PersistentVolumeClaim, enum values: - Never: do nothing
+                          if the PersistentVolumeClaim not exists. - IfNotPresent:
+                          create the PersistentVolumeClaim if not present and the
+                          accessModes only contains ''ReadWriteMany''.'
+                        enum:
+                        - IfNotPresent
+                        - Never
+                        type: string
+                      initCapacity:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: initCapacity represents the init storage size
+                          of the PersistentVolumeClaim which should be created if
+                          not exist. and the default value is 100Gi if it is empty.
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                      name:
+                        description: the name of PersistentVolumeClaim to store backup
+                          data.
+                        type: string
+                      persistentVolumeConfigMap:
+                        description: 'persistentVolumeConfigMap references the configmap
+                          which contains a persistentVolume template. key must be
+                          "persistentVolume" and value is the "PersistentVolume" struct.
+                          support the following built-in Objects: - $(GENERATE_NAME):
+                          generate a specific format "`PVC NAME`-`PVC NAMESPACE`".
+                          if the PersistentVolumeClaim not exists and CreatePolicy
+                          is "IfNotPresent", the controller will create it by this
+                          template. this is a mutually exclusive setting with "storageClassName".'
+                        properties:
+                          name:
+                            description: the name of the persistentVolume ConfigMap.
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                          namespace:
+                            description: the namespace of the persistentVolume ConfigMap.
+                            pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                            type: string
+                        required:
+                        - name
+                        - namespace
+                        type: object
+                      storageClassName:
+                        description: storageClassName is the name of the StorageClass
+                          required by the claim.
+                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                        type: string
+                    type: object
+                  target:
+                    description: target database cluster for backup.
+                    properties:
+                      labelsSelector:
+                        description: labelsSelector is used to find matching pods.
+                          Pods that match this label selector are counted to determine
+                          the number of pods in their corresponding topology domain.
+                        properties:
+                          matchExpressions:
+                            description: matchExpressions is a list of label selector
+                              requirements. The requirements are ANDed.
+                            items:
+                              description: A label selector requirement is a selector
+                                that contains values, a key, and an operator that
+                                relates the key and values.
+                              properties:
+                                key:
+                                  description: key is the label key that the selector
+                                    applies to.
+                                  type: string
+                                operator:
+                                  description: operator represents a key's relationship
+                                    to a set of values. Valid operators are In, NotIn,
+                                    Exists and DoesNotExist.
+                                  type: string
+                                values:
+                                  description: values is an array of string values.
+                                    If the operator is In or NotIn, the values array
+                                    must be non-empty. If the operator is Exists or
+                                    DoesNotExist, the values array must be empty.
+                                    This array is replaced during a strategic merge
+                                    patch.
+                                  items:
+                                    type: string
+                                  type: array
+                              required:
+                              - key
+                              - operator
+                              type: object
+                            type: array
+                          matchLabels:
+                            additionalProperties:
+                              type: string
+                            description: matchLabels is a map of {key,value} pairs.
+                              A single {key,value} in the matchLabels map is equivalent
+                              to an element of matchExpressions, whose key field is
+                              "key", the operator is "In", and the values array contains
+                              only "value". The requirements are ANDed.
+                            type: object
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                      secret:
+                        description: secret is used to connect to the target database
+                          cluster. If not set, secret will be inherited from backup
+                          policy template. if still not set, the controller will check
+                          if any system account for dataprotection has been created.
+                        properties:
+                          name:
+                            description: the secret name
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                          passwordKey:
+                            default: password
+                            description: passwordKey the map key of the password in
+                              the connection credential secret
+                            type: string
+                          usernameKey:
+                            default: username
+                            description: usernameKey the map key of the user in the
+                              connection credential secret
+                            type: string
+                        required:
+                        - name
+                        type: object
+                    required:
+                    - labelsSelector
+                    type: object
+                required:
+                - target
+                type: object
+              logfile:
+                description: the policy for logfile backup.
+                properties:
+                  backupRepoName:
+                    description: refer to BackupRepo and the backup data will be stored
+                      in the corresponding repo.
+                    pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                    type: string
+                  backupStatusUpdates:
+                    description: define how to update metadata for backup status.
+                    items:
+                      properties:
+                        containerName:
+                          description: which container name that kubectl can execute.
+                          type: string
+                        path:
+                          description: 'specify the json path of backup object for
+                            patch. example: manifests.backupLog -- means patch the
+                            backup json path of status.manifests.backupLog.'
+                          type: string
+                        script:
+                          description: the shell Script commands to collect backup
+                            status metadata. The script must exist in the container
+                            of ContainerName and the output format must be set to
+                            JSON. Note that outputting to stderr may cause the result
+                            format to not be in JSON.
+                          type: string
+                        updateStage:
+                          description: 'when to update the backup status, pre: before
+                            backup, post: after backup'
+                          enum:
+                          - pre
+                          - post
+                          type: string
+                        useTargetPodServiceAccount:
+                          description: useTargetPodServiceAccount defines whether
+                            this job requires the service account of the backup target
+                            pod. if true, will use the service account of the backup
+                            target pod. otherwise, will use the system service account.
+                          type: boolean
+                      required:
+                      - updateStage
+                      type: object
+                    type: array
+                  backupToolName:
+                    description: which backup tool to perform database backup, only
+                      support one tool.
+                    pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                    type: string
+                  backupsHistoryLimit:
+                    default: 7
+                    description: the number of automatic backups to retain. Value
+                      must be non-negative integer. 0 means NO limit on the number
+                      of backups.
+                    format: int32
+                    type: integer
+                  onFailAttempted:
+                    description: count of backup stop retries on fail.
+                    format: int32
+                    type: integer
+                  persistentVolumeClaim:
+                    description: refer to PersistentVolumeClaim and the backup data
+                      will be stored in the corresponding persistent volume.
+                    properties:
+                      createPolicy:
+                        default: IfNotPresent
+                        description: 'createPolicy defines the policy for creating
+                          the PersistentVolumeClaim, enum values: - Never: do nothing
+                          if the PersistentVolumeClaim not exists. - IfNotPresent:
+                          create the PersistentVolumeClaim if not present and the
+                          accessModes only contains ''ReadWriteMany''.'
+                        enum:
+                        - IfNotPresent
+                        - Never
+                        type: string
+                      initCapacity:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: initCapacity represents the init storage size
+                          of the PersistentVolumeClaim which should be created if
+                          not exist. and the default value is 100Gi if it is empty.
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                      name:
+                        description: the name of PersistentVolumeClaim to store backup
+                          data.
+                        type: string
+                      persistentVolumeConfigMap:
+                        description: 'persistentVolumeConfigMap references the configmap
+                          which contains a persistentVolume template. key must be
+                          "persistentVolume" and value is the "PersistentVolume" struct.
+                          support the following built-in Objects: - $(GENERATE_NAME):
+                          generate a specific format "`PVC NAME`-`PVC NAMESPACE`".
+                          if the PersistentVolumeClaim not exists and CreatePolicy
+                          is "IfNotPresent", the controller will create it by this
+                          template. this is a mutually exclusive setting with "storageClassName".'
+                        properties:
+                          name:
+                            description: the name of the persistentVolume ConfigMap.
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                          namespace:
+                            description: the namespace of the persistentVolume ConfigMap.
+                            pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                            type: string
+                        required:
+                        - name
+                        - namespace
+                        type: object
+                      storageClassName:
+                        description: storageClassName is the name of the StorageClass
+                          required by the claim.
+                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                        type: string
+                    type: object
+                  target:
+                    description: target database cluster for backup.
+                    properties:
+                      labelsSelector:
+                        description: labelsSelector is used to find matching pods.
+                          Pods that match this label selector are counted to determine
+                          the number of pods in their corresponding topology domain.
+                        properties:
+                          matchExpressions:
+                            description: matchExpressions is a list of label selector
+                              requirements. The requirements are ANDed.
+                            items:
+                              description: A label selector requirement is a selector
+                                that contains values, a key, and an operator that
+                                relates the key and values.
+                              properties:
+                                key:
+                                  description: key is the label key that the selector
+                                    applies to.
+                                  type: string
+                                operator:
+                                  description: operator represents a key's relationship
+                                    to a set of values. Valid operators are In, NotIn,
+                                    Exists and DoesNotExist.
+                                  type: string
+                                values:
+                                  description: values is an array of string values.
+                                    If the operator is In or NotIn, the values array
+                                    must be non-empty. If the operator is Exists or
+                                    DoesNotExist, the values array must be empty.
+                                    This array is replaced during a strategic merge
+                                    patch.
+                                  items:
+                                    type: string
+                                  type: array
+                              required:
+                              - key
+                              - operator
+                              type: object
+                            type: array
+                          matchLabels:
+                            additionalProperties:
+                              type: string
+                            description: matchLabels is a map of {key,value} pairs.
+                              A single {key,value} in the matchLabels map is equivalent
+                              to an element of matchExpressions, whose key field is
+                              "key", the operator is "In", and the values array contains
+                              only "value". The requirements are ANDed.
+                            type: object
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                      secret:
+                        description: secret is used to connect to the target database
+                          cluster. If not set, secret will be inherited from backup
+                          policy template. if still not set, the controller will check
+                          if any system account for dataprotection has been created.
+                        properties:
+                          name:
+                            description: the secret name
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                          passwordKey:
+                            default: password
+                            description: passwordKey the map key of the password in
+                              the connection credential secret
+                            type: string
+                          usernameKey:
+                            default: username
+                            description: usernameKey the map key of the user in the
+                              connection credential secret
+                            type: string
+                        required:
+                        - name
+                        type: object
+                    required:
+                    - labelsSelector
+                    type: object
+                required:
+                - target
+                type: object
+              retention:
+                description: retention describe how long the Backup should be retained.
+                  if not set, will be retained forever.
+                properties:
+                  ttl:
+                    description: ttl is a time string ending with the 'd'|'D'|'h'|'H'
+                      character to describe how long the Backup should be retained.
+                      if not set, will be retained forever.
+                    pattern: ^\d+[d|D|h|H]$
+                    type: string
+                type: object
+              schedule:
+                description: schedule policy for backup.
+                properties:
+                  datafile:
+                    description: schedule policy for datafile backup.
+                    properties:
+                      cronExpression:
+                        description: the cron expression for schedule, the timezone
+                          is in UTC. see https://en.wikipedia.org/wiki/Cron.
+                        type: string
+                      enable:
+                        description: enable or disable the schedule.
+                        type: boolean
+                    required:
+                    - cronExpression
+                    - enable
+                    type: object
+                  logfile:
+                    description: schedule policy for logfile backup.
+                    properties:
+                      cronExpression:
+                        description: the cron expression for schedule, the timezone
+                          is in UTC. see https://en.wikipedia.org/wiki/Cron.
+                        type: string
+                      enable:
+                        description: enable or disable the schedule.
+                        type: boolean
+                    required:
+                    - cronExpression
+                    - enable
+                    type: object
+                  snapshot:
+                    description: schedule policy for snapshot backup.
+                    properties:
+                      cronExpression:
+                        description: the cron expression for schedule, the timezone
+                          is in UTC. see https://en.wikipedia.org/wiki/Cron.
+                        type: string
+                      enable:
+                        description: enable or disable the schedule.
+                        type: boolean
+                    required:
+                    - cronExpression
+                    - enable
+                    type: object
+                  startingDeadlineMinutes:
+                    description: startingDeadlineMinutes defines the deadline in minutes
+                      for starting the backup job if it misses scheduled time for
+                      any reason.
+                    format: int64
+                    maximum: 1440
+                    minimum: 0
+                    type: integer
+                type: object
+              snapshot:
+                description: the policy for snapshot backup.
+                properties:
+                  backupStatusUpdates:
+                    description: define how to update metadata for backup status.
+                    items:
+                      properties:
+                        containerName:
+                          description: which container name that kubectl can execute.
+                          type: string
+                        path:
+                          description: 'specify the json path of backup object for
+                            patch. example: manifests.backupLog -- means patch the
+                            backup json path of status.manifests.backupLog.'
+                          type: string
+                        script:
+                          description: the shell Script commands to collect backup
+                            status metadata. The script must exist in the container
+                            of ContainerName and the output format must be set to
+                            JSON. Note that outputting to stderr may cause the result
+                            format to not be in JSON.
+                          type: string
+                        updateStage:
+                          description: 'when to update the backup status, pre: before
+                            backup, post: after backup'
+                          enum:
+                          - pre
+                          - post
+                          type: string
+                        useTargetPodServiceAccount:
+                          description: useTargetPodServiceAccount defines whether
+                            this job requires the service account of the backup target
+                            pod. if true, will use the service account of the backup
+                            target pod. otherwise, will use the system service account.
+                          type: boolean
+                      required:
+                      - updateStage
+                      type: object
+                    type: array
+                  backupsHistoryLimit:
+                    default: 7
+                    description: the number of automatic backups to retain. Value
+                      must be non-negative integer. 0 means NO limit on the number
+                      of backups.
+                    format: int32
+                    type: integer
+                  hooks:
+                    description: execute hook commands for backup.
+                    properties:
+                      containerName:
+                        description: which container can exec command
+                        type: string
+                      image:
+                        description: exec command with image
+                        type: string
+                      postCommands:
+                        description: post backup to perform commands
+                        items:
+                          type: string
+                        type: array
+                      preCommands:
+                        description: pre backup to perform commands
+                        items:
+                          type: string
+                        type: array
+                    type: object
+                  onFailAttempted:
+                    description: count of backup stop retries on fail.
+                    format: int32
+                    type: integer
+                  target:
+                    description: target database cluster for backup.
+                    properties:
+                      labelsSelector:
+                        description: labelsSelector is used to find matching pods.
+                          Pods that match this label selector are counted to determine
+                          the number of pods in their corresponding topology domain.
+                        properties:
+                          matchExpressions:
+                            description: matchExpressions is a list of label selector
+                              requirements. The requirements are ANDed.
+                            items:
+                              description: A label selector requirement is a selector
+                                that contains values, a key, and an operator that
+                                relates the key and values.
+                              properties:
+                                key:
+                                  description: key is the label key that the selector
+                                    applies to.
+                                  type: string
+                                operator:
+                                  description: operator represents a key's relationship
+                                    to a set of values. Valid operators are In, NotIn,
+                                    Exists and DoesNotExist.
+                                  type: string
+                                values:
+                                  description: values is an array of string values.
+                                    If the operator is In or NotIn, the values array
+                                    must be non-empty. If the operator is Exists or
+                                    DoesNotExist, the values array must be empty.
+                                    This array is replaced during a strategic merge
+                                    patch.
+                                  items:
+                                    type: string
+                                  type: array
+                              required:
+                              - key
+                              - operator
+                              type: object
+                            type: array
+                          matchLabels:
+                            additionalProperties:
+                              type: string
+                            description: matchLabels is a map of {key,value} pairs.
+                              A single {key,value} in the matchLabels map is equivalent
+                              to an element of matchExpressions, whose key field is
+                              "key", the operator is "In", and the values array contains
+                              only "value". The requirements are ANDed.
+                            type: object
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                      secret:
+                        description: secret is used to connect to the target database
+                          cluster. If not set, secret will be inherited from backup
+                          policy template. if still not set, the controller will check
+                          if any system account for dataprotection has been created.
+                        properties:
+                          name:
+                            description: the secret name
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                          passwordKey:
+                            default: password
+                            description: passwordKey the map key of the password in
+                              the connection credential secret
+                            type: string
+                          usernameKey:
+                            default: username
+                            description: usernameKey the map key of the user in the
+                              connection credential secret
+                            type: string
+                        required:
+                        - name
+                        type: object
+                    required:
+                    - labelsSelector
+                    type: object
+                required:
+                - target
+                type: object
+            type: object
+          status:
+            description: BackupPolicyStatus defines the observed state of BackupPolicy
+            properties:
+              failureReason:
+                description: the reason if backup policy check failed.
+                type: string
+              lastScheduleTime:
+                description: information when was the last time the job was successfully
+                  scheduled.
+                format: date-time
+                type: string
+              lastSuccessfulTime:
+                description: information when was the last time the job successfully
+                  completed.
+                format: date-time
+                type: string
+              observedGeneration:
+                description: observedGeneration is the most recent generation observed
+                  for this BackupPolicy. It corresponds to the Cluster's generation,
+                  which is updated on mutation by the API Server.
+                format: int64
+                type: integer
+              phase:
+                description: 'backup policy phase valid value: Available, Failed.'
+                enum:
+                - Available
+                - Failed
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

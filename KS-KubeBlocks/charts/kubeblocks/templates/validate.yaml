@@ -1,0 +1,5 @@
+{{- if and .Values.admissionWebhooks.enabled ( not .Values.admissionWebhooks.ignoreReplicasCheck ) }}
+  {{- if lt (int .Values.replicaCount) 3 }}
+    {{ fail "Enabling admission webhooks requires highly-available deployment as 3 or more replicas." }}
+  {{- end }}
+{{- end }}

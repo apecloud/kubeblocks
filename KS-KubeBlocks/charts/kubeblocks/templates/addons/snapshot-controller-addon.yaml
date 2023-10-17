@@ -1,0 +1,91 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: snapshot-controller
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": community
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: 'Deploys a Snapshot Controller in a cluster. Snapshot Controllers are
+    often bundled with the Kubernetes distribution, this chart is meant for cases where
+    it is not. '
+  type: Helm
+
+  helm:
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "snapshot-controller" "version" "1.7.2" "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
+
+    installOptions:
+     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: 1.7.2
+     {{- end }}
+
+    installValues:
+      configMapRefs:
+        - name: snapshot-controller-chart-kubeblocks-values
+          key: values-kubeblocks-override.yaml
+
+    valuesMapping:
+      valueMap:
+        replicaCount: replicaCount
+        storageClass: volumeSnapshotClasses[0].driver
+
+      jsonMap:
+        tolerations: tolerations
+
+      resources:
+        cpu:
+          requests: resources.requests.cpu
+          limits: resources.limits.cpu
+        memory:
+          requests: resources.requests.memory
+          limits: resources.limits.memory
+
+  defaultInstallValues:
+    - enabled: {{ get ( get ( .Values | toYaml | fromYaml ) "snapshot-controller" ) "enabled" }}
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
+
+    - selectors:
+        - key: KubeGitVersion
+          operator: Contains
+          values:
+            - eks
+      storageClass: ebs.csi.aws.com
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
+
+    - selectors:
+        - key: KubeGitVersion
+          operator: Contains
+          values:
+            - gke
+      storageClass: pd.csi.storage.gke.io
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
+
+    - selectors:
+        - key: KubeGitVersion
+          operator: Contains
+          values:
+            - aks
+      storageClass: disk.csi.azure.com
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
+
+  installable:
+    autoInstall:  {{ get ( get ( .Values | toYaml | fromYaml ) "snapshot-controller" ) "enabled" }}
+    selectors:
+      - key: KubeGitVersion
+        operator: DoesNotContain
+        values:
+          - tke
+          - aliyun

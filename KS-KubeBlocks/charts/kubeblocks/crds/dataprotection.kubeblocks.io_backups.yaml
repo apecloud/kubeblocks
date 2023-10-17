@@ -1,0 +1,209 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.9.0
+  creationTimestamp: null
+  name: backups.dataprotection.kubeblocks.io
+spec:
+  group: dataprotection.kubeblocks.io
+  names:
+    categories:
+    - kubeblocks
+    kind: Backup
+    listKind: BackupList
+    plural: backups
+    singular: backup
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.backupType
+      name: TYPE
+      type: string
+    - jsonPath: .status.phase
+      name: STATUS
+      type: string
+    - jsonPath: .status.sourceCluster
+      name: SOURCE-CLUSTER
+      type: string
+    - jsonPath: .status.totalSize
+      name: TOTAL-SIZE
+      type: string
+    - jsonPath: .status.duration
+      name: DURATION
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: CREATE-TIME
+      type: string
+    - jsonPath: .status.completionTimestamp
+      name: COMPLETION-TIME
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Backup is the Schema for the backups API (defined by User).
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: BackupSpec defines the desired state of Backup.
+            properties:
+              backupPolicyName:
+                description: Which backupPolicy is applied to perform this backup
+                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                type: string
+              backupType:
+                default: datafile
+                description: Backup Type. datafile or logfile or snapshot. If not
+                  set, datafile is the default type.
+                enum:
+                - datafile
+                - logfile
+                - snapshot
+                type: string
+              parentBackupName:
+                description: if backupType is incremental, parentBackupName is required.
+                type: string
+            required:
+            - backupPolicyName
+            - backupType
+            type: object
+          status:
+            description: BackupStatus defines the observed state of Backup.
+            properties:
+              availableReplicas:
+                description: availableReplicas available replicas for statefulSet
+                  which created by backup.
+                format: int32
+                type: integer
+              backupToolName:
+                description: backupToolName references the backup tool name.
+                type: string
+              completionTimestamp:
+                description: Date/time when the backup finished being processed.
+                format: date-time
+                type: string
+              duration:
+                description: The duration time of backup execution. When converted
+                  to a string, the form is "1h2m0.5s".
+                type: string
+              expiration:
+                description: The date and time when the Backup is eligible for garbage
+                  collection. 'null' means the Backup is NOT be cleaned except delete
+                  manual.
+                format: date-time
+                type: string
+              failureReason:
+                description: The reason for a backup failure.
+                type: string
+              manifests:
+                description: manifests determines the backup metadata info.
+                properties:
+                  backupLog:
+                    description: backupLog records startTime and stopTime of data
+                      logging.
+                    properties:
+                      startTime:
+                        description: startTime records the start time of data logging.
+                        format: date-time
+                        type: string
+                      stopTime:
+                        description: stopTime records the stop time of data logging.
+                        format: date-time
+                        type: string
+                    type: object
+                  backupSnapshot:
+                    description: snapshot records the volume snapshot metadata.
+                    properties:
+                      volumeSnapshotContentName:
+                        description: volumeSnapshotContentName specifies the name
+                          of a pre-existing VolumeSnapshotContent object representing
+                          an existing volume snapshot. This field should be set if
+                          the snapshot already exists and only needs a representation
+                          in Kubernetes. This field is immutable.
+                        type: string
+                      volumeSnapshotName:
+                        description: volumeSnapshotName records the volumeSnapshot
+                          name.
+                        type: string
+                    type: object
+                  backupTool:
+                    description: backupTool records information about backup files
+                      generated by the backup tool.
+                    properties:
+                      checkpoint:
+                        description: backup checkpoint, for incremental backup.
+                        type: string
+                      checksum:
+                        description: checksum of backup file, generated by md5 or
+                          sha1 or sha256.
+                        type: string
+                      filePath:
+                        description: filePath records the file path of backup.
+                        type: string
+                      uploadTotalSize:
+                        description: Backup upload total size. A string with capacity
+                          units in the form of "1Gi", "1Mi", "1Ki".
+                        type: string
+                      volumeName:
+                        description: volumeName records volume name of backup data
+                          pvc.
+                        type: string
+                    type: object
+                  target:
+                    description: target records the target cluster metadata string,
+                      which is in JSON format.
+                    type: string
+                  userContext:
+                    additionalProperties:
+                      type: string
+                    description: userContext stores some loosely structured and extensible
+                      information.
+                    type: object
+                type: object
+              parentBackupName:
+                description: Records parentBackupName if backupType is incremental.
+                type: string
+              persistentVolumeClaimName:
+                description: remoteVolume saves the backup data.
+                type: string
+              phase:
+                description: BackupPhase The current phase. Valid values are New,
+                  InProgress, Completed, Failed.
+                enum:
+                - New
+                - InProgress
+                - Running
+                - Completed
+                - Failed
+                - Deleting
+                type: string
+              sourceCluster:
+                description: sourceCluster records the source cluster information
+                  for this backup.
+                type: string
+              startTimestamp:
+                description: Date/time when the backup started being processed.
+                format: date-time
+                type: string
+              totalSize:
+                description: Backup total size. A string with capacity units in the
+                  form of "1Gi", "1Mi", "1Ki".
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

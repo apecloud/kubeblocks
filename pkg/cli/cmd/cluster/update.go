@@ -45,7 +45,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/operations"
 	"github.com/apecloud/kubeblocks/pkg/cli/cluster"
 	"github.com/apecloud/kubeblocks/pkg/cli/patch"
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
@@ -53,6 +52,7 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	"github.com/apecloud/kubeblocks/pkg/gotemplate"
 )
 
@@ -273,7 +273,7 @@ func (o *updateOptions) buildPatch(flags []*pflag.Flag) error {
 				return err
 			}
 
-			defaultBackupMethod, backupMethodMap, err := operations.GetBackupMethodsFromBackupPolicy(backupPolicyList, "")
+			defaultBackupMethod, backupMethodMap, err := utils.GetBackupMethodsFromBackupPolicy(backupPolicyList, "")
 			if err != nil {
 				return err
 			}

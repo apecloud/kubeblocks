@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -33,6 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 )
 
 const backupTimeLayout = "20060102150405"
@@ -128,7 +128,7 @@ func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *a
 		})); err != nil {
 		return nil, err
 	}
-	defaultBackupMethod, backupMethodMap, err := GetBackupMethodsFromBackupPolicy(backupPolicyList, backupSpec.BackupPolicyName)
+	defaultBackupMethod, backupMethodMap, err := utils.GetBackupMethodsFromBackupPolicy(backupPolicyList, backupSpec.BackupPolicyName)
 	if err != nil {
 		return nil, err
 	}
@@ -208,38 +208,6 @@ func getDefaultBackupPolicy(reqCtx intctrlutil.RequestCtx, cli client.Client, cl
 	}
 
 	return defaultBackupPolices.Items[0].GetName(), nil
-}
-
-// GetBackupMethodsFromBackupPolicy get backup methods from backup policy
-// if backup policy is specified, search the backup policy with the name
-// if backup policy is not specified, search the default backup policy
-// if method's snapshotVolumes is true, use the method as the default backup method
-func GetBackupMethodsFromBackupPolicy(backupPolicyList *dpv1alpha1.BackupPolicyList, backupPolicyName string) (string, map[string]struct{}, error) {
-	var defaultBackupMethod string
-	var backupMethodsMap = make(map[string]struct{})
-	for _, policy := range backupPolicyList.Items {
-		// if backupPolicyName is not empty, only use the backup policy with the name
-		if backupPolicyName != "" && policy.Name != backupPolicyName {
-			continue
-		}
-		// if backupPolicyName is empty, only use the default backup policy
-		if backupPolicyName == "" && policy.Annotations[dptypes.DefaultBackupPolicyAnnotationKey] != "true" {
-			continue
-		}
-		if policy.Status.Phase != dpv1alpha1.AvailablePhase {
-			continue
-		}
-		for _, method := range policy.Spec.BackupMethods {
-			if boolptr.IsSetToTrue(method.SnapshotVolumes) {
-				defaultBackupMethod = method.Name
-			}
-			backupMethodsMap[method.Name] = struct{}{}
-		}
-	}
-	if defaultBackupMethod == "" {
-		return "", nil, fmt.Errorf("failed to find default backup method which snapshotVolumes is true, please check cluster's backup policy")
-	}
-	return defaultBackupMethod, backupMethodsMap, nil
 }
 
 func getBackupLabels(cluster, request string) map[string]string {

@@ -1,6 +1,6 @@
 ---
 title: Full feature and limit list
-description: The full feature and limit list of KubeBlocks migration function for MOngoDB
+description: The full feature and limit list of KubeBlocks migration function for MongoDB
 keywords: [mongodb, migration, migrate data in MongoDB to KubeBlocks, full feature, limit]
 sidebar_position: 1
 sidebar_label: Full feature and limit list

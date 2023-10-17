@@ -70,6 +70,10 @@ func (ha *Ha) RunCycle() {
 		return
 	}
 
+	if !cluster.HaConfig.IsEnable() {
+		return
+	}
+
 	switch {
 	case !ha.dbManager.IsRunning():
 		ha.logger.Infof("DB Service is not running,  wait for sqlctl to start it")
@@ -194,7 +198,13 @@ func (ha *Ha) Start() {
 	isExist, _ := ha.dcs.IsLockExist()
 	for !isExist {
 		if ok, _ := ha.dbManager.IsLeader(context.Background(), cluster); ok {
-			_ = ha.dcs.Initialize()
+			err := ha.dcs.Initialize()
+			if err != nil {
+				ha.logger.Warnf("DCS initialize failed: %v", err)
+				time.Sleep(5 * time.Second)
+				continue
+			}
+
 			break
 		}
 		ha.logger.Infof("Waiting for the database Leader to be ready.")
@@ -204,7 +214,7 @@ func (ha *Ha) Start() {
 
 	for {
 		ha.RunCycle()
-		time.Sleep(1 * time.Second)
+		time.Sleep(10 * time.Second)
 	}
 }
 

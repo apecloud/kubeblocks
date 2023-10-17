@@ -7,12 +7,9 @@ sidebar_position: 1
 
 # Configure cluster parameters
 
-The KubeBlocks configuration function provides a set of consistent default configuration generation strategies for all the databases running on KubeBlocks and also provides a unified parameter configuration interface to facilitate managing parameter reconfiguration, searching the parameter user guide, and validating parameter effectiveness.
+The KubeBlocks configuration function provides a set of consistent default configuration generation strategies for all the databases running on KubeBlocks and also provides a unified interface to facilitate managing parameter configuration, searching the parameter user guide, and validating parameter effectiveness.
 
-## Before you start
-
-1. Install KubeBlocks: You can install KubeBlocks by [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
-2. [Create a PostgreSQL cluster](./../cluster-management/create-and-connect-a-postgresql-cluster.md#create-a-postgresql-cluster) and wait until the cluster status is Running.
+From v0.6.0, KubeBlocks supports `kbcli cluster configure` and `kbcli cluster edit-config` to configure parameters. The difference is that KubeBlocks configures parameters automatically with `kbcli cluster configure` but `kbcli cluster edit-config` provides a visualized way for you to edit parameters directly.
 
 ## View parameter information
 
@@ -35,7 +32,7 @@ You can also view the details of this configuration file and parameters.
 * View the parameter description.
 
   ```bash
-  kbcli cluster explain-config pg-cluster |head -n 20
+  kbcli cluster explain-config pg-cluster | head -n 20
   ```
 
 * View the user guide of a specified parameter.
@@ -63,14 +60,16 @@ You can also view the details of this configuration file and parameters.
   </details>
 
   * Allowed Values: It defines the valid value range of this parameter.
-  * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter reconfiguration takes effect. There are two different reconfiguration strategies based on the effectiveness type of modified parameters, i.e. **dynamic** and **static**.
-    * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and can be updated online. Follow the instructions in [Reconfigure dynamic parameters](#reconfigure-dynamic-parameters).
-    * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make reconfiguration effective. Follow the instructions in [Reconfigure static parameters](#reconfigure-static-parameters).
+  * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter configuration takes effect. There are two different configuration strategies based on the effectiveness type of modified parameters, i.e. **dynamic** and **static**.
+    * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and can be configured online. Follow the instructions in [Configure dynamic parameters](#configure-dynamic-parameters).
+    * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make configuration effective. Follow the instructions in [Configure static parameters](#configure-static-parameters).
   * Description: It describes the parameter definition.
 
-## Reconfigure dynamic parameters
+## Configure parameters
 
-The example below reconfigures `max_connections`.
+### Configure parameters with configure command
+
+The example below takes configuring `max_connections` as an example.
 
 1. View the current values of `max_connections`.
 
@@ -106,11 +105,11 @@ The example below reconfigures `max_connections`.
 
    :::
 
-3. View the status of the parameter reconfiguration.
+3. View the status of the parameter configuration.
 
-   `Status.Progress` and `Status.Status` shows the overall status of the parameter reconfiguration and `Conditions` show the details.
+   `Status.Progress` and `Status.Status` shows the overall status of the parameter configuration and `Conditions` show the details.
 
-   When the `Status.Status` shows `Succeed`, the reconfiguration is completed.
+   When the `Status.Status` shows `Succeed`, the configuration is completed.
 
    ```bash
    kbcli cluster describe-ops pg-cluster-reconfiguring-fq6q7 -n default
@@ -147,7 +146,7 @@ The example below reconfigures `max_connections`.
 
    </details>
 
-4. Connect to the database to verify whether the parameters are modified.
+4. Connect to the database to verify whether the parameter is configured as expected.
 
    The whole searching process has a 30-second delay since it takes some time for kubelet to synchronize modifications to the volume of the pod.
 
@@ -163,104 +162,48 @@ The example below reconfigures `max_connections`.
    (1 row)
    ```
 
-## Reconfigure static parameters
+### Configure parameters with edit-config command
 
-The example below reconfigures `shared_buffers`.
+For your convenience, KubeBlocks offers a tool `edit-config` to help you to configure parameter in a visulized way.
 
-1. View the current values of `shared_buffers`.
+For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on notepad.
+
+1. Edit the configuration file.
+
+   ```bash
+   kbcli cluster edit-config pg-cluster
+   ```
+
+:::note
+
+If there are multiple components in a cluster, use `--component` to specify a component.
+
+:::
+
+2. View the status of the parameter configuration.
+
+   ```bash
+   kbcli cluster describe-ops xxx -n default
+   ```
+
+3. Connect to the database to verify whether the parameters are configured as expected.
 
    ```bash
    kbcli cluster connect pg-cluster
    ```
 
-   ```bash
-   postgres=# show shared_buffers;
-    shared_buffers
-   ----------------
-    256MB
-   (1 row)
-   ```
+:::note
 
-2. Adjust the values of `shared_buffers`.
+1. For the `edit-config` function, static parameters and dynamic parameters cannot be edited at the same time.
+2. Deleting a parameter will be supported later.
 
-   ```bash
-   kbcli cluster configure pg-cluster --set=shared_buffers=512M
-   ```
-
-   :::note
-
-   Make sure the value you set is within the Allowed Values of this parameter. If you set a value that does not meet the value range, the system prompts an error. For example,
-
-   ```bash
-   kbcli cluster configure pg-cluster  --set=shared_buffers=5M
-   error: failed to validate updated config: [failed to cue template render configure: [pg.maxclients: invalid value 5 (out of bound 16-107374182):
-    343:34
-   ]
-   ]
-   ```
-
-   :::
-
-3. View the status of the parameter reconfiguration.
-
-   `Status.Progress` and `Status.Status` shows the overall status of the parameter reconfiguration and `Conditions` show the details.
-
-   When the `Status.Status` shows `Succeed`, the reconfiguration is completed.
-
-   ```bash
-   kbcli cluster describe-ops pg-cluster-reconfiguring-rcnzb -n default
-   ```
-
-   <details>
-
-   <summary>Output</summary>
-
-   ```bash
-   Spec:
-     Name: pg-cluster-reconfiguring-rcnzb NameSpace: default Cluster: pg-cluster Type: Reconfiguring
-
-   Command:
-     kbcli cluster configure pg-cluster --components=postgresql --config-spec=postgresql-configuration --config-file=postgresql.conf --set shared_buffers=512M --namespace=default
-
-   Status:
-     Start Time:         Mar 17,2023 19:31 UTC+0800
-     Duration:           2s
-     Status:             Running
-     Progress:           0/1
-                         OBJECT-KEY   STATUS   DURATION   MESSAGE
-
-   Conditions:
-   LAST-TRANSITION-TIME         TYPE                 REASON                         STATUS   MESSAGE
-   Mar 17,2023 19:31 UTC+0800   Progressing          OpsRequestProgressingStarted   True     Start to process the OpsRequest: pg-cluster-reconfiguring-rcnzb in Cluster: pg-cluster
-   Mar 17,2023 19:31 UTC+0800   Validated            ValidateOpsRequestPassed       True     OpsRequest: pg-cluster-reconfiguring-rcnzb is validated
-   Mar 17,2023 19:31 UTC+0800   Reconfigure          ReconfigureStarted             True     Start to reconfigure in Cluster: pg-cluster, Component: postgresql
-   Mar 17,2023 19:31 UTC+0800   ReconfigureMerged    ReconfigureMerged              True     Reconfiguring in Cluster: pg-cluster, Component: postgresql, ConfigSpec: postgresql-configuration, info: updated: map[postgresql.conf:{"shared_buffers":"512M"}], added: map[], deleted:map[]
-   Mar 17,2023 19:31 UTC+0800   ReconfigureRunning   ReconfigureRunning             True     Reconfiguring in Cluster: pg-cluster, Component: postgresql, ConfigSpec: postgresql-configuration
-   ```
-
-   </details>
-
-4. Connect to the database to verify whether the parameters are modified.
-
-   The whole searching process has a 30-second delay since it takes some time for kubelete to synchronize modifications to the volume of the pod.
-
-   ```bash
-   kbcli cluster connect pg-cluster
-   ```
-
-   ```bash
-   postgres=# show shared_buffers;
-    shared_buffers
-   ----------------
-    512MB
-   (1 row)
-   ```
+:::
 
 ## View history and compare differences
 
-After the reconfiguration is completed, you can search the reconfiguration history and compare the parameter differences.
+After the configuration is completed, you can search the configuration history and compare the parameter differences.
 
-View the parameter reconfiguration history.
+View the parameter configuration history.
 
 ```bash
 kbcli cluster describe-config pg-cluster

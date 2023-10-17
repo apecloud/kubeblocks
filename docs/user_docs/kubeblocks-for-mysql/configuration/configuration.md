@@ -7,12 +7,9 @@ sidebar_position: 1
 
 # Configure cluster parameters
 
-The KubeBlocks configuration function provides a set of consistent default configuration generation strategies for all the databases running on KubeBlocks and also provides a unified parameter configuration interface to facilitate managing parameter reconfiguration, searching the parameter user guide, and validating parameter effectiveness.
+The KubeBlocks configuration function provides a set of consistent default configuration generation strategies for all the databases running on KubeBlocks and also provides a unified parameter configuration interface to facilitate managing parameter configuration, searching the parameter user guide, and validating parameter effectiveness.
 
-## Before you start
-
-1. Install KubeBlocks: You can install KubeBlocks by [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
-2. [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md#create-a-mysql-cluster) and wait until the cluster status is Running.
+From v0.6.0, KubeBlocks supports both `kbcli cluster configure` and `kbcli cluster edit-config` to configure parameters. The difference is that KubeBlocks configures parameters automatically with `kbcli cluster configure` but `kbcli cluster edit-config` provides a visualized way for you to edit parameters directly.
 
 ## View parameter information
 
@@ -35,14 +32,16 @@ You can also view the details of this configuration file and parameters.
 * View the parameter description.
 
   ```bash
-  kbcli cluster explain-config mysql-cluster |head -n 20
+  kbcli cluster explain-config mysql-cluster | head -n 20
   ```
 
 * View the user guide of a specified parameter.
   
   ```bash
-  kbcli cluster explain-config mysql-cluster --param=innodb_buffer_pool_size
+  kbcli cluster explain-config mysql-cluster --param=innodb_buffer_pool_size --config-spec=mysql-consensusset-config
   ```
+
+  `--config-spec` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mysql-cluster` to view the all template names.
 
   <details>
 
@@ -64,14 +63,16 @@ You can also view the details of this configuration file and parameters.
   </details>
 
   * Allowed Values: It defines the valid value range of this parameter.
-  * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter reconfiguration takes effect. There are two different reconfiguration strategies based on the effectiveness type of modified parameters, i.e. **dynamic** and **static**.
-    * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and can be updated online. Follow the instructions in [Reconfigure dynamic parameters](#reconfigure-dynamic-parameters).
-    * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make reconfiguration effective. Follow the instructions in [Reconfigure static parameters](#reconfigure-static-parameters).
+  * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter configuration takes effect. There are two different configuration strategies based on the effectiveness type of modified parameters, i.e. **dynamic** and **static**.
+    * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and can be configured online. Follow the instructions in [Configure dynamic parameters](#configure-dynamic-parameters).
+    * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make configuration effective. Follow the instructions in [Configure static parameters](#configure-static-parameters).
   * Description: It describes the parameter definition.
 
-## Reconfigure dynamic parameters
+## Configure parameters
 
-The example below reconfigures `max_connection` and `innodb_buffer_pool_size`.
+### Configure parameters with configure command
+
+The example below takes configuring `max_connection` and `innodb_buffer_pool_size` as an example.
 
 1. View the current values of `max_connection` and `innodb_buffer_pool_size`.
 
@@ -121,9 +122,9 @@ The example below reconfigures `max_connection` and `innodb_buffer_pool_size`.
 
    :::
 
-3. Search the status of the parameter reconfiguration.
+3. Search the status of the parameter configuration.
 
-   `Status.Progress` shows the overall status of the parameter reconfiguration and `Conditions` show the details.
+   `Status.Progress` shows the overall status of the parameter configuration and `Conditions` show the details.
 
    ```bash
    kbcli cluster describe-ops mysql-cluster-reconfiguring-z2wvn -n default
@@ -159,7 +160,7 @@ The example below reconfigures `max_connection` and `innodb_buffer_pool_size`.
 
     </details>
 
-4. Connect to the database to verify whether the parameters are modified.
+4. Connect to the database to verify whether the parameters are configured as expected.
 
    The whole searching process has a 30-second delay since it takes some time for kubelet to synchronize modifications to the volume of the pod.
 
@@ -189,116 +190,51 @@ The example below reconfigures `max_connection` and `innodb_buffer_pool_size`.
    1 row in set (0.00 sec)
    ```
 
-## Reconfigure static parameters
+### Configure parameters with edit-config command
 
-Static parameter reconfiguring requires restarting the pod. The following example reconfigures `ngram_token_size`.
+For your convenience, KubeBlocks offers a tool `edit-config` to help you to configure parameter in a visulized way.
 
-1. Search the current value of `ngram_token_size` and the default value is 2.
+For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on notepad.
 
-    ```bash
-    kbcli cluster explain-config mysql-cluster --param=ngram_token_size
-    ```
+The following steps take configuring MySQL Standalone as an example.
 
-    ```bash
-    kbcli cluster connect mysql-cluster
-    ```
-
-    ```bash
-    mysql> show variables like '%ngram_token_size%';
-    >
-    +------------------+-------+
-    | Variable_name    | Value |
-    +------------------+-------+
-    | ngram_token_size | 2     |
-    +------------------+-------+
-    1 row in set (0.01 sec)
-    ```
-
-2. Adjust the value of `ngram_token_size`.
+1. Edit the configuration file.
 
    ```bash
-   kbcli cluster configure mysql-cluster  --set=ngram_token_size=6
+   kbcli cluster edit-config mysql-cluster --config-spec=mysql-consensusset-config
    ```
 
-   :::note
+:::note
 
-   Make sure the value you set is within the Allowed Values of this parameter. Otherwise, the reconfiguration may fail.
+* `--config-spec` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mysql-cluster` to view the all template names.
+* If there are multiple components in a cluster, use `--component` to specify a component.
 
-   :::
+:::
 
-3. View the status of the parameter reconfiguration.
-
-   `Status.Progress` and `Status.Status` shows the overall status of the parameter reconfiguration and Conditions show the details.
-
-   When the `Status.Status` shows `Succeed`, the reconfiguration is completed.
-
-   <details>
-
-   <summary>Output</summary>
+1. View the status of the parameter configuration.
 
    ```bash
-   # In progress
-   kbcli cluster describe-ops mysql-cluster-reconfiguring-nrnpf -n default
-   >
-   Spec:
-     Name: mysql-cluster-reconfiguring-nrnpf        NameSpace: default        Cluster: mysql-cluster        Type: Reconfiguring
-
-   Command:
-     kbcli cluster configure mysql-cluster --component-names=mysql --template-name=mysql-consensusset-config --config-file=my.cnf --set ngram_token_size=6
-
-   Status:
-     Start Time:         Mar 13,2023 03:37 UTC+0800
-     Duration:           22s
-     Status:             Running
-     Progress:           0/1
-                         OBJECT-KEY   STATUS   DURATION   MESSAGE
+   kbcli cluster describe-ops xxx -n default
    ```
 
-   ```bash
-   # Parameter reconfiguration is completed
-   kbcli cluster describe-ops mysql-cluster-reconfiguring-nrnpf -n default
-   >
-   Spec:
-     Name: mysql-cluster-reconfiguring-nrnpf        NameSpace: default        Cluster: mysql-cluster        Type: Reconfiguring
-
-   Command:
-     kbcli cluster configure mysql-cluster --component-names=mysql --template-name=mysql-consensusset-config --config-file=my.cnf --set ngram_token_size=6
-
-   Status:
-     Start Time:         Mar 13,2023 03:37 UTC+0800
-     Completion Time:    Mar 13,2023 03:37 UTC+0800
-     Duration:           26s
-     Status:             Succeed
-     Progress:           1/1
-                         OBJECT-KEY   STATUS   DURATION   MESSAGE
-   ```
-
-   </details>
-
-4. Connect to the database to verify whether the parameters are modified.
-
-   The whole searching process has a 30-second delay since it takes some time for kubelete to synchronize modifications to the volume of the pod.
+2. Connect to the database to verify whether the parameters are configured as expected.
 
    ```bash
    kbcli cluster connect mysql-cluster
    ```
 
-   ```bash
-   mysql> show variables like '%ngram_token_size%';
-   >
-   +------------------+-------+
-   | Variable_name    | Value |
-   +------------------+-------+
-   | ngram_token_size | 6     |
-   +------------------+-------+
-   1 row in set (0.09 sec)
-   ```
+:::note
+
+1. For the `edit-config` function, static parameters and dynamic parameters cannot be edited at the same time.
+2. Deleting a parameter will be supported later.
+
+:::
 
 ## View history and compare differences
 
-After the reconfiguration is completed, you can search the reconfiguration history and compare the parameter differences.
+After the configuration is completed, you can search the configuration history and compare the parameter differences.
 
-View the parameter reconfiguration history.
+View the parameter configuration history.
 
 ```bash
 kbcli cluster describe-config mysql-cluster

@@ -5,7 +5,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sethvargo/go-password/password"
 	"github.com/spf13/viper"
+
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -79,11 +81,16 @@ func (o DataScriptOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.C
 	}
 
 	// create jobs
-	if job, err := buildDataScriptJob(reqCtx, cli, opsResource.Cluster, component, opsRequest, componentDef.CharacterType); err != nil {
+	var jobs []*batchv1.Job
+	if jobs, err = buildDataScriptJobs(reqCtx, cli, opsResource.Cluster, component, opsRequest, componentDef.CharacterType); err != nil {
 		return err
-	} else {
-		return cli.Create(reqCtx.Ctx, job)
 	}
+	for _, job := range jobs {
+		if err = cli.Create(reqCtx.Ctx, job); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ReconcileAction implements OpsHandler.ReconcileAction
@@ -96,37 +103,60 @@ func (o DataScriptOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli
 	cluster := opsResource.Cluster
 	spec := opsRequest.Spec.ScriptSpec
 
-	getStatusFromJobCondition := func(job *batchv1.Job) appsv1alpha1.OpsPhase {
+	meetsJobConditions := func(job *batchv1.Job, condType batchv1.JobConditionType, condStatus corev1.ConditionStatus) bool {
 		for _, condition := range job.Status.Conditions {
-			if condition.Type == batchv1.JobComplete && condition.Status == corev1.ConditionTrue {
-				return appsv1alpha1.OpsSucceedPhase
-			} else if condition.Type == batchv1.JobFailed && condition.Status == corev1.ConditionTrue {
-				return appsv1alpha1.OpsFailedPhase
+			if condition.Type == condType && condition.Status == condStatus {
+				return true
 			}
 		}
-		return appsv1alpha1.OpsRunningPhase
+		return false
 	}
 
 	// retrieve job for this opsRequest
 	jobList := &batchv1.JobList{}
-	err := cli.List(reqCtx.Ctx, jobList, client.InNamespace(cluster.Namespace), client.MatchingLabels(getDataScriptJobLabels(cluster.Name, spec.ComponentName, opsRequest.Name)))
-	if err != nil {
+	if err := cli.List(reqCtx.Ctx, jobList, client.InNamespace(cluster.Namespace), client.MatchingLabels(getDataScriptJobLabels(cluster.Name, spec.ComponentName, opsRequest.Name))); err != nil {
 		return appsv1alpha1.OpsFailedPhase, 0, err
-	}
-
-	if len(jobList.Items) == 0 {
+	} else if len(jobList.Items) == 0 {
 		return appsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("job not found")
 	}
+
+	var (
+		expectedCount int
+		succedCount   int
+		failedCount   int
+	)
+
+	expectedCount = len(jobList.Items)
 	// check job status
-	job := &jobList.Items[0]
-	phase := getStatusFromJobCondition(job)
-	// jobs are owned by opsRequest, so we don't need to delete them explicitly
-	if phase == appsv1alpha1.OpsFailedPhase {
-		return phase, 0, fmt.Errorf("job execution failed, please check the job log with `kubectl logs jobs/%s -n %s`", job.Name, job.Namespace)
-	} else if phase == appsv1alpha1.OpsSucceedPhase {
-		return phase, 0, nil
+	for _, job := range jobList.Items {
+		if meetsJobConditions(&job, batchv1.JobComplete, corev1.ConditionTrue) {
+			succedCount++
+		} else if meetsJobConditions(&job, batchv1.JobFailed, corev1.ConditionTrue) {
+			failedCount++
+		}
 	}
-	return phase, time.Second, nil
+
+	opsStatus := appsv1alpha1.OpsRunningPhase
+	if succedCount == expectedCount {
+		opsStatus = appsv1alpha1.OpsSucceedPhase
+	} else if failedCount+succedCount == expectedCount {
+		opsStatus = appsv1alpha1.OpsFailedPhase
+	}
+
+	patch := client.MergeFrom(opsRequest.DeepCopy())
+	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", succedCount, expectedCount)
+
+	// patch OpsRequest.status.components
+	if err := cli.Status().Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
+		return opsStatus, time.Second, err
+	}
+
+	if succedCount == expectedCount {
+		return appsv1alpha1.OpsSucceedPhase, 0, nil
+	} else if failedCount+succedCount == expectedCount {
+		return appsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("%d job execution failed, please check the job log ", failedCount)
+	}
+	return appsv1alpha1.OpsRunningPhase, 5 * time.Second, nil
 }
 
 func (o DataScriptOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error) {
@@ -193,127 +223,168 @@ func getTargetService(reqCtx intctrlutil.RequestCtx, cli client.Client, clusterO
 	return serviceName, nil
 }
 
-func buildDataScriptJob(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster, component *appsv1alpha1.ClusterComponentSpec,
-	ops *appsv1alpha1.OpsRequest, charType string) (*batchv1.Job, error) {
+func buildDataScriptJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster, component *appsv1alpha1.ClusterComponentSpec,
+	ops *appsv1alpha1.OpsRequest, charType string) ([]*batchv1.Job, error) {
 	engineForJob, err := engine.New(charType)
 	if err != nil || engineForJob == nil {
 		return nil, &FastFaileError{message: err.Error()}
 	}
 
-	envs := []corev1.EnvVar{}
+	buildJob := func(endpoint string) (*batchv1.Job, error) {
+		envs := []corev1.EnvVar{}
+
+		envs = append(envs, corev1.EnvVar{
+			Name:  "KB_HOST",
+			Value: endpoint,
+		})
+
+		// parse username and password
+		secretFrom := ops.Spec.ScriptSpec.Secret
+		if secretFrom == nil {
+			secretFrom = &appsv1alpha1.ScriptSecret{
+				Name:        fmt.Sprintf("%s-conn-credential", cluster.Name),
+				PasswordKey: "password",
+				UsernameKey: "username",
+			}
+		}
+		// verify secrets exist
+		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: secretFrom.Name}, &corev1.Secret{}); err != nil {
+			return nil, &FastFaileError{message: err.Error()}
+		}
+
+		envs = append(envs, corev1.EnvVar{
+			Name: "KB_USER",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: secretFrom.UsernameKey,
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretFrom.Name,
+					},
+				},
+			},
+		})
+		envs = append(envs, corev1.EnvVar{
+			Name: "KB_PASSWD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: secretFrom.PasswordKey,
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretFrom.Name,
+					},
+				},
+			},
+		})
+
+		// parse scripts
+		scripts, err := getScriptContent(reqCtx, cli, ops.Spec.ScriptSpec)
+		if err != nil {
+			return nil, &FastFaileError{message: err.Error()}
+		}
+
+		envs = append(envs, corev1.EnvVar{
+			Name:  "KB_SCRIPT",
+			Value: strings.Join(scripts, "\n"),
+		})
+
+		jobCmdTpl, envVars, err := engineForJob.ExecuteCommand(scripts)
+		if err != nil {
+			return nil, &FastFaileError{message: err.Error()}
+		}
+		if envVars != nil {
+			envs = append(envs, envVars...)
+		}
+		containerImg := viper.GetString(constant.KBDataScriptClientsImage)
+		if len(ops.Spec.ScriptSpec.Image) != 0 {
+			containerImg = ops.Spec.ScriptSpec.Image
+		}
+		if len(containerImg) == 0 {
+			return nil, &FastFaileError{message: "image is empty"}
+		}
+
+		container := corev1.Container{
+			Name:            "datascript",
+			Image:           containerImg,
+			ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)),
+			Command:         jobCmdTpl,
+			Env:             envs,
+		}
+		randomStr, _ := password.Generate(4, 0, 0, true, false)
+		jobName := fmt.Sprintf("%s-%s-%s-%s", cluster.Name, "script", ops.Name, randomStr)
+		if len(jobName) > 63 {
+			jobName = jobName[:63]
+		}
+
+		job := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      jobName,
+				Namespace: cluster.Namespace,
+			},
+		}
+
+		// set backoff limit to 0, so that the job will not be restarted
+		job.Spec.BackoffLimit = pointer.Int32(0)
+		job.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
+		job.Spec.Template.Spec.Containers = []corev1.Container{container}
+
+		// add labels
+		job.Labels = getDataScriptJobLabels(cluster.Name, component.Name, ops.Name)
+		// add tolerations
+		tolerations, err := componetutil.BuildTolerations(cluster, component)
+		if err != nil {
+			return nil, &FastFaileError{message: err.Error()}
+		}
+		job.Spec.Template.Spec.Tolerations = tolerations
+		// add owner reference
+		scheme, _ := appsv1alpha1.SchemeBuilder.Build()
+		if err := controllerutil.SetOwnerReference(ops, job, scheme); err != nil {
+			return nil, &FastFaileError{message: err.Error()}
+		}
+		return job, nil
+	}
+
 	// parse kb host
-	serviceName, err := getTargetService(reqCtx, cli, client.ObjectKeyFromObject(cluster), component.Name)
+	var endpoint string
+	var job *batchv1.Job
+
+	jobs := make([]*batchv1.Job, 0)
+	if ops.Spec.ScriptSpec.Selector == nil {
+		if endpoint, err = getTargetService(reqCtx, cli, client.ObjectKeyFromObject(cluster), component.Name); err != nil {
+			return nil, &FastFaileError{message: err.Error()}
+		}
+		if job, err = buildJob(endpoint); err != nil {
+			return nil, &FastFaileError{message: err.Error()}
+		}
+		jobs = append(jobs, job)
+		return jobs, nil
+	}
+
+	selector, err := metav1.LabelSelectorAsSelector(ops.Spec.ScriptSpec.Selector)
 	if err != nil {
 		return nil, &FastFaileError{message: err.Error()}
 	}
 
-	envs = append(envs, corev1.EnvVar{
-		Name:  "KB_HOST",
-		Value: serviceName,
-	})
+	pods := &corev1.PodList{}
+	if err = cli.List(reqCtx.Ctx, pods, client.InNamespace(cluster.Namespace),
+		client.MatchingLabels{
+			constant.AppInstanceLabelKey:    cluster.Name,
+			constant.KBAppComponentLabelKey: component.Name,
+		},
+		client.MatchingLabelsSelector{Selector: selector},
+	); err != nil {
+		return nil, &FastFaileError{message: err.Error()}
+	} else if len(pods.Items) == 0 {
+		return nil, &FastFaileError{message: "no pods found"}
+	}
 
-	// parse username and password
-	secretFrom := ops.Spec.ScriptSpec.Secret
-	if secretFrom == nil {
-		secretFrom = &appsv1alpha1.ScriptSecret{
-			Name:        fmt.Sprintf("%s-conn-credential", cluster.Name),
-			PasswordKey: "password",
-			UsernameKey: "username",
+	for _, pod := range pods.Items {
+		endpoint = pod.Status.PodIP
+		if job, err = buildJob(endpoint); err != nil {
+			return nil, &FastFaileError{message: err.Error()}
+		} else {
+			jobs = append(jobs, job)
 		}
 	}
-	// verify secrets exist
-	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: secretFrom.Name}, &corev1.Secret{}); err != nil {
-		return nil, &FastFaileError{message: err.Error()}
-	}
-
-	envs = append(envs, corev1.EnvVar{
-		Name: "KB_USER",
-		ValueFrom: &corev1.EnvVarSource{
-			SecretKeyRef: &corev1.SecretKeySelector{
-				Key: secretFrom.UsernameKey,
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: secretFrom.Name,
-				},
-			},
-		},
-	})
-	envs = append(envs, corev1.EnvVar{
-		Name: "KB_PASSWD",
-		ValueFrom: &corev1.EnvVarSource{
-			SecretKeyRef: &corev1.SecretKeySelector{
-				Key: secretFrom.PasswordKey,
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: secretFrom.Name,
-				},
-			},
-		},
-	})
-
-	// parse scripts
-	scripts, err := getScriptContent(reqCtx, cli, ops.Spec.ScriptSpec)
-	if err != nil {
-		return nil, &FastFaileError{message: err.Error()}
-	}
-
-	envs = append(envs, corev1.EnvVar{
-		Name:  "KB_SCRIPT",
-		Value: strings.Join(scripts, "\n"),
-	})
-
-	jobCmdTpl, envVars, err := engineForJob.ExecuteCommand(scripts)
-	if err != nil {
-		return nil, &FastFaileError{message: err.Error()}
-	}
-	if envVars != nil {
-		envs = append(envs, envVars...)
-	}
-	containerImg := viper.GetString(constant.KBDataScriptClientsImage)
-	if len(ops.Spec.ScriptSpec.Image) != 0 {
-		containerImg = ops.Spec.ScriptSpec.Image
-	}
-	if len(containerImg) == 0 {
-		return nil, &FastFaileError{message: "image is empty"}
-	}
-
-	container := corev1.Container{
-		Name:            "datascript",
-		Image:           containerImg,
-		ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)),
-		Command:         jobCmdTpl,
-		Env:             envs,
-	}
-
-	jobName := fmt.Sprintf("%s-%s-%s", cluster.Name, "script", ops.Name)
-	if len(jobName) > 63 {
-		jobName = jobName[:63]
-	}
-
-	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      jobName,
-			Namespace: cluster.Namespace,
-		},
-	}
-
-	// set backoff limit to 0, so that the job will not be restarted
-	job.Spec.BackoffLimit = pointer.Int32Ptr(0)
-	job.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
-	job.Spec.Template.Spec.Containers = []corev1.Container{container}
-
-	// add labels
-	job.Labels = getDataScriptJobLabels(cluster.Name, component.Name, ops.Name)
-	// add tolerations
-	tolerations, err := componetutil.BuildTolerations(cluster, component)
-	if err != nil {
-		return nil, &FastFaileError{message: err.Error()}
-	}
-	job.Spec.Template.Spec.Tolerations = tolerations
-	// add owner reference
-	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
-	if err := controllerutil.SetOwnerReference(ops, job, scheme); err != nil {
-		return nil, &FastFaileError{message: err.Error()}
-	}
-	return job, nil
+	return jobs, nil
 }
 
 func getDataScriptJobLabels(cluster, component, request string) map[string]string {

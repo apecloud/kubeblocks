@@ -12,6 +12,8 @@ The quickest way to try out KubeBlocks is to create a new Kubernetes cluster and
 
 ## Environment preparation
 
+Prepare an accessible Kubernetes cluster with the version 1.22 or above, and this cluster should meet the following requirements.
+
 <table>
 	<tr>
 	    <th colspan="3">Resource Requirements</th>

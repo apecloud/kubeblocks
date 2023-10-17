@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"strings"
 	"time"
 
 	"golang.org/x/exp/slices"
@@ -45,11 +46,13 @@ const (
 	VolumeResizeFailed = "VolumeResizeFailed"
 	// FileSystemResizeFailed the event reason of fileSystem resize failed on kubelet volume manager
 	FileSystemResizeFailed = "FileSystemResizeFailed"
+	OptimisticLockErrorMsg = "the object has been modified; please apply your changes to the latest version and try again"
 )
 
 func init() {
 	k8score.PersistentVolumeClaimHandlerMap["volume-expansion"] = handleVolumeExpansionWithPVC
-	k8score.EventHandlerMap["volume-expansion"] = PersistentVolumeClaimEventHandler{}
+	// Note: remove the event check for volume expansion
+	// k8score.EventHandlerMap["volume-expansion"] = PersistentVolumeClaimEventHandler{}
 }
 
 // handleVolumeExpansionOperation handles the pvc for the volume expansion OpsRequest.
@@ -100,6 +103,10 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) Handle(cli client.Clien
 		return nil
 	}
 
+	// ignore the OptimisticLockErrorMsg
+	if strings.Contains(event.Message, OptimisticLockErrorMsg) {
+		return nil
+	}
 	// here, if the volume expansion ops is running, change the pvc status to Failed on the OpsRequest.
 	return pvcEventHandler.handlePVCFailedStatusOnRunningOpsRequests(cli, reqCtx, recorder, event, pvc)
 }

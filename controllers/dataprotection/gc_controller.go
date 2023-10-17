@@ -131,9 +131,12 @@ func (r *GCReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 }
 
 func getGCFrequency() time.Duration {
-	gcFrequencySeconds := viper.GetInt(dptypes.CfgKeyGCFrequencySeconds)
-	if gcFrequencySeconds > 0 {
-		return time.Duration(gcFrequencySeconds) * time.Second
+	gcFrequency := dptypes.DefaultGCFrequency
+	if val := viper.GetString(dptypes.CfgKeyGCFrequency); val != "" {
+		var err error
+		if gcFrequency, err = time.ParseDuration(val); err != nil {
+			return dptypes.DefaultGCFrequency
+		}
 	}
-	return dptypes.DefaultGCFrequencySeconds
+	return gcFrequency
 }

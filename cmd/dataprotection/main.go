@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -98,7 +99,8 @@ func init() {
 	viper.SetDefault("KUBEBLOCKS_SERVICEACCOUNT_NAME", "kubeblocks")
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
-	viper.SetDefault(dptypes.CfgKeyGCFrequencySeconds, dptypes.DefaultGCFrequencySeconds)
+	viper.SetDefault(dptypes.CfgKeyGCFrequency, dptypes.DefaultGCFrequency)
+	viper.SetDefault(dptypes.CfgKeyBackupJobTTL, dptypes.DefaultBackupJobTTL)
 }
 
 func main() {
@@ -332,6 +334,16 @@ func validateRequiredToParseConfigs() error {
 	if cmNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector); cmNodeSelector != "" {
 		nodeSelector := map[string]string{}
 		if err := json.Unmarshal([]byte(cmNodeSelector), &nodeSelector); err != nil {
+			return err
+		}
+	}
+	if jobTTL := viper.GetString(dptypes.CfgKeyBackupJobTTL); jobTTL != "" {
+		if _, err := time.ParseDuration(jobTTL); err != nil {
+			return err
+		}
+	}
+	if gcFrequency := viper.GetString(dptypes.CfgKeyGCFrequency); gcFrequency != "" {
+		if _, err := time.ParseDuration(gcFrequency); err != nil {
 			return err
 		}
 	}

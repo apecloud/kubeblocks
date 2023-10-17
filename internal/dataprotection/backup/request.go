@@ -400,14 +400,34 @@ func (r *Request) injectSyncProgressContainer(podSpec *corev1.PodSpec,
 	)
 
 	args := fmt.Sprintf(`
-set -o errexit;
-set -o nounset;
-while [ ! -f ${%[1]s} ]; do
-  sleep ${%[2]s}
-done
-backupInfo=$(cat ${%[1]s});
-echo backupInfo:${backupInfo};
-eval kubectl -n %[3]s patch backup %[4]s --subresource=status --type=merge --patch '{\"status\":${backupInfo}}';
+#!/bin/bash
+set -o errexit
+set -o nounset
+
+function update_backup_stauts() {
+  local backup_info_file="$1"
+  local exit_file="$1.exit"
+  local sleep_seconds="$2"
+  while true; do 
+    if [ -f "$exit_file" ]; then
+      echo "exit file $exit_file exists, exit"
+      exit 1
+    fi
+    if [ -f "$backup_info_file" ]; then
+      break
+    fi
+    echo "backup info file not exists, wait for ${sleep_seconds}s"
+    sleep $sleep_seconds
+  done
+
+  local backup_info=$(cat $backup_info_file)
+  echo backupInfo:${backup_info}
+  local namespace="$3"
+  local backup_name="$4"
+  eval kubectl -n "$namespace" patch backup "$backup_name" --subresource=status --type=merge --patch '{\"status\":${backup_info}}'
+}
+
+update_backup_stauts ${%s} ${%s} %s %s
 `, dptypes.DPBackupInfoFile, dptypes.DPCheckInterval, r.Backup.Namespace, r.Backup.Name)
 
 	container.Args = []string{args}

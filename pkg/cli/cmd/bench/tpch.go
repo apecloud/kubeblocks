@@ -155,8 +155,7 @@ func (o *TpchOptions) Validate() error {
 		}
 	}
 	if !supported {
-		return fmt.Errorf("tpch now only support driver in [%s], your cluster driver is %s"+
-			"if your cluster belongs to the category of MySQL, please set the driver to one of them",
+		return fmt.Errorf("tpch now only supports drivers in [%s], current cluster driver is %s",
 			strings.Join(tpchSupportedDrivers, ", "), o.Driver)
 	}
 

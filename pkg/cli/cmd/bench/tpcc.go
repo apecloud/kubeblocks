@@ -195,8 +195,7 @@ func (o *TpccOptions) Validate() error {
 		}
 	}
 	if !supported {
-		return fmt.Errorf("tpcc now only support driver in [%s], your cluster driver is %s"+
-			"if your cluster belongs to the category of MySQL or PostgreSQL, please set the driver to one of them",
+		return fmt.Errorf("tpcc now only supports drivers in [%s], current cluster driver is %s",
 			strings.Join(tpccSupportedDrivers, ","), o.Driver)
 	}
 

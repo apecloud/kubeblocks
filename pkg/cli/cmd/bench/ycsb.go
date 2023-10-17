@@ -191,9 +191,7 @@ func (o *YcsbOptions) Validate() error {
 		}
 	}
 	if !supported {
-		return fmt.Errorf("ycsb now only support driver in %s, your cluster driver is %s"+
-			"if your cluster belongs to the category of one of them, please set the driver to one of them",
-			strings.Join(ycsbSupportedDrivers, ","), o.Driver)
+		return fmt.Errorf("ycsb now only supports drivers in [%s], current cluster driver is %s", strings.Join(ycsbSupportedDrivers, ","), o.Driver)
 	}
 
 	if o.RecordCount < 0 {

@@ -174,7 +174,7 @@ func (o *PgBenchOptions) Validate() error {
 	}
 
 	if o.Driver != pgBenchDriver {
-		return fmt.Errorf("pgbench only support driver %s, your cluster driver is %s, if your cluster belongs to the category of PostgreSQL, please set the driver to %s", pgBenchDriver, o.Driver, pgBenchDriver)
+		return fmt.Errorf("pgbench only supports drivers in [%s], current cluster driver is %s", pgBenchDriver, o.Driver)
 	}
 
 	if len(o.Clients) == 0 {

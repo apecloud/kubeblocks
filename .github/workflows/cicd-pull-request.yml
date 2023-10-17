@@ -7,6 +7,7 @@ on:
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   BASE_BRANCH: origin/main
+  GO_VERSION: "1.21"
 
 jobs:
   trigger-mode:
@@ -72,7 +73,7 @@ jobs:
       - name: Install golangci-lint
         if: matrix.ops == 'lint'
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.51.2
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
 
       - name: make test ${{ matrix.ops }}
         if: ${{ ! contains(matrix.ops, '/') }}
@@ -89,7 +90,7 @@ jobs:
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && github.event.pull_request.head.repo.full_name != github.repository }}
     outputs:
       runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
-    runs-on: [ self-hosted, kubeblocks-runner ]
+    runs-on: [ self-hosted, gke-runner-go1.21 ]
     steps:
       - uses: actions/checkout@v3
       - name: make mod-vendor

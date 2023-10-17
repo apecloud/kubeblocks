@@ -192,7 +192,7 @@ func mockUnderlyingSts(rsm workloads.ReplicatedStateMachine, generation int64) *
 
 func mockDAG() *graph.DAG {
 	d := graph.NewDAG()
-	graphCli.Root(d, transCtx.rsmOrig, transCtx.rsm)
+	graphCli.Root(d, transCtx.rsmOrig, transCtx.rsm, model.ActionStatusPtr())
 	return d
 }
 

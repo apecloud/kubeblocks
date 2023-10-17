@@ -111,9 +111,6 @@ func (b *PlanBuilder) rsmWalkFunc(v graph.Vertex) error {
 	if vertex.Action == nil {
 		return errors.New("vertex action can't be nil")
 	}
-	if vertex.Immutable {
-		return nil
-	}
 	switch *vertex.Action {
 	case model.CREATE:
 		err := b.cli.Create(b.transCtx.Context, vertex.Obj)

@@ -38,9 +38,11 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
@@ -324,7 +326,10 @@ func generateComponentObjects(w *templateRenderWorkflow, ctx intctrlutil.Request
 	if err != nil {
 		return nil, nil, err
 	}
-	component, err := components.NewComponent(ctx, cli, w.clusterDefObj, w.clusterVersionObj, cluster, compName, graph.NewDAG())
+	dag := graph.NewDAG()
+	root := builder.NewReplicatedStateMachineBuilder(cluster.Namespace, fmt.Sprintf("%s-%s", cluster.Name, compName)).GetObject()
+	model.NewGraphClient(nil).Root(dag, nil, root, nil)
+	component, err := components.NewComponent(ctx, cli, w.clusterDefObj, w.clusterVersionObj, cluster, compName, dag)
 	if err != nil {
 		return nil, nil, err
 	}

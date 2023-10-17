@@ -37,7 +37,7 @@ type RestoreTransformer struct {
 var _ graph.Transformer = &RestoreTransformer{}
 
 func (t *RestoreTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*ClusterTransformContext)
+	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster
 	clusterDef := transCtx.ClusterDef
 	clusterVer := transCtx.ClusterVer

@@ -32,7 +32,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 )
@@ -40,7 +40,7 @@ import (
 // BackupPolicyTplTransformer transforms the backup policy template to the data
 // protection backup policy and backup schedule.
 type BackupPolicyTplTransformer struct {
-	*ClusterTransformContext
+	*clusterTransformContext
 
 	tplCount          int
 	tplIdentifier     string
@@ -56,15 +56,12 @@ var _ graph.Transformer = &BackupPolicyTplTransformer{}
 // Transform transforms the backup policy template to the backup policy and
 // backup schedule.
 func (r *BackupPolicyTplTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	rootVertex, err := ictrltypes.FindRootVertex(dag)
-	if err != nil {
-		return err
-	}
+	r.clusterTransformContext = ctx.(*clusterTransformContext)
+	graphCli, _ := r.clusterTransformContext.Client.(model.GraphClient)
 
-	r.ClusterTransformContext = ctx.(*ClusterTransformContext)
 	clusterDefName := r.ClusterDef.Name
 	backupPolicyTpls := &appsv1alpha1.BackupPolicyTemplateList{}
-	if err = r.Client.List(r.Context, backupPolicyTpls,
+	if err := r.Client.List(r.Context, backupPolicyTpls,
 		client.MatchingLabels{constant.ClusterDefLabelKey: clusterDefName}); err != nil {
 		return err
 	}
@@ -90,30 +87,31 @@ func (r *BackupPolicyTplTransformer) Transform(ctx graph.TransformContext, dag *
 			r.backupPolicy = &tpl.Spec.BackupPolicies[i]
 			r.compWorkloadType = compDef.WorkloadType
 
-			transformBackupPolicy := func() (*dpv1alpha1.BackupPolicy, *ictrltypes.LifecycleVertex) {
+			transformBackupPolicy := func() *dpv1alpha1.BackupPolicy {
 				// build the data protection backup policy from the template.
 				dpBackupPolicy, action := r.transformBackupPolicy()
 				if dpBackupPolicy == nil {
-					return nil, nil
+					return nil
 				}
 
 				// if exist multiple backup policy templates and duplicate spec.identifier,
 				// the generated backupPolicy may have duplicate names, so it is
 				// necessary to check if it already exists.
 				if _, ok := backupPolicyNames[dpBackupPolicy.Name]; ok {
-					return dpBackupPolicy, nil
+					return dpBackupPolicy
 				}
 
-				vertex := &ictrltypes.LifecycleVertex{Obj: dpBackupPolicy, Action: action}
-				dag.AddVertex(vertex)
-				dag.Connect(rootVertex, vertex)
+				switch *action {
+				case model.CREATE:
+					graphCli.Create(dag, dpBackupPolicy)
+				case model.UPDATE:
+					graphCli.Update(dag, dpBackupPolicy, dpBackupPolicy)
+				}
 				backupPolicyNames[dpBackupPolicy.Name] = struct{}{}
-				return dpBackupPolicy, vertex
+				return dpBackupPolicy
 			}
 
-			transformBackupSchedule := func(
-				backupPolicy *dpv1alpha1.BackupPolicy,
-				bpVertex *ictrltypes.LifecycleVertex) {
+			transformBackupSchedule := func(backupPolicy *dpv1alpha1.BackupPolicy) {
 				// if backup policy is nil, it means that the backup policy template
 				// is invalid, backup schedule depends on backup policy, so we do
 				// not need to transform backup schedule.
@@ -134,9 +132,9 @@ func (r *BackupPolicyTplTransformer) Transform(ctx graph.TransformContext, dag *
 				// If the backup schedule is nil, create a new backup schedule
 				// based on the cluster backup configuration.
 				if dpBackupSchedule == nil {
-					action = ictrltypes.ActionCreatePtr()
+					action = model.ActionCreatePtr()
 				} else if action == nil {
-					action = ictrltypes.ActionUpdatePtr()
+					action = model.ActionUpdatePtr()
 				}
 
 				// for a cluster, the default backup schedule is created by backup
@@ -159,27 +157,27 @@ func (r *BackupPolicyTplTransformer) Transform(ctx graph.TransformContext, dag *
 					return
 				}
 
-				parent := rootVertex
-				if bpVertex != nil {
-					parent = bpVertex
+				switch *action {
+				case model.CREATE:
+					graphCli.Create(dag, dpBackupSchedule)
+				case model.UPDATE:
+					graphCli.Update(dag, dpBackupSchedule, dpBackupSchedule)
 				}
-				vertex := &ictrltypes.LifecycleVertex{Obj: dpBackupSchedule, Action: action}
-				dag.AddVertex(vertex)
-				dag.Connect(parent, vertex)
+				graphCli.DependOn(dag, backupPolicy, dpBackupSchedule)
 				backupScheduleNames[dpBackupSchedule.Name] = struct{}{}
 			}
 
 			// transform backup policy template to data protection backupPolicy
 			// and backupSchedule
-			policy, policyVertex := transformBackupPolicy()
-			transformBackupSchedule(policy, policyVertex)
+			policy := transformBackupPolicy()
+			transformBackupSchedule(policy)
 		}
 	}
 	return nil
 }
 
 // transformBackupPolicy transforms backup policy template to backup policy.
-func (r *BackupPolicyTplTransformer) transformBackupPolicy() (*dpv1alpha1.BackupPolicy, *ictrltypes.LifecycleAction) {
+func (r *BackupPolicyTplTransformer) transformBackupPolicy() (*dpv1alpha1.BackupPolicy, *model.Action) {
 	cluster := r.OrigCluster
 	backupPolicyName := generateBackupPolicyName(cluster.Name, r.backupPolicy.ComponentDefRef, r.tplIdentifier)
 	backupPolicy := &dpv1alpha1.BackupPolicy{}
@@ -192,16 +190,16 @@ func (r *BackupPolicyTplTransformer) transformBackupPolicy() (*dpv1alpha1.Backup
 
 	if len(backupPolicy.Name) == 0 {
 		// build a new backup policy by the backup policy template.
-		return r.buildBackupPolicy(backupPolicyName), ictrltypes.ActionCreatePtr()
+		return r.buildBackupPolicy(backupPolicyName), model.ActionCreatePtr()
 	}
 
 	// sync the existing backup policy with the cluster changes
 	r.syncBackupPolicy(backupPolicy)
-	return backupPolicy, ictrltypes.ActionUpdatePtr()
+	return backupPolicy, model.ActionUpdatePtr()
 }
 
 func (r *BackupPolicyTplTransformer) transformBackupSchedule(
-	backupPolicy *dpv1alpha1.BackupPolicy) (*dpv1alpha1.BackupSchedule, *ictrltypes.LifecycleAction) {
+	backupPolicy *dpv1alpha1.BackupPolicy) (*dpv1alpha1.BackupSchedule, *model.Action) {
 	cluster := r.OrigCluster
 	scheduleName := generateBackupScheduleName(cluster.Name, r.backupPolicy.ComponentDefRef, r.tplIdentifier)
 	backupSchedule := &dpv1alpha1.BackupSchedule{}
@@ -214,7 +212,7 @@ func (r *BackupPolicyTplTransformer) transformBackupSchedule(
 
 	if len(backupSchedule.Name) == 0 {
 		// build a new backup schedule from the backup policy template.
-		return r.buildBackupSchedule(scheduleName, backupPolicy), ictrltypes.ActionCreatePtr()
+		return r.buildBackupSchedule(scheduleName, backupPolicy), model.ActionCreatePtr()
 	}
 	return backupSchedule, nil
 }

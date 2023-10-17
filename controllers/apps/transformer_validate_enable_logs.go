@@ -27,7 +27,7 @@ import (
 type ValidateEnableLogsTransformer struct{}
 
 func (e *ValidateEnableLogsTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*ClusterTransformContext)
+	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster
 
 	// validate config and send warning event log if necessary

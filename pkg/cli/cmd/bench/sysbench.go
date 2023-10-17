@@ -22,6 +22,7 @@ package bench
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,6 +42,7 @@ var (
 		"mysql":      "mysql",
 		"postgresql": "pgsql",
 	}
+	sysbenchSupportedDrivers = []string{"mysql", "pgsql"}
 )
 
 var sysbenchExample = templates.Examples(`
@@ -194,7 +196,9 @@ func (o *SysBenchOptions) Validate() error {
 		}
 	}
 	if !supported {
-		return fmt.Errorf("driver %s is not supported", o.Driver)
+		return fmt.Errorf("sysbench now only support driver in [%s], your cluster driver is %s, "+
+			"if your cluster belongs to the category of MySQL or PostgreSQL, please set the driver to one of them",
+			strings.Join(sysbenchSupportedDrivers, ","), o.Driver)
 	}
 
 	if o.User == "" {

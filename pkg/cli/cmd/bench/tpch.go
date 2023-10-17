@@ -22,6 +22,7 @@ package bench
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +41,7 @@ var (
 	tpchDriverMap = map[string]string{
 		"mysql": "mysql",
 	}
+	tpchSupportedDrivers = []string{"mysql"}
 )
 
 var tpchExample = templates.Examples(`
@@ -153,7 +155,9 @@ func (o *TpchOptions) Validate() error {
 		}
 	}
 	if !supported {
-		return fmt.Errorf("driver %s is not supported", o.Driver)
+		return fmt.Errorf("tpch now only support driver in [%s], your cluster driver is %s"+
+			"if your cluster belongs to the category of MySQL, please set the driver to one of them",
+			strings.Join(tpchSupportedDrivers, ", "), o.Driver)
 	}
 
 	if o.User == "" {

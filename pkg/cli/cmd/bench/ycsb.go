@@ -22,6 +22,7 @@ package bench
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,6 +44,7 @@ var (
 		"postgresql": "postgresql",
 		"redis":      "redis",
 	}
+	ycsbSupportedDrivers = []string{"mongodb", "mysql", "postgresql", "redis"}
 )
 
 var ycsbExample = templates.Examples(`
@@ -189,7 +191,9 @@ func (o *YcsbOptions) Validate() error {
 		}
 	}
 	if !supported {
-		return fmt.Errorf("driver %s is not supported", o.Driver)
+		return fmt.Errorf("ycsb now only support driver in %s, your cluster driver is %s"+
+			"if your cluster belongs to the category of one of them, please set the driver to one of them",
+			strings.Join(ycsbSupportedDrivers, ","), o.Driver)
 	}
 
 	if o.RecordCount < 0 {

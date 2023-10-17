@@ -21,7 +21,7 @@ spec:
     preBackup: []
     postBackup: []
     backupData:
-      image: registry.cn-hangzhou.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
+      image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
       runOnTargetPodNode: true
       command:
       - sh
@@ -33,7 +33,7 @@ spec:
         intervalSeconds: 5
   restore:
     prepareData:
-      image: registry.cn-hangzhou.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
+      image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
       command:
       - sh
       - -c
@@ -57,7 +57,7 @@ spec:
   backup: {}
   restore:
     prepareData:
-      image: registry.cn-hangzhou.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
+      image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
       command:
       - sh
       - -c

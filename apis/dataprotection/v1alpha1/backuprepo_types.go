@@ -109,6 +109,7 @@ type BackupRepoStatus struct {
 // +kubebuilder:resource:path=backuprepos,categories={kubeblocks},scope=Cluster
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase"
 // +kubebuilder:printcolumn:name="STORAGEPROVIDER",type="string",JSONPath=".spec.storageProviderRef"
+// +kubebuilder:printcolumn:name="ACCESSMETHOD",type="string",JSONPath=".spec.accessMethod"
 // +kubebuilder:printcolumn:name="DEFAULT",type="boolean",JSONPath=`.status.isDefault`
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 

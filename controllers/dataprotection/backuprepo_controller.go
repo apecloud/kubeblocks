@@ -266,6 +266,11 @@ func (r *BackupRepoReconciler) checkStorageProvider(
 			reason = ReasonInvalidStorageProvider
 			return provider, newDependencyError("both StorageClassTemplate and PersistentVolumeClaimTemplate are empty")
 		}
+		csiInstalledCond := meta.FindStatusCondition(provider.Status.Conditions, storagev1alpha1.ConditionTypeCSIDriverInstalled)
+		if csiInstalledCond == nil || csiInstalledCond.Status != metav1.ConditionTrue {
+			reason = ReasonStorageProviderNotReady
+			return provider, newDependencyError("CSI driver is not installed")
+		}
 	case repo.AccessByTool():
 		if provider.Spec.DatasafedConfigTemplate == "" {
 			reason = ReasonInvalidStorageProvider
@@ -274,15 +279,8 @@ func (r *BackupRepoReconciler) checkStorageProvider(
 	}
 
 	// check its status
-	if provider.Status.Phase == storagev1alpha1.StorageProviderReady {
-		reason = ReasonStorageProviderReady
-		return provider, nil
-	} else {
-		reason = ReasonStorageProviderNotReady
-		err = newDependencyError(fmt.Sprintf("storage provider %s is not ready, status: %s",
-			provider.Name, provider.Status.Phase))
-		return provider, err
-	}
+	reason = ReasonStorageProviderReady
+	return provider, nil
 }
 
 func (r *BackupRepoReconciler) checkParameters(reqCtx intctrlutil.RequestCtx,

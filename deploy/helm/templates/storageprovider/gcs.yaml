@@ -45,6 +45,7 @@ spec:
     {{ `{{- end }}` }}
     endpoint = {{ `{{ $endpoint }}` }}
     root = {{ `{{ index .Parameters "bucket" }}` }}
+    chunk_size = 50Mi
 
   parametersSchema:
     openAPIV3Schema:

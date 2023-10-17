@@ -322,11 +322,15 @@ dataProtection:
     # Overrides the image tag whose default is the chart appVersion.
     tag: ""
     imagePullSecrets: []
+    datasafed:
+      repository: apecloud/datasafed
+      tag: "0.0.3"
 
 ## BackupRepo settings
 ##
 ## @param backupRepo.create - creates a backup repo during installation
 ## @param backupRepo.default - set the created repo as the default
+## @param backupRepo.accessMethod - the access method for the backup repo, options: [Mount, Tool]
 ## @param backupRepo.storageProvider - the storage provider used by the repo, options: [s3, oss, minio]
 ## @param backupRepo.pvReclaimPolicy - the PV reclaim policy, options: [Retain, Delete]
 ## @param backupRepo.volumeCapacity - the capacity for creating PVC
@@ -335,6 +339,7 @@ dataProtection:
 backupRepo:
   create: false
   default: true
+  accessMethod: Tool
   storageProvider: ""
   pvReclaimPolicy: "Retain"
   volumeCapacity: ""

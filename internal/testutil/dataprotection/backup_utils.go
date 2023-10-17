@@ -24,6 +24,8 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -79,6 +81,11 @@ func NewFakeStorageProvider(testCtx *testutil.TestContext,
 	// the storage provider controller is not running, so set the status manually
 	Expect(testapps.ChangeObjStatus(testCtx, sp, func() {
 		sp.Status.Phase = storagev1alpha1.StorageProviderReady
+		meta.SetStatusCondition(&sp.Status.Conditions, metav1.Condition{
+			Type:   storagev1alpha1.ConditionTypeCSIDriverInstalled,
+			Status: metav1.ConditionTrue,
+			Reason: "CSIDriverInstalled",
+		})
 	})).Should(Succeed())
 	return sp
 }

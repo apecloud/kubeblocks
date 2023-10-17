@@ -60,6 +60,7 @@ const (
 	SecretName         = "fake-secret-conn-credential"
 	StorageClassName   = "fake-storage-class"
 	PVCName            = "fake-pvc"
+	ServiceRefName     = "fake-serviceRef"
 
 	KubeBlocksRepoName  = "fake-kubeblocks-repo"
 	KubeBlocksChartName = "fake-kubeblocks"
@@ -299,6 +300,9 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 					},
 					ConfigConstraintRef: "mysql8.0-config-constraints",
 				},
+			},
+			ServiceRefDeclarations: []appsv1alpha1.ServiceRefDeclaration{
+				FakeServiceRef(ServiceRefName),
 			},
 		},
 		{
@@ -992,7 +996,7 @@ func FakeEventForObject(name string, namespace string, object string) *corev1.Ev
 	}
 }
 
-func FakeStorageProvider(name string) *storagev1alpha1.StorageProvider {
+func FakeStorageProvider(name string, mutateFunc func(obj *storagev1alpha1.StorageProvider)) *storagev1alpha1.StorageProvider {
 	storageProvider := &storagev1alpha1.StorageProvider{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: fmt.Sprintf("%s/%s", types.StorageAPIGroup, types.StorageAPIVersion),
@@ -1040,6 +1044,9 @@ mountOptions: {{ index .Parameters "mountOptions" | default "" }}
 		},
 	}
 	storageProvider.SetCreationTimestamp(metav1.Now())
+	if mutateFunc != nil {
+		mutateFunc(storageProvider)
+	}
 	return storageProvider
 }
 
@@ -1077,4 +1084,16 @@ func FakeClusterList() *appsv1alpha1.ClusterList {
 	}
 	clusters.Items = append(clusters.Items, *FakeCluster(ClusterName, Namespace))
 	return clusters
+}
+
+func FakeServiceRef(serviceRefName string) appsv1alpha1.ServiceRefDeclaration {
+	return appsv1alpha1.ServiceRefDeclaration{
+		Name: serviceRefName,
+		ServiceRefDeclarationSpecs: []appsv1alpha1.ServiceRefDeclarationSpec{
+			{
+				ServiceKind:    "mysql",
+				ServiceVersion: "8.0.\\d{1,2}$",
+			},
+		},
+	}
 }

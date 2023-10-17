@@ -14,9 +14,10 @@ spec:
     preBackup: []
     postBackup: []
     backupData:
-      image: apecloud/curl-jq:latest
+      image: {{ .Values.images.registry | default "docker.io" }}/{{ .Values.images.tools.repository}}:{{ .Values.images.tools.tag | default "latest" }}
       runOnTargetPodNode: false
       command:
+      # no bash available in the image
       - sh
       - -c
       - |
@@ -26,9 +27,9 @@ spec:
         intervalSeconds: 5
   restore:
     prepareData:
-      image: apecloud/curl-jq:latest
+      image: {{ .Values.images.registry | default "docker.io" }}/{{ .Values.images.repository}}:{{ include "qdrant.version" . | default .Values.images.tag }}
       command:
-      - sh
+      - bash
       - -c
       - |
         {{- .Files.Get "scripts/qdrant-restore.sh" | nindent 8 }}

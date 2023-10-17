@@ -8,7 +8,7 @@ on:
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   K3D_NAME: default
-  K3S_VERSION: v1.25
+  K3S_VERSION: v1.26
   BASE_BRANCH: origin/main
 
 jobs:

@@ -134,28 +134,6 @@ func getPVCsByVolumeNames(cli client.Client,
 	return all, nil
 }
 
-func GenerateBackupRepoVolumeName(pvcName string) string {
-	return fmt.Sprintf("dp-backup-%s", pvcName)
-}
-
-func buildBackupRepoVolume(pvcName string) corev1.Volume {
-	return corev1.Volume{
-		Name: GenerateBackupRepoVolumeName(pvcName),
-		VolumeSource: corev1.VolumeSource{
-			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-				ClaimName: pvcName,
-			},
-		},
-	}
-}
-
-func buildBackupRepoVolumeMount(pvcName string) corev1.VolumeMount {
-	return corev1.VolumeMount{
-		Name:      GenerateBackupRepoVolumeName(pvcName),
-		MountPath: RepoVolumeMountPath,
-	}
-}
-
 func excludeLabelsForWorkload() []string {
 	return []string{constant.KBAppComponentLabelKey}
 }
@@ -206,14 +184,6 @@ func generateUniqueNameWithBackupSchedule(backupSchedule *dpv1alpha1.BackupSched
 		uniqueName = fmt.Sprintf("%s-%s", backupSchedule.OwnerReferences[0].UID[:8], backupSchedule.OwnerReferences[0].Name)
 	}
 	return uniqueName
-}
-
-func buildBackupInfoFilePath(backup *dpv1alpha1.Backup, pathPrefix string) string {
-	return buildBackupPathInContainer(backup, pathPrefix) + "/" + backupInfoFileName
-}
-
-func buildBackupPathInContainer(backup *dpv1alpha1.Backup, pathPrefix string) string {
-	return RepoVolumeMountPath + BuildBackupPath(backup, pathPrefix)
 }
 
 // BuildBackupPath builds the path to storage backup datas in backup repository.

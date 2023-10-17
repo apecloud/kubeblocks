@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -64,47 +65,114 @@ func (f *MockRestoreFactory) AddEnv(env corev1.EnvVar) *MockRestoreFactory {
 	return f
 }
 
-func (f *MockRestoreFactory) SetDataSourceRef(volumeSource, mountPath string) *MockRestoreFactory {
+func (f *MockRestoreFactory) initPrepareDataConfig() {
 	prepareDataConfig := f.Get().Spec.PrepareDataConfig
 	if prepareDataConfig == nil {
-		prepareDataConfig = &dpv1alpha1.PrepareDataConfig{
+		f.Get().Spec.PrepareDataConfig = &dpv1alpha1.PrepareDataConfig{
 			VolumeClaimManagementPolicy: dpv1alpha1.ParallelManagementPolicy,
 		}
 	}
-	prepareDataConfig.DataSourceRef = &dpv1alpha1.VolumeConfig{
+}
+
+func (f *MockRestoreFactory) initReadyConfig() {
+	ReadyConfig := f.Get().Spec.ReadyConfig
+	if ReadyConfig == nil {
+		f.Get().Spec.ReadyConfig = &dpv1alpha1.ReadyConfig{}
+	}
+}
+
+func (f *MockRestoreFactory) buildRestoreVolumeClaim(name, volumeSource, mountPath, storageClass string) dpv1alpha1.RestoreVolumeClaim {
+	return dpv1alpha1.RestoreVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				constant.AppManagedByLabelKey: "restore",
+			},
+		},
+		VolumeConfig: dpv1alpha1.VolumeConfig{
+			VolumeSource: volumeSource,
+			MountPath:    mountPath,
+		},
+		VolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+			StorageClassName: &storageClass,
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse("20Gi"),
+				},
+			},
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+		},
+	}
+}
+
+func (f *MockRestoreFactory) SetVolumeRestoreManagementPolicy(policy dpv1alpha1.VolumeClaimManagementPolicy) *MockRestoreFactory {
+	f.initPrepareDataConfig()
+	f.Get().Spec.PrepareDataConfig.VolumeClaimManagementPolicy = policy
+	return f
+}
+
+func (f *MockRestoreFactory) SetShedulingSpec(schedulingSpec dpv1alpha1.SchedulingSpec) *MockRestoreFactory {
+	f.initPrepareDataConfig()
+	f.Get().Spec.PrepareDataConfig.SchedulingSpec = schedulingSpec
+	return f
+}
+
+func (f *MockRestoreFactory) SetDataSourceRef(volumeSource, mountPath string) *MockRestoreFactory {
+	f.initPrepareDataConfig()
+	f.Get().Spec.PrepareDataConfig.DataSourceRef = &dpv1alpha1.VolumeConfig{
 		VolumeSource: volumeSource,
 		MountPath:    mountPath,
 	}
-	f.Get().Spec.PrepareDataConfig = prepareDataConfig
 	return f
 }
 
 func (f *MockRestoreFactory) SetVolumeClaimsTemplate(templateName, volumeSource, mountPath, storageClass string, replicas, startingIndex int32) *MockRestoreFactory {
-	prepareDataConfig := f.Get().Spec.PrepareDataConfig
-	if prepareDataConfig == nil {
-		prepareDataConfig = &dpv1alpha1.PrepareDataConfig{}
-	}
-	prepareDataConfig.RestoreVolumeClaimsTemplate = &dpv1alpha1.RestoreVolumeClaimsTemplate{
+	f.initPrepareDataConfig()
+	f.Get().Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate = &dpv1alpha1.RestoreVolumeClaimsTemplate{
 		Replicas:      replicas,
 		StartingIndex: startingIndex,
 		Templates: []dpv1alpha1.RestoreVolumeClaim{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: templateName,
-				},
-				VolumeConfig: dpv1alpha1.VolumeConfig{
-					VolumeSource: volumeSource,
-					MountPath:    mountPath,
-				},
-				VolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
-					StorageClassName: &storageClass,
-					Resources: corev1.ResourceRequirements{
-						Requests: corev1.ResourceList{
-							corev1.ResourceStorage: resource.MustParse("20Gi"),
-						},
-					},
-					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-				},
+			f.buildRestoreVolumeClaim(templateName, volumeSource, mountPath, storageClass),
+		},
+	}
+	return f
+}
+
+func (f *MockRestoreFactory) AddVolumeClaim(claimName, volumeSource, mountPath, storageClass string) *MockRestoreFactory {
+	f.initPrepareDataConfig()
+	f.Get().Spec.PrepareDataConfig.RestoreVolumeClaims = append(f.Get().Spec.PrepareDataConfig.RestoreVolumeClaims,
+		f.buildRestoreVolumeClaim(claimName, volumeSource, mountPath, storageClass))
+	return f
+}
+
+func (f *MockRestoreFactory) SetConnectCredential(secretName string) *MockRestoreFactory {
+	f.initReadyConfig()
+	f.Get().Spec.ReadyConfig.ConnectionCredential = &dpv1alpha1.ConnectionCredential{
+		SecretName:  secretName,
+		UsernameKey: "username",
+		PasswordKey: "password",
+	}
+	return f
+}
+
+func (f *MockRestoreFactory) SetJobActionConfig(matchLabels map[string]string) *MockRestoreFactory {
+	f.initReadyConfig()
+	f.Get().Spec.ReadyConfig.JobAction = &dpv1alpha1.JobAction{
+		Target: dpv1alpha1.JobActionTarget{
+			PodSelector: metav1.LabelSelector{
+				MatchLabels: matchLabels,
+			},
+		},
+	}
+	return f
+}
+
+func (f *MockRestoreFactory) SetExecActionConfig(matchLabels map[string]string) *MockRestoreFactory {
+	f.initReadyConfig()
+	f.Get().Spec.ReadyConfig.ExecAction = &dpv1alpha1.ExecAction{
+		Target: dpv1alpha1.ExecActionTarget{
+			PodSelector: metav1.LabelSelector{
+				MatchLabels: matchLabels,
 			},
 		},
 	}

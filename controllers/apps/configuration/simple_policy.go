@@ -53,8 +53,14 @@ func (s *simplePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error)
 		funcs = GetReplicationRollingUpgradeFuncs()
 		compLists = fromStatefulSetObjects(params.ComponentUnits)
 	case appsv1alpha1.Stateless:
-		funcs = GetDeploymentRollingUpgradeFuncs()
-		compLists = fromDeploymentObjects(params.DeploymentUnits)
+		// NODE: stateless component uses the StatefulSet object
+		if len(params.RSMList) != 0 {
+			funcs = GetStatefulSetRollingUpgradeFuncs()
+			compLists = fromStatefulSetObjects(params.ComponentUnits)
+		} else {
+			funcs = GetDeploymentRollingUpgradeFuncs()
+			compLists = fromDeploymentObjects(params.DeploymentUnits)
+		}
 	}
 	return restartAndCheckComponent(params, funcs, compLists)
 }

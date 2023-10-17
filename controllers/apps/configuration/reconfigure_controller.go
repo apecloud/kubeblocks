@@ -219,6 +219,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 		ContainerNames:           reconcileContext.Containers,
 		ComponentUnits:           reconcileContext.StatefulSets,
 		DeploymentUnits:          reconcileContext.Deployments,
+		RSMList:                  reconcileContext.RSMList,
 		Component:                reconcileContext.ClusterDefComObj,
 		ClusterComponent:         reconcileContext.ClusterComObj,
 		Restart:                  forceRestart || !cfgcm.IsSupportReload(configConstraint.Spec.ReloadOptions),

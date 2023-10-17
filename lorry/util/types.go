@@ -27,11 +27,11 @@ import (
 type OperationKind string
 
 const (
-	RespFieldEvent   = "event"
-	RespFieldMessage = "message"
-	RespTypMeta      = "metadata"
-	RespEveSucc      = "Success"
-	RespEveFail      = "Failed"
+	RespFieldEvent = "event"
+	RespTypMsg     = "message"
+	RespTypMeta    = "metadata"
+	RespEveSucc    = "Success"
+	RespEveFail    = "Failed"
 
 	GetOperation    OperationKind = "get"
 	CreateOperation OperationKind = "create"

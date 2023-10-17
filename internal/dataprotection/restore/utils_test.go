@@ -107,8 +107,8 @@ var _ = Describe("Restore Utils Test", func() {
 			return namespace
 		}
 
-		mockRestoreMGR := func(restoreNamespace string) *RestoreManager {
-			backup := mockBackupForRestore(&testCtx, actionSet.Name, testdp.BackupPVCName, true, true)
+		mockRestoreMGR := func(restoreNamespace string, backupPvcName string) *RestoreManager {
+			backup := mockBackupForRestore(&testCtx, actionSet.Name, backupPvcName, true, true)
 			restore := testdp.NewRestoreactory(restoreNamespace, testdp.RestoreName).
 				SetBackup(backup.Name, testCtx.DefaultNamespace).
 				SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
@@ -118,14 +118,14 @@ var _ = Describe("Restore Utils Test", func() {
 		}
 
 		It("test ValidateAndInitRestoreMGR function, reference the backup with same namespace", func() {
-			restoreMGR := mockRestoreMGR(testCtx.DefaultNamespace)
+			restoreMGR := mockRestoreMGR(testCtx.DefaultNamespace, testdp.BackupPVCName)
 			reqCtx := getReqCtx()
 			Expect(ValidateAndInitRestoreMGR(reqCtx, k8sClient, recorder, restoreMGR)).Should(Succeed())
 		})
 
 		It("test ValidateAndInitRestoreMGR function, reference the backup with different namespace and no referenceGrant", func() {
 			mockMyNamespace()
-			restoreMGR := mockRestoreMGR(myNamespace)
+			restoreMGR := mockRestoreMGR(myNamespace, "")
 			reqCtx := getReqCtx()
 			err := ValidateAndInitRestoreMGR(reqCtx, k8sClient, recorder, restoreMGR)
 			Expect(err).Should(HaveOccurred())
@@ -133,9 +133,17 @@ var _ = Describe("Restore Utils Test", func() {
 			testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.RestoreSignature, true, client.InNamespace(myNamespace))
 		})
 
+		It("test ValidateAndInitRestoreMGR function, reference the backup with different namespace and backup with pvc", func() {
+			restoreMGR := mockRestoreMGR(myNamespace, testdp.BackupPVCName)
+			reqCtx := getReqCtx()
+			err := ValidateAndInitRestoreMGR(reqCtx, k8sClient, recorder, restoreMGR)
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("isn't supported when the accessMethod of backupRepo"))
+		})
+
 		It("test ValidateAndInitRestoreMGR function, reference the backup with different namespace and referenceGrant", func() {
 			mockMyNamespace()
-			restoreMGR := mockRestoreMGR(myNamespace)
+			restoreMGR := mockRestoreMGR(myNamespace, "")
 			reqCtx := getReqCtx()
 			referenceGrant := &gatewayv1beta1.ReferenceGrant{
 				ObjectMeta: metav1.ObjectMeta{

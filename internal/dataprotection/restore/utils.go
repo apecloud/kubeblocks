@@ -227,8 +227,18 @@ func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 	restoreMgr *RestoreManager) error {
 	backupName := restoreMgr.Restore.Spec.Backup.Name
 	backupNamespace := restoreMgr.Restore.Spec.Backup.Namespace
+	// get backupActionSet based on the specified backup name.
+	backupSet, err := restoreMgr.GetBackupActionSetByNamespaced(reqCtx, cli, backupName, backupNamespace)
+	if err != nil {
+		return err
+	}
+
 	restoreNamespace := restoreMgr.Restore.Namespace
 	if restoreNamespace != backupNamespace {
+		if backupSet.Backup.Status.PersistentVolumeClaimName != "" {
+			return intctrlutil.NewFatalError(fmt.Sprintf(`restore %s/%s isn't supported when the accessMethod of backupRepo "%s" is %s`,
+				backupNamespace, backupName, backupSet.Backup.Status.BackupRepoName, dpv1alpha1.AccessMethodMount))
+		}
 		// check if there is permission for cross namespace recovery.
 		isGrant, err := isGrantedForCrossNamespace(reqCtx, cli, restoreNamespace, backupName, backupNamespace)
 		if err != nil {
@@ -237,11 +247,6 @@ func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 		if !isGrant {
 			return intctrlutil.NewFatalError(fmt.Sprintf("accessing %s/%s isn't allowed", backupNamespace, backupName))
 		}
-	}
-	// get backupActionSet based on the specified backup name.
-	backupSet, err := restoreMgr.GetBackupActionSetByNamespaced(reqCtx, cli, backupName, backupNamespace)
-	if err != nil {
-		return err
 	}
 
 	// check if the backup is completed exclude continuous backup.

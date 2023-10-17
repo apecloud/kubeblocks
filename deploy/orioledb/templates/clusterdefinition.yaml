@@ -102,9 +102,9 @@ spec:
               serviceVersion: ^v3.\d...d$
       service:
         ports:
-          - name: tcp-postgresql
+          - name: tcp-orioledb
             port: 5432
-            targetPort: tcp-postgresql
+            targetPort: tcp-orioledb
           - name: tcp-pgbouncer
             port: 6432
             targetPort: tcp-pgbouncer
@@ -153,7 +153,7 @@ spec:
               - name: patroni-dependency
                 mountPath: /dependency
             ports:
-              - name: tcp-postgresql
+              - name: tcp-orioledb
                 containerPort: 5432
               - name: patroni
                 containerPort: 8008

@@ -23,6 +23,7 @@ kbcli cluster restore [flags]
 
 ```
       --backup string                  Backup name
+      --backup-namespace string        Backup namespace, default by current namespace
   -h, --help                           help for restore
       --restore-to-time string         point in time recovery(PITR)
       --volume-restore-policy string   the volume claim restore policy, supported values: [Serial, Parallel] (default "Parallel")

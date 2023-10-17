@@ -18,6 +18,7 @@ kbcli dataprotection restore [flags]
 ### Options
 
 ```
+      --backup-namespace string        Backup namespace, default by current namespace
       --cluster string                 The cluster to restore
   -h, --help                           help for restore
       --restore-to-time string         point in time recovery(PITR)

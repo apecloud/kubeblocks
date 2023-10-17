@@ -43,7 +43,6 @@ import (
 	componentutil "github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
@@ -434,12 +433,6 @@ func resolvePodSpecDefaultFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 			resolveContainerProbe(*c.StartupProbe, cc.StartupProbe)
 		}
 	}
-	min := func(a, b int) int {
-		if a < b {
-			return a
-		}
-		return b
-	}
 	for i := 0; i < min(len(obj.Volumes), len(pobj.Volumes)); i++ {
 		resolveVolume(obj.Volumes[i], &pobj.Volumes[i])
 	}
@@ -585,7 +578,8 @@ func updateComponentInfoToPods(
 		return err
 	}
 	// list all pods in dag
-	podVertices := ictrltypes.FindAll[*corev1.Pod](dag)
+	graphCli := model.NewGraphClient(cli)
+	pods := graphCli.FindAll(dag, &corev1.Pod{})
 
 	replicasStr := strconv.Itoa(int(component.Replicas))
 	updateAnnotation := func(obj client.Object) {
@@ -603,19 +597,17 @@ func updateComponentInfoToPods(
 			pod.Annotations[constant.ComponentReplicasAnnotationKey] == replicasStr {
 			continue
 		}
-		idx := slices.IndexFunc(podVertices, func(vertex graph.Vertex) bool {
-			v, _ := vertex.(*ictrltypes.LifecycleVertex)
-			return v.Obj.GetName() == pod.Name
+		idx := slices.IndexFunc(pods, func(obj client.Object) bool {
+			return obj.GetName() == pod.Name
 		})
 		// pod already in dag, merge annotations
 		if idx >= 0 {
-			v, _ := podVertices[idx].(*ictrltypes.LifecycleVertex)
-			updateAnnotation(v.Obj)
+			updateAnnotation(pods[idx])
 			continue
 		}
 		// pod not in dag, add a new vertex
 		updateAnnotation(pod)
-		dag.AddVertex(&ictrltypes.LifecycleVertex{Obj: pod, Action: ictrltypes.ActionUpdatePtr()})
+		graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), nil)
 	}
 	return nil
 }
@@ -630,7 +622,8 @@ func updateCustomLabelToPods(ctx context.Context,
 		return nil
 	}
 	// list all pods in dag
-	podVertices := ictrltypes.FindAll[*corev1.Pod](dag)
+	graphCli := model.NewGraphClient(cli)
+	pods := graphCli.FindAll(dag, &corev1.Pod{})
 
 	for _, customLabelSpec := range component.CustomLabelSpecs {
 		for _, resource := range customLabelSpec.Resources {
@@ -652,19 +645,17 @@ func updateCustomLabelToPods(ctx context.Context,
 			}
 
 			for i := range podList.Items {
-				idx := slices.IndexFunc(podVertices, func(vertex graph.Vertex) bool {
-					v, _ := vertex.(*ictrltypes.LifecycleVertex)
-					return v.Obj.GetName() == podList.Items[i].Name
+				idx := slices.IndexFunc(pods, func(obj client.Object) bool {
+					return obj.GetName() == podList.Items[i].Name
 				})
 				// pod already in dag, merge labels
 				if idx >= 0 {
-					v, _ := podVertices[idx].(*ictrltypes.LifecycleVertex)
-					updateObjLabel(cluster.Name, string(cluster.UID), component.Name, customLabelSpec, v.Obj)
+					updateObjLabel(cluster.Name, string(cluster.UID), component.Name, customLabelSpec, pods[idx])
 					continue
 				}
 				pod := &podList.Items[i]
 				updateObjLabel(cluster.Name, string(cluster.UID), component.Name, customLabelSpec, pod)
-				dag.AddVertex(&ictrltypes.LifecycleVertex{Obj: pod, Action: ictrltypes.ActionUpdatePtr()})
+				graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), nil)
 			}
 		}
 	}

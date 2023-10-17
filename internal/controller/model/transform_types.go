@@ -49,8 +49,10 @@ type Action string
 const (
 	CREATE = Action("CREATE")
 	UPDATE = Action("UPDATE")
+	PATCH  = Action("PATCH")
 	DELETE = Action("DELETE")
 	STATUS = Action("STATUS")
+	NOOP   = Action("NOOP")
 )
 
 type GVKNObjKey struct {
@@ -64,23 +66,19 @@ type GVKNObjKey struct {
 // all transformers doing their object manipulation works on obj.spec
 // the root vertex(i.e. the cluster vertex) will be treated specially:
 // as all its meta, spec and status can be updated in one reconciliation loop
-// Update is ignored when immutable=true
-// orphan object will be force deleted when action is DELETE
 type ObjectVertex struct {
-	Obj       client.Object
-	OriObj    client.Object
-	Immutable bool
-	IsOrphan  bool
-	Action    *Action
+	Obj    client.Object
+	OriObj client.Object
+	Action *Action
 }
 
 func (v *ObjectVertex) String() string {
 	if v.Action == nil {
-		return fmt.Sprintf("{obj:%T, name: %s, immutable: %v, orphan: %v, action: nil}",
-			v.Obj, v.Obj.GetName(), v.Immutable, v.IsOrphan)
+		return fmt.Sprintf("{obj:%T, name: %s, action: nil}",
+			v.Obj, v.Obj.GetName())
 	}
-	return fmt.Sprintf("{obj:%T, name: %s, immutable: %v, orphan: %v, action: %v}",
-		v.Obj, v.Obj.GetName(), v.Immutable, v.IsOrphan, *v.Action)
+	return fmt.Sprintf("{obj:%T, name: %s, action: %v}",
+		v.Obj, v.Obj.GetName(), *v.Action)
 }
 
 type ObjectSnapshot map[GVKNObjKey]client.Object

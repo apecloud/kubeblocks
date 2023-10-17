@@ -34,17 +34,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-func FindAll[T interface{}](dag *graph.DAG) []graph.Vertex {
-	vertices := make([]graph.Vertex, 0)
-	for _, vertex := range dag.Vertices() {
-		v, _ := vertex.(*ObjectVertex)
-		if _, ok := v.Obj.(T); ok {
-			vertices = append(vertices, vertex)
-		}
-	}
-	return vertices
-}
-
 func FindRootVertex(dag *graph.DAG) (*ObjectVertex, error) {
 	root := dag.Root()
 	if root == nil {
@@ -110,8 +99,32 @@ func IsOwnerOf(owner, obj client.Object) bool {
 	return false
 }
 
-func ActionPtr(action Action) *Action {
+func actionPtr(action Action) *Action {
 	return &action
+}
+
+func ActionCreatePtr() *Action {
+	return actionPtr(CREATE)
+}
+
+func ActionDeletePtr() *Action {
+	return actionPtr(DELETE)
+}
+
+func ActionUpdatePtr() *Action {
+	return actionPtr(UPDATE)
+}
+
+func ActionPatchPtr() *Action {
+	return actionPtr(PATCH)
+}
+
+func ActionStatusPtr() *Action {
+	return actionPtr(STATUS)
+}
+
+func ActionNoopPtr() *Action {
+	return actionPtr(NOOP)
 }
 
 func NewRequeueError(after time.Duration, reason string) error {

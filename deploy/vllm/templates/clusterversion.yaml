@@ -58,7 +58,7 @@ spec:
               - name: EXTRA_ARGS
                 value: "--trust-remote-code"
               - name: CLONE_MODEL_SCRIPT
-                value: "curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash; apt-get install git-lfs; git lfs install; git clone https://www.modelscope.cn/baichuan-inc/Baichuan2-13B-Chat.git"
+                value: "git lfs install; git clone https://www.modelscope.cn/baichuan-inc/Baichuan2-13B-Chat.git"
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion

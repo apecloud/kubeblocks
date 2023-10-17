@@ -33,8 +33,9 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -89,6 +90,13 @@ var _ = Describe("Component", func() {
 
 	AfterEach(cleanAll)
 
+	newDAGWithPlaceholder := func(namespace, clusterName, compName string) *graph.DAG {
+		root := builder.NewReplicatedStateMachineBuilder(namespace, fmt.Sprintf("%s-%s", clusterName, compName)).GetObject()
+		dag := graph.NewDAG()
+		model.NewGraphClient(nil).Root(dag, nil, root, nil)
+		return dag
+	}
+
 	setup := func() {
 		defaultStorageClass = testk8s.CreateMockStorageClass(&testCtx, testk8s.DefaultStorageClassName)
 		Expect(*defaultStorageClass.AllowVolumeExpansion).Should(BeTrue())
@@ -109,46 +117,43 @@ var _ = Describe("Component", func() {
 			GetObject()
 
 		reqCtx = intctrlutil.RequestCtx{Ctx: ctx, Log: logger, Recorder: recorder}
-		dag = graph.NewDAG()
+		dag = newDAGWithPlaceholder(clusterObj.Namespace, clusterName, statefulCompName)
 	}
 
 	resetDag := func(comp Component) {
 		Expect(comp).ShouldNot(BeNil())
 		rsmComp, ok := comp.(*rsmComponent)
 		Expect(ok).Should(BeTrue())
-		dag = graph.NewDAG()
+		dag = newDAGWithPlaceholder(clusterObj.Namespace, clusterName, rsmComp.GetName())
 		rsmComp.dag = dag
 	}
 
 	submitChanges := func(ctx context.Context, cli client.Client, dag *graph.DAG) error {
 		walking := func(v graph.Vertex) error {
-			node, ok := v.(*ictrltypes.LifecycleVertex)
+			node, ok := v.(*model.ObjectVertex)
 			Expect(ok).Should(BeTrue())
 
 			_, ok = node.Obj.(*appsv1alpha1.Cluster)
-			Expect(!ok || *node.Action == ictrltypes.NOOP).Should(BeTrue())
+			Expect(!ok || *node.Action == model.NOOP).Should(BeTrue())
 
 			switch *node.Action {
-			case ictrltypes.CREATE:
+			case model.CREATE:
 				err := cli.Create(ctx, node.Obj)
 				if err != nil && !apierrors.IsAlreadyExists(err) {
 					return err
 				}
-			case ictrltypes.UPDATE:
-				if node.Immutable {
-					return nil
-				}
+			case model.UPDATE:
 				err := cli.Update(ctx, node.Obj)
 				if err != nil && !apierrors.IsNotFound(err) {
 					return err
 				}
-			case ictrltypes.PATCH:
-				patch := client.MergeFrom(node.ObjCopy)
+			case model.PATCH:
+				patch := client.MergeFrom(node.OriObj)
 				err := cli.Patch(ctx, node.Obj, patch)
 				if err != nil && !apierrors.IsNotFound(err) {
 					return err
 				}
-			case ictrltypes.DELETE:
+			case model.DELETE:
 				if controllerutil.RemoveFinalizer(node.Obj, constant.DBClusterFinalizerName) {
 					err := cli.Update(ctx, node.Obj)
 					if err != nil && !apierrors.IsNotFound(err) {
@@ -161,12 +166,12 @@ var _ = Describe("Component", func() {
 						return err
 					}
 				}
-			case ictrltypes.STATUS:
-				patch := client.MergeFrom(node.ObjCopy)
+			case model.STATUS:
+				patch := client.MergeFrom(node.OriObj)
 				if err := cli.Status().Patch(ctx, node.Obj, patch); err != nil {
 					return err
 				}
-			case ictrltypes.NOOP:
+			case model.NOOP:
 				// nothing
 			}
 			return nil
@@ -175,7 +180,7 @@ var _ = Describe("Component", func() {
 			return dag.WalkReverseTopoOrder(walking, nil)
 		} else {
 			withRoot := graph.NewDAG()
-			ictrltypes.LifecycleObjectNoop(withRoot, &appsv1alpha1.Cluster{}, nil)
+			model.NewGraphClient(cli).Root(withRoot, nil, &appsv1alpha1.Cluster{}, model.ActionNoopPtr())
 			withRoot.Merge(dag)
 			return withRoot.WalkReverseTopoOrder(walking, nil)
 		}

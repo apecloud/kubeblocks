@@ -20,14 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"fmt"
-	"time"
-
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type MockClusterFactory struct {
@@ -36,7 +31,7 @@ type MockClusterFactory struct {
 
 func NewClusterFactory(namespace, name, cdRef, cvRef string) *MockClusterFactory {
 	f := &MockClusterFactory{}
-	f.init(namespace, name,
+	f.Init(namespace, name,
 		&appsv1alpha1.Cluster{
 			Spec: appsv1alpha1.ClusterSpec{
 				ClusterDefRef:     cdRef,
@@ -49,17 +44,17 @@ func NewClusterFactory(namespace, name, cdRef, cvRef string) *MockClusterFactory
 }
 
 func (factory *MockClusterFactory) SetClusterAffinity(affinity *appsv1alpha1.Affinity) *MockClusterFactory {
-	factory.get().Spec.Affinity = affinity
+	factory.Get().Spec.Affinity = affinity
 	return factory
 }
 
 func (factory *MockClusterFactory) AddClusterToleration(toleration corev1.Toleration) *MockClusterFactory {
-	tolerations := factory.get().Spec.Tolerations
+	tolerations := factory.Get().Spec.Tolerations
 	if len(tolerations) == 0 {
 		tolerations = []corev1.Toleration{}
 	}
 	tolerations = append(tolerations, toleration)
-	factory.get().Spec.Tolerations = tolerations
+	factory.Get().Spec.Tolerations = tolerations
 	return factory
 }
 
@@ -68,168 +63,120 @@ func (factory *MockClusterFactory) AddComponent(compName string, compDefName str
 		Name:            compName,
 		ComponentDefRef: compDefName,
 	}
-	factory.get().Spec.ComponentSpecs = append(factory.get().Spec.ComponentSpecs, comp)
+	factory.Get().Spec.ComponentSpecs = append(factory.Get().Spec.ComponentSpecs, comp)
+	return factory
+}
+
+type updateFn func(comp *appsv1alpha1.ClusterComponentSpec)
+
+func (factory *MockClusterFactory) lastComponentRef(update updateFn) *MockClusterFactory {
+	comps := factory.Get().Spec.ComponentSpecs
+	if len(comps) > 0 {
+		update(&comps[len(comps)-1])
+	}
+	factory.Get().Spec.ComponentSpecs = comps
 	return factory
 }
 
 func (factory *MockClusterFactory) SetReplicas(replicas int32) *MockClusterFactory {
-	comps := factory.get().Spec.ComponentSpecs
-	if len(comps) > 0 {
-		comps[len(comps)-1].Replicas = replicas
-	}
-	factory.get().Spec.ComponentSpecs = comps
-	return factory
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+		comp.Replicas = replicas
+	})
 }
 
 func (factory *MockClusterFactory) SetServiceAccountName(serviceAccountName string) *MockClusterFactory {
-	comps := factory.get().Spec.ComponentSpecs
-	if len(comps) > 0 {
-		comps[len(comps)-1].ServiceAccountName = serviceAccountName
-	}
-	return factory
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+		comp.ServiceAccountName = serviceAccountName
+	})
 }
 
 func (factory *MockClusterFactory) SetResources(resources corev1.ResourceRequirements) *MockClusterFactory {
-	comps := factory.get().Spec.ComponentSpecs
-	if len(comps) > 0 {
-		comps[len(comps)-1].Resources = resources
-	}
-	factory.get().Spec.ComponentSpecs = comps
-	return factory
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+		comp.Resources = resources
+	})
 }
 
 func (factory *MockClusterFactory) SetComponentAffinity(affinity *appsv1alpha1.Affinity) *MockClusterFactory {
-	comps := factory.get().Spec.ComponentSpecs
-	if len(comps) > 0 {
-		comps[len(comps)-1].Affinity = affinity
-	}
-	factory.get().Spec.ComponentSpecs = comps
-	return factory
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+		comp.Affinity = affinity
+	})
 }
 
 func (factory *MockClusterFactory) SetEnabledLogs(logName ...string) *MockClusterFactory {
-	comps := factory.get().Spec.ComponentSpecs
-	if len(comps) > 0 {
-		comps[len(comps)-1].EnabledLogs = logName
-	}
-	factory.get().Spec.ComponentSpecs = comps
-	return factory
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+		comp.EnabledLogs = logName
+	})
 }
 
 func (factory *MockClusterFactory) SetClassDefRef(classDefRef *appsv1alpha1.ClassDefRef) *MockClusterFactory {
-	comps := factory.get().Spec.ComponentSpecs
-	if len(comps) > 0 {
-		comps[len(comps)-1].ClassDefRef = classDefRef
-	}
-	factory.get().Spec.ComponentSpecs = comps
-	return factory
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+		comp.ClassDefRef = classDefRef
+	})
 }
 
 func (factory *MockClusterFactory) AddComponentToleration(toleration corev1.Toleration) *MockClusterFactory {
-	comps := factory.get().Spec.ComponentSpecs
-	if len(comps) > 0 {
-		comp := comps[len(comps)-1]
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
 		tolerations := comp.Tolerations
 		if len(tolerations) == 0 {
 			tolerations = []corev1.Toleration{}
 		}
 		tolerations = append(tolerations, toleration)
 		comp.Tolerations = tolerations
-		comps[len(comps)-1] = comp
-	}
-	factory.get().Spec.ComponentSpecs = comps
-	return factory
+	})
 }
 
 func (factory *MockClusterFactory) AddVolumeClaimTemplate(volumeName string,
 	pvcSpec appsv1alpha1.PersistentVolumeClaimSpec) *MockClusterFactory {
-	comps := factory.get().Spec.ComponentSpecs
-	if len(comps) > 0 {
-		comp := comps[len(comps)-1]
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
 		comp.VolumeClaimTemplates = append(comp.VolumeClaimTemplates,
 			appsv1alpha1.ClusterComponentVolumeClaimTemplate{
 				Name: volumeName,
 				Spec: pvcSpec,
 			})
-		comps[len(comps)-1] = comp
-	}
-	factory.get().Spec.ComponentSpecs = comps
-	return factory
+	})
 }
 
 func (factory *MockClusterFactory) SetMonitor(monitor bool) *MockClusterFactory {
-	comps := factory.get().Spec.ComponentSpecs
-	if len(comps) > 0 {
-		comps[len(comps)-1].Monitor = monitor
-	}
-	factory.get().Spec.ComponentSpecs = comps
-	return factory
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+		comp.Monitor = monitor
+	})
 }
 
 func (factory *MockClusterFactory) SetSwitchPolicy(switchPolicy *appsv1alpha1.ClusterSwitchPolicy) *MockClusterFactory {
-	comps := factory.get().Spec.ComponentSpecs
-	if len(comps) > 0 {
-		comps[len(comps)-1].SwitchPolicy = switchPolicy
-	}
-	factory.get().Spec.ComponentSpecs = comps
-	return factory
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+		comp.SwitchPolicy = switchPolicy
+	})
 }
 
 func (factory *MockClusterFactory) SetTLS(tls bool) *MockClusterFactory {
-	comps := factory.get().Spec.ComponentSpecs
-	if len(comps) > 0 {
-		comps[len(comps)-1].TLS = tls
-	}
-	factory.get().Spec.ComponentSpecs = comps
-	return factory
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+		comp.TLS = tls
+	})
 }
 
 func (factory *MockClusterFactory) SetIssuer(issuer *appsv1alpha1.Issuer) *MockClusterFactory {
-	comps := factory.get().Spec.ComponentSpecs
-	if len(comps) > 0 {
-		comps[len(comps)-1].Issuer = issuer
-	}
-	factory.get().Spec.ComponentSpecs = comps
-	return factory
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+		comp.Issuer = issuer
+	})
 }
 
 func (factory *MockClusterFactory) AddService(serviceName string, serviceType corev1.ServiceType) *MockClusterFactory {
-	comps := factory.get().Spec.ComponentSpecs
-	if len(comps) > 0 {
-		comp := comps[len(comps)-1]
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
 		comp.Services = append(comp.Services,
 			appsv1alpha1.ClusterComponentService{
 				Name:        serviceName,
 				ServiceType: serviceType,
 			})
-		comps[len(comps)-1] = comp
-	}
-	factory.get().Spec.ComponentSpecs = comps
-	return factory
-}
-
-func (factory *MockClusterFactory) AddRestorePointInTime(restoreTime metav1.Time, compNames, sourceCluster string) *MockClusterFactory {
-	annotations := factory.get().Annotations
-	if annotations == nil {
-		annotations = map[string]string{}
-	}
-	annotations[constant.RestoreFromTimeAnnotationKey] = fmt.Sprintf(`{"%s":"%s"}`, compNames, restoreTime.Format(time.RFC3339))
-	annotations[constant.RestoreFromSrcClusterAnnotationKey] = sourceCluster
-
-	factory.get().Annotations = annotations
-	return factory
+	})
 }
 
 func (factory *MockClusterFactory) SetBackup(backup *appsv1alpha1.ClusterBackup) *MockClusterFactory {
-	factory.get().Spec.Backup = backup
+	factory.Get().Spec.Backup = backup
 	return factory
 }
 
 func (factory *MockClusterFactory) SetServiceRefs(serviceRefs []appsv1alpha1.ServiceRef) *MockClusterFactory {
-	comps := factory.get().Spec.ComponentSpecs
-	if len(comps) > 0 {
-		comps[len(comps)-1].ServiceRefs = serviceRefs
-	}
-	factory.get().Spec.ComponentSpecs = comps
-	return factory
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+		comp.ServiceRefs = serviceRefs
+	})
 }

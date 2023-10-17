@@ -26,8 +26,8 @@ kbcli backup create NAME [flags]
 ```
       --cluster string   Cluster name
   -h, --help             help for create
+      --method string    Backup type (default "snapshot")
       --policy string    Backup policy name, this flag will be ignored when backup-type is snapshot
-      --type string      Backup type (default "snapshot")
 ```
 
 ### Options inherited from parent commands

@@ -8,13 +8,12 @@ metadata:
 spec:
   csiDriverName: ru.yandex.s3.csi
   csiDriverSecretTemplate: |
-    accessKeyID: {{ `{{ index .Parameters "accessKeyId" }}` }}
-    secretAccessKey: {{ `{{ index .Parameters "secretAccessKey" }}` }}
-    {{ `{{- $region := index .Parameters "region" }}` }}
     {{ `{{- $endpoint := index .Parameters "endpoint" }}` }}
     {{ `{{- if not $endpoint }}` }}
       {{ `{{- $endpoint = (printf "https://storage.googleapis.com") }}` }}
     {{ `{{- end }}` }}
+    accessKeyID: {{ `{{ index .Parameters "accessKeyId" }}` }}
+    secretAccessKey: {{ `{{ index .Parameters "secretAccessKey" }}` }}
     endpoint: {{ `{{ $endpoint }}` }}
 
   storageClassTemplate: |
@@ -32,6 +31,21 @@ spec:
       csi.storage.k8s.io/node-stage-secret-namespace: {{ `{{ .CSIDriverSecretRef.Namespace }}` }}
       csi.storage.k8s.io/node-publish-secret-name: {{ `{{ .CSIDriverSecretRef.Name }}` }}
       csi.storage.k8s.io/node-publish-secret-namespace: {{ `{{ .CSIDriverSecretRef.Namespace }}` }}
+
+  datasafedConfigTemplate: |
+    [storage]
+    type = s3
+    provider = GCS
+    env_auth = false
+    access_key_id = {{ `{{ index .Parameters "accessKeyId" }}` }}
+    secret_access_key = {{ `{{ index .Parameters "secretAccessKey" }}` }}
+    {{ `{{- $endpoint := index .Parameters "endpoint" }}` }}
+    {{ `{{- if not $endpoint }}` }}
+      {{ `{{- $endpoint = (printf "https://storage.googleapis.com") }}` }}
+    {{ `{{- end }}` }}
+    endpoint = {{ `{{ $endpoint }}` }}
+    root = {{ `{{ index .Parameters "bucket" }}` }}
+    chunk_size = 50Mi
 
   parametersSchema:
     openAPIV3Schema:

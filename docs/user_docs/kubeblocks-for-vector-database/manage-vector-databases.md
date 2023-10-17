@@ -39,7 +39,7 @@ Before you start, [Install KubeBlocks](./../installation/install-with-helm/) and
 3. Check the cluster information.
 
    ```bash
-   kblci cluster describe qdrant
+   kbcli cluster describe qdrant
    >
    Name: qdrant         Created Time: Aug 15,2023 23:03 UTC+0800
    NAMESPACE   CLUSTER-DEFINITION   VERSION        STATUS    TERMINATION-POLICY
@@ -73,11 +73,17 @@ Before you start, [Install KubeBlocks](./../installation/install-with-helm/) and
 
 ## Connect to a vector database cluster
 
-Use the following command to connect to a vector database cluster.
+Qdrant provides both HTTP and gRPC protocols for client access on ports 6333 and 6334 respectively. Depending on where the client is, different connection options are offered to connect to the Qdrant cluster.
 
-```bash
-kbcli cluster connect <clustername>  --namespace <name>
-```
+:::note
+
+If your cluster is on AWS, install the AWS Load Balancer Controller first.
+
+:::
+
+- If your client is inside a K8s cluster, run `kbcli cluster describe qdrant` to get the ClusterIP address of the cluster or the corresponding K8s cluster domain name.
+- If your client is outside the K8s cluster but in the same VPC as the server, run `kbcli cluster expose qdant --enable=true --type=vpc` to get a VPC load balancer address for the database cluster.
+- If your client is outside the VPC, run `kbcli cluster expose qdant --enable=true --type=internet` to open a public network reachable address for the database cluster.
 
 ## Monitor the vector database
 

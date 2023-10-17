@@ -43,8 +43,14 @@ func (s *simplePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error)
 	switch params.WorkloadType() {
 	default:
 		return makeReturnedStatus(ESNotSupport), core.MakeError("not supported component workload type:[%s]", params.WorkloadType())
-	case appsv1alpha1.Consensus, appsv1alpha1.Replication, appsv1alpha1.Stateful:
-		funcs = GetRSMRollingUpgradeFuncs()
+	case appsv1alpha1.Consensus:
+		funcs = GetConsensusRollingUpgradeFuncs()
+		compLists = fromStatefulSetObjects(params.ComponentUnits)
+	case appsv1alpha1.Stateful:
+		funcs = GetStatefulSetRollingUpgradeFuncs()
+		compLists = fromStatefulSetObjects(params.ComponentUnits)
+	case appsv1alpha1.Replication:
+		funcs = GetReplicationRollingUpgradeFuncs()
 		compLists = fromStatefulSetObjects(params.ComponentUnits)
 	case appsv1alpha1.Stateless:
 		funcs = GetDeploymentRollingUpgradeFuncs()

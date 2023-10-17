@@ -56,7 +56,6 @@ kbcli [flags]
 
 * [kbcli addon](kbcli_addon.md)	 - Addon command.
 * [kbcli alert](kbcli_alert.md)	 - Manage alert receiver, include add, list and delete receiver.
-* [kbcli backup](kbcli_backup.md)	 - Backup command.
 * [kbcli backuprepo](kbcli_backuprepo.md)	 - BackupRepo command.
 * [kbcli bench](kbcli_bench.md)	 - Run a benchmark.
 * [kbcli builder](kbcli_builder.md)	 - builder command.
@@ -64,16 +63,13 @@ kbcli [flags]
 * [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
 * [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command.
 * [kbcli clusterversion](kbcli_clusterversion.md)	 - ClusterVersion command.
-* [kbcli context](kbcli_context.md)	 - kbcli context allows you to manage cloud context. This command is currently only applicable to cloud, and currently does not support switching the context of the local k8s cluster.
 * [kbcli dashboard](kbcli_dashboard.md)	 - List and open the KubeBlocks dashboards.
+* [kbcli dataprotection](kbcli_dataprotection.md)	 - Data protection command.
 * [kbcli fault](kbcli_fault.md)	 - Inject faults to pod.
 * [kbcli infra](kbcli_infra.md)	 - infra command
 * [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands.
-* [kbcli login](kbcli_login.md)	 - Authenticate with the KubeBlocks Cloud
-* [kbcli logout](kbcli_logout.md)	 - Log out of the KubeBlocks Cloud
 * [kbcli migration](kbcli_migration.md)	 - Data migration between two data sources.
 * [kbcli options](kbcli_options.md)	 - Print the list of flags inherited by all commands.
-* [kbcli org](kbcli_org.md)	 - kbcli org is used to manage cloud organizations and is only suitable for interacting with cloud.
 * [kbcli playground](kbcli_playground.md)	 - Bootstrap or destroy a playground KubeBlocks in local host or cloud.
 * [kbcli plugin](kbcli_plugin.md)	 - Provides utilities for interacting with plugins.
 * [kbcli report](kbcli_report.md)	 - report kubeblocks or cluster info.

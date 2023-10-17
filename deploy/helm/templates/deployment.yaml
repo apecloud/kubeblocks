@@ -85,11 +85,10 @@ spec:
               value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.datascript.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
             - name: KUBEBLOCKS_SERVICEACCOUNT_NAME
               value: {{ include "kubeblocks.serviceAccountName" . }}
-            {{- if or .Values.dataProtection.enableVolumeSnapshot (index .Values "snapshot-controller" "enabled") }}
-            - name: VOLUMESNAPSHOT
-              value: "true"
-            {{- end }}
-            {{- if .Capabilities.APIVersions.Has "snapshot.storage.k8s.io/v1beta1" }}
+            {{- if .Capabilities.APIVersions.Has "snapshot.storage.k8s.io/v1" }}
+            - name: VOLUMESNAPSHOT_API_BETA
+              value: "false"
+            {{- else if .Capabilities.APIVersions.Has "snapshot.storage.k8s.io/v1beta1" }}
             - name: VOLUMESNAPSHOT_API_BETA
               value: "true"
             {{- end }}
@@ -113,6 +112,8 @@ spec:
             - name: RECOVER_VOLUME_EXPANSION_FAILURE
               value: "true"
             {{- end }}
+            - name: KUBE_PROVIDER
+              value: {{ .Values.provider | quote }}
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}

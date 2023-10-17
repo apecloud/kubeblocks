@@ -2,7 +2,7 @@
 title: kbcli backuprepo describe
 ---
 
-Describe a backuprepo.
+Describe a backup repository.
 
 ```
 kbcli backuprepo describe [flags]

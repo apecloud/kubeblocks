@@ -20,16 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -41,7 +42,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/dataprotection/utils/boolptr"
 )
 
 var (
@@ -68,10 +69,10 @@ type describeOptions struct {
 	names []string
 
 	*cluster.ClusterObjects
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
-func newOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *describeOptions {
+func newOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *describeOptions {
 	return &describeOptions{
 		factory:   f,
 		IOStreams: streams,
@@ -79,7 +80,7 @@ func newOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *describ
 	}
 }
 
-func NewDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewDescribeCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := newOptions(f, streams)
 	cmd := &cobra.Command{
 		Use:               "describe NAME",
@@ -162,13 +163,34 @@ func (o *describeOptions) describeCluster(name string) error {
 	showImages(comps, o.Out)
 
 	// data protection info
-	showDataProtection(o.BackupPolicies, o.Backups, o.Out)
+	defaultBackupRepo, err := o.getDefaultBackupRepo()
+	if err != nil {
+		return err
+	}
+	showDataProtection(o.BackupPolicies, o.BackupSchedules, defaultBackupRepo, o.Out)
 
 	// events
 	showEvents(o.Cluster.Name, o.Cluster.Namespace, o.Out)
 	fmt.Fprintln(o.Out)
 
 	return nil
+}
+
+func (o *describeOptions) getDefaultBackupRepo() (string, error) {
+	backupRepoListObj, err := o.dynamic.Resource(types.BackupRepoGVR()).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return printer.NoneString, err
+	}
+	for _, item := range backupRepoListObj.Items {
+		repo := dpv1alpha1.BackupRepo{}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, &repo); err != nil {
+			return printer.NoneString, err
+		}
+		if repo.Status.IsDefault {
+			return repo.Name, nil
+		}
+	}
+	return printer.NoneString, nil
 }
 
 func showCluster(c *appsv1alpha1.Cluster, out io.Writer) {
@@ -227,66 +249,50 @@ func showEndpoints(c *appsv1alpha1.Cluster, svcList *corev1.ServiceList, out io.
 	tbl.Print()
 }
 
-func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backups []dpv1alpha1.Backup, out io.Writer) {
-	if len(backupPolicies) == 0 {
+func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backupSchedules []dpv1alpha1.BackupSchedule, defaultBackupRepo string, out io.Writer) {
+	if len(backupPolicies) == 0 || len(backupSchedules) == 0 {
 		return
 	}
-	tbl := newTbl(out, "\nData Protection:", "AUTO-BACKUP", "BACKUP-SCHEDULE", "TYPE", "BACKUP-TTL", "LAST-SCHEDULE", "RECOVERABLE-TIME")
-	for _, policy := range backupPolicies {
-		if policy.Annotations[constant.DefaultBackupPolicyAnnotationKey] != "true" {
-			continue
-		}
-		if policy.Status.Phase != dpv1alpha1.PolicyAvailable {
-			continue
-		}
-		ttlString := printer.NoneString
-		backupSchedule := printer.NoneString
-		backupType := printer.NoneString
-		scheduleEnable := "Disabled"
-		if policy.Spec.Schedule.Snapshot != nil {
-			if policy.Spec.Schedule.Snapshot.Enable {
-				scheduleEnable = "Enabled"
-				backupSchedule = policy.Spec.Schedule.Snapshot.CronExpression
-				backupType = string(dpv1alpha1.BackupTypeSnapshot)
+	tbl := newTbl(out, "\nData Protection:", "BACKUP-REPO", "AUTO-BACKUP", "BACKUP-SCHEDULE", "BACKUP-METHOD", "BACKUP-RETENTION")
+	for _, schedule := range backupSchedules {
+		backupRepo := defaultBackupRepo
+		for _, policy := range backupPolicies {
+			if policy.Name != schedule.Spec.BackupPolicyName {
+				continue
+			}
+			if policy.Spec.BackupRepoName != nil {
+				backupRepo = *policy.Spec.BackupRepoName
 			}
 		}
-		if policy.Spec.Schedule.Datafile != nil {
-			if policy.Spec.Schedule.Datafile.Enable {
-				scheduleEnable = "Enabled"
-				backupSchedule = policy.Spec.Schedule.Datafile.CronExpression
-				backupType = string(dpv1alpha1.BackupTypeDataFile)
+		for _, schedulePolicy := range schedule.Spec.Schedules {
+			if !boolptr.IsSetToTrue(schedulePolicy.Enabled) {
+				continue
 			}
+
+			tbl.AddRow(backupRepo, "Enabled", schedulePolicy.CronExpression, schedulePolicy.BackupMethod, schedulePolicy.RetentionPeriod.String())
 		}
-		if policy.Spec.Retention != nil && policy.Spec.Retention.TTL != nil {
-			ttlString = *policy.Spec.Retention.TTL
-		}
-		lastScheduleTime := printer.NoneString
-		if policy.Status.LastScheduleTime != nil {
-			lastScheduleTime = util.TimeFormat(policy.Status.LastScheduleTime)
-		}
-		tbl.AddRow(scheduleEnable, backupSchedule, backupType, ttlString, lastScheduleTime, getBackupRecoverableTime(backups))
 	}
 	tbl.Print()
 }
 
-// getBackupRecoverableTime returns the recoverable time range string
-func getBackupRecoverableTime(backups []dpv1alpha1.Backup) string {
-	recoverabelTime := dpv1alpha1.GetRecoverableTimeRange(backups)
-	var result string
-	for _, i := range recoverabelTime {
-		result = addTimeRange(result, i.StartTime, i.StopTime)
-	}
-	if result == "" {
-		return printer.NoneString
-	}
-	return result
-}
+//	 getBackupRecoverableTime returns the recoverable time range string
+//	func getBackupRecoverableTime(backups []dpv1alpha1.Backup) string {
+//	recoverabelTime := dpv1alpha1.GetRecoverableTimeRange(backups)
+//	var result string
+//	for _, i := range recoverabelTime {
+//		result = addTimeRange(result, i.StartTime, i.StopTime)
+//	}
+//	if result == "" {
+//		return printer.NoneString
+//	}
+//	return result
+//	}
 
-func addTimeRange(result string, start, end *metav1.Time) string {
-	if result != "" {
-		result += ", "
-	}
-	result += fmt.Sprintf("%s ~ %s", util.TimeFormatWithDuration(start, time.Second),
-		util.TimeFormatWithDuration(end, time.Second))
-	return result
-}
+//	func addTimeRange(result string, start, end *metav1.Time) string {
+//		if result != "" {
+//			result += ", "
+//		}
+//		result += fmt.Sprintf("%s ~ %s", util.TimeFormatWithDuration(start, time.Second),
+//			util.TimeFormatWithDuration(end, time.Second))
+//		return result
+//	}

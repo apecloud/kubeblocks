@@ -22,7 +22,6 @@ package controllerutil
 import (
 	"errors"
 	"fmt"
-	"strings"
 )
 
 type Error struct {
@@ -48,21 +47,12 @@ const (
 
 	ErrorTypeRequeue ErrorType = "Requeue" // requeue for reconcile.
 
-	// ErrorType for backup
-	ErrorTypeBackupNotSupported       ErrorType = "BackupNotSupported"       // this backup type not supported
-	ErrorTypeBackupPVTemplateNotFound ErrorType = "BackupPVTemplateNotFound" // this pv template not found
-	ErrorTypeBackupNotCompleted       ErrorType = "BackupNotCompleted"       // report backup not completed.
-	ErrorTypeBackupPVCNameIsEmpty     ErrorType = "BackupPVCNameIsEmpty"     // pvc name for backup is empty
-	ErrorTypeBackupJobFailed          ErrorType = "BackupJobFailed"          // backup job failed
-	ErrorTypeStorageNotMatch          ErrorType = "ErrorTypeStorageNotMatch"
-	ErrorTypeReconfigureFailed        ErrorType = "ErrorTypeReconfigureFailed"
-	ErrorTypeInvalidLogfileBackupName ErrorType = "InvalidLogfileBackupName"
-	ErrorTypeBackupScheduleDisabled   ErrorType = "BackupScheduleDisabled"
-	ErrorTypeLogfileScheduleDisabled  ErrorType = "LogfileScheduleDisabled"
+	ErrorTypeFatal ErrorType = "Fatal" // fatal error
 
 	// ErrorType for cluster controller
-	ErrorTypeBackupFailed ErrorType = "BackupFailed"
-	ErrorTypeNeedWaiting  ErrorType = "NeedWaiting" // waiting for next reconcile
+	ErrorTypeBackupFailed  ErrorType = "BackupFailed"
+	ErrorTypeRestoreFailed ErrorType = "RestoreFailed"
+	ErrorTypeNeedWaiting   ErrorType = "NeedWaiting" // waiting for next reconcile
 
 	// ErrorType for preflight
 	ErrorTypePreflightCommon = "PreflightCommon"
@@ -114,37 +104,7 @@ func IsNotFound(err error) bool {
 	return IsTargetError(err, ErrorTypeNotFound)
 }
 
-// NewBackupNotSupported returns a new Error with ErrorTypeBackupNotSupported.
-func NewBackupNotSupported(backupType, backupPolicyName string) *Error {
-	return NewErrorf(ErrorTypeBackupNotSupported, `backup type "%s" not supported by backup policy "%s"`, backupType, backupPolicyName)
-}
-
-// NewBackupPVTemplateNotFound returns a new Error with ErrorTypeBackupPVTemplateNotFound.
-func NewBackupPVTemplateNotFound(cmName, cmNamespace string) *Error {
-	return NewErrorf(ErrorTypeBackupPVTemplateNotFound, `"the persistentVolume template is empty in the configMap %s/%s", pvConfig.Namespace, pvConfig.Name`, cmNamespace, cmName)
-}
-
-// NewBackupPVCNameIsEmpty returns a new Error with ErrorTypeBackupPVCNameIsEmpty.
-func NewBackupPVCNameIsEmpty(backupType, backupPolicyName string) *Error {
-	return NewErrorf(ErrorTypeBackupPVCNameIsEmpty, `the persistentVolumeClaim name of spec.%s is empty in BackupPolicy "%s"`, strings.ToLower(backupType), backupPolicyName)
-}
-
-// NewBackupJobFailed returns a new Error with ErrorTypeBackupJobFailed.
-func NewBackupJobFailed(jobName string) *Error {
-	return NewErrorf(ErrorTypeBackupJobFailed, `backup job "%s" failed`, jobName)
-}
-
-// NewInvalidLogfileBackupName returns a new Error with ErrorTypeInvalidLogfileBackupName.
-func NewInvalidLogfileBackupName(backupPolicyName string) *Error {
-	return NewErrorf(ErrorTypeInvalidLogfileBackupName, `backup name is incorrect for logfile, you can create the logfile backup by enabling the schedule in BackupPolicy "%s"`, backupPolicyName)
-}
-
-// NewBackupScheduleDisabled returns a new Error with ErrorTypeBackupScheduleDisabled.
-func NewBackupScheduleDisabled(backupType, backupPolicyName string) *Error {
-	return NewErrorf(ErrorTypeBackupScheduleDisabled, `%s schedule is disabled, you can enable spec.schedule.%s in BackupPolicy "%s"`, backupType, backupType, backupPolicyName)
-}
-
-// NewBackupLogfileScheduleDisabled returns a new Error with ErrorTypeLogfileScheduleDisabled.
-func NewBackupLogfileScheduleDisabled(backupToolName string) *Error {
-	return NewErrorf(ErrorTypeLogfileScheduleDisabled, `BackupTool "%s" of the backup relies on logfile. Please enable the logfile scheduling firstly`, backupToolName)
+// NewFatalError returns a new Error with ErrorTypeFatal
+func NewFatalError(message string) *Error {
+	return NewErrorf(ErrorTypeFatal, message)
 }

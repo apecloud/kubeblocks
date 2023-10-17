@@ -22,7 +22,7 @@ package cluster
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -33,7 +33,7 @@ import (
 )
 
 func NewFakeOperationsOptions(ns, cName string, opsType appsv1alpha1.OpsType, objs ...runtime.Object) (*cmdtesting.TestFactory, *create.CreateOptions) {
-	streams, _, _, _ := genericclioptions.NewTestIOStreams()
+	streams, _, _, _ := genericiooptions.NewTestIOStreams()
 	tf := cmdtesting.NewTestFactory().WithNamespace(ns)
 	baseOptions := &create.CreateOptions{
 		IOStreams: streams,
@@ -53,7 +53,7 @@ func NewFakeOperationsOptions(ns, cName string, opsType appsv1alpha1.OpsType, ob
 		types.ClusterGVR():          types.KindCluster + "List",
 		types.ConfigConstraintGVR(): types.KindConfigConstraint + "List",
 		types.BackupGVR():           types.KindBackup + "List",
-		types.RestoreJobGVR():       types.KindRestoreJob + "List",
+		types.RestoreGVR():          types.KindRestore + "List",
 		types.OpsGVR():              types.KindOps + "List",
 	}
 	baseOptions.Dynamic = dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, listMapping, objs...)

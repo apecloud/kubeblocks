@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: llm-cluster-vexpand-
+spec:
+  clusterRef: llm-cluster
+  type: VolumeExpansion
+  volumeExpansion:
+    - componentName: llm
+      volumeClaimTemplates:
+        - name: data
+          storage: "15Gi"

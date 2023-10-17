@@ -18,12 +18,14 @@ limitations under the License.
 
 package v1alpha1
 
+type ActionSetExpansion interface{}
+
 type BackupExpansion interface{}
 
 type BackupPolicyExpansion interface{}
 
 type BackupRepoExpansion interface{}
 
-type BackupToolExpansion interface{}
+type BackupScheduleExpansion interface{}
 
-type RestoreJobExpansion interface{}
+type RestoreExpansion interface{}

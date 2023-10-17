@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: kafka-cluster-hscale-out-
+spec:
+  clusterRef: kafka-cluster
+  type: HorizontalScaling
+  horizontalScaling:
+    - componentName: broker
+      replicas: 3

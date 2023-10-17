@@ -21,7 +21,7 @@ package migration
 
 import (
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/cli/list"
@@ -29,7 +29,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
-func NewMigrationListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewMigrationListCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := list.NewListOptions(f, streams, types.MigrationTaskGVR())
 	cmd := &cobra.Command{
 		Use:               "list [NAME]",

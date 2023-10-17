@@ -125,4 +125,25 @@ var _ = Describe("helper", func() {
 		Expect(err).Should(Succeed())
 		Expect(cm).ShouldNot(BeNil())
 	})
+
+	It("get all ServiceRefs from cluster-definition", func() {
+		Expect(GetServiceRefs(testing.FakeClusterDef())).Should(Equal([]string{testing.ServiceRefName}))
+	})
+
+	It("get default ServiceRef from cluster-definition", func() {
+		cd := testing.FakeClusterDef()
+		ref, err := GetDefaultServiceRef(cd)
+		Expect(ref).Should(Equal(testing.ServiceRefName))
+		Expect(err).Should(Succeed())
+
+		deepCopyCD := cd.DeepCopy()
+		deepCopyCD.Spec.ComponentDefs[0].ServiceRefDeclarations = append(deepCopyCD.Spec.ComponentDefs[0].ServiceRefDeclarations, testing.FakeServiceRef("other-serviceRef"))
+		_, err = GetDefaultServiceRef(deepCopyCD)
+		Expect(err).Should(HaveOccurred())
+
+		deepCopyCD = cd.DeepCopy()
+		deepCopyCD.Spec.ComponentDefs[0].ServiceRefDeclarations = nil
+		_, err = GetDefaultServiceRef(deepCopyCD)
+		Expect(err).Should(HaveOccurred())
+	})
 })

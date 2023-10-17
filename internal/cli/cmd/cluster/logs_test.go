@@ -30,7 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
@@ -110,7 +110,7 @@ var _ = Describe("logs", func() {
 		}
 		tf.ClientConfigVal = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: scheme.Codecs, GroupVersion: &schema.GroupVersion{Version: "v1"}}}
 
-		stream := genericclioptions.NewTestIOStreamsDiscard()
+		stream := genericiooptions.NewTestIOStreamsDiscard()
 		l := &LogsOptions{
 			ExecOptions: exec.NewExecOptions(tf, stream),
 			logOptions: cmdlogs.LogsOptions{

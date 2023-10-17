@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: td-cluster-vscale-
+spec:
+  clusterRef: td-cluster
+  type: VerticalScaling
+  verticalScaling:
+    - componentName: tdengine
+      requests:
+        cpu: "500m"
+        memory: 500Mi

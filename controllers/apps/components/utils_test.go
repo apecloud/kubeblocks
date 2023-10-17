@@ -63,7 +63,7 @@ func TestIsProbeTimeout(t *testing.T) {
 	}
 }
 
-var _ = Describe("Component", func() {
+var _ = Describe("Component Utils", func() {
 	var (
 		randomStr          = testCtx.GetRandomStr()
 		clusterDefName     = "mysql-clusterdef-" + randomStr
@@ -254,9 +254,7 @@ var _ = Describe("Component", func() {
 			})
 		})
 	})
-})
 
-var _ = Describe("Component utils test", func() {
 	Context("test mergeServiceAnnotations", func() {
 		It("should merge annotations from original that not exist in target to final result", func() {
 			originalKey := "only-existing-in-original"
@@ -293,7 +291,7 @@ var _ = Describe("Component utils test", func() {
 				SetOwnerReferences("apps/v1", constant.StatefulSetKind, nil).
 				AddAppInstanceLabel(clusterName).
 				AddAppComponentLabel(compName).
-				AddAppManangedByLabel().
+				AddAppManagedByLabel().
 				AddRoleLabel(role).
 				AddConsensusSetAccessModeLabel(mode).
 				AddControllerRevisionHashLabel("").

@@ -7,34 +7,32 @@ metadata:
 data:
   start.sh: |
     #!/bin/sh
+    ordinal=${KB_POD_NAME##*-}
+    echo "current pod ordinal: $ordinal"
+    /scripts/vllm-start.sh &
+    if [ $ordinal -eq 0 ]; then
+      ray start --head --block
+    else 
+      ray start --address="${KB_VLLM_0_HOSTNAME}:6379" --block
+    fi
+  vllm-start.sh: |
+    #!/bin/sh
     echo "model=${MODEL_NAME}"
     ordinal=${KB_POD_NAME##*-}
     echo "current pod ordinal: $ordinal"
     echo "EXTRA_ARGS=${EXTRA_ARGS}"
     cd vllm
-    if [ $ordinal -eq 0 ]; then
-      while true; do
-        ray start --head
-        python -m vllm.entrypoints.api_server --host 0.0.0.0 --port 8080 --model ${MODEL_NAME} --max-num-batched-tokens 8192 --tensor-parallel-size ${KB_VLLM_N} ${EXTRA_ARGS}
+    while true; do
+      if [ $ordinal -eq 0 ]; then
+        python -m vllm.entrypoints.api_server --host 0.0.0.0 --port 8000 --model ${MODEL_NAME} --gpu-memory-utilization 0.95 --max-num-seqs 512 --max-num-batched-tokens 8192 --tensor-parallel-size ${KB_VLLM_N} ${EXTRA_ARGS} > log
         code=$?
         if [ $code -eq 0 ]; then
           break
         fi
         echo "exit with code $code, wait for 1 second and try again..."
         sleep 1
-      done
-    else 
-      while true; do
-        ray start --address="${KB_VLLM_0_HOSTNAME}:6379"
-        code=$?
-        if [ $code -eq 0 ]; then
-          break
-        fi
-        echo "exit with code $code, wait for 1 second and try again..."
+      else 
+        # keep container running
         sleep 1
-      done
-      # keep pod running
-      while true; do
-        sleep 1
-      done
-    fi
+      fi
+    done

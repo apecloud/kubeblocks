@@ -37,14 +37,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	testdp "github.com/apecloud/kubeblocks/internal/testutil/dataprotection"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	lorry "github.com/apecloud/kubeblocks/lorry/client"
 )
 
@@ -322,7 +323,7 @@ var _ = Describe("OpsRequest Controller", func() {
 	Context("with Cluster which has MySQL ConsensusSet", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
-			viper.Set("VOLUMESNAPSHOT", true)
+			testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.ConsensusMySQLComponent, mysqlCompDefName).
 				AddHorizontalScalePolicy(appsv1alpha1.HorizontalScalePolicy{
@@ -364,7 +365,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			createBackupPolicyTpl(clusterDefObj)
 
 			By("set component to horizontal with snapshot policy and create a cluster")
-			viper.Set("VOLUMESNAPSHOT", true)
+			testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
 			if clusterDefObj.Spec.ComponentDefs[0].HorizontalScalePolicy == nil {
 				Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
 					func(clusterDef *appsv1alpha1.ClusterDefinition) {
@@ -388,7 +389,11 @@ var _ = Describe("OpsRequest Controller", func() {
 			for i := 0; i < int(replicas); i++ {
 				pvcName := fmt.Sprintf("%s-%s-%s-%d", testapps.DataVolumeName, clusterKey.Name, mysqlCompName, i)
 				pvc := testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterKey.Name,
-					mysqlCompName, testapps.DataVolumeName).SetStorage("1Gi").Create(&testCtx).GetObject()
+					mysqlCompName, testapps.DataVolumeName).
+					SetStorage("1Gi").
+					SetStorageClass(testk8s.DefaultStorageClassName).
+					Create(&testCtx).
+					GetObject()
 				// mock pvc bound
 				Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pvc), func(pvc *corev1.PersistentVolumeClaim) {
 					pvc.Status.Phase = corev1.ClaimBound
@@ -429,7 +434,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		It("HorizontalScaling when not support snapshot", func() {
 			By("init backup policy template, mysql cluster and hscale ops")
-			viper.Set("VOLUMESNAPSHOT", false)
+			testk8s.MockDisableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
 
 			createMysqlCluster(3)
 			cluster := &appsv1alpha1.Cluster{}
@@ -471,8 +476,9 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		It("HorizontalScaling via volume snapshot backup", func() {
 			By("init backup policy template, mysql cluster and hscale ops")
-			viper.Set("VOLUMESNAPSHOT", true)
-			createMysqlCluster(3)
+			testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
+			oldReplicas := int32(3)
+			createMysqlCluster(oldReplicas)
 
 			replicas := int32(5)
 			ops := createClusterHscaleOps(replicas)
@@ -489,11 +495,12 @@ var _ = Describe("OpsRequest Controller", func() {
 			})).Should(Succeed())
 
 			By("mock backup status is ready, component phase should change to Updating when component is horizontally scaling.")
-			backupKey := types.NamespacedName{Name: fmt.Sprintf("%s-%s-scaling",
+			backupKey := client.ObjectKey{Name: fmt.Sprintf("%s-%s-scaling",
 				clusterKey.Name, mysqlCompName), Namespace: testCtx.DefaultNamespace}
-			backup := &dataprotectionv1alpha1.Backup{}
+			backup := &dpv1alpha1.Backup{}
 			Expect(k8sClient.Get(testCtx.Ctx, backupKey, backup)).Should(Succeed())
-			backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
+			backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+			testdp.MockBackupStatusMethod(backup, testdp.BackupMethodName, testapps.DataVolumeName, testdp.ActionSetName)
 			Expect(k8sClient.Status().Update(testCtx.Ctx, backup)).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.UpdatingClusterCompPhase))
@@ -505,7 +512,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			vs.Name = backupKey.Name
 			vs.Namespace = backupKey.Namespace
 			vs.Labels = map[string]string{
-				constant.DataProtectionLabelBackupNameKey: backupKey.Name,
+				dptypes.DataProtectionLabelBackupNameKey: backupKey.Name,
 			}
 			pvcName := ""
 			vs.Spec = snapshotv1.VolumeSnapshotSpec{
@@ -515,6 +522,35 @@ var _ = Describe("OpsRequest Controller", func() {
 			}
 			Expect(k8sClient.Create(testCtx.Ctx, vs)).Should(Succeed())
 			Eventually(testapps.CheckObjExists(&testCtx, backupKey, vs, true)).Should(Succeed())
+
+			mockComponentPVCsAndBound := func(comp *appsv1alpha1.ClusterComponentSpec) {
+				for i := 0; i < int(replicas); i++ {
+					for _, vct := range comp.VolumeClaimTemplates {
+						pvcKey := types.NamespacedName{
+							Namespace: clusterKey.Namespace,
+							Name:      fmt.Sprintf("%s-%s-%s-%d", vct.Name, clusterKey.Name, comp.Name, i),
+						}
+						testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcKey.Name, clusterKey.Name,
+							comp.Name, testapps.DataVolumeName).SetStorage(vct.Spec.Resources.Requests.Storage().String()).AddLabelsInMap(map[string]string{
+							constant.AppInstanceLabelKey:    clusterKey.Name,
+							constant.KBAppComponentLabelKey: comp.Name,
+							constant.AppManagedByLabelKey:   constant.AppName,
+						}).CheckedCreate(&testCtx)
+						Eventually(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
+							pvc.Status.Phase = corev1.ClaimBound
+							if pvc.Status.Capacity == nil {
+								pvc.Status.Capacity = corev1.ResourceList{}
+							}
+							pvc.Status.Capacity[corev1.ResourceStorage] = pvc.Spec.Resources.Requests[corev1.ResourceStorage]
+						})).Should(Succeed())
+					}
+				}
+			}
+
+			// mock pvcs have restored
+			mockComponentPVCsAndBound(clusterObj.Spec.GetComponentByName(mysqlCompName))
+			// check restore CR and mock it to Completed
+			checkRestoreAndSetCompleted(clusterKey, mysqlCompName, int(replicas-oldReplicas))
 
 			By("check the underlying workload been updated")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentWorkload()),
@@ -624,7 +660,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		It("delete Running opsRequest", func() {
 			By("Create a horizontalScaling ops")
-			viper.Set("VOLUMESNAPSHOT", true)
+			testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
 			createMysqlCluster(3)
 			ops := createClusterHscaleOps(5)
 			opsKey := client.ObjectKeyFromObject(ops)
@@ -652,7 +688,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		It("cancel HorizontalScaling opsRequest which is Running", func() {
 			By("create cluster and mock it to running")
-			viper.Set("VOLUMESNAPSHOT", false)
+			testk8s.MockDisableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
 			oldReplicas := int32(3)
 			createMysqlCluster(oldReplicas)
 			mockCompRunning(oldReplicas)

@@ -12,6 +12,8 @@ The quickest way to try out KubeBlocks is to create a new Kubernetes cluster and
 
 ## Environment preparation
 
+Prepare an accessible Kubernetes cluster with the version 1.22 or above, and this cluster should meet the following requirements.
+
 <table>
 	<tr>
 	    <th colspan="3">Resource Requirements</th>
@@ -47,24 +49,47 @@ The command `kbcli kubeblocks install` installs KubeBlocks in the `kb-system` na
 kbcli kubeblocks install
 ```
 
+If you want to install KubeBlocks with a specified version, follow the steps below.
+
+1. View the available versions.
+
+   ```bash
+   kbcli kubeblocks list-versions
+   ```
+
+   Or you can view the available versions in [KubeBlocks Release](https://github.com/apecloud/kubeblocks/releases/).
+2. Specify a version with `--version` and run the command below.
+
+   ```bash
+   kbcli kubeblocks install --version=x.x.x
+   ```
+
+  :::note
+
+  By default, kbcli installs the latest release version and then when installing KubeBlocks, kbcli installs the matched version. Ensure that the major versions of kbcli and KubeBlocks match.
+
+  For instance, you can install kbcli v0.6.1 and KubeBlocks v0.6.3, but mismatched versions like kbcli v0.5.0 and KubeBlocks v0.6.0 may result in errors.
+  
+  :::
 
 ## Verify KubeBlocks installation
 
 Run the following command to check whether KubeBlocks is installed successfully.
 
 ```bash
-kubectl get pod -n kb-system
+kbcli kubeblocks status
 ```
 
 ***Result***
 
-If the following pods are all `Running`, KubeBlocks has been installed successfully.
+If the KubeBlocks Workloads are all ready, KubeBlocks has been installed successfully.
 
 ```bash
-NAME                                                     READY   STATUS      RESTARTS   AGE
-kb-addon-alertmanager-webhook-adaptor-5549f94599-fsnmc   2/2     Running     0          84s
-kb-addon-grafana-5ddcd7758f-x4t5g                        3/3     Running     0          84s
-kb-addon-prometheus-alertmanager-0                       2/2     Running     0          84s
-kb-addon-prometheus-server-0                             2/2     Running     0          84s
-kubeblocks-846b8878d9-q8g2w                              1/1     Running     0          98s
+KubeBlocks is deployed in namespace: kb-system,version: x.x.x
+>
+KubeBlocks Workloads:
+NAMESPACE   KIND         NAME                           READY PODS   CPU(CORES)   MEMORY(BYTES)   CREATED-AT
+kb-system   Deployment   kb-addon-snapshot-controller   1/1          N/A          N/A             Oct 13,2023 14:27 UTC+0800
+kb-system   Deployment   kubeblocks                     1/1          N/A          N/A             Oct 13,2023 14:26 UTC+0800
+kb-system   Deployment   kubeblocks-dataprotection      1/1          N/A          N/A             Oct 13,2023 14:26 UTC+0800
 ```

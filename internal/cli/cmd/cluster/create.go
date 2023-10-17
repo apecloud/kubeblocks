@@ -42,7 +42,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	rbacv1ac "k8s.io/client-go/applyconfigurations/rbac/v1"
 	"k8s.io/client-go/dynamic"
@@ -53,7 +53,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
@@ -61,6 +61,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
+	"github.com/apecloud/kubeblocks/internal/dataprotection/utils/boolptr"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
@@ -138,6 +140,15 @@ var clusterCreateExample = templates.Examples(`
 
 	# Create a cluster with auto backup
 	kbcli cluster create --cluster-definition apecloud-mysql --backup-enabled
+
+	# Create a cluster with default component having multiple storage volumes
+	kbcli cluster create --cluster-definition oceanbase --pvc name=data-file,size=50Gi --pvc name=data-log,size=50Gi --pvc name=log,size=20Gi
+
+	# Create a cluster with specifying a component having multiple storage volumes
+	kbcli cluster create --cluster-definition pulsar --pvc type=bookies,name=ledgers,size=20Gi --pvc type=bookies,name=journal,size=20Gi
+
+	# Create a cluster with using a service reference to another KubeBlocks cluster
+	cluster create --cluster-definition pulsar --service-reference name=pulsarZookeeper,cluster=zookeeper,namespace=default
 `)
 
 const (
@@ -226,10 +237,11 @@ type CreateOptions struct {
 	Values            []string                 `json:"-"`
 	RBACEnabled       bool                     `json:"-"`
 	Storages          []string                 `json:"-"`
+	ServiceRef        []string                 `json:"-"`
 	// backup name to restore in creation
-	Backup        string `json:"backup,omitempty"`
-	RestoreTime   string `json:"restoreTime,omitempty"`
-	SourceCluster string `json:"sourceCluster,omitempty"`
+	Backup                  string `json:"backup,omitempty"`
+	RestoreTime             string `json:"restoreTime,omitempty"`
+	RestoreManagementPolicy string `json:"-"`
 
 	// backup config
 	BackupConfig *appsv1alpha1.ClusterBackup `json:"backupConfig,omitempty"`
@@ -240,7 +252,7 @@ type CreateOptions struct {
 	create.CreateOptions `json:"-"`
 }
 
-func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCreateCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewCreateOptions(f, streams)
 	cmd := &cobra.Command{
 		Use:     "create [NAME]",
@@ -260,9 +272,11 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().StringVarP(&o.SetFile, "set-file", "f", "", "Use yaml file, URL, or stdin to set the cluster resource")
 	cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)")
 	cmd.Flags().StringArrayVar(&o.Storages, "pvc", []string{}, "Set the cluster detail persistent volume claim, each '--pvc' corresponds to a component, and will override the simple configurations about storage by --set (e.g. --pvc type=mysql,name=data,mode=ReadWriteOnce,size=20Gi --pvc type=mysql,name=log,mode=ReadWriteOnce,size=1Gi)")
+	cmd.Flags().StringArrayVar(&o.ServiceRef, "service-reference", []string{}, "Set the other KubeBlocks cluster dependencies, each '--service-reference' corresponds to a cluster service. (e.g --service-reference name=pulsarZookeeper,cluster=zookeeper,namespace=default)")
+
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 	cmd.Flags().StringVar(&o.RestoreTime, "restore-to-time", "", "Set a time for point in time recovery")
-	cmd.Flags().StringVar(&o.SourceCluster, "source-cluster", "", "Set a source cluster for point in time recovery")
+	cmd.Flags().StringVar(&o.RestoreManagementPolicy, "volume-restore-policy", "Parallel", "the volume claim restore policy, supported values: [Serial, Parallel]")
 	cmd.Flags().BoolVar(&o.RBACEnabled, "rbac-enabled", false, "Specify whether rbac resources will be created by kbcli, otherwise KubeBlocks server will try to create rbac resources")
 	cmd.PersistentFlags().BoolVar(&o.EditBeforeCreate, "edit", o.EditBeforeCreate, "Edit the API resource before creating")
 	cmd.PersistentFlags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
@@ -285,7 +299,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	return cmd
 }
 
-func NewCreateOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *CreateOptions {
+func NewCreateOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *CreateOptions {
 	o := &CreateOptions{CreateOptions: create.CreateOptions{
 		Factory:         f,
 		IOStreams:       streams,
@@ -308,7 +322,7 @@ func setMonitor(monitoringInterval uint8, components []map[string]interface{}) {
 	}
 }
 
-func getRestoreFromBackupAnnotation(backup *dataprotectionv1alpha1.Backup, compSpecsCount int, firstCompName string) (string, error) {
+func getRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, managementPolicy string, compSpecsCount int, firstCompName string, restoreTime string) (string, error) {
 	componentName := backup.Labels[constant.KBAppComponentLabelKey]
 	if len(componentName) == 0 {
 		if compSpecsCount != 1 {
@@ -316,11 +330,19 @@ func getRestoreFromBackupAnnotation(backup *dataprotectionv1alpha1.Backup, compS
 		}
 		componentName = firstCompName
 	}
-	restoreFromBackupAnnotation := fmt.Sprintf(`{"%s":"%s"}`, componentName, backup.Name)
+	backupNameString := fmt.Sprintf(`"%s":"%s"`, constant.BackupNameKeyForRestore, backup.Name)
+	backupNamespaceString := fmt.Sprintf(`"%s":"%s"`, constant.BackupNamespaceKeyForRestore, backup.Namespace)
+	managementPolicyString := fmt.Sprintf(`"%s":"%s"`, constant.VolumeManagementPolicyKeyForRestore, managementPolicy)
+	var restoreTimeString string
+	if restoreTime != "" {
+		restoreTimeString = fmt.Sprintf(`",%s":"%s"`, constant.RestoreTimeKeyForRestore, restoreTime)
+	}
+
+	restoreFromBackupAnnotation := fmt.Sprintf(`{"%s":{%s,%s,%s%s}}`, componentName, backupNameString, backupNamespaceString, managementPolicyString, restoreTimeString)
 	return restoreFromBackupAnnotation, nil
 }
 
-func getSourceClusterFromBackup(backup *dataprotectionv1alpha1.Backup) (*appsv1alpha1.Cluster, error) {
+func getSourceClusterFromBackup(backup *dpv1alpha1.Backup) (*appsv1alpha1.Cluster, error) {
 	sourceCluster := &appsv1alpha1.Cluster{}
 	sourceClusterJSON := backup.Annotations[constant.ClusterSnapshotAnnotationKey]
 	if err := json.Unmarshal([]byte(sourceClusterJSON), sourceCluster); err != nil {
@@ -330,55 +352,27 @@ func getSourceClusterFromBackup(backup *dataprotectionv1alpha1.Backup) (*appsv1a
 	return sourceCluster, nil
 }
 
-func getBackupObjectFromRestoreArgs(o *CreateOptions, backup *dataprotectionv1alpha1.Backup) error {
-	if o.Backup != "" {
-		if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.Namespace, o.Backup); err != nil {
-			return err
-		}
-	} else if o.RestoreTime != "" {
-		createRestoreOptions := CreateRestoreOptions{
-			SourceCluster:  o.SourceCluster,
-			RestoreTimeStr: o.RestoreTime,
-		}
-		createRestoreOptions.Dynamic = o.Dynamic
-		createRestoreOptions.Namespace = o.Namespace
-		if err := createRestoreOptions.validateRestoreTime(); err != nil {
-			return err
-		}
-		objs, err := o.Dynamic.Resource(types.BackupGVR()).Namespace(o.Namespace).
-			List(context.TODO(), metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("%s=%s",
-					constant.AppInstanceLabelKey, o.SourceCluster),
-			})
-		if err != nil {
-			return err
-		}
-		if len(objs.Items) == 0 {
-			return fmt.Errorf("can not found any backup to restore time")
-		}
-
-		return runtime.DefaultUnstructuredConverter.FromUnstructured(objs.Items[0].UnstructuredContent(), backup)
+func getBackupObjectFromRestoreArgs(o *CreateOptions, backup *dpv1alpha1.Backup) error {
+	if o.Backup == "" {
+		return nil
+	}
+	if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.Namespace, o.Backup); err != nil {
+		return err
 	}
 	return nil
 }
 
 func fillClusterInfoFromBackup(o *CreateOptions, cls **appsv1alpha1.Cluster) error {
-	if o.Backup == "" && o.RestoreTime == "" && o.SourceCluster == "" {
+	if o.Backup == "" {
 		return nil
 	}
-	backup := &dataprotectionv1alpha1.Backup{}
+	backup := &dpv1alpha1.Backup{}
 	if err := getBackupObjectFromRestoreArgs(o, backup); err != nil {
 		return err
 	}
 	backupCluster, err := getSourceClusterFromBackup(backup)
 	if err != nil {
 		return err
-	}
-	// HACK/TODO: apecloud-mysql pitr only support one replica for PITR.
-	if backupCluster.Spec.ClusterDefRef == apeCloudMysql && o.RestoreTime != "" {
-		for _, c := range backupCluster.Spec.ComponentSpecs {
-			c.Replicas = 1
-		}
 	}
 	curCluster := *cls
 	if curCluster == nil {
@@ -402,54 +396,53 @@ func fillClusterInfoFromBackup(o *CreateOptions, cls **appsv1alpha1.Cluster) err
 	return nil
 }
 
+func formatRestoreTimeAndValidate(restoreTimeStr string, continuousBackup *dpv1alpha1.Backup) (string, error) {
+	if restoreTimeStr == "" {
+		return restoreTimeStr, nil
+	}
+	restoreTime, err := util.TimeParse(restoreTimeStr, time.Second)
+	if err != nil {
+		// retry to parse time with RFC3339 format.
+		var errRFC error
+		restoreTime, errRFC = time.Parse(time.RFC3339, restoreTimeStr)
+		if errRFC != nil {
+			// if retry failure, report the error
+			return restoreTimeStr, err
+		}
+	}
+	restoreTimeStr = restoreTime.Format(time.RFC3339)
+	// TODO: check with Recoverable time
+	if !isTimeInRange(restoreTime, continuousBackup.Status.TimeRange.Start.Time, continuousBackup.Status.TimeRange.End.Time) {
+		return restoreTimeStr, fmt.Errorf("restore-to-time is out of time range, you can view the recoverable time: \n"+
+			"\tkbcli cluster describe %s -n %s", continuousBackup.Labels[constant.AppInstanceLabelKey], continuousBackup.Namespace)
+	}
+	return restoreTimeStr, nil
+}
+
 func setBackup(o *CreateOptions, components []map[string]interface{}) error {
 	backupName := o.Backup
 	if len(backupName) == 0 || len(components) == 0 {
 		return nil
 	}
-	backup := &dataprotectionv1alpha1.Backup{}
+	backup := &dpv1alpha1.Backup{}
 	if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.Namespace, backupName); err != nil {
 		return err
 	}
-	if backup.Status.Phase != dataprotectionv1alpha1.BackupCompleted {
+	if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
 		return fmt.Errorf(`backup "%s" is not completed`, backup.Name)
 	}
-	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, len(components), components[0]["name"].(string))
+	restoreTimeStr, err := formatRestoreTimeAndValidate(o.RestoreTime, backup)
+	if err != nil {
+		return err
+	}
+	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, o.RestoreManagementPolicy, len(components), components[0]["name"].(string), restoreTimeStr)
 	if err != nil {
 		return err
 	}
 	if o.Annotations == nil {
 		o.Annotations = map[string]string{}
 	}
-	o.Annotations[constant.RestoreFromBackUpAnnotationKey] = restoreAnnotation
-	return nil
-}
-
-func setRestoreTime(o *CreateOptions, components []map[string]interface{}) error {
-	if o.RestoreTime == "" || o.SourceCluster == "" {
-		return nil
-	}
-
-	// HACK/TODO: apecloud-mysql pitr only support one replica for PITR.
-	if o.ClusterDefRef == apeCloudMysql {
-		for _, c := range components {
-			if c["replicas"].(int64) > 1 {
-				return fmt.Errorf("apecloud-mysql only support one replica for point-in-time recovery")
-			}
-		}
-	}
-
-	if o.Annotations == nil {
-		o.Annotations = map[string]string{}
-	}
-	restoreTime, err := util.TimeParse(o.RestoreTime, time.Second)
-	if err != nil {
-		return err
-	}
-	// TODO: hack implement for multi-component cluster, how to elegantly implement pitr for multi-component cluster?
-	o.Annotations[constant.RestoreFromTimeAnnotationKey] = fmt.Sprintf(`{"%s":"%s"}`, components[0]["name"], restoreTime.Format(time.RFC3339))
-	o.Annotations[constant.RestoreFromSrcClusterAnnotationKey] = o.SourceCluster
-
+	o.Annotations[constant.RestoreFromBackupAnnotationKey] = restoreAnnotation
 	return nil
 }
 
@@ -546,9 +539,6 @@ func (o *CreateOptions) Complete() error {
 
 	setMonitor(o.MonitoringInterval, components)
 	if err = setBackup(o, components); err != nil {
-		return err
-	}
-	if err = setRestoreTime(o, components); err != nil {
 		return err
 	}
 	o.ComponentSpecs = components
@@ -653,6 +643,14 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 
 	if len(storages) != 0 {
 		compSpecs = rebuildCompStorage(storages, compSpecs)
+	}
+
+	// build service reference if --service-reference not empty
+	if len(o.ServiceRef) != 0 {
+		compSpecs, err = buildServiceRefs(o.ServiceRef, cd, compSpecs)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var comps []map[string]interface{}
@@ -869,7 +867,7 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cluster-definition",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterDefGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.CompGetResource(f, util.GVRToString(types.ClusterDefGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cluster-version",
@@ -877,7 +875,7 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 			var clusterVersion []string
 			clusterDefinition, err := cmd.Flags().GetString("cluster-definition")
 			if clusterDefinition == "" || err != nil {
-				clusterVersion = utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterVersionGVR()), toComplete)
+				clusterVersion = utilcomp.CompGetResource(f, util.GVRToString(types.ClusterVersionGVR()), toComplete)
 			} else {
 				label := fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, clusterDefinition)
 				clusterVersion = util.CompGetResourceWithLabels(f, cmd, util.GVRToString(types.ClusterVersionGVR()), []string{label}, toComplete)
@@ -903,10 +901,6 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 
 // PreCreate before saving yaml to k8s, makes changes on Unstructured yaml
 func (o *CreateOptions) PreCreate(obj *unstructured.Unstructured) error {
-	if !o.EnableAllLogs {
-		// EnableAllLogs is false, nothing will change
-		return nil
-	}
 	c := &appsv1alpha1.Cluster{}
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, c); err != nil {
 		return err
@@ -916,7 +910,14 @@ func (o *CreateOptions) PreCreate(obj *unstructured.Unstructured) error {
 	if err != nil {
 		return err
 	}
-	setEnableAllLogs(c, cd)
+
+	if !o.EnableAllLogs {
+		setEnableAllLogs(c, cd)
+	}
+	if o.BackupConfig == nil {
+		// if backup config is not specified, set cluster's backup to nil
+		c.Spec.Backup = nil
+	}
 	data, e := runtime.DefaultUnstructuredConverter.ToUnstructured(c)
 	if e != nil {
 		return e
@@ -1237,7 +1238,7 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&f.Tenancy, "tenancy", "SharedNode", "Tenancy options, one of: (SharedNode, DedicatedNode)")
 	cmd.Flags().BoolVar(&f.BackupEnabled, "backup-enabled", false, "Specify whether enabled automated backup")
 	cmd.Flags().StringVar(&f.BackupRetentionPeriod, "backup-retention-period", "1d", "a time string ending with the 'd'|'D'|'h'|'H' character to describe how long the Backup should be retained")
-	cmd.Flags().StringVar(&f.BackupMethod, "backup-method", "snapshot", "the backup method, support: snapshot, backupTool")
+	cmd.Flags().StringVar(&f.BackupMethod, "backup-method", "", "the backup method, view it by \"kbcli cd describe <cluster-definition>\", if not specified, the default backup method will be to take snapshots of the volume")
 	cmd.Flags().StringVar(&f.BackupCronExpression, "backup-cron-expression", "", "the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.")
 	cmd.Flags().Int64Var(&f.BackupStartingDeadlineMinutes, "backup-starting-deadline-minutes", 0, "the deadline in minutes for starting the backup job if it misses its scheduled time for any reason")
 	cmd.Flags().StringVar(&f.BackupRepoName, "backup-repo-name", "", "the backup repository name")
@@ -1403,11 +1404,6 @@ func (o *CreateOptions) buildAnnotation(cls *appsv1alpha1.Cluster) {
 }
 
 func (o *CreateOptions) buildBackupConfig(cls *appsv1alpha1.Cluster) error {
-	// set default backup config
-	o.BackupConfig = &appsv1alpha1.ClusterBackup{
-		Method: dataprotectionv1alpha1.BackupMethodSnapshot,
-	}
-
 	// if the cls.Backup isn't nil, use the backup config in cluster
 	if cls != nil && cls.Spec.Backup != nil {
 		o.BackupConfig = cls.Spec.Backup
@@ -1417,34 +1413,112 @@ func (o *CreateOptions) buildBackupConfig(cls *appsv1alpha1.Cluster) error {
 	var flags []*pflag.Flag
 	if o.Cmd != nil {
 		o.Cmd.Flags().Visit(func(flag *pflag.Flag) {
-			flags = append(flags, flag)
+			// only check the backup flags
+			if flag.Name == "backup-enabled" || flag.Name == "backup-retention-period" ||
+				flag.Name == "backup-method" || flag.Name == "backup-cron-expression" ||
+				flag.Name == "backup-starting-deadline-minutes" || flag.Name == "backup-repo-name" ||
+				flag.Name == "pitr-enabled" {
+				flags = append(flags, flag)
+			}
 		})
 	}
 
-	// if the flag is set by user, use the flag value
-	for _, flag := range flags {
-		switch flag.Name {
-		case "backup-enabled":
-			o.BackupConfig.Enabled = &o.BackupEnabled
-		case "backup-retention-period":
-			o.BackupConfig.RetentionPeriod = &o.BackupRetentionPeriod
-		case "backup-method":
-			o.BackupConfig.Method = dataprotectionv1alpha1.BackupMethod(o.BackupMethod)
-		case "backup-cron-expression":
-			if _, err := cron.ParseStandard(o.BackupCronExpression); err != nil {
-				return fmt.Errorf("invalid cron expression: %s, please see https://en.wikipedia.org/wiki/Cron", o.BackupCronExpression)
+	// must set backup method when set backup config in cli
+	if len(flags) > 0 {
+		if o.BackupConfig == nil {
+			o.BackupConfig = &appsv1alpha1.ClusterBackup{}
+		}
+
+		// get default backup method and all backup methods
+		defaultBackupMethod, backupMethodsMap, err := getBackupMethodsFromBackupPolicyTemplates(o.Dynamic, o.ClusterDefRef)
+		if err != nil {
+			return err
+		}
+
+		// if backup method is empty in backup config, use the default backup method
+		if o.BackupConfig.Method == "" {
+			o.BackupConfig.Method = defaultBackupMethod
+		}
+
+		// if the flag is set by user, use the flag value
+		for _, flag := range flags {
+			switch flag.Name {
+			case "backup-enabled":
+				o.BackupConfig.Enabled = &o.BackupEnabled
+			case "backup-retention-period":
+				o.BackupConfig.RetentionPeriod = dpv1alpha1.RetentionPeriod(o.BackupRetentionPeriod)
+			case "backup-method":
+				if _, ok := backupMethodsMap[o.BackupMethod]; !ok {
+					return fmt.Errorf("backup method %s is not supported, please view supported backup methods by \"kbcli cd describe %s\"", o.BackupMethod, o.ClusterDefRef)
+				}
+				o.BackupConfig.Method = o.BackupMethod
+			case "backup-cron-expression":
+				if _, err := cron.ParseStandard(o.BackupCronExpression); err != nil {
+					return fmt.Errorf("invalid cron expression: %s, please see https://en.wikipedia.org/wiki/Cron", o.BackupCronExpression)
+				}
+				o.BackupConfig.CronExpression = o.BackupCronExpression
+			case "backup-starting-deadline-minutes":
+				o.BackupConfig.StartingDeadlineMinutes = &o.BackupStartingDeadlineMinutes
+			case "backup-repo-name":
+				o.BackupConfig.RepoName = o.BackupRepoName
+			case "pitr-enabled":
+				o.BackupConfig.PITREnabled = &o.BackupPITREnabled
 			}
-			o.BackupConfig.CronExpression = o.BackupCronExpression
-		case "backup-starting-deadline-minutes":
-			o.BackupConfig.StartingDeadlineMinutes = &o.BackupStartingDeadlineMinutes
-		case "backup-repo-name":
-			o.BackupConfig.RepoName = o.BackupRepoName
-		case "pitr-enabled":
-			o.BackupConfig.PITREnabled = &o.BackupPITREnabled
 		}
 	}
 
 	return nil
+}
+
+// get backup methods from backup policy template
+// if method's snapshotVolumes is true, use the method as default method
+func getBackupMethodsFromBackupPolicyTemplates(dynamic dynamic.Interface, clusterDefRef string) (string, map[string]struct{}, error) {
+	var backupPolicyTemplates []appsv1alpha1.BackupPolicyTemplate
+	var defaultBackupPolicyTemplate appsv1alpha1.BackupPolicyTemplate
+
+	obj, err := dynamic.Resource(types.BackupPolicyTemplateGVR()).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, clusterDefRef),
+	})
+	if err != nil {
+		return "", nil, err
+	}
+	for _, item := range obj.Items {
+		var backupPolicyTemplate appsv1alpha1.BackupPolicyTemplate
+		err = runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, &backupPolicyTemplate)
+		if err != nil {
+			return "", nil, err
+		}
+		backupPolicyTemplates = append(backupPolicyTemplates, backupPolicyTemplate)
+	}
+
+	if len(backupPolicyTemplates) == 0 {
+		return "", nil, fmt.Errorf("failed to find backup policy template for cluster definition %s", clusterDefRef)
+	}
+	// if there is only one backup policy template, use it as default backup policy template
+	if len(backupPolicyTemplates) == 1 {
+		defaultBackupPolicyTemplate = backupPolicyTemplates[0]
+	}
+	for _, backupPolicyTemplate := range backupPolicyTemplates {
+		if backupPolicyTemplate.Annotations[dptypes.DefaultBackupPolicyTemplateAnnotationKey] == annotationTrueValue {
+			defaultBackupPolicyTemplate = backupPolicyTemplate
+			break
+		}
+	}
+
+	var defaultBackupMethod string
+	var backupMethodsMap = make(map[string]struct{})
+	for _, policy := range defaultBackupPolicyTemplate.Spec.BackupPolicies {
+		for _, method := range policy.BackupMethods {
+			if boolptr.IsSetToTrue(method.SnapshotVolumes) {
+				defaultBackupMethod = method.Name
+			}
+			backupMethodsMap[method.Name] = struct{}{}
+		}
+	}
+	if defaultBackupMethod == "" {
+		return "", nil, fmt.Errorf("failed to find default backup method which snapshotVolumes is true, please check backup policy template for cluster definition %s", clusterDefRef)
+	}
+	return defaultBackupMethod, backupMethodsMap, nil
 }
 
 // parse the cluster component spec
@@ -1537,13 +1611,13 @@ func buildCompStorages(pvcs []string, cd *appsv1alpha1.ClusterDefinition) (map[s
 		for _, set := range sets {
 			kv := strings.Split(set, "=")
 			if len(kv) != 2 {
-				return nil, fmt.Errorf("unknown set format \"%s\", should be like key1=value1", set)
+				return nil, fmt.Errorf("unknown --pvc format \"%s\", should be like key1=value1", set)
 			}
 
 			// only record the supported key
 			k := parseKey(kv[0])
 			if k == storageKeyUnknown {
-				return nil, fmt.Errorf("unknown set key \"%s\", should be one of [%s]", kv[0], strings.Join(storageSetKey(), ","))
+				return nil, fmt.Errorf("unknown --pvc key \"%s\", should be one of [%s]", kv[0], strings.Join(storageSetKey(), ","))
 			}
 			res[k] = kv[1]
 		}
@@ -1649,4 +1723,140 @@ func rebuildCompStorage(pvcMaps map[string][]map[storageKey]string, specs []*app
 		}
 	}
 	return specs
+}
+
+// serviceRefKey declares --service-reference validate keyword
+type serviceRefKey string
+
+const (
+	serviceRefKeyName      serviceRefKey = "name"
+	serviceRefKeyCluster   serviceRefKey = "cluster"
+	serviceRefKeyNamespace serviceRefKey = "namespace"
+	serviceRefKeyUnknown   serviceRefKey = "unknown"
+)
+
+func serviceRefSetKey() []string {
+	return []string{
+		string(serviceRefKeyName),
+		string(serviceRefKeyCluster),
+		string(serviceRefKeyNamespace),
+	}
+}
+
+// getServiceRefs parses the serviceRef from flag --service-reference and performs basic validation, then return all valid serviceRefs
+func getServiceRefs(serviceRef []string, cd *appsv1alpha1.ClusterDefinition) ([]map[serviceRefKey]string, error) {
+	var serviceRefSets []map[serviceRefKey]string
+
+	parseKey := func(key string) serviceRefKey {
+		for _, k := range serviceRefSetKey() {
+			if strings.EqualFold(k, key) {
+				return serviceRefKey(k)
+			}
+		}
+		return serviceRefKeyUnknown
+	}
+
+	buildServiceRefMap := func(sets []string) (map[serviceRefKey]string, error) {
+		res := map[serviceRefKey]string{}
+		for _, set := range sets {
+			kv := strings.Split(set, "=")
+			if len(kv) != 2 {
+				return nil, fmt.Errorf("unknown --service-reference format \"%s\", should be like key1=value1", set)
+			}
+
+			// only record the supported key
+			k := parseKey(kv[0])
+			if k == serviceRefKeyUnknown {
+				return nil, fmt.Errorf("unknown --service-reference key \"%s\", should be one of [%s]", kv[0], strings.Join(serviceRefSetKey(), ","))
+			}
+			res[k] = kv[1]
+		}
+		return res, nil
+	}
+
+	for _, ref := range serviceRef {
+		refMap, err := buildServiceRefMap(strings.Split(ref, ","))
+		if err != nil {
+			return nil, err
+		}
+		if len(refMap) == 0 {
+			continue
+		}
+		serviceRefName := refMap[serviceRefKeyName]
+
+		if len(serviceRefName) == 0 {
+			name, err := cluster.GetDefaultServiceRef(cd)
+			if err != nil {
+				return nil, err
+			}
+			refMap[serviceRefKeyName] = name
+		} else {
+			// check if the serviceRefName is defined in the cluster-definition
+			valid := false
+			for _, c := range cluster.GetServiceRefs(cd) {
+				if c == serviceRefName {
+					valid = true
+					break
+				}
+			}
+			if !valid {
+				// todo:  kbcli cluster list-serviceRef
+				return nil, fmt.Errorf("the service reference name \"%s\" is not declared in the cluster components,use `kbcli cluster list-serviceRef %s` to show all available service reference names", serviceRefName, cd.Name)
+			}
+		}
+		serviceRefSets = append(serviceRefSets, refMap)
+	}
+	return serviceRefSets, nil
+}
+
+// buildServiceRefs supplements the serviceRef content for compSpecs based on the input flags --service-reference
+func buildServiceRefs(serviceRef []string, cd *appsv1alpha1.ClusterDefinition, compSpecs []*appsv1alpha1.ClusterComponentSpec) ([]*appsv1alpha1.ClusterComponentSpec, error) {
+	refSet, err := getServiceRefs(serviceRef, cd)
+	if err != nil {
+		return nil, err
+	}
+	// Check if the ServiceRefDeclarations for the current refName have been declared in the cluster-definition corresponding to comp
+	check := func(comp *appsv1alpha1.ClusterComponentSpec, refName string) bool {
+		valid := false
+		for _, cdSpec := range cd.Spec.ComponentDefs {
+			if cdSpec.Name != comp.Name {
+				continue
+			}
+			for i := range cdSpec.ServiceRefDeclarations {
+				if cdSpec.ServiceRefDeclarations[i].Name == refName {
+					// serviceRefName has been declared in cluster-definition
+					valid = true
+					break
+				}
+			}
+		}
+		return valid
+	}
+
+	for _, ref := range refSet {
+		name := ref[serviceRefKeyName]
+		for i, comp := range compSpecs {
+			if !check(comp, name) {
+				continue
+			}
+			// if cluster-definition ComponentDef have the correct ServiceRefDeclarations，add the ServiceRefs to the cluster compSpecs
+			if compSpecs[i].ServiceRefs == nil {
+				compSpecs[i].ServiceRefs = []appsv1alpha1.ServiceRef{
+					{
+						Name:      ref[serviceRefKeyName],
+						Namespace: ref[serviceRefKeyNamespace],
+						Cluster:   ref[serviceRefKeyCluster],
+					},
+				}
+			} else {
+				compSpecs[i].ServiceRefs = append(compSpecs[i].ServiceRefs,
+					appsv1alpha1.ServiceRef{
+						Name:      ref[serviceRefKeyName],
+						Namespace: ref[serviceRefKeyNamespace],
+						Cluster:   ref[serviceRefKeyCluster],
+					})
+			}
+		}
+	}
+	return compSpecs, nil
 }

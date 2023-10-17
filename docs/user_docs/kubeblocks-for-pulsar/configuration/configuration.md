@@ -7,6 +7,8 @@ sidebar_position: 4
 
 # Configure cluster parameters
 
+From v0.6.0, KubeBlocks supports `kbcli cluster configure` and `kbcli cluster edit-config` to configure parameters. The difference is that KubeBlocks configures parameters automatically with `kbcli cluster configure` but `kbcli cluster edit-config` provides a visualized way for you to edit parameters directly.
+
 There are 3 types of parameters:
 
 1. Environment parameters, such as GC-related parameters, `PULSAR_MEM`, and `PULSAR_GC`, changes will apply to all components;
@@ -38,12 +40,17 @@ kbcli cluster describe-config pulsar
 * View the parameter description.
 
   ```bash
-  kbcli cluster explain-config pulsar |head -n 20
+  kbcli cluster explain-config pulsar | head -n 20
   ```
 
-## Reconfigure environment parameters
+## Configure parameters
+
+### Configure parameters with configure command
+
+#### Configure environment parameters
 
 ***Steps***
+
 1. You need to specify the component name to configure parameters. Get the pulsar cluster component name.
 
   ```bash
@@ -85,9 +92,9 @@ kbcli cluster describe-config pulsar
    kubectl get pod -l app.kubernetes.io/name=pulsar
    ```
 
-## Reconfigure dynamic parameters
+#### Configure other parameters
 
-The following steps take the reconfiguration of dynamic parameter `brokerShutdownTimeoutMs` as an example.
+The following steps take the configuration of dynamic parameter `brokerShutdownTimeoutMs` as an example.
 
 ***Steps***
 
@@ -103,7 +110,7 @@ The following steps take the reconfiguration of dynamic parameter `brokerShutdow
    broker-config            broker.conf            true      pulsar-broker-config-tpl   brokers-config-constraints   pulsar-broker-broker-config            broker      pulsar
    ```
 
-2. Reconfigure parameters.
+2. Configure parameters.
 
    ```bash
    kbcli cluster configure pulsar --component=broker --config-spec=broker-config --set brokerShutdownTimeoutMs=66600
@@ -136,69 +143,46 @@ The following steps take the reconfiguration of dynamic parameter `brokerShutdow
                          OBJECT-KEY   STATUS   DURATION   MESSAGE
    ```
 
-## Reconfigure static parameters
+### Configure parameters with edit-config command
 
-Static parameter reconfiguring requires restarting the pod. The following example reconfigures `lostBookieRecoveryDelay`.
+For your convenience, KubeBlocks offers a tool `edit-config` to help you to configure parameter in a visulized way.
 
-1. Get the current configuration.
+For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on notepad.
 
-    ```bash
-    kbcli cluster explain-config pulsar --component=broker
-    >
-    ConfigSpecs Meta:
-    CONFIG-SPEC-NAME         FILE                   ENABLED   TEMPLATE                   CONSTRAINT                   RENDERED                               COMPONENT   CLUSTER
-    agamotto-configuration   agamotto-config.yaml   false     pulsar-agamotto-conf-tpl                                pulsar-broker-agamotto-configuration   broker      pulsar
-    broker-env               conf                   true      pulsar-broker-env-tpl      pulsar-env-constraints       pulsar-broker-broker-env               broker      pulsar
-    broker-config            broker.conf            true      pulsar-broker-config-tpl   brokers-config-constraints   pulsar-broker-broker-config            broker      pulsar
-    ```
-
-2. Adjust the value of `lostBookieRecoveryDelay`.
+1. Edit the configuration file.
 
    ```bash
-   kbcli cluster configure pulsar --component=broker --config-spec=broker-config --set lostBookieRecoveryDelay=1000
+   kbcli cluster edit-config pulsar
    ```
 
-   :::note
+:::note
 
-   The change of parameters may cause the restart of the cluster. Enter `yes` to confirm it. 
+If there are multiple components in a cluster, use `--component` to specify a component.
 
-   :::
+:::
 
-   ***Example***
+2. View the status of the parameter configuration.
 
    ```bash
-   kbcli cluster configure pulsar --component=broker --config-spec=broker-config --set lostBookieRecoveryDelay=1000
-   >
-   Warning: The parameter change incurs a cluster restart, which brings the cluster down for a while. Enter to continue...
-   Please type "yes" to confirm: yes
-   Will updated configure file meta:
-     ConfigSpec: broker-config          ConfigFile: broker.conf        ComponentName: broker        ClusterName: pulsar
-   OpsRequest pulsar-reconfiguring-gmz7w created successfully, you can view the progress:
-           kbcli cluster describe-ops pulsar-reconfiguring-gmz7w -n default
+   kbcli cluster describe-ops xxx -n default
    ```
 
-3. View the status of the parameter reconfiguration.
+3. Connect to the database to verify whether the parameters are configured as expected.
 
    ```bash
-   kbcli cluster describe-ops pulsar-reconfiguring-gmz7w -n default
-   >
-   Spec:
-     Name: pulsar-reconfiguring-gmz7w        NameSpace: default        Cluster: pulsar        Type: Reconfiguring
-
-   Command:
-     kbcli cluster configure pulsar --components=broker --config-spec=broker-config --config-file=broker.conf --set lostBookieRecoveryDelay=1000 --namespace=default
-
-   Status:
-     Start Time:         Jul 20,2023 09:57 UTC+0800
-     Duration:           57s
-     Status:             Running
-     Progress:           1/2
-                         OBJECT-KEY   STATUS   DURATION   MESSAGE
+   kbcli cluster connect pulsar
    ```
 
-## Reconfigure with kubectl
+:::note
 
-Using kubectl to reconfigure pulsar cluster requires modifying the configuration file.
+1. For the `edit-config` function, static parameters and dynamic parameters cannot be edited at the same time.
+2. Deleting a parameter will be supported later.
+
+:::
+
+### Configure parameters with kubectl
+
+Using kubectl to configure pulsar cluster requires modifying the configuration file.
 
 ***Steps***
 

@@ -30,7 +30,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/organization"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
@@ -44,7 +44,7 @@ type CloudContext struct {
 	APIPath      string
 	OutputFormat string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 type Metadata struct {

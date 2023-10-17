@@ -26,7 +26,7 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/authorize/authenticator"
 )
@@ -91,12 +91,12 @@ var _ = Describe("issued provider", func() {
 		issuedTokenProvider *CloudIssuedTokenProvider
 		tokenRes            *authenticator.TokenResponse
 		o                   Options
-		streams             genericclioptions.IOStreams
+		streams             genericiooptions.IOStreams
 	)
 
 	BeforeEach(func() {
 		mockAuthenticator = NewMockAuthenticator()
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		streams, _, _, _ = genericiooptions.NewTestIOStreams()
 		o = Options{
 			ClientID:  "test_client_id",
 			AuthURL:   "test_auth_url",

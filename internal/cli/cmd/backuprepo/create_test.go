@@ -27,11 +27,12 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic/fake"
 	clientfake "k8s.io/client-go/rest/fake"
@@ -42,13 +43,13 @@ import (
 )
 
 var _ = Describe("backuprepo create command", func() {
-	var streams genericclioptions.IOStreams
+	var streams genericiooptions.IOStreams
 	var tf *cmdtesting.TestFactory
 	var cmd *cobra.Command
 	var options *createOptions
 
 	BeforeEach(func() {
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		streams, _, _, _ = genericiooptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace(testing.Namespace)
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 		httpResp := func(obj runtime.Object) *http.Response {
@@ -84,7 +85,7 @@ var _ = Describe("backuprepo create command", func() {
 		err := options.init(tf)
 		Expect(err).ShouldNot(HaveOccurred())
 
-		providerObj := testing.FakeStorageProvider("fake-s3")
+		providerObj := testing.FakeStorageProvider("fake-s3", nil)
 		repoObj := testing.FakeBackupRepo("test-backuprepo", false)
 		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
 			scheme.Scheme, providerObj, repoObj)
@@ -207,7 +208,7 @@ var _ = Describe("backuprepo create command", func() {
 		})
 		It("should validate if there is a default backup repo", func() {
 			By("setting up a default backup repo")
-			providerObj := testing.FakeStorageProvider("fake-s3")
+			providerObj := testing.FakeStorageProvider("fake-s3", nil)
 			repoObj := testing.FakeBackupRepo("test-backuprepo", true)
 			tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
 				scheme.Scheme, providerObj, repoObj)
@@ -219,6 +220,46 @@ var _ = Describe("backuprepo create command", func() {
 			err = options.validate(cmd)
 			Expect(err).Should(MatchError(ContainSubstring("there is already a default backup repo")))
 		})
+		Context("validate access method", func() {
+			const supported = "supported"
+			BeforeEach(func() {
+				options.providerObject.Spec.StorageClassTemplate = ""
+				options.providerObject.Spec.PersistentVolumeClaimTemplate = ""
+				options.providerObject.Spec.DatasafedConfigTemplate = ""
+				options.accessMethod = "" // unspecified
+			})
+			It("should return error if the provider doesn't support any access method", func() {
+				Expect(options.supportedAccessMethods()).Should(BeEmpty())
+				err := options.validate(cmd)
+				Expect(err).Should(MatchError(ContainSubstring("it doesn't support any access method")))
+			})
+			It("should use the mount method if it's the only supported access method", func() {
+				options.providerObject.Spec.StorageClassTemplate = supported
+				err := options.validate(cmd)
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(options.accessMethod).Should(Equal("Mount"))
+			})
+			It("should use the tool method if it's the only supported access method", func() {
+				options.providerObject.Spec.DatasafedConfigTemplate = supported
+				err := options.validate(cmd)
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(options.accessMethod).Should(Equal("Tool"))
+			})
+			It("should return error if the specified access method is not supported", func() {
+				options.providerObject.Spec.StorageClassTemplate = supported
+				options.accessMethod = "Tool"
+				err := options.validate(cmd)
+				Expect(err).Should(MatchError(ContainSubstring("doesn't support \"Tool\" access method")))
+			})
+			It("should prefer using the tool method", func() {
+				options.providerObject.Spec.StorageClassTemplate = supported
+				options.providerObject.Spec.DatasafedConfigTemplate = supported
+				options.accessMethod = ""
+				err := options.validate(cmd)
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(options.accessMethod).Should(Equal("Tool"))
+			})
+		})
 	})
 
 	Describe("run", func() {
@@ -226,7 +267,7 @@ var _ = Describe("backuprepo create command", func() {
 			By("preparing the options")
 			err := options.parseProviderFlags(cmd, []string{
 				"--provider", "fake-s3", "--access-key-id", "abc", "--secret-access-key", "def",
-				"--region", "us-west-1", "--bucket", "test-bucket", "--default",
+				"--region", "us-west-1", "--bucket", "test-bucket", "--default", "--access-method", "Mount",
 			}, tf)
 			Expect(err).ShouldNot(HaveOccurred())
 			err = options.complete(cmd)

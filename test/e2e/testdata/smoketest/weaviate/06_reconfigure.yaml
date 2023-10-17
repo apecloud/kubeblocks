@@ -1,0 +1,16 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: weaviate-cluster-reconfiguring-
+spec:
+  clusterRef: weaviate-cluster
+  reconfigure:
+    componentName: weaviate
+    configurations:
+      - keys:
+          - key: envs
+            parameters:
+              - key: AUTHENTICATION_APIKEY_ENABLED
+                value: "false"
+        name: weaviate-env-template
+  type: Reconfiguring

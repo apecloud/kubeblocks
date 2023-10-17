@@ -28,13 +28,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -57,10 +57,10 @@ type describeBackupRepoOptions struct {
 	gvr   schema.GroupVersionResource
 	names []string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
-func newDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newDescribeCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &describeBackupRepoOptions{
 		factory:   f,
 		IOStreams: streams,
@@ -68,7 +68,7 @@ func newDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	}
 	cmd := &cobra.Command{
 		Use:               "describe",
-		Short:             "Describe a backuprepo.",
+		Short:             "Describe a backup repository.",
 		Example:           describeExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.BackupRepoGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -111,7 +111,7 @@ func (o *describeBackupRepoOptions) run() error {
 		if err != nil {
 			return err
 		}
-		backupRepo := &dataprotectionv1alpha1.BackupRepo{}
+		backupRepo := &dpv1alpha1.BackupRepo{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(backupRepoObj.Object, backupRepo); err != nil {
 			return err
 		}
@@ -123,27 +123,26 @@ func (o *describeBackupRepoOptions) run() error {
 	return nil
 }
 
-func (o *describeBackupRepoOptions) printBackupRepo(backupRepo *dataprotectionv1alpha1.BackupRepo) error {
+func (o *describeBackupRepoOptions) printBackupRepo(backupRepo *dpv1alpha1.BackupRepo) error {
 	printer.PrintLine("Summary:")
 	printer.PrintPairStringToLine("Name", backupRepo.Name)
 	printer.PrintPairStringToLine("Provider", backupRepo.Spec.StorageProviderRef)
-	printer.PrintPairStringToLine("Bucket", backupRepo.Spec.Config["bucket"])
-	if backupRepo.Spec.StorageProviderRef == "minio" {
-		printer.PrintPairStringToLine("Endpoint", backupRepo.Spec.Config["endpoint"])
-	} else {
-		printer.PrintPairStringToLine("Region", backupRepo.Spec.Config["region"])
-	}
 	backups, backupSize, err := countBackupNumsAndSize(o.dynamic, backupRepo)
 	if err != nil {
 		return err
 	}
 	printer.PrintPairStringToLine("Backups", fmt.Sprintf("%d", backups))
-	printer.PrintPairStringToLine("Total data size", backupSize)
+	printer.PrintPairStringToLine("Total Data Size", backupSize)
 
 	printer.PrintLine("\nSpec:")
+	printer.PrintPairStringToLine("AccessMethod", string(backupRepo.Spec.AccessMethod))
 	printer.PrintPairStringToLine("PvReclaimPolicy", string(backupRepo.Spec.PVReclaimPolicy))
 	printer.PrintPairStringToLine("StorageProviderRef", backupRepo.Spec.StorageProviderRef)
 	printer.PrintPairStringToLine("VolumeCapacity", backupRepo.Spec.VolumeCapacity.String())
+	printer.PrintLine("  Config:")
+	for k, v := range backupRepo.Spec.Config {
+		printer.PrintPairStringToLine(k, v, 4)
+	}
 
 	printer.PrintLine("\nStatus:")
 	printer.PrintPairStringToLine("Phase", string(backupRepo.Status.Phase))
@@ -153,7 +152,7 @@ func (o *describeBackupRepoOptions) printBackupRepo(backupRepo *dataprotectionv1
 	return nil
 }
 
-func countBackupNumsAndSize(dynamic dynamic.Interface, backupRepo *dataprotectionv1alpha1.BackupRepo) (int, string, error) {
+func countBackupNumsAndSize(dynamic dynamic.Interface, backupRepo *dpv1alpha1.BackupRepo) (int, string, error) {
 	var size uint64
 	count := 0
 
@@ -166,12 +165,12 @@ func countBackupNumsAndSize(dynamic dynamic.Interface, backupRepo *dataprotectio
 	count = len(backupList.Items)
 
 	for _, obj := range backupList.Items {
-		backup := &dataprotectionv1alpha1.Backup{}
+		backup := &dpv1alpha1.Backup{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, backup); err != nil {
 			return count, humanize.Bytes(size), err
 		}
 		// if backup doesn't complete, we don't count it's size
-		if backup.Status.Phase != dataprotectionv1alpha1.BackupCompleted {
+		if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
 			continue
 		}
 		backupSize, err := humanize.ParseBytes(backup.Status.TotalSize)

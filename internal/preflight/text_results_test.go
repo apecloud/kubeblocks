@@ -22,7 +22,8 @@ package preflight
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 
 	analyzerunner "github.com/replicatedhq/troubleshoot/pkg/analyze"
 )
@@ -34,7 +35,7 @@ var _ = Describe("text_results_test", func() {
 		yamlFormat       = "yaml"
 		kbcliFormat      = "kbcli"
 		unknownFormat    = "unknown"
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		streams, _, _, _ = genericiooptions.NewTestIOStreams()
 		out              = streams.Out
 	)
 	It("ShowStdoutResults Test", func() {

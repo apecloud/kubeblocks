@@ -27,7 +27,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -48,7 +48,7 @@ var (
 type PluginInstallOption struct {
 	plugins []pluginEntry
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 type pluginEntry struct {
@@ -56,7 +56,7 @@ type pluginEntry struct {
 	plugin Plugin
 }
 
-func NewPluginInstallCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func NewPluginInstallCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	o := &PluginInstallOption{
 		IOStreams: streams,
 	}

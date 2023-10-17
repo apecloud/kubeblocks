@@ -26,7 +26,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -53,7 +53,7 @@ type ExecOptions struct {
 	Command []string
 }
 
-func NewExecOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *ExecOptions {
+func NewExecOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *ExecOptions {
 	return &ExecOptions{
 		Factory: f,
 		StreamOptions: cmdexec.StreamOptions{

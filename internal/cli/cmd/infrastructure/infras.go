@@ -21,11 +21,11 @@ package infrastructure
 
 import (
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 )
 
 // NewInfraCmd for builder functions
-func NewInfraCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func NewInfraCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "infra",
 		Short: "infra command",

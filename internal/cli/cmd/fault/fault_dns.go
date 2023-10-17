@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -46,7 +46,7 @@ type DNSChaosOptions struct {
 	FaultBaseOptions
 }
 
-func NewDNSChaosOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, action string) *DNSChaosOptions {
+func NewDNSChaosOptions(f cmdutil.Factory, streams genericiooptions.IOStreams, action string) *DNSChaosOptions {
 	o := &DNSChaosOptions{
 		FaultBaseOptions: FaultBaseOptions{
 			CreateOptions: create.CreateOptions{
@@ -63,7 +63,7 @@ func NewDNSChaosOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, 
 	return o
 }
 
-func NewDNSChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewDNSChaosCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dns",
 		Short: "Inject faults into DNS server.",
@@ -75,7 +75,7 @@ func NewDNSChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	return cmd
 }
 
-func NewRandomCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewRandomCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewDNSChaosOptions(f, streams, string(v1alpha1.RandomAction))
 	cmd := o.NewCobraCommand(Random, RandomShort)
 
@@ -85,7 +85,7 @@ func NewRandomCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	return cmd
 }
 
-func NewErrorCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewErrorCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewDNSChaosOptions(f, streams, string(v1alpha1.ErrorAction))
 	cmd := o.NewCobraCommand(Error, ErrorShort)
 

@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -78,7 +78,7 @@ type PgBenchOptions struct {
 	BenchBaseOptions
 }
 
-func NewPgBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewPgBenchCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &PgBenchOptions{
 		BenchBaseOptions: BenchBaseOptions{
 			IOStreams: streams,
@@ -188,10 +188,6 @@ func (o *PgBenchOptions) Validate() error {
 
 	if o.Database == "" {
 		return fmt.Errorf("database is required")
-	}
-
-	if err := validateBenchmarkExist(o.factory, o.IOStreams, o.name); err != nil {
-		return err
 	}
 
 	return nil

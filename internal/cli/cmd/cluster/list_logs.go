@@ -27,7 +27,7 @@ import (
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -64,11 +64,11 @@ type ListLogsOptions struct {
 	dynamicClient dynamic.Interface
 	clientSet     *kubernetes.Clientset
 	factory       cmdutil.Factory
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 	exec *exec.ExecOptions
 }
 
-func NewListLogsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewListLogsCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &ListLogsOptions{
 		factory:   f,
 		IOStreams: streams,

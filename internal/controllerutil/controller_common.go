@@ -233,8 +233,8 @@ func BackgroundDeleteObject(cli client.Client, ctx context.Context, obj client.O
 		PropagationPolicy: &deletePropagation,
 	}
 
-	if err := cli.Delete(ctx, obj, deleteOptions); err != nil && !apierrors.IsNotFound(err) {
-		return err
+	if err := cli.Delete(ctx, obj, deleteOptions); err != nil {
+		return client.IgnoreNotFound(err)
 	}
 	return nil
 }

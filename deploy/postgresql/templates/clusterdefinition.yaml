@@ -113,7 +113,7 @@ spec:
               - /kb-scripts/init_container.sh
             volumeMounts:
               - name: data
-                mountPath: /home/postgres/pgdata
+                mountPath: {{ .Values.dataMountPath }}
               - name: postgresql-config
                 mountPath: /home/postgres/conf
               - name: scripts
@@ -145,7 +145,7 @@ spec:
               - name: dshm
                 mountPath: /dev/shm
               - name: data
-                mountPath: /home/postgres/pgdata
+                mountPath: {{ .Values.dataMountPath }}
               - name: postgresql-config
                 mountPath: /home/postgres/conf
               - name: scripts
@@ -171,7 +171,7 @@ spec:
               - name: KUBERNETES_LABELS
                 value: '{"app.kubernetes.io/instance":"$(KB_CLUSTER_NAME)","apps.kubeblocks.io/component-name":"$(KB_COMP_NAME)"}'
               - name: RESTORE_DATA_DIR
-                value: /home/postgres/pgdata/kb_restore
+                value: {{ .Values.dataMountPath }}/kb_restore
               - name: KB_PG_CONFIG_PATH
                 value: /home/postgres/conf/postgresql.conf
               - name: SPILO_CONFIGURATION
@@ -183,7 +183,7 @@ spec:
               - name: ALLOW_NOSSL
                 value: "true"
               - name: PGROOT
-                value: /home/postgres/pgdata/pgroot
+                value: {{ .Values.dataMountPath }}/pgroot
               - name: POD_IP
                 valueFrom:
                   fieldRef:

@@ -30,7 +30,7 @@ import (
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -90,7 +90,7 @@ var (
 
 func (r *configObserverOptions) addCommonFlags(cmd *cobra.Command, f cmdutil.Factory) {
 	cmd.Flags().StringSliceVar(&r.configSpecs, "config-specs", nil, "Specify the name of the configuration template to describe. (e.g. for apecloud-mysql: --config-specs=mysql-3node-tpl)")
-	flags.AddComponentsFlag(f, cmd, true, &r.componentNames, "Specify the name of Component to describe (e.g. for apecloud-mysql: --component=mysql). If the cluster has only one component, unset the parameter.\"")
+	flags.AddComponentsFlag(f, cmd, &r.componentNames, "Specify the name of Component to describe (e.g. for apecloud-mysql: --component=mysql). If the cluster has only one component, unset the parameter.\"")
 }
 
 func (r *configObserverOptions) complete2(args []string) error {
@@ -376,7 +376,7 @@ func isDynamicType(pt *parameterSchema, staticParameters, dynamicParameters *cfg
 }
 
 // NewDescribeReconfigureCmd shows details of history modifications or configuration file of reconfiguring operations
-func NewDescribeReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewDescribeReconfigureCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &configObserverOptions{
 		isExplain:          false,
 		showDetail:         false,
@@ -400,7 +400,7 @@ func NewDescribeReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOSt
 }
 
 // NewExplainReconfigureCmd shows details of modifiable parameters.
-func NewExplainReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewExplainReconfigureCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &configObserverOptions{
 		isExplain:          true,
 		truncEnum:          true,

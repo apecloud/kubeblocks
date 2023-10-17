@@ -93,14 +93,19 @@ func ParseParentNameAndOrdinal(s string) (string, int32) {
 
 // GetPodListByStatefulSet gets statefulSet pod list.
 func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet) ([]corev1.Pod, error) {
-	podList := &corev1.PodList{}
 	selector, err := metav1.LabelSelectorAsMap(stsObj.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
+	return GetPodListByStatefulSetWithSelector(ctx, cli, stsObj, selector)
+}
+
+// GetPodListByStatefulSetWithSelector gets statefulSet pod list.
+func GetPodListByStatefulSetWithSelector(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, selector client.MatchingLabels) ([]corev1.Pod, error) {
+	podList := &corev1.PodList{}
 	if err := cli.List(ctx, podList,
 		&client.ListOptions{Namespace: stsObj.Namespace},
-		client.MatchingLabels(selector)); err != nil {
+		selector); err != nil {
 		return nil, err
 	}
 	var pods []corev1.Pod

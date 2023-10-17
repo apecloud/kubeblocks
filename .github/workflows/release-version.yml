@@ -16,13 +16,6 @@ env:
 
 
 jobs:
-  merge-releasing-branch:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Auto merge releasing PR
-        run: ./.github/utils/merge_releasing_pr.sh
-
   release-message:
     runs-on: ubuntu-latest
     outputs:
@@ -65,7 +58,7 @@ jobs:
       - name: Install golangci-lint
         if: matrix.ops == 'lint'
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.51.2
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
 
       - name: make test ${{ matrix.ops }}
         run: |

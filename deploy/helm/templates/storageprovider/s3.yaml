@@ -36,6 +36,18 @@ spec:
       csi.storage.k8s.io/node-publish-secret-name: {{ `{{ .CSIDriverSecretRef.Name }}` }}
       csi.storage.k8s.io/node-publish-secret-namespace: {{ `{{ .CSIDriverSecretRef.Namespace }}` }}
 
+  datasafedConfigTemplate: |
+    [storage]
+    type = s3
+    provider = AWS
+    env_auth = false
+    access_key_id = {{ `{{ index .Parameters "accessKeyId" }}` }}
+    secret_access_key = {{ `{{ index .Parameters "secretAccessKey" }}` }}
+    region = {{ `{{ index .Parameters "region" }}` }}
+    endpoint = {{ `{{ index .Parameters "endpoint" }}` }}
+    root = {{ `{{ index .Parameters "bucket" }}` }}
+    chunk_size = 50Mi
+
   parametersSchema:
     openAPIV3Schema:
       type: "object"

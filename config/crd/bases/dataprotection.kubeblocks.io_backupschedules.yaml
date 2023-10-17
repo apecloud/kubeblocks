@@ -1,0 +1,141 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.12.1
+  labels:
+    app.kubernetes.io/name: kubeblocks
+  name: backupschedules.dataprotection.kubeblocks.io
+spec:
+  group: dataprotection.kubeblocks.io
+  names:
+    categories:
+    - kubeblocks
+    kind: BackupSchedule
+    listKind: BackupScheduleList
+    plural: backupschedules
+    shortNames:
+    - bs
+    singular: backupschedule
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: STATUS
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: BackupSchedule is the Schema for the backupschedules API.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: BackupScheduleSpec defines the desired state of BackupSchedule.
+            properties:
+              backupPolicyName:
+                description: Which backupPolicy is applied to perform this backup.
+                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                type: string
+              schedules:
+                description: schedules defines the list of backup schedules.
+                items:
+                  properties:
+                    backupMethod:
+                      description: backupMethod specifies the backup method name that
+                        is defined in backupPolicy.
+                      type: string
+                    cronExpression:
+                      description: the cron expression for schedule, the timezone
+                        is in UTC. see https://en.wikipedia.org/wiki/Cron.
+                      type: string
+                    enabled:
+                      description: enabled specifies whether the backup schedule is
+                        enabled or not.
+                      type: boolean
+                    retentionPeriod:
+                      default: 7d
+                      description: "retentionPeriod determines a duration up to which
+                        the backup should be kept. controller will remove all backups
+                        that are older than the RetentionPeriod. For example, RetentionPeriod
+                        of `30d` will keep only the backups of last 30 days. Sample
+                        duration format: - years: \t2y - months: \t6mo - days: \t\t30d
+                        - hours: \t12h - minutes: \t30m You can also combine the above
+                        durations. For example: 30d12h30m"
+                      type: string
+                  required:
+                  - backupMethod
+                  - cronExpression
+                  type: object
+                minItems: 1
+                type: array
+              startingDeadlineMinutes:
+                description: startingDeadlineMinutes defines the deadline in minutes
+                  for starting the backup workload if it misses scheduled time for
+                  any reason.
+                format: int64
+                maximum: 1440
+                minimum: 0
+                type: integer
+            required:
+            - backupPolicyName
+            - schedules
+            type: object
+          status:
+            description: BackupScheduleStatus defines the observed state of BackupSchedule.
+            properties:
+              failureReason:
+                description: failureReason is an error that caused the backup to fail.
+                type: string
+              observedGeneration:
+                description: observedGeneration is the most recent generation observed
+                  for this BackupSchedule. It refers to the BackupSchedule's generation,
+                  which is updated on mutation by the API Server.
+                format: int64
+                type: integer
+              phase:
+                description: phase describes the phase of the BackupSchedule.
+                type: string
+              schedules:
+                additionalProperties:
+                  description: ScheduleStatus defines the status of each schedule.
+                  properties:
+                    failureReason:
+                      description: failureReason is an error that caused the backup
+                        to fail.
+                      type: string
+                    lastScheduleTime:
+                      description: lastScheduleTime records the last time the backup
+                        was scheduled.
+                      format: date-time
+                      type: string
+                    lastSuccessfulTime:
+                      description: lastSuccessfulTime records the last time the backup
+                        was successfully completed.
+                      format: date-time
+                      type: string
+                    phase:
+                      description: phase describes the phase of the schedule.
+                      type: string
+                  type: object
+                description: schedules describes the status of each schedule.
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

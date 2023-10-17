@@ -56,8 +56,12 @@ func (r *rollingUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatus
 	var funcs RollingUpgradeFuncs
 
 	switch params.WorkloadType() {
-	case appsv1alpha1.Consensus, appsv1alpha1.Replication, appsv1alpha1.Stateful:
-		funcs = GetRSMRollingUpgradeFuncs()
+	case appsv1alpha1.Consensus:
+		funcs = GetConsensusRollingUpgradeFuncs()
+	case appsv1alpha1.Replication:
+		funcs = GetReplicationRollingUpgradeFuncs()
+	case appsv1alpha1.Stateful:
+		funcs = GetStatefulSetRollingUpgradeFuncs()
 	default:
 		return makeReturnedStatus(ESNotSupport), cfgcore.MakeError("not supported component workload type[%s]", params.WorkloadType())
 	}

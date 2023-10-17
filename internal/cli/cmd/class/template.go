@@ -24,7 +24,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
@@ -49,12 +49,12 @@ const ComponentClassTemplate = `
 `
 
 type TemplateOptions struct {
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 
 	outputFile string
 }
 
-func NewTemplateCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func NewTemplateCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	o := &TemplateOptions{IOStreams: streams}
 	cmd := &cobra.Command{
 		Use:   "template",

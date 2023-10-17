@@ -21,7 +21,7 @@ package builder
 
 import (
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/builder/template"
@@ -29,7 +29,7 @@ import (
 )
 
 // NewBuilderCmd for builder functions
-func NewBuilderCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewBuilderCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "builder",
 		Short: "builder command.",

@@ -348,12 +348,12 @@ func GetPortByPortName(pod *corev1.Pod, portName string) (int32, error) {
 	return 0, fmt.Errorf("port %s not found", portName)
 }
 
-func GetProbeGRPCPort(pod *corev1.Pod) (int32, error) {
-	return GetPortByPortName(pod, constant.ProbeGRPCPortName)
+func GetLorryGRPCPort(pod *corev1.Pod) (int32, error) {
+	return GetPortByPortName(pod, constant.LorryGRPCPortName)
 }
 
-func GetProbeHTTPPort(pod *corev1.Pod) (int32, error) {
-	return GetPortByPortName(pod, constant.ProbeHTTPPortName)
+func GetLorryHTTPPort(pod *corev1.Pod) (int32, error) {
+	return GetPortByPortName(pod, constant.LorryHTTPPortName)
 }
 
 // GuessLorryHTTPPort guesses lorry container and serving port.
@@ -428,14 +428,18 @@ func (c ByPodName) Less(i, j int) bool {
 // BuildPodHostDNS builds the host dns of pod.
 // ref: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/
 func BuildPodHostDNS(pod *corev1.Pod) string {
+	if pod == nil {
+		return ""
+	}
 	// build pod dns string
 	// ref: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/
-	hostDNS := []string{pod.Name}
-	if pod.Spec.Hostname != "" {
-		hostDNS[0] = pod.Spec.Hostname
-	}
 	if pod.Spec.Subdomain != "" {
+		hostDNS := []string{pod.Name}
+		if pod.Spec.Hostname != "" {
+			hostDNS[0] = pod.Spec.Hostname
+		}
 		hostDNS = append(hostDNS, pod.Spec.Subdomain)
+		return strings.Join(hostDNS, ".")
 	}
-	return strings.Join(hostDNS, ".")
+	return pod.Status.PodIP
 }

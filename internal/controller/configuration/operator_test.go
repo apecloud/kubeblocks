@@ -92,8 +92,6 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 			cfgcore.GenerateComponentConfigurationName(clusterName, mysqlCompName)).
 			ClusterRef(clusterName).
 			Component(mysqlCompName).
-			ClusterVerRef(clusterVersionName).
-			ClusterDefRef(clusterDefName).
 			GetObject()
 		configConstraint = &appsv1alpha1.ConfigConstraint{
 			ObjectMeta: metav1.ObjectMeta{

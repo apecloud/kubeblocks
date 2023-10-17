@@ -37,6 +37,9 @@ type RestartComponent func(client client.Client, ctx intctrlutil.RequestCtx, key
 type RestartContainerFunc func(pod *corev1.Pod, ctx context.Context, containerName []string, createConnFn createReconfigureClient) error
 type OnlineUpdatePodFunc func(pod *corev1.Pod, ctx context.Context, createClient createReconfigureClient, configSpec string, updatedParams map[string]string) error
 
+// Node: Distinguish between implementation and interface.
+// RollingUpgradeFuncs defines the interface, rsm is an implementation of Stateful, Replication and Consensus, not the only solution.
+
 type RollingUpgradeFuncs struct {
 	GetPodsFunc          GetPodsFunc
 	RestartContainerFunc RestartContainerFunc
@@ -44,9 +47,27 @@ type RollingUpgradeFuncs struct {
 	RestartComponent     RestartComponent
 }
 
-func GetRSMRollingUpgradeFuncs() RollingUpgradeFuncs {
+func GetConsensusRollingUpgradeFuncs() RollingUpgradeFuncs {
 	return RollingUpgradeFuncs{
-		GetPodsFunc:          getRSMPods,
+		GetPodsFunc:          getConsensusPods,
+		RestartContainerFunc: commonStopContainerWithPod,
+		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
+		RestartComponent:     restartStatefulComponent,
+	}
+}
+
+func GetStatefulSetRollingUpgradeFuncs() RollingUpgradeFuncs {
+	return RollingUpgradeFuncs{
+		GetPodsFunc:          getStatefulSetPods,
+		RestartContainerFunc: commonStopContainerWithPod,
+		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
+		RestartComponent:     restartStatefulComponent,
+	}
+}
+
+func GetReplicationRollingUpgradeFuncs() RollingUpgradeFuncs {
+	return RollingUpgradeFuncs{
+		GetPodsFunc:          getReplicationSetPods,
 		RestartContainerFunc: commonStopContainerWithPod,
 		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
 		RestartComponent:     restartStatefulComponent,

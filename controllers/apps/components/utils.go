@@ -54,7 +54,7 @@ var (
 )
 
 func listObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](
-	ctx context.Context, cli client.Client, _ func(T, L), namespace string, labels client.MatchingLabels) ([]PT, error) {
+	ctx context.Context, cli client.Client, _ func(T, PT, L, PL), namespace string, labels client.MatchingLabels) ([]PT, error) {
 	var objList L
 	if err := cli.List(ctx, PL(&objList), labels, client.InNamespace(namespace)); err != nil {
 		return nil, err

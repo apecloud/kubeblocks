@@ -21,11 +21,11 @@ package playground
 
 import (
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 )
 
 // NewPlaygroundCmd creates the playground command
-func NewPlaygroundCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func NewPlaygroundCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "playground [init | destroy]",
 		Short: "Bootstrap or destroy a playground KubeBlocks in local host or cloud.",

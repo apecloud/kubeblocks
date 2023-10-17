@@ -26,7 +26,7 @@ import (
 
 	"github.com/spf13/cobra"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
 	kccmd "k8s.io/kubectl/pkg/cmd"
@@ -38,7 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/addon"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/alert"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/backup"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/backuprepo"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/bench"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/builder"
@@ -46,14 +45,13 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/clusterdefinition"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/clusterversion"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/context"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/dashboard"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/dataprotection"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/fault"
 	infras "github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/migration"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/options"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/organization"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/playground"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/plugin"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/report"
@@ -119,7 +117,7 @@ func NewDefaultCliCmd() *cobra.Command {
 			case "help", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
 				// Don't search for a plugin
 			default:
-				if err := kccmd.HandlePluginCommand(pluginHandler, cmdPathPieces); err != nil {
+				if err := kccmd.HandlePluginCommand(pluginHandler, cmdPathPieces, true); err != nil {
 					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 					os.Exit(1)
 				}
@@ -186,14 +184,14 @@ A Command Line Interface for KubeBlocks`,
 	util.AddKlogFlags(flags)
 
 	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
-	ioStreams := genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}
+	ioStreams := genericiooptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}
 
 	// Add subcommands
 	cmd.AddCommand(
-		auth.NewLogin(ioStreams),
-		auth.NewLogout(ioStreams),
-		organization.NewOrganizationCmd(ioStreams),
-		context.NewContextCmd(ioStreams),
+		// auth.NewLogin(ioStreams),
+		// auth.NewLogout(ioStreams),
+		// organization.NewOrganizationCmd(ioStreams),
+		// context.NewContextCmd(ioStreams),
 		playground.NewPlaygroundCmd(ioStreams),
 		kubeblocks.NewKubeBlocksCmd(f, ioStreams),
 		bench.NewBenchCmd(f, ioStreams),
@@ -212,7 +210,7 @@ A Command Line Interface for KubeBlocks`,
 		report.NewReportCmd(f, ioStreams),
 		infras.NewInfraCmd(ioStreams),
 		backuprepo.NewBackupRepoCmd(f, ioStreams),
-		backup.NewBackupCmd(f, ioStreams),
+		dataprotection.NewDataProtectionCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}
@@ -260,7 +258,7 @@ func registerCompletionFuncForGlobalFlags(cmd *cobra.Command, f cmdutil.Factory)
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"namespace",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return utilcomp.CompGetResource(f, cmd, "namespace", toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.CompGetResource(f, "namespace", toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"context",

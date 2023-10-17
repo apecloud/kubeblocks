@@ -49,8 +49,10 @@ const (
 	roleEventReportFrequency          = int(1 / roleEventRecordQPS)
 	defaultFailedEventReportFrequency = 1800
 	defaultRoleDetectionThreshold     = 300
+	defaultRoleProbeTimeoutSeconds    = 2
 
 	rsmRoleUpdateMechanismVarName = "KB_RSM_ROLE_UPDATE_MECHANISM"
+	roleProbeTimeoutVarName       = "KB_RSM_ROLE_PROBE_TIMEOUT"
 )
 
 const (

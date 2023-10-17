@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: pulsar-cluster-stop-
+spec:
+  clusterRef: pulsar-cluster
+  ttlSecondsAfterSucceed: 3600
+  type: Stop
+  restart:
+    - componentName: zookeeper

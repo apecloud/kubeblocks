@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -58,12 +58,12 @@ const (
 
 type SetOrUnsetDefaultOption struct {
 	Factory   cmdutil.Factory
-	IOStreams genericclioptions.IOStreams
+	IOStreams genericiooptions.IOStreams
 	// `set-default` sets the setDefault to true, `unset-default` sets to false
 	setDefault bool
 }
 
-func newSetOrUnsetDefaultOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, toSet bool) *SetOrUnsetDefaultOption {
+func newSetOrUnsetDefaultOptions(f cmdutil.Factory, streams genericiooptions.IOStreams, toSet bool) *SetOrUnsetDefaultOption {
 	return &SetOrUnsetDefaultOption{
 		Factory:    f,
 		IOStreams:  streams,
@@ -71,7 +71,7 @@ func newSetOrUnsetDefaultOptions(f cmdutil.Factory, streams genericclioptions.IO
 	}
 }
 
-func newSetDefaultCMD(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newSetDefaultCMD(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := newSetOrUnsetDefaultOptions(f, streams, true)
 	cmd := &cobra.Command{
 		Use:               "set-default NAME",
@@ -86,7 +86,7 @@ func newSetDefaultCMD(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	return cmd
 }
 
-func newUnSetDefaultCMD(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newUnSetDefaultCMD(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := newSetOrUnsetDefaultOptions(f, streams, false)
 	cmd := &cobra.Command{
 		Use:               "unset-default NAME",

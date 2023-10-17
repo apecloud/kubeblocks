@@ -69,7 +69,8 @@ const (
 	jobScenarioMembership       = "membership-reconfiguration"
 	jobScenarioUpdate           = "pod-update"
 
-	roleProbeName                 = "kb-role-probe"
+	roleProbeContainerName        = "kb-role-probe"
+	roleProbeBinaryName           = "lorry"
 	roleAgentVolumeName           = "role-agent"
 	roleAgentInstallerName        = "role-agent-installer"
 	roleAgentVolumeMountPath      = "/role-probe"
@@ -79,7 +80,10 @@ const (
 	shell2httpServePath           = "/role"
 	defaultRoleProbeAgentImage    = "apecloud/kubeblocks-tools:latest"
 	defaultRoleProbeDaemonPort    = 7373
-	roleProbeURI                  = "/v1.0/bindings/custom?operation=checkRole"
+	defaultRoleProbeGRPCPort      = 50101
+	roleProbeGRPCPortName         = "probe-grpc-port"
+	grpcHealthProbeBinaryPath     = "/bin/grpc_health_probe"
+	grpcHealthProbeArgsFormat     = "-addr=:%d"
 	defaultActionImage            = "busybox:latest"
 	usernameCredentialVarName     = "KB_RSM_USERNAME"
 	passwordCredentialVarName     = "KB_RSM_PASSWORD"
@@ -88,8 +92,9 @@ const (
 	leaderHostVarName             = "KB_RSM_LEADER_HOST"
 	targetHostVarName             = "KB_RSM_TARGET_HOST"
 	RoleUpdateMechanismVarName    = "KB_RSM_ROLE_UPDATE_MECHANISM"
+	roleProbeTimeoutVarName       = "KB_RSM_ROLE_PROBE_TIMEOUT"
 	directAPIServerEventFieldPath = "spec.containers{sqlchannel}"
-	readinessProbeEventFieldPath  = "spec.containers{" + roleProbeName + "}"
+	readinessProbeEventFieldPath  = "spec.containers{" + roleProbeContainerName + "}"
 	legacyEventFieldPath          = "spec.containers{kb-checkrole}"
 	checkRoleEventReason          = "checkRole"
 

@@ -67,6 +67,9 @@ func (p *Paths) IndexPluginsPath(name string) []string {
 	if _, err := os.Stat(filepath.Join(p.IndexPath(name), "krew-plugins")); err == nil {
 		result = append(result, filepath.Join(p.IndexPath(name), "krew-plugins"))
 	}
+	if _, err := os.Stat(filepath.Join(p.IndexPath(name), "cli-plugins")); err == nil {
+		result = append(result, filepath.Join(p.IndexPath(name), "cli-plugins"))
+	}
 	return result
 }
 

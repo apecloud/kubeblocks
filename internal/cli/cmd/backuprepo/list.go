@@ -26,12 +26,12 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -40,7 +40,7 @@ import (
 
 var (
 	listExample = templates.Examples(`
-	# List all backuprepos
+	# List all backup repositories
 	kbcli backuprepo list
 	`)
 )
@@ -50,13 +50,13 @@ type listBackupRepoOptions struct {
 	*list.ListOptions
 }
 
-func newListCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newListCommand(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &listBackupRepoOptions{
 		ListOptions: list.NewListOptions(f, streams, types.BackupRepoGVR()),
 	}
 	cmd := &cobra.Command{
 		Use:               "list",
-		Short:             "List BackupRepo.",
+		Short:             "List Backup Repositories.",
 		Aliases:           []string{"ls"},
 		Example:           listExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.BackupRepoGVR()),
@@ -99,13 +99,13 @@ func printBackupRepoList(o *listBackupRepoOptions) error {
 	}
 
 	if len(infos) == 0 {
-		fmt.Fprintln(o.IOStreams.Out, "No backup Repo found")
+		fmt.Fprintln(o.IOStreams.Out, "No backup repository found")
 		return nil
 	}
 
-	backupRepos := make([]*dataprotectionv1alpha1.BackupRepo, 0)
+	backupRepos := make([]*dpv1alpha1.BackupRepo, 0)
 	for _, info := range infos {
-		backupRepo := &dataprotectionv1alpha1.BackupRepo{}
+		backupRepo := &dpv1alpha1.BackupRepo{}
 		obj := info.Object.(*unstructured.Unstructured)
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, backupRepo); err != nil {
 			return err
@@ -134,6 +134,7 @@ func printBackupRepoList(o *listBackupRepoOptions) error {
 			tbl.AddRow(backupRepo.Name,
 				backupRepo.Status.Phase,
 				backupRepo.Spec.StorageProviderRef,
+				backupRepo.Spec.AccessMethod,
 				backupRepo.Status.IsDefault,
 				fmt.Sprintf("%d", backups),
 				backupSize,
@@ -143,7 +144,7 @@ func printBackupRepoList(o *listBackupRepoOptions) error {
 	}
 
 	if err = printer.PrintTable(o.Out, nil, printRows,
-		"NAME", "STATUS", "STORAGE-PROVIDER", "DEFAULT", "BACKUPS", "TOTAL-SIZE"); err != nil {
+		"NAME", "STATUS", "STORAGE-PROVIDER", "ACCESS-METHOD", "DEFAULT", "BACKUPS", "TOTAL-SIZE"); err != nil {
 		return err
 	}
 	return nil

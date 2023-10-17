@@ -104,22 +104,22 @@ var _ = Describe("handler builder test.", func() {
 			}{
 				{
 					name:     "Create",
-					testFunc: func() { handler.Create(createEvent, queue) },
+					testFunc: func() { handler.Create(ctx, createEvent, queue) },
 					getTimes: 1,
 				},
 				{
 					name:     "Update",
-					testFunc: func() { handler.Update(updateEvent, queue) },
+					testFunc: func() { handler.Update(ctx, updateEvent, queue) },
 					getTimes: 2,
 				},
 				{
 					name:     "Delete",
-					testFunc: func() { handler.Delete(deleteEvent, queue) },
+					testFunc: func() { handler.Delete(ctx, deleteEvent, queue) },
 					getTimes: 1,
 				},
 				{
 					name:     "Generic",
-					testFunc: func() { handler.Generic(genericEvent, queue) },
+					testFunc: func() { handler.Generic(ctx, genericEvent, queue) },
 					getTimes: 1,
 				},
 			}

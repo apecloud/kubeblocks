@@ -29,7 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest/fake"
@@ -42,10 +42,10 @@ import (
 
 var _ = Describe("List", func() {
 	var cmd *cobra.Command
-	var streams genericclioptions.IOStreams
+	var streams genericiooptions.IOStreams
 	buf := new(bytes.Buffer)
 
-	buildTestCmd := func(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	buildTestCmd := func(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 		o := NewListOptions(f, streams, schema.GroupVersionResource{Group: "", Resource: "pods", Version: types.K8sCoreAPIVersion})
 		cmd := &cobra.Command{
 			Use:   "ls-test",
@@ -74,7 +74,7 @@ var _ = Describe("List", func() {
 	BeforeEach(func() {
 		pods, _, _ := cmdtesting.TestData()
 		tf := mockClient(pods)
-		streams, _, buf, _ = genericclioptions.NewTestIOStreams()
+		streams, _, buf, _ = genericiooptions.NewTestIOStreams()
 		cmd = buildTestCmd(tf, streams)
 		cmd.SetOut(buf)
 	})
@@ -82,7 +82,7 @@ var _ = Describe("List", func() {
 	It("run", func() {
 		pods, _, _ := cmdtesting.TestData()
 		tf := mockClient(pods)
-		streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+		streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 		cmd := buildTestCmd(tf, streams)
 		cmd.Run(cmd, []string{})
 		Expect(len(buf.String()) > 0).Should(BeTrue())
@@ -216,7 +216,7 @@ metadata:
 
 		It("No resources found", func() {
 			tf := mockClient(&corev1.PodList{})
-			streams, _, buf, errbuf := genericclioptions.NewTestIOStreams()
+			streams, _, buf, errbuf := genericiooptions.NewTestIOStreams()
 			cmd = buildTestCmd(tf, streams)
 			cmd.SetOut(buf)
 			cmd.Run(cmd, []string{})

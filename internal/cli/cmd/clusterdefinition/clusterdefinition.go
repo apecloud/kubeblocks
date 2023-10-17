@@ -21,7 +21,7 @@ package clusterdefinition
 
 import (
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -34,7 +34,7 @@ var listExample = templates.Examples(`
 		# list all ClusterDefinitions
 		kbcli clusterdefinition list`)
 
-func NewClusterDefinitionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewClusterDefinitionCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "clusterdefinition",
 		Short:   "ClusterDefinition command.",
@@ -43,10 +43,11 @@ func NewClusterDefinitionCmd(f cmdutil.Factory, streams genericclioptions.IOStre
 
 	cmd.AddCommand(NewListCmd(f, streams))
 	cmd.AddCommand(NewListComponentsCmd(f, streams))
+	cmd.AddCommand(NewDescribeCmd(f, streams))
 	return cmd
 }
 
-func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewListCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := list.NewListOptions(f, streams, types.ClusterDefGVR())
 	cmd := &cobra.Command{
 		Use:               "list",

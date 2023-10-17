@@ -18,7 +18,7 @@ spec:
       service:
         ports:
           - name: model
-            port: 8080
+            port: 8000
             targetPort: model
       podSpec:
         volumes:
@@ -29,6 +29,8 @@ spec:
             imagePullPolicy: {{default .Values.image.pullPolicy "IfNotPresent"}}
             securityContext:
               runAsUser: 0
+              privileged: true
+              allowPrivilegeEscalation: true
             terminationMessagePath: /dev/termination-log
             terminationMessagePolicy: File
             volumeMounts:
@@ -42,7 +44,7 @@ spec:
               - /scripts/start.sh
             ports:
               - name: model
-                containerPort: 8080
+                containerPort: 8000
   connectionCredential:
     username: root
     password: ""

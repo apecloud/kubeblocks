@@ -26,7 +26,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -155,7 +155,7 @@ type NetworkChaosOptions struct {
 	FaultBaseOptions
 }
 
-func NewNetworkChaosOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, action string) *NetworkChaosOptions {
+func NewNetworkChaosOptions(f cmdutil.Factory, streams genericiooptions.IOStreams, action string) *NetworkChaosOptions {
 	o := &NetworkChaosOptions{
 		FaultBaseOptions: FaultBaseOptions{CreateOptions: create.CreateOptions{
 			Factory:         f,
@@ -171,7 +171,7 @@ func NewNetworkChaosOptions(f cmdutil.Factory, streams genericclioptions.IOStrea
 	return o
 }
 
-func NewNetworkChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewNetworkChaosCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "network",
 		Short: "Network chaos.",
@@ -189,7 +189,7 @@ func NewNetworkChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	return cmd
 }
 
-func NewPartitionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewPartitionCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewNetworkChaosOptions(f, streams, string(v1alpha1.PartitionAction))
 	cmd := o.NewCobraCommand(Partition, PartitionShort)
 
@@ -198,7 +198,7 @@ func NewPartitionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	return cmd
 }
 
-func NewLossCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewLossCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewNetworkChaosOptions(f, streams, string(v1alpha1.LossAction))
 	cmd := o.NewCobraCommand(Loss, LossShort)
 
@@ -211,7 +211,7 @@ func NewLossCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	return cmd
 }
 
-func NewDelayCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewDelayCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewNetworkChaosOptions(f, streams, string(v1alpha1.DelayAction))
 	cmd := o.NewCobraCommand(Delay, DelayShort)
 
@@ -225,7 +225,7 @@ func NewDelayCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	return cmd
 }
 
-func NewDuplicateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewDuplicateCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewNetworkChaosOptions(f, streams, string(v1alpha1.DuplicateAction))
 	cmd := o.NewCobraCommand(Duplicate, DuplicateShort)
 
@@ -238,7 +238,7 @@ func NewDuplicateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	return cmd
 }
 
-func NewCorruptCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCorruptCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewNetworkChaosOptions(f, streams, string(v1alpha1.CorruptAction))
 	cmd := o.NewCobraCommand(Corrupt, CorruptShort)
 
@@ -251,7 +251,7 @@ func NewCorruptCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	return cmd
 }
 
-func NewBandwidthCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewBandwidthCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewNetworkChaosOptions(f, streams, string(v1alpha1.BandwidthAction))
 	cmd := o.NewCobraCommand(Bandwidth, BandwidthShort)
 

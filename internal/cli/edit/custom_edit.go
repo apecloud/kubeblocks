@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/editor"
 
@@ -49,10 +49,10 @@ type CustomEditOptions struct {
 	Method     string
 	TestEnv    bool
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
-func NewCustomEditOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, method string) *CustomEditOptions {
+func NewCustomEditOptions(f cmdutil.Factory, streams genericiooptions.IOStreams, method string) *CustomEditOptions {
 	return &CustomEditOptions{
 		Factory:    f,
 		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput("yaml"),
@@ -88,13 +88,8 @@ func (o *CustomEditOptions) Run(originalObj runtime.Object) error {
 		edited = original
 	}
 
-	dynamicClient, err := o.Factory.DynamicClient()
-	if err != nil {
-		return fmt.Errorf("failed to get dynamic client: %v", err)
-	}
 	// apply validation
-	fieldValidationVerifier := resource.NewQueryParamVerifier(dynamicClient, o.Factory.OpenAPIGetter(), resource.QueryParamFieldValidation)
-	schemaValidator, err := o.Factory.Validator(metav1.FieldValidationStrict, fieldValidationVerifier)
+	schemaValidator, err := o.Factory.Validator(metav1.FieldValidationStrict)
 	if err != nil {
 		return fmt.Errorf("failed to get validator: %v", err)
 	}
@@ -191,7 +186,7 @@ func addHeader(w io.Writer) error {
 	return err
 }
 
-func confirmToContinue(stream genericclioptions.IOStreams) error {
+func confirmToContinue(stream genericiooptions.IOStreams) error {
 	printer.Warning(stream.Out, "Above resource will be created or changed, do you want to continue to create or change this resource?\n  Only 'yes' will be accepted to confirm.\n\n")
 	entered, _ := prompt.NewPrompt("Enter a value:", nil, stream.In).Run()
 	if entered != "yes" {

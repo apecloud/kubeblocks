@@ -1,0 +1,11 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: elasticsearch-cluster-start-
+spec:
+  clusterRef: elasticsearch-cluster
+  ttlSecondsAfterSucceed: 27017
+  type: Start
+  restart:
+    - componentName: elasticsearch
+    - componentName: metrics

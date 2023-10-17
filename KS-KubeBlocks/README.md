@@ -23,4 +23,6 @@ NebulaGraph, RisingWave, Pika, GreptimeDB, and OceanBase have seamlessly joined 
 * Simplifies day-2 operations, such as upgrading, scaling, monitoring, backup, and restore.
 * Contains a powerful and intuitive command line tool.
 
-https://github.com/apecloud/kubeblocks
+More detailed information can be found on the [KubeBlocks official website](https://kubeblocks.io/).
+
+Github: https://github.com/apecloud/kubeblocks

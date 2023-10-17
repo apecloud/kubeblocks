@@ -16,4 +16,6 @@ KubeBlocks 的名字源自 Kubernetes（K8s）和乐高积木，致力于让 K8s
 * 包含强大且直观的命令行工具 
 
  
-详细信息参考：KubeBlocks 官网  Github：https://github.com/apecloud/kubeblocks
+详细信息参考：[KubeBlocks 官网](https://kubeblocks.io/) 
+
+Github：https://github.com/apecloud/kubeblocks

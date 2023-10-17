@@ -13,6 +13,7 @@ KubeBlocks 的名字源自 Kubernetes（K8s）和乐高积木，致力于让 K8s
 * 支持 MySQL、PostgreSQL、Redis、MongoDB、Kafka 等15个主流数据库和流计算引擎
 * 提供生产级性能、弹性、可扩展性和可观察性
 * 简化 day-2 操作，例如升级、扩展、监控、备份和恢复
-* 包含强大且直观的命令行工具
+* 包含强大且直观的命令行工具 
 
-https://github.com/apecloud/kubeblocks
+ 
+详细信息参考：KubeBlocks 官网  Github：https://github.com/apecloud/kubeblocks

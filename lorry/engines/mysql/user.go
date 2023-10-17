@@ -62,3 +62,20 @@ func (mgr *Manager) ListUsers(ctx context.Context) ([]util.UserInfo, error) {
 	}
 	return users, nil
 }
+
+func (mgr *Manager) ListSystemAccounts(ctx context.Context) ([]util.UserInfo, error) {
+	users := []util.UserInfo{}
+
+	err := QueryRowsMap(mgr.DB, listSystemAccountsSQL, func(rMap RowMap) error {
+		user := util.UserInfo{
+			UserName: rMap.GetString("userName"),
+		}
+		users = append(users, user)
+		return nil
+	})
+	if err != nil {
+		mgr.Logger.Error(err, "error executing %s")
+		return nil, err
+	}
+	return users, nil
+}

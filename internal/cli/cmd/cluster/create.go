@@ -230,6 +230,7 @@ type CreateOptions struct {
 	Storages          []string                 `json:"-"`
 	// backup name to restore in creation
 	Backup                  string `json:"backup,omitempty"`
+	BackupNamespace         string `json:"backupNamespace,omitempty"`
 	RestoreTime             string `json:"restoreTime,omitempty"`
 	RestoreManagementPolicy string `json:"-"`
 
@@ -263,6 +264,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.
 	cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)")
 	cmd.Flags().StringArrayVar(&o.Storages, "pvc", []string{}, "Set the cluster detail persistent volume claim, each '--pvc' corresponds to a component, and will override the simple configurations about storage by --set (e.g. --pvc type=mysql,name=data,mode=ReadWriteOnce,size=20Gi --pvc type=mysql,name=log,mode=ReadWriteOnce,size=1Gi)")
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
+	cmd.Flags().StringVar(&o.BackupNamespace, "backup-namespace", "", "the source backup namespace, default by current namespace")
 	cmd.Flags().StringVar(&o.RestoreTime, "restore-to-time", "", "Set a time for point in time recovery")
 	cmd.Flags().StringVar(&o.RestoreManagementPolicy, "volume-restore-policy", "Parallel", "the volume claim restore policy, supported values: [Serial, Parallel]")
 	cmd.Flags().BoolVar(&o.RBACEnabled, "rbac-enabled", false, "Specify whether rbac resources will be created by kbcli, otherwise KubeBlocks server will try to create rbac resources")
@@ -344,7 +346,10 @@ func getBackupObjectFromRestoreArgs(o *CreateOptions, backup *dpv1alpha1.Backup)
 	if o.Backup == "" {
 		return nil
 	}
-	if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.Namespace, o.Backup); err != nil {
+	if o.BackupNamespace == "" {
+		o.BackupNamespace = o.Namespace
+	}
+	if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.BackupNamespace, o.Backup); err != nil {
 		return err
 	}
 	return nil
@@ -413,7 +418,7 @@ func setBackup(o *CreateOptions, components []map[string]interface{}) error {
 		return nil
 	}
 	backup := &dpv1alpha1.Backup{}
-	if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.Namespace, backupName); err != nil {
+	if err := getBackupObjectFromRestoreArgs(o, backup); err != nil {
 		return err
 	}
 	if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {

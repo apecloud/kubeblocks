@@ -295,7 +295,7 @@ func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.Synt
 	}
 	r.restoreTime = backupSource[constant.RestoreTimeKeyForRestore]
 	backup := &dpv1alpha1.Backup{}
-	if err = r.Client.Get(r.Ctx, types.NamespacedName{Name: backupSource[constant.BackupNameKeyForRestore], Namespace: r.Cluster.Namespace}, backup); err != nil {
+	if err = r.Client.Get(r.Ctx, types.NamespacedName{Name: backupSource[constant.BackupNameKeyForRestore], Namespace: r.namespace}, backup); err != nil {
 		return nil, err
 	}
 	return backup, nil

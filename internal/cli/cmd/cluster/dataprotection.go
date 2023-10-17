@@ -417,7 +417,8 @@ func completeForDeleteBackup(o *delete.DeleteOptions, args []string) error {
 
 type CreateRestoreOptions struct {
 	// backup name to restore in creation
-	Backup string `json:"backup,omitempty"`
+	Backup          string `json:"backup,omitempty"`
+	BackupNamespace string `json:"backupNamespace,omitempty"`
 
 	// point in time recovery args
 	RestoreTime             *time.Time `json:"restoreTime,omitempty"`
@@ -451,7 +452,11 @@ func (o *CreateRestoreOptions) Run() error {
 func (o *CreateRestoreOptions) runRestoreFromBackup() error {
 	// get backup
 	backup := &dpv1alpha1.Backup{}
-	if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.Namespace, o.Backup); err != nil {
+
+	if o.BackupNamespace == "" {
+		o.BackupNamespace = o.Namespace
+	}
+	if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.BackupNamespace, o.Backup); err != nil {
 		return err
 	}
 	if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
@@ -470,6 +475,7 @@ func (o *CreateRestoreOptions) runRestoreFromBackup() error {
 	if err != nil {
 		return err
 	}
+	clusterObj.Namespace = o.Namespace
 	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, o.RestoreManagementPolicy, len(clusterObj.Spec.ComponentSpecs), clusterObj.Spec.ComponentSpecs[0].Name, restoreTimeStr)
 	if err != nil {
 		return err
@@ -547,6 +553,7 @@ func NewCreateRestoreCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) 
 		},
 	}
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Backup name")
+	cmd.Flags().StringVar(&o.BackupNamespace, "backup-namespace", "", "Backup namespace, default by current namespace")
 	cmd.Flags().StringVar(&o.RestoreTimeStr, "restore-to-time", "", "point in time recovery(PITR)")
 	cmd.Flags().StringVar(&o.RestoreManagementPolicy, "volume-restore-policy", "Parallel", "the volume claim restore policy, supported values: [Serial, Parallel]")
 	return cmd

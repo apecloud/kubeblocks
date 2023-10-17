@@ -11,19 +11,11 @@ kbcli cluster backup NAME [flags]
 ### Examples
 
 ```
-  # create a backup, the default type is snapshot.
-  kbcli cluster backup mycluster
+  # create a backup with a specified method, run "kbcli cluster desc-backup-policy mycluster" to show supported backup methods
+  kbcli cluster backup mycluster --method volume-snapshot
   
-  # create a snapshot backup
-  # create a snapshot of the cluster's persistent volume for backup
-  kbcli cluster backup mycluster --type snapshot
-  
-  # create a datafile backup
-  # backup all files under the data directory and save them to the specified storage, only full backup is supported now.
-  kbcli cluster backup mycluster --type datafile
-  
-  # create a backup with specified backup policy
-  kbcli cluster backup mycluster --policy <backup-policy-name>
+  # create a backup with specified backup policy, run "kbcli cluster list-backup-policy mycluster" to show the cluster supported backup policies
+  kbcli cluster backup mycluster --method volume-snapshot --policy <backup-policy-name>
 ```
 
 ### Options

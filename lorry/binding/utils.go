@@ -188,16 +188,16 @@ func getAndFormatNow() string {
 
 func opsTerminateOnSucc(result OpsResult, metadata opsMetadata, msg interface{}) (OpsResult, error) {
 	metadata.EndTime = getAndFormatNow()
-	result[RespTypEve] = RespEveSucc
-	result[RespTypMsg] = msg
+	result[RespFieldEvent] = RespEveSucc
+	result[RespFieldMessage] = msg
 	result[RespTypMeta] = metadata
 	return result, nil
 }
 
 func opsTerminateOnErr(result OpsResult, metadata opsMetadata, err error) (OpsResult, error) {
 	metadata.EndTime = getAndFormatNow()
-	result[RespTypEve] = RespEveFail
-	result[RespTypMsg] = err.Error()
+	result[RespFieldEvent] = RespEveFail
+	result[RespFieldMessage] = err.Error()
 	result[RespTypMeta] = metadata
 	return result, nil
 }

@@ -260,8 +260,8 @@ func (pgOps *PostgresOperations) createUserOps(ctx context.Context, req *ProbeRe
 
 	if err := ParseObjFromRequest(req, DefaultUserInfoParser, UserNameAndPasswdValidator, &object); err != nil {
 		result := OpsResult{}
-		result[util.RespTypEve] = util.RespEveFail
-		result[util.RespTypMsg] = err.Error()
+		result[util.RespFieldEvent] = util.RespEveFail
+		result[util.RespFieldMessage] = err.Error()
 		return result, nil
 	}
 
@@ -282,8 +282,8 @@ func (pgOps *PostgresOperations) deleteUserOps(ctx context.Context, req *ProbeRe
 
 	if err := ParseObjFromRequest(req, DefaultUserInfoParser, UserNameValidator, &object); err != nil {
 		result := OpsResult{}
-		result[util.RespTypEve] = util.RespEveFail
-		result[util.RespTypMsg] = err.Error()
+		result[util.RespFieldEvent] = util.RespEveFail
+		result[util.RespFieldMessage] = err.Error()
 		return result, nil
 	}
 	return ExecuteObject(ctx, pgOps, req, opsKind, sqlTplRend, msgTplRend, object)
@@ -326,8 +326,8 @@ func (pgOps *PostgresOperations) managePrivillege(ctx context.Context, req *Prob
 
 	if err := ParseObjFromRequest(req, DefaultUserInfoParser, UserNameAndRoleValidator, &object); err != nil {
 		result := OpsResult{}
-		result[util.RespTypEve] = util.RespEveFail
-		result[util.RespTypMsg] = err.Error()
+		result[util.RespFieldEvent] = util.RespEveFail
+		result[util.RespFieldMessage] = err.Error()
 		return result, nil
 	}
 
@@ -386,8 +386,8 @@ func (pgOps *PostgresOperations) describeUserOps(ctx context.Context, req *Probe
 
 	if err := ParseObjFromRequest(req, DefaultUserInfoParser, UserNameValidator, &object); err != nil {
 		result := OpsResult{}
-		result[util.RespTypEve] = util.RespEveFail
-		result[util.RespTypMsg] = err.Error()
+		result[util.RespFieldEvent] = util.RespEveFail
+		result[util.RespFieldMessage] = err.Error()
 		return result, nil
 	}
 

@@ -19,6 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package operations
 
+import (
+	"time"
+
+	"github.com/apecloud/kubeblocks/lorry/util"
+)
+
 // OpsRequest is the request for Operation
 type OpsRequest struct {
 	Data       []byte         `json:"data"`
@@ -29,4 +35,40 @@ type OpsRequest struct {
 type OpsResponse struct {
 	Data     map[string]any    `json:"data,omitempty"`
 	Metadata map[string]string `json:"metadata,omitempty"`
+}
+
+type OpsMetadata struct {
+	Operation util.OperationKind `json:"operation,omitempty"`
+	StartTime string             `json:"startTime,omitempty"`
+	EndTime   string             `json:"endTime,omitempty"`
+	Extra     string             `json:"extra,omitempty"`
+}
+
+func getAndFormatNow() string {
+	return time.Now().Format(time.RFC3339Nano)
+}
+
+func NewOpsResponse(operation util.OperationKind) *OpsResponse {
+	resp := &OpsResponse{
+		Data:     map[string]any{},
+		Metadata: map[string]string{},
+	}
+
+	resp.Metadata["startTime"] = getAndFormatNow()
+	resp.Metadata["operation"] = string(operation)
+	return resp
+}
+
+func (resp *OpsResponse) WithSuccess(msg interface{}) (*OpsResponse, error) {
+	resp.Metadata["endTime"] = getAndFormatNow()
+	resp.Data[util.RespFieldEvent] = util.OperationSuccess
+	resp.Data[util.RespFieldMessage] = msg
+	return resp, nil
+}
+
+func (resp *OpsResponse) WithError(err error) (*OpsResponse, error) {
+	resp.Metadata["endTime"] = getAndFormatNow()
+	resp.Data[util.RespFieldEvent] = util.OperationFailed
+	resp.Data[util.RespFieldMessage] = err.Error()
+	return resp, err
 }

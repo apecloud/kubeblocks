@@ -67,10 +67,7 @@ func (s *Query) Do(ctx context.Context, req *operations.OpsRequest) (*operations
 		return nil, errors.New("no sql provided")
 	}
 
-	resp := &operations.OpsResponse{
-		Data: map[string]any{},
-	}
-	resp.Data["operation"] = util.ExecOperation
+	resp := operations.NewOpsResponse(util.QueryOperation)
 
 	result, err := s.dbManager.Query(ctx, sql)
 	if err != nil {
@@ -79,5 +76,5 @@ func (s *Query) Do(ctx context.Context, req *operations.OpsRequest) (*operations
 	}
 
 	resp.Data["result"] = string(result)
-	return resp, err
+	return resp, nil
 }

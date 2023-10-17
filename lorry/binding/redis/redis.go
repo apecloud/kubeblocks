@@ -231,8 +231,8 @@ func (r *Redis) createOps(ctx context.Context, req *ProbeRequest, resp *ProbeRes
 
 	if err := ParseObjFromRequest(req, defaultRedisEntryParser, defaultRedisEntryValidator, &object); err != nil {
 		result := OpsResult{}
-		result[RespTypEve] = RespEveFail
-		result[RespTypMsg] = err.Error()
+		result[RespFieldEvent] = RespEveFail
+		result[RespFieldMessage] = err.Error()
 		return result, nil
 	}
 	return ExecuteObject(ctx, r, req, CreateOperation, cmdRender, msgRender, object)
@@ -250,8 +250,8 @@ func (r *Redis) deleteOps(ctx context.Context, req *ProbeRequest, resp *ProbeRes
 	)
 	if err := ParseObjFromRequest(req, defaultRedisEntryParser, defaultRedisEntryValidator, &object); err != nil {
 		result := OpsResult{}
-		result[RespTypEve] = RespEveFail
-		result[RespTypMsg] = err.Error()
+		result[RespFieldEvent] = RespEveFail
+		result[RespFieldMessage] = err.Error()
 		return result, nil
 	}
 
@@ -267,8 +267,8 @@ func (r *Redis) getOps(ctx context.Context, req *ProbeRequest, resp *ProbeRespon
 	)
 	if err := ParseObjFromRequest(req, defaultRedisEntryParser, defaultRedisEntryValidator, &object); err != nil {
 		result := OpsResult{}
-		result[RespTypEve] = RespEveFail
-		result[RespTypMsg] = err.Error()
+		result[RespFieldEvent] = RespEveFail
+		result[RespFieldMessage] = err.Error()
 		return result, nil
 	}
 	return QueryObject(ctx, r, req, GetOperation, cmdRender, nil, object)
@@ -369,8 +369,8 @@ func (r *Redis) describeUserOps(ctx context.Context, req *ProbeRequest, resp *Pr
 
 	if err := ParseObjFromRequest(req, DefaultUserInfoParser, UserNameValidator, &object); err != nil {
 		result := OpsResult{}
-		result[RespTypEve] = RespEveFail
-		result[RespTypMsg] = err.Error()
+		result[RespFieldEvent] = RespEveFail
+		result[RespFieldMessage] = err.Error()
 		return result, nil
 	}
 
@@ -469,8 +469,8 @@ func (r *Redis) createUserOps(ctx context.Context, req *ProbeRequest, resp *Prob
 
 	if err := ParseObjFromRequest(req, DefaultUserInfoParser, UserNameAndPasswdValidator, &object); err != nil {
 		result := OpsResult{}
-		result[RespTypEve] = RespEveFail
-		result[RespTypMsg] = err.Error()
+		result[RespFieldEvent] = RespEveFail
+		result[RespFieldMessage] = err.Error()
 		return result, nil
 	}
 
@@ -490,8 +490,8 @@ func (r *Redis) deleteUserOps(ctx context.Context, req *ProbeRequest, resp *Prob
 	)
 	if err := ParseObjFromRequest(req, DefaultUserInfoParser, UserNameValidator, &object); err != nil {
 		result := OpsResult{}
-		result[RespTypEve] = RespEveFail
-		result[RespTypMsg] = err.Error()
+		result[RespFieldEvent] = RespEveFail
+		result[RespFieldMessage] = err.Error()
 		return result, nil
 	}
 
@@ -528,8 +528,8 @@ func (r *Redis) managePrivillege(ctx context.Context, req *ProbeRequest, op Oper
 
 	if err := ParseObjFromRequest(req, DefaultUserInfoParser, UserNameAndRoleValidator, &object); err != nil {
 		result := OpsResult{}
-		result[RespTypEve] = RespEveFail
-		result[RespTypMsg] = err.Error()
+		result[RespFieldEvent] = RespEveFail
+		result[RespFieldMessage] = err.Error()
 		return result, nil
 	}
 

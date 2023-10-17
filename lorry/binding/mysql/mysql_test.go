@@ -320,14 +320,14 @@ func TestMySQLAccounts(t *testing.T) {
 
 		result, err = mysqlOps.createUserOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, util.RespEveFail, result[util.RespTypEve])
-		assert.Equal(t, ErrNoUserName.Error(), result[util.RespTypMsg])
+		assert.Equal(t, util.RespEveFail, result[util.RespFieldEvent])
+		assert.Equal(t, ErrNoUserName.Error(), result[util.RespFieldMessage])
 
 		req.Metadata["userName"] = userName
 		result, err = mysqlOps.createUserOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, util.RespEveFail, result[util.RespTypEve])
-		assert.Equal(t, ErrNoPassword.Error(), result[util.RespTypMsg])
+		assert.Equal(t, util.RespEveFail, result[util.RespFieldEvent])
+		assert.Equal(t, ErrNoPassword.Error(), result[util.RespFieldMessage])
 
 		req.Metadata["password"] = password
 
@@ -335,7 +335,7 @@ func TestMySQLAccounts(t *testing.T) {
 		mock.ExpectExec(createUserCmd).WillReturnResult(sqlmock.NewResult(1, 1))
 		result, err = mysqlOps.createUserOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, util.RespEveSucc, result[util.RespTypEve], result[util.RespTypMsg])
+		assert.Equal(t, util.RespEveSucc, result[util.RespFieldEvent], result[util.RespFieldMessage])
 	})
 
 	t.Run("Delete account", func(t *testing.T) {
@@ -348,8 +348,8 @@ func TestMySQLAccounts(t *testing.T) {
 
 		result, err = mysqlOps.deleteUserOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, util.RespEveFail, result[util.RespTypEve])
-		assert.Equal(t, ErrNoUserName.Error(), result[util.RespTypMsg])
+		assert.Equal(t, util.RespEveFail, result[util.RespFieldEvent])
+		assert.Equal(t, ErrNoUserName.Error(), result[util.RespFieldMessage])
 
 		req.Metadata["userName"] = userName
 		deleteUserCmd := fmt.Sprintf("DROP USER IF EXISTS '%s'@'%%';", req.Metadata["userName"])
@@ -357,7 +357,7 @@ func TestMySQLAccounts(t *testing.T) {
 
 		result, err = mysqlOps.deleteUserOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, util.RespEveSucc, result[util.RespTypEve], result[util.RespTypMsg])
+		assert.Equal(t, util.RespEveSucc, result[util.RespFieldEvent], result[util.RespFieldMessage])
 	})
 	t.Run("Describe account", func(t *testing.T) {
 		var err error
@@ -372,8 +372,8 @@ func TestMySQLAccounts(t *testing.T) {
 
 		result, err = mysqlOps.describeUserOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, util.RespEveFail, result[util.RespTypEve])
-		assert.Equal(t, ErrNoUserName.Error(), result[util.RespTypMsg])
+		assert.Equal(t, util.RespEveFail, result[util.RespFieldEvent])
+		assert.Equal(t, ErrNoUserName.Error(), result[util.RespFieldMessage])
 
 		req.Metadata["userName"] = userName
 
@@ -383,9 +383,9 @@ func TestMySQLAccounts(t *testing.T) {
 
 		result, err = mysqlOps.describeUserOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, util.RespEveSucc, result[util.RespTypEve])
+		assert.Equal(t, util.RespEveSucc, result[util.RespFieldEvent])
 
-		data := result[util.RespTypMsg].(string)
+		data := result[util.RespFieldMessage].(string)
 		users := []util.UserInfo{}
 		err = json.Unmarshal([]byte(data), &users)
 		assert.Nil(t, err)
@@ -414,8 +414,8 @@ func TestMySQLAccounts(t *testing.T) {
 
 		result, err = mysqlOps.listUsersOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, util.RespEveSucc, result[util.RespTypEve], result[util.RespTypMsg])
-		data := result[util.RespTypMsg].(string)
+		assert.Equal(t, util.RespEveSucc, result[util.RespFieldEvent], result[util.RespFieldMessage])
+		data := result[util.RespFieldMessage].(string)
 		users := []util.UserInfo{}
 		err = json.Unmarshal([]byte(data), &users)
 		assert.Nil(t, err)
@@ -433,14 +433,14 @@ func TestMySQLAccounts(t *testing.T) {
 
 		result, err = mysqlOps.grantUserRoleOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, util.RespEveFail, result[util.RespTypEve])
-		assert.Equal(t, ErrNoUserName.Error(), result[util.RespTypMsg])
+		assert.Equal(t, util.RespEveFail, result[util.RespFieldEvent])
+		assert.Equal(t, ErrNoUserName.Error(), result[util.RespFieldMessage])
 
 		req.Metadata["userName"] = userName
 		result, err = mysqlOps.grantUserRoleOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, util.RespEveFail, result[util.RespTypEve])
-		assert.Equal(t, ErrNoRoleName.Error(), result[util.RespTypMsg])
+		assert.Equal(t, util.RespEveFail, result[util.RespFieldEvent])
+		assert.Equal(t, ErrNoRoleName.Error(), result[util.RespFieldMessage])
 
 		req.Metadata["roleName"] = roleName
 		roleDesc, err := mysqlOps.role2Priv(req.Metadata["roleName"])
@@ -450,7 +450,7 @@ func TestMySQLAccounts(t *testing.T) {
 		mock.ExpectExec(grantRoleCmd).WillReturnResult(sqlmock.NewResult(1, 1))
 		result, err = mysqlOps.grantUserRoleOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, util.RespEveSucc, result[util.RespTypEve], result[util.RespTypMsg])
+		assert.Equal(t, util.RespEveSucc, result[util.RespFieldEvent], result[util.RespFieldMessage])
 	})
 
 	t.Run("Revoke Roles", func(t *testing.T) {
@@ -463,14 +463,14 @@ func TestMySQLAccounts(t *testing.T) {
 
 		result, err = mysqlOps.revokeUserRoleOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, util.RespEveFail, result[util.RespTypEve])
-		assert.Equal(t, ErrNoUserName.Error(), result[util.RespTypMsg])
+		assert.Equal(t, util.RespEveFail, result[util.RespFieldEvent])
+		assert.Equal(t, ErrNoUserName.Error(), result[util.RespFieldMessage])
 
 		req.Metadata["userName"] = userName
 		result, err = mysqlOps.revokeUserRoleOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, util.RespEveFail, result[util.RespTypEve])
-		assert.Equal(t, ErrNoRoleName.Error(), result[util.RespTypMsg])
+		assert.Equal(t, util.RespEveFail, result[util.RespFieldEvent])
+		assert.Equal(t, ErrNoRoleName.Error(), result[util.RespFieldMessage])
 
 		req.Metadata["roleName"] = roleName
 		roleDesc, err := mysqlOps.role2Priv(req.Metadata["roleName"])
@@ -480,7 +480,7 @@ func TestMySQLAccounts(t *testing.T) {
 		mock.ExpectExec(revokeRoleCmd).WillReturnResult(sqlmock.NewResult(1, 1))
 		result, err = mysqlOps.revokeUserRoleOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, util.RespEveSucc, result[util.RespTypEve], result[util.RespTypMsg])
+		assert.Equal(t, util.RespEveSucc, result[util.RespFieldEvent], result[util.RespFieldMessage])
 	})
 	t.Run("List System Accounts", func(t *testing.T) {
 		var err error
@@ -500,8 +500,8 @@ func TestMySQLAccounts(t *testing.T) {
 
 		result, err = mysqlOps.listSystemAccountsOps(ctx, req, resp)
 		assert.Nil(t, err)
-		assert.Equal(t, util.RespEveSucc, result[util.RespTypEve], result[util.RespTypMsg])
-		data := result[util.RespTypMsg].(string)
+		assert.Equal(t, util.RespEveSucc, result[util.RespFieldEvent], result[util.RespFieldMessage])
+		data := result[util.RespFieldMessage].(string)
 		users := []string{}
 		err = json.Unmarshal([]byte(data), &users)
 		assert.Nil(t, err)

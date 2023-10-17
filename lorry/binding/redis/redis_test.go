@@ -86,7 +86,7 @@ func TestRedisInvokeCreate(t *testing.T) {
 
 	err = json.Unmarshal(bindingRes.Data, &result)
 	assert.Nil(t, err)
-	assert.Equal(t, util.RespEveSucc, result[util.RespTypEve], result[util.RespTypMsg])
+	assert.Equal(t, util.RespEveSucc, result[util.RespFieldEvent], result[util.RespFieldMessage])
 }
 
 func TestRedisInvokeGet(t *testing.T) {
@@ -109,7 +109,7 @@ func TestRedisInvokeGet(t *testing.T) {
 	assert.NotNil(t, bindingRes.Data)
 	err = json.Unmarshal(bindingRes.Data, &opsResult)
 	assert.Nil(t, err)
-	assert.Equal(t, util.RespEveFail, opsResult[util.RespTypEve])
+	assert.Equal(t, util.RespEveFail, opsResult[util.RespFieldEvent])
 
 	// invoke one more time
 	bindingRes, err = r.Invoke(context.TODO(), request)
@@ -117,9 +117,9 @@ func TestRedisInvokeGet(t *testing.T) {
 	assert.NotNil(t, bindingRes.Data)
 	err = json.Unmarshal(bindingRes.Data, &opsResult)
 	assert.Nil(t, err)
-	assert.Equal(t, util.RespEveSucc, opsResult[util.RespTypEve])
+	assert.Equal(t, util.RespEveSucc, opsResult[util.RespFieldEvent])
 	var o1 interface{}
-	_ = json.Unmarshal([]byte(opsResult[util.RespTypMsg].(string)), &o1)
+	_ = json.Unmarshal([]byte(opsResult[util.RespFieldMessage].(string)), &o1)
 	assert.Equal(t, testData, o1)
 }
 
@@ -142,7 +142,7 @@ func TestRedisInvokeDelete(t *testing.T) {
 	assert.NotNil(t, bindingRes.Data)
 	err = json.Unmarshal(bindingRes.Data, &opsResult)
 	assert.Nil(t, err)
-	assert.Equal(t, util.RespEveSucc, opsResult[util.RespTypEve])
+	assert.Equal(t, util.RespEveSucc, opsResult[util.RespFieldEvent])
 }
 
 func TestRedisGetRoles(t *testing.T) {
@@ -164,7 +164,7 @@ func TestRedisGetRoles(t *testing.T) {
 	assert.NotNil(t, bindingRes.Data)
 	err = json.Unmarshal(bindingRes.Data, &opsResult)
 	assert.Nil(t, err)
-	assert.Equal(t, util.RespEveSucc, opsResult[util.RespTypEve])
+	assert.Equal(t, util.RespEveSucc, opsResult[util.RespFieldEvent])
 	assert.Equal(t, PRIMARY, opsResult["role"])
 
 	// invoke one more time
@@ -172,7 +172,7 @@ func TestRedisGetRoles(t *testing.T) {
 	assert.Nil(t, err)
 	err = json.Unmarshal(bindingRes.Data, &opsResult)
 	assert.Nil(t, err)
-	assert.Equal(t, util.RespEveSucc, opsResult[util.RespTypEve])
+	assert.Equal(t, util.RespEveSucc, opsResult[util.RespFieldEvent])
 	assert.Equal(t, SECONDARY, opsResult["role"])
 }
 
@@ -196,10 +196,10 @@ func TestRedisAccounts(t *testing.T) {
 		// parse result
 		opsResult := OpsResult{}
 		_ = json.Unmarshal(response.Data, &opsResult)
-		assert.Equal(t, util.RespEveSucc, opsResult[util.RespTypEve], opsResult[util.RespTypMsg])
+		assert.Equal(t, util.RespEveSucc, opsResult[util.RespFieldEvent], opsResult[util.RespFieldMessage])
 
 		users := make([]util.UserInfo, 0)
-		err = json.Unmarshal([]byte(opsResult[util.RespTypMsg].(string)), &users)
+		err = json.Unmarshal([]byte(opsResult[util.RespFieldMessage].(string)), &users)
 		assert.Nil(t, err)
 		assert.NotEmpty(t, users)
 		user := users[0]
@@ -258,8 +258,8 @@ func TestRedisAccounts(t *testing.T) {
 			assert.NotNil(t, response.Data)
 			err = json.Unmarshal(response.Data, &opsResult)
 			assert.Nil(t, err)
-			assert.Equal(t, accTest.expectEveType, opsResult[util.RespTypEve], opsResult[util.RespTypMsg])
-			assert.Contains(t, opsResult[util.RespTypMsg], accTest.expectEveMsg)
+			assert.Equal(t, accTest.expectEveType, opsResult[util.RespFieldEvent], opsResult[util.RespFieldMessage])
+			assert.Contains(t, opsResult[util.RespFieldMessage], accTest.expectEveMsg)
 		}
 		mock.ClearExpect()
 	})
@@ -322,9 +322,9 @@ func TestRedisAccounts(t *testing.T) {
 				assert.NotNil(t, response.Data)
 				err = json.Unmarshal(response.Data, &opsResult)
 				assert.Nil(t, err)
-				assert.Equal(t, accTest.expectEveType, opsResult[util.RespTypEve], opsResult[util.RespTypMsg])
+				assert.Equal(t, accTest.expectEveType, opsResult[util.RespFieldEvent], opsResult[util.RespFieldMessage])
 				if len(accTest.expectEveMsg) > 0 {
-					assert.Contains(t, accTest.expectEveMsg, opsResult[util.RespTypMsg])
+					assert.Contains(t, accTest.expectEveMsg, opsResult[util.RespFieldMessage])
 				}
 			}
 		}
@@ -414,14 +414,14 @@ func TestRedisAccounts(t *testing.T) {
 			assert.NotNil(t, response.Data)
 			err = json.Unmarshal(response.Data, &opsResult)
 			assert.Nil(t, err)
-			assert.Equal(t, accTest.expectEveType, opsResult[util.RespTypEve], opsResult[util.RespTypMsg])
+			assert.Equal(t, accTest.expectEveType, opsResult[util.RespFieldEvent], opsResult[util.RespFieldMessage])
 			if len(accTest.expectEveMsg) > 0 {
-				assert.Contains(t, opsResult[util.RespTypMsg], accTest.expectEveMsg)
+				assert.Contains(t, opsResult[util.RespFieldMessage], accTest.expectEveMsg)
 			}
-			if util.RespEveSucc == opsResult[util.RespTypEve] {
+			if util.RespEveSucc == opsResult[util.RespFieldEvent] {
 				// parse user info
 				users := make([]util.UserInfo, 0)
-				err = json.Unmarshal([]byte(opsResult[util.RespTypMsg].(string)), &users)
+				err = json.Unmarshal([]byte(opsResult[util.RespFieldMessage].(string)), &users)
 				assert.Nil(t, err)
 				assert.Len(t, users, 1)
 				user := users[0]
@@ -475,8 +475,8 @@ func TestRedisAccounts(t *testing.T) {
 			assert.NotNil(t, response.Data)
 			err = json.Unmarshal(response.Data, &opsResult)
 			assert.Nil(t, err)
-			assert.Equal(t, accTest.expectEveType, opsResult[util.RespTypEve], opsResult[util.RespTypMsg])
-			assert.Contains(t, opsResult[util.RespTypMsg], accTest.expectEveMsg)
+			assert.Equal(t, accTest.expectEveType, opsResult[util.RespFieldEvent], opsResult[util.RespFieldMessage])
+			assert.Contains(t, opsResult[util.RespFieldMessage], accTest.expectEveMsg)
 		}
 		mock.ClearExpect()
 	})
@@ -543,10 +543,10 @@ func TestRedisAccounts(t *testing.T) {
 		// parse result
 		opsResult := OpsResult{}
 		_ = json.Unmarshal(response.Data, &opsResult)
-		assert.Equal(t, util.RespEveSucc, opsResult[util.RespTypEve], opsResult[util.RespTypMsg])
+		assert.Equal(t, util.RespEveSucc, opsResult[util.RespFieldEvent], opsResult[util.RespFieldMessage])
 
 		users := []string{}
-		err = json.Unmarshal([]byte(opsResult[util.RespTypMsg].(string)), &users)
+		err = json.Unmarshal([]byte(opsResult[util.RespFieldMessage].(string)), &users)
 		assert.Nil(t, err)
 		assert.NotEmpty(t, users)
 		assert.Len(t, users, 2)

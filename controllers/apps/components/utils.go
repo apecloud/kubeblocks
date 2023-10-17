@@ -68,7 +68,7 @@ func ListObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L g
 	return objs, nil
 }
 
-func listRSMOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*workloads.ReplicatedStateMachine, error) {
+func ListRSMOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*workloads.ReplicatedStateMachine, error) {
 	return ListObjWithLabelsInNamespace(ctx, cli, generics.RSMSignature, namespace, labels)
 }
 
@@ -175,8 +175,8 @@ func GetComponentPodListWithRole(ctx context.Context, cli client.Client, cluster
 	return podList, nil
 }
 
-// isProbeTimeout checks if the application of the pod is probe timed out.
-func isProbeTimeout(probes *appsv1alpha1.ClusterDefinitionProbes, podsReadyTime *metav1.Time) bool {
+// IsProbeTimeout checks if the application of the pod is probe timed out.
+func IsProbeTimeout(probes *appsv1alpha1.ClusterDefinitionProbes, podsReadyTime *metav1.Time) bool {
 	if podsReadyTime == nil {
 		return false
 	}
@@ -565,8 +565,8 @@ func getCustomLabelSupportKind() []string {
 	}
 }
 
-// updateComponentInfoToPods patches current component's replicas to all belonging pods, as an annotation.
-func updateComponentInfoToPods(
+// UpdateComponentInfoToPods patches current component's replicas to all belonging pods, as an annotation.
+func UpdateComponentInfoToPods(
 	ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
@@ -620,8 +620,8 @@ func updateComponentInfoToPods(
 	return nil
 }
 
-// updateCustomLabelToPods updates custom label to pods
-func updateCustomLabelToPods(ctx context.Context,
+// UpdateCustomLabelToPods updates custom label to pods
+func UpdateCustomLabelToPods(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *componentutil.SynthesizedComponent,

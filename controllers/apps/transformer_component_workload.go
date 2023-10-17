@@ -56,16 +56,20 @@ type ComponentWorkloadTransformer struct {
 	client.Client
 }
 
-// ComponentWorkloadOps handles component rsm workload ops
-type ComponentWorkloadOps struct {
+// componentWorkloadOps handles component rsm workload ops
+type componentWorkloadOps struct {
 	cli            client.Client
 	reqCtx         intctrlutil.RequestCtx
 	cluster        *appsv1alpha1.Cluster
 	synthesizeComp *component.SynthesizedComponent
-	rsm            *workloads.ReplicatedStateMachine
-	oldSnapshotRSM *workloads.ReplicatedStateMachine
-	workloadVertex *ictrltypes.LifecycleVertex
 	dag            *graph.DAG
+
+	// runningRSM is a snapshot of the rsm that is already running
+	runningRSM *workloads.ReplicatedStateMachine
+	// protoRSM is the rsm object that is rebuilt from scratch during each reconcile process
+	protoRSM *workloads.ReplicatedStateMachine
+	// workloadVertex is the vertex of the protoRSM workload in the DAG
+	workloadVertex *ictrltypes.LifecycleVertex
 }
 
 var _ graph.Transformer = &ComponentWorkloadTransformer{}
@@ -203,7 +207,7 @@ func (t *ComponentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 			if rsmWorkloadVertex == nil {
 				rsmWorkloadVertex = updateResource(dag, rsm, nil)
 			}
-			cwo := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, rsm, oldRsmObj, rsmWorkloadVertex, dag)
+			cwo := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, oldRsmObj, rsm, rsmWorkloadVertex, dag)
 
 			// handle rsm workload restart
 			if err := cwo.restart(); err != nil {
@@ -388,13 +392,13 @@ func copyAndMerge(oldObj, newObj client.Object, cluster *appsv1alpha1.Cluster) c
 }
 
 // restart handles rsm workload restart by patch pod template annotation
-func (r *ComponentWorkloadOps) restart() error {
-	return components.RestartPod(&r.rsm.Spec.Template)
+func (r *componentWorkloadOps) restart() error {
+	return components.RestartPod(&r.runningRSM.Spec.Template)
 }
 
 // expandVolume handles rsm workload expand volume
-func (r *ComponentWorkloadOps) expandVolume() error {
-	for _, vct := range r.rsm.Spec.VolumeClaimTemplates {
+func (r *componentWorkloadOps) expandVolume() error {
+	for _, vct := range r.runningRSM.Spec.VolumeClaimTemplates {
 		var proto *corev1.PersistentVolumeClaimTemplate
 		for _, v := range r.synthesizeComp.VolumeClaimTemplates {
 			if v.Name == vct.Name {
@@ -415,8 +419,8 @@ func (r *ComponentWorkloadOps) expandVolume() error {
 }
 
 // horizontalScale handles rsm workload horizontal scale
-func (r *ComponentWorkloadOps) horizontalScale() error {
-	sts := components.ConvertRSMToSTS(r.rsm)
+func (r *componentWorkloadOps) horizontalScale() error {
+	sts := components.ConvertRSMToSTS(r.runningRSM)
 	if sts.Status.ReadyReplicas == r.synthesizeComp.Replicas {
 		return nil
 	}
@@ -454,15 +458,15 @@ func (r *ComponentWorkloadOps) horizontalScale() error {
 }
 
 // < 0 for scale in, > 0 for scale out, and == 0 for nothing
-func (r *ComponentWorkloadOps) horizontalScaling(synthesizeComp *component.SynthesizedComponent, stsObj *apps.StatefulSet) int {
+func (r *componentWorkloadOps) horizontalScaling(synthesizeComp *component.SynthesizedComponent, stsObj *apps.StatefulSet) int {
 	return int(synthesizeComp.Replicas - *stsObj.Spec.Replicas)
 }
 
-func (r *ComponentWorkloadOps) postScaleIn() error {
+func (r *componentWorkloadOps) postScaleIn() error {
 	return nil
 }
 
-func (r *ComponentWorkloadOps) postScaleOut(stsObj *apps.StatefulSet) error {
+func (r *componentWorkloadOps) postScaleOut(stsObj *apps.StatefulSet) error {
 	var (
 		snapshotKey = types.NamespacedName{
 			Namespace: stsObj.Namespace,
@@ -489,7 +493,7 @@ func (r *ComponentWorkloadOps) postScaleOut(stsObj *apps.StatefulSet) error {
 	return nil
 }
 
-func (r *ComponentWorkloadOps) scaleIn(stsObj *apps.StatefulSet) error {
+func (r *componentWorkloadOps) scaleIn(stsObj *apps.StatefulSet) error {
 	// if scale in to 0, do not delete pvcs
 	if r.synthesizeComp.Replicas == 0 {
 		r.reqCtx.Log.Info("scale in to 0, keep all PVCs")
@@ -504,7 +508,7 @@ func (r *ComponentWorkloadOps) scaleIn(stsObj *apps.StatefulSet) error {
 	return r.deletePVCs4ScaleIn(stsObj)
 }
 
-func (r *ComponentWorkloadOps) scaleOut(stsObj *apps.StatefulSet) error {
+func (r *componentWorkloadOps) scaleOut(stsObj *apps.StatefulSet) error {
 	var (
 		backupKey = types.NamespacedName{
 			Namespace: stsObj.Namespace,
@@ -551,8 +555,8 @@ func (r *ComponentWorkloadOps) scaleOut(stsObj *apps.StatefulSet) error {
 	}
 }
 
-func (r *ComponentWorkloadOps) updatePodReplicaLabel4Scaling(replicas int32) error {
-	pods, err := components.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.rsm.Namespace, constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name))
+func (r *componentWorkloadOps) updatePodReplicaLabel4Scaling(replicas int32) error {
+	pods, err := components.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name))
 	if err != nil {
 		return err
 	}
@@ -567,8 +571,8 @@ func (r *ComponentWorkloadOps) updatePodReplicaLabel4Scaling(replicas int32) err
 	return nil
 }
 
-func (r *ComponentWorkloadOps) leaveMember4ScaleIn() error {
-	pods, err := components.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.rsm.Namespace, constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name))
+func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
+	pods, err := components.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name))
 	if err != nil {
 		return err
 	}
@@ -601,7 +605,7 @@ func (r *ComponentWorkloadOps) leaveMember4ScaleIn() error {
 	return err // TODO: use requeue-after
 }
 
-func (r *ComponentWorkloadOps) deletePVCs4ScaleIn(stsObj *apps.StatefulSet) error {
+func (r *componentWorkloadOps) deletePVCs4ScaleIn(stsObj *apps.StatefulSet) error {
 	for i := r.synthesizeComp.Replicas; i < *stsObj.Spec.Replicas; i++ {
 		for _, vct := range stsObj.Spec.VolumeClaimTemplates {
 			pvcKey := types.NamespacedName{
@@ -622,13 +626,13 @@ func (r *ComponentWorkloadOps) deletePVCs4ScaleIn(stsObj *apps.StatefulSet) erro
 	return nil
 }
 
-func (r *ComponentWorkloadOps) expandVolumes(vctName string, proto *corev1.PersistentVolumeClaimTemplate) error {
+func (r *componentWorkloadOps) expandVolumes(vctName string, proto *corev1.PersistentVolumeClaimTemplate) error {
 	pvcNotFound := false
-	for i := *r.rsm.Spec.Replicas - 1; i >= 0; i-- {
+	for i := *r.runningRSM.Spec.Replicas - 1; i >= 0; i-- {
 		pvc := &corev1.PersistentVolumeClaim{}
 		pvcKey := types.NamespacedName{
-			Namespace: r.rsm.GetNamespace(),
-			Name:      fmt.Sprintf("%s-%s-%d", vctName, r.rsm.Name, i),
+			Namespace: r.runningRSM.GetNamespace(),
+			Name:      fmt.Sprintf("%s-%s-%d", vctName, r.runningRSM.Name, i),
 		}
 		if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, pvc); err != nil {
 			if apierrors.IsNotFound(err) {
@@ -644,7 +648,7 @@ func (r *ComponentWorkloadOps) expandVolumes(vctName string, proto *corev1.Persi
 	return nil
 }
 
-func (r *ComponentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
+func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 	pvc *corev1.PersistentVolumeClaim, pvcNotFound bool, vctProto *corev1.PersistentVolumeClaimTemplate) error {
 	// reference: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#recovering-from-failure-when-expanding-volumes
 	// 1. Mark the PersistentVolume(PV) that is bound to the PersistentVolumeClaim(PVC) with Retain reclaim policy.
@@ -860,17 +864,17 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	synthesizeComp *component.SynthesizedComponent,
-	rsm *workloads.ReplicatedStateMachine,
-	snapshotRSM *workloads.ReplicatedStateMachine,
+	runningRSM *workloads.ReplicatedStateMachine,
+	protoRSM *workloads.ReplicatedStateMachine,
 	workloadVertex *ictrltypes.LifecycleVertex,
-	dag *graph.DAG) *ComponentWorkloadOps {
-	return &ComponentWorkloadOps{
+	dag *graph.DAG) *componentWorkloadOps {
+	return &componentWorkloadOps{
 		cli:            cli,
 		reqCtx:         reqCtx,
 		cluster:        cluster,
 		synthesizeComp: synthesizeComp,
-		rsm:            rsm,
-		oldSnapshotRSM: snapshotRSM,
+		runningRSM:     runningRSM,
+		protoRSM:       protoRSM,
 		workloadVertex: workloadVertex,
 		dag:            dag,
 	}

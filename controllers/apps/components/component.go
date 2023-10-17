@@ -197,7 +197,7 @@ func (c *rsmComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Client, bu
 }
 
 func (c *rsmComponent) loadRunningWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client) (*workloads.ReplicatedStateMachine, error) {
-	rsmList, err := listRSMOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.getMatchingLabels())
+	rsmList, err := ListRSMOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.getMatchingLabels())
 	if err != nil {
 		return nil, err
 	}
@@ -360,12 +360,13 @@ func (c *rsmComponent) status(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 	c.updateWorkload(c.runningWorkload)
 
 	// update component info to pods' annotations
-	if err := updateComponentInfoToPods(reqCtx.Ctx, cli, c.Cluster, c.component, c.dag); err != nil {
+	if err := UpdateComponentInfoToPods(reqCtx.Ctx, cli, c.Cluster, c.component, c.dag); err != nil {
 		return err
 	}
 
 	// patch the current componentSpec workload's custom labels
-	if err := updateCustomLabelToPods(reqCtx.Ctx, cli, c.Cluster, c.component, c.dag); err != nil {
+	// TODO(xingran): refactor custom labels to component.Spec.labels and remove it from componentStatus Transformer
+	if err := UpdateCustomLabelToPods(reqCtx.Ctx, cli, c.Cluster, c.component, c.dag); err != nil {
 		reqCtx.Event(c.Cluster, corev1.EventTypeWarning, "component Workload Controller PatchWorkloadCustomLabelFailed", err.Error())
 		return err
 	}
@@ -580,7 +581,7 @@ func (c *rsmComponent) hasFailedPod(reqCtx intctrlutil.RequestCtx, cli client.Cl
 				continue
 			}
 			podsReadyTime := &condition.LastTransitionTime
-			if isProbeTimeout(c.component.Probes, podsReadyTime) {
+			if IsProbeTimeout(c.component.Probes, podsReadyTime) {
 				hasProbeTimeout = true
 				if messages == nil {
 					messages = appsv1alpha1.ComponentMessageMap{}
@@ -718,15 +719,15 @@ func (c *rsmComponent) isScaleOutFailed(reqCtx intctrlutil.RequestCtx, cli clien
 	if err != nil {
 		return false, err
 	}
-	if status, err := d.checkBackupStatus(); err != nil {
+	if status, err := d.CheckBackupStatus(); err != nil {
 		return false, err
-	} else if status == backupStatusFailed {
+	} else if status == BackupStatusFailed {
 		return true, nil
 	}
 	for i := *c.runningWorkload.Spec.Replicas; i < c.component.Replicas; i++ {
-		if status, err := d.checkRestoreStatus(i); err != nil {
+		if status, err := d.CheckRestoreStatus(i); err != nil {
 			return false, err
-		} else if status == backupStatusFailed {
+		} else if status == BackupStatusFailed {
 			return true, nil
 		}
 	}

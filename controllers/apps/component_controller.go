@@ -90,8 +90,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&ComponentConfigurationRenderTransformer{Client: r.Client},
 			// add our finalizer to all objects
 			&ComponentOwnershipTransformer{},
-			// update cluster status
-			&ComponentStatusTransformer{},
+			// update component status
+			&ComponentStatusTransformer{Client: r.Client},
 		).
 		Build()
 

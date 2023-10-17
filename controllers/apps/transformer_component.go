@@ -49,6 +49,8 @@ func (c *ComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.
 		Recorder: transCtx.EventRecorder,
 	}
 
+	// TODO(xingran): build component object
+
 	var err error
 	dags4Component := make([]*graph.DAG, 0)
 	if cluster.IsStatusUpdating() {

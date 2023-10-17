@@ -58,7 +58,7 @@ func TestIsProbeTimeout(t *testing.T) {
 			RoleProbeTimeoutAfterPodsReady: appsv1alpha1.DefaultRoleProbeTimeoutAfterPodsReady,
 		},
 	}
-	if !isProbeTimeout(compDef.Probes, podsReadyTime) {
+	if !IsProbeTimeout(compDef.Probes, podsReadyTime) {
 		t.Error("probe timed out should be true")
 	}
 }
@@ -243,7 +243,7 @@ var _ = Describe("Component Utils", func() {
 				}
 				dag := graph.NewDAG()
 				dag.AddVertex(&types.LifecycleVertex{Obj: pods[0], Action: types.ActionUpdatePtr()})
-				Expect(updateCustomLabelToPods(testCtx.Ctx, k8sClient, cluster, comp, dag)).Should(Succeed())
+				Expect(UpdateCustomLabelToPods(testCtx.Ctx, k8sClient, cluster, comp, dag)).Should(Succeed())
 				podVertices := types.FindAll[*corev1.Pod](dag)
 				Expect(podVertices).Should(HaveLen(3))
 				for _, vertex := range podVertices {

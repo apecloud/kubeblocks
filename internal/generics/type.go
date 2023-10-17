@@ -30,6 +30,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -115,6 +116,8 @@ var BackupSignature = func(_ dpv1alpha1.Backup, _ *dpv1alpha1.Backup, _ dpv1alph
 var BackupScheduleSignature = func(_ dpv1alpha1.BackupSchedule, _ *dpv1alpha1.BackupSchedule, _ dpv1alpha1.BackupScheduleList, _ *dpv1alpha1.BackupScheduleList) {
 }
 var RestoreSignature = func(_ dpv1alpha1.Restore, _ *dpv1alpha1.Restore, _ dpv1alpha1.RestoreList, _ *dpv1alpha1.RestoreList) {
+}
+var ReferenceGrantSignature = func(_ gatewayv1beta1.ReferenceGrant, _ *gatewayv1beta1.ReferenceGrant, _ gatewayv1beta1.ReferenceGrantList, _ *gatewayv1beta1.ReferenceGrantList) {
 }
 var ActionSetSignature = func(_ dpv1alpha1.ActionSet, _ *dpv1alpha1.ActionSet, _ dpv1alpha1.ActionSetList, _ *dpv1alpha1.ActionSetList) {
 }

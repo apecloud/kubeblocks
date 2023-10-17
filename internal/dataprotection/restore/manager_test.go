@@ -41,7 +41,7 @@ import (
 	testdp "github.com/apecloud/kubeblocks/internal/testutil/dataprotection"
 )
 
-var _ = Describe("Backup Deleter Test", func() {
+var _ = Describe("Restore Manager Test", func() {
 
 	cleanEnv := func() {
 		By("clean resources")
@@ -90,23 +90,6 @@ var _ = Describe("Backup Deleter Test", func() {
 				&dpv1alpha1.ActionSet{}, testapps.WithName(testdp.ActionSetName))
 
 		})
-
-		mockBackupForRestore := func(testCtx *testutil.TestContext, actionSetName, backupPVCName string, mockBackupCompleted, useVolumeSnapshotBackup bool) *dpv1alpha1.Backup {
-			backup := testdp.NewFakeBackup(testCtx, nil)
-			if mockBackupCompleted {
-				// then mock backup to completed
-				backupMethodName := testdp.BackupMethodName
-				if useVolumeSnapshotBackup {
-					backupMethodName = testdp.VSBackupMethodName
-				}
-				Expect(testapps.ChangeObjStatus(testCtx, backup, func() {
-					backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
-					backup.Status.PersistentVolumeClaimName = backupPVCName
-					testdp.MockBackupStatusMethod(backup, backupMethodName, testdp.DataVolumeName, actionSetName)
-				})).Should(Succeed())
-			}
-			return backup
-		}
 
 		initResources := func(reqCtx intctrlutil.RequestCtx, startingIndex int, useVolumeSnapshotBackup bool, change func(f *testdp.MockRestoreFactory)) (*RestoreManager, *BackupActionSet) {
 			By("create a completed backup")
@@ -297,3 +280,20 @@ var _ = Describe("Backup Deleter Test", func() {
 	})
 
 })
+
+func mockBackupForRestore(testCtx *testutil.TestContext, actionSetName, backupPVCName string, mockBackupCompleted, useVolumeSnapshotBackup bool) *dpv1alpha1.Backup {
+	backup := testdp.NewFakeBackup(testCtx, nil)
+	if mockBackupCompleted {
+		// then mock backup to completed
+		backupMethodName := testdp.BackupMethodName
+		if useVolumeSnapshotBackup {
+			backupMethodName = testdp.VSBackupMethodName
+		}
+		Expect(testapps.ChangeObjStatus(testCtx, backup, func() {
+			backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+			backup.Status.PersistentVolumeClaimName = backupPVCName
+			testdp.MockBackupStatusMethod(backup, backupMethodName, testdp.DataVolumeName, actionSetName)
+		})).Should(Succeed())
+	}
+	return backup
+}

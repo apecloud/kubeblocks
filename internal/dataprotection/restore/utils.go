@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -224,15 +225,24 @@ func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	recorder record.EventRecorder,
 	restoreMgr *RestoreManager) error {
-
-	// get backupActionSet based on the specified backup name.
 	backupName := restoreMgr.Restore.Spec.Backup.Name
-	backupSet, err := restoreMgr.GetBackupActionSetByNamespaced(reqCtx, cli, backupName, restoreMgr.Restore.Spec.Backup.Namespace)
+	backupNamespace := restoreMgr.Restore.Spec.Backup.Namespace
+	restoreNamespace := restoreMgr.Restore.Namespace
+	if restoreNamespace != backupNamespace {
+		// check if there is permission for cross namespace recovery.
+		isGrant, err := isGrantedForCrossNamespace(reqCtx, cli, restoreNamespace, backupName, backupNamespace)
+		if err != nil {
+			return err
+		}
+		if !isGrant {
+			return intctrlutil.NewFatalError(fmt.Sprintf("accessing %s/%s isn't allowed", backupNamespace, backupName))
+		}
+	}
+	// get backupActionSet based on the specified backup name.
+	backupSet, err := restoreMgr.GetBackupActionSetByNamespaced(reqCtx, cli, backupName, backupNamespace)
 	if err != nil {
 		return err
 	}
-
-	// TODO: check if there is permission for cross namespace recovery.
 
 	// check if the backup is completed exclude continuous backup.
 	var backupType dpv1alpha1.BackupType
@@ -261,6 +271,43 @@ func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 		err = intctrlutil.NewFatalError(fmt.Sprintf("backup type of %s is empty", backupName))
 	}
 	return err
+}
+
+// isGrantedForCrossNamespace checks that accessing to {namespace}/{name} of backup is allowed.
+func isGrantedForCrossNamespace(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	restoreNamespace,
+	backupName,
+	backupNamespace string) (bool, error) {
+	rgList := &gatewayv1beta1.ReferenceGrantList{}
+	if err := cli.List(reqCtx.Ctx, rgList, client.InNamespace(backupNamespace)); err != nil {
+		return false, err
+	}
+	var allowed bool
+	for _, grant := range rgList.Items {
+		var validFrom bool
+		// "From" describes the resources can reference the resource "To".
+		for _, from := range grant.Spec.From {
+			if from.Group == dptypes.DataprotectionAPIGroup && from.Kind == dptypes.RestoreKind && string(from.Namespace) == restoreNamespace {
+				validFrom = true
+				break
+			}
+		}
+		if !validFrom {
+			continue
+		}
+		for _, to := range grant.Spec.To {
+			if to.Group != dptypes.DataprotectionAPIGroup || to.Kind != dptypes.BackupKind {
+				continue
+			}
+			if to.Name == nil || string(*to.Name) == "" || string(*to.Name) == backupName {
+				allowed = true
+				break
+			}
+		}
+
+	}
+	return allowed, nil
 }
 
 func cutJobName(jobName string) string {

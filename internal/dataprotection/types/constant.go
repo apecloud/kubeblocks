@@ -116,5 +116,6 @@ const (
 
 const (
 	RestoreKind            = "Restore"
+	BackupKind             = "Backup"
 	DataprotectionAPIGroup = "dataprotection.kubeblocks.io"
 )

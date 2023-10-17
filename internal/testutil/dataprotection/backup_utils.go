@@ -222,7 +222,7 @@ func MockBackupStatusMethod(backup *dpv1alpha1.Backup, backupMethodName, targetV
 		TargetVolumes: &dpv1alpha1.TargetVolumeInfo{
 			Volumes: []string{targetVolume},
 			VolumeMounts: []corev1.VolumeMount{
-				{Name: targetVolume, MountPath: "/"},
+				{Name: targetVolume, MountPath: DataVolumeMountPath},
 			},
 		},
 	}

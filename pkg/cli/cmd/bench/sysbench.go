@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubebench/api/v1alpha1"
-
 	"github.com/apecloud/kubeblocks/pkg/cli/cluster"
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
 )
@@ -125,20 +124,20 @@ func (o *SysBenchOptions) Complete(args []string) error {
 
 	o.Step, o.name = parseStepAndName(args, "sysbench")
 
+	o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return err
+	}
+
+	if o.dynamic, err = o.factory.DynamicClient(); err != nil {
+		return err
+	}
+
+	if o.client, err = o.factory.KubernetesClientSet(); err != nil {
+		return err
+	}
+
 	if o.ClusterName != "" {
-		o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
-		if err != nil {
-			return err
-		}
-
-		if o.dynamic, err = o.factory.DynamicClient(); err != nil {
-			return err
-		}
-
-		if o.client, err = o.factory.KubernetesClientSet(); err != nil {
-			return err
-		}
-
 		clusterGetter := cluster.ObjectsGetter{
 			Client:    o.client,
 			Dynamic:   o.dynamic,

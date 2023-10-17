@@ -44,7 +44,7 @@ kbcli cluster list mongodb-cluster
 kubectl -n demo get cluster mongodb-cluster 
 >
 NAME              CLUSTER-DEFINITION   VERSION          TERMINATION-POLICY   STATUS    AGE
-mongodb-cluster   mongodb              mongodb-5.0.14   Delete               Running   17m
+mongodb-cluster   mongodb              mongodb-5.0   Delete               Running   17m
 ```
 
 </TabItem>

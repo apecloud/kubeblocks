@@ -39,13 +39,13 @@ kbcli cluster list mongodb-cluster
       ***Example***
 
       ```bash
-      kbcli cluster vscale mongodb-cluster --component-names=mongodb --cpu=500m --memory=500Mi
+      kbcli cluster vscale mongodb-cluster --components=mongodb --cpu=500m --memory=500Mi
       >
       OpsRequest mongodb-cluster-verticalscaling-thglk created successfully, you can view the progress:
              kbcli cluster describe-ops mongodb-cluster-verticalscaling-thglk -n default
       ```
 
-   - `--component-names` describes the component name ready for vertical scaling.
+   - `--components` describes the component name ready for vertical scaling.
    - `--memory` describes the requested and limited size of the component memory.
    - `--cpu` describes the requested and limited size of the component CPU.
 
@@ -71,7 +71,7 @@ kbcli cluster list mongodb-cluster
      namespace: default
    spec:
      clusterDefinitionRef: mongodb
-     clusterVersionRef: mongodb-5.0.14
+     clusterVersionRef: mongodb-5.0
      componentSpecs:
      - name: mongodb
        componentDefRef: mongodb
@@ -100,7 +100,7 @@ kbcli cluster list mongodb-cluster
     kbcli cluster list mongodb-cluster
     >
     NAME              NAMESPACE   CLUSTER-DEFINITION   VERSION          TERMINATION-POLICY   STATUS    CREATED-TIME                 
-    mongodb-cluster   default     mongodb              mongodb-5.0.14   WipeOut              Running   Apr 26,2023 11:50 UTC+0800  
+    mongodb-cluster   default     mongodb              mongodb-5.0   WipeOut              Running   Apr 26,2023 11:50 UTC+0800  
     ```
 
    - STATUS=VerticalScaling: it means the vertical scaling is in progress.

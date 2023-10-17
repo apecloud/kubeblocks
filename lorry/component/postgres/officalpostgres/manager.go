@@ -63,7 +63,7 @@ func NewManager(logger logr.Logger) (*Manager, error) {
 	}
 
 	Mgr.Manager = *baseManager
-	component.RegisterManager("official-postgresql", util.Replication, Mgr)
+	component.RegisterManager("postgresql", util.Replication, Mgr)
 
 	return Mgr, nil
 }

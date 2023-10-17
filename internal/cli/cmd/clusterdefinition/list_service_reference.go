@@ -74,7 +74,7 @@ func listServiceRef(o *list.ListOptions) error {
 
 	p := printer.NewTablePrinter(o.Out)
 	p.SetHeader("NAME", "COMPONENT", "SERVICE-KIND", "SERVICE-VERSION")
-	p.SortBy(4, 1)
+	p.SortBy(1)
 	for _, info := range infos {
 		var cd v1alpha1.ClusterDefinition
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(info.Object.(*unstructured.Unstructured).Object, &cd); err != nil {

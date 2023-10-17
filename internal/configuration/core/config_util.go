@@ -66,7 +66,12 @@ func MergeUpdatedConfig(baseMap, updatedMap map[string]string) map[string]string
 func FromStringMap(m map[string]*string) map[string]interface{} {
 	r := make(map[string]interface{}, len(m))
 	for key, v := range m {
-		r[key] = v
+		if v != nil {
+			r[key] = *v
+		} else {
+			// delete config parameter if value is nil
+			r[key] = nil
+		}
 	}
 	return r
 }

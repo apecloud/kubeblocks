@@ -19,6 +19,7 @@ fi
 # default standby when pgdata is not empty
 if [ "$(ls -A ${PGDATA})" ]; then
   # touch "$PGDATA"/standby.signal
+  echo "postgresql has been initialized"
 else
   if [ "$KB_0_POD_NAME_PREFIX" != "$KB_POD_NAME" ]; then
     # Ensure 'daemon' user exists when running as 'root'

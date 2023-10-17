@@ -48,7 +48,6 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -295,7 +294,10 @@ func (c *rsmComponent) status(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 	if err != nil {
 		return err
 	}
-	isAllConfigSynced := c.isAllConfigSynced(reqCtx, cli)
+	isAllConfigSynced, err := c.isAllConfigSynced(reqCtx, cli)
+	if err != nil {
+		return err
+	}
 	hasFailedPod, messages, err := c.hasFailedPod(reqCtx, cli, pods)
 	if err != nil {
 		return err
@@ -578,36 +580,43 @@ func (c *rsmComponent) hasFailedPod(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	return hasProbeTimeout, messages, nil
 }
 
-func (c *rsmComponent) isAllConfigSynced(reqCtx intctrlutil.RequestCtx, cli client.Client) bool {
-	checkFinishedReconfigure := func(cm *corev1.ConfigMap) bool {
-		labels := cm.GetLabels()
-		annotations := cm.GetAnnotations()
-		if len(annotations) == 0 || len(labels) == 0 {
-			return false
-		}
-		hash, _ := util.ComputeHash(cm.Data)
-		return labels[constant.CMInsConfigurationHashLabelKey] == hash
+func (c *rsmComponent) isAllConfigSynced(reqCtx intctrlutil.RequestCtx, cli client.Client) (bool, error) {
+	var (
+		cmKey client.ObjectKey
+		cmObj = &corev1.ConfigMap{}
+	)
+
+	if len(c.component.ConfigTemplates) == 0 {
+		return true, nil
 	}
 
-	var (
-		cmKey           client.ObjectKey
-		cmObj           = &corev1.ConfigMap{}
-		allConfigSynced = true
-	)
+	configurationKey := client.ObjectKey{
+		Namespace: c.GetNamespace(),
+		Name:      cfgcore.GenerateComponentConfigurationName(c.GetClusterName(), c.GetName()),
+	}
+	configuration := &appsv1alpha1.Configuration{}
+	if err := cli.Get(reqCtx.Ctx, configurationKey, configuration); err != nil {
+		return false, err
+	}
 	for _, configSpec := range c.component.ConfigTemplates {
+		item := configuration.Spec.GetConfigurationItem(configSpec.Name)
+		status := configuration.Status.GetItemStatus(configSpec.Name)
+		// for creating phase
+		if item == nil || status == nil {
+			return false, nil
+		}
 		cmKey = client.ObjectKey{
 			Namespace: c.GetNamespace(),
 			Name:      cfgcore.GetComponentCfgName(c.GetClusterName(), c.GetName(), configSpec.Name),
 		}
 		if err := cli.Get(reqCtx.Ctx, cmKey, cmObj); err != nil {
-			return true
+			return false, err
 		}
-		if !checkFinishedReconfigure(cmObj) {
-			allConfigSynced = false
-			break
+		if intctrlutil.GetConfigSpecReconcilePhase(cmObj, *item, status) != appsv1alpha1.CFinishedPhase {
+			return false, nil
 		}
 	}
-	return allConfigSynced
+	return true, nil
 }
 
 func (c *rsmComponent) updateMembersStatus() {

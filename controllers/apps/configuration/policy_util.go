@@ -59,13 +59,7 @@ func getReplicationSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 func GetComponentPods(params reconfigureParams) ([]corev1.Pod, error) {
 	componentPods := make([]corev1.Pod, 0)
 	for i := range params.ComponentUnits {
-		pods, err := common.GetPodListByStatefulSetWithSelector(params.Ctx.Ctx,
-			params.Client,
-			&params.ComponentUnits[i],
-			client.MatchingLabels{
-				constant.KBAppComponentLabelKey: params.ClusterComponent.Name,
-				constant.AppInstanceLabelKey:    params.Cluster.Name,
-			})
+		pods, err := common.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, &params.ComponentUnits[i])
 		if err != nil {
 			return nil, err
 		}

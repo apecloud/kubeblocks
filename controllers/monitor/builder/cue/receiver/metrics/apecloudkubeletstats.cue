@@ -30,9 +30,9 @@ output:
 			endpoint: parameters.endpoint
 			extra_metadata_labels: ["k8s.volume.type", "kubeblocks"]
 			metric_groups: ["container", "pod", "volume"]
-			resource_attributes:
-        receiver: "apecloudkubeletstats"
 		}
+		resource_attributes:
+        receiver: "apecloudkubeletstats"
   }
 
 

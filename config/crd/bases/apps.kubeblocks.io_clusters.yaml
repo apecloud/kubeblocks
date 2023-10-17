@@ -234,6 +234,9 @@ spec:
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
+                      x-kubernetes-validations:
+                      - message: componentDefRef is immutable
+                        rule: self == oldSelf
                     enabledLogs:
                       description: enabledLogs indicates which log file takes effect
                         in the database cluster. element is the log type which is
@@ -296,6 +299,9 @@ spec:
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
+                      x-kubernetes-validations:
+                      - message: name is immutable
+                        rule: self == oldSelf
                     noCreatePDB:
                       default: false
                       description: noCreatePDB defines the PodDisruptionBudget creation

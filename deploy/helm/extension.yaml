@@ -1,19 +1,19 @@
 apiVersion: kubesphere.io/v1alpha1
 name: kubeblocks
-version: 0.6.2
+version: 0.6.3
 displayName:
   zh: KubeBlocks
   en: KubeBlocks
 description:
-  zh: KubeBlocks 是一个数据库工作负载管理平台，协助开发人员和平台工程师在他们自己的K8S中有效管理各种数据库。
-  en: KubeBlocks is a platform that assists developers and platform engineers in managing various database workloads, such as MySQL, PostgreSQL, Redis, MongoDB, Kafka, and vector databases.
+  zh: KubeBlocks 是一个基于 Kubernetes 的云原生数据基础设施管理平台，旨在为用户提供一种便捷的方式来管理和运维关系型数据库、NoSQL数据库、向量数据库以及流计算系统。
+  en: KubeBlocks is a cloud-native data infrastructure management platform based on Kubernetes, aiming to provide users with a convenient way to manage and operate relational, NoSQL, vector databases and streaming systems.
 category: database
 keywords:
   - kubernetes
   - database
   - streaming
   - message queue
-  - paas
+  - dbpaas
   - platform
 home: https://kubeblocks.io
 sources:
@@ -30,6 +30,5 @@ provider:
     email: "kubeblocks@apecloud.com"
     url: "https://kubeblocks.io/"
 icon: ./static/logo.svg
-screenshots:
-  - ./static/screenshot/kbcli.png
+screenshots: []
 installationMode: Multicluster

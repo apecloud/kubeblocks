@@ -42,7 +42,7 @@ const (
 	urlTemplate = "http://%s:%d/v1.0/"
 )
 
-type HttpClient struct {
+type HTTPClient struct {
 	Client           *http.Client
 	Port             int32
 	URL              string
@@ -52,7 +52,7 @@ type HttpClient struct {
 	RequestTimeout   time.Duration
 }
 
-var _ Client = &HttpClient{}
+var _ Client = &HTTPClient{}
 
 type OperationResult struct {
 	response *http.Response
@@ -60,7 +60,7 @@ type OperationResult struct {
 	respTime time.Time
 }
 
-func NewClientWithPod(pod *corev1.Pod) (*HttpClient, error) {
+func NewHTTPClientWithPod(pod *corev1.Pod) (*HTTPClient, error) {
 	ip := pod.Status.PodIP
 	if ip == "" {
 		return nil, fmt.Errorf("pod %v has no ip", pod.Name)
@@ -85,7 +85,7 @@ func NewClientWithPod(pod *corev1.Pod) (*HttpClient, error) {
 		Transport: netTransport,
 	}
 
-	operationClient := &HttpClient{
+	operationClient := &HTTPClient{
 		Client:           client,
 		Port:             port,
 		URL:              fmt.Sprintf(urlTemplate, ip, port),
@@ -97,7 +97,7 @@ func NewClientWithPod(pod *corev1.Pod) (*HttpClient, error) {
 	return operationClient, nil
 }
 
-func (cli *HttpClient) GetRole(ctx context.Context) (string, error) {
+func (cli *HTTPClient) GetRole(ctx context.Context) (string, error) {
 	resp, err := cli.Request(ctx, string(GetRoleOperation), http.MethodGet, nil)
 	if err != nil {
 		return "", err
@@ -107,7 +107,7 @@ func (cli *HttpClient) GetRole(ctx context.Context) (string, error) {
 }
 
 // GetSystemAccounts lists all system accounts created
-func (cli *HttpClient) GetSystemAccounts(ctx context.Context) ([]map[string]any, error) {
+func (cli *HTTPClient) GetSystemAccounts(ctx context.Context) ([]map[string]any, error) {
 	resp, err := cli.Request(ctx, string(ListSystemAccountsOp), http.MethodGet, nil)
 	if err != nil {
 		return nil, err
@@ -116,34 +116,34 @@ func (cli *HttpClient) GetSystemAccounts(ctx context.Context) ([]map[string]any,
 }
 
 // JoinMember sends a join member operation request to Lorry, located on the target pod that is about to join.
-func (cli *HttpClient) JoinMember(ctx context.Context) error {
+func (cli *HTTPClient) JoinMember(ctx context.Context) error {
 	_, err := cli.Request(ctx, string(JoinMemberOperation), http.MethodPost, nil)
 	return err
 }
 
 // LeaveMember sends a Leave member operation request to Lorry, located on the target pod that is about to leave.
-func (cli *HttpClient) LeaveMember(ctx context.Context) error {
+func (cli *HTTPClient) LeaveMember(ctx context.Context) error {
 	_, err := cli.Request(ctx, string(LeaveMemberOperation), http.MethodPost, nil)
 	return err
 }
 
-func (cli *HttpClient) Request(ctx context.Context, operation, method string, req *httpserver.Request) (map[string]any, error) {
+func (cli *HTTPClient) Request(ctx context.Context, operation, method string, req *httpserver.Request) (map[string]any, error) {
 	ctxWithReconcileTimeout, cancel := context.WithTimeout(ctx, cli.ReconcileTimeout)
 	defer cancel()
 
 	// Request sql channel via http request
 	url := fmt.Sprintf("%s%s", cli.URL, operation)
 
-	var body []byte
-	var err error
+	var reader io.Reader = nil
 	if req != nil {
-		body, err = json.Marshal(req)
+		body, err := json.Marshal(req)
 		if err != nil {
 			return nil, errors.Wrap(err, "request encode failed")
 		}
+		reader = bytes.NewReader(body)
 	}
 
-	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, url, method, bytes.NewReader(body))
+	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, url, method, reader)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +160,7 @@ func (cli *HttpClient) Request(ctx context.Context, operation, method string, re
 	return result, nil
 }
 
-func (cli *HttpClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, url, method string, body io.Reader) (*http.Response, error) {
+func (cli *HTTPClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, url, method string, body io.Reader) (*http.Response, error) {
 	ch := make(chan *OperationResult, 1)
 	go cli.InvokeComponent(ctxWithReconcileTimeout, url, method, body, ch)
 	var resp *http.Response
@@ -175,7 +175,7 @@ func (cli *HttpClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.
 	return resp, err
 }
 
-func (cli *HttpClient) InvokeComponent(ctxWithReconcileTimeout context.Context, url, method string, body io.Reader, ch chan *OperationResult) {
+func (cli *HTTPClient) InvokeComponent(ctxWithReconcileTimeout context.Context, url, method string, body io.Reader, ch chan *OperationResult) {
 	ctxWithRequestTimeout, cancel := context.WithTimeout(context.Background(), cli.RequestTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctxWithRequestTimeout, method, url, body)

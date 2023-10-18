@@ -20,26 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package client
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-// HACK: for unit test only.
-var mockClient Client
-var mockClientError error
+// These tests use Ginkgo (BDD-style Go testing framework). Refer to
+// http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-func SetMockClient(cli Client, err error) {
-	mockClient = cli
-	mockClientError = err
-}
-
-func UnsetMockClient() {
-	mockClient = nil
-	mockClientError = nil
-}
-
-func NewClient(characterType string, pod corev1.Pod) (Client, error) {
-	if mockClient != nil || mockClientError != nil {
-		return mockClient, mockClientError
-	}
-	return NewHTTPClientWithPod(&pod)
+func TestLorryClient(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Lorry Client. Suite")
 }

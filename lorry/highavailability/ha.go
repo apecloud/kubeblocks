@@ -185,7 +185,7 @@ func (ha *Ha) RunCycle() {
 			break
 		}
 
-		ha.logger.Info("Refresh leader ttl") // todo: 没有触发
+		ha.logger.Info("Refresh leader ttl")
 		_ = ha.dcs.UpdateLease()
 
 		if int(cluster.Replicas) < len(ha.dbManager.GetMemberAddrs(ha.ctx, cluster)) && cluster.Replicas != 0 {

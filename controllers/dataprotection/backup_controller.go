@@ -46,16 +46,16 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/dataprotection/action"
-	dpbackup "github.com/apecloud/kubeblocks/internal/dataprotection/backup"
-	dperrors "github.com/apecloud/kubeblocks/internal/dataprotection/errors"
-	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
-	dputils "github.com/apecloud/kubeblocks/internal/dataprotection/utils"
-	"github.com/apecloud/kubeblocks/internal/dataprotection/utils/boolptr"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/action"
+	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
+	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // BackupReconciler reconciles a Backup object

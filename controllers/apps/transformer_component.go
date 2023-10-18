@@ -27,10 +27,10 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
-	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // ComponentTransformer transforms all components to a K8s objects DAG

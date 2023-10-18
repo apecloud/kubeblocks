@@ -134,7 +134,7 @@ type ReloadOptions struct {
 type UnixSignalTrigger struct {
 	// signal is valid for unix signal.
 	// e.g: SIGHUP
-	// url: ../../internal/configuration/configmap/handler.go:allUnixSignals
+	// url: ../../pkg/configuration/configmap/handler.go:allUnixSignals
 	// +kubebuilder:validation:Required
 	Signal SignalType `json:"signal"`
 

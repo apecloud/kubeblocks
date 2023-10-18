@@ -29,10 +29,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/shirou/gopsutil/v3/process"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/dcs"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type Manager struct {

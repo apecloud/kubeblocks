@@ -31,10 +31,10 @@ import (
 	"github.com/go-logr/logr"
 	probing "github.com/prometheus-community/pro-bing"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	dcs3 "github.com/apecloud/kubeblocks/lorry/dcs"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type Ha struct {

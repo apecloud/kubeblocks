@@ -23,10 +23,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/configuration/validate"
-	"github.com/apecloud/kubeblocks/internal/controller/configuration"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
+	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type reconfigureContext struct {

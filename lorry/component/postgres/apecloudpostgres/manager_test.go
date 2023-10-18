@@ -30,11 +30,11 @@ import (
 	"github.com/pashagolub/pgxmock/v2"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/binding"
 	"github.com/apecloud/kubeblocks/lorry/component/postgres"
 	"github.com/apecloud/kubeblocks/lorry/dcs"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 func MockDatabase(t *testing.T) (*Manager, pgxmock.PgxPoolIface, error) {

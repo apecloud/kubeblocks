@@ -25,7 +25,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // IsOvertimeEvent checks whether the duration of warning event reaches the threshold.

@@ -15,7 +15,7 @@ spec:
   # ConfigurationSchema that impose restrictions on engine parameter's rule
   configurationSchema:
     # schema: auto generate from cue scripts
-    # example: ../../internal/configuration/testdata/mysql_openapi.json
+    # example: ../../pkg/configuration/testdata/mysql_openapi.json
     cue: |-
       // top level configuration type
       //  mysql server param: a set of name/value pairs.

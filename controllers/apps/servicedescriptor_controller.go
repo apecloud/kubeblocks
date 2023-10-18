@@ -32,8 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // ServiceDescriptorReconciler reconciles a ServiceDescriptor object
@@ -43,9 +43,9 @@ type ServiceDescriptorReconciler struct {
 	Recorder record.EventRecorder
 }
 
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=servicedescriptors,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=servicedescriptors/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=servicedescriptors/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=servicedescriptors,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=servicedescriptors/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=servicedescriptors/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

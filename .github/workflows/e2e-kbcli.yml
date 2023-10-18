@@ -12,7 +12,7 @@ on:
         required: false
         default: ''
       TEST_TYPE:
-        description: 'test type (e.g. mysql|postgres|redis|mongo|kafka|pulsar|weaviate|qdrant|smarte|scale|greptimedb|nebula|risingwave|starrocks|oceanbase|foxlake|oracle-mysql|asmysql|openldap|polardbx|milvus|clickhouse|pika|opensearch|elasticsearch|vllm|orioledb|official-pg)'
+        description: 'test type (e.g. mysql|postgres|redis|mongo|kafka|pulsar|weaviate|qdrant|smarte|scale|greptimedb|nebula|risingwave|starrocks|oceanbase|foxlake|oracle-mysql|asmysql|openldap|polardbx|milvus|clickhouse|pika|opensearch|elasticsearch|llm|orioledb|official-pg)'
         required: false
         default: ''
       CLOUD_PROVIDER:

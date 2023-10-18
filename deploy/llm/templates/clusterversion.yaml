@@ -159,3 +159,31 @@ spec:
                 value: upstage/SOLAR-0-70b-16bit
               - name: EXTRA_ARGS
                 value: "--trust-remote-code --swap-space 1"
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: ggml-baichuan-7b-q4
+  labels:
+    {{- include "llm.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: ggml
+  componentVersions:
+    - componentDefRef: ggml
+      versionsContext:
+        initContainers:
+          - name: download
+            image: apecloud/baichuan-llama-7b:ggmlv3.q4_0
+            command: ["sh", "-c", "cp /models/baichuan-llama-7b.ggmlv3.q4_0.bin /models-target/"]
+            volumeMounts:
+              - name: models
+                mountPath: /models-target
+        containers:
+          - name: ggml
+            image: {{ .Values.imageDev.registry | default "docker.io" }}/{{ .Values.imageDev.repository}}:{{ default .Chart.AppVersion .Values.imageDev.tag }}
+            env:
+              - name: MODEL
+                value: /models/baichuan-llama-7b.ggmlv3.q4_0.bin
+            volumeMounts:
+              - name: models
+                mountPath: /models

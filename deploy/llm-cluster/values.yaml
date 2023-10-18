@@ -1,8 +1,8 @@
-# Default values for vllm-cluster.
+# Default values for llm-cluster.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-## @param version vllm cluster version
+## @param version llm cluster version
 ##
 version: vllm-baichuan2-13b
 
@@ -25,3 +25,5 @@ storage: 20
 ## @param gpu
 ##
 gpu: 1
+
+developMode: false

@@ -387,7 +387,10 @@ var _ = Describe("Cluster Controller", func() {
 		backup := testdp.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 			SetBackupPolicyName(backupPolicyName).
 			SetBackupMethod(backupMethod).
-			SetLabels(map[string]string{constant.AppInstanceLabelKey: clusterKey.Name, constant.BackupProtectionLabelKey: constant.BackupRetain}).
+			SetLabels(map[string]string{
+				constant.AppInstanceLabelKey:      clusterKey.Name,
+				constant.BackupProtectionLabelKey: constant.BackupRetain,
+			}).
 			WithRandomName().
 			Create(&testCtx).GetObject()
 		backupKey := client.ObjectKeyFromObject(backup)
@@ -1499,7 +1502,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		// trigger rsm to reconcile as the underlying sts is not created
 		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(sts), func(rsm *workloads.ReplicatedStateMachine) {
-			rsm.Annotations = map[string]string{"time": time.Now().Format(time.RFC3339)}
+			rsm.Annotations["time"] = time.Now().Format(time.RFC3339)
 		})()).Should(Succeed())
 		By("Checking pods' annotations")
 		Eventually(func(g Gomega) {
@@ -1787,13 +1790,14 @@ var _ = Describe("Cluster Controller", func() {
 				factory.SetReplicas(3)
 			}, true)
 
-			By("Check stateless workload has been created")
-			Eventually(testapps.List(&testCtx, generics.RSMSignature,
-				client.MatchingLabels{
-					constant.AppInstanceLabelKey:    clusterKey.Name,
-					constant.KBAppComponentLabelKey: statelessCompName,
-				}, client.InNamespace(clusterKey.Namespace))).ShouldNot(HaveLen(0))
-
+			for compName := range compNameNDef {
+				By(fmt.Sprintf("Check %s workload has been created", compName))
+				Eventually(testapps.List(&testCtx, generics.RSMSignature,
+					client.MatchingLabels{
+						constant.AppInstanceLabelKey:    clusterKey.Name,
+						constant.KBAppComponentLabelKey: compName,
+					}, client.InNamespace(clusterKey.Namespace))).ShouldNot(HaveLen(0))
+			}
 			rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
 
 			By("Check stateful pod's volumes")
@@ -1816,6 +1820,18 @@ var _ = Describe("Cluster Controller", func() {
 					}
 				}
 			}
+
+			By("Check associated Secret has been created")
+			Eventually(testapps.List(&testCtx, generics.SecretSignature,
+				client.MatchingLabels{
+					constant.AppInstanceLabelKey: clusterKey.Name,
+				})).ShouldNot(BeEmpty())
+
+			By("Check associated CM has been created")
+			Eventually(testapps.List(&testCtx, generics.ConfigMapSignature,
+				client.MatchingLabels{
+					constant.AppInstanceLabelKey: clusterKey.Name,
+				})).ShouldNot(BeEmpty())
 
 			By("Check associated PDB has been created")
 			Eventually(testapps.List(&testCtx, generics.PodDisruptionBudgetSignature,

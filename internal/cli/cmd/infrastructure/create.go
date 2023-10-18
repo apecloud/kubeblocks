@@ -27,7 +27,7 @@ import (
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/connector"
 	"github.com/spf13/cobra"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/constant"
@@ -169,7 +169,7 @@ func checkAndUpdateZone() {
 	fmt.Printf("current zone: %s\n", os.Getenv(ZoneName))
 }
 
-func NewCreateKubernetesCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func NewCreateKubernetesCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	o := &createOptions{
 		clusterOptions: clusterOptions{
 			IOStreams: streams,

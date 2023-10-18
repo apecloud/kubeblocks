@@ -27,7 +27,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
 // ComponentDeletionTransformer handles component deletion
@@ -41,15 +41,13 @@ func (t *ComponentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 		return nil
 	}
 
-	root, err := ictrltypes.FindRootVertex(dag)
-	if err != nil {
-		return err
-	}
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	comp := transCtx.Component
 
 	// TODO: get the resource own by component for example rsm and delete them
 
 	transCtx.Component.Status.Phase = appsv1alpha1.DeletingClusterCompPhase
-	root.Action = ictrltypes.ActionDeletePtr()
+	graphCli.Delete(dag, comp)
 
 	ctx.GetRecorder().Eventf(transCtx.Component, corev1.EventTypeNormal, constant.ReasonDeletingCR, "Deleting %s:%s",
 		strings.ToLower(transCtx.Component.GetObjectKind().GroupVersionKind().Kind), transCtx.Component.GetName())

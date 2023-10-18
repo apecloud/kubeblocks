@@ -34,13 +34,30 @@ You can install kbcli with `curl` or `brew`.
    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
    ```
 
+   If you want to install kbcli with a specified version, follow the steps below.
+
+   1. Check the available versions in [KubeBlocks Release](https://github.com/apecloud/kubeblocks/releases/).
+   2. Specify a version with `-s` and run the command below.
+
+      ```bash
+      curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s x.x.x
+      ```
+
+  :::note
+
+  By default, kbcli installs the latest release version and then when installing KubeBlocks, kbcli installs the matched version. Ensure that the major versions of kbcli and KubeBlocks match.
+
+  For instance, you can install kbcli v0.6.1 and KubeBlocks v0.6.3, but mismatched versions like kbcli v0.5.0 and KubeBlocks v0.6.0 may result in errors.
+
+  :::
+
 2. Run `kbcli version` to check the version of kbcli and ensure that it is successfully installed.
 
-:::note
+  :::note
 
-- If a timeout exception occurs during installation, please check your network settings and retry.
+  If a timeout exception occurs during installation, please check your network settings and retry.
 
-:::
+  :::
 
 - Option 2: Install kbcli using Homebrew.
 
@@ -54,6 +71,16 @@ You can install kbcli with `curl` or `brew`.
 
    ```bash
    brew install kbcli
+   ```
+
+   If you want to install kbcli with a specified version, run the commands below.
+
+   ```bash
+   # View the available version
+   brew search kbcli
+
+   # Specify a version
+   brew install kbcli@x.x.x
    ```
 
 3. Verify that kbcli is successfully installed.
@@ -87,7 +114,7 @@ If you need to customize the installation path, use the zip file.
     powershell -Command " & ([scriptblock]::Create((iwr https://www.kubeblocks.io/installer/install_cli.ps1)))"
     ```
 
-    To install a specified version of kbcli, use -v after the command and describe the version you want to install.
+    To install a specified version of kbcli, use `-v` after the command and describe the version you want to install.
 
     ```bash
     powershell -Command " & ([scriptblock]::Create((iwr https://www.kubeblocks.io/installer/install_cli.ps1))) -v 0.5.2"
@@ -95,7 +122,7 @@ If you need to customize the installation path, use the zip file.
 
 - Option 2: Install using the installation package.
 
-1. Download the kbcli installation zip package from [GitHub](https://github.com/apecloud/kubeblocks/releases/).
+1. Download the kbcli installation zip package from [KubeBlocks Release](https://github.com/apecloud/kubeblocks/releases/).
 2. Extract the file and add it to the environment variables.
     1. Click the Windows icon and select **System Settings**.
     2. Click **Settings** -> **Related Settings** -> **Advanced system settings**.

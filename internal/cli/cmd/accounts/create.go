@@ -22,7 +22,7 @@ package accounts
 import (
 	"github.com/sethvargo/go-password/password"
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
@@ -33,7 +33,7 @@ type CreateUserOptions struct {
 	info lorryutil.UserInfo
 }
 
-func NewCreateUserOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *CreateUserOptions {
+func NewCreateUserOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *CreateUserOptions {
 	return &CreateUserOptions{
 		AccountBaseOptions: NewAccountBaseOptions(f, streams, lorryutil.CreateUserOp),
 	}

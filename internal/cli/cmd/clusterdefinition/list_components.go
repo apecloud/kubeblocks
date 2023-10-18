@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -42,7 +42,7 @@ var (
 		kbcli clusterdefinition list-components apecloud-mysql`)
 )
 
-func NewListComponentsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewListComponentsCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := list.NewListOptions(f, streams, types.ClusterDefGVR())
 	o.AllNamespaces = true
 	cmd := &cobra.Command{

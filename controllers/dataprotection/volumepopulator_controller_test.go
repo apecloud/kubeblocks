@@ -108,24 +108,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 			createStorageClass(volumeBinding)
 
 			By("create backup")
-			backup := testdp.NewFakeBackup(&testCtx, nil)
-			// wait for backup is failed by backup controller.
-			// it will be failed if the backupPolicy is not created.
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
-				g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseFailed))
-			})).Should(Succeed())
-
-			if mockBackupCompleted {
-				// then mock backup to completed
-				backupMethodName := testdp.BackupMethodName
-				if useVolumeSnapshotBackup {
-					backupMethodName = testdp.VSBackupMethodName
-				}
-				Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
-					backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
-					testdp.MockBackupStatusMethod(backup, backupMethodName, testdp.DataVolumeName, actionSet.Name)
-				})).Should(Succeed())
-			}
+			backup := mockBackupForRestore(actionSet.Name, "", mockBackupCompleted, useVolumeSnapshotBackup)
 
 			By("create restore ")
 			restore := testdp.NewRestoreactory(testCtx.DefaultNamespace, testdp.RestoreName).

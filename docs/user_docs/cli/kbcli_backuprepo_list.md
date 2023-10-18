@@ -2,7 +2,7 @@
 title: kbcli backuprepo list
 ---
 
-List BackupRepo.
+List Backup Repositories.
 
 ```
 kbcli backuprepo list [flags]
@@ -11,7 +11,7 @@ kbcli backuprepo list [flags]
 ### Examples
 
 ```
-  # List all backuprepos
+  # List all backup repositories
   kbcli backuprepo list
 ```
 

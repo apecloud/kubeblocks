@@ -22,7 +22,7 @@ package apps
 import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
 type InitComponentTransformer struct {
@@ -34,7 +34,7 @@ var _ graph.Transformer = &InitComponentTransformer{}
 
 func (t *InitComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	// put the Component object first, it will be root vertex of DAG
-	rootVertex := &ictrltypes.LifecycleVertex{Obj: t.Component, ObjCopy: t.ComponentOrig, Action: ictrltypes.ActionStatusPtr()}
+	rootVertex := &model.ObjectVertex{Obj: t.Component, OriObj: t.ComponentOrig, Action: model.ActionStatusPtr()}
 	dag.AddVertex(rootVertex)
 	return nil
 }

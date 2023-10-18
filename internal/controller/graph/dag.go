@@ -23,8 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-
-	"golang.org/x/exp/maps"
 )
 
 type DAG struct {
@@ -238,7 +236,7 @@ func (d *DAG) Equals(other *DAG, less func(v1, v2 Vertex) bool) bool {
 		return false
 	}
 	for i := range vertices1 {
-		if less(vertices1[i], vertices2[i]) {
+		if less(vertices1[i], vertices2[i]) || less(vertices2[i], vertices1[i]) {
 			return false
 		}
 	}
@@ -262,12 +260,11 @@ func (d *DAG) Root() Vertex {
 
 func (d *DAG) Merge(subDag *DAG) {
 	for v := range subDag.vertices {
-		if len(subDag.inAdj(v)) == 0 {
-			d.Connect(d.Root(), v)
-		}
+		d.AddConnectRoot(v)
 	}
-	maps.Copy(d.vertices, subDag.vertices)
-	maps.Copy(d.edges, subDag.edges)
+	for e := range subDag.edges {
+		d.AddEdge(e)
+	}
 }
 
 // String returns a string representation of the DAG in topology order

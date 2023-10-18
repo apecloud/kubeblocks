@@ -32,6 +32,7 @@ kbcli backuprepo create [NAME] [flags]
 ### Options
 
 ```
+      --access-method string       Specify the access method for the backup repository, "Tool" is preferred if not specified. options: ["Mount" "Tool"]
       --default                    Specify whether to set the created backup repo as default
   -h, --help                       help for create
       --provider string            Specify storage provider

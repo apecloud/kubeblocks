@@ -30,7 +30,7 @@ spec:
     prepareData:
       image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
       command:
-      - sh
+      - bash
       - -c
       - |
         {{- .Files.Get "dataprotection/datafile-restore.sh" | nindent 8 }}
@@ -52,7 +52,7 @@ spec:
     prepareData:
       image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
       command:
-      - sh
+      - bash
       - -c
       - "touch ${DATA_DIR}/mongodb.backup; sync"
     postReady: []

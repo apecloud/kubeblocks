@@ -25,7 +25,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -35,21 +35,21 @@ type ComponentOwnershipTransformer struct{}
 var _ graph.Transformer = &ComponentOwnershipTransformer{}
 
 func (f *ComponentOwnershipTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	rootVertex, err := ictrltypes.FindRootVertex(dag)
-	if err != nil {
-		return err
-	}
-	vertices := ictrltypes.FindAllNot[*appsv1alpha1.Component](dag)
+	transCtx, _ := ctx.(*ComponentTransformContext)
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	comp := transCtx.Component
 
-	controllerutil.AddFinalizer(rootVertex.Obj, constant.DBComponentDefinitionFinalizerName)
-	for _, vertex := range vertices {
-		v, _ := vertex.(*ictrltypes.LifecycleVertex)
-		if err := intctrlutil.SetOwnership(rootVertex.Obj, v.Obj, rscheme, constant.DBComponentDefinitionFinalizerName); err != nil {
+	objects := graphCli.FindAll(dag, &appsv1alpha1.Component{}, model.HaveDifferentTypeWithOption)
+	controllerutil.AddFinalizer(comp, constant.DBComponentDefinitionFinalizerName)
+
+	for _, object := range objects {
+		if err := intctrlutil.SetOwnership(comp, object, rscheme, constant.DBComponentDefinitionFinalizerName); err != nil {
 			if _, ok := err.(*controllerutil.AlreadyOwnedError); ok {
 				continue
 			}
 			return err
 		}
 	}
+
 	return nil
 }

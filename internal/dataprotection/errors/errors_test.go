@@ -61,9 +61,17 @@ func TestNewErrors(t *testing.T) {
 	if !intctrlutil.IsTargetError(pvTemplateNotFound, ErrorTypeBackupPVTemplateNotFound) {
 		t.Error("should be error of BackupPVTemplateNotFound")
 	}
-	pvsIsEmpty := NewBackupPVCNameIsEmpty("datafile", "policy-test1")
-	if !intctrlutil.IsTargetError(pvsIsEmpty, ErrorTypeBackupPVCNameIsEmpty) {
+	pvcIsEmpty := NewBackupPVCNameIsEmpty("datafile", "policy-test1")
+	if !intctrlutil.IsTargetError(pvcIsEmpty, ErrorTypeBackupPVCNameIsEmpty) {
 		t.Error("should be error of BackupPVCNameIsEmpty")
+	}
+	repoIsNotReady := NewBackupRepoIsNotReady("repo")
+	if !intctrlutil.IsTargetError(repoIsNotReady, ErrorTypeBackupRepoIsNotReady) {
+		t.Error("should be error of BackupRepoIsNotReady")
+	}
+	toolConfigSecretNameIsEmpty := NewToolConfigSecretNameIsEmpty("repo")
+	if !intctrlutil.IsTargetError(toolConfigSecretNameIsEmpty, ErrorTypeToolConfigSecretNameIsEmpty) {
+		t.Error("should be error of ToolConfigSecretNameIsEmpty")
 	}
 	jobFailed := NewBackupJobFailed("jobName")
 	if !intctrlutil.IsTargetError(jobFailed, ErrorTypeBackupJobFailed) {

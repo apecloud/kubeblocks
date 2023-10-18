@@ -19,6 +19,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package types
 
+// config keys used in viper
+const (
+	// CfgKeyGCFrequencySeconds is the key of gc frequency, its unit is second
+	CfgKeyGCFrequencySeconds = "GC_FREQUENCY_SECONDS"
+)
+
+// config default values
+const (
+	// DefaultGCFrequencySeconds is the default gc frequency, its unit is second
+	DefaultGCFrequencySeconds = 60 * 60
+)
+
 const (
 	// DataProtectionFinalizerName is the name of our custom finalizer
 	DataProtectionFinalizerName = "dataprotection.kubeblocks.io/finalizer"
@@ -72,8 +84,8 @@ const (
 	DPDBPort = "DP_DB_PORT"
 	// DPTargetPodName the target pod name
 	DPTargetPodName = "DP_TARGET_POD_NAME"
-	// DPBackupDIR the dest directory for backup data
-	DPBackupDIR = "DP_BACKUP_DIR"
+	// DPBackupBasePath the base path for backup data in the storage
+	DPBackupBasePath = "DP_BACKUP_BASE_PATH"
 	// DPBackupName backup CR name
 	DPBackupName = "DP_BACKUP_NAME"
 	// DPTTL backup time to live, reference the backupPolicy.spec.retention.ttl
@@ -96,6 +108,10 @@ const (
 	DPBaseBackupStartTimestamp = "BASE_BACKUP_START_TIMESTAMP" // base backup start timestamp for pitr
 	// DPBackupStopTime backup stop time
 	DPBackupStopTime = "BACKUP_STOP_TIME" // backup stop time
+	// DPDatasafedLocalBackendPath force datasafed to use local backend with the path
+	DPDatasafedLocalBackendPath = "DATASAFED_LOCAL_BACKEND_PATH"
+	// DPDatasafedBinPath the path containing the datasafed binary
+	DPDatasafedBinPath = "DP_DATASAFED_BIN_PATH"
 )
 
 const (

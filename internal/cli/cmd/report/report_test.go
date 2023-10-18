@@ -28,8 +28,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/client-go/kubernetes"
-	clientfake "k8s.io/client-go/rest/fake"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -37,9 +35,11 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/kubernetes"
+	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	kbclischeme "github.com/apecloud/kubeblocks/internal/cli/scheme"
@@ -52,7 +52,7 @@ import (
 var _ = Describe("report", func() {
 	var (
 		namespace = "test"
-		streams   genericclioptions.IOStreams
+		streams   genericiooptions.IOStreams
 		tf        *cmdtesting.TestFactory
 	)
 
@@ -74,7 +74,7 @@ var _ = Describe("report", func() {
 		tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
 		tf.Client = &clientfake.RESTClient{}
 		tf.FakeDynamicClient = testing.FakeDynamicClient()
-		streams = genericclioptions.NewTestIOStreamsDiscard()
+		streams = genericiooptions.NewTestIOStreamsDiscard()
 	})
 
 	AfterEach(func() {
@@ -342,7 +342,7 @@ var _ = Describe("report", func() {
 
 			tf.Client = tf.UnstructuredClient
 			tf.FakeDynamicClient = testing.FakeDynamicClient(deploy, podEvent, &secrets.Items[0])
-			streams = genericclioptions.NewTestIOStreamsDiscard()
+			streams = genericiooptions.NewTestIOStreamsDiscard()
 		})
 
 		It("complete kb-report options", func() {
@@ -426,7 +426,7 @@ var _ = Describe("report", func() {
 			tf.Client = tf.UnstructuredClient
 			tf.FakeDynamicClient = testing.FakeDynamicClient(deploy, sts, event)
 			kbfakeclient = testing.FakeKBClientSet(cluster, clusterDef, clusterVersion)
-			streams = genericclioptions.NewTestIOStreamsDiscard()
+			streams = genericiooptions.NewTestIOStreamsDiscard()
 		})
 
 		It("validate cluster-report options", func() {

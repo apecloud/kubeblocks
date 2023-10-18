@@ -26,11 +26,12 @@ import (
 	"io"
 	"net/http"
 
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/go-errors/errors"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/apecloud/kubeblocks/lorry/binding"
+
+	"github.com/apecloud/kubeblocks/internal/constant"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/binding/custom"
 	"github.com/apecloud/kubeblocks/lorry/binding/etcd"
 	"github.com/apecloud/kubeblocks/lorry/binding/mongodb"

@@ -7,7 +7,7 @@ image:
   # Redis Stack Server, which combines open source Redis with RediSearch, RedisJSON, RedisGraph, RedisTimeSeries, and RedisBloom,
   # is dual-licensed under the Redis Source Available License (RSALv2), as described below, and the Server Side Public License (SSPL)
   # For information about licensing per version, see https://redis.io/docs/stack/license/
-  registry: registry.cn-hangzhou.aliyuncs.com
+  registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
   repository: apecloud/redis-stack-server
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
@@ -24,7 +24,7 @@ logConfigs:
 
 metrics:
   image:
-    registry: registry.cn-hangzhou.aliyuncs.com
+    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
     repository: apecloud/agamotto
     tag: 0.1.2-beta.1
     pullPolicy: IfNotPresent

@@ -43,6 +43,7 @@ spec:
     region = {{ `{{ index .Parameters "region" }}` }}
     endpoint = {{ `{{ printf "obs.%s.myhuaweicloud.com" .Parameters.region }}` }}
     root = {{ `{{ index .Parameters "bucket" }}` }}
+    chunk_size = 50Mi
 
   parametersSchema:
     openAPIV3Schema:

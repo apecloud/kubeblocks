@@ -24,7 +24,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/editor"
 
@@ -39,7 +39,7 @@ type EditOptions struct {
 	GVR  schema.GroupVersionResource
 }
 
-func NewEditOptions(f cmdutil.Factory, streams genericclioptions.IOStreams,
+func NewEditOptions(f cmdutil.Factory, streams genericiooptions.IOStreams,
 	gvr schema.GroupVersionResource) *EditOptions {
 	return &EditOptions{
 		Factory:     f,

@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes/scheme"
 	clientfake "k8s.io/client-go/rest/fake"
@@ -51,7 +51,7 @@ import (
 var _ = Describe("kubeblocks status", func() {
 	var (
 		namespace  = "test"
-		streams    genericclioptions.IOStreams
+		streams    genericiooptions.IOStreams
 		tf         *cmdtesting.TestFactory
 		stsName    = "test-sts"
 		deployName = "test-deploy"
@@ -115,7 +115,7 @@ var _ = Describe("kubeblocks status", func() {
 
 		tf.Client = tf.UnstructuredClient
 		tf.FakeDynamicClient = testing.FakeDynamicClient(deploy, sts)
-		streams = genericclioptions.NewTestIOStreamsDiscard()
+		streams = genericiooptions.NewTestIOStreamsDiscard()
 	})
 
 	AfterEach(func() {

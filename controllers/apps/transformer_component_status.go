@@ -36,14 +36,12 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 	rsmcore "github.com/apecloud/kubeblocks/internal/controller/rsm"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
@@ -98,11 +96,6 @@ func (t *ComponentStatusTransformer) Transform(ctx graph.TransformContext, dag *
 		return nil
 	}
 
-	rootVertex, err := ictrltypes.FindRootVertex(dag)
-	if err != nil {
-		return err
-	}
-
 	cluster := transCtx.Cluster
 	clusterObj := cluster.DeepCopy()
 	synthesizeComp := transCtx.SynthesizeComponent
@@ -134,7 +127,6 @@ func (t *ComponentStatusTransformer) Transform(ctx graph.TransformContext, dag *
 	case model.IsObjectUpdating(compOrig):
 		transCtx.Logger.Info(fmt.Sprintf("update component status after applying resources, generation: %d", comp.Generation))
 		comp.Status.ObservedGeneration = comp.Generation
-		rootVertex.Action = ictrltypes.ActionStatusPtr()
 	case model.IsObjectStatusUpdating(compOrig):
 		// reconcile the component status and sync the component status to cluster status
 		csh := newComponentStatusHandler(reqCtx, t.Client, clusterObj, comp, synthesizeComp, runningRSM, protoRSM, dag)
@@ -202,7 +194,10 @@ func (r *componentStatusHandler) reconcileComponentPhase() error {
 	}
 
 	// check if all configTemplates are synced
-	isAllConfigSynced := r.isAllConfigSynced()
+	isAllConfigSynced, err := r.isAllConfigSynced()
+	if err != nil {
+		return err
+	}
 
 	// check if the component has failed pod
 	hasFailedPod, messages, err := r.hasFailedPod(pods)
@@ -379,36 +374,43 @@ func (r *componentStatusHandler) isRSMRunning() (bool, error) {
 }
 
 // isAllConfigSynced checks if all configTemplates are synced.
-func (r *componentStatusHandler) isAllConfigSynced() bool {
-	checkFinishedReconfigure := func(cm *corev1.ConfigMap) bool {
-		labels := cm.GetLabels()
-		annotations := cm.GetAnnotations()
-		if len(annotations) == 0 || len(labels) == 0 {
-			return false
-		}
-		hash, _ := util.ComputeHash(cm.Data)
-		return labels[constant.CMInsConfigurationHashLabelKey] == hash
+func (r *componentStatusHandler) isAllConfigSynced() (bool, error) {
+	var (
+		cmKey client.ObjectKey
+		cmObj = &corev1.ConfigMap{}
+	)
+
+	if len(r.synthesizeComp.ConfigTemplates) == 0 {
+		return true, nil
 	}
 
-	var (
-		cmKey           client.ObjectKey
-		cmObj           = &corev1.ConfigMap{}
-		allConfigSynced = true
-	)
+	configurationKey := client.ObjectKey{
+		Namespace: r.cluster.Namespace,
+		Name:      cfgcore.GenerateComponentConfigurationName(r.cluster.Name, r.synthesizeComp.Name),
+	}
+	configuration := &appsv1alpha1.Configuration{}
+	if err := r.cli.Get(r.reqCtx.Ctx, configurationKey, configuration); err != nil {
+		return false, err
+	}
 	for _, configSpec := range r.synthesizeComp.ConfigTemplates {
+		item := configuration.Spec.GetConfigurationItem(configSpec.Name)
+		status := configuration.Status.GetItemStatus(configSpec.Name)
+		// for creating phase
+		if item == nil || status == nil {
+			return false, nil
+		}
 		cmKey = client.ObjectKey{
-			Namespace: r.cluster.GetNamespace(),
+			Namespace: r.cluster.Namespace,
 			Name:      cfgcore.GetComponentCfgName(r.cluster.Name, r.synthesizeComp.Name, configSpec.Name),
 		}
 		if err := r.cli.Get(r.reqCtx.Ctx, cmKey, cmObj); err != nil {
-			return true
+			return false, err
 		}
-		if !checkFinishedReconfigure(cmObj) {
-			allConfigSynced = false
-			break
+		if intctrlutil.GetConfigSpecReconcilePhase(cmObj, *item, status) != appsv1alpha1.CFinishedPhase {
+			return false, nil
 		}
 	}
-	return allConfigSynced
+	return true, nil
 }
 
 // isScaleOutFailed checks if the component scale out failed.

@@ -76,12 +76,9 @@ spec:
               - bash
               - -c
               - |
-                echo VITE_PORT=6333 >> .env
-                echo VITE_HOSTNAME=http://127.0.0.1 >> .env
-                npm run build
                 cd dist/ && serve
             ports:
-              - name: http
+              - name: web-ui
                 containerPort: 3000
           - name: qdrant
             imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}

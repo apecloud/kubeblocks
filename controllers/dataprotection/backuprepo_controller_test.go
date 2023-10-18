@@ -185,6 +185,11 @@ parameters:
     secret-namespace: {{ .CSIDriverSecretRef.Namespace }}
 `
 			obj.Status.Phase = storagev1alpha1.StorageProviderReady
+			meta.SetStatusCondition(&obj.Status.Conditions, metav1.Condition{
+				Type:   storagev1alpha1.ConditionTypeCSIDriverInstalled,
+				Status: metav1.ConditionTrue,
+				Reason: "CSIDriverInstalled",
+			})
 			if mutateFunc != nil {
 				mutateFunc(obj)
 			}
@@ -306,6 +311,11 @@ parameters:
 			By("updating the status of the storage provider to not ready")
 			Eventually(testapps.GetAndChangeObjStatus(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
 				provider.Status.Phase = storagev1alpha1.StorageProviderNotReady
+				meta.SetStatusCondition(&provider.Status.Conditions, metav1.Condition{
+					Type:   storagev1alpha1.ConditionTypeCSIDriverInstalled,
+					Status: metav1.ConditionFalse,
+					Reason: "CSINotInstalled",
+				})
 			})).Should(Succeed())
 			By("checking the status of the BackupRepo, should become failed")
 			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
@@ -664,8 +674,7 @@ spec:
 			var backup *dpv1alpha1.Backup
 			var toolConfigSecretKey types.NamespacedName
 
-			BeforeEach(func() {
-				By("preparing")
+			createStorageProviderSpecForToolAccessMethod := func(mutateFunc func(provider *storagev1alpha1.StorageProvider)) {
 				createStorageProviderSpec(func(provider *storagev1alpha1.StorageProvider) {
 					provider.Spec.DatasafedConfigTemplate = `
 [storage]
@@ -675,7 +684,15 @@ key2={{ index .Parameters "key2" }}
 cred-key1={{ index .Parameters "cred-key1" }}
 cred-key2={{ index .Parameters "cred-key2" }}
 `
+					if mutateFunc != nil {
+						mutateFunc(provider)
+					}
 				})
+			}
+
+			BeforeEach(func() {
+				By("preparing")
+				createStorageProviderSpecForToolAccessMethod(nil)
 				createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
 					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodTool
 				})
@@ -695,7 +712,7 @@ cred-key2={{ index .Parameters "cred-key2" }}
 
 			It("should check that the storage provider has a non-empty datasafedConfigTemplate", func() {
 				By("preparing")
-				createStorageProviderSpec(func(provider *storagev1alpha1.StorageProvider) {
+				createStorageProviderSpecForToolAccessMethod(func(provider *storagev1alpha1.StorageProvider) {
 					provider.Spec.DatasafedConfigTemplate = ""
 				})
 				createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
@@ -714,7 +731,7 @@ cred-key2={{ index .Parameters "cred-key2" }}
 
 			It("should fail if the datasafedConfigTemplate is invalid", func() {
 				By("preparing")
-				createStorageProviderSpec(func(provider *storagev1alpha1.StorageProvider) {
+				createStorageProviderSpecForToolAccessMethod(func(provider *storagev1alpha1.StorageProvider) {
 					provider.Spec.DatasafedConfigTemplate = "bad template {{"
 				})
 				createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
@@ -727,6 +744,25 @@ cred-key2={{ index .Parameters "cred-key2" }}
 					g.Expect(cond).NotTo(BeNil())
 					g.Expect(cond.Status).Should(BeEquivalentTo(corev1.ConditionFalse))
 					g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonBadToolConfigTemplate))
+				})).Should(Succeed())
+			})
+
+			It("should work even if the CSI driver required by the storage provider is not installed", func() {
+				By("preparing")
+				createStorageProviderSpecForToolAccessMethod(func(provider *storagev1alpha1.StorageProvider) {
+					provider.Status.Phase = storagev1alpha1.StorageProviderNotReady
+					meta.SetStatusCondition(&provider.Status.Conditions, metav1.Condition{
+						Type:   storagev1alpha1.ConditionTypeCSIDriverInstalled,
+						Status: metav1.ConditionFalse,
+						Reason: "NotInstalled",
+					})
+				})
+				createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
+					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodTool
+				})
+				By("checking")
+				Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+					g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoReady))
 				})).Should(Succeed())
 			})
 

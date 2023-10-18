@@ -32,7 +32,7 @@ import (
 	"golang.org/x/exp/slices"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -96,7 +96,7 @@ on the created kubernetes cluster, and an apecloud-mysql cluster named mycluster
 )
 
 type initOptions struct {
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 	helmCfg        *helm.Config
 	clusterDef     string
 	kbVersion      string
@@ -109,7 +109,7 @@ type initOptions struct {
 	baseOptions
 }
 
-func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func newInitCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	o := &initOptions{
 		IOStreams: streams,
 	}
@@ -503,7 +503,7 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 
 // createCluster constructs a cluster create options and run
 func (o *initOptions) createCluster() error {
-	c := cmdcluster.NewCreateOptions(util.NewFactory(), genericclioptions.NewTestIOStreamsDiscard())
+	c := cmdcluster.NewCreateOptions(util.NewFactory(), genericiooptions.NewTestIOStreamsDiscard())
 	c.ClusterDefRef = o.clusterDef
 	c.ClusterVersionRef = o.clusterVersion
 	c.Namespace = defaultNamespace

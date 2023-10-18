@@ -26,7 +26,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
@@ -48,13 +48,13 @@ var (
 )
 
 type listVersionsOption struct {
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 	version string
 	devel   bool
 	limit   int
 }
 
-func newListVersionsCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func newListVersionsCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	o := listVersionsOption{IOStreams: streams}
 	cmd := &cobra.Command{
 		Use:     "list-versions",

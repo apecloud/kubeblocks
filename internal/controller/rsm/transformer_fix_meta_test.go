@@ -58,7 +58,7 @@ var _ = Describe("fix meta transformer test.", func() {
 			root := &model.ObjectVertex{
 				Obj:    transCtx.rsm,
 				OriObj: transCtx.rsmOrig,
-				Action: model.ActionPtr(model.UPDATE),
+				Action: model.ActionUpdatePtr(),
 			}
 			dagExpected.AddVertex(root)
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())

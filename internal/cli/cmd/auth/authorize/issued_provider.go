@@ -30,7 +30,7 @@ import (
 	"github.com/briandowns/spinner"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/pkg/errors"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/authorize/authenticator"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/utils"
@@ -42,7 +42,7 @@ type Options struct {
 	ClientID  string `json:"client_id"`
 	AuthURL   string
 	NoBrowser bool
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 type CloudIssuedTokenProvider struct {

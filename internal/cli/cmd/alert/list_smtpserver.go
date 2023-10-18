@@ -21,7 +21,7 @@ package alert
 
 import (
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -39,7 +39,7 @@ type listSMTPServerOptions struct {
 	baseOptions
 }
 
-func newListSMTPServerCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newListSMTPServerCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &listSMTPServerOptions{baseOptions: baseOptions{IOStreams: streams}}
 	cmd := &cobra.Command{
 		Use:     "list-smtpserver",

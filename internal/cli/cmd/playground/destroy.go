@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -57,7 +57,7 @@ var (
 )
 
 type destroyOptions struct {
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 	baseOptions
 
 	// purge resources, before destroying kubernetes cluster we should delete cluster and
@@ -68,7 +68,7 @@ type destroyOptions struct {
 	timeout time.Duration
 }
 
-func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
+func newDestroyCmd(streams genericiooptions.IOStreams) *cobra.Command {
 	o := &destroyOptions{
 		IOStreams: streams,
 	}
@@ -298,14 +298,15 @@ func (o *destroyOptions) deleteClusters(dynamic dynamic.Interface) error {
 
 	// check all clusters termination policy is WipeOut
 	if checkWipeOut {
-		if err = wait.PollImmediate(5*time.Second, o.timeout, func() (bool, error) {
-			return checkClusters(func(cluster *appsv1alpha1.Cluster) bool {
-				if cluster.Spec.TerminationPolicy != appsv1alpha1.WipeOut {
-					klog.V(1).Infof("Cluster %s termination policy is %s", cluster.Name, cluster.Spec.TerminationPolicy)
-				}
-				return cluster.Spec.TerminationPolicy == appsv1alpha1.WipeOut
-			})
-		}); err != nil {
+		if err = wait.PollUntilContextTimeout(context.Background(), 5*time.Second,
+			o.timeout, true, func(_ context.Context) (bool, error) {
+				return checkClusters(func(cluster *appsv1alpha1.Cluster) bool {
+					if cluster.Spec.TerminationPolicy != appsv1alpha1.WipeOut {
+						klog.V(1).Infof("Cluster %s termination policy is %s", cluster.Name, cluster.Spec.TerminationPolicy)
+					}
+					return cluster.Spec.TerminationPolicy == appsv1alpha1.WipeOut
+				})
+			}); err != nil {
 			return err
 		}
 	}
@@ -316,13 +317,14 @@ func (o *destroyOptions) deleteClusters(dynamic dynamic.Interface) error {
 	}
 
 	// check and wait all clusters are deleted
-	if err = wait.PollImmediate(5*time.Second, o.timeout, func() (bool, error) {
-		return checkClusters(func(cluster *appsv1alpha1.Cluster) bool {
-			// always return false if any cluster is not deleted
-			klog.V(1).Infof("Cluster %s is not deleted", cluster.Name)
-			return false
-		})
-	}); err != nil {
+	if err = wait.PollUntilContextTimeout(context.Background(), 5*time.Second,
+		o.timeout, true, func(_ context.Context) (bool, error) {
+			return checkClusters(func(cluster *appsv1alpha1.Cluster) bool {
+				// always return false if any cluster is not deleted
+				klog.V(1).Infof("Cluster %s is not deleted", cluster.Name)
+				return false
+			})
+		}); err != nil {
 		return err
 	}
 

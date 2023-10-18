@@ -32,7 +32,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
@@ -163,12 +163,12 @@ var (
 )
 
 type listOptions struct {
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 	factory cmdutil.Factory
 	client  *kubernetes.Clientset
 }
 
-func newListOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *listOptions {
+func newListOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *listOptions {
 	return &listOptions{
 		factory:   f,
 		IOStreams: streams,
@@ -176,7 +176,7 @@ func newListOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *lis
 }
 
 // NewDashboardCmd creates the dashboard command
-func NewDashboardCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewDashboardCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dashboard",
 		Short: "List and open the KubeBlocks dashboards.",
@@ -191,7 +191,7 @@ func NewDashboardCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	return cmd
 }
 
-func newListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newListCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := newListOptions(f, streams)
 	cmd := &cobra.Command{
 		Use:     "list",
@@ -236,14 +236,14 @@ func printTable(out io.Writer) error {
 
 type openOptions struct {
 	factory cmdutil.Factory
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 	portForwardOptions *cmdpf.PortForwardOptions
 
 	name      string
 	localPort string
 }
 
-func newOpenOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *openOptions {
+func newOpenOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *openOptions {
 	return &openOptions{
 		factory:   f,
 		IOStreams: streams,
@@ -253,7 +253,7 @@ func newOpenOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *ope
 	}
 }
 
-func newOpenCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newOpenCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := newOpenOptions(f, streams)
 	cmd := &cobra.Command{
 		Use:     "open NAME [DASHBOARD-TYPE] [--port PORT]",
@@ -410,7 +410,7 @@ func newFactory(namespace string) cmdutil.Factory {
 }
 
 type defaultPortForwarder struct {
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts cmdpf.PortForwardOptions) error {

@@ -1,0 +1,13 @@
+{{- include "kblib.clusterCommon" . }}
+  clusterDefinitionRef: vllm  # ref clusterDefinition.name
+  componentSpecs:
+    - name: vllm
+      componentDefRef: vllm # ref clusterDefinition componentDefs.name
+      {{- include "kblib.componentMonitor" . | indent 6 }}
+      replicas: {{ .Values.replicas }}
+      serviceAccountName: {{ include "kblib.serviceAccountName" . }}
+      resources:
+        limits:
+          nvidia.com/gpu: {{ .Values.gpu }}
+        requests:
+          nvidia.com/gpu: {{ .Values.gpu }}

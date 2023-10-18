@@ -25,7 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -38,7 +38,7 @@ type rsmComponentWorkloadBuilder struct {
 	reqCtx        intctrlutil.RequestCtx
 	client        client.Client
 	comp          *rsmComponent
-	defaultAction *ictrltypes.LifecycleAction
+	defaultAction *model.Action
 	error         error
 	envConfig     *corev1.ConfigMap
 	workload      client.Object
@@ -55,7 +55,7 @@ func (b *rsmComponentWorkloadBuilder) Complete() error {
 		return fmt.Errorf("fail to create component workloads, cluster: %s, component: %s",
 			b.comp.GetClusterName(), b.comp.GetName())
 	}
-	b.comp.setWorkload(b.workload, b.defaultAction, nil)
+	b.comp.setWorkload(b.workload, b.defaultAction)
 	return nil
 }
 
@@ -73,7 +73,7 @@ func (b *rsmComponentWorkloadBuilder) BuildWrapper(buildfn func() ([]client.Obje
 			b.error = err
 		}
 		for _, obj := range objs {
-			b.comp.addResource(obj, b.defaultAction, nil)
+			b.comp.addResource(obj, b.defaultAction)
 		}
 	}
 	return b

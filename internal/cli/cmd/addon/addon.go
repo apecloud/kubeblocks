@@ -37,7 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	discoverycli "k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -76,7 +76,7 @@ func (r *addonEnableFlags) useDefault() bool {
 }
 
 type addonCmdOpts struct {
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 
 	Factory cmdutil.Factory
 	dynamic dynamic.Interface
@@ -90,7 +90,7 @@ type addonCmdOpts struct {
 }
 
 // NewAddonCmd for addon functions
-func NewAddonCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewAddonCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "addon COMMAND",
 		Short: "Addon command.",
@@ -104,7 +104,7 @@ func NewAddonCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	return cmd
 }
 
-func newListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newListCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := list.NewListOptions(f, streams, types.AddonGVR())
 	cmd := &cobra.Command{
 		Use:               "list",
@@ -120,7 +120,7 @@ func newListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	return cmd
 }
 
-func newDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newDescribeCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &addonCmdOpts{
 		Options:   patch.NewOptions(f, streams, types.AddonGVR()),
 		Factory:   f,
@@ -142,7 +142,7 @@ func newDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	return cmd
 }
 
-func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newEnableCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &addonCmdOpts{
 		Options:          patch.NewOptions(f, streams, types.AddonGVR()),
 		Factory:          f,
@@ -228,7 +228,7 @@ re-enable the addon (More info on how-to resize a PVC: https://kubernetes.io/doc
 	return cmd
 }
 
-func newDisableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newDisableCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &addonCmdOpts{
 		Options:   patch.NewOptions(f, streams, types.AddonGVR()),
 		Factory:   f,

@@ -69,10 +69,16 @@ spec:
                 description: backupMethod specifies the backup method name that is
                   defined in backupPolicy.
                 type: string
+                x-kubernetes-validations:
+                - message: forbidden to update spec.backupMethod
+                  rule: self == oldSelf
               backupPolicyName:
                 description: Which backupPolicy is applied to perform this backup.
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
+                x-kubernetes-validations:
+                - message: forbidden to update spec.backupPolicyName
+                  rule: self == oldSelf
               deletionPolicy:
                 allOf:
                 - enum:
@@ -93,15 +99,17 @@ spec:
                 description: parentBackupName determines the parent backup name for
                   incremental or differential backup.
                 type: string
+                x-kubernetes-validations:
+                - message: forbidden to update spec.parentBackupName
+                  rule: self == oldSelf
               retentionPeriod:
-                default: 7d
                 description: "retentionPeriod determines a duration up to which the
-                  backup should be kept. controller will remove all backups that are
+                  backup should be kept. Controller will remove all backups that are
                   older than the RetentionPeriod. For example, RetentionPeriod of
                   `30d` will keep only the backups of last 30 days. Sample duration
                   format: - years: \t2y - months: \t6mo - days: \t\t30d - hours: \t12h
                   - minutes: \t30m You can also combine the above durations. For example:
-                  30d12h30m"
+                  30d12h30m. If not set, the backup will be kept forever."
                 type: string
             required:
             - backupMethod

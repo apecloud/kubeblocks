@@ -25,7 +25,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/maps"
 	apps "k8s.io/api/apps/v1"
@@ -45,7 +44,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	lorry "github.com/apecloud/kubeblocks/lorry/client"
@@ -68,8 +66,6 @@ type componentWorkloadOps struct {
 	runningRSM *workloads.ReplicatedStateMachine
 	// protoRSM is the rsm object that is rebuilt from scratch during each reconcile process
 	protoRSM *workloads.ReplicatedStateMachine
-	// workloadVertex is the vertex of the protoRSM workload in the DAG
-	workloadVertex *ictrltypes.LifecycleVertex
 }
 
 var _ graph.Transformer = &ComponentWorkloadTransformer{}
@@ -88,11 +84,7 @@ func (t *ComponentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 		return nil
 	}
 
-	root, err := ictrltypes.FindRootVertex(dag)
-	if err != nil {
-		return err
-	}
-
+	graphCli, _ := transCtx.Client.(model.GraphClient)
 	cluster := transCtx.Cluster
 	synthesizeComp := transCtx.SynthesizeComponent
 
@@ -142,22 +134,9 @@ func (t *ComponentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	updateSet := newNameSet.Intersection(oldNameSet)
 	deleteSet := oldNameSet.Difference(newNameSet)
 
-	buildWorkloadVertex := func(dag *graph.DAG) *ictrltypes.LifecycleVertex {
-		var rsmWorkloadVertex *ictrltypes.LifecycleVertex
-		for _, vertex := range dag.Vertices() {
-			v, _ := vertex.(*ictrltypes.LifecycleVertex)
-			if _, ok := v.Obj.(*workloads.ReplicatedStateMachine); ok {
-				rsmWorkloadVertex = v
-				break
-			}
-		}
-		return rsmWorkloadVertex
-	}
-
 	createNewObjects := func() error {
 		for name := range createSet {
-			// TODO: use graphClient.Create(dag, newSnapshot[name]) instead
-			createResource(dag, newSnapshot[name], nil)
+			graphCli.Create(dag, newSnapshot[name])
 		}
 		return nil
 	}
@@ -166,19 +145,14 @@ func (t *ComponentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 		for name := range updateSet {
 			oldObj := oldSnapshot[name]
 			newObj := copyAndMerge(oldObj, newSnapshot[name], cluster)
-			// TODO: use graphClient.Update(dag, oldObj, newObj) instead
-			updateResource(dag, newObj, root)
+			graphCli.Update(dag, oldObj, newObj)
 
 			// to work around that the scaled PVC will be deleted at object action.
 			newRsmObj, ok := newObj.(*workloads.ReplicatedStateMachine)
 			if !ok {
 				continue
 			}
-			rsmWorkloadVertex := buildWorkloadVertex(dag)
-			if rsmWorkloadVertex == nil {
-				return errors.New("rsm workload vertex not found")
-			}
-			if err := updateVolumes(reqCtx, t.Client, synthesizeComp, newRsmObj, dag, rsmWorkloadVertex); err != nil {
+			if err := updateVolumes(reqCtx, t.Client, synthesizeComp, newRsmObj, dag); err != nil {
 				return err
 			}
 
@@ -188,8 +162,7 @@ func (t *ComponentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 
 	deleteOrphanObjects := func() error {
 		for name := range deleteSet {
-			// TODO: use graphClient.Delete(dag, oldSnapshot[name]) instead
-			deleteResource(dag, oldSnapshot[name], nil)
+			graphCli.Delete(dag, oldSnapshot[name])
 		}
 		return nil
 	}
@@ -202,12 +175,8 @@ func (t *ComponentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 			if !ok {
 				continue
 			}
-			// build rsm workload vertex
-			rsmWorkloadVertex := buildWorkloadVertex(dag)
-			if rsmWorkloadVertex == nil {
-				rsmWorkloadVertex = updateResource(dag, rsm, nil)
-			}
-			cwo := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, oldRsmObj, rsm, rsmWorkloadVertex, dag)
+
+			cwo := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, oldRsmObj, rsm, dag)
 
 			// handle rsm workload restart
 			if err := cwo.restart(); err != nil {
@@ -223,6 +192,7 @@ func (t *ComponentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 			if err := cwo.horizontalScale(); err != nil {
 				return err
 			}
+
 			dag = cwo.dag
 		}
 
@@ -400,9 +370,9 @@ func (r *componentWorkloadOps) restart() error {
 func (r *componentWorkloadOps) expandVolume() error {
 	for _, vct := range r.runningRSM.Spec.VolumeClaimTemplates {
 		var proto *corev1.PersistentVolumeClaimTemplate
-		for _, v := range r.synthesizeComp.VolumeClaimTemplates {
+		for i, v := range r.synthesizeComp.VolumeClaimTemplates {
 			if v.Name == vct.Name {
-				proto = &v
+				proto = &r.synthesizeComp.VolumeClaimTemplates[i]
 				break
 			}
 		}
@@ -485,8 +455,9 @@ func (r *componentWorkloadOps) postScaleOut(stsObj *apps.StatefulSet) error {
 		if err != nil {
 			return err
 		}
+		graphCli := model.NewGraphClient(r.cli)
 		for _, obj := range tmpObjs {
-			deleteResource(r.dag, obj, nil)
+			graphCli.Do(r.dag, nil, obj, model.ActionDeletePtr(), nil)
 		}
 	}
 
@@ -520,10 +491,9 @@ func (r *componentWorkloadOps) scaleOut(stsObj *apps.StatefulSet) error {
 	if *stsObj.Spec.Replicas == 0 {
 		return nil
 	}
-
-	r.workloadVertex.Immutable = true
-	rsmProto := r.workloadVertex.Obj.(*workloads.ReplicatedStateMachine)
-	stsProto := components.ConvertRSMToSTS(rsmProto)
+	graphCli := model.NewGraphClient(r.cli)
+	graphCli.Noop(r.dag, r.protoRSM)
+	stsProto := components.ConvertRSMToSTS(r.protoRSM)
 	d, err := components.NewDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, stsObj, stsProto, backupKey)
 	if err != nil {
 		return err
@@ -539,23 +509,24 @@ func (r *componentWorkloadOps) scaleOut(stsObj *apps.StatefulSet) error {
 	}
 	if succeed {
 		// pvcs are ready, rsm.replicas should be updated
-		r.workloadVertex.Immutable = false
+		graphCli.Update(r.dag, nil, r.protoRSM)
 		return r.postScaleOut(stsObj)
 	} else {
-		r.workloadVertex.Immutable = true
+		graphCli.Noop(r.dag, r.protoRSM)
 		// update objs will trigger reconcile, no need to requeue error
 		objs, err := d.CloneData(d)
 		if err != nil {
 			return err
 		}
 		for _, obj := range objs {
-			createResource(r.dag, obj, nil)
+			graphCli.Do(r.dag, nil, obj, model.ActionCreatePtr(), nil)
 		}
 		return nil
 	}
 }
 
 func (r *componentWorkloadOps) updatePodReplicaLabel4Scaling(replicas int32) error {
+	graphCli := model.NewGraphClient(r.cli)
 	pods, err := components.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name))
 	if err != nil {
 		return err
@@ -566,7 +537,7 @@ func (r *componentWorkloadOps) updatePodReplicaLabel4Scaling(replicas int32) err
 			obj.Annotations = make(map[string]string)
 		}
 		obj.Annotations[constant.ComponentReplicasAnnotationKey] = strconv.Itoa(int(replicas))
-		updateResource(r.dag, obj, r.workloadVertex)
+		graphCli.Update(r.dag, nil, obj)
 	}
 	return nil
 }
@@ -606,6 +577,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 }
 
 func (r *componentWorkloadOps) deletePVCs4ScaleIn(stsObj *apps.StatefulSet) error {
+	graphCli := model.NewGraphClient(r.cli)
 	for i := r.synthesizeComp.Replicas; i < *stsObj.Spec.Replicas; i++ {
 		for _, vct := range stsObj.Spec.VolumeClaimTemplates {
 			pvcKey := types.NamespacedName{
@@ -620,20 +592,20 @@ func (r *componentWorkloadOps) deletePVCs4ScaleIn(stsObj *apps.StatefulSet) erro
 			// after updating STS and before deleting PVCs, the PVCs intended to scale-in will be leaked.
 			// For simplicity, the updating dependency is added between them to guarantee that the PVCs to scale-in
 			// will be deleted or the scaling-in operation will be failed.
-			deleteResource(r.dag, &pvc, r.workloadVertex)
+			graphCli.Delete(r.dag, &pvc)
 		}
 	}
 	return nil
 }
 
 func (r *componentWorkloadOps) expandVolumes(vctName string, proto *corev1.PersistentVolumeClaimTemplate) error {
-	pvcNotFound := false
 	for i := *r.runningRSM.Spec.Replicas - 1; i >= 0; i-- {
 		pvc := &corev1.PersistentVolumeClaim{}
 		pvcKey := types.NamespacedName{
-			Namespace: r.runningRSM.GetNamespace(),
+			Namespace: r.cluster.Namespace,
 			Name:      fmt.Sprintf("%s-%s-%d", vctName, r.runningRSM.Name, i),
 		}
+		pvcNotFound := false
 		if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, pvc); err != nil {
 			if apierrors.IsNotFound(err) {
 				pvcNotFound = true
@@ -641,6 +613,18 @@ func (r *componentWorkloadOps) expandVolumes(vctName string, proto *corev1.Persi
 				return err
 			}
 		}
+
+		if !pvcNotFound {
+			quantity := pvc.Spec.Resources.Requests.Storage()
+			newQuantity := proto.Spec.Resources.Requests.Storage()
+			if quantity.Cmp(*pvc.Status.Capacity.Storage()) == 0 && newQuantity.Cmp(*quantity) < 0 {
+				errMsg := fmt.Sprintf("shrinking the volume is not supported, volume: %s, quantity: %s, new quantity: %s",
+					pvc.GetName(), quantity.String(), newQuantity.String())
+				r.reqCtx.Event(r.cluster, corev1.EventTypeWarning, "VolumeExpansionFailed", errMsg)
+				return fmt.Errorf("%s", errMsg)
+			}
+		}
+
 		if err := r.updatePVCSize(pvcKey, pvc, pvcNotFound, proto); err != nil {
 			return err
 		}
@@ -701,6 +685,8 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 		}
 	}
 
+	graphCli := model.NewGraphClient(r.cli)
+
 	type pvcRecreateStep int
 	const (
 		pvPolicyRetainStep pvcRecreateStep = iota
@@ -710,8 +696,8 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 		pvRestorePolicyStep
 	)
 
-	addStepMap := map[pvcRecreateStep]func(fromVertex *ictrltypes.LifecycleVertex, step pvcRecreateStep) *ictrltypes.LifecycleVertex{
-		pvPolicyRetainStep: func(fromVertex *ictrltypes.LifecycleVertex, step pvcRecreateStep) *ictrltypes.LifecycleVertex {
+	addStepMap := map[pvcRecreateStep]func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex{
+		pvPolicyRetainStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 1: update pv to retain
 			retainPV := pv.DeepCopy()
 			if retainPV.Labels == nil {
@@ -724,30 +710,30 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 			}
 			retainPV.Annotations[constant.PVLastClaimPolicyAnnotationKey] = string(pv.Spec.PersistentVolumeReclaimPolicy)
 			retainPV.Spec.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimRetain
-			return patchResource(r.dag, retainPV, pv, fromVertex)
+			return graphCli.Do(r.dag, pv, retainPV, model.ActionPatchPtr(), fromVertex)
 		},
-		deletePVCStep: func(fromVertex *ictrltypes.LifecycleVertex, step pvcRecreateStep) *ictrltypes.LifecycleVertex {
+		deletePVCStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 2: delete pvc, this will not delete pv because policy is 'retain'
 			removeFinalizerPVC := pvc.DeepCopy()
 			removeFinalizerPVC.SetFinalizers([]string{})
-			removeFinalizerPVCVertex := patchResource(r.dag, removeFinalizerPVC, pvc, fromVertex)
-			return deleteResource(r.dag, pvc, removeFinalizerPVCVertex)
+			removeFinalizerPVCVertex := graphCli.Do(r.dag, pvc, removeFinalizerPVC, model.ActionPatchPtr(), fromVertex)
+			return graphCli.Do(r.dag, nil, removeFinalizerPVC, model.ActionDeletePtr(), removeFinalizerPVCVertex)
 		},
-		removePVClaimRefStep: func(fromVertex *ictrltypes.LifecycleVertex, step pvcRecreateStep) *ictrltypes.LifecycleVertex {
+		removePVClaimRefStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 3: remove claimRef in pv
 			removeClaimRefPV := pv.DeepCopy()
 			if removeClaimRefPV.Spec.ClaimRef != nil {
 				removeClaimRefPV.Spec.ClaimRef.UID = ""
 				removeClaimRefPV.Spec.ClaimRef.ResourceVersion = ""
 			}
-			return patchResource(r.dag, removeClaimRefPV, pv, fromVertex)
+			return graphCli.Do(r.dag, pv, removeClaimRefPV, model.ActionPatchPtr(), fromVertex)
 		},
-		createPVCStep: func(fromVertex *ictrltypes.LifecycleVertex, step pvcRecreateStep) *ictrltypes.LifecycleVertex {
+		createPVCStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 4: create new pvc
 			newPVC.SetResourceVersion("")
-			return createResource(r.dag, newPVC, fromVertex)
+			return graphCli.Do(r.dag, nil, newPVC, model.ActionCreatePtr(), fromVertex)
 		},
-		pvRestorePolicyStep: func(fromVertex *ictrltypes.LifecycleVertex, step pvcRecreateStep) *ictrltypes.LifecycleVertex {
+		pvRestorePolicyStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 5: restore to previous pv policy
 			restorePV := pv.DeepCopy()
 			policy := corev1.PersistentVolumeReclaimPolicy(restorePV.Annotations[constant.PVLastClaimPolicyAnnotationKey])
@@ -755,12 +741,12 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 				policy = corev1.PersistentVolumeReclaimDelete
 			}
 			restorePV.Spec.PersistentVolumeReclaimPolicy = policy
-			return patchResource(r.dag, restorePV, pv, fromVertex)
+			return graphCli.Do(r.dag, pv, restorePV, model.ActionPatchPtr(), fromVertex)
 		},
 	}
 
 	updatePVCByRecreateFromStep := func(fromStep pvcRecreateStep) {
-		lastVertex := r.workloadVertex
+		lastVertex := r.buildProtoRSMWorkloadVertex()
 		for step := pvRestorePolicyStep; step >= fromStep && step >= pvPolicyRetainStep; step-- {
 			lastVertex = addStepMap[step](lastVertex, step)
 		}
@@ -790,7 +776,7 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 	}
 	if pvcQuantity := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; pvcQuantity.Cmp(vctProto.Spec.Resources.Requests[corev1.ResourceStorage]) != 0 {
 		// use pvc's update without anything extra
-		updateResource(r.dag, newPVC, r.workloadVertex)
+		graphCli.Update(r.dag, nil, newPVC)
 		return nil
 	}
 	// all the else means no need to update
@@ -798,8 +784,20 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 	return nil
 }
 
+// buildProtoRSMWorkloadVertex builds protoRSM workload vertex
+func (r *componentWorkloadOps) buildProtoRSMWorkloadVertex() *model.ObjectVertex {
+	for _, vertex := range r.dag.Vertices() {
+		v, _ := vertex.(*model.ObjectVertex)
+		if v.Obj == r.protoRSM {
+			return v
+		}
+	}
+	return nil
+}
+
 func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeComp *component.SynthesizedComponent,
-	rsmObj *workloads.ReplicatedStateMachine, dag *graph.DAG, workloadVertex *ictrltypes.LifecycleVertex) error {
+	rsmObj *workloads.ReplicatedStateMachine, dag *graph.DAG) error {
+	graphCli := model.NewGraphClient(cli)
 	getRunningVolumes := func(vctName string) ([]*corev1.PersistentVolumeClaim, error) {
 		pvcs, err := components.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.PersistentVolumeClaimSignature,
 			rsmObj.Namespace, constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name))
@@ -821,8 +819,8 @@ func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeC
 
 	// PVCs which have been added to the dag because of volume expansion.
 	pvcNameSet := sets.New[string]()
-	for _, v := range ictrltypes.FindAll[*corev1.PersistentVolumeClaim](dag) {
-		pvcNameSet.Insert(v.(*ictrltypes.LifecycleVertex).Obj.GetName())
+	for _, obj := range graphCli.FindAll(dag, &corev1.PersistentVolumeClaim{}) {
+		pvcNameSet.Insert(obj.GetName())
 	}
 
 	for _, vct := range synthesizeComp.VolumeClaimTemplates {
@@ -834,30 +832,10 @@ func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeC
 			if pvcNameSet.Has(pvc.Name) {
 				continue
 			}
-			noopResource(dag, pvc, workloadVertex)
+			graphCli.Noop(dag, pvc)
 		}
 	}
 	return nil
-}
-
-func createResource(dag *graph.DAG, obj client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
-	return ictrltypes.LifecycleObjectCreate(dag, obj, parent)
-}
-
-func deleteResource(dag *graph.DAG, obj client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
-	return ictrltypes.LifecycleObjectDelete(dag, obj, parent)
-}
-
-func updateResource(dag *graph.DAG, obj client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
-	return ictrltypes.LifecycleObjectUpdate(dag, obj, parent)
-}
-
-func patchResource(dag *graph.DAG, obj client.Object, objCopy client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
-	return ictrltypes.LifecycleObjectPatch(dag, obj, objCopy, parent)
-}
-
-func noopResource(dag *graph.DAG, obj client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
-	return ictrltypes.LifecycleObjectNoop(dag, obj, parent)
 }
 
 func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
@@ -866,7 +844,6 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 	synthesizeComp *component.SynthesizedComponent,
 	runningRSM *workloads.ReplicatedStateMachine,
 	protoRSM *workloads.ReplicatedStateMachine,
-	workloadVertex *ictrltypes.LifecycleVertex,
 	dag *graph.DAG) *componentWorkloadOps {
 	return &componentWorkloadOps{
 		cli:            cli,
@@ -875,7 +852,6 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 		synthesizeComp: synthesizeComp,
 		runningRSM:     runningRSM,
 		protoRSM:       protoRSM,
-		workloadVertex: workloadVertex,
 		dag:            dag,
 	}
 }

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -32,7 +33,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -119,7 +120,7 @@ var _ = Describe("create", func() {
 
 	Context("multipleSourceComponent test", func() {
 		defer GinkgoRecover()
-		streams := genericclioptions.IOStreams{
+		streams := genericiooptions.IOStreams{
 			In:     os.Stdin,
 			Out:    os.Stdout,
 			ErrOut: os.Stdout,
@@ -758,4 +759,98 @@ var _ = Describe("create", func() {
 
 	})
 
+	It("test getServiceRefs", func() {
+		testCase := []struct {
+			input    []string
+			success  bool
+			expected []map[serviceRefKey]string
+		}{
+			{
+				[]string{fmt.Sprintf("name=%s,cluster=mysql,namespace=default", testing.ServiceRefName)},
+				true,
+				[]map[serviceRefKey]string{
+					{
+						serviceRefKeyName:      testing.ServiceRefName,
+						serviceRefKeyCluster:   "mysql",
+						serviceRefKeyNamespace: "default",
+					},
+				},
+			},
+			{
+				[]string{"name=invalid,cluster=mysql,namespace=default"},
+				false,
+				nil,
+			},
+			{
+				[]string{"invalidKey=test"},
+				false,
+				nil,
+			},
+		}
+		for i := range testCase {
+			refs, err := getServiceRefs(testCase[i].input, testing.FakeClusterDef())
+			if testCase[i].success {
+				Expect(err).Should(Succeed())
+				Expect(refs).Should(Equal(testCase[i].expected))
+			} else {
+				Expect(err).Should(HaveOccurred())
+			}
+		}
+
+	})
+
+	It("test build ServiceRefs for ClusterComponentSpec", func() {
+		testCase := []struct {
+			input    []string
+			before   []*appsv1alpha1.ClusterComponentSpec
+			cd       *appsv1alpha1.ClusterDefinition
+			success  bool
+			expected []*appsv1alpha1.ClusterComponentSpec
+		}{
+			{[]string{fmt.Sprintf("name=%s,cluster=%s,namespace=%s", testing.ServiceRefName, testing.ClusterName, testing.Namespace)},
+				[]*appsv1alpha1.ClusterComponentSpec{
+					{
+						Name: testing.ComponentDefName,
+					},
+				},
+				testing.FakeClusterDef(),
+				true,
+				[]*appsv1alpha1.ClusterComponentSpec{
+					{
+						Name: testing.ComponentDefName,
+						ServiceRefs: []appsv1alpha1.ServiceRef{
+							{Name: testing.ServiceRefName, Cluster: testing.ClusterName, Namespace: testing.Namespace},
+						},
+					},
+				},
+			}, {[]string{fmt.Sprintf("name=%s,cluster=%s,namespace=%s", testing.ServiceRefName, testing.ClusterName, testing.Namespace)},
+				[]*appsv1alpha1.ClusterComponentSpec{
+					{
+						Name: testing.ComponentDefName,
+					},
+				},
+				testing.FakeClusterDef(),
+				true,
+				[]*appsv1alpha1.ClusterComponentSpec{
+					{
+						Name: testing.ComponentDefName,
+						ServiceRefs: []appsv1alpha1.ServiceRef{
+							{Name: testing.ServiceRefName, Cluster: testing.ClusterName, Namespace: testing.Namespace},
+						},
+					},
+				},
+			},
+		}
+
+		for i := range testCase {
+			compSpec, err := buildServiceRefs(testCase[i].input, testCase[i].cd, testCase[i].before)
+			if testCase[i].success {
+				Expect(err).Should(Succeed())
+				Expect(compSpec).Should(Equal(testCase[i].expected))
+			} else {
+				Expect(err).Should(HaveOccurred())
+			}
+		}
+
+	})
 })

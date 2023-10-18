@@ -38,7 +38,7 @@ import (
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -72,7 +72,7 @@ type UninstallOptions struct {
 	force           bool
 }
 
-func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newUninstallCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &UninstallOptions{
 		Options: Options{
 			IOStreams: streams,

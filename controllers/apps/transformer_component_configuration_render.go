@@ -26,8 +26,8 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -49,7 +49,7 @@ func (t *ComponentConfigurationRenderTransformer) Transform(ctx graph.TransformC
 	var rsm *workloads.ReplicatedStateMachine
 	var dependOnObjs []client.Object
 	for _, vertex := range dag.Vertices() {
-		v, _ := vertex.(*ictrltypes.LifecycleVertex)
+		v, _ := vertex.(*model.ObjectVertex)
 		if rsmV, ok := v.Obj.(*workloads.ReplicatedStateMachine); ok {
 			rsm = rsmV
 			continue

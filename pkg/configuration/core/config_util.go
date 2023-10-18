@@ -22,6 +22,7 @@ package core
 import (
 	"context"
 	"regexp"
+	"strings"
 
 	"github.com/spf13/cast"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,7 +42,7 @@ const pattern = `^[a-z0-9A-Z]([a-zA-Z0-9\.\-\_]*[a-zA-Z0-9])?$`
 var regxPattern = regexp.MustCompile(pattern)
 
 func FromValueToString(val interface{}) string {
-	str := cast.ToString(val)
+	str := strings.Trim(cast.ToString(val), ` '"`)
 	if regxPattern.MatchString(str) {
 		return str
 	}

@@ -98,6 +98,7 @@ type BackupStatus struct {
 
 	// totalSize is the total size of backed up data size.
 	// A string with capacity units in the format of "1Gi", "1Mi", "1Ki".
+	// If no capacity unit is specified, it is assumed to be in bytes.
 	// +optional
 	TotalSize string `json:"totalSize,omitempty"`
 

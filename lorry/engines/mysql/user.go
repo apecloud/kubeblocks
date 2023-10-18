@@ -88,7 +88,9 @@ func (mgr *Manager) DescribeUser(ctx context.Context, userName string) (*models.
 	// only keep one role name of the highest privilege
 	userRoles := make([]models.RoleType, 0)
 
-	err := QueryRowsMap(mgr.DB, listUserSQL, func(rMap RowMap) error {
+	sql := fmt.Sprintf(showGrantSQL, user.UserName)
+
+	err := QueryRowsMap(mgr.DB, sql, func(rMap RowMap) error {
 		for k, v := range rMap {
 			if user.UserName == "" {
 				user.UserName = strings.TrimPrefix(strings.TrimSuffix(k, "@%"), "Grants for ")
@@ -100,7 +102,7 @@ func (mgr *Manager) DescribeUser(ctx context.Context, userName string) (*models.
 		return nil
 	})
 	if err != nil {
-		mgr.Logger.Error(err, "error executing %s")
+		mgr.Logger.Error(err, "execute sql failed", "sql", sql)
 		return nil, err
 	}
 
@@ -109,6 +111,58 @@ func (mgr *Manager) DescribeUser(ctx context.Context, userName string) (*models.
 		user.RoleName = (string)(userRoles[0])
 	}
 	return user, nil
+}
+
+func (mgr *Manager) CreateUser(ctx context.Context, userName, password string) error {
+	sql := fmt.Sprintf(createUserSQL, userName, password)
+
+	_, err := mgr.Exec(ctx, sql)
+	if err != nil {
+		mgr.Logger.Error(err, "execute sql failed", "sql", sql)
+		return err
+	}
+
+	return nil
+}
+
+func (mgr *Manager) DeleteUser(ctx context.Context, userName string) error {
+	sql := fmt.Sprintf(deleteUserSQL, userName)
+
+	_, err := mgr.Exec(ctx, sql)
+	if err != nil {
+		mgr.Logger.Error(err, "execute sql failed", "sql", sql)
+		return err
+	}
+
+	return nil
+}
+
+func (mgr *Manager) GrantUserRole(ctx context.Context, userName, roleName string) error {
+	// render sql stmts
+	roleDesc, _ := role2Priv(roleName)
+	// update privilege
+	sql := fmt.Sprintf(grantSQL, roleDesc, userName)
+	_, err := mgr.Exec(ctx, sql)
+	if err != nil {
+		mgr.Logger.Error(err, "execute sql failed", "sql", sql)
+		return err
+	}
+
+	return nil
+}
+
+func (mgr *Manager) RevokeUserRole(ctx context.Context, userName, roleName string) error {
+	// render sql stmts
+	roleDesc, _ := role2Priv(roleName)
+	// update privilege
+	sql := fmt.Sprintf(revokeSQL, roleDesc, userName)
+	_, err := mgr.Exec(ctx, sql)
+	if err != nil {
+		mgr.Logger.Error(err, "execute sql failed", "sql", sql)
+		return err
+	}
+
+	return nil
 }
 
 func role2Priv(roleName string) (string, error) {

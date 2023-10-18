@@ -26,7 +26,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/factory"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -36,15 +36,14 @@ type ClusterCredentialTransformer struct{}
 var _ graph.Transformer = &ClusterCredentialTransformer{}
 
 func (c *ClusterCredentialTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*ClusterTransformContext)
+	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster
+	graphCli, _ := transCtx.Client.(model.GraphClient)
 
-	root, err := ictrltypes.FindRootVertex(dag)
-	if err != nil {
-		return err
-	}
-
-	var synthesizedComponent *component.SynthesizedComponent
+	var (
+		synthesizedComponent *component.SynthesizedComponent
+		err                  error
+	)
 	compSpecMap := cluster.Spec.GetDefNameMappingComponents()
 	for _, compDef := range transCtx.ClusterDef.Spec.ComponentDefs {
 		if compDef.Service == nil {
@@ -75,7 +74,7 @@ func (c *ClusterCredentialTransformer) Transform(ctx graph.TransformContext, dag
 	if synthesizedComponent != nil {
 		secret := factory.BuildConnCredential(transCtx.ClusterDef, cluster, synthesizedComponent)
 		if secret != nil {
-			ictrltypes.LifecycleObjectCreate(dag, secret, root)
+			graphCli.Create(dag, secret)
 		}
 	}
 	return nil

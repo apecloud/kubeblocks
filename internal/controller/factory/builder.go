@@ -622,7 +622,7 @@ func buildActionFromCharacterType(characterType string, isConsensus bool) []work
 	case "mongodb":
 		return []workloads.Action{
 			{
-				Image: "registry.cn-hangzhou.aliyuncs.com/apecloud/mongo:5.0.14",
+				Image: "infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/mongo:5.0.14",
 				Command: []string{
 					"Status=$(export CLIENT=`which mongosh>/dev/null&&echo mongosh||echo mongo`; $CLIENT -u $KB_RSM_USERNAME -p $KB_RSM_PASSWORD 127.0.0.1:27017 --authenticationDatabase admin --quiet --eval \"JSON.stringify(rs.status())\") &&",
 					"MyState=$(echo $Status | jq '.myState') &&",
@@ -645,7 +645,7 @@ func buildActionFromCharacterType(characterType string, isConsensus bool) []work
 	case "redis":
 		return []workloads.Action{
 			{
-				Image: "registry.cn-hangzhou.aliyuncs.com/apecloud/redis-stack-server:7.0.6-RC8",
+				Image: "infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/redis-stack-server:7.0.6-RC8",
 				Command: []string{
 					"Role=$(redis-cli --user $KB_RSM_USERNAME --pass $KB_RSM_PASSWORD --no-auth-warning info | grep role | awk -F ':' '{print $2}' | tr '[:upper:]' '[:lower:]' | tr -d '\r' | tr -d '\n') &&",
 					"if [ \"master\" = \"$Role\" ]; then echo -n \"primary\"; else echo -n \"secondary\"; fi",

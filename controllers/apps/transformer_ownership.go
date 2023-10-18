@@ -26,7 +26,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -36,20 +36,19 @@ type OwnershipTransformer struct{}
 var _ graph.Transformer = &OwnershipTransformer{}
 
 func (f *OwnershipTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	rootVertex, err := ictrltypes.FindRootVertex(dag)
-	if err != nil {
-		return err
-	}
-	vertices := ictrltypes.FindAllNot[*appsv1alpha1.Cluster](dag)
+	transCtx, _ := ctx.(*clusterTransformContext)
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	cluster := transCtx.Cluster
 
-	controllerutil.AddFinalizer(rootVertex.Obj, constant.DBClusterFinalizerName)
-	for _, vertex := range vertices {
-		v, _ := vertex.(*ictrltypes.LifecycleVertex)
+	objects := graphCli.FindAll(dag, &appsv1alpha1.Cluster{}, model.HaveDifferentTypeWithOption)
+
+	controllerutil.AddFinalizer(cluster, constant.DBClusterFinalizerName)
+	for _, object := range objects {
 		// TODO: skip to set ownership for ClusterRoleBinding which is a cluster-scoped object.
-		if _, ok := v.Obj.(*rbacv1.ClusterRoleBinding); ok {
+		if _, ok := object.(*rbacv1.ClusterRoleBinding); ok {
 			continue
 		}
-		if err := intctrlutil.SetOwnership(rootVertex.Obj, v.Obj, rscheme, constant.DBClusterFinalizerName); err != nil {
+		if err := intctrlutil.SetOwnership(cluster, object, rscheme, constant.DBClusterFinalizerName); err != nil {
 			if _, ok := err.(*controllerutil.AlreadyOwnedError); ok {
 				continue
 			}

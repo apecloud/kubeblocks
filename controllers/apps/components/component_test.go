@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package components
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -37,8 +38,9 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -139,54 +141,59 @@ var _ = Describe("Component", func() {
 		return clusterObj.Status.Components[statefulCompName]
 	}
 
-	applyChanges := func(dag *graph.DAG) error {
+	newDAGWithPlaceholder := func(namespace, clusterName, compName string) *graph.DAG {
+		root := builder.NewReplicatedStateMachineBuilder(namespace, fmt.Sprintf("%s-%s", clusterName, compName)).GetObject()
+		dag := graph.NewDAG()
+		model.NewGraphClient(nil).Root(dag, nil, root, nil)
+		return dag
+	}
+
+	applyChanges := func(ctx context.Context, cli client.Client, dag *graph.DAG) error {
 		walking := func(v graph.Vertex) error {
-			node, ok := v.(*ictrltypes.LifecycleVertex)
+			node, ok := v.(*model.ObjectVertex)
 			Expect(ok).Should(BeTrue())
 
 			_, ok = node.Obj.(*appsv1alpha1.Cluster)
-			Expect(!ok || *node.Action == ictrltypes.NOOP).Should(BeTrue())
+			Expect(!ok || *node.Action == model.NOOP).Should(BeTrue())
 
 			switch *node.Action {
-			case ictrltypes.CREATE:
+			case model.CREATE:
 				controllerutil.AddFinalizer(node.Obj, constant.DBClusterFinalizerName)
+				// Using the testCtx.Create since it adds the label which will be used at clearing resources.
 				err := testCtx.Create(ctx, node.Obj)
 				if err != nil && !apierrors.IsAlreadyExists(err) {
 					return err
 				}
-			case ictrltypes.UPDATE:
-				if node.Immutable {
-					return nil
-				}
-				err := testCtx.Cli.Update(ctx, node.Obj)
+			case model.UPDATE:
+				err := cli.Update(ctx, node.Obj)
 				if err != nil && !apierrors.IsNotFound(err) {
 					return err
 				}
-			case ictrltypes.PATCH:
-				patch := client.MergeFrom(node.ObjCopy)
-				err := testCtx.Cli.Patch(ctx, node.Obj, patch)
+			case model.PATCH:
+				patch := client.MergeFrom(node.OriObj)
+				err := cli.Patch(ctx, node.Obj, patch)
 				if err != nil && !apierrors.IsNotFound(err) {
 					return err
 				}
-			case ictrltypes.DELETE:
+			case model.DELETE:
 				if controllerutil.RemoveFinalizer(node.Obj, constant.DBClusterFinalizerName) {
-					err := testCtx.Cli.Update(ctx, node.Obj)
+					err := cli.Update(ctx, node.Obj)
 					if err != nil && !apierrors.IsNotFound(err) {
 						return err
 					}
 				}
 				if _, ok := node.Obj.(*appsv1alpha1.Cluster); !ok {
-					err := testCtx.Cli.Delete(ctx, node.Obj)
+					err := cli.Delete(ctx, node.Obj)
 					if err != nil && !apierrors.IsNotFound(err) {
 						return err
 					}
 				}
-			case ictrltypes.STATUS:
-				patch := client.MergeFrom(node.ObjCopy)
-				if err := testCtx.Cli.Status().Patch(ctx, node.Obj, patch); err != nil {
+			case model.STATUS:
+				patch := client.MergeFrom(node.OriObj)
+				if err := cli.Status().Patch(ctx, node.Obj, patch); err != nil {
 					return err
 				}
-			case ictrltypes.NOOP:
+			case model.NOOP:
 				// nothing
 			}
 			return nil
@@ -195,14 +202,14 @@ var _ = Describe("Component", func() {
 			return dag.WalkReverseTopoOrder(walking, nil)
 		} else {
 			withRoot := graph.NewDAG()
-			ictrltypes.LifecycleObjectNoop(withRoot, &appsv1alpha1.Cluster{}, nil)
+			model.NewGraphClient(cli).Root(withRoot, nil, &appsv1alpha1.Cluster{}, model.ActionNoopPtr())
 			withRoot.Merge(dag)
 			return withRoot.WalkReverseTopoOrder(walking, nil)
 		}
 	}
 
 	newComponent := func(compName string) (Component, *graph.DAG) {
-		dag := graph.NewDAG()
+		dag := newDAGWithPlaceholder(testCtx.DefaultNamespace, clusterName, compName)
 		comp, err := NewComponent(reqCtx, testCtx.Cli, clusterDefObj, clusterVerObj, clusterObj, compName, dag)
 		Expect(comp).ShouldNot(BeNil())
 		Expect(err).Should(Succeed())
@@ -214,7 +221,7 @@ var _ = Describe("Component", func() {
 		if err := comp.Create(reqCtx, testCtx.Cli); err != nil {
 			return err
 		}
-		return applyChanges(dag)
+		return applyChanges(testCtx.Ctx, testCtx.Cli, dag)
 	}
 
 	deleteComponent := func() error {
@@ -222,7 +229,7 @@ var _ = Describe("Component", func() {
 		if err := comp.Delete(reqCtx, testCtx.Cli); err != nil {
 			return err
 		}
-		return applyChanges(dag)
+		return applyChanges(testCtx.Ctx, testCtx.Cli, dag)
 	}
 
 	updateComponent := func() error {
@@ -231,7 +238,7 @@ var _ = Describe("Component", func() {
 		if err := comp.Update(reqCtx, testCtx.Cli); err != nil {
 			return err
 		}
-		return applyChanges(dag)
+		return applyChanges(testCtx.Ctx, testCtx.Cli, dag)
 	}
 
 	retryUpdateComponent := func() error {
@@ -240,7 +247,7 @@ var _ = Describe("Component", func() {
 		if err := comp.Update(reqCtx, testCtx.Cli); err != nil {
 			return err
 		}
-		return applyChanges(dag)
+		return applyChanges(testCtx.Ctx, testCtx.Cli, dag)
 	}
 
 	statusComponent := func() error {
@@ -249,7 +256,7 @@ var _ = Describe("Component", func() {
 		if err := comp.Status(reqCtx, testCtx.Cli); err != nil {
 			return err
 		}
-		return applyChanges(dag)
+		return applyChanges(testCtx.Ctx, testCtx.Cli, dag)
 	}
 
 	pvcKey := func(clusterName, compName, vctName string, ordinal int) types.NamespacedName {

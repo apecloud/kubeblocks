@@ -67,7 +67,7 @@ var _ = Describe("object generation transformer test.", func() {
 			sts := builder.NewStatefulSetBuilder(namespace, name).GetObject()
 			headlessSvc := builder.NewHeadlessServiceBuilder(name, getHeadlessSvcName(*rsm)).GetObject()
 			svc := builder.NewServiceBuilder(name, name).GetObject()
-			env := builder.NewConfigMapBuilder(name, name+"-env").GetObject()
+			env := builder.NewConfigMapBuilder(name, name+"-rsm-env").GetObject()
 			k8sMock.EXPECT().
 				List(gomock.Any(), &apps.StatefulSetList{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, list *apps.StatefulSetList, _ ...client.ListOption) error {

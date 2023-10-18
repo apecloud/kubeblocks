@@ -61,7 +61,7 @@ var _ = Describe("plan builder test", func() {
 		It("should create object", func() {
 			v := &model.ObjectVertex{
 				Obj:    rsm,
-				Action: model.ActionPtr(model.CREATE),
+				Action: model.ActionCreatePtr(),
 			}
 			k8sMock.EXPECT().
 				Create(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -83,7 +83,7 @@ var _ = Describe("plan builder test", func() {
 			v := &model.ObjectVertex{
 				OriObj: stsOrig,
 				Obj:    sts,
-				Action: model.ActionPtr(model.UPDATE),
+				Action: model.ActionUpdatePtr(),
 			}
 			k8sMock.EXPECT().
 				Update(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -106,7 +106,7 @@ var _ = Describe("plan builder test", func() {
 			v := &model.ObjectVertex{
 				OriObj: svcOrig,
 				Obj:    svc,
-				Action: model.ActionPtr(model.UPDATE),
+				Action: model.ActionUpdatePtr(),
 			}
 			k8sMock.EXPECT().
 				Update(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -131,7 +131,7 @@ var _ = Describe("plan builder test", func() {
 			v := &model.ObjectVertex{
 				OriObj: pvcOrig,
 				Obj:    pvc,
-				Action: model.ActionPtr(model.UPDATE),
+				Action: model.ActionUpdatePtr(),
 			}
 			k8sMock.EXPECT().
 				Update(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -148,7 +148,7 @@ var _ = Describe("plan builder test", func() {
 		It("should delete object", func() {
 			v := &model.ObjectVertex{
 				Obj:    rsm,
-				Action: model.ActionPtr(model.DELETE),
+				Action: model.ActionDeletePtr(),
 			}
 			k8sMock.EXPECT().
 				Update(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -178,7 +178,7 @@ var _ = Describe("plan builder test", func() {
 			v := &model.ObjectVertex{
 				Obj:    rsm,
 				OriObj: rsmOrig,
-				Action: model.ActionPtr(model.STATUS),
+				Action: model.ActionStatusPtr(),
 			}
 			ct := gomock.NewController(GinkgoT())
 			statusWriter := mockclient.NewMockStatusWriter(ct)
@@ -205,10 +205,9 @@ var _ = Describe("plan builder test", func() {
 			Expect(err.Error()).Should(ContainSubstring("vertex action can't be nil"))
 		})
 
-		It("should return nil and do nothing if immutable=true", func() {
+		It("should return nil and do nothing if action is Noop", func() {
 			v := &model.ObjectVertex{
-				Action:    model.ActionPtr(model.UPDATE),
-				Immutable: true,
+				Action: model.ActionNoopPtr(),
 			}
 			Expect(rsmBuilder.rsmWalkFunc(v)).Should(Succeed())
 		})

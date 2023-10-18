@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/configuration/core"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
@@ -104,9 +105,10 @@ type reconfigureParams struct {
 
 	// List of StatefulSets using this config template.
 	ComponentUnits []appsv1.StatefulSet
-
 	// List of Deployment using this config template.
 	DeploymentUnits []appsv1.Deployment
+	// List of ReplicatedStateMachine using this config template.
+	RSMList []workloads.ReplicatedStateMachine
 }
 
 var (

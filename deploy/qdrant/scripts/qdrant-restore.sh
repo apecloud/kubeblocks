@@ -18,10 +18,15 @@ mkdir -p "${SNAPSHOT_DIR}"
 datasafed pull "${SNAPSHOT_FILE}" "${SNAPSHOT_DIR}/${SNAPSHOT_FILE}"
 
 # start qdrant restore process
-qdrant --storage-snapshot "${SNAPSHOT_DIR}/${SNAPSHOT_FILE}"  --config-path /qdrant/config/config.yaml  --force-snapshot --uri http://localhost:6333 &
+/qdrant/qdrant --storage-snapshot "${SNAPSHOT_DIR}/${SNAPSHOT_FILE}"  --config-path /qdrant/config/config.yaml  --force-snapshot --uri http://localhost:6333 2>&1 | tee "${DATA_DIR}/restore.log" &
 
 # wait until restore finished
-until curl http://localhost:6333/cluster; do sleep 1; done
+# note: if we have curl, we can detect it this way
+#   until curl http://localhost:6333/cluster; do sleep 1; done
+until grep -q "Qdrant HTTP listening on" "${DATA_DIR}/restore.log"; do
+  sleep 1
+done
+rm "${DATA_DIR}/restore.log"
 
 # restore finished, we can kill the restore process now
 pid=`pidof qdrant`

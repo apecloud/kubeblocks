@@ -396,22 +396,34 @@ var _ = Describe("DataProtection", func() {
 	It("describe-backup-policy", func() {
 		cmd := NewDescribeBackupPolicyCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
-		By("test describe-backup-policy cmd with no backup policy")
+		By("test describe-backup-policy cmd with cluster and backupPolicy")
 		tf.FakeDynamicClient = testing.FakeDynamicClient()
 		o := describeBackupPolicyOptions{
 			Factory:   tf,
 			IOStreams: streams,
 		}
-		args := []string{}
-		Expect(o.Complete(args)).Should(HaveOccurred())
+		Expect(o.Complete()).Should(Succeed())
+		Expect(o.Validate()).Should(HaveOccurred())
 
-		By("test describe-backup-policy")
+		By("test describe-backup-policy with cluster")
 		policyName := "test1"
 		policy1 := testing.FakeBackupPolicy(policyName, testing.ClusterName)
-		args = append(args, policyName)
 		tf.FakeDynamicClient = testing.FakeDynamicClient(policy1)
-		Expect(o.Complete(args)).Should(Succeed())
 		o.client = testing.FakeClientSet()
+		o.ClusterNames = []string{testing.ClusterName}
+		Expect(o.Complete()).Should(Succeed())
+		Expect(o.Validate()).Should(Succeed())
+		Expect(o.Run()).Should(Succeed())
+
+		By("test describe-backup-policy with backupPolicy")
+		o = describeBackupPolicyOptions{
+			Factory:   tf,
+			IOStreams: streams,
+		}
+		o.Names = []string{policyName}
+		o.client = testing.FakeClientSet()
+		Expect(o.Complete()).Should(Succeed())
+		Expect(o.Validate()).Should(Succeed())
 		Expect(o.Run()).Should(Succeed())
 	})
 

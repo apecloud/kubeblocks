@@ -234,6 +234,9 @@ spec:
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
+                      x-kubernetes-validations:
+                      - message: componentDefRef is immutable
+                        rule: self == oldSelf
                     enabledLogs:
                       description: enabledLogs indicates which log file takes effect
                         in the database cluster. element is the log type which is
@@ -296,6 +299,9 @@ spec:
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
+                      x-kubernetes-validations:
+                      - message: name is immutable
+                        rule: self == oldSelf
                     noCreatePDB:
                       default: false
                       description: noCreatePDB defines the PodDisruptionBudget creation
@@ -637,11 +643,19 @@ spec:
                   - name
                   - replicas
                   type: object
+                maxItems: 128
                 minItems: 1
                 type: array
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
+                x-kubernetes-validations:
+                - message: duplicated component
+                  rule: self.all(x, size(self.filter(c, c.name == x.name)) == 1)
+                - message: component can not be added dynamically
+                  rule: self.all(x, oldSelf.exists(y, y.name == x.name))
+                - message: component can not be removed dynamically
+                  rule: oldSelf.all(x, self.exists(y, y.name == x.name))
               monitor:
                 description: monitor specifies the configuration of monitor
                 properties:

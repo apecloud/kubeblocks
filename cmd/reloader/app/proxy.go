@@ -24,11 +24,11 @@ import (
 
 	"go.uber.org/zap"
 
-	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/container"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
+	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/container"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type reconfigureProxy struct {

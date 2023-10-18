@@ -27,9 +27,9 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
 type configSpecList []appsv1alpha1.ComponentConfigSpec
@@ -80,8 +80,8 @@ func (c *configReconcileContext) GetRelatedObjects() error {
 		ClusterVer().
 		ClusterComponent().
 		ClusterDefComponent().
-		StatefulSet().
 		RSM().
+		StatefulSet().
 		Deployment().
 		Complete()
 }
@@ -89,9 +89,10 @@ func (c *configReconcileContext) GetRelatedObjects() error {
 func (c *configReconcileContext) StatefulSet() *configReconcileContext {
 	stsFn := func() (err error) {
 		dComp := c.ClusterDefComObj
-		if dComp == nil || dComp.WorkloadType == appsv1alpha1.Stateless {
+		if dComp == nil || dComp.WorkloadType == appsv1alpha1.Stateless || len(c.RSMList) != 0 {
 			return
 		}
+
 		c.StatefulSets, c.Containers, err = retrieveRelatedComponentsByConfigmap(
 			c.Client,
 			c.Context,
@@ -124,6 +125,7 @@ func (c *configReconcileContext) RSM() *configReconcileContext {
 		}
 
 		// fix uid mismatch bug: convert rsm to sts
+		// NODE: all components use the StatefulSet
 		for _, rsm := range c.RSMList {
 			var stsObject appv1.StatefulSet
 			if err = c.Client.Get(c.Context, client.ObjectKeyFromObject(components.ConvertRSMToSTS(&rsm)), &stsObject); err != nil {
@@ -139,9 +141,10 @@ func (c *configReconcileContext) RSM() *configReconcileContext {
 func (c *configReconcileContext) Deployment() *configReconcileContext {
 	deployFn := func() (err error) {
 		dComp := c.ClusterDefComObj
-		if dComp == nil || dComp.WorkloadType != appsv1alpha1.Stateless {
+		if dComp == nil || dComp.WorkloadType != appsv1alpha1.Stateless || len(c.RSMList) != 0 {
 			return
 		}
+
 		c.Deployments, c.Containers, err = retrieveRelatedComponentsByConfigmap(
 			c.Client,
 			c.Context,

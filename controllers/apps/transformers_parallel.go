@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
 type ParallelTransformers struct {

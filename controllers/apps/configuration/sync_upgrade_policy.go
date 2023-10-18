@@ -27,8 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	podutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	podutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type syncPolicy struct {

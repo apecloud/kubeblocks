@@ -32,51 +32,51 @@ import (
 	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
-type CreateUser struct {
+type GrantRole struct {
 	operations.Base
 	dbManager engines.DBManager
 	logger    logr.Logger
 }
 
-var createUser operations.Operation = &CreateUser{}
+var grantRole operations.Operation = &GrantRole{}
 
 func init() {
-	err := operations.Register("createuser", createUser)
+	err := operations.Register("grantrole", grantRole)
 	if err != nil {
 		panic(err.Error())
 	}
 }
 
-func (s *CreateUser) Init(ctx context.Context) error {
+func (s *GrantRole) Init(ctx context.Context) error {
 	dbManager, err := register.GetDBManager()
 	if err != nil {
 		return errors.Wrap(err, "get manager failed")
 	}
 	s.dbManager = dbManager
-	s.logger = ctrl.Log.WithName("CreateUser")
+	s.logger = ctrl.Log.WithName("grantRole")
 	return nil
 }
 
-func (s *CreateUser) IsReadonly(ctx context.Context) bool {
+func (s *GrantRole) IsReadonly(ctx context.Context) bool {
 	return false
 }
 
-func (s *CreateUser) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
+func (s *GrantRole) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
 	userInfo, err := UserInfoParser(req)
 	if err != nil {
 		return err
 	}
 
-	return userInfo.UserNameAndPasswdValidator()
+	return userInfo.UserNameValidator()
 }
 
-func (s *CreateUser) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
+func (s *GrantRole) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
 	userInfo, _ := UserInfoParser(req)
-	resp := operations.NewOpsResponse(util.CreateUserOp)
+	resp := operations.NewOpsResponse(util.GrantUserRoleOp)
 
-	err := s.dbManager.CreateUser(ctx, userInfo.UserName, userInfo.Password)
+	err := s.dbManager.GrantUserRole(ctx, userInfo.UserName, userInfo.RoleName)
 	if err != nil {
-		s.logger.Info("executing CreateUser error", "error", err)
+		s.logger.Info("executing grantRole error", "error", err)
 		return resp, err
 	}
 

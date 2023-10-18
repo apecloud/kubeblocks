@@ -62,7 +62,7 @@ func (s *ListSystemAccounts) IsReadonly(ctx context.Context) bool {
 }
 
 func (s *ListSystemAccounts) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	resp := operations.NewOpsResponse(util.ListUsersOp)
+	resp := operations.NewOpsResponse(util.ListSystemAccountsOp)
 
 	result, err := s.dbManager.ListSystemAccounts(ctx)
 	if err != nil {

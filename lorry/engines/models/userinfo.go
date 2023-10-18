@@ -47,6 +47,10 @@ func (user *UserInfo) PasswdValidator() error {
 }
 
 func (user *UserInfo) RoleValidator() error {
+	if user.RoleName == "" {
+		return ErrNoRoleName
+	}
+
 	roles := []RoleType{ReadOnlyRole, ReadWriteRole, SuperUserRole}
 	for _, role := range roles {
 		if role.EqualTo(user.RoleName) {
@@ -68,7 +72,7 @@ func (user *UserInfo) UserNameAndPasswdValidator() error {
 }
 
 func (user *UserInfo) UserNameAndRoleValidator() error {
-	if err := user.UserNameAndPasswdValidator(); err != nil {
+	if err := user.UserNameValidator(); err != nil {
 		return err
 	}
 

@@ -18,3 +18,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package user
+
+import (
+	"context"
+
+	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
+	ctrl "sigs.k8s.io/controller-runtime"
+
+	"github.com/apecloud/kubeblocks/lorry/engines"
+	"github.com/apecloud/kubeblocks/lorry/engines/register"
+	"github.com/apecloud/kubeblocks/lorry/operations"
+	"github.com/apecloud/kubeblocks/lorry/util"
+)
+
+type DeleteUser struct {
+	operations.Base
+	dbManager engines.DBManager
+	logger    logr.Logger
+}
+
+var deleteUser operations.Operation = &DeleteUser{}
+
+func init() {
+	err := operations.Register("deleteuser", deleteUser)
+	if err != nil {
+		panic(err.Error())
+	}
+}
+
+func (s *DeleteUser) Init(ctx context.Context) error {
+	dbManager, err := register.GetDBManager()
+	if err != nil {
+		return errors.Wrap(err, "get manager failed")
+	}
+	s.dbManager = dbManager
+	s.logger = ctrl.Log.WithName("DeleteUser")
+	return nil
+}
+
+func (s *DeleteUser) IsReadonly(ctx context.Context) bool {
+	return false
+}
+
+func (s *DeleteUser) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
+	userInfo, err := UserInfoParser(req)
+	if err != nil {
+		return err
+	}
+
+	return userInfo.UserNameValidator()
+}
+
+func (s *DeleteUser) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
+	userInfo, _ := UserInfoParser(req)
+	resp := operations.NewOpsResponse(util.DeleteUserOp)
+
+	err := s.dbManager.DeleteUser(ctx, userInfo.UserName)
+	if err != nil {
+		s.logger.Info("executing DeleteUser error", "error", err)
+		return resp, err
+	}
+
+	return resp.WithSuccess("")
+}

@@ -32,51 +32,51 @@ import (
 	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
-type CreateUser struct {
+type RevokeRole struct {
 	operations.Base
 	dbManager engines.DBManager
 	logger    logr.Logger
 }
 
-var createUser operations.Operation = &CreateUser{}
+var revokeRole operations.Operation = &RevokeRole{}
 
 func init() {
-	err := operations.Register("createuser", createUser)
+	err := operations.Register("revokerole", revokeRole)
 	if err != nil {
 		panic(err.Error())
 	}
 }
 
-func (s *CreateUser) Init(ctx context.Context) error {
+func (s *RevokeRole) Init(ctx context.Context) error {
 	dbManager, err := register.GetDBManager()
 	if err != nil {
 		return errors.Wrap(err, "get manager failed")
 	}
 	s.dbManager = dbManager
-	s.logger = ctrl.Log.WithName("CreateUser")
+	s.logger = ctrl.Log.WithName("revokeRole")
 	return nil
 }
 
-func (s *CreateUser) IsReadonly(ctx context.Context) bool {
+func (s *RevokeRole) IsReadonly(ctx context.Context) bool {
 	return false
 }
 
-func (s *CreateUser) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
+func (s *RevokeRole) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
 	userInfo, err := UserInfoParser(req)
 	if err != nil {
 		return err
 	}
 
-	return userInfo.UserNameAndPasswdValidator()
+	return userInfo.UserNameAndRoleValidator()
 }
 
-func (s *CreateUser) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
+func (s *RevokeRole) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
 	userInfo, _ := UserInfoParser(req)
-	resp := operations.NewOpsResponse(util.CreateUserOp)
+	resp := operations.NewOpsResponse(util.RevokeUserRoleOp)
 
-	err := s.dbManager.CreateUser(ctx, userInfo.UserName, userInfo.Password)
+	err := s.dbManager.RevokeUserRole(ctx, userInfo.UserName, userInfo.RoleName)
 	if err != nil {
-		s.logger.Info("executing CreateUser error", "error", err)
+		s.logger.Info("executing RevokeRole error", "error", err)
 		return resp, err
 	}
 

@@ -27,7 +27,7 @@ import (
 
 // OpsRequest is the request for Operation
 type OpsRequest struct {
-	Data       []byte         `json:"data"`
+	Data       []byte         `json:"data,omitempty"`
 	Parameters map[string]any `json:"parameters,omitempty"`
 }
 

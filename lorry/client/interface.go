@@ -17,21 +17,14 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package httpserver
+package client
 
-import (
-	"github.com/valyala/fasthttp"
-)
+import "context"
 
-type Endpoint struct {
-	Method    string
-	Route     string
-	Version   string
-	Duplicate string
-	Handler   fasthttp.RequestHandler
-}
+type Client interface {
+	// JoinMember sends a join member operation request to Lorry, located on the target pod that is about to join.
+	JoinMember(ctx context.Context) error
 
-type Request struct {
-	Data       interface{}    `json:"data,omitempty"`
-	Parameters map[string]any `json:"parameters,omitempty"`
+	// LeaveMember sends a Leave member operation request to Lorry, located on the target pod that is about to leave.
+	LeaveMember(ctx context.Context) error
 }

@@ -97,6 +97,27 @@ var _ = Describe("object generation transformer test.", func() {
 
 			// compare DAGs
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
+
+			By("set svc and alternative svcs to nil")
+			rsm.Spec.Service = nil
+			rsm.Spec.AlternativeServices = nil
+			k8sMock.EXPECT().
+				List(gomock.Any(), &apps.StatefulSetList{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, list *apps.StatefulSetList, _ ...client.ListOption) error {
+					return nil
+				}).Times(1)
+			k8sMock.EXPECT().
+				List(gomock.Any(), &corev1.ServiceList{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, list *corev1.ServiceList, _ ...client.ListOption) error {
+					return nil
+				}).Times(1)
+			k8sMock.EXPECT().
+				List(gomock.Any(), &corev1.ConfigMapList{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, list *corev1.ConfigMapList, _ ...client.ListOption) error {
+					return nil
+				}).Times(1)
+			dag = mockDAG()
+			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
 		})
 	})
 

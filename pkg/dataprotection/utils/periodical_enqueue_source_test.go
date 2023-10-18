@@ -131,14 +131,14 @@ var _ = Describe("Periodical Enqueue Source", func() {
 				return backupList
 			}
 
-			By("start source")
-			Expect(source.Start(ctx, nil, queue)).Should(Succeed())
-
 			By("create a resource")
 			createBackup(backupName + "-1")
 
 			By("create another resource")
 			createBackup(backupName + "-2")
+
+			By("start source")
+			Expect(source.Start(ctx, nil, queue)).Should(Succeed())
 
 			time.Sleep(2 * time.Second)
 			Expect(queue.Len()).Should(Equal(2))

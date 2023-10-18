@@ -1,7 +1,7 @@
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
-  name: vllm
+  name: llm
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
     "kubeblocks.io/provider": community
@@ -15,7 +15,7 @@ spec:
   type: Helm
 
   helm:
-    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "vllm" "version" (default .Chart.Version .Values.versionOverride) "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "llm" "version" (default .Chart.Version .Values.versionOverride) "values" .Values) | indent 4 }}
     {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
 
     installOptions:

@@ -1,4 +1,10 @@
 image:
+  repository: apecloud/vllm
+  pullPolicy: IfNotPresent
+  registry: docker.io
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: latest-amd64
+imageDev:
   repository: apecloud/llama-cpp-python
   pullPolicy: IfNotPresent
   registry: docker.io

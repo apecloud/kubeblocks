@@ -37,6 +37,13 @@ spec:
                 value: baichuan-inc/Baichuan2-13B-Chat
               - name: EXTRA_ARGS
                 value: "--trust-remote-code"
+              - name: RAY_REDIS_ADDRESS
+                value: redis:6379
+              - name: REDIS_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    key: password
+                    name: redis-password-secret
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion

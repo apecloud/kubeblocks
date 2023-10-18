@@ -14,7 +14,7 @@ data:
     echo "current pod ordinal: $ordinal"
     /scripts/vllm-start.sh &
     if [ $ordinal -eq 0 ]; then
-      ray start --head --block
+      ray start --head --redis-password=$REDIS_PASSWORD --block
     else 
       ray start --address="${KB_VLLM_0_HOSTNAME}:6379" --block
     fi

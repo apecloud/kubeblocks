@@ -32,7 +32,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
+	client2 "github.com/apecloud/kubeblocks/pkg/controller/client"
 )
 
 var (

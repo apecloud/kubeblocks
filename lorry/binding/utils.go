@@ -38,10 +38,10 @@ import (
 	ctlruntime "sigs.k8s.io/controller-runtime"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	. "github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type RedisEntry struct {

@@ -39,10 +39,10 @@ import (
 
 	// +kubebuilder:scaffold:imports
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/testutil"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/testutil"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to

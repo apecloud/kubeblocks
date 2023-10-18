@@ -29,9 +29,9 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 const backupTimeLayout = "20060102150405"

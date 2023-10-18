@@ -31,12 +31,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	dprestore "github.com/apecloud/kubeblocks/internal/dataprotection/restore"
-	dputils "github.com/apecloud/kubeblocks/internal/dataprotection/utils"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testdp "github.com/apecloud/kubeblocks/internal/testutil/dataprotection"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
+	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 )
 
 var _ = Describe("Restore Controller test", func() {

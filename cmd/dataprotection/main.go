@@ -48,10 +48,10 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	dpcontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // added lease.coordination.k8s.io for leader election

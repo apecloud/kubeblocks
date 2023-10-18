@@ -36,11 +36,11 @@ import (
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("BackupRepo controller", func() {

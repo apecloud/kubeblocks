@@ -491,32 +491,27 @@ func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, templat
 		},
 	)
 
-	getCharacterTypeAndWorkload := func(template *corev1.PodTemplateSpec) (characterType *corev1.EnvVar, workloadType *corev1.EnvVar) {
+	getCharacterTypeAndWorkload := func(template *corev1.PodTemplateSpec) (characterType *corev1.EnvVar) {
 		for _, container := range template.Spec.Containers {
 			if !(len(container.Command) > 0 && container.Command[0] == "lorry") {
 				continue
 			}
 			envs := container.Env
 			for i, e := range envs {
-				if e.Name == kBEnvWorkloadType {
-					workloadType = &envs[i]
-				} else if e.Name == kBEnvCharacterType {
+				if e.Name == kBEnvCharacterType {
 					characterType = &envs[i]
 				}
 			}
-			if characterType != nil && workloadType != nil {
+			if characterType != nil {
 				break
 			}
 		}
-		return characterType, workloadType
+		return characterType
 	}
 
-	characterType, workloadType := getCharacterTypeAndWorkload(template)
+	characterType := getCharacterTypeAndWorkload(template)
 	if characterType != nil {
 		env = append(env, *characterType)
-	}
-	if workloadType != nil {
-		env = append(env, *workloadType)
 	}
 
 	readinessProbe := &corev1.Probe{

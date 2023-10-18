@@ -885,7 +885,6 @@ var _ = Describe("Cluster Controller", func() {
 
 		// REVIEW: this test flow, wait for running phase?
 		testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
-		viper.Set(constant.CfgKeyBackupPVCName, "")
 
 		horizontalScale(int(updatedReplicas), testk8s.DefaultStorageClassName, dataClonePolicy, compDefName)
 	}
@@ -2013,13 +2012,11 @@ var _ = Describe("Cluster Controller", func() {
 
 		It("should successfully h-scale with multiple components", func() {
 			testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
-			viper.Set(constant.CfgKeyBackupPVCName, "")
 			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 		})
 
 		It("should successfully h-scale with multiple components by backup tool", func() {
 			testk8s.MockDisableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
-			viper.Set(constant.CfgKeyBackupPVCName, "test-backup-pvc")
 			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 		})
 	})
@@ -2295,7 +2292,6 @@ var _ = Describe("Cluster Controller", func() {
 				It("scale-out with data clone policy", func() {
 					testVolumeExpansion(compName, compDefName, mockStorageClass)
 					testk8s.MockEnableVolumeSnapshot(&testCtx, mockStorageClass.Name)
-					viper.Set(constant.CfgKeyBackupPVCName, "")
 					horizontalScale(5, mockStorageClass.Name, appsv1alpha1.HScaleDataClonePolicyCloneVolume, compDefName)
 				})
 

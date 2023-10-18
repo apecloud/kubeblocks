@@ -27,12 +27,6 @@ const (
 	CfgKeyCtrlrMgrNodeSelector          = "CM_NODE_SELECTOR"
 	CfgKeyCtrlrMgrTolerations           = "CM_TOLERATIONS"
 	CfgKeyCtrlrReconcileRetryDurationMS = "CM_RECON_RETRY_DURATION_MS"       // accept time
-	CfgKeyBackupPVCName                 = "BACKUP_PVC_NAME"                  // the global persistent volume claim to store the backup data
-	CfgKeyBackupPVCInitCapacity         = "BACKUP_PVC_INIT_CAPACITY"         // the init capacity for creating the pvc, e.g. 10Gi.
-	CfgKeyBackupPVCStorageClass         = "BACKUP_PVC_STORAGE_CLASS"         // the pvc storage class name.
-	CfgKeyBackupPVCCreatePolicy         = "BACKUP_PVC_CREATE_POLICY"         // the pvc creation policy, choice is "IfNotPresent" or "Never"
-	CfgKeyBackupPVConfigmapName         = "BACKUP_PV_CONFIGMAP_NAME"         // the configmap containing the persistentVolume template.
-	CfgKeyBackupPVConfigmapNamespace    = "BACKUP_PV_CONFIGMAP_NAMESPACE"    // the configmap namespace containing the persistentVolume template.
 	CfgRecoverVolumeExpansionFailure    = "RECOVER_VOLUME_EXPANSION_FAILURE" // refer to feature gates RecoverVolumeExpansionFailure of k8s.
 	CfgKeyProvider                      = "KUBE_PROVIDER"
 

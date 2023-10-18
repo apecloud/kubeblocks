@@ -1,4 +1,13 @@
 {{- include "kblib.clusterCommon" . }}
+{{ if .Values.developMode }}
+  clusterDefinitionRef: ggml  # ref clusterDefinition.name
+  componentSpecs:
+    - name: ggml
+      componentDefRef: ggml # ref clusterDefinition componentDefs.name
+      {{- include "kblib.componentMonitor" . | indent 6 }}
+      replicas: {{ .Values.replicas }}
+      serviceAccountName: {{ include "kblib.serviceAccountName" . }}
+{{ else }}
   clusterDefinitionRef: vllm  # ref clusterDefinition.name
   componentSpecs:
     - name: vllm
@@ -11,3 +20,4 @@
           nvidia.com/gpu: {{ .Values.gpu }}
         requests:
           nvidia.com/gpu: {{ .Values.gpu }}
+{{ end }}

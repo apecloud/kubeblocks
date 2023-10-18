@@ -1,7 +1,7 @@
 annotations:
   category: Database
 apiVersion: v2
-name: vllm-cluster
+name: llm-cluster
 type: application
 version: 0.7.0-alpha.0
 description: A vLLM Cluster Helm chart for KubeBlocks.
@@ -14,9 +14,9 @@ dependencies:
 appVersion: "7.0.6"
 
 keywords:
-  - vllm
+  - llm
 
-home: https://github.com/apecloud/kubeblocks/tree/main/deploy/vllm-cluster
+home: https://github.com/apecloud/kubeblocks/tree/main/deploy/llm-cluster
 icon: https://kubeblocks.io/img/logo.png
 
 maintainers:
@@ -25,4 +25,3 @@ maintainers:
 
 sources:
   - https://github.com/apecloud/kubeblocks/
-  - https://github.com/apecloud/kubeblocks/tree/main/deploy/vllm

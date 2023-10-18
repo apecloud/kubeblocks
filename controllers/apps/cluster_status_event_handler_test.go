@@ -30,9 +30,9 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
 var _ = Describe("test cluster Failed/Abnormal phase", func() {
@@ -226,13 +226,13 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			//	false)
 
 			// By("watch warning event from Pod and component workload type is Consensus")
-			//// wait for StatefulSet created by cluster controller
+			// // wait for StatefulSet created by cluster controller
 			// stsName = clusterName + "-" + consensusMySQLCompName
 			// Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: stsName, Namespace: testCtx.DefaultNamespace},
 			//	func(g Gomega, fetched *appsv1.StatefulSet) {
 			//		g.Expect(fetched.Generation).To(BeEquivalentTo(1))
 			//	})).Should(Succeed())
-			//// create a failed pod
+			// // create a failed pod
 			// podName := stsName + "-0"
 			// createStsPod(podName, "", consensusMySQLCompName)
 			// setInvolvedObject(event, constant.PodKind, podName)
@@ -257,7 +257,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			//	false)
 
 			// By("test Abnormal phase for consensus component")
-			//// mock leader pod ready and sts.status.availableReplicas is 1
+			// // mock leader pod ready and sts.status.availableReplicas is 1
 			// Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
 			//	testk8s.MockPodAvailable(pod, metav1.NewTime(time.Now()))
 			// })).ShouldNot(HaveOccurred())
@@ -288,7 +288,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			// })()).ShouldNot(HaveOccurred())
 
 			// By("test the cluster phase when stateless component is Failed and other components are Running")
-			//// set nginx component phase to Failed
+			// // set nginx component phase to Failed
 			// Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *appsv1alpha1.Cluster) {
 			//	compStatus := tmpCluster.Status.Components[statelessCompName]
 			//	compStatus.Phase = appsv1alpha1.FailedClusterCompPhase

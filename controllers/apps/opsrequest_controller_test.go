@@ -40,13 +40,13 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testdp "github.com/apecloud/kubeblocks/internal/testutil/dataprotection"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 	lorry "github.com/apecloud/kubeblocks/lorry/client"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
+	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
 var _ = Describe("OpsRequest Controller", func() {

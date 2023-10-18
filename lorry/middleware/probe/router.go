@@ -30,8 +30,6 @@ import (
 
 	. "github.com/apecloud/kubeblocks/lorry/binding"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/binding/custom"
 	"github.com/apecloud/kubeblocks/lorry/binding/etcd"
 	"github.com/apecloud/kubeblocks/lorry/binding/mongodb"
@@ -40,6 +38,8 @@ import (
 	"github.com/apecloud/kubeblocks/lorry/binding/redis"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var builtinMap = make(map[string]BaseInternalOps)

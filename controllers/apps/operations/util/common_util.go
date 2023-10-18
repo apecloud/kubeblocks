@@ -28,7 +28,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 func setOpsRequestToCluster(cluster *appsv1alpha1.Cluster, opsRequestSlice []appsv1alpha1.OpsRecorder) {

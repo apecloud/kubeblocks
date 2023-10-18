@@ -20,7 +20,7 @@ spec:
   # ConfigurationSchema that impose restrictions on engine parameter's rule
   configurationSchema:
     # schema: auto generate from mmmcue scripts
-    # example: ../../internal/configuration/testdata/mysql_openapi.json
+    # example: ../../pkg/configuration/testdata/mysql_openapi.json
     cue: |-
       {{- .Files.Get "config/mysql8-config-constraint.cue" | nindent 6 }}
 

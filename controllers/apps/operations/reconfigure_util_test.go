@@ -30,9 +30,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
 var _ = Describe("Reconfigure util test", func() {

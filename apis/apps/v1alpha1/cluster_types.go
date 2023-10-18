@@ -30,8 +30,8 @@ import (
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // ClusterSpec defines the desired state of Cluster.
@@ -64,6 +64,10 @@ type ClusterSpec struct {
 	// +listMapKey=name
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=128
+	// +kubebuilder:validation:XValidation:rule="self.all(x, size(self.filter(c, c.name == x.name)) == 1)",message="duplicated component"
+	// +kubebuilder:validation:XValidation:rule="self.all(x, oldSelf.exists(y, y.name == x.name))",message="component can not be added dynamically"
+	// +kubebuilder:validation:XValidation:rule="oldSelf.all(x, self.exists(y, y.name == x.name))",message="component can not be removed dynamically"
 	ComponentSpecs []ClusterComponentSpec `json:"componentSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// tenancy describes how pods are distributed across node.
@@ -218,6 +222,7 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	Name string `json:"name"`
 
 	// componentDefRef references componentDef defined in ClusterDefinition spec. Need to
@@ -225,6 +230,7 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDefRef is immutable"
 	ComponentDefRef string `json:"componentDefRef"`
 
 	// classDefRef references the class defined in ComponentClassDefinition.

@@ -544,6 +544,12 @@ func (r *BackupReconciler) handleCompletedPhase(
 	if err := r.deleteExternalResources(reqCtx, backup); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
+
+	// update backup expiration time
+	if err := r.updateBackupExpiredTime(reqCtx, backup); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
 	return intctrlutil.Reconciled()
 }
 
@@ -636,6 +642,26 @@ func (r *BackupReconciler) deleteExternalResources(
 		return err
 	}
 	return r.deleteExternalJobs(reqCtx, backup)
+}
+
+func (r *BackupReconciler) updateBackupExpiredTime(
+	reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
+	// if backup's retention period is set, update the backup expiration time.
+	if backup.Spec.RetentionPeriod != "" {
+		duration, err := backup.Spec.RetentionPeriod.ToDuration()
+		if err != nil {
+			return err
+		}
+		if duration.Seconds() > 0 {
+			backup.Status.Expiration = &metav1.Time{
+				Time: backup.Status.CompletionTimestamp.Add(duration),
+			}
+		}
+		if err = r.Client.Status().Patch(reqCtx.Ctx, backup, client.MergeFrom(backup)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // getClusterObjectString gets the cluster object and convert it to string.

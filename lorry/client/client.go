@@ -33,6 +33,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
+	probe2 "github.com/apecloud/kubeblocks/lorry/middleware/probe"
 	. "github.com/apecloud/kubeblocks/lorry/util"
 	"github.com/apecloud/kubeblocks/pkg/cli/exec"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -200,10 +201,15 @@ func (cli *OperationClient) Request(ctx context.Context, operation string) (map[
 	ctxWithReconcileTimeout, cancel := context.WithTimeout(ctx, cli.ReconcileTimeout)
 	defer cancel()
 
+	body, err := getBodyWithOperation(operation)
+	if err != nil {
+		return nil, err
+	}
+
 	// Request sql channel via http request
 	url := fmt.Sprintf("%s?operation=%s", cli.URL, operation)
 
-	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, url, http.MethodPost, nil)
+	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, url, http.MethodPost, body)
 	if err != nil {
 		return nil, err
 	}
@@ -388,4 +394,17 @@ func parseResponse(data []byte, operation string, charType string) (SQLChannelRe
 	// convert it to SQLChannelResponse
 	err := json.Unmarshal(data, &response)
 	return response, err
+}
+
+func getBodyWithOperation(operation string) (io.Reader, error) {
+	meta := probe2.RequestMeta{
+		Operation: operation,
+		Metadata:  map[string]string{},
+	}
+	binary, err := json.Marshal(meta)
+	if err != nil {
+		return nil, err
+	}
+	body := bytes.NewReader(binary)
+	return body, nil
 }

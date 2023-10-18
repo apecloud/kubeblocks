@@ -49,7 +49,11 @@ var ha *Ha
 
 func NewHa(logger logr.Logger) *Ha {
 
-	dcs, _ := dcs3.NewKubernetesStore(logger)
+	dcs, err := dcs3.NewKubernetesStore(logger)
+	if err != nil {
+		logger.Error(err, "get k8s store failed")
+		return nil
+	}
 	characterType := viper.GetString(constant.KBEnvCharacterType)
 	if characterType == "" {
 		logger.Error(nil, "%s not set", "characterType", constant.KBEnvCharacterType)

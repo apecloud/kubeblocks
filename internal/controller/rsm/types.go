@@ -78,7 +78,7 @@ const (
 	shell2httpImage               = "msoap/shell2http:1.16.0"
 	shell2httpBinaryPath          = "/app/shell2http"
 	shell2httpServePath           = "/role"
-	defaultRoleProbeAgentImage    = "registry.cn-hangzhou.aliyuncs.com/apecloud/kubeblocks-tools:0.7.0-beta.4"
+	defaultRoleProbeAgentImage    = "apecloud/kubeblocks-tools:latest"
 	defaultRoleProbeDaemonPort    = 7373
 	defaultRoleProbeGRPCPort      = 50101
 	roleProbeGRPCPortName         = "probe-grpc-port"

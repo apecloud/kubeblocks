@@ -90,7 +90,7 @@ func main() {
 		panic(fmt.Errorf("fatal error config file: %v", err))
 	}
 
-	err = probe2.RegisterBuiltin(characterType) // register all builtin component
+	err = probe2.RegisterBuiltin(characterType) // register builtin component
 	if err != nil {
 		panic(fmt.Errorf("fatal error register builtin: %v", err))
 	}

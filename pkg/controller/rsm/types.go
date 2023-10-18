@@ -94,6 +94,8 @@ const (
 	RoleUpdateMechanismVarName    = "KB_RSM_ROLE_UPDATE_MECHANISM"
 	roleProbeTimeoutVarName       = "KB_RSM_ROLE_PROBE_TIMEOUT"
 	directAPIServerEventFieldPath = "spec.containers{sqlchannel}"
+	kBEnvCharacterType            = "KB_SERVICE_CHARACTER_TYPE"
+	kBEnvWorkloadType             = "KB_WORKLOAD_TYPE"
 	readinessProbeEventFieldPath  = "spec.containers{" + roleProbeContainerName + "}"
 	legacyEventFieldPath          = "spec.containers{kb-checkrole}"
 	checkRoleEventReason          = "checkRole"

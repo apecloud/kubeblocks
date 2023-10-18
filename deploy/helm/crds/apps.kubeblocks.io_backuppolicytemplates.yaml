@@ -56,7 +56,6 @@ spec:
                     backupMethods:
                       description: backupMethods defines the backup methods.
                       items:
-                        description: BackupMethod defines the backup method.
                         properties:
                           actionSetName:
                             description: actionSetName refers to the ActionSet object
@@ -183,6 +182,47 @@ spec:
                                   type: object
                               required:
                               - name
+                              type: object
+                            type: array
+                          envMapping:
+                            description: envMapping defines the variables of cluster
+                              mapped to env values' keys.
+                            items:
+                              properties:
+                                key:
+                                  description: env key which needs to mapping.
+                                  type: string
+                                valueFrom:
+                                  description: valueFrom defines source of the env
+                                    value.
+                                  properties:
+                                    clusterVersionRef:
+                                      description: mapped ClusterVersionRef to env
+                                        value.
+                                      items:
+                                        properties:
+                                          mappingValue:
+                                            description: mapping value for the specified
+                                              ClusterVersion names.
+                                            type: string
+                                          names:
+                                            description: the array of ClusterVersion
+                                              name which can be mapped to the env
+                                              value.
+                                            items:
+                                              type: string
+                                            type: array
+                                        required:
+                                        - mappingValue
+                                        - names
+                                        type: object
+                                      type: array
+                                  required:
+                                  - clusterVersionRef
+                                  type: object
+                              required:
+                              - key
+                              - valueFrom
                               type: object
                             type: array
                           name:

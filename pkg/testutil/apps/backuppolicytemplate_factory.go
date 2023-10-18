@@ -59,7 +59,7 @@ func (f *MockBackupPolicyTemplateFactory) getLastBackupMethod() *dpv1alpha1.Back
 		return nil
 	}
 	backupMethods := backupPolicy.BackupMethods
-	return &backupMethods[l-1]
+	return &backupMethods[l-1].BackupMethod
 }
 
 func (f *MockBackupPolicyTemplateFactory) AddBackupPolicy(componentDef string) *MockBackupPolicyTemplateFactory {
@@ -95,15 +95,31 @@ func (f *MockBackupPolicyTemplateFactory) AddSchedule(method, schedule string, e
 }
 
 func (f *MockBackupPolicyTemplateFactory) AddBackupMethod(name string,
-	snapshotVolumes bool, actionSetName string) *MockBackupPolicyTemplateFactory {
+	snapshotVolumes bool, actionSetName string, mappingEnvWithClusterVersion ...string) *MockBackupPolicyTemplateFactory {
 	backupPolicy := f.getLastBackupPolicy()
-	backupPolicy.BackupMethods = append(backupPolicy.BackupMethods,
-		dpv1alpha1.BackupMethod{
+	backupMethod := appsv1alpha1.BackupMethod{
+		BackupMethod: dpv1alpha1.BackupMethod{
 			Name:            name,
 			SnapshotVolumes: &snapshotVolumes,
 			ActionSetName:   actionSetName,
 			TargetVolumes:   &dpv1alpha1.TargetVolumeInfo{},
-		})
+		}}
+	if len(mappingEnvWithClusterVersion) > 0 {
+		backupMethod.EnvMapping = []appsv1alpha1.EnvMappingVar{
+			{
+				Key: EnvKeyImageTag,
+				ValueFrom: appsv1alpha1.ValueFrom{
+					ClusterVersionRef: []appsv1alpha1.ClusterVersionMapping{
+						{
+							Names:        mappingEnvWithClusterVersion,
+							MappingValue: DefaultImageTag,
+						},
+					},
+				},
+			},
+		}
+	}
+	backupPolicy.BackupMethods = append(backupPolicy.BackupMethods, backupMethod)
 	return f
 }
 

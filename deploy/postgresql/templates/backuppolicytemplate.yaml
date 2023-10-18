@@ -16,6 +16,14 @@ spec:
     - name: pg-basebackup
       snapshotVolumes: false
       actionSetName: postgres-basebackup
+      envMapping:
+      - key: IMAGE_TAG
+        valueFrom:
+          clusterVersionRef:
+          - names: [postgresql-12.14.0, postgresql-12.14.1, postgresql-12.15.0]
+            mappingValue: "12.15.0-pgvector-v0.5.0"
+          - names: [postgresql-14.7.2-pgvector-v0.5.0, postgresql-14.8.0]
+            mappingValue: "14.8.0-pgvector-v0.5.0"
       targetVolumes:
         volumeMounts:
         - name: data

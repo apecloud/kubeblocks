@@ -32,6 +32,16 @@ spec:
     - name: dump
       snapshotVolumes: false
       actionSetName: mongodb-dump
+      envMapping:
+      - key: IMAGE_TAG
+        valueFrom:
+          clusterVersionRef:
+          - names: [mongodb-4.0, mongodb-4.2, mongodb-4.4]
+            mappingValue: "4.4"
+          - names: [mongodb-5.0, mongodb-5.0.20]
+            mappingValue: "5.0.20"
+          - names: [mongodb-6.0]
+            mappingValue: "6.0"
     schedules:
     - backupMethod: datafile
       enabled: false

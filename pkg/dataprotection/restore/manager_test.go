@@ -191,6 +191,8 @@ var _ = Describe("Backup Deleter Test", func() {
 			jobs, err := restoreMGR.BuildPrepareDataJobs(reqCtx, k8sClient, *backupSet, actionSetName)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(len(jobs)).Should(Equal(replicas))
+			// image should be expanded by env
+			Expect(jobs[0].Spec.Template.Spec.Containers[0].Image).Should(ContainSubstring(testdp.ImageTag))
 
 			checkPVC(startingIndex, false)
 		})

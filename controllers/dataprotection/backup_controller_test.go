@@ -145,6 +145,8 @@ var _ = Describe("Backup Controller test", func() {
 				By("check backup job's nodeName equals pod's nodeName")
 				Eventually(testapps.CheckObj(&testCtx, getJobKey(), func(g Gomega, fetched *batchv1.Job) {
 					g.Expect(fetched.Spec.Template.Spec.NodeSelector[corev1.LabelHostname]).To(Equal(targetPod.Spec.NodeName))
+					// image should be expanded by env
+					g.Expect(fetched.Spec.Template.Spec.Containers[0].Image).Should(ContainSubstring(testdp.ImageTag))
 				})).Should(Succeed())
 
 				testdp.PatchK8sJobStatus(&testCtx, getJobKey(), batchv1.JobComplete)

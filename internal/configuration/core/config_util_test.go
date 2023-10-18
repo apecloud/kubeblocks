@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
@@ -232,6 +233,23 @@ test=test
 		},
 		want:    "a b\nc d e f g",
 		wantErr: false,
+	}, {
+		name: "badcase_test",
+		args: args{
+			baseCfg: []byte(` `),
+			updatedParameters: map[string]string{
+				"ENABLE_MODULES":     "true",
+				"HUGGINGFACE_APIKEY": "kssdlsdjskwssl",
+			},
+			formatConfig: &v1alpha1.FormatterConfig{
+				Format: v1alpha1.Dotenv,
+			},
+		},
+		// fix begin
+		// ENABLE_MODULES=0x1400004f130
+		// HUGGINGFACE_APIKEY=0x1400004f140
+		want:    "ENABLE_MODULES=true\nHUGGINGFACE_APIKEY=kssdlsdjskwssl\n",
+		wantErr: false,
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -296,6 +314,36 @@ func TestFromValueToString(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := FromValueToString(tt.args.val); got != tt.want {
 				t.Errorf("FromValueToString() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFromStringMap(t *testing.T) {
+	type args struct {
+		m map[string]*string
+	}
+	tests := []struct {
+		name string
+		args args
+		want map[string]interface{}
+	}{{
+		name: "test",
+		args: args{
+			m: map[string]*string{
+				"abcd":       cfgutil.ToPointer("test"),
+				"null_field": nil,
+			},
+		},
+		want: map[string]interface{}{
+			"abcd":       "test",
+			"null_field": nil,
+		},
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := FromStringMap(tt.args.m); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("FromStringMap() = %v, want %v", got, tt.want)
 			}
 		})
 	}

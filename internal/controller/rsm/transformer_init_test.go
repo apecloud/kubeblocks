@@ -53,7 +53,7 @@ var _ = Describe("init transformer test.", func() {
 			root := &model.ObjectVertex{
 				Obj:    rsm,
 				OriObj: rsm.DeepCopy(),
-				Action: model.ActionPtr(model.STATUS),
+				Action: model.ActionStatusPtr(),
 			}
 			dagExpected.AddVertex(root)
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())

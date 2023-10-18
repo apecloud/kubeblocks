@@ -75,26 +75,18 @@ var (
 		# edit backup policy
 		kbcli cluster edit-backup-policy <backup-policy-name>
 
-        # enable pitr
-		kbcli cluster edit-backup-policy <backup-policy-name> --set schedule.logfile.enable=true
+        # update backup Repo
+		kbcli cluster edit-backup-policy <backup-policy-name> --set backupRepoName=<backup-repo-name>
 
 	    # using short cmd to edit backup policy
         kbcli cluster edit-bp <backup-policy-name>
 	`)
 	createBackupExample = templates.Examples(`
-		# create a backup, the default type is snapshot.
-		kbcli cluster backup mycluster
+		# create a backup with a specified method, run "kbcli cluster desc-backup-policy mycluster" to show supported backup methods
+		kbcli cluster backup mycluster --method volume-snapshot
 
-		# create a snapshot backup
-		# create a snapshot of the cluster's persistent volume for backup
-		kbcli cluster backup mycluster --type snapshot
-
-		# create a datafile backup
-		# backup all files under the data directory and save them to the specified storage, only full backup is supported now.
-		kbcli cluster backup mycluster --type datafile 
-
-		# create a backup with specified backup policy
-		kbcli cluster backup mycluster --policy <backup-policy-name>
+		# create a backup with specified backup policy, run "kbcli cluster list-backup-policy mycluster" to show the cluster supported backup policies
+		kbcli cluster backup mycluster --method volume-snapshot --policy <backup-policy-name>
 	`)
 	listBackupExample = templates.Examples(`
 		# list all backups
@@ -107,18 +99,17 @@ var (
 	createRestoreExample = templates.Examples(`
 		# restore a new cluster from a backup
 		kbcli cluster restore new-cluster-name --backup backup-name
-
-		# restore a new cluster from point in time
-		kbcli cluster restore new-cluster-name --restore-to-time "Apr 13,2023 18:40:35 UTC+0800" --backup logfile-backup
-        kbcli cluster restore new-cluster-name --restore-to-time "2023-04-13T18:40:35+08:00" --backup logfile-backup
 	`)
 	describeBackupExample = templates.Examples(`
 		# describe a backup
 		kbcli cluster describe-backup backup-default-mycluster-20230616190023
 	`)
 	describeBackupPolicyExample = templates.Examples(`
-		# describe a backup policy
-		kbcli cluster describe-backup-policy mycluster-mysql-backup-policy
+		# describe the default backup policy of the cluster
+		kbcli cluster describe-backup-policy cluster-name
+
+		# describe the backup policy of the cluster with specified name
+		kbcli cluster describe-backup-policy cluster-name --name backup-policy-name
 	`)
 )
 
@@ -860,22 +851,19 @@ func (o *editBackupPolicyOptions) applyChanges(backupPolicy *dpv1alpha1.BackupPo
 
 type describeBackupPolicyOptions struct {
 	namespace string
-	names     []string
 	dynamic   dynamic.Interface
 	Factory   cmdutil.Factory
 	client    clientset.Interface
 
+	LabelSelector string
+	ClusterNames  []string
+	Names         []string
+
 	genericiooptions.IOStreams
 }
 
-func (o *describeBackupPolicyOptions) Complete(args []string) error {
+func (o *describeBackupPolicyOptions) Complete() error {
 	var err error
-
-	if len(args) == 0 {
-		return fmt.Errorf("backupPolicy name should be specified")
-	}
-
-	o.names = args
 
 	if o.client, err = o.Factory.KubernetesClientSet(); err != nil {
 		return err
@@ -891,16 +879,52 @@ func (o *describeBackupPolicyOptions) Complete(args []string) error {
 	return nil
 }
 
+func (o *describeBackupPolicyOptions) Validate() error {
+	// must specify one of the cluster name or backup policy name
+	if len(o.ClusterNames) == 0 && len(o.Names) == 0 {
+		return fmt.Errorf("missing cluster name or backup policy name")
+	}
+
+	return nil
+}
+
 func (o *describeBackupPolicyOptions) Run() error {
-	for _, name := range o.names {
-		backupPolicyObj := &dpv1alpha1.BackupPolicy{}
-		if err := cluster.GetK8SClientObject(o.dynamic, backupPolicyObj, types.BackupPolicyGVR(), o.namespace, name); err != nil {
+	var backupPolicyNameMap = make(map[string]bool)
+	for _, name := range o.Names {
+		backupPolicyNameMap[name] = true
+	}
+
+	backupPolicyList, err := o.dynamic.Resource(types.BackupPolicyGVR()).Namespace(o.namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: o.LabelSelector,
+	})
+	if err != nil {
+		return err
+	}
+
+	if len(backupPolicyList.Items) == 0 {
+		fmt.Fprintf(o.Out, "No backup policy found")
+		return nil
+	}
+
+	for _, obj := range backupPolicyList.Items {
+		backupPolicy := &dpv1alpha1.BackupPolicy{}
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, backupPolicy); err != nil {
 			return err
 		}
-		if err := o.printBackupPolicyObj(backupPolicyObj); err != nil {
+		isDefault := obj.GetAnnotations()[dptypes.DefaultBackupPolicyAnnotationKey] == "true"
+		// if backup policy name is specified, only print the backup policy with the specified name
+		if len(o.Names) > 0 && !backupPolicyNameMap[backupPolicy.Name] {
+			continue
+		}
+		// if backup policy name is not specified, only print the default backup policy
+		if len(o.Names) == 0 && !isDefault {
+			continue
+		}
+		if err := o.printBackupPolicyObj(backupPolicy); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -909,6 +933,7 @@ func (o *describeBackupPolicyOptions) printBackupPolicyObj(obj *dpv1alpha1.Backu
 	realPrintPairStringToLine("Name", obj.Name)
 	realPrintPairStringToLine("Cluster", obj.Labels[constant.AppInstanceLabelKey])
 	realPrintPairStringToLine("Namespace", obj.Namespace)
+	realPrintPairStringToLine("Default", strconv.FormatBool(obj.Annotations[dptypes.DefaultBackupPolicyAnnotationKey] == "true"))
 	if obj.Spec.BackupRepoName != nil {
 		realPrintPairStringToLine("Backup Repo Name", *obj.Spec.BackupRepoName)
 	}
@@ -932,16 +957,20 @@ func NewDescribeBackupPolicyCmd(f cmdutil.Factory, streams genericiooptions.IOSt
 	cmd := &cobra.Command{
 		Use:                   "describe-backup-policy",
 		DisableFlagsInUseLine: true,
-		Aliases:               []string{"describe-bp"},
+		Aliases:               []string{"desc-backup-policy"},
 		Short:                 "Describe backup policy",
 		Example:               describeBackupPolicyExample,
-		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, types.BackupPolicyGVR()),
+		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
+			o.ClusterNames = args
+			o.LabelSelector = util.BuildLabelSelectorByNames(o.LabelSelector, args)
 			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
-			util.CheckErr(o.Complete(args))
+			util.CheckErr(o.Complete())
+			util.CheckErr(o.Validate())
 			util.CheckErr(o.Run())
 		},
 	}
+	cmd.Flags().StringSliceVar(&o.Names, "name", []string{}, "Backup policy name")
 	return cmd
 }
 

@@ -310,7 +310,6 @@ func TestMerge(t *testing.T) {
 	dag1.AddVertex(v1)
 	dag1.AddVertex(v2)
 	dag1.Connect(v1, v2)
-	dag2.AddVertex(v2)
 	dag2.AddVertex(v3)
 	dag2.AddVertex(v4)
 	dag2.AddVertex(v5)

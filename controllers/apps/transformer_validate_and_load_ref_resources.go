@@ -34,7 +34,7 @@ import (
 type ValidateAndLoadRefResourcesTransformer struct{}
 
 func (t *ValidateAndLoadRefResourcesTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*ClusterTransformContext)
+	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster
 
 	var err error

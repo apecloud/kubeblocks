@@ -46,7 +46,7 @@ var _ = Describe("transform utils test", func() {
 		name      = "bar"
 	)
 
-	Context("FindX function", func() {
+	Context("FindRootVertex function", func() {
 		It("should work well", func() {
 			dag := graph.NewDAG()
 			_, err := FindRootVertex(dag)
@@ -61,26 +61,6 @@ var _ = Describe("transform utils test", func() {
 			dag.AddConnectRoot(&ObjectVertex{Obj: obj0})
 			dag.AddConnectRoot(&ObjectVertex{Obj: obj1})
 			dag.AddConnectRoot(&ObjectVertex{Obj: obj2})
-			vertices := FindAll[*apps.StatefulSet](dag)
-			Expect(vertices).Should(HaveLen(1))
-			v, ok := vertices[0].(*ObjectVertex)
-			Expect(ok).Should(BeTrue())
-			Expect(v.Obj).Should(Equal(root))
-			vertices = FindAll[*corev1.Pod](dag)
-			Expect(vertices).Should(HaveLen(3))
-			objList := []*corev1.Pod{obj0, obj1, obj2}
-			for _, vertex := range vertices {
-				v, ok := vertex.(*ObjectVertex)
-				Expect(ok).Should(BeTrue())
-				contained := false
-				for _, pod := range objList {
-					if v.Obj == pod {
-						contained = true
-						break
-					}
-				}
-				Expect(contained).Should(BeTrue())
-			}
 
 			rootVertex, err := FindRootVertex(dag)
 			Expect(err).Should(BeNil())

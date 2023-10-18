@@ -22,19 +22,21 @@ package apps
 import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
 type initTransformer struct {
-	cluster       *appsv1alpha1.Cluster
-	originCluster *appsv1alpha1.Cluster
+	cluster *appsv1alpha1.Cluster
 }
 
 var _ graph.Transformer = &initTransformer{}
 
 func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	// put the cluster object first, it will be root vertex of DAG
-	rootVertex := &ictrltypes.LifecycleVertex{Obj: t.cluster, ObjCopy: t.originCluster, Action: ictrltypes.ActionStatusPtr()}
-	dag.AddVertex(rootVertex)
+	transCtx, _ := ctx.(*clusterTransformContext)
+	transCtx.Cluster, transCtx.OrigCluster = t.cluster, t.cluster.DeepCopy()
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+
+	// init dag
+	graphCli.Root(dag, transCtx.OrigCluster, transCtx.Cluster, model.ActionStatusPtr())
 	return nil
 }

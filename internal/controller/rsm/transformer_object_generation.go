@@ -125,7 +125,10 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		}
 	}
 	handleDependencies := func() {
-		cli.DependOn(dag, sts, svc, headLessSvc, envConfig)
+		cli.DependOn(dag, sts, headLessSvc, envConfig)
+		if svc != nil {
+			cli.DependOn(dag, sts, svc)
+		}
 	}
 
 	// objects to be created

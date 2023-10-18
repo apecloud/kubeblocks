@@ -155,7 +155,6 @@ var _ = Describe("Restore Controller test", func() {
 			Expect(k8sClient.List(ctx, jobList,
 				client.MatchingLabels{dprestore.DataProtectionLabelRestoreKey: restore.Name},
 				client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
-
 			for _, v := range jobList.Items {
 				testdp.PatchK8sJobStatus(&testCtx, client.ObjectKeyFromObject(&v), batchv1.JobComplete)
 			}
@@ -244,6 +243,11 @@ var _ = Describe("Restore Controller test", func() {
 				By("mock jobs are completed")
 				mockRestoreJobsCompleted(restore)
 
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(restore), func(g Gomega, r *dpv1alpha1.Restore) {
+					g.Expect(r.Status.Actions.PrepareData).ShouldNot(BeEmpty())
+					g.Expect(r.Status.Actions.PrepareData[0].Status).Should(Equal(dpv1alpha1.RestoreActionCompleted))
+				})).Should(Succeed())
+
 				By("after the first job is completed, next job will be created")
 				checkJobAndPVCSCount(restore, 1, replicas, startingIndex)
 
@@ -262,6 +266,7 @@ var _ = Describe("Restore Controller test", func() {
 
 				By("wait for restore is completed")
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(restore), func(g Gomega, r *dpv1alpha1.Restore) {
+					fmt.Printf("%v\n", r.Status.Actions)
 					g.Expect(r.Status.Phase).Should(Equal(dpv1alpha1.RestorePhaseCompleted))
 				})).Should(Succeed())
 			})

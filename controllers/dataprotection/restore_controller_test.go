@@ -266,7 +266,6 @@ var _ = Describe("Restore Controller test", func() {
 
 				By("wait for restore is completed")
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(restore), func(g Gomega, r *dpv1alpha1.Restore) {
-					fmt.Printf("%v\n", r.Status.Actions)
 					g.Expect(r.Status.Phase).Should(Equal(dpv1alpha1.RestorePhaseCompleted))
 				})).Should(Succeed())
 			})

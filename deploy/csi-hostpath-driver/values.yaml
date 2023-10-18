@@ -5,8 +5,8 @@
 replicaCount: 1
 
 image:
-  registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/google_containers/
-  repository: hostpathplugin
+  registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+  repository: apecloud/hostpathplugin
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""

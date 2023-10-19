@@ -163,7 +163,11 @@ func (r *Request) buildBackupDataAction() (action.Action, error) {
 	}
 
 	backupDataAct := r.ActionSet.Spec.Backup.BackupData
-	podSpec := r.buildJobActionPodSpec(backupDataContainerName, &backupDataAct.JobActionSpec)
+	podSpec, err := r.buildJobActionPodSpec(backupDataContainerName, &backupDataAct.JobActionSpec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build job action pod spec: %w", err)
+	}
+
 	if backupDataAct.SyncProgress != nil {
 		r.injectSyncProgressContainer(podSpec, backupDataAct.SyncProgress)
 	}
@@ -257,17 +261,23 @@ func (r *Request) buildExecAction(name string, exec *dpv1alpha1.ExecActionSpec) 
 }
 
 func (r *Request) buildJobAction(name string, job *dpv1alpha1.JobActionSpec) (action.Action, error) {
+	podSpec, err := r.buildJobActionPodSpec(name, job)
+	if err != nil {
+		return nil, err
+	}
 	return &action.JobAction{
 		Name:         name,
 		ObjectMeta:   *buildBackupJobObjMeta(r.Backup, name),
 		Owner:        r.Backup,
-		PodSpec:      r.buildJobActionPodSpec(name, job),
+		PodSpec:      podSpec,
 		BackOffLimit: r.BackupPolicy.Spec.BackoffLimit,
 	}, nil
 }
 
-func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSpec) *corev1.PodSpec {
+func (r *Request) buildJobActionPodSpec(name string,
+	job *dpv1alpha1.JobActionSpec) (*corev1.PodSpec, error) {
 	targetPod := r.TargetPods[0]
+
 	// build environment variables, include built-in envs, envs from backupMethod
 	// and envs from actionSet. Latter will override former for the same name.
 	// env from backupMethod has the highest priority.
@@ -301,6 +311,10 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 		return utils.MergeEnv(envVars, r.BackupMethod.Env)
 	}
 
+	runOnTargetPodNode := func() bool {
+		return boolptr.IsSetToTrue(job.RunOnTargetPodNode)
+	}
+
 	buildVolumes := func() []corev1.Volume {
 		volumes := []corev1.Volume{
 			{
@@ -311,7 +325,7 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 			},
 		}
 		// only mount the volumes when the backup pod is running on the target pod node.
-		if boolptr.IsSetToTrue(job.RunOnTargetPodNode) {
+		if runOnTargetPodNode() {
 			volumes = append(volumes, getVolumesByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)...)
 		}
 		return volumes
@@ -325,7 +339,7 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 			},
 		}
 		// only mount the volumes when the backup pod is running on the target pod node.
-		if boolptr.IsSetToTrue(job.RunOnTargetPodNode) {
+		if runOnTargetPodNode() {
 			volumesMount = append(volumesMount, getVolumeMountsByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)...)
 		}
 		return volumesMount
@@ -362,23 +376,25 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 		Volumes:            buildVolumes(),
 		ServiceAccountName: r.targetServiceAccountName(),
 		RestartPolicy:      corev1.RestartPolicyNever,
-
-		// tolerate all taints
-		Tolerations: []corev1.Toleration{
-			{
-				Operator: corev1.TolerationOpExists,
-			},
-		},
 	}
 
-	if boolptr.IsSetToTrue(job.RunOnTargetPodNode) {
+	// if run on target pod node, set backup pod tolerations same as the target pod,
+	// that will make sure the backup pod can be scheduled to the target pod node.
+	// If not, just use the tolerations built by the environment variables.
+	if runOnTargetPodNode() {
+		podSpec.Tolerations = targetPod.Spec.Tolerations
 		podSpec.NodeSelector = map[string]string{
 			corev1.LabelHostname: targetPod.Spec.NodeName,
 		}
+	} else {
+		if err := utils.AddTolerations(podSpec); err != nil {
+			return nil, err
+		}
 	}
+
 	utils.InjectDatasafed(podSpec, r.BackupRepo, RepoVolumeMountPath,
 		BuildBackupPath(r.Backup, r.BackupPolicy.Spec.PathPrefix))
-	return podSpec
+	return podSpec, nil
 }
 
 // injectSyncProgressContainer injects a container to sync the backup progress.

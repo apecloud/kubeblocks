@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -187,16 +186,4 @@ func SetControllerReference(owner, controlled metav1.Object, scheme *runtime.Sch
 		return nil
 	}
 	return controllerutil.SetControllerReference(owner, controlled, scheme)
-}
-
-func GetDefaultJobTTL() (*int32, error) {
-	ttl := dptypes.DefaultBackupJobTTL
-	if jobTTL := viper.GetString(dptypes.CfgKeyBackupJobTTL); jobTTL != "" {
-		var err error
-		if ttl, err = time.ParseDuration(jobTTL); err != nil {
-			return nil, err
-		}
-	}
-	ttlSec := int32(ttl.Seconds())
-	return &ttlSec, nil
 }

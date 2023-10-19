@@ -226,7 +226,7 @@ func (cli *OperationClient) Request(ctx context.Context, operation string) (map[
 	return result, nil
 }
 
-func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, url, method string, body io.Reader) (*http.Response, error) {
+func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, url, method string, body []byte) (*http.Response, error) {
 	ch := make(chan *OperationResult, 1)
 	go cli.InvokeComponent(ctxWithReconcileTimeout, url, method, body, ch)
 	var resp *http.Response
@@ -241,10 +241,10 @@ func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout con
 	return resp, err
 }
 
-func (cli *OperationClient) InvokeComponent(ctxWithReconcileTimeout context.Context, url, method string, body io.Reader, ch chan *OperationResult) {
+func (cli *OperationClient) InvokeComponent(ctxWithReconcileTimeout context.Context, url, method string, body []byte, ch chan *OperationResult) {
 	ctxWithRequestTimeout, cancel := context.WithTimeout(context.Background(), cli.RequestTimeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctxWithRequestTimeout, method, url, body)
+	req, err := http.NewRequestWithContext(ctxWithRequestTimeout, method, url, bytes.NewBuffer(body))
 	if err != nil || req == nil {
 		operationRes := &OperationResult{
 			response: nil,
@@ -255,7 +255,7 @@ func (cli *OperationClient) InvokeComponent(ctxWithReconcileTimeout context.Cont
 		return
 	}
 
-	mapKey := GetMapKeyFromRequest(req)
+	mapKey := GetMapKeyFromRequest(req, body)
 	operationRes, ok := cli.cache[mapKey]
 	if ok {
 		delete(cli.cache, mapKey)
@@ -279,17 +279,10 @@ func (cli *OperationClient) InvokeComponent(ctxWithReconcileTimeout context.Cont
 	}
 }
 
-func GetMapKeyFromRequest(req *http.Request) string {
+func GetMapKeyFromRequest(req *http.Request, body []byte) string {
 	var buf bytes.Buffer
 	buf.WriteString(req.URL.String())
-
-	if req.Body != nil {
-		all, err := io.ReadAll(req.Body)
-		if err != nil {
-			return ""
-		}
-		buf.Write(all)
-	}
+	buf.Write(body)
 	keys := make([]string, 0, len(req.Header))
 	for k := range req.Header {
 		keys = append(keys, k)
@@ -298,7 +291,6 @@ func GetMapKeyFromRequest(req *http.Request) string {
 	for _, k := range keys {
 		buf.WriteString(fmt.Sprintf("%s:%s", k, req.Header[k]))
 	}
-
 	return buf.String()
 }
 
@@ -396,7 +388,7 @@ func parseResponse(data []byte, operation string, charType string) (SQLChannelRe
 	return response, err
 }
 
-func getBodyWithOperation(operation string) (io.Reader, error) {
+func getBodyWithOperation(operation string) ([]byte, error) {
 	meta := probe2.RequestMeta{
 		Operation: operation,
 		Metadata:  map[string]string{},
@@ -405,6 +397,5 @@ func getBodyWithOperation(operation string) (io.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	body := bytes.NewReader(binary)
-	return body, nil
+	return binary, nil
 }

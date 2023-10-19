@@ -946,29 +946,7 @@ spec:
                       CustomHandler to define your own role probe function if none
                       of them satisfies the requirement.'
                     type: string
-                  failureThreshold:
-                    default: 3
-                    description: Minimum consecutive failures for the probe to be
-                      considered failed after having succeeded. Defaults to 3. Minimum
-                      value is 1.
-                    format: int32
-                    minimum: 1
-                    type: integer
-                  initialDelaySeconds:
-                    default: 0
-                    description: Number of seconds after the container has started
-                      before role probe has started.
-                    format: int32
-                    minimum: 0
-                    type: integer
-                  periodSeconds:
-                    default: 2
-                    description: How often (in seconds) to perform the probe. Default
-                      to 2 seconds. Minimum value is 1.
-                    format: int32
-                    minimum: 1
-                    type: integer
-                  probeActions:
+                  customHandler:
                     description: "CustomHandler defines the custom way to do role
                       probe. if the BuiltinHandler satisfies the requirement, use
                       it instead. \n how the actions defined here works: \n Actions
@@ -995,6 +973,28 @@ spec:
                       - command
                       type: object
                     type: array
+                  failureThreshold:
+                    default: 3
+                    description: Minimum consecutive failures for the probe to be
+                      considered failed after having succeeded. Defaults to 3. Minimum
+                      value is 1.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  initialDelaySeconds:
+                    default: 0
+                    description: Number of seconds after the container has started
+                      before role probe has started.
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  periodSeconds:
+                    default: 2
+                    description: How often (in seconds) to perform the probe. Default
+                      to 2 seconds. Minimum value is 1.
+                    format: int32
+                    minimum: 1
+                    type: integer
                   roleUpdateMechanism:
                     default: ReadinessProbeEventUpdate
                     description: RoleUpdateMechanism specifies the way how pod role

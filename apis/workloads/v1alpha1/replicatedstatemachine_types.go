@@ -240,7 +240,7 @@ type RoleProbe struct {
 	// - KB_RSM_USERNAME username part of credential
 	// - KB_RSM_PASSWORD password part of credential
 	// +optional
-	CustomHandler []Action `json:"probeActions,omitempty"`
+	CustomHandler []Action `json:"customHandler,omitempty"`
 
 	// Number of seconds after the container has started before role probe has started.
 	// +kubebuilder:default=0

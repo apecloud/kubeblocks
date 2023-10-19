@@ -320,11 +320,11 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.6.0 -n kb-system
 
 </Tabs>
 
-  :::note
+:::note
 
-  If you fail to log in on Chrome, try switching to Safari and give it another try. 
+If you fail to log in on Chrome, try switching to Safari and give it another try. 
 
-  :::
+:::
 
 ## (Optional) Change the backup repository for a cluster
 

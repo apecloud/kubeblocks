@@ -173,7 +173,7 @@ spec:
       versionsContext:
         initContainers:
           - name: download
-            image: apecloud/baichuan-llama-7b:ggmlv3.q4_0
+            image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/baichuan-llama-7b:ggmlv3.q4_0
             command: ["sh", "-c", "cp /models/baichuan-llama-7b.ggmlv3.q4_0.bin /models-target/"]
             volumeMounts:
               - name: models

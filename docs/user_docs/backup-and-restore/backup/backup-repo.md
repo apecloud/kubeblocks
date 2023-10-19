@@ -92,6 +92,12 @@ There are various ways to create a BackupRepo. Make sure you have done all the n
 
    ![MinIO dashboard](./../../../img/backup-and-restore-configure-backuprepo-minio.png)
 
+:::note
+
+If you fail to log in on Chrome, try switching to Safari and give it another try. 
+
+:::
+
 ### Install S3 CSI driver
 
 <Tabs>
@@ -319,12 +325,6 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.6.0 -n kb-system
 </TabItem>
 
 </Tabs>
-
-:::note
-
-If you fail to log in on Chrome, try switching to Safari and give it another try. 
-
-:::
 
 ## (Optional) Change the backup repository for a cluster
 

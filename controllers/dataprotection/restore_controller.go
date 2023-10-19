@@ -165,6 +165,7 @@ func (r *RestoreReconciler) inProgressAction(reqCtx intctrlutil.RequestCtx, rest
 		err = r.Client.Status().Patch(reqCtx.Ctx, restoreMgr.Restore, client.MergeFrom(restoreMgr.OriginalRestore))
 	}
 	if err != nil {
+		r.Recorder.Event(restore, corev1.EventTypeWarning, corev1.EventTypeWarning, err.Error())
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()

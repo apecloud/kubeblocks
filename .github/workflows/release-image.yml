@@ -87,7 +87,7 @@ jobs:
     needs: [ release-image, release-tools-image, release-datascript-image]
     if: ${{ always() && github.event.action == 'published' }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: send message
         id: send_message
         run: |

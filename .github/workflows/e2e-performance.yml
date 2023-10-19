@@ -51,7 +51,7 @@ jobs:
     outputs:
       release-version: ${{ steps.get_release_version.outputs.release-version }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: check release version
         id: get_release_version
         run: |
@@ -68,7 +68,7 @@ jobs:
   performance:
     name: ${{ inputs.NODE_TYPE }} ${{ inputs.PERFORMANCE_TYPE }}
     needs: check
-    uses: apecloud/apecloud-cd/.github/workflows/performance-test-k8s.yml@v0.1.30
+    uses: apecloud/apecloud-cd/.github/workflows/performance-test-k8s.yml@main
     with:
       CLOUD_PROVIDER: "gke"
       CLUSTER_VERSION: "${{ inputs.K8S_VERSION }}"
@@ -80,5 +80,4 @@ jobs:
       BENCH_TABLES: "${{ inputs.BENCH_TABLES }}"
       CLUSTER_STORAGE: "${{ inputs.CLUSTER_STORAGE }}"
       REGION: "${{ vars.REGION_AWS_EKS }}"
-      APECD_REF: "v0.1.30"
     secrets: inherit

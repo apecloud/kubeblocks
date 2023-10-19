@@ -472,13 +472,17 @@ var _ = Describe("create", func() {
 	It("test build backup config", func() {
 		backupPolicyTemplate := testing.FakeBackupPolicyTemplate("backupPolicyTemplate-test", testing.ClusterDefName)
 		backupPolicy := appsv1alpha1.BackupPolicy{
-			BackupMethods: []v1alpha1.BackupMethod{
+			BackupMethods: []appsv1alpha1.BackupMethod{
 				{
-					Name:            "volume-snapshot",
-					SnapshotVolumes: boolptr.True(),
+					BackupMethod: v1alpha1.BackupMethod{
+						Name:            "volume-snapshot",
+						SnapshotVolumes: boolptr.True(),
+					},
 				},
 				{
-					Name: "xtrabackup",
+					BackupMethod: v1alpha1.BackupMethod{
+						Name: "xtrabackup",
+					},
 				},
 			},
 		}

@@ -385,7 +385,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 			return nil, err
 		}
 		if len(targetPodList.Items) == 0 {
-			return nil, intctrlutil.NewFatalError(fmt.Sprintf("can not found any pod by spec.readyConfig.%s.target.podSelector", msgKey))
+			return nil, fmt.Errorf("can not found any pod by spec.readyConfig.%s.target.podSelector", msgKey)
 		}
 		return targetPodList.Items, nil
 	}
@@ -407,16 +407,17 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 			return nil, err
 		}
 		targetPod := targetPodList[0]
-		for _, volumeMount := range jobAction.Target.VolumeMounts {
-			for _, volume := range targetPod.Spec.Volumes {
-				if volume.Name != volumeMount.Name {
-					continue
-				}
-				jobBuilder.addToSpecificVolumesAndMounts(&volume, &volumeMount)
-			}
-		}
 		if boolptr.IsSetToTrue(actionSpec.Job.RunOnTargetPodNode) {
 			jobBuilder.setNodeNameToNodeSelector(targetPod.Spec.NodeName)
+			// mount the targe pod's volumes when RunOnTargetPodNode is true
+			for _, volumeMount := range jobAction.Target.VolumeMounts {
+				for _, volume := range targetPod.Spec.Volumes {
+					if volume.Name != volumeMount.Name {
+						continue
+					}
+					jobBuilder.addToSpecificVolumesAndMounts(&volume, &volumeMount)
+				}
+			}
 		}
 		job := jobBuilder.setImage(actionSpec.Job.Image).
 			setJobName(buildJobName(0)).

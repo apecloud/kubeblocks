@@ -15,7 +15,7 @@
 # Variables                                                                    #
 ################################################################################
 APP_NAME = kubeblocks
-VERSION ?= 0.7.0-alpha.0
+VERSION ?= 0.8.0-alpha.0
 GITHUB_PROXY ?=
 INIT_ENV ?= false
 TEST_TYPE ?= wesql
@@ -205,7 +205,7 @@ module: ## Run go mod tidy->verify against go modules.
 	$(GO) mod tidy -compat=1.21
 	$(GO) mod verify
 
-TEST_PACKAGES ?= ./pkg/... ./apis/... ./controllers/... ./cmd/...
+TEST_PACKAGES ?= ./pkg/... ./apis/... ./controllers/... ./cmd/... ./lorry/...
 
 CLUSTER_TYPES=minikube k3d
 .PHONY: add-k8s-host

@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 )
 
 // BackupPolicyTplTransformer transforms the backup policy template to the data
@@ -263,6 +264,8 @@ func (r *BackupPolicyTplTransformer) syncBackupPolicy(backupPolicy *dpv1alpha1.B
 		backupPolicy.Spec.BackupRepoName = &r.Cluster.Spec.Backup.RepoName
 	}
 
+	r.syncBackupMethods(backupPolicy)
+
 	// only update the role labelSelector of the backup target instance when
 	// component workload is Replication/Consensus. Because the replicas of
 	// component will change, such as 2->1. then if the target role is 'follower'
@@ -321,17 +324,43 @@ func (r *BackupPolicyTplTransformer) buildBackupPolicy(backupPolicyName string) 
 			Annotations: r.buildAnnotations(),
 		},
 	}
-
+	r.syncBackupMethods(backupPolicy)
 	bpSpec := backupPolicy.Spec
 	// if cluster have backup repo, set backup repo name to backup policy.
 	if cluster.Spec.Backup != nil && cluster.Spec.Backup.RepoName != "" {
 		bpSpec.BackupRepoName = &cluster.Spec.Backup.RepoName
 	}
-	bpSpec.BackupMethods = r.backupPolicy.BackupMethods
 	bpSpec.PathPrefix = buildBackupPathPrefix(cluster, comp.Name)
 	bpSpec.Target = r.buildBackupTarget(comp)
 	backupPolicy.Spec = bpSpec
 	return backupPolicy
+}
+
+// syncBackupMethods syncs the backupMethod of tpl to backupPolicy.
+func (r *BackupPolicyTplTransformer) syncBackupMethods(backupPolicy *dpv1alpha1.BackupPolicy) {
+	var backupMethods []dpv1alpha1.BackupMethod
+	for _, v := range r.backupPolicy.BackupMethods {
+		mappingEnv := r.doEnvMapping(v.EnvMapping)
+		v.BackupMethod.Env = dputils.MergeEnv(v.BackupMethod.Env, mappingEnv)
+		backupMethods = append(backupMethods, v.BackupMethod)
+	}
+	backupPolicy.Spec.BackupMethods = backupMethods
+}
+
+func (r *BackupPolicyTplTransformer) doEnvMapping(envMapping []appsv1alpha1.EnvMappingVar) []corev1.EnvVar {
+	var env []corev1.EnvVar
+	for _, v := range envMapping {
+		for _, cv := range v.ValueFrom.ClusterVersionRef {
+			if !slices.Contains(cv.Names, r.Cluster.Spec.ClusterVersionRef) {
+				continue
+			}
+			env = append(env, corev1.EnvVar{
+				Name:  v.Key,
+				Value: cv.MappingValue,
+			})
+		}
+	}
+	return env
 }
 
 func (r *BackupPolicyTplTransformer) buildBackupTarget(

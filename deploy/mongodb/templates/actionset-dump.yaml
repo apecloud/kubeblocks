@@ -11,12 +11,14 @@ spec:
       value: {{ .Values.dataMountPath }}/db
     - name: DP_DB_PORT
       value: "27017"
+    - name: IMAGE_TAG
+      value: {{ .Values.image.tag }}
   backupType: Full
   backup:
     preBackup: []
     postBackup: []
     backupData:
-      image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+      image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:$(IMAGE_TAG)
       runOnTargetPodNode: false
       syncProgress:
         enabled: true
@@ -30,7 +32,7 @@ spec:
   restore:
     postReady:
     - job:
-        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:$(IMAGE_TAG)
         runOnTargetPodNode: false
         command:
         - bash

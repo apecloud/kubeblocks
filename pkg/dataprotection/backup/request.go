@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/action"
@@ -301,35 +302,43 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 	}
 
 	buildVolumes := func() []corev1.Volume {
-		return append(
-			[]corev1.Volume{
-				{
-					Name: syncProgressSharedVolumeName,
-					VolumeSource: corev1.VolumeSource{
-						EmptyDir: &corev1.EmptyDirVolumeSource{},
-					},
+		volumes := []corev1.Volume{
+			{
+				Name: syncProgressSharedVolumeName,
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
 				},
 			},
-			getVolumesByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)...)
+		}
+		// only mount the volumes when the backup pod is running on the target pod node.
+		if boolptr.IsSetToTrue(job.RunOnTargetPodNode) {
+			volumes = append(volumes, getVolumesByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)...)
+		}
+		return volumes
 	}
 
 	buildVolumeMounts := func() []corev1.VolumeMount {
-		return append(
-			[]corev1.VolumeMount{
-				{
-					Name:      syncProgressSharedVolumeName,
-					MountPath: syncProgressSharedMountPath,
-				},
+		volumesMount := []corev1.VolumeMount{
+			{
+				Name:      syncProgressSharedVolumeName,
+				MountPath: syncProgressSharedMountPath,
 			},
-			getVolumeMountsByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)...)
+		}
+		// only mount the volumes when the backup pod is running on the target pod node.
+		if boolptr.IsSetToTrue(job.RunOnTargetPodNode) {
+			volumesMount = append(volumesMount, getVolumeMountsByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)...)
+		}
+		return volumesMount
 	}
 
 	runAsUser := int64(0)
+	env := buildEnv()
 	container := corev1.Container{
-		Name:            name,
-		Image:           job.Image,
+		Name: name,
+		// expand the image value with the env variables.
+		Image:           common.Expand(job.Image, common.MappingFuncFor(utils.CovertEnvToMap(env))),
 		Command:         job.Command,
-		Env:             buildEnv(),
+		Env:             env,
 		VolumeMounts:    buildVolumeMounts(),
 		ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)),
 		SecurityContext: &corev1.SecurityContext{

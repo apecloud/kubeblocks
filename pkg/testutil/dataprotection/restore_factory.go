@@ -162,6 +162,12 @@ func (f *MockRestoreFactory) SetJobActionConfig(matchLabels map[string]string) *
 			PodSelector: metav1.LabelSelector{
 				MatchLabels: matchLabels,
 			},
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      DataVolumeName,
+					MountPath: DataVolumeMountPath,
+				},
+			},
 		},
 	}
 	return f

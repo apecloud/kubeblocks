@@ -393,6 +393,9 @@ func (c *rsmComponent) status(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 }
 
 func (c *rsmComponent) updatePrimaryIndex(ctx context.Context, cli client.Client) error {
+	if c.component.WorkloadType != appsv1alpha1.Replication {
+		return nil
+	}
 	podList, err := listPodOwnedByComponent(ctx, cli, c.GetNamespace(), c.getMatchingLabels())
 	if err != nil {
 		return err

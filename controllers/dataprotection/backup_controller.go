@@ -516,8 +516,10 @@ func (r *BackupReconciler) handleRunningPhase(
 		if err != nil {
 			return r.updateStatusIfFailed(reqCtx, backup, request.Backup, fmt.Errorf("failed to parse retention period %s, %v", request.Spec.RetentionPeriod, err))
 		}
-		request.Status.Expiration = &metav1.Time{
-			Time: request.Status.CompletionTimestamp.Add(duration),
+		if duration.Seconds() > 0 {
+			request.Status.Expiration = &metav1.Time{
+				Time: request.Status.CompletionTimestamp.Add(duration),
+			}
 		}
 	}
 	r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedBackup", "Completed backup")

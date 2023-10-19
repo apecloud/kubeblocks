@@ -26,6 +26,7 @@ import (
 
 	"github.com/valyala/fasthttp"
 
+	"github.com/apecloud/kubeblocks/lorry/engines/models"
 	"github.com/apecloud/kubeblocks/lorry/operations"
 	"github.com/apecloud/kubeblocks/lorry/util"
 )
@@ -121,9 +122,14 @@ func OperationWrapper(op operations.Operation) fasthttp.RequestHandler {
 			if _, ok := err.(util.ProbeError); ok {
 				statusCode = fasthttp.StatusUnavailableForLegalReasons
 			} else {
-				msg := NewErrorResponse("ERR_OPERATION_FAILED", fmt.Sprintf("operation exec failed: %v", err))
+				if err == models.ErrNoImplemented {
+					statusCode = fasthttp.StatusNotImplemented
+				} else {
+					statusCode = fasthttp.StatusInternalServerError
+					logger.Error(err, "operation exec failed")
+				}
+				msg := NewErrorResponse("ERR_OPERATION_FAILED", err.Error())
 				respond(reqCtx, withError(fasthttp.StatusInternalServerError, msg))
-				logger.Error(err, "operation exec failed")
 				return
 			}
 		}

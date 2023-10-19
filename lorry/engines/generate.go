@@ -17,6 +17,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package dcs
+package engines
 
-//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../hack/boilerplate.go.txt -package dcs -destination dcs_mock.go github.com/apecloud/kubeblocks/lorry/dcs DCS
+//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../hack/boilerplate.go.txt -package engines -destination dbmanager_mock.go github.com/apecloud/kubeblocks/lorry/engines DBManager

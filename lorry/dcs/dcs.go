@@ -66,6 +66,10 @@ func init() {
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 }
 
+func SetStore(d DCS) {
+	dcs = d
+}
+
 func GetStore() DCS {
 	return dcs
 }

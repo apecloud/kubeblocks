@@ -24,11 +24,13 @@ import (
 	"net"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/spf13/viper"
 	"github.com/valyala/fasthttp"
 
+	"github.com/apecloud/kubeblocks/lorry/dcs"
 	"github.com/apecloud/kubeblocks/lorry/engines"
 	"github.com/apecloud/kubeblocks/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/lorry/httpserver"
@@ -37,6 +39,10 @@ import (
 
 var (
 	lorryHTTPPort = 3501
+	dbManager     engines.DBManager
+	mockDBManager *engines.MockDBManager
+	dcsStore      dcs.DCS
+	mockDCSStore  *dcs.MockDCS
 )
 
 func init() {
@@ -45,18 +51,21 @@ func init() {
 	viper.SetDefault("KB_CLUSTER_COMP_NAME", "cluster-component-test")
 	viper.SetDefault("KB_NAMESPACE", "namespace-test")
 }
+
 func TestLorryClient(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Lorry Client. Suite")
 }
 
 var _ = BeforeSuite(func() {
-	mockManager, err := engines.NewMockManager(nil)
-	Expect(err).Should(BeNil())
-	register.SetDBManager(mockManager)
-	ops := opsregister.Operations()
-	httpServer := httpserver.NewServer(ops)
-	StartHTTPServerNonBlocking(httpServer)
+	// Init mock db manager
+	InitMockDBManager()
+
+	// Init mock dcs store
+	InitMockDCSStore()
+
+	// Start lorry HTTP server
+	StartHTTPServer()
 })
 
 func newTCPServer(port int) (net.Listener, int) {
@@ -72,7 +81,9 @@ func newTCPServer(port int) (net.Listener, int) {
 	return l, port
 }
 
-func StartHTTPServerNonBlocking(s httpserver.Server) {
+func StartHTTPServer() {
+	ops := opsregister.Operations()
+	s := httpserver.NewServer(ops)
 	handler := s.Router()
 
 	listener, port := newTCPServer(lorryHTTPPort)
@@ -81,4 +92,19 @@ func StartHTTPServerNonBlocking(s httpserver.Server) {
 	go func() {
 		Expect(fasthttp.Serve(listener, handler)).Should(Succeed())
 	}()
+}
+
+func InitMockDBManager() {
+	ctrl := gomock.NewController(GinkgoT())
+	mockDBManager = engines.NewMockDBManager(ctrl)
+	register.SetDBManager(mockDBManager)
+	dbManager = mockDBManager
+}
+
+func InitMockDCSStore() {
+	ctrl := gomock.NewController(GinkgoT())
+	mockDCSStore = dcs.NewMockDCS(ctrl)
+	mockDCSStore.EXPECT().GetClusterFromCache().Return(&dcs.Cluster{}).AnyTimes()
+	dcs.SetStore(mockDCSStore)
+	dcsStore = mockDCSStore
 }

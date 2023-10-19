@@ -21,12 +21,14 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -83,67 +85,75 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 	})
 
-	// Context("request with timeout", func() {
-	// 	var httpServer *httptest.Server
-	// 	var port int
-	// 	var lorryClient *HTTPClient
+	Context("request with timeout", func() {
+		var httpServer *httptest.Server
+		var port int
+		var lorryClient *HTTPClient
 
-	// 	BeforeEach(func() {
-	// 		pod1 := pod.DeepCopy()
-	// 		body := []byte("{\"role\": \"leader\"}")
-	// 		httpServer, port = newHTTPServer(body)
-	// 		pod1.Spec.Containers[0].Ports[0].ContainerPort = int32(port)
-	// 		lorryClient, _ = NewHTTPClientWithPod(pod1)
-	// 		Expect(lorryClient).ShouldNot(BeNil())
-	// 	})
+		BeforeEach(func() {
+			pod1 := pod.DeepCopy()
+			body := []byte("{\"role\": \"leader\"}")
+			httpServer, port = newHTTPServer(body)
+			pod1.Spec.Containers[0].Ports[0].ContainerPort = int32(port)
+			lorryClient, _ = NewHTTPClientWithPod(pod1)
+			Expect(lorryClient).ShouldNot(BeNil())
+		})
 
-	// 	AfterEach(func() {
-	// 		httpServer.Close()
-	// 	})
+		AfterEach(func() {
+			httpServer.Close()
+		})
 
-	// 	It("response in time", func() {
-	// 		lorryClient.ReconcileTimeout = 1 * time.Second
-	// 		_, err := lorryClient.GetRole(context.TODO())
-	// 		Expect(err).ShouldNot(HaveOccurred())
-	// 		Expect(lorryClient.cache).Should(BeEmpty())
-	// 	})
+		It("response in time", func() {
+			lorryClient.ReconcileTimeout = 1 * time.Second
+			_, err := lorryClient.GetRole(context.TODO())
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(lorryClient.cache).Should(BeEmpty())
+		})
 
-	// 	It("response timeout", func() {
-	// 		lorryClient.ReconcileTimeout = 50 * time.Millisecond
-	// 		_, err := lorryClient.GetRole(context.TODO())
-	// 		Expect(err).Should(HaveOccurred())
-	// 		// wait client to get response and cache it
-	// 		time.Sleep(200 * time.Millisecond)
-	// 		Expect(lorryClient.cache).Should(HaveLen(1))
-	// 	})
+		It("response timeout", func() {
+			lorryClient.ReconcileTimeout = 50 * time.Millisecond
+			_, err := lorryClient.GetRole(context.TODO())
+			Expect(err).Should(HaveOccurred())
+			// wait client to get response and cache it
+			time.Sleep(200 * time.Millisecond)
+			Expect(lorryClient.cache).Should(HaveLen(1))
+		})
 
-	// 	It("response by cache", func() {
-	// 		lorryClient.ReconcileTimeout = 50 * time.Millisecond
-	// 		// get response from server, and timeout
-	// 		_, err := lorryClient.GetRole(context.TODO())
-	// 		Expect(err).Should(HaveOccurred())
-	// 		// wait client to get response and cache it
-	// 		time.Sleep(200 * time.Millisecond)
-	// 		// get response from cache
-	// 		_, err = lorryClient.GetRole(context.TODO())
-	// 		Expect(err).ShouldNot(HaveOccurred())
-	// 		Expect(lorryClient.cache).Should(BeEmpty())
-	// 	})
-	// })
+		It("response by cache", func() {
+			lorryClient.ReconcileTimeout = 50 * time.Millisecond
+			// get response from server, and timeout
+			_, err := lorryClient.GetRole(context.TODO())
+			Expect(err).Should(HaveOccurred())
+			// wait client to get response and cache it
+			time.Sleep(200 * time.Millisecond)
+			// get response from cache
+			_, err = lorryClient.GetRole(context.TODO())
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(lorryClient.cache).Should(BeEmpty())
+		})
+	})
 
 	Context("get replica role", func() {
 		var lorryClient *HTTPClient
 
 		BeforeEach(func() {
 			lorryClient, _ = NewHTTPClientWithPod(pod)
+			lorryClient.ReconcileTimeout = 500 * time.Second
 			Expect(lorryClient).ShouldNot(BeNil())
 		})
 
 		It("success", func() {
+			mockDBManager.EXPECT().GetReplicaRole(gomock.Any(), gomock.Any()).Return("leader", nil)
 			role, err := lorryClient.GetRole(context.TODO())
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(role).Should(Equal("leader"))
+		})
 
+		It("not implemented", func() {
+			mockDBManager.EXPECT().GetReplicaRole(gomock.Any(), gomock.Any()).Return(string(""), fmt.Errorf("not implemented"))
+			role, err := lorryClient.GetRole(context.TODO())
+			Expect(err).Should(HaveOccurred())
+			Expect(role).Should(BeEmpty())
 		})
 
 	})

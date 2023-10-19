@@ -87,13 +87,12 @@ func NewHTTPClientWithPod(pod *corev1.Pod) (*HTTPClient, error) {
 	}
 
 	operationClient := &HTTPClient{
-		Client:         client,
-		Port:           port,
-		URL:            fmt.Sprintf(urlTemplate, ip, port),
-		CacheTTL:       60 * time.Second,
-		RequestTimeout: 30 * time.Second,
-		//ReconcileTimeout: 500 * time.Millisecond,
-		ReconcileTimeout: 500 * time.Second,
+		Client:           client,
+		Port:             port,
+		URL:              fmt.Sprintf(urlTemplate, ip, port),
+		CacheTTL:         60 * time.Second,
+		RequestTimeout:   30 * time.Second,
+		ReconcileTimeout: 500 * time.Millisecond,
 		cache:            make(map[string]*OperationResult),
 	}
 	return operationClient, nil
@@ -105,7 +104,12 @@ func (cli *HTTPClient) GetRole(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	return resp["role"].(string), nil
+	role, ok := resp["role"]
+	if !ok {
+		return "", nil
+	}
+
+	return role.(string), nil
 }
 
 // GetSystemAccounts lists all system accounts created
@@ -149,17 +153,21 @@ func (cli *HTTPClient) Request(ctx context.Context, operation, method string, re
 	if err != nil {
 		return nil, err
 	}
-	result := map[string]any{}
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal(data, &result)
-	if err != nil {
-		return nil, err
-	}
 
-	return result, nil
+	switch resp.StatusCode {
+	case http.StatusOK, http.StatusUnavailableForLegalReasons:
+		return parseBody(resp.Body)
+	case http.StatusNoContent:
+		return nil, nil
+	case http.StatusNotImplemented, http.StatusInternalServerError:
+		fallthrough
+	default:
+		msg, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf(string(msg))
+	}
 }
 
 func (cli *HTTPClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, url, method string, body io.Reader) (*http.Response, error) {
@@ -236,4 +244,18 @@ func GetMapKeyFromRequest(req *http.Request) string {
 	}
 
 	return buf.String()
+}
+
+func parseBody(body io.Reader) (map[string]any, error) {
+	result := map[string]any{}
+	data, err := io.ReadAll(body)
+	if err != nil {
+		return nil, errors.Wrap(err, "read response body failed")
+	}
+	err = json.Unmarshal(data, &result)
+	if err != nil {
+		return nil, errors.Wrap(err, "decode body failed")
+	}
+
+	return result, nil
 }

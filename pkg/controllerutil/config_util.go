@@ -55,6 +55,20 @@ type ConfigEventContext struct {
 	PolicyStatus core.PolicyExecStatus
 }
 
+type Result struct {
+	Phase      v1alpha1.ConfigurationPhase
+	Revision   string
+	Policy     string
+	ExecResult string
+
+	SucceedCount  int32
+	ExpectedCount int32
+
+	Retry   bool
+	Failed  bool
+	Message string
+}
+
 type ConfigEventHandler interface {
 	Handle(eventContext ConfigEventContext, lastOpsRequest string, phase v1alpha1.OpsPhase, err error) error
 }

@@ -53,7 +53,7 @@ func TestGcConfigRevision(t *testing.T) {
 		AddAnnotations(core.GenerateRevisionPhaseKey("9"), "finished").
 		AddAnnotations(core.GenerateRevisionPhaseKey("10"), "finished").
 		AddAnnotations(core.GenerateRevisionPhaseKey("11"), "finished").
-		AddAnnotations(core.GenerateRevisionPhaseKey("12"), "finished").
+		AddAnnotations(core.GenerateRevisionPhaseKey("12"), `{"Phase":"Finished","Revision":"12","Policy":"","ExecResult":"","SucceedCount":0,"ExpectedCount":0,"Retry":false,"Failed":false,"Message":"the configuration file has not been modified, skip reconfigure"}`).
 		GetObject()
 
 	assert.Equal(t, 12, len(RetrieveRevision(cm.GetAnnotations())))

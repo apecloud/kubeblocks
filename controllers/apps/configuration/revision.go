@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
+	"encoding/json"
 	"sort"
 	"strconv"
 	"strings"
@@ -29,12 +30,14 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type ConfigurationRevision struct {
 	Revision    int64
 	StrRevision string
 	Phase       appsv1alpha1.ConfigurationPhase
+	Result      intctrlutil.Result
 }
 
 const revisionHistoryLimit = 10
@@ -78,16 +81,33 @@ func RetrieveRevision(annotations map[string]string) []ConfigurationRevision {
 	return revisions
 }
 
-func parseRevision(revision string, phase string) (ConfigurationRevision, error) {
+func parseRevision(revision string, data string) (ConfigurationRevision, error) {
 	v, err := strconv.ParseInt(revision, 10, 64)
 	if err != nil {
 		return ConfigurationRevision{}, err
 	}
+	result := parseResult(data, revision)
 	return ConfigurationRevision{
 		StrRevision: revision,
 		Revision:    v,
-		Phase:       appsv1alpha1.ConfigurationPhase(phase),
+		Phase:       result.Phase,
+		Result:      result,
 	}, nil
+}
+
+func parseResult(data string, revision string) intctrlutil.Result {
+	result := intctrlutil.Result{
+		Revision: revision,
+	}
+	data = strings.TrimSpace(data)
+	if data == "" {
+		return result
+	}
+	err := json.Unmarshal([]byte(data), &result)
+	if err != nil {
+		result.Phase = appsv1alpha1.ConfigurationPhase(data)
+	}
+	return result
 }
 
 func GetCurrentRevision(annotations map[string]string) string {

@@ -53,6 +53,12 @@ const (
 	ConfigReconcileInterval = time.Second * 1
 )
 
+const (
+	configurationNoChangedMessage           = "the configuration file has not been modified, skip reconfigure"
+	configurationNotUsingMessage            = "the configmap is not used by any container, skip reconfigure"
+	configurationNotRelatedComponentMessage = "related component does not found any configSpecs, skip reconfigure"
+)
+
 var ConfigurationRequiredLabels = []string{
 	constant.AppNameLabelKey,
 	constant.AppInstanceLabelKey,
@@ -102,7 +108,7 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to check last-applied-configuration")
 	} else if isAppliedConfigs {
-		return updateConfigPhase(r.Client, reqCtx, config, appsv1alpha1.CFinishedPhase, false, false)
+		return updateConfigPhase(r.Client, reqCtx, config, appsv1alpha1.CFinishedPhase, configurationNoChangedMessage)
 	}
 
 	// process configuration without ConfigConstraints
@@ -163,7 +169,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 	if configPatch != nil && !configPatch.IsModify {
 		reqCtx.Recorder.Eventf(configMap, corev1.EventTypeNormal, appsv1alpha1.ReasonReconfigureRunning,
 			"nothing changed, skip reconfigure")
-		return r.updateConfigCMStatus(reqCtx, configMap, core.ReconfigureNoChangeType)
+		return r.updateConfigCMStatus(reqCtx, configMap, core.ReconfigureNoChangeType, nil)
 	}
 
 	if configPatch != nil {
@@ -197,15 +203,17 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 	}
 	if reconcileContext.ConfigSpec == nil {
 		reqCtx.Log.Info(fmt.Sprintf("not found configSpec[%s] in the component[%s].", configSpecName, componentName))
-		reqCtx.Recorder.Eventf(configMap, corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
-			"related component does not have any configSpecs, skip reconfigure")
-		return updateConfigPhase(r.Client, reqCtx, configMap, appsv1alpha1.CFinishedPhase, false, false)
+		reqCtx.Recorder.Eventf(configMap,
+			corev1.EventTypeWarning,
+			appsv1alpha1.ReasonReconfigureFailed,
+			configurationNotRelatedComponentMessage)
+		return updateConfigPhase(r.Client, reqCtx, configMap, appsv1alpha1.CFinishedPhase, configurationNotRelatedComponentMessage)
 	}
 	if len(reconcileContext.StatefulSets) == 0 && len(reconcileContext.Deployments) == 0 {
 		reqCtx.Recorder.Eventf(configMap,
 			corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
 			"the configmap is not used by any container, skip reconfigure")
-		return updateConfigPhase(r.Client, reqCtx, configMap, appsv1alpha1.CFinishedPhase, false, false)
+		return updateConfigPhase(r.Client, reqCtx, configMap, appsv1alpha1.CFinishedPhase, configurationNotUsingMessage)
 	}
 
 	return r.performUpgrade(reconfigureParams{
@@ -227,13 +235,13 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 	})
 }
 
-func (r *ReconfigureReconciler) updateConfigCMStatus(reqCtx intctrlutil.RequestCtx, cfg *corev1.ConfigMap, reconfigureType string) (ctrl.Result, error) {
+func (r *ReconfigureReconciler) updateConfigCMStatus(reqCtx intctrlutil.RequestCtx, cfg *corev1.ConfigMap, reconfigureType string, result *intctrlutil.Result) (ctrl.Result, error) {
 	configData, err := json.Marshal(cfg.Data)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(cfg, r.Recorder, err, reqCtx.Log)
 	}
 
-	if ok, err := updateAppliedConfigs(r.Client, reqCtx, cfg, configData, reconfigureType); err != nil || !ok {
+	if ok, err := updateAppliedConfigs(r.Client, reqCtx, cfg, configData, reconfigureType, result); err != nil || !ok {
 		return intctrlutil.RequeueAfter(ConfigReconcileInterval, reqCtx.Log, "failed to patch status and retry...", "error", err)
 	}
 
@@ -263,21 +271,45 @@ func (r *ReconfigureReconciler) performUpgrade(params reconfigureParams) (ctrl.R
 
 	switch returnedStatus.Status {
 	default:
-		return updateConfigPhase(params.Client, params.Ctx, params.ConfigMap, appsv1alpha1.CFailedAndPausePhase, false, false)
+		return updateConfigPhaseWithResult(
+			params.Client,
+			params.Ctx,
+			params.ConfigMap,
+			reconciled(returnedStatus, policy.GetPolicyName(), appsv1alpha1.CFailedAndPausePhase,
+				withFailed(core.MakeError("unknown status"), false)),
+		)
 	case ESFailedAndRetry:
-		return updateConfigPhase(params.Client, params.Ctx, params.ConfigMap, appsv1alpha1.CFailedPhase, false, true)
+		return updateConfigPhaseWithResult(
+			params.Client,
+			params.Ctx,
+			params.ConfigMap,
+			reconciled(returnedStatus, policy.GetPolicyName(), appsv1alpha1.CFailedPhase,
+				withFailed(err, true)),
+		)
 	case ESRetry:
-		return updateConfigPhase(params.Client, params.Ctx, params.ConfigMap, appsv1alpha1.CUpgradingPhase, false, true)
+		return updateConfigPhaseWithResult(
+			params.Client,
+			params.Ctx,
+			params.ConfigMap,
+			reconciled(returnedStatus, policy.GetPolicyName(), appsv1alpha1.CUpgradingPhase),
+		)
 	case ESFailed:
-		return updateConfigPhase(params.Client, params.Ctx, params.ConfigMap, appsv1alpha1.CFailedAndPausePhase, true, false)
+		return updateConfigPhaseWithResult(
+			params.Client,
+			params.Ctx,
+			params.ConfigMap,
+			reconciled(returnedStatus, policy.GetPolicyName(), appsv1alpha1.CFailedAndPausePhase),
+		)
 	case ESNone:
-		params.Ctx.Recorder.Eventf(params.ConfigMap,
+		params.Ctx.Recorder.Eventf(
+			params.ConfigMap,
 			corev1.EventTypeNormal,
 			appsv1alpha1.ReasonReconfigureSucceed,
 			"the reconfigure[%s] request[%s] has been processed successfully",
 			policy.GetPolicyName(),
 			getOpsRequestID(params.ConfigMap))
-		return r.updateConfigCMStatus(params.Ctx, params.ConfigMap, policy.GetPolicyName())
+		result := reconciled(returnedStatus, policy.GetPolicyName(), appsv1alpha1.CFinishedPhase)
+		return r.updateConfigCMStatus(params.Ctx, params.ConfigMap, policy.GetPolicyName(), &result)
 	}
 }
 

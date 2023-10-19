@@ -22,6 +22,12 @@ package rsm
 import (
 	"encoding/json"
 	"fmt" //nolint:goimports
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
+	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	apps "k8s.io/api/apps/v1"
@@ -32,13 +38,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strconv"
 	"strings"
-
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 )
 
 type ObjectGenerationTransformer struct{}

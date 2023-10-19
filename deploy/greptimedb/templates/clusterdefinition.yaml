@@ -8,9 +8,9 @@ spec:
   connectionCredential:
     username: root
     password: "$(RANDOM_PASSWD)"
-    endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-mysql)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_mysql)"
     host: "$(SVC_FQDN)"
-    port: "$(SVC_PORT_tcp-mysql)"
+    port: "$(SVC_PORT_mysql)"
     accesskey: ""
     secretkey: ""
   componentDefs:

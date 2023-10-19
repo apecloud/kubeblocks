@@ -70,6 +70,6 @@ func (s *ListSystemAccounts) Do(ctx context.Context, req *operations.OpsRequest)
 		return resp, err
 	}
 
-	resp.Data["users"] = result
+	resp.Data["systemAccounts"] = result
 	return resp.WithSuccess("")
 }

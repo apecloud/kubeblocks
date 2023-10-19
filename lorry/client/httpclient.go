@@ -112,13 +112,17 @@ func (cli *HTTPClient) GetRole(ctx context.Context) (string, error) {
 	return role.(string), nil
 }
 
-// GetSystemAccounts lists all system accounts created
-func (cli *HTTPClient) GetSystemAccounts(ctx context.Context) ([]map[string]any, error) {
+// ListSystemAccounts lists all system accounts created
+func (cli *HTTPClient) ListSystemAccounts(ctx context.Context) ([]map[string]any, error) {
 	resp, err := cli.Request(ctx, string(ListSystemAccountsOp), http.MethodGet, nil)
 	if err != nil {
 		return nil, err
 	}
-	return resp["users"].([]map[string]any), nil
+	systemAccounts, ok := resp["systemAccounts"]
+	if !ok {
+		return nil, nil
+	}
+	return convertToArrayOfMap(systemAccounts)
 }
 
 // JoinMember sends a join member operation request to Lorry, located on the target pod that is about to join.
@@ -257,5 +261,22 @@ func parseBody(body io.Reader) (map[string]any, error) {
 		return nil, errors.Wrap(err, "decode body failed")
 	}
 
+	return result, nil
+}
+
+func convertToArrayOfMap(value any) ([]map[string]any, error) {
+	array, ok := value.([]any)
+	if !ok {
+		return nil, fmt.Errorf("resp errors: %v", value)
+	}
+
+	result := make([]map[string]any, 0, len(array))
+	for _, v := range array {
+		m, ok := v.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("resp errors: %v", value)
+		}
+		result = append(result, m)
+	}
 	return result, nil
 }

@@ -35,6 +35,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/constant"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/lorry/engines/models"
 )
 
 var _ = Describe("Lorry HTTP Client", func() {
@@ -138,25 +139,61 @@ var _ = Describe("Lorry HTTP Client", func() {
 
 		BeforeEach(func() {
 			lorryClient, _ = NewHTTPClientWithPod(pod)
-			lorryClient.ReconcileTimeout = 500 * time.Second
 			Expect(lorryClient).ShouldNot(BeNil())
 		})
 
 		It("success", func() {
-			mockDBManager.EXPECT().GetReplicaRole(gomock.Any(), gomock.Any()).Return("leader", nil)
-			role, err := lorryClient.GetRole(context.TODO())
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(role).Should(Equal("leader"))
+			role := "leader"
+			mockDBManager.EXPECT().GetReplicaRole(gomock.Any(), gomock.Any()).Return(role, nil)
+			Expect(lorryClient.GetRole(context.TODO())).Should(Equal(role))
+			//Expect(err).ShouldNot(HaveOccurred())
+			//Expect(role).Should(Equal("leader"))
 		})
 
 		It("not implemented", func() {
-			mockDBManager.EXPECT().GetReplicaRole(gomock.Any(), gomock.Any()).Return(string(""), fmt.Errorf("not implemented"))
+			msg := "not implemented for test"
+			mockDBManager.EXPECT().GetReplicaRole(gomock.Any(), gomock.Any()).Return(string(""), fmt.Errorf(msg))
 			role, err := lorryClient.GetRole(context.TODO())
 			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring(msg))
 			Expect(role).Should(BeEmpty())
 		})
-
 	})
+
+	Context("get system accounts", func() {
+		var lorryClient *HTTPClient
+		var systemAccounts []models.UserInfo
+
+		BeforeEach(func() {
+			lorryClient, _ = NewHTTPClientWithPod(pod)
+			Expect(lorryClient).ShouldNot(BeNil())
+			systemAccounts = []models.UserInfo{
+				{
+					UserName: "kb-admin1",
+				},
+				{
+					UserName: "kb-admin2",
+				},
+			}
+		})
+
+		It("success", func() {
+			mockDBManager.EXPECT().ListSystemAccounts(gomock.Any()).Return(systemAccounts, nil)
+			accounts, err := lorryClient.ListSystemAccounts(context.TODO())
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(accounts).Should(HaveLen(2))
+		})
+
+		It("not implemented", func() {
+			msg := "not implemented for test"
+			mockDBManager.EXPECT().ListSystemAccounts(gomock.Any()).Return(nil, fmt.Errorf(msg))
+			accounts, err := lorryClient.ListSystemAccounts(context.TODO())
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring(msg))
+			Expect(accounts).Should(BeEmpty())
+		})
+	})
+
 })
 
 // func TestSystemAccounts(t *testing.T) {

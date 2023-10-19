@@ -163,6 +163,17 @@ var _ = Describe("Backup Deleter Test", func() {
 			}
 		}
 
+		checkVolumes := func(job *batchv1.Job, volumeName string, exist bool) {
+			var volumeExist bool
+			for _, v := range job.Spec.Template.Spec.Volumes {
+				if v.Name == volumeName {
+					volumeExist = true
+					break
+				}
+			}
+			Expect(volumeExist).Should(Equal(exist))
+		}
+
 		It("test with RestorePVCFromSnapshot function", func() {
 			reqCtx := getReqCtx()
 			startingIndex := 0
@@ -269,7 +280,7 @@ var _ = Describe("Backup Deleter Test", func() {
 			Expect(job).ShouldNot(BeNil())
 		})
 
-		It("test with BuildPostReadyActionJobs function", func() {
+		testPostReady := func(existVolume bool) {
 			reqCtx := getReqCtx()
 			matchLabels := map[string]string{
 				constant.AppInstanceLabelKey: testdp.ClusterName,
@@ -294,8 +305,21 @@ var _ = Describe("Backup Deleter Test", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			// count of job should equal to 1
 			Expect(len(jobs)).Should(Equal(1))
+
+			checkVolumes(jobs[0], testdp.DataVolumeName, existVolume)
+		}
+
+		It("test with BuildPostReadyActionJobs function and run target pod node", func() {
+			testPostReady(true)
 		})
 
+		It("test with BuildPostReadyActionJobs function and no need to run target pod node", func() {
+			Expect(testapps.ChangeObj(&testCtx, actionSet, func(set *dpv1alpha1.ActionSet) {
+				runTargetPodNode := false
+				actionSet.Spec.Restore.PostReady[1].Job.RunOnTargetPodNode = &runTargetPodNode
+			})).Should(Succeed())
+			testPostReady(false)
+		})
 	})
 
 })

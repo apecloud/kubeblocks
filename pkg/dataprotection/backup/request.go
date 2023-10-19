@@ -302,27 +302,33 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 	}
 
 	buildVolumes := func() []corev1.Volume {
-		return append(
-			[]corev1.Volume{
-				{
-					Name: syncProgressSharedVolumeName,
-					VolumeSource: corev1.VolumeSource{
-						EmptyDir: &corev1.EmptyDirVolumeSource{},
-					},
+		volumes := []corev1.Volume{
+			{
+				Name: syncProgressSharedVolumeName,
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
 				},
 			},
-			getVolumesByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)...)
+		}
+		// only mount the volumes when the backup pod is running on the target pod node.
+		if boolptr.IsSetToTrue(job.RunOnTargetPodNode) {
+			volumes = append(volumes, getVolumesByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)...)
+		}
+		return volumes
 	}
 
 	buildVolumeMounts := func() []corev1.VolumeMount {
-		return append(
-			[]corev1.VolumeMount{
-				{
-					Name:      syncProgressSharedVolumeName,
-					MountPath: syncProgressSharedMountPath,
-				},
+		volumesMount := []corev1.VolumeMount{
+			{
+				Name:      syncProgressSharedVolumeName,
+				MountPath: syncProgressSharedMountPath,
 			},
-			getVolumeMountsByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)...)
+		}
+		// only mount the volumes when the backup pod is running on the target pod node.
+		if boolptr.IsSetToTrue(job.RunOnTargetPodNode) {
+			volumesMount = append(volumesMount, getVolumeMountsByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)...)
+		}
+		return volumesMount
 	}
 
 	runAsUser := int64(0)

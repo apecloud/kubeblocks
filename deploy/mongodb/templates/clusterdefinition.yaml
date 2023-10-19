@@ -107,6 +107,8 @@ spec:
             command:
               - /scripts/replicaset-setup.sh
             env:
+              - name: SERVICE_PORT
+                value: "27017"
               - name: MONGODB_ROOT_USER
                 valueFrom:
                   secretKeyRef:

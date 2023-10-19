@@ -48,6 +48,7 @@ const (
 
 	KBToolImage   = "apecloud/kubeblocks-tool:latest"
 	BackupPVCName = "test-backup-pvc"
+	ImageTag      = "latest"
 )
 
 // Restore

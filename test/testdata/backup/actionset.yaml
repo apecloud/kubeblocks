@@ -7,9 +7,11 @@ spec:
   env:
   - name: DATA_DIR
     value: /var/lib/mysql
+  - name: IMAGE_TAG
+    value: latest
   backup:
     backupData:
-      image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/percona-xtrabackup
+      image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/percona-xtrabackup:$(IMAGE_TAG)
       runOnTargetPodNode: true
       command:
       - sh
@@ -20,7 +22,7 @@ spec:
         --user=${DP_DB_USER} --password=${DP_DB_PASSWORD} --datadir=${DATA_DIR} > /${DP_BACKUP_DIR}/${DP_BACKUP_NAME}.xbstream
   restore:
     prepareData:
-      image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/percona-xtrabackup
+      image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/percona-xtrabackup:$(IMAGE_TAG)
       command:
       - sh
       - -c
@@ -42,7 +44,8 @@ spec:
         - touch ${DATA_DIR}/standby.signal
         container: postgres
     - job:
-        image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/percona-xtrabackup
+        image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/percona-xtrabackup:$(IMAGE_TAG)
+        runOnTargetPodNode: true
         command:
         - sh
         - -c

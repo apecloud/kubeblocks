@@ -187,3 +187,15 @@ func SetControllerReference(owner, controlled metav1.Object, scheme *runtime.Sch
 	}
 	return controllerutil.SetControllerReference(owner, controlled, scheme)
 }
+
+// CovertEnvToMap coverts env array to map.
+func CovertEnvToMap(env []corev1.EnvVar) map[string]string {
+	envMap := map[string]string{}
+	for _, v := range env {
+		if v.ValueFrom != nil {
+			continue
+		}
+		envMap[v.Name] = v.Value
+	}
+	return envMap
+}

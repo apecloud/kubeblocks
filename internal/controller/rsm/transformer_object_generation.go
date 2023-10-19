@@ -36,8 +36,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"reflect" //nolint:goimports
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strconv"
-	"strings"
+	"strconv" //nolint:goimports
+	"strings" //nolint:goimports
 )
 
 type ObjectGenerationTransformer struct{}

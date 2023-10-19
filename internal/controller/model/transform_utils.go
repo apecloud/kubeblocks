@@ -165,7 +165,7 @@ func IsObjectStatusUpdating(object client.Object) bool {
 	return !IsObjectDeleting(object) && !IsObjectUpdating(object)
 }
 
-// ReadCacheSnapshot reads all objects owned by our cluster
+// ReadCacheSnapshot reads all objects owned by our rsm
 func ReadCacheSnapshot(transCtx graph.TransformContext, root client.Object, ml client.MatchingLabels, kinds ...client.ObjectList) (ObjectSnapshot, error) {
 	// list what kinds of object cluster owns
 	snapshot := make(ObjectSnapshot)

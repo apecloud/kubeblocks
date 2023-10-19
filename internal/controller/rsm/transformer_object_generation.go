@@ -22,17 +22,16 @@ package rsm
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
-	"strconv"
-	"strings"
-
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strconv"
+	"strings"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -55,13 +54,13 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	if model.IsObjectDeleting(rsmOrig) {
 		return nil
 	}
-
 	// generate objects by current spec
 	svc := buildSvc(*rsm)
 	altSvs := buildAlternativeSvs(*rsm)
 	headLessSvc := buildHeadlessSvc(*rsm)
 	envConfig := buildEnvConfigMap(*rsm)
 	sts := buildSts(*rsm, headLessSvc.Name, *envConfig)
+	debugPod := buildDebugPod(*rsm, *envConfig, sts.Name)
 	objects := []client.Object{headLessSvc, envConfig, sts}
 	if svc != nil {
 		objects = append(objects, svc)
@@ -69,7 +68,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	for _, s := range altSvs {
 		objects = append(objects, s)
 	}
-
+	objects = append(objects, debugPod)
 	for _, object := range objects {
 		if err := setOwnership(rsm, object, model.GetScheme(), getFinalizer(object)); err != nil {
 			return err
@@ -82,7 +81,6 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	if err != nil {
 		return err
 	}
-
 	// compute create/update/delete set
 	newSnapshot := make(map[model.GVKNObjKey]client.Object)
 	for _, object := range objects {
@@ -100,7 +98,6 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	createSet := newNameSet.Difference(oldNameSet)
 	updateSet := newNameSet.Intersection(oldNameSet)
 	deleteSet := oldNameSet.Difference(newNameSet)
-
 	createNewObjects := func() {
 		for name := range createSet {
 			cli.Create(dag, newSnapshot[name])
@@ -307,6 +304,64 @@ func buildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
 		AddAnnotationsInMap(annotations).
 		AddLabelsInMap(labels).
 		SetData(envData).GetObject()
+}
+
+func buildDebugPod(rsm workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap, stsName string) *corev1.Pod {
+	// 根据需要设置 Pod 的名称、标签、容器等属性
+	spec := buildDebugPodTemplate(rsm, envConfig, stsName).Spec
+	container := spec.Containers[0]
+	labels := getLabels(&rsm)
+	for key, value := range rsm.Spec.Selector.MatchLabels {
+		labels[key] = value
+	}
+	container.Command = []string{
+		"sleep",
+		"infinity",
+	}
+	return builder.NewPodBuilder(rsm.Namespace, "debug.pod").
+		AddContainer(container).
+		AddVolumes(spec.Volumes[0]).
+		AddLabelsInMap(labels).
+		GetObject()
+}
+
+func buildDebugPodTemplate(rsm workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap, stsName string) *corev1.PodTemplateSpec {
+	template := rsm.Spec.Template
+	// inject env ConfigMap into workload pods only
+	for i := range template.Spec.Containers {
+		if template.Spec.Containers[i].Name == "etcd" {
+			zeroPodName := stsName + "-0"
+			svcName := getHeadlessSvcName(rsm)
+			svcPort := findSvcPort(rsm)
+			host := fmt.Sprintf("%s.%s", zeroPodName, svcName)
+			template.Spec.Containers[i].Env = []corev1.EnvVar{
+				{
+					Name:  leaderHostVarName,
+					Value: host,
+				},
+				{
+					Name:  servicePortVarName,
+					Value: strconv.Itoa(svcPort),
+				},
+				{
+					Name:  targetHostVarName,
+					Value: host,
+				},
+			}
+
+			template.Spec.Containers[i].EnvFrom = append(template.Spec.Containers[i].EnvFrom,
+				corev1.EnvFromSource{
+					ConfigMapRef: &corev1.ConfigMapEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: envConfig.Name,
+						},
+						Optional: func() *bool { optional := false; return &optional }(),
+					}})
+			continue
+		}
+	}
+
+	return &template
 }
 
 func buildStsPodTemplate(rsm workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap) *corev1.PodTemplateSpec {

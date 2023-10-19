@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"sort"
 
+	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -197,9 +198,21 @@ func (r *RestoreManager) RestorePVCFromSnapshot(reqCtx intctrlutil.RequestCtx, c
 		if claim.VolumeSource == "" {
 			return intctrlutil.NewFatalError(fmt.Sprintf(`claim "%s"" volumeSource can not be empty if the backup uses volume snapshot`, claim.Name))
 		}
+
+		// TODO: compatibility handling for version 0.6/0.5, will be removed in 0.8.
+		volumeSnapshotName := backupSet.Backup.Name
+		vsCli := &intctrlutil.VolumeSnapshotCompatClient{
+			Client: cli,
+			Ctx:    reqCtx.Ctx,
+		}
+		if exist, err := vsCli.CheckResourceExists(types.NamespacedName{Namespace: backupSet.Backup.Namespace, Name: volumeSnapshotName}, &vsv1.VolumeSnapshot{}); err != nil {
+			return err
+		} else if !exist {
+			volumeSnapshotName = utils.GetBackupVolumeSnapshotName(backupSet.Backup.Name, claim.VolumeSource)
+		}
 		// get volumeSnapshot by backup and volumeSource.
 		claim.VolumeClaimSpec.DataSource = &corev1.TypedLocalObjectReference{
-			Name:     utils.GetBackupVolumeSnapshotName(backupSet.Backup.Name, claim.VolumeSource),
+			Name:     volumeSnapshotName,
 			Kind:     constant.VolumeSnapshotKind,
 			APIGroup: &VolumeSnapshotGroup,
 		}

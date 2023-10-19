@@ -1633,7 +1633,7 @@ var _ = Describe("Cluster Controller", func() {
 				backupScheduleKey := client.ObjectKey{Name: backupScheduleName, Namespace: clusterKey.Namespace}
 				if backup == nil {
 					Eventually(testapps.CheckObjExists(&testCtx, backupScheduleKey,
-						&dpv1alpha1.BackupSchedule{}, false)).Should(Succeed())
+						&dpv1alpha1.BackupSchedule{}, true)).Should(Succeed())
 					continue
 				}
 				Eventually(testapps.CheckObj(&testCtx, backupScheduleKey, checkSchedule)).Should(Succeed())

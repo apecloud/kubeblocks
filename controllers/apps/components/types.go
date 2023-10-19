@@ -49,6 +49,8 @@ type Component interface {
 	Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error
 }
 
+// NewComponent creates a new Component object
+// TODO(xingran): delete it after handle restore and config refactor
 func NewComponent(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	definition *appsv1alpha1.ClusterDefinition,
@@ -98,7 +100,7 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 		return nil, nil
 	}
 
-	return newRSMComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
+	return nil, nil
 }
 
 func getClassManager(ctx context.Context, cli types2.ReadonlyClient, cluster *appsv1alpha1.Cluster) (*class.Manager, error) {

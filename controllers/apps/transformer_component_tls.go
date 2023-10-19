@@ -26,12 +26,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controller/factory"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
+	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/factory"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 )
 
 // ComponentTLSTransformer handles component configuration render

@@ -227,11 +227,25 @@ type ClusterComponentSpec struct {
 
 	// componentDefRef references componentDef defined in ClusterDefinition spec. Need to
 	// comply with IANA Service Naming rule.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDefRef is immutable"
+	// +optional
 	ComponentDefRef string `json:"componentDefRef"`
+
+	// enableComponentDefinition is the switch to control whether to enable the new ComponentDefinition API.
+	// ComponentDefinition and ClusterDefinition are mutually exclusive. When the switch is enabled, ComponentDefRef will be ignored.
+	// +kubebuilder:default=false
+	// +optional
+	EnableComponentDefinition bool `json:"enableComponentDefinition,omitempty"`
+
+	// componentDef references the name of the ComponentDefinition.
+	// When the enableComponentDefinition is true, ComponentDef must be provided. In this case, ComponentDef takes precedence over ComponentDefRef, and ComponentDefRef will be ignored.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=22
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	// +optional
+	ComponentDef string `json:"componentDef"`
 
 	// classDefRef references the class defined in ComponentClassDefinition.
 	// +optional

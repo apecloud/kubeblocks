@@ -29,6 +29,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -105,4 +106,12 @@ func IsNil(i interface{}) bool {
 		return reflect.ValueOf(i).IsNil()
 	}
 	return false
+}
+
+func ValidateExistence(ctx context.Context, cli roclient.ReadonlyClient, key client.ObjectKey, object client.Object) error {
+	err := cli.Get(ctx, key, object)
+	if err != nil && !IsNotFound(err) {
+		return err
+	}
+	return nil
 }

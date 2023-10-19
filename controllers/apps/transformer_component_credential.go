@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
 // ComponentCredentialTransformer handles referenced resources validation and load them into context

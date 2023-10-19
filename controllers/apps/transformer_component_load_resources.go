@@ -25,9 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // ComponentLoadResourcesTransformer handles referenced resources validation and load them into context

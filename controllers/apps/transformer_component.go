@@ -20,20 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"fmt"
-
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
-	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// ComponentTransformer transforms all components to a K8s objects DAG
+// ComponentTransformer transforms all cluster.Spec.ComponentSpecs to mapping Component objects
 type ComponentTransformer struct {
 	client.Client
 }
@@ -43,137 +41,143 @@ var _ graph.Transformer = &ComponentTransformer{}
 func (c *ComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster
+	origCluster := transCtx.OrigCluster
+	graphCli, _ := transCtx.Client.(model.GraphClient)
 
-	clusterDef := transCtx.ClusterDef
-	clusterVer := transCtx.ClusterVer
 	reqCtx := ictrlutil.RequestCtx{
 		Ctx:      transCtx.Context,
 		Log:      transCtx.Logger,
 		Recorder: transCtx.EventRecorder,
 	}
 
-	// TODO(xingran): build component object
-
-	var err error
-	dags4Component := make([]*graph.DAG, 0)
-	if cluster.IsStatusUpdating() {
-		// status existed components
-		err = c.transform4StatusUpdate(reqCtx, clusterDef, clusterVer, cluster, &dags4Component)
-	} else {
-		// create new components or update existed components
-		err = c.transform4SpecUpdate(reqCtx, clusterDef, clusterVer, cluster, &dags4Component)
+	if model.IsObjectDeleting(origCluster) {
+		return nil
 	}
-	if err != nil && !ictrlutil.IsDelayedRequeueError(err) {
+
+	if cluster.Spec.ComponentSpecs == nil {
+		return nil
+	}
+	protoCompSpecMap := make(map[string]*appsv1alpha1.ClusterComponentSpec)
+	for _, spec := range cluster.Spec.ComponentSpecs {
+		protoCompSpecMap[spec.Name] = &spec
+	}
+
+	protoCompSet := sets.KeySet(protoCompSpecMap)
+	// TODO(refactor): should review that whether it is reasonable to use component status
+	clusterStatusCompSet := sets.KeySet(cluster.Status.Components)
+
+	createCompSet := protoCompSet.Difference(clusterStatusCompSet)
+	updateCompSet := protoCompSet.Intersection(clusterStatusCompSet)
+	deleteCompSet := clusterStatusCompSet.Difference(protoCompSet)
+
+	createCompObjects := func() error {
+		for compName := range createCompSet {
+			protoComp, err := component.BuildProtoComponent(reqCtx, c.Client, cluster, protoCompSpecMap[compName])
+			if err != nil {
+				return err
+			}
+			graphCli.Create(dag, protoComp)
+		}
+		return nil
+	}
+
+	updateCompObjects := func() error {
+		for compName := range updateCompSet {
+			runningComp, err := getCacheSnapshotComp(reqCtx, c.Client, compName, cluster.Namespace)
+			if err != nil {
+				return err
+			}
+			protoComp, err := component.BuildProtoComponent(reqCtx, c.Client, cluster, protoCompSpecMap[compName])
+			if err != nil {
+				return err
+			}
+			newObj := copyAndMergeComponent(runningComp, protoComp, cluster)
+			graphCli.Update(dag, runningComp, newObj)
+		}
+		return nil
+	}
+
+	deleteCompObjects := func() error {
+		for compName := range deleteCompSet {
+			runningComp, err := getCacheSnapshotComp(reqCtx, c.Client, compName, cluster.Namespace)
+			if err != nil {
+				return err
+			}
+			graphCli.Delete(dag, runningComp)
+		}
+		return nil
+	}
+
+	// component objects to be created
+	if err := createCompObjects(); err != nil {
 		return err
 	}
 
-	for _, subDag := range dags4Component {
-		for _, v := range subDag.Vertices() {
-			node, ok := v.(*model.ObjectVertex)
-			if !ok {
-				panic("runtime error, unexpected lifecycle vertex type")
-			}
-			if node.Obj == nil {
-				panic("runtime error, nil vertex object")
-			}
-		}
-		dag.Merge(subDag)
-	}
-	return err
-}
-
-func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster, dags *[]*graph.DAG) error {
-	compSpecMap := make(map[string]*appsv1alpha1.ClusterComponentSpec)
-	compDefMap := make(map[string]*appsv1alpha1.ClusterComponentDefinition)
-	for _, spec := range cluster.Spec.ComponentSpecs {
-		compSpecMap[spec.Name] = &spec
-	}
-	for _, compDef := range clusterDef.Spec.ComponentDefs {
-		compDefMap[compDef.Name] = &compDef
-	}
-	compProto := sets.KeySet(compSpecMap)
-	// if component spec is empty, generate the component spec from cluster template and cluster
-	if cluster.Spec.ComponentSpecs == nil {
-		compProto = sets.KeySet(compDefMap)
-	}
-	// TODO(refactor): should review that whether it is reasonable to use component status
-	compStatus := sets.KeySet(cluster.Status.Components)
-
-	createSet := compProto.Difference(compStatus)
-	updateSet := compProto.Intersection(compStatus)
-	deleteSet := compStatus.Difference(compProto)
-
-	for compName := range createSet {
-		dag := newDAGWithPlaceholder(cluster.Namespace, cluster.Name, compName)
-		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compName, dag)
-		if err != nil {
-			return err
-		}
-		if comp == nil {
-			continue
-		}
-		if err := comp.Create(reqCtx, c.Client); err != nil {
-			return err
-		}
-		*dags = append(*dags, dag)
+	// component objects to be updated
+	if err := updateCompObjects(); err != nil {
+		return err
 	}
 
-	for compName := range deleteSet {
-		dag := newDAGWithPlaceholder(cluster.Namespace, cluster.Name, compName)
-		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compName, dag)
-		if err != nil {
-			return err
-		}
-		if comp == nil {
-			continue
-		}
-		if err := comp.Delete(reqCtx, c.Client); err != nil {
-			return err
-		}
-		*dags = append(*dags, dag)
-	}
-
-	for compName := range updateSet {
-		dag := newDAGWithPlaceholder(cluster.Namespace, cluster.Name, compName)
-		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compName, dag)
-		if err != nil {
-			return err
-		}
-		if err := comp.Update(reqCtx, c.Client); err != nil {
-			return err
-		}
-		*dags = append(*dags, dag)
+	// component objects to be deleted
+	if err := deleteCompObjects(); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func (c *ComponentTransformer) transform4StatusUpdate(reqCtx ictrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster, dags *[]*graph.DAG) error {
-	var delayedError error
-	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		dag := newDAGWithPlaceholder(cluster.Namespace, cluster.Name, compSpec.Name)
-		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compSpec.Name, dag)
-		if err != nil {
-			return err
+// copyAndMergeComponent merges two component objects for updating:
+// 1. new a component object targetCompObj by copying from oldCompObj
+// 2. merge all fields can be updated from newCompObj into targetCompObj
+func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component, cluster *appsv1alpha1.Cluster) *appsv1alpha1.Component {
+	compObjCopy := oldCompObj.DeepCopy()
+	compProto := newCompObj
+
+	// mergeAnnotations keeps the original annotations.
+	mergeMetadataMap := func(originalMap map[string]string, targetMap *map[string]string) {
+		if targetMap == nil || originalMap == nil {
+			return
 		}
-		if err := comp.Status(reqCtx, c.Client); err != nil {
-			if !ictrlutil.IsDelayedRequeueError(err) {
-				return err
-			}
-			if delayedError == nil {
-				delayedError = err
+		if *targetMap == nil {
+			*targetMap = map[string]string{}
+		}
+		for k, v := range originalMap {
+			// if the annotation not exist in targetAnnotations, copy it from original.
+			if _, ok := (*targetMap)[k]; !ok {
+				(*targetMap)[k] = v
 			}
 		}
-		*dags = append(*dags, dag)
 	}
-	return delayedError
+
+	// merge labels and annotations
+	mergeMetadataMap(compObjCopy.Annotations, &compProto.Annotations)
+	mergeMetadataMap(compObjCopy.Labels, &compProto.Labels)
+	compObjCopy.Annotations = compProto.Annotations
+	compObjCopy.Labels = compProto.Labels
+
+	// merge spec
+	compObjCopy.Spec.Monitor = compProto.Spec.Monitor
+	compObjCopy.Spec.Resources = compProto.Spec.Resources
+	compObjCopy.Spec.ServiceRefs = compProto.Spec.ServiceRefs
+	compObjCopy.Spec.Replicas = compProto.Spec.Replicas
+	compObjCopy.Spec.Configs = compProto.Spec.Configs
+	compObjCopy.Spec.EnabledLogs = compProto.Spec.EnabledLogs
+	compObjCopy.Spec.VolumeClaimTemplates = compProto.Spec.VolumeClaimTemplates
+	compObjCopy.Spec.UpdateStrategy = compProto.Spec.UpdateStrategy
+	compObjCopy.Spec.ServiceAccountName = compProto.Spec.ServiceAccountName
+	compObjCopy.Spec.Affinity = compProto.Spec.Affinity
+	compObjCopy.Spec.Tolerations = compProto.Spec.Tolerations
+	compObjCopy.Spec.TLS = compProto.Spec.TLS
+	compObjCopy.Spec.Issuer = compProto.Spec.Issuer
+
+	return compObjCopy
 }
 
-func newDAGWithPlaceholder(namespace, clusterName, compName string) *graph.DAG {
-	root := builder.NewReplicatedStateMachineBuilder(namespace, fmt.Sprintf("%s-%s", clusterName, compName)).GetObject()
-	dag := graph.NewDAG()
-	model.NewGraphClient(nil).Root(dag, nil, root, nil)
-	return dag
+// getCacheSnapshotComp gets the component object from cache snapshot
+func getCacheSnapshotComp(reqCtx ictrlutil.RequestCtx, cli client.Client, compName, namespace string) (*appsv1alpha1.Component, error) {
+	runningComp := &appsv1alpha1.Component{}
+	if err := ictrlutil.ValidateExistence(reqCtx.Ctx, cli, types.NamespacedName{Name: compName, Namespace: namespace}, runningComp); err != nil {
+		return nil, err
+	}
+	return runningComp, nil
 }

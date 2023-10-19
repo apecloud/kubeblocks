@@ -227,6 +227,14 @@ spec:
                       required:
                       - class
                       type: object
+                    componentDef:
+                      description: componentDef references the name of the ComponentDefinition.
+                        When the enableComponentDefinition is true, ComponentDef must
+                        be provided. In this case, ComponentDef takes precedence over
+                        ComponentDefRef, and ComponentDefRef will be ignored.
+                      maxLength: 22
+                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
+                      type: string
                     componentDefRef:
                       description: componentDefRef references componentDef defined
                         in ClusterDefinition spec. Need to comply with IANA Service
@@ -237,6 +245,13 @@ spec:
                       x-kubernetes-validations:
                       - message: componentDefRef is immutable
                         rule: self == oldSelf
+                    enableComponentDefinition:
+                      default: false
+                      description: enableComponentDefinition is the switch to control
+                        whether to enable the new ComponentDefinition API. ComponentDefinition
+                        and ClusterDefinition are mutually exclusive. When the switch
+                        is enabled, ComponentDefRef will be ignored.
+                      type: boolean
                     enabledLogs:
                       description: enabledLogs indicates which log file takes effect
                         in the database cluster. element is the log type which is
@@ -639,7 +654,6 @@ spec:
                         type: object
                       type: array
                   required:
-                  - componentDefRef
                   - name
                   - replicas
                   type: object

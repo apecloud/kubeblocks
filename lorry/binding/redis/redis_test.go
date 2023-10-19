@@ -31,9 +31,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	. "github.com/apecloud/kubeblocks/lorry/binding"
 	. "github.com/apecloud/kubeblocks/lorry/util"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (

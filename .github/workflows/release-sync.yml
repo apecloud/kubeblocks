@@ -23,7 +23,7 @@ jobs:
     outputs:
       release-version: ${{ steps.get_latest_version.outputs.release_version }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: update release ${{ env.CLI_NAME }} latest
         id: get_latest_version
         run: |

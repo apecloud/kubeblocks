@@ -31,10 +31,10 @@ import (
 	"github.com/go-logr/logr"
 	probing "github.com/prometheus-community/pro-bing"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	dcs3 "github.com/apecloud/kubeblocks/lorry/dcs"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type Ha struct {
@@ -49,7 +49,11 @@ var ha *Ha
 
 func NewHa(logger logr.Logger) *Ha {
 
-	dcs, _ := dcs3.NewKubernetesStore(logger)
+	dcs, err := dcs3.NewKubernetesStore(logger)
+	if err != nil {
+		logger.Error(err, "get k8s store failed")
+		return nil
+	}
 	characterType := viper.GetString(constant.KBEnvCharacterType)
 	if characterType == "" {
 		logger.Error(nil, "%s not set", "characterType", constant.KBEnvCharacterType)

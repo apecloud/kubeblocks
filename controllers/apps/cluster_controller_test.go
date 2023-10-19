@@ -54,16 +54,16 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
-	"github.com/apecloud/kubeblocks/internal/common"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testdp "github.com/apecloud/kubeblocks/internal/testutil/dataprotection"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	lorry "github.com/apecloud/kubeblocks/lorry/client"
+	"github.com/apecloud/kubeblocks/pkg/common"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
+	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (
@@ -885,7 +885,6 @@ var _ = Describe("Cluster Controller", func() {
 
 		// REVIEW: this test flow, wait for running phase?
 		testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
-		viper.Set(constant.CfgKeyBackupPVCName, "")
 
 		horizontalScale(int(updatedReplicas), testk8s.DefaultStorageClassName, dataClonePolicy, compDefName)
 	}
@@ -2013,13 +2012,11 @@ var _ = Describe("Cluster Controller", func() {
 
 		It("should successfully h-scale with multiple components", func() {
 			testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
-			viper.Set(constant.CfgKeyBackupPVCName, "")
 			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 		})
 
 		It("should successfully h-scale with multiple components by backup tool", func() {
 			testk8s.MockDisableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
-			viper.Set(constant.CfgKeyBackupPVCName, "test-backup-pvc")
 			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 		})
 	})
@@ -2295,7 +2292,6 @@ var _ = Describe("Cluster Controller", func() {
 				It("scale-out with data clone policy", func() {
 					testVolumeExpansion(compName, compDefName, mockStorageClass)
 					testk8s.MockEnableVolumeSnapshot(&testCtx, mockStorageClass.Name)
-					viper.Set(constant.CfgKeyBackupPVCName, "")
 					horizontalScale(5, mockStorageClass.Name, appsv1alpha1.HScaleDataClonePolicyCloneVolume, compDefName)
 				})
 

@@ -1,0 +1,28 @@
+syntax = 'proto3';
+
+package proto;
+
+option go_package = "github.com/apecloud/kubeblocks/pkg/configuration/proto";
+
+service Reconfigure {
+  rpc StopContainer(StopContainerRequest) returns (StopContainerResponse) {}
+
+  rpc OnlineUpgradeParams(OnlineUpgradeParamsRequest) returns (OnlineUpgradeParamsResponse) {}
+}
+
+message StopContainerRequest {
+  repeated string containerIDs = 1;
+}
+
+message StopContainerResponse {
+  string errMessage = 1;
+}
+
+message OnlineUpgradeParamsRequest {
+  string configSpec = 1;
+  map<string, string> params = 2;
+}
+
+message OnlineUpgradeParamsResponse {
+  string errMessage = 1;
+}

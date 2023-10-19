@@ -13,10 +13,6 @@ kbcli cluster restore [flags]
 ```
   # restore a new cluster from a backup
   kbcli cluster restore new-cluster-name --backup backup-name
-  
-  # restore a new cluster from point in time
-  kbcli cluster restore new-cluster-name --restore-to-time "Apr 13,2023 18:40:35 UTC+0800" --backup logfile-backup
-  kbcli cluster restore new-cluster-name --restore-to-time "2023-04-13T18:40:35+08:00" --backup logfile-backup
 ```
 
 ### Options

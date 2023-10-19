@@ -24,7 +24,7 @@ jobs:
   trigger-release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: trigger release
         id: get_release_version
         run: |

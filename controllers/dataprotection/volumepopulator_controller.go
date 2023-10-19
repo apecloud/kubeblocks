@@ -40,11 +40,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	dprestore "github.com/apecloud/kubeblocks/internal/dataprotection/restore"
-	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
-	"github.com/apecloud/kubeblocks/internal/dataprotection/utils"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 )
 
 // VolumePopulatorReconciler reconciles a Restore object

@@ -1,6 +1,0 @@
-image:
-  repository: apecloud/llama-cpp-python
-  pullPolicy: IfNotPresent
-  registry: docker.io
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: latest

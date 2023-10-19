@@ -37,7 +37,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 #COPY cmd/manager/main.go cmd/manager/main.go
 #COPY cmd/manager/ cmd/manager/
 #COPY apis/ apis/
-#COPY internal/ internal/
+#COPY pkg/ pkg/
 #COPY controllers/ controllers/
 #COPY test/testdata/testdata.go test/testdata/testdata.go
 

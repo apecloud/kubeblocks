@@ -31,9 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	componetutil "github.com/apecloud/kubeblocks/internal/controller/component"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	componetutil "github.com/apecloud/kubeblocks/pkg/controller/component"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // customizedEngine helps render jobs.

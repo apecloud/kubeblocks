@@ -6,4 +6,4 @@ if ! [ -x "$(which act)" ]; then
 fi
 
 # run act
-act --reuse --platform self-hosted=jashbook/golang-lint:1.20-latest --workflows .github/localflows/cicd-local.yml
+act --reuse --platform self-hosted=jashbook/golang-lint:1.21-latest --workflows .github/localflows/cicd-local.yml

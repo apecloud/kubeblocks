@@ -97,7 +97,7 @@ jobs:
               }
             }' -f project=$PROJECT_ID -f item=$ITEM_ID -f status_field=$STATUS_FIELD_ID -f status_value=${{ env.TODO_OPTION_ID }} --silent
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         if: |
           github.event.action == 'published'
 

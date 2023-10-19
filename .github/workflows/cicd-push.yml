@@ -27,7 +27,7 @@ jobs:
           all_but_latest: true
           access_token: ${{ github.token }}
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Get trigger mode
@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Push Pre-Check
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: install pcregrep
@@ -90,7 +90,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[cli]') }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: install lib
         run: |
           sudo apt-get update
@@ -130,7 +130,7 @@ jobs:
     outputs:
       runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: make manifests check
         run: |
           make manifests
@@ -181,7 +181,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && always() }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: remove runner
         run: |
           bash .github/utils/utils.sh --type 9 \
@@ -263,7 +263,7 @@ jobs:
       matrix:
         os: [linux-amd64, darwin-arm64]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: install lib
         run: |
           sudo apt-get update

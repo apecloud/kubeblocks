@@ -15,7 +15,7 @@ jobs:
     name: GET PR Issue Label
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: get issue link
         run: |
           gh api graphql -f query='

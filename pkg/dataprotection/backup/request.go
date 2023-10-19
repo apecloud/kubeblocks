@@ -399,8 +399,12 @@ func (r *Request) injectSyncProgressContainer(podSpec *corev1.PodSpec,
 			Value: fmt.Sprintf("%d", checkIntervalSeconds)},
 	)
 
+	// sync progress script will wait for the backup info file to be created,
+	// if the file is created, it will update the backup status and exit.
+	// If an exit file named with the backup info file with .exit suffix exists,
+	// it indicates that the container for backing up data exited abnormally,
+	// this script will exit.
 	args := fmt.Sprintf(`
-#!/bin/bash
 set -o errexit
 set -o nounset
 
@@ -419,14 +423,12 @@ function update_backup_stauts() {
     echo "backup info file not exists, wait for ${sleep_seconds}s"
     sleep $sleep_seconds
   done
-
   local backup_info=$(cat $backup_info_file)
   echo backupInfo:${backup_info}
   local namespace="$3"
   local backup_name="$4"
   eval kubectl -n "$namespace" patch backup "$backup_name" --subresource=status --type=merge --patch '{\"status\":${backup_info}}'
 }
-
 update_backup_stauts ${%s} ${%s} %s %s
 `, dptypes.DPBackupInfoFile, dptypes.DPCheckInterval, r.Backup.Namespace, r.Backup.Name)
 

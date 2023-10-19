@@ -98,14 +98,10 @@ func (j *JobAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
 				build(), nil
 		}
 		// job is running
-		return sb.build(), nil
+		return handleErr(nil)
 	}
 
 	// job doesn't exist, create it
-	ttl, err := utils.GetDefaultJobTTL()
-	if err != nil {
-		return handleErr(err)
-	}
 	job := &batchv1.Job{
 		ObjectMeta: j.ObjectMeta,
 		Spec: batchv1.JobSpec{
@@ -113,8 +109,7 @@ func (j *JobAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
 				ObjectMeta: j.ObjectMeta,
 				Spec:       *j.PodSpec,
 			},
-			BackoffLimit:            j.BackOffLimit,
-			TTLSecondsAfterFinished: ttl,
+			BackoffLimit: j.BackOffLimit,
 		},
 	}
 

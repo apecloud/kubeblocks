@@ -19,24 +19,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package types
 
-import (
-	"time"
-)
-
 // config keys used in viper
 const (
-	// CfgKeyGCFrequency is the key of gc frequency
-	CfgKeyGCFrequency = "GC_FREQUENCY"
-	// CfgKeyBackupJobTTL is the key of backup job ttl
-	CfgKeyBackupJobTTL = "BACKUP_JOB_TTL"
+	// CfgKeyGCFrequencySeconds is the key of gc frequency, its unit is second
+	CfgKeyGCFrequencySeconds = "GC_FREQUENCY_SECONDS"
 )
 
 // config default values
 const (
-	// DefaultGCFrequency is the default gc frequency
-	DefaultGCFrequency = 60 * time.Minute
-	// DefaultBackupJobTTL is the default backup job ttl
-	DefaultBackupJobTTL = 5 * time.Minute
+	// DefaultGCFrequencySeconds is the default gc frequency, its unit is second
+	DefaultGCFrequencySeconds = 60 * 60
 )
 
 const (

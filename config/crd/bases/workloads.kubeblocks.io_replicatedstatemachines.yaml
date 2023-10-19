@@ -809,6 +809,12 @@ spec:
                 - password
                 - username
                 type: object
+              debugMode:
+                default: false
+                description: DebugMode provides an environment for developers to develop
+                  addon for KB. The environment is the same as 'action-pod',so you
+                  can verify you shell script in it.
+                type: boolean
               memberUpdateStrategy:
                 description: 'MemberUpdateStrategy, Members(Pods) update strategy.
                   serial: update Members one by one that guarantee minimum component

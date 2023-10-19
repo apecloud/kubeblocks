@@ -60,15 +60,17 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	headLessSvc := buildHeadlessSvc(*rsm)
 	envConfig := buildEnvConfigMap(*rsm)
 	sts := buildSts(*rsm, headLessSvc.Name, *envConfig)
-	debugPod := buildDebugPod(*rsm, *envConfig, sts.Name)
 	objects := []client.Object{headLessSvc, envConfig, sts}
+	if *rsm.Spec.DebugMode {
+		debugPod := buildDebugPod(*rsm, *envConfig, sts.Name)
+		objects = append(objects, debugPod)
+	}
 	if svc != nil {
 		objects = append(objects, svc)
 	}
 	for _, s := range altSvs {
 		objects = append(objects, s)
 	}
-	objects = append(objects, debugPod)
 	for _, object := range objects {
 		if err := setOwnership(rsm, object, model.GetScheme(), getFinalizer(object)); err != nil {
 			return err

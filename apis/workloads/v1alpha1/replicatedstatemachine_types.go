@@ -116,6 +116,12 @@ type ReplicatedStateMachineSpec struct {
 	// Credential used to connect to DB engine
 	// +optional
 	Credential *Credential `json:"credential,omitempty"`
+
+	// DebugMode provides an environment for developers to develop addon for KB.
+	// The environment is the same as 'action-pod',so you can verify you shell script in it.
+	// +kubebuilder:default=false
+	// +optional
+	DebugMode *bool `json:"debugMode,omitempty"`
 }
 
 // ReplicatedStateMachineStatus defines the observed state of ReplicatedStateMachine

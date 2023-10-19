@@ -47,10 +47,10 @@ Meet the following requirements for a smooth user experience:
   error: failed to set up k3d cluster: failed to create k3d cluster kb-playground: Failed Cluster Start: Failed to start server k3d-kb-playground-server-0: Node k3d-kb-playground-server-0 failed to get ready: error waiting for log line `k3s is up and running` from node 'k3d-kb-playground-server-0': stopped returning log lines
  ```
 
-You can follow the steps to solve this problem.
+  You can follow the steps to solve this problem.
 
-1. Uninstall or delete the current `kbcli.exe`.
-2. Download the latest kbcli by `winget` or visit the [GitHub release page](https://github.com/apecloud/kubeblocks/releases) of KubeBlocks to download kbcli again.
+  1. Uninstall or delete the current `kbcli.exe`.
+  2. Download the latest kbcli by `winget` or visit the [GitHub release page](https://github.com/apecloud/kubeblocks/releases) of KubeBlocks to download kbcli again.
 
 :::
 

@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/action"
@@ -325,11 +326,13 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 	}
 
 	runAsUser := int64(0)
+	env := buildEnv()
 	container := corev1.Container{
-		Name:            name,
-		Image:           job.Image,
+		Name: name,
+		// expand the image value with the env variables.
+		Image:           common.Expand(job.Image, common.MappingFuncFor(utils.CovertEnvToMap(env))),
 		Command:         job.Command,
-		Env:             buildEnv(),
+		Env:             env,
 		VolumeMounts:    buildVolumeMounts(),
 		ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)),
 		SecurityContext: &corev1.SecurityContext{

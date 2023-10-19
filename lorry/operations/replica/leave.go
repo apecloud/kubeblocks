@@ -21,6 +21,7 @@ package replica
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -29,6 +30,7 @@ import (
 	"github.com/apecloud/kubeblocks/lorry/dcs"
 	"github.com/apecloud/kubeblocks/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/lorry/operations"
+	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
 type Leave struct {
@@ -41,7 +43,7 @@ type Leave struct {
 var leave operations.Operation = &Leave{}
 
 func init() {
-	err := operations.Register("leave", leave)
+	err := operations.Register(strings.ToLower(string(util.LeaveMemberOperation)), leave)
 	if err != nil {
 		panic(err.Error())
 	}

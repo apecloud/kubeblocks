@@ -35,6 +35,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/constant"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/lorry/dcs"
 	"github.com/apecloud/kubeblocks/lorry/engines/models"
 )
 
@@ -222,44 +223,56 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 	})
 
-})
+	Context("leave member", func() {
+		var lorryClient *HTTPClient
+		var cluster *dcs.Cluster
+		var podName string
 
-// func TestSystemAccounts(t *testing.T) {
-// 	roleNames, _ := json.Marshal([]string{"kbadmin", "kbprobe"})
-// 	sqlResponse := SQLChannelResponse{
-// 		Event:   RespEveSucc,
-// 		Message: string(roleNames),
-// 	}
-// 	respData, _ := json.Marshal(sqlResponse)
-//
-// 	s := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-// 		writer.WriteHeader(200)
-// 		_, _ = writer.Write(respData)
-// 	}))
-//
-// 	addr := s.Listener.Addr().String()
-// 	index := strings.LastIndex(addr, ":")
-// 	portStr := addr[index+1:]
-// 	port, _ := strconv.Atoi(portStr)
-//
-// 	cli, closer, err := initSQLChannelClient(port, t)
-// 	if err != nil {
-// 		t.Errorf("new sql channel client error: %v", err)
-// 	}
-// 	defer closer()
-//
-// 	t.Run("ResponseByCache", func(t *testing.T) {
-// 		cli.ReconcileTimeout = 200 * time.Millisecond
-// 		_, err := cli.GetSystemAccounts()
-//
-// 		if err != nil {
-// 			t.Errorf("return reps in cache: %v", err)
-// 		}
-// 		if len(cli.cache) != 0 {
-// 			t.Errorf("cache should be cleared: %v", cli.cache)
-// 		}
-// 	})
-// }
+		BeforeEach(func() {
+			lorryClient, _ = NewHTTPClientWithPod(pod)
+			Expect(lorryClient).ShouldNot(BeNil())
+			podName = "pod-test"
+
+			cluster = &dcs.Cluster{
+				HaConfig: &dcs.HaConfig{DeleteMembers: make(map[string]dcs.MemberToDelete)},
+				Members:  []dcs.Member{{Name: podName}},
+			}
+		})
+
+		It("success if leave once", func() {
+			mockDBManager.EXPECT().GetCurrentMemberName().Return("pod-test").Times(2)
+			mockDBManager.EXPECT().LeaveMemberFromCluster(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil)
+			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil)
+			Expect(lorryClient.LeaveMember(context.TODO())).Should(Succeed())
+			Expect(cluster.HaConfig.DeleteMembers).Should(HaveLen(1))
+		})
+
+		It("success if leave twice", func() {
+			mockDBManager.EXPECT().GetCurrentMemberName().Return("pod-test").Times(4)
+			mockDBManager.EXPECT().LeaveMemberFromCluster(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
+			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil).Times(2)
+			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil)
+			// first leave
+			Expect(lorryClient.LeaveMember(context.TODO())).Should(Succeed())
+			Expect(cluster.HaConfig.DeleteMembers).Should(HaveLen(1))
+			// second leave
+			Expect(lorryClient.LeaveMember(context.TODO())).Should(Succeed())
+			Expect(cluster.HaConfig.DeleteMembers).Should(HaveLen(1))
+		})
+
+		It("not implemented", func() {
+			msg := "not implemented for test"
+			mockDBManager.EXPECT().GetCurrentMemberName().Return("pod-test").Times(2)
+			mockDBManager.EXPECT().LeaveMemberFromCluster(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf(msg))
+			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil)
+			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil)
+			err := lorryClient.LeaveMember(context.TODO())
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring(msg))
+		})
+	})
+})
 
 // func TestJoinMember(t *testing.T) {
 //

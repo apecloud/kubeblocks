@@ -21,6 +21,7 @@ package replica
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -29,6 +30,7 @@ import (
 	"github.com/apecloud/kubeblocks/lorry/dcs"
 	"github.com/apecloud/kubeblocks/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/lorry/operations"
+	"github.com/apecloud/kubeblocks/lorry/util"
 )
 
 type Join struct {
@@ -41,7 +43,7 @@ type Join struct {
 var join operations.Operation = &Join{}
 
 func init() {
-	err := operations.Register("join", join)
+	err := operations.Register(strings.ToLower(string(util.JoinMemberOperation)), join)
 	if err != nil {
 		panic(err.Error())
 	}

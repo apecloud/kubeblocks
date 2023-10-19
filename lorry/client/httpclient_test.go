@@ -223,6 +223,41 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 	})
 
+	Context("join member", func() {
+		var lorryClient *HTTPClient
+		var cluster *dcs.Cluster
+
+		BeforeEach(func() {
+			lorryClient, _ = NewHTTPClientWithPod(pod)
+			Expect(lorryClient).ShouldNot(BeNil())
+			cluster = &dcs.Cluster{}
+		})
+
+		It("success if join once", func() {
+			mockDBManager.EXPECT().JoinCurrentMemberToCluster(gomock.Any(), gomock.Any()).Return(nil)
+			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil)
+			Expect(lorryClient.JoinMember(context.TODO())).Should(Succeed())
+		})
+
+		It("success if join twice", func() {
+			mockDBManager.EXPECT().JoinCurrentMemberToCluster(gomock.Any(), gomock.Any()).Return(nil).Times(2)
+			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil).Times(2)
+			// first join
+			Expect(lorryClient.JoinMember(context.TODO())).Should(Succeed())
+			// second join
+			Expect(lorryClient.JoinMember(context.TODO())).Should(Succeed())
+		})
+
+		It("not implemented", func() {
+			msg := "not implemented for test"
+			mockDBManager.EXPECT().JoinCurrentMemberToCluster(gomock.Any(), gomock.Any()).Return(fmt.Errorf(msg))
+			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil)
+			err := lorryClient.JoinMember(context.TODO())
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring(msg))
+		})
+	})
+
 	Context("leave member", func() {
 		var lorryClient *HTTPClient
 		var cluster *dcs.Cluster
@@ -274,68 +309,6 @@ var _ = Describe("Lorry HTTP Client", func() {
 	})
 })
 
-// func TestJoinMember(t *testing.T) {
-//
-// 	t.Run("Join Member success", func(t *testing.T) {
-// 		sqlResponse := SQLChannelResponse{
-// 			Event: RespEveSucc,
-// 		}
-// 		respData, _ := json.Marshal(sqlResponse)
-// 		port := initHTTPServer(respData)
-//
-// 		cli, closer, err := initSQLChannelClient(port, t)
-// 		if err != nil {
-// 			t.Errorf("new sql channel client error: %v", err)
-// 		}
-// 		defer closer()
-// 		cli.ReconcileTimeout = 200 * time.Millisecond
-// 		err = cli.JoinMember(context.TODO())
-// 		assert.Nil(t, err)
-// 	})
-//
-// 	t.Run("Join Member fail", func(t *testing.T) {
-// 		cli, closer, err := initSQLChannelClient(-1, t)
-// 		if err != nil {
-// 			t.Errorf("new sql channel client error: %v", err)
-// 		}
-// 		defer closer()
-// 		cli.ReconcileTimeout = 200 * time.Millisecond
-// 		err = cli.JoinMember(context.TODO())
-// 		assert.NotNil(t, err)
-// 	})
-// }
-//
-// func TestLeaveMember(t *testing.T) {
-//
-// 	t.Run("Leave Member success", func(t *testing.T) {
-// 		sqlResponse := SQLChannelResponse{
-// 			Event: RespEveSucc,
-// 		}
-// 		respData, _ := json.Marshal(sqlResponse)
-// 		port := initHTTPServer(respData)
-//
-// 		cli, closer, err := initSQLChannelClient(port, t)
-// 		if err != nil {
-// 			t.Errorf("new sql channel client error: %v", err)
-// 		}
-// 		defer closer()
-// 		cli.ReconcileTimeout = 200 * time.Millisecond
-// 		err = cli.LeaveMember(context.TODO())
-// 		assert.Nil(t, err)
-// 	})
-//
-// 	t.Run("Leave Member fail", func(t *testing.T) {
-// 		cli, closer, err := initSQLChannelClient(-1, t)
-// 		if err != nil {
-// 			t.Errorf("new sql channel client error: %v", err)
-// 		}
-// 		defer closer()
-// 		cli.ReconcileTimeout = 200 * time.Millisecond
-// 		err = cli.LeaveMember(context.TODO())
-// 		assert.NotNil(t, err)
-// 	})
-// }
-//
 // func TestParseSqlChannelResult(t *testing.T) {
 // 	t.Run("Binding Not Supported", func(t *testing.T) {
 // 		result := `

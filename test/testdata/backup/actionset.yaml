@@ -45,6 +45,7 @@ spec:
         container: postgres
     - job:
         image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/percona-xtrabackup:$(IMAGE_TAG)
+        runOnTargetPodNode: true
         command:
         - sh
         - -c

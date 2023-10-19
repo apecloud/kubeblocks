@@ -11,7 +11,7 @@ spec:
   - componentDefRef: mongodb
     retentionPeriod: 7d
     target:
-      role: follower
+      role: secondary
     backupMethods:
     - name: datafile
       snapshotVolumes: false

@@ -47,7 +47,7 @@ var _ = Describe("object generation transformer test.", func() {
 			SetService(service).
 			SetCredential(credential).
 			SetTemplate(template).
-			SetProbeActions(observeActions).
+			SetCustomHandler(observeActions).
 			GetObject()
 
 		transCtx = &rsmTransformContext{

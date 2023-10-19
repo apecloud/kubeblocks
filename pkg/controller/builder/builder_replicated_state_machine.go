@@ -117,24 +117,24 @@ func (builder *ReplicatedStateMachineBuilder) SetUpdateStrategyType(strategyType
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetProbeActions(actions []workloads.Action) *ReplicatedStateMachineBuilder {
+func (builder *ReplicatedStateMachineBuilder) SetCustomHandler(handler []workloads.Action) *ReplicatedStateMachineBuilder {
 	roleProbe := builder.get().Spec.RoleProbe
 	if roleProbe == nil {
 		roleProbe = &workloads.RoleProbe{}
 	}
-	roleProbe.ProbeActions = actions
+	roleProbe.CustomHandler = handler
 	builder.get().Spec.RoleProbe = roleProbe
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) AddProbeAction(action workloads.Action) *ReplicatedStateMachineBuilder {
+func (builder *ReplicatedStateMachineBuilder) AddCustomHandler(handler workloads.Action) *ReplicatedStateMachineBuilder {
 	roleProbe := builder.get().Spec.RoleProbe
 	if roleProbe == nil {
 		roleProbe = &workloads.RoleProbe{}
 	}
-	actions := roleProbe.ProbeActions
-	actions = append(actions, action)
-	roleProbe.ProbeActions = actions
+	handlers := roleProbe.CustomHandler
+	handlers = append(handlers, handler)
+	roleProbe.CustomHandler = handlers
 	builder.get().Spec.RoleProbe = roleProbe
 	return builder
 }

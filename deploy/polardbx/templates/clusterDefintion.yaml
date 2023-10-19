@@ -8,9 +8,9 @@ spec:
   connectionCredential:
     username: "polardbx_root"
     password: "$(RANDOM_PASSWD)"
-    endpoint: "$(SVC_FQDN):$(SVC_PORT_polardbx)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_mysql)"
     host: "$(SVC_FQDN)"
-    port: "$(SVC_PORT_polardbx)"
+    port: "$(SVC_PORT_mysql)"
     metaDbPasswd: "$(RANDOM_PASSWD)"
   componentDefs:
     - name: gms

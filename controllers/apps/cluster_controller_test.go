@@ -2035,7 +2035,7 @@ var _ = Describe("Cluster Controller", func() {
 		BeforeEach(func() {
 			cleanEnv()
 			createAllWorkloadTypesClusterDef()
-			createBackupPolicyTpl(clusterDefObj)
+			createBackupPolicyTpl(clusterDefObj, clusterVersionName)
 		})
 
 		createClusterWithBackup := func(backup *appsv1alpha1.ClusterBackup) {
@@ -2138,8 +2138,20 @@ var _ = Describe("Cluster Controller", func() {
 
 				checkPolicy := func(g Gomega, policy *dpv1alpha1.BackupPolicy) {
 					if backup != nil && backup.RepoName != "" {
-						Expect(*policy.Spec.BackupRepoName).Should(BeEquivalentTo(backup.RepoName))
+						g.Expect(*policy.Spec.BackupRepoName).Should(BeEquivalentTo(backup.RepoName))
 					}
+					g.Expect(policy.Spec.BackupMethods).ShouldNot(BeEmpty())
+					// expect for image tage env in backupMethod
+					var existImageTagEnv bool
+					for _, v := range policy.Spec.BackupMethods {
+						for _, e := range v.Env {
+							if e.Name == testapps.EnvKeyImageTag && e.Value == testapps.DefaultImageTag {
+								existImageTagEnv = true
+								break
+							}
+						}
+					}
+					g.Expect(existImageTagEnv).Should(BeTrue())
 				}
 
 				By("checking backup policy")
@@ -2599,14 +2611,14 @@ var _ = Describe("Cluster Controller", func() {
 	})
 })
 
-func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition) {
+func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition, mappingClusterVersions ...string) {
 	By("Creating a BackupPolicyTemplate")
 	bpt := testapps.NewBackupPolicyTemplateFactory(backupPolicyTPLName).
 		AddLabels(constant.ClusterDefLabelKey, clusterDefObj.Name).
 		SetClusterDefRef(clusterDefObj.Name)
 	for _, v := range clusterDefObj.Spec.ComponentDefs {
 		bpt = bpt.AddBackupPolicy(v.Name).
-			AddBackupMethod(backupMethodName, false, actionSetName).
+			AddBackupMethod(backupMethodName, false, actionSetName, mappingClusterVersions...).
 			SetBackupMethodVolumeMounts("data", "/data").
 			AddBackupMethod(vsBackupMethodName, true, vsActionSetName).
 			SetBackupMethodVolumes([]string{"data"}).

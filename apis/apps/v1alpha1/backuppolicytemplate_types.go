@@ -80,7 +80,41 @@ type BackupPolicy struct {
 
 	// backupMethods defines the backup methods.
 	// +kubebuilder:validation:Required
-	BackupMethods []dpv1alpha1.BackupMethod `json:"backupMethods"`
+	BackupMethods []BackupMethod `json:"backupMethods"`
+}
+
+type BackupMethod struct {
+	dpv1alpha1.BackupMethod `json:",inline"`
+
+	// envMapping defines the variables of cluster mapped to env values' keys.
+	// +optional
+	EnvMapping []EnvMappingVar `json:"envMapping,omitempty"`
+}
+
+type EnvMappingVar struct {
+	// env key which needs to mapping.
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
+
+	// valueFrom defines source of the env value.
+	// +kubebuilder:validation:Required
+	ValueFrom ValueFrom `json:"valueFrom"`
+}
+
+type ValueFrom struct {
+	// mapped ClusterVersionRef to env value.
+	// +kubebuilder:validation:Required
+	ClusterVersionRef []ClusterVersionMapping `json:"clusterVersionRef"`
+}
+
+type ClusterVersionMapping struct {
+	// the array of ClusterVersion name which can be mapped to the env value.
+	// +kubebuilder:validation:Required
+	Names []string `json:"names"`
+
+	// mapping value for the specified ClusterVersion names.
+	// +kubebuilder:validation:Required
+	MappingValue string `json:"mappingValue"`
 }
 
 type SchedulePolicy struct {

@@ -174,7 +174,8 @@ type JobActionSpec struct {
 
 	// runOnTargetPodNode specifies whether to run the job workload on the
 	// target pod node. If backup container should mount the target pod's
-	// volume, this field should be set to true.
+	// volumes, this field should be set to true. otherwise the target pod's
+	// volumes will be ignored.
 	// +optional
 	// +kubebuilder:default=false
 	RunOnTargetPodNode *bool `json:"runOnTargetPodNode,omitempty"`

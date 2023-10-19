@@ -309,7 +309,6 @@ func buildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
 }
 
 func buildDebugPod(rsm workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap, stsName string) *corev1.Pod {
-	// 根据需要设置 Pod 的名称、标签、容器等属性
 	spec := buildDebugPodTemplate(rsm, envConfig, stsName).Spec
 	container := spec.Containers[0]
 	labels := getLabels(&rsm)

@@ -916,6 +916,12 @@ type RSMSpec struct {
 	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
 	// +optional
 	MemberUpdateStrategy *workloads.MemberUpdateStrategy `json:"memberUpdateStrategy,omitempty"`
+
+	// DebugMode provides an environment for developers to develop addon for KB.
+	// The environment is the same as 'action-pod',so you can verify you shell script in it.
+	// +kubebuilder:default=false
+	// +optional
+	DebugMode *bool `json:"debugMode,omitempty"`
 }
 
 type ReplicationSetSpec struct {

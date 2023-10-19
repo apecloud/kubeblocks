@@ -21,7 +21,6 @@ package components
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -424,7 +423,7 @@ func (c *rsmComponent) updatePrimaryIndex(ctx context.Context, cli client.Client
 		case len(emptyRolePods) == len(podList):
 			return podList[0].Name, nil
 		case len(primaryPods) != 1:
-			return "", errors.New(fmt.Sprintf("the number of primary pod is not equal to 1, primary pods: %v, emptyRole pods: %v", primaryPods, emptyRolePods))
+			return "", fmt.Errorf("the number of primary pod is not equal to 1, primary pods: %v, emptyRole pods: %v", primaryPods, emptyRolePods)
 		default:
 			return primaryPods[0], nil
 		}

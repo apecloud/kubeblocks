@@ -18,6 +18,7 @@ package apps
 
 import (
 	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -45,6 +46,13 @@ var _ = Describe("", func() {
 
 	AfterEach(func() {
 		cleanEnv()
+	})
+
+	Context("create a backuppolicytemplate", func() {
+		It("should be available", func() {
+			bpt := testapps.NewBackupPolicyTemplateFactory("backup-policy-template")
+			Expect(bpt).ShouldNot(BeNil())
+		})
 	})
 
 })

@@ -24,10 +24,28 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/testutil"
 )
 
 type MockBackupPolicyTemplateFactory struct {
 	BaseFactory[appsv1alpha1.BackupPolicyTemplate, *appsv1alpha1.BackupPolicyTemplate, MockBackupPolicyTemplateFactory]
+}
+
+func NewFackeBackupPolicyTemplate(testCtx *testutil.TestContext,
+	change func(bpt *appsv1alpha1.BackupPolicyTemplate)) *appsv1alpha1.BackupPolicyTemplate {
+	bpt := NewBackupPolicyTemplateFactory(BackupPolicyTemplateName).
+		AddLabels(constant.ClusterDefLabelKey, ClusterDefName).
+		SetClusterDefRef(ClusterDefName).
+		AddBackupMethod(BackupMethod, false, ActionSetName).
+		SetBackupMethodVolumeMounts(DataVolumeName, "/data").
+		AddBackupMethod(VsBackupMethodName, true, VsActionSetName).
+		SetBackupMethodVolumeMounts(DataVolumeName, "/data").
+		AddSchedule(BackupMethod, "0 0 * * *", true).
+		AddSchedule(VsBackupMethodName, "0 0 * * *", true).
+		Apply(change).
+		Create(testCtx).GetObject()
+	return bpt
 }
 
 func NewBackupPolicyTemplateFactory(name string) *MockBackupPolicyTemplateFactory {

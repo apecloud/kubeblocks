@@ -112,6 +112,19 @@ func (cli *HTTPClient) GetRole(ctx context.Context) (string, error) {
 	return role.(string), nil
 }
 
+// ListUsers lists all normal users created
+func (cli *HTTPClient) ListUsers(ctx context.Context) ([]map[string]any, error) {
+	resp, err := cli.Request(ctx, string(ListUsersOp), http.MethodGet, nil)
+	if err != nil {
+		return nil, err
+	}
+	users, ok := resp["users"]
+	if !ok {
+		return nil, nil
+	}
+	return convertToArrayOfMap(users)
+}
+
 // ListSystemAccounts lists all system accounts created
 func (cli *HTTPClient) ListSystemAccounts(ctx context.Context) ([]map[string]any, error) {
 	resp, err := cli.Request(ctx, string(ListSystemAccountsOp), http.MethodGet, nil)

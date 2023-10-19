@@ -146,8 +146,6 @@ var _ = Describe("Lorry HTTP Client", func() {
 			role := "leader"
 			mockDBManager.EXPECT().GetReplicaRole(gomock.Any(), gomock.Any()).Return(role, nil)
 			Expect(lorryClient.GetRole(context.TODO())).Should(Equal(role))
-			//Expect(err).ShouldNot(HaveOccurred())
-			//Expect(role).Should(Equal("leader"))
 		})
 
 		It("not implemented", func() {
@@ -160,7 +158,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 	})
 
-	Context("get system accounts", func() {
+	Context("list system accounts", func() {
 		var lorryClient *HTTPClient
 		var systemAccounts []models.UserInfo
 
@@ -179,9 +177,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 
 		It("success", func() {
 			mockDBManager.EXPECT().ListSystemAccounts(gomock.Any()).Return(systemAccounts, nil)
-			accounts, err := lorryClient.ListSystemAccounts(context.TODO())
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(accounts).Should(HaveLen(2))
+			Expect(lorryClient.ListSystemAccounts(context.TODO())).Should(HaveLen(2))
 		})
 
 		It("not implemented", func() {
@@ -191,6 +187,38 @@ var _ = Describe("Lorry HTTP Client", func() {
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring(msg))
 			Expect(accounts).Should(BeEmpty())
+		})
+	})
+
+	Context("list users", func() {
+		var lorryClient *HTTPClient
+		var users []models.UserInfo
+
+		BeforeEach(func() {
+			lorryClient, _ = NewHTTPClientWithPod(pod)
+			Expect(lorryClient).ShouldNot(BeNil())
+			users = []models.UserInfo{
+				{
+					UserName: "user1",
+				},
+				{
+					UserName: "user2",
+				},
+			}
+		})
+
+		It("success", func() {
+			mockDBManager.EXPECT().ListUsers(gomock.Any()).Return(users, nil)
+			Expect(lorryClient.ListUsers(context.TODO())).Should(HaveLen(2))
+		})
+
+		It("not implemented", func() {
+			msg := "not implemented for test"
+			mockDBManager.EXPECT().ListUsers(gomock.Any()).Return(nil, fmt.Errorf(msg))
+			users, err := lorryClient.ListUsers(context.TODO())
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring(msg))
+			Expect(users).Should(BeEmpty())
 		})
 	})
 

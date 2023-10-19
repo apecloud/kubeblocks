@@ -510,6 +510,16 @@ func (r *BackupReconciler) handleRunningPhase(
 		duration := request.Status.CompletionTimestamp.Sub(request.Status.StartTimestamp.Time).Round(time.Second)
 		request.Status.Duration = &metav1.Duration{Duration: duration}
 	}
+	if request.Spec.RetentionPeriod != "" {
+		// set expiration time
+		duration, err := request.Spec.RetentionPeriod.ToDuration()
+		if err != nil {
+			return r.updateStatusIfFailed(reqCtx, backup, request.Backup, fmt.Errorf("failed to parse retention period %s, %v", request.Spec.RetentionPeriod, err))
+		}
+		request.Status.Expiration = &metav1.Time{
+			Time: request.Status.CompletionTimestamp.Add(duration),
+		}
+	}
 	r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedBackup", "Completed backup")
 	if err = r.Client.Status().Patch(reqCtx.Ctx, request.Backup, client.MergeFrom(backup)); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -542,11 +552,6 @@ func (r *BackupReconciler) handleCompletedPhase(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
 	if err := r.deleteExternalResources(reqCtx, backup); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-
-	// update backup expiration time
-	if err := r.updateBackupExpiredTime(reqCtx, backup); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
@@ -642,26 +647,6 @@ func (r *BackupReconciler) deleteExternalResources(
 		return err
 	}
 	return r.deleteExternalJobs(reqCtx, backup)
-}
-
-func (r *BackupReconciler) updateBackupExpiredTime(
-	reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
-	// if backup's retention period is set, update the backup expiration time.
-	if backup.Spec.RetentionPeriod != "" {
-		duration, err := backup.Spec.RetentionPeriod.ToDuration()
-		if err != nil {
-			return err
-		}
-		if duration.Seconds() > 0 {
-			backup.Status.Expiration = &metav1.Time{
-				Time: backup.Status.CompletionTimestamp.Add(duration),
-			}
-		}
-		if err = r.Client.Status().Patch(reqCtx.Ctx, backup, client.MergeFrom(backup)); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // getClusterObjectString gets the cluster object and convert it to string.

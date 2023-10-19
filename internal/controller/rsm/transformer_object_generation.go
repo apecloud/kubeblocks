@@ -21,7 +21,7 @@ package rsm
 
 import (
 	"encoding/json"
-	"fmt"
+	"fmt" //nolint:goimports
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	apps "k8s.io/api/apps/v1"

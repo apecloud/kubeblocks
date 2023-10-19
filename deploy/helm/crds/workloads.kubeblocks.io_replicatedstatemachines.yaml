@@ -939,6 +939,13 @@ spec:
               roleProbe:
                 description: RoleProbe provides method to probe role.
                 properties:
+                  builtinHandlerName:
+                    description: 'BuiltinHandler specifies the builtin handler name
+                      to use to probe the role of the main container. current available
+                      handlers: mysql, postgres, mongodb, redis, etcd, kafka. use
+                      CustomHandler to define your own role probe function if none
+                      of them satisfies the requirement.'
+                    type: string
                   failureThreshold:
                     default: 3
                     description: Minimum consecutive failures for the probe to be
@@ -962,13 +969,16 @@ spec:
                     minimum: 1
                     type: integer
                   probeActions:
-                    description: 'ProbeActions define Actions to be taken in serial.
-                      after all actions done, the final output should be a single
-                      string of the role name defined in spec.Roles latest [BusyBox](https://busybox.net/)
-                      image will be used if Image not configured Environment variables
-                      can be used in Command: - v_KB_RSM_LAST_STDOUT stdout from last
-                      action, watch ''v_'' prefixed - KB_RSM_USERNAME username part
-                      of credential - KB_RSM_PASSWORD password part of credential'
+                    description: "CustomHandler defines the custom way to do role
+                      probe. if the BuiltinHandler satisfies the requirement, use
+                      it instead. \n how the actions defined here works: \n Actions
+                      will be taken in serial. after all actions done, the final output
+                      should be a single string of the role name defined in spec.Roles
+                      latest [BusyBox](https://busybox.net/) image will be used if
+                      Image not configured Environment variables can be used in Command:
+                      - v_KB_RSM_LAST_STDOUT stdout from last action, watch 'v_' prefixed
+                      - KB_RSM_USERNAME username part of credential - KB_RSM_PASSWORD
+                      password part of credential"
                     items:
                       properties:
                         command:
@@ -986,13 +996,12 @@ spec:
                       type: object
                     type: array
                   roleUpdateMechanism:
-                    default: None
+                    default: ReadinessProbeEventUpdate
                     description: RoleUpdateMechanism specifies the way how pod role
                       label being updated.
                     enum:
                     - ReadinessProbeEventUpdate
                     - DirectAPIServerEventUpdate
-                    - None
                     type: string
                   successThreshold:
                     default: 1
@@ -1009,8 +1018,6 @@ spec:
                     format: int32
                     minimum: 1
                     type: integer
-                required:
-                - probeActions
                 type: object
               roles:
                 description: Roles, a list of roles defined in the system.

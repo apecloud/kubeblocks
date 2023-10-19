@@ -217,20 +217,30 @@ type RoleUpdateMechanism string
 const (
 	ReadinessProbeEventUpdate  RoleUpdateMechanism = "ReadinessProbeEventUpdate"
 	DirectAPIServerEventUpdate RoleUpdateMechanism = "DirectAPIServerEventUpdate"
-	NoneUpdate                 RoleUpdateMechanism = "None"
 )
 
 // RoleProbe defines how to observe role
 type RoleProbe struct {
-	// ProbeActions define Actions to be taken in serial.
+	// BuiltinHandler specifies the builtin handler name to use to probe the role of the main container.
+	// current available handlers: mysql, postgres, mongodb, redis, etcd, kafka.
+	// use CustomHandler to define your own role probe function if none of them satisfies the requirement.
+	// +optional
+	BuiltinHandler *string `json:"builtinHandlerName,omitempty"`
+
+	// CustomHandler defines the custom way to do role probe.
+	// if the BuiltinHandler satisfies the requirement, use it instead.
+	//
+	// how the actions defined here works:
+	//
+	// Actions will be taken in serial.
 	// after all actions done, the final output should be a single string of the role name defined in spec.Roles
 	// latest [BusyBox](https://busybox.net/) image will be used if Image not configured
 	// Environment variables can be used in Command:
 	// - v_KB_RSM_LAST_STDOUT stdout from last action, watch 'v_' prefixed
 	// - KB_RSM_USERNAME username part of credential
 	// - KB_RSM_PASSWORD password part of credential
-	// +kubebuilder:validation:Required
-	ProbeActions []Action `json:"probeActions"`
+	// +optional
+	CustomHandler []Action `json:"probeActions,omitempty"`
 
 	// Number of seconds after the container has started before role probe has started.
 	// +kubebuilder:default=0
@@ -267,8 +277,8 @@ type RoleProbe struct {
 	FailureThreshold int32 `json:"failureThreshold,omitempty"`
 
 	// RoleUpdateMechanism specifies the way how pod role label being updated.
-	// +kubebuilder:default=None
-	// +kubebuilder:validation:Enum={ReadinessProbeEventUpdate, DirectAPIServerEventUpdate, None}
+	// +kubebuilder:default=ReadinessProbeEventUpdate
+	// +kubebuilder:validation:Enum={ReadinessProbeEventUpdate, DirectAPIServerEventUpdate}
 	// +optional
 	RoleUpdateMechanism RoleUpdateMechanism `json:"roleUpdateMechanism,omitempty"`
 }

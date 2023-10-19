@@ -50,7 +50,7 @@ jobs:
       release-version: ${{ steps.get_release_version.outputs.release-version }}
       cluster-region: ${{ steps.get_release_version.outputs.cluster-region }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: check release version
         id: get_release_version
         run: |
@@ -75,7 +75,7 @@ jobs:
   e2e:
     name: ${{ inputs.CLOUD_PROVIDER }}
     needs: check
-    uses: apecloud/apecloud-cd/.github/workflows/smoke-test-k8s.yml@v0.1.21
+    uses: apecloud/apecloud-cd/.github/workflows/smoke-test-k8s.yml@main
     with:
       CLOUD_PROVIDER: "${{ inputs.CLOUD_PROVIDER }}"
       KB_VERSION: "${{ needs.check.outputs.release-version }}"
@@ -83,5 +83,4 @@ jobs:
       INSTANCE_TYPE: "${{ inputs.INSTANCE_TYPE }}"
       REGION: "${{ needs.check.outputs.cluster-region }}"
       TEST_TYPE: "${{ inputs.TEST_TYPE }}"
-      APECD_REF: "v0.1.21"
     secrets: inherit

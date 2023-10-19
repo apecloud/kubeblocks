@@ -7,7 +7,7 @@ jobs:
   make-test:
     runs-on: [self-hosted ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: make test
         run:  |
           make mod-vendor lint test

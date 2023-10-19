@@ -62,7 +62,7 @@ jobs:
       release-version: ${{ steps.get_release_version.outputs.release-version }}
       cluster-region: ${{ steps.get_release_version.outputs.cluster-region }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: check release version
         id: get_release_version
         run: |
@@ -96,7 +96,6 @@ jobs:
       INSTANCE_TYPE: "${{ inputs.INSTANCE_TYPE }}"
       REGION: "${{ needs.check.outputs.cluster-region }}"
       BRANCH_NAME: "${{ inputs.BRANCH_NAME }}"
-      APECD_REF: "main"
       ARGS: "${{ inputs.ARGS }}"
       TEST_TYPE: "${{ inputs.TEST_TYPE }}"
     secrets: inherit

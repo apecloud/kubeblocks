@@ -28,11 +28,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
 var _ = Describe("ConfigWrapper util test", func() {

@@ -25,9 +25,9 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testdp "github.com/apecloud/kubeblocks/internal/testutil/dataprotection"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 )
 
 var _ = Describe("ActionSet Controller test", func() {

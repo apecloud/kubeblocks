@@ -28,10 +28,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/binding"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/util"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 func TestGetRouter(t *testing.T) {

@@ -29,8 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/yaml"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("", func() {

@@ -38,9 +38,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type stageCtx struct {

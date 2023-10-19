@@ -37,14 +37,14 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
 var _ = Describe("Component", func() {

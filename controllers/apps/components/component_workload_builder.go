@@ -28,11 +28,11 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controller/factory"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/factory"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/plan"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type componentWorkloadBuilder interface {

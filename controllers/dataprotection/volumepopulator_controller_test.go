@@ -31,11 +31,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	dprestore "github.com/apecloud/kubeblocks/internal/dataprotection/restore"
-	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testdp "github.com/apecloud/kubeblocks/internal/testutil/dataprotection"
+	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 )
 
 var _ = Describe("Volume Populator Controller test", func() {

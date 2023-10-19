@@ -33,12 +33,12 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/plan"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
 var _ = Describe("TLS self-signed cert function", func() {
@@ -119,8 +119,8 @@ var _ = Describe("TLS self-signed cert function", func() {
 		// 	It("should create/delete the tls cert Secret", func() {
 		//
 		// 		// REVIEW: do review this test setup
-		// 		//  In [AfterEach] at: /Users/nashtsai/go/src/github.com/apecloud/kubeblocks/internal/testutil/apps/common_util.go:323
-		// 		// Assertion in callback at /Users/nashtsai/go/src/github.com/apecloud/kubeblocks/internal/testutil/apps/common_util.go:322 failed:
+		// 		//  In [AfterEach] at: /Users/nashtsai/go/src/github.com/apecloud/kubeblocks/pkg/testutil/apps/common_util.go:323
+		// 		// Assertion in callback at /Users/nashtsai/go/src/github.com/apecloud/kubeblocks/pkg/testutil/apps/common_util.go:322 failed:
 		// 		// Expected
 		// 		// <[]v1.StatefulSet | len:1, cap:1>:
 		// 		// 	to be empty

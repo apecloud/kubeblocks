@@ -27,9 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
 var _ = Describe("Reconfigure simplePolicy", func() {

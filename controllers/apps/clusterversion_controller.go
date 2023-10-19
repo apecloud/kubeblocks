@@ -40,9 +40,9 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsconfig "github.com/apecloud/kubeblocks/controllers/apps/configuration"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusterversions,verbs=get;list;watch;create;update;patch;delete

@@ -35,10 +35,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/dcs"
 	"github.com/apecloud/kubeblocks/lorry/util"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (

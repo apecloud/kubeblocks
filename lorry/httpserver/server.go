@@ -35,6 +35,7 @@ import (
 // Server is an interface for the Dapr HTTP server.
 type Server interface {
 	io.Closer
+	Router() fasthttp.RequestHandler
 	StartNonBlocking() error
 }
 

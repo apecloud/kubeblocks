@@ -17,20 +17,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package register
+package dcs
 
-import (
-	"github.com/apecloud/kubeblocks/lorry/operations"
-	_ "github.com/apecloud/kubeblocks/lorry/operations/replica"
-	_ "github.com/apecloud/kubeblocks/lorry/operations/sql"
-	_ "github.com/apecloud/kubeblocks/lorry/operations/user"
-	_ "github.com/apecloud/kubeblocks/lorry/operations/volume"
-)
-
-func Register(name string, op operations.Operation) error {
-	return operations.Register(name, op)
-}
-
-func Operations() map[string]operations.Operation {
-	return operations.Operations()
-}
+//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../hack/boilerplate.go.txt -package dcs -destination mock_store.go github.com/apecloud/kubeblocks/lorry/dcs DCS

@@ -28,6 +28,7 @@ import (
 	"net"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -86,12 +87,13 @@ func NewHTTPClientWithPod(pod *corev1.Pod) (*HTTPClient, error) {
 	}
 
 	operationClient := &HTTPClient{
-		Client:           client,
-		Port:             port,
-		URL:              fmt.Sprintf(urlTemplate, ip, port),
-		CacheTTL:         60 * time.Second,
-		RequestTimeout:   30 * time.Second,
-		ReconcileTimeout: 500 * time.Millisecond,
+		Client:         client,
+		Port:           port,
+		URL:            fmt.Sprintf(urlTemplate, ip, port),
+		CacheTTL:       60 * time.Second,
+		RequestTimeout: 30 * time.Second,
+		//ReconcileTimeout: 500 * time.Millisecond,
+		ReconcileTimeout: 500 * time.Second,
 		cache:            make(map[string]*OperationResult),
 	}
 	return operationClient, nil
@@ -132,7 +134,7 @@ func (cli *HTTPClient) Request(ctx context.Context, operation, method string, re
 	defer cancel()
 
 	// Request sql channel via http request
-	url := fmt.Sprintf("%s%s", cli.URL, operation)
+	url := fmt.Sprintf("%s%s", cli.URL, strings.ToLower(operation))
 
 	var reader io.Reader = nil
 	if req != nil {

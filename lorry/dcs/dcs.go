@@ -30,6 +30,7 @@ type DCS interface {
 	// cluster manage functions
 	GetClusterName() string
 	GetCluster() (*Cluster, error)
+	GetClusterFromCache() *Cluster
 	ResetCluser()
 	DeleteCluser()
 

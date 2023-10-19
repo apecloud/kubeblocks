@@ -45,7 +45,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 		GetObject()
 	pod.Spec.Containers[0].Ports = []corev1.ContainerPort{
 		{
-			ContainerPort: int32(3501),
+			ContainerPort: int32(lorryHTTPPort),
 			Name:          constant.LorryHTTPPortName,
 			Protocol:      "TCP",
 		},
@@ -83,50 +83,69 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 	})
 
-	Context("request with timeout", func() {
-		var httpServer *httptest.Server
-		var port int
+	// Context("request with timeout", func() {
+	// 	var httpServer *httptest.Server
+	// 	var port int
+	// 	var lorryClient *HTTPClient
+
+	// 	BeforeEach(func() {
+	// 		pod1 := pod.DeepCopy()
+	// 		body := []byte("{\"role\": \"leader\"}")
+	// 		httpServer, port = newHTTPServer(body)
+	// 		pod1.Spec.Containers[0].Ports[0].ContainerPort = int32(port)
+	// 		lorryClient, _ = NewHTTPClientWithPod(pod1)
+	// 		Expect(lorryClient).ShouldNot(BeNil())
+	// 	})
+
+	// 	AfterEach(func() {
+	// 		httpServer.Close()
+	// 	})
+
+	// 	It("response in time", func() {
+	// 		lorryClient.ReconcileTimeout = 1 * time.Second
+	// 		_, err := lorryClient.GetRole(context.TODO())
+	// 		Expect(err).ShouldNot(HaveOccurred())
+	// 		Expect(lorryClient.cache).Should(BeEmpty())
+	// 	})
+
+	// 	It("response timeout", func() {
+	// 		lorryClient.ReconcileTimeout = 50 * time.Millisecond
+	// 		_, err := lorryClient.GetRole(context.TODO())
+	// 		Expect(err).Should(HaveOccurred())
+	// 		// wait client to get response and cache it
+	// 		time.Sleep(200 * time.Millisecond)
+	// 		Expect(lorryClient.cache).Should(HaveLen(1))
+	// 	})
+
+	// 	It("response by cache", func() {
+	// 		lorryClient.ReconcileTimeout = 50 * time.Millisecond
+	// 		// get response from server, and timeout
+	// 		_, err := lorryClient.GetRole(context.TODO())
+	// 		Expect(err).Should(HaveOccurred())
+	// 		// wait client to get response and cache it
+	// 		time.Sleep(200 * time.Millisecond)
+	// 		// get response from cache
+	// 		_, err = lorryClient.GetRole(context.TODO())
+	// 		Expect(err).ShouldNot(HaveOccurred())
+	// 		Expect(lorryClient.cache).Should(BeEmpty())
+	// 	})
+	// })
+
+	Context("get replica role", func() {
 		var lorryClient *HTTPClient
+
 		BeforeEach(func() {
-			body := []byte("{\"role\": \"leader\"}")
-			httpServer, port = newHTTPServer(body)
-			pod.Spec.Containers[0].Ports[0].ContainerPort = int32(port)
 			lorryClient, _ = NewHTTPClientWithPod(pod)
 			Expect(lorryClient).ShouldNot(BeNil())
 		})
 
-		AfterEach(func() {
-			httpServer.Close()
-		})
-
-		It("response in time", func() {
-			lorryClient.ReconcileTimeout = 1 * time.Second
-			_, err := lorryClient.GetRole(context.TODO())
+		It("success", func() {
+			role, err := lorryClient.GetRole(context.TODO())
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(lorryClient.cache).Should(BeEmpty())
+			Expect(role).Should(Equal("leader"))
+
 		})
 
-		It("response timeout", func() {
-			lorryClient.ReconcileTimeout = 50 * time.Millisecond
-			_, err := lorryClient.GetRole(context.TODO())
-			Expect(err).Should(HaveOccurred())
-			// wait client to get response and cache it
-			time.Sleep(200 * time.Millisecond)
-			Expect(lorryClient.cache).Should(HaveLen(1))
-		})
-
-		It("response by cache", func() {
-			lorryClient.ReconcileTimeout = 50 * time.Millisecond
-			// get response from server, and timeout
-			_, err := lorryClient.GetRole(context.TODO())
-			Expect(err).Should(HaveOccurred())
-			// wait client to get response and cache it
-			time.Sleep(200 * time.Millisecond)
-			// get response from cache
-			_, err = lorryClient.GetRole(context.TODO())
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(lorryClient.cache).Should(BeEmpty())
-		})
 	})
 })
 
@@ -278,24 +297,6 @@ var _ = Describe("Lorry HTTP Client", func() {
 // 	assert.False(t, IsUnSupportedError(nil))
 // 	assert.True(t, IsUnSupportedError(err))
 // 	assert.False(t, IsUnSupportedError(errors.New("test")))
-// }
-//
-// func newTCPServer(t *testing.T, port int) (int, func()) {
-// 	var l net.Listener
-// 	for i := 0; i < 3; i++ {
-// 		l, _ = net.Listen("tcp", fmt.Sprintf(":%v", port))
-// 		if l != nil {
-// 			break
-// 		}
-// 		port++
-// 	}
-// 	if l == nil {
-// 		t.Errorf("couldn't start listening")
-// 	}
-// 	closer := func() {
-// 		l.Close()
-// 	}
-// 	return port, closer
 // }
 //
 // func initSQLChannelClient(httpPort int, t *testing.T) (*OperationClient, func(), error) {

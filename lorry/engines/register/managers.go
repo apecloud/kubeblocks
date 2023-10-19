@@ -70,6 +70,10 @@ func GetManagerNewFunc(characterType, workloadType string) managerNewFunc {
 	return managerNewFuncs[key]
 }
 
+func SetDBManager(manager engines.DBManager) {
+	dbManager = manager
+}
+
 func GetDBManager() (engines.DBManager, error) {
 	if dbManager != nil {
 		return dbManager, nil

@@ -75,8 +75,7 @@ func (s *GetRole) Do(ctx context.Context, req *operations.OpsRequest) (*operatio
 	}
 	resp.Data["operation"] = util.GetRoleOperation
 
-	k8sStore := s.dcsStore.(*dcs.KubernetesStore)
-	cluster := k8sStore.GetClusterFromCache()
+	cluster := s.dcsStore.GetClusterFromCache()
 	role, err := s.dbManager.GetReplicaRole(ctx, cluster)
 	if err != nil {
 		s.logger.Info("executing getrole error", "error", err)

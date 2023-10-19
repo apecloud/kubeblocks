@@ -43,7 +43,7 @@ jobs:
 
           TEST_PACKAGES=`bash .github/utils/utils.sh --type 16 \
               --trigger-type "$TRIGGER_MODE" \
-              --test-pkgs "internal|apis|controllers|cmd" \
+              --test-pkgs "pkg|apis|controllers|cmd|lorry" \
               --test-check "mod-vendor|lint|staticcheck"`
           echo "$TEST_PACKAGES"
           echo "matrix={\"include\":[$TEST_PACKAGES]}" >> $GITHUB_OUTPUT
@@ -109,7 +109,7 @@ jobs:
         run: |
           bash .github/utils/utils.sh --type 14 \
               --file cover.out \
-              --ignore-pkgs "cmd/|pkg/cli|pkg/controller/consensusset|pkg/controller/model|controllers/k8score"
+              --ignore-pkgs "cmd/|pkg/cli|pkg/client|pkg/controller/model|controllers/k8score"
 
       - name: upload coverage report
         uses: codecov/codecov-action@v3

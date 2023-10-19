@@ -9739,7 +9739,7 @@ SignalType
 </em>
 </td>
 <td>
-<p>signal is valid for unix signal.<br />e.g: SIGHUP<br />url: ../../internal/configuration/configmap/handler.go:allUnixSignals</p><br />
+<p>signal is valid for unix signal.<br />e.g: SIGHUP<br />url: ../../pkg/configuration/configmap/handler.go:allUnixSignals</p><br />
 </td>
 </tr>
 <tr>

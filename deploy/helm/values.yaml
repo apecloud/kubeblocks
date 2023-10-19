@@ -1808,3 +1808,5 @@ external-dns:
     operator: Equal
     value: "true"
     effect: NoSchedule
+
+developMode: false

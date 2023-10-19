@@ -56,9 +56,9 @@ import (
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
 	storagecontrollers "github.com/apecloud/kubeblocks/controllers/storage"
 	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // added lease.coordination.k8s.io for leader election

@@ -31,7 +31,7 @@ import (
 	"strconv"
 	"strings"
 
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
 
 const (

@@ -100,7 +100,7 @@ var _ = Describe("cluster webhook", func() {
 			By("By testing spec.components[?].type not found in clusterDefinitionRef")
 			patch = client.MergeFrom(cluster.DeepCopy())
 			cluster.Spec.ComponentSpecs[0].ComponentDefRef = "replicaset"
-			Expect(k8sClient.Patch(ctx, cluster, patch).Error()).To(ContainSubstring("is not found in ClusterDefinition.spec.componentDefs[*].name"))
+			Expect(k8sClient.Patch(ctx, cluster, patch).Error()).To(ContainSubstring("componentDefRef is immutable"))
 			// restore
 			cluster.Spec.ComponentSpecs[0].ComponentDefRef = "replicasets"
 

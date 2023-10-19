@@ -157,7 +157,7 @@ jobs:
         run: |
           bash .github/utils/utils.sh --type 14 \
               --file cover.out \
-              --ignore-pkgs "cmd/|internal/cli|internal/controller/consensusset|internal/controller/model|controllers/k8score"
+              --ignore-pkgs "cmd/|pkg/cli|pkg/controller/consensusset|pkg/controller/model|controllers/k8score"
 
       - name: upload coverage report
         uses: codecov/codecov-action@v3

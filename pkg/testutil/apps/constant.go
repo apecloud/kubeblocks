@@ -63,14 +63,6 @@ const (
 	StogrageClassName = "test-sc"
 	EnvKeyImageTag    = "IMAGE_TAG"
 	DefaultImageTag   = "test"
-
-	ClusterDefName = "test-cd"
-
-	BackupPolicyTemplateName = "test-bpt"
-	BackupMethod             = "test-bm"
-	ActionSetName            = "test-as"
-	VsBackupMethodName       = "test-vs-bm"
-	VsActionSetName          = "test-vs-as"
 )
 
 var (

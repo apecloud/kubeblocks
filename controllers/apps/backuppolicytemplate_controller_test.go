@@ -17,6 +17,8 @@ limitations under the License.
 package apps
 
 import (
+	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -27,6 +29,16 @@ import (
 )
 
 var _ = Describe("", func() {
+	var (
+		BackupPolicyTemplateName = "test-bpt"
+		ClusterDefName           = "test-cd"
+		BackupPolicyName         = "test-bp"
+		BackupMethod             = "test-bm"
+		ActionSetName            = "test-as"
+		VsBackupMethodName       = "test-vs-bm"
+		VsActionSetName          = "test-vs-as"
+	)
+
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -34,7 +46,10 @@ var _ = Describe("", func() {
 		// create the new objects.
 		By("clean resources")
 
+		// delete rest mocked objects
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		testapps.ClearResources(&testCtx, intctrlutil.ComponentResourceConstraintSignature, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.ComponentClassDefinitionSignature, ml)
 
 		// non-namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupPolicyTemplateSignature, true, ml)
@@ -50,8 +65,20 @@ var _ = Describe("", func() {
 
 	Context("create a backuppolicytemplate", func() {
 		It("should be available", func() {
-			bpt := testapps.NewBackupPolicyTemplateFactory("backup-policy-template")
-			Expect(bpt).ShouldNot(BeNil())
+			bpt := testapps.NewBackupPolicyTemplateFactory(BackupPolicyTemplateName).
+				SetClusterDefRef(ClusterDefName).
+				AddBackupPolicy(BackupPolicyName).
+				AddBackupMethod(BackupMethod, false, ActionSetName).
+				SetBackupMethodVolumeMounts("data", "/data").
+				AddBackupMethod(VsBackupMethodName, true, VsActionSetName).
+				SetBackupMethodVolumeMounts("data", "/data").
+				AddSchedule(BackupMethod, "0 0 * * *", true).
+				AddSchedule(VsBackupMethodName, "0 0 * * *", true).
+				Create(&testCtx).GetObject()
+			key := client.ObjectKeyFromObject(bpt)
+			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pobj *v1alpha1.BackupPolicyTemplate) {
+				g.Expect(pobj.GetLabels()[constant.ClusterDefLabelKey]).To(Equal(bpt.Spec.ClusterDefRef))
+			})).Should(Succeed())
 		})
 	})
 

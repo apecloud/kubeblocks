@@ -22,6 +22,7 @@ package bench
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubebench/api/v1alpha1"
-
 	"github.com/apecloud/kubeblocks/pkg/cli/cluster"
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
 )
@@ -44,6 +44,7 @@ var (
 		"postgresql": "postgresql",
 		"redis":      "redis",
 	}
+	ycsbSupportedDrivers = []string{"mongodb", "mysql", "postgresql", "redis"}
 )
 
 var ycsbExample = templates.Examples(`
@@ -124,21 +125,21 @@ func (o *YcsbOptions) Complete(args []string) error {
 		return err
 	}
 
+	o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return err
+	}
+
+	if o.dynamic, err = o.factory.DynamicClient(); err != nil {
+		return err
+	}
+
+	if o.client, err = o.factory.KubernetesClientSet(); err != nil {
+		return err
+	}
+
 	o.Step, o.name = parseStepAndName(args, "ycsb")
 	if o.ClusterName != "" {
-		o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
-		if err != nil {
-			return err
-		}
-
-		if o.dynamic, err = o.factory.DynamicClient(); err != nil {
-			return err
-		}
-
-		if o.client, err = o.factory.KubernetesClientSet(); err != nil {
-			return err
-		}
-
 		clusterGetter := cluster.ObjectsGetter{
 			Client:    o.client,
 			Dynamic:   o.dynamic,
@@ -190,7 +191,7 @@ func (o *YcsbOptions) Validate() error {
 		}
 	}
 	if !supported {
-		return fmt.Errorf("driver %s is not supported", o.Driver)
+		return fmt.Errorf("ycsb now only supports drivers in [%s], current cluster driver is %s", strings.Join(ycsbSupportedDrivers, ","), o.Driver)
 	}
 
 	if o.RecordCount < 0 {

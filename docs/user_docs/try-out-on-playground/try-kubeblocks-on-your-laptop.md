@@ -54,7 +54,8 @@ Meet the following requirements for a smooth user experience:
 
 :::
 
-1. Check the MySQL cluster repeatedly until the status becomes `Running`.
+
+2. Check the MySQL cluster repeatedly until the status becomes `Running`.
 
    ```bash
    kbcli cluster list

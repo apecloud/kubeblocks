@@ -157,7 +157,7 @@ jobs:
         run: |
           bash .github/utils/utils.sh --type 14 \
               --file cover.out \
-              --ignore-pkgs "cmd/|pkg/cli|pkg/client|pkg/controller/model|controllers/k8score"
+              --ignore-pkgs "${{ vars.IGNORE_COVERAGE_PKG }}"
 
       - name: upload coverage report
         uses: codecov/codecov-action@v3

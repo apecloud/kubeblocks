@@ -92,6 +92,12 @@ There are various ways to create a BackupRepo. Make sure you have done all the n
 
    ![MinIO dashboard](./../../../img/backup-and-restore-configure-backuprepo-minio.png)
 
+:::note
+
+If you fail to log in on Chrome, try switching to Safari and give it another try. 
+
+:::
+
 ### Install S3 CSI driver
 
 <Tabs>

@@ -116,7 +116,7 @@ func createStorageClass(testCtx *testutil.TestContext, storageClassName string) 
 		Provisioner:          defaultProvisioner,
 		AllowVolumeExpansion: &allowVolumeExpansion,
 	}
-	gomega.Expect(testCtx.Cli.Create(testCtx.Ctx, sc)).Should(gomega.Succeed())
+	gomega.Expect(testCtx.Create(testCtx.Ctx, sc)).Should(gomega.Succeed())
 	return sc
 }
 

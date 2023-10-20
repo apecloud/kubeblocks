@@ -172,11 +172,6 @@ spec:
                         the component service. If specified, the account must be defined
                         in @SystemAccounts. Cannot be updated.
                       type: string
-                    credentialSecret:
-                      description: 'TODO: how to use the secret? CredentialSecret
-                        specifies the secret used to access the component service.
-                        Cannot be updated.'
-                      type: string
                     name:
                       description: The name of the ConnectionCredential. Cannot be
                         updated.
@@ -186,6 +181,16 @@ spec:
                         the component service. If the service has multiple ports,
                         a specific port must be specified to use here. Otherwise,
                         the unique port of the service will be used. Cannot be updated.
+                      type: string
+                    secretName:
+                      description: 'TODO: how to use the secret? SecretName specifies
+                        the name of existed secret used to access the component service.
+                        Cannot be updated.'
+                      type: string
+                    secretNamespace:
+                      description: SecretNamespace specifies the namespace existed
+                        secret used to access the component service. If not specified,
+                        the namespace component existed will be used. Cannot be updated.
                       type: string
                     serviceName:
                       description: ServiceName specifies the name of component service

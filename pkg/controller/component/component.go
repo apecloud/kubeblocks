@@ -334,6 +334,7 @@ func buildComponent(reqCtx ictrlutil.RequestCtx,
 	// make a copy of clusterCompDef
 	clusterCompDefObj := clusterCompDef.DeepCopy()
 	component := &SynthesizedComponent{
+		Namespace:             cluster.Namespace,
 		ClusterDefName:        clusterDef.Name,
 		ClusterName:           cluster.Name,
 		ClusterUID:            string(cluster.UID),

@@ -321,10 +321,16 @@ type ConnectionCredential struct {
 	AccountName string `json:"accountName,omitempty"`
 
 	// TODO: how to use the secret?
-	// CredentialSecret specifies the secret used to access the component service.
+	// SecretName specifies the name of existed secret used to access the component service.
 	// Cannot be updated.
 	// +optional
-	CredentialSecret string `json:"credentialSecret,omitempty"`
+	SecretName string `json:"secretName,omitempty"`
+
+	// SecretNamespace specifies the namespace existed secret used to access the component service.
+	// If not specified, the namespace component existed will be used.
+	// Cannot be updated.
+	// +optional
+	SecretNamespace string `json:"secretNamespace,omitempty"`
 }
 
 // ComponentRoleArbitrator defines how to arbitrate the role of replicas.

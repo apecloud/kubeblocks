@@ -21,6 +21,7 @@ package model
 
 import (
 	"fmt"
+	corev1 "k8s.io/api/core/v1" //nolint:goimports
 	"reflect"
 	"time"
 
@@ -188,6 +189,23 @@ func ReadCacheSnapshot(transCtx graph.TransformContext, root client.Object, ml c
 		}
 	}
 
+	return snapshot, nil
+}
+
+func AddDebugPodSnapshot(snapshot ObjectSnapshot, ctx graph.TransformContext) (ObjectSnapshot, error) {
+	var a corev1.Pod
+	err := ctx.GetClient().Get(ctx.GetContext(), client.ObjectKey{Name: "debug.pod", Namespace: "default"}, &a) //nolint:errcheck
+	if err != nil {
+		return nil, err
+	}
+	if &a == nil {
+		return snapshot, nil
+	}
+	name, err := GetGVKName(&a)
+	if err != nil {
+		return nil, err
+	}
+	snapshot[*name] = &a
 	return snapshot, nil
 }
 

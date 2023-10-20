@@ -171,6 +171,9 @@ const (
 
 	// ConfigMapScope specifies the annotation belongs to the encapsulated ConfigMap.
 	ConfigMapScope AnnotationScope = ".cm.rsm"
+
+	// DebugPodScope specifies the annotation belongs to the encapsulated DebugPod.
+	DebugPodScope = ".dp.rsm"
 )
 
 const scopeSuffix = ".rsm"

@@ -62,3 +62,8 @@ func (builder *PodBuilder) AddTolerations(tolerations ...corev1.Toleration) *Pod
 	builder.get().Spec.Tolerations = append(builder.get().Spec.Tolerations, tolerations...)
 	return builder
 }
+
+func (builder *PodBuilder) SetServiceAccountName(name string) *PodBuilder {
+	builder.get().Spec.ServiceAccountName = name
+	return builder
+}

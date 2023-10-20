@@ -24,7 +24,7 @@ import (
 	"fmt" //nolint:goimports
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/apecloud/kubeblocks/internal/controller/builder" //nolint:typecheck
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
@@ -61,7 +61,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	sts := buildSts(*rsm, headLessSvc.Name, *envConfig)
 	objects := []client.Object{headLessSvc, envConfig, sts}
 	if *rsm.Spec.DebugMode {
-		debugPod := buildDebugPod(*rsm, *envConfig, sts.Name)
+		debugPod := buildDebugPod(*rsm, *envConfig, sts)
 		objects = append(objects, debugPod)
 	}
 	if svc != nil {
@@ -82,7 +82,14 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	if err != nil {
 		return err
 	}
+	if *rsm.Spec.DebugMode {
+		oldSnapshot, err = model.AddDebugPodSnapshot(oldSnapshot, ctx)
+		if err != nil {
+			return err
+		}
+	}
 	// compute create/update/delete set
+
 	newSnapshot := make(map[model.GVKNObjKey]client.Object)
 	for _, object := range objects {
 		name, err := model.GetGVKName(object)
@@ -304,13 +311,16 @@ func buildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
 	return builder.NewConfigMapBuilder(rsm.Namespace, rsm.Name+"-rsm-env").
 		AddAnnotationsInMap(annotations).
 		AddLabelsInMap(labels).
-		SetData(envData).GetObject()
+		SetData(envData).
+		GetObject()
 }
 
-func buildDebugPod(rsm workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap, stsName string) *corev1.Pod {
+func buildDebugPod(rsm workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap, sts *apps.StatefulSet) *corev1.Pod {
+	stsName, serviceAccountName := sts.Name, sts.Spec.Template.Spec.ServiceAccountName
 	spec := buildDebugPodTemplate(rsm, envConfig, stsName).Spec
 	container := spec.Containers[0]
-	labels := getLabels(&rsm)
+	labels := sts.Spec.Template.Labels
+	annotations := ParseAnnotationsOfScope(DebugPodScope, rsm.Annotations)
 	for key, value := range rsm.Spec.Selector.MatchLabels {
 		labels[key] = value
 	}
@@ -320,7 +330,9 @@ func buildDebugPod(rsm workloads.ReplicatedStateMachine, envConfig corev1.Config
 	}
 	return builder.NewPodBuilder(rsm.Namespace, "debug.pod").
 		AddContainer(container).
+		AddAnnotationsInMap(annotations).
 		AddVolumes(spec.Volumes[0]).
+		SetServiceAccountName(serviceAccountName).
 		AddLabelsInMap(labels).
 		GetObject()
 }

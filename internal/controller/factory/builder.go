@@ -332,13 +332,13 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		SetServiceName(rsmName + "-headless").
 		SetReplicas(component.Replicas).
 		SetTemplate(template)
-
 	var vcts []corev1.PersistentVolumeClaim
 	for _, vct := range component.VolumeClaimTemplates {
 		vcts = append(vcts, vctToPVC(vct))
 	}
 	rsmBuilder.SetVolumeClaimTemplates(vcts...)
 
+	rsmBuilder.SetDebugMode(component.RSMSpec.DebugMode)
 	if component.StatefulSetWorkload != nil {
 		podManagementPolicy, updateStrategy := component.StatefulSetWorkload.FinalStsUpdateStrategy()
 		rsmBuilder.SetPodManagementPolicy(podManagementPolicy).SetUpdateStrategy(updateStrategy)

@@ -27,10 +27,13 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	appsv1 "k8s.io/api/apps/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -51,6 +54,8 @@ var (
 	# Upgrade KubeBlocks other settings, for example, set replicaCount to 3
 	kbcli kubeblocks upgrade --set replicaCount=3`)
 )
+
+type getDeploymentFunc func(client kubernetes.Interface) (*appsv1.Deployment, error)
 
 func newUpgradeCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &InstallOptions{
@@ -81,6 +86,7 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra
 }
 
 func (o *InstallOptions) Upgrade() error {
+	klog.V(1).Info("##### Start to upgrade KubeBlocks #####")
 	if o.HelmCfg.Namespace() == "" {
 		ns, err := util.GetKubeBlocksNamespace(o.Client)
 		if err != nil || ns == "" {
@@ -119,8 +125,7 @@ func (o *InstallOptions) Upgrade() error {
 		return err
 	}
 
-	// double check for KubeBlocks upgrade
-	// and only check when KubeBlocks version change
+	// double check when KubeBlocks version change
 	if !o.autoApprove && o.Version != "" {
 		oldVersion, err := version.NewVersion(kbVersion)
 		if err != nil {
@@ -156,7 +161,15 @@ func (o *InstallOptions) Upgrade() error {
 	// KubeBlocks after upgrade.
 	s = spinner.New(o.Out, spinnerMsg("Stop KubeBlocks "+kbVersion))
 	defer s.Fail()
-	if err = o.stopKubeBlocks(); err != nil {
+	if err = o.stopDeployment(util.GetKubeBlocksDeploy); err != nil {
+		return err
+	}
+	s.Success()
+
+	// stop the data protection deployment
+	s = spinner.New(o.Out, spinnerMsg("Stop DataProtection"))
+	defer s.Fail()
+	if err = o.stopDeployment(util.GetDataProtectionDeploy); err != nil {
 		return err
 	}
 	s.Success()
@@ -186,37 +199,40 @@ func (o *InstallOptions) upgradeChart() error {
 	return o.buildChart().Upgrade(o.HelmCfg)
 }
 
-// stopKubeBlocks stops the old version KubeBlocks by setting the replicas of
-// KubeBlocks deployment to 0
-func (o *InstallOptions) stopKubeBlocks() error {
-	kbDeploy, err := util.GetKubeBlocksDeploy(o.Client)
+// stopDeployment stops the deployment by setting the replicas to 0
+func (o *InstallOptions) stopDeployment(getDeployFn getDeploymentFunc) error {
+	deploy, err := getDeployFn(o.Client)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
 		return err
 	}
 
-	// if KubeBlocks is not deployed, just return
-	if kbDeploy == nil {
-		klog.V(1).Info("KubeBlocks is not deployed, no need to stop")
+	if deploy == nil {
+		klog.V(1).Info("deployment is not found, no need to stop")
 		return nil
 	}
 
-	if _, err = o.Client.AppsV1().Deployments(kbDeploy.Namespace).Patch(
-		context.TODO(), kbDeploy.Name, apitypes.JSONPatchType,
+	if _, err = o.Client.AppsV1().Deployments(deploy.Namespace).Patch(
+		context.TODO(), deploy.Name, apitypes.JSONPatchType,
 		[]byte(`[{"op": "replace", "path": "/spec/replicas", "value": 0}]`),
 		metav1.PatchOptions{}); err != nil {
 		return err
 	}
 
-	// wait for KubeBlocks to be stopped
-	return wait.PollImmediate(5*time.Second, o.Timeout, func() (bool, error) {
-		kbDeploy, err = util.GetKubeBlocksDeploy(o.Client)
-		if err != nil {
-			return false, err
-		}
-		if *kbDeploy.Spec.Replicas == 0 && kbDeploy.Status.Replicas == 0 &&
-			kbDeploy.Status.AvailableReplicas == 0 {
-			return true, nil
-		}
-		return false, nil
-	})
+	// wait for deployment to be stopped
+	return wait.PollUntilContextTimeout(context.Background(), 5*time.Second, o.Timeout, true,
+		func(_ context.Context) (bool, error) {
+			deploy, err = util.GetKubeBlocksDeploy(o.Client)
+			if err != nil {
+				return false, err
+			}
+			if *deploy.Spec.Replicas == 0 &&
+				deploy.Status.Replicas == 0 &&
+				deploy.Status.AvailableReplicas == 0 {
+				return true, nil
+			}
+			return false, nil
+		})
 }

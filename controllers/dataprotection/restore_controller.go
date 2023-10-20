@@ -38,10 +38,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	dprestore "github.com/apecloud/kubeblocks/internal/dataprotection/restore"
-	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 // RestoreReconciler reconciles a Restore object
@@ -165,6 +165,7 @@ func (r *RestoreReconciler) inProgressAction(reqCtx intctrlutil.RequestCtx, rest
 		err = r.Client.Status().Patch(reqCtx.Ctx, restoreMgr.Restore, client.MergeFrom(restoreMgr.OriginalRestore))
 	}
 	if err != nil {
+		r.Recorder.Event(restore, corev1.EventTypeWarning, corev1.EventTypeWarning, err.Error())
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
@@ -267,7 +268,7 @@ func (r *RestoreReconciler) postReady(reqCtx intctrlutil.RequestCtx, restoreMgr 
 		r.handleRestoreStageError(restoreMgr.Restore, dpv1alpha1.PrepareData, err)
 	}()
 	if readyConfig.ReadinessProbe != nil && !meta.IsStatusConditionTrue(restoreMgr.Restore.Status.Conditions, dprestore.ConditionTypeReadinessProbe) {
-		// TODO: check readiness probe, use a job or exec?
+		// TODO: check readiness probe, use a job and kubectl exec?
 		_ = klog.TODO()
 	}
 	for _, v := range restoreMgr.PostReadyBackupSets {
@@ -320,14 +321,14 @@ func (r *RestoreReconciler) handleBackupActionSet(reqCtx intctrlutil.RequestCtx,
 	switch stage {
 	case dpv1alpha1.PrepareData:
 		if backupSet.UseVolumeSnapshot {
-			if err = restoreMgr.RestorePVCFromSnapshot(reqCtx, r.Client, backupSet, actionName); err != nil {
+			if err = restoreMgr.RestorePVCFromSnapshot(reqCtx, r.Client, backupSet); err != nil {
 				return false, nil
 			}
 		}
 		jobs, err = restoreMgr.BuildPrepareDataJobs(reqCtx, r.Client, backupSet, actionName)
 	case dpv1alpha1.PostReady:
 		// 2. build jobs for postReady action
-		jobs, err = restoreMgr.BuildPostReadyActionJobs(reqCtx, r.Client, backupSet, backupSet.ActionSet.Spec.Restore.PostReady[step])
+		jobs, err = restoreMgr.BuildPostReadyActionJobs(reqCtx, r.Client, backupSet, step)
 	}
 	if err != nil {
 		return false, err

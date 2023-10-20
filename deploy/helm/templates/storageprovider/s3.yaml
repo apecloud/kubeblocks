@@ -46,6 +46,7 @@ spec:
     region = {{ `{{ index .Parameters "region" }}` }}
     endpoint = {{ `{{ index .Parameters "endpoint" }}` }}
     root = {{ `{{ index .Parameters "bucket" }}` }}
+    chunk_size = 50Mi
 
   parametersSchema:
     openAPIV3Schema:

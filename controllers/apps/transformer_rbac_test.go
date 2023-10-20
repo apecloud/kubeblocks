@@ -32,13 +32,12 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/factory"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/factory"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("object rbac transformer test.", func() {
@@ -55,6 +54,7 @@ var _ = Describe("object rbac transformer test.", func() {
 	var ctx context.Context
 	var logger logr.Logger
 	var dag *graph.DAG
+	var graphCli model.GraphClient
 	var transformer graph.Transformer
 	var cluster *appsv1alpha1.Cluster
 	var clusterDefObj *appsv1alpha1.ClusterDefinition
@@ -80,16 +80,18 @@ var _ = Describe("object rbac transformer test.", func() {
 			Name:      serviceAccountName,
 		}
 
-		transCtx = &ClusterTransformContext{
+		graphCli = model.NewGraphClient(k8sClient)
+
+		transCtx = &clusterTransformContext{
 			Context:       ctx,
-			Client:        k8sClient,
+			Client:        graphCli,
 			EventRecorder: nil,
 			Logger:        logger,
 			Cluster:       cluster,
 			ClusterDef:    clusterDefObj,
 		}
 
-		dag = mockDAG(cluster)
+		dag = mockDAG(graphCli, cluster)
 		transformer = &RBACTransformer{}
 		allSettings = viper.AllSettings()
 		viper.SetDefault(constant.EnableRBACManager, true)
@@ -111,14 +113,20 @@ var _ = Describe("object rbac transformer test.", func() {
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
 
 			serviceAccount := factory.BuildServiceAccount(cluster)
-			serviceAccount.Name = serviceAccountName
-
 			roleBinding := factory.BuildRoleBinding(cluster)
-			roleBinding.Subjects[0].Name = serviceAccountName
 
-			dagExpected := mockDAG(cluster)
-			ictrltypes.LifecycleObjectCreate(dagExpected, serviceAccount, nil)
-			ictrltypes.LifecycleObjectCreate(dagExpected, roleBinding, nil)
+			dagExpected := mockDAG(graphCli, cluster)
+			graphCli.Create(dagExpected, serviceAccount)
+			graphCli.Create(dagExpected, roleBinding)
+			graphCli.DependOn(dagExpected, roleBinding, serviceAccount)
+			stsList := graphCli.FindAll(dagExpected, &appsv1.StatefulSet{})
+			for i := range stsList {
+				graphCli.DependOn(dagExpected, stsList[i], serviceAccount)
+			}
+			deployList := graphCli.FindAll(dagExpected, &appsv1.Deployment{})
+			for i := range deployList {
+				graphCli.DependOn(dagExpected, deployList[i], serviceAccount)
+			}
 			Expect(dag.Equals(dagExpected, model.DefaultLess)).Should(BeTrue())
 		})
 
@@ -129,31 +137,34 @@ var _ = Describe("object rbac transformer test.", func() {
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
 
 			serviceAccount := factory.BuildServiceAccount(cluster)
-			serviceAccount.Name = serviceAccountName
-
 			roleBinding := factory.BuildRoleBinding(cluster)
-			roleBinding.Subjects[0].Name = serviceAccountName
-
 			clusterRoleBinding := factory.BuildClusterRoleBinding(cluster)
-			clusterRoleBinding.Subjects[0].Name = serviceAccountName
 
-			dagExpected := mockDAG(cluster)
-			ictrltypes.LifecycleObjectCreate(dagExpected, serviceAccount, nil)
-			ictrltypes.LifecycleObjectCreate(dagExpected, roleBinding, nil)
-			ictrltypes.LifecycleObjectCreate(dagExpected, clusterRoleBinding, nil)
+			dagExpected := mockDAG(graphCli, cluster)
+			graphCli.Create(dagExpected, serviceAccount)
+			graphCli.Create(dagExpected, roleBinding)
+			graphCli.Create(dagExpected, clusterRoleBinding)
+			graphCli.DependOn(dagExpected, roleBinding, clusterRoleBinding)
+			graphCli.DependOn(dagExpected, clusterRoleBinding, serviceAccount)
+			stsList := graphCli.FindAll(dagExpected, &appsv1.StatefulSet{})
+			for i := range stsList {
+				graphCli.DependOn(dagExpected, stsList[i], serviceAccount)
+			}
+			deployList := graphCli.FindAll(dagExpected, &appsv1.Deployment{})
+			for i := range deployList {
+				graphCli.DependOn(dagExpected, deployList[i], serviceAccount)
+			}
 			Expect(dag.Equals(dagExpected, model.DefaultLess)).Should(BeTrue())
 		})
 	})
 })
 
-func mockDAG(cluster *appsv1alpha1.Cluster) *graph.DAG {
+func mockDAG(graphCli model.GraphClient, cluster *appsv1alpha1.Cluster) *graph.DAG {
 	d := graph.NewDAG()
-	ictrltypes.LifecycleObjectCreate(d, cluster, nil)
-	root, err := ictrltypes.FindRootVertex(d)
-	Expect(err).Should(BeNil())
+	graphCli.Root(d, cluster, cluster, model.ActionStatusPtr())
 	sts := &appsv1.StatefulSet{}
-	ictrltypes.LifecycleObjectCreate(d, sts, root)
+	graphCli.Create(d, sts)
 	deploy := &appsv1.Deployment{}
-	ictrltypes.LifecycleObjectCreate(d, deploy, root)
+	graphCli.Create(d, deploy)
 	return d
 }

@@ -37,7 +37,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 	. "github.com/apecloud/kubeblocks/test/e2e"
 	. "github.com/apecloud/kubeblocks/test/e2e/envcheck"
 	. "github.com/apecloud/kubeblocks/test/e2e/installation"

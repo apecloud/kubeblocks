@@ -35,10 +35,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	. "github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 func TestNewClientWithPod(t *testing.T) {
@@ -51,12 +51,12 @@ func TestNewClientWithPod(t *testing.T) {
 		GetObject()
 	pod.Spec.Containers[0].Ports = []corev1.ContainerPort{{
 		ContainerPort: int32(3501),
-		Name:          constant.ProbeHTTPPortName,
+		Name:          constant.LorryHTTPPortName,
 		Protocol:      "TCP",
 	},
 		{
 			ContainerPort: int32(port),
-			Name:          constant.ProbeGRPCPortName,
+			Name:          constant.LorryGRPCPortName,
 			Protocol:      "TCP",
 		},
 	}
@@ -319,12 +319,12 @@ func initSQLChannelClient(httpPort int, t *testing.T) (*OperationClient, func(),
 	pod.Spec.Containers[0].Ports = []corev1.ContainerPort{
 		{
 			ContainerPort: int32(httpPort),
-			Name:          constant.ProbeHTTPPortName,
+			Name:          constant.LorryHTTPPortName,
 			Protocol:      "TCP",
 		},
 		{
 			ContainerPort: int32(port),
-			Name:          constant.ProbeGRPCPortName,
+			Name:          constant.LorryGRPCPortName,
 			Protocol:      "TCP",
 		},
 	}

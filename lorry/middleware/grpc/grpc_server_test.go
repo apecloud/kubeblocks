@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	health "google.golang.org/grpc/health/grpc_health_v1"
 
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/binding"
 	"github.com/apecloud/kubeblocks/lorry/middleware/probe"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 func TestNewServer(t *testing.T) {

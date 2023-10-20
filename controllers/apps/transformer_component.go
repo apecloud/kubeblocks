@@ -20,14 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // ComponentTransformer transforms all components to a K8s objects DAG
@@ -38,7 +41,7 @@ type ComponentTransformer struct {
 var _ graph.Transformer = &ComponentTransformer{}
 
 func (c *ComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*ClusterTransformContext)
+	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster
 
 	clusterDef := transCtx.ClusterDef
@@ -64,7 +67,7 @@ func (c *ComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.
 
 	for _, subDag := range dags4Component {
 		for _, v := range subDag.Vertices() {
-			node, ok := v.(*ictrltypes.LifecycleVertex)
+			node, ok := v.(*model.ObjectVertex)
 			if !ok {
 				panic("runtime error, unexpected lifecycle vertex type")
 			}
@@ -100,7 +103,7 @@ func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx,
 	deleteSet := compStatus.Difference(compProto)
 
 	for compName := range createSet {
-		dag := graph.NewDAG()
+		dag := newDAGWithPlaceholder(cluster.Namespace, cluster.Name, compName)
 		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compName, dag)
 		if err != nil {
 			return err
@@ -115,21 +118,22 @@ func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx,
 	}
 
 	for compName := range deleteSet {
-		dag := graph.NewDAG()
+		dag := newDAGWithPlaceholder(cluster.Namespace, cluster.Name, compName)
 		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compName, dag)
 		if err != nil {
 			return err
 		}
-		if comp != nil {
-			if err := comp.Delete(reqCtx, c.Client); err != nil {
-				return err
-			}
+		if comp == nil {
+			continue
+		}
+		if err := comp.Delete(reqCtx, c.Client); err != nil {
+			return err
 		}
 		*dags = append(*dags, dag)
 	}
 
 	for compName := range updateSet {
-		dag := graph.NewDAG()
+		dag := newDAGWithPlaceholder(cluster.Namespace, cluster.Name, compName)
 		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compName, dag)
 		if err != nil {
 			return err
@@ -147,7 +151,7 @@ func (c *ComponentTransformer) transform4StatusUpdate(reqCtx ictrlutil.RequestCt
 	clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster, dags *[]*graph.DAG) error {
 	var delayedError error
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		dag := graph.NewDAG()
+		dag := newDAGWithPlaceholder(cluster.Namespace, cluster.Name, compSpec.Name)
 		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compSpec.Name, dag)
 		if err != nil {
 			return err
@@ -163,4 +167,11 @@ func (c *ComponentTransformer) transform4StatusUpdate(reqCtx ictrlutil.RequestCt
 		*dags = append(*dags, dag)
 	}
 	return delayedError
+}
+
+func newDAGWithPlaceholder(namespace, clusterName, compName string) *graph.DAG {
+	root := builder.NewReplicatedStateMachineBuilder(namespace, fmt.Sprintf("%s-%s", clusterName, compName)).GetObject()
+	dag := graph.NewDAG()
+	model.NewGraphClient(nil).Root(dag, nil, root, nil)
+	return dag
 }

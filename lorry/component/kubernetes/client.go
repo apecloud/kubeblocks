@@ -1,6 +1,8 @@
 package kubernetes
 
 import (
+	"errors"
+
 	"github.com/go-logr/logr"
 	"k8s.io/client-go/kubernetes"
 	ctlruntime "sigs.k8s.io/controller-runtime"
@@ -30,6 +32,7 @@ func GetRESTClient(logger logr.Logger) (*rest.RESTClient, error) {
 	restConfig, err := ctlruntime.GetConfig()
 	if err != nil {
 		logger.Error(err, "kubeconfig not found")
+		return nil, errors.New("kubeconfig not found")
 	}
 	_ = appsv1alpha1.AddToScheme(clientsetscheme.Scheme)
 	restConfig.GroupVersion = &appsv1alpha1.GroupVersion

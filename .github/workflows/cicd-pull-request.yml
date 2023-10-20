@@ -24,7 +24,7 @@ jobs:
           all_but_latest: true
           access_token: ${{ github.token }}
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           repository: ${{ github.event.pull_request.head.repo.full_name }}
@@ -43,7 +43,7 @@ jobs:
 
           TEST_PACKAGES=`bash .github/utils/utils.sh --type 16 \
               --trigger-type "$TRIGGER_MODE" \
-              --test-pkgs "internal|apis|controllers|cmd" \
+              --test-pkgs "pkg|apis|controllers|cmd|lorry" \
               --test-check "mod-vendor|lint|staticcheck"`
           echo "$TEST_PACKAGES"
           echo "matrix={\"include\":[$TEST_PACKAGES]}" >> $GITHUB_OUTPUT
@@ -57,7 +57,7 @@ jobs:
       fail-fast: true
       matrix: ${{ fromJSON(needs.trigger-mode.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: install lib
         run: |
           sudo apt-get update
@@ -73,7 +73,7 @@ jobs:
       - name: Install golangci-lint
         if: matrix.ops == 'lint'
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.51.2
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
 
       - name: make test ${{ matrix.ops }}
         if: ${{ ! contains(matrix.ops, '/') }}
@@ -92,7 +92,7 @@ jobs:
       runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
     runs-on: [ self-hosted, gke-runner-go1.21 ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: make mod-vendor
         run: |
           make mod-vendor
@@ -109,7 +109,7 @@ jobs:
         run: |
           bash .github/utils/utils.sh --type 14 \
               --file cover.out \
-              --ignore-pkgs "cmd/|internal/cli|internal/controller/consensusset|internal/controller/model|controllers/k8score"
+              --ignore-pkgs "cmd/|pkg/cli|pkg/client|pkg/controller/model|controllers/k8score"
 
       - name: upload coverage report
         uses: codecov/codecov-action@v3
@@ -133,7 +133,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && github.event.pull_request.head.repo.full_name != github.repository && always()  }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: remove runner
         run: |
           bash .github/utils/utils.sh --type 9 \
@@ -205,7 +205,7 @@ jobs:
       matrix:
         os: [linux-amd64, darwin-arm64]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: install lib
         run: |
           sudo apt-get update

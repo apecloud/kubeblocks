@@ -13,7 +13,7 @@ run-name: ref_name:${{ github.ref_name }} release_version:${{ inputs.release_ver
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   RELEASE_BOT_WEBHOOK: ${{ secrets.RELEASE_BOT_WEBHOOK }}
-
+  GO_VERSION: "1.21"
 
 jobs:
   release-message:
@@ -21,7 +21,7 @@ jobs:
     outputs:
       matrix: ${{ steps.get_trigger_mode.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: release message
         id: get_trigger_mode
         run: |
@@ -42,7 +42,7 @@ jobs:
       fail-fast: true
       matrix: ${{ fromJSON(needs.release-message.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: install lib
         run: |
           sudo apt-get update
@@ -58,7 +58,7 @@ jobs:
       - name: Install golangci-lint
         if: matrix.ops == 'lint'
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.51.2
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
 
       - name: make test ${{ matrix.ops }}
         run: |
@@ -74,7 +74,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout branch ${{ github.ref_name }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: push tag
         uses: mathieudutour/github-tag-action@v6.1
         with:
@@ -87,7 +87,7 @@ jobs:
     needs: release-version
     if: ${{ failure() || cancelled() }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: send message
         run: |
           bash .github/utils/utils.sh --type 12 \

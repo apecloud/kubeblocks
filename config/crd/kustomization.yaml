@@ -8,6 +8,8 @@ resources:
 - bases/apps.kubeblocks.io_clusterversions.yaml
 - bases/apps.kubeblocks.io_configconstraints.yaml
 - bases/apps.kubeblocks.io_opsrequests.yaml
+- bases/dataprotection.kubeblocks.io_actionsets.yaml
+- bases/dataprotection.kubeblocks.io_backupschedules.yaml
 - bases/dataprotection.kubeblocks.io_backuppolicies.yaml
 - bases/dataprotection.kubeblocks.io_backups.yaml
 - bases/extensions.kubeblocks.io_addons.yaml

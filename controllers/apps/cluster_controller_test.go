@@ -54,16 +54,16 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
-	"github.com/apecloud/kubeblocks/internal/common"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testdp "github.com/apecloud/kubeblocks/internal/testutil/dataprotection"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	lorry "github.com/apecloud/kubeblocks/lorry/client"
+	"github.com/apecloud/kubeblocks/pkg/common"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
+	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (
@@ -388,7 +388,10 @@ var _ = Describe("Cluster Controller", func() {
 		backup := testdp.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 			SetBackupPolicyName(backupPolicyName).
 			SetBackupMethod(backupMethod).
-			SetLabels(map[string]string{constant.AppInstanceLabelKey: clusterKey.Name, constant.BackupProtectionLabelKey: constant.BackupRetain}).
+			SetLabels(map[string]string{
+				constant.AppInstanceLabelKey:      clusterKey.Name,
+				constant.BackupProtectionLabelKey: constant.BackupRetain,
+			}).
 			WithRandomName().
 			Create(&testCtx).GetObject()
 		backupKey := client.ObjectKeyFromObject(backup)
@@ -882,7 +885,6 @@ var _ = Describe("Cluster Controller", func() {
 
 		// REVIEW: this test flow, wait for running phase?
 		testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
-		viper.Set(constant.CfgKeyBackupPVCName, "")
 
 		horizontalScale(int(updatedReplicas), testk8s.DefaultStorageClassName, dataClonePolicy, compDefName)
 	}
@@ -1500,7 +1502,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		// trigger rsm to reconcile as the underlying sts is not created
 		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(sts), func(rsm *workloads.ReplicatedStateMachine) {
-			rsm.Annotations = map[string]string{"time": time.Now().Format(time.RFC3339)}
+			rsm.Annotations["time"] = time.Now().Format(time.RFC3339)
 		})()).Should(Succeed())
 		By("Checking pods' annotations")
 		Eventually(func(g Gomega) {
@@ -1790,13 +1792,14 @@ var _ = Describe("Cluster Controller", func() {
 				factory.SetReplicas(3)
 			}, true)
 
-			By("Check stateless workload has been created")
-			Eventually(testapps.List(&testCtx, generics.RSMSignature,
-				client.MatchingLabels{
-					constant.AppInstanceLabelKey:    clusterKey.Name,
-					constant.KBAppComponentLabelKey: statelessCompName,
-				}, client.InNamespace(clusterKey.Namespace))).ShouldNot(HaveLen(0))
-
+			for compName := range compNameNDef {
+				By(fmt.Sprintf("Check %s workload has been created", compName))
+				Eventually(testapps.List(&testCtx, generics.RSMSignature,
+					client.MatchingLabels{
+						constant.AppInstanceLabelKey:    clusterKey.Name,
+						constant.KBAppComponentLabelKey: compName,
+					}, client.InNamespace(clusterKey.Namespace))).ShouldNot(HaveLen(0))
+			}
 			rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
 
 			By("Check stateful pod's volumes")
@@ -1819,6 +1822,18 @@ var _ = Describe("Cluster Controller", func() {
 					}
 				}
 			}
+
+			By("Check associated Secret has been created")
+			Eventually(testapps.List(&testCtx, generics.SecretSignature,
+				client.MatchingLabels{
+					constant.AppInstanceLabelKey: clusterKey.Name,
+				})).ShouldNot(BeEmpty())
+
+			By("Check associated CM has been created")
+			Eventually(testapps.List(&testCtx, generics.ConfigMapSignature,
+				client.MatchingLabels{
+					constant.AppInstanceLabelKey: clusterKey.Name,
+				})).ShouldNot(BeEmpty())
 
 			By("Check associated PDB has been created")
 			Eventually(testapps.List(&testCtx, generics.PodDisruptionBudgetSignature,
@@ -1997,13 +2012,11 @@ var _ = Describe("Cluster Controller", func() {
 
 		It("should successfully h-scale with multiple components", func() {
 			testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
-			viper.Set(constant.CfgKeyBackupPVCName, "")
 			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 		})
 
 		It("should successfully h-scale with multiple components by backup tool", func() {
 			testk8s.MockDisableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
-			viper.Set(constant.CfgKeyBackupPVCName, "test-backup-pvc")
 			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 		})
 	})
@@ -2019,7 +2032,7 @@ var _ = Describe("Cluster Controller", func() {
 		BeforeEach(func() {
 			cleanEnv()
 			createAllWorkloadTypesClusterDef()
-			createBackupPolicyTpl(clusterDefObj)
+			createBackupPolicyTpl(clusterDefObj, clusterVersionName)
 		})
 
 		createClusterWithBackup := func(backup *appsv1alpha1.ClusterBackup) {
@@ -2122,8 +2135,20 @@ var _ = Describe("Cluster Controller", func() {
 
 				checkPolicy := func(g Gomega, policy *dpv1alpha1.BackupPolicy) {
 					if backup != nil && backup.RepoName != "" {
-						Expect(*policy.Spec.BackupRepoName).Should(BeEquivalentTo(backup.RepoName))
+						g.Expect(*policy.Spec.BackupRepoName).Should(BeEquivalentTo(backup.RepoName))
 					}
+					g.Expect(policy.Spec.BackupMethods).ShouldNot(BeEmpty())
+					// expect for image tage env in backupMethod
+					var existImageTagEnv bool
+					for _, v := range policy.Spec.BackupMethods {
+						for _, e := range v.Env {
+							if e.Name == testapps.EnvKeyImageTag && e.Value == testapps.DefaultImageTag {
+								existImageTagEnv = true
+								break
+							}
+						}
+					}
+					g.Expect(existImageTagEnv).Should(BeTrue())
 				}
 
 				By("checking backup policy")
@@ -2279,7 +2304,6 @@ var _ = Describe("Cluster Controller", func() {
 				It("scale-out with data clone policy", func() {
 					testVolumeExpansion(compName, compDefName, mockStorageClass)
 					testk8s.MockEnableVolumeSnapshot(&testCtx, mockStorageClass.Name)
-					viper.Set(constant.CfgKeyBackupPVCName, "")
 					horizontalScale(5, mockStorageClass.Name, appsv1alpha1.HScaleDataClonePolicyCloneVolume, compDefName)
 				})
 
@@ -2583,14 +2607,14 @@ var _ = Describe("Cluster Controller", func() {
 	})
 })
 
-func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition) {
+func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition, mappingClusterVersions ...string) {
 	By("Creating a BackupPolicyTemplate")
 	bpt := testapps.NewBackupPolicyTemplateFactory(backupPolicyTPLName).
 		AddLabels(constant.ClusterDefLabelKey, clusterDefObj.Name).
 		SetClusterDefRef(clusterDefObj.Name)
 	for _, v := range clusterDefObj.Spec.ComponentDefs {
 		bpt = bpt.AddBackupPolicy(v.Name).
-			AddBackupMethod(backupMethodName, false, actionSetName).
+			AddBackupMethod(backupMethodName, false, actionSetName, mappingClusterVersions...).
 			SetBackupMethodVolumeMounts("data", "/data").
 			AddBackupMethod(vsBackupMethodName, true, vsActionSetName).
 			SetBackupMethodVolumes([]string{"data"}).

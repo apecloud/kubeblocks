@@ -29,12 +29,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
-	"github.com/apecloud/kubeblocks/internal/configuration/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
+	"github.com/apecloud/kubeblocks/pkg/configuration/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // ExecStatus defines running result for Reconfiguring policy (fsm).
@@ -104,9 +105,10 @@ type reconfigureParams struct {
 
 	// List of StatefulSets using this config template.
 	ComponentUnits []appsv1.StatefulSet
-
 	// List of Deployment using this config template.
 	DeploymentUnits []appsv1.Deployment
+	// List of ReplicatedStateMachine using this config template.
+	RSMList []workloads.ReplicatedStateMachine
 }
 
 var (

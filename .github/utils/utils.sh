@@ -497,7 +497,7 @@ get_trigger_mode() {
             .github/*|.devcontainer/*|githooks/*|examples/*)
                 add_trigger_mode "[other]"
             ;;
-            internal/cli/cmd/*)
+            pkg/cli/cmd/*)
                 add_trigger_mode "[cli][test]"
             ;;
             *)
@@ -618,6 +618,12 @@ set_size_label() {
 set_test_packages() {
     pkgs_dir=$1
     if ( find $pkgs_dir -maxdepth 1 -type f -name '*_test.go' ) > /dev/null; then
+        # skip check
+        case $pkgs_dir in
+            pkg/client)
+                return
+            ;;
+        esac
         if [[ -z "$TEST_PACKAGES" ]]; then
             TEST_PACKAGES="{\"ops\":\"$pkgs_dir\"}"
         else

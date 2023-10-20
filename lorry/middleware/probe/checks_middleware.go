@@ -91,7 +91,6 @@ func SetMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 		if method == http.MethodGet && strings.HasPrefix(uri.Path, bindingPath) {
 			request.Method = http.MethodPost
-
 			operation := uri.Query().Get(operationKey)
 			if strings.HasPrefix(operation, "get") || strings.HasPrefix(operation, "check") || strings.HasPrefix(operation, "list") {
 				body := getRequestBody(operation, uri.Query())

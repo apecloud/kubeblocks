@@ -30,7 +30,7 @@ spec:
     prepareData:
       image: {{ include "redis.image" . }}
       command:
-      - sh
+      - bash
       - -c
       - |
         {{- .Files.Get "dataprotection/restore.sh" | nindent 8 }}

@@ -192,7 +192,7 @@ func TestPostgresIntegration(t *testing.T) {
 // 1. export PGUSER=potgres
 // 2. export PGPASSWORD=<your-pg-password>
 // 4. export POSTGRES_TEST_CONN_URL="postgres://${PGUSER}:${PGPASSWORD}@localhost:5432/postgres"
-// 5. `go test -v -count=1 ./cmd/probe/internal/binding/postgres -run ^TestPostgresIntegrationAccounts`
+// 5. `go test -v -count=1 ./cmd/probe/pkg/binding/postgres -run ^TestPostgresIntegrationAccounts`
 func TestPostgresIntegrationAccounts(t *testing.T) {
 	url := os.Getenv("POSTGRES_TEST_CONN_URL")
 	if url == "" {

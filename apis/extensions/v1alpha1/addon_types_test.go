@@ -26,7 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	"github.com/apecloud/kubeblocks/internal/testutil"
+	"github.com/apecloud/kubeblocks/pkg/testutil"
 )
 
 func TestSelectorRequirementString(t *testing.T) {

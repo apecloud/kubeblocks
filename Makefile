@@ -15,7 +15,7 @@
 # Variables                                                                    #
 ################################################################################
 APP_NAME = kubeblocks
-VERSION ?= 0.7.0-alpha.0
+VERSION ?= 0.8.0-alpha.0
 GITHUB_PROXY ?=
 INIT_ENV ?= false
 TEST_TYPE ?= wesql
@@ -152,14 +152,14 @@ client-sdk-gen: module ## Generate CRD client code.
 .PHONY: manager-go-generate
 manager-go-generate: ## Run go generate against lifecycle manager code.
 ifeq ($(SKIP_GO_GEN), false)
-	$(GO) generate -x ./internal/configuration/proto
+	$(GO) generate -x ./pkg/configuration/proto
 endif
 
 .PHONY: test-go-generate
 test-go-generate: ## Run go generate against test code.
-	$(GO) generate -x ./internal/testutil/k8s/mocks/...
-	$(GO) generate -x ./internal/configuration/container/mocks/...
-	$(GO) generate -x ./internal/configuration/proto/mocks/...
+	$(GO) generate -x ./pkg/testutil/k8s/mocks/...
+	$(GO) generate -x ./pkg/configuration/container/mocks/...
+	$(GO) generate -x ./pkg/configuration/proto/mocks/...
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -205,7 +205,7 @@ module: ## Run go mod tidy->verify against go modules.
 	$(GO) mod tidy -compat=1.21
 	$(GO) mod verify
 
-TEST_PACKAGES ?= ./internal/... ./apis/... ./controllers/... ./cmd/...
+TEST_PACKAGES ?= ./pkg/... ./apis/... ./controllers/... ./cmd/... ./lorry/...
 
 CLUSTER_TYPES=minikube k3d
 .PHONY: add-k8s-host
@@ -284,7 +284,7 @@ kbcli-fast: build-kbcli-embed-chart
 	@mv bin/kbcli.$(OS).$(ARCH) bin/kbcli
 
 create-kbcli-embed-charts-dir:
-	mkdir -p internal/cli/cluster/charts/
+	mkdir -p pkg/cli/cluster/charts/
 build-single-kbcli-embed-chart.%: chart=$(word 2,$(subst ., ,$@))
 build-single-kbcli-embed-chart.%:
 	$(HELM) dependency update deploy/$(chart) --skip-refresh
@@ -293,7 +293,7 @@ ifeq ($(VERSION), latest)
 else
 	$(HELM) package deploy/$(chart) --version $(VERSION)
 endif
-	mv $(chart)-*.tgz internal/cli/cluster/charts/$(chart).tgz
+	mv $(chart)-*.tgz pkg/cli/cluster/charts/$(chart).tgz
 
 .PHONY: build-kbcli-embed-chart
 build-kbcli-embed-chart: helmtool create-kbcli-embed-charts-dir \
@@ -517,7 +517,7 @@ install-docker-buildx: ## Create `docker buildx` builder.
 	fi
 
 .PHONY: golangci
-golangci: GOLANGCILINT_VERSION = v1.51.2
+golangci: GOLANGCILINT_VERSION = v1.54.2
 golangci: ## Download golangci-lint locally if necessary.
 ifneq ($(shell which golangci-lint),)
 	@echo golangci-lint is already installed

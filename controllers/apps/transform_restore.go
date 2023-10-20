@@ -24,10 +24,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
-	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/plan"
+	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type RestoreTransformer struct {
@@ -37,7 +37,7 @@ type RestoreTransformer struct {
 var _ graph.Transformer = &RestoreTransformer{}
 
 func (t *RestoreTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*ClusterTransformContext)
+	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster
 	clusterDef := transCtx.ClusterDef
 	clusterVer := transCtx.ClusterVer

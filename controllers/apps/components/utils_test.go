@@ -35,13 +35,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/types"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
 func TestIsFailedOrAbnormal(t *testing.T) {
@@ -242,14 +242,14 @@ var _ = Describe("Component Utils", func() {
 					CustomLabelSpecs: []appsv1alpha1.CustomLabelSpec{customLabelSpec},
 				}
 				dag := graph.NewDAG()
-				dag.AddVertex(&types.LifecycleVertex{Obj: pods[0], Action: types.ActionUpdatePtr()})
+				dag.AddVertex(&model.ObjectVertex{Obj: pods[0], Action: model.ActionUpdatePtr()})
 				Expect(updateCustomLabelToPods(testCtx.Ctx, k8sClient, cluster, comp, dag)).Should(Succeed())
-				podVertices := types.FindAll[*corev1.Pod](dag)
-				Expect(podVertices).Should(HaveLen(3))
-				for _, vertex := range podVertices {
-					v, _ := vertex.(*types.LifecycleVertex)
-					Expect(v.Obj.GetLabels()).ShouldNot(BeNil())
-					Expect(v.Obj.GetLabels()[customLabelSpec.Key]).Should(Equal(fmt.Sprintf("%s-%s", clusterName, comp.Name)))
+				graphCli := model.NewGraphClient(k8sClient)
+				podList := graphCli.FindAll(dag, &corev1.Pod{})
+				Expect(podList).Should(HaveLen(3))
+				for _, pod := range podList {
+					Expect(pod.GetLabels()).ShouldNot(BeNil())
+					Expect(pod.GetLabels()[customLabelSpec.Key]).Should(Equal(fmt.Sprintf("%s-%s", clusterName, comp.Name)))
 				}
 			})
 		})

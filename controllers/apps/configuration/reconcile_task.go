@@ -132,5 +132,13 @@ func updateLastDoneRevision(revision ConfigurationRevision, status *appsv1alpha1
 func updateRevision(revision ConfigurationRevision, status *appsv1alpha1.ConfigurationItemDetailStatus) {
 	if revision.StrRevision == status.UpdateRevision {
 		status.Phase = revision.Phase
+		status.ReconcileDetail = &appsv1alpha1.ReconcileDetail{
+			CurrentRevision: revision.StrRevision,
+			Policy:          revision.Result.Policy,
+			SucceedCount:    revision.Result.SucceedCount,
+			ExpectedCount:   revision.Result.ExpectedCount,
+			ExecResult:      revision.Result.ExecResult,
+			ErrMessage:      revision.Result.Message,
+		}
 	}
 }

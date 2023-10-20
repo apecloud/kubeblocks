@@ -54,12 +54,18 @@ func reconciled(status ReturnedStatus, policy string, phase appsv1alpha1.Configu
 
 func unReconciled(phase appsv1alpha1.ConfigurationPhase, revision string, message string) intctrlutil.Result {
 	return intctrlutil.Result{
-		Phase:    phase,
-		Revision: revision,
-		Message:  message,
-		Failed:   false,
-		Retry:    false,
+		Phase:         phase,
+		Revision:      revision,
+		Message:       message,
+		SucceedCount:  core.Unconfirmed,
+		ExpectedCount: core.Unconfirmed,
+		Failed:        false,
+		Retry:         false,
 	}
+}
+
+func isReconciledResult(result intctrlutil.Result) bool {
+	return result.ExecResult != ""
 }
 
 func withFailed(err error, retry bool) options {
@@ -109,9 +115,12 @@ func updateConfigPhaseWithResult(cli client.Client, ctx intctrlutil.RequestCtx, 
 	}
 
 	GcConfigRevision(config)
-	result.Revision = revision
-	b, _ := json.Marshal(result)
-	config.ObjectMeta.Annotations[core.GenerateRevisionPhaseKey(revision)] = string(b)
+	if _, ok := config.ObjectMeta.Annotations[core.GenerateRevisionPhaseKey(revision)]; !ok || isReconciledResult(result) {
+		result.Revision = revision
+		b, _ := json.Marshal(result)
+		config.ObjectMeta.Annotations[core.GenerateRevisionPhaseKey(revision)] = string(b)
+	}
+
 	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
 		return intctrlutil.RequeueWithError(err, ctx.Log, "")
 	}

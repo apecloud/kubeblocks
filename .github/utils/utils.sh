@@ -636,7 +636,6 @@ set_test_packages() {
     if ( find $pkgs_dir -maxdepth 1 -type f -name '*_test.go' ) > /dev/null; then
         skip_check=$(skip_check_pkg "$pkgs_dir")
         if [[ "$skip_check" == "true" ]]; then
-            echo "skip check pkg:$pkgs_dir"
             return
         fi
         if [[ -z "$TEST_PACKAGES" ]]; then

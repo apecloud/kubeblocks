@@ -34,7 +34,6 @@ import (
 	"sigs.k8s.io/yaml"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/pkg/cli/printer"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -304,7 +303,7 @@ func isTemplateOwner(cm *corev1.ConfigMap, configSpec *appsv1alpha1.ComponentCon
 	return isTemplateObject(cm, cfgName) || isTemplateEnvFromObject(cm, configSpec, cfgName)
 }
 
-func generateComponentObjects(w *templateRenderWorkflow, ctx intctrlutil.RequestCtx, cli *mockClient,
+func generateComponentObjects(w *templateRenderWorkflow, reqCtx intctrlutil.RequestCtx, cli *mockClient,
 	componentType string, cluster *appsv1alpha1.Cluster) (*component.SynthesizedComponent, []client.Object, error) {
 	cmGVK := generics.ToGVK(&corev1.ConfigMap{})
 
@@ -329,14 +328,27 @@ func generateComponentObjects(w *templateRenderWorkflow, ctx intctrlutil.Request
 	dag := graph.NewDAG()
 	root := builder.NewReplicatedStateMachineBuilder(cluster.Namespace, fmt.Sprintf("%s-%s", cluster.Name, compName)).GetObject()
 	model.NewGraphClient(nil).Root(dag, nil, root, nil)
-	component, err := components.NewComponent(ctx, cli, w.clusterDefObj, w.clusterVersionObj, cluster, compName, dag)
+
+	compSpec := cluster.Spec.GetComponentByName(compName)
+	compDef, err := component.BuildComponentDefinition(reqCtx, cli, cluster, compSpec)
 	if err != nil {
 		return nil, nil, err
 	}
-	secret := factory.BuildConnCredential(w.clusterDefObj, cluster, component.GetSynthesizedComponent())
-	cli.AppendMockObjects(secret)
-	if err = component.Create(ctx, cli); err != nil {
+	comp, err := component.BuildProtoComponent(reqCtx, cli, cluster, compSpec)
+	if err != nil {
 		return nil, nil, err
 	}
-	return component.GetSynthesizedComponent(), objs, nil
+	synthesizeComp, err := component.BuildSynthesizedComponent(reqCtx, cli, cluster, compDef, comp)
+	if err != nil {
+		return nil, nil, err
+	}
+	secret := factory.BuildConnCredential(w.clusterDefObj, cluster, synthesizeComp)
+	cli.AppendMockObjects(secret)
+
+	// TODO(xingran & zhangtao): This is the logic before the componentDefinition refactoring. component.Create has already been removed during the refactoring. If any functionality depends on it, please check to replace it with the new approach.
+	// if err = component.Create(ctx, cli); err != nil {
+	// 	return nil, nil, err
+	// }
+
+	return synthesizeComp, objs, nil
 }

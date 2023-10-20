@@ -29,41 +29,38 @@ import (
 )
 
 var (
-	lorryAddr string
+	lorryAddr2 string
+	userName   string
+	password   string
 )
 
-var ListUsersCmd = &cobra.Command{
-	Use:   "listusers",
-	Short: "list normal users.",
+var CreateUserCmd = &cobra.Command{
+	Use:   "createuser",
+	Short: "create user.",
 	Example: `
-lorryctl  listusers 
+lorryctl  createuser --username xxx --password xxx 
   `,
 	Args: cobra.MinimumNArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		lorryClient, err := client.NewHTTPClientWithURL(lorryAddr)
+		lorryClient, err := client.NewHTTPClientWithURL(lorryAddr2)
 		if err != nil {
 			fmt.Printf("new lorry http client failed: %v\n", err)
 			return
 		}
 
-		users, err := lorryClient.ListUsers(context.TODO())
+		err = lorryClient.CreateUser(context.TODO(), userName, password)
 		if err != nil {
-			fmt.Printf("list users failed: %v\n", err)
+			fmt.Printf("create user failed: %v\n", err)
 			return
-		}
-		fmt.Printf("list users:\n")
-		for _, m := range users {
-			fmt.Println("-------------------------")
-			for k, v := range m {
-				fmt.Printf("%s: %v\n", k, v)
-			}
 		}
 	},
 }
 
 func init() {
-	ListUsersCmd.Flags().StringVarP(&lorryAddr, "lorry-addr", "", "http://localhost:3501/v1.0/", "The addr of lorry to request")
-	ListUsersCmd.Flags().BoolP("help", "h", false, "Print this help message")
+	CreateUserCmd.Flags().StringVarP(&userName, "username", "", "", "The name of user to create")
+	CreateUserCmd.Flags().StringVarP(&password, "password", "", "", "The password of user to create")
+	CreateUserCmd.Flags().StringVarP(&lorryAddr2, "lorry-addr", "", "http://localhost:3501/v1.0/", "The addr of lorry to request")
+	CreateUserCmd.Flags().BoolP("help", "h", false, "Print this help message")
 
-	RootCmd.AddCommand(ListUsersCmd)
+	RootCmd.AddCommand(CreateUserCmd)
 }

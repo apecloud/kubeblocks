@@ -51,7 +51,13 @@ lorryctl  listsystemaccounts
 			fmt.Printf("list systemaccounts failed: %v\n", err)
 			return
 		}
-		fmt.Printf("list systemaccounts:\n %v\n", systemaccounts)
+		fmt.Printf("list systemaccounts:\n")
+		for _, m := range systemaccounts {
+			fmt.Println("-------------------------")
+			for k, v := range m {
+				fmt.Printf("%s: %v\n", k, v)
+			}
+		}
 	},
 }
 

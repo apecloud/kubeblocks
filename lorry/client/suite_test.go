@@ -38,7 +38,7 @@ import (
 )
 
 var (
-	lorryHTTPPort = 3501
+	lorryHTTPPort = 35011
 	dbManager     engines.DBManager
 	mockDBManager *engines.MockDBManager
 	dcsStore      dcs.DCS

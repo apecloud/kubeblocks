@@ -139,6 +139,16 @@ func (cli *HTTPClient) GetRole(ctx context.Context) (string, error) {
 	return role.(string), nil
 }
 
+func (cli *HTTPClient) CreateUser(ctx context.Context, userName, password string) error {
+	parameters := map[string]any{
+		"userName": userName,
+		"password": password,
+	}
+	req := &httpserver.Request{Parameters: parameters}
+	_, err := cli.Request(ctx, string(CreateUserOp), http.MethodPost, req)
+	return err
+}
+
 // ListUsers lists all normal users created
 func (cli *HTTPClient) ListUsers(ctx context.Context) ([]map[string]any, error) {
 	resp, err := cli.Request(ctx, string(ListUsersOp), http.MethodGet, nil)
@@ -276,6 +286,7 @@ func GetMapKeyFromRequest(req *http.Request) string {
 		if err != nil {
 			return ""
 		}
+		req.Body = io.NopCloser(bytes.NewReader(all))
 		buf.Write(all)
 	}
 	keys := make([]string, 0, len(req.Header))

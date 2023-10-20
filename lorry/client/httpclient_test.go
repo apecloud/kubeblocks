@@ -191,6 +191,27 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 	})
 
+	Context("create user", func() {
+		var lorryClient *HTTPClient
+
+		BeforeEach(func() {
+			lorryClient, _ = NewHTTPClientWithPod(pod)
+			Expect(lorryClient).ShouldNot(BeNil())
+			lorryClient.ReconcileTimeout = 100 * time.Second
+		})
+
+		It("success", func() {
+			mockDBManager.EXPECT().CreateUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			Expect(lorryClient.CreateUser(context.TODO(), "user-test", "password-test")).Should(Succeed())
+		})
+
+		It("not implemented", func() {
+			msg := "not implemented for test"
+			mockDBManager.EXPECT().CreateUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf(msg))
+			Expect(lorryClient.CreateUser(context.TODO(), "user-test", "password-test")).Should(HaveOccurred())
+		})
+	})
+
 	Context("list users", func() {
 		var lorryClient *HTTPClient
 		var users []models.UserInfo

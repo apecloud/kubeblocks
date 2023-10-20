@@ -21,6 +21,7 @@ package user
 
 import (
 	"context"
+	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -41,7 +42,7 @@ type CreateUser struct {
 var createUser operations.Operation = &CreateUser{}
 
 func init() {
-	err := operations.Register("createuser", createUser)
+	err := operations.Register(strings.ToLower(string(util.CreateUserOp)), createUser)
 	if err != nil {
 		panic(err.Error())
 	}

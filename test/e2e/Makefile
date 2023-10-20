@@ -5,6 +5,7 @@ GINKGO_VERSION = 2.9.1
 GINKGO = $(GOPATH)/bin/ginkgo
 HELM_VERSION ?= v3.9.0
 INIT_ENV ?= false
+CONFIG_TYPE ?= s3
 # The help target prints out all targets with their descriptions organized
 # beneath their categories. The categories are represented by '##@' and the
 # target descriptions by '##'. The awk commands is responsible for reading the
@@ -50,11 +51,16 @@ ifeq ($(origin INIT_ENV), command line)
 else
     INIT_ENV ?= false
 endif
+ifeq ($(origin CONFIG_TYPE), command line)
+    CONFIG_TYPE ?= $(CONFIG_TYPE)
+else
+    CONFIG_TYPE ?= s3
+endif
 
 .PHONY: run
 run: ginkgo ## Run end-to-end tests.
 	#ACK_GINKGO_DEPRECATIONS=$(GINKGO_VERSION) $(GINKGO) run .
-	$(GINKGO) test -process -ginkgo.v . -- -VERSION=$(VERSION) -PROVIDER=$(PROVIDER) -REGION=$(REGION) -SECRET_ID=$(SECRET_ID) -SECRET_KEY=$(SECRET_KEY) -INIT_ENV=$(INIT_ENV) -TEST_TYPE=$(TEST_TYPE) -SKIP_CASE=$(SKIP_CASE) --ginkgo.json-report=report.json
+	$(GINKGO) test -process -ginkgo.v . -- -VERSION=$(VERSION) -PROVIDER=$(PROVIDER) -REGION=$(REGION) -SECRET_ID=$(SECRET_ID) -SECRET_KEY=$(SECRET_KEY) -INIT_ENV=$(INIT_ENV) -TEST_TYPE=$(TEST_TYPE) -SKIP_CASE=$(SKIP_CASE) -CONFIG_TYPE=$(CONFIG_TYPE) --ginkgo.json-report=report.json
 
 build: ginkgo ## Run ginkgo build e2e test suite binary.
 	$(GINKGO) build .

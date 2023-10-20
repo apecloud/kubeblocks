@@ -35,6 +35,7 @@ var SecretKey string
 var InitEnv bool
 var TestType string
 var SkipCase string
+var ConfigType string
 var TestResults []Result
 
 type Result struct {

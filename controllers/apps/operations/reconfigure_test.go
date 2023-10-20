@@ -20,8 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"encoding/json"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/spf13/cast"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	configutil "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -87,21 +91,42 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		return cfgCM, cfgTpl
 	}
 
-	assureConfigInstanceObj := func(clusterName, componentName, ns string, cdComponent *appsv1alpha1.ClusterComponentDefinition) *corev1.ConfigMap {
+	assureConfigInstanceObj := func(clusterName, componentName, ns string, cdComponent *appsv1alpha1.ClusterComponentDefinition) (*appsv1alpha1.Configuration, *corev1.ConfigMap) {
 		if len(cdComponent.ConfigSpecs) == 0 {
-			return nil
+			return nil, nil
 		}
-		var cmObj *corev1.ConfigMap
+
+		By("create configuration cr")
 		configuration := builder.NewConfigurationBuilder(testCtx.DefaultNamespace, core.GenerateComponentConfigurationName(clusterName, componentName)).
 			ClusterRef(clusterName).
 			Component(componentName)
 		for _, configSpec := range cdComponent.ConfigSpecs {
+			configuration.AddConfigurationItem(configSpec)
+		}
+		Expect(testCtx.CheckedCreateObj(ctx, configuration.GetObject())).Should(Succeed())
+
+		// update status
+		By("update configuration status")
+		revision := "1"
+		Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(configuration.GetObject()),
+			func(config *appsv1alpha1.Configuration) {
+				revision = cast.ToString(config.GetGeneration())
+				for _, item := range config.Spec.ConfigItemDetails {
+					configutil.CheckAndUpdateItemStatus(config, item, revision)
+				}
+			})).Should(Succeed())
+
+		By("create configmap for configSpecs")
+		var cmObj *corev1.ConfigMap
+		for _, configSpec := range cdComponent.ConfigSpecs {
 			cmInsName := core.GetComponentCfgName(clusterName, componentName, configSpec.Name)
+			By("create configmap: " + cmInsName)
 			cfgCM := testapps.NewCustomizedObj("operations_config/config-template.yaml",
 				&corev1.ConfigMap{},
 				testapps.WithNamespacedName(cmInsName, ns),
 				testapps.WithLabels(
 					constant.AppNameLabelKey, clusterName,
+					constant.ConfigurationRevision, revision,
 					constant.AppInstanceLabelKey, clusterName,
 					constant.KBAppComponentLabelKey, componentName,
 					constant.CMConfigurationTemplateNameLabelKey, configSpec.TemplateRef,
@@ -110,20 +135,19 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 					constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
 				),
 			)
-			configuration.AddConfigurationItem(configSpec)
 			Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
 			cmObj = cfgCM
 		}
-		Expect(testCtx.CheckedCreateObj(ctx, configuration.GetObject())).Should(Succeed())
-		return cmObj
+		return configuration.GetObject(), cmObj
 	}
 
-	assureMockReconfigureData := func(policyName string) (*OpsResource, intctrlutil.ConfigEventContext) {
+	assureMockReconfigureData := func(policyName string) (*OpsResource, *appsv1alpha1.Configuration, *corev1.ConfigMap) {
 		By("init operations resources ")
 		opsRes, clusterDef, clusterObject := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
 		var (
 			cfgObj       *corev1.ConfigMap
+			config       *appsv1alpha1.Configuration
 			stsComponent *appsv1alpha1.ClusterComponentDefinition
 		)
 		By("Test Reconfigure")
@@ -159,38 +183,15 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 
 			Expect(k8sClient.Patch(ctx, clusterDef, patch)).Should(Succeed())
 			By("mock config cm object")
-			cfgObj = assureConfigInstanceObj(clusterName, consensusComp, testCtx.DefaultNamespace, stsComponent)
+			config, cfgObj = assureConfigInstanceObj(clusterName, consensusComp, testCtx.DefaultNamespace, stsComponent)
 		}
 
-		By("mock event context")
-		eventContext := intctrlutil.ConfigEventContext{
-			ConfigMap: cfgObj,
-			Component: &clusterDef.Spec.ComponentDefs[0],
-			Client:    k8sClient,
-			ReqCtx: intctrlutil.RequestCtx{
-				Ctx:      ctx,
-				Log:      log.FromContext(ctx),
-				Recorder: opsRes.Recorder,
-			},
-			Cluster:        clusterObject,
-			ConfigSpecName: "mysql-test",
-			ConfigPatch: &core.ConfigPatchInfo{
-				AddConfig:    map[string]interface{}{},
-				UpdateConfig: map[string][]byte{},
-				DeleteConfig: map[string]interface{}{},
-			},
-			PolicyStatus: core.PolicyExecStatus{
-				PolicyName:    policyName,
-				SucceedCount:  2,
-				ExpectedCount: 3,
-			},
-		}
-		return opsRes, eventContext
+		return opsRes, config, cfgObj
 	}
 
 	Context("Test Reconfigure", func() {
 		It("Test Reconfigure OpsRequest with restart", func() {
-			opsRes, eventContext := assureMockReconfigureData("simple")
+			opsRes, configuration, _ := assureMockReconfigureData("simple")
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx:      testCtx.Ctx,
 				Log:      log.FromContext(ctx).WithName("Reconfigure"),
@@ -226,28 +227,54 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			initClusterForOps(opsRes)
 
 			opsManager := GetOpsManager()
-			reAction := reconfigureAction{}
+			//reAction := reconfigureAction{}
+			By("init ops phase")
+			_, err := opsManager.Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+
 			By("Reconfigure configure")
-			Expect(reAction.Action(reqCtx, k8sClient, opsRes)).Should(Succeed())
-			By("configuration Reconcile callback")
-			Expect(reAction.Handle(eventContext, ops.Name, appsv1alpha1.OpsRunningPhase, nil)).Should(Succeed())
+			_, err = opsManager.Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			//Expect(reAction.Action(reqCtx, k8sClient, opsRes)).Should(Succeed())
+			//By("configuration Reconcile callback")
+			// Expect(reAction.Handle(eventContext, ops.Name, appsv1alpha1.OpsRunningPhase, nil)).Should(Succeed())
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
 			_, _ = opsManager.Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsRunningPhase))
 
-			By("Validate cluster status")
-			_, err := opsManager.Do(reqCtx, k8sClient, opsRes)
-			Expect(err).ShouldNot(HaveOccurred())
-			// do Action
-			_, err = opsManager.Do(reqCtx, k8sClient, opsRes)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(opsRes.Cluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
-			// do action
-			_, err = opsManager.Do(reqCtx, k8sClient, opsRes)
-			Expect(err).ShouldNot(HaveOccurred())
+			By("mock configuration.status.phase to Finished")
+			var item *appsv1alpha1.ConfigurationItemDetail
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(configuration),
+				func(config *appsv1alpha1.Configuration) {
+					item = config.Spec.GetConfigurationItem("mysql-test")
+					for i := 0; i < len(config.Status.ConfigurationItemStatus); i++ {
+						config.Status.ConfigurationItemStatus[i].Phase = appsv1alpha1.CFinishedPhase
+					}
+				})).Should(Succeed())
+
+			By("mock configmap controller to updated")
+			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKey{
+				Name:      core.GetComponentCfgName(clusterName, consensusComp, "mysql-test"),
+				Namespace: testCtx.DefaultNamespace},
+				func(cm *corev1.ConfigMap) {
+					b, err := json.Marshal(item)
+					Expect(err).ShouldNot(HaveOccurred())
+					if cm.Annotations == nil {
+						cm.Annotations = make(map[string]string)
+					}
+					cm.Annotations[constant.ConfigAppliedVersionAnnotationKey] = string(b)
+					b, err = json.Marshal(intctrlutil.Result{
+						Phase:      appsv1alpha1.CFinishedPhase,
+						Policy:     "simple",
+						ExecResult: "none",
+					})
+					Expect(err).ShouldNot(HaveOccurred())
+					cm.Annotations[core.GenerateRevisionPhaseKey("1")] = string(b)
+				})).Should(Succeed())
 
 			By("Reconfigure operation success")
-			Expect(reAction.Handle(eventContext, ops.Name, appsv1alpha1.OpsSucceedPhase, nil)).Should(Succeed())
+			// Expect(reAction.Handle(eventContext, ops.Name, appsv1alpha1.OpsSucceedPhase, nil)).Should(Succeed())
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
 			_, _ = opsManager.Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsSucceedPhase))
@@ -255,7 +282,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		})
 
 		It("Test Reconfigure OpsRequest with autoReload", func() {
-			opsRes, eventContext := assureMockReconfigureData("autoReload")
+			opsRes, _, _ := assureMockReconfigureData("autoReload")
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx:      testCtx.Ctx,
 				Log:      log.FromContext(ctx).WithName("Reconfigure"),
@@ -286,7 +313,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			initClusterForOps(opsRes)
 
 			opsManager := GetOpsManager()
-			reAction := reconfigureAction{}
+			// reAction := reconfigureAction{}
 			By("Reconfigure configure")
 			_, err := opsManager.Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -296,7 +323,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			By("configuration Reconcile callback")
 
-			Expect(reAction.Handle(eventContext, ops.Name, appsv1alpha1.OpsSucceedPhase, nil)).Should(Succeed())
+			// Expect(reAction.Handle(eventContext, ops.Name, appsv1alpha1.OpsSucceedPhase, nil)).Should(Succeed())
 			By("Reconfigure configure")
 			_, _ = opsManager.Reconcile(reqCtx, k8sClient, opsRes)
 			// mock cluster.status.component.phase to Updating

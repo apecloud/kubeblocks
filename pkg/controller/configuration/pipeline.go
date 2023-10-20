@@ -147,13 +147,13 @@ func (p *pipeline) UpdateConfigurationStatus() *pipeline {
 		patch := client.MergeFrom(existing)
 		updated := existing.DeepCopy()
 		for _, item := range existing.Spec.ConfigItemDetails {
-			checkAndUpdateItemStatus(updated, item, reversion)
+			CheckAndUpdateItemStatus(updated, item, reversion)
 		}
 		return p.ResourceFetcher.Client.Status().Patch(p.Context, updated, patch)
 	})
 }
 
-func checkAndUpdateItemStatus(updated *appsv1alpha1.Configuration, item appsv1alpha1.ConfigurationItemDetail, reversion string) {
+func CheckAndUpdateItemStatus(updated *appsv1alpha1.Configuration, item appsv1alpha1.ConfigurationItemDetail, reversion string) {
 	foundStatus := func(name string) *appsv1alpha1.ConfigurationItemDetailStatus {
 		for i := range updated.Status.ConfigurationItemStatus {
 			status := &updated.Status.ConfigurationItemStatus[i]

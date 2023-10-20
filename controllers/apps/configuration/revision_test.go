@@ -29,6 +29,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 func TestGcConfigRevision(t *testing.T) {
@@ -95,6 +96,10 @@ func TestParseRevision(t *testing.T) {
 			StrRevision: "120000",
 			Revision:    120000,
 			Phase:       appsv1alpha1.CPendingPhase,
+			Result: intctrlutil.Result{
+				Phase:    appsv1alpha1.CPendingPhase,
+				Revision: "120000",
+			},
 		},
 		wantErr: false,
 	}, {

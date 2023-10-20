@@ -23,6 +23,7 @@ on:
         options:
           - gke
           - eks
+          - k3s
       CLUSTER_VERSION:
         description: 'k8s cluster version (e.g. 1.26)'
         required: false

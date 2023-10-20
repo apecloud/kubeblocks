@@ -72,9 +72,32 @@ spec:
                   backupPolicyName:
                     description: Which backupPolicy is applied to perform this backup
                     type: string
+                  deletionPolicy:
+                    default: Delete
+                    description: deletionPolicy determines whether the backup contents
+                      stored in backup repository should be deleted when the backup
+                      custom resource is deleted. Supported values are "Retain" and
+                      "Delete". "Retain" means that the backup content and its physical
+                      snapshot on backup repository are kept. "Delete" means that
+                      the backup content and its physical snapshot on backup repository
+                      are deleted.
+                    enum:
+                    - Delete
+                    - Retain
+                    type: string
                   parentBackupName:
                     description: if backupType is incremental, parentBackupName is
                       required.
+                    type: string
+                  retentionPeriod:
+                    description: "retentionPeriod determines a duration up to which
+                      the backup should be kept. Controller will remove all backups
+                      that are older than the RetentionPeriod. For example, RetentionPeriod
+                      of `30d` will keep only the backups of last 30 days. Sample
+                      duration format: - years: \t2y - months: \t6mo - days: \t\t30d
+                      - hours: \t12h - minutes: \t30m You can also combine the above
+                      durations. For example: 30d12h30m. If not set, the backup will
+                      be kept forever."
                     type: string
                 type: object
               cancel:

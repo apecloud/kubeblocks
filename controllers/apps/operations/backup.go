@@ -32,6 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 )
 
 const backupTimeLayout = "20060102150405"
@@ -120,6 +121,24 @@ func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *a
 		return nil, err
 	}
 
+	backupPolicyList := &dpv1alpha1.BackupPolicyList{}
+	if err := cli.List(reqCtx.Ctx, backupPolicyList, client.InNamespace(cluster.Namespace),
+		client.MatchingLabels(map[string]string{
+			constant.AppInstanceLabelKey: cluster.Name,
+		})); err != nil {
+		return nil, err
+	}
+	defaultBackupMethod, backupMethodMap, err := utils.GetBackupMethodsFromBackupPolicy(backupPolicyList, backupSpec.BackupPolicyName)
+	if err != nil {
+		return nil, err
+	}
+	if backupSpec.BackupMethod == "" {
+		backupSpec.BackupMethod = defaultBackupMethod
+	}
+	if _, ok := backupMethodMap[backupSpec.BackupMethod]; !ok {
+		return nil, fmt.Errorf("backup method %s is not supported, please check cluster's backup policy", backupSpec.BackupMethod)
+	}
+
 	backup := &dpv1alpha1.Backup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      backupSpec.BackupName,
@@ -130,6 +149,32 @@ func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *a
 			BackupPolicyName: backupSpec.BackupPolicyName,
 			BackupMethod:     backupSpec.BackupMethod,
 		},
+	}
+
+	if backupSpec.DeletionPolicy != "" {
+		backup.Spec.DeletionPolicy = dpv1alpha1.BackupDeletionPolicy(backupSpec.DeletionPolicy)
+	}
+	if backupSpec.RetentionPeriod != "" {
+		retentionPeriod := dpv1alpha1.RetentionPeriod(backupSpec.RetentionPeriod)
+		if _, err := retentionPeriod.ToDuration(); err != nil {
+			return nil, err
+		}
+		backup.Spec.RetentionPeriod = retentionPeriod
+	}
+	if backupSpec.ParentBackupName != "" {
+		parentBackup := dpv1alpha1.Backup{}
+		if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: backupSpec.ParentBackupName, Namespace: cluster.Namespace}, &parentBackup); err != nil {
+			return nil, err
+		}
+		// check parent backup exists and completed
+		if parentBackup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
+			return nil, fmt.Errorf("parent backup %s is not completed", backupSpec.ParentBackupName)
+		}
+		// check parent backup belongs to the cluster of the backup
+		if parentBackup.Labels[constant.AppInstanceLabelKey] != cluster.Name {
+			return nil, fmt.Errorf("parent backup %s is not belong to cluster %s", backupSpec.ParentBackupName, cluster.Name)
+		}
+		backup.Spec.ParentBackupName = backupSpec.ParentBackupName
 	}
 
 	return backup, nil

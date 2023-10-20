@@ -51,7 +51,7 @@ on:
         required: false
         default: ''
 
-run-name: kbcli:${{ inputs.PRE_VERSION }} to ${{ inputs.VERSION }} ${{ inputs.CLOUD_PROVIDER }}:${{ inputs.CLUSTER_VERSION }}:${{ inputs.INSTANCE_TYPE }}
+run-name: kbcli:${{ inputs.PRE_VERSION }} to ${{ inputs.VERSION }} ${{ inputs.CLOUD_PROVIDER }}:${{ inputs.CLUSTER_VERSION }}:${{ inputs.INSTANCE_TYPE }} ${{ inputs.TEST_TYPE }}
 
 env:
   GH_TOKEN: ${{ github.token }}

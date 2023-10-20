@@ -23,12 +23,12 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
-// ComponentEnableLogsValidationTransformer validates enableLogs config and sends warning event log if necessary
-type ComponentEnableLogsValidationTransformer struct{}
+// ComponentValidationTransformer validates the consistency between spec & definition.
+type ComponentValidationTransformer struct{}
 
-var _ graph.Transformer = &ComponentEnableLogsValidationTransformer{}
+var _ graph.Transformer = &ComponentValidationTransformer{}
 
-func (e *ComponentEnableLogsValidationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (e *ComponentValidationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ComponentTransformContext)
 	comp := transCtx.Component
 

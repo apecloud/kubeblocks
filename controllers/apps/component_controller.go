@@ -77,8 +77,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&ComponentMetaTransformer{},
 			// validate referenced componentDefinition objects existence and availability, and build synthesized component
 			&ComponentLoadResourcesTransformer{},
-			// validate enabled logs
-			&ComponentEnableLogsValidationTransformer{},
+			// do spec & definition consistency validation
+			&ComponentValidationTransformer{},
 			// handle component connection credential secret object
 			&ComponentCredentialTransformer{},
 			// handle rsm(ReplicatedStateMachine) workload generation

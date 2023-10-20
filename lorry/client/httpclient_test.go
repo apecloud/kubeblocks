@@ -197,7 +197,6 @@ var _ = Describe("Lorry HTTP Client", func() {
 		BeforeEach(func() {
 			lorryClient, _ = NewHTTPClientWithPod(pod)
 			Expect(lorryClient).ShouldNot(BeNil())
-			lorryClient.ReconcileTimeout = 100 * time.Second
 		})
 
 		It("success", func() {
@@ -209,6 +208,26 @@ var _ = Describe("Lorry HTTP Client", func() {
 			msg := "not implemented for test"
 			mockDBManager.EXPECT().CreateUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf(msg))
 			Expect(lorryClient.CreateUser(context.TODO(), "user-test", "password-test")).Should(HaveOccurred())
+		})
+	})
+
+	Context("delete user", func() {
+		var lorryClient *HTTPClient
+
+		BeforeEach(func() {
+			lorryClient, _ = NewHTTPClientWithPod(pod)
+			Expect(lorryClient).ShouldNot(BeNil())
+		})
+
+		It("success", func() {
+			mockDBManager.EXPECT().DeleteUser(gomock.Any(), gomock.Any()).Return(nil)
+			Expect(lorryClient.DeleteUser(context.TODO(), "user-test")).Should(Succeed())
+		})
+
+		It("not implemented", func() {
+			msg := "not implemented for test"
+			mockDBManager.EXPECT().DeleteUser(gomock.Any(), gomock.Any()).Return(fmt.Errorf(msg))
+			Expect(lorryClient.DeleteUser(context.TODO(), "user-test")).Should(HaveOccurred())
 		})
 	})
 

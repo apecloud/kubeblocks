@@ -28,42 +28,40 @@ import (
 	"github.com/apecloud/kubeblocks/lorry/client"
 )
 
-type CreateUserOptions struct {
+type DeleteUserOptions struct {
 	lorryAddr string
 	userName  string
-	password  string
 }
 
-var createUserOptions = &CreateUserOptions{}
+var deleteUserOptions = &DeleteUserOptions{}
 
-var CreateUserCmd = &cobra.Command{
-	Use:   "createuser",
-	Short: "create user.",
+var DeleteUserCmd = &cobra.Command{
+	Use:   "deleteuser",
+	Short: "delete user.",
 	Example: `
-lorryctl  createuser --username xxx --password xxx 
+lorryctl  deleteuser --username xxx --password xxx 
   `,
 	Args: cobra.MinimumNArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		lorryClient, err := client.NewHTTPClientWithURL(createUserOptions.lorryAddr)
+		lorryClient, err := client.NewHTTPClientWithURL(deleteUserOptions.lorryAddr)
 		if err != nil {
 			fmt.Printf("new lorry http client failed: %v\n", err)
 			return
 		}
 
-		err = lorryClient.CreateUser(context.TODO(), createUserOptions.userName, createUserOptions.password)
+		err = lorryClient.DeleteUser(context.TODO(), deleteUserOptions.userName)
 		if err != nil {
-			fmt.Printf("create user failed: %v\n", err)
+			fmt.Printf("delete user failed: %v\n", err)
 			return
 		}
-		fmt.Printf("create user success")
+		fmt.Printf("delete user success")
 	},
 }
 
 func init() {
-	CreateUserCmd.Flags().StringVarP(&createUserOptions.userName, "username", "", "", "The name of user to create")
-	CreateUserCmd.Flags().StringVarP(&createUserOptions.password, "password", "", "", "The password of user to create")
-	CreateUserCmd.Flags().StringVarP(&createUserOptions.lorryAddr, "lorry-addr", "", "http://localhost:3501/v1.0/", "The addr of lorry to request")
-	CreateUserCmd.Flags().BoolP("help", "h", false, "Print this help message")
+	DeleteUserCmd.Flags().StringVarP(&deleteUserOptions.userName, "username", "", "", "The name of user to delete")
+	DeleteUserCmd.Flags().StringVarP(&deleteUserOptions.lorryAddr, "lorry-addr", "", "http://localhost:3501/v1.0/", "The addr of lorry to request")
+	DeleteUserCmd.Flags().BoolP("help", "h", false, "Print this help message")
 
-	RootCmd.AddCommand(CreateUserCmd)
+	RootCmd.AddCommand(DeleteUserCmd)
 }

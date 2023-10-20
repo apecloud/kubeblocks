@@ -28,17 +28,35 @@ func GenerateDefaultConnCredential(clusterName string) string {
 	return fmt.Sprintf("%s-conn-credential", clusterName)
 }
 
-// GenerateComponentServiceEndpoint generates default service endpoint name of component
-func GenerateComponentServiceEndpoint(clusterName, componentName, namespace string) string {
-	return fmt.Sprintf("%s-%s.%s.svc", clusterName, componentName, namespace)
+// GenerateComponentConnCredential generates connection credential name of component
+func GenerateComponentConnCredential(clusterName, compName, name string) string {
+	if len(name) == 0 {
+		name = "conn-credential"
+	}
+	return fmt.Sprintf("%s-%s-%s", clusterName, compName, name)
 }
 
-// GenerateComponentHeadlessServiceEndpoint generates default service endpoint name of component
-func GenerateComponentHeadlessServiceEndpoint(clusterName, componentName, namespace string) string {
-	return fmt.Sprintf("%s-%s-headless.%s.svc", clusterName, componentName, namespace)
+// GenerateComponentServiceEndpoint generates service endpoint of component
+func GenerateComponentServiceEndpoint(clusterName, compName, svcName, namespace string) string {
+	return fmt.Sprintf("%s-%s-%s.%s.svc", clusterName, compName, svcName, namespace)
+}
+
+// GenerateDefaultComponentServiceEndpoint generates default service endpoint of component
+func GenerateDefaultComponentServiceEndpoint(clusterName, compName, namespace string) string {
+	return fmt.Sprintf("%s-%s.%s.svc", clusterName, compName, namespace)
+}
+
+// GenerateComponentHeadlessServiceEndpoint generates headless service endpoint of component
+func GenerateComponentHeadlessServiceEndpoint(clusterName, compName, svcName, namespace string) string {
+	return fmt.Sprintf("%s-%s-%s-headless.%s.svc", clusterName, compName, svcName, namespace)
+}
+
+// GenerateDefalutComponentHeadlessServiceEndpoint generates default headless service endpoint of component
+func GenerateDefalutComponentHeadlessServiceEndpoint(clusterName, compName, namespace string) string {
+	return fmt.Sprintf("%s-%s-headless.%s.svc", clusterName, compName, namespace)
 }
 
 // GenerateClusterComponentPattern generates cluster and component pattern
-func GenerateClusterComponentPattern(clusterName, componentName string) string {
-	return fmt.Sprintf("%s-%s", clusterName, componentName)
+func GenerateClusterComponentPattern(clusterName, compName string) string {
+	return fmt.Sprintf("%s-%s", clusterName, compName)
 }

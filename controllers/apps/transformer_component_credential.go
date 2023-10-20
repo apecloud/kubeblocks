@@ -20,7 +20,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"fmt"
+	"reflect"
+
+	"golang.org/x/exp/maps"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 // ComponentCredentialTransformer handles referenced resources validation and load them into context
@@ -29,6 +42,167 @@ type ComponentCredentialTransformer struct{}
 var _ graph.Transformer = &ComponentCredentialTransformer{}
 
 func (t *ComponentCredentialTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	// TODO: build component credential
+	cctx, _ := ctx.(*ComponentTransformContext)
+	synthesizeComp := cctx.SynthesizeComponent
+
+	if model.IsObjectDeleting(cctx.ComponentOrig) {
+		return nil
+	}
+
+	graphCli, _ := cctx.Client.(model.GraphClient)
+	for _, credential := range synthesizeComp.ConnectionCredentials {
+		secret, err := t.buildConnCredential(ctx, synthesizeComp, credential)
+		if err != nil {
+			return err
+		}
+		if err = t.createOrUpdate(ctx, dag, graphCli, secret); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (t *ComponentCredentialTransformer) buildConnCredential(ctx graph.TransformContext,
+	synthesizeComp *component.SynthesizedComponent, credential appsv1alpha1.ConnectionCredential) (*corev1.Secret, error) {
+	secret := factory.BuildConnCredential4Component(synthesizeComp, credential.Name)
+	if len(credential.SecretName) != 0 {
+		if err := t.buildFromExistedSecret(ctx, credential, secret); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := t.buildFromServiceAndAccount(ctx, synthesizeComp, credential, secret); err != nil {
+			return nil, err
+		}
+	}
+	return secret, nil
+}
+
+func (t *ComponentCredentialTransformer) buildFromExistedSecret(ctx graph.TransformContext,
+	credential appsv1alpha1.ConnectionCredential, secret *corev1.Secret) error {
+	namespace := func() string {
+		namespace := credential.SecretNamespace
+		if len(namespace) == 0 {
+			namespace = secret.Namespace
+		}
+		return namespace
+	}
+	secretKey := types.NamespacedName{
+		Namespace: namespace(),
+		Name:      credential.SecretName,
+	}
+	obj := &corev1.Secret{}
+	if err := ctx.GetClient().Get(ctx.GetContext(), secretKey, obj); err != nil {
+		return err
+	}
+	secret.Immutable = obj.Immutable
+	secret.Data = obj.Data
+	secret.StringData = obj.StringData
+	secret.Type = obj.Type
+	return nil
+}
+
+func (t *ComponentCredentialTransformer) buildFromServiceAndAccount(ctx graph.TransformContext,
+	synthesizeComp *component.SynthesizedComponent, credential appsv1alpha1.ConnectionCredential, secret *corev1.Secret) error {
+	data := make(map[string]string)
+	if len(credential.ServiceName) > 0 {
+		if err := t.buildEndpoint(synthesizeComp, credential, &data); err != nil {
+			return err
+		}
+	}
+	if len(credential.AccountName) > 0 {
+		if err := t.buildCredential(ctx, synthesizeComp.Namespace, credential.AccountName, &data); err != nil {
+			return err
+		}
+	}
+	// TODO: define the format of conn-credential secret
+	secret.StringData = data
+	return nil
+}
+
+func (t *ComponentCredentialTransformer) buildEndpoint(synthesizeComp *component.SynthesizedComponent,
+	credential appsv1alpha1.ConnectionCredential, data *map[string]string) error {
+	var service *appsv1alpha1.ComponentService
+	for i, svc := range synthesizeComp.ComponentServices {
+		if svc.Name == credential.ServiceName {
+			service = &synthesizeComp.ComponentServices[i]
+			break
+		}
+	}
+	if service == nil {
+		return fmt.Errorf("connection credential references a service not definied, credential: %s, service: %s",
+			credential.Name, credential.ServiceName)
+	}
+	if len(service.Ports) <= 0 {
+		return fmt.Errorf("connection credential references a service which doesn't define any ports, credential: %s, service: %s",
+			credential.Name, credential.ServiceName)
+	}
+	if len(credential.PortName) == 0 && len(service.Ports) > 1 {
+		return fmt.Errorf("connection credential should specify which port to use for the referenced service, credential: %s, service: %s",
+			credential.Name, credential.ServiceName)
+	}
+
+	t.buildEndpointFromService(synthesizeComp, credential, service, data)
+	return nil
+}
+
+func (t *ComponentCredentialTransformer) buildEndpointFromService(synthesizeComp *component.SynthesizedComponent,
+	credential appsv1alpha1.ConnectionCredential, service *appsv1alpha1.ComponentService, data *map[string]string) {
+	serviceName := constant.GenerateComponentServiceEndpoint(synthesizeComp.ClusterName,
+		synthesizeComp.Name, string(service.ServiceName), synthesizeComp.Namespace)
+
+	port := int32(0)
+	if len(credential.PortName) == 0 {
+		port = service.Ports[0].Port
+	} else {
+		for _, servicePort := range service.Ports {
+			if servicePort.Name == credential.PortName {
+				port = servicePort.Port
+				break
+			}
+		}
+	}
+
+	// TODO: define the service and port pattern
+	(*data)["service"] = serviceName
+	(*data)["port"] = fmt.Sprintf("%d", port)
+}
+
+func (t *ComponentCredentialTransformer) buildCredential(ctx graph.TransformContext,
+	namespace, accountName string, data *map[string]string) error {
+	key := types.NamespacedName{
+		Namespace: namespace,
+		Name:      accountName,
+	}
+	secret := &corev1.Secret{}
+	if err := ctx.GetClient().Get(ctx.GetContext(), key, secret); err != nil {
+		return err
+	}
+	// TODO: which field should to use from accounts?
+	maps.Copy(*data, secret.StringData)
+	return nil
+}
+
+func (t *ComponentCredentialTransformer) createOrUpdate(ctx graph.TransformContext,
+	dag *graph.DAG, graphCli model.GraphClient, secret *corev1.Secret) error {
+	key := types.NamespacedName{
+		Namespace: secret.Namespace,
+		Name:      secret.Name,
+	}
+	obj := &corev1.Secret{}
+	if err := ctx.GetClient().Get(ctx.GetContext(), key, obj); err != nil {
+		if apierrors.IsNotFound(err) {
+			graphCli.Create(dag, secret)
+			return nil
+		}
+		return err
+	}
+	objCopy := obj.DeepCopy()
+	objCopy.Immutable = secret.Immutable
+	objCopy.Data = secret.Data
+	objCopy.StringData = secret.StringData
+	objCopy.Type = secret.Type
+	if !reflect.DeepEqual(obj, objCopy) {
+		graphCli.Update(dag, obj, objCopy)
+	}
 	return nil
 }

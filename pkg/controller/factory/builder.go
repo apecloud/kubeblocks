@@ -702,9 +702,9 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 		"$(UUID_B64)":             uuidB64,
 		"$(UUID_STR_B64)":         uuidStrB64,
 		"$(UUID_HEX)":             uuidHex,
-		"$(SVC_FQDN)":             constant.GenerateComponentServiceEndpoint(cluster.Name, component.Name, cluster.Namespace),
+		"$(SVC_FQDN)":             constant.GenerateDefaultComponentServiceEndpoint(cluster.Name, component.Name, cluster.Namespace),
 		"$(KB_CLUSTER_COMP_NAME)": constant.GenerateClusterComponentPattern(cluster.Name, component.Name),
-		"$(HEADLESS_SVC_FQDN)":    constant.GenerateComponentHeadlessServiceEndpoint(cluster.Name, component.Name, cluster.Namespace),
+		"$(HEADLESS_SVC_FQDN)":    constant.GenerateDefalutComponentHeadlessServiceEndpoint(cluster.Name, component.Name, cluster.Namespace),
 	}
 	if len(component.Services) > 0 {
 		for _, p := range component.Services[0].Spec.Ports {
@@ -720,6 +720,12 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 	}
 	replaceData(m)
 	return connCredential
+}
+
+func BuildConnCredential4Component(comp *component.SynthesizedComponent, name string) *corev1.Secret {
+	secretName := constant.GenerateComponentConnCredential(comp.ClusterName, comp.Name, name)
+	labels := constant.GetKBWellKnownLabels(comp.ClusterDefName, comp.ClusterName, comp.Name)
+	return builder.NewSecretBuilder(comp.Namespace, secretName).AddLabelsInMap(labels).GetObject()
 }
 
 func BuildPDB(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) *policyv1.PodDisruptionBudget {

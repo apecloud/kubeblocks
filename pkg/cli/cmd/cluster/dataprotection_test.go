@@ -164,16 +164,15 @@ var _ = Describe("DataProtection", func() {
 
 		It("run backup command", func() {
 			defaultBackupPolicy := testing.FakeBackupPolicy(policyName, testing.ClusterName)
-			initClient(defaultBackupPolicy)
-			By("test with specified backupPolicy")
+			otherBackupPolicy := testing.FakeBackupPolicy("otherPolicy", testing.ClusterName)
+			otherBackupPolicy.Annotations = map[string]string{}
+			initClient(defaultBackupPolicy, otherBackupPolicy)
+			By("test backup with default backupPolicy")
 			cmd := NewCreateBackupCmd(tf, streams)
 			Expect(cmd).ShouldNot(BeNil())
-			// must succeed otherwise exit 1 and make test fails
-			_ = cmd.Flags().Set("policy", defaultBackupPolicy.Name)
-			_ = cmd.Flags().Set("method", testing.BackupMethodName)
 			cmd.Run(cmd, []string{testing.ClusterName})
 
-			By("test with logfile type")
+			By("test with specified backupMethod and backupPolicy")
 			o := &CreateBackupOptions{
 				CreateOptions: create.CreateOptions{
 					IOStreams:       streams,
@@ -182,7 +181,7 @@ var _ = Describe("DataProtection", func() {
 					CueTemplateName: "backup_template.cue",
 					Name:            testing.ClusterName,
 				},
-				BackupPolicy: defaultBackupPolicy.Name,
+				BackupPolicy: otherBackupPolicy.Name,
 				BackupMethod: testing.BackupMethodName,
 			}
 			Expect(o.CompleteBackup()).Should(Succeed())

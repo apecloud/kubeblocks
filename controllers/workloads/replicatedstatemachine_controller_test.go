@@ -80,7 +80,7 @@ var _ = Describe("ReplicatedStateMachine Controller", func() {
 				AddMatchLabelsInMap(commonLabels).
 				SetService(service).
 				SetTemplate(template).
-				AddProbeAction(action).
+				AddCustomHandler(action).
 				GetObject()
 			Expect(k8sClient.Create(ctx, rsm)).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(rsm),

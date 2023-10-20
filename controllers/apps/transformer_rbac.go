@@ -43,7 +43,9 @@ import (
 )
 
 // RBACTransformer puts the rbac at the beginning of the DAG
-type RBACTransformer struct{}
+type RBACTransformer struct {
+	client.Client
+}
 
 var _ graph.Transformer = &RBACTransformer{}
 
@@ -52,7 +54,7 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
-	componentSpecs, err := getComponentSpecs(transCtx)
+	componentSpecs, err := getComponentSpecs(c.Client, transCtx)
 	if err != nil {
 		return err
 	}
@@ -231,7 +233,7 @@ func isRoleBindingExist(transCtx *clusterTransformContext, serviceAccountName st
 	return true
 }
 
-func getComponentSpecs(transCtx *clusterTransformContext) ([]appsv1alpha1.ClusterComponentSpec, error) {
+func getComponentSpecs(cli client.Client, transCtx *clusterTransformContext) ([]appsv1alpha1.ClusterComponentSpec, error) {
 	cluster := transCtx.Cluster
 	clusterDef := transCtx.ClusterDef
 	componentSpecs := make([]appsv1alpha1.ClusterComponentSpec, 0, 1)
@@ -244,7 +246,7 @@ func getComponentSpecs(transCtx *clusterTransformContext) ([]appsv1alpha1.Cluste
 				Ctx: transCtx.Context,
 				Log: log.Log.WithName("rbac"),
 			}
-			synthesizedComponent, err := component.BuildComponent(reqCtx, nil, cluster, transCtx.ClusterDef, &compDef, nil, nil)
+			synthesizedComponent, err := component.BuildSynthesizedComponentWrapper(reqCtx, cli, cluster, nil)
 			if err != nil {
 				return nil, err
 			}

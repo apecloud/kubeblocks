@@ -209,18 +209,11 @@ var _ = Describe("Cluster Controller", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			component, err := component.BuildComponent(
-				reqCtx,
-				nil,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				&cluster.Spec.ComponentSpecs[0],
-				nil,
-				&clusterVersion.Spec.ComponentVersions[0])
+			// TODO(xingran): check it BuildComponent can be replaced by BuildSynthesizedComponentWrapper
+			synthesizeComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 
-			resources, err := buildComponentResources(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, component)
+			resources, err := buildComponentResources(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, synthesizeComp)
 			Expect(err).Should(Succeed())
 
 			expects := []string{
@@ -255,19 +248,11 @@ var _ = Describe("Cluster Controller", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			component, err := component.BuildComponent(
-				reqCtx,
-				nil,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				&cluster.Spec.ComponentSpecs[0],
-				nil,
-				&clusterVersion.Spec.ComponentVersions[0],
-			)
+			// TODO(xingran): check it BuildComponent can be replaced by BuildSynthesizedComponentWrapper
+			synthesizeComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 
-			resources, err := buildComponentResources(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, component)
+			resources, err := buildComponentResources(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, synthesizeComp)
 			Expect(err).Should(Succeed())
 
 			expects := []string{
@@ -316,18 +301,11 @@ var _ = Describe("Cluster Controller", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			component, err := component.BuildComponent(
-				reqCtx,
-				nil,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				&cluster.Spec.ComponentSpecs[0],
-				nil,
-				&clusterVersion.Spec.ComponentVersions[0])
+			// TODO(xingran): check it BuildComponent can be replaced by BuildSynthesizedComponentWrapper
+			synthesizeComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 
-			resources, err := buildComponentResources(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, component)
+			resources, err := buildComponentResources(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, synthesizeComp)
 			Expect(err).Should(Succeed())
 
 			expects := []string{
@@ -339,7 +317,7 @@ var _ = Describe("Cluster Controller", func() {
 				Expect(reflect.TypeOf(resources[i]).String()).Should(ContainSubstring(v), fmt.Sprintf("failed at idx %d", i))
 				if isStatefulSet(v) {
 					sts := resources[i].(*appsv1.StatefulSet)
-					Expect(configuration.CheckEnvFrom(&sts.Spec.Template.Spec.Containers[0], cfgcore.GenerateEnvFromName(cfgcore.GetComponentCfgName(cluster.Name, component.Name, configSpecName)))).Should(BeTrue())
+					Expect(configuration.CheckEnvFrom(&sts.Spec.Template.Spec.Containers[0], cfgcore.GenerateEnvFromName(cfgcore.GetComponentCfgName(cluster.Name, synthesizeComp.Name, configSpecName)))).Should(BeTrue())
 				}
 			}
 		})
@@ -375,18 +353,11 @@ var _ = Describe("Cluster Controller", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			component, err := component.BuildComponent(
-				reqCtx,
-				nil,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				&cluster.Spec.ComponentSpecs[0],
-				nil,
-				&clusterVersion.Spec.ComponentVersions[0])
+			// TODO(xingran): check it BuildComponent can be replaced by BuildSynthesizedComponentWrapper
+			synthesizeComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 
-			resources, err := buildComponentResources(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, component)
+			resources, err := buildComponentResources(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, synthesizeComp)
 			Expect(err).Should(Succeed())
 
 			expects := []string{
@@ -439,17 +410,10 @@ var _ = Describe("Cluster Controller", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			component, err := component.BuildComponent(
-				reqCtx,
-				nil,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				&cluster.Spec.ComponentSpecs[0],
-				nil,
-				&clusterVersion.Spec.ComponentVersions[0])
+			// TODO(xingran): check it BuildComponent can be replaced by BuildSynthesizedComponentWrapper
+			synthesizeComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
-			resources, err := buildComponentResources(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, component)
+			resources, err := buildComponentResources(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, synthesizeComp)
 			Expect(err).Should(Succeed())
 			expects := []string{
 				"PodDisruptionBudget",
@@ -493,18 +457,11 @@ var _ = Describe("Cluster Controller", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			component, err := component.BuildComponent(
-				reqCtx,
-				nil,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				&cluster.Spec.ComponentSpecs[0],
-				nil,
-				&clusterVersion.Spec.ComponentVersions[0])
+			// TODO(xingran): check it BuildComponent can be replaced by BuildSynthesizedComponentWrapper
+			synthesizeComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 
-			resources, err := buildComponentResources(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, component)
+			resources, err := buildComponentResources(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, synthesizeComp)
 			Expect(err).Should(Succeed())
 
 			Expect(resources).Should(HaveLen(2))

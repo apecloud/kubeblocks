@@ -96,22 +96,16 @@ func newAllFieldsClusterObj(
 
 func newAllFieldsComponent(clusterDef *appsv1alpha1.ClusterDefinition, clusterVersion *appsv1alpha1.ClusterVersion) *component.SynthesizedComponent {
 	cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(clusterDef, clusterVersion, false)
-	component, err := component.BuildComponent(
-		intctrlutil.RequestCtx{
-			Ctx: testCtx.Ctx,
-			Log: logger,
-		},
-		nil,
-		cluster,
-		clusterDef,
-		&clusterDef.Spec.ComponentDefs[0],
-		&cluster.Spec.ComponentSpecs[0],
-		nil,
-		&clusterVersion.Spec.ComponentVersions[0])
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx: testCtx.Ctx,
+		Log: logger,
+	}
+	// TODO(xingran): check it BuildComponent can be replaced by BuildSynthesizedComponentWrapper
+	synthesizeComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, &cluster.Spec.ComponentSpecs[0])
 	Expect(err).Should(Succeed())
-	Expect(component).ShouldNot(BeNil())
-	addTestVolumeMount(component.PodSpec, mysqlCompName)
-	return component
+	Expect(synthesizeComp).ShouldNot(BeNil())
+	addTestVolumeMount(synthesizeComp.PodSpec, mysqlCompName)
+	return synthesizeComp
 }
 
 func addTestVolumeMount(spec *corev1.PodSpec, containerName string) {

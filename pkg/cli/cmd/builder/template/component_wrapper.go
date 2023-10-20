@@ -330,15 +330,7 @@ func generateComponentObjects(w *templateRenderWorkflow, reqCtx intctrlutil.Requ
 	model.NewGraphClient(nil).Root(dag, nil, root, nil)
 
 	compSpec := cluster.Spec.GetComponentByName(compName)
-	compDef, err := component.BuildComponentDefinition(reqCtx, cli, cluster, compSpec)
-	if err != nil {
-		return nil, nil, err
-	}
-	comp, err := component.BuildProtoComponent(reqCtx, cli, cluster, compSpec)
-	if err != nil {
-		return nil, nil, err
-	}
-	synthesizeComp, err := component.BuildSynthesizedComponent(reqCtx, cli, cluster, compDef, comp)
+	synthesizeComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, cli, cluster, compSpec)
 	if err != nil {
 		return nil, nil, err
 	}

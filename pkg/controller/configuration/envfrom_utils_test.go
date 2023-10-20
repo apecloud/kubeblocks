@@ -92,15 +92,8 @@ var _ = Describe("ConfigEnvFrom test", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			component, err := component.BuildComponent(
-				reqCtx,
-				nil,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				&cluster.Spec.ComponentSpecs[0],
-				nil,
-				&clusterVersion.Spec.ComponentVersions[0])
+			// TODO(xingran): check it BuildComponent can be replaced by BuildSynthesizedComponentWrapper
+			synthesizeComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 
 			podSpec := &corev1.PodSpec{
@@ -117,8 +110,8 @@ var _ = Describe("ConfigEnvFrom test", func() {
 			k8sMockClient.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedFailedResult(), testutil.WithTimes(1)),
 				testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithAnyTimes()))
 
-			Expect(injectTemplateEnvFrom(cluster, component, podSpec, k8sMockClient.Client(), reqCtx.Ctx, nil)).ShouldNot(Succeed())
-			Expect(injectTemplateEnvFrom(cluster, component, podSpec, k8sMockClient.Client(), reqCtx.Ctx, nil)).Should(Succeed())
+			Expect(injectTemplateEnvFrom(cluster, synthesizeComp, podSpec, k8sMockClient.Client(), reqCtx.Ctx, nil)).ShouldNot(Succeed())
+			Expect(injectTemplateEnvFrom(cluster, synthesizeComp, podSpec, k8sMockClient.Client(), reqCtx.Ctx, nil)).Should(Succeed())
 		})
 
 		It("should SyncEnvConfigmap success", func() {

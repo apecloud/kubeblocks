@@ -55,15 +55,7 @@ func (t *RestoreTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 		if cluster.Annotations[constant.RestoreFromBackupAnnotationKey] == "" {
 			continue
 		}
-		compDef, err := component.BuildComponentDefinition(reqCtx, t.Client, cluster, &spec)
-		if err != nil {
-			return commitError(err)
-		}
-		comp, err := component.BuildProtoComponent(reqCtx, t.Client, cluster, &spec)
-		if err != nil {
-			return commitError(err)
-		}
-		synthesizeComp, err := component.BuildSynthesizedComponent(reqCtx, t.Client, cluster, compDef, comp)
+		synthesizeComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, t.Client, cluster, &spec)
 		if err != nil {
 			return commitError(err)
 		}

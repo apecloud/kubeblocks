@@ -21,6 +21,7 @@ package apps
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -31,7 +32,9 @@ import (
 )
 
 // ClusterCredentialTransformer creates the connection credential secret
-type ClusterCredentialTransformer struct{}
+type ClusterCredentialTransformer struct {
+	client.Client
+}
 
 var _ graph.Transformer = &ClusterCredentialTransformer{}
 
@@ -59,7 +62,7 @@ func (c *ClusterCredentialTransformer) Transform(ctx graph.TransformContext, dag
 				Name: comps[0].Name,
 			}
 		} else {
-			synthesizedComponent, err = component.BuildComponent(reqCtx, nil, cluster, transCtx.ClusterDef, &compDef, nil, nil)
+			synthesizedComponent, err = component.BuildSynthesizedComponentWrapper(reqCtx, c.Client, cluster, nil)
 			if err != nil {
 				return err
 			}

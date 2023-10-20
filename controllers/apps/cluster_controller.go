@@ -178,7 +178,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// validate config
 			&ValidateEnableLogsTransformer{},
 			// create cluster connection credential secret object
-			&ClusterCredentialTransformer{},
+			&ClusterCredentialTransformer{Client: r.Client},
 			// handle restore before ClusterComponentTransformer
 			&RestoreTransformer{Client: r.Client},
 			// create all cluster components objects
@@ -187,7 +187,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// and backupschedule.dataprotection.kubeblocks.io
 			&BackupPolicyTplTransformer{},
 			// handle rbac for pod
-			&RBACTransformer{},
+			&RBACTransformer{Client: r.Client},
 			// add our finalizer to all objects
 			&OwnershipTransformer{},
 			// make all workload objects depending on credential secret

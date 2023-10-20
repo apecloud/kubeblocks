@@ -133,16 +133,10 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint,
 		AddAnnotations(core.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name).
 		Create(&testCtx).GetObject()
 
-	synthesizedComp, err := component.BuildComponent(intctrlutil.RequestCtx{
-		Ctx: ctx,
-		Log: log.FromContext(ctx),
-	}, nil,
-		clusterObj,
-		clusterDefObj,
-		clusterDefObj.GetComponentDefByName(statefulCompDefName),
-		clusterObj.Spec.GetComponentByName(statefulCompName),
-		nil,
-		clusterVersionObj.Spec.GetDefNameMappingComponents()[statefulCompDefName])
+	synthesizedComp, err := component.BuildSynthesizedComponentWrapper(intctrlutil.RequestCtx{
+		Ctx: testCtx.Ctx,
+		Log: log.FromContext(testCtx.Ctx),
+	}, testCtx.Cli, clusterObj, clusterObj.Spec.GetComponentByName(statefulCompName))
 	Expect(err).ShouldNot(HaveOccurred())
 
 	return configmap, constraint, clusterObj, clusterVersionObj, synthesizedComp

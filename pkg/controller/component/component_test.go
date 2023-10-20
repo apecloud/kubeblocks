@@ -87,56 +87,25 @@ var _ = Describe("component module", func() {
 				Ctx: ctx,
 				Log: tlog,
 			}
-			component, err := BuildComponent(
-				reqCtx,
-				nil,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				&cluster.Spec.ComponentSpecs[0],
-				nil,
-				&clusterVersion.Spec.ComponentVersions[0])
+			component, err := BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 
 			By("leave clusterVersion.versionCtx empty initContains and containers")
 			clusterVersion.Spec.ComponentVersions[0].VersionsCtx.Containers = nil
 			clusterVersion.Spec.ComponentVersions[0].VersionsCtx.InitContainers = nil
-			component, err = BuildComponent(
-				reqCtx,
-				nil,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				&cluster.Spec.ComponentSpecs[0],
-				nil,
-				&clusterVersion.Spec.ComponentVersions[0])
+			// TODO(xingran): clusterVersion should be updated use cli, all the test cases BuildComponent should be refactored
+			component, err = BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 
 			By("new container in clusterVersion not in clusterDefinition")
-			component, err = BuildComponent(
-				reqCtx,
-				nil,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				&cluster.Spec.ComponentSpecs[0],
-				nil,
-				&clusterVersion.Spec.ComponentVersions[1])
+			component, err = BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 			Expect(len(component.PodSpec.Containers) >= 3).Should(BeTrue())
 
 			By("new init container in clusterVersion not in clusterDefinition")
-			component, err = BuildComponent(
-				reqCtx,
-				nil,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				&cluster.Spec.ComponentSpecs[0],
-				nil,
-				&clusterVersion.Spec.ComponentVersions[1])
+			component, err = BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 			Expect(len(component.PodSpec.InitContainers)).Should(Equal(1))
 		})
@@ -158,32 +127,27 @@ var _ = Describe("component module", func() {
 			cluster.Spec.ComponentSpecs = nil
 
 			By("build first component from simplified fields")
-			component, err := buildComponent(
-				reqCtx,
-				nil,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				nil,
-				nil,
-				&clusterVersion.Spec.ComponentVersions[0])
+			// TODO(xingran): check it BuildComponent can be replaced by BuildSynthesizedComponentWrapper
+			synthesizeComp, err := BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, nil)
 			Expect(err).Should(Succeed())
-			Expect(component).ShouldNot(BeNil())
-			Expect(component.Replicas).Should(Equal(*cluster.Spec.Replicas))
-			Expect(component.VolumeClaimTemplates[0].Spec.Resources.Requests["storage"]).Should(Equal(cluster.Spec.Storage.Size))
+			Expect(synthesizeComp).ShouldNot(BeNil())
+			Expect(synthesizeComp.Replicas).Should(Equal(*cluster.Spec.Replicas))
+			Expect(synthesizeComp.VolumeClaimTemplates[0].Spec.Resources.Requests["storage"]).Should(Equal(cluster.Spec.Storage.Size))
 
 			By("build second component will be nil")
-			component, err = buildComponent(
-				reqCtx,
-				nil,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[1],
-				nil,
-				nil,
-				&clusterVersion.Spec.ComponentVersions[0])
+			// TODO(xingran): check it BuildComponent can be replaced by BuildSynthesizedComponentWrapper, this nil component should be refactored
+			synthesizeComp, err = BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, nil)
+			/*			component, err = buildComponent(
+						reqCtx,
+						nil,
+						cluster,
+						clusterDef,
+						&clusterDef.Spec.ComponentDefs[1],
+						nil,
+						nil,
+						&clusterVersion.Spec.ComponentVersions[0])*/
 			Expect(err).Should(Succeed())
-			Expect(component).Should(BeNil())
+			Expect(synthesizeComp).Should(BeNil())
 		})
 
 		It("build affinity correctly", func() {
@@ -197,19 +161,21 @@ var _ = Describe("component module", func() {
 			By("clear cluster's component spec")
 			cluster.Spec.ComponentSpecs = nil
 			By("call build")
-			component, err := buildComponent(
-				reqCtx,
-				nil,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				nil,
-				nil,
-				&clusterVersion.Spec.ComponentVersions[0])
+			// TODO(xingran): check it BuildComponent can be replaced by BuildSynthesizedComponentWrapper
+			synthesizeComp, err := BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, nil)
+			/*			component, err := buildComponent(
+						reqCtx,
+						nil,
+						cluster,
+						clusterDef,
+						&clusterDef.Spec.ComponentDefs[0],
+						nil,
+						nil,
+						&clusterVersion.Spec.ComponentVersions[0])*/
 			Expect(err).Should(Succeed())
-			Expect(component).ShouldNot(BeNil())
-			Expect(component.PodSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].PodAffinityTerm.TopologyKey).Should(Equal("topology.kubernetes.io/zone"))
-			Expect(component.PodSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).Should(Equal("kubernetes.io/hostname"))
+			Expect(synthesizeComp).ShouldNot(BeNil())
+			Expect(synthesizeComp.PodSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].PodAffinityTerm.TopologyKey).Should(Equal("topology.kubernetes.io/zone"))
+			Expect(synthesizeComp.PodSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).Should(Equal("kubernetes.io/hostname"))
 		})
 
 		It("build monitor correctly", func() {
@@ -227,34 +193,38 @@ var _ = Describe("component module", func() {
 			By("clear cluster's component spec")
 			cluster.Spec.ComponentSpecs = nil
 			By("call build")
-			component, err := buildComponent(
-				reqCtx,
-				nil,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				nil,
-				nil,
-				&clusterVersion.Spec.ComponentVersions[0])
+			// TODO(xingran): check it BuildComponent can be replaced by BuildSynthesizedComponentWrapper
+			synthesizeComp, err := BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, nil)
+			/*			component, err := buildComponent(
+						reqCtx,
+						nil,
+						cluster,
+						clusterDef,
+						&clusterDef.Spec.ComponentDefs[0],
+						nil,
+						nil,
+						&clusterVersion.Spec.ComponentVersions[0])*/
 			Expect(err).Should(Succeed())
-			Expect(component).ShouldNot(BeNil())
-			Expect(component.Monitor.Enable).Should(Equal(false))
+			Expect(synthesizeComp).ShouldNot(BeNil())
+			Expect(synthesizeComp.Monitor.Enable).Should(Equal(false))
 			By("set monitor interval to 10s")
 			interval2 := intstr.Parse("10s")
 			cluster.Spec.Monitor.MonitoringInterval = &interval2
 			By("call build")
-			component, err = buildComponent(
-				reqCtx,
-				nil,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				nil,
-				nil,
-				&clusterVersion.Spec.ComponentVersions[0])
+			// TODO(xingran): check it BuildComponent can be replaced by BuildSynthesizedComponentWrapper
+			synthesizeComp, err = BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, nil)
+			/*			component, err = buildComponent(
+						reqCtx,
+						nil,
+						cluster,
+						clusterDef,
+						&clusterDef.Spec.ComponentDefs[0],
+						nil,
+						nil,
+						&clusterVersion.Spec.ComponentVersions[0])*/
 			Expect(err).Should(Succeed())
-			Expect(component).ShouldNot(BeNil())
-			Expect(component.Monitor.Enable).Should(Equal(true))
+			Expect(synthesizeComp).ShouldNot(BeNil())
+			Expect(synthesizeComp.Monitor.Enable).Should(Equal(true))
 		})
 
 		It("build network correctly", func() {
@@ -272,20 +242,22 @@ var _ = Describe("component module", func() {
 			By("clear cluster's component spec")
 			cluster.Spec.ComponentSpecs = nil
 			By("call build")
-			component, err := buildComponent(
-				reqCtx,
-				nil,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				nil,
-				nil,
-				&clusterVersion.Spec.ComponentVersions[0])
+			// TODO(xingran): check it BuildComponent can be replaced by BuildSynthesizedComponentWrapper
+			synthesizeComp, err := BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, nil)
+			/*			component, err := buildComponent(
+						reqCtx,
+						nil,
+						cluster,
+						clusterDef,
+						&clusterDef.Spec.ComponentDefs[0],
+						nil,
+						nil,
+						&clusterVersion.Spec.ComponentVersions[0])*/
 			Expect(err).Should(Succeed())
-			Expect(component).ShouldNot(BeNil())
-			Expect(component.Services[1].Name).Should(Equal("vpc"))
-			Expect(component.Services[1].Annotations["networking.gke.io/load-balancer-type"]).Should(Equal("Internal"))
-			Expect(component.Services[1].Spec.Type).Should(BeEquivalentTo("LoadBalancer"))
+			Expect(synthesizeComp).ShouldNot(BeNil())
+			Expect(synthesizeComp.Services[1].Name).Should(Equal("vpc"))
+			Expect(synthesizeComp.Services[1].Annotations["networking.gke.io/load-balancer-type"]).Should(Equal("Internal"))
+			Expect(synthesizeComp.Services[1].Spec.Type).Should(BeEquivalentTo("LoadBalancer"))
 		})
 
 		It("Test replace secretRef env placeholder token", func() {
@@ -332,17 +304,19 @@ var _ = Describe("component module", func() {
 			By("clear cluster's component spec")
 			cluster.Spec.ComponentSpecs = nil
 			By("call build")
-			component, err := buildComponent(
-				reqCtx,
-				nil,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				nil,
-				nil,
-				&clusterVersion.Spec.ComponentVersions[0])
+			// TODO(xingran): check it BuildComponent can be replaced by BuildSynthesizedComponentWrapper
+			synthesizeComp, err := BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, nil)
+			/*			component, err := buildComponent(
+						reqCtx,
+						nil,
+						cluster,
+						clusterDef,
+						&clusterDef.Spec.ComponentDefs[0],
+						nil,
+						nil,
+						&clusterVersion.Spec.ComponentVersions[0])*/
 			Expect(err).Should(Succeed())
-			Expect(component).Should(BeNil())
+			Expect(synthesizeComp).Should(BeNil())
 		})
 
 		It("build serviceReference correctly", func() {
@@ -371,21 +345,24 @@ var _ = Describe("component module", func() {
 				testapps.NginxImage: serviceDescriptor,
 			}
 			By("call build")
-			component, err := buildComponent(
-				reqCtx,
-				nil,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				&cluster.Spec.ComponentSpecs[0],
-				serviceReferenceMap,
-				&clusterVersion.Spec.ComponentVersions[0])
+			// TODO(xingran): check it BuildComponent can be replaced by BuildSynthesizedComponentWrapper
+			synthesizeComp, err := BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, &cluster.Spec.ComponentSpecs[0])
+			/*			component, err := buildComponent(
+						reqCtx,
+						nil,
+						cluster,
+						clusterDef,
+						&clusterDef.Spec.ComponentDefs[0],
+						&cluster.Spec.ComponentSpecs[0],
+						serviceReferenceMap,
+						&clusterVersion.Spec.ComponentVersions[0])*/
 			Expect(err).Should(Succeed())
-			Expect(component).ShouldNot(BeNil())
-			Expect(component.ServiceReferences).ShouldNot(BeNil())
-			Expect(component.ServiceReferences[testapps.NginxImage].Name).Should(Equal(name))
-			Expect(component.ServiceReferences[testapps.NginxImage].Spec.ServiceKind).Should(Equal(kind))
-			Expect(component.ServiceReferences[testapps.NginxImage].Spec.ServiceVersion).Should(Equal(version))
+			Expect(synthesizeComp).ShouldNot(BeNil())
+			Expect(synthesizeComp.ServiceReferences).ShouldNot(BeNil())
+			Expect(synthesizeComp.ServiceReferences[testapps.NginxImage].Name).Should(Equal(name))
+			Expect(synthesizeComp.ServiceReferences[testapps.NginxImage].Spec.ServiceKind).Should(Equal(kind))
+			Expect(synthesizeComp.ServiceReferences[testapps.NginxImage].Spec.ServiceVersion).Should(Equal(version))
+			Expect(serviceReferenceMap).Should(BeEmpty()) // for test failed
 		})
 	})
 })

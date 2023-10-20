@@ -144,14 +144,7 @@ func (r *ConfigurationReconciler) runTasks(taskCtx TaskContext, tasks []Task) (e
 		configuration = taskCtx.configuration
 	)
 
-	synthesizedComp, err = component.BuildComponent(taskCtx.reqCtx,
-		nil,
-		taskCtx.fetcher.ClusterObj,
-		taskCtx.fetcher.ClusterDefObj,
-		taskCtx.fetcher.ClusterDefComObj,
-		taskCtx.fetcher.ClusterComObj,
-		nil,
-		taskCtx.fetcher.ClusterVerComObj)
+	synthesizedComp, err = component.BuildSynthesizedComponentWrapper(taskCtx.reqCtx, r.Client, taskCtx.fetcher.ClusterObj, taskCtx.fetcher.ClusterComObj)
 	if err != nil {
 		return err
 	}

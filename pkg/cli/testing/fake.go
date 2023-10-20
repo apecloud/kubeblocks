@@ -625,7 +625,8 @@ func FakeKBDeploy(version string) *appsv1.Deployment {
 		},
 	}
 	deploy.SetLabels(map[string]string{
-		"app.kubernetes.io/name": types.KubeBlocksChartName,
+		"app.kubernetes.io/name":      types.KubeBlocksChartName,
+		"app.kubernetes.io/component": "apps",
 	})
 	if len(version) > 0 {
 		deploy.Labels["app.kubernetes.io/version"] = version

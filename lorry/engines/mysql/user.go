@@ -88,7 +88,7 @@ func (mgr *Manager) DescribeUser(ctx context.Context, userName string) (*models.
 	// only keep one role name of the highest privilege
 	userRoles := make([]models.RoleType, 0)
 
-	sql := fmt.Sprintf(showGrantSQL, user.UserName)
+	sql := fmt.Sprintf(showGrantSQL, userName)
 
 	err := QueryRowsMap(mgr.DB, sql, func(rMap RowMap) error {
 		for k, v := range rMap {

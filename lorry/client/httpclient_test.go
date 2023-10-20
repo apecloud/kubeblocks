@@ -267,6 +267,28 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 	})
 
+	Context("grant user role", func() {
+		var lorryClient *HTTPClient
+
+		BeforeEach(func() {
+			lorryClient, _ = NewHTTPClientWithPod(pod)
+			Expect(lorryClient).ShouldNot(BeNil())
+		})
+
+		It("success", func() {
+			mockDBManager.EXPECT().GrantUserRole(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			Expect(lorryClient.GrantUserRole(context.TODO(), "user-test", "readwrite")).Should(Succeed())
+		})
+
+		It("not implemented", func() {
+			msg := "not implemented for test"
+			mockDBManager.EXPECT().GrantUserRole(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf(msg))
+			err := lorryClient.GrantUserRole(context.TODO(), "user-test", "readwrite")
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring(msg))
+		})
+	})
+
 	Context("list users", func() {
 		var lorryClient *HTTPClient
 		var users []models.UserInfo

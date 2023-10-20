@@ -21,6 +21,7 @@ package user
 
 import (
 	"context"
+	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -41,7 +42,7 @@ type GrantRole struct {
 var grantRole operations.Operation = &GrantRole{}
 
 func init() {
-	err := operations.Register("grantrole", grantRole)
+	err := operations.Register(strings.ToLower(string(util.GrantUserRoleOp)), grantRole)
 	if err != nil {
 		panic(err.Error())
 	}

@@ -21,7 +21,7 @@ spec:
     preBackup: []
     postBackup: []
     backupData:
-      image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
+      image: {{ include "apecloud-mysql.bakcupToolImage" . }}
       runOnTargetPodNode: true
       command:
       - sh
@@ -33,7 +33,7 @@ spec:
         intervalSeconds: 5
   restore:
     prepareData:
-      image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
+      image: {{ include "apecloud-mysql.bakcupToolImage" . }}
       command:
       - sh
       - -c
@@ -57,7 +57,7 @@ spec:
   backup: {}
   restore:
     prepareData:
-      image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
+      image: {{ include "apecloud-mysql.bakcupToolImage" . }}
       command:
       - sh
       - -c

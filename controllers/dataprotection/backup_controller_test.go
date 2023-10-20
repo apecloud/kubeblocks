@@ -186,6 +186,22 @@ var _ = Describe("Backup Controller test", func() {
 			})
 		})
 
+		Context("create an invalid backup", func() {
+			It("should fail if backupPolicy is not found", func() {
+				By("creating a backup using a not found backupPolicy")
+				backup := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
+					backup.Spec.BackupPolicyName = "not-found"
+				})
+				backupKey := client.ObjectKeyFromObject(backup)
+
+				By("check backup failed and its expiration is set")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
+					g.Expect(fetched.Status.Expiration).ShouldNot(BeNil())
+				}))
+			})
+		})
+
 		Context("deletes a backup", func() {
 			var (
 				backupKey types.NamespacedName

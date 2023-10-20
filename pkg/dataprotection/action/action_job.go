@@ -79,8 +79,10 @@ func (j *JobAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
 	exists, err := ctrlutil.CheckResourceExists(ctx.Ctx, ctx.Client, key, &original)
 	if err != nil {
 		return handleErr(err)
-	} else if exists {
-		// job exists, check job status and set action status accordingly
+	}
+
+	// job exists, check job status and set action status accordingly
+	if exists {
 		objRef, _ := ref.GetReference(ctx.Scheme, &original)
 		sb = sb.startTimestamp(&original.CreationTimestamp).objectRef(objRef)
 		_, finishedType, msg := utils.IsJobFinished(&original)
@@ -88,7 +90,6 @@ func (j *JobAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
 		case batchv1.JobComplete:
 			return sb.phase(dpv1alpha1.ActionPhaseCompleted).
 				completionTimestamp(nil).
-				reason("").
 				build(), nil
 		case batchv1.JobFailed:
 			return sb.phase(dpv1alpha1.ActionPhaseFailed).
@@ -97,7 +98,7 @@ func (j *JobAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
 				build(), nil
 		}
 		// job is running
-		return sb.build(), nil
+		return handleErr(nil)
 	}
 
 	// job doesn't exist, create it

@@ -227,7 +227,6 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			initClusterForOps(opsRes)
 
 			opsManager := GetOpsManager()
-			//reAction := reconfigureAction{}
 			By("init ops phase")
 			_, err := opsManager.Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -236,9 +235,6 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			_, err = opsManager.Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 
-			//Expect(reAction.Action(reqCtx, k8sClient, opsRes)).Should(Succeed())
-			//By("configuration Reconcile callback")
-			// Expect(reAction.Handle(eventContext, ops.Name, appsv1alpha1.OpsRunningPhase, nil)).Should(Succeed())
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
 			_, _ = opsManager.Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsRunningPhase))

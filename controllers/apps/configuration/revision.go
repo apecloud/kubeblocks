@@ -62,7 +62,7 @@ func GcRevision(annotations map[string]string) []ConfigurationRevision {
 
 func GetLastRevision(annotations map[string]string, revision int64) (ConfigurationRevision, bool) {
 	revisions := RetrieveRevision(annotations)
-	for i := len(revisions) - 1; i >= 0; i++ {
+	for i := len(revisions) - 1; i >= 0; i-- {
 		if revisions[i].Revision == revision {
 			return revisions[i], true
 		}

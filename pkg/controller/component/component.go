@@ -31,6 +31,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/class"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -58,7 +59,33 @@ func buildProtoCompFromCompDef(reqCtx ictrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.Component, error) {
-	return nil, nil
+
+	if clusterCompSpec == nil || clusterCompSpec.ComponentDef == "" {
+		return nil, errors.New("invalid component spec")
+	}
+
+	cmpd := &appsv1alpha1.ComponentDefinition{}
+	if err := ictrlutil.ValidateExistence(reqCtx.Ctx, cli, types.NamespacedName{Name: clusterCompSpec.ComponentDef}, cmpd, false); err != nil {
+		return nil, err
+	}
+
+	comp := builder.NewComponentBuilder(cluster.Namespace, clusterCompSpec.Name, cluster.Name, clusterCompSpec.ComponentDef).
+		SetAffinity(clusterCompSpec.Affinity).
+		SetTolerations(clusterCompSpec.Tolerations).
+		SetReplicas(clusterCompSpec.Replicas).
+		SetResources(clusterCompSpec.Resources).
+		SetMonitor(clusterCompSpec.Monitor).
+		SetServiceAccountName(clusterCompSpec.ServiceAccountName).
+		SetVolumeClaimTemplates(clusterCompSpec.VolumeClaimTemplates).
+		SetUpdateStrategy(clusterCompSpec.UpdateStrategy).
+		SetEnabledLogs(clusterCompSpec.EnabledLogs).
+		SetServiceRefs(clusterCompSpec.ServiceRefs).
+		SetClassRef(clusterCompSpec.ClassDefRef).
+		SetIssuer(clusterCompSpec.Issuer).
+		SetTLS(clusterCompSpec.TLS).
+		GetObject()
+
+	return comp, nil
 }
 
 // buildProtoCompFromConvertor builds a new Component object based on converting clusterComponentDefinition to ComponentDefinition.
@@ -66,13 +93,16 @@ func buildProtoCompFromConvertor(reqCtx ictrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.Component, error) {
+	if cluster.Spec.ClusterDefRef == "" || cluster.Spec.ClusterVersionRef == "" {
+		return nil, errors.New("clusterDefRef and ClusterVersionRef is required when enableComponentDefinition is false")
+	}
 
 	cd := &appsv1alpha1.ClusterDefinition{}
-	if err := ictrlutil.ValidateExistence(reqCtx.Ctx, cli, types.NamespacedName{Name: cluster.Spec.ClusterDefRef}, cd); err != nil {
+	if err := ictrlutil.ValidateExistence(reqCtx.Ctx, cli, types.NamespacedName{Name: cluster.Spec.ClusterDefRef}, cd, false); err != nil {
 		return nil, err
 	}
 	cv := &appsv1alpha1.ClusterVersion{}
-	if err := ictrlutil.ValidateExistence(reqCtx.Ctx, cli, types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}, cv); err != nil {
+	if err := ictrlutil.ValidateExistence(reqCtx.Ctx, cli, types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}, cv, false); err != nil {
 		return nil, err
 	}
 	var clusterCompDef *appsv1alpha1.ClusterComponentDefinition

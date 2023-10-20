@@ -564,6 +564,14 @@ spec:
                         type: object
                       type: array
                       x-kubernetes-preserve-unknown-fields: true
+                    updateStrategy:
+                      description: updateStrategy defines the update strategy for
+                        the component.
+                      enum:
+                      - Serial
+                      - BestEffortParallel
+                      - Parallel
+                      type: string
                     volumeClaimTemplates:
                       description: volumeClaimTemplates information for statefulset.spec.volumeClaimTemplates.
                       items:

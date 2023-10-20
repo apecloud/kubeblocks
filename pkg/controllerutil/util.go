@@ -108,9 +108,12 @@ func IsNil(i interface{}) bool {
 	return false
 }
 
-func ValidateExistence(ctx context.Context, cli roclient.ReadonlyClient, key client.ObjectKey, object client.Object) error {
+func ValidateExistence(ctx context.Context, cli roclient.ReadonlyClient, key client.ObjectKey, object client.Object, ignoreNotFound bool) error {
 	err := cli.Get(ctx, key, object)
-	if err != nil && !IsNotFound(err) {
+	if err != nil && IsNotFound(err) && ignoreNotFound {
+		return nil
+	}
+	if err != nil {
 		return err
 	}
 	return nil

@@ -216,11 +216,11 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx, cli roclient.R
 	}
 
 	cd := &appsv1alpha1.ClusterDefinition{}
-	if err := intctrlutil.ValidateExistence(reqCtx.Ctx, cli, types.NamespacedName{Name: cluster.Spec.ClusterDefRef}, cd); err != nil {
+	if err := intctrlutil.ValidateExistence(reqCtx.Ctx, cli, types.NamespacedName{Name: cluster.Spec.ClusterDefRef}, cd, false); err != nil {
 		return err
 	}
 	cv := &appsv1alpha1.ClusterVersion{}
-	if err := intctrlutil.ValidateExistence(reqCtx.Ctx, cli, types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}, cv); err != nil {
+	if err := intctrlutil.ValidateExistence(reqCtx.Ctx, cli, types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}, cv, false); err != nil {
 		return err
 	}
 

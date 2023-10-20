@@ -176,7 +176,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component, clust
 // getCacheSnapshotComp gets the component object from cache snapshot
 func getCacheSnapshotComp(reqCtx ictrlutil.RequestCtx, cli client.Client, compName, namespace string) (*appsv1alpha1.Component, error) {
 	runningComp := &appsv1alpha1.Component{}
-	if err := ictrlutil.ValidateExistence(reqCtx.Ctx, cli, types.NamespacedName{Name: compName, Namespace: namespace}, runningComp); err != nil {
+	if err := ictrlutil.ValidateExistence(reqCtx.Ctx, cli, types.NamespacedName{Name: compName, Namespace: namespace}, runningComp, false); err != nil {
 		return nil, err
 	}
 	return runningComp, nil

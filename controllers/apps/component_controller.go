@@ -74,20 +74,23 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		AddTransformer(
 			// handle component deletion first
 			&ComponentDeletionTransformer{},
-			// update finalizer and component definition labels
-			&ComponentAssureMetaTransformer{},
+			&ComponentMetaTransformer{},
 			// validate referenced componentDefinition objects existence and availability, and build synthesized component
 			&ComponentLoadResourcesTransformer{},
-			// validate enabled logs
-			&ComponentEnableLogsValidationTransformer{},
-			// handle component connection credential secret object
+			// do spec & definition consistency validation
+			&ComponentValidationTransformer{},
+			// handle the component services
+			&ComponentServiceTransformer{},
+			// handle the connection credentials
 			&ComponentCredentialTransformer{},
-			// handle rsm(ReplicatedStateMachine) workload generation
+			// handle the component PDB
+			&ComponentPDBTransformer{},
+			// handle the component workload
 			&ComponentWorkloadTransformer{Client: r.Client},
 			// handle tls volume and cert
 			&ComponentTLSTransformer{},
-			// handle configuration rendering
-			&ComponentConfigurationRenderTransformer{Client: r.Client},
+			// render the component configurations
+			&ComponentConfigurationTransformer{Client: r.Client},
 			// add our finalizer to all objects
 			&ComponentOwnershipTransformer{},
 			// update component status

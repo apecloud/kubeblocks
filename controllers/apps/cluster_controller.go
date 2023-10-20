@@ -179,10 +179,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&ValidateEnableLogsTransformer{},
 			// create cluster connection credential secret object
 			&ClusterCredentialTransformer{},
-			// handle restore before ComponentTransformer
+			// handle restore before ClusterComponentTransformer
 			&RestoreTransformer{Client: r.Client},
-			// create all components objects
-			&ComponentTransformer{Client: r.Client},
+			// create all cluster components objects
+			&ClusterComponentTransformer{Client: r.Client},
 			// transform backupPolicyTemplate to backuppolicy.dataprotection.kubeblocks.io
 			// and backupschedule.dataprotection.kubeblocks.io
 			&BackupPolicyTplTransformer{},

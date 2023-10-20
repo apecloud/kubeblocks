@@ -85,8 +85,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&ComponentWorkloadTransformer{Client: r.Client},
 			// handle tls volume and cert
 			&ComponentTLSTransformer{},
-			// handle configuration rendering
-			&ComponentConfigurationRenderTransformer{Client: r.Client},
+			// render the component configurations
+			&ComponentConfigurationTransformer{Client: r.Client},
 			// add our finalizer to all objects
 			&ComponentOwnershipTransformer{},
 			// update component status

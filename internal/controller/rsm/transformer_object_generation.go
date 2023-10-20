@@ -341,7 +341,7 @@ func buildDebugPodTemplate(rsm workloads.ReplicatedStateMachine, envConfig corev
 	template := rsm.Spec.Template
 	// inject env ConfigMap into workload pods only
 	for i := range template.Spec.Containers {
-		if template.Spec.Containers[i].Name == "etcd" {
+		if i == 0 {
 			zeroPodName := stsName + "-0"
 			svcName := getHeadlessSvcName(rsm)
 			svcPort := findSvcPort(rsm)

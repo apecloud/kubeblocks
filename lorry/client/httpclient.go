@@ -158,6 +158,23 @@ func (cli *HTTPClient) DeleteUser(ctx context.Context, userName string) error {
 	return err
 }
 
+func (cli *HTTPClient) DescribeUser(ctx context.Context, userName string) (map[string]any, error) {
+	parameters := map[string]any{
+		"userName": userName,
+	}
+	req := &httpserver.Request{Parameters: parameters}
+	resp, err := cli.Request(ctx, string(DescribeUserOp), http.MethodGet, req)
+	if err != nil {
+		return nil, err
+	}
+	user, ok := resp["user"]
+	if !ok {
+		return nil, nil
+	}
+
+	return user.(map[string]any), nil
+}
+
 // ListUsers lists all normal users created
 func (cli *HTTPClient) ListUsers(ctx context.Context) ([]map[string]any, error) {
 	resp, err := cli.Request(ctx, string(ListUsersOp), http.MethodGet, nil)

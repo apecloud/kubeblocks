@@ -28,40 +28,43 @@ import (
 	"github.com/apecloud/kubeblocks/lorry/client"
 )
 
-type DeleteUserOptions struct {
+type DescribeUserOptions struct {
 	lorryAddr string
 	userName  string
 }
 
-var deleteUserOptions = &DeleteUserOptions{}
+var describeUserOptions = &DescribeUserOptions{}
 
-var DeleteUserCmd = &cobra.Command{
-	Use:   "deleteuser",
-	Short: "delete user.",
+var DescribeUserCmd = &cobra.Command{
+	Use:   "describeuser",
+	Short: "describe user.",
 	Example: `
-lorryctl  deleteuser --username xxx 
+lorryctl  describeuser --username xxx 
   `,
 	Args: cobra.MinimumNArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		lorryClient, err := client.NewHTTPClientWithURL(deleteUserOptions.lorryAddr)
+		lorryClient, err := client.NewHTTPClientWithURL(describeUserOptions.lorryAddr)
 		if err != nil {
 			fmt.Printf("new lorry http client failed: %v\n", err)
 			return
 		}
 
-		err = lorryClient.DeleteUser(context.TODO(), deleteUserOptions.userName)
+		user, err := lorryClient.DescribeUser(context.TODO(), describeUserOptions.userName)
 		if err != nil {
-			fmt.Printf("delete user failed: %v\n", err)
+			fmt.Printf("describe user failed: %v\n", err)
 			return
 		}
-		fmt.Printf("delete user success")
+		fmt.Println("describe user success:")
+		for k, v := range user {
+			fmt.Printf("%s: %v\n", k, v)
+		}
 	},
 }
 
 func init() {
-	DeleteUserCmd.Flags().StringVarP(&deleteUserOptions.userName, "username", "", "", "The name of user to delete")
-	DeleteUserCmd.Flags().StringVarP(&deleteUserOptions.lorryAddr, "lorry-addr", "", "http://localhost:3501/v1.0/", "The addr of lorry to request")
-	DeleteUserCmd.Flags().BoolP("help", "h", false, "Print this help message")
+	DescribeUserCmd.Flags().StringVarP(&describeUserOptions.userName, "username", "", "", "The name of user to describe")
+	DescribeUserCmd.Flags().StringVarP(&describeUserOptions.lorryAddr, "lorry-addr", "", "http://localhost:3501/v1.0/", "The addr of lorry to request")
+	DescribeUserCmd.Flags().BoolP("help", "h", false, "Print this help message")
 
-	RootCmd.AddCommand(DeleteUserCmd)
+	RootCmd.AddCommand(DescribeUserCmd)
 }

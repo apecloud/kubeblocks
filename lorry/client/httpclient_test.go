@@ -40,26 +40,30 @@ import (
 )
 
 var _ = Describe("Lorry HTTP Client", func() {
-	podName := "pod-for-lorry-test"
-	pod := testapps.NewPodFactory("default", podName).
-		AddContainer(corev1.Container{
-			Name:    testapps.DefaultNginxContainerName,
-			Command: []string{"lorry", "--port", "3501"},
-			Image:   testapps.NginxImage}).
-		GetObject()
-	pod.Spec.Containers[0].Ports = []corev1.ContainerPort{
-		{
-			ContainerPort: int32(lorryHTTPPort),
-			Name:          constant.LorryHTTPPortName,
-			Protocol:      "TCP",
-		},
-		{
-			ContainerPort: int32(50001),
-			Name:          constant.LorryGRPCPortName,
-			Protocol:      "TCP",
-		},
-	}
-	pod.Status.PodIP = "127.0.0.1"
+	var pod *corev1.Pod
+
+	BeforeEach(func() {
+		podName := "pod-for-lorry-test"
+		pod = testapps.NewPodFactory("default", podName).
+			AddContainer(corev1.Container{
+				Name:    testapps.DefaultNginxContainerName,
+				Command: []string{"lorry", "--port", strconv.Itoa(lorryHTTPPort)},
+				Image:   testapps.NginxImage}).
+			GetObject()
+		pod.Spec.Containers[0].Ports = []corev1.ContainerPort{
+			{
+				ContainerPort: int32(lorryHTTPPort),
+				Name:          constant.LorryHTTPPortName,
+				Protocol:      "TCP",
+			},
+			{
+				ContainerPort: int32(50001),
+				Name:          constant.LorryGRPCPortName,
+				Protocol:      "TCP",
+			},
+		}
+		pod.Status.PodIP = "127.0.0.1"
+	})
 
 	Context("new HTTPClient", func() {
 		//port, closer := newTCPServer(t, 50001)
@@ -207,7 +211,9 @@ var _ = Describe("Lorry HTTP Client", func() {
 		It("not implemented", func() {
 			msg := "not implemented for test"
 			mockDBManager.EXPECT().CreateUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf(msg))
-			Expect(lorryClient.CreateUser(context.TODO(), "user-test", "password-test")).Should(HaveOccurred())
+			err := lorryClient.CreateUser(context.TODO(), "user-test", "password-test")
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring(msg))
 		})
 	})
 
@@ -227,7 +233,9 @@ var _ = Describe("Lorry HTTP Client", func() {
 		It("not implemented", func() {
 			msg := "not implemented for test"
 			mockDBManager.EXPECT().DeleteUser(gomock.Any(), gomock.Any()).Return(fmt.Errorf(msg))
-			Expect(lorryClient.DeleteUser(context.TODO(), "user-test")).Should(HaveOccurred())
+			err := lorryClient.DeleteUser(context.TODO(), "user-test")
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring(msg))
 		})
 	})
 

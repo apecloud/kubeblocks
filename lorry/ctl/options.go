@@ -174,17 +174,6 @@ func newCommands(ctx context.Context, options *Options) (*Commands, error) {
 		SigCh:              make(chan os.Signal, 1),
 		restartDB:          true,
 	}
-	go func() {
-		for {
-			sig := <-cmd.SigCh
-			switch sig {
-			case syscall.SIGUSR1:
-				cmd.restartDB = false
-			case syscall.SIGUSR2:
-				cmd.restartDB = true
-			}
-		}
-	}()
 	return cmd, nil
 }
 

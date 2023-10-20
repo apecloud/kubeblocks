@@ -29,7 +29,6 @@ import (
 	"golang.org/x/exp/maps"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -72,8 +71,10 @@ var _ graph.Transformer = &ComponentWorkloadTransformer{}
 
 func (t *ComponentWorkloadTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ComponentTransformContext)
+	cluster := transCtx.Cluster
 	comp := transCtx.Component
 	compOrig := transCtx.ComponentOrig
+	synthesizeComp := transCtx.SynthesizeComponent
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      transCtx.Context,
 		Log:      transCtx.Logger,
@@ -84,9 +85,10 @@ func (t *ComponentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 		return nil
 	}
 
-	graphCli, _ := transCtx.Client.(model.GraphClient)
-	cluster := transCtx.Cluster
-	synthesizeComp := transCtx.SynthesizeComponent
+	obj, err := t.RSMObject(ctx, cluster, comp)
+	if err != nil {
+		return err
+	}
 
 	// build synthesizeComp podSpec volumeMounts
 	buildPodSpecVolumeMounts(synthesizeComp)
@@ -97,136 +99,78 @@ func (t *ComponentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	if err != nil {
 		return err
 	}
-	objects := []client.Object{rsm}
 
-	// build PDB for backward compatibility
-	// MinAvailable is used to determine whether to create a PDB (Pod Disruption Budget) object. However, the functionality of PDB should be implemented within the RSM.
-	// Therefore, PDB objects are no longer needed in the new API, and the MinAvailable field should be deprecated.
-	// The old MinAvailable field, which value is determined based on the deprecated "workloadType" field, is also no longer applicable in the new API.
-	// TODO(xingran): which should be removed when workloadType and ClusterCompDefName are removed
-	if synthesizeComp.MinAvailable != nil {
-		pdb := factory.BuildPDB(cluster, synthesizeComp)
-		objects = append(objects, pdb)
-	}
-
-	// read cache snapshot
-	ml := constant.GetComponentWellKnownLabels(cluster.Name, comp.Name)
-	oldSnapshot, err := model.ReadCacheSnapshot(ctx, comp, ml, ownedWorkloadKinds()...)
-	if err != nil {
-		return err
-	}
-
-	// compute create/update/delete set
-	newSnapshot := make(map[model.GVKNObjKey]client.Object)
-	for _, object := range objects {
-		name, err := model.GetGVKName(object)
-		if err != nil {
-			return err
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	if obj == nil {
+		if rsm == nil {
+			// do nothing
+		} else {
+			graphCli.Create(dag, rsm)
 		}
-		newSnapshot[*name] = object
-	}
-
-	// now compute the diff between old and target snapshot and generate the plan
-	oldNameSet := sets.KeySet(oldSnapshot)
-	newNameSet := sets.KeySet(newSnapshot)
-
-	createSet := newNameSet.Difference(oldNameSet)
-	updateSet := newNameSet.Intersection(oldNameSet)
-	deleteSet := oldNameSet.Difference(newNameSet)
-
-	createNewObjects := func() error {
-		for name := range createSet {
-			graphCli.Create(dag, newSnapshot[name])
+	} else {
+		if rsm == nil {
+			graphCli.Delete(dag, obj)
+		} else {
+			err = t.handleUpdate(reqCtx, graphCli, dag, cluster, synthesizeComp, obj, rsm)
 		}
-		return nil
 	}
+	return err
+}
 
-	updateObjects := func() error {
-		for name := range updateSet {
-			oldObj := oldSnapshot[name]
-			newObj := copyAndMerge(oldObj, newSnapshot[name], cluster)
-			graphCli.Update(dag, oldObj, newObj)
-
-			// to work around that the scaled PVC will be deleted at object action.
-			newRsmObj, ok := newObj.(*workloads.ReplicatedStateMachine)
-			if !ok {
-				continue
-			}
-			if err := updateVolumes(reqCtx, t.Client, synthesizeComp, newRsmObj, dag); err != nil {
-				return err
-			}
-
-		}
-		return nil
+func (t *ComponentWorkloadTransformer) RSMObject(ctx graph.TransformContext,
+	cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) (*workloads.ReplicatedStateMachine, error) {
+	rsms := &workloads.ReplicatedStateMachineList{}
+	inNS := client.InNamespace(cluster.GetNamespace())
+	ml := client.MatchingLabels(constant.GetComponentWellKnownLabels(cluster.Name, comp.Name))
+	if err := ctx.GetClient().List(ctx.GetContext(), rsms, inNS, ml); err != nil {
+		return nil, err
 	}
-
-	deleteOrphanObjects := func() error {
-		for name := range deleteSet {
-			graphCli.Delete(dag, oldSnapshot[name])
-		}
-		return nil
+	if len(rsms.Items) == 0 {
+		return nil, nil
 	}
+	return &rsms.Items[0], nil
+}
 
-	// handle rsm workload restart/expandVolume/horizontalScale
+func (t *ComponentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG,
+	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, rsm *workloads.ReplicatedStateMachine) error {
 	// TODO(xingran): Some RSM workload operations should be moved down to Lorry implementation. Subsequent operations such as horizontal scaling will be removed from the component controller
-	rsmWorkloadOps := func() error {
-		for name := range updateSet {
-			oldRsmObj, ok := oldSnapshot[name].(*workloads.ReplicatedStateMachine)
-			if !ok {
-				continue
-			}
-
-			cwo := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, oldRsmObj, rsm, dag)
-
-			// handle rsm workload restart
-			if err := cwo.restart(); err != nil {
-				return err
-			}
-
-			// handle rsm expand volume
-			if err := cwo.expandVolume(); err != nil {
-				return err
-			}
-
-			// handle rsm workload horizontal scale
-			if err := cwo.horizontalScale(); err != nil {
-				return err
-			}
-
-			dag = cwo.dag
-		}
-
-		return nil
-	}
-
-	// handle rsm workload restart/expandVolume/horizontalScale ops
-	if err := rsmWorkloadOps(); err != nil {
+	if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, obj, rsm); err != nil {
 		return err
 	}
 
-	// objects to be created
-	if err := createNewObjects(); err != nil {
+	objCopy := copyAndMerge(obj, rsm, cluster)
+	cli.Update(dag, obj, objCopy)
+
+	// to work around that the scaled PVC will be deleted at object action.
+	newRsmObj, _ := objCopy.(*workloads.ReplicatedStateMachine)
+	if err := updateVolumes(reqCtx, t.Client, synthesizeComp, newRsmObj, dag); err != nil {
 		return err
 	}
-
-	// objects to be updated
-	if err := updateObjects(); err != nil {
-		return err
-	}
-
-	// objects to be deleted
-	if err := deleteOrphanObjects(); err != nil {
-		return err
-	}
-
 	return nil
 }
 
-func ownedWorkloadKinds() []client.ObjectList {
-	return []client.ObjectList{
-		&workloads.ReplicatedStateMachineList{},
-		&policyv1.PodDisruptionBudgetList{},
+func (t *ComponentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.RequestCtx, dag *graph.DAG,
+	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, rsm *workloads.ReplicatedStateMachine) error {
+	cwo := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, obj, rsm, dag)
+
+	// handle rsm workload restart
+	if err := cwo.restart(); err != nil {
+		return err
 	}
+
+	// handle rsm expand volume
+	if err := cwo.expandVolume(); err != nil {
+		return err
+	}
+
+	// handle rsm workload horizontal scale
+	if err := cwo.horizontalScale(); err != nil {
+		return err
+	}
+
+	dag = cwo.dag
+
+	return nil
 }
 
 // buildPodSpecVolumeMounts builds podSpec volumeMounts
@@ -343,19 +287,9 @@ func copyAndMerge(oldObj, newObj client.Object, cluster *appsv1alpha1.Cluster) c
 		return rsmObjCopy
 	}
 
-	copyAndMergePDB := func(oldPDB, newPDB *policyv1.PodDisruptionBudget) client.Object {
-		pdbObjCopy := oldPDB.DeepCopy()
-		mergeMetadataMap(pdbObjCopy.Annotations, &newPDB.Annotations)
-		pdbObjCopy.Annotations = newPDB.Annotations
-		pdbObjCopy.Spec = newPDB.Spec
-		return pdbObjCopy
-	}
-
 	switch o := newObj.(type) {
 	case *workloads.ReplicatedStateMachine:
 		return copyAndMergeRsm(oldObj.(*workloads.ReplicatedStateMachine), o)
-	case *policyv1.PodDisruptionBudget:
-		return copyAndMergePDB(oldObj.(*policyv1.PodDisruptionBudget), o)
 	default:
 		return newObj
 	}

@@ -101,3 +101,10 @@ func (builder *ServiceBuilder) SetType(serviceType corev1.ServiceType) *ServiceB
 	}
 	return builder
 }
+
+func (builder *ServiceBuilder) SetSpec(spec *corev1.ServiceSpec) *ServiceBuilder {
+	if spec != nil {
+		builder.get().Spec = *spec
+	}
+	return builder
+}

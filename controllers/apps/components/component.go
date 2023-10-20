@@ -381,6 +381,68 @@ func (c *rsmComponent) status(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 		return err
 	}
 
+	// set primary-pod annotation
+	// TODO(free6om): primary-pod is only used in redis to bootstrap the redis cluster correctly.
+	// it is too hacky to be replaced by a better design.
+	if err := c.updatePrimaryIndex(reqCtx.Ctx, cli); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *rsmComponent) updatePrimaryIndex(ctx context.Context, cli client.Client) error {
+	if c.component.WorkloadType != appsv1alpha1.Replication {
+		return nil
+	}
+	podList, err := listPodOwnedByComponent(ctx, cli, c.GetNamespace(), c.getMatchingLabels())
+	if err != nil {
+		return err
+	}
+	if len(podList) == 0 {
+		return nil
+	}
+	slices.SortFunc(podList, func(a, b *corev1.Pod) bool {
+		return a.GetName() < b.GetName()
+	})
+	primaryPods := make([]string, 0)
+	emptyRolePods := make([]string, 0)
+	for _, pod := range podList {
+		role, ok := pod.Labels[constant.RoleLabelKey]
+		if !ok || role == "" {
+			emptyRolePods = append(emptyRolePods, pod.Name)
+			continue
+		}
+		if role == constant.Primary {
+			primaryPods = append(primaryPods, pod.Name)
+		}
+	}
+	primaryPodName, err := func() (string, error) {
+		switch {
+		// if the workload is newly created, and the role label is not set, we set the pod with index=0 as the primary by default.
+		case len(emptyRolePods) == len(podList):
+			return podList[0].Name, nil
+		case len(primaryPods) != 1:
+			return "", fmt.Errorf("the number of primary pod is not equal to 1, primary pods: %v, emptyRole pods: %v", primaryPods, emptyRolePods)
+		default:
+			return primaryPods[0], nil
+		}
+	}()
+	if err != nil {
+		return err
+	}
+	graphCli := model.NewGraphClient(c.Client)
+	for _, pod := range podList {
+		if pod.Annotations == nil {
+			pod.Annotations = map[string]string{}
+		}
+		pi, ok := pod.Annotations[constant.PrimaryAnnotationKey]
+		if !ok || pi != primaryPodName {
+			origPod := pod.DeepCopy()
+			pod.Annotations[constant.PrimaryAnnotationKey] = primaryPodName
+			graphCli.Patch(c.dag, origPod, pod)
+		}
+	}
 	return nil
 }
 

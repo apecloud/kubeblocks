@@ -41,7 +41,12 @@ import (
 
 func TestInit(t *testing.T) {
 	hs, s := setUpHost("leader", t)
-	defer s.Close()
+	mechanism := viper.GetString(binding.RSMRoleUpdateMechanismVarName)
+	viper.Set(binding.RSMRoleUpdateMechanismVarName, "")
+	defer func() {
+		s.Close()
+		viper.Set(binding.RSMRoleUpdateMechanismVarName, mechanism)
+	}()
 
 	tests := map[string]struct {
 		input     string

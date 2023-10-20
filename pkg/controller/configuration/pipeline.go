@@ -112,7 +112,7 @@ func (p *pipeline) RenderScriptTemplate() *pipeline {
 func (p *pipeline) UpdateConfiguration() *pipeline {
 	buildConfiguration := func() (err error) {
 		expectedConfiguration := p.createConfiguration()
-		if intctrlutil.SetOwnerReference(p.ClusterObj, expectedConfiguration) != nil {
+		if intctrlutil.SetOwnerReference(p.ctx.Cluster, expectedConfiguration) != nil {
 			return
 		}
 

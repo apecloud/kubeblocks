@@ -55,8 +55,6 @@ spec:
           runAsUser: 10000
         containers:
           - name: zookeeper
-{{/*            command:*/}}
-{{/*              - /kb-scripts/start-zookeeper.sh*/}}
             env:
               - name: K8S_REPLICAS
                 value: "$(KB_REPLICA_COUNT)"
@@ -66,6 +64,8 @@ spec:
                 value: "false"
               - name: RE_CONFIG_ENABLE
                 value: "true"
+              - name: ZOO_4LW_COMMANDS_WHITELIST
+                value: "srvr, mntr, ruok"
             ports:
               - name: client
                 containerPort: {{ .Values.containerPorts.client }}
@@ -75,17 +75,22 @@ spec:
                 containerPort: {{ .Values.containerPorts.election }}
               - name: http
                 containerPort: {{ .Values.containerPorts.http }}
-{{/*            livenessProbe:*/}}
-{{/*              exec:*/}}
-{{/*                command:*/}}
-{{/*                  - bash*/}}
-{{/*                  - -c*/}}
-{{/*                  - echo ruok | nc -q 1 localhost 2181 | grep imok*/}}
-{{/*              failureThreshold: 10*/}}
-{{/*              initialDelaySeconds: 5*/}}
-{{/*              periodSeconds: 30*/}}
-{{/*              successThreshold: 1*/}}
-{{/*              timeoutSeconds: 30*/}}
+            livenessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 30
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              exec:
+                command: [ '/bin/bash', '-c', 'echo "ruok" | timeout 2 nc -w 2 localhost {{ .Values.containerPorts.client }} | grep imok' ]
+            readinessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              exec:
+                command: [ '/bin/bash', '-c', 'echo "ruok" | timeout 2 nc -w 2 localhost {{ .Values.containerPorts.client }} | grep imok' ]
             resources:
               requests:
                 cpu: 50m

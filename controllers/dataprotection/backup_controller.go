@@ -504,6 +504,18 @@ func (r *BackupReconciler) handleRunningPhase(
 		duration := request.Status.CompletionTimestamp.Sub(request.Status.StartTimestamp.Time).Round(time.Second)
 		request.Status.Duration = &metav1.Duration{Duration: duration}
 	}
+	if request.Spec.RetentionPeriod != "" {
+		// set expiration time
+		duration, err := request.Spec.RetentionPeriod.ToDuration()
+		if err != nil {
+			return r.updateStatusIfFailed(reqCtx, backup, request.Backup, fmt.Errorf("failed to parse retention period %s, %v", request.Spec.RetentionPeriod, err))
+		}
+		if duration.Seconds() > 0 {
+			request.Status.Expiration = &metav1.Time{
+				Time: request.Status.CompletionTimestamp.Add(duration),
+			}
+		}
+	}
 	r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedBackup", "Completed backup")
 	if err = r.Client.Status().Patch(reqCtx.Ctx, request.Backup, client.MergeFrom(backup)); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -538,6 +550,7 @@ func (r *BackupReconciler) handleCompletedPhase(
 	if err := r.deleteExternalResources(reqCtx, backup); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
+
 	return intctrlutil.Reconciled()
 }
 

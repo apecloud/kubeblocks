@@ -141,7 +141,7 @@ func (c *rsmComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) 
 }
 
 func (c *rsmComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.status(reqCtx, cli, c.newBuilder(reqCtx, cli, model.ActionNoopPtr()))
+	return c.status(reqCtx, cli, c.newBuilder(reqCtx, cli, nil))
 }
 
 func (c *rsmComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli client.Client,
@@ -276,6 +276,7 @@ func (c *rsmComponent) status(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 	if c.runningWorkload == nil {
 		return nil
 	}
+	c.noopAllNoneWorkloadObjects()
 
 	isDeleting := func() bool {
 		return !c.runningWorkload.DeletionTimestamp.IsZero()
@@ -388,6 +389,11 @@ func (c *rsmComponent) status(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 		return err
 	}
 
+	graphCli := model.NewGraphClient(c.Client)
+	if graphCli.IsAction(c.dag, c.workload, nil) {
+		graphCli.Noop(c.dag, c.workload)
+	}
+
 	return nil
 }
 
@@ -478,8 +484,8 @@ func (c *rsmComponent) resolveObjectsAction(reqCtx intctrlutil.RequestCtx, cli c
 		switch action, err := resolveObjectAction(snapshot, object, cli.Scheme()); {
 		case err != nil:
 			return err
-		case *action == model.UPDATE:
-			graphCli.Update(c.dag, nil, object)
+		case *action == model.CREATE:
+			graphCli.Create(c.dag, object)
 		default:
 			graphCli.Noop(c.dag, object)
 
@@ -487,12 +493,17 @@ func (c *rsmComponent) resolveObjectsAction(reqCtx intctrlutil.RequestCtx, cli c
 	}
 	if c.GetCluster().IsStatusUpdating() {
 		// TODO(refactor): fix me, this is a workaround for h-scaling to update stateful set.
-		objects = graphCli.FindAll(c.dag, &workloads.ReplicatedStateMachine{}, model.HaveDifferentTypeWithOption)
-		for _, object := range objects {
-			graphCli.Noop(c.dag, object)
-		}
+		c.noopAllNoneWorkloadObjects()
 	}
 	return c.validateObjectsAction()
+}
+
+func (c *rsmComponent) noopAllNoneWorkloadObjects() {
+	graphCli := model.NewGraphClient(c.Client)
+	objects := graphCli.FindAll(c.dag, &workloads.ReplicatedStateMachine{}, model.HaveDifferentTypeWithOption)
+	for _, object := range objects {
+		graphCli.Noop(c.dag, object)
+	}
 }
 
 // setStatusPhase sets the cluster component phase and messages conditionally.

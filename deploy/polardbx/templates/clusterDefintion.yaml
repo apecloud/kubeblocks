@@ -22,13 +22,6 @@ spec:
           defaultMode: 0555
       workloadType: Consensus
       characterType: polardbx
-      consensusSpec:
-        leader:
-          name: "leader"
-          accessMode: ReadWrite
-        followers:
-          - name: "follower"
-            accessMode: Readonly
       rsmSpec:
         roles:
           - name: "leader"
@@ -40,7 +33,7 @@ spec:
             canVote: true
         roleProbe:
           roleUpdateMechanism: DirectAPIServerEventUpdate
-          probeActions:
+          customHandler:
             - image: "arey/mysql-client:latest"
               command:
                 - mysql
@@ -243,13 +236,6 @@ spec:
             - name: GMS_SVC_NAME
               valueFrom:
                 type: ServiceRef
-      consensusSpec:
-        leader:
-          name: "leader"
-          accessMode: ReadWrite
-        followers:
-          - name: "follower"
-            accessMode: Readonly
       rsmSpec:
         roles:
           - name: "leader"
@@ -261,7 +247,7 @@ spec:
             canVote: true
         roleProbe:
           roleUpdateMechanism: DirectAPIServerEventUpdate
-          probeActions:
+          customHandler:
             - image: "arey/mysql-client:latest"
               command:
                 - mysql

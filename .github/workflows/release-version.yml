@@ -32,7 +32,8 @@ jobs:
           TEST_PACKAGES=`bash .github/utils/utils.sh --type 16 \
               --trigger-type "[test]" \
               --test-pkgs "${{ vars.TEST_PKGS }}" \
-              --test-check "${{ vars.TEST_CHECK }}"`
+              --test-check "${{ vars.TEST_CHECK }}" \
+              --ignore-pkgs "${{ vars.SKIP_CHECK_PKG }}"`
           echo "matrix={\"include\":[$TEST_PACKAGES]}" >> $GITHUB_OUTPUT
 
   release-test:

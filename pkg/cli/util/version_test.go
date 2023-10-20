@@ -48,7 +48,7 @@ var _ = Describe("version util", func() {
 		Expect(v.Cli).ShouldNot(BeEmpty())
 	})
 
-	It("get vsion info when KubeBlocks is deployed", func() {
+	It("get version info when KubeBlocks is deployed", func() {
 		client := testing.FakeClientSet(testing.FakeKBDeploy(kbVersion))
 		v, err := GetVersionInfo(client)
 		Expect(err).Should(Succeed())

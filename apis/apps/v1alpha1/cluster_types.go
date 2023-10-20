@@ -326,6 +326,10 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:default=false
 	// +optional
 	NoCreatePDB bool `json:"noCreatePDB,omitempty"`
+
+	// updateStrategy defines the update strategy for the component.
+	// +optional
+	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
 }
 
 // GetMinAvailable wraps the 'prefer' value return. As for component replicaCount <= 1, it will return 0,

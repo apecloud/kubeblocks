@@ -29,11 +29,12 @@ type ComponentBuilder struct {
 	BaseBuilder[appsv1alpha1.Component, *appsv1alpha1.Component, ComponentBuilder]
 }
 
-func NewComponentBuilder(namespace, name, componentDefinition string) *ComponentBuilder {
+func NewComponentBuilder(namespace, name, cluster, componentDefinition string) *ComponentBuilder {
 	builder := &ComponentBuilder{}
 	builder.init(namespace, name,
 		&appsv1alpha1.Component{
 			Spec: appsv1alpha1.ComponentSpec{
+				Cluster: cluster,
 				CompDef: componentDefinition,
 			},
 		}, builder)
@@ -55,6 +56,11 @@ func (builder *ComponentBuilder) SetToleration(toleration corev1.Toleration) *Co
 	return builder
 }
 
+func (builder *ComponentBuilder) SetTolerations(tolerations []corev1.Toleration) *ComponentBuilder {
+	builder.get().Spec.Tolerations = tolerations
+	return builder
+}
+
 func (builder *ComponentBuilder) SetReplicas(replicas int32) *ComponentBuilder {
 	builder.get().Spec.Replicas = replicas
 	return builder
@@ -70,8 +76,8 @@ func (builder *ComponentBuilder) SetResources(resources corev1.ResourceRequireme
 	return builder
 }
 
-func (builder *ComponentBuilder) SetEnabledLogs(logName ...string) *ComponentBuilder {
-	builder.get().Spec.EnabledLogs = logName
+func (builder *ComponentBuilder) SetEnabledLogs(logNames []string) *ComponentBuilder {
+	builder.get().Spec.EnabledLogs = logNames
 	return builder
 }
 
@@ -96,5 +102,25 @@ func (builder *ComponentBuilder) AddVolumeClaimTemplate(volumeName string,
 		Name: volumeName,
 		Spec: pvcSpec,
 	})
+	return builder
+}
+
+func (builder *ComponentBuilder) SetVolumeClaimTemplates(volumeClaimTemplates []appsv1alpha1.ClusterComponentVolumeClaimTemplate) *ComponentBuilder {
+	builder.get().Spec.VolumeClaimTemplates = volumeClaimTemplates
+	return builder
+}
+
+func (builder *ComponentBuilder) SetServiceRefs(serviceRefs []appsv1alpha1.ServiceRef) *ComponentBuilder {
+	builder.get().Spec.ServiceRefs = serviceRefs
+	return builder
+}
+
+func (builder *ComponentBuilder) SetClassRef(classRef *appsv1alpha1.ClassDefRef) *ComponentBuilder {
+	builder.get().Spec.ClassDefRef = classRef
+	return builder
+}
+
+func (builder *ComponentBuilder) SetUpdateStrategy(updateStrategy *appsv1alpha1.UpdateStrategy) *ComponentBuilder {
+	builder.get().Spec.UpdateStrategy = updateStrategy
 	return builder
 }

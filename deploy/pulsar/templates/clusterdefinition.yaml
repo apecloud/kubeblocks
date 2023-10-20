@@ -143,6 +143,8 @@ spec:
             - name: PULSAR_LOG_LEVEL
               value: DEBUG
             {{- end }}
+            - name: SERVICE_PORT
+              value: "8080"
             - name: POD_NAME
               value: $(KB_POD_NAME)
             - name: PULSAR_PREFIX_brokerServicePort
@@ -331,6 +333,8 @@ spec:
             - name: PULSAR_LOG_LEVEL
               value: DEBUG
             {{- end }}
+            - name: SERVICE_PORT
+              value: "8080"
             - name: brokerWebServiceURL
               value: http://$(brokerSVC):80
             - name: brokerServiceURL
@@ -482,6 +486,8 @@ spec:
             - name: PULSAR_LOG_LEVEL
               value: DEBUG
             {{- end }}
+            - name: SERVICE_PORT
+              value: "8000"
             - name: cluster_domain
               value: {{ .Values.clusterDomain }}
             lifecycle:
@@ -649,6 +655,8 @@ spec:
             - name: PULSAR_LOG_LEVEL
               value: DEBUG
             {{- end }}
+            - name: SERVICE_PORT
+              value: "8000"
             - name: httpServerEnabled
               value: "true"
             - name: httpServerPort
@@ -751,6 +759,8 @@ spec:
               - name: PULSAR_LOG_LEVEL
                 value: DEBUG
               {{- end }}
+              - name: SERVICE_PORT
+                value: "8000"
               - name: EXTERNAL_PROVIDED_SERVERS
                 value: "false"
               - name: OPTS

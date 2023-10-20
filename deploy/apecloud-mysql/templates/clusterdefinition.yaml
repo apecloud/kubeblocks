@@ -109,6 +109,8 @@ spec:
               - containerPort: 13306
                 name: paxos
             env:
+              - name: SERVICE_PORT
+                value: "3306"
               - name: MYSQL_ROOT_HOST
                 value: {{ .Values.auth.rootHost | default "%" | quote }}
               - name: MYSQL_ROOT_USER
@@ -235,6 +237,8 @@ spec:
                 value: "$(KB_CLUSTER_NAME)-vtcontroller-headless"
               - name: VTCTLD_WEB_PORT
                 value: "15000"
+              - name: SERVICE_PORT
+                value: "$(VTTABLET_PORT)"
               - name: MYSQL_ROOT_USER
                 valueFrom:
                   secretKeyRef:

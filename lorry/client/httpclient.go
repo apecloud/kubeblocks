@@ -185,6 +185,16 @@ func (cli *HTTPClient) GrantUserRole(ctx context.Context, userName, roleName str
 	return err
 }
 
+func (cli *HTTPClient) RevokeUserRole(ctx context.Context, userName, roleName string) error {
+	parameters := map[string]any{
+		"userName": userName,
+		"roleName": roleName,
+	}
+	req := &httpserver.Request{Parameters: parameters}
+	_, err := cli.Request(ctx, string(RevokeUserRoleOp), http.MethodPost, req)
+	return err
+}
+
 // ListUsers lists all normal users created
 func (cli *HTTPClient) ListUsers(ctx context.Context) ([]map[string]any, error) {
 	resp, err := cli.Request(ctx, string(ListUsersOp), http.MethodGet, nil)

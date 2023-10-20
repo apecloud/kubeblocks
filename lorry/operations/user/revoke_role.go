@@ -21,6 +21,7 @@ package user
 
 import (
 	"context"
+	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -41,7 +42,7 @@ type RevokeRole struct {
 var revokeRole operations.Operation = &RevokeRole{}
 
 func init() {
-	err := operations.Register("revokerole", revokeRole)
+	err := operations.Register(strings.ToLower(string(util.RevokeUserRoleOp)), revokeRole)
 	if err != nil {
 		panic(err.Error())
 	}

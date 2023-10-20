@@ -64,13 +64,13 @@ func RegisterBuiltin(characterType string) error {
 		if err != nil {
 			return errors.Errorf(initErrFmt, "redis", err)
 		}
-	case "postgres":
+	case "postgresql":
 		pgOp := postgres.NewPostgres()
-		builtinMap["postgres"] = pgOp
-		properties := component.GetProperties("postgres")
+		builtinMap["postgresql"] = pgOp
+		properties := component.GetProperties("postgresql")
 		err := pgOp.Init(properties)
 		if err != nil {
-			return errors.Errorf(initErrFmt, "postgres", err)
+			return errors.Errorf(initErrFmt, "postgresql", err)
 		}
 	case "etcd":
 		etcdOp := etcd.NewEtcd()

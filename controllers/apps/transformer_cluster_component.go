@@ -31,14 +31,14 @@ import (
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// ComponentTransformer transforms all cluster.Spec.ComponentSpecs to mapping Component objects
-type ComponentTransformer struct {
+// ClusterComponentTransformer transforms all cluster.Spec.ComponentSpecs to mapping Component objects
+type ClusterComponentTransformer struct {
 	client.Client
 }
 
-var _ graph.Transformer = &ComponentTransformer{}
+var _ graph.Transformer = &ClusterComponentTransformer{}
 
-func (c *ComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (c *ClusterComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster
 	origCluster := transCtx.OrigCluster

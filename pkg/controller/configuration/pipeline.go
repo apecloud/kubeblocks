@@ -111,17 +111,18 @@ func (p *pipeline) RenderScriptTemplate() *pipeline {
 
 func (p *pipeline) UpdateConfiguration() *pipeline {
 	buildConfiguration := func() (err error) {
-		expectConfiguration := p.createConfiguration()
-		configuration := appsv1alpha1.Configuration{}
-		err = p.ResourceFetcher.Client.Get(p.Context, client.ObjectKeyFromObject(expectConfiguration), &configuration)
+		expectedConfiguration := p.createConfiguration()
+		if intctrlutil.SetOwnerReference(p.ClusterObj, expectedConfiguration) != nil {
+			return
+		}
+
+		existingConfiguration := appsv1alpha1.Configuration{}
+		err = p.ResourceFetcher.Client.Get(p.Context, client.ObjectKeyFromObject(expectedConfiguration), &existingConfiguration)
 		switch {
 		case err == nil:
-			return p.updateConfiguration(expectConfiguration, &configuration)
+			return p.updateConfiguration(expectedConfiguration, &existingConfiguration)
 		case apierrors.IsNotFound(err):
-			if len(expectConfiguration.Spec.ConfigItemDetails) == 0 {
-				return nil
-			}
-			return p.ResourceFetcher.Client.Create(p.Context, expectConfiguration)
+			return p.ResourceFetcher.Client.Create(p.Context, expectedConfiguration)
 		default:
 			return err
 		}

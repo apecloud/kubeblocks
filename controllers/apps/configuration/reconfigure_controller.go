@@ -255,16 +255,6 @@ func (r *ReconfigureReconciler) performUpgrade(params reconfigureParams) (ctrl.R
 	}
 
 	returnedStatus, err := policy.Upgrade(params)
-	// TODO delete callback
-	// Replace sync status with configuration.status
-	// if err := r.HandleConfigEvent(params, core.PolicyExecStatus{
-	//	PolicyName:    policy.GetPolicyName(),
-	//	ExecStatus:    string(returnedStatus.Status),
-	//	SucceedCount:  returnedStatus.SucceedCount,
-	//	ExpectedCount: returnedStatus.ExpectedCount,
-	// }, err); err != nil {
-	//	return intctrlutil.RequeueWithErrorAndRecordEvent(params.ConfigMap, r.Recorder, err, params.Ctx.Log)
-	// }
 	if err != nil {
 		params.Ctx.Log.Error(err, "failed to update engine parameters")
 	}
@@ -318,47 +308,4 @@ func getOpsRequestID(cm *corev1.ConfigMap) string {
 		return cm.Annotations[constant.LastAppliedOpsCRAnnotationKey]
 	}
 	return ""
-}
-
-func (r *ReconfigureReconciler) HandleConfigEvent(params reconfigureParams, status core.PolicyExecStatus, err error) error {
-	var (
-		cm             = params.ConfigMap
-		lastOpsRequest = ""
-	)
-
-	if len(cm.Annotations) != 0 {
-		lastOpsRequest = cm.Annotations[constant.LastAppliedOpsCRAnnotationKey]
-	}
-
-	eventContext := intctrlutil.ConfigEventContext{
-		ConfigSpecName:   params.ConfigSpecName,
-		Client:           params.Client,
-		ReqCtx:           params.Ctx,
-		Cluster:          params.Cluster,
-		Component:        params.Component,
-		ConfigPatch:      params.ConfigPatch,
-		ConfigConstraint: params.ConfigConstraint,
-		ConfigMap:        params.ConfigMap,
-		ComponentUnits:   params.ComponentUnits,
-		DeploymentUnits:  params.DeploymentUnits,
-		PolicyStatus:     status,
-	}
-
-	for _, handler := range intctrlutil.ConfigEventHandlerMap {
-		if err := handler.Handle(eventContext, lastOpsRequest, fromReconfigureStatus(ExecStatus(status.ExecStatus)), err); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func fromReconfigureStatus(status ExecStatus) appsv1alpha1.OpsPhase {
-	switch status {
-	case ESFailed:
-		return appsv1alpha1.OpsFailedPhase
-	case ESNone:
-		return appsv1alpha1.OpsSucceedPhase
-	default:
-		return appsv1alpha1.OpsRunningPhase
-	}
 }

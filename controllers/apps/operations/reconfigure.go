@@ -47,7 +47,6 @@ func init() {
 		OpsHandler:                         &reAction,
 		ProcessingReasonInClusterCondition: ProcessingReasonReconfiguring,
 	}
-	// intctrlutil.ConfigEventHandlerMap["ops_status_reconfigure"] = &reAction
 	opsManager.RegisterOps(appsv1alpha1.ReconfiguringType, reconfigureBehaviour)
 }
 

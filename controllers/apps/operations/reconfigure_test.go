@@ -246,6 +246,14 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 					item = config.Spec.GetConfigurationItem("mysql-test")
 					for i := 0; i < len(config.Status.ConfigurationItemStatus); i++ {
 						config.Status.ConfigurationItemStatus[i].Phase = appsv1alpha1.CFinishedPhase
+						if config.Status.ConfigurationItemStatus[i].Name == item.Name {
+							config.Status.ConfigurationItemStatus[i].ReconcileDetail = &appsv1alpha1.ReconcileDetail{
+								Policy:          "simple",
+								CurrentRevision: config.Status.ConfigurationItemStatus[i].UpdateRevision,
+								SucceedCount:    2,
+								ExpectedCount:   2,
+							}
+						}
 					}
 				})).Should(Succeed())
 

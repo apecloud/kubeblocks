@@ -35,6 +35,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
+	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -360,8 +361,10 @@ func updateReconfigureStatusByCM(reconfiguringStatus *appsv1alpha1.Reconfiguring
 	}
 	cmCount := len(reconfiguringStatus.ConfigurationStatus)
 	reconfiguringStatus.ConfigurationStatus = append(reconfiguringStatus.ConfigurationStatus, appsv1alpha1.ConfigurationItemStatus{
-		Name:   tplName,
-		Status: appsv1alpha1.ReasonReconfigureMerging,
+		Name:          tplName,
+		Status:        appsv1alpha1.ReasonReconfigurePersisting,
+		SucceedCount:  core.NotStarted,
+		ExpectedCount: core.Unconfirmed,
 	})
 	cmStatus := &reconfiguringStatus.ConfigurationStatus[cmCount]
 	return handleReconfigureStatus(cmStatus)

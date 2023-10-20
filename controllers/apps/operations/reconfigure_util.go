@@ -262,7 +262,7 @@ func constructReconfiguringConditions(result reconfiguringResult, resource *OpsR
 	if result.noFormatFilesUpdated || result.configPatch.IsModify {
 		return appsv1alpha1.NewReconfigureRunningCondition(
 			resource.OpsRequest,
-			appsv1alpha1.ReasonReconfigureMerged,
+			appsv1alpha1.ReasonReconfigurePersisted,
 			configSpec.Name,
 			formatConfigPatchToMessage(result.configPatch, nil))
 	}

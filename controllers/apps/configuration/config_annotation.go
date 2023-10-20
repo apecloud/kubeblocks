@@ -57,7 +57,7 @@ func unReconciled(phase appsv1alpha1.ConfigurationPhase, revision string, messag
 		Phase:         phase,
 		Revision:      revision,
 		Message:       message,
-		SucceedCount:  core.Unconfirmed,
+		SucceedCount:  core.NotStarted,
 		ExpectedCount: core.Unconfirmed,
 		Failed:        false,
 		Retry:         false,

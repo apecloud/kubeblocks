@@ -122,12 +122,6 @@ There are various ways to create a BackupRepo. Make sure you have done all the n
 
    </Tabs>
 
-:::note
-
-If you encounter connection issues while logging in to MinIO with `kbcli dashboard open minio`, try running the command `kubectl port-forward --namespace kb-system svc/kb-addon-minio 9001:9001` (You may need to retry a few times) and then access the dashboard.
-
-:::
-
 
 2. Generate credentials.
 

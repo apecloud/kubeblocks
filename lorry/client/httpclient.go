@@ -45,7 +45,6 @@ const (
 
 type HTTPClient struct {
 	Client           *http.Client
-	Port             int32
 	URL              string
 	cache            map[string]*OperationResult
 	CacheTTL         time.Duration
@@ -88,8 +87,36 @@ func NewHTTPClientWithPod(pod *corev1.Pod) (*HTTPClient, error) {
 
 	operationClient := &HTTPClient{
 		Client:           client,
-		Port:             port,
 		URL:              fmt.Sprintf(urlTemplate, ip, port),
+		CacheTTL:         60 * time.Second,
+		RequestTimeout:   30 * time.Second,
+		ReconcileTimeout: 500 * time.Millisecond,
+		cache:            make(map[string]*OperationResult),
+	}
+	return operationClient, nil
+}
+
+func NewHTTPClientWithURL(url string) (*HTTPClient, error) {
+	if url == "" {
+		return nil, fmt.Errorf("no url")
+	}
+
+	// don't use default http-client
+	dialer := &net.Dialer{
+		Timeout: 5 * time.Second,
+	}
+	netTransport := &http.Transport{
+		Dial:                dialer.Dial,
+		TLSHandshakeTimeout: 5 * time.Second,
+	}
+	client := &http.Client{
+		Timeout:   time.Second * 30,
+		Transport: netTransport,
+	}
+
+	operationClient := &HTTPClient{
+		Client:           client,
+		URL:              url,
 		CacheTTL:         60 * time.Second,
 		RequestTimeout:   30 * time.Second,
 		ReconcileTimeout: 500 * time.Millisecond,

@@ -45,6 +45,7 @@ Usage: $(basename "$0") <options>
     -pn, --pr-number          The pull request number
     -tp, --test-pkgs          The test packages
     -tc, --test-check         The test check
+    -tf, --test-pkgs-first    The test packages first level directory
 EOF
 }
 
@@ -72,6 +73,7 @@ main() {
     local PR_NUMBER=""
     local TEST_PACKAGES=""
     local TEST_PKGS=""
+    local TEST_PKGS_FIRST=""
     local TEST_CHECK=""
 
     parse_command_line "$@"
@@ -247,6 +249,12 @@ parse_command_line() {
             -tc|--test-check)
                 if [[ -n "${2:-}" ]]; then
                     TEST_CHECK="$2"
+                    shift
+                fi
+                ;;
+            -tf|--test-pkgs-first)
+                if [[ -n "${2:-}" ]]; then
+                    TEST_PKGS_FIRST="$2"
                     shift
                 fi
                 ;;
@@ -662,6 +670,10 @@ get_test_packages() {
     fi
     for check in $( echo "$TEST_CHECK" | sed 's/|/ /g' ); do
         set_test_check $check
+    done
+
+    for pkgs_first in $( echo "$TEST_PKGS_FIRST" | sed 's/|/ /g' ); do
+        set_test_check "./$pkgs_first"
     done
 
     for pkgs in $( echo "$TEST_PKGS" | sed 's/|/ /g' ); do

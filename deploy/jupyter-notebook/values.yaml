@@ -9,7 +9,7 @@ image:
   repository: apecloud/jupyter-notebook-llm
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: beta1
+  tag: beta2
 
 fullnameOverride: ""
 

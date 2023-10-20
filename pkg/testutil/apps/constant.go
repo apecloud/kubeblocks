@@ -61,6 +61,8 @@ const (
 	DefaultResourceConstraintName = "kb-resource-constraint"
 
 	StogrageClassName = "test-sc"
+	EnvKeyImageTag    = "IMAGE_TAG"
+	DefaultImageTag   = "test"
 )
 
 var (

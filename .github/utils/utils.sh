@@ -615,9 +615,30 @@ set_size_label() {
     fi
 }
 
+skip_check_pkg() {
+    check_pkg=${1:-""}
+    skip="false"
+    if [[ -z "$check_pkg" ]]; then
+        echo "$skip"
+        return
+    fi
+    for skip_pkg in $(echo "$IGNORE_PKGS" | sed 's/|/ /g'); do
+        if [[ "$check_pkg" == "$skip_pkg" ]]; then
+            skip="true"
+            break
+        fi
+    done
+    echo "$skip"
+}
+
 set_test_packages() {
     pkgs_dir=$1
     if ( find $pkgs_dir -maxdepth 1 -type f -name '*_test.go' ) > /dev/null; then
+        skip_check=$(skip_check_pkg "$pkgs_dir")
+        if [[ "$skip_check" == "true" ]]; then
+            echo "skip check pkg:$pkgs_dir"
+            return
+        fi
         if [[ -z "$TEST_PACKAGES" ]]; then
             TEST_PACKAGES="{\"ops\":\"$pkgs_dir\"}"
         else

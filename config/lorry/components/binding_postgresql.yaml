@@ -1,4 +1,4 @@
-name: postgres
+name: postgresql
 spec:
   version: v1
   metadata:

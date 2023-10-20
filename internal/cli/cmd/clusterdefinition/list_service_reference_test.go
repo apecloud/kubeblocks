@@ -81,8 +81,8 @@ var _ = Describe("clusterdefinition list components", func() {
 
 	It("list-service", func() {
 		cmd.Run(cmd, []string{clusterdefinitionName})
-		expected := `NAME              COMPONENT             SERVICE-KIND   SERVICE-VERSION   
-fake-serviceRef   fake-component-type   mysql          8.0.\d{1,2}$      
+		expected := `CLUSTER-DEFINITION        NAME              COMPONENT             SERVICE-KIND   SERVICE-VERSION   
+fake-cluster-definition   fake-serviceRef   fake-component-type   mysql          8.0.\d{1,2}$      
 `
 		Expect(expected).Should(Equal(out.String()))
 		fmt.Println(out.String())

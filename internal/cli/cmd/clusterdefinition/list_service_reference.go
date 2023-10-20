@@ -73,8 +73,8 @@ func listServiceRef(o *list.ListOptions) error {
 	}
 
 	p := printer.NewTablePrinter(o.Out)
-	p.SetHeader("NAME", "COMPONENT", "SERVICE-KIND", "SERVICE-VERSION")
-	p.SortBy(1)
+	p.SetHeader("CLUSTER-DEFINITION", "NAME", "COMPONENT", "SERVICE-KIND", "SERVICE-VERSION")
+	p.SortBy(1, 2)
 	for _, info := range infos {
 		var cd v1alpha1.ClusterDefinition
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(info.Object.(*unstructured.Unstructured).Object, &cd); err != nil {
@@ -86,7 +86,7 @@ func listServiceRef(o *list.ListOptions) error {
 			}
 			for _, serviceDec := range comp.ServiceRefDeclarations {
 				for _, ref := range serviceDec.ServiceRefDeclarationSpecs {
-					p.AddRow(serviceDec.Name, comp.Name, ref.ServiceKind, ref.ServiceVersion)
+					p.AddRow(cd.Name, serviceDec.Name, comp.Name, ref.ServiceKind, ref.ServiceVersion)
 				}
 			}
 		}

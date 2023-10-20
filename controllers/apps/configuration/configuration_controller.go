@@ -160,7 +160,6 @@ func (r *ConfigurationReconciler) runTasks(taskCtx TaskContext, tasks []Task) (e
 	patch := client.MergeFrom(configuration.DeepCopy())
 	revision := strconv.FormatInt(configuration.GetGeneration(), 10)
 	for _, task := range tasks {
-		task.Status.UpdateRevision = revision
 		if err := task.Do(taskCtx.fetcher, synthesizedComp, revision); err != nil {
 			errs = append(errs, err)
 			continue

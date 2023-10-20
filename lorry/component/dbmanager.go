@@ -22,9 +22,10 @@ package component
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
-	"strings"
 
 	"github.com/apecloud/kubeblocks/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/constant"

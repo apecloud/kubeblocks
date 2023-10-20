@@ -74,6 +74,8 @@ spec:
               - name: pod-info
                 mountPath: /kb-podinfo
             env:
+              - name: SERVICE_PORT
+                value: "6379"
               - name: REDIS_REPL_USER
                 value: "kbreplicator"
               - name: REDIS_REPL_PASSWORD
@@ -81,6 +83,12 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+                    optional: false
+              - name: REDIS_DEFAULT_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
                     optional: false
               - name: REDIS_DEFAULT_PASSWORD
                 valueFrom:

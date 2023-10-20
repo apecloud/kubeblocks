@@ -45,6 +45,7 @@ jobs:
               --trigger-type "$TRIGGER_MODE" \
               --test-pkgs "${{ vars.TEST_PKGS }}" \
               --test-check "${{ vars.TEST_CHECK }}" \
+              --test-pkgs-first "${{ vars.TEST_PKGS_FIRST }}" \
               --ignore-pkgs "${{ vars.SKIP_CHECK_PKG }}"`
           echo "$TEST_PACKAGES"
           echo "matrix={\"include\":[$TEST_PACKAGES]}" >> $GITHUB_OUTPUT

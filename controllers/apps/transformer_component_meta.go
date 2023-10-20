@@ -26,22 +26,18 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
-type ComponentAssureMetaTransformer struct{}
+type ComponentMetaTransformer struct{}
 
-var _ graph.Transformer = &ComponentAssureMetaTransformer{}
+var _ graph.Transformer = &ComponentMetaTransformer{}
 
-func (t *ComponentAssureMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *ComponentMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ComponentTransformContext)
 	component := transCtx.Component
 
-	// The object is not being deleted, so if it does not have our finalizer,
-	// then lets add the finalizer and update the object. This is equivalent
-	// registering our finalizer.
 	if !controllerutil.ContainsFinalizer(component, constant.DBComponentFinalizerName) {
 		controllerutil.AddFinalizer(component, constant.DBComponentFinalizerName)
 	}
 
-	// patch the label to prevent the label from being modified by the user.
 	labels := component.Labels
 	if labels == nil {
 		labels = map[string]string{}

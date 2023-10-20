@@ -159,7 +159,7 @@ func initConfiguration(resourceCtx *intctrlutil.ResourceCtx, synthesizedComponen
 	}).
 		Prepare().
 		UpdateConfiguration(). // reconcile Configuration
-		Configuration(). // sync Configuration
+		Configuration().       // sync Configuration
 		CreateConfigTemplate().
 		UpdateConfigRelatedObject().
 		UpdateConfigurationStatus().

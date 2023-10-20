@@ -96,7 +96,6 @@ func syncImpl(fetcher *Task,
 		Sync().
 		Complete()
 
-	status.UpdateRevision = revision
 	if err != nil {
 		status.Message = cfgutil.ToPointer(err.Error())
 		status.Phase = appsv1alpha1.CMergeFailedPhase
@@ -104,7 +103,8 @@ func syncImpl(fetcher *Task,
 		status.Message = nil
 		status.Phase = appsv1alpha1.CMergedPhase
 	}
-	return
+	status.UpdateRevision = revision
+	return err
 }
 
 func syncStatus(configMap *corev1.ConfigMap, status *appsv1alpha1.ConfigurationItemDetailStatus) (err error) {

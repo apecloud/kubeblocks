@@ -17,7 +17,8 @@ debugEnabled: false
 ## Default Pulsar image
 ##
 defaultPulsarImage:
-  repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/pulsar
+  registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+  repository: apecloud/pulsar
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag:
@@ -34,7 +35,8 @@ images:
   zookeeper:
     # Zookeeper component is used for metadata, shouldn't need update following tag value for common 
     # upgrade scenario
-    repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/pulsar
+    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+    repository: apecloud/pulsar
     pullPolicy: IfNotPresent
     tag: 2.11.2
 
@@ -49,12 +51,14 @@ images:
     tag: ""
 
   pulsarTools:
-    repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/pulsartools
+    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+    repository: apecloud/pulsartools
     pullPolicy: ""
     tag: "2.11"
 
   metrics:
-    repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/agamotto
+    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+    repository: apecloud/agamotto
     pullPolicy: IfNotPresent
     tag: 0.1.2-beta.2
 

@@ -40,3 +40,17 @@ Expand the mountOptions of the storageClass.
   {{- .Values.storageClass.mountOptions }}
 {{- end }}
 {{- end }}
+
+{{/*
+Create full image name
+*/}}
+{{- define "csi-s3.imageFullName" -}}
+{{- printf "%s/%s:%s" ( .image.registry | default .root.Values.images.defaultImage.registry ) ( .image.repository ) ( .image.tag ) -}}
+{{- end -}}
+
+{{/*
+Create image pull policy
+*/}}
+{{- define "csi-s3.imagePullPolicy" -}}
+{{- printf "%s" ( .image.pullPolicy | default .root.Values.images.defaultImage.pullPolicy | default "IfNotPresent" ) -}}
+{{- end -}}

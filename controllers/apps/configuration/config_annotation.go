@@ -65,7 +65,7 @@ func unReconciled(phase appsv1alpha1.ConfigurationPhase, revision string, messag
 }
 
 func isReconciledResult(result intctrlutil.Result) bool {
-	return result.ExecResult != ""
+	return result.ExecResult != "" && result.Policy != ""
 }
 
 func withFailed(err error, retry bool) options {

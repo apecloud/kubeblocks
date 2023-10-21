@@ -59,7 +59,8 @@ func (r *reconfigureAction) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx,
 
 func handleReconfigureStatusProgress(result *appsv1alpha1.ReconcileDetail, opsStatus *appsv1alpha1.OpsRequestStatus, phase appsv1alpha1.ConfigurationPhase) handleReconfigureOpsStatus {
 	return func(cmStatus *appsv1alpha1.ConfigurationItemStatus) (err error) {
-		if result != nil {
+		// the Pending phase is waiting to be executed, and there is currently no valid ReconcileDetail information.
+		if result != nil && phase != appsv1alpha1.CPendingPhase {
 			cmStatus.LastAppliedStatus = result.ExecResult
 			cmStatus.UpdatePolicy = appsv1alpha1.UpgradePolicy(result.Policy)
 			cmStatus.SucceedCount = result.SucceedCount
@@ -138,14 +139,12 @@ func (r *reconfigureAction) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli c
 	}
 
 	switch phase := reconfiguringPhase(resource, *item, itemStatus); phase {
-	case appsv1alpha1.CCreatingPhase:
-		return appsv1alpha1.OpsFailedPhase, 0, core.MakeError("the configuration is creating")
+	case appsv1alpha1.CCreatingPhase, appsv1alpha1.CInitPhase:
+		return appsv1alpha1.OpsFailedPhase, 0, core.MakeError("the configuration is creating or initializing, is not ready to reconfigure")
 	case appsv1alpha1.CFailedAndPausePhase:
 		return appsv1alpha1.OpsFailedPhase, 0, nil
 	case appsv1alpha1.CFinishedPhase:
 		return appsv1alpha1.OpsSucceedPhase, 0, nil
-	// case appsv1alpha1.CPendingPhase:
-	//	return appsv1alpha1.OpsRunningPhase, 30 * time.Second, nil
 	default:
 		return syncStatus(cli, reqCtx, opsRes, itemStatus, phase)
 	}

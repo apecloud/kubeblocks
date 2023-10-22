@@ -164,21 +164,20 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 	}
 
 	// TODO support multi tpl conditions merge
+	item := reconfigure.Configurations[0]
 	opsPipeline := newPipeline(reconfigureContext{
 		cli:           cli,
 		reqCtx:        reqCtx,
 		resource:      resource,
-		config:        reconfigure.Configurations[0],
+		config:        item,
 		clusterName:   clusterName,
 		componentName: componentName,
 	})
 
 	result := opsPipeline.
-		ClusterDef().
-		ClusterVer().
+		Configuration().
 		Validate().
-		Configuration(). // for new configuration
-		ConfigMap(opsPipeline.config.Name).
+		ConfigMap(item.Name).
 		ConfigConstraints().
 		Merge().
 		UpdateOpsLabel().

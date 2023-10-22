@@ -71,46 +71,23 @@ func newPipeline(ctx reconfigureContext) *pipeline {
 	return pipeline
 }
 
-func (p pipeline) foundConfigSpec(name string, configSpecs []appsv1alpha1.ComponentConfigSpec) *appsv1alpha1.ComponentConfigSpec {
-	if len(name) == 0 && len(configSpecs) == 1 {
-		return &configSpecs[0]
-	}
-	for _, configSpec := range configSpecs {
-		if configSpec.Name == name {
-			return &configSpec
-		}
-	}
-	return nil
-}
-
 func (p *pipeline) Validate() *pipeline {
-	validateFn := func() (err error) {
-		var components []appsv1alpha1.ClusterComponentVersion
-		var configSpecs []appsv1alpha1.ComponentConfigSpec
-
-		if p.ClusterVerObj != nil {
-			components = p.ClusterVerObj.Spec.ComponentVersions
+	validateFn := func() error {
+		if p.ConfigurationObj == nil {
+			return cfgcore.MakeError("failed to found configuration of component[%s] in the cluster[%s]",
+				p.reconfigureContext.componentName,
+				p.reconfigureContext.clusterName,
+			)
 		}
-		configSpecs, err = cfgcore.GetConfigTemplatesFromComponent(
-			p.resource.Cluster.Spec.ComponentSpecs,
-			p.ClusterDefObj.Spec.ComponentDefs,
-			components,
-			p.componentName)
-		if err != nil {
+
+		item := p.ConfigurationObj.Spec.GetConfigurationItem(p.config.Name)
+		if item == nil || item.ConfigSpec == nil {
 			p.isFailed = true
-			return
+			return cfgcore.MakeError("failed to reconfigure, not existed config[%s]", p.config.Name)
 		}
 
-		configSpec := p.foundConfigSpec(p.config.Name, configSpecs)
-		if configSpec != nil {
-			p.configSpec = configSpec
-			return
-		}
-		err = cfgcore.MakeError(
-			"failed to reconfigure, not existed config[%s], all configs: %v",
-			p.config.Name, getConfigSpecName(configSpecs))
-		p.isFailed = true
-		return
+		p.configSpec = item.ConfigSpec
+		return nil
 	}
 
 	return p.Wrap(validateFn)
@@ -127,10 +104,10 @@ func (p *pipeline) ConfigConstraints() *pipeline {
 		return
 	}
 
-	ccKey := client.ObjectKey{
-		Name: p.configSpec.ConfigConstraintRef,
-	}
 	fetchCCFn := func() error {
+		ccKey := client.ObjectKey{
+			Name: p.configSpec.ConfigConstraintRef,
+		}
 		p.configConstraint = &appsv1alpha1.ConfigConstraint{}
 		return p.cli.Get(p.reqCtx.Ctx, ccKey, p.configConstraint)
 	}
@@ -159,7 +136,7 @@ func (p *pipeline) doMergeImpl(parameters appsv1alpha1.ConfigurationItem) error 
 	filter := validate.WithKeySelector(configSpec.Keys)
 	for _, key := range parameters.Keys {
 		if configSpec.ConfigConstraintRef != "" && filter(key.Key) {
-			if key.FileContent != "" && len(key.Parameters) == 0 {
+			if key.FileContent != "" {
 				return cfgcore.MakeError("not allowed to update file content: %s", key.Key)
 			}
 			updateParameters(item, key.Key, key.Parameters)
@@ -169,7 +146,7 @@ func (p *pipeline) doMergeImpl(parameters appsv1alpha1.ConfigurationItem) error 
 			})
 			continue
 		}
-		if key.FileContent != "" {
+		if len(key.Parameters) != 0 {
 			return cfgcore.MakeError("not allowed to patch parameters: %s", key.Key)
 		}
 		updateFileContent(item, key.Key, key.FileContent)
@@ -182,66 +159,18 @@ func (p *pipeline) createUpdatePatch(item *appsv1alpha1.ConfigurationItemDetail,
 	if p.configConstraint == nil {
 		return nil
 	}
+
 	updatedData, err := configuration.DoMerge(p.ConfigMapObj.Data, item.ConfigFileParams, p.configConstraint, *configSpec)
 	if err != nil {
-		return err
-	}
-	if err = validate.NewConfigValidator(&p.configConstraint.Spec, validate.WithKeySelector(configSpec.Keys)).Validate(updatedData); err != nil {
 		p.isFailed = true
 		return err
 	}
-
 	p.configPatch, _, err = cfgcore.CreateConfigPatch(p.ConfigMapObj.Data,
 		updatedData,
 		p.configConstraint.Spec.FormatterConfig.Format,
 		p.configSpec.Keys,
 		false)
 	return err
-}
-
-func updateFileContent(item *appsv1alpha1.ConfigurationItemDetail, key string, content string) {
-	params, ok := item.ConfigFileParams[key]
-	if !ok {
-		item.ConfigFileParams[key] = appsv1alpha1.ConfigParams{
-			Content: &content,
-		}
-		return
-	}
-	item.ConfigFileParams[key] = appsv1alpha1.ConfigParams{
-		Parameters: params.Parameters,
-		Content:    &content,
-	}
-}
-
-func updateParameters(item *appsv1alpha1.ConfigurationItemDetail, key string, parameters []appsv1alpha1.ParameterPair) {
-	updatedParams := make(map[string]*string, len(parameters))
-	for _, parameter := range parameters {
-		updatedParams[parameter.Key] = parameter.Value
-	}
-
-	params, ok := item.ConfigFileParams[key]
-	if !ok {
-		item.ConfigFileParams[key] = appsv1alpha1.ConfigParams{
-			Parameters: updatedParams,
-		}
-		return
-	}
-
-	item.ConfigFileParams[key] = appsv1alpha1.ConfigParams{
-		Content:    params.Content,
-		Parameters: mergeMaps(params.Parameters, updatedParams),
-	}
-}
-
-func mergeMaps(m1 map[string]*string, m2 map[string]*string) map[string]*string {
-	merged := make(map[string]*string)
-	for key, value := range m1 {
-		merged[key] = value
-	}
-	for key, value := range m2 {
-		merged[key] = value
-	}
-	return merged
 }
 
 func (p *pipeline) doMerge() error {
@@ -277,39 +206,16 @@ func (p *pipeline) UpdateOpsLabel() *pipeline {
 func (p *pipeline) Sync() *pipeline {
 	return p.Wrap(func() error {
 		return p.Client.Patch(p.reqCtx.Ctx, p.updatedObject, client.MergeFrom(p.ConfigurationObj))
-		// var cc *appsv1alpha1.ConfigConstraintSpec
-		// var configSpec = *p.configSpec
-		//
-		// if p.configConstraint != nil {
-		//	cc = &p.configConstraint.Spec
-		// }
-		// return syncConfigmap(p.ConfigMapObj,
-		//	p.mergedConfig,
-		//	p.cli,
-		//	p.reqCtx.Ctx,
-		//	p.resource.OpsRequest.Name,
-		//	configSpec,
-		//	cc,
-		//	p.config.Policy)
 	})
 }
 
 func (p *pipeline) Complete() reconfiguringResult {
-	if p.err != nil {
-		return makeReconfiguringResult(p.err, withFailed(p.isFailed))
+	if p.Err != nil {
+		return makeReconfiguringResult(p.Err, withFailed(p.isFailed))
 	}
 
 	return makeReconfiguringResult(nil,
 		withReturned(p.mergedConfig, p.configPatch),
 		withNoFormatFilesUpdated(p.isFileUpdated),
 	)
-}
-
-func hasFileUpdate(config appsv1alpha1.ConfigurationItem) bool {
-	for _, key := range config.Keys {
-		if key.FileContent != "" {
-			return true
-		}
-	}
-	return false
 }

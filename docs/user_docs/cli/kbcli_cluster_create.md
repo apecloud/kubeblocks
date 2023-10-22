@@ -92,7 +92,7 @@ kbcli cluster create [NAME] [flags]
   kbcli cluster create --cluster-definition pulsar --pvc type=bookies,name=ledgers,size=20Gi --pvc type=bookies,name=journal,size=20Gi
   
   # Create a cluster with using a service reference to another KubeBlocks cluster
-  cluster create --cluster-definition pulsar --service-reference name=pulsarZookeeper,cluster=zookeeper,namespace=default
+  kbcli cluster create --cluster-definition pulsar --service-reference name=pulsarZookeeper,cluster=zookeeper,namespace=default
 ```
 
 ### Options

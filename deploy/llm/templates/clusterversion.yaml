@@ -187,3 +187,87 @@ spec:
             volumeMounts:
               - name: models
                 mountPath: /models
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: ggml-baichuan2-13b-q4
+  labels:
+    {{- include "llm.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: ggml
+  componentVersions:
+    - componentDefRef: ggml
+      versionsContext:
+        initContainers:
+          - name: download
+            image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/baichuan2-13b-gguf:ggml-model-q4
+            command: ["sh", "-c", "cp /models/ggml-model-q4.gguf /models-target/"]
+            volumeMounts:
+              - name: models
+                mountPath: /models-target
+        containers:
+          - name: ggml
+            image: {{ .Values.imageDev.registry | default "docker.io" }}/{{ .Values.imageDev.repository}}:{{ default .Chart.AppVersion .Values.imageDev.tagNew }}
+            env:
+              - name: MODEL
+                value: /models/ggml-model-q4.gguf
+            volumeMounts:
+              - name: models
+                mountPath: /models
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: ggml-replit-code-3b-f16
+  labels:
+    {{- include "llm.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: ggml
+  componentVersions:
+    - componentDefRef: ggml
+      versionsContext:
+        initContainers:
+          - name: download
+            image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/replit-code-3b:ggml-model-f16
+            command: ["sh", "-c", "cp /models/ggml-model-f16.gguf /models-target/"]
+            volumeMounts:
+              - name: models
+                mountPath: /models-target
+        containers:
+          - name: ggml
+            image: {{ .Values.imageDev.registry | default "docker.io" }}/{{ .Values.imageDev.repository}}:{{ default .Chart.AppVersion .Values.imageDev.tagNew }}
+            env:
+              - name: MODEL
+                value: /models/ggml-model-f16.gguf
+            volumeMounts:
+              - name: models
+                mountPath: /models
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: ggml-codeshell-7b-chat-q4
+  labels:
+    {{- include "llm.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: ggml
+  componentVersions:
+    - componentDefRef: ggml
+      versionsContext:
+        initContainers:
+          - name: download
+            image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/codeshell-7b-chat:codeshell-chat-q4_0
+            command: ["sh", "-c", "cp /models/codeshell-chat-q4_0.gguf /models-target/"]
+            volumeMounts:
+              - name: models
+                mountPath: /models-target
+        containers:
+          - name: ggml
+            image: {{ .Values.imageDev.registry | default "docker.io" }}/{{ .Values.imageDev.repository}}:{{ default .Chart.AppVersion .Values.imageDev.tagCodeShell }}
+            env:
+              - name: MODEL
+                value: /models/codeshell-chat-q4_0.gguf
+            volumeMounts:
+              - name: models
+                mountPath: /models

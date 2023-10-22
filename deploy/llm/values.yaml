@@ -10,3 +10,5 @@ imageDev:
   registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
   # Overrides the image tag whose default is the chart appVersion.
   tag: latest
+  tagNew: latest-new
+  tagCodeShell: latest-codeshell

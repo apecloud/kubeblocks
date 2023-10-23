@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package components
+package apps
 
 import (
 	"context"
@@ -60,10 +60,10 @@ const (
 	backupStatusNotCreated backupStatus = "NotCreated"
 	backupStatusProcessing backupStatus = "Processing"
 	backupStatusReadyToUse backupStatus = "ReadyToUse"
-	BackupStatusFailed     backupStatus = "Failed"
+	backupStatusFailed     backupStatus = "Failed"
 )
 
-func NewDataClone(reqCtx intctrlutil.RequestCtx,
+func newDataClone(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
@@ -366,11 +366,11 @@ func (d *backupDataClone) CheckBackupStatus() (backupStatus, error) {
 		if errors.IsNotFound(err) {
 			return backupStatusNotCreated, nil
 		} else {
-			return BackupStatusFailed, err
+			return backupStatusFailed, err
 		}
 	}
 	if backup.Status.Phase == dpv1alpha1.BackupPhaseFailed {
-		return BackupStatusFailed, intctrlutil.NewErrorf(intctrlutil.ErrorTypeBackupFailed, "backup for horizontalScaling failed: %s",
+		return backupStatusFailed, intctrlutil.NewErrorf(intctrlutil.ErrorTypeBackupFailed, "backup for horizontalScaling failed: %s",
 			backup.Status.FailureReason)
 	}
 	if backup.Status.Phase == dpv1alpha1.BackupPhaseCompleted {

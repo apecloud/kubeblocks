@@ -439,19 +439,19 @@ func (r *componentStatusHandler) isScaleOutFailed() (bool, error) {
 		Namespace: stsObj.Namespace,
 		Name:      stsObj.Name + "-scaling",
 	}
-	d, err := components.NewDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, stsObj, stsProto, backupKey)
+	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, stsObj, stsProto, backupKey)
 	if err != nil {
 		return false, err
 	}
 	if status, err := d.CheckBackupStatus(); err != nil {
 		return false, err
-	} else if status == components.BackupStatusFailed {
+	} else if status == backupStatusFailed {
 		return true, nil
 	}
 	for i := *r.runningRSM.Spec.Replicas; i < r.synthesizeComp.Replicas; i++ {
 		if status, err := d.CheckRestoreStatus(i); err != nil {
 			return false, err
-		} else if status == components.BackupStatusFailed {
+		} else if status == backupStatusFailed {
 			return true, nil
 		}
 	}

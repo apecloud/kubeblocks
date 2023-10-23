@@ -368,7 +368,7 @@ func (r *componentWorkloadOps) postScaleOut(stsObj *apps.StatefulSet) error {
 		}
 	)
 
-	d, err := components.NewDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, stsObj, stsObj, snapshotKey)
+	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, stsObj, stsObj, snapshotKey)
 	if err != nil {
 		return err
 	}
@@ -418,7 +418,7 @@ func (r *componentWorkloadOps) scaleOut(stsObj *apps.StatefulSet) error {
 	graphCli := model.NewGraphClient(r.cli)
 	graphCli.Noop(r.dag, r.protoRSM)
 	stsProto := components.ConvertRSMToSTS(r.protoRSM)
-	d, err := components.NewDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, stsObj, stsProto, backupKey)
+	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, stsObj, stsProto, backupKey)
 	if err != nil {
 		return err
 	}

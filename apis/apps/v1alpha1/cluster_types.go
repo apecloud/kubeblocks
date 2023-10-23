@@ -234,7 +234,7 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDefRef is immutable"
 	// +optional
-	ComponentDefRef string `json:"componentDefRef"`
+	ComponentDefRef string `json:"componentDefRef,omitempty"`
 
 	// componentDef references the name of the ComponentDefinition.
 	// If both componentDefRef and componentDef are provided, the componentDef will take precedence over componentDefRef.
@@ -242,7 +242,7 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDef is immutable"
 	// +optional
-	ComponentDef string `json:"componentDef"`
+	ComponentDef string `json:"componentDef,omitempty"`
 
 	// classDefRef references the class defined in ComponentClassDefinition.
 	// +optional

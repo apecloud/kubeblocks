@@ -194,7 +194,7 @@ type ResourceMeta struct {
 	// +optional
 	SubPath string `json:"subPath,omitempty"`
 
-	// asVolumeFrom defines the list of containers will be injected into volumeMounts.
+	// asVolumeFrom defines the list of containers where volumeMounts will be injected into.
 	// +listType=set
 	// +optional
 	AsVolumeFrom []string `json:"asVolumeFrom,omitempty"`
@@ -370,7 +370,7 @@ type ClusterComponentSpec struct {
 	// +optional
 	NoCreatePDB bool `json:"noCreatePDB,omitempty"`
 
-	// userVolumes defines the user-defined volumes.
+	// userResourceRefs defines the user-defined volumes.
 	// +optional
 	UserResourceRefs *UserResourceRefs `json:"userResourceRefs,omitempty"`
 }

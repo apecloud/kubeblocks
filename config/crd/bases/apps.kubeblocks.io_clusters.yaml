@@ -550,7 +550,7 @@ spec:
                       type: array
                       x-kubernetes-preserve-unknown-fields: true
                     userResourceRefs:
-                      description: userVolumes defines the user-defined volumes.
+                      description: userResourceRefs defines the user-defined volumes.
                       properties:
                         configMapRefs:
                           description: configMapRefs defines the user-defined configmaps.
@@ -558,7 +558,7 @@ spec:
                             properties:
                               asVolumeFrom:
                                 description: asVolumeFrom defines the list of containers
-                                  will be injected into volumeMounts.
+                                  where volumeMounts will be injected into.
                                 items:
                                   type: string
                                 type: array
@@ -669,7 +669,7 @@ spec:
                             properties:
                               asVolumeFrom:
                                 description: asVolumeFrom defines the list of containers
-                                  will be injected into volumeMounts.
+                                  where volumeMounts will be injected into.
                                 items:
                                   type: string
                                 type: array

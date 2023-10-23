@@ -21,7 +21,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -54,12 +53,12 @@ func init() {
 	utilruntime.Must(monitorv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.SetDefault(constant.MonitorNamespaceEnvName, "default")
-	viper.AddConfigPath(fmt.Sprintf("/etc/%s/", constant.OTeldAppName))
-	viper.AddConfigPath(fmt.Sprintf("$HOME/.%s", constant.OTeldAppName))
-	viper.AddConfigPath(".")
+	// viper.SetConfigName("config")
+	// viper.SetConfigType("yaml")
+	// viper.SetDefault(constant.MonitorNamespaceEnvName, "default")
+	// viper.AddConfigPath(fmt.Sprintf("/etc/%s/", constant.OTeldAppName))
+	// viper.AddConfigPath(fmt.Sprintf("$HOME/.%s", constant.OTeldAppName))
+	// viper.AddConfigPath(".")
 
 	// set env default value
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
@@ -83,16 +82,16 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	if err := viper.ReadInConfig(); err != nil {
-		setupLog.Error(err, "error reading config")
-		os.Exit(1)
-	}
-	setupLog.Info(fmt.Sprintf("oteld config file: %s", viper.ConfigFileUsed()))
-	config, err := types.LoadConfig(viper.ConfigFileUsed())
-	if err != nil {
-		setupLog.Error(err, "unable to load config")
-		os.Exit(1)
-	}
+	// if err := viper.ReadInConfig(); err != nil {
+	//	setupLog.Error(err, "error reading config")
+	//	os.Exit(1)
+	// }
+	// setupLog.Info(fmt.Sprintf("oteld config file: %s", viper.ConfigFileUsed()))
+	// config, err := types.LoadConfig(viper.ConfigFileUsed())
+	// if err != nil {
+	//	setupLog.Error(err, "unable to load config")
+	//	os.Exit(1)
+	// }
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
@@ -122,7 +121,7 @@ func main() {
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("oteld-controller"),
-	}, config).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "OTeld")
 		os.Exit(1)
 	}

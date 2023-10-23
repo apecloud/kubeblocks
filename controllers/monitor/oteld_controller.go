@@ -21,10 +21,7 @@ package monitor
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/fsnotify/fsnotify"
-	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -114,12 +111,12 @@ func (o *OTeldReconciler) runTasks(reqCtx intctrlutil.RequestCtx, oteld *monitor
 	return nil
 }
 
-func New(params monitortypes.OTeldParams, config *monitortypes.Config) *OTeldReconciler {
+func New(params monitortypes.OTeldParams) *OTeldReconciler {
 	reconcile := OTeldReconciler{
 		Client:   params.Client,
 		Scheme:   params.Scheme,
 		Recorder: params.Recorder,
-		Config:   config,
+		// Config:   config,
 
 		// sub-controllers
 		tasks: []monitortypes.ReconcileTask{
@@ -136,16 +133,6 @@ func New(params monitortypes.OTeldParams, config *monitortypes.Config) *OTeldRec
 		},
 	}
 
-	viper.OnConfigChange(func(e fsnotify.Event) {
-		log.Log.Info(fmt.Sprintf("config file changed: %s", e.Name))
-		newConfig, err := monitortypes.LoadConfig(viper.ConfigFileUsed())
-		if err != nil {
-			log.Log.Error(err, fmt.Sprintf("failed to reload config: %s", e.Name))
-			return
-		}
-		// TODO how to trigger the operator to reconcile
-		reconcile.Config = newConfig
-	})
 	return &reconcile
 }
 

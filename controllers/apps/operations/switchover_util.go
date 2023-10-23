@@ -34,10 +34,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlcomputil "github.com/apecloud/kubeblocks/pkg/controller/component"
+	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -66,7 +65,7 @@ func needDoSwitchover(ctx context.Context,
 	case constant.KBSwitchoverCandidateInstanceForAnyPod:
 		return true, nil
 	default:
-		podList, err := components.GetComponentPodList(ctx, cli, *cluster, componentSpec.Name)
+		podList, err := intctrlcomp.GetComponentPodList(ctx, cli, *cluster, componentSpec.Name)
 		if err != nil {
 			return false, err
 		}
@@ -377,10 +376,10 @@ func replaceSwitchoverConnCredentialEnv(clusterName string, switchoverSpec *apps
 	if switchoverSpec == nil {
 		return
 	}
-	namedValuesMap := intctrlcomputil.GetEnvReplacementMapForConnCredential(clusterName)
+	namedValuesMap := intctrlcomp.GetEnvReplacementMapForConnCredential(clusterName)
 	replaceEnvVars := func(cmdExecutorConfig *appsv1alpha1.CmdExecutorConfig) {
 		if cmdExecutorConfig != nil {
-			cmdExecutorConfig.Env = intctrlcomputil.ReplaceSecretEnvVars(namedValuesMap, cmdExecutorConfig.Env)
+			cmdExecutorConfig.Env = intctrlcomp.ReplaceSecretEnvVars(namedValuesMap, cmdExecutorConfig.Env)
 		}
 	}
 	replaceEnvVars(switchoverSpec.WithCandidate.CmdExecutorConfig)
@@ -539,9 +538,9 @@ func getPrimaryOrLeaderPod(ctx context.Context, cli client.Client, cluster appsv
 	}
 	switch compDef.WorkloadType {
 	case appsv1alpha1.Replication:
-		podList, err = components.GetComponentPodListWithRole(ctx, cli, cluster, compSpecName, constant.Primary)
+		podList, err = intctrlcomp.GetComponentPodListWithRole(ctx, cli, cluster, compSpecName, constant.Primary)
 	case appsv1alpha1.Consensus:
-		podList, err = components.GetComponentPodListWithRole(ctx, cli, cluster, compSpecName, compDef.ConsensusSpec.Leader.Name)
+		podList, err = intctrlcomp.GetComponentPodListWithRole(ctx, cli, cluster, compSpecName, compDef.ConsensusSpec.Leader.Name)
 	}
 	if err != nil {
 		return nil, err

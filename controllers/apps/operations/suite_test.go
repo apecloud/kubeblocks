@@ -41,8 +41,8 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -171,7 +171,7 @@ func initOperationsResources(clusterDefinitionName,
 func initConsensusPods(ctx context.Context, cli client.Client, opsRes *OpsResource, clusterName string) []corev1.Pod {
 	// mock the pods of consensusSet component
 	testapps.MockConsensusComponentPods(&testCtx, nil, clusterName, consensusComp)
-	podList, err := components.GetComponentPodList(ctx, cli, *opsRes.Cluster, consensusComp)
+	podList, err := intctrlcomp.GetComponentPodList(ctx, cli, *opsRes.Cluster, consensusComp)
 	Expect(err).Should(Succeed())
 	// the opsRequest will use startTime to check some condition.
 	// if there is no sleep for 1 second, unstable error may occur.

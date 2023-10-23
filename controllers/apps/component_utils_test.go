@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package components
+package apps
 
 import (
 	"fmt"
@@ -43,12 +43,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
-
-func TestIsFailedOrAbnormal(t *testing.T) {
-	if !IsFailedOrAbnormal(appsv1alpha1.AbnormalClusterCompPhase) {
-		t.Error("isAbnormal should be true")
-	}
-}
 
 func TestIsProbeTimeout(t *testing.T) {
 	podsReadyTime := &metav1.Time{Time: time.Now().Add(-10 * time.Minute)}
@@ -130,7 +124,7 @@ var _ = Describe("Component Utils", func() {
 
 			By("test getObjectListByComponentName function")
 			stsList := &appsv1.StatefulSetList{}
-			_ = getObjectListByComponentName(ctx, k8sClient, *cluster, stsList, consensusCompName)
+			_ = component.GetObjectListByComponentName(ctx, k8sClient, *cluster, stsList, consensusCompName)
 			Expect(len(stsList.Items) > 0).Should(BeTrue())
 
 			By("test getObjectListByCustomLabels function")
@@ -144,10 +138,10 @@ var _ = Describe("Component Utils", func() {
 			Expect(clusterComp).ShouldNot(BeNil())
 
 			By("test GetComponentStsMinReadySeconds")
-			minReadySeconds, _ := GetComponentWorkloadMinReadySeconds(ctx, k8sClient, *cluster,
+			minReadySeconds, _ := component.GetComponentWorkloadMinReadySeconds(ctx, k8sClient, *cluster,
 				appsv1alpha1.Stateless, statelessCompName)
 			Expect(minReadySeconds).To(Equal(int32(10)))
-			minReadySeconds, _ = GetComponentWorkloadMinReadySeconds(ctx, k8sClient, *cluster,
+			minReadySeconds, _ = component.GetComponentWorkloadMinReadySeconds(ctx, k8sClient, *cluster,
 				appsv1alpha1.Consensus, statelessCompName)
 			Expect(minReadySeconds).To(Equal(int32(0)))
 
@@ -256,28 +250,6 @@ var _ = Describe("Component Utils", func() {
 	})
 
 	Context("test mergeServiceAnnotations", func() {
-		It("should merge annotations from original that not exist in target to final result", func() {
-			originalKey := "only-existing-in-original"
-			targetKey := "only-existing-in-target"
-			updatedKey := "updated-in-target"
-			originalAnnotations := map[string]string{
-				originalKey: "true",
-				updatedKey:  "false",
-			}
-			targetAnnotations := map[string]string{
-				targetKey:  "true",
-				updatedKey: "true",
-			}
-			mergeAnnotations(originalAnnotations, &targetAnnotations)
-			Expect(targetAnnotations[targetKey]).ShouldNot(BeEmpty())
-			Expect(targetAnnotations[originalKey]).ShouldNot(BeEmpty())
-			Expect(targetAnnotations[updatedKey]).Should(Equal("true"))
-			By("merging with target being nil")
-			var nilAnnotations map[string]string
-			mergeAnnotations(originalAnnotations, &nilAnnotations)
-			Expect(nilAnnotations).ShouldNot(BeNil())
-		})
-
 		It("test sync pod spec default values set by k8s", func() {
 			var (
 				clusterName = "cluster"

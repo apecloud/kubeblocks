@@ -30,25 +30,25 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
+	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 func getDeploymentRollingPods(params reconfigureParams) ([]corev1.Pod, error) {
-	// util.GetComponentPodList supports deployment
+	// intctrlcomp.GetComponentPodList supports deployment
 	return getReplicationSetPods(params)
 }
 
 func getReplicationSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 	var ctx = params.Ctx
 	var cluster = params.Cluster
-	podList, err := components.GetComponentPodList(ctx.Ctx, params.Client, *cluster, params.ClusterComponent.Name)
+	podList, err := intctrlcomp.GetComponentPodList(ctx.Ctx, params.Client, *cluster, params.ClusterComponent.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func getConsensusPods(params reconfigureParams) ([]corev1.Pod, error) {
 
 	// TODO: should resolve the dependency on consensus module
 	if params.Component.RSMSpec != nil {
-		rsm.SortPods(pods, rsm.ComposeRolePriorityMap(params.Component.RSMSpec.Roles), true)
+		rsmcore.SortPods(pods, rsmcore.ComposeRolePriorityMap(params.Component.RSMSpec.Roles), true)
 	}
 	return pods, nil
 }

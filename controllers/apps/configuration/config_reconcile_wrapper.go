@@ -26,8 +26,8 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -128,7 +128,7 @@ func (c *configReconcileContext) RSM() *configReconcileContext {
 		// NODE: all components use the StatefulSet
 		for _, rsm := range c.RSMList {
 			var stsObject appv1.StatefulSet
-			if err = c.Client.Get(c.Context, client.ObjectKeyFromObject(components.ConvertRSMToSTS(&rsm)), &stsObject); err != nil {
+			if err = c.Client.Get(c.Context, client.ObjectKeyFromObject(rsmcore.ConvertRSMToSTS(&rsm)), &stsObject); err != nil {
 				return
 			}
 			c.StatefulSets = append(c.StatefulSets, stsObject)

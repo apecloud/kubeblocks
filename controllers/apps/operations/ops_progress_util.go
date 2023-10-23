@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -178,7 +178,7 @@ func handleComponentStatusProgress(
 	if clusterComponent == nil || clusterComponentDef == nil {
 		return
 	}
-	if podList, err = components.GetComponentPodList(reqCtx.Ctx, cli, *opsRes.Cluster, clusterComponent.Name); err != nil {
+	if podList, err = intctrlcomp.GetComponentPodList(reqCtx.Ctx, cli, *opsRes.Cluster, clusterComponent.Name); err != nil {
 		return
 	}
 	switch clusterComponentDef.WorkloadType {
@@ -206,7 +206,7 @@ func handleStatelessProgress(reqCtx intctrlutil.RequestCtx,
 	if compStatus.Phase == appsv1alpha1.RunningClusterCompPhase && pgRes.clusterComponent.Replicas != int32(len(podList.Items)) {
 		return 0, intctrlutil.NewError(intctrlutil.ErrorWaitCacheRefresh, "wait for the pods of deployment to be synchronized")
 	}
-	minReadySeconds, err := components.GetComponentDeployMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, pgRes.clusterComponent.Name)
+	minReadySeconds, err := intctrlcomp.GetComponentDeployMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, pgRes.clusterComponent.Name)
 	if err != nil {
 		return 0, err
 	}
@@ -222,7 +222,7 @@ func handleStatefulSetProgress(reqCtx intctrlutil.RequestCtx,
 	podList *corev1.PodList,
 	pgRes progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, error) {
-	minReadySeconds, err := components.GetComponentStsMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, pgRes.clusterComponent.Name)
+	minReadySeconds, err := intctrlcomp.GetComponentStsMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, pgRes.clusterComponent.Name)
 	if err != nil {
 		return 0, err
 	}
@@ -379,7 +379,7 @@ func podIsFailedDuringOperation(
 	pod *corev1.Pod,
 	componentPhase appsv1alpha1.ClusterComponentPhase,
 	opsIsCompleted bool) bool {
-	if !components.IsFailedOrAbnormal(componentPhase) {
+	if !isFailedOrAbnormal(componentPhase) {
 		return false
 	}
 	return !pod.CreationTimestamp.Before(&opsStartTime) || opsIsCompleted
@@ -464,7 +464,7 @@ func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 	if *lastComponentReplicas == *expectReplicas {
 		return 0, 0, nil
 	}
-	if podList, err = components.GetComponentPodList(reqCtx.Ctx, cli, *opsRes.Cluster, clusterComponent.Name); err != nil {
+	if podList, err = intctrlcomp.GetComponentPodList(reqCtx.Ctx, cli, *opsRes.Cluster, clusterComponent.Name); err != nil {
 		return 0, 0, err
 	}
 	actualPodsLen := int32(len(podList.Items))
@@ -508,7 +508,7 @@ func handleScaleOutProgress(reqCtx intctrlutil.RequestCtx,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, error) {
 	var componentName = pgRes.clusterComponent.Name
 	var workloadType = pgRes.clusterComponentDef.WorkloadType
-	minReadySeconds, err := components.GetComponentWorkloadMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, workloadType, componentName)
+	minReadySeconds, err := intctrlcomp.GetComponentWorkloadMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, workloadType, componentName)
 	if err != nil {
 		return 0, err
 	}
@@ -556,7 +556,7 @@ func handleScaleDownProgress(
 	}
 	var workloadType = pgRes.clusterComponentDef.WorkloadType
 	var componentName = pgRes.clusterComponent.Name
-	minReadySeconds, err := components.GetComponentStsMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, componentName)
+	minReadySeconds, err := intctrlcomp.GetComponentStsMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, componentName)
 	if err != nil {
 		return 0, err
 	}

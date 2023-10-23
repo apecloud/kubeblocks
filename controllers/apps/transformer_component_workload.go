@@ -37,13 +37,13 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	lorry "github.com/apecloud/kubeblocks/lorry/client"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -271,12 +271,12 @@ func copyAndMerge(oldObj, newObj client.Object, cluster *appsv1alpha1.Cluster) c
 		rsmObjCopy.Spec.MemberUpdateStrategy = rsmProto.Spec.MemberUpdateStrategy
 		rsmObjCopy.Spec.Credential = rsmProto.Spec.Credential
 
-		components.ResolvePodSpecDefaultFields(oldRsm.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
-		components.DelayUpdatePodSpecSystemFields(oldRsm.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
+		ResolvePodSpecDefaultFields(oldRsm.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
+		DelayUpdatePodSpecSystemFields(oldRsm.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
 
 		isTemplateUpdated := !reflect.DeepEqual(&oldRsm.Spec, &rsmObjCopy.Spec)
 		if isTemplateUpdated {
-			components.UpdatePodSpecSystemFields(&rsmObjCopy.Spec.Template.Spec)
+			UpdatePodSpecSystemFields(&rsmObjCopy.Spec.Template.Spec)
 		}
 
 		return rsmObjCopy
@@ -314,7 +314,7 @@ func (r *componentWorkloadOps) expandVolume() error {
 
 // horizontalScale handles rsm workload horizontal scale
 func (r *componentWorkloadOps) horizontalScale() error {
-	sts := components.ConvertRSMToSTS(r.runningRSM)
+	sts := rsmcore.ConvertRSMToSTS(r.runningRSM)
 	if sts.Status.ReadyReplicas == r.synthesizeComp.Replicas {
 		return nil
 	}
@@ -417,7 +417,7 @@ func (r *componentWorkloadOps) scaleOut(stsObj *apps.StatefulSet) error {
 	}
 	graphCli := model.NewGraphClient(r.cli)
 	graphCli.Noop(r.dag, r.protoRSM)
-	stsProto := components.ConvertRSMToSTS(r.protoRSM)
+	stsProto := rsmcore.ConvertRSMToSTS(r.protoRSM)
 	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, stsObj, stsProto, backupKey)
 	if err != nil {
 		return err
@@ -451,7 +451,7 @@ func (r *componentWorkloadOps) scaleOut(stsObj *apps.StatefulSet) error {
 
 func (r *componentWorkloadOps) updatePodReplicaLabel4Scaling(replicas int32) error {
 	graphCli := model.NewGraphClient(r.cli)
-	pods, err := components.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name))
+	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name))
 	if err != nil {
 		return err
 	}
@@ -467,7 +467,7 @@ func (r *componentWorkloadOps) updatePodReplicaLabel4Scaling(replicas int32) err
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
-	pods, err := components.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name))
+	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name))
 	if err != nil {
 		return err
 	}
@@ -723,7 +723,7 @@ func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeC
 	rsmObj *workloads.ReplicatedStateMachine, dag *graph.DAG) error {
 	graphCli := model.NewGraphClient(cli)
 	getRunningVolumes := func(vctName string) ([]*corev1.PersistentVolumeClaim, error) {
-		pvcs, err := components.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.PersistentVolumeClaimSignature,
+		pvcs, err := component.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.PersistentVolumeClaimSignature,
 			rsmObj.Namespace, constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name))
 		if err != nil {
 			if apierrors.IsNotFound(err) {

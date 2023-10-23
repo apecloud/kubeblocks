@@ -34,7 +34,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -102,7 +101,7 @@ func (t *ComponentStatusTransformer) Transform(ctx graph.TransformContext, dag *
 
 	// get underlying running rsm
 	var runningRSM *workloads.ReplicatedStateMachine
-	runningRSMList, err := components.ListRSMOwnedByComponent(reqCtx.Ctx, t.Client, cluster.Namespace, constant.GetComponentWellKnownLabels(cluster.Name, synthesizeComp.Name))
+	runningRSMList, err := component.ListRSMOwnedByComponent(reqCtx.Ctx, t.Client, cluster.Namespace, constant.GetComponentWellKnownLabels(cluster.Name, synthesizeComp.Name))
 	if err != nil {
 		return err
 	}
@@ -178,7 +177,7 @@ func (r *componentStatusHandler) reconcileComponentPhase() error {
 	}()
 
 	// get the component's underlying pods
-	pods, err := components.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli,
+	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli,
 		r.cluster.Namespace, constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name))
 	if err != nil {
 		return err
@@ -258,12 +257,12 @@ func (r *componentStatusHandler) reconcileComponentPhase() error {
 	}
 
 	// update component info to pods' annotations
-	if err := components.UpdateComponentInfoToPods(r.reqCtx.Ctx, r.cli, r.cluster, r.synthesizeComp, r.dag); err != nil {
+	if err := UpdateComponentInfoToPods(r.reqCtx.Ctx, r.cli, r.cluster, r.synthesizeComp, r.dag); err != nil {
 		return err
 	}
 
 	// patch the current componentSpec workload's custom labels
-	if err := components.UpdateCustomLabelToPods(r.reqCtx.Ctx, r.cli, r.cluster, r.synthesizeComp, r.dag); err != nil {
+	if err := UpdateCustomLabelToPods(r.reqCtx.Ctx, r.cli, r.cluster, r.synthesizeComp, r.dag); err != nil {
 		r.reqCtx.Event(r.cluster, corev1.EventTypeWarning, "Component Controller PatchWorkloadCustomLabelFailed", err.Error())
 		return err
 	}
@@ -327,7 +326,7 @@ func (r *componentStatusHandler) syncComponentStatusToCluster() error {
 // 3. and with leader role label set
 // TODO(xingran): remove the dependency of the component's workload type.
 func (r *componentStatusHandler) isComponentAvailable(pods []*corev1.Pod) (bool, error) {
-	if isLatestRevision, err := components.IsComponentPodsWithLatestRevision(r.reqCtx.Ctx, r.cli, r.cluster, r.runningRSM); err != nil {
+	if isLatestRevision, err := component.IsComponentPodsWithLatestRevision(r.reqCtx.Ctx, r.cli, r.cluster, r.runningRSM); err != nil {
 		return false, err
 	} else if !isLatestRevision {
 		return false, nil
@@ -370,7 +369,7 @@ func (r *componentStatusHandler) isRSMRunning() (bool, error) {
 	if r.runningRSM == nil {
 		return false, nil
 	}
-	if isLatestRevision, err := components.IsComponentPodsWithLatestRevision(r.reqCtx.Ctx, r.cli, r.cluster, r.runningRSM); err != nil {
+	if isLatestRevision, err := component.IsComponentPodsWithLatestRevision(r.reqCtx.Ctx, r.cli, r.cluster, r.runningRSM); err != nil {
 		return false, err
 	} else if !isLatestRevision {
 		return false, nil
@@ -433,8 +432,8 @@ func (r *componentStatusHandler) isScaleOutFailed() (bool, error) {
 	}
 
 	// stsObj is the underlying rsm workload which is already running in the component.
-	stsObj := components.ConvertRSMToSTS(r.runningRSM)
-	stsProto := components.ConvertRSMToSTS(r.protoRSM)
+	stsObj := rsmcore.ConvertRSMToSTS(r.runningRSM)
+	stsProto := rsmcore.ConvertRSMToSTS(r.protoRSM)
 	backupKey := types.NamespacedName{
 		Namespace: stsObj.Namespace,
 		Name:      stsObj.Name + "-scaling",
@@ -483,7 +482,7 @@ func (r *componentStatusHandler) hasVolumeExpansionRunning() (bool, bool, error)
 // getRunningVolumes gets the running volumes of the rsm.
 func (r *componentStatusHandler) getRunningVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, vctName string,
 	rsmObj *workloads.ReplicatedStateMachine) ([]*corev1.PersistentVolumeClaim, error) {
-	pvcs, err := components.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.PersistentVolumeClaimSignature,
+	pvcs, err := component.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.PersistentVolumeClaimSignature,
 		r.cluster.Namespace, constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name))
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -504,7 +503,7 @@ func (r *componentStatusHandler) getRunningVolumes(reqCtx intctrlutil.RequestCtx
 // hasFailedPod checks if the component has failed pod.
 // TODO(xingran): remove the dependency of the component's workload type.
 func (r *componentStatusHandler) hasFailedPod(pods []*corev1.Pod) (bool, appsv1alpha1.ComponentMessageMap, error) {
-	if isLatestRevision, err := components.IsComponentPodsWithLatestRevision(r.reqCtx.Ctx, r.cli, r.cluster, r.runningRSM); err != nil {
+	if isLatestRevision, err := component.IsComponentPodsWithLatestRevision(r.reqCtx.Ctx, r.cli, r.cluster, r.runningRSM); err != nil {
 		return false, nil, err
 	} else if !isLatestRevision {
 		return false, nil, nil
@@ -531,7 +530,7 @@ func (r *componentStatusHandler) hasFailedPod(pods []*corev1.Pod) (bool, appsv1a
 				continue
 			}
 			podsReadyTime := &condition.LastTransitionTime
-			if components.IsProbeTimeout(r.synthesizeComp.Probes, podsReadyTime) {
+			if IsProbeTimeout(r.synthesizeComp.Probes, podsReadyTime) {
 				hasProbeTimeout = true
 				if messages == nil {
 					messages = appsv1alpha1.ComponentMessageMap{}
@@ -709,7 +708,7 @@ func (r *componentStatusHandler) updatePrimaryIndex() error {
 	if r.synthesizeComp.WorkloadType != appsv1alpha1.Replication {
 		return nil
 	}
-	podList, err := components.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name))
+	podList, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name))
 	if err != nil {
 		return err
 	}

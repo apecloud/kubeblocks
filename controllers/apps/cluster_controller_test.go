@@ -43,8 +43,8 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -379,7 +379,7 @@ var _ = Describe("Cluster Controller", func() {
 	checkSingleWorkload := func(compDefName string, expects func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment)) {
 		Eventually(func(g Gomega) {
 			l := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
-			sts := components.ConvertRSMToSTS(&l.Items[0])
+			sts := rsm.ConvertRSMToSTS(&l.Items[0])
 			expects(g, sts, nil)
 		}).Should(Succeed())
 	}

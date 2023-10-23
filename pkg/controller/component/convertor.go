@@ -124,12 +124,12 @@ func covertObject(convertors map[string]convertor, obj any, args ...any) error {
 func typeofObject(obj any) reflect.Type {
 	val := reflect.ValueOf(obj)
 	if val.Kind() == reflect.Ptr {
-		val = val.Elem()
+		return reflect.TypeOf(obj).Elem()
 	}
 	if val.Kind() != reflect.Struct {
 		panic("not a struct")
 	}
-	return reflect.TypeOf(val)
+	return reflect.TypeOf(obj)
 }
 
 type convertor interface {

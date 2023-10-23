@@ -37,3 +37,16 @@ type GlobalRoleSnapshot struct {
 	Version          string            `json:"term,omitempty"`
 	PodRoleNamePairs []PodRoleNamePair `json:"PodRoleNamePairs,omitempty"`
 }
+
+// BuiltinHandler defines builtin role probe handler name.
+type BuiltinHandler string
+
+const (
+	MySQLHandler    BuiltinHandler = "mysql"
+	PostgresHandler BuiltinHandler = "postgres"
+	MongoDBHandler  BuiltinHandler = "mongodb"
+	RedisHandler    BuiltinHandler = "redis"
+	ETCDHandler     BuiltinHandler = "etcd"
+	KafkaHandler    BuiltinHandler = "kafka"
+	WeSQLHandler    BuiltinHandler = "wesql"
+)

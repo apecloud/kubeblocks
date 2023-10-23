@@ -22,9 +22,11 @@ package dataprotection
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/types"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -243,10 +245,16 @@ var _ = Describe("Restore Controller test", func() {
 				By("mock jobs are completed")
 				mockRestoreJobsCompleted(restore)
 
+				var firstJobName string
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(restore), func(g Gomega, r *dpv1alpha1.Restore) {
 					g.Expect(r.Status.Actions.PrepareData).ShouldNot(BeEmpty())
 					g.Expect(r.Status.Actions.PrepareData[0].Status).Should(Equal(dpv1alpha1.RestoreActionCompleted))
+					firstJobName = strings.ReplaceAll(r.Status.Actions.PrepareData[0].ObjectKey, "Job/", "")
 				})).Should(Succeed())
+
+				By("wait for deleted first job")
+				Eventually(testapps.CheckObjExists(&testCtx,
+					types.NamespacedName{Name: firstJobName, Namespace: testCtx.DefaultNamespace}, &batchv1.Job{}, false)).Should(Succeed())
 
 				By("after the first job is completed, next job will be created")
 				checkJobAndPVCSCount(restore, 1, replicas, startingIndex)

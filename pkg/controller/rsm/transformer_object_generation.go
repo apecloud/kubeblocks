@@ -351,53 +351,63 @@ func injectRoleProbeContainer(rsm workloads.ReplicatedStateMachine, template *co
 				ValueFrom: credential.Password.ValueFrom,
 			})
 	}
-	allUsedPorts := findAllUsedPorts(template)
+
+	actionSvcPorts := buildActionSvcPorts(template, roleProbe.CustomHandler)
+
+	actionSvcList, _ := json.Marshal(actionSvcPorts)
+	injectRoleProbeBaseContainer(rsm, template, string(actionSvcList), credentialEnv)
+
+	if roleProbe.CustomHandler != nil {
+		injectCustomRoleProbeContainer(rsm, template, actionSvcPorts, credentialEnv)
+	}
+}
+
+func buildActionSvcPorts(template *corev1.PodTemplateSpec, actions []workloads.Action) []int32 {
+	findAllUsedPorts := func() []int32 {
+		allUsedPorts := make([]int32, 0)
+		for _, container := range template.Spec.Containers {
+			for _, port := range container.Ports {
+				allUsedPorts = append(allUsedPorts, port.ContainerPort)
+				allUsedPorts = append(allUsedPorts, port.HostPort)
+			}
+		}
+		return allUsedPorts
+	}
+
+	findNextAvailablePort := func(base int32, allUsedPorts []int32) int32 {
+		for port := base + 1; port < 65535; port++ {
+			available := true
+			for _, usedPort := range allUsedPorts {
+				if port == usedPort {
+					available = false
+					break
+				}
+			}
+			if available {
+				return port
+			}
+		}
+		return 0
+	}
+
+	allUsedPorts := findAllUsedPorts()
 	svcPort := actionSvcPortBase
 	var actionSvcPorts []int32
-	for range roleProbe.ProbeActions {
+	for range actions {
 		svcPort = findNextAvailablePort(svcPort, allUsedPorts)
 		actionSvcPorts = append(actionSvcPorts, svcPort)
 	}
-	injectProbeActionContainer(rsm, template, actionSvcPorts, credentialEnv)
-	actionSvcList, _ := json.Marshal(actionSvcPorts)
-	injectRoleProbeAgentContainer(rsm, template, string(actionSvcList), credentialEnv)
+	return actionSvcPorts
 }
 
-func findNextAvailablePort(base int32, allUsedPorts []int32) int32 {
-	for port := base + 1; port < 65535; port++ {
-		available := true
-		for _, usedPort := range allUsedPorts {
-			if port == usedPort {
-				available = false
-				break
-			}
-		}
-		if available {
-			return port
-		}
-	}
-	return 0
-}
-
-func findAllUsedPorts(template *corev1.PodTemplateSpec) []int32 {
-	allUsedPorts := make([]int32, 0)
-	for _, container := range template.Spec.Containers {
-		for _, port := range container.Ports {
-			allUsedPorts = append(allUsedPorts, port.ContainerPort)
-			allUsedPorts = append(allUsedPorts, port.HostPort)
-		}
-	}
-	return allUsedPorts
-}
-
-func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcList string, credentialEnv []corev1.EnvVar) {
-	// compute parameters for role probe agent container
+func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcList string, credentialEnv []corev1.EnvVar) {
+	// compute parameters for role probe base container
 	roleProbe := rsm.Spec.RoleProbe
 	if roleProbe == nil {
 		return
 	}
 	credential := rsm.Spec.Credential
-	image := viper.GetString("ROLE_PROBE_AGENT_IMAGE")
+	image := viper.GetString("ROLE_PROBE_IMAGE")
 	if len(image) == 0 {
 		image = defaultRoleProbeAgentImage
 	}
@@ -494,28 +504,14 @@ func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, templat
 		},
 	)
 
-	getCharacterTypeAndWorkload := func(template *corev1.PodTemplateSpec) (characterType *corev1.EnvVar) {
-		for _, container := range template.Spec.Containers {
-			if !(len(container.Command) > 0 && container.Command[0] == "lorry") {
-				continue
-			}
-			envs := container.Env
-			for i, e := range envs {
-				if e.Name == kBEnvCharacterType {
-					characterType = &envs[i]
-				}
-			}
-			if characterType != nil {
-				break
-			}
-		}
-		return characterType
+	characterType := "custom"
+	if roleProbe.BuiltinHandler != nil {
+		characterType = *roleProbe.BuiltinHandler
 	}
-
-	characterType := getCharacterTypeAndWorkload(template)
-	if characterType != nil {
-		env = append(env, *characterType)
-	}
+	env = append(env, corev1.EnvVar{
+		Name:  constant.KBEnvCharacterType,
+		Value: characterType,
+	})
 
 	readinessProbe := &corev1.Probe{
 		ProbeHandler: corev1.ProbeHandler{
@@ -535,17 +531,9 @@ func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, templat
 
 	tryToGetRoleProbeContainer := func() *corev1.Container {
 		for i, container := range template.Spec.Containers {
-			if container.Image != image {
-				continue
+			if container.Name == constant.RoleProbeContainerName {
+				return &template.Spec.Containers[i]
 			}
-			if len(container.Command) == 0 || container.Command[0] != roleProbeBinaryName {
-				continue
-			}
-			if container.ReadinessProbe != nil {
-				continue
-			}
-			// if all the above conditions satisfied, container that can do the role probe job found
-			return &template.Spec.Containers[i]
 		}
 		return nil
 	}
@@ -554,11 +542,12 @@ func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, templat
 	if container := tryToGetRoleProbeContainer(); container != nil {
 		// presume the second port is the grpc port.
 		// this is an easily broken contract between rsm controller and cluster controller.
-		// TODO(free6om): design a better way to do this after Lorry-WeSyncer separation done
+		// TODO(free6om): design a better way to do this
 		readinessProbe.Exec.Command = []string{
 			grpcHealthProbeBinaryPath,
 			fmt.Sprintf(grpcHealthProbeArgsFormat, int(container.Ports[1].ContainerPort)),
 		}
+		readinessProbe.HTTPGet = nil
 		container.ReadinessProbe = readinessProbe
 		for _, e := range env {
 			if slices.IndexFunc(container.Env, func(v corev1.EnvVar) bool {
@@ -601,7 +590,7 @@ func injectRoleProbeAgentContainer(rsm workloads.ReplicatedStateMachine, templat
 	template.Spec.Containers = append(template.Spec.Containers, *container)
 }
 
-func injectProbeActionContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
+func injectCustomRoleProbeContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
 	if rsm.Spec.RoleProbe == nil {
 		return
 	}
@@ -635,7 +624,7 @@ func injectProbeActionContainer(rsm workloads.ReplicatedStateMachine, template *
 	template.Spec.InitContainers = append(template.Spec.InitContainers, initContainer)
 
 	// inject action containers based on utility images
-	for i, action := range rsm.Spec.RoleProbe.ProbeActions {
+	for i, action := range rsm.Spec.RoleProbe.CustomHandler {
 		image := action.Image
 		if len(image) == 0 {
 			image = defaultActionImage

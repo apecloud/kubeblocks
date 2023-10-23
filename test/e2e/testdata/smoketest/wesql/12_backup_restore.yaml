@@ -22,9 +22,9 @@ rules:
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: mysql-cluster-snapshot
+  name: mysql-cluster-restore
   annotations:
-    kubeblocks.io/restore-from-backup: "{\"mysql\":\"backup-snapshot-mysql\"}"
+    kubeblocks.io/restore-from-backup: '{"mysql":{"name":"backup-mysql-cluster","namespace":"default","managementPolicy":"Parallel"}}'
 spec:
   clusterDefinitionRef:  apecloud-mysql
   clusterVersionRef: ac-mysql-8.0.30

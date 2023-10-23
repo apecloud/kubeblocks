@@ -8,8 +8,8 @@ metadata:
 spec:
   backupType: Full
   env:
-    - name: DATA_DIR
-      value: /var/lib/mysql
+  - name: DATA_DIR
+    value: /var/lib/mysql
   backup:
     preBackup: []
     postBackup: []
@@ -20,14 +20,7 @@ spec:
       - bash
       - -c
       - |
-        set -e
-        set -o pipefail
-        export PATH="$PATH:$DP_DATASAFED_BIN_PATH"
-        export DATASAFED_BACKEND_BASE_PATH="$DP_BACKUP_BASE_PATH"
-        xtrabackup --backup --safe-slave-backup --slave-info --stream=xbstream \
-        --host=${DP_DB_HOST} --user=${DP_DB_USER} --password=${DP_DB_PASSWORD} --datadir=${DATA_DIR} | datasafed push - "/${DP_BACKUP_NAME}.xbstream"
-        TOTAL_SIZE=$(datasafed stat / | grep TotalSize | awk '{print $2}')
-        echo "{\"totalSize\":\"$TOTAL_SIZE\"}" > "${DP_BACKUP_INFO_FILE}"
+        {{- .Files.Get "dataprotection/bakcup.sh" | nindent 8 }}
       syncProgress:
         enabled: true
         intervalSeconds: 5
@@ -38,17 +31,5 @@ spec:
       - bash
       - -c
       - |
-        set -e
-        set -o pipefail
-        export PATH="$PATH:$DP_DATASAFED_BIN_PATH"
-        export DATASAFED_BACKEND_BASE_PATH="$DP_BACKUP_BASE_PATH"
-        mkdir -p ${DATA_DIR}
-        TMP_DIR=/data/mysql/temp
-        mkdir -p ${TMP_DIR} && cd ${TMP_DIR}
-        datasafed pull "${DP_BACKUP_NAME}.xbstream" - | xbstream -x
-        xtrabackup --decompress --remove-original --target-dir=${TMP_DIR}
-        xtrabackup --prepare --target-dir=${TMP_DIR}
-        xtrabackup --move-back --target-dir=${TMP_DIR} --datadir=${DATA_DIR}/
-        rm -rf ${TMP_DIR}
-        chmod -R 0777 ${DATA_DIR}
+        {{- .Files.Get "dataprotection/restore.sh" | nindent 8 }}
     postReady: []

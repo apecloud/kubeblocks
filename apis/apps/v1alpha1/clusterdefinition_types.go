@@ -330,6 +330,9 @@ type ClusterComponentDefinition struct {
 
 	// characterType defines well-known database component name, such as mongos(mongodb), proxy(redis), mariadb(mysql)
 	// KubeBlocks will generate proper monitor configs for well-known characterType when builtIn is true.
+	//
+	// CharacterType will also be used in role probe to decide which probe engine to use.
+	// current available candidates are: mysql, postgres, mongodb, redis, etcd, kafka.
 	// +optional
 	CharacterType string `json:"characterType,omitempty"`
 

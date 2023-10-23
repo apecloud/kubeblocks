@@ -98,6 +98,13 @@ metrics:
   service:
     port: 9104
 
+backupTool:
+  image:
+    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+    repository: apecloud/apecloud-xtrabackup
+    tag: latest
+    pullPolicy: IfNotPresent
+
 wesqlscale:
   cell: "zone1"
   image:

@@ -73,6 +73,7 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		reqCtx.Log.Info("get lorry container port failed", "error", err)
 		return err
 	}
+	lorrySvcGRPCPort := viper.GetInt("PROBE_SERVICE_GRPC_PORT")
 
 	if componentProbes.RoleProbe != nil && (component.RSMSpec == nil || component.RSMSpec.RoleProbe == nil) {
 		roleChangedContainer := container.DeepCopy()
@@ -107,7 +108,7 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		lorryContainers = append(lorryContainers, *weSyncerContainer)
 	}
 
-	buildLorryServiceContainer(component, &lorryContainers[0], int(lorrySvcHTTPPort))
+	buildLorryServiceContainer(component, &lorryContainers[0], int(lorrySvcHTTPPort), lorrySvcGRPCPort)
 
 	reqCtx.Log.V(1).Info("lorry", "containers", lorryContainers)
 	component.PodSpec.Containers = append(component.PodSpec.Containers, lorryContainers...)
@@ -143,11 +144,12 @@ func buildBasicContainer() *corev1.Container {
 		GetObject()
 }
 
-func buildLorryServiceContainer(component *SynthesizedComponent, container *corev1.Container, lorrySvcHTTPPort int) {
+func buildLorryServiceContainer(component *SynthesizedComponent, container *corev1.Container, lorrySvcHTTPPort, lorrySvcGRPCPort int) {
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	container.Command = []string{"lorry",
 		"--port", strconv.Itoa(lorrySvcHTTPPort),
+		"--grpcport", strconv.Itoa(lorrySvcGRPCPort),
 	}
 
 	if len(component.PodSpec.Containers) > 0 {
@@ -222,7 +224,13 @@ func buildLorryServiceContainer(component *SynthesizedComponent, container *core
 			ContainerPort: int32(lorrySvcHTTPPort),
 			Name:          constant.LorryHTTPPortName,
 			Protocol:      "TCP",
-		}}
+		},
+		{
+			ContainerPort: int32(lorrySvcGRPCPort),
+			Name:          constant.LorryGRPCPortName,
+			Protocol:      "TCP",
+		},
+	}
 
 	// pass the volume protection spec to lorry container through env.
 	if volumeProtectionEnabled(component) {

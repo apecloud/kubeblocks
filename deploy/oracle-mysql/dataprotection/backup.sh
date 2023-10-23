@@ -1,5 +1,4 @@
-#!/usr/bin/env bash
-
+#!/bin/bash
 set -e
 set -o pipefail
 export PATH="$PATH:$DP_DATASAFED_BIN_PATH"
@@ -17,19 +16,7 @@ function handle_exit() {
 }
 trap handle_exit EXIT
 
-endpoint=http://${DP_DB_HOST}:6333
-
-snapshot=$(curl -XPOST ${endpoint}/snapshots)
-status=$(echo ${snapshot} | jq '.status')
-if [ "${status}" != "ok" ] && [ "${status}" != "\"ok\"" ]; then
-  echo "backup failed, status: ${status}"
-  exit 1
-fi
-
-name=$(echo ${snapshot} | jq -r '.result.name')
-curl -v --fail-with-body ${endpoint}/snapshots/${name} | datasafed push - "/${DP_BACKUP_NAME}.snapshot"
-
-curl -XDELETE ${endpoint}/snapshots/${name}
-
+xtrabackup --backup --safe-slave-backup --slave-info --stream=xbstream \
+  --host=${DP_DB_HOST} --user=${DP_DB_USER} --password=${DP_DB_PASSWORD} --datadir=${DATA_DIR} | datasafed push - "/${DP_BACKUP_NAME}.xbstream"
 TOTAL_SIZE=$(datasafed stat / | grep TotalSize | awk '{print $2}')
 echo "{\"totalSize\":\"$TOTAL_SIZE\"}" >"${DP_BACKUP_INFO_FILE}"

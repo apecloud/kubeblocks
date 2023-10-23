@@ -37,6 +37,13 @@ import (
 	"github.com/apecloud/kubeblocks/version"
 )
 
+const (
+	// kubeblocksAppComponent the value of app.kubernetes.io/component label for KubeBlocks deployment
+	kubeblocksAppComponent = "apps"
+	// dataprotectionAppComponent the value of app.kubernetes.io/component label for DataProtection deployment
+	dataprotectionAppComponent = "dataprotection"
+)
+
 type Version struct {
 	KubeBlocks string
 	Kubernetes string
@@ -104,9 +111,11 @@ func GetK8sVersion(discoveryClient discovery.DiscoveryInterface) (string, error)
 // GetKubeBlocksDeploy gets KubeBlocks deployments, now one kubernetes cluster
 // only support one KubeBlocks
 func GetKubeBlocksDeploy(client kubernetes.Interface) (*appsv1.Deployment, error) {
-	deploys, err := client.AppsV1().Deployments(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/name=" + types.KubeBlocksChartName,
-	})
+	deploys, err := client.AppsV1().Deployments(metav1.NamespaceAll).List(context.Background(),
+		metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("app.kubernetes.io/name=%s,app.kubernetes.io/component=%s",
+				types.KubeBlocksChartName, kubeblocksAppComponent),
+		})
 	if err != nil {
 		return nil, err
 	}
@@ -114,13 +123,27 @@ func GetKubeBlocksDeploy(client kubernetes.Interface) (*appsv1.Deployment, error
 		return nil, nil
 	}
 	if len(deploys.Items) > 1 {
-		// for compatibility with older versions, filter here instead of LabelSelector
-		for _, i := range deploys.Items {
-			if _, ok := i.Labels["app.kubernetes.io/component"]; ok {
-				return &i, nil
-			}
-		}
 		return nil, fmt.Errorf("found multiple KubeBlocks deployments, please check your cluster")
+	}
+	return &deploys.Items[0], nil
+}
+
+// GetDataProtectionDeploy gets DataProtection deployments, now one kubernetes cluster
+// only support one DataProtection
+func GetDataProtectionDeploy(client kubernetes.Interface) (*appsv1.Deployment, error) {
+	deploys, err := client.AppsV1().Deployments(metav1.NamespaceAll).List(context.Background(),
+		metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("app.kubernetes.io/name=%s,app.kubernetes.io/component=%s",
+				types.KubeBlocksChartName, dataprotectionAppComponent),
+		})
+	if err != nil {
+		return nil, err
+	}
+	if deploys == nil || len(deploys.Items) == 0 {
+		return nil, nil
+	}
+	if len(deploys.Items) > 1 {
+		return nil, fmt.Errorf("found multiple DataProtection deployments, please check your cluster")
 	}
 	return &deploys.Items[0], nil
 }

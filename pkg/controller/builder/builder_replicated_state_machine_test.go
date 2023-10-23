@@ -173,8 +173,8 @@ var _ = Describe("replicated_state_machine builder", func() {
 			SetUpdateStrategy(strategy).
 			SetUpdateStrategyType(strategyType).
 			SetRoleProbe(&roleProbe).
-			SetProbeActions(actions).
-			AddProbeAction(action).
+			SetCustomHandler(actions).
+			AddCustomHandler(action).
 			SetMemberUpdateStrategy(&memberUpdateStrategy).
 			SetService(service).
 			SetAlternativeServices(alternativeServices).
@@ -209,9 +209,9 @@ var _ = Describe("replicated_state_machine builder", func() {
 		Expect(rsm.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(Equal(maxUnavailable))
 		Expect(rsm.Spec.RoleProbe).ShouldNot(BeNil())
 		Expect(rsm.Spec.RoleProbe.InitialDelaySeconds).Should(Equal(delay))
-		Expect(rsm.Spec.RoleProbe.ProbeActions).Should(HaveLen(2))
-		Expect(rsm.Spec.RoleProbe.ProbeActions[0]).Should(Equal(actions[0]))
-		Expect(rsm.Spec.RoleProbe.ProbeActions[1]).Should(Equal(action))
+		Expect(rsm.Spec.RoleProbe.CustomHandler).Should(HaveLen(2))
+		Expect(rsm.Spec.RoleProbe.CustomHandler[0]).Should(Equal(actions[0]))
+		Expect(rsm.Spec.RoleProbe.CustomHandler[1]).Should(Equal(action))
 		Expect(rsm.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
 		Expect(*rsm.Spec.MemberUpdateStrategy).Should(Equal(memberUpdateStrategy))
 		Expect(rsm.Spec.Service).ShouldNot(BeNil())

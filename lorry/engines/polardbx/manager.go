@@ -20,9 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package polardbx
 
 import (
-	"context"
-
-	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/lorry/engines"
@@ -40,7 +37,7 @@ type Manager struct {
 var _ engines.DBManager = &Manager{}
 
 func NewManager(properties engines.Properties) (engines.DBManager, error) {
-	logger := ctrl.Log.WithName("MySQL")
+	logger := ctrl.Log.WithName("PolarDBX")
 	mysqlMgr, err := mysql.NewManager(properties)
 	if err != nil {
 		return nil, err
@@ -51,33 +48,4 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 	mgr.Logger = logger
 
 	return mgr, nil
-}
-
-func (mgr *Manager) GetRole(ctx context.Context) (string, error) {
-	sql := "select role from information_schema.alisql_cluster_local"
-
-	rows, err := mgr.DB.QueryContext(ctx, sql)
-	if err != nil {
-		mgr.Logger.Error(err, "error executing sql", "sql", sql)
-		return "", errors.Wrapf(err, "error executing %s", sql)
-	}
-
-	defer func() {
-		_ = rows.Close()
-		_ = rows.Err()
-	}()
-
-	var role string
-	var isReady bool
-	for rows.Next() {
-		if err = rows.Scan(&role); err != nil {
-			mgr.Logger.Error(err, "Role query error")
-			return role, err
-		}
-		isReady = true
-	}
-	if isReady {
-		return role, nil
-	}
-	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
 }

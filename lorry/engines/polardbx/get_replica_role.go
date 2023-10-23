@@ -20,22 +20,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package polardbx
 
 import (
-	"github.com/apecloud/kubeblocks/lorry/component/mysql"
+	"context"
+
+	"github.com/pkg/errors"
 )
 
-type Config struct {
-	*mysql.Config
-}
+func (mgr *Manager) GetReplcaRole(ctx context.Context) (string, error) {
+	sql := "select role from information_schema.alisql_cluster_local"
 
-var config *Config
-
-func NewConfig(properties map[string]string) (*Config, error) {
-	mysqlConfig, err := mysql.NewConfig(properties)
+	rows, err := mgr.DB.QueryContext(ctx, sql)
 	if err != nil {
-		return nil, err
+		mgr.Logger.Error(err, "error executing sql", "sql", sql)
+		return "", errors.Wrapf(err, "error executing %s", sql)
 	}
-	config = &Config{
-		Config: mysqlConfig,
+
+	defer func() {
+		_ = rows.Close()
+		_ = rows.Err()
+	}()
+
+	var role string
+	var isReady bool
+	for rows.Next() {
+		if err = rows.Scan(&role); err != nil {
+			mgr.Logger.Error(err, "Role query error")
+			return role, err
+		}
+		isReady = true
 	}
-	return config, nil
+	if isReady {
+		return role, nil
+	}
+	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
 }

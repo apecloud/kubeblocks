@@ -36,18 +36,17 @@ func BuildProtoComponent(reqCtx ictrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.Component, error) {
-
 	// check if clusterCompSpec enable the ComponentDefinition API feature gate.
 	if clusterCompSpec.EnableComponentDefinition && clusterCompSpec.ComponentDef != "" {
 		return buildProtoCompFromCompDef(reqCtx, cli, cluster, clusterCompSpec)
-	} else if !clusterCompSpec.EnableComponentDefinition && clusterCompSpec.ComponentDefRef != "" {
+	}
+	if !clusterCompSpec.EnableComponentDefinition && clusterCompSpec.ComponentDefRef != "" {
 		if cluster.Spec.ClusterDefRef == "" {
 			return nil, errors.New("clusterDefRef is required when enableComponentDefinition is false")
 		}
 		return buildProtoCompFromConvertor(reqCtx, cli, cluster, clusterCompSpec)
-	} else {
-		return nil, errors.New("invalid component spec")
 	}
+	return nil, errors.New("invalid component spec")
 }
 
 // BuildComponentDefinition constructs a ComponentDefinition object based on the following rules:
@@ -64,14 +63,14 @@ func BuildComponentDefinition(reqCtx ictrlutil.RequestCtx,
 			return nil, err
 		}
 		return cmpd, nil
-	} else if !clusterCompSpec.EnableComponentDefinition && clusterCompSpec.ComponentDefRef != "" {
+	}
+	if !clusterCompSpec.EnableComponentDefinition && clusterCompSpec.ComponentDefRef != "" {
 		if cluster.Spec.ClusterDefRef == "" {
 			return nil, errors.New("clusterDefRef is required when enableComponentDefinition is false")
 		}
 		return buildCompDefFromConvertor(reqCtx, cli, cluster, clusterCompSpec)
-	} else {
-		return nil, errors.New("invalid component spec")
 	}
+	return nil, errors.New("invalid component spec")
 }
 
 // buildCompDefFromConvertor builds a new ComponentDefinition object based on converting clusterComponentDefinition to ComponentDefinition.

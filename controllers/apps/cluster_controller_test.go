@@ -518,7 +518,7 @@ var _ = Describe("Cluster Controller", func() {
 			}
 		})).ShouldNot(HaveOccurred())
 	}
-	
+
 	// TODO: add case: empty image in cd, should report applyResourceFailed condition
 	Context("when creating cluster without clusterversion", func() {
 		BeforeEach(func() {

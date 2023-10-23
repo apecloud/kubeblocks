@@ -79,6 +79,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&ComponentLoadResourcesTransformer{},
 			// do spec & definition consistency validation
 			&ComponentValidationTransformer{},
+			// handle RBAC for component workloads
+			&ComponentRBACTransformer{},
 			// handle the component services
 			&ComponentServiceTransformer{},
 			// handle the connection credentials

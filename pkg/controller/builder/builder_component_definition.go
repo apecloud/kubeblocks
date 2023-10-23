@@ -241,7 +241,7 @@ func (builder *ComponentDefinitionBuilder) SetLifecycleAction(name string, val i
 	t := reflect.TypeOf(reflect.ValueOf(obj).Elem())
 	for i := 0; i < t.NumField(); i++ {
 		fieldName := t.Field(i).Name
-		if strings.ToUpper(fieldName) == strings.ToUpper(name) {
+		if strings.EqualFold(fieldName, name) {
 			fieldValue := reflect.ValueOf(obj).Elem().FieldByName(fieldName)
 			if fieldValue.IsValid() && fieldValue.Type().AssignableTo(reflect.TypeOf(val)) {
 				fieldValue.Set(reflect.ValueOf(val))

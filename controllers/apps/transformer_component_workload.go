@@ -168,7 +168,7 @@ func (t *ComponentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.R
 		return err
 	}
 
-	dag = cwo.dag
+	// dag = cwo.dag
 
 	return nil
 }

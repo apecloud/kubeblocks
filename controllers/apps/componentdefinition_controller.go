@@ -39,7 +39,7 @@ import (
 )
 
 var (
-	defaultServiceName = fmt.Sprintf("%s-%s", appsv1alpha1.KB_CLUSTER_NAME, appsv1alpha1.KB_COMPONENT_NAME)
+	defaultServiceName = fmt.Sprintf("%s-%s", appsv1alpha1.KBClusterName, appsv1alpha1.KBComponentName)
 )
 
 // ComponentDefinitionReconciler reconciles a ComponentDefinition object
@@ -383,7 +383,7 @@ func checkUniqueItem(slice any, fieldName string) bool {
 		}
 
 		field := item.FieldByNameFunc(func(name string) bool {
-			return strings.ToLower(name) == strings.ToLower(fieldName)
+			return strings.EqualFold(name, fieldName)
 		})
 		if !field.IsValid() {
 			panic(fmt.Sprintf("Field '%s' not found in struct", fieldName))

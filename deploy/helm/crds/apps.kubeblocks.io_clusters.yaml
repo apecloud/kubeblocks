@@ -229,12 +229,14 @@ spec:
                       type: object
                     componentDef:
                       description: componentDef references the name of the ComponentDefinition.
-                        When the enableComponentDefinition is true, ComponentDef must
-                        be provided. In this case, ComponentDef takes precedence over
-                        ComponentDefRef, and ComponentDefRef will be ignored.
+                        If both componentDefRef and componentDef are provided, the
+                        componentDef will take precedence over componentDefRef.
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
+                      x-kubernetes-validations:
+                      - message: componentDef is immutable
+                        rule: self == oldSelf
                     componentDefRef:
                       description: componentDefRef references componentDef defined
                         in ClusterDefinition spec. Need to comply with IANA Service
@@ -245,13 +247,6 @@ spec:
                       x-kubernetes-validations:
                       - message: componentDefRef is immutable
                         rule: self == oldSelf
-                    enableComponentDefinition:
-                      default: false
-                      description: enableComponentDefinition is the switch to control
-                        whether to enable the new ComponentDefinition API. ComponentDefinition
-                        and ClusterDefinition are mutually exclusive. When the switch
-                        is enabled, ComponentDefRef will be ignored.
-                      type: boolean
                     enabledLogs:
                       description: enabledLogs indicates which log file takes effect
                         in the database cluster. element is the log type which is
@@ -665,6 +660,13 @@ spec:
                   - name
                   - replicas
                   type: object
+                  x-kubernetes-validations:
+                  - message: either componentDefRef or componentDef should be provided
+                    rule: has(self.componentDefRef) || has(self.componentDef)
+                  - message: componentDefRef is required once set
+                    rule: '!has(oldSelf.componentDefRef) || has(self.componentDefRef)'
+                  - message: componentDef is required once set
+                    rule: '!has(oldSelf.componentDef) || has(self.componentDef)'
                 maxItems: 128
                 minItems: 1
                 type: array

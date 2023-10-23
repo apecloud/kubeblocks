@@ -36,17 +36,18 @@ func BuildProtoComponent(reqCtx ictrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.Component, error) {
-	// check if clusterCompSpec enable the ComponentDefinition API feature gate.
-	if clusterCompSpec.EnableComponentDefinition && clusterCompSpec.ComponentDef != "" {
+	if clusterCompSpec.ComponentDef == "" {
+		if clusterCompSpec.ComponentDefRef == "" {
+			return nil, errors.New("invalid component spec")
+		}
+		if cluster.Spec.ClusterDefRef == "" {
+			return nil, errors.New("clusterDefRef is required when component def is not provided")
+		}
+	}
+	if clusterCompSpec.ComponentDef != "" {
 		return buildProtoCompFromCompDef(reqCtx, cli, cluster, clusterCompSpec)
 	}
-	if !clusterCompSpec.EnableComponentDefinition && clusterCompSpec.ComponentDefRef != "" {
-		if cluster.Spec.ClusterDefRef == "" {
-			return nil, errors.New("clusterDefRef is required when enableComponentDefinition is false")
-		}
-		return buildProtoCompFromConvertor(reqCtx, cli, cluster, clusterCompSpec)
-	}
-	return nil, errors.New("invalid component spec")
+	return buildProtoCompFromConvertor(reqCtx, cli, cluster, clusterCompSpec)
 }
 
 // BuildComponentDefinition constructs a ComponentDefinition object based on the following rules:
@@ -56,21 +57,22 @@ func BuildComponentDefinition(reqCtx ictrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ComponentDefinition, error) {
-	// check if clusterCompSpec enable the ComponentDefinition API feature gate.
-	if clusterCompSpec.EnableComponentDefinition && clusterCompSpec.ComponentDef != "" {
+	if clusterCompSpec.ComponentDef == "" {
+		if clusterCompSpec.ComponentDefRef == "" {
+			return nil, errors.New("invalid component spec")
+		}
+		if cluster.Spec.ClusterDefRef == "" {
+			return nil, errors.New("clusterDefRef is required  when component def is not provided")
+		}
+	}
+	if clusterCompSpec.ComponentDef != "" {
 		cmpd := &appsv1alpha1.ComponentDefinition{}
 		if err := ictrlutil.ValidateExistence(reqCtx.Ctx, cli, types.NamespacedName{Name: clusterCompSpec.ComponentDef}, cmpd, false); err != nil {
 			return nil, err
 		}
 		return cmpd, nil
 	}
-	if !clusterCompSpec.EnableComponentDefinition && clusterCompSpec.ComponentDefRef != "" {
-		if cluster.Spec.ClusterDefRef == "" {
-			return nil, errors.New("clusterDefRef is required when enableComponentDefinition is false")
-		}
-		return buildCompDefFromConvertor(reqCtx, cli, cluster, clusterCompSpec)
-	}
-	return nil, errors.New("invalid component spec")
+	return buildCompDefFromConvertor(reqCtx, cli, cluster, clusterCompSpec)
 }
 
 // buildCompDefFromConvertor builds a new ComponentDefinition object based on converting clusterComponentDefinition to ComponentDefinition.

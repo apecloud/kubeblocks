@@ -49,9 +49,9 @@ type OteldCfgRef struct {
 type ReconcileCtx struct {
 	intctrlutil.RequestCtx
 
-	//Ctx       context.Context
-	//Req       ctrl.Request
-	//Log       logr.Logger
+	// Ctx       context.Context
+	// Req       ctrl.Request
+	// Log       logr.Logger
 	Config    *Config
 	Namespace string
 
@@ -178,9 +178,11 @@ func NewReconcileTask(name string, task ReconcileFunc) ReconcileTask {
 	}
 	newTask := func(reqCtx ReconcileCtx) error {
 		reqCtx = ReconcileCtx{
-			Ctx:         reqCtx.Ctx,
-			Req:         reqCtx.Req,
-			Log:         reqCtx.Log.WithValues("subTask", name),
+			RequestCtx: intctrlutil.RequestCtx{
+				Ctx: reqCtx.Ctx,
+				Req: reqCtx.Req,
+				Log: reqCtx.Log.WithValues("subTask", name),
+			},
 			Config:      reqCtx.Config,
 			Namespace:   reqCtx.Namespace,
 			OteldCfgRef: reqCtx.OteldCfgRef,

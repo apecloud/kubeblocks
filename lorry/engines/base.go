@@ -103,6 +103,10 @@ func (mgr *DBManagerBase) IsLeader(context.Context, *dcs.Cluster) (bool, error) 
 	return false, nil
 }
 
+func (mgr *DBManagerBase) IsLeaderMember(context.Context, *dcs.Cluster, *dcs.Member) (bool, error) {
+	return false, errors.New("not implemented")
+}
+
 func (mgr *DBManagerBase) GetMemberAddrs(context.Context, *dcs.Cluster) []string {
 	return nil
 }
@@ -209,6 +213,18 @@ func (mgr *DBManagerBase) GrantUserRole(context.Context, string, string) error {
 }
 
 func (mgr *DBManagerBase) RevokeUserRole(context.Context, string, string) error {
+	return errors.New("not implemented")
+}
+
+func (mgr *DBManagerBase) IsRunning() bool {
+	return false
+}
+
+func (mgr *DBManagerBase) Lock(context.Context, string) error {
+	return errors.New("not implemented")
+}
+
+func (mgr *DBManagerBase) Unlock(context.Context) error {
 	return errors.New("not implemented")
 }
 

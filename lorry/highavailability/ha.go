@@ -32,15 +32,15 @@ import (
 	probing "github.com/prometheus-community/pro-bing"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/lorry/component"
 	dcs3 "github.com/apecloud/kubeblocks/lorry/dcs"
+	"github.com/apecloud/kubeblocks/lorry/engines"
 	"github.com/apecloud/kubeblocks/lorry/engines/register"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type Ha struct {
 	ctx        context.Context
-	dbManager  component.DBManager
+	dbManager  engines.DBManager
 	dcs        dcs3.DCS
 	logger     logr.Logger
 	deleteLock sync.Mutex

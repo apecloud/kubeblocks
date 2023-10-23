@@ -88,7 +88,7 @@ type DBManager interface {
 	Start(context.Context, *dcs.Cluster) error
 	Stop() error
 
-	GetHealthiestMember(*dcs.Cluster, string) *dcs.Member
+	// GetHealthiestMember(*dcs.Cluster, string) *dcs.Member
 	// IsHealthiestMember(*dcs.Cluster) bool
 
 	GetCurrentMemberName() string

@@ -32,7 +32,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/lorry/binding/custom"
 	"github.com/apecloud/kubeblocks/lorry/binding/etcd"
-	"github.com/apecloud/kubeblocks/lorry/binding/postgres"
 	"github.com/apecloud/kubeblocks/lorry/binding/redis"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/util"
@@ -61,14 +60,6 @@ func RegisterBuiltin(characterType string) error {
 		err := redisOp.Init(properties)
 		if err != nil {
 			return errors.Errorf(initErrFmt, builtinRedis, err)
-		}
-	case builtinPostgreSQL:
-		pgOp := postgres.NewPostgres()
-		builtinMap[builtinPostgreSQL] = pgOp
-		properties := component.GetProperties(builtinPostgreSQL)
-		err := pgOp.Init(properties)
-		if err != nil {
-			return errors.Errorf(initErrFmt, builtinPostgreSQL, err)
 		}
 	case builtinETCD:
 		etcdOp := etcd.NewEtcd()

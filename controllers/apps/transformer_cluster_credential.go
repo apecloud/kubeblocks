@@ -38,6 +38,8 @@ type ClusterCredentialTransformer struct {
 
 var _ graph.Transformer = &ClusterCredentialTransformer{}
 
+// Transform creates the connection credential secret
+// TODO(xingran): ClusterCredentialTransformer needs to be refactored. It should not depend on clusterDefinition anymore.
 func (c *ClusterCredentialTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster

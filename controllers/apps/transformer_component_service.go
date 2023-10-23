@@ -103,6 +103,9 @@ func (t *ComponentServiceTransformer) buildService(synthesizeComp *component.Syn
 		if err := t.checkRoles(synthesizeComp, service.Name, service.RoleSelector); err != nil {
 			return nil, err
 		}
+		if svc.Spec.Selector == nil {
+			svc.Spec.Selector = make(map[string]string)
+		}
 		svc.Spec.Selector[constant.RoleLabelKey] = strings.Join(service.RoleSelector, ",")
 	}
 	return svc, nil

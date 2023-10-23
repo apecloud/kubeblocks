@@ -39,6 +39,7 @@ import (
 
 var (
 	lorryHTTPPort = 3501
+	tcpListener   net.Listener
 	dbManager     engines.DBManager
 	mockDBManager *engines.MockDBManager
 	dcsStore      dcs.DCS
@@ -68,17 +69,20 @@ var _ = BeforeSuite(func() {
 	StartHTTPServer()
 })
 
+var _ = AfterSuite(func() {
+	StopHTTPServer()
+})
+
 func newTCPServer(port int) (net.Listener, int) {
-	var l net.Listener
 	for i := 0; i < 3; i++ {
-		l, _ = net.Listen("tcp", fmt.Sprintf(":%v", port))
-		if l != nil {
+		tcpListener, _ = net.Listen("tcp", fmt.Sprintf(":%v", port))
+		if tcpListener != nil {
 			break
 		}
 		port++
 	}
-	Expect(l).ShouldNot(BeNil())
-	return l, port
+	Expect(tcpListener).ShouldNot(BeNil())
+	return tcpListener, port
 }
 
 func StartHTTPServer() {
@@ -92,6 +96,13 @@ func StartHTTPServer() {
 	go func() {
 		Expect(fasthttp.Serve(listener, handler)).Should(Succeed())
 	}()
+}
+
+func StopHTTPServer() {
+	if tcpListener == nil {
+		return
+	}
+	_ = tcpListener.Close()
 }
 
 func InitMockDBManager() {

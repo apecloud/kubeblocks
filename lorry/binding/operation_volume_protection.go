@@ -33,6 +33,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -45,6 +46,7 @@ import (
 	"github.com/apecloud/kubeblocks/lorry/component"
 	. "github.com/apecloud/kubeblocks/lorry/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (
@@ -92,6 +94,10 @@ func init() {
 			logger: logVolProt,
 		},
 		SendEvent: true,
+	}
+
+	if viper.GetBool("VOLUME_PROTECT_LOG_DISABLED") {
+		optVolProt.Logger = zapr.NewLogger(zap.New(zapcore.NewNopCore()))
 	}
 
 	if err := optVolProt.Requester.init(context.Background()); err != nil {

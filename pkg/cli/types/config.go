@@ -27,3 +27,5 @@ const (
 	CfgKeyClusterDefaultMemory      = "CLUSTER_DEFAULT_MEMORY"
 	CfgKeyHelmRepoURL               = "HELM_REPO_URL"
 )
+
+const CfgKeyVolumeProtectLogDisabled = "VOLUME_PROTECT_LOG_DISABLED"

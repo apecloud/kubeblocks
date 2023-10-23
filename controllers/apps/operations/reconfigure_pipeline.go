@@ -42,7 +42,6 @@ type reconfigureContext struct {
 }
 
 type pipeline struct {
-	err      error
 	isFailed bool
 
 	updatedParameters []cfgcore.ParamPairs

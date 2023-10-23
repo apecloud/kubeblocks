@@ -115,6 +115,10 @@ var _ = Describe("Reconfigure util test", func() {
 			diffCfg := `{"mysqld":{"x1":"y1","x2":"y2"}}`
 
 			cmObj, tplObj, configObj := mockCfgTplObj(tpl)
+			tpl2Key := client.ObjectKey{
+				Namespace: cmObj.Namespace,
+				Name:      core.GetComponentCfgName(clusterName, componentName, tpl2.Name),
+			}
 			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSequenceResult(map[client.ObjectKey][]testutil.MockGetReturned{
 				// for cm
 				client.ObjectKeyFromObject(cmObj): {{
@@ -124,7 +128,7 @@ var _ = Describe("Reconfigure util test", func() {
 					Object: cmObj,
 					Err:    nil,
 				}},
-				client.ObjectKey{Name: core.GetComponentCfgName(clusterName, componentName, tpl2.Name), Namespace: cmObj.Namespace}: {{
+				tpl2Key: {{
 					Object: cmObj,
 					Err:    nil,
 				}},
@@ -180,7 +184,6 @@ var _ = Describe("Reconfigure util test", func() {
 			By("TPL object failed.")
 			// mock failed
 			r = testUpdateConfigConfigmapResource(reqCtx, k8sMockClient.Client(), opsRes, updatedCfg, clusterName, componentName)
-			//r = updateConfigConfigmapResource(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test", mockUpdate)
 			Expect(r.err).ShouldNot(Succeed())
 			Expect(r.err.Error()).Should(ContainSubstring("failed to get tpl object"))
 
@@ -275,7 +278,6 @@ z2=y2
 				}
 
 				_ = updatedFiles
-				//r := updateConfigConfigmapResource(updatedFiles, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test", mockUpdate)
 				r := testUpdateConfigConfigmapResource(reqCtx, k8sMockClient.Client(), opsRes, updatedFiles, clusterName, componentName)
 				Expect(r.err).Should(Succeed())
 				diff := r.configPatch

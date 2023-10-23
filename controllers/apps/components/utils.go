@@ -75,21 +75,6 @@ func ListPodOwnedByComponent(ctx context.Context, cli client.Client, namespace s
 	return ListObjWithLabelsInNamespace(ctx, cli, generics.PodSignature, namespace, labels)
 }
 
-// RestartPod restarts a Pod through updating the pod's annotation
-func RestartPod(podTemplate *corev1.PodTemplateSpec) error {
-	if podTemplate.Annotations == nil {
-		podTemplate.Annotations = map[string]string{}
-	}
-
-	startTimestamp := time.Now() // TODO(impl): opsRes.OpsRequest.Status.StartTimestamp
-	restartTimestamp := podTemplate.Annotations[constant.RestartAnnotationKey]
-	// if res, _ := time.Parse(time.RFC3339, restartTimestamp); startTimestamp.After(res) {
-	if res, _ := time.Parse(time.RFC3339, restartTimestamp); startTimestamp.Before(res) {
-		podTemplate.Annotations[constant.RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
-	}
-	return nil
-}
-
 // mergeAnnotations keeps the original annotations.
 // if annotations exist and are replaced, the Deployment/StatefulSet will be updated.
 func mergeAnnotations(originalAnnotations map[string]string, targetAnnotations *map[string]string) {

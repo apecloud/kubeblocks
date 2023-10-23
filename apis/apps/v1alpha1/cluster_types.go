@@ -216,6 +216,9 @@ type ClusterStatus struct {
 }
 
 // ClusterComponentSpec defines the cluster component spec.
+// +kubebuilder:validation:XValidation:rule="has(self.componentDefRef) || has(self.componentDef)",message="either componentDefRef or componentDef should be provided"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDefRef) || has(self.componentDefRef)", message="componentDefRef is required once set"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDef) || has(self.componentDef)", message="componentDef is required once set"
 type ClusterComponentSpec struct {
 	// name defines cluster's component name, this name is also part of Service DNS name, so this name will
 	// comply with IANA Service Naming rule.
@@ -233,17 +236,11 @@ type ClusterComponentSpec struct {
 	// +optional
 	ComponentDefRef string `json:"componentDefRef"`
 
-	// enableComponentDefinition is the switch to control whether to enable the new ComponentDefinition API.
-	// ComponentDefinition and ClusterDefinition are mutually exclusive. When the switch is enabled, ComponentDefRef will be ignored.
-	// +kubebuilder:default=false
-	// +optional
-	EnableComponentDefinition bool `json:"enableComponentDefinition,omitempty"`
-
 	// componentDef references the name of the ComponentDefinition.
-	// When the enableComponentDefinition is true, ComponentDef must be provided. In this case, ComponentDef takes precedence over ComponentDefRef, and ComponentDefRef will be ignored.
-	// +kubebuilder:validation:Required
+	// If both componentDefRef and componentDef are provided, the componentDef will take precedence over componentDefRef.
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDef is immutable"
 	// +optional
 	ComponentDef string `json:"componentDef"`
 

@@ -434,8 +434,8 @@ func (store *KubernetesStore) CreateHaConfig(cluster *Cluster) error {
 	maxLag := viper.GetString(constant.KBEnvMaxLag)
 	enableHA := viper.GetString(constant.KBEnvEnableHA)
 	if enableHA == "" {
-		// disable HA by default
-		enableHA = "false"
+		// enable HA by default
+		enableHA = "true"
 	}
 	haConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{

@@ -39,7 +39,7 @@ import (
 	monitorv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 	monitorcontrollers "github.com/apecloud/kubeblocks/controllers/monitor"
 	"github.com/apecloud/kubeblocks/controllers/monitor/types"
-	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	//+kubebuilder:scaffold:imports
 )
 

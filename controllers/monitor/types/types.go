@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
 
 type OTeldParams struct {

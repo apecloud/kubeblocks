@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package types
 
 import (
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
+	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 )
 
 // APIConfig contains options relevant to connecting to the K8s API

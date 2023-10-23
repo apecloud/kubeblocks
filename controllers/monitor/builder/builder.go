@@ -23,7 +23,7 @@ import (
 	"embed"
 
 	"cuelang.org/go/cue"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/leaanthony/debme"
 	"gopkg.in/yaml.v2"
 )

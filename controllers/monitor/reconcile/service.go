@@ -32,10 +32,10 @@ import (
 )
 
 func Service(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
-	desired := []*corev1.Service{}
+	desired := make([]*corev1.Service, 0)
 
-	if reqCtx.GetOteldInstance(monitorv1alpha1.ModeDaemonSet) != nil {
-		svc, err := buildSvcForOtel(reqCtx.Config, reqCtx.GetOteldInstance(monitorv1alpha1.ModeDaemonSet), reqCtx.Namespace)
+	if daemon := reqCtx.GetOteldInstance(monitorv1alpha1.ModeDaemonSet); daemon != nil {
+		svc, err := buildSvcForOtel(reqCtx.Config, daemon, reqCtx.Namespace)
 		if err != nil {
 			return err
 		}
@@ -43,9 +43,8 @@ func Service(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 			desired = append(desired, svc)
 		}
 	}
-
-	if reqCtx.GetOteldInstance(monitorv1alpha1.ModeDeployment) != nil {
-		svc, _ := buildSvcForOtel(reqCtx.Config, reqCtx.GetOteldInstance(monitorv1alpha1.ModeDeployment), reqCtx.Namespace)
+	if deploy := reqCtx.GetOteldInstance(monitorv1alpha1.ModeDeployment); deploy != nil {
+		svc, _ := buildSvcForOtel(reqCtx.Config, deploy, reqCtx.Namespace)
 		if svc != nil {
 			desired = append(desired, svc)
 		}
@@ -54,12 +53,7 @@ func Service(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 	if err := expectedService(reqCtx, params, desired); err != nil {
 		return err
 	}
-
-	if err := deleteService(reqCtx, params, desired); err != nil {
-		return err
-	}
-
-	return nil
+	return deleteService(reqCtx, params, desired)
 }
 
 func expectedService(reqCtx types.ReconcileCtx, params types.OTeldParams, desired []*corev1.Service) error {

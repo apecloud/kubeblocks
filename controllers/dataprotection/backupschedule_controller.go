@@ -22,7 +22,6 @@ package dataprotection
 import (
 	"context"
 	"reflect"
-	"strings"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -36,12 +35,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	dpbackup "github.com/apecloud/kubeblocks/internal/dataprotection/backup"
-	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
-	dputils "github.com/apecloud/kubeblocks/internal/dataprotection/utils"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // BackupScheduleReconciler reconciles a BackupSchedule object
@@ -82,12 +81,6 @@ func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	})
 	if res != nil {
 		return *res, err
-	}
-
-	// try to remove expired or oldest backups, triggered by cronjob controller
-	// TODO(ldm): another garbage collection controller to remove expired backups
-	if err = r.removeExpiredBackups(reqCtx); err != nil {
-		return r.patchStatusFailed(reqCtx, backupSchedule, "RemoveExpiredBackupsFailed", err)
 	}
 
 	if err = r.handleSchedule(reqCtx, backupSchedule); err != nil {
@@ -195,34 +188,6 @@ func (r *BackupScheduleReconciler) patchStatusFailed(reqCtx intctrlutil.RequestC
 	}
 	r.Recorder.Event(backupSchedule, corev1.EventTypeWarning, reason, err.Error())
 	return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
-}
-
-func (r *BackupScheduleReconciler) removeExpiredBackups(reqCtx intctrlutil.RequestCtx) error {
-	backups := dpv1alpha1.BackupList{}
-	if err := r.Client.List(reqCtx.Ctx, &backups,
-		client.InNamespace(reqCtx.Req.Namespace)); err != nil {
-		return err
-	}
-
-	now := metav1.Now()
-	for _, item := range backups.Items {
-		// ignore retained backup.
-		if strings.EqualFold(item.GetLabels()[constant.BackupProtectionLabelKey], constant.BackupRetain) {
-			continue
-		}
-
-		// ignore backup which is not expired.
-		if item.Status.Expiration == nil || !item.Status.Expiration.Before(&now) {
-			continue
-		}
-
-		// delete expired backup.
-		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &item); err != nil {
-			// failed delete backups, return error info.
-			return err
-		}
-	}
-	return nil
 }
 
 // handleSchedule handles backup schedules for different backup method.

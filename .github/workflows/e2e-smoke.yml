@@ -14,15 +14,15 @@ on:
       CLOUD_PROVIDER:
         description: 'cloud provider'
         required: true
-        default: 'eks'
+        default: 'gke'
         type: choice
         options:
-          - eks
           - gke
+          - eks
       CLUSTER_VERSION:
-        description: 'k8s cluster version (e.g. 1.25)'
+        description: 'k8s cluster version (e.g. 1.26)'
         required: false
-        default: '1.25'
+        default: '1.26'
         type: choice
         options:
           - 1.27
@@ -50,7 +50,7 @@ jobs:
       release-version: ${{ steps.get_release_version.outputs.release-version }}
       cluster-region: ${{ steps.get_release_version.outputs.cluster-region }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: check release version
         id: get_release_version
         run: |
@@ -66,7 +66,7 @@ jobs:
 
           CLUSTER_REGION=""
           if [[ "${{ inputs.CLOUD_PROVIDER }}" == 'eks' && -z "$CLUSTER_REGION" ]]; then
-              CLUSTER_REGION="${{ vars.REGION_AWK_EKS }}"
+              CLUSTER_REGION="${{ vars.REGION_AWS_EKS }}"
           elif [[ "${{ inputs.CLOUD_PROVIDER }}" == 'gke' && -z "$CLUSTER_REGION" ]]; then
               CLUSTER_REGION="${{ vars.REGION_GCP_GEK }}"
           fi
@@ -75,7 +75,7 @@ jobs:
   e2e:
     name: ${{ inputs.CLOUD_PROVIDER }}
     needs: check
-    uses: apecloud/apecloud-cd/.github/workflows/smoke-test-k8s.yml@v0.1.21
+    uses: apecloud/apecloud-cd/.github/workflows/smoke-test-k8s.yml@main
     with:
       CLOUD_PROVIDER: "${{ inputs.CLOUD_PROVIDER }}"
       KB_VERSION: "${{ needs.check.outputs.release-version }}"
@@ -83,5 +83,4 @@ jobs:
       INSTANCE_TYPE: "${{ inputs.INSTANCE_TYPE }}"
       REGION: "${{ needs.check.outputs.cluster-region }}"
       TEST_TYPE: "${{ inputs.TEST_TYPE }}"
-      APECD_REF: "v0.1.21"
     secrets: inherit

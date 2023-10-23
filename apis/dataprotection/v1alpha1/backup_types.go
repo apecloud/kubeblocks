@@ -26,10 +26,12 @@ type BackupSpec struct {
 	// Which backupPolicy is applied to perform this backup.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.backupPolicyName"
 	BackupPolicyName string `json:"backupPolicyName"`
 
 	// backupMethod specifies the backup method name that is defined in backupPolicy.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.backupMethod"
 	BackupMethod string `json:"backupMethod"`
 
 	// deletionPolicy determines whether the backup contents stored in backup repository
@@ -43,7 +45,7 @@ type BackupSpec struct {
 	DeletionPolicy BackupDeletionPolicy `json:"deletionPolicy,omitempty"`
 
 	// retentionPeriod determines a duration up to which the backup should be kept.
-	// controller will remove all backups that are older than the RetentionPeriod.
+	// Controller will remove all backups that are older than the RetentionPeriod.
 	// For example, RetentionPeriod of `30d` will keep only the backups of last 30 days.
 	// Sample duration format:
 	// - years: 	2y
@@ -51,14 +53,15 @@ type BackupSpec struct {
 	// - days: 		30d
 	// - hours: 	12h
 	// - minutes: 	30m
-	// You can also combine the above durations. For example: 30d12h30m
-	// +kubebuilder:default="7d"
+	// You can also combine the above durations. For example: 30d12h30m.
+	// If not set, the backup will be kept forever.
 	// +optional
 	RetentionPeriod RetentionPeriod `json:"retentionPeriod,omitempty"`
 
 	// parentBackupName determines the parent backup name for incremental or
 	// differential backup.
 	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.parentBackupName"
 	ParentBackupName string `json:"parentBackupName,omitempty"`
 }
 
@@ -95,6 +98,7 @@ type BackupStatus struct {
 
 	// totalSize is the total size of backed up data size.
 	// A string with capacity units in the format of "1Gi", "1Mi", "1Ki".
+	// If no capacity unit is specified, it is assumed to be in bytes.
 	// +optional
 	TotalSize string `json:"totalSize,omitempty"`
 

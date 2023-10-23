@@ -26,11 +26,10 @@ import (
 	"io"
 	"net/http"
 
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/go-errors/errors"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/apecloud/kubeblocks/lorry/binding"
+
 	"github.com/apecloud/kubeblocks/lorry/binding/custom"
 	"github.com/apecloud/kubeblocks/lorry/binding/etcd"
 	"github.com/apecloud/kubeblocks/lorry/binding/mysql"
@@ -38,6 +37,17 @@ import (
 	"github.com/apecloud/kubeblocks/lorry/binding/redis"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+)
+
+const (
+	builtinMySQL      = "mysql"
+	builtinPostgreSQL = "postgresql"
+	builtinRedis      = "redis"
+	builtinETCD       = "etcd"
+	builtinMongodb    = "mongodb"
+	builtinCustom     = "custom"
 )
 
 var builtinMap = make(map[string]BaseInternalOps)
@@ -46,44 +56,44 @@ var customOp *custom.HTTPCustom
 func RegisterBuiltin(characterType string) error {
 	initErrFmt := "%s init err: %v"
 	switch characterType {
-	case "mysql":
+	case builtinMySQL:
 		mysqlOp := mysql.NewMysql()
-		builtinMap["mysql"] = mysqlOp
-		properties := component.GetProperties("mysql")
+		builtinMap[builtinMySQL] = mysqlOp
+		properties := component.GetProperties(builtinMySQL)
 		err := mysqlOp.Init(properties)
 		if err != nil {
-			return errors.Errorf(initErrFmt, "mysql", err)
+			return errors.Errorf(initErrFmt, builtinMySQL, err)
 		}
-	case "redis":
+	case builtinRedis:
 		redisOp := redis.NewRedis()
-		builtinMap["redis"] = redisOp
-		properties := component.GetProperties("redis")
+		builtinMap[builtinRedis] = redisOp
+		properties := component.GetProperties(builtinRedis)
 		err := redisOp.Init(properties)
 		if err != nil {
-			return errors.Errorf(initErrFmt, "redis", err)
+			return errors.Errorf(initErrFmt, builtinRedis, err)
 		}
-	case "postgres":
+	case builtinPostgreSQL:
 		pgOp := postgres.NewPostgres()
-		builtinMap["postgres"] = pgOp
-		properties := component.GetProperties("postgres")
+		builtinMap[builtinPostgreSQL] = pgOp
+		properties := component.GetProperties(builtinPostgreSQL)
 		err := pgOp.Init(properties)
 		if err != nil {
-			return errors.Errorf(initErrFmt, "postgres", err)
+			return errors.Errorf(initErrFmt, builtinPostgreSQL, err)
 		}
-	case "etcd":
+	case builtinETCD:
 		etcdOp := etcd.NewEtcd()
-		builtinMap["etcd"] = etcdOp
-		properties := component.GetProperties("etcd")
+		builtinMap[builtinETCD] = etcdOp
+		properties := component.GetProperties(builtinETCD)
 		err := etcdOp.Init(properties)
 		if err != nil {
-			return errors.Errorf(initErrFmt, "etcd", err)
+			return errors.Errorf(initErrFmt, builtinETCD, err)
 		}
 	default:
 		customOp = custom.NewHTTPCustom()
 		empty := make(component.Properties)
 		err := customOp.Init(empty)
 		if err != nil {
-			return errors.Errorf(initErrFmt, "custom", err)
+			return errors.Errorf(initErrFmt, builtinCustom, err)
 		}
 	}
 	return nil

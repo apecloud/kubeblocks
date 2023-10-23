@@ -36,6 +36,7 @@ spec:
     secret_access_key = {{ `{{ index .Parameters "secretAccessKey" }}` }}
     endpoint = {{ `{{ index .Parameters "endpoint" }}` }}
     root = {{ `{{ index .Parameters "bucket" }}` }}
+    chunk_size = 50Mi
 
   parametersSchema:
     openAPIV3Schema:

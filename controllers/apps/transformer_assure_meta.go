@@ -22,8 +22,8 @@ package apps
 import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
 type AssureMetaTransformer struct{}
@@ -31,7 +31,7 @@ type AssureMetaTransformer struct{}
 var _ graph.Transformer = &AssureMetaTransformer{}
 
 func (t *AssureMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*ClusterTransformContext)
+	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster
 
 	// The object is not being deleted, so if it does not have our finalizer,

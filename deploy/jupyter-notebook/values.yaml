@@ -5,11 +5,11 @@
 replicaCount: 1
 
 image:
-  registry: registry.cn-hangzhou.aliyuncs.com
+  registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
   repository: apecloud/jupyter-notebook-llm
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: beta1
+  tag: beta2
 
 fullnameOverride: ""
 

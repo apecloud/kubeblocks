@@ -1,15 +1,7 @@
-set -e;
-cd ${DP_BACKUP_DIR};
+set -e
+set -o pipefail
+export PATH="$PATH:$DP_DATASAFED_BIN_PATH"
+export DATASAFED_BACKEND_BASE_PATH="$DP_BACKUP_BASE_PATH"
 mkdir -p ${DATA_DIR};
-# compatible with gzip compression
-if [ -f base.tar.gz ];then
-  tar -xvf base.tar.gz -C ${DATA_DIR}/;
-else
-  tar -xvf base.tar -C ${DATA_DIR}/;
-fi
-if [ -f pg_wal.tar.gz ];then
-  tar -xvf pg_wal.tar.gz -C ${DATA_DIR}/pg_wal/;
-else
-  tar -xvf pg_wal.tar -C ${DATA_DIR}/pg_wal/;
-fi
+datasafed pull "${DP_BACKUP_NAME}.tar.gz" - | gunzip | tar -xvf - -C "${DATA_DIR}/"
 echo "done!";

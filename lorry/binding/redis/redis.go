@@ -37,11 +37,11 @@ import (
 	// to avoid the error: 'json: unsupported type: map[interface {}]interface {}'
 	json "github.com/json-iterator/go"
 
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	. "github.com/apecloud/kubeblocks/lorry/binding"
 	. "github.com/apecloud/kubeblocks/lorry/component"
 	redis3 "github.com/apecloud/kubeblocks/lorry/component/redis"
 	. "github.com/apecloud/kubeblocks/lorry/util"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var (

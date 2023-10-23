@@ -51,7 +51,7 @@ const (
 	defaultRoleDetectionThreshold     = 300
 	defaultRoleProbeTimeoutSeconds    = 2
 
-	rsmRoleUpdateMechanismVarName = "KB_RSM_ROLE_UPDATE_MECHANISM"
+	RSMRoleUpdateMechanismVarName = "KB_RSM_ROLE_UPDATE_MECHANISM"
 	roleProbeTimeoutVarName       = "KB_RSM_ROLE_PROBE_TIMEOUT"
 )
 

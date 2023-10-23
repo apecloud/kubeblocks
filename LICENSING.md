@@ -14,7 +14,7 @@ deploy/**
 docker/**
 externalapis/**
 hack/**
-pkg/**
+pkg/client/**
 test/**
 tools/**
 ```
@@ -22,7 +22,7 @@ tools/**
 The following directories and their subdirectories are licensed under their original upstream licenses:
 
 ```
-cmd/probe/internal/component/
-internal/cli/cmd/plugin/download/**
+cmd/probe/pkg/component/
+pkg/cli/cmd/plugin/download/**
 vendor/
 ```

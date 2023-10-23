@@ -12,7 +12,7 @@ versionOverride:
 ## @param image.imagePullSecrets KubeBlocks image pull secrets
 ## @param image.tools.repository KubeBlocks tools image repository
 image:
-  registry: registry.cn-hangzhou.aliyuncs.com
+  registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
   repository: apecloud/kubeblocks
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
@@ -316,17 +316,21 @@ dataProtection:
   backupPVConfigMapNamespace: ""
 
   image:
-    registry: registry.cn-hangzhou.aliyuncs.com
+    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
     repository: apecloud/kubeblocks-dataprotection
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
     tag: ""
     imagePullSecrets: []
+    datasafed:
+      repository: apecloud/datasafed
+      tag: "0.0.3"
 
 ## BackupRepo settings
 ##
 ## @param backupRepo.create - creates a backup repo during installation
 ## @param backupRepo.default - set the created repo as the default
+## @param backupRepo.accessMethod - the access method for the backup repo, options: [Mount, Tool]
 ## @param backupRepo.storageProvider - the storage provider used by the repo, options: [s3, oss, minio]
 ## @param backupRepo.pvReclaimPolicy - the PV reclaim policy, options: [Retain, Delete]
 ## @param backupRepo.volumeCapacity - the capacity for creating PVC
@@ -335,6 +339,7 @@ dataProtection:
 backupRepo:
   create: false
   default: true
+  accessMethod: Tool
   storageProvider: ""
   pvReclaimPolicy: "Retain"
   volumeCapacity: ""
@@ -369,7 +374,7 @@ addonChartLocationBase: file://
 ## @param addonChartsImage - addon charts image, used to copy Helm charts to the addon job container.
 ## @param addonChartsImage.chartsPath - the helm charts path in the addon charts image.
 addonChartsImage:
-  registry: registry.cn-hangzhou.aliyuncs.com
+  registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
   repository: apecloud/kubeblocks-charts
   pullPolicy: IfNotPresent
   tag: ""
@@ -397,7 +402,7 @@ prometheus:
     ## alertmanager container image
     ##
     image:
-      repository: registry.cn-hangzhou.aliyuncs.com/apecloud/alertmanager
+      repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/alertmanager
       tag: v0.24.0
 
     ## ConfigMap override where fullname is {{.Release.Name}}-{{.Values.alertmanager.configMapOverrideName}}
@@ -565,7 +570,7 @@ prometheus:
     ## node-exporter container image
     ##
     image:
-      repository: registry.cn-hangzhou.aliyuncs.com/apecloud/node-exporter
+      repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/node-exporter
       tag: v1.3.1
 
   configmapReload:
@@ -573,13 +578,13 @@ prometheus:
       ## configmap-reload container image
       ##
       image:
-        repository: registry.cn-hangzhou.aliyuncs.com/apecloud/configmap-reload
+        repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/configmap-reload
         tag: v0.5.0
     alertmanager:
       ## configmap-reload container image
       ##
       image:
-        repository: registry.cn-hangzhou.aliyuncs.com/apecloud/configmap-reload
+        repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/configmap-reload
         tag: v0.5.0
 
   server:
@@ -590,7 +595,7 @@ prometheus:
     ## Prometheus server container image
     ##
     image:
-      repository: registry.cn-hangzhou.aliyuncs.com/apecloud/prometheus
+      repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/prometheus
       tag: v2.44.0
 
     global:
@@ -1476,7 +1481,7 @@ grafana:
   replicas: 1
 
   image:
-    repository: registry.cn-hangzhou.aliyuncs.com/apecloud/grafana
+    repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/grafana
     # Overrides the Grafana image tag whose default is the chart appVersion
     tag: 9.2.4
 
@@ -1521,7 +1526,7 @@ grafana:
 
   sidecar:
     image:
-      repository: registry.cn-hangzhou.aliyuncs.com/apecloud/k8s-sidecar
+      repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/k8s-sidecar
       tag: 1.19.2
 
     dashboards:
@@ -1627,7 +1632,7 @@ snapshot-controller:
   ## @param snapshot-controller.image.repository -- Repository to pull the image from.
   ##
   image:
-    repository: registry.cn-hangzhou.aliyuncs.com/apecloud/snapshot-controller
+    repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/snapshot-controller
     tag: v6.2.1
 
   tolerations:
@@ -1685,7 +1690,7 @@ alertmanager-webhook-adaptor:
   ## Webhook-Adaptor container image
   ##
   image:
-    registry: registry.cn-hangzhou.aliyuncs.com
+    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
 
   affinity:
     nodeAffinity:
@@ -1751,7 +1756,7 @@ enabledAlphaFeatureGates:
 agamotto:
   enabled: false
   image:
-    registry: registry.cn-hangzhou.aliyuncs.com
+    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
 
 
 provider: "" # cloud be "aws","gcp","aliyun","tencentCloud", "huaweiCloud", "azure"
@@ -1803,3 +1808,5 @@ external-dns:
     operator: Equal
     value: "true"
     effect: NoSchedule
+
+developMode: false

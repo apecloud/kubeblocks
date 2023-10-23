@@ -32,7 +32,7 @@ import (
 	"k8s.io/client-go/dynamic"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/pkg/cli/types"
 	. "github.com/apecloud/kubeblocks/test/e2e"
 	e2eutil "github.com/apecloud/kubeblocks/test/e2e/util"
 )

@@ -11,14 +11,18 @@ kbcli cluster describe-backup-policy
 ### Examples
 
 ```
-  # describe a backup policy
-  kbcli cluster describe-backup-policy mycluster-mysql-backup-policy
+  # describe the default backup policy of the cluster
+  kbcli cluster describe-backup-policy cluster-name
+  
+  # describe the backup policy of the cluster with specified name
+  kbcli cluster describe-backup-policy cluster-name --name backup-policy-name
 ```
 
 ### Options
 
 ```
-  -h, --help   help for describe-backup-policy
+  -h, --help           help for describe-backup-policy
+      --name strings   Backup policy name
 ```
 
 ### Options inherited from parent commands

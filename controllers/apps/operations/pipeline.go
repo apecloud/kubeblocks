@@ -23,10 +23,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/configuration/validate"
-	"github.com/apecloud/kubeblocks/internal/controller/configuration"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
+	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type reconfigureContext struct {
@@ -163,6 +163,10 @@ func (p *pipeline) doMergeImpl(parameters appsv1alpha1.ConfigurationItem) error 
 				return cfgcore.MakeError("not allowed to update file content: %s", key.Key)
 			}
 			updateParameters(item, key.Key, key.Parameters)
+			p.updatedParameters = append(p.updatedParameters, cfgcore.ParamPairs{
+				Key:           key.Key,
+				UpdatedParams: fromKeyValuePair(key.Parameters),
+			})
 			continue
 		}
 		if key.FileContent != "" {
@@ -196,8 +200,16 @@ func (p *pipeline) createUpdatePatch(item *appsv1alpha1.ConfigurationItemDetail,
 }
 
 func updateFileContent(item *appsv1alpha1.ConfigurationItemDetail, key string, content string) {
+	params, ok := item.ConfigFileParams[key]
+	if !ok {
+		item.ConfigFileParams[key] = appsv1alpha1.ConfigParams{
+			Content: &content,
+		}
+		return
+	}
 	item.ConfigFileParams[key] = appsv1alpha1.ConfigParams{
-		Content: &content,
+		Parameters: params.Parameters,
+		Content:    &content,
 	}
 }
 
@@ -206,9 +218,30 @@ func updateParameters(item *appsv1alpha1.ConfigurationItemDetail, key string, pa
 	for _, parameter := range parameters {
 		updatedParams[parameter.Key] = parameter.Value
 	}
-	item.ConfigFileParams[key] = appsv1alpha1.ConfigParams{
-		Parameters: updatedParams,
+
+	params, ok := item.ConfigFileParams[key]
+	if !ok {
+		item.ConfigFileParams[key] = appsv1alpha1.ConfigParams{
+			Parameters: updatedParams,
+		}
+		return
 	}
+
+	item.ConfigFileParams[key] = appsv1alpha1.ConfigParams{
+		Content:    params.Content,
+		Parameters: mergeMaps(params.Parameters, updatedParams),
+	}
+}
+
+func mergeMaps(m1 map[string]*string, m2 map[string]*string) map[string]*string {
+	merged := make(map[string]*string)
+	for key, value := range m1 {
+		merged[key] = value
+	}
+	for key, value := range m2 {
+		merged[key] = value
+	}
+	return merged
 }
 
 func (p *pipeline) doMerge() error {

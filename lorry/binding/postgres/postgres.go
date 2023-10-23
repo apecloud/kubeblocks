@@ -27,17 +27,17 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
+	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	. "github.com/apecloud/kubeblocks/lorry/binding"
 	. "github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/component/postgres"
 	"github.com/apecloud/kubeblocks/lorry/component/postgres/apecloudpostgres"
 	"github.com/apecloud/kubeblocks/lorry/component/postgres/officalpostgres"
 	"github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // List of operations.

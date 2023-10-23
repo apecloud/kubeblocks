@@ -32,15 +32,15 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	dpbackup "github.com/apecloud/kubeblocks/internal/dataprotection/backup"
-	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
-	dputils "github.com/apecloud/kubeblocks/internal/dataprotection/utils"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	"github.com/apecloud/kubeblocks/internal/testutil"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	testdp "github.com/apecloud/kubeblocks/internal/testutil/dataprotection"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
+	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
 var _ = Describe("Backup Controller test", func() {
@@ -145,6 +145,8 @@ var _ = Describe("Backup Controller test", func() {
 				By("check backup job's nodeName equals pod's nodeName")
 				Eventually(testapps.CheckObj(&testCtx, getJobKey(), func(g Gomega, fetched *batchv1.Job) {
 					g.Expect(fetched.Spec.Template.Spec.NodeSelector[corev1.LabelHostname]).To(Equal(targetPod.Spec.NodeName))
+					// image should be expanded by env
+					g.Expect(fetched.Spec.Template.Spec.Containers[0].Image).Should(ContainSubstring(testdp.ImageTag))
 				})).Should(Succeed())
 
 				testdp.PatchK8sJobStatus(&testCtx, getJobKey(), batchv1.JobComplete)
@@ -184,6 +186,22 @@ var _ = Describe("Backup Controller test", func() {
 			})
 		})
 
+		Context("create an invalid backup", func() {
+			It("should fail if backupPolicy is not found", func() {
+				By("creating a backup using a not found backupPolicy")
+				backup := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
+					backup.Spec.BackupPolicyName = "not-found"
+				})
+				backupKey := client.ObjectKeyFromObject(backup)
+
+				By("check backup failed and its expiration is set")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
+					g.Expect(fetched.Status.Expiration).ShouldNot(BeNil())
+				}))
+			})
+		})
+
 		Context("deletes a backup", func() {
 			var (
 				backupKey types.NamespacedName
@@ -208,7 +226,7 @@ var _ = Describe("Backup Controller test", func() {
 				jobKey := dpbackup.BuildDeleteBackupFilesJobKey(backup)
 				job := &batchv1.Job{}
 				Eventually(testapps.CheckObjExists(&testCtx, jobKey, job, true)).Should(Succeed())
-				volumeName := dpbackup.GenerateBackupRepoVolumeName(repoPVCName)
+				volumeName := "dp-backup-data"
 				Eventually(testapps.CheckObj(&testCtx, jobKey, func(g Gomega, job *batchv1.Job) {
 					Expect(job.Spec.Template.Spec.Volumes).
 						Should(ContainElement(corev1.Volume{
@@ -476,6 +494,7 @@ var _ = Describe("Backup Controller test", func() {
 					Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(sp),
 						func(fetched *storagev1alpha1.StorageProvider) {
 							fetched.Status.Phase = storagev1alpha1.StorageProviderNotReady
+							fetched.Status.Conditions = nil
 						})).ShouldNot(HaveOccurred())
 					Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(repo),
 						func(g Gomega, repo *dpv1alpha1.BackupRepo) {

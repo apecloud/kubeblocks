@@ -4,12 +4,14 @@ metadata:
   name: llm
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": community
   {{- if .Values.keepAddons }}
   annotations:
     helm.sh/resource-policy: keep
   {{- end }}
 spec:
-  description: The large language model.
+  description: 'vLLM is a high-throughput and memory-efficient inference and serving engine for LLMs.'
+
   type: Helm
 
   helm:
@@ -17,30 +19,12 @@ spec:
     {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
 
     installOptions:
-      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-      version: 0.1.0
-      {{- end }}
-
-    valuesMapping:
-      valueMap:
-        replicaCount: replicaCount
-
-      jsonMap:
-        tolerations: tolerations
-
-      resources:
-        cpu:
-          requests: resources.requests.cpu
-          limits: resources.limits.cpu
-        memory:
-          requests: resources.requests.memory
-          limits: resources.limits.memory
-
-  defaultInstallValues:
-  - replicas: 1
-    {{- with .Values.tolerations }}
-    tolerations: {{ toJson . | quote }}
-    {{- end }}
+     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: {{ default .Chart.Version .Values.versionOverride }}
+     {{- end }}
 
   installable:
     autoInstall: false
+
+  defaultInstallValues:
+    - enabled: false

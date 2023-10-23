@@ -52,11 +52,11 @@ import (
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // BackupRepoReconciler reconciles a BackupRepo object
@@ -266,6 +266,11 @@ func (r *BackupRepoReconciler) checkStorageProvider(
 			reason = ReasonInvalidStorageProvider
 			return provider, newDependencyError("both StorageClassTemplate and PersistentVolumeClaimTemplate are empty")
 		}
+		csiInstalledCond := meta.FindStatusCondition(provider.Status.Conditions, storagev1alpha1.ConditionTypeCSIDriverInstalled)
+		if csiInstalledCond == nil || csiInstalledCond.Status != metav1.ConditionTrue {
+			reason = ReasonStorageProviderNotReady
+			return provider, newDependencyError("CSI driver is not installed")
+		}
 	case repo.AccessByTool():
 		if provider.Spec.DatasafedConfigTemplate == "" {
 			reason = ReasonInvalidStorageProvider
@@ -274,15 +279,8 @@ func (r *BackupRepoReconciler) checkStorageProvider(
 	}
 
 	// check its status
-	if provider.Status.Phase == storagev1alpha1.StorageProviderReady {
-		reason = ReasonStorageProviderReady
-		return provider, nil
-	} else {
-		reason = ReasonStorageProviderNotReady
-		err = newDependencyError(fmt.Sprintf("storage provider %s is not ready, status: %s",
-			provider.Name, provider.Status.Phase))
-		return provider, err
-	}
+	reason = ReasonStorageProviderReady
+	return provider, nil
 }
 
 func (r *BackupRepoReconciler) checkParameters(reqCtx intctrlutil.RequestCtx,

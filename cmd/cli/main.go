@@ -22,8 +22,8 @@ package main
 import (
 	"k8s.io/component-base/cli"
 
-	"github.com/apecloud/kubeblocks/internal/cli/cmd"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/pkg/cli/cmd"
+	"github.com/apecloud/kubeblocks/pkg/cli/util"
 )
 
 func main() {

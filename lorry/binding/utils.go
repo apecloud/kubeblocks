@@ -38,10 +38,10 @@ import (
 	ctlruntime "sigs.k8s.io/controller-runtime"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	. "github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type RedisEntry struct {
@@ -225,8 +225,8 @@ func String2RoleType(roleName string) RoleType {
 func SentProbeEvent(ctx context.Context, opsResult OpsResult, resp *ProbeResponse, log logr.Logger) {
 	log.Info(fmt.Sprintf("send event: %v", opsResult))
 	roleUpdateMechanism := workloads.DirectAPIServerEventUpdate
-	if viper.IsSet(rsmRoleUpdateMechanismVarName) {
-		roleUpdateMechanism = workloads.RoleUpdateMechanism(viper.GetString(rsmRoleUpdateMechanismVarName))
+	if viper.IsSet(RSMRoleUpdateMechanismVarName) {
+		roleUpdateMechanism = workloads.RoleUpdateMechanism(viper.GetString(RSMRoleUpdateMechanismVarName))
 	}
 	switch roleUpdateMechanism {
 	case workloads.ReadinessProbeEventUpdate:

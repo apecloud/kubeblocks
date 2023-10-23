@@ -32,10 +32,10 @@ import (
 	probing "github.com/prometheus-community/pro-bing"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	dcs3 "github.com/apecloud/kubeblocks/lorry/dcs"
 	"github.com/apecloud/kubeblocks/lorry/engines/register"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type Ha struct {

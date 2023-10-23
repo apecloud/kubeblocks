@@ -46,16 +46,16 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/dataprotection/action"
-	dpbackup "github.com/apecloud/kubeblocks/internal/dataprotection/backup"
-	dperrors "github.com/apecloud/kubeblocks/internal/dataprotection/errors"
-	dptypes "github.com/apecloud/kubeblocks/internal/dataprotection/types"
-	dputils "github.com/apecloud/kubeblocks/internal/dataprotection/utils"
-	"github.com/apecloud/kubeblocks/internal/dataprotection/utils/boolptr"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/action"
+	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
+	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // BackupReconciler reconciles a Backup object
@@ -302,20 +302,42 @@ func (r *BackupReconciler) handleBackupRepo(request *dpbackup.Request) error {
 	}
 	request.BackupRepo = repo
 
-	pvcName := repo.Status.BackupPVCName
-	if pvcName == "" {
-		return dperrors.NewBackupPVCNameIsEmpty(repo.Name, request.Spec.BackupPolicyName)
+	if repo.Status.Phase != dpv1alpha1.BackupRepoReady {
+		return dperrors.NewBackupRepoIsNotReady(repo.Name)
 	}
 
-	pvc := &corev1.PersistentVolumeClaim{}
-	pvcKey := client.ObjectKey{Namespace: request.Req.Namespace, Name: pvcName}
-	if err = r.Client.Get(request.Ctx, pvcKey, pvc); err != nil {
-		return client.IgnoreNotFound(err)
-	}
-
-	// backupRepo PVC exists, record the PVC name
-	if err == nil {
-		request.BackupRepoPVC = pvc
+	switch {
+	case repo.AccessByMount():
+		pvcName := repo.Status.BackupPVCName
+		if pvcName == "" {
+			return dperrors.NewBackupPVCNameIsEmpty(repo.Name, request.Spec.BackupPolicyName)
+		}
+		pvc := &corev1.PersistentVolumeClaim{}
+		pvcKey := client.ObjectKey{Namespace: request.Req.Namespace, Name: pvcName}
+		if err = r.Client.Get(request.Ctx, pvcKey, pvc); err != nil {
+			// will wait for the backuprepo controller to create the PVC,
+			// so ignore the NotFound error
+			return client.IgnoreNotFound(err)
+		}
+		// backupRepo PVC exists, record the PVC name
+		if err == nil {
+			request.BackupRepoPVC = pvc
+		}
+	case repo.AccessByTool():
+		toolConfigSecretName := repo.Status.ToolConfigSecretName
+		if toolConfigSecretName == "" {
+			return dperrors.NewToolConfigSecretNameIsEmpty(repo.Name)
+		}
+		secret := &corev1.Secret{}
+		secretKey := client.ObjectKey{Namespace: request.Req.Namespace, Name: toolConfigSecretName}
+		if err = r.Client.Get(request.Ctx, secretKey, secret); err != nil {
+			// will wait for the backuprepo controller to create the secret,
+			// so ignore the NotFound error
+			return client.IgnoreNotFound(err)
+		}
+		if err == nil {
+			request.ToolConfigSecret = secret
+		}
 	}
 	return nil
 }
@@ -327,8 +349,10 @@ func (r *BackupReconciler) patchBackupStatus(
 	request.Status.Path = dpbackup.BuildBackupPath(request.Backup, request.BackupPolicy.Spec.PathPrefix)
 	request.Status.Target = request.BackupPolicy.Spec.Target
 	request.Status.BackupMethod = request.BackupMethod
-	request.Status.PersistentVolumeClaimName = request.BackupRepoPVC.Name
 	request.Status.BackupRepoName = request.BackupRepo.Name
+	if request.BackupRepoPVC != nil {
+		request.Status.PersistentVolumeClaimName = request.BackupRepoPVC.Name
+	}
 
 	// init action status
 	actions, err := request.BuildActions()
@@ -348,14 +372,8 @@ func (r *BackupReconciler) patchBackupStatus(
 	request.Status.Phase = dpv1alpha1.BackupPhaseRunning
 	request.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
 
-	duration, err := original.Spec.RetentionPeriod.ToDuration()
-	if err != nil {
-		return fmt.Errorf("failed to parse retention period %s, %v", original.Spec.RetentionPeriod, err)
-	}
-	if original.Spec.RetentionPeriod != "" {
-		request.Status.Expiration = &metav1.Time{
-			Time: request.Status.StartTimestamp.Add(duration),
-		}
+	if err = setExpirationByCreationTime(request.Backup); err != nil {
+		return err
 	}
 	return r.Client.Status().Patch(request.Ctx, request.Backup, client.MergeFrom(original))
 }
@@ -383,10 +401,10 @@ func (r *BackupReconciler) patchBackupObjectMeta(
 	request.Labels[constant.AppManagedByLabelKey] = constant.AppName
 	request.Labels[dataProtectionLabelBackupTypeKey] = request.GetBackupType()
 
-	// if the backupRepo PVC is not present, add a special label and wait for the
-	// backup repo controller to create the PVC.
+	// wait for the backup repo controller to prepare the essential resource.
 	wait := false
-	if request.BackupRepoPVC == nil {
+	if (request.BackupRepo.AccessByMount() && request.BackupRepoPVC == nil) ||
+		(request.BackupRepo.AccessByTool() && request.ToolConfigSecret == nil) {
 		request.Labels[dataProtectionWaitRepoPreparationKey] = trueVal
 		wait = true
 	}
@@ -486,6 +504,18 @@ func (r *BackupReconciler) handleRunningPhase(
 		duration := request.Status.CompletionTimestamp.Sub(request.Status.StartTimestamp.Time).Round(time.Second)
 		request.Status.Duration = &metav1.Duration{Duration: duration}
 	}
+	if request.Spec.RetentionPeriod != "" {
+		// set expiration time
+		duration, err := request.Spec.RetentionPeriod.ToDuration()
+		if err != nil {
+			return r.updateStatusIfFailed(reqCtx, backup, request.Backup, fmt.Errorf("failed to parse retention period %s, %v", request.Spec.RetentionPeriod, err))
+		}
+		if duration.Seconds() > 0 {
+			request.Status.Expiration = &metav1.Time{
+				Time: request.Status.CompletionTimestamp.Add(duration),
+			}
+		}
+	}
 	r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedBackup", "Completed backup")
 	if err = r.Client.Status().Patch(reqCtx.Ctx, request.Backup, client.MergeFrom(backup)); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -520,6 +550,7 @@ func (r *BackupReconciler) handleCompletedPhase(
 	if err := r.deleteExternalResources(reqCtx, backup); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
+
 	return intctrlutil.Reconciled()
 }
 
@@ -531,6 +562,11 @@ func (r *BackupReconciler) updateStatusIfFailed(
 	sendWarningEventForError(r.Recorder, backup, err)
 	backup.Status.Phase = dpv1alpha1.BackupPhaseFailed
 	backup.Status.FailureReason = err.Error()
+
+	// set expiration time for failed backup, make sure the failed backup will be
+	// deleted after the expiration time.
+	_ = setExpirationByCreationTime(backup)
+
 	if errUpdate := r.Client.Status().Patch(reqCtx.Ctx, backup, client.MergeFrom(original)); errUpdate != nil {
 		return intctrlutil.CheckedRequeueWithError(errUpdate, reqCtx.Log, "")
 	}
@@ -646,5 +682,36 @@ func setClusterSnapshotAnnotation(backup *dpv1alpha1.Backup, cluster *appsv1alph
 		backup.Annotations = map[string]string{}
 	}
 	backup.Annotations[constant.ClusterSnapshotAnnotationKey] = *clusterString
+	return nil
+}
+
+func setExpirationByCreationTime(backup *dpv1alpha1.Backup) error {
+	// if expiration is already set, do not update it.
+	if backup.Status.Expiration != nil {
+		return nil
+	}
+
+	duration, err := backup.Spec.RetentionPeriod.ToDuration()
+	if err != nil {
+		return fmt.Errorf("failed to parse retention period %s, %v", backup.Spec.RetentionPeriod, err)
+	}
+
+	// if duration is zero, the backup will be kept forever.
+	// Do not set expiration time for it.
+	if duration.Seconds() == 0 {
+		return nil
+	}
+
+	var expiration *metav1.Time
+	if backup.Status.StartTimestamp != nil {
+		expiration = &metav1.Time{
+			Time: backup.Status.StartTimestamp.Add(duration),
+		}
+	} else {
+		expiration = &metav1.Time{
+			Time: backup.CreationTimestamp.Add(duration),
+		}
+	}
+	backup.Status.Expiration = expiration
 	return nil
 }

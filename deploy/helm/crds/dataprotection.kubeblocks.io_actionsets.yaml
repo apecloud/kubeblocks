@@ -76,8 +76,9 @@ spec:
                         default: false
                         description: runOnTargetPodNode specifies whether to run the
                           job workload on the target pod node. If backup container
-                          should mount the target pod's volume, this field should
-                          be set to true.
+                          should mount the target pod's volumes, this field should
+                          be set to true. otherwise the target pod's volumes will
+                          be ignored.
                         type: boolean
                       syncProgress:
                         description: syncProgress specifies whether to sync the backup
@@ -163,8 +164,9 @@ spec:
                               default: false
                               description: runOnTargetPodNode specifies whether to
                                 run the job workload on the target pod node. If backup
-                                container should mount the target pod's volume, this
-                                field should be set to true.
+                                container should mount the target pod's volumes, this
+                                field should be set to true. otherwise the target
+                                pod's volumes will be ignored.
                               type: boolean
                           required:
                           - command
@@ -236,8 +238,9 @@ spec:
                               default: false
                               description: runOnTargetPodNode specifies whether to
                                 run the job workload on the target pod node. If backup
-                                container should mount the target pod's volume, this
-                                field should be set to true.
+                                container should mount the target pod's volumes, this
+                                field should be set to true. otherwise the target
+                                pod's volumes will be ignored.
                               type: boolean
                           required:
                           - command
@@ -485,8 +488,9 @@ spec:
                               default: false
                               description: runOnTargetPodNode specifies whether to
                                 run the job workload on the target pod node. If backup
-                                container should mount the target pod's volume, this
-                                field should be set to true.
+                                container should mount the target pod's volumes, this
+                                field should be set to true. otherwise the target
+                                pod's volumes will be ignored.
                               type: boolean
                           required:
                           - command
@@ -518,8 +522,9 @@ spec:
                         default: false
                         description: runOnTargetPodNode specifies whether to run the
                           job workload on the target pod node. If backup container
-                          should mount the target pod's volume, this field should
-                          be set to true.
+                          should mount the target pod's volumes, this field should
+                          be set to true. otherwise the target pod's volumes will
+                          be ignored.
                         type: boolean
                     required:
                     - command

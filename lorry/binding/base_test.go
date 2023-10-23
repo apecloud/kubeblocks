@@ -31,9 +31,9 @@ import (
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
 
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	. "github.com/apecloud/kubeblocks/lorry/util"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type fakeOperations struct {

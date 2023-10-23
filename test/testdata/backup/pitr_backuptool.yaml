@@ -3,7 +3,7 @@ kind: BackupTool
 metadata:
   name: backup-tool-
 spec:
-  image: registry.cn-hangzhou.aliyuncs.com/apecloud/percona-xtrabackup
+  image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/percona-xtrabackup
   deployKind: job
   type: pitr
   env:

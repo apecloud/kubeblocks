@@ -55,14 +55,7 @@ func OTeldAgent(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 			params.Recorder.Eventf(existingDaemonset, corev1.EventTypeWarning, "Failed to find secret", err.Error())
 			return err
 		}
-		if existingDaemonset == nil {
-			return nil
-		}
 		return k8sClient.Create(reqCtx.Ctx, oteldDaemonset)
-	}
-
-	if existingDaemonset == nil {
-		return k8sClient.Delete(reqCtx.Ctx, existingDaemonset)
 	}
 
 	if reflect.DeepEqual(existingDaemonset.Spec, oteldDaemonset.Spec) {

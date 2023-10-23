@@ -46,25 +46,32 @@ func NewConfigGenerator() *OteldConfigGenerater {
 }
 
 func (cg *OteldConfigGenerater) GenerateOteldConfiguration(instance *OteldInstance, metricsExporterList []v1alpha1.MetricsExporterSink, logsExporterList []v1alpha1.LogsExporterSink) (yaml.MapSlice, error) {
+	var err error
+	var cfg = yaml.MapSlice{}
+
 	if instance == nil || instance.OteldTemplate == nil {
 		return nil, nil
 	}
 	if cg.cache != nil && cg.cache[instance.OteldTemplate.Spec.Mode] != nil {
 		return cg.cache[instance.OteldTemplate.Spec.Mode], nil
 	}
-	cfg := yaml.MapSlice{}
-	var err error
-	cfg, err = cg.appendExtentions(cfg)
-	cfg, err = cg.appendReceiver(cfg, instance)
-	cfg, err = cg.appendProcessor(cfg)
-	cfg, err = cg.appendExporter(cfg, metricsExporterList, logsExporterList)
-	cfg, err = cg.appendServices(cfg, instance)
-	if err != nil {
+	if cfg, err = cg.appendExtentions(cfg); err != nil {
+		return nil, err
+	}
+	if cfg, err = cg.appendReceiver(cfg, instance); err != nil {
+		return nil, err
+	}
+	if cfg, err = cg.appendProcessor(cfg); err != nil {
+		return nil, err
+	}
+	if cfg, err = cg.appendExporter(cfg, metricsExporterList, logsExporterList); err != nil {
+		return nil, err
+	}
+	if cfg, err = cg.appendServices(cfg, instance); err != nil {
 		return nil, err
 	}
 
 	cg.cache[instance.OteldTemplate.Spec.Mode] = cfg
-
 	return cfg, nil
 }
 

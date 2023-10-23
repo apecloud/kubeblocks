@@ -21,7 +21,6 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -59,7 +58,7 @@ type OTeldCollectorTemplateSpec struct {
 	// ENV vars to set on the OpenTelemetry Collector's Pods. These can then in certain cases be
 	// consumed in the config file for the Collector.
 	// +optional
-	Env []v1.EnvVar `json:"env,omitempty"`
+	Env []corev1.EnvVar `json:"env,omitempty"`
 
 	// PodAnnotations is the set of annotations that will be attached to
 	// Collector and Target Allocator pods.
@@ -69,19 +68,19 @@ type OTeldCollectorTemplateSpec struct {
 	// Volumes represents which volumes to use in the underlying collector deployment(s).
 	// +optional
 	// +listType=atomic
-	Volumes []v1.Volume `json:"volumes,omitempty"`
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
 	// VolumeMounts represents the mount points to use in the underlying collector deployment(s)
 	// +optional
 	// +listType=atomic
-	VolumeMounts []v1.VolumeMount `json:"volumeMounts,omitempty"`
+	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 
 	// Ports allows a set of ports to be exposed by the underlying v1.Service. By default, the operator
 	// will attempt to infer the required ports by parsing the .Spec.Config property but this property can be
 	// used to open additional ports that can't be inferred by the operator, like for custom receivers.
 	// +optional
 	// +listType=atomic
-	Ports []v1.ServicePort `json:"ports,omitempty"`
+	Ports []corev1.ServicePort `json:"ports,omitempty"`
 
 	// SecurityContext configures the container security context for
 	// the opentelemetry-collector container.
@@ -94,7 +93,7 @@ type OTeldCollectorTemplateSpec struct {
 	// injected sidecar container.
 	//
 	// +optional
-	SecurityContext v1.SecurityContext `json:"securityContext,omitempty"`
+	SecurityContext corev1.SecurityContext `json:"securityContext,omitempty"`
 
 	// PodSecurityContext configures the pod security context for the
 	// opentelemetry-collector pod, when running as a deployment, daemonset,
@@ -103,7 +102,7 @@ type OTeldCollectorTemplateSpec struct {
 	// In sidecar mode, the opentelemetry-operator will ignore this setting.
 	//
 	// +optional
-	PodSecurityContext v1.PodSecurityContext `json:"podSecurityContext,omitempty"`
+	PodSecurityContext corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
 }
 
 // CollectorDataSourceStatus defines the observed state of CollectorDataSource

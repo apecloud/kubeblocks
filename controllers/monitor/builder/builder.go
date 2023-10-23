@@ -94,5 +94,4 @@ func MergeValMapFromYamlStr(defaultMap map[string]any, yamlStr string) {
 	for k, v := range valMap {
 		defaultMap[k] = v
 	}
-	return
 }

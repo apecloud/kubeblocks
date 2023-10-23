@@ -26,6 +26,46 @@ import (
 	"github.com/pkg/errors"
 )
 
+type execCommand struct {
+	*exec.Cmd
+	Stdout *bytes.Buffer
+	Stderr *bytes.Buffer
+}
+
+func NewExecCommander(name string, args ...string) LocalCommand {
+	execCmd := exec.Command(name, args...)
+
+	var stdout, stderr bytes.Buffer
+	execCmd.Stdout = &stdout
+	execCmd.Stderr = &stderr
+	return &execCommand{
+		Cmd:    execCmd,
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}
+}
+
+func (cmd *execCommand) GetStdout() *bytes.Buffer {
+	return cmd.Stdout
+}
+
+func (cmd *execCommand) GetStderr() *bytes.Buffer {
+	return cmd.Stderr
+}
+
+var LocalCommander = NewExecCommander
+
+func ExecCommand(name string, args ...string) (string, error) {
+	cmd := LocalCommander(name, args...)
+
+	err := cmd.Run()
+	if err != nil || cmd.GetStderr().String() != "<nil>" {
+		return "", errors.Errorf("exec command %s failed, err:%v, stderr:%s", name, err, cmd.GetStderr().String())
+	}
+
+	return cmd.GetStdout().String(), nil
+}
+
 func Psql(args ...string) (string, error) {
 	return ExecCommand("psql", args...)
 }
@@ -38,16 +78,38 @@ func PgCtl(arg string) (string, error) {
 	return ExecCommand("su", args...)
 }
 
-func ExecCommand(name string, args ...string) (string, error) {
-	var stdout, stderr bytes.Buffer
-	cmd := exec.Command(name, args...)
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+func PgWalDump(args ...string) (string, error) {
+	return ExecCommand("pg_waldump", args...)
+}
 
-	err := cmd.Run()
-	if err != nil || stderr.String() != "" {
-		return "", errors.Errorf("exec command %s failed, err:%v, stderr:%s", name, err, stderr.String())
+func PgRewind(args ...string) (string, error) {
+	return ExecCommand("pg_rewind", args...)
+}
+
+type FakeCommand struct {
+	Stdout     *bytes.Buffer
+	Stderr     *bytes.Buffer
+	RunnerFunc func() error
+}
+
+func NewFakeCommander(f func() error, stdout, stderr *bytes.Buffer) func(name string, args ...string) LocalCommand {
+	return func(name string, args ...string) LocalCommand {
+		return &FakeCommand{
+			RunnerFunc: f,
+			Stdout:     stdout,
+			Stderr:     stderr,
+		}
 	}
+}
 
-	return stdout.String(), nil
+func (cmd *FakeCommand) Run() error {
+	return cmd.RunnerFunc()
+}
+
+func (cmd *FakeCommand) GetStdout() *bytes.Buffer {
+	return cmd.Stdout
+}
+
+func (cmd *FakeCommand) GetStderr() *bytes.Buffer {
+	return cmd.Stderr
 }

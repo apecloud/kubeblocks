@@ -121,9 +121,9 @@ func (s *CheckRole) Do(ctx context.Context, req *operations.OpsRequest) (*operat
 	defer cancel()
 	role, err := manager.GetReplicaRole(ctx1, cluster)
 	if err != nil {
+		s.logger.Info("executing checkRole error", "error", err)
 		// do not return err, as it will cause readinessprobe to fail
 		err = nil
-		s.logger.Info("executing checkRole error", "error", err)
 		if s.CheckRoleFailedCount%s.FailedEventReportFrequency == 0 {
 			s.logger.Info("role checks failed continuously", "times", s.CheckRoleFailedCount)
 			// if err is not nil, send event through kubelet readinessprobe

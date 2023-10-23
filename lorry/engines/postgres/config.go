@@ -24,9 +24,9 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/lorry/dcs"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (

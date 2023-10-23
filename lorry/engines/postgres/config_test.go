@@ -22,10 +22,10 @@ package postgres
 import (
 	"testing"
 
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/apecloud/kubeblocks/lorry/dcs"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 func TestGetPostgresqlMetadata(t *testing.T) {

@@ -21,7 +21,9 @@ package postgres
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -35,8 +37,8 @@ import (
 	"github.com/spf13/cast"
 	"golang.org/x/exp/slices"
 
+	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/dcs"
-	"github.com/apecloud/kubeblocks/lorry/engines"
 )
 
 var (
@@ -86,7 +88,7 @@ type PgBaseIFace interface {
 }
 
 type PgIFace interface {
-	engines.DBManager
+	component.DBManager
 	PgBaseIFace
 }
 
@@ -101,6 +103,12 @@ type PgxPoolIFace interface {
 	PgxIFace
 	Acquire(ctx context.Context) (*pgxpool.Conn, error)
 	Close()
+}
+
+type LocalCommand interface {
+	Run() error
+	GetStdout() *bytes.Buffer
+	GetStderr() *bytes.Buffer
 }
 
 type ConsensusMemberHealthStatus struct {
@@ -323,6 +331,10 @@ func ParsePgLsn(str string) int64 {
 	return prefix*0x100000000 + suffix
 }
 
+func FormatPgLsn(lsn int64) string {
+	return fmt.Sprintf("%X/%08X", lsn>>32, lsn&0xFFFFFFFF)
+}
+
 func ParsePrimaryConnInfo(str string) map[string]string {
 	infos := strings.Split(str, " ")
 	result := make(map[string]string)
@@ -335,4 +347,18 @@ func ParsePrimaryConnInfo(str string) map[string]string {
 	}
 
 	return result
+}
+
+func ParsePgWalDumpError(errorInfo string, lsnStr string) string {
+	prefixPattern := fmt.Sprintf("error in WAL record at %s: invalid record length at ", lsnStr)
+	suffixPattern := ": wanted "
+
+	startIndex := strings.Index(errorInfo, prefixPattern) + len(prefixPattern)
+	endIndex := strings.Index(errorInfo, suffixPattern)
+
+	if startIndex == -1 || endIndex == -1 {
+		return ""
+	}
+
+	return errorInfo[startIndex:endIndex]
 }

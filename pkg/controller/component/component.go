@@ -96,7 +96,7 @@ func buildProtoCompFromConvertor(reqCtx ictrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	return BuildComponentFrom(clusterCompDef, clusterCompVer, clusterCompSpec)
+	return BuildComponentFrom(cluster, clusterCompDef, clusterCompVer, clusterCompSpec)
 }
 
 // buildProtoCompFromCompDef builds a new Component object based on ComponentDefinition API.

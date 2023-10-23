@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -68,7 +69,8 @@ func BuildComponentDefinitionFrom(clusterCompDef *appsv1alpha1.ClusterComponentD
 	return compDef, nil
 }
 
-func BuildComponentFrom(clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
+func BuildComponentFrom(cluster *appsv1alpha1.Cluster,
+	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
 	clusterCompVer *appsv1alpha1.ClusterComponentVersion,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.Component, error) {
 	if clusterCompDef == nil || clusterCompSpec == nil {
@@ -93,7 +95,7 @@ func BuildComponentFrom(clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
 		"issuer":               &issuerConvertor{},
 	}
 	comp := &appsv1alpha1.Component{}
-	if err := covertObject(convertors, &comp.Spec, clusterCompDef, clusterCompVer, clusterCompSpec); err != nil {
+	if err := covertObject(convertors, &comp.Spec, cluster, clusterCompDef, clusterCompVer, clusterCompSpec); err != nil {
 		return nil, err
 	}
 	return comp, nil
@@ -533,123 +535,138 @@ func (c *serviceRefDeclarationConvertor) convert(args ...any) (any, error) {
 	return clusterCompDef.ServiceRefDeclarations, nil
 }
 
-// TODO(component)
-// func parseComponentConvertorArgs(args ...any) (*appsv1alpha1.ClusterComponentDefinition,
-//	*appsv1alpha1.ClusterComponentVersion, *appsv1alpha1.ClusterComponentSpec) {
-//	def := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-//	ver := args[1].(*appsv1alpha1.ClusterComponentVersion)
-//	spec := args[2].(*appsv1alpha1.ClusterComponentSpec)
-//	return def, ver, spec
-// }
+// parseComponentConvertorArgs parses the args of component convertor.
+func parseComponentConvertorArgs(args ...any) (*appsv1alpha1.Cluster, *appsv1alpha1.ClusterComponentDefinition, *appsv1alpha1.ClusterComponentVersion, *appsv1alpha1.ClusterComponentSpec, error) {
+	cluster, ok := args[0].(*appsv1alpha1.Cluster)
+	if !ok {
+		return nil, nil, nil, nil, errors.New("args[0] is not a cluster")
+	}
+	clusterCompDef, ok := args[1].(*appsv1alpha1.ClusterComponentDefinition)
+	if !ok {
+		return nil, nil, nil, nil, errors.New("args[1] not a cluster component definition")
+	}
+	clusterCompVer, ok := args[2].(*appsv1alpha1.ClusterComponentVersion)
+	if !ok {
+		return nil, nil, nil, nil, errors.New("args[2] not a cluster component version")
+	}
+	clusterCompSpec, ok := args[3].(*appsv1alpha1.ClusterComponentSpec)
+	if !ok {
+		return nil, nil, nil, nil, errors.New("args[3] not a cluster component spec")
+	}
+	return cluster, clusterCompDef, clusterCompVer, clusterCompSpec, nil
+}
 
 type clusterConvertor struct{}
 
 func (c *clusterConvertor) convert(args ...any) (any, error) {
-	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
-	return "", nil // TODO
+	cluster, _, _, _, err := parseComponentConvertorArgs(args...)
+	if err != nil {
+		return nil, err
+	}
+	return cluster.Name, nil
 }
 
 type compDefConvertor struct{}
 
 func (c *compDefConvertor) convert(args ...any) (any, error) {
-	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	// cluster, clusterCompDef, clusterCompVer, clusterCompSpec, err := parseComponentConvertorArgs(args...)
 	return "", nil // TODO
 }
 
 type classDefRefConvertor struct{}
 
 func (c *classDefRefConvertor) convert(args ...any) (any, error) {
-	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	// cluster, clusterCompDef, clusterCompVer, clusterCompSpec, err := parseComponentConvertorArgs(args...)
 	return "", nil // TODO
 }
 
 type serviceRefConvertor struct{}
 
 func (c *serviceRefConvertor) convert(args ...any) (any, error) {
-	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	// cluster, clusterCompDef, clusterCompVer, clusterCompSpec, err := parseComponentConvertorArgs(args...)
 	return "", nil // TODO
 }
 
 type resourceConvertor struct{}
 
 func (c *resourceConvertor) convert(args ...any) (any, error) {
-	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	// cluster, clusterCompDef, clusterCompVer, clusterCompSpec, err := parseComponentConvertorArgs(args...)
 	return "", nil // TODO
 }
 
 type volumeClaimTemplateConvertor struct{}
 
 func (c *volumeClaimTemplateConvertor) convert(args ...any) (any, error) {
-	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	// cluster, clusterCompDef, clusterCompVer, clusterCompSpec, err := parseComponentConvertorArgs(args...)
 	return "", nil // TODO
 }
 
 type replicaConvertor struct{}
 
 func (c *replicaConvertor) convert(args ...any) (any, error) {
-	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	// cluster, clusterCompDef, clusterCompVer, clusterCompSpec, err := parseComponentConvertorArgs(args...)
 	return "", nil // TODO
 }
 
 type configConvertor2 struct{}
 
 func (c *configConvertor2) convert(args ...any) (any, error) {
-	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	// cluster, clusterCompDef, clusterCompVer, clusterCompSpec, err := parseComponentConvertorArgs(args...)
 	return "", nil // TODO
 }
 
 type monitorConvertor2 struct{}
 
 func (c *monitorConvertor2) convert(args ...any) (any, error) {
-	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	// cluster, clusterCompDef, clusterCompVer, clusterCompSpec, err := parseComponentConvertorArgs(args...)
 	return "", nil // TODO
 }
 
 type enabledLogConvertor struct{}
 
 func (c *enabledLogConvertor) convert(args ...any) (any, error) {
-	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	// cluster, clusterCompDef, clusterCompVer, clusterCompSpec, err := parseComponentConvertorArgs(args)
 	return "", nil // TODO
 }
 
 type updateStrategyConvertor2 struct{}
 
 func (c *updateStrategyConvertor2) convert(args ...any) (any, error) {
-	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	// cluster, clusterCompDef, clusterCompVer, clusterCompSpec, err := parseComponentConvertorArgs(args...)
 	return "", nil // TODO
 }
 
 type serviceAccountNameConvertor struct{}
 
 func (c *serviceAccountNameConvertor) convert(args ...any) (any, error) {
-	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	// cluster, clusterCompDef, clusterCompVer, clusterCompSpec, err := parseComponentConvertorArgs(args...)
 	return "", nil // TODO
 }
 
 type affinityConvertor struct{}
 
 func (c *affinityConvertor) convert(args ...any) (any, error) {
-	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	// cluster, clusterCompDef, clusterCompVer, clusterCompSpec, err := parseComponentConvertorArgs(args...)
 	return "", nil // TODO
 }
 
 type tolerationConvertor struct{}
 
 func (c *tolerationConvertor) convert(args ...any) (any, error) {
-	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	// cluster, clusterCompDef, clusterCompVer, clusterCompSpec, err := parseComponentConvertorArgs(args...)
 	return "", nil // TODO
 }
 
 type tlsConvertor struct{}
 
 func (c *tlsConvertor) convert(args ...any) (any, error) {
-	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	// cluster, clusterCompDef, clusterCompVer, clusterCompSpec, err := parseComponentConvertorArgs(args...)
 	return "", nil // TODO
 }
 
 type issuerConvertor struct{}
 
 func (c *issuerConvertor) convert(args ...any) (any, error) {
-	// clusterCompDef, clusterCompVer, clusterCompSpec := parseComponentConvertorArgs(args)
+	// cluster, clusterCompDef, clusterCompVer, clusterCompSpec, err := parseComponentConvertorArgs(args...)
 	return "", nil // TODO
 }

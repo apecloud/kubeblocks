@@ -38,16 +38,6 @@ var _ = Describe("monitor_controller", func() {
 		metricsExporterList = fakeMetricsExporterSinkList()
 	})
 
-	It("should generate config correctly from config yaml", func() {
-		Eventually(func(g Gomega) {
-			config, err := LoadConfig("./data/config_test.yaml")
-			if err != nil {
-				return
-			}
-			g.Expect(config).ShouldNot(BeNil())
-		}).Should(Succeed())
-	})
-
 	It("should generate oteld correctly", func() {
 		instance := fakeInstance()
 

@@ -43,9 +43,9 @@ func Deployment(reqCtx monitortypes.ReconcileCtx, params monitortypes.OTeldParam
 		namespace = viper.GetString(constant.MonitorNamespaceEnvName)
 	)
 
-	instance := reqCtx.GetOteldInstance(monitorv1alpha1.ModeDeployment)
+	instance := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDeployment)
 
-	oteldDeployment := buildDeploymentForOteld(reqCtx.Config, instance, namespace, OTeldName)
+	oteldDeployment := buildDeploymentForOteld(instance, namespace, OTeldName)
 
 	existingDeployment := &appsv1.Deployment{}
 	err := k8sClient.Get(reqCtx.Ctx, client.ObjectKey{Name: OTeldName, Namespace: namespace}, existingDeployment)
@@ -77,7 +77,7 @@ func Deployment(reqCtx monitortypes.ReconcileCtx, params monitortypes.OTeldParam
 	return k8sClient.Update(reqCtx.Ctx, oteldDeployment)
 }
 
-func buildDeploymentForOteld(config *monitortypes.Config, instance *monitortypes.OteldInstance, namespace, name string) *appsv1.Deployment {
+func buildDeploymentForOteld(instance *monitortypes.OteldInstance, namespace, name string) *appsv1.Deployment {
 	if instance == nil || instance.Oteld == nil {
 		return nil
 	}
@@ -94,7 +94,7 @@ func buildDeploymentForOteld(config *monitortypes.Config, instance *monitortypes
 	}
 
 	template := instance.Oteld
-	podSpec := buildPodSpecForOteld(config, template)
+	podSpec := buildPodSpecForOteld(template)
 
 	podBuilder := builder.NewPodBuilder("", "").
 		AddLabelsInMap(commonLabels)

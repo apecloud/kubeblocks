@@ -20,45 +20,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package types
 
 import (
-	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
+	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 )
 
-// APIConfig contains options relevant to connecting to the K8s API
-type APIConfig struct {
-	// How to authenticate to the K8s API server.  This can be one of `none`
-	// (for no auth), `serviceAccount` (to use the standard service account
-	// token provided to the agent pod), or `kubeConfig` to use credentials
-	// from `~/.kube/config`.
-	AuthType AuthType `json:"authType"`
+type OTeldAgentConfig struct {
+	OteldInstanceMap map[v1alpha1.Mode]*OteldInstance
+	Exporters        *Exporters
 }
 
-// AuthType describes the type of authentication to use for the K8s API
-type AuthType string
-
-const (
-	// AuthTypeNone means no auth is required
-	AuthTypeNone AuthType = "none"
-	// AuthTypeServiceAccount means to use the built-in service account that
-	// K8s automatically provisions for each pod.
-	AuthTypeServiceAccount AuthType = "serviceAccount"
-	// AuthTypeKubeConfig uses local credentials like those used by kubectl.
-	AuthTypeKubeConfig AuthType = "kubeConfig"
-	// AuthTypeTLS indicates that client TLS auth is desired
-	AuthTypeTLS AuthType = "tls"
-)
-
-type Config struct {
-	// APIConfig is the authentication method used to connect to Kubelet
-	APIConfig `json:",inline"`
-
-	// CollectionInterval is the metrics collection interval
-	CollectionInterval string `json:"collectionInterval"`
+type OteldCfgRef struct {
+	*OTeldAgentConfig
 }
 
-func LoadConfig(configFile string) (*Config, error) {
-	config := &Config{}
-	if err := cfgutil.FromYamlConfig(configFile, config); err != nil {
-		return nil, err
+func (c *OTeldAgentConfig) GetOteldInstance(mode v1alpha1.Mode) *OteldInstance {
+	if c == nil || c.OteldInstanceMap == nil {
+		return nil
 	}
-	return config, nil
+	return c.OteldInstanceMap[mode]
 }

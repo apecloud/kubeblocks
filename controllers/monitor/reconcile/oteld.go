@@ -22,6 +22,7 @@ package reconcile
 import (
 	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 	monitortype "github.com/apecloud/kubeblocks/controllers/monitor/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const OTeldName = "apecloudoteld"
@@ -33,64 +34,38 @@ func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) erro
 		k8sClient = params.Client
 	)
 
-	reqCtx.SetConfigGenerator(monitortype.NewConfigGenerator())
-
 	exporter := monitortype.Exporters{}
 	metricsExporters := &v1alpha1.MetricsExporterSinkList{}
 	if err := k8sClient.List(ctx, metricsExporters); err != nil {
 		return err
 	}
-	exporter.Metricsexporter = metricsExporters.Items
+	exporter.MetricsExporter = metricsExporters.Items
 
 	logsExporters := &v1alpha1.LogsExporterSinkList{}
 	if err := k8sClient.List(ctx, logsExporters); err != nil {
 		return err
 	}
-	exporter.Logsexporter = logsExporters.Items
-
-	reqCtx.SetExporters(&exporter)
+	exporter.LogsExporter = logsExporters.Items
 
 	datasources := &v1alpha1.CollectorDataSourceList{}
-	if err := k8sClient.List(ctx, datasources); err != nil {
+	if err := k8sClient.List(ctx, datasources, client.InNamespace(reqCtx.OTeld.GetNamespace())); err != nil {
 		return err
 	}
 
-	oteldTemplates := &v1alpha1.OTeldList{}
-	if err := k8sClient.List(ctx, oteldTemplates); err != nil {
-		return err
-	}
-	instanceMap, err := buildOteldInstance(datasources, oteldTemplates)
-
-	for i := 0; i < len(oteldTemplates.Items); i++ {
-		template := oteldTemplates.Items[i]
-		instance := instanceMap[template.Spec.Mode]
-		if instance == nil {
-			continue
-		}
-		instance.Oteld = &template
-	}
-
-	reqCtx.SetOteldInstanceMap(instanceMap)
+	instanceMap, err := BuildInstanceMapForPipline(datasources, reqCtx.OTeld)
 	if err != nil {
 		return err
 	}
 
-	if err = reqCtx.VerifyOteldInstance(metricsExporters, logsExporters); err != nil {
+	reqCtx.OteldCfgRef.Exporters = &exporter
+	reqCtx.OteldCfgRef.OteldInstanceMap = instanceMap
+	if err = monitortype.VerifyOteldInstance(metricsExporters, logsExporters, instanceMap); err != nil {
 		return err
 	}
 	return err
 }
 
-func buildOteldInstance(datasources *v1alpha1.CollectorDataSourceList, templates *v1alpha1.OTeldList) (map[v1alpha1.Mode]*monitortype.OteldInstance, error) {
-	instanceMap, err := BuildInstanceMapForPipline(datasources)
-	if err != nil {
-		return nil, err
-	}
-
-	return instanceMap, nil
-}
-
-func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList) (map[v1alpha1.Mode]*monitortype.OteldInstance, error) {
+func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList, oteld *v1alpha1.OTeld) (map[v1alpha1.Mode]*monitortype.OteldInstance, error) {
 	instanceMap := map[v1alpha1.Mode]*monitortype.OteldInstance{}
 	for _, dataSource := range datasources.Items {
 		mode := dataSource.Spec.Mode
@@ -99,7 +74,7 @@ func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList) (
 		}
 		oteldInstance, ok := instanceMap[mode]
 		if !ok {
-			oteldInstance = monitortype.NewOteldInstance()
+			oteldInstance = monitortype.NewOteldInstance(oteld)
 		}
 		switch dataSource.Spec.Type {
 		case v1alpha1.MetricsDatasourceType:

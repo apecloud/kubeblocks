@@ -28,14 +28,13 @@ import (
 
 	monitorv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/monitor/types"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 func Service(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 	desired := make([]*corev1.Service, 0)
 
-	if daemon := reqCtx.GetOteldInstance(monitorv1alpha1.ModeDaemonSet); daemon != nil {
-		svc, err := buildSvcForOtel(reqCtx.Config, daemon.Oteld, reqCtx.Namespace)
+	if daemon := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDaemonSet); daemon != nil {
+		svc, err := buildSvcForOtel(daemon.Oteld, reqCtx.OTeld.Namespace)
 		if err != nil {
 			return err
 		}
@@ -43,17 +42,14 @@ func Service(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 			desired = append(desired, svc)
 		}
 	}
-	if deploy := reqCtx.GetOteldInstance(monitorv1alpha1.ModeDeployment); deploy != nil {
-		svc, _ := buildSvcForOtel(reqCtx.Config, deploy.Oteld, reqCtx.Namespace)
+	if deploy := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDeployment); deploy != nil {
+		svc, _ := buildSvcForOtel(deploy.Oteld, reqCtx.OTeld.Namespace)
 		if svc != nil {
 			desired = append(desired, svc)
 		}
 	}
 
-	if err := expectedService(reqCtx, params, desired); err != nil {
-		return err
-	}
-	return deleteService(reqCtx, params, desired)
+	return expectedService(reqCtx, params, desired)
 }
 
 func expectedService(reqCtx types.ReconcileCtx, params types.OTeldParams, desired []*corev1.Service) error {
@@ -100,38 +96,6 @@ func expectedService(reqCtx types.ReconcileCtx, params types.OTeldParams, desire
 		}
 
 		reqCtx.Log.V(2).Info("applied", "configmap.name", desired.Name, "configmap.namespace", desired.Namespace)
-	}
-	return nil
-}
-
-func deleteService(reqCtx types.ReconcileCtx, params types.OTeldParams, desired []*corev1.Service) error {
-	listopts := []client.ListOption{
-		client.InNamespace(reqCtx.Namespace),
-		client.MatchingLabels(map[string]string{
-			constant.AppManagedByLabelKey: constant.AppName,
-			constant.AppNameLabelKey:      OTeldName,
-		}),
-	}
-
-	serviceList := &corev1.ServiceList{}
-	if params.Client.List(reqCtx.Ctx, serviceList, listopts...) != nil {
-		return nil
-	}
-
-	for _, configMap := range serviceList.Items {
-		isdel := true
-		for _, keep := range desired {
-			if keep.Name == configMap.Name && keep.Namespace == configMap.Namespace {
-				isdel = false
-				break
-			}
-		}
-
-		if isdel {
-			if err := params.Client.Delete(reqCtx.Ctx, &configMap); err != nil {
-				return fmt.Errorf("failed to delete: %w", err)
-			}
-		}
 	}
 	return nil
 }

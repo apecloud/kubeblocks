@@ -34,23 +34,20 @@ import (
 const OteldSecretName = "oteld-secret"
 
 func Secret(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
-	desired := []*corev1.Secret{}
+	desired := make([]*corev1.Secret, 0)
 
-	cg := reqCtx.GetConfigGenerator()
-	if cg == nil {
-		return fmt.Errorf("config generator is nil")
-	}
-	daemonsetInstance := reqCtx.GetOteldInstance(monitorv1alpha1.ModeDaemonSet)
-	if daemonsetInstance != nil {
-		secret, _ := buildSecretForOteld(reqCtx.Config, daemonsetInstance, reqCtx.Namespace, reqCtx.GetExporters(), cg)
+	cg := types.NewConfigGenerator()
+	daemonSetInstance := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDaemonSet)
+	if daemonSetInstance != nil {
+		secret, _ := buildSecretForOteld(daemonSetInstance, reqCtx.OTeld.Namespace, reqCtx.OteldCfgRef.Exporters, cg)
 		if secret != nil {
 			desired = append(desired, secret)
 		}
 	}
 
-	deploymentInstance := reqCtx.GetOteldInstance(monitorv1alpha1.ModeDeployment)
+	deploymentInstance := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDeployment)
 	if deploymentInstance != nil {
-		secret, _ := buildSecretForOteld(reqCtx.Config, deploymentInstance, reqCtx.Namespace, reqCtx.GetExporters(), cg)
+		secret, _ := buildSecretForOteld(deploymentInstance, reqCtx.OTeld.Namespace, reqCtx.OteldCfgRef.Exporters, cg)
 		if secret != nil {
 			desired = append(desired, secret)
 		}
@@ -118,7 +115,7 @@ func expectedSecret(reqCtx types.ReconcileCtx, params types.OTeldParams, desired
 
 func deleteSecret(reqCtx types.ReconcileCtx, params types.OTeldParams, desired []*corev1.Secret) error {
 	listopts := []client.ListOption{
-		client.InNamespace(reqCtx.Namespace),
+		client.InNamespace(reqCtx.OTeld.Namespace),
 		client.MatchingLabels(map[string]string{
 			constant.AppManagedByLabelKey: constant.AppName,
 			constant.AppNameLabelKey:      OTeldName,

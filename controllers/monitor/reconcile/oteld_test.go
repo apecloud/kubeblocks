@@ -28,18 +28,16 @@ import (
 
 var _ = Describe("monitor_controller", func() {
 	var (
-		config   *types.Config
 		instance *types.OteldInstance
 	)
 
 	BeforeEach(func() {
-		config = &types.Config{}
 		instance = &types.OteldInstance{}
 	})
 
 	It("should generate config correctly from config yaml", func() {
 		Eventually(func(g Gomega) {
-			otel := buildDaemonsetForOteld(config, instance, "test", "test")
+			otel := buildDaemonsetForOteld(instance, "test", "test")
 			g.Expect(otel).ShouldNot(BeNil())
 			g.Expect(otel.Name).Should(Equal("test"))
 		}).Should(Succeed())

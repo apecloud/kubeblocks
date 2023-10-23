@@ -43,9 +43,9 @@ func OTeldAgent(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 		namespace = viper.GetString(constant.MonitorNamespaceEnvName)
 	)
 
-	instance := reqCtx.GetOteldInstance(monitorv1alpha1.ModeDaemonSet)
+	instance := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDaemonSet)
 
-	oteldDaemonset := buildDaemonsetForOteld(reqCtx.Config, instance, namespace, OTeldName)
+	oteldDaemonset := buildDaemonsetForOteld(instance, namespace, OTeldName)
 
 	existingDaemonset := &appsv1.DaemonSet{}
 	err := k8sClient.Get(reqCtx.Ctx, client.ObjectKey{Name: OTeldName, Namespace: namespace}, existingDaemonset)
@@ -70,7 +70,7 @@ func OTeldAgent(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 	return k8sClient.Update(reqCtx.Ctx, oteldDaemonset)
 }
 
-func buildDaemonsetForOteld(config *types.Config, instance *types.OteldInstance, namespace string, name string) *appsv1.DaemonSet {
+func buildDaemonsetForOteld(instance *types.OteldInstance, namespace string, name string) *appsv1.DaemonSet {
 	if instance == nil || instance.Oteld == nil {
 		return nil
 	}
@@ -87,7 +87,7 @@ func buildDaemonsetForOteld(config *types.Config, instance *types.OteldInstance,
 	}
 
 	template := instance.Oteld
-	podSpec := buildPodSpecForOteld(config, template)
+	podSpec := buildPodSpecForOteld(template)
 
 	podBuilder := builder.NewPodBuilder("", "").
 		AddLabelsInMap(commonLabels)

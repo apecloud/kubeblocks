@@ -32,21 +32,18 @@ import (
 )
 
 func ConfigMap(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
-	desired := []*corev1.ConfigMap{}
+	desired := make([]*corev1.ConfigMap, 0)
 
-	cg := reqCtx.GetConfigGenerator()
-	if cg == nil {
-		return fmt.Errorf("config generator is nil")
-	}
-	if reqCtx.GetOteldInstance(monitorv1alpha1.ModeDaemonSet) != nil {
-		configmap, _ := buildConfigMapForOteld(reqCtx.Config, reqCtx.GetOteldInstance(monitorv1alpha1.ModeDaemonSet), reqCtx.Namespace, reqCtx.GetExporters(), cg)
+	cg := types.NewConfigGenerator()
+	if daemont := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDaemonSet); daemont != nil {
+		configmap, _ := buildConfigMapForOteld(daemont, reqCtx.OTeld.Namespace, reqCtx.OteldCfgRef.Exporters, cg)
 		if configmap != nil {
 			desired = append(desired, configmap)
 		}
 	}
 
-	if reqCtx.GetOteldInstance(monitorv1alpha1.ModeDeployment) != nil {
-		configmap, _ := buildConfigMapForOteld(reqCtx.Config, reqCtx.GetOteldInstance(monitorv1alpha1.ModeDeployment), reqCtx.Namespace, reqCtx.GetExporters(), cg)
+	if deployment := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDeployment); deployment != nil {
+		configmap, _ := buildConfigMapForOteld(deployment, reqCtx.OTeld.Namespace, reqCtx.OteldCfgRef.Exporters, cg)
 		if configmap != nil {
 			desired = append(desired, configmap)
 		}
@@ -114,7 +111,7 @@ func expectedConfigMap(reqCtx types.ReconcileCtx, params types.OTeldParams, desi
 
 func deleteConfigMap(reqCtx types.ReconcileCtx, params types.OTeldParams, desired []*corev1.ConfigMap) error {
 	listopts := []client.ListOption{
-		client.InNamespace(reqCtx.Namespace),
+		client.InNamespace(reqCtx.OTeld.Namespace),
 		client.MatchingLabels(map[string]string{
 			constant.AppManagedByLabelKey: constant.AppName,
 			constant.AppNameLabelKey:      OTeldName,

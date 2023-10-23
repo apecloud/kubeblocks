@@ -20,13 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package types
 
 import (
+	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
 
 type OTeldParams struct {
@@ -35,124 +34,15 @@ type OTeldParams struct {
 	Recorder record.EventRecorder
 }
 
-type OteldConfig struct {
-	OteldInstanceMap map[v1alpha1.Mode]*OteldInstance
-	Exporters        *Exporters
-	ConfigGenerator  *OteldConfigGenerater
-}
-
-type OteldCfgRef struct {
-	Config *OteldConfig
-}
-
 // ReconcileCtx wrapper for reconcile procedure context parameters
 type ReconcileCtx struct {
 	intctrlutil.RequestCtx
 
-	// Ctx       context.Context
-	// Req       ctrl.Request
-	// Log       logr.Logger
-	Config    *Config
-	Namespace string
+	OTeld *v1alpha1.OTeld
 
-	OteldCfgRef *OteldCfgRef
-}
-
-func (c *ReconcileCtx) SetConfigGenerator(cg *OteldConfigGenerater) {
-	if c.OteldCfgRef == nil {
-		c.OteldCfgRef = &OteldCfgRef{}
-	}
-	if c.OteldCfgRef.Config == nil {
-		c.OteldCfgRef.Config = &OteldConfig{}
-	}
-	c.OteldCfgRef.Config.ConfigGenerator = cg
-}
-
-func (c *ReconcileCtx) GetConfigGenerator() *OteldConfigGenerater {
-	if c.OteldCfgRef == nil ||
-		c.OteldCfgRef.Config == nil ||
-		c.OteldCfgRef.Config.OteldInstanceMap == nil {
-		return nil
-	}
-	return c.OteldCfgRef.Config.ConfigGenerator
-}
-
-func (c *ReconcileCtx) SetOteldInstanceMap(oteldInstanceMap map[v1alpha1.Mode]*OteldInstance) {
-	if c.OteldCfgRef == nil {
-		c.OteldCfgRef = &OteldCfgRef{}
-	}
-	if c.OteldCfgRef.Config == nil {
-		c.OteldCfgRef.Config = &OteldConfig{}
-	}
-	c.OteldCfgRef.Config.OteldInstanceMap = oteldInstanceMap
-}
-
-func (c *ReconcileCtx) GetOteldConfig() (map[v1alpha1.Mode]*OteldInstance, error) {
-	if c.OteldCfgRef == nil ||
-		c.OteldCfgRef.Config == nil ||
-		c.OteldCfgRef.Config.OteldInstanceMap == nil {
-		return nil, cfgcore.MakeError("not found oteld config")
-	}
-	return c.OteldCfgRef.Config.OteldInstanceMap, nil
-}
-
-func (c *ReconcileCtx) SetExporters(exporters *Exporters) {
-	if c.OteldCfgRef == nil {
-		c.OteldCfgRef = &OteldCfgRef{}
-	}
-	if c.OteldCfgRef.Config == nil {
-		c.OteldCfgRef.Config = &OteldConfig{}
-	}
-	c.OteldCfgRef.Config.Exporters = exporters
-}
-
-func (c *ReconcileCtx) GetExporters() *Exporters {
-	if c.OteldCfgRef == nil ||
-		c.OteldCfgRef.Config == nil ||
-		c.OteldCfgRef.Config.Exporters == nil {
-		return nil
-	}
-	return c.OteldCfgRef.Config.Exporters
-}
-
-func (c *ReconcileCtx) VerifyOteldInstance(metricsExporterList *v1alpha1.MetricsExporterSinkList, logsExporterList *v1alpha1.LogsExporterSinkList) error {
-	metricsMap := make(map[string]bool)
-	for _, mExporter := range metricsExporterList.Items {
-		metricsMap[string(mExporter.Spec.Type)] = true
-	}
-	logMap := make(map[string]bool)
-	for _, lExporter := range logsExporterList.Items {
-		logMap[string(lExporter.Spec.Type)] = true
-	}
-
-	for _, instance := range c.OteldCfgRef.Config.OteldInstanceMap {
-		if instance.MetricsPipline != nil {
-			for _, pipline := range instance.MetricsPipline {
-				for key := range pipline.ExporterMap {
-					if _, ok := metricsMap[key]; !ok {
-						return cfgcore.MakeError("not found exporter %s", key)
-					}
-				}
-			}
-		}
-		if instance.LogsPipline != nil {
-			for _, pipline := range instance.LogsPipline {
-				for key := range pipline.ExporterMap {
-					if _, ok := logMap[key]; !ok {
-						return cfgcore.MakeError("not found exporter %s", key)
-					}
-				}
-			}
-		}
-	}
-	return nil
-}
-
-func (c *ReconcileCtx) GetOteldInstance(mode v1alpha1.Mode) *OteldInstance {
-	if c.OteldCfgRef == nil || c.OteldCfgRef.Config == nil || c.OteldCfgRef.Config.OteldInstanceMap == nil {
-		return nil
-	}
-	return c.OteldCfgRef.Config.OteldInstanceMap[mode]
+	// Config    *Config
+	// Namespace string
+	OteldCfgRef OteldCfgRef
 }
 
 type ReconcileTask interface {
@@ -183,8 +73,8 @@ func NewReconcileTask(name string, task ReconcileFunc) ReconcileTask {
 				Req: reqCtx.Req,
 				Log: reqCtx.Log.WithValues("subTask", name),
 			},
-			Config:      reqCtx.Config,
-			Namespace:   reqCtx.Namespace,
+			// Config:      reqCtx.Config,
+			// Namespace:   reqCtx.Namespace,
 			OteldCfgRef: reqCtx.OteldCfgRef,
 		}
 		return task(reqCtx)

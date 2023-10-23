@@ -42,7 +42,7 @@ const (
 //	defaultMetricsPort = 8888
 // )
 
-func buildPodSpecForOteld(config *types.Config, template *v1alpha1.OTeld) *corev1.PodSpec {
+func buildPodSpecForOteld(template *v1alpha1.OTeld) *corev1.PodSpec {
 	container := corev1.Container{
 		Name:            OTeldName,
 		Image:           template.Spec.Image,
@@ -72,7 +72,7 @@ func buildPodSpecForOteld(config *types.Config, template *v1alpha1.OTeld) *corev
 		GetObject().Spec
 }
 
-func buildSvcForOtel(_ *types.Config, oteld *v1alpha1.OTeld, namespace string) (*corev1.Service, error) {
+func buildSvcForOtel(oteld *v1alpha1.OTeld, namespace string) (*corev1.Service, error) {
 	if oteld == nil {
 		return nil, nil
 	}
@@ -124,7 +124,7 @@ func buildSvcForOtel(_ *types.Config, oteld *v1alpha1.OTeld, namespace string) (
 		GetObject(), nil
 }
 
-func buildConfigMapForOteld(_ *types.Config, instance *types.OteldInstance, namespace string, exporters *types.Exporters, gc *types.OteldConfigGenerater) (*corev1.ConfigMap, error) {
+func buildConfigMapForOteld(instance *types.OteldInstance, namespace string, exporters *types.Exporters, gc *types.OteldConfigGenerater) (*corev1.ConfigMap, error) {
 	if instance == nil || instance.Oteld == nil || !instance.Oteld.Spec.UseConfigMap {
 		return nil, nil
 	}
@@ -137,7 +137,7 @@ func buildConfigMapForOteld(_ *types.Config, instance *types.OteldInstance, name
 		constant.AppInstanceLabelKey:  name,
 	}
 
-	configData, _ := gc.GenerateOteldConfiguration(instance, exporters.Metricsexporter, exporters.Logsexporter)
+	configData, _ := gc.GenerateOteldConfiguration(instance, exporters.MetricsExporter, exporters.LogsExporter)
 	marshal, err := yaml.Marshal(configData)
 	if err != nil {
 		return nil, err
@@ -150,7 +150,7 @@ func buildConfigMapForOteld(_ *types.Config, instance *types.OteldInstance, name
 		GetObject(), nil
 }
 
-func buildSecretForOteld(_ *types.Config, instance *types.OteldInstance, namespace string, exporters *types.Exporters, gc *types.OteldConfigGenerater) (*corev1.Secret, error) {
+func buildSecretForOteld(instance *types.OteldInstance, namespace string, exporters *types.Exporters, gc *types.OteldConfigGenerater) (*corev1.Secret, error) {
 	if instance == nil || instance.Oteld == nil {
 		return nil, nil
 	}
@@ -163,7 +163,7 @@ func buildSecretForOteld(_ *types.Config, instance *types.OteldInstance, namespa
 		constant.AppInstanceLabelKey:  name,
 	}
 
-	configData, _ := gc.GenerateOteldConfiguration(instance, exporters.Metricsexporter, exporters.Logsexporter)
+	configData, _ := gc.GenerateOteldConfiguration(instance, exporters.MetricsExporter, exporters.LogsExporter)
 	marshal, err := yaml.Marshal(configData)
 	if err != nil {
 		return nil, err

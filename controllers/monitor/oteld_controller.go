@@ -45,7 +45,6 @@ type OTeldReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
-	Config   *monitortypes.Config
 
 	// sub-controllers
 	tasks []monitortypes.ReconcileTask
@@ -99,8 +98,11 @@ func (o *OTeldReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 func (o *OTeldReconciler) runTasks(reqCtx intctrlutil.RequestCtx, oteld *monitorv1alpha1.OTeld) error {
 	oteldCtx := monitortypes.ReconcileCtx{
-		RequestCtx:  reqCtx,
-		OteldCfgRef: &monitortypes.OteldCfgRef{},
+		RequestCtx: reqCtx,
+		OTeld:      oteld,
+		OteldCfgRef: monitortypes.OteldCfgRef{
+			OTeldAgentConfig: &monitortypes.OTeldAgentConfig{},
+		},
 	}
 
 	for _, task := range o.tasks {
@@ -116,21 +118,20 @@ func New(params monitortypes.OTeldParams) *OTeldReconciler {
 		Client:   params.Client,
 		Scheme:   params.Scheme,
 		Recorder: params.Recorder,
-		// Config:   config,
+	}
 
-		// sub-controllers
-		tasks: []monitortypes.ReconcileTask{
-			monitortypes.NewReconcileTask(monitorreconsile.OTeldName, monitortypes.WithReconcileOption(monitorreconsile.OTeld, params)),
-			monitortypes.NewReconcileTask(monitorreconsile.OteldSecretName, monitortypes.WithReconcileOption(monitorreconsile.Secret, params)),
-			monitortypes.NewReconcileTask(monitorreconsile.OteldConfigMapNamePattern, monitortypes.WithReconcileOption(monitorreconsile.ConfigMap, params)),
-			monitortypes.NewReconcileTask(monitorreconsile.OteldServiceNamePattern, monitortypes.WithReconcileOption(monitorreconsile.Service, params)),
-			monitortypes.NewReconcileTask(monitorreconsile.OTeldAPIServerName, monitortypes.WithReconcileOption(monitorreconsile.Deployment, params)),
-			monitortypes.NewReconcileTask(monitorreconsile.OTeldAgentName, monitortypes.WithReconcileOption(monitorreconsile.OTeldAgent, params)),
-			monitortypes.NewReconcileTask(monitorreconsile.PrometheusName, monitortypes.WithReconcileOption(monitorreconsile.Prometheus, params)),
-			monitortypes.NewReconcileTask(monitorreconsile.LokiName, monitortypes.WithReconcileOption(monitorreconsile.Loki, params)),
-			monitortypes.NewReconcileTask(monitorreconsile.GrafnaName, monitortypes.WithReconcileOption(monitorreconsile.Grafana, params)),
-			monitortypes.NewReconcileTask(monitorreconsile.VMAgentName, monitortypes.WithReconcileOption(monitorreconsile.VMAgent, params)),
-		},
+	// sub-controllers
+	reconcile.tasks = []monitortypes.ReconcileTask{
+		monitortypes.NewReconcileTask(monitorreconsile.OTeldName, monitortypes.WithReconcileOption(monitorreconsile.OTeld, params)),
+		monitortypes.NewReconcileTask(monitorreconsile.OteldSecretName, monitortypes.WithReconcileOption(monitorreconsile.Secret, params)),
+		monitortypes.NewReconcileTask(monitorreconsile.OteldConfigMapNamePattern, monitortypes.WithReconcileOption(monitorreconsile.ConfigMap, params)),
+		monitortypes.NewReconcileTask(monitorreconsile.OteldServiceNamePattern, monitortypes.WithReconcileOption(monitorreconsile.Service, params)),
+		monitortypes.NewReconcileTask(monitorreconsile.OTeldAPIServerName, monitortypes.WithReconcileOption(monitorreconsile.Deployment, params)),
+		monitortypes.NewReconcileTask(monitorreconsile.OTeldAgentName, monitortypes.WithReconcileOption(monitorreconsile.OTeldAgent, params)),
+		monitortypes.NewReconcileTask(monitorreconsile.PrometheusName, monitortypes.WithReconcileOption(monitorreconsile.Prometheus, params)),
+		monitortypes.NewReconcileTask(monitorreconsile.LokiName, monitortypes.WithReconcileOption(monitorreconsile.Loki, params)),
+		monitortypes.NewReconcileTask(monitorreconsile.GrafnaName, monitortypes.WithReconcileOption(monitorreconsile.Grafana, params)),
+		monitortypes.NewReconcileTask(monitorreconsile.VMAgentName, monitortypes.WithReconcileOption(monitorreconsile.VMAgent, params)),
 	}
 
 	return &reconcile

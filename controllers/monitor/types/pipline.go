@@ -27,8 +27,8 @@ type Receiver struct {
 }
 
 type Exporters struct {
-	Metricsexporter []v1alpha1.MetricsExporterSink
-	Logsexporter    []v1alpha1.LogsExporterSink
+	MetricsExporter []v1alpha1.MetricsExporterSink
+	LogsExporter    []v1alpha1.LogsExporterSink
 }
 
 type Pipline struct {
@@ -52,8 +52,9 @@ func NewPipline() Pipline {
 	}
 }
 
-func NewOteldInstance() *OteldInstance {
+func NewOteldInstance(oteld *v1alpha1.OTeld) *OteldInstance {
 	return &OteldInstance{
+		Oteld:          oteld,
 		MetricsPipline: []Pipline{},
 		LogsPipline:    []Pipline{},
 	}

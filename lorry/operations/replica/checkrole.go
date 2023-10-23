@@ -31,11 +31,11 @@ import (
 	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/lorry/dcs"
 	"github.com/apecloud/kubeblocks/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/lorry/operations"
 	"github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // AccessMode defines SVC access mode enums.

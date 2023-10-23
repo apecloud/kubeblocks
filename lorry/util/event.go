@@ -18,8 +18,8 @@ import (
 	ctlruntime "sigs.k8s.io/controller-runtime"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/scheme"
-	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/pkg/cli/scheme"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var logger = ctlruntime.Log.WithName("event")

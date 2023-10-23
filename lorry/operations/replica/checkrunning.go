@@ -26,14 +26,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/lorry/engines/register"
-	"github.com/apecloud/kubeblocks/lorry/operations"
-	"github.com/apecloud/kubeblocks/lorry/util"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
+
+	"github.com/apecloud/kubeblocks/lorry/engines/register"
+	"github.com/apecloud/kubeblocks/lorry/operations"
+	"github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // CheckRunning checks whether the binding service is in running status,

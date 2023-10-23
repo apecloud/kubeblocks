@@ -28,9 +28,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/apecloud/kubeblocks/internal/cli/exec"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	. "github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/cli/exec"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // OperationHTTPClient is a mock client for operation, mainly used to hide curl command details.

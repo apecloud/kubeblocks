@@ -29,7 +29,6 @@ import (
 	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/lorry/engines"
 	"github.com/apecloud/kubeblocks/lorry/engines/mongodb"
 	"github.com/apecloud/kubeblocks/lorry/engines/mysql"
@@ -37,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/lorry/engines/postgres/apecloudpostgres"
 	"github.com/apecloud/kubeblocks/lorry/engines/postgres/officalpostgres"
 	"github.com/apecloud/kubeblocks/lorry/engines/wesql"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type managerNewFunc func(engines.Properties) (engines.DBManager, error)

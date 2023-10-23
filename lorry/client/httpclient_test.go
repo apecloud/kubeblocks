@@ -33,10 +33,10 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	"github.com/apecloud/kubeblocks/lorry/dcs"
 	"github.com/apecloud/kubeblocks/lorry/engines/models"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
 var _ = Describe("Lorry HTTP Client", func() {

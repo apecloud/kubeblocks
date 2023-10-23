@@ -34,9 +34,9 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/lorry/httpserver"
 	. "github.com/apecloud/kubeblocks/lorry/util"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 const (

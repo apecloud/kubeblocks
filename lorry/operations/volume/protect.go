@@ -44,10 +44,10 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/lorry/operations"
 	"github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 const (

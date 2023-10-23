@@ -4,8 +4,7 @@ apiVersion: v2
 name: mariadb
 type: application
 version: 0.7.0-alpha.0
-description: MRIADB is a database that is compatible with MRIADB syntax and achieves high availability
-  through the utilization of the RAFT consensus protocol.
+description: MariaDB is an open-source relational database management system developed from a branch of MySQL. 
 dependencies:
   - name: kblib
     version: 0.1.0

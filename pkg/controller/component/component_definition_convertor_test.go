@@ -23,6 +23,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 )
 
-var _ = Describe("Test Convertor", func() {
+var _ = Describe("Test Component Definition Convertor", func() {
 	// TODO: add test cases
 })

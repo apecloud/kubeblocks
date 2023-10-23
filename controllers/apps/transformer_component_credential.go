@@ -43,12 +43,11 @@ var _ graph.Transformer = &ComponentCredentialTransformer{}
 
 func (t *ComponentCredentialTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	cctx, _ := ctx.(*ComponentTransformContext)
-	synthesizeComp := cctx.SynthesizeComponent
-
 	if model.IsObjectDeleting(cctx.ComponentOrig) {
 		return nil
 	}
 
+	synthesizeComp := cctx.SynthesizeComponent
 	graphCli, _ := cctx.Client.(model.GraphClient)
 	for _, credential := range synthesizeComp.ConnectionCredentials {
 		secret, err := t.buildConnCredential(ctx, synthesizeComp, credential)

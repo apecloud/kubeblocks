@@ -125,7 +125,7 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 			"$(KB_CLUSTER_COMP_NAME)", "$(KB_NAMESPACE)")},
 	}...)
 
-	if component.TLS {
+	if component.TLSConfig != nil && component.TLSConfig.Enable {
 		toInjectEnvs = append(toInjectEnvs, []corev1.EnvVar{
 			{Name: "KB_TLS_CERT_PATH", Value: MountPath},
 			{Name: "KB_TLS_CA_FILE", Value: CAName},

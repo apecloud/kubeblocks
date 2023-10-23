@@ -79,16 +79,20 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&ComponentLoadResourcesTransformer{},
 			// do spec & definition consistency validation
 			&ComponentValidationTransformer{},
-			// handle RBAC for component workloads
+			// TODO(component): handle RBAC for component workloads
 			&ComponentRBACTransformer{},
+			// handle the component PDB
+			&ComponentPDBTransformer{},
 			// handle the component services
 			&ComponentServiceTransformer{},
 			// handle the connection credentials
 			&ComponentCredentialTransformer{},
-			// handle the component PDB
-			&ComponentPDBTransformer{},
+			// TODO(component): handle restore before component transformer
+			&ComponentRestoreTransformer{},
 			// handle the component workload
 			&ComponentWorkloadTransformer{Client: r.Client},
+			// TODO(component): transform backupPolicyTemplate to backuppolicy.dataprotection.kubeblocks.io and backupschedule.dataprotection.kubeblocks.io
+			&ComponentBackupPolicyTransformer{},
 			// handle tls volume and cert
 			&ComponentTLSTransformer{},
 			// render the component configurations

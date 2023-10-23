@@ -24,12 +24,12 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-// ComponentRBACTransformer handles the component PDB
-type ComponentRBACTransformer struct{}
+// ComponentBackupPolicyTransformer handles the component PDB
+type ComponentBackupPolicyTransformer struct{}
 
-var _ graph.Transformer = &ComponentRBACTransformer{}
+var _ graph.Transformer = &ComponentBackupPolicyTransformer{}
 
-func (t *ComponentRBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *ComponentBackupPolicyTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	cctx, _ := ctx.(*ComponentTransformContext)
 	if model.IsObjectDeleting(cctx.ComponentOrig) {
 		return nil

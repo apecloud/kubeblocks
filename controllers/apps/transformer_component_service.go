@@ -43,12 +43,11 @@ var _ graph.Transformer = &ComponentServiceTransformer{}
 
 func (t *ComponentServiceTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	cctx, _ := ctx.(*ComponentTransformContext)
-	synthesizeComp := cctx.SynthesizeComponent
-
 	if model.IsObjectDeleting(cctx.ComponentOrig) {
 		return nil
 	}
 
+	synthesizeComp := cctx.SynthesizeComponent
 	graphCli, _ := cctx.Client.(model.GraphClient)
 	for _, service := range synthesizeComp.ComponentServices {
 		svc, err := t.buildService(synthesizeComp, &service)

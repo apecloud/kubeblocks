@@ -24,14 +24,14 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-// ComponentRBACTransformer handles the component PDB
-type ComponentRBACTransformer struct{}
+// ClusterServiceTransformer handles cluster services.
+type ClusterServiceTransformer struct{}
 
-var _ graph.Transformer = &ComponentRBACTransformer{}
+var _ graph.Transformer = &ClusterServiceTransformer{}
 
-func (t *ComponentRBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	cctx, _ := ctx.(*ComponentTransformContext)
-	if model.IsObjectDeleting(cctx.ComponentOrig) {
+func (t *ClusterServiceTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	cctx, _ := ctx.(*clusterTransformContext)
+	if model.IsObjectDeleting(cctx.OrigCluster) {
 		return nil
 	}
 	// TODO(component)

@@ -167,8 +167,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component, clust
 	compObjCopy.Spec.ServiceAccountName = compProto.Spec.ServiceAccountName
 	compObjCopy.Spec.Affinity = compProto.Spec.Affinity
 	compObjCopy.Spec.Tolerations = compProto.Spec.Tolerations
-	compObjCopy.Spec.TLS = compProto.Spec.TLS
-	compObjCopy.Spec.Issuer = compProto.Spec.Issuer
+	compObjCopy.Spec.TLSConfig = compProto.Spec.TLSConfig
 
 	return compObjCopy
 }

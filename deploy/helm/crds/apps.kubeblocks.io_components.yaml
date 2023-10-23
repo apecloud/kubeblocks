@@ -222,43 +222,6 @@ spec:
                   type: string
                 type: array
                 x-kubernetes-list-type: set
-              issuer:
-                description: Issuer defines Tls certs issuer
-                properties:
-                  name:
-                    default: KubeBlocks
-                    description: 'Name of issuer. Options supported: - KubeBlocks
-                      - Certificates signed by KubeBlocks Operator. - UserProvided
-                      - User provided own CA-signed certificates.'
-                    enum:
-                    - KubeBlocks
-                    - UserProvided
-                    type: string
-                  secretRef:
-                    description: secretRef. TLS certs Secret reference required when
-                      from is UserProvided
-                    properties:
-                      ca:
-                        description: CA cert key in Secret
-                        type: string
-                      cert:
-                        description: Cert key in Secret
-                        type: string
-                      key:
-                        description: Key of TLS private key in Secret
-                        type: string
-                      name:
-                        description: Name of the Secret
-                        type: string
-                    required:
-                    - ca
-                    - cert
-                    - key
-                    - name
-                    type: object
-                required:
-                - name
-                type: object
               monitor:
                 default: false
                 description: monitor is a switch to enable monitoring and is set as
@@ -388,9 +351,49 @@ spec:
                   - name
                   type: object
                 type: array
-              tls:
-                default: false
-                type: boolean
+              tlsConfig:
+                properties:
+                  enable:
+                    default: false
+                    type: boolean
+                  issuer:
+                    description: Issuer defines Tls certs issuer
+                    properties:
+                      name:
+                        default: KubeBlocks
+                        description: 'Name of issuer. Options supported: - KubeBlocks
+                          - Certificates signed by KubeBlocks Operator. - UserProvided
+                          - User provided own CA-signed certificates.'
+                        enum:
+                        - KubeBlocks
+                        - UserProvided
+                        type: string
+                      secretRef:
+                        description: secretRef. TLS certs Secret reference required
+                          when from is UserProvided
+                        properties:
+                          ca:
+                            description: CA cert key in Secret
+                            type: string
+                          cert:
+                            description: Cert key in Secret
+                            type: string
+                          key:
+                            description: Key of TLS private key in Secret
+                            type: string
+                          name:
+                            description: Name of the Secret
+                            type: string
+                        required:
+                        - ca
+                        - cert
+                        - key
+                        - name
+                        type: object
+                    required:
+                    - name
+                    type: object
+                type: object
               tolerations:
                 items:
                   description: The pod this Toleration is attached to tolerates any

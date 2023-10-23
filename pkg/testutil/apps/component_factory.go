@@ -80,13 +80,13 @@ func (factory *MockComponentFactory) SetMonitor(monitor bool) *MockComponentFact
 	return factory
 }
 
-func (factory *MockComponentFactory) SetTLS(tls bool) *MockComponentFactory {
-	factory.Get().Spec.TLS = tls
-	return factory
-}
-
-func (factory *MockComponentFactory) SetIssuer(issuer *appsv1alpha1.Issuer) *MockComponentFactory {
-	factory.Get().Spec.Issuer = issuer
+func (factory *MockComponentFactory) SetTLSConfig(enable bool, issuer *appsv1alpha1.Issuer) *MockComponentFactory {
+	if enable {
+		factory.Get().Spec.TLSConfig = &appsv1alpha1.TLSConfig{
+			Enable: enable,
+			Issuer: issuer,
+		}
+	}
 	return factory
 }
 

@@ -542,6 +542,15 @@ type Affinity struct {
 	Tenancy TenancyType `json:"tenancy,omitempty"`
 }
 
+type TLSConfig struct {
+	// +kubebuilder:default=false
+	// +optional
+	Enable bool `json:"enable,omitempty"`
+
+	// +optional
+	Issuer *Issuer `json:"issuer,omitempty"`
+}
+
 // Issuer defines Tls certs issuer
 type Issuer struct {
 	// Name of issuer.

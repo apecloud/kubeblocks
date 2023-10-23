@@ -48,8 +48,7 @@ type SynthesizedComponent struct {
 	LogConfigs           []v1alpha1.LogConfig                   `json:"logConfigs,omitempty"`
 	ConfigTemplates      []v1alpha1.ComponentConfigSpec         `json:"configTemplates,omitempty"`
 	ScriptTemplates      []v1alpha1.ComponentTemplateSpec       `json:"scriptTemplates,omitempty"`
-	TLS                  bool                                   `json:"tls"`
-	Issuer               *v1alpha1.Issuer                       `json:"issuer,omitempty"`
+	TLSConfig            *v1alpha1.TLSConfig                    `json:"TLSConfig,omitempty"`
 	ServiceAccountName   string                                 `json:"serviceAccountName,omitempty"`
 	ComponentRefEnvs     []*corev1.EnvVar                       `json:"componentRefEnvs,omitempty"`
 	ServiceReferences    map[string]*v1alpha1.ServiceDescriptor `json:"serviceReferences,omitempty"`

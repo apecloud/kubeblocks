@@ -101,12 +101,8 @@ type ComponentSpec struct {
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
-	// +kubebuilder:default=false
 	// +optional
-	TLS bool `json:"tls,omitempty"`
-
-	// +optional
-	Issuer *Issuer `json:"issuer,omitempty"`
+	TLSConfig *TLSConfig `json:"tlsConfig,omitempty"`
 }
 
 // ComponentStatus defines the observed state of Component

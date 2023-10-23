@@ -126,8 +126,7 @@ func buildProtoCompFromCompDef(reqCtx ictrlutil.RequestCtx,
 		SetEnabledLogs(clusterCompSpec.EnabledLogs).
 		SetServiceRefs(clusterCompSpec.ServiceRefs).
 		SetClassRef(clusterCompSpec.ClassDefRef).
-		SetIssuer(clusterCompSpec.Issuer).
-		SetTLS(clusterCompSpec.TLS).
+		SetTLSConfig(clusterCompSpec.TLS, clusterCompSpec.Issuer).
 		GetObject()
 
 	return comp, nil

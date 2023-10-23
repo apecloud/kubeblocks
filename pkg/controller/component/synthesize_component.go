@@ -107,8 +107,7 @@ func buildSynthesizeComponent(reqCtx intctrlutil.RequestCtx,
 		RoleArbitrator:        compDefObj.Spec.RoleArbitrator,
 		Replicas:              comp.Spec.Replicas,
 		EnabledLogs:           comp.Spec.EnabledLogs,
-		TLS:                   comp.Spec.TLS,
-		Issuer:                comp.Spec.Issuer,
+		TLSConfig:             comp.Spec.TLSConfig,
 		ServiceAccountName:    comp.Spec.ServiceAccountName,
 	}
 

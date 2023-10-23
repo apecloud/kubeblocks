@@ -86,13 +86,13 @@ func (builder *ComponentBuilder) SetMonitor(monitor bool) *ComponentBuilder {
 	return builder
 }
 
-func (builder *ComponentBuilder) SetTLS(tls bool) *ComponentBuilder {
-	builder.get().Spec.TLS = tls
-	return builder
-}
-
-func (builder *ComponentBuilder) SetIssuer(issuer *appsv1alpha1.Issuer) *ComponentBuilder {
-	builder.get().Spec.Issuer = issuer
+func (builder *ComponentBuilder) SetTLSConfig(enable bool, issuer *appsv1alpha1.Issuer) *ComponentBuilder {
+	if enable {
+		builder.get().Spec.TLSConfig = &appsv1alpha1.TLSConfig{
+			Enable: enable,
+			Issuer: issuer,
+		}
+	}
 	return builder
 }
 

@@ -56,17 +56,19 @@ func (t *ComponentTLSTransformer) Transform(ctx graph.TransformContext, dag *gra
 	return nil
 }
 
-func buildTLSCert(ctx context.Context, cli roclient.ReadonlyClient, cluster *appsv1alpha1.Cluster, synthesizeComp component.SynthesizedComponent, dag *graph.DAG) error {
-	if !synthesizeComp.TLS {
+func buildTLSCert(ctx context.Context, cli roclient.ReadonlyClient, cluster *appsv1alpha1.Cluster,
+	synthesizeComp component.SynthesizedComponent, dag *graph.DAG) error {
+	tls := synthesizeComp.TLSConfig
+	if tls == nil || !tls.Enable {
 		return nil
 	}
-	if synthesizeComp.Issuer == nil {
+	if tls.Issuer == nil {
 		return fmt.Errorf("issuer shouldn't be nil when tls enabled")
 	}
 
-	switch synthesizeComp.Issuer.Name {
+	switch tls.Issuer.Name {
 	case appsv1alpha1.IssuerUserProvided:
-		if err := plan.CheckTLSSecretRef(ctx, cli, cluster.Namespace, synthesizeComp.Issuer.SecretRef); err != nil {
+		if err := plan.CheckTLSSecretRef(ctx, cli, cluster.Namespace, tls.Issuer.SecretRef); err != nil {
 			return err
 		}
 	case appsv1alpha1.IssuerKubeBlocks:
@@ -82,7 +84,8 @@ func buildTLSCert(ctx context.Context, cli roclient.ReadonlyClient, cluster *app
 }
 
 func updateTLSVolumeAndVolumeMount(podSpec *corev1.PodSpec, clusterName string, synthesizeComp component.SynthesizedComponent) error {
-	if !synthesizeComp.TLS {
+	tls := synthesizeComp.TLSConfig
+	if tls == nil || !tls.Enable {
 		return nil
 	}
 
@@ -107,28 +110,29 @@ func updateTLSVolumeAndVolumeMount(podSpec *corev1.PodSpec, clusterName string, 
 }
 
 func composeTLSVolume(clusterName string, synthesizeComp component.SynthesizedComponent) (*corev1.Volume, error) {
-	if !synthesizeComp.TLS {
+	tls := synthesizeComp.TLSConfig
+	if tls == nil || !tls.Enable {
 		return nil, fmt.Errorf("can't compose TLS volume when TLS not enabled")
 	}
-	if synthesizeComp.Issuer == nil {
+	if tls.Issuer == nil {
 		return nil, fmt.Errorf("issuer shouldn't be nil when TLS enabled")
 	}
-	if synthesizeComp.Issuer.Name == appsv1alpha1.IssuerUserProvided && synthesizeComp.Issuer.SecretRef == nil {
+	if tls.Issuer.Name == appsv1alpha1.IssuerUserProvided && tls.Issuer.SecretRef == nil {
 		return nil, fmt.Errorf("secret ref shouldn't be nil when issuer is UserProvided")
 	}
 
 	var secretName, ca, cert, key string
-	switch synthesizeComp.Issuer.Name {
+	switch tls.Issuer.Name {
 	case appsv1alpha1.IssuerKubeBlocks:
 		secretName = plan.GenerateTLSSecretName(clusterName, synthesizeComp.Name)
 		ca = factory.CAName
 		cert = factory.CertName
 		key = factory.KeyName
 	case appsv1alpha1.IssuerUserProvided:
-		secretName = synthesizeComp.Issuer.SecretRef.Name
-		ca = synthesizeComp.Issuer.SecretRef.CA
-		cert = synthesizeComp.Issuer.SecretRef.Cert
-		key = synthesizeComp.Issuer.SecretRef.Key
+		secretName = tls.Issuer.SecretRef.Name
+		ca = tls.Issuer.SecretRef.CA
+		cert = tls.Issuer.SecretRef.Cert
+		key = tls.Issuer.SecretRef.Key
 	}
 	volume := corev1.Volume{
 		Name: factory.VolumeName,

@@ -77,12 +77,12 @@ jobs:
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
 
-      - name: make test ${{ matrix.ops }}
+      - name: make ${{ matrix.ops }}
         if: ${{ ! contains(matrix.ops, '/') }}
         run: |
           make ${{ matrix.ops }}
 
-      - name: make ${{ matrix.ops }}
+      - name: make test ${{ matrix.ops }}
         if: ${{ contains(matrix.ops, '/') }}
         run: |
           make test TEST_PACKAGES=./${{ matrix.ops }}/...

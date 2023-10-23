@@ -533,13 +533,14 @@ func (c *serviceRefDeclarationConvertor) convert(args ...any) (any, error) {
 	return clusterCompDef.ServiceRefDeclarations, nil
 }
 
-func parseComponentConvertorArgs(args ...any) (*appsv1alpha1.ClusterComponentDefinition,
-	*appsv1alpha1.ClusterComponentVersion, *appsv1alpha1.ClusterComponentSpec) {
-	def := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	ver := args[1].(*appsv1alpha1.ClusterComponentVersion)
-	spec := args[2].(*appsv1alpha1.ClusterComponentSpec)
-	return def, ver, spec
-}
+// TODO(component)
+// func parseComponentConvertorArgs(args ...any) (*appsv1alpha1.ClusterComponentDefinition,
+//	*appsv1alpha1.ClusterComponentVersion, *appsv1alpha1.ClusterComponentSpec) {
+//	def := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+//	ver := args[1].(*appsv1alpha1.ClusterComponentVersion)
+//	spec := args[2].(*appsv1alpha1.ClusterComponentSpec)
+//	return def, ver, spec
+// }
 
 type clusterConvertor struct{}
 

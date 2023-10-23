@@ -17,9 +17,17 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package component
+package apps
 
-// TODO(component)
-// func ignoreResourceConstraint(cluster *appsv1alpha1.Cluster) bool {
-//	return strings.ToLower(cluster.GetAnnotations()[constant.IgnoreResourceConstraint]) == "true"
-// }
+import (
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+)
+
+// ComponentRBACTransformer handles the component PDB
+type ComponentRBACTransformer struct{}
+
+var _ graph.Transformer = &ComponentRBACTransformer{}
+
+func (t *ComponentRBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	return nil
+}

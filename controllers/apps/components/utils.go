@@ -107,17 +107,6 @@ func mergeAnnotations(originalAnnotations map[string]string, targetAnnotations *
 	}
 }
 
-// buildWorkLoadAnnotations builds the annotations for Deployment/StatefulSet
-func buildWorkLoadAnnotations(obj client.Object, cluster *appsv1alpha1.Cluster) {
-	workloadAnnotations := obj.GetAnnotations()
-	if workloadAnnotations == nil {
-		workloadAnnotations = map[string]string{}
-	}
-	// record the cluster generation to check if the sts is latest
-	workloadAnnotations[constant.KubeBlocksGenerationKey] = strconv.FormatInt(cluster.Generation, 10)
-	obj.SetAnnotations(workloadAnnotations)
-}
-
 // GetClusterByObject gets cluster by related k8s workloads.
 func GetClusterByObject(ctx context.Context,
 	cli client.Client,

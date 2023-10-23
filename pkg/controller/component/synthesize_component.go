@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/class"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
@@ -236,7 +235,6 @@ func buildServiceAccountName(synthesizeComp *SynthesizedComponent) {
 
 // buildLifecycleActions builds lifecycleActions for component.
 func buildLifecycleActions(synthesizeComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) {
-	return
 }
 
 // buildBackwardCompatibleFields builds backward compatible fields for component which referenced a clusterComponentDefinition and clusterComponentVersion before KubeBlocks Version 0.7.0
@@ -266,9 +264,7 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx, cli roclient.R
 		return fmt.Errorf("referenced component definition does not exist, cluster: %s, component: %s, component definition ref:%s",
 			cluster.Name, clusterCompSpec.Name, clusterCompSpec.ComponentDefRef)
 	}
-	if cv != nil {
-		clusterCompVer = cv.Spec.GetDefNameMappingComponents()[clusterCompSpec.ComponentDefRef]
-	}
+	clusterCompVer = cv.Spec.GetDefNameMappingComponents()[clusterCompSpec.ComponentDefRef]
 
 	buildWorkload := func() {
 		synthesizeComp.WorkloadType = clusterCompDef.WorkloadType
@@ -644,34 +640,35 @@ func overrideSwitchoverSpecAttr(switchoverSpec *appsv1alpha1.SwitchoverSpec, cvS
 	}
 }
 
-func updateResources(cluster *appsv1alpha1.Cluster, component *SynthesizedComponent, clusterCompSpec appsv1alpha1.ClusterComponentSpec, clsMgr *class.Manager) error {
-	if ignoreResourceConstraint(cluster) {
-		return nil
-	}
-
-	if clsMgr == nil {
-		return nil
-	}
-
-	expectResources, err := clsMgr.GetResources(cluster.Spec.ClusterDefRef, &clusterCompSpec)
-	if err != nil || expectResources == nil {
-		return err
-	}
-
-	actualResources := component.PodSpec.Containers[0].Resources
-	if actualResources.Requests == nil {
-		actualResources.Requests = corev1.ResourceList{}
-	}
-	if actualResources.Limits == nil {
-		actualResources.Limits = corev1.ResourceList{}
-	}
-	for k, v := range expectResources {
-		actualResources.Requests[k] = v
-		actualResources.Limits[k] = v
-	}
-	component.PodSpec.Containers[0].Resources = actualResources
-	return nil
-}
+// TODO(component)
+// func updateResources(cluster *appsv1alpha1.Cluster, component *SynthesizedComponent, clusterCompSpec appsv1alpha1.ClusterComponentSpec, clsMgr *class.Manager) error {
+//	if ignoreResourceConstraint(cluster) {
+//		return nil
+//	}
+//
+//	if clsMgr == nil {
+//		return nil
+//	}
+//
+//	expectResources, err := clsMgr.GetResources(cluster.Spec.ClusterDefRef, &clusterCompSpec)
+//	if err != nil || expectResources == nil {
+//		return err
+//	}
+//
+//	actualResources := component.PodSpec.Containers[0].Resources
+//	if actualResources.Requests == nil {
+//		actualResources.Requests = corev1.ResourceList{}
+//	}
+//	if actualResources.Limits == nil {
+//		actualResources.Limits = corev1.ResourceList{}
+//	}
+//	for k, v := range expectResources {
+//		actualResources.Requests[k] = v
+//		actualResources.Limits[k] = v
+//	}
+//	component.PodSpec.Containers[0].Resources = actualResources
+//	return nil
+// }
 
 func getCloudProvider() CloudProvider {
 	k8sVersion := viper.GetString(constant.CfgKeyServerInfo)

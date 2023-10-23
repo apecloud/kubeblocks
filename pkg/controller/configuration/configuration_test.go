@@ -95,7 +95,7 @@ func newAllFieldsClusterObj(
 }
 
 func newAllFieldsComponent(clusterDef *appsv1alpha1.ClusterDefinition, clusterVersion *appsv1alpha1.ClusterVersion) *component.SynthesizedComponent {
-	cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(clusterDef, clusterVersion, false)
+	cluster, _, _, _ := newAllFieldsClusterObj(clusterDef, clusterVersion, false)
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx: testCtx.Ctx,
 		Log: logger,

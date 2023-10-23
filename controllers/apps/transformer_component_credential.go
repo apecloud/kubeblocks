@@ -132,7 +132,7 @@ func (t *ComponentCredentialTransformer) buildEndpoint(synthesizeComp *component
 		return fmt.Errorf("connection credential references a service not definied, credential: %s, service: %s",
 			credential.Name, credential.ServiceName)
 	}
-	if len(service.Ports) <= 0 {
+	if len(service.Ports) == 0 {
 		return fmt.Errorf("connection credential references a service which doesn't define any ports, credential: %s, service: %s",
 			credential.Name, credential.ServiceName)
 	}

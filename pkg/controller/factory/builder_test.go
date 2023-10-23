@@ -142,7 +142,7 @@ var _ = Describe("builder", func() {
 		return reqCtx
 	}
 	newAllFieldsComponent := func(clusterDef *appsv1alpha1.ClusterDefinition, clusterVersion *appsv1alpha1.ClusterVersion) *component.SynthesizedComponent {
-		cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(clusterDef, clusterVersion, false)
+		cluster, _, _, _ := newAllFieldsClusterObj(clusterDef, clusterVersion, false)
 		reqCtx := newReqCtx()
 		By("assign every available fields")
 		// TODO(xingran): check it BuildComponent can be replaced by BuildSynthesizedComponentWrapper

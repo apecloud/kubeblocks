@@ -25,25 +25,25 @@ type BuiltInEnvVar string
 type BuiltInString string
 
 const (
-	// KB_NAMESPACE references the namespace where the component is running.
-	KB_NAMESPACE BuiltInEnvVar = "$(KB_NAMESPACE)"
+	// KBNamespace references the namespace where the component is running.
+	KBNamespace BuiltInEnvVar = "$(KB_NAMESPACE)"
 
-	// KB_CLUSTER_NAME references the name of the cluster.
-	KB_CLUSTER_NAME BuiltInEnvVar = "$(KB_CLUSTER_NAME)"
+	// KBClusterName references the name of the cluster.
+	KBClusterName BuiltInEnvVar = "$(KB_CLUSTER_NAME)"
 
-	// KB_COMPONENT_NAME references the name of the component.
-	KB_COMPONENT_NAME BuiltInEnvVar = "$(KB_COMPONENT_NAME)"
+	// KBComponentName references the name of the component.
+	KBComponentName BuiltInEnvVar = "$(KB_COMPONENT_NAME)"
 
-	KB_HOST_NAME BuiltInEnvVar = "$(KB_HOST_NAME)"
-	KB_HOST_IP   BuiltInEnvVar = "$(KB_HOST_IP)"
-	KB_HOST_FQDN BuiltInEnvVar = "$(KB_HOST_FQDN)"
-	KB_POD_NAME  BuiltInEnvVar = "$(KB_POD_NAME)"
-	KB_POD_IP    BuiltInEnvVar = "$(KB_POD_IP)"
-	KB_POD_FQDN  BuiltInEnvVar = "$(KB_POD_FQDN)"
+	KBHostName BuiltInEnvVar = "$(KB_HOST_NAME)"
+	KBHostIP   BuiltInEnvVar = "$(KB_HOST_IP)"
+	KBHostFQDN BuiltInEnvVar = "$(KB_HOST_FQDN)"
+	KBPodName  BuiltInEnvVar = "$(KB_POD_NAME)"
+	KBPodIP    BuiltInEnvVar = "$(KB_POD_IP)"
+	KBPodFQDN  BuiltInEnvVar = "$(KB_POD_FQDN)"
 
-	// KB_COMPONENT_REPLICAS references the number of replicas for the component.
-	KB_COMPONENT_REPLICAS BuiltInEnvVar = "$(KB_COMPONENT_REPLICAS)"
+	// KBComponentReplicas references the number of replicas for the component.
+	KBComponentReplicas BuiltInEnvVar = "$(KB_COMPONENT_REPLICAS)"
 
-	// KB_REPLICA_ROLE references the role of the replica (e.g., leader, follower).
-	KB_REPLICA_ROLE BuiltInEnvVar = "$(KB_REPLICA_ROLE)"
+	// KBReplicaRole references the role of the replica (e.g., leader, follower).
+	KBReplicaRole BuiltInEnvVar = "$(KB_REPLICA_ROLE)"
 )

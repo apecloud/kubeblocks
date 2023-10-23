@@ -27,8 +27,8 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// OTeldCollectorTemplateSpec defines the desired state of CollectorDataSource
-type OTeldCollectorTemplateSpec struct {
+// OTeldSpec defines the desired state of CollectorDataSource
+type OTeldSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
@@ -105,8 +105,8 @@ type OTeldCollectorTemplateSpec struct {
 	PodSecurityContext corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
 }
 
-// OTeldCollectorTemplateStatus defines the observed state of CollectorDataSource
-type OTeldCollectorTemplateStatus struct {
+// OTeldStatus defines the observed state of CollectorDataSource
+type OTeldStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
@@ -114,24 +114,24 @@ type OTeldCollectorTemplateStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// OTeldCollectorTemplate is the Schema for the collectordatasources API
-type OTeldCollectorTemplate struct {
+// OTeld is the Schema for the collectordatasources API
+type OTeld struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   OTeldCollectorTemplateSpec   `json:"spec,omitempty"`
-	Status OTeldCollectorTemplateStatus `json:"status,omitempty"`
+	Spec   OTeldSpec   `json:"spec,omitempty"`
+	Status OTeldStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// OTeldCollectorTemplateList contains a list of CollectorDataSource
-type OTeldCollectorTemplateList struct {
+// OTeldList contains a list of CollectorDataSource
+type OTeldList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []OTeldCollectorTemplate `json:"items"`
+	Items           []OTeld `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&OTeldCollectorTemplate{}, &OTeldCollectorTemplateList{})
+	SchemeBuilder.Register(&OTeld{}, &OTeldList{})
 }

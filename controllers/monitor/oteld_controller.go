@@ -139,7 +139,7 @@ func New(params monitortypes.OTeldParams, config *monitortypes.Config) *OTeldRec
 // SetupWithManager sets up the controller with the Manager.
 func (r *OTeldReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&monitorv1alpha1.OTeldCollectorTemplate{}).
+		For(&monitorv1alpha1.OTeld{}).
 		Owns(&monitorv1alpha1.LogsExporterSink{}).
 		Owns(&monitorv1alpha1.MetricsExporterSink{}).
 		Owns(&monitorv1alpha1.CollectorDataSource{}).

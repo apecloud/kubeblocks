@@ -42,7 +42,7 @@ var (
 	defaultMetricsPort = 8888
 )
 
-func buildPodSpecForOteld(config *types.Config, template *v1alpha1.OTeldCollectorTemplate) *corev1.PodSpec {
+func buildPodSpecForOteld(config *types.Config, template *v1alpha1.OTeld) *corev1.PodSpec {
 	container := corev1.Container{
 		Name:            OTeldName,
 		Image:           template.Spec.Image,

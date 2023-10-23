@@ -5,21 +5,20 @@ metadata:
     controller-gen.kubebuilder.io/version: v0.12.1
   labels:
     app.kubernetes.io/name: kubeblocks
-  name: oteldcollectortemplates.monitor.kubeblocks.io
+  name: otelds.monitor.kubeblocks.io
 spec:
   group: monitor.kubeblocks.io
   names:
-    kind: OTeldCollectorTemplate
-    listKind: OTeldCollectorTemplateList
-    plural: oteldcollectortemplates
-    singular: oteldcollectortemplate
+    kind: OTeld
+    listKind: OTeldList
+    plural: otelds
+    singular: oteld
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: CollectorDataSource is the Schema for the collectordatasources
-          API
+        description: OTeld is the Schema for the collectordatasources API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -34,7 +33,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: CollectorDataSourceSpec defines the desired state of CollectorDataSource
+            description: OTeldSpec defines the desired state of CollectorDataSource
             properties:
               env:
                 description: ENV vars to set on the OpenTelemetry Collector's Pods.
@@ -2253,7 +2252,7 @@ spec:
             - useConfigMap
             type: object
           status:
-            description: CollectorDataSourceStatus defines the observed state of CollectorDataSource
+            description: OTeldStatus defines the observed state of CollectorDataSource
             type: object
         type: object
     served: true

@@ -78,8 +78,8 @@ func fakeInstance() *OteldInstance {
 				},
 			},
 		},
-		OteldTemplate: &v1alpha1.OTeldCollectorTemplate{
-			Spec: v1alpha1.OTeldCollectorTemplateSpec{
+		OteldTemplate: &v1alpha1.OTeld{
+			Spec: v1alpha1.OTeldSpec{
 				Mode: v1alpha1.ModeDaemonSet,
 			},
 		},

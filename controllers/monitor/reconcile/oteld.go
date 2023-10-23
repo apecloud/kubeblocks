@@ -55,7 +55,7 @@ func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) erro
 		return err
 	}
 
-	oteldTemplates := &v1alpha1.OTeldCollectorTemplateList{}
+	oteldTemplates := &v1alpha1.OTeldList{}
 	if err := k8sClient.List(ctx, oteldTemplates); err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) erro
 	return err
 }
 
-func buildOteldInstance(datasources *v1alpha1.CollectorDataSourceList, templates *v1alpha1.OTeldCollectorTemplateList) (map[v1alpha1.Mode]*monitortype.OteldInstance, error) {
+func buildOteldInstance(datasources *v1alpha1.CollectorDataSourceList, templates *v1alpha1.OTeldList) (map[v1alpha1.Mode]*monitortype.OteldInstance, error) {
 	instanceMap, err := BuildInstanceMapForPipline(datasources)
 	if err != nil {
 		return nil, err

@@ -337,8 +337,9 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		vcts = append(vcts, vctToPVC(vct))
 	}
 	rsmBuilder.SetVolumeClaimTemplates(vcts...)
-
-	rsmBuilder.SetDebugMode(component.RSMSpec.DebugMode)
+	if component.RSMSpec != nil {
+		rsmBuilder.SetDebugMode(component.RSMSpec.DebugMode)
+	}
 	if component.StatefulSetWorkload != nil {
 		podManagementPolicy, updateStrategy := component.StatefulSetWorkload.FinalStsUpdateStrategy()
 		rsmBuilder.SetPodManagementPolicy(podManagementPolicy).SetUpdateStrategy(updateStrategy)

@@ -83,10 +83,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		return err
 	}
 	if *rsm.Spec.DebugMode {
-		oldSnapshot, err = model.AddDebugPodSnapshot(oldSnapshot, ctx)
-		if err != nil {
-			return err
-		}
+		oldSnapshot = model.AddDebugPodSnapshot(oldSnapshot, ctx)
 	}
 	// compute create/update/delete set
 

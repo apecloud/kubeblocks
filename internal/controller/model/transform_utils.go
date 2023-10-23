@@ -192,21 +192,21 @@ func ReadCacheSnapshot(transCtx graph.TransformContext, root client.Object, ml c
 	return snapshot, nil
 }
 
-func AddDebugPodSnapshot(snapshot ObjectSnapshot, ctx graph.TransformContext) (ObjectSnapshot, error) {
+func AddDebugPodSnapshot(snapshot ObjectSnapshot, ctx graph.TransformContext) ObjectSnapshot {
 	var a corev1.Pod
 	err := ctx.GetClient().Get(ctx.GetContext(), client.ObjectKey{Name: "debug.pod", Namespace: "default"}, &a) //nolint:errcheck
 	if err != nil {
-		return nil, err
+		return nil
 	}
 	if &a == nil {
-		return snapshot, nil
+		return snapshot
 	}
 	name, err := GetGVKName(&a)
 	if err != nil {
-		return nil, err
+		return nil
 	}
 	snapshot[*name] = &a
-	return snapshot, nil
+	return snapshot
 }
 
 func DefaultLess(v1, v2 graph.Vertex) bool {

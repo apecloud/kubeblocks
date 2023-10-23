@@ -153,11 +153,6 @@ func (t *ComponentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.R
 	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, rsm *workloads.ReplicatedStateMachine) error {
 	cwo := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, obj, rsm, dag)
 
-	// handle rsm workload restart
-	if err := cwo.restart(); err != nil {
-		return err
-	}
-
 	// handle rsm expand volume
 	if err := cwo.expandVolume(); err != nil {
 		return err
@@ -293,11 +288,6 @@ func copyAndMerge(oldObj, newObj client.Object, cluster *appsv1alpha1.Cluster) c
 	default:
 		return newObj
 	}
-}
-
-// restart handles rsm workload restart by patch pod template annotation
-func (r *componentWorkloadOps) restart() error {
-	return components.RestartPod(&r.runningRSM.Spec.Template)
 }
 
 // expandVolume handles rsm workload expand volume

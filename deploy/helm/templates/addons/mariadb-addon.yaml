@@ -4,7 +4,7 @@ metadata:
   name: mariadb
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
-    "kubeblocks.io/provider": ApeCloud
+    "kubeblocks.io/provider": community
   {{- if .Values.keepAddons }}
   annotations:
     helm.sh/resource-policy: keep

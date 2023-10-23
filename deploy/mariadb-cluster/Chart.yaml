@@ -4,7 +4,7 @@ apiVersion: v2
 name: mariadb
 type: application
 version: 0.7.0-alpha.0
-description: ApeCloud MRIADB is a database that is compatible with MRIADB syntax and achieves high availability
+description: MRIADB is a database that is compatible with MRIADB syntax and achieves high availability
   through the utilization of the RAFT consensus protocol.
 dependencies:
   - name: kblib
@@ -12,8 +12,8 @@ dependencies:
     repository: file://../kblib
     alias: extra
 
-# This is the version number of the ApeCloud Mariadb being deployed,
-# rather than the version number of ApeCloud Mariadb-Scale itself.
+# This is the version number of the  Mariadb being deployed,
+# rather than the version number of  Mariadb-Scale itself.
 # From a user's perspective, the version  number of the frontend
 # proxy of the Mariadb being used is not relevant.
 appVersion: "10.6.15"
@@ -29,7 +29,7 @@ home: https://github.com/apecloud/kubeblocks/tree/main/deploy/mariadb-cluster
 icon: https://kubeblocks.io/img/logo.png
 
 maintainers:
-  - name: ApeCloud
+  - name: yinmin2020
     url: https://kubeblocks.io/
 
 sources:

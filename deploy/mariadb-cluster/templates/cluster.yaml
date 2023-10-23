@@ -9,10 +9,6 @@ spec:
   {{- include "kblib.affinity" . | indent 2 }}
   clusterDefinitionRef: mariadb # ref clusterdefinition.name
   componentSpecs:
-    - name: mariadb
-      replicas: 1
-      componentDefRef: mariadb-compdef # ref clusterdefinition componentDefs.name
-      {{- include "kblib.componentMonitor" . | indent 6 }}
       serviceAccountName: {{ include "kblib.serviceAccountName" . }}
       {{- include "kblib.componentResources" . | indent 6 }}
       {{- include "kblib.componentResources" . | indent 6 }}

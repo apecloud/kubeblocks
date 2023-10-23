@@ -1,12 +1,12 @@
-# Default values for apecloud-mysql-cluster.
+# Default values for mariadb-cluster
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-## @param version MySQL cluster version
+## @param version MARIADB cluster version
 ##
 version: mariadb
 
-## @param mode MySQL cluster topology mode, standalone, raftGroup
+## @param mode MARIADB cluster topology mode, standalone, raftGroup
 ##
 mode: standalone
 
@@ -33,11 +33,6 @@ requests:
 ##
 storage: 20
 
-## @param proxyEnabled if true, enable the proxy
-## if mode is standalone, proxyEnabled is always false
-## if mode is raftGroup, proxyEnabled can be true or false
-##
-proxyEnabled: false
 
 ## customized default values to override kblib chart's values
 extra:

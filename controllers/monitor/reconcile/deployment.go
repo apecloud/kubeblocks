@@ -78,7 +78,7 @@ func Deployment(reqCtx monitortypes.ReconcileCtx, params monitortypes.OTeldParam
 }
 
 func buildDeploymentForOteld(config *monitortypes.Config, instance *monitortypes.OteldInstance, namespace, name string) *appsv1.Deployment {
-	if instance == nil || instance.OteldTemplate == nil {
+	if instance == nil || instance.Oteld == nil {
 		return nil
 	}
 
@@ -93,7 +93,7 @@ func buildDeploymentForOteld(config *monitortypes.Config, instance *monitortypes
 		MatchLabels: commonLabels,
 	}
 
-	template := instance.OteldTemplate
+	template := instance.Oteld
 	podSpec := buildPodSpecForOteld(config, template)
 
 	podBuilder := builder.NewPodBuilder("", "").

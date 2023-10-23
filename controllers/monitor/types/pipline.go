@@ -41,7 +41,7 @@ type Pipline struct {
 type OteldInstance struct {
 	MetricsPipline []Pipline
 	LogsPipline    []Pipline
-	OteldTemplate  *v1alpha1.OTeld
+	Oteld          *v1alpha1.OTeld
 }
 
 func NewPipline() Pipline {

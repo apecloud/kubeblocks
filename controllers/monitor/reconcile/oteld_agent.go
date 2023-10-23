@@ -71,7 +71,7 @@ func OTeldAgent(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 }
 
 func buildDaemonsetForOteld(config *types.Config, instance *types.OteldInstance, namespace string, name string) *appsv1.DaemonSet {
-	if instance == nil || instance.OteldTemplate == nil {
+	if instance == nil || instance.Oteld == nil {
 		return nil
 	}
 
@@ -86,7 +86,7 @@ func buildDaemonsetForOteld(config *types.Config, instance *types.OteldInstance,
 		MatchLabels: commonLabels,
 	}
 
-	template := instance.OteldTemplate
+	template := instance.Oteld
 	podSpec := buildPodSpecForOteld(config, template)
 
 	podBuilder := builder.NewPodBuilder("", "").

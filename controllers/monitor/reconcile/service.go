@@ -35,7 +35,7 @@ func Service(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 	desired := make([]*corev1.Service, 0)
 
 	if daemon := reqCtx.GetOteldInstance(monitorv1alpha1.ModeDaemonSet); daemon != nil {
-		svc, err := buildSvcForOtel(reqCtx.Config, daemon, reqCtx.Namespace)
+		svc, err := buildSvcForOtel(reqCtx.Config, daemon.Oteld, reqCtx.Namespace)
 		if err != nil {
 			return err
 		}
@@ -44,7 +44,7 @@ func Service(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 		}
 	}
 	if deploy := reqCtx.GetOteldInstance(monitorv1alpha1.ModeDeployment); deploy != nil {
-		svc, _ := buildSvcForOtel(reqCtx.Config, deploy, reqCtx.Namespace)
+		svc, _ := buildSvcForOtel(reqCtx.Config, deploy.Oteld, reqCtx.Namespace)
 		if svc != nil {
 			desired = append(desired, svc)
 		}

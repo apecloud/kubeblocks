@@ -78,7 +78,7 @@ func fakeInstance() *OteldInstance {
 				},
 			},
 		},
-		OteldTemplate: &v1alpha1.OTeld{
+		Oteld: &v1alpha1.OTeld{
 			Spec: v1alpha1.OTeldSpec{
 				Mode: v1alpha1.ModeDaemonSet,
 			},
@@ -86,23 +86,23 @@ func fakeInstance() *OteldInstance {
 	}
 }
 
-func fakeCollectorDataSourceList() v1alpha1.CollectorDataSourceList {
-	return v1alpha1.CollectorDataSourceList{
-		Items: []v1alpha1.CollectorDataSource{
-			{
-				Spec: v1alpha1.CollectorDataSourceSpec{
-					Type:        v1alpha1.MetricsDatasourceType,
-					ExporterRef: v1alpha1.ExporterRef{ExporterNames: []string{"prometheus"}},
-					DataSourceList: []v1alpha1.DataSource{
-						{Name: "apecloudmysql"},
-						{Name: "apecloudkubeletstats"},
-						{Name: "apecloudnode"},
-					},
-				},
-			},
-		},
-	}
-}
+// func fakeCollectorDataSourceList() v1alpha1.CollectorDataSourceList {
+//	return v1alpha1.CollectorDataSourceList{
+//		Items: []v1alpha1.CollectorDataSource{
+//			{
+//				Spec: v1alpha1.CollectorDataSourceSpec{
+//					Type:        v1alpha1.MetricsDatasourceType,
+//					ExporterRef: v1alpha1.ExporterRef{ExporterNames: []string{"prometheus"}},
+//					DataSourceList: []v1alpha1.DataSource{
+//						{Name: "apecloudmysql"},
+//						{Name: "apecloudkubeletstats"},
+//						{Name: "apecloudnode"},
+//					},
+//				},
+//			},
+//		},
+//	}
+// }
 
 func fakeMetricsExporterSinkList() v1alpha1.MetricsExporterSinkList {
 	return v1alpha1.MetricsExporterSinkList{

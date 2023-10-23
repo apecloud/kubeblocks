@@ -49,11 +49,11 @@ func (cg *OteldConfigGenerater) GenerateOteldConfiguration(instance *OteldInstan
 	var err error
 	var cfg = yaml.MapSlice{}
 
-	if instance == nil || instance.OteldTemplate == nil {
+	if instance == nil || instance.Oteld == nil {
 		return nil, nil
 	}
-	if cg.cache != nil && cg.cache[instance.OteldTemplate.Spec.Mode] != nil {
-		return cg.cache[instance.OteldTemplate.Spec.Mode], nil
+	if cg.cache != nil && cg.cache[instance.Oteld.Spec.Mode] != nil {
+		return cg.cache[instance.Oteld.Spec.Mode], nil
 	}
 	if cfg, err = cg.appendExtentions(cfg); err != nil {
 		return nil, err
@@ -71,7 +71,7 @@ func (cg *OteldConfigGenerater) GenerateOteldConfiguration(instance *OteldInstan
 		return nil, err
 	}
 
-	cg.cache[instance.OteldTemplate.Spec.Mode] = cfg
+	cg.cache[instance.Oteld.Spec.Mode] = cfg
 	return cfg, nil
 }
 

@@ -67,7 +67,7 @@ func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) erro
 		if instance == nil {
 			continue
 		}
-		instance.OteldTemplate = &template
+		instance.Oteld = &template
 	}
 
 	reqCtx.SetOteldInstanceMap(instanceMap)

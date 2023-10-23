@@ -21,4 +21,6 @@ package constant
 
 const (
 	MonitorNamespaceEnvName = "OTELD_NAMESPACE"
+
+	MonitorFinalizerName = "monitor.kubeblocks.io/finalizer"
 )

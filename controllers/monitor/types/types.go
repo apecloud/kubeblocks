@@ -20,12 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package types
 
 import (
-	"context"
-
-	"github.com/go-logr/logr"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
@@ -50,9 +47,11 @@ type OteldCfgRef struct {
 
 // ReconcileCtx wrapper for reconcile procedure context parameters
 type ReconcileCtx struct {
-	Ctx       context.Context
-	Req       ctrl.Request
-	Log       logr.Logger
+	intctrlutil.RequestCtx
+
+	//Ctx       context.Context
+	//Req       ctrl.Request
+	//Log       logr.Logger
 	Config    *Config
 	Namespace string
 

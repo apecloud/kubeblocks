@@ -21,10 +21,14 @@ package rsm
 
 import (
 	"encoding/json"
-	"fmt" //nolint:goimports
+	"fmt"
+	"reflect"
+	"strconv"
+	"strings"
+
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/builder" //nolint:typecheck
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 	viper "github.com/apecloud/kubeblocks/internal/viperx"
@@ -34,10 +38,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"reflect" //nolint:goimports
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strconv" //nolint:goimports
-	"strings" //nolint:goimports
 )
 
 type ObjectGenerationTransformer struct{}
@@ -53,6 +54,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	if model.IsObjectDeleting(rsmOrig) {
 		return nil
 	}
+
 	// generate objects by current spec
 	svc := buildSvc(*rsm)
 	altSvs := buildAlternativeSvs(*rsm)
@@ -60,8 +62,9 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	envConfig := buildEnvConfigMap(*rsm)
 	sts := buildSts(*rsm, headLessSvc.Name, *envConfig)
 	objects := []client.Object{headLessSvc, envConfig, sts}
-	if *rsm.Spec.DebugMode {
-		debugPod := buildDebugPod(*rsm, *envConfig, sts)
+
+	if rsm.Spec.DebugMode != nil && *rsm.Spec.DebugMode {
+		debugPod := buildDebugPod(*rsm, sts)
 		objects = append(objects, debugPod)
 	}
 	if svc != nil {
@@ -81,9 +84,6 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	oldSnapshot, err := model.ReadCacheSnapshot(ctx, rsm, ml, ownedKinds()...)
 	if err != nil {
 		return err
-	}
-	if *rsm.Spec.DebugMode {
-		oldSnapshot = model.AddDebugPodSnapshot(oldSnapshot, ctx)
 	}
 	// compute create/update/delete set
 
@@ -312,65 +312,59 @@ func buildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
 		GetObject()
 }
 
-func buildDebugPod(rsm workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap, sts *apps.StatefulSet) *corev1.Pod {
-	stsName, serviceAccountName := sts.Name, sts.Spec.Template.Spec.ServiceAccountName
-	spec := buildDebugPodTemplate(rsm, envConfig, stsName).Spec
+func buildDebugPod(rsm workloads.ReplicatedStateMachine, sts *apps.StatefulSet) *corev1.Pod {
+	stsName := sts.Name
+	spec := buildDebugPodTemplate(rsm, stsName).Spec
 	container := spec.Containers[0]
 	labels := sts.Spec.Template.Labels
-	annotations := ParseAnnotationsOfScope(DebugPodScope, rsm.Annotations)
 	for key, value := range rsm.Spec.Selector.MatchLabels {
 		labels[key] = value
 	}
 	container.Command = []string{
-		"sleep",
-		"infinity",
+		"/bin/sh",
+		"-c",
+		"tail -f /dev/null",
 	}
-	return builder.NewPodBuilder(rsm.Namespace, "debug.pod").
+
+	return builder.NewPodBuilder(rsm.Namespace, debugPodName).
 		AddContainer(container).
-		AddAnnotationsInMap(annotations).
-		AddVolumes(spec.Volumes[0]).
-		SetServiceAccountName(serviceAccountName).
 		AddLabelsInMap(labels).
 		GetObject()
 }
 
-func buildDebugPodTemplate(rsm workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap, stsName string) *corev1.PodTemplateSpec {
-	template := rsm.Spec.Template
-	// inject env ConfigMap into workload pods only
-	for i := range template.Spec.Containers {
-		if i == 0 {
-			zeroPodName := stsName + "-0"
-			svcName := getHeadlessSvcName(rsm)
-			svcPort := findSvcPort(rsm)
-			host := fmt.Sprintf("%s.%s", zeroPodName, svcName)
-			template.Spec.Containers[i].Env = []corev1.EnvVar{
-				{
-					Name:  leaderHostVarName,
-					Value: host,
-				},
-				{
-					Name:  servicePortVarName,
-					Value: strconv.Itoa(svcPort),
-				},
-				{
-					Name:  targetHostVarName,
-					Value: host,
-				},
-			}
-
-			template.Spec.Containers[i].EnvFrom = append(template.Spec.Containers[i].EnvFrom,
-				corev1.EnvFromSource{
-					ConfigMapRef: &corev1.ConfigMapEnvSource{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: envConfig.Name,
-						},
-						Optional: func() *bool { optional := false; return &optional }(),
-					}})
-			continue
-		}
+func buildDebugPodTemplate(rsm workloads.ReplicatedStateMachine, stsName string) *corev1.PodTemplateSpec {
+	zeroPodName := stsName + "-0"
+	env := buildActionEnv(&rsm, zeroPodName, zeroPodName)
+	credential := rsm.Spec.Credential
+	credentialEnv := make([]corev1.EnvVar, 0)
+	if credential != nil {
+		credentialEnv = append(credentialEnv,
+			corev1.EnvVar{
+				Name:      usernameCredentialVarName,
+				Value:     credential.Username.Value,
+				ValueFrom: credential.Username.ValueFrom,
+			},
+			corev1.EnvVar{
+				Name:      passwordCredentialVarName,
+				Value:     credential.Password.Value,
+				ValueFrom: credential.Password.ValueFrom,
+			})
 	}
-
-	return &template
+	env = append(env, credentialEnv...)
+	image := rsm.Spec.Template.Spec.Containers[0].Image
+	container := corev1.Container{
+		Name:            rsm.Spec.Template.Spec.Containers[0].Name,
+		Image:           image,
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Env:             env,
+	}
+	template := &corev1.PodTemplateSpec{
+		Spec: corev1.PodSpec{
+			Containers:    []corev1.Container{container},
+			RestartPolicy: corev1.RestartPolicyNever,
+		},
+	}
+	return template
 }
 
 func buildStsPodTemplate(rsm workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap) *corev1.PodTemplateSpec {

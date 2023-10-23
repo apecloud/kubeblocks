@@ -172,7 +172,7 @@ func (builder *ReplicatedStateMachineBuilder) SetCredential(credential workloads
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetDebugMode(debugmode *bool) *ReplicatedStateMachineBuilder {
-	builder.get().Spec.DebugMode = debugmode
+func (builder *ReplicatedStateMachineBuilder) SetDebugMode(debugMode *bool) *ReplicatedStateMachineBuilder {
+	builder.get().Spec.DebugMode = debugMode
 	return builder
 }

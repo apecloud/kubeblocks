@@ -146,6 +146,15 @@ var _ = Describe("object generation transformer test.", func() {
 		})
 	})
 
+	Context("buildDebugPod function", func() {
+		It("should work well", func() {
+			sts := mockUnderlyingSts(*rsm, 90)
+			debugPod := buildDebugPod(*rsm, sts)
+			Expect(debugPod).ShouldNot(BeNil())
+			Expect(debugPod.Spec.Containers[0].Name).Should(Equal(rsm.Spec.Template.Spec.Containers[0].Name))
+		})
+	})
+
 	Context("well-known service labels", func() {
 		It("should work well", func() {
 			svc := buildSvc(*rsm)
@@ -157,4 +166,5 @@ var _ = Describe("object generation transformer test.", func() {
 			}
 		})
 	})
+
 })

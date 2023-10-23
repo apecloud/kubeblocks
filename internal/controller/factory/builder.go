@@ -332,6 +332,7 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		SetServiceName(rsmName + "-headless").
 		SetReplicas(component.Replicas).
 		SetTemplate(template)
+
 	var vcts []corev1.PersistentVolumeClaim
 	for _, vct := range component.VolumeClaimTemplates {
 		vcts = append(vcts, vctToPVC(vct))

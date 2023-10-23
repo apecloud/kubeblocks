@@ -158,6 +158,7 @@ var _ = Describe("replicated_state_machine builder", func() {
 			Username: workloads.CredentialVar{Value: "foo"},
 			Password: workloads.CredentialVar{Value: "bar"},
 		}
+		debugModeOn := true
 		rsm := NewReplicatedStateMachineBuilder(ns, name).
 			SetReplicas(replicas).
 			AddMatchLabel(selectorKey1, selectorValue1).
@@ -179,6 +180,7 @@ var _ = Describe("replicated_state_machine builder", func() {
 			SetService(service).
 			SetAlternativeServices(alternativeServices).
 			SetCredential(credential).
+			SetDebugMode(&debugModeOn).
 			GetObject()
 
 		Expect(rsm.Name).Should(Equal(name))
@@ -197,6 +199,7 @@ var _ = Describe("replicated_state_machine builder", func() {
 		Expect(rsm.Spec.MembershipReconfiguration).ShouldNot(BeNil())
 		Expect(*rsm.Spec.MembershipReconfiguration).Should(Equal(reconfiguration))
 		Expect(rsm.Spec.Template).Should(Equal(template))
+		Expect(rsm.Spec.DebugMode).Should(Equal(&debugModeOn))
 		Expect(rsm.Spec.VolumeClaimTemplates).Should(HaveLen(2))
 		Expect(rsm.Spec.VolumeClaimTemplates[0]).Should(Equal(vcs[0]))
 		Expect(rsm.Spec.VolumeClaimTemplates[1]).Should(Equal(vc))

@@ -53,6 +53,7 @@ const (
 	rsmGenerationLabelKey = "rsm.workloads.kubeblocks.io/controller-generation"
 
 	defaultPodName = "Unknown"
+	debugPodName   = "debug.pod"
 
 	rsmFinalizerName = "rsm.workloads.kubeblocks.io/finalizer"
 

@@ -59,6 +59,7 @@ var _ = Describe("pod builder", func() {
 		ctx := corev1.PodSecurityContext{
 			RunAsUser: &user,
 		}
+		serviceAccount := "foo-1"
 		tolerations := []corev1.Toleration{
 			{
 				Key:      "node",
@@ -73,6 +74,7 @@ var _ = Describe("pod builder", func() {
 			SetRestartPolicy(restartPolicy).
 			SetSecurityContext(ctx).
 			AddTolerations(tolerations...).
+			SetServiceAccountName(serviceAccount).
 			GetObject()
 
 		Expect(pod.Name).Should(Equal(name))
@@ -83,6 +85,7 @@ var _ = Describe("pod builder", func() {
 		Expect(pod.Spec.Volumes).Should(HaveLen(1))
 		Expect(pod.Spec.Volumes[0]).Should(Equal(volumes[0]))
 		Expect(pod.Spec.RestartPolicy).Should(Equal(restartPolicy))
+		Expect(pod.Spec.ServiceAccountName).Should(Equal(serviceAccount))
 		Expect(pod.Spec.SecurityContext).ShouldNot(BeNil())
 		Expect(*pod.Spec.SecurityContext).Should(Equal(ctx))
 		Expect(pod.Spec.Tolerations).Should(HaveLen(1))

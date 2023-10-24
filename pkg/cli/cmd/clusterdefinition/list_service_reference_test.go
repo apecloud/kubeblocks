@@ -32,12 +32,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/kubernetes/scheme"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	"k8s.io/kubectl/pkg/scheme"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/cli/list"
 	"github.com/apecloud/kubeblocks/pkg/cli/testing"
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
 )
@@ -49,7 +48,6 @@ var _ = Describe("clusterdefinition list components", func() {
 		out     *bytes.Buffer
 		tf      *cmdtesting.TestFactory
 	)
-
 	const (
 		namespace             = testing.Namespace
 		clusterdefinitionName = testing.ClusterDefName
@@ -73,42 +71,21 @@ var _ = Describe("clusterdefinition list components", func() {
 		clusterDef := testing.FakeClusterDef()
 		tf = mockClient(clusterDef)
 		streams, _, out, _ = genericiooptions.NewTestIOStreams()
-		cmd = NewListComponentsCmd(tf, streams)
+		cmd = NewListServiceReferenceCmd(tf, streams)
 	})
 
-	AfterEach(func() {
-		tf.Cleanup()
-	})
-
-	It("create list-components cmd", func() {
-		cmd := NewListComponentsCmd(tf, streams)
+	It("create list-service-reference cmd", func() {
+		cmd := NewListServiceReferenceCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 	})
 
-	It("list-components requires a clusterdefinition Name", func() {
-		Expect(validate([]string{})).Should(HaveOccurred())
-	})
-
-	It("cd list-components when the cd do not exist", func() {
-		o := list.NewListOptions(tf, streams, types.ClusterDefGVR())
-		o.AllNamespaces = true
-		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-		tf.UnstructuredClient = &clientfake.RESTClient{
-			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-			GroupVersion:         schema.GroupVersion{Group: types.AppsAPIGroup, Version: types.AppsAPIVersion},
-			Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, testing.FakeResourceNotFound(types.ClusterDefGVR(), clusterdefinitionName+"-no-exist"))},
-		}
-		Expect(listComponents(o)).Should(HaveOccurred())
-
-	})
-
-	It("list-components", func() {
+	It("list-service", func() {
 		cmd.Run(cmd, []string{clusterdefinitionName})
-		expected := `NAME                    WORKLOAD-TYPE   CHARACTER-TYPE   CLUSTER-DEFINITION        IS-MAIN   
-fake-component-type                     mysql            fake-cluster-definition   true      
-fake-component-type-1                   mysql            fake-cluster-definition   false     
+		expected := `CLUSTER-DEFINITION        NAME              COMPONENT             SERVICE-KIND   SERVICE-VERSION   
+fake-cluster-definition   fake-serviceRef   fake-component-type   mysql          8.0.\d{1,2}$      
 `
 		Expect(expected).Should(Equal(out.String()))
 		fmt.Println(out.String())
 	})
+
 })

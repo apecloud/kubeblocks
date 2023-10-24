@@ -37,37 +37,30 @@ import (
 )
 
 var (
-	listComponentsExample = templates.Examples(`
-		# List all components belonging to the cluster definition.
-		kbcli clusterdefinition list-components apecloud-mysql`)
+	listServiceRefExample = templates.Examples(`
+		# List cluster references name declared in a cluster definition.
+		kbcli clusterdefinition list-service-reference apecloud-mysql`)
 )
 
-func NewListComponentsCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
+func NewListServiceReferenceCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := list.NewListOptions(f, streams, types.ClusterDefGVR())
 	o.AllNamespaces = true
 	cmd := &cobra.Command{
-		Use:               "list-components",
-		Short:             "List cluster definition components.",
-		Example:           listComponentsExample,
-		Aliases:           []string{"ls-comps"},
+		Use:               "list-service-reference",
+		Short:             "List cluster references declared in a cluster definition.",
+		Example:           listServiceRefExample,
+		Aliases:           []string{"ls-sr"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(validate(args))
 			o.Names = args
-			util.CheckErr(listComponents(o))
+			util.CheckErr(listServiceRef(o))
 		},
 	}
 	return cmd
 }
 
-func validate(args []string) error {
-	if len(args) == 0 {
-		return fmt.Errorf("missing clusterdefinition name")
-	}
-	return nil
-}
-
-func listComponents(o *list.ListOptions) error {
+func listServiceRef(o *list.ListOptions) error {
 	o.Print = false
 
 	r, err := o.Run()
@@ -78,23 +71,31 @@ func listComponents(o *list.ListOptions) error {
 	if err != nil {
 		return err
 	}
+
 	p := printer.NewTablePrinter(o.Out)
-	p.SetHeader("NAME", "WORKLOAD-TYPE", "CHARACTER-TYPE", "CLUSTER-DEFINITION", "IS-MAIN")
-	p.SortBy(4, 1)
+	p.SetHeader("CLUSTER-DEFINITION", "NAME", "COMPONENT", "SERVICE-KIND", "SERVICE-VERSION")
+	p.SortBy(1, 2)
 	for _, info := range infos {
 		var cd v1alpha1.ClusterDefinition
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(info.Object.(*unstructured.Unstructured).Object, &cd); err != nil {
 			return err
 		}
-		for i, comp := range cd.Spec.ComponentDefs {
-			if i == 0 {
-				p.AddRow(printer.BoldGreen(comp.Name), comp.WorkloadType, comp.CharacterType, cd.Name, "true")
-			} else {
-				p.AddRow(comp.Name, comp.WorkloadType, comp.CharacterType, cd.Name, "false")
+		for _, comp := range cd.Spec.ComponentDefs {
+			if comp.ServiceRefDeclarations == nil {
+				continue
 			}
-
+			for _, serviceDec := range comp.ServiceRefDeclarations {
+				for _, ref := range serviceDec.ServiceRefDeclarationSpecs {
+					p.AddRow(cd.Name, serviceDec.Name, comp.Name, ref.ServiceKind, ref.ServiceVersion)
+				}
+			}
 		}
 	}
-	p.Print()
+
+	if p.Tbl.Length() == 0 {
+		fmt.Printf("No service references are declared in cluster definition %s", o.Names)
+	} else {
+		p.Print()
+	}
 	return nil
 }

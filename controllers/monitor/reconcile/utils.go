@@ -57,10 +57,11 @@ func buildPodSpecForOteld(oTeld *v1alpha1.OTeld, mode v1alpha1.Mode) corev1.PodS
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddArgs(fmt.Sprintf("--config=%s", defaultOtelConfigPath)).
 		AddEnv(corev1.EnvVar{
-			Name: "HOST_IP",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
-			},
+			Name:  "HOST_IP",
+			Value: "0.0.0.0",
+			//ValueFrom: &corev1.EnvVarSource{
+			//	FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
+			//},
 		}).
 		AddEnv(corev1.EnvVar{
 			Name:  "HOST_ROOT_MOUNT_PATH",

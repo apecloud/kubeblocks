@@ -33,7 +33,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	probe2 "github.com/apecloud/kubeblocks/lorry/middleware/probe"
 	. "github.com/apecloud/kubeblocks/lorry/util"
 	"github.com/apecloud/kubeblocks/pkg/cli/exec"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -389,7 +388,10 @@ func parseResponse(data []byte, operation string, charType string) (SQLChannelRe
 }
 
 func getBodyWithOperation(operation string) ([]byte, error) {
-	meta := probe2.RequestMeta{
+	meta := struct {
+		Operation string            `json:"operation"`
+		Metadata  map[string]string `json:"metadata"`
+	}{
 		Operation: operation,
 		Metadata:  map[string]string{},
 	}

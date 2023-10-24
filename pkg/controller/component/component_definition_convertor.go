@@ -31,6 +31,42 @@ import (
 
 // TODO(component): type check
 
+// BuildComponentDefinitionFrom builds a ComponentDefinition from a ClusterComponentDefinition and a ClusterComponentVersion.
+func BuildComponentDefinitionFrom(clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
+	clusterCompVer *appsv1alpha1.ClusterComponentVersion,
+	clusterName string) (*appsv1alpha1.ComponentDefinition, error) {
+	if clusterCompDef == nil {
+		return nil, nil
+	}
+	convertors := map[string]convertor{
+		"provider":               &compDefProviderConvertor{},
+		"description":            &compDefDescriptionConvertor{},
+		"servicekind":            &compDefServiceKindConvertor{},
+		"serviceversion":         &compDefServiceVersionConvertor{},
+		"runtime":                &compDefRuntimeConvertor{},
+		"volumes":                &compDefVolumesConvertor{},
+		"services":               &compDefServicesConvertor{},
+		"configs":                &compDefConfigsConvertor{},
+		"logconfigs":             &compDefLogConfigsConvertor{},
+		"monitor":                &compDefMonitorConvertor{},
+		"scripts":                &compDefScriptsConvertor{},
+		"policyrules":            &compDefPolicyRulesConvertor{},
+		"labels":                 &compDefLabelsConvertor{},
+		"systemaccounts":         &compDefSystemAccountsConvertor{},
+		"connectioncredentials":  &compDefConnCredentialsConvertor{},
+		"updatestrategy":         &compDefUpdateStrategyConvertor{},
+		"roles":                  &compDefRolesConvertor{},
+		"rolearbitrator":         &compDefRoleArbitratorConvertor{},
+		"lifecycleactions":       &compDefLifecycleActionsConvertor{},
+		"servicerefdeclarations": &compDefServiceRefDeclarationsConvertor{},
+	}
+	compDef := &appsv1alpha1.ComponentDefinition{}
+	if err := covertObject(convertors, &compDef.Spec, clusterCompDef, clusterCompVer, clusterName); err != nil {
+		return nil, err
+	}
+	return compDef, nil
+}
+
 // compDefProviderConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Provider.
 type compDefProviderConvertor struct{}
 
@@ -91,42 +127,6 @@ type compDefLifecycleActionsConvertor struct{}
 // compDefServiceRefDeclarationsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.ServiceRefDeclarations.
 type compDefServiceRefDeclarationsConvertor struct{}
 
-// BuildComponentDefinitionFrom builds a ComponentDefinition from a ClusterComponentDefinition and a ClusterComponentVersion.
-func BuildComponentDefinitionFrom(clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
-	clusterCompVer *appsv1alpha1.ClusterComponentVersion,
-	clusterName string) (*appsv1alpha1.ComponentDefinition, error) {
-	if clusterCompDef == nil {
-		return nil, nil
-	}
-	convertors := map[string]convertor{
-		"provider":               &compDefProviderConvertor{},
-		"description":            &compDefDescriptionConvertor{},
-		"servicekind":            &compDefServiceKindConvertor{},
-		"serviceversion":         &compDefServiceVersionConvertor{},
-		"runtime":                &compDefRuntimeConvertor{},
-		"volumes":                &compDefVolumesConvertor{},
-		"services":               &compDefServicesConvertor{},
-		"configs":                &compDefConfigsConvertor{},
-		"logconfigs":             &compDefLogConfigsConvertor{},
-		"monitor":                &compDefMonitorConvertor{},
-		"scripts":                &compDefScriptsConvertor{},
-		"policyrules":            &compDefPolicyRulesConvertor{},
-		"labels":                 &compDefLabelsConvertor{},
-		"systemaccounts":         &compDefSystemAccountsConvertor{},
-		"connectioncredentials":  &compDefConnCredentialsConvertor{},
-		"updatestrategy":         &compDefUpdateStrategyConvertor{},
-		"roles":                  &compDefRolesConvertor{},
-		"rolearbitrator":         &compDefRoleArbitratorConvertor{},
-		"lifecycleactions":       &compDefLifecycleActionsConvertor{},
-		"servicerefdeclarations": &compDefServiceRefDeclarationsConvertor{},
-	}
-	compDef := &appsv1alpha1.ComponentDefinition{}
-	if err := covertObject(convertors, &compDef.Spec, clusterCompDef, clusterCompVer, clusterName); err != nil {
-		return nil, err
-	}
-	return compDef, nil
-}
-
 func (c *compDefProviderConvertor) convert(args ...any) (any, error) {
 	return "", nil
 }
@@ -147,12 +147,15 @@ func (c *compDefServiceVersionConvertor) convert(args ...any) (any, error) {
 
 func (c *compDefRuntimeConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	clusterCompVer := args[1].(*appsv1alpha1.ClusterComponentVersion)
+	var clusterCompVer *appsv1alpha1.ClusterComponentVersion
+	if len(args) > 1 {
+		clusterCompVer = args[1].(*appsv1alpha1.ClusterComponentVersion)
+	}
 	if clusterCompDef.PodSpec == nil {
 		return nil, fmt.Errorf("no pod spec")
 	}
 
-	podSpec := *clusterCompDef.PodSpec
+	podSpec := clusterCompDef.PodSpec.DeepCopy()
 	if clusterCompVer != nil {
 		for _, container := range clusterCompVer.VersionsCtx.InitContainers {
 			podSpec.InitContainers = appendOrOverrideContainerAttr(podSpec.InitContainers, container)
@@ -161,7 +164,7 @@ func (c *compDefRuntimeConvertor) convert(args ...any) (any, error) {
 			podSpec.Containers = appendOrOverrideContainerAttr(podSpec.Containers, container)
 		}
 	}
-	return podSpec, nil
+	return *podSpec, nil
 }
 
 func (c *compDefVolumesConvertor) convert(args ...any) (any, error) {
@@ -198,7 +201,7 @@ func (c *compDefVolumesConvertor) convert(args ...any) (any, error) {
 
 func (c *compDefServicesConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	clusterName := args[2].(string)
+	clusterName := args[1].(string)
 	if clusterCompDef.Service == nil {
 		return nil, nil
 	}
@@ -238,12 +241,14 @@ func (c *compDefServicesConvertor) convert(args ...any) (any, error) {
 
 func (c *compDefConfigsConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	clusterCompVer := args[1].(*appsv1alpha1.ClusterComponentVersion)
+	var clusterCompVer *appsv1alpha1.ClusterComponentVersion
+	if len(args) > 1 {
+		clusterCompVer = args[1].(*appsv1alpha1.ClusterComponentVersion)
+	}
 	if clusterCompVer == nil {
 		return clusterCompDef.ConfigSpecs, nil
-	} else {
-		return cfgcore.MergeConfigTemplates(clusterCompVer.ConfigSpecs, clusterCompDef.ConfigSpecs), nil
 	}
+	return cfgcore.MergeConfigTemplates(clusterCompVer.ConfigSpecs, clusterCompDef.ConfigSpecs), nil
 }
 
 func (c *compDefLogConfigsConvertor) convert(args ...any) (any, error) {
@@ -381,7 +386,10 @@ func (c *compDefServiceRefDeclarationsConvertor) convert(args ...any) (any, erro
 
 func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	clusterCompVer := args[1].(*appsv1alpha1.ClusterComponentVersion)
+	var clusterCompVer *appsv1alpha1.ClusterComponentVersion
+	if len(args) > 1 {
+		clusterCompVer = args[1].(*appsv1alpha1.ClusterComponentVersion)
+	}
 
 	lifecycleActions := &appsv1alpha1.ComponentLifecycleActions{}
 

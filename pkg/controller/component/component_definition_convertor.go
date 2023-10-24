@@ -155,7 +155,7 @@ func (c *compDefRuntimeConvertor) convert(args ...any) (any, error) {
 		return nil, fmt.Errorf("no pod spec")
 	}
 
-	podSpec := *clusterCompDef.PodSpec
+	podSpec := clusterCompDef.PodSpec.DeepCopy()
 	if clusterCompVer != nil {
 		for _, container := range clusterCompVer.VersionsCtx.InitContainers {
 			podSpec.InitContainers = appendOrOverrideContainerAttr(podSpec.InitContainers, container)
@@ -164,7 +164,7 @@ func (c *compDefRuntimeConvertor) convert(args ...any) (any, error) {
 			podSpec.Containers = appendOrOverrideContainerAttr(podSpec.Containers, container)
 		}
 	}
-	return podSpec, nil
+	return *podSpec, nil
 }
 
 func (c *compDefVolumesConvertor) convert(args ...any) (any, error) {

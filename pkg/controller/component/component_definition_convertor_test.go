@@ -44,6 +44,9 @@ var _ = Describe("Component Definition Convertor", func() {
 			logVolumeName        = "log"
 
 			defaultVolumeMode = int32(0555)
+
+			runAsUser    = int64(0)
+			runAsNonRoot = false
 		)
 
 		BeforeEach(func() {
@@ -102,23 +105,68 @@ var _ = Describe("Component Definition Convertor", func() {
 						FilePathPattern: "/data/mysql/log/mysqld.log",
 					},
 				},
-				PodSpec: &corev1.PodSpec{},
+				PodSpec: &corev1.PodSpec{
+					Volumes: []corev1.Volume{},
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name:    "mysql",
+							Command: []string{"/entrypoint.sh"},
+							Env: []corev1.EnvVar{
+								corev1.EnvVar{
+									Name:  "port",
+									Value: "3306",
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								corev1.VolumeMount{
+									Name:      dataVolumeName,
+									MountPath: "/data/mysql",
+								},
+								corev1.VolumeMount{
+									Name:      logVolumeName,
+									MountPath: "/data/log",
+								},
+							},
+							Ports: []corev1.ContainerPort{
+								corev1.ContainerPort{
+									Name:          "mysql",
+									ContainerPort: 3306,
+								},
+								corev1.ContainerPort{
+									Name:          "paxos",
+									ContainerPort: 13306,
+								},
+							},
+							SecurityContext: &corev1.SecurityContext{
+								RunAsUser:    &runAsUser,
+								RunAsNonRoot: &runAsNonRoot,
+							},
+							Lifecycle: &corev1.Lifecycle{
+								PreStop: &corev1.LifecycleHandler{
+									Exec: &corev1.ExecAction{
+										Command: []string{"/pre-stop.sh"},
+									},
+								},
+							},
+						},
+					},
+				},
 				Service: &appsv1alpha1.ServiceSpec{
 					Ports: []appsv1alpha1.ServicePort{
 						appsv1alpha1.ServicePort{
 							Name: "data",
 							Port: 3306,
 							TargetPort: intstr.IntOrString{
-								Type:   intstr.Int,
-								IntVal: 3306,
+								Type:   intstr.String,
+								StrVal: "mysql",
 							},
 						},
 						appsv1alpha1.ServicePort{
 							Name: "paxos",
 							Port: 13306,
 							TargetPort: intstr.IntOrString{
-								Type:   intstr.Int,
-								IntVal: 13306,
+								Type:   intstr.String,
+								StrVal: "paxos",
 							},
 						},
 					},
@@ -279,13 +327,33 @@ var _ = Describe("Component Definition Convertor", func() {
 			})
 
 			It("w/ comp version", func() {
-				// TODO(component)
-				clusterCompVer := &appsv1alpha1.ClusterComponentVersion{}
+				clusterCompVer := &appsv1alpha1.ClusterComponentVersion{
+					VersionsCtx: appsv1alpha1.VersionsContext{
+						InitContainers: []corev1.Container{
+							corev1.Container{
+								Name:  "init",
+								Image: "init",
+							},
+						},
+						Containers: []corev1.Container{
+							corev1.Container{
+								Name:  "mysql",
+								Image: "image",
+							},
+						},
+					},
+				}
 
 				convertor := &compDefRuntimeConvertor{}
 				res, err := convertor.convert(clusterCompDef, clusterCompVer)
 				Expect(err).Should(Succeed())
-				Expect(res).Should(BeEquivalentTo(*clusterCompDef.PodSpec))
+
+				expectedPodSpec := clusterCompDef.PodSpec
+				Expect(expectedPodSpec.Containers[0].Image).Should(BeEmpty())
+				Expect(expectedPodSpec.InitContainers).Should(HaveLen(0))
+				expectedPodSpec.Containers[0].Image = clusterCompVer.VersionsCtx.Containers[0].Image
+				expectedPodSpec.InitContainers = clusterCompVer.VersionsCtx.InitContainers
+				Expect(res).Should(BeEquivalentTo(*expectedPodSpec))
 			})
 		})
 
@@ -370,9 +438,8 @@ var _ = Describe("Component Definition Convertor", func() {
 
 				// headless service
 				Expect(services[1].ServiceName).Should(BeEquivalentTo(svcName + "-headless"))
-				// TODO(component): container ports
-				Expect(services[1].ServiceSpec.Ports).Should(HaveLen(len(clusterCompDef.Service.Ports)))
-				for i := range services[1].ServiceSpec.Ports {
+				Expect(len(services[1].ServiceSpec.Ports)).Should(Equal(len(clusterCompDef.Service.Ports) + len(clusterCompDef.PodSpec.Containers[0].Ports)))
+				for i := range clusterCompDef.Service.Ports {
 					Expect(services[1].ServiceSpec.Ports[i].Name).Should(Equal(clusterCompDef.Service.Ports[i].Name))
 					Expect(services[1].ServiceSpec.Ports[i].Port).Should(Equal(clusterCompDef.Service.Ports[i].Port))
 					Expect(services[1].ServiceSpec.Ports[i].TargetPort).Should(Equal(clusterCompDef.Service.Ports[i].TargetPort))
@@ -393,13 +460,27 @@ var _ = Describe("Component Definition Convertor", func() {
 			})
 
 			It("w/ comp version", func() {
-				// TODO(component)
-				clusterCompVer := &appsv1alpha1.ClusterComponentVersion{}
+				clusterCompVer := &appsv1alpha1.ClusterComponentVersion{
+					ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{
+						appsv1alpha1.ComponentConfigSpec{
+							ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+								Name:        "agamotto-config",
+								TemplateRef: "agamotto-config-template",
+								VolumeName:  "agamotto-config",
+								DefaultMode: &defaultVolumeMode,
+							},
+						},
+					},
+				}
 
 				convertor := &compDefConfigsConvertor{}
 				res, err := convertor.convert(clusterCompDef, clusterCompVer)
 				Expect(err).Should(Succeed())
-				Expect(res).Should(BeEquivalentTo(clusterCompDef.ConfigSpecs))
+
+				expectedConfigs := make([]appsv1alpha1.ComponentConfigSpec, 0)
+				expectedConfigs = append(expectedConfigs, clusterCompVer.ConfigSpecs...)
+				expectedConfigs = append(expectedConfigs, clusterCompDef.ConfigSpecs...)
+				Expect(res).Should(BeEquivalentTo(expectedConfigs))
 			})
 		})
 

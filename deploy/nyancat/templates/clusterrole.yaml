@@ -7,4 +7,7 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["services", "pods", "secrets"]
-    verbs: ["get", "list"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps.kubeblocks.io"]
+    resources: ["clusters"]
+    verbs: ["get", "list", "watch"]

@@ -26,38 +26,16 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/go-errors/errors"
-
 	. "github.com/apecloud/kubeblocks/lorry/binding"
 
-	"github.com/apecloud/kubeblocks/lorry/binding/custom"
-	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-const (
-	builtinPostgreSQL = "postgresql"
-	builtinETCD       = "etcd"
-	builtinMongodb    = "mongodb"
-	builtinCustom     = "custom"
-)
-
 var builtinMap = make(map[string]BaseInternalOps)
-var customOp *custom.HTTPCustom
 
 func RegisterBuiltin(characterType string) error {
-	initErrFmt := "%s init err: %v"
-	switch characterType {
-	default:
-		customOp = custom.NewHTTPCustom()
-		empty := make(component.Properties)
-		err := customOp.Init(empty)
-		if err != nil {
-			return errors.Errorf(initErrFmt, builtinCustom, err)
-		}
-	}
 	return nil
 }
 
@@ -118,7 +96,7 @@ func route(character string, ctx context.Context, request *ProbeRequest) (*Probe
 	// if there is no builtin type, use the custom
 	if !ok {
 		logger.Info("No correspond builtin type, use the custom...")
-		return customOp.Invoke(ctx, request)
+		//return customOp.Invoke(ctx, request)
 	}
 	return ops.Invoke(ctx, request)
 }

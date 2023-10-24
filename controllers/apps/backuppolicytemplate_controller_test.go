@@ -24,6 +24,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -44,6 +45,9 @@ var _ = Describe("", func() {
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
 		By("clean resources")
+
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupPolicyTemplateSignature, true, ml)
 	}
 
 	BeforeEach(func() {

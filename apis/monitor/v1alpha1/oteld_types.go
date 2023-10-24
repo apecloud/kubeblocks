@@ -41,6 +41,9 @@ type OTeldSpec struct {
 	// MetricsPort is the port of the oteld metrics
 	MetricsPort int `json:"metricsPort,omitempty"`
 
+	// CollectionInterval is the default collect interval of the oteld collection
+	CollectionInterval string `json:"collectionInterval"`
+
 	// Resources is the resource requirements for the oteld
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 

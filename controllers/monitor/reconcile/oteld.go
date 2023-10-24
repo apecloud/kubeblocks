@@ -47,12 +47,17 @@ func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) erro
 	}
 	exporter.LogsExporter = logsExporters.Items
 
-	datasources := &v1alpha1.CollectorDataSourceList{}
-	if err := k8sClient.List(ctx, datasources, client.InNamespace(reqCtx.OTeld.GetNamespace())); err != nil {
+	systemDatasources := &v1alpha1.CollectorDataSourceList{}
+	if err := k8sClient.List(ctx, systemDatasources, client.InNamespace(reqCtx.OTeld.GetNamespace())); err != nil {
 		return err
 	}
 
-	instanceMap, err := BuildInstanceMapForPipline(datasources, reqCtx.OTeld)
+	appDatasources := &v1alpha1.AppDataSourceList{}
+	if err := k8sClient.List(ctx, appDatasources, client.InNamespace(reqCtx.OTeld.GetNamespace())); err != nil {
+		return err
+	}
+
+	instanceMap, err := BuildInstanceMapForPipline(systemDatasources, appDatasources, reqCtx.OTeld)
 	if err != nil {
 		return err
 	}
@@ -65,7 +70,7 @@ func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) erro
 	return err
 }
 
-func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList, oteld *v1alpha1.OTeld) (map[v1alpha1.Mode]*monitortype.OteldInstance, error) {
+func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList, appDatasources *v1alpha1.AppDataSourceList, oteld *v1alpha1.OTeld) (map[v1alpha1.Mode]*monitortype.OteldInstance, error) {
 	instanceMap := map[v1alpha1.Mode]*monitortype.OteldInstance{}
 	for _, dataSource := range datasources.Items {
 		mode := dataSource.Spec.Mode
@@ -76,39 +81,39 @@ func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList, o
 		if !ok {
 			oteldInstance = monitortype.NewOteldInstance(oteld)
 		}
-		switch dataSource.Spec.Type {
-		case v1alpha1.MetricsDatasourceType:
-			if oteldInstance.MetricsPipline == nil {
-				oteldInstance.MetricsPipline = []monitortype.Pipline{}
-			}
-			pipline := monitortype.NewPipline()
-			pipline.Name = dataSource.Name
-			for _, data := range dataSource.Spec.DataSourceList {
-				pipline.ReceiverMap[data.Name] = monitortype.Receiver{
-					Parameter:          data.Parameter,
-					CollectionInterval: dataSource.Spec.CollectionInterval,
-				}
-			}
-
-			for _, exporter := range dataSource.Spec.ExporterNames {
-				pipline.ExporterMap[exporter] = true
-			}
-			oteldInstance.MetricsPipline = append(oteldInstance.MetricsPipline, pipline)
-
-		case v1alpha1.LogsDataSourceType:
-			if oteldInstance.LogsPipline == nil {
-				oteldInstance.LogsPipline = []monitortype.Pipline{}
-			}
-			pipline := monitortype.NewPipline()
-			pipline.Name = dataSource.Name
-			for _, data := range dataSource.Spec.DataSourceList {
-				pipline.ReceiverMap[data.Name] = monitortype.Receiver{Parameter: data.Parameter}
-			}
-			for _, exporter := range dataSource.Spec.ExporterNames {
-				pipline.ExporterMap[exporter] = true
-			}
-			oteldInstance.LogsPipline = append(oteldInstance.LogsPipline, pipline)
+		if oteldInstance.MetricsPipline == nil {
+			oteldInstance.MetricsPipline = []monitortype.Pipline{}
 		}
+		pipline := monitortype.NewPipline()
+		pipline.Name = dataSource.Name
+		for _, data := range dataSource.Spec.DataSourceList {
+			pipline.ReceiverMap[data.Name] = monitortype.Receiver{
+				Parameter:          data.Parameter,
+				CollectionInterval: dataSource.Spec.CollectionInterval,
+			}
+		}
+
+		for _, exporter := range dataSource.Spec.ExporterNames {
+			pipline.ExporterMap[exporter] = true
+		}
+		oteldInstance.MetricsPipline = append(oteldInstance.MetricsPipline, pipline)
+
+		instanceMap[dataSource.Spec.Mode] = oteldInstance
+	}
+
+	for _, dataSource := range appDatasources.Items {
+		mode := dataSource.Spec.Mode
+		if mode == "" {
+			mode = DefaultMode
+		}
+		oteldInstance, ok := instanceMap[mode]
+		if !ok {
+			oteldInstance = monitortype.NewOteldInstance(oteld)
+		}
+		if oteldInstance.AppDataSources == nil {
+			oteldInstance.AppDataSources = []v1alpha1.AppDataSource{}
+		}
+		oteldInstance.AppDataSources = append(oteldInstance.AppDataSources, dataSource)
 		instanceMap[dataSource.Spec.Mode] = oteldInstance
 	}
 	return instanceMap, nil

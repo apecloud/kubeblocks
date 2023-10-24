@@ -1,34 +1,38 @@
-logs: {
-	include:[string]
+logItem: {
+	include:[...string]
 }
 
+
 parameters: {
-	clusterName: string
-	componentName: string
-	containerName: string
+	cluster_name: string
+	component_name: string
+	container_name: string
 	metrics: {
 		enabled: *true | bool
-		collectionInterval: *"30s" | string
-		enabled_metrics?: [string]
+		collection_interval: *"30s" | string
+		enabled_metrics?: [...string]
 	}
 	logs: {
 		enabled: *true | bool
-		logs_collector?: [logs]
+		logs_collector?: [...logItem]
 	}
 }
 
 output: {
-	"\(parameters.clusterName)/\(parameters.componentName)/\(parameters.containerName)/\(parameters.containerName)": {
+	"\(parameters.cluster_name)/\(parameters.component_name)/\(parameters.container_name)/\(parameters.container_name)": {
 		enabled_metrics: parameters.metrics.enabled
 		enabled_logs: parameters.logs.enabled
 		metrics_collector: {
-			collection_interval: parameters.collection_interval
+			collection_interval: parameters.metrics.collection_interval
 			if parameters.enabled_metrics != _|_ {
 				enable_metrics: parameters.enabled_metrics
 			}
 		}
-		if logs.logs_collector != _|_ {
-			logs_collector: logs.logs_collector
+		if parameters.logs.logs_collector != _|_ {
+			logs_collector: parameters.logs.logs_collector
+		}
+		if parameters.extra_labels != _|_ {
+			external_labels: parameters.extra_labels
 		}
 	}
 }

@@ -21,6 +21,7 @@ package builder
 
 import (
 	"embed"
+	"fmt"
 
 	"cuelang.org/go/cue"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -45,6 +46,22 @@ func getCacheCUETplValue(key string, valueCreator func() (*intctrlutil.CUETpl, e
 	}
 	cacheCtx[key] = v
 	return v, err
+}
+
+func GetSubDirFileNames(subDir string) ([]string, error) {
+	cueFS, err := debme.FS(cueTemplates, fmt.Sprintf("cue/%s", subDir))
+	if err != nil {
+		return nil, err
+	}
+	cueTplFiles, err := cueFS.ReadDir(".")
+	if err != nil {
+		return nil, err
+	}
+	fileNames := make([]string, len(cueTplFiles))
+	for i, file := range cueTplFiles {
+		fileNames[i] = file.Name()
+	}
+	return fileNames, nil
 }
 
 func BuildFromCUEForOTel(tplName string, fillMap map[string]any, lookupKey string) ([]byte, error) {

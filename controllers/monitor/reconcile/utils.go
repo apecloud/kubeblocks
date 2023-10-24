@@ -150,6 +150,32 @@ func buildConfigMapForOteld(instance *types.OteldInstance, namespace string, exp
 		GetObject(), nil
 }
 
+func buildEngineConfigForOteld(instance *types.OteldInstance, namespace string, gc *types.OteldConfigGenerater) (*corev1.ConfigMap, error) {
+	if instance == nil || instance.Oteld == nil || !instance.Oteld.Spec.UseConfigMap {
+		return nil, nil
+	}
+
+	name := fmt.Sprintf(OteldConfigMapNamePattern, instance.Oteld.Spec.Mode)
+
+	commonLabels := map[string]string{
+		constant.AppManagedByLabelKey: constant.AppName,
+		constant.AppNameLabelKey:      OTeldName,
+		constant.AppInstanceLabelKey:  name,
+	}
+
+	configData, _ := gc.GenerateEngineConfiguration(instance)
+	marshal, err := yaml.Marshal(configData)
+	if err != nil {
+		return nil, err
+	}
+
+	return builder.NewConfigMapBuilder(namespace, name).
+		SetData(map[string]string{"config.yaml": string(marshal)}).
+		AddLabelsInMap(commonLabels).
+		SetOwnerReferences(instance.Oteld.APIVersion, instance.Oteld.Kind, instance.Oteld).
+		GetObject(), nil
+}
+
 func buildSecretForOteld(instance *types.OteldInstance, namespace string, exporters *types.Exporters, gc *types.OteldConfigGenerater) (*corev1.Secret, error) {
 	if instance == nil || instance.Oteld == nil {
 		return nil, nil

@@ -58,6 +58,7 @@ type AppDataSourceSpec struct {
 	Mode Mode `json:"mode,omitempty"`
 
 	// NodeSelector is the node selector of the data source
+	// only used when mode is deployment
 	// +optional
 	NodeSelector v1.NodeSelector `json:"nodeSelector,omitempty"`
 

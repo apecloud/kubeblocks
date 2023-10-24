@@ -40,6 +40,11 @@ func ConfigMap(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 		if configmap != nil {
 			desired = append(desired, configmap)
 		}
+
+		engineConfig, _ := buildEngineConfigForOteld(daemont, reqCtx.OTeld.Namespace, cg)
+		if engineConfig != nil {
+			desired = append(desired, engineConfig)
+		}
 	}
 
 	if deployment := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDeployment); deployment != nil {

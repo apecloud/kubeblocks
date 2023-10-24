@@ -47,7 +47,12 @@ var _ = Describe("monitor_controller", func() {
 		bytes, err := yaml.Marshal(cfg)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(len(bytes) > 0).Should(BeTrue())
-		Expect(true).Should(BeTrue())
+
+		engineCfg, err := cg.GenerateEngineConfiguration(instance)
+		Expect(err).ShouldNot(HaveOccurred())
+		bytes, err = yaml.Marshal(engineCfg)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(len(bytes) > 0).Should(BeTrue())
 	})
 
 })
@@ -58,9 +63,8 @@ func fakeInstance() *OteldInstance {
 			{
 				Name: "metrics",
 				ReceiverMap: map[string]Receiver{
-					"apecloudmysql":        {Parameter: "endpoint: test5"},
-					"apecloudkubeletstats": {},
-					"apecloudnode":         {},
+					"kubeletstats": {},
+					"node":         {},
 				},
 				ProcessorMap: map[string]bool{},
 				ExporterMap: map[string]bool{
@@ -71,6 +75,22 @@ func fakeInstance() *OteldInstance {
 		Oteld: &v1alpha1.OTeld{
 			Spec: v1alpha1.OTeldSpec{
 				Mode: v1alpha1.ModeDaemonSet,
+			},
+		},
+		AppDataSources: []v1alpha1.AppDataSource{
+			{
+				Spec: v1alpha1.AppDataSourceSpec{
+					Mode:          v1alpha1.ModeDaemonSet,
+					ClusterName:   "test",
+					ComponentName: "test",
+					ContainerName: "test",
+					Metrics: &v1alpha1.MetricsDataSource{
+						Enable: true,
+					},
+					Logs: &v1alpha1.LogsDataSource{
+						Enable: true,
+					},
+				},
 			},
 		},
 	}

@@ -2,7 +2,6 @@ logItem: {
 	include:[...string]
 }
 
-
 parameters: {
 	cluster_name: string
 	component_name: string
@@ -10,11 +9,11 @@ parameters: {
 	metrics: {
 		enabled: *true | bool
 		collection_interval: *"30s" | string
-		enabled_metrics?: [...string]
+		enabled_metrics: [...string]
 	}
 	logs: {
 		enabled: *true | bool
-		logs_collector?: [...logItem]
+		logs_collector: [...logItem]
 	}
 }
 

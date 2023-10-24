@@ -35,6 +35,10 @@ spec:
           spec:
             description: OTeldSpec defines the desired state of CollectorDataSource
             properties:
+              collectionInterval:
+                description: CollectionInterval is the default collect interval of
+                  the oteld collection
+                type: string
               env:
                 description: ENV vars to set on the OpenTelemetry Collector's Pods.
                   These can then in certain cases be consumed in the config file for
@@ -2249,6 +2253,7 @@ spec:
                 type: array
                 x-kubernetes-list-type: atomic
             required:
+            - collectionInterval
             - useConfigMap
             type: object
           status:

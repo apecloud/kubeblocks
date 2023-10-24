@@ -35,7 +35,7 @@ type MetricsConfig struct {
 type MetricsDataSource struct {
 	Enable bool `json:"enable,omitempty"`
 
-	MetricsCollector *MetricsConfig `json:"metricsCollector,omitempty"`
+	MetricsCollector *MetricsConfig `json:",inline"`
 }
 
 type InputConfig struct {

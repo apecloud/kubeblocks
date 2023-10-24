@@ -67,17 +67,14 @@ spec:
               metrics:
                 description: MetricsConfig is the metrics config
                 properties:
+                  collectionInterval:
+                    type: string
                   enable:
                     type: boolean
-                  metricsCollector:
-                    properties:
-                      collectionInterval:
-                        type: string
-                      enabledMetrics:
-                        items:
-                          type: string
-                        type: array
-                    type: object
+                  enabledMetrics:
+                    items:
+                      type: string
+                    type: array
                 type: object
               mode:
                 description: Mode represents how the OTeld should be deployed (deployment,
@@ -90,6 +87,7 @@ spec:
                 type: string
               nodeSelector:
                 description: NodeSelector is the node selector of the data source
+                  only used when mode is deployment
                 properties:
                   nodeSelectorTerms:
                     description: Required. A list of node selector terms. The terms

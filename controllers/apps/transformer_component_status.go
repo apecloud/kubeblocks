@@ -117,7 +117,7 @@ func (t *ComponentStatusTransformer) Transform(ctx graph.TransformContext, dag *
 	}
 
 	// build protoRSM workload
-	protoRSM, err := factory.BuildRSM(clusterObj, synthesizeComp)
+	protoRSM, err := factory.BuildRSMWrapper(clusterObj, synthesizeComp)
 	if err != nil {
 		return err
 	}

@@ -21,6 +21,8 @@ package component
 
 import (
 	"errors"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -37,6 +39,9 @@ type rsmRolesConvertor struct{}
 
 // rsmRoleProbeConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.RoleProbe.
 type rsmRoleProbeConvertor struct{}
+
+// rsmCredentialConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.Credential.
+type rsmCredentialConvertor struct{}
 
 // rsmMembershipReconfigurationConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.MembershipReconfiguration.
 type rsmMembershipReconfigurationConvertor struct{}
@@ -57,6 +62,7 @@ func BuildRSMFrom(cluster *appsv1alpha1.Cluster, synthesizeComp *SynthesizedComp
 		"alternativeservices":       &rsmAlternativeServicesConvertor{},
 		"roles":                     &rsmRolesConvertor{},
 		"roleprobe":                 &rsmRoleProbeConvertor{},
+		"credential":                &rsmCredentialConvertor{},
 		"membershipreconfiguration": &rsmMembershipReconfigurationConvertor{},
 		"memberupdatestrategy":      &rsmMemberUpdateStrategyConvertor{},
 	}
@@ -186,6 +192,39 @@ func (c *rsmRoleProbeConvertor) convert(args ...any) (any, error) {
 	}
 
 	return rsmRoleProbe, nil
+}
+
+func (c *rsmCredentialConvertor) convert(args ...any) (any, error) {
+	cluster, _, err := parseRSMConvertorArgs(args...)
+	if err != nil {
+		return nil, err
+	}
+
+	secretName := constant.GenerateDefaultConnCredential(cluster.Name)
+	credential := workloads.Credential{
+		Username: workloads.CredentialVar{
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key: constant.AccountNameForSecret,
+				},
+			},
+		},
+		Password: workloads.CredentialVar{
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key: constant.AccountPasswdForSecret,
+				},
+			},
+		},
+	}
+
+	return credential, nil
 }
 
 func (c *rsmMembershipReconfigurationConvertor) convert(args ...any) (any, error) {

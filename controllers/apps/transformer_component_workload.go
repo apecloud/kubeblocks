@@ -94,8 +94,8 @@ func (t *ComponentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	buildPodSpecVolumeMounts(synthesizeComp)
 
 	// build rsm workload
-	// TODO(xingran): BuildRSM relies on the deprecated fields of the component, for example component.WorkloadType, which should be removed in the future
-	rsm, err := factory.BuildRSM(cluster, synthesizeComp)
+	// TODO(xingran): BuildRSMWrapper relies on the deprecated fields of the component, for example component.WorkloadType, which should be removed in the future
+	rsm, err := factory.BuildRSMWrapper(cluster, synthesizeComp)
 	if err != nil {
 		return err
 	}

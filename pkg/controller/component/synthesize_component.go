@@ -281,6 +281,7 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx, cli roclient.R
 	buildWorkload := func() {
 		synthesizeComp.WorkloadType = clusterCompDef.WorkloadType
 		synthesizeComp.CharacterType = clusterCompDef.CharacterType
+		synthesizeComp.ClusterCompDefName = clusterCompDef.Name
 		synthesizeComp.HorizontalScalePolicy = clusterCompDef.HorizontalScalePolicy
 		synthesizeComp.StatelessSpec = clusterCompDef.StatelessSpec
 		synthesizeComp.StatefulSpec = clusterCompDef.StatefulSpec

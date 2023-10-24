@@ -32,8 +32,15 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
-func BuildRSMWrapper(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
-	return nil, nil
+// BuildRSMWrapper builds a ReplicatedStateMachine object based on Cluster, SynthesizedComponent.
+func BuildRSMWrapper(cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
+	if synthesizeComp.ClusterCompDefName == "" {
+		// build rsm from new ClusterDefinition API, and convert componentDefinition attributes to rsm attributes.
+		return BuildRSMFromConvertor(cluster, synthesizeComp)
+	}
+
+	// build rsm from old ClusterDefinition API
+	return BuildRSM(cluster, synthesizeComp)
 }
 
 // BuildRSMFromConvertor builds a ReplicatedStateMachine object based on the new ComponentDefinition and Component API, and does not depend on the deprecated fields in the SynthesizedComponent.
@@ -69,65 +76,26 @@ func BuildRSMFromConvertor(cluster *appsv1alpha1.Cluster, synthesizeComp *compon
 	}
 	rsmBuilder.SetVolumeClaimTemplates(vcts...)
 
-	// TODO(xingran): call rsm convertors to convert componentDef attributes to rsm attributes. including service, credential, roles, roleProbe, membershipReconfiguration, memberUpdateStrategy, etc.
-	rsm, err := component.BuildRSMFrom(cluster, synthesizeComp, rsmBuilder.GetObject())
+	// TODO(xingran): call convertors to convert componentDef attributes to  attributes. including service, credential, roles, roleProbe, membershipReconfiguration, memberUpdateStrategy, etc.
+	convertedRSM, err := component.BuildRSMFrom(cluster, synthesizeComp, rsmBuilder.GetObject())
 	if err != nil {
 		return nil, err
 	}
 
-	// return rsm, nil
-
-	service, alternativeServices := separateServices(component.Services)
-	addServiceCommonLabels(service, commonLabels, synthesizeComp.CompDefName)
-	for i := range alternativeServices {
-		addServiceCommonLabels(&alternativeServices[i], commonLabels, synthesizeComp.CompDefName)
-	}
-	if service != nil {
-		rsmBuilder.SetService(service)
-	}
-	if len(alternativeServices) == 0 {
-		alternativeServices = nil
-	}
-	alternativeServices = fixService(cluster.Namespace, rsmName, component, alternativeServices...)
-	rsmBuilder.SetAlternativeServices(alternativeServices)
-
-	secretName := constant.GenerateDefaultConnCredential(cluster.Name)
-	credential := workloads.Credential{
-		Username: workloads.CredentialVar{
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: secretName,
-					},
-					Key: constant.AccountNameForSecret,
-				},
-			},
-		},
-		Password: workloads.CredentialVar{
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: secretName,
-					},
-					Key: constant.AccountPasswdForSecret,
-				},
-			},
-		},
-	}
-	rsmBuilder.SetCredential(credential)
-
 	// update sts.spec.volumeClaimTemplates[].metadata.labels
-	if len(rsm.Spec.VolumeClaimTemplates) > 0 && len(rsm.GetLabels()) > 0 {
-		for index, vct := range rsm.Spec.VolumeClaimTemplates {
-			BuildPersistentVolumeClaimLabels(component, &vct, vct.Name)
-			rsm.Spec.VolumeClaimTemplates[index] = vct
+	// TODO(xingran): synthesizeComp.VolumeTypes has been removed, and the following code needs to be refactored.
+	if len(convertedRSM.Spec.VolumeClaimTemplates) > 0 && len(convertedRSM.GetLabels()) > 0 {
+		for index, vct := range convertedRSM.Spec.VolumeClaimTemplates {
+			BuildPersistentVolumeClaimLabels(synthesizeComp, &vct, vct.Name)
+			convertedRSM.Spec.VolumeClaimTemplates[index] = vct
 		}
 	}
 
-	if err := processContainersInjection(cluster, synthesizeComp, &rsm.Spec.Template.Spec); err != nil {
+	if err := processContainersInjection(cluster, synthesizeComp, &convertedRSM.Spec.Template.Spec); err != nil {
 		return nil, err
 	}
-	return rsm, nil
+
+	return convertedRSM, nil
 }
 
 // BuildRSM builds a ReplicatedStateMachine object based on the old CLusterDefinition API, and depends on the the deprecated fields in the SynthesizedComponent.
@@ -273,15 +241,4 @@ func getMonitorAnnotations(synthesizeComp *component.SynthesizedComponent) map[s
 		annotations["monitor.kubeblocks.io/agamotto"] = falseStr
 	}
 	return rsm.AddAnnotationScope(rsm.HeadlessServiceScope, annotations)
-}
-
-// separateComponentDefServices separates 'services' to a main service from cd and alternative services from componentDefinition
-// TODO(xingran): convert componentDef.services to rsm.Service
-func separateComponentDefServices(services []corev1.Service) (*corev1.Service, []corev1.Service) {
-	if len(services) == 0 {
-		return nil, nil
-	}
-	// from component.buildComponent (which contains component.Services' building process), the first item should be the main service
-	// TODO(free6om): make two fields in component(i.e. Service and AlternativeServices) after RSM passes all testes.
-	return &services[0], services[1:]
 }

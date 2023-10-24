@@ -43,9 +43,9 @@ type InputConfig struct {
 }
 
 type LogsDataSource struct {
-	Enable bool `json:"enable,omitempty"`
+	Enable bool `json:"enabled,omitempty"`
 
-	LogCollector *InputConfig `json:"logCollector,omitempty"`
+	LogCollector map[string]InputConfig `json:"logCollector,omitempty"`
 }
 
 // AppDataSourceSpec defines the desired state of AppDataSource

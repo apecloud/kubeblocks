@@ -290,8 +290,10 @@ func (in *LogsDataSource) DeepCopyInto(out *LogsDataSource) {
 	*out = *in
 	if in.LogCollector != nil {
 		in, out := &in.LogCollector, &out.LogCollector
-		*out = new(InputConfig)
-		(*in).DeepCopyInto(*out)
+		*out = make(map[string]InputConfig, len(*in))
+		for key, val := range *in {
+			(*out)[key] = *val.DeepCopy()
+		}
 	}
 }
 

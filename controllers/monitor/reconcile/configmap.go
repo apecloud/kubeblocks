@@ -52,6 +52,10 @@ func ConfigMap(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 		if configmap != nil {
 			desired = append(desired, configmap)
 		}
+		engineConfig, _ := buildEngineConfigForOteld(deployment, reqCtx.OTeld.Namespace, cg)
+		if engineConfig != nil {
+			desired = append(desired, engineConfig)
+		}
 	}
 
 	if err := expectedConfigMap(reqCtx, params, desired); err != nil {

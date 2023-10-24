@@ -75,6 +75,7 @@ func NewReconcileTask(name string, task ReconcileFunc) ReconcileTask {
 			},
 			// Config:      reqCtx.Config,
 			// Namespace:   reqCtx.Namespace,
+			OTeld:       reqCtx.OTeld,
 			OteldCfgRef: reqCtx.OteldCfgRef,
 		}
 		return task(reqCtx)

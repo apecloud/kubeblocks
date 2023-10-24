@@ -295,7 +295,7 @@ func (cg *OteldConfigGenerater) GenerateEngineConfiguration(instance *OteldInsta
 	cfg = append(cfg, infraSlice...)
 	defaultConfigSlice := yaml.MapSlice{}
 	for _, dataSource := range instance.AppDataSources {
-		valMap = buildEngineValMap(dataSource, instance)
+		valMap = buildEngineValMap(dataSource)
 		configSlice, err := buildSliceFromCUE(engineTplPath, valMap)
 		if err != nil {
 			return nil, err
@@ -307,19 +307,18 @@ func (cg *OteldConfigGenerater) GenerateEngineConfiguration(instance *OteldInsta
 	return cfg, nil
 }
 
-func buildEngineValMap(source v1alpha1.AppDataSource, instance *OteldInstance) map[string]any {
-	collectorInterval := instance.Oteld.Spec.CollectionInterval
-	if source.Spec.CollectionInterval != "" {
-		collectorInterval = source.Spec.CollectionInterval
-	}
+func buildEngineValMap(source v1alpha1.AppDataSource) map[string]any {
 	return map[string]any{
 		"cluster_name":                source.Spec.ClusterName,
 		"component_name":              source.Spec.ComponentName,
 		"container_name":              source.Spec.ContainerName,
 		"metrics.enabled":             source.Spec.Metrics.Enable,
-		"metrics.collection_interval": collectorInterval,
+		"metrics.collection_interval": source.Spec.Metrics.MetricsCollector.CollectionInterval,
 		"logs.enabled":                source.Spec.Logs.Enable,
+		"metrics.enabled_metrics":     source.Spec.Metrics.MetricsCollector.EnabledMetrics,
+		"logs.include":                source.Spec.Logs.LogCollector,
 	}
+
 }
 
 func buildEngineInfraValMap(instance *OteldInstance) map[string]any {

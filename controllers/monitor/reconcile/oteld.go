@@ -95,7 +95,7 @@ func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList, a
 		}
 		oteldInstance.MetricsPipline = append(oteldInstance.MetricsPipline, pipline)
 
-		instanceMap[dataSource.Spec.Mode] = oteldInstance
+		instanceMap[mode] = oteldInstance
 	}
 
 	for _, dataSource := range appDatasources.Items {
@@ -111,7 +111,7 @@ func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList, a
 			oteldInstance.AppDataSources = []v1alpha1.AppDataSource{}
 		}
 		oteldInstance.AppDataSources = append(oteldInstance.AppDataSources, dataSource)
-		instanceMap[dataSource.Spec.Mode] = oteldInstance
+		instanceMap[mode] = oteldInstance
 	}
 	return instanceMap, nil
 }

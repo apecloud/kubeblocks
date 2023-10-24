@@ -54,14 +54,16 @@ spec:
               logs:
                 description: LogsConfig is the logs config
                 properties:
-                  enable:
+                  enabled:
                     type: boolean
                   logCollector:
-                    properties:
-                      include:
-                        items:
-                          type: string
-                        type: array
+                    additionalProperties:
+                      properties:
+                        include:
+                          items:
+                            type: string
+                          type: array
+                      type: object
                     type: object
                 type: object
               metrics:

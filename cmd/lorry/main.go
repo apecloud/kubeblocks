@@ -33,6 +33,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	kzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/apecloud/kubeblocks/lorry/dcs"
 	"github.com/apecloud/kubeblocks/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/lorry/highavailability"
 	"github.com/apecloud/kubeblocks/lorry/httpserver"
@@ -83,6 +84,12 @@ func main() {
 	err = register.InitDBManager()
 	if err != nil {
 		panic(errors.Wrap(err, "DB manager initialize failed"))
+	}
+
+	// Initialize DCS (Distributed Control System)
+	err = dcs.InitStore()
+	if err != nil {
+		panic(errors.Wrap(err, "DCS initialize failed"))
 	}
 
 	// Start HA

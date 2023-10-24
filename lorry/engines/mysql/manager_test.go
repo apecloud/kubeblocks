@@ -56,7 +56,6 @@ var _ = Describe("MySQL DBManager", func() {
 			Expect(dbManger).Should(BeNil())
 		})
 	})
-
 })
 
 // func TestGetRole(t *testing.T) {

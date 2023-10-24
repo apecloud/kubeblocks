@@ -514,19 +514,27 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 	})
 
 	readinessProbe := &corev1.Probe{
-		ProbeHandler: corev1.ProbeHandler{
+		InitialDelaySeconds: roleProbe.InitialDelaySeconds,
+		TimeoutSeconds:      roleProbe.TimeoutSeconds,
+		PeriodSeconds:       roleProbe.PeriodSeconds,
+		SuccessThreshold:    roleProbe.SuccessThreshold,
+		FailureThreshold:    roleProbe.FailureThreshold,
+	}
+
+	if roleProbe.RoleUpdateMechanism == workloads.ReadinessProbeEventUpdate {
+		readinessProbe.ProbeHandler = corev1.ProbeHandler{
 			Exec: &corev1.ExecAction{
 				Command: []string{
 					grpcHealthProbeBinaryPath,
 					fmt.Sprintf(grpcHealthProbeArgsFormat, probeGRPCPort),
 				},
 			},
-		},
-		InitialDelaySeconds: roleProbe.InitialDelaySeconds,
-		TimeoutSeconds:      roleProbe.TimeoutSeconds,
-		PeriodSeconds:       roleProbe.PeriodSeconds,
-		SuccessThreshold:    roleProbe.SuccessThreshold,
-		FailureThreshold:    roleProbe.FailureThreshold,
+		}
+	} else {
+		readinessProbe.HTTPGet = &corev1.HTTPGetAction{
+			Path: httpRoleProbePath,
+			Port: intstr.FromInt(probeDaemonPort),
+		}
 	}
 
 	tryToGetRoleProbeContainer := func() *corev1.Container {
@@ -540,15 +548,17 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 
 	// if role probe container exists, update the readiness probe, env and serving container port
 	if container := tryToGetRoleProbeContainer(); container != nil {
-		// presume the second port is the grpc port.
-		// this is an easily broken contract between rsm controller and cluster controller.
-		// TODO(free6om): design a better way to do this
-		readinessProbe.Exec.Command = []string{
-			grpcHealthProbeBinaryPath,
-			fmt.Sprintf(grpcHealthProbeArgsFormat, int(container.Ports[1].ContainerPort)),
+		if roleProbe.RoleUpdateMechanism == workloads.ReadinessProbeEventUpdate {
+			// presume the second port is the grpc port.
+			// this is an easily broken contract between rsm controller and cluster controller.
+			// TODO(free6om): design a better way to do this
+			readinessProbe.Exec.Command = []string{
+				grpcHealthProbeBinaryPath,
+				fmt.Sprintf(grpcHealthProbeArgsFormat, int(container.Ports[1].ContainerPort)),
+			}
+			readinessProbe.HTTPGet = nil
+			container.ReadinessProbe = readinessProbe
 		}
-		readinessProbe.HTTPGet = nil
-		container.ReadinessProbe = readinessProbe
 		for _, e := range env {
 			if slices.IndexFunc(container.Env, func(v corev1.EnvVar) bool {
 				return v.Name == e.Name

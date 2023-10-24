@@ -32,7 +32,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/lorry/binding/custom"
 	"github.com/apecloud/kubeblocks/lorry/binding/etcd"
-	"github.com/apecloud/kubeblocks/lorry/binding/redis"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -41,7 +40,6 @@ import (
 
 const (
 	builtinPostgreSQL = "postgresql"
-	builtinRedis      = "redis"
 	builtinETCD       = "etcd"
 	builtinMongodb    = "mongodb"
 	builtinCustom     = "custom"
@@ -53,14 +51,6 @@ var customOp *custom.HTTPCustom
 func RegisterBuiltin(characterType string) error {
 	initErrFmt := "%s init err: %v"
 	switch characterType {
-	case builtinRedis:
-		redisOp := redis.NewRedis()
-		builtinMap[builtinRedis] = redisOp
-		properties := component.GetProperties(builtinRedis)
-		err := redisOp.Init(properties)
-		if err != nil {
-			return errors.Errorf(initErrFmt, builtinRedis, err)
-		}
 	case builtinETCD:
 		etcdOp := etcd.NewEtcd()
 		builtinMap[builtinETCD] = etcdOp

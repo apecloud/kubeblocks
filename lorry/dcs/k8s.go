@@ -110,7 +110,6 @@ func NewKubernetesStore() (*KubernetesStore, error) {
 		clientset:         clientset,
 		logger:            logger,
 	}
-	dcs = store
 	return store, err
 }
 

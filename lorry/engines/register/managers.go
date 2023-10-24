@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/lorry/engines/polardbx"
 	"github.com/apecloud/kubeblocks/lorry/engines/postgres/apecloudpostgres"
 	"github.com/apecloud/kubeblocks/lorry/engines/postgres/officalpostgres"
+	"github.com/apecloud/kubeblocks/lorry/engines/redis"
 	"github.com/apecloud/kubeblocks/lorry/engines/wesql"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
@@ -54,6 +55,7 @@ func init() {
 
 	RegisterManagerNewFunc("mysql", "consensus", wesql.NewManager)
 	RegisterManagerNewFunc("mysql", "replication", mysql.NewManager)
+	RegisterManagerNewFunc("redis", "replication", redis.NewManager)
 	RegisterManagerNewFunc("mongodb", "consensus", mongodb.NewManager)
 	RegisterManagerNewFunc("polardbx", "consensus", polardbx.NewManager)
 	RegisterManagerNewFunc("postgresql", "replication", officalpostgres.NewManager)

@@ -82,6 +82,7 @@ const (
 	defaultRoleProbeDaemonPort   = 7373
 	defaultRoleProbeGRPCPort     = 50101
 	roleProbeGRPCPortName        = "probe-grpc-port"
+	httpRoleProbePath            = "/v1.0/checkrole"
 	grpcHealthProbeBinaryPath    = "/bin/grpc_health_probe"
 	grpcHealthProbeArgsFormat    = "-addr=:%d"
 	defaultActionImage           = "busybox:latest"

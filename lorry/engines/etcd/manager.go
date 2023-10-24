@@ -87,6 +87,7 @@ func (mgr *Manager) IsDBStartupReady() bool {
 	cancel()
 	if err != nil {
 		mgr.Logger.Info("get etcd status failed", "error", err, "status", status)
+		return false
 	}
 
 	mgr.DBStartupReady = true

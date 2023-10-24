@@ -71,17 +71,19 @@ var _ = Describe("ETCD DBManager", func() {
 			Expect(manager.IsDBStartupReady()).Should(BeTrue())
 		})
 
-		// It("it is not ready", func() {
-		// 	etcdServer, err := StartEtcdServer()
-		// 	Expect(err).Should(BeNil())
-		// 	etcdServer.Stop()
-		// 	testEndpoint := fmt.Sprintf("http://%s", etcdServer.ETCD.Clients[0].Addr().(*net.TCPAddr).String())
-		// 	manager := &Manager{
-		// 		etcd:     etcdServer.client,
-		// 		endpoint: testEndpoint,
-		// 	}
-		// 	Expect(manager.IsDBStartupReady()).Should(BeFalse())
-		// })
+		It("it is not ready", func() {
+			etcdServer, err := StartEtcdServer()
+			Expect(err).Should(BeNil())
+			etcdServer.Stop()
+			testEndpoint := fmt.Sprintf("http://%s", etcdServer.ETCD.Clients[0].Addr().(*net.TCPAddr).String())
+			properties := engines.Properties{
+				"endpoint": testEndpoint,
+			}
+			manager, err := NewManager(properties)
+			Expect(err).Should(BeNil())
+			Expect(manager).ShouldNot(BeNil())
+			Expect(manager.IsDBStartupReady()).Should(BeFalse())
+		})
 	})
 
 	Context("get replica role", func() {

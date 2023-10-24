@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"fmt"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
@@ -28,15 +31,44 @@ type ComponentValidationTransformer struct{}
 
 var _ graph.Transformer = &ComponentValidationTransformer{}
 
-func (e *ComponentValidationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *ComponentValidationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ComponentTransformContext)
 	comp := transCtx.Component
 
-	err := comp.ValidateEnabledLogs(transCtx.CompDef)
+	err := validateEnabledLogs(comp, transCtx.CompDef)
 
 	setProvisioningStartedCondition(&comp.Status.Conditions, comp.Name, comp.Generation, err)
 	if err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
 	return nil
+}
+
+func validateEnabledLogs(comp *appsv1alpha1.Component, compDef *appsv1alpha1.ComponentDefinition) error {
+	invalidLogNames := validateEnabledLogConfigs(compDef, comp.Spec.EnabledLogs)
+	if len(invalidLogNames) > 0 {
+		return fmt.Errorf(fmt.Sprintf("EnabledLogs: %s are not defined in Component: %s of the ComponentDefinition",
+			invalidLogNames, comp.Name))
+	}
+	return nil
+}
+
+func validateEnabledLogConfigs(compDef *appsv1alpha1.ComponentDefinition, enabledLogs []string) []string {
+	invalidLogNames := make([]string, 0, len(enabledLogs))
+	logTypes := make(map[string]struct{})
+
+	for _, logConfig := range compDef.Spec.LogConfigs {
+		logTypes[logConfig.Name] = struct{}{}
+	}
+
+	// imply that all values in enabledLogs config are invalid.
+	if len(logTypes) == 0 {
+		return enabledLogs
+	}
+	for _, name := range enabledLogs {
+		if _, ok := logTypes[name]; !ok {
+			invalidLogNames = append(invalidLogNames, name)
+		}
+	}
+	return invalidLogNames
 }

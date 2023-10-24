@@ -20,9 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
-	"fmt"
-
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -162,25 +159,4 @@ type ComponentList struct {
 
 func init() {
 	SchemeBuilder.Register(&Component{}, &ComponentList{})
-}
-
-// ToVolumeClaimTemplates convert r.VolumeClaimTemplates to []corev1.PersistentVolumeClaimTemplate.
-func (r *ComponentSpec) ToVolumeClaimTemplates() []corev1.PersistentVolumeClaimTemplate {
-	if r == nil {
-		return nil
-	}
-	var ts []corev1.PersistentVolumeClaimTemplate
-	for _, t := range r.VolumeClaimTemplates {
-		ts = append(ts, t.toVolumeClaimTemplate())
-	}
-	return ts
-}
-
-// ValidateEnabledLogs validates enabledLogs config in component.Spec, and returns metav1.Condition when detecting invalid values.
-func (r *Component) ValidateEnabledLogs(compDef *ComponentDefinition) error {
-	invalidLogNames := compDef.ValidateEnabledLogConfigs(r.Spec.EnabledLogs)
-	if len(invalidLogNames) > 0 {
-		return errors.New(fmt.Sprintf("EnabledLogs: %s are not defined in Component: %s of the ComponentDefinition", invalidLogNames, r.Name))
-	}
-	return nil
 }

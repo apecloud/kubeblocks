@@ -182,8 +182,21 @@ func buildAffinitiesAndTolerations(cluster *appsv1alpha1.Cluster, synthesizeComp
 // buildVolumeClaimTemplates builds volumeClaimTemplates for component.
 func buildVolumeClaimTemplates(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) {
 	if comp.Spec.VolumeClaimTemplates != nil {
-		synthesizeComp.VolumeClaimTemplates = comp.Spec.ToVolumeClaimTemplates()
+		synthesizeComp.VolumeClaimTemplates = toVolumeClaimTemplates(&comp.Spec)
 	}
+}
+
+func toVolumeClaimTemplates(compSpec *appsv1alpha1.ComponentSpec) []corev1.PersistentVolumeClaimTemplate {
+	var ts []corev1.PersistentVolumeClaimTemplate
+	for _, t := range compSpec.VolumeClaimTemplates {
+		ts = append(ts, corev1.PersistentVolumeClaimTemplate{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: t.Name,
+			},
+			Spec: t.Spec.ToV1PersistentVolumeClaimSpec(),
+		})
+	}
+	return ts
 }
 
 // buildResources builds and updates podSpec resources for component.

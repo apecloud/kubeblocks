@@ -43,13 +43,21 @@ func Secret(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 		if secret != nil {
 			desired = append(desired, secret)
 		}
+		engineSecret, _ := buildEngineSecretForOteld(daemonSetInstance, reqCtx.OTeld.Namespace, monitorv1alpha1.ModeDaemonSet, cg)
+		if engineSecret != nil {
+			desired = append(desired, engineSecret)
+		}
 	}
 
 	deploymentInstance := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDeployment)
 	if deploymentInstance != nil {
-		secret, _ := buildSecretForOteld(deploymentInstance, reqCtx.OTeld.Namespace, reqCtx.OteldCfgRef.Exporters, monitorv1alpha1.ModeDaemonSet, cg)
+		secret, _ := buildSecretForOteld(deploymentInstance, reqCtx.OTeld.Namespace, reqCtx.OteldCfgRef.Exporters, monitorv1alpha1.ModeDeployment, cg)
 		if secret != nil {
 			desired = append(desired, secret)
+		}
+		engineSecret, _ := buildEngineSecretForOteld(deploymentInstance, reqCtx.OTeld.Namespace, monitorv1alpha1.ModeDeployment, cg)
+		if engineSecret != nil {
+			desired = append(desired, engineSecret)
 		}
 	}
 

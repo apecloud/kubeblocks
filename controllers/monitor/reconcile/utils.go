@@ -41,6 +41,7 @@ const (
 	OteldEngineConfigMapNamePattern = "oteld-configmap-engine-%s"
 	OteldServiceNamePattern         = "oteld-service-%s"
 	OteldSecretNamePattern          = "oteld-secret-%s"
+	OteldEngineSecretNamePattern    = "oteld-secret-engine-%s"
 )
 
 var (
@@ -156,20 +157,15 @@ func buildPodSpecForOteld(oTeld *v1alpha1.OTeld, mode v1alpha1.Mode) corev1.PodS
 		AddVolumes(corev1.Volume{
 			Name: "oteld-config-volume",
 			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: fmt.Sprintf(OteldConfigMapNamePattern, mode),
-					},
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: fmt.Sprintf(OteldSecretNamePattern, mode),
 				}},
 		}).
 		AddVolumes(corev1.Volume{
 			Name: "engine-config-volume",
 			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						// TODO engine configmap name
-						Name: fmt.Sprintf(OteldEngineConfigMapNamePattern, mode),
-					},
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: fmt.Sprintf(OteldEngineSecretNamePattern, mode),
 				}},
 		}).
 		SetSecurityContext(corev1.PodSecurityContext{
@@ -306,6 +302,32 @@ func buildSecretForOteld(instance *types.OteldInstance, namespace string, export
 
 	return builder.NewSecretBuilder(namespace, name).
 		PutData("config.yaml", marshal).
+		AddLabelsInMap(commonLabels).
+		SetOwnerReferences(instance.Oteld.APIVersion, instance.Oteld.Kind, instance.Oteld).
+		GetObject(), nil
+}
+
+func buildEngineSecretForOteld(instance *types.OteldInstance, namespace string, mode v1alpha1.Mode, gc *types.OteldConfigGenerater) (*corev1.Secret, error) {
+	if instance == nil || instance.Oteld == nil || !instance.Oteld.Spec.UseConfigMap {
+		return nil, nil
+	}
+
+	name := fmt.Sprintf(OteldEngineSecretNamePattern, mode)
+
+	commonLabels := map[string]string{
+		constant.AppManagedByLabelKey: constant.AppName,
+		constant.AppNameLabelKey:      OTeldName,
+		constant.AppInstanceLabelKey:  name,
+	}
+
+	configData, _ := gc.GenerateEngineConfiguration(instance)
+	marshal, err := yaml.Marshal(configData)
+	if err != nil {
+		return nil, err
+	}
+
+	return builder.NewSecretBuilder(namespace, name).
+		PutData("kb_engine.yaml", marshal).
 		AddLabelsInMap(commonLabels).
 		SetOwnerReferences(instance.Oteld.APIVersion, instance.Oteld.Kind, instance.Oteld).
 		GetObject(), nil

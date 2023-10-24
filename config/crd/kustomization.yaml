@@ -24,6 +24,7 @@ resources:
 - bases/monitor.kubeblocks.io_logsexportersinks.yaml
 - bases/monitor.kubeblocks.io_metricsexportersinks.yaml
 - bases/monitor.kubeblocks.io_collectordatasources.yaml
+- bases/monitor.kubeblocks.io_otelds.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

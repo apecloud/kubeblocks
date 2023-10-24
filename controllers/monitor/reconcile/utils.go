@@ -21,7 +21,9 @@ package reconcile
 
 import (
 	"fmt"
+	"path/filepath"
 
+	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -38,37 +40,142 @@ const (
 	OteldSecretNamePattern    = "oteld-secret-%s"
 )
 
-// var (
-//	defaultMetricsPort = 8888
-// )
+var (
+	defaultMetricsPort      = 8888
+	defaultOtelConfigPath   = "/etc/oteld/config/config.yaml"
+	defaultEngineConfigPath = "/opt/apecloud/apps/kb_engine.yaml"
+)
 
-func buildPodSpecForOteld(template *v1alpha1.OTeld) *corev1.PodSpec {
-	container := corev1.Container{
-		Name:            OTeldName,
-		Image:           template.Spec.Image,
-		ImagePullPolicy: corev1.PullIfNotPresent,
-		Args: []string{
-			"--config=/etc/oteld/config/config.yaml",
-		},
-		Env: template.Spec.Env,
-		Ports: []corev1.ContainerPort{
-			{
-				Name:          "http",
-				Protocol:      corev1.ProtocolTCP,
-				ContainerPort: 1234,
-				//HostPort:      1234,
+func buildPodSpecForOteld(oTeld *v1alpha1.OTeld) corev1.PodSpec {
+	oteldSpec := oTeld.Spec
+	container := builder.NewContainerBuilder(OTeldName).
+		SetImage(oteldSpec.Image).
+		SetImagePullPolicy(corev1.PullIfNotPresent).
+		AddArgs(fmt.Sprintf("--config=%s", defaultOtelConfigPath)).
+		AddEnv(corev1.EnvVar{
+			Name: "HOST_IP",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
 			},
-		},
-		Resources:       template.Spec.Resources,
-		VolumeMounts:    template.Spec.VolumeMounts,
-		SecurityContext: &template.Spec.SecurityContext,
-	}
+		}).
+		AddEnv(corev1.EnvVar{
+			Name:  "HOST_ROOT_MOUNT_PATH",
+			Value: "/host/root",
+		}).
+		AddEnv(corev1.EnvVar{
+			Name:  "OTELD_ENGINE_CONFIG",
+			Value: defaultEngineConfigPath,
+		}).
+		AddEnv(corev1.EnvVar{
+			Name: "POD_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
+			},
+		}).
+		AddEnv(corev1.EnvVar{
+			Name: "POD_NAMESPACE",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
+			},
+		}).
+		AddEnv(corev1.EnvVar{
+			Name: "NODE_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"},
+			},
+		}).
+		SetResources(oteldSpec.Resources).
+		SetSecurityContext(corev1.SecurityContext{
+			Privileged:             cfgutil.ToPointer(true),
+			ReadOnlyRootFilesystem: cfgutil.ToPointer(true),
+		}).
+		SetReadinessProbe(corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "//metrics",
+					Port: intstr.FromInt32(int32(defaultMetricsPort)),
+				},
+			},
+			InitialDelaySeconds: 5,
+			PeriodSeconds:       10,
+		}).
+		SetLivenessProbe(corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "//metrics",
+					Port: intstr.FromInt32(int32(defaultMetricsPort)),
+				},
+			},
+			InitialDelaySeconds: 15,
+			PeriodSeconds:       20,
+		}).
+		AddPorts(corev1.ContainerPort{
+			Name:          "http",
+			Protocol:      corev1.ProtocolTCP,
+			ContainerPort: int32(defaultMetricsPort),
+		}).
+		AddVolumeMounts(corev1.VolumeMount{
+			Name:      "oteldlog",
+			MountPath: "/var/log/oteld",
+		}).
+		AddVolumeMounts(corev1.VolumeMount{
+			Name:             "root",
+			MountPath:        "/host/root",
+			MountPropagation: cfgutil.ToPointer(corev1.MountPropagationHostToContainer),
+			ReadOnly:         true,
+		}).
+		AddVolumeMounts(corev1.VolumeMount{
+			Name:      "oteld-config-volume",
+			MountPath: filepath.Dir(defaultOtelConfigPath),
+		}).
+		AddVolumeMounts(corev1.VolumeMount{
+			Name:      "engine-config-volume",
+			MountPath: filepath.Dir(defaultEngineConfigPath),
+		}).
+		GetObject()
 
-	return &builder.NewPodBuilder("", "").
+	return builder.NewPodBuilder("", "").
 		AddSerciveAccount("oteld-controller").
-		AddContainer(container).
-		AddVolumes(template.Spec.Volumes...).
-		SetSecurityContext(template.Spec.PodSecurityContext).
+		AddContainer(*container).
+		AddVolumes(corev1.Volume{
+			Name: "oteldlog",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: "/var/log/oteld",
+					Type: cfgutil.ToPointer(corev1.HostPathDirectoryOrCreate),
+				}},
+		}).
+		AddVolumes(corev1.Volume{
+			Name: "root",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: "/"}},
+		}).
+		AddVolumes(corev1.Volume{
+			Name: "oteld-config-volume",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						// TODO otel configmap name
+						Name: "",
+					},
+				}},
+		}).
+		AddVolumes(corev1.Volume{
+			Name: "engine-config-volume",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						// TODO engine configmap name
+						Name: "",
+					},
+				}},
+		}).
+		SetSecurityContext(corev1.PodSecurityContext{
+			RunAsUser:    cfgutil.ToPointer(int64(0)),
+			RunAsGroup:   cfgutil.ToPointer(int64(0)),
+			FSGroup:      cfgutil.ToPointer(int64(65534)),
+			RunAsNonRoot: cfgutil.ToPointer(false),
+		}).
 		GetObject().Spec
 }
 

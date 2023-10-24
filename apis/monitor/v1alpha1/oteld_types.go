@@ -58,54 +58,54 @@ type OTeldSpec struct {
 	// +optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
-	// ENV vars to set on the OpenTelemetry Collector's Pods. These can then in certain cases be
-	// consumed in the config file for the Collector.
-	// +optional
-	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// PodAnnotations is the set of annotations that will be attached to
-	// Collector and Target Allocator pods.
-	// +optional
-	PodAnnotations map[string]string `json:"podAnnotations,omitempty"`
-
-	// Volumes represents which volumes to use in the underlying collector deployment(s).
-	// +optional
-	// +listType=atomic
-	Volumes []corev1.Volume `json:"volumes,omitempty"`
-
-	// VolumeMounts represents the mount points to use in the underlying collector deployment(s)
-	// +optional
-	// +listType=atomic
-	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
-
-	// Ports allows a set of ports to be exposed by the underlying v1.Service. By default, the operator
-	// will attempt to infer the required ports by parsing the .Spec.Config property but this property can be
-	// used to open additional ports that can't be inferred by the operator, like for custom receivers.
-	// +optional
-	// +listType=atomic
-	Ports []corev1.ServicePort `json:"ports,omitempty"`
-
-	// SecurityContext configures the container security context for
-	// the opentelemetry-collector container.
+	//// ENV vars to set on the OpenTelemetry Collector's Pods. These can then in certain cases be
+	//// consumed in the config file for the Collector.
+	//// +optional
+	// Env []corev1.EnvVar `json:"env,omitempty"`
 	//
-	// In deployment, daemonset, or statefulset mode, this controls
-	// the security context settings for the primary application
-	// container.
+	//// PodAnnotations is the set of annotations that will be attached to
+	//// Collector and Target Allocator pods.
+	//// +optional
+	// PodAnnotations map[string]string `json:"podAnnotations,omitempty"`
 	//
-	// In sidecar mode, this controls the security context for the
-	// injected sidecar container.
+	//// Volumes represents which volumes to use in the underlying collector deployment(s).
+	//// +optional
+	//// +listType=atomic
+	// Volumes []corev1.Volume `json:"volumes,omitempty"`
 	//
-	// +optional
-	SecurityContext corev1.SecurityContext `json:"securityContext,omitempty"`
-
-	// PodSecurityContext configures the pod security context for the
-	// opentelemetry-collector pod, when running as a deployment, daemonset,
-	// or statefulset.
+	//// VolumeMounts represents the mount points to use in the underlying collector deployment(s)
+	//// +optional
+	//// +listType=atomic
+	// VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 	//
-	// In sidecar mode, the opentelemetry-operator will ignore this setting.
+	//// Ports allows a set of ports to be exposed by the underlying v1.Service. By default, the operator
+	//// will attempt to infer the required ports by parsing the .Spec.Config property but this property can be
+	//// used to open additional ports that can't be inferred by the operator, like for custom receivers.
+	//// +optional
+	//// +listType=atomic
+	// Ports []corev1.ServicePort `json:"ports,omitempty"`
 	//
-	// +optional
-	PodSecurityContext corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
+	//// SecurityContext configures the container security context for
+	//// the opentelemetry-collector container.
+	////
+	//// In deployment, daemonset, or statefulset mode, this controls
+	//// the security context settings for the primary application
+	//// container.
+	////
+	//// In sidecar mode, this controls the security context for the
+	//// injected sidecar container.
+	////
+	//// +optional
+	// SecurityContext corev1.SecurityContext `json:"securityContext,omitempty"`
+	//
+	//// PodSecurityContext configures the pod security context for the
+	//// opentelemetry-collector pod, when running as a deployment, daemonset,
+	//// or statefulset.
+	////
+	//// In sidecar mode, the opentelemetry-operator will ignore this setting.
+	////
+	//// +optional
+	// PodSecurityContext corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
 }
 
 // OTeldStatus defines the observed state of CollectorDataSource

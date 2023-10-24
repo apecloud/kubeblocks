@@ -22,7 +22,7 @@ package reconcile
 import (
 	"reflect"
 
-	"github.com/spf13/viper"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -40,41 +40,39 @@ const OTeldAgentName = "oteld-agent"
 func OTeldAgent(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 	var (
 		k8sClient = params.Client
-		namespace = viper.GetString(constant.MonitorNamespaceEnvName)
+		name      = reqCtx.OTeld.Name
+		namespace = reqCtx.OTeld.Namespace
 	)
 
 	instance := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDaemonSet)
-
-	oteldDaemonset := buildDaemonsetForOteld(instance, namespace, OTeldName)
+	if instance == nil {
+		return cfgcore.MakeError("oteld instance is nil")
+	}
+	oteldDaemonSet := buildDaemonSetForOteld(instance, namespace, name)
 
 	existingDaemonset := &appsv1.DaemonSet{}
-	err := k8sClient.Get(reqCtx.Ctx, client.ObjectKey{Name: OTeldName, Namespace: namespace}, existingDaemonset)
-	if err != nil {
+	if err := k8sClient.Get(reqCtx.Ctx, client.ObjectKey{Name: name, Namespace: namespace}, existingDaemonset); err != nil {
 		if !apierrors.IsNotFound(err) {
 			reqCtx.Log.Error(err, "Failed to find secret", "daemonset", existingDaemonset.Name)
 			params.Recorder.Eventf(existingDaemonset, corev1.EventTypeWarning, "Failed to find secret", err.Error())
 			return err
 		}
-		return k8sClient.Create(reqCtx.Ctx, oteldDaemonset)
+		return k8sClient.Create(reqCtx.Ctx, oteldDaemonSet)
 	}
 
-	if reflect.DeepEqual(existingDaemonset.Spec, oteldDaemonset.Spec) {
+	if reflect.DeepEqual(existingDaemonset.Spec, oteldDaemonSet.Spec) {
 		return nil
 	}
 
 	updatedDeamonset := existingDaemonset.DeepCopy()
-	updatedDeamonset.Spec = oteldDaemonset.Spec
-	updatedDeamonset.Labels = oteldDaemonset.Labels
-	updatedDeamonset.Annotations = oteldDaemonset.Annotations
+	updatedDeamonset.Spec = oteldDaemonSet.Spec
+	updatedDeamonset.Labels = oteldDaemonSet.Labels
+	updatedDeamonset.Annotations = oteldDaemonSet.Annotations
 	reqCtx.Log.Info("updating existing daemonset", "daemonset", client.ObjectKeyFromObject(updatedDeamonset))
-	return k8sClient.Update(reqCtx.Ctx, oteldDaemonset)
+	return k8sClient.Update(reqCtx.Ctx, oteldDaemonSet)
 }
 
-func buildDaemonsetForOteld(instance *types.OteldInstance, namespace string, name string) *appsv1.DaemonSet {
-	if instance == nil || instance.Oteld == nil {
-		return nil
-	}
-
+func buildDaemonSetForOteld(instance *types.OteldInstance, namespace string, name string) *appsv1.DaemonSet {
 	commonLabels := map[string]string{
 		constant.AppManagedByLabelKey: constant.AppName,
 		constant.AppNameLabelKey:      OTeldName,
@@ -87,14 +85,11 @@ func buildDaemonsetForOteld(instance *types.OteldInstance, namespace string, nam
 	}
 
 	template := instance.Oteld
-	podSpec := buildPodSpecForOteld(template)
-
-	podBuilder := builder.NewPodBuilder("", "").
-		AddLabelsInMap(commonLabels)
-
 	podTemplate := corev1.PodTemplateSpec{
-		ObjectMeta: podBuilder.GetObject().ObjectMeta,
-		Spec:       *podSpec,
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: commonLabels,
+		},
+		Spec: buildPodSpecForOteld(template),
 	}
 
 	return builder.NewDaemonSetBuilder(namespace, name).

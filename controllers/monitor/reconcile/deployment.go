@@ -94,13 +94,11 @@ func buildDeploymentForOteld(instance *monitortypes.OteldInstance, namespace, na
 	}
 
 	template := instance.Oteld
-	podSpec := buildPodSpecForOteld(template)
-
-	podBuilder := builder.NewPodBuilder("", "").
-		AddLabelsInMap(commonLabels)
 	podTemplate := corev1.PodTemplateSpec{
-		ObjectMeta: podBuilder.GetObject().ObjectMeta,
-		Spec:       *podSpec,
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: commonLabels,
+		},
+		Spec: buildPodSpecForOteld(template),
 	}
 
 	return builder.NewDeploymentBuilder(namespace, name).

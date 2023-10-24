@@ -32,9 +32,19 @@ type OteldCfgRef struct {
 	*OTeldAgentConfig
 }
 
-func (c *OTeldAgentConfig) GetOteldInstance(mode v1alpha1.Mode) *OteldInstance {
+func (c *OteldCfgRef) GetOteldInstance(mode v1alpha1.Mode) *OteldInstance {
 	if c == nil || c.OteldInstanceMap == nil {
 		return nil
 	}
 	return c.OteldInstanceMap[mode]
+}
+
+func (c *OteldCfgRef) SetOteldInstance(metricsExporters *v1alpha1.MetricsExporterSinkList, logsExporters *v1alpha1.LogsExporterSinkList, instanceMap map[v1alpha1.Mode]*OteldInstance) {
+	c.OTeldAgentConfig = &OTeldAgentConfig{
+		Exporters: &Exporters{
+			MetricsExporter: metricsExporters.Items,
+			LogsExporter:    logsExporters.Items,
+		},
+		OteldInstanceMap: instanceMap,
+	}
 }

@@ -34,18 +34,14 @@ func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) erro
 		k8sClient = params.Client
 	)
 
-	exporter := monitortype.Exporters{}
 	metricsExporters := &v1alpha1.MetricsExporterSinkList{}
 	if err := k8sClient.List(ctx, metricsExporters); err != nil {
 		return err
 	}
-	exporter.MetricsExporter = metricsExporters.Items
-
 	logsExporters := &v1alpha1.LogsExporterSinkList{}
 	if err := k8sClient.List(ctx, logsExporters); err != nil {
 		return err
 	}
-	exporter.LogsExporter = logsExporters.Items
 
 	systemDatasources := &v1alpha1.CollectorDataSourceList{}
 	if err := k8sClient.List(ctx, systemDatasources, client.InNamespace(reqCtx.OTeld.GetNamespace())); err != nil {
@@ -61,17 +57,18 @@ func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) erro
 	if err != nil {
 		return err
 	}
-
-	reqCtx.OteldCfgRef.Exporters = &exporter
-	reqCtx.OteldCfgRef.OteldInstanceMap = instanceMap
 	if err = monitortype.VerifyOteldInstance(metricsExporters, logsExporters, instanceMap); err != nil {
 		return err
 	}
-	return err
+
+	reqCtx.OteldCfgRef.SetOteldInstance(metricsExporters, logsExporters, instanceMap)
+	return nil
 }
 
 func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList, appDatasources *v1alpha1.AppDataSourceList, oteld *v1alpha1.OTeld) (map[v1alpha1.Mode]*monitortype.OteldInstance, error) {
-	instanceMap := map[v1alpha1.Mode]*monitortype.OteldInstance{}
+	instanceMap := map[v1alpha1.Mode]*monitortype.OteldInstance{
+		DefaultMode: monitortype.NewOteldInstance(oteld),
+	}
 	for _, dataSource := range datasources.Items {
 		mode := dataSource.Spec.Mode
 		if mode == "" {

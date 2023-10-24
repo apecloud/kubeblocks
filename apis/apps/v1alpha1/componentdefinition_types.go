@@ -508,22 +508,34 @@ type Action struct {
 	RetryPolicy *RetryPolicy `json:"retryPolicy,omitempty"`
 }
 
+type LifecycleActionHandler struct {
+	// builtinHandler specifies the builtin handler name to do the action.
+	// Different lifecycleActions support different BuiltinHandlers. Details can be queried through official documentation in the future.
+	// use CustomHandler to define your own actions if none of them satisfies the requirement.
+	// +optional
+	BuiltinHandler *string `json:"builtinHandlerName,omitempty"`
+
+	// customHandler defines the custom way to do action.
+	// +optional
+	CustomHandler *Action `json:"customHandler,omitempty"`
+}
+
 // ComponentLifecycleActions defines a set of operational actions for interacting with component services and processes.
 type ComponentLifecycleActions struct {
 	// PostStart is called immediately after a component is created.
 	// Cannot be updated.
 	// +optional
-	PostStart *Action `json:"postStart,omitempty"`
+	PostStart *LifecycleActionHandler `json:"postStart,omitempty"`
 
 	// PreStop is called immediately before a component is terminated due to an API request.
 	// Cannot be updated.
 	// +optional
-	PreStop *Action `json:"preStop,omitempty"`
+	PreStop *LifecycleActionHandler `json:"preStop,omitempty"`
 
 	// RoleProbe defines how to probe the role of replicas.
 	// Cannot be updated.
 	// +optional
-	RoleProbe *corev1.Probe `json:"roleProbe,omitempty"`
+	RoleProbe *RoleProbeSpec `json:"roleProbe,omitempty"`
 
 	// Switchover defines how to proactively switch the current leader to a new replica to minimize the impact on availability.
 	// This action is typically invoked when the leader is about to become unavailable due to events, such as:
@@ -543,7 +555,7 @@ type ComponentLifecycleActions struct {
 	// It may involve updating configuration, notifying other members, and ensuring data consistency.
 	// Cannot be updated.
 	// +optional
-	MemberJoin *Action `json:"memberJoin,omitempty"`
+	MemberJoin *LifecycleActionHandler `json:"memberJoin,omitempty"`
 
 	// MemberLeave defines how to remove a replica from the replication group.
 	// This action is typically invoked when a replica needs to be removed, such as during scale-in.
@@ -551,18 +563,18 @@ type ComponentLifecycleActions struct {
 	// but it is advisable to avoid performing data migration within this action.
 	// Cannot be updated.
 	// +optional
-	MemberLeave *Action `json:"memberLeave,omitempty"`
+	MemberLeave *LifecycleActionHandler `json:"memberLeave,omitempty"`
 
 	// Readonly defines how to set a replica service as read-only.
 	// This action is used to protect a replica in case of volume space exhaustion or excessive traffic.
 	// Cannot be updated.
 	// +optional
-	Readonly *Action `json:"readonly,omitempty"`
+	Readonly *LifecycleActionHandler `json:"readonly,omitempty"`
 
 	// Readwrite defines how to set a replica service as read-write.
 	// Cannot be updated.
 	// +optional
-	Readwrite *Action `json:"readwrite,omitempty"`
+	Readwrite *LifecycleActionHandler `json:"readwrite,omitempty"`
 
 	// DataPopulate defines how to populate the data to create new replicas.
 	// This action is typically used when a new replica needs to be constructed, such as:
@@ -572,7 +584,7 @@ type ComponentLifecycleActions struct {
 	// It should write the valid data to stdout without including any extraneous information.
 	// Cannot be updated.
 	// +optional
-	DataPopulate *Action `json:"dataPopulate,omitempty"`
+	DataPopulate *LifecycleActionHandler `json:"dataPopulate,omitempty"`
 
 	// DataAssemble defines how to assemble data synchronized from external before starting the service for a new replica.
 	// This action is typically used when creating a new replica, such as:
@@ -583,17 +595,17 @@ type ComponentLifecycleActions struct {
 	// the action must be able to guarantee idempotence to allow for retries from the beginning.
 	// Cannot be updated.
 	// +optional
-	DataAssemble *Action `json:"dataAssemble,omitempty"`
+	DataAssemble *LifecycleActionHandler `json:"dataAssemble,omitempty"`
 
 	// Reconfigure defines how to notify the replica service that there is a configuration update.
 	// Cannot be updated.
 	// +optional
-	Reconfigure *Action `json:"reconfigure,omitempty"`
+	Reconfigure *LifecycleActionHandler `json:"reconfigure,omitempty"`
 
 	// AccountProvision defines how to provision accounts.
 	// Cannot be updated.
 	// +optional
-	AccountProvision *Action `json:"accountProvision,omitempty"`
+	AccountProvision *LifecycleActionHandler `json:"accountProvision,omitempty"`
 }
 
 type ComponentSwitchoverSpec struct {
@@ -609,6 +621,44 @@ type ComponentSwitchoverSpec struct {
 	// Once ScriptSpecSelectors is defined, the scripts defined in scripts can be referenced in the Action.
 	// +optional
 	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
+}
+
+type RoleProbeSpec struct {
+	LifecycleActionHandler `json:",inline"`
+
+	// Number of seconds after the container has started before liveness probes are initiated.
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+	// +optional
+	InitialDelaySeconds int32 `json:"initialDelaySeconds,omitempty" protobuf:"varint,2,opt,name=initialDelaySeconds"`
+	// Number of seconds after which the probe times out.
+	// Defaults to 1 second. Minimum value is 1.
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+	// +optional
+	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,3,opt,name=timeoutSeconds"`
+	// How often (in seconds) to perform the probe.
+	// Default to 10 seconds. Minimum value is 1.
+	// +optional
+	PeriodSeconds int32 `json:"periodSeconds,omitempty" protobuf:"varint,4,opt,name=periodSeconds"`
+	// Minimum consecutive successes for the probe to be considered successful after having failed.
+	// Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.
+	// +optional
+	SuccessThreshold int32 `json:"successThreshold,omitempty" protobuf:"varint,5,opt,name=successThreshold"`
+	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
+	// Defaults to 3. Minimum value is 1.
+	// +optional
+	FailureThreshold int32 `json:"failureThreshold,omitempty" protobuf:"varint,6,opt,name=failureThreshold"`
+	// Optional duration in seconds the pod needs to terminate gracefully upon probe failure.
+	// The grace period is the duration in seconds after the processes running in the pod are sent
+	// a termination signal and the time when the processes are forcibly halted with a kill signal.
+	// Set this value longer than the expected cleanup time for your process.
+	// If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this
+	// value overrides the value provided by the pod spec.
+	// Value must be non-negative integer. The value zero indicates stop immediately via
+	// the kill signal (no opportunity to shut down).
+	// This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
+	// Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.
+	// +optional
+	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty" protobuf:"varint,7,opt,name=terminationGracePeriodSeconds"`
 }
 
 // ValidateEnabledLogConfigs validates enabledLogs against component compDefName, and returns the invalid logNames undefined in ComponentDefinition.

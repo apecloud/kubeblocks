@@ -69,10 +69,15 @@ const (
 
 	AppName = "kubeblocks"
 
-	// K8s recommonded well-known labels and annotation keys
-	AppInstanceLabelKey  = "app.kubernetes.io/instance"  //
-	AppNameLabelKey      = "app.kubernetes.io/name"      // refer clusterDefinition.Name
-	AppComponentLabelKey = "app.kubernetes.io/component" // refer clusterDefinition.Spec.ComponentDefs[*].Name
+	// K8S recommended well-known labels and annotation keys
+
+	// AppInstanceLabelKey refer cluster.Name
+	AppInstanceLabelKey = "app.kubernetes.io/instance"
+	// AppNameLabelKey refer clusterDefinition.Name before KubeBlocks Version 0.8.0 or refer ComponentDefinition.Name after KubeBlocks Version 0.8.0 (TODO：Pending)
+	AppNameLabelKey = "app.kubernetes.io/name"
+	// AppComponentLabelKey refer clusterDefinition.Spec.ComponentDefs[*].Name before KubeBlocks Version 0.8.0 or refer ComponentDefinition.Name after KubeBlocks Version 0.8.0
+	AppComponentLabelKey = "app.kubernetes.io/component"
+	// AppVersionLabelKey refer clusterVersion.Name before KubeBlocks Version 0.8.0 or refer ComponentDefinition.Name after KubeBlocks Version 0.8.0
 	AppVersionLabelKey   = "app.kubernetes.io/version"
 	AppManagedByLabelKey = "app.kubernetes.io/managed-by"
 	RegionLabelKey       = "topology.kubernetes.io/region"

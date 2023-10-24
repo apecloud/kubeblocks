@@ -29,11 +29,21 @@ func GetKBConfigMapWellKnownLabels(cmTplName, clusterDefName, clusterName, compo
 	}
 }
 
-// GetKBWellKnownLabels returns the well-known labels for KB resources
+// GetKBWellKnownLabels returns the well-known labels for KB resources with ClusterDefinition API
 func GetKBWellKnownLabels(clusterDefName, clusterName, componentName string) map[string]string {
 	return map[string]string{
 		AppManagedByLabelKey:   AppName,
 		AppNameLabelKey:        clusterDefName,
+		AppInstanceLabelKey:    clusterName,
+		KBAppComponentLabelKey: componentName,
+	}
+}
+
+// GetKBWellKnownLabelsWithCompDef returns the well-known labels for KB resources with ComponentDefinition API
+func GetKBWellKnownLabelsWithCompDef(compDefName, clusterName, componentName string) map[string]string {
+	return map[string]string{
+		AppManagedByLabelKey:   AppName,
+		AppNameLabelKey:        compDefName, // TODO: reusing AppNameLabelKey for compDefName ?
 		AppInstanceLabelKey:    clusterName,
 		KBAppComponentLabelKey: componentName,
 	}
@@ -45,6 +55,20 @@ func GetComponentWellKnownLabels(clusterName, componentName string) map[string]s
 		AppManagedByLabelKey:   AppName,
 		AppInstanceLabelKey:    clusterName,
 		KBAppComponentLabelKey: componentName,
+	}
+}
+
+// GetAppVersionLabel returns the label for AppVersion
+func GetAppVersionLabel(appVersion string) map[string]string {
+	return map[string]string{
+		AppVersionLabelKey: appVersion,
+	}
+}
+
+// GetComponentDefLabel returns the label for ComponentDefinition (refer ComponentDefinition.Name)
+func GetComponentDefLabel(compDefName string) map[string]string {
+	return map[string]string{
+		AppComponentLabelKey: compDefName,
 	}
 }
 

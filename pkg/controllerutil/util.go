@@ -118,3 +118,19 @@ func ValidateExistence(ctx context.Context, cli roclient.ReadonlyClient, key cli
 	}
 	return nil
 }
+
+// MergeMetadataMap merges two map[string]string, the targetMap will be updated.
+func MergeMetadataMap(originalMap map[string]string, targetMap *map[string]string) {
+	if targetMap == nil || originalMap == nil {
+		return
+	}
+	if *targetMap == nil {
+		*targetMap = map[string]string{}
+	}
+	for k, v := range originalMap {
+		// if the annotation not exist in targetAnnotations, copy it from original.
+		if _, ok := (*targetMap)[k]; !ok {
+			(*targetMap)[k] = v
+		}
+	}
+}

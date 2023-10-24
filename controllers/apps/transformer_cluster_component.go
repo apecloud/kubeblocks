@@ -133,25 +133,9 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component, clust
 	compObjCopy := oldCompObj.DeepCopy()
 	compProto := newCompObj
 
-	// mergeAnnotations keeps the original annotations.
-	mergeMetadataMap := func(originalMap map[string]string, targetMap *map[string]string) {
-		if targetMap == nil || originalMap == nil {
-			return
-		}
-		if *targetMap == nil {
-			*targetMap = map[string]string{}
-		}
-		for k, v := range originalMap {
-			// if the annotation not exist in targetAnnotations, copy it from original.
-			if _, ok := (*targetMap)[k]; !ok {
-				(*targetMap)[k] = v
-			}
-		}
-	}
-
 	// merge labels and annotations
-	mergeMetadataMap(compObjCopy.Annotations, &compProto.Annotations)
-	mergeMetadataMap(compObjCopy.Labels, &compProto.Labels)
+	ictrlutil.MergeMetadataMap(compObjCopy.Annotations, &compProto.Annotations)
+	ictrlutil.MergeMetadataMap(compObjCopy.Labels, &compProto.Labels)
 	compObjCopy.Annotations = compProto.Annotations
 	compObjCopy.Labels = compProto.Labels
 

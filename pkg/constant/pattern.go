@@ -60,3 +60,13 @@ func GenerateDefalutComponentHeadlessServiceEndpoint(clusterName, compName, name
 func GenerateClusterComponentPattern(clusterName, compName string) string {
 	return fmt.Sprintf("%s-%s", clusterName, compName)
 }
+
+// GenerateRSMNamePattern generates rsm name pattern
+func GenerateRSMNamePattern(clusterName, compName string) string {
+	return fmt.Sprintf("%s-%s", clusterName, compName)
+}
+
+// GenerateRSMServiceNamePattern generates rsm name pattern
+func GenerateRSMServiceNamePattern(rsmName string) string {
+	return fmt.Sprintf("%s-headless", rsmName)
+}

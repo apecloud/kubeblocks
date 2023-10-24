@@ -405,7 +405,7 @@ func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
 	return lifecycleActions, nil // TODO
 }
 
-func (c *compDefLifecycleActionsConvertor) convertRoleProbe(probe *appsv1alpha1.ClusterDefinitionProbe) *corev1.Probe {
+func (c *compDefLifecycleActionsConvertor) convertRoleProbe(probe *appsv1alpha1.ClusterDefinitionProbe) *appsv1alpha1.RoleProbeSpec {
 	if probe.Commands == nil || len(probe.Commands.Writes) == 0 || len(probe.Commands.Queries) == 0 {
 		return nil
 	}
@@ -413,15 +413,18 @@ func (c *compDefLifecycleActionsConvertor) convertRoleProbe(probe *appsv1alpha1.
 	if len(probe.Commands.Writes) == 0 {
 		commands = probe.Commands.Queries
 	}
-	return &corev1.Probe{
-		ProbeHandler: corev1.ProbeHandler{
-			Exec: &corev1.ExecAction{
-				Command: commands,
-			},
-		},
+
+	return &appsv1alpha1.RoleProbeSpec{
 		TimeoutSeconds:   probe.TimeoutSeconds,
 		PeriodSeconds:    probe.PeriodSeconds,
 		FailureThreshold: probe.FailureThreshold,
+		LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
+			CustomHandler: &appsv1alpha1.Action{
+				Exec: &appsv1alpha1.ExecAction{
+					Command: commands,
+				},
+			},
+		},
 	}
 }
 

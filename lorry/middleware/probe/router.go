@@ -31,7 +31,6 @@ import (
 	. "github.com/apecloud/kubeblocks/lorry/binding"
 
 	"github.com/apecloud/kubeblocks/lorry/binding/custom"
-	"github.com/apecloud/kubeblocks/lorry/binding/etcd"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -51,14 +50,6 @@ var customOp *custom.HTTPCustom
 func RegisterBuiltin(characterType string) error {
 	initErrFmt := "%s init err: %v"
 	switch characterType {
-	case builtinETCD:
-		etcdOp := etcd.NewEtcd()
-		builtinMap[builtinETCD] = etcdOp
-		properties := component.GetProperties(builtinETCD)
-		err := etcdOp.Init(properties)
-		if err != nil {
-			return errors.Errorf(initErrFmt, builtinETCD, err)
-		}
 	default:
 		customOp = custom.NewHTTPCustom()
 		empty := make(component.Properties)

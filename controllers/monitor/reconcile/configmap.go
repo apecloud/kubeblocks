@@ -36,23 +36,23 @@ func ConfigMap(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 
 	cg := types.NewConfigGenerator()
 	if daemont := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDaemonSet); daemont != nil {
-		configmap, _ := buildConfigMapForOteld(daemont, reqCtx.OTeld.Namespace, reqCtx.OteldCfgRef.Exporters, cg)
+		configmap, _ := buildConfigMapForOteld(daemont, reqCtx.OTeld.Namespace, reqCtx.OteldCfgRef.Exporters, monitorv1alpha1.ModeDaemonSet, cg)
 		if configmap != nil {
 			desired = append(desired, configmap)
 		}
 
-		engineConfig, _ := buildEngineConfigForOteld(daemont, reqCtx.OTeld.Namespace, cg)
+		engineConfig, _ := buildEngineConfigForOteld(daemont, reqCtx.OTeld.Namespace, monitorv1alpha1.ModeDaemonSet, cg)
 		if engineConfig != nil {
 			desired = append(desired, engineConfig)
 		}
 	}
 
 	if deployment := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDeployment); deployment != nil {
-		configmap, _ := buildConfigMapForOteld(deployment, reqCtx.OTeld.Namespace, reqCtx.OteldCfgRef.Exporters, cg)
+		configmap, _ := buildConfigMapForOteld(deployment, reqCtx.OTeld.Namespace, reqCtx.OteldCfgRef.Exporters, monitorv1alpha1.ModeDeployment, cg)
 		if configmap != nil {
 			desired = append(desired, configmap)
 		}
-		engineConfig, _ := buildEngineConfigForOteld(deployment, reqCtx.OTeld.Namespace, cg)
+		engineConfig, _ := buildEngineConfigForOteld(deployment, reqCtx.OTeld.Namespace, monitorv1alpha1.ModeDeployment, cg)
 		if engineConfig != nil {
 			desired = append(desired, engineConfig)
 		}

@@ -35,9 +35,12 @@ import (
 )
 
 const (
-	OteldConfigMapNamePattern = "oteld-configmap-%s"
-	OteldServiceNamePattern   = "oteld-service-%s"
-	OteldSecretNamePattern    = "oteld-secret-%s"
+	OteldConfigMapName = "oteld-configmap"
+
+	OteldConfigMapNamePattern       = "oteld-configmap-%s"
+	OteldEngineConfigMapNamePattern = "oteld-configmap-engine-%s"
+	OteldServiceNamePattern         = "oteld-service-%s"
+	OteldSecretNamePattern          = "oteld-secret-%s"
 )
 
 var (
@@ -46,7 +49,7 @@ var (
 	defaultEngineConfigPath = "/opt/apecloud/apps/kb_engine.yaml"
 )
 
-func buildPodSpecForOteld(oTeld *v1alpha1.OTeld) corev1.PodSpec {
+func buildPodSpecForOteld(oTeld *v1alpha1.OTeld, mode v1alpha1.Mode) corev1.PodSpec {
 	oteldSpec := oTeld.Spec
 	container := builder.NewContainerBuilder(OTeldName).
 		SetImage(oteldSpec.Image).
@@ -155,8 +158,7 @@ func buildPodSpecForOteld(oTeld *v1alpha1.OTeld) corev1.PodSpec {
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
-						// TODO otel configmap name
-						Name: "",
+						Name: fmt.Sprintf(OteldConfigMapNamePattern, mode),
 					},
 				}},
 		}).
@@ -166,7 +168,7 @@ func buildPodSpecForOteld(oTeld *v1alpha1.OTeld) corev1.PodSpec {
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
 						// TODO engine configmap name
-						Name: "",
+						Name: fmt.Sprintf(OteldEngineConfigMapNamePattern, mode),
 					},
 				}},
 		}).
@@ -179,12 +181,12 @@ func buildPodSpecForOteld(oTeld *v1alpha1.OTeld) corev1.PodSpec {
 		GetObject().Spec
 }
 
-func buildSvcForOtel(oteld *v1alpha1.OTeld, namespace string) (*corev1.Service, error) {
+func buildSvcForOtel(oteld *v1alpha1.OTeld, namespace string, mode v1alpha1.Mode) (*corev1.Service, error) {
 	if oteld == nil {
 		return nil, nil
 	}
 
-	name := fmt.Sprintf(OteldServiceNamePattern, oteld.Spec.Mode)
+	name := fmt.Sprintf(OteldServiceNamePattern, mode)
 	port := oteld.Spec.MetricsPort
 	if oteld.Spec.MetricsPort != 0 {
 		port = oteld.Spec.MetricsPort
@@ -231,12 +233,12 @@ func buildSvcForOtel(oteld *v1alpha1.OTeld, namespace string) (*corev1.Service, 
 		GetObject(), nil
 }
 
-func buildConfigMapForOteld(instance *types.OteldInstance, namespace string, exporters *types.Exporters, gc *types.OteldConfigGenerater) (*corev1.ConfigMap, error) {
+func buildConfigMapForOteld(instance *types.OteldInstance, namespace string, exporters *types.Exporters, mode v1alpha1.Mode, gc *types.OteldConfigGenerater) (*corev1.ConfigMap, error) {
 	if instance == nil || instance.Oteld == nil || !instance.Oteld.Spec.UseConfigMap {
 		return nil, nil
 	}
 
-	name := fmt.Sprintf(OteldConfigMapNamePattern, instance.Oteld.Spec.Mode)
+	name := fmt.Sprintf(OteldConfigMapNamePattern, mode)
 
 	commonLabels := map[string]string{
 		constant.AppManagedByLabelKey: constant.AppName,
@@ -257,12 +259,12 @@ func buildConfigMapForOteld(instance *types.OteldInstance, namespace string, exp
 		GetObject(), nil
 }
 
-func buildEngineConfigForOteld(instance *types.OteldInstance, namespace string, gc *types.OteldConfigGenerater) (*corev1.ConfigMap, error) {
+func buildEngineConfigForOteld(instance *types.OteldInstance, namespace string, mode v1alpha1.Mode, gc *types.OteldConfigGenerater) (*corev1.ConfigMap, error) {
 	if instance == nil || instance.Oteld == nil || !instance.Oteld.Spec.UseConfigMap {
 		return nil, nil
 	}
 
-	name := fmt.Sprintf(OteldConfigMapNamePattern, instance.Oteld.Spec.Mode)
+	name := fmt.Sprintf(OteldEngineConfigMapNamePattern, mode)
 
 	commonLabels := map[string]string{
 		constant.AppManagedByLabelKey: constant.AppName,
@@ -277,18 +279,18 @@ func buildEngineConfigForOteld(instance *types.OteldInstance, namespace string, 
 	}
 
 	return builder.NewConfigMapBuilder(namespace, name).
-		SetData(map[string]string{"config.yaml": string(marshal)}).
+		SetData(map[string]string{"kb_engine.yaml": string(marshal)}).
 		AddLabelsInMap(commonLabels).
 		SetOwnerReferences(instance.Oteld.APIVersion, instance.Oteld.Kind, instance.Oteld).
 		GetObject(), nil
 }
 
-func buildSecretForOteld(instance *types.OteldInstance, namespace string, exporters *types.Exporters, gc *types.OteldConfigGenerater) (*corev1.Secret, error) {
+func buildSecretForOteld(instance *types.OteldInstance, namespace string, exporters *types.Exporters, mode v1alpha1.Mode, gc *types.OteldConfigGenerater) (*corev1.Secret, error) {
 	if instance == nil || instance.Oteld == nil {
 		return nil, nil
 	}
 
-	name := fmt.Sprintf(OteldSecretNamePattern, instance.Oteld.Spec.Mode)
+	name := fmt.Sprintf(OteldSecretNamePattern, mode)
 
 	commonLabels := map[string]string{
 		constant.AppManagedByLabelKey: constant.AppName,

@@ -71,7 +71,7 @@ spec:
                 properties:
                   collectionInterval:
                     type: string
-                  enable:
+                  enabled:
                     type: boolean
                   enabledMetrics:
                     items:

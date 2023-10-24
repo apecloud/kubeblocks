@@ -30,11 +30,15 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/monitor/types"
 )
 
+const (
+	OteldServiceName = "oteld-service"
+)
+
 func Service(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 	desired := make([]*corev1.Service, 0)
 
 	if daemon := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDaemonSet); daemon != nil {
-		svc, err := buildSvcForOtel(daemon.Oteld, reqCtx.OTeld.Namespace)
+		svc, err := buildSvcForOtel(daemon.Oteld, reqCtx.OTeld.Namespace, monitorv1alpha1.ModeDaemonSet)
 		if err != nil {
 			return err
 		}
@@ -43,7 +47,7 @@ func Service(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 		}
 	}
 	if deploy := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDeployment); deploy != nil {
-		svc, _ := buildSvcForOtel(deploy.Oteld, reqCtx.OTeld.Namespace)
+		svc, _ := buildSvcForOtel(deploy.Oteld, reqCtx.OTeld.Namespace, monitorv1alpha1.ModeDeployment)
 		if svc != nil {
 			desired = append(desired, svc)
 		}

@@ -27,15 +27,11 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-type MetricsConfig struct {
+type MetricsDataSource struct {
+	Enable bool `json:"enabled,omitempty"`
+
 	CollectionInterval string   `json:"collectionInterval,omitempty"`
 	EnabledMetrics     []string `json:"enabledMetrics,omitempty"`
-}
-
-type MetricsDataSource struct {
-	Enable bool `json:"enable,omitempty"`
-
-	MetricsCollector *MetricsConfig `json:",inline"`
 }
 
 type InputConfig struct {

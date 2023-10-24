@@ -308,16 +308,19 @@ func (cg *OteldConfigGenerater) GenerateEngineConfiguration(instance *OteldInsta
 }
 
 func buildEngineValMap(source v1alpha1.AppDataSource) map[string]any {
-	return map[string]any{
+	valMap := map[string]any{
 		"cluster_name":                source.Spec.ClusterName,
 		"component_name":              source.Spec.ComponentName,
 		"container_name":              source.Spec.ContainerName,
 		"metrics.enabled":             source.Spec.Metrics.Enable,
-		"metrics.collection_interval": source.Spec.Metrics.MetricsCollector.CollectionInterval,
+		"metrics.collection_interval": source.Spec.Metrics.CollectionInterval,
 		"logs.enabled":                source.Spec.Logs.Enable,
-		"metrics.enabled_metrics":     source.Spec.Metrics.MetricsCollector.EnabledMetrics,
-		"logs.include":                source.Spec.Logs.LogCollector,
+		"metrics.enabled_metrics":     source.Spec.Metrics.EnabledMetrics,
 	}
+	if source.Spec.Logs.LogCollector != nil {
+		valMap["logs.logs_collector"] = source.Spec.Logs.LogCollector
+	}
+	return valMap
 
 }
 

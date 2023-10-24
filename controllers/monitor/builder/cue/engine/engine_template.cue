@@ -1,5 +1,8 @@
-logItem: {
-	include:[...string]
+
+logsInclude: {
+	[string]: {
+		include: [...string]
+	}
 }
 
 parameters: {
@@ -13,7 +16,7 @@ parameters: {
 	}
 	logs: {
 		enabled: *true | bool
-		logs_collector: [...logItem]
+		logs_collector: logsInclude
 	}
 }
 
@@ -28,7 +31,13 @@ output: {
 			}
 		}
 		if parameters.logs.logs_collector != _|_ {
-			logs_collector: parameters.logs.logs_collector
+			logs_collector: {
+				for k, v in parameters.logs.logs_collector {
+					"\(k)": {
+						include: v.include
+					}
+				}
+			}
 		}
 		if parameters.extra_labels != _|_ {
 			external_labels: parameters.extra_labels

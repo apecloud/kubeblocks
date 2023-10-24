@@ -89,7 +89,7 @@ func buildDaemonSetForOteld(instance *types.OteldInstance, namespace string, nam
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: commonLabels,
 		},
-		Spec: buildPodSpecForOteld(template),
+		Spec: buildPodSpecForOteld(template, monitorv1alpha1.ModeDaemonSet),
 	}
 
 	return builder.NewDaemonSetBuilder(namespace, name).

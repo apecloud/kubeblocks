@@ -39,7 +39,7 @@ func Secret(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 	cg := types.NewConfigGenerator()
 	daemonSetInstance := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDaemonSet)
 	if daemonSetInstance != nil {
-		secret, _ := buildSecretForOteld(daemonSetInstance, reqCtx.OTeld.Namespace, reqCtx.OteldCfgRef.Exporters, cg)
+		secret, _ := buildSecretForOteld(daemonSetInstance, reqCtx.OTeld.Namespace, reqCtx.OteldCfgRef.Exporters, monitorv1alpha1.ModeDaemonSet, cg)
 		if secret != nil {
 			desired = append(desired, secret)
 		}
@@ -47,7 +47,7 @@ func Secret(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 
 	deploymentInstance := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDeployment)
 	if deploymentInstance != nil {
-		secret, _ := buildSecretForOteld(deploymentInstance, reqCtx.OTeld.Namespace, reqCtx.OteldCfgRef.Exporters, cg)
+		secret, _ := buildSecretForOteld(deploymentInstance, reqCtx.OTeld.Namespace, reqCtx.OteldCfgRef.Exporters, monitorv1alpha1.ModeDaemonSet, cg)
 		if secret != nil {
 			desired = append(desired, secret)
 		}

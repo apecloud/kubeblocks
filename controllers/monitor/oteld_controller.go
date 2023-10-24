@@ -124,8 +124,8 @@ func New(params monitortypes.OTeldParams) *OTeldReconciler {
 	reconcile.tasks = []monitortypes.ReconcileTask{
 		monitortypes.NewReconcileTask(monitorreconsile.OTeldName, monitortypes.WithReconcileOption(monitorreconsile.OTeld, params)),
 		monitortypes.NewReconcileTask(monitorreconsile.OteldSecretName, monitortypes.WithReconcileOption(monitorreconsile.Secret, params)),
-		monitortypes.NewReconcileTask(monitorreconsile.OteldConfigMapNamePattern, monitortypes.WithReconcileOption(monitorreconsile.ConfigMap, params)),
-		monitortypes.NewReconcileTask(monitorreconsile.OteldServiceNamePattern, monitortypes.WithReconcileOption(monitorreconsile.Service, params)),
+		monitortypes.NewReconcileTask(monitorreconsile.OteldConfigMapName, monitortypes.WithReconcileOption(monitorreconsile.ConfigMap, params)),
+		monitortypes.NewReconcileTask(monitorreconsile.OteldServiceName, monitortypes.WithReconcileOption(monitorreconsile.Service, params)),
 		monitortypes.NewReconcileTask(monitorreconsile.OTeldAPIServerName, monitortypes.WithReconcileOption(monitorreconsile.Deployment, params)),
 		monitortypes.NewReconcileTask(monitorreconsile.OTeldAgentName, monitortypes.WithReconcileOption(monitorreconsile.OTeldAgent, params)),
 		monitortypes.NewReconcileTask(monitorreconsile.PrometheusName, monitortypes.WithReconcileOption(monitorreconsile.Prometheus, params)),

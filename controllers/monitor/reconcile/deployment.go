@@ -22,7 +22,6 @@ package reconcile
 import (
 	"reflect"
 
-	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -40,7 +39,7 @@ const OTeldAPIServerName = "grafana"
 func Deployment(reqCtx monitortypes.ReconcileCtx, params monitortypes.OTeldParams) error {
 	var (
 		k8sClient = params.Client
-		namespace = viper.GetString(constant.MonitorNamespaceEnvName)
+		namespace = reqCtx.OTeld.GetNamespace()
 	)
 
 	instance := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDeployment)
@@ -98,7 +97,7 @@ func buildDeploymentForOteld(instance *monitortypes.OteldInstance, namespace, na
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: commonLabels,
 		},
-		Spec: buildPodSpecForOteld(template),
+		Spec: buildPodSpecForOteld(template, monitorv1alpha1.ModeDeployment),
 	}
 
 	return builder.NewDeploymentBuilder(namespace, name).

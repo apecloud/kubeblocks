@@ -196,7 +196,7 @@ var _ = Describe("Backup Controller test", func() {
 				})
 				backupKey := client.ObjectKeyFromObject(backup)
 
-				By("check backup failed and its expiration is set")
+				By("check backup failed and its expiration when retentionPeriod is not set")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
 					g.Expect(fetched.Status.Expiration).Should(BeNil())
@@ -459,7 +459,7 @@ var _ = Describe("Backup Controller test", func() {
 				})
 			})
 
-			It("should fail because of invalid backup method", func() {
+			It("should fail because backup method doesn't specify snapshotVolumes with empty actionSet", func() {
 				backup := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
 					backup.Spec.BackupPolicyName = backupPolicy.Name
 					backup.Spec.BackupMethod = "invalid"

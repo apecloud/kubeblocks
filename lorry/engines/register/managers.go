@@ -30,6 +30,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/lorry/engines"
+	"github.com/apecloud/kubeblocks/lorry/engines/etcd"
 	"github.com/apecloud/kubeblocks/lorry/engines/mongodb"
 	"github.com/apecloud/kubeblocks/lorry/engines/mysql"
 	"github.com/apecloud/kubeblocks/lorry/engines/polardbx"
@@ -56,6 +57,7 @@ func init() {
 	RegisterManagerNewFunc("mysql", "consensus", wesql.NewManager)
 	RegisterManagerNewFunc("mysql", "replication", mysql.NewManager)
 	RegisterManagerNewFunc("redis", "replication", redis.NewManager)
+	RegisterManagerNewFunc("etcd", "consensus", etcd.NewManager)
 	RegisterManagerNewFunc("mongodb", "consensus", mongodb.NewManager)
 	RegisterManagerNewFunc("polardbx", "consensus", polardbx.NewManager)
 	RegisterManagerNewFunc("postgresql", "replication", officalpostgres.NewManager)

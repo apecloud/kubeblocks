@@ -20,75 +20,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package etcd
 
 import (
-	"context"
-	"fmt"
-	"io/ioutil"
-	"net"
+	"errors"
 	"net/url"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/go-logr/zapr"
-	"github.com/pkg/errors"
+	"github.com/golang/mock/gomock"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/spf13/viper"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/server/v3/embed"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/v3client"
-	"go.uber.org/zap"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/apecloud/kubeblocks/lorry/binding"
+	"github.com/apecloud/kubeblocks/lorry/dcs"
 )
 
 const (
 	etcdStartTimeout = 30
 )
 
-func TestETCD(t *testing.T) {
-	etcdServer, err := startEtcdServer("http://localhost:0")
-	if err != nil {
-		t.Errorf("start embedded etcd server error: %s", err)
-	}
-	defer stopEtcdServer(etcdServer)
-	testEndpoint := fmt.Sprintf("http://%s", etcdServer.ETCD.Clients[0].Addr().(*net.TCPAddr).String())
+var (
+	dcsStore     dcs.DCS
+	mockDCSStore *dcs.MockDCS
+	etcdServer   *EmbeddedETCD
+)
 
-	t.Run("Invoke GetRole", func(t *testing.T) {
-		e := mockEtcd(etcdServer)
-		role, err := e.GetRole(context.Background(), &binding.ProbeRequest{}, &binding.ProbeResponse{})
-		if err != nil {
-			t.Errorf("get role error: %s", err)
-		}
-		if role != "leader" {
-			t.Errorf("unexpected role: %s", role)
-		}
-	})
-	t.Run("InitDelay", func(t *testing.T) {
-		e := &Etcd{endpoint: testEndpoint}
-		err = e.InitDelay()
-		if err != nil {
-			t.Errorf("etcd client init error: %s", err)
-		}
-	})
+func init() {
+	viper.AutomaticEnv()
+	viper.SetDefault("KB_POD_NAME", "pod-test-0")
+	viper.SetDefault("KB_CLUSTER_COMP_NAME", "cluster-component-test")
+	viper.SetDefault("KB_NAMESPACE", "namespace-test")
+	ctrl.SetLogger(zap.New())
 }
 
-func mockEtcd(etcdServer *EmbeddedETCD) *Etcd {
-	e := &Etcd{}
-	e.etcd = etcdServer.client
-	return e
+func TestETCDDBManager(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "ETCD DBManager. Suite")
 }
 
-func startEtcdServer(peerAddress string) (*EmbeddedETCD, error) {
-	etcd := &EmbeddedETCD{}
-	development, err := zap.NewDevelopment()
-	if err != nil {
-		return nil, err
-	}
-	logger := zapr.NewLogger(development)
-	etcd.logger = logger
-	return etcd, etcd.Start(peerAddress)
+var _ = BeforeSuite(func() {
+	// Init mock dcs store
+	InitMockDCSStore()
+
+	// Start ETCD Server
+	// server, err := StartEtcdServer()
+	// Expect(err).Should(BeNil())
+	// etcdServer = server
+})
+
+var _ = AfterSuite(func() {
+	StopEtcdServer(etcdServer)
+})
+
+func InitMockDCSStore() {
+	ctrl := gomock.NewController(GinkgoT())
+	mockDCSStore = dcs.NewMockDCS(ctrl)
+	mockDCSStore.EXPECT().GetClusterFromCache().Return(&dcs.Cluster{}).AnyTimes()
+	dcs.SetStore(mockDCSStore)
+	dcsStore = mockDCSStore
 }
 
-func stopEtcdServer(etcdServer *EmbeddedETCD) {
+func StartEtcdServer() (*EmbeddedETCD, error) {
+	peerAddress := "http://localhost:0"
+
+	etcdServer := &EmbeddedETCD{}
+	logger := ctrl.Log.WithName("ETCD server")
+	etcdServer.logger = logger
+	return etcdServer, etcdServer.Start(peerAddress)
+}
+
+func StopEtcdServer(etcdServer *EmbeddedETCD) {
 	if etcdServer != nil {
 		etcdServer.Stop()
 	}
@@ -103,7 +109,7 @@ type EmbeddedETCD struct {
 
 // Start starts embedded ETCD.
 func (e *EmbeddedETCD) Start(peerAddress string) error {
-	dir, err := ioutil.TempDir("", "ETCD")
+	dir, err := os.MkdirTemp("", "ETCD")
 	if err != nil {
 		return err
 	}
@@ -134,5 +140,6 @@ func (e *EmbeddedETCD) Start(peerAddress string) error {
 // Stop stops the embedded ETCD & cleanups the tmp dir.
 func (e *EmbeddedETCD) Stop() {
 	e.ETCD.Close()
+	e.ETCD.Server.Stop()
 	os.RemoveAll(e.tmpDir)
 }

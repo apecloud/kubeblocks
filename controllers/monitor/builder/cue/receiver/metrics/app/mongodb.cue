@@ -30,7 +30,7 @@ output:
       compatible_mode: true
 		}
 		resource_attributes: {
-		  job: oteld-app-metrics
-      receiver: apecloudmongodb
+		  job: "oteld-app-metrics"
+      receiver: "apecloudmongodb"
 		}
   }

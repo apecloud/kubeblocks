@@ -137,7 +137,10 @@ func newMetricsReceiverCreator(name string, receiverMap map[string]Receiver) (ya
 		receiverSlice = append(receiverSlice, receivers...)
 	}
 
-	appMetricsFileNames, err := builder.GetSubDirFileNames("cue/receiver/metrics/app")
+	appMetricsFileNames, err := builder.GetSubDirFileNames("receiver/metrics/app")
+	if err != nil {
+		return yaml.MapItem{}, err
+	}
 	for _, fileName := range appMetricsFileNames {
 		tplName := fmt.Sprintf("receiver/metrics/app/%s", fileName)
 		receivers, err := buildSliceFromCUE(tplName, map[string]any{})

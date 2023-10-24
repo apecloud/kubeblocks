@@ -15,11 +15,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-parameters: {
-	enable: *true | bool
-  container_runtime_type: *"containerd" | string
-}
-
 output: {
 	extensions: {
   	memory_ballast:

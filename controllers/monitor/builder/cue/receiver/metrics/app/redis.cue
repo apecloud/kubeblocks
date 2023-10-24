@@ -15,18 +15,31 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+parameters: {
+	job: *"oteld-app-metrics" | string
+	endpoint: *"`endpoint`:6379" | string
+	username: *"envs[\"REDIS_REPL_USER\"]" | string
+	password: *"envs[\"REDIS_REPL_PASSWORD\"]" | string
+}
+
 output:
-  resource_attributes: {
-  	container: {
-  		app_kubernetes_io_component: "`labels[\"app.kubernetes.io/component\"]`"
-	    app_kubernetes_io_instance: "`labels[\"app.kubernetes.io/instance\"]`"
-	    app_kubernetes_io_managed_by: "`labels[\"app.kubernetes.io/managed-by\"]`"
-	    app_kubernetes_io_name: "`labels[\"app.kubernetes.io/name\"]`"
-	    app_kubernetes_io_version: "`labels[\"app.kubernetes.io/version\"]`"
-	    apps_kubeblocks_io_component_name: "`labels[\"apps.kubeblocks.io/component-name\"]`"
-	    node: "${env:NODE_NAME}"
-	    namespace: "`namespace`"
-	    pod: "`name`"
-	    job: "oteld-app-metrics"
-  	}
+  apecloudredis: {
+  	rule: "type == \"container\" && monitor_type == \"redis\" && config != nil && config.EnabledMetrics"
+		config: {
+			endpoint: parameters.endpoint
+			username: parameters.username
+			password: parameters.password
+			password_file: ""
+			lua_script: ""
+			tls: {
+				insecure: true
+				insecure_skip_verify: true
+			}
+			collection_interval: "`settings.CollectionInterval`"
+		}
+
+		resource_attributes: {
+			job: parameters.job
+			receiver: "apecloudredis"
+		}
   }

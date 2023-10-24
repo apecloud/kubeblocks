@@ -15,19 +15,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-parameters: {
-	collection_interval: *"15s" | string
-}
-
-
 output:
-	k8s_cluster: {
-		rule: "type == \"k8s.node\""
-		config: {
-			"collection_interval": parameters.collection_interval
-		}
-		resource_attributes: {
-			receiver: "k8s_cluster"
-		}
-	}
-
+  "prometheus_simple/qdrant": {
+  	rule: "type == \"container\" && config != nil && config.EnabledMetrics && config.ClusterDefName == \"qdrant\" && config.ComponentDefName == \"qdrant\""
+    config: {
+    	collection_interval: "`settings.CollectionInterval`"
+        endpoint: "`endpoint`:6333"
+        disable_keep_alives: false
+        use_service_account: false
+    }
+  }

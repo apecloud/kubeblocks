@@ -19,9 +19,6 @@ parameters: {
 	endpoint: *"`endpoint`:3306" | string
 	username: *"`envs[\"MYSQL_ROOT_USER\"]`" | string
   password: *"`envs[\"MYSQL_ROOT_PASSWORD\"]`" | string
-  allow_native_passwords: *true | bool
-  transport: *"tcp" | string
-  collection_interval: *"`settings.CollectionInterval`" | string
 }
 
 output:
@@ -31,8 +28,8 @@ output:
   		endpoint: parameters.endpoint
   		username: parameters.username
       password: parameters.password
-      allow_native_passwords: parameters.allow_native_passwords
-      transport: parameters.transport
+      allow_native_passwords: true
+      transport: "tcp"
       collection_interval: "`settings.CollectionInterval`"
   	}
     resource_attributes:

@@ -15,17 +15,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-output: {
-	memory_limiter:{
-  	limit_mib: 512
-    spike_limit_mib: 128
-    check_interval: "10s"
-  }
-  batch: {
-  	send_batch_max_size: 200
-    send_batch_size: 200
-    timeout: "5s"
-  }
+parameters: {
+	collection_interval: *"15s" | string
+	job: *"oteld-k8s-cluster-metrics" | string
 }
 
+output:
+	k8s_cluster: {
+		rule: "type == \"k8s.node\""
+		config: {
+			"collection_interval": parameters.collection_interval
+		}
+		resource_attributes: {
+			receiver: "k8s_cluster"
+			job: parameters.job
+		}
+	}
 

@@ -15,8 +15,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-output:
-  resource_attributes: {
+output: {
+	watch_observers: ["apecloud_engine_observer"]
+	resource_attributes: {
   	container: {
   		app_kubernetes_io_component: "`labels[\"app.kubernetes.io/component\"]`"
 	    app_kubernetes_io_instance: "`labels[\"app.kubernetes.io/instance\"]`"
@@ -50,4 +51,5 @@ output:
       job: "oteld-system"
 	  }
   }
+}
 

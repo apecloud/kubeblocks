@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ComponentDefinition
 metadata:
-  name: postgresql
+  name: postgresql-14.7.2
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
@@ -138,27 +138,28 @@ spec:
           args:
             - curl -s http://$(KB_REPLICATION_PRIMARY_POD_FQDN):8008/switchover -XPOST -d '{"leader":"$(KB_REPLICATION_PRIMARY_POD_NAME)"}'
     accountProvision:
-      image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
-      exec:
-        command:
-          - psql
-        args:
-          - -h$(KB_ACCOUNT_ENDPOINT)
-          - -c
-          - $(KB_ACCOUNT_STATEMENT)
-      env:
-        - name: PGUSER
-          valueFrom:
-            secretKeyRef:
-              name: $(CONN_CREDENTIAL_SECRET_NAME)
-              key: username
-              optional: false
-        - name: PGPASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: $(CONN_CREDENTIAL_SECRET_NAME)
-              key: password
-              optional: false
+      customHandler:
+        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+        exec:
+          command:
+            - psql
+          args:
+            - -h$(KB_ACCOUNT_ENDPOINT)
+            - -c
+            - $(KB_ACCOUNT_STATEMENT)
+        env:
+          - name: PGUSER
+            valueFrom:
+              secretKeyRef:
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                key: username
+                optional: false
+          - name: PGPASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                key: password
+                optional: false
   runtime:
     securityContext:
       runAsUser: 0
@@ -166,6 +167,7 @@ spec:
       runAsGroup: 103
     initContainers:
       - name: pg-init-container
+        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:14.7.2-pgvector-v0.5.0
         imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
         command:
           - /kb-scripts/init_container.sh
@@ -180,6 +182,7 @@ spec:
             mountPath: /kb-podinfo
     containers:
       - name: postgresql
+        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:14.7.2-pgvector-v0.5.0
         imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
         securityContext:
           runAsUser: 0

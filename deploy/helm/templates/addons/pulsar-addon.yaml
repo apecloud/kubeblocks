@@ -23,6 +23,12 @@ spec:
       version: {{ default .Chart.Version .Values.versionOverride }}
       {{- end }}
 
+    installValues:
+      {{- if eq $cloudProvider "huaweiCloud" }}
+      setValues:
+        - cloudProvider=huaweiCloud
+      {{- end }}
+
   installable:
     autoInstall: true
 

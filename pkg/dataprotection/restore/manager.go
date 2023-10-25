@@ -295,9 +295,11 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 			}
 			if prepareActions[i].Status == dpv1alpha1.RestoreActionCompleted && currentOrder < restoreJobReplicas {
 				currentOrder += 1
-				// volume restore policy is Serial, should delete the completed job to release the pvc.
-				if err = deleteRestoreJob(reqCtx, cli, prepareActions[i].ObjectKey, r.Restore.Namespace); err != nil {
-					return nil, err
+				if prepareDataConfig.IsSerialPolicy() {
+					// if the restore policy is Serial, should delete the completed job to release the pvc.
+					if err := deleteRestoreJob(reqCtx, cli, prepareActions[i].ObjectKey, r.Restore.Namespace); err != nil {
+						return nil, err
+					}
 				}
 			}
 		}

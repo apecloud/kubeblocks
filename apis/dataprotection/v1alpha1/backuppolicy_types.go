@@ -77,7 +77,6 @@ type PodSelector struct {
 	// strategy specifies the strategy to select the target pod when multiple pods
 	// are selected.
 	// Valid values are:
-	// - All(TODO): select all pods that match the labelsSelector.
 	// - Any: select any one pod that match the labelsSelector.
 	// +kubebuilder:default=Any
 	Strategy PodSelectionStrategy `json:"strategy,omitempty"`

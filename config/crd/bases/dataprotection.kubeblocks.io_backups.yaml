@@ -605,8 +605,7 @@ spec:
                         default: Any
                         description: 'strategy specifies the strategy to select the
                           target pod when multiple pods are selected. Valid values
-                          are: - All(TODO): select all pods that match the labelsSelector.
-                          - Any: select any one pod that match the labelsSelector.'
+                          are: - Any: select any one pod that match the labelsSelector.'
                         enum:
                         - Any
                         type: string

@@ -42,7 +42,7 @@ const (
 	backupTypeLogfile  = "logfile"
 )
 
-// Version Scope: 0.7]
+// Version Scope: [0.7]
 const (
 
 	// backup method

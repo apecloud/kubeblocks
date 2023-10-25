@@ -35,6 +35,11 @@ spec:
           spec:
             description: OTeldSpec defines the desired state of CollectorDataSource
             properties:
+              batch:
+                properties:
+                  enabled:
+                    type: boolean
+                type: object
               collectionInterval:
                 description: CollectionInterval is the default collect interval of
                   the oteld collection
@@ -45,6 +50,12 @@ spec:
               logLevel:
                 description: LogsLevel is the level of the oteld collector logs
                 type: string
+              memeryLimit:
+                properties:
+                  enabled:
+                    description: MemoryLimit is the memory limit of the oteld
+                    type: boolean
+                type: object
               metricsPort:
                 description: MetricsPort is the port of the oteld metrics
                 type: integer

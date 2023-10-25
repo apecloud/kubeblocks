@@ -26,17 +26,17 @@
 
 ## What is KubeBlocks
 
-KubeBlocks is an open source system software that runs and manages data infrastructure on Kubernetes. It could manage various data systems, including RDBMSs (MySQL, PostgreSQL), Caches(Redis), NoSQLs (MongoDB), MQs(Kafka, Pulsar), and vector databases(Milvus, Qdrant, Weaviate), and the community is actively integrating more types of data systems into KuberBlocks. KubeBlocks helps developers, SREs, and platform engineers deploy and maintain dedicated DBPaaS in the enterprise, and supports a variety of public clouds and on-premise environments. 
+KubeBlocks is an open source system software that runs and manages data infrastructure on Kubernetes. It could manage various data/database engines, including RDBMSs (MySQL, PostgreSQL), Caches(Redis), NoSQLs (MongoDB), MQs(Kafka, Pulsar), and vector databases(Milvus, Qdrant, Weaviate), and the community is actively integrating more types of data/database engines into KuberBlocks. KubeBlocks helps developers, SREs, and platform engineers deploy and maintain dedicated DBPaaS in the enterprise, and supports a variety of public clouds and on-premise environments. 
 
-KubeBlocks is designed for production purposes, providing secure, cost-effective, high-available and extensive DBPaaS for enterprise. The name KubeBlocks is inspired by Kubernetes and LEGO blocks, signifying that integrating data infrastructure on K8s can be both productive and enjoyable, like playing with construction toys. The core of KubeBlocks is a K8s operator, which defines a set of CRDs to abstract the common attributes of various data systems, thereby supporting the rapid integration of a new data system into KubeBlocks while keeping the same operating experience and expected behaviors.
+KubeBlocks is designed for production purposes, providing secure, cost-effective, high-available and extensive DBPaaS for enterprise. The name KubeBlocks is inspired by Kubernetes and LEGO blocks, signifying that integrating data infrastructure on K8s can be quite standard and efficient, like playing with LEGO blocks. The core of KubeBlocks is a K8s operator, which defines a set of CRDs to abstract the common attributes of various data systems, thereby supporting the rapid integration of a new data/database engine into KubeBlocks while keeping the same operating experience and expected behaviors.
 
 ### Why you need KubeBlocks
 
-KubeBlocks integrates the most popular database engines and provides rich management functions, along with declarative APIs, on various environments. Furthermore, KubeBlocks offers the following benefits:
+KubeBlocks integrates the most popular data/database engines and provides rich management functions, along with declarative APIs, on various environments. Furthermore, KubeBlocks offers the following benefits:
 
 * Cost-effective
   
-  KubeBlocks optimizes the kernel and parameters of MySQL and PostgreSQL databases for containerized and cloud environments, and its performance exceeds that of RDS with the same hardware (see our blogs for details).
+  KubeBlocks optimizes the kernel and parameters of MySQL and PostgreSQL databases for containerized and cloud environments, and its performance exceeds that of RDS with the same hardware (see our blogs for test reports).
 
 * Reliability
   
@@ -44,7 +44,7 @@ KubeBlocks integrates the most popular database engines and provides rich manage
 
 * Observability
   
-  KubeBlocks collects monitoring metrics from rich data sources, integrates with the Prometheus stack, and provides insightful Grafana templates. In addition, troubleshooting tools such as slow logs are also provided.
+  KubeBlocks collects monitoring metrics from richful data sources, integrates with the Prometheus stack, and provides insightful Grafana templates. In addition, troubleshooting tools such as slowlogs are also provided.
 
 * Extensibility
   

@@ -37,8 +37,8 @@ import (
 	"github.com/spf13/cast"
 	"golang.org/x/exp/slices"
 
-	"github.com/apecloud/kubeblocks/lorry/component"
 	"github.com/apecloud/kubeblocks/lorry/dcs"
+	"github.com/apecloud/kubeblocks/lorry/engines"
 )
 
 var (
@@ -88,7 +88,7 @@ type PgBaseIFace interface {
 }
 
 type PgIFace interface {
-	component.DBManager
+	engines.DBManager
 	PgBaseIFace
 }
 

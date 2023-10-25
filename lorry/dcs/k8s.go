@@ -41,7 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	k8scomponent "github.com/apecloud/kubeblocks/lorry/component/kubernetes"
+	k8scomponent "github.com/apecloud/kubeblocks/lorry/engines/kubernetes"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )

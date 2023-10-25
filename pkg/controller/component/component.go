@@ -156,6 +156,9 @@ func getClusterCompDefAndVersion(reqCtx ictrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ClusterComponentDefinition, *appsv1alpha1.ClusterComponentVersion, error) {
+	if clusterCompSpec == nil {
+		return nil, nil, nil
+	}
 	if cluster.Spec.ClusterDefRef == "" || cluster.Spec.ClusterVersionRef == "" {
 		return nil, nil, errors.New("clusterDefRef and ClusterVersionRef is required when enableComponentDefinition is false")
 	}

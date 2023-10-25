@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # TLS setting
-{{- if $.component.tls }}
+{{- if $.component.tlsConfig }}
   # override TLS and auth settings
   export KAFKA_TLS_TYPE="PEM"
   echo "[tls]KAFKA_TLS_TYPE=$KAFKA_TLS_TYPE"

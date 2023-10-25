@@ -90,6 +90,7 @@ func buildSynthesizeComponent(reqCtx intctrlutil.RequestCtx,
 	var err error
 	compDefObj := compDef.DeepCopy()
 	synthesizeComp := &SynthesizedComponent{
+		Namespace:             cluster.Namespace,
 		ClusterName:           cluster.Name,
 		ClusterUID:            string(cluster.UID),
 		Name:                  comp.Name,
@@ -271,6 +272,10 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx, cli roclient.R
 	if clusterCompSpec == nil {
 		return errors.New(fmt.Sprintf("component spec %s not found", synthesizeComp.Name))
 	}
+	if clusterCompSpec.ComponentDefRef == "" {
+		return nil // no need to build backward compatible fields
+	}
+
 	clusterCompDef = cd.GetComponentDefByName(clusterCompSpec.ComponentDefRef)
 	if clusterCompDef == nil {
 		return fmt.Errorf("referenced component definition does not exist, cluster: %s, component: %s, component definition ref:%s",
@@ -370,6 +375,9 @@ func handleSimplifiedAPI(reqCtx intctrlutil.RequestCtx, cli client.Client, clust
 	}
 
 	fillSimplifiedAPI := func(cd *appsv1alpha1.ClusterDefinition, clusterCompDef *appsv1alpha1.ClusterComponentDefinition) {
+		if clusterCompDef == nil {
+			return
+		}
 		// fill simplified api only to first defined component
 		if len(cd.Spec.ComponentDefs) == 0 ||
 			cd.Spec.ComponentDefs[0].Name != clusterCompDef.Name {

@@ -37,10 +37,11 @@ import (
 // ClusterSpec defines the desired state of Cluster.
 type ClusterSpec struct {
 	// Cluster referencing ClusterDefinition name. This is an immutable attribute.
-	// +kubebuilder:validation:Required
+	// If ClusterDefRef is not specified, ComponentDef must be specified for each Component in ComponentSpecs.
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="clusterDefinitionRef is immutable"
+	// +optional
 	ClusterDefRef string `json:"clusterDefinitionRef"`
 
 	// Cluster referencing ClusterVersion name.
@@ -244,7 +245,7 @@ type ClusterComponentSpec struct {
 	// componentDef references the name of the ComponentDefinition.
 	// If both componentDefRef and componentDef are provided, the componentDef will take precedence over componentDefRef.
 	// +kubebuilder:validation:MaxLength=22
-	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDef is immutable"
 	// +optional
 	ComponentDef string `json:"componentDef,omitempty"`

@@ -150,7 +150,8 @@ spec:
                 type: object
               clusterDefinitionRef:
                 description: Cluster referencing ClusterDefinition name. This is an
-                  immutable attribute.
+                  immutable attribute. If ClusterDefRef is not specified, ComponentDef
+                  must be specified for each Component in ComponentSpecs.
                 maxLength: 63
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
@@ -232,7 +233,7 @@ spec:
                         If both componentDefRef and componentDef are provided, the
                         componentDef will take precedence over componentDefRef.
                       maxLength: 22
-                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                       x-kubernetes-validations:
                       - message: componentDef is immutable
@@ -1393,7 +1394,6 @@ spec:
                 type: array
                 x-kubernetes-preserve-unknown-fields: true
             required:
-            - clusterDefinitionRef
             - terminationPolicy
             type: object
           status:

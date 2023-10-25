@@ -43,7 +43,12 @@ func (t *ComponentConfigurationTransformer) Transform(ctx graph.TransformContext
 
 	comp := transCtx.Component
 	cluster := transCtx.Cluster
+	compOrig := transCtx.ComponentOrig
 	synthesizeComp := transCtx.SynthesizeComponent
+
+	if model.IsObjectDeleting(compOrig) {
+		return nil
+	}
 
 	// get rsm and dependOnObjs which will be used in configuration render
 	var rsm *workloads.ReplicatedStateMachine

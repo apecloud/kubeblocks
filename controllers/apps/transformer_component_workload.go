@@ -106,6 +106,7 @@ func (t *ComponentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 			// do nothing
 		} else {
 			graphCli.Create(dag, rsm)
+			return nil
 		}
 	} else {
 		if rsm == nil {

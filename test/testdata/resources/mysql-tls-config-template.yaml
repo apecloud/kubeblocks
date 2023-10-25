@@ -22,7 +22,7 @@ data:
     [client]
     socket=/var/run/mysqld/mysqld.sock
     host=localhost
-    {{- if $.component.tls }}
+    {{- if $.component.tlsConfig }}
     {{- $ca_file := getCAFile }}
     {{- $cert_file := getCertFile }}
     {{- $key_file := getKeyFile }}

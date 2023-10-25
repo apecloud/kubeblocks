@@ -25,8 +25,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const OTeldName = "apecloudoteld"
-const DefaultMode = v1alpha1.ModeDaemonSet
+const (
+	OTeldName           = "apecloudoteld"
+	DefaultMode         = v1alpha1.ModeDaemonSet
+	ExporterNamePattern = "%s/%s"
+)
 
 func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) error {
 	var (
@@ -53,7 +56,7 @@ func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) erro
 		return err
 	}
 
-	instanceMap, err := BuildInstanceMapForPipline(systemDatasources, appDatasources, reqCtx.OTeld)
+	instanceMap, err := BuildInstanceMapForPipline(systemDatasources, appDatasources, metricsExporters, logsExporters, reqCtx.OTeld)
 	if err != nil {
 		return err
 	}
@@ -65,7 +68,11 @@ func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) erro
 	return nil
 }
 
-func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList, appDatasources *v1alpha1.AppDataSourceList, oteld *v1alpha1.OTeld) (map[v1alpha1.Mode]*monitortype.OteldInstance, error) {
+func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList,
+	appDatasources *v1alpha1.AppDataSourceList,
+	metricsExporters *v1alpha1.MetricsExporterSinkList,
+	logsExporters *v1alpha1.LogsExporterSinkList,
+	oteld *v1alpha1.OTeld) (map[v1alpha1.Mode]*monitortype.OteldInstance, error) {
 	instanceMap := map[v1alpha1.Mode]*monitortype.OteldInstance{
 		DefaultMode: monitortype.NewOteldInstance(oteld),
 	}
@@ -88,6 +95,13 @@ func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList, a
 				Parameter:          data.Parameter,
 				CollectionInterval: dataSource.Spec.CollectionInterval,
 			}
+		}
+
+		if oteldInstance.Oteld.Spec.Batch.Enabeld == true {
+			pipline.ProcessorMap[monitortype.BatchProcessorName] = true
+		}
+		if oteldInstance.Oteld.Spec.MemoryLimiter.Enabled == true {
+			pipline.ProcessorMap[monitortype.MemoryProcessorName] = true
 		}
 
 		for _, exporter := range dataSource.Spec.ExporterNames {
@@ -113,5 +127,35 @@ func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList, a
 		oteldInstance.AppDataSources = append(oteldInstance.AppDataSources, dataSource)
 		instanceMap[mode] = oteldInstance
 	}
+
+	for _, instance := range instanceMap {
+		systemMetricsPipline := monitortype.NewPipline()
+		systemMetricsPipline.Name = monitortype.AppMetricsCreatorName
+		if instance.Oteld.Spec.Batch.Enabeld == true {
+			systemMetricsPipline.ProcessorMap[monitortype.BatchProcessorName] = true
+		}
+		if instance.Oteld.Spec.MemoryLimiter.Enabled == true {
+			systemMetricsPipline.ProcessorMap[monitortype.MemoryProcessorName] = true
+		}
+		for _, exporter := range metricsExporters.Items {
+			systemMetricsPipline.ExporterMap[string(exporter.Spec.Type)] = true
+		}
+		instance.AppMetricsPiplien = systemMetricsPipline
+
+		logPipline := monitortype.NewPipline()
+		logPipline.Name = monitortype.LogCreatorName
+		logPipline.ReceiverMap[monitortype.LogCreatorName] = monitortype.Receiver{}
+		if instance.Oteld.Spec.Batch.Enabeld == true {
+			logPipline.ProcessorMap[monitortype.BatchProcessorName] = true
+		}
+		if instance.Oteld.Spec.MemoryLimiter.Enabled == true {
+			logPipline.ProcessorMap[monitortype.MemoryProcessorName] = true
+		}
+		for _, exporter := range logsExporters.Items {
+			logPipline.ExporterMap[string(exporter.Spec.Type)] = true
+		}
+		instance.LogsPipline = logPipline
+	}
+
 	return instanceMap, nil
 }

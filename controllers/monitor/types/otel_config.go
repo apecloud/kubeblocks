@@ -39,8 +39,12 @@ const (
 	MetricsInfraTplName = "receiver/metrics_creator_infra.cue"
 	LogsInfraTplName    = "receiver/logs_creator_infra.cue"
 
-	logCreatorName = "receiver_creator/logs"
-	engineTplPath  = "engine/engine_template.cue"
+	AppMetricsCreatorName = "receiver_creator/app"
+	LogCreatorName        = "receiver_creator/logs"
+	EngineTplPath         = "engine/engine_template.cue"
+
+	BatchProcessorName  = "batch"
+	MemoryProcessorName = "memory_limiter"
 )
 
 type OteldConfigGenerater struct {
@@ -107,13 +111,43 @@ func newReceiverCreatorSlice(instance *OteldInstance) (yaml.MapSlice, error) {
 		creators = append(creators, creator)
 	}
 
+	appMetricsCreator, err := newAppReceiverCreator()
+	if err != nil {
+		return nil, err
+	}
+	creators = append(creators, appMetricsCreator)
+
 	logsInfraName := LogsInfraTplName
 	logCreatorSlice, err := buildSliceFromCUE(logsInfraName, map[string]any{})
 	if err != nil {
 		return nil, err
 	}
-	creators = append(creators, yaml.MapItem{Key: logCreatorName, Value: logCreatorSlice})
+	creators = append(creators, yaml.MapItem{Key: LogCreatorName, Value: logCreatorSlice})
 	return creators, nil
+}
+
+func newAppReceiverCreator() (yaml.MapItem, error) {
+	infraTplName := MetricsInfraTplName
+	metricsSlice, err := buildSliceFromCUE(infraTplName, map[string]any{})
+	if err != nil {
+		return yaml.MapItem{}, err
+	}
+	receiverSlice := yaml.MapSlice{}
+
+	appMetricsFileNames, err := builder.GetSubDirFileNames("receiver/metrics/app")
+	if err != nil {
+		return yaml.MapItem{}, err
+	}
+	for _, fileName := range appMetricsFileNames {
+		tplName := fmt.Sprintf("receiver/metrics/app/%s", fileName)
+		receivers, err := buildSliceFromCUE(tplName, map[string]any{})
+		if err != nil {
+			return yaml.MapItem{}, err
+		}
+		receiverSlice = append(receiverSlice, receivers...)
+	}
+	metricsSlice = append(metricsSlice, yaml.MapItem{Key: "receivers", Value: receiverSlice})
+	return yaml.MapItem{Key: fmt.Sprintf(AppMetricsCreatorName), Value: metricsSlice}, nil
 }
 
 func newMetricsReceiverCreator(name string, receiverMap map[string]Receiver) (yaml.MapItem, error) {
@@ -131,19 +165,6 @@ func newMetricsReceiverCreator(name string, receiverMap map[string]Receiver) (ya
 		}
 		builder.MergeValMapFromYamlStr(valueMap, params.Parameter)
 		receivers, err := buildSliceFromCUE(tplName, valueMap)
-		if err != nil {
-			return yaml.MapItem{}, err
-		}
-		receiverSlice = append(receiverSlice, receivers...)
-	}
-
-	appMetricsFileNames, err := builder.GetSubDirFileNames("receiver/metrics/app")
-	if err != nil {
-		return yaml.MapItem{}, err
-	}
-	for _, fileName := range appMetricsFileNames {
-		tplName := fmt.Sprintf("receiver/metrics/app/%s", fileName)
-		receivers, err := buildSliceFromCUE(tplName, map[string]any{})
 		if err != nil {
 			return yaml.MapItem{}, err
 		}
@@ -220,6 +241,13 @@ func (cg *OteldConfigGenerater) buildPiplineItem(instance *OteldInstance) yaml.M
 			receiverSlice := []string{}
 			receiverSlice = append(receiverSlice, fmt.Sprintf(ReceiverNamePattern, mPipline.Name))
 			metricsSlice = append(metricsSlice, yaml.MapItem{Key: "receivers", Value: receiverSlice})
+
+			processorSlice := []string{}
+			for name := range mPipline.ProcessorMap {
+				processorSlice = append(processorSlice, name)
+			}
+			metricsSlice = append(metricsSlice, yaml.MapItem{Key: "processors", Value: processorSlice})
+
 			exporterSlice := []string{}
 			for name := range mPipline.ExporterMap {
 				exporterSlice = append(exporterSlice, name)
@@ -231,19 +259,50 @@ func (cg *OteldConfigGenerater) buildPiplineItem(instance *OteldInstance) yaml.M
 		}
 	}
 
-	if instance.LogsPipline != nil {
-		logsSlice := yaml.MapSlice{}
-		for _, lPipline := range instance.LogsPipline {
-			receiverSlice := []string{}
-			receiverSlice = append(receiverSlice, fmt.Sprintf(ReceiverNamePattern, lPipline.Name))
-			logsSlice = append(logsSlice, yaml.MapItem{Key: "receivers", Value: receiverSlice})
-			exporterSlice := []string{}
-			for name := range lPipline.ExporterMap {
-				exporterSlice = append(exporterSlice, name)
-			}
+	if instance.AppMetricsPiplien.Name != "" {
+		metricsPipline := instance.AppMetricsPiplien
 
-			logsSlice = append(logsSlice, yaml.MapItem{Key: "exporters", Value: exporterSlice})
+		metricsSlice := yaml.MapSlice{}
+		var receiverSlice []string
+		receiverSlice = append(receiverSlice, metricsPipline.Name)
+		metricsSlice = append(metricsSlice, yaml.MapItem{Key: "receivers", Value: receiverSlice})
+
+		processorSlice := []string{}
+		for name := range metricsPipline.ProcessorMap {
+			processorSlice = append(processorSlice, name)
 		}
+		metricsSlice = append(metricsSlice, yaml.MapItem{Key: "processors", Value: processorSlice})
+
+		var exporterSlice []string
+		for exporter, _ := range metricsPipline.ExporterMap {
+			exporterSlice = append(exporterSlice, exporter)
+		}
+		metricsSlice = append(metricsSlice, yaml.MapItem{Key: "exporters", Value: exporterSlice})
+
+		pipline = append(pipline, yaml.MapItem{Key: "metrics/app", Value: metricsSlice})
+
+	}
+
+	if len(instance.AppDataSources) > 0 {
+		logPipline := instance.LogsPipline
+
+		logsSlice := yaml.MapSlice{}
+		var receiverSlice []string
+		receiverSlice = append(receiverSlice, logPipline.Name)
+		logsSlice = append(logsSlice, yaml.MapItem{Key: "receivers", Value: receiverSlice})
+
+		processorSlice := []string{}
+		for name := range logPipline.ProcessorMap {
+			processorSlice = append(processorSlice, name)
+		}
+		logsSlice = append(logsSlice, yaml.MapItem{Key: "processors", Value: processorSlice})
+
+		var exporterSlice []string
+		for exporter, _ := range logPipline.ExporterMap {
+			exporterSlice = append(exporterSlice, exporter)
+		}
+		logsSlice = append(logsSlice, yaml.MapItem{Key: "exporters", Value: exporterSlice})
+
 		if len(logsSlice) > 0 {
 			pipline = append(pipline, yaml.MapItem{Key: "logs", Value: logsSlice})
 		}
@@ -296,7 +355,7 @@ func (cg *OteldConfigGenerater) GenerateEngineConfiguration(instance *OteldInsta
 	defaultConfigSlice := yaml.MapSlice{}
 	for _, dataSource := range instance.AppDataSources {
 		valMap = buildEngineValMap(dataSource)
-		configSlice, err := buildSliceFromCUE(engineTplPath, valMap)
+		configSlice, err := buildSliceFromCUE(EngineTplPath, valMap)
 		if err != nil {
 			return nil, err
 		}

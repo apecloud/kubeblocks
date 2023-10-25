@@ -59,9 +59,6 @@ func buildPodSpecForOteld(oTeld *v1alpha1.OTeld, mode v1alpha1.Mode) corev1.PodS
 		AddEnv(corev1.EnvVar{
 			Name:  "HOST_IP",
 			Value: "0.0.0.0",
-			//ValueFrom: &corev1.EnvVarSource{
-			//	FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
-			//},
 		}).
 		AddEnv(corev1.EnvVar{
 			Name:  "HOST_ROOT_MOUNT_PATH",
@@ -94,26 +91,26 @@ func buildPodSpecForOteld(oTeld *v1alpha1.OTeld, mode v1alpha1.Mode) corev1.PodS
 			Privileged:             cfgutil.ToPointer(true),
 			ReadOnlyRootFilesystem: cfgutil.ToPointer(true),
 		}).
-		SetReadinessProbe(corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: "//metrics",
-					Port: intstr.FromInt32(int32(defaultMetricsPort)),
-				},
-			},
-			InitialDelaySeconds: 5,
-			PeriodSeconds:       10,
-		}).
-		SetLivenessProbe(corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: "//metrics",
-					Port: intstr.FromInt32(int32(defaultMetricsPort)),
-				},
-			},
-			InitialDelaySeconds: 15,
-			PeriodSeconds:       20,
-		}).
+		// SetReadinessProbe(corev1.Probe{
+		//	 ProbeHandler: corev1.ProbeHandler{
+		//		 HTTPGet: &corev1.HTTPGetAction{
+		//			 Path: "//metrics",
+		//			 Port: intstr.FromInt32(int32(defaultMetricsPort)),
+		//		 },
+		//	 },
+		//	 InitialDelaySeconds: 5,
+		//	 PeriodSeconds:       10,
+		// }).
+		// SetLivenessProbe(corev1.Probe{
+		// 	 ProbeHandler: corev1.ProbeHandler{
+		// 		 HTTPGet: &corev1.HTTPGetAction{
+		//			 Path: "//metrics",
+		//			 Port: intstr.FromInt32(int32(defaultMetricsPort)),
+		//		 },
+		//	 },
+		//	 InitialDelaySeconds: 15,
+		//	 PeriodSeconds:       20,
+		// }).
 		AddPorts(corev1.ContainerPort{
 			Name:          "http",
 			Protocol:      corev1.ProtocolTCP,

@@ -27,6 +27,15 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+type MemoryLimiterConfig struct {
+	// MemoryLimit is the memory limit of the oteld
+	Enabled bool `json:"enabled,omitempty"`
+}
+
+type BatchConfig struct {
+	Enabeld bool `json:"enabled,omitempty"`
+}
+
 // OTeldSpec defines the desired state of CollectorDataSource
 type OTeldSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
@@ -43,6 +52,10 @@ type OTeldSpec struct {
 
 	// CollectionInterval is the default collect interval of the oteld collection
 	CollectionInterval string `json:"collectionInterval"`
+
+	MemoryLimiter MemoryLimiterConfig `json:"memeryLimit,omitempty"`
+
+	Batch BatchConfig `json:"batch,omitempty"`
 
 	// Resources is the resource requirements for the oteld
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`

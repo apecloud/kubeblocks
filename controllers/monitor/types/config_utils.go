@@ -44,15 +44,6 @@ func VerifyOteldInstance(metricsExporterList *v1alpha1.MetricsExporterSinkList, 
 				}
 			}
 		}
-		if instance.LogsPipline != nil {
-			for _, pipline := range instance.LogsPipline {
-				for key := range pipline.ExporterMap {
-					if _, ok := logMap[key]; !ok {
-						return cfgcore.MakeError("not found exporter %s", key)
-					}
-				}
-			}
-		}
 	}
 	return nil
 }

@@ -83,9 +83,10 @@ func buildDeploymentForOteld(instance *monitortypes.OteldInstance, namespace, na
 
 	commonLabels := map[string]string{
 		constant.AppManagedByLabelKey: constant.AppName,
-		constant.AppNameLabelKey:      OTeldName,
-		constant.AppInstanceLabelKey:  name,
+		constant.AppNameLabelKey:      "apecloudoteld",
+		constant.AppInstanceLabelKey:  "apecloudoteld",
 		constant.MonitorManagedByKey:  "oteld",
+		constant.MonitorMode:          string(monitorv1alpha1.ModeDeployment),
 	}
 
 	labelSelector := &metav1.LabelSelector{

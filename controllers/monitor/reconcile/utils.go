@@ -215,6 +215,7 @@ func buildSvcForOtel(oteld *v1alpha1.OTeld, namespace string, mode v1alpha1.Mode
 		selectors = map[string]string{
 			constant.AppInstanceLabelKey: "apecloudoteld",
 			constant.AppNameLabelKey:     "apecloudoteld",
+			constant.MonitorMode:         string(mode),
 		}
 	)
 
@@ -240,7 +241,7 @@ func buildConfigMapForOteld(instance *types.OteldInstance, namespace string, exp
 		constant.AppInstanceLabelKey:  name,
 	}
 
-	configData, _ := gc.GenerateOteldConfiguration(instance, exporters.MetricsExporter, exporters.LogsExporter)
+	configData, _ := gc.GenerateOteldConfiguration(instance, exporters.MetricsExporter, exporters.LogsExporter, mode)
 	marshal, err := yaml.Marshal(configData)
 	if err != nil {
 		return nil, err
@@ -266,7 +267,7 @@ func buildEngineConfigForOteld(instance *types.OteldInstance, namespace string, 
 		constant.AppInstanceLabelKey:  name,
 	}
 
-	configData, _ := gc.GenerateEngineConfiguration(instance)
+	configData, _ := gc.GenerateEngineConfiguration(instance, mode)
 	marshal, err := yaml.Marshal(configData)
 	if err != nil {
 		return nil, err
@@ -292,7 +293,7 @@ func buildSecretForOteld(instance *types.OteldInstance, namespace string, export
 		constant.AppInstanceLabelKey:  name,
 	}
 
-	configData, _ := gc.GenerateOteldConfiguration(instance, exporters.MetricsExporter, exporters.LogsExporter)
+	configData, _ := gc.GenerateOteldConfiguration(instance, exporters.MetricsExporter, exporters.LogsExporter, mode)
 	marshal, err := yaml.Marshal(configData)
 	if err != nil {
 		return nil, err
@@ -318,7 +319,7 @@ func buildEngineSecretForOteld(instance *types.OteldInstance, namespace string, 
 		constant.AppInstanceLabelKey:  name,
 	}
 
-	configData, _ := gc.GenerateEngineConfiguration(instance)
+	configData, _ := gc.GenerateEngineConfiguration(instance, mode)
 	marshal, err := yaml.Marshal(configData)
 	if err != nil {
 		return nil, err

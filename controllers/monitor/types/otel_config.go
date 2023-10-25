@@ -62,15 +62,15 @@ func NewConfigGenerator() *OteldConfigGenerater {
 	}
 }
 
-func (cg *OteldConfigGenerater) GenerateOteldConfiguration(instance *OteldInstance, metricsExporterList []v1alpha1.MetricsExporterSink, logsExporterList []v1alpha1.LogsExporterSink) (yaml.MapSlice, error) {
+func (cg *OteldConfigGenerater) GenerateOteldConfiguration(instance *OteldInstance, metricsExporterList []v1alpha1.MetricsExporterSink, logsExporterList []v1alpha1.LogsExporterSink, mode v1alpha1.Mode) (yaml.MapSlice, error) {
 	var err error
 	var cfg = yaml.MapSlice{}
 
 	if instance == nil || instance.Oteld == nil {
 		return nil, nil
 	}
-	if cg.cache != nil && cg.cache[instance.Oteld.Spec.Mode] != nil {
-		return cg.cache[instance.Oteld.Spec.Mode], nil
+	if cg.cache != nil && cg.cache[mode] != nil {
+		return cg.cache[mode], nil
 	}
 	if cfg, err = cg.appendExtentions(cfg); err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func (cg *OteldConfigGenerater) GenerateOteldConfiguration(instance *OteldInstan
 		return nil, err
 	}
 
-	cg.cache[instance.Oteld.Spec.Mode] = cfg
+	cg.cache[mode] = cfg
 	return cfg, nil
 }
 
@@ -340,7 +340,7 @@ func buildSliceFromCUE(tplName string, valMap map[string]any) (yaml.MapSlice, er
 	return extensionSlice, nil
 }
 
-func (cg *OteldConfigGenerater) GenerateEngineConfiguration(instance *OteldInstance) (yaml.MapSlice, error) {
+func (cg *OteldConfigGenerater) GenerateEngineConfiguration(instance *OteldInstance, mode v1alpha1.Mode) (yaml.MapSlice, error) {
 	var err error
 	var valMap map[string]any
 	var cfg = yaml.MapSlice{}
@@ -348,8 +348,8 @@ func (cg *OteldConfigGenerater) GenerateEngineConfiguration(instance *OteldInsta
 	if instance == nil || instance.Oteld == nil {
 		return nil, nil
 	}
-	if cg.engineCache != nil && cg.engineCache[instance.Oteld.Spec.Mode] != nil {
-		return cg.engineCache[instance.Oteld.Spec.Mode], nil
+	if cg.engineCache != nil && cg.engineCache[mode] != nil {
+		return cg.engineCache[mode], nil
 	}
 
 	valMap = buildEngineInfraValMap(instance)
@@ -368,8 +368,8 @@ func (cg *OteldConfigGenerater) GenerateEngineConfiguration(instance *OteldInsta
 		}
 		defaultConfigSlice = append(defaultConfigSlice, configSlice...)
 	}
-	cfg = append(cfg, yaml.MapItem{Key: "default_config", Value: defaultConfigSlice})
-	cg.engineCache[instance.Oteld.Spec.Mode] = cfg
+	cfg = append(cfg, yaml.MapItem{Key: "scrape_configs", Value: defaultConfigSlice})
+	cg.engineCache[mode] = cfg
 	return cfg, nil
 }
 

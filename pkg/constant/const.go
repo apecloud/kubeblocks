@@ -171,6 +171,9 @@ const (
 	MonitorPathKey      = "monitor.kubeblocks.io/path"
 	MonitorSchemaKey    = "monitor.kubeblocks.io/schema"
 	MonitorManagedByKey = "monitor.kubeblocks.io/managed-by"
+
+	// monitor.io labels
+	MonitorMode = "monitor.kubeblocks.io/mode"
 )
 
 const (

@@ -23,7 +23,7 @@ output: {
 	"prometheus_simple/pulsar": {
 		rule: "type == \"container\" && config != nil && config.EnabledMetrics && config.ClusterDefName == \"pulsar\" && ( config.ComponentDefName == \"bookies-recovery\" || config.ComponentDefName == \"zookeeper\" || config.ComponentDefName == \"bookies\" )"
 		config: {
-			collection_interval: "settings.CollectionInterval"
+			collection_interval: "`settings.CollectionInterval`"
 			use_service_account: false
 			endpoint: parameters.endpoint
 			disable_keep_alives: false
@@ -32,7 +32,7 @@ output: {
 	"prometheus_simple/pulsar2": {
 		rule: "type == \"container\" && config != nil && config.EnabledMetrics && config.ClusterDefName == \"pulsar\" && ( config.ComponentDefName == \"bookies-recovery\" || config.ComponentDefName == \"zookeeper\" || config.ComponentDefName == \"bookies\" )"
 		config: {
-			collection_interval: "settings.CollectionInterval"
+			collection_interval: "`settings.CollectionInterval`"
 			use_service_account: false
 			endpoint: parameters.endpoint
 			disable_keep_alives: false

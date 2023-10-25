@@ -75,9 +75,10 @@ func OTeldAgent(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 func buildDaemonSetForOteld(instance *types.OteldInstance, namespace string, name string) *appsv1.DaemonSet {
 	commonLabels := map[string]string{
 		constant.AppManagedByLabelKey: constant.AppName,
-		constant.AppNameLabelKey:      OTeldName,
-		constant.AppInstanceLabelKey:  name,
+		constant.AppNameLabelKey:      "apecloudoteld",
+		constant.AppInstanceLabelKey:  "apecloudoteld",
 		constant.MonitorManagedByKey:  "oteld",
+		constant.MonitorMode:          string(monitorv1alpha1.ModeDaemonSet),
 	}
 
 	labelSelector := &metav1.LabelSelector{

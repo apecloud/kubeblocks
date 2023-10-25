@@ -24,9 +24,10 @@ import (
 	"fmt"
 
 	"cuelang.org/go/cue"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/leaanthony/debme"
 	"gopkg.in/yaml.v2"
+
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 var (

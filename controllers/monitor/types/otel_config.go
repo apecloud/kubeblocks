@@ -22,9 +22,10 @@ package types
 import (
 	"fmt"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/monitor/builder"
-	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -149,7 +150,7 @@ func newAppReceiverCreator() (yaml.MapItem, error) {
 		receiverSlice = append(receiverSlice, receivers...)
 	}
 	metricsSlice = append(metricsSlice, yaml.MapItem{Key: "receivers", Value: receiverSlice})
-	return yaml.MapItem{Key: fmt.Sprintf(AppMetricsCreatorName), Value: metricsSlice}, nil
+	return yaml.MapItem{Key: AppMetricsCreatorName, Value: metricsSlice}, nil
 }
 
 func newMetricsReceiverCreator(name string, receiverMap map[string]Receiver) (yaml.MapItem, error) {
@@ -282,7 +283,7 @@ func (cg *OteldConfigGenerater) buildPiplineItem(instance *OteldInstance) yaml.M
 		metricsSlice = append(metricsSlice, yaml.MapItem{Key: "processors", Value: processorSlice})
 
 		var exporterSlice []string
-		for exporter, _ := range metricsPipline.ExporterMap {
+		for exporter := range metricsPipline.ExporterMap {
 			exporterSlice = append(exporterSlice, exporter)
 		}
 		metricsSlice = append(metricsSlice, yaml.MapItem{Key: "exporters", Value: exporterSlice})
@@ -305,7 +306,7 @@ func (cg *OteldConfigGenerater) buildPiplineItem(instance *OteldInstance) yaml.M
 		logsSlice = append(logsSlice, yaml.MapItem{Key: "processors", Value: processorSlice})
 
 		var exporterSlice []string
-		for exporter, _ := range logPipline.ExporterMap {
+		for exporter := range logPipline.ExporterMap {
 			exporterSlice = append(exporterSlice, exporter)
 		}
 		logsSlice = append(logsSlice, yaml.MapItem{Key: "exporters", Value: exporterSlice})

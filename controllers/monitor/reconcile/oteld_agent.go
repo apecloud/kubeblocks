@@ -22,7 +22,6 @@ package reconcile
 import (
 	"reflect"
 
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,6 +30,7 @@ import (
 
 	monitorv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/monitor/types"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )

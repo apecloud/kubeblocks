@@ -23,13 +23,13 @@ import (
 	"fmt"
 	"path/filepath"
 
-	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/monitor/types"
+	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )

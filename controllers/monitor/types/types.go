@@ -20,12 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package types
 
 import (
-	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type OTeldParams struct {

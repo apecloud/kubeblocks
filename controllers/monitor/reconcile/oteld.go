@@ -21,9 +21,11 @@ package reconcile
 
 import (
 	"fmt"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 	monitortype "github.com/apecloud/kubeblocks/controllers/monitor/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -95,10 +97,10 @@ func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList,
 			}
 		}
 
-		if oteldInstance.Oteld.Spec.Batch.Enabeld == true {
+		if oteldInstance.Oteld.Spec.Batch.Enabeld {
 			pipline.ProcessorMap[monitortype.BatchProcessorName] = true
 		}
-		if oteldInstance.Oteld.Spec.MemoryLimiter.Enabled == true {
+		if oteldInstance.Oteld.Spec.MemoryLimiter.Enabled {
 			pipline.ProcessorMap[monitortype.MemoryProcessorName] = true
 		}
 
@@ -134,10 +136,10 @@ func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList,
 	for _, instance := range instanceMap {
 		systemMetricsPipline := monitortype.NewPipline()
 		systemMetricsPipline.Name = monitortype.AppMetricsCreatorName
-		if instance.Oteld.Spec.Batch.Enabeld == true {
+		if instance.Oteld.Spec.Batch.Enabeld {
 			systemMetricsPipline.ProcessorMap[monitortype.BatchProcessorName] = true
 		}
-		if instance.Oteld.Spec.MemoryLimiter.Enabled == true {
+		if instance.Oteld.Spec.MemoryLimiter.Enabled {
 			systemMetricsPipline.ProcessorMap[monitortype.MemoryProcessorName] = true
 		}
 		for _, exporter := range metricsExporters.Items {
@@ -148,10 +150,10 @@ func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList,
 		logPipline := monitortype.NewPipline()
 		logPipline.Name = monitortype.LogCreatorName
 		logPipline.ReceiverMap[monitortype.LogCreatorName] = monitortype.Receiver{}
-		if instance.Oteld.Spec.Batch.Enabeld == true {
+		if instance.Oteld.Spec.Batch.Enabeld {
 			logPipline.ProcessorMap[monitortype.BatchProcessorName] = true
 		}
-		if instance.Oteld.Spec.MemoryLimiter.Enabled == true {
+		if instance.Oteld.Spec.MemoryLimiter.Enabled {
 			logPipline.ProcessorMap[monitortype.MemoryProcessorName] = true
 		}
 		for _, exporter := range logsExporters.Items {

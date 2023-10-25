@@ -23,8 +23,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 	"gopkg.in/yaml.v2"
+
+	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 )
 
 var _ = Describe("monitor_controller", func() {
@@ -42,13 +43,13 @@ var _ = Describe("monitor_controller", func() {
 		instance := fakeInstance()
 
 		cg := NewConfigGenerator()
-		cfg, err := cg.GenerateOteldConfiguration(instance, metricsExporterList.Items, logsExporterList.Items)
+		cfg, err := cg.GenerateOteldConfiguration(instance, metricsExporterList.Items, logsExporterList.Items, v1alpha1.ModeDaemonSet)
 		Expect(err).ShouldNot(HaveOccurred())
 		bytes, err := yaml.Marshal(cfg)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(len(bytes) > 0).Should(BeTrue())
 
-		engineCfg, err := cg.GenerateEngineConfiguration(instance)
+		engineCfg, err := cg.GenerateEngineConfiguration(instance, v1alpha1.ModeDaemonSet)
 		Expect(err).ShouldNot(HaveOccurred())
 		bytes, err = yaml.Marshal(engineCfg)
 		Expect(err).ShouldNot(HaveOccurred())

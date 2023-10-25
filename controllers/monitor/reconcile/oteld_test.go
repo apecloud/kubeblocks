@@ -20,10 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package reconcile
 
 import (
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/monitor/types"
 )
 

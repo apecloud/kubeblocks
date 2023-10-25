@@ -22,6 +22,7 @@ package rsm
 import (
 	"encoding/json"
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"reflect"
 	"strconv"
 	"strings"
@@ -320,11 +321,6 @@ func buildDebugPod(rsm workloads.ReplicatedStateMachine, sts *apps.StatefulSet) 
 	for key, value := range rsm.Spec.Selector.MatchLabels {
 		labels[key] = value
 	}
-	container.Command = []string{
-		"/bin/sh",
-		"-c",
-		"tail -f /dev/null",
-	}
 
 	return builder.NewPodBuilder(rsm.Namespace, debugPodName).
 		AddContainer(container).
@@ -352,11 +348,19 @@ func buildDebugPodTemplate(rsm workloads.ReplicatedStateMachine, stsName string)
 	}
 	env = append(env, credentialEnv...)
 	image := rsm.Spec.Template.Spec.Containers[0].Image
+	containerLimit := corev1.ResourceList{
+		"cpu":               resource.MustParse("0"),
+		"ephemeral-storage": resource.MustParse("0"),
+		"memory":            resource.MustParse("0"),
+	}
 	container := corev1.Container{
 		Name:            rsm.Spec.Template.Spec.Containers[0].Name,
 		Image:           image,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		Env:             env,
+		Resources: corev1.ResourceRequirements{
+			Limits: containerLimit,
+		},
 	}
 	template := &corev1.PodTemplateSpec{
 		Spec: corev1.PodSpec{

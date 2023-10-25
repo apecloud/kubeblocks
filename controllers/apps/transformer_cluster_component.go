@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -84,7 +85,15 @@ func (c *ClusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 	updateCompObjects := func() error {
 		for compName := range updateCompSet {
 			runningComp, err := getCacheSnapshotComp(reqCtx, c.Client, compName, cluster.Namespace)
-			if err != nil {
+			if err != nil && apierrors.IsNotFound(err) {
+				// to be backwards compatible with old API versions, for components that are already running but don't have a component CR, component CR needs to be generated.
+				protoComp, err := component.BuildProtoComponent(reqCtx, c.Client, cluster, protoCompSpecMap[compName])
+				if err != nil {
+					return err
+				}
+				graphCli.Create(dag, protoComp)
+				continue
+			} else if err != nil {
 				return err
 			}
 			protoComp, err := component.BuildProtoComponent(reqCtx, c.Client, cluster, protoCompSpecMap[compName])

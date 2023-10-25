@@ -24,6 +24,7 @@ import (
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -110,7 +111,7 @@ func IsNil(i interface{}) bool {
 
 func ValidateExistence(ctx context.Context, cli roclient.ReadonlyClient, key client.ObjectKey, object client.Object, ignoreNotFound bool) error {
 	err := cli.Get(ctx, key, object)
-	if err != nil && IsNotFound(err) && ignoreNotFound {
+	if err != nil && apierrors.IsNotFound(err) && ignoreNotFound {
 		return nil
 	}
 	if err != nil {

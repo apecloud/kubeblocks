@@ -40,6 +40,7 @@ func BuildRSMWrapper(cluster *appsv1alpha1.Cluster, synthesizeComp *component.Sy
 	}
 
 	// build rsm from old ClusterDefinition API
+	// TODO(xingran): it will be deprecated in the future.
 	return BuildRSM(cluster, synthesizeComp)
 }
 

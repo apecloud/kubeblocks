@@ -27,7 +27,7 @@
 {{ $servers = trimSuffix " \\\n" $servers}}
 exec kafka_exporter --web.listen-address=:9308 \
 {{- if hasKey $component "tls" }}
-  {{- if $component.tls }}
+  {{- if $component.tlsConfig }}
     --tls.enabled \
   {{- end }}
 {{- end }}

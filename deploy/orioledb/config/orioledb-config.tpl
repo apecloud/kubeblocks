@@ -212,7 +212,7 @@ session_replication_role = 'origin'
 sql_firewall.firewall = 'disable'
 shared_buffers = '{{ printf "%d%s" $shared_buffers $buffer_unit }}'
 shared_preload_libraries = 'orioledb,pg_stat_statements,auto_explain'
-{{- if $.component.tls }}
+{{- if $.component.tlsConfig }}
 {{- $ca_file := getCAFile }}
 {{- $cert_file := getCertFile }}
 {{- $key_file := getKeyFile }}

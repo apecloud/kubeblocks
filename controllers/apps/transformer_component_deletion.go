@@ -20,12 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"strings"
-
-	corev1 "k8s.io/api/core/v1"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -48,9 +43,6 @@ func (t *ComponentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 
 	transCtx.Component.Status.Phase = appsv1alpha1.DeletingClusterCompPhase
 	graphCli.Delete(dag, comp)
-
-	ctx.GetRecorder().Eventf(transCtx.Component, corev1.EventTypeNormal, constant.ReasonDeletingCR, "Deleting %s:%s",
-		strings.ToLower(transCtx.Component.GetObjectKind().GroupVersionKind().Kind), transCtx.Component.GetName())
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
 	return graph.ErrPrematureStop

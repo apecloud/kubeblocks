@@ -21,33 +21,13 @@ package component
 
 import (
 	"errors"
+
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
-
-// rsmServiceConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.Service.
-type rsmServiceConvertor struct{}
-
-// rsmAlternativeServicesConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.AlternativeServices.
-type rsmAlternativeServicesConvertor struct{}
-
-// rsmRolesConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.Roles.
-type rsmRolesConvertor struct{}
-
-// rsmRoleProbeConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.RoleProbe.
-type rsmRoleProbeConvertor struct{}
-
-// rsmCredentialConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.Credential.
-type rsmCredentialConvertor struct{}
-
-// rsmMembershipReconfigurationConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.MembershipReconfiguration.
-type rsmMembershipReconfigurationConvertor struct{}
-
-// rsmMemberUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.MemberUpdateStrategy.
-type rsmMemberUpdateStrategyConvertor struct{}
 
 // BuildRSMFrom builds a new Component object based on Cluster, SynthesizedComponent.
 func BuildRSMFrom(cluster *appsv1alpha1.Cluster, synthesizeComp *SynthesizedComponent, protoRSM *workloads.ReplicatedStateMachine) (*workloads.ReplicatedStateMachine, error) {
@@ -71,6 +51,27 @@ func BuildRSMFrom(cluster *appsv1alpha1.Cluster, synthesizeComp *SynthesizedComp
 	}
 	return protoRSM, nil
 }
+
+// rsmServiceConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.Service.
+type rsmServiceConvertor struct{}
+
+// rsmAlternativeServicesConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.AlternativeServices.
+type rsmAlternativeServicesConvertor struct{}
+
+// rsmRolesConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.Roles.
+type rsmRolesConvertor struct{}
+
+// rsmRoleProbeConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.RoleProbe.
+type rsmRoleProbeConvertor struct{}
+
+// rsmCredentialConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.Credential.
+type rsmCredentialConvertor struct{}
+
+// rsmMembershipReconfigurationConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.MembershipReconfiguration.
+type rsmMembershipReconfigurationConvertor struct{}
+
+// rsmMemberUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.MemberUpdateStrategy.
+type rsmMemberUpdateStrategyConvertor struct{}
 
 // parseRSMConvertorArgs parses the args of rsm convertor.
 func parseRSMConvertorArgs(args ...any) (*appsv1alpha1.Cluster, *SynthesizedComponent, error) {
@@ -201,7 +202,7 @@ func (c *rsmCredentialConvertor) convert(args ...any) (any, error) {
 	}
 
 	secretName := constant.GenerateDefaultConnCredential(cluster.Name)
-	credential := workloads.Credential{
+	credential := &workloads.Credential{
 		Username: workloads.CredentialVar{
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{

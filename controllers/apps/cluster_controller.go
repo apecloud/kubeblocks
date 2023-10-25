@@ -172,7 +172,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&AssureMetaTransformer{},
 			// validate cd & cv's existence and availability
 			&ValidateAndLoadRefResourcesTransformer{},
-			// TODO(component): handle cluster services
+			// handle cluster services
 			&ClusterServiceTransformer{},
 			// TODO(component): create default cluster connection credential secret object
 			&ClusterCredentialTransformer{Client: r.Client},

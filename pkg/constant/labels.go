@@ -49,6 +49,14 @@ func GetKBWellKnownLabelsWithCompDef(compDefName, clusterName, componentName str
 	}
 }
 
+// GetClusterWellKnownLabels returns the well-known labels for a cluster
+func GetClusterWellKnownLabels(clusterName string) map[string]string {
+	return map[string]string{
+		AppManagedByLabelKey: AppName,
+		AppInstanceLabelKey:  clusterName,
+	}
+}
+
 // GetComponentWellKnownLabels returns the well-known labels for Component API
 func GetComponentWellKnownLabels(clusterName, componentName string) map[string]string {
 	return map[string]string{

@@ -172,6 +172,7 @@ func buildPodSpecForOteld(oTeld *v1alpha1.OTeld, mode v1alpha1.Mode) corev1.PodS
 			FSGroup:      cfgutil.ToPointer(int64(65534)),
 			RunAsNonRoot: cfgutil.ToPointer(false),
 		}).
+		SetNodeSelector(oTeld.Spec.NodeSelector).
 		GetObject().Spec
 }
 

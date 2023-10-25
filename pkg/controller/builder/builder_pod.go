@@ -67,3 +67,8 @@ func (builder *PodBuilder) AddSerciveAccount(serviceAccount string) *PodBuilder 
 	builder.get().Spec.ServiceAccountName = serviceAccount
 	return builder
 }
+
+func (builder *PodBuilder) SetNodeSelector(nodeSelector map[string]string) *PodBuilder {
+	builder.get().Spec.NodeSelector = nodeSelector
+	return builder
+}

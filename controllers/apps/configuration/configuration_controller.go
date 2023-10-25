@@ -34,7 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -74,8 +73,9 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "cannot find configuration")
 	}
 
-	if res, err := intctrlutil.HandleCRDeletion(reqCtx, r, configuration, constant.ConfigurationTemplateFinalizerName, nil); res != nil {
-		return *res, err
+	if !configuration.GetDeletionTimestamp().IsZero() {
+		reqCtx.Log.Info("configuration is deleting, skip reconcile")
+		return intctrlutil.Reconciled()
 	}
 
 	tasks := make([]Task, 0, len(configuration.Spec.ConfigItemDetails))

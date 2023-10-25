@@ -1,30 +1,11 @@
 ---
-# Source: apecloud-mysql-cluster/templates/role.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: kb-mysql-cluster
-  namespace: default
-  labels:
-    app.kubernetes.io/name: apecloud-mysql-cluster
-    app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: "8.0.30"
-    app.kubernetes.io/managed-by: Helm
-rules:
-  - apiGroups:
-      - ""
-    resources:
-      - events
-    verbs:
-      - create
----
 # Source: apecloud-mysql-cluster/templates/cluster.yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: mysql-cluster-restore
   annotations:
-    kubeblocks.io/restore-from-backup: '{"mysql":{"name":"backup-mysql-cluster","namespace":"default","volumeRestorePolicy":"Parallel"}}'
+    kubeblocks.io/restore-from-backup: '{"mysql":{"name":"backup-mysql-cluster-snapshot","namespace":"default","managementPolicy":"Parallel"}}'
 spec:
   clusterDefinitionRef:  apecloud-mysql
   clusterVersionRef: ac-mysql-8.0.30

@@ -3,9 +3,9 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: mycluster-redis-cluster-snapshot
+  name: redis-cluster-datafile
   annotations:
-    kubeblocks.io/restore-from-backup: "{\"redis\":\"backup-snapshot-mycluster-redis\"}"
+    kubeblocks.io/restore-from-backup: '{"redis":{"name":"backup-redis-cluster","namespace":"default","managementPolicy":"Parallel"}}'
 spec:
   clusterDefinitionRef: redis  # ref clusterDefinition.name
   clusterVersionRef: redis-7.0.6 # ref clusterVersion.name

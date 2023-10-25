@@ -1,0 +1,13 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: Backup
+metadata:
+  name: backup-mysql-cluster
+spec:
+  backupPolicyName: mysql-cluster-mysql-backup-policy
+  retentionPeriod: 7d
+  backupMethod: xtrabackup
+  deletionPolicy: Delete
+status:
+  duration: 60s
+  backupRepoName: my-repo
+  phase: Completed

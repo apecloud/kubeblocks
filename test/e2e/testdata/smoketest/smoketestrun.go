@@ -46,7 +46,7 @@ type Options struct {
 	Dynamic dynamic.Interface
 }
 
-var arr = []string{"00", "componentresourceconstraint", "restore", "class", "cv", "snapshot"}
+var arr = []string{"00", "componentresourceconstraint", "restore", "class", "cv", "backup"}
 
 func SmokeTest() {
 	BeforeEach(func() {

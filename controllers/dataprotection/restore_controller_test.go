@@ -72,6 +72,7 @@ var _ = Describe("Restore Controller test", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.StorageClassSignature, true, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupRepoSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageProviderSignature, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeSignature, true, ml)
 	}
 
 	BeforeEach(func() {

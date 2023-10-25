@@ -40,7 +40,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-
+	"github.com/apecloud/kubeblocks/lorry/engines"
 	"github.com/apecloud/kubeblocks/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/lorry/operations"
 	"github.com/apecloud/kubeblocks/lorry/util"
@@ -70,6 +70,7 @@ type volumeExt struct {
 
 type Protection struct {
 	operations.Base
+	dbManager     engines.DBManager
 	Requester     volumeStatsRequester
 	Pod           string
 	HighWatermark int
@@ -81,10 +82,18 @@ type Protection struct {
 
 func (p *Protection) Init(ctx context.Context) error {
 	p.Logger = ctrl.Log.WithName("Volume-Protection")
-	p.Requester = &httpsVolumeStatsRequester{
-		logger: p.Logger,
+	if p.Requester == nil {
+		p.Requester = &httpsVolumeStatsRequester{
+			logger: p.Logger,
+		}
 	}
 	p.SendEvent = true
+
+	dbManager, err := register.GetDBManager()
+	if err != nil {
+		return errors.Wrap(err, "get manager failed")
+	}
+	p.dbManager = dbManager
 
 	if err := p.Requester.init(ctx); err != nil {
 		return err
@@ -99,13 +108,15 @@ func (p *Protection) Init(ctx context.Context) error {
 }
 
 func (p *Protection) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
-	if p.disabled() {
-		return errors.New("the volume protection operation is disabled")
-	}
 	return nil
 }
 
 func (p *Protection) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
+	if p.disabled() {
+		p.Logger.Info("the volume protection operation is disabled")
+		return nil, nil
+	}
+
 	summary, err := p.Requester.request(ctx)
 	if err != nil {
 		p.Logger.Error(err, "request stats summary from kubelet error")
@@ -117,11 +128,13 @@ func (p *Protection) Do(ctx context.Context, req *operations.OpsRequest) (*opera
 	}
 
 	volumeUsages, err := p.checkUsage(ctx)
-	rsp := operations.OpsResponse{}
-	if err == nil {
-		rsp.Data["protect"] = volumeUsages
+	resp := &operations.OpsResponse{
+		Data: map[string]any{},
 	}
-	return &rsp, err
+	if err == nil {
+		resp.Data["protect"] = volumeUsages
+	}
+	return resp, err
 }
 
 func (o *Protection) initVolumes() error {
@@ -271,19 +284,11 @@ func (o *Protection) lowWatermark(ctx context.Context, volumeUsages map[string]a
 }
 
 func (o *Protection) lockInstance(ctx context.Context) error {
-	manager, err := register.GetDBManager()
-	if err != nil || manager == nil {
-		o.Logger.Error(err, "Get DB manager failed")
-	}
-	return manager.Lock(ctx, "disk full")
+	return o.dbManager.Lock(ctx, "disk full")
 }
 
 func (o *Protection) unlockInstance(ctx context.Context) error {
-	manager, err := register.GetDBManager()
-	if err != nil || manager == nil {
-		o.Logger.Error(err, "Get DB manager failed")
-	}
-	return manager.Unlock(ctx)
+	return o.dbManager.Unlock(ctx)
 }
 
 func (o *Protection) buildVolumesMsg() map[string]any {

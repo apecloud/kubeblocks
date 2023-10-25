@@ -8,7 +8,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -18,6 +17,7 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var logger = ctlruntime.Log.WithName("event")
@@ -53,10 +53,10 @@ func SentEventForProbe(ctx context.Context, data map[string]any) error {
 
 func CreateEvent(reason string, data map[string]any) (*corev1.Event, error) {
 	// get pod object
-	podName := os.Getenv(constant.KBEnvPodName)
-	podUID := os.Getenv(constant.KBEnvPodUID)
-	nodeName := os.Getenv(constant.KBEnvNodeName)
-	namespace := os.Getenv(constant.KBEnvNamespace)
+	podName := viper.GetString(constant.KBEnvPodName)
+	podUID := viper.GetString(constant.KBEnvPodUID)
+	nodeName := viper.GetString(constant.KBEnvNodeName)
+	namespace := viper.GetString(constant.KBEnvNamespace)
 	msg, err := json.Marshal(data)
 	if err != nil {
 		return nil, err

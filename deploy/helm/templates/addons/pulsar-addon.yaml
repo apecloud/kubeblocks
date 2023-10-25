@@ -24,6 +24,7 @@ spec:
       {{- end }}
 
     installValues:
+      {{- $cloudProvider := (include "kubeblocks.cloudProvider" .) }}
       {{- if eq $cloudProvider "huaweiCloud" }}
       setValues:
         - cloudProvider=huaweiCloud

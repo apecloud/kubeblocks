@@ -201,7 +201,7 @@ func (c *compDefVolumesConvertor) convert(args ...any) (any, error) {
 
 func (c *compDefServicesConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	clusterName := args[1].(string)
+	clusterName := args[2].(string)
 	if clusterCompDef.Service == nil {
 		return nil, nil
 	}

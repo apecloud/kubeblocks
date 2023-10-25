@@ -64,11 +64,12 @@ type clusterTransformContext struct {
 	Client roclient.ReadonlyClient
 	record.EventRecorder
 	logr.Logger
-	Cluster       *appsv1alpha1.Cluster
-	OrigCluster   *appsv1alpha1.Cluster
-	ClusterDef    *appsv1alpha1.ClusterDefinition
-	ClusterVer    *appsv1alpha1.ClusterVersion
-	ComponentDefs map[string]*appsv1alpha1.ComponentDefinition // TODO(component)
+	Cluster        *appsv1alpha1.Cluster
+	OrigCluster    *appsv1alpha1.Cluster
+	ClusterDef     *appsv1alpha1.ClusterDefinition
+	ClusterVer     *appsv1alpha1.ClusterVersion
+	ComponentSpecs []*appsv1alpha1.ClusterComponentSpec
+	ComponentDefs  map[string]*appsv1alpha1.ComponentDefinition
 }
 
 // clusterPlanBuilder a graph.PlanBuilder implementation for Cluster reconciliation

@@ -33,6 +33,8 @@ import (
 // ValidateAndLoadRefResourcesTransformer handles referenced resources'(cd & cv) validation and load them into context
 type ValidateAndLoadRefResourcesTransformer struct{}
 
+var _ graph.Transformer = &ValidateAndLoadRefResourcesTransformer{}
+
 func (t *ValidateAndLoadRefResourcesTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster
@@ -82,7 +84,29 @@ func (t *ValidateAndLoadRefResourcesTransformer) Transform(ctx graph.TransformCo
 		transCtx.ClusterVer = &appsv1alpha1.ClusterVersion{}
 	}
 
+	if err = t.checkComponentDefinitions(transCtx, cluster); err != nil {
+		return newRequeueError(requeueDuration, err.Error())
+	}
+
 	return nil
 }
 
-var _ graph.Transformer = &ValidateAndLoadRefResourcesTransformer{}
+func (t *ValidateAndLoadRefResourcesTransformer) checkComponentDefinitions(ctx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
+	for _, comp := range cluster.Spec.ComponentSpecs {
+		if len(comp.ComponentDef) == 0 {
+			continue
+		}
+		compDef := &appsv1alpha1.ComponentDefinition{}
+		if err := ctx.Client.Get(ctx.Context, types.NamespacedName{Name: comp.ComponentDef}, compDef); err != nil {
+			return err
+		}
+		if compDef.Status.Phase != appsv1alpha1.AvailablePhase {
+			return fmt.Errorf("the componetn definition referenced is unavailable: %s", comp.ComponentDef)
+		}
+		if ctx.ComponentDefs == nil {
+			ctx.ComponentDefs = make(map[string]*appsv1alpha1.ComponentDefinition)
+		}
+		ctx.ComponentDefs[compDef.Name] = compDef
+	}
+	return nil
+}

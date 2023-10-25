@@ -33,10 +33,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	statsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
@@ -119,10 +116,10 @@ func (p *Protection) Do(ctx context.Context, req *operations.OpsRequest) (*opera
 		return nil, err
 	}
 
-	msg, err := p.checkUsage(ctx)
+	volumeUsages, err := p.checkUsage(ctx)
 	rsp := operations.OpsResponse{}
 	if err == nil {
-		rsp.Data["protect"] = msg
+		rsp.Data["protect"] = volumeUsages
 	}
 	return &rsp, err
 }
@@ -188,7 +185,7 @@ func (o *Protection) updateVolumeStats(payload []byte) error {
 	return nil
 }
 
-func (o *Protection) checkUsage(ctx context.Context) (string, error) {
+func (o *Protection) checkUsage(ctx context.Context) (map[string]any, error) {
 	lower := make([]string, 0)
 	higher := make([]string, 0)
 	for name, v := range o.Volumes {
@@ -200,21 +197,21 @@ func (o *Protection) checkUsage(ctx context.Context) (string, error) {
 		}
 	}
 
-	msg := o.buildVolumesMsg()
+	volumeUsages := o.buildVolumesMsg()
 	readonly := o.Readonly
 	// the instance is running normally and there have volume(s) over the space usage threshold.
 	if !readonly && len(higher) > 0 {
-		if err := o.highWatermark(ctx, msg); err != nil {
-			return "", err
+		if err := o.highWatermark(ctx, volumeUsages); err != nil {
+			return volumeUsages, err
 		}
 	}
 	// the instance is protected in RO mode, and all volumes' space usage are under the threshold.
 	if readonly && len(lower) == len(o.Volumes) {
-		if err := o.lowWatermark(ctx, msg); err != nil {
-			return "", err
+		if err := o.lowWatermark(ctx, volumeUsages); err != nil {
+			return volumeUsages, err
 		}
 	}
-	return msg, nil
+	return volumeUsages, nil
 }
 
 // checkVolumeWatermark checks whether the volume's space usage is over the threshold.
@@ -235,39 +232,39 @@ func (o *Protection) checkVolumeWatermark(v volumeExt) int {
 	return 1
 }
 
-func (o *Protection) highWatermark(ctx context.Context, msg string) error {
+func (o *Protection) highWatermark(ctx context.Context, volumeUsages map[string]any) error {
 	if o.Readonly { // double check
 		return nil
 	}
 	if err := o.lockInstance(ctx); err != nil {
-		o.Logger.Error(err, "set instance to read-only error", "volumes", msg)
+		o.Logger.Error(err, "set instance to read-only error", "volumes", volumeUsages)
 		return err
 	}
 
-	o.Logger.Info("set instance to read-only OK", "msg", msg)
+	o.Logger.Info("set instance to read-only OK", "msg", volumeUsages)
 	o.Readonly = true
 
-	if err := o.sendEvent(ctx, reasonLock, msg); err != nil {
-		o.Logger.Error(err, "send volume protection (lock) event error", "volumes", msg)
+	if err := o.sendEvent(ctx, reasonLock, volumeUsages); err != nil {
+		o.Logger.Error(err, "send volume protection (lock) event error", "volumes", volumeUsages)
 		return err
 	}
 	return nil
 }
 
-func (o *Protection) lowWatermark(ctx context.Context, msg string) error {
+func (o *Protection) lowWatermark(ctx context.Context, volumeUsages map[string]any) error {
 	if !o.Readonly { // double check
 		return nil
 	}
 	if err := o.unlockInstance(ctx); err != nil {
-		o.Logger.Error(err, "reset instance to read-write error", "volumes", msg)
+		o.Logger.Error(err, "reset instance to read-write error", "volumes", volumeUsages)
 		return err
 	}
 
-	o.Logger.Info("reset instance to read-write OK", "msg", msg)
+	o.Logger.Info("reset instance to read-write OK", "msg", volumeUsages)
 	o.Readonly = false
 
-	if err := o.sendEvent(ctx, reasonUnlock, msg); err != nil {
-		o.Logger.Error(err, "send volume protection (unlock) event error", "volumes", msg)
+	if err := o.sendEvent(ctx, reasonUnlock, volumeUsages); err != nil {
+		o.Logger.Error(err, "send volume protection (unlock) event error", "volumes", volumeUsages)
 		return err
 	}
 	return nil
@@ -289,7 +286,7 @@ func (o *Protection) unlockInstance(ctx context.Context) error {
 	return manager.Unlock(ctx)
 }
 
-func (o *Protection) buildVolumesMsg() string {
+func (o *Protection) buildVolumesMsg() map[string]any {
 	volumes := make([]map[string]string, 0)
 	for _, v := range o.Volumes {
 		usage := make(map[string]string)
@@ -308,40 +305,18 @@ func (o *Protection) buildVolumesMsg() string {
 		"highWatermark": fmt.Sprintf("%d", o.HighWatermark),
 		"volumes":       volumes,
 	}
-	msg, _ := json.Marshal(usages)
-	return string(msg)
+	return usages
 }
 
-func (o *Protection) sendEvent(ctx context.Context, reason, msg string) error {
+func (o *Protection) sendEvent(ctx context.Context, reason string, volumeUsages map[string]any) error {
 	if o.SendEvent {
-		return util.SendEvent(ctx, o.createEvent(reason, msg))
+		event, err := util.CreateEvent(reason, volumeUsages)
+		if err != nil {
+			return errors.Wrap(err, "create volume protection event failed")
+		}
+		return util.SendEvent(ctx, event)
 	}
 	return nil
-}
-
-func (o *Protection) createEvent(reason, msg string) *corev1.Event {
-	return &corev1.Event{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s.%s", viper.GetString(constant.KBEnvPodName), rand.String(16)),
-			Namespace: viper.GetString(constant.KBEnvNamespace),
-		},
-		InvolvedObject: corev1.ObjectReference{
-			Kind:      "Pod",
-			Namespace: viper.GetString(constant.KBEnvNamespace),
-			Name:      viper.GetString(constant.KBEnvPodName),
-			UID:       types.UID(viper.GetString(constant.KBEnvPodUID)),
-			FieldPath: "spec.containers{lorry}",
-		},
-		Reason:  reason,
-		Message: msg,
-		Source: corev1.EventSource{
-			Component: "lorry",
-			Host:      viper.GetString(constant.KBEnvNodeName),
-		},
-		FirstTimestamp: metav1.Now(),
-		LastTimestamp:  metav1.Now(),
-		Type:           "Normal",
-	}
 }
 
 type httpsVolumeStatsRequester struct {

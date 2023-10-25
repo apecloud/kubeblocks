@@ -1,12 +1,11 @@
 package util
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
-	"text/template"
 	"time"
 
 	"github.com/spf13/viper"
@@ -18,7 +17,6 @@ import (
 	ctlruntime "sigs.k8s.io/controller-runtime"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/cli/scheme"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
@@ -35,7 +33,11 @@ func SentEventForProbe(ctx context.Context, data map[string]any) error {
 	case workloads.ReadinessProbeEventUpdate:
 		return NewProbeError("not sending event directly, use readiness probe instand")
 	case workloads.DirectAPIServerEventUpdate:
-		event, err := createEvent(data)
+		operation, ok := data["operation"]
+		if !ok {
+			return errors.New("operation failed must be set")
+		}
+		event, err := CreateEvent(string(operation.(OperationKind)), data)
 		if err != nil {
 			logger.Error(err, "generate event failed")
 			return err
@@ -49,25 +51,7 @@ func SentEventForProbe(ctx context.Context, data map[string]any) error {
 	return nil
 }
 
-func createEvent(data map[string]any) (*corev1.Event, error) {
-	eventTmpl := `
-apiVersion: v1
-kind: Event
-metadata:
-  name: {{ .PodName }}.{{ .EventSeq }}
-  namespace: {{ .Namespace }}
-involvedObject:
-  apiVersion: v1
-  fieldPath: spec.containers{kb-checkrole}
-  kind: Pod
-  name: {{ .PodName }}
-  namespace: {{ .Namespace }}
-reason: RoleChanged
-type: Normal
-source:
-  component: lorry
-`
-
+func CreateEvent(reason string, data map[string]any) (*corev1.Event, error) {
 	// get pod object
 	podName := os.Getenv(constant.KBEnvPodName)
 	podUID := os.Getenv(constant.KBEnvPodUID)
@@ -78,39 +62,32 @@ source:
 		return nil, err
 	}
 
-	seq := rand.String(16)
-	roleValue := map[string]string{
-		"PodName":   podName,
-		"Namespace": namespace,
-		"EventSeq":  seq,
+	event := &corev1.Event{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s.%s", podName, rand.String(16)),
+			Namespace: namespace,
+		},
+		InvolvedObject: corev1.ObjectReference{
+			Kind:      "Pod",
+			Namespace: namespace,
+			Name:      podName,
+			UID:       types.UID(podUID),
+			FieldPath: "spec.containers{lorry}",
+		},
+		Reason:  reason,
+		Message: string(msg),
+		Source: corev1.EventSource{
+			Component: "lorry",
+			Host:      nodeName,
+		},
+		FirstTimestamp:      metav1.Now(),
+		LastTimestamp:       metav1.Now(),
+		EventTime:           metav1.NowMicro(),
+		ReportingController: "lorry",
+		ReportingInstance:   podName,
+		Action:              reason,
+		Type:                "Normal",
 	}
-	tmpl, err := template.New("event-tmpl").Parse(eventTmpl)
-	if err != nil {
-		return nil, err
-	}
-
-	buf := new(bytes.Buffer)
-	err = tmpl.Execute(buf, roleValue)
-	if err != nil {
-		return nil, err
-	}
-
-	event := &corev1.Event{}
-	_, _, err = scheme.Codecs.UniversalDeserializer().Decode(buf.Bytes(), nil, event)
-	if err != nil {
-		return nil, err
-	}
-	event.Message = string(msg)
-	event.InvolvedObject.UID = types.UID(podUID)
-	event.Source.Host = nodeName
-	event.Reason = string(data["operation"].(OperationKind))
-	event.FirstTimestamp = metav1.Now()
-	event.LastTimestamp = metav1.Now()
-	event.EventTime = metav1.NowMicro()
-	event.ReportingController = "lorry"
-	event.ReportingInstance = podName
-	event.Action = string(data["operation"].(OperationKind))
-
 	return event, nil
 }
 

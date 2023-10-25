@@ -96,6 +96,7 @@ const (
 	roleProbeTimeoutVarName      = "KB_RSM_ROLE_PROBE_TIMEOUT"
 	readinessProbeEventFieldPath = "spec.containers{" + roleProbeContainerName + "}"
 	legacyEventFieldPath         = "spec.containers{kb-checkrole}"
+	lorryEventFieldPath          = "spec.containers{kb-checkrole}"
 	checkRoleEventReason         = "checkRole"
 
 	actionSvcPortBase = int32(36500)

@@ -348,7 +348,7 @@ spec:
                           type: string
                         succeedCount:
                           default: -1
-                          description: successCount is the number of pods for which
+                          description: succeedCount is the number of pods for which
                             configuration changes were successfully executed.
                           format: int32
                           type: integer

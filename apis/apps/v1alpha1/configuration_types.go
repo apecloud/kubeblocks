@@ -86,7 +86,7 @@ type ReconcileDetail struct {
 	// +optional
 	CurrentRevision string `json:"currentRevision,omitempty"`
 
-	// successCount is the number of pods for which configuration changes were successfully executed.
+	// succeedCount is the number of pods for which configuration changes were successfully executed.
 	// +kubebuilder:default=-1
 	// +optional
 	SucceedCount int32 `json:"succeedCount,omitempty"`

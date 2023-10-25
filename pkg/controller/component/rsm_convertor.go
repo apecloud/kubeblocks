@@ -130,7 +130,7 @@ func (c *rsmRolesConvertor) convert(args ...any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	rsmReplicaRoles := make([]workloads.ReplicaRole, len(synthesizeComp.Roles))
+	rsmReplicaRoles := make([]workloads.ReplicaRole, 0)
 	compReplicaRoles := synthesizeComp.Roles
 	for _, compReplicaRole := range compReplicaRoles {
 		rsmReplicaRole := workloads.ReplicaRole{

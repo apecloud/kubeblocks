@@ -22,12 +22,12 @@ fi
 
 # NOTE: restore from an old version backup, will be removed in 0.8
 if [ $(remote_file_exists "base.tar.gz") == "true" ]; then
-  datasafed pull "base.tar.gz" - | gunzip | tar -xzvf - -C "${DATA_DIR}/"
+  datasafed pull "base.tar.gz" - | tar -xzvf - -C "${DATA_DIR}/"
 elif [ $(remote_file_exists "base.tar") == "true" ]; then
   datasafed pull "base.tar" - | tar -xvf - -C "${DATA_DIR}/"
 fi
 if [ $(remote_file_exists "pg_wal.tar.gz") == "true" ]; then
-  datasafed pull "pg_wal.tar.gz" - | gunzip | tar -xzvf - -C "${DATA_DIR}/pg_wal/"
+  datasafed pull "pg_wal.tar.gz" - | tar -xzvf - -C "${DATA_DIR}/pg_wal/"
 elif [ $(remote_file_exists "pg_wal.tar") == "true" ]; then
   datasafed pull "pg_wal.tar" - | tar -xvf - -C "${DATA_DIR}/pg_wal/"
 fi

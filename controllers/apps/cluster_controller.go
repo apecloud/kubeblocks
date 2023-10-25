@@ -176,8 +176,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&ClusterAPINormalizationTransformer{},
 			// handle cluster services
 			&ClusterServiceTransformer{},
-			// TODO(component): create default cluster connection credential secret object
-			&ClusterCredentialTransformer{Client: r.Client},
+			// create default cluster connection credential secret object
+			&ClusterCredentialTransformer{},
 			// TODO(component): handle restore before ClusterComponentTransformer
 			&RestoreTransformer{Client: r.Client},
 			// create all cluster components objects

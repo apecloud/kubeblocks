@@ -113,7 +113,7 @@ func (t *ComponentCredentialTransformer) buildFromServiceAndAccount(ctx graph.Tr
 			return err
 		}
 	}
-	// TODO: define the format of conn-credential secret
+	// TODO(component): define the format of conn-credential secret
 	secret.StringData = data
 	return nil
 }
@@ -146,7 +146,7 @@ func (t *ComponentCredentialTransformer) buildEndpoint(synthesizeComp *component
 
 func (t *ComponentCredentialTransformer) buildEndpointFromService(synthesizeComp *component.SynthesizedComponent,
 	credential appsv1alpha1.ConnectionCredential, service *appsv1alpha1.ComponentService, data *map[string]string) {
-	// TODO: service.ServiceName
+	// TODO(component): service.ServiceName
 	serviceName := constant.GenerateComponentServiceEndpoint(synthesizeComp.ClusterName,
 		synthesizeComp.Name, string(service.ServiceName), synthesizeComp.Namespace)
 
@@ -162,7 +162,7 @@ func (t *ComponentCredentialTransformer) buildEndpointFromService(synthesizeComp
 		}
 	}
 
-	// TODO: define the service and port pattern
+	// TODO(component): define the service and port pattern
 	(*data)["service"] = serviceName
 	(*data)["port"] = fmt.Sprintf("%d", port)
 }
@@ -171,13 +171,13 @@ func (t *ComponentCredentialTransformer) buildCredential(ctx graph.TransformCont
 	namespace, accountName string, data *map[string]string) error {
 	key := types.NamespacedName{
 		Namespace: namespace,
-		Name:      accountName,
+		Name:      accountName, // TODO(component): secret name
 	}
 	secret := &corev1.Secret{}
 	if err := ctx.GetClient().Get(ctx.GetContext(), key, secret); err != nil {
 		return err
 	}
-	// TODO: which field should to use from accounts?
+	// TODO(component): which field should to use from accounts?
 	maps.Copy(*data, secret.StringData)
 	return nil
 }

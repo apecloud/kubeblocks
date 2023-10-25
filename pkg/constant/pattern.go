@@ -25,7 +25,15 @@ import (
 
 // GenerateDefaultConnCredential generates default connection credential name of cluster
 func GenerateDefaultConnCredential(clusterName string) string {
-	return fmt.Sprintf("%s-conn-credential", clusterName)
+	return GenerateClusterConnCredential(clusterName, "")
+}
+
+// GenerateClusterConnCredential generates connection credential name of cluster
+func GenerateClusterConnCredential(clusterName, name string) string {
+	if len(name) == 0 {
+		name = "conn-credential"
+	}
+	return fmt.Sprintf("%s-%s", clusterName, name)
 }
 
 // GenerateComponentConnCredential generates connection credential name of component

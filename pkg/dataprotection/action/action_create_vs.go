@@ -186,7 +186,7 @@ func (c *CreateVolumeSnapshotAction) createVolumeSnapshotIfNotExist(ctx Context,
 
 	msg := fmt.Sprintf("creating volume snapshot %s/%s", snap.Namespace, snap.Name)
 	ctx.Recorder.Event(c.Owner, corev1.EventTypeNormal, "CreatingVolumeSnapshot", msg)
-	if err = ctx.Client.Create(ctx.Ctx, snap); err != nil {
+	if err = vsCli.Create(snap); err != nil {
 		return err
 	}
 	return nil

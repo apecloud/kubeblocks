@@ -283,8 +283,11 @@ func (r *BackupReconciler) prepareBackupRequest(
 	}
 
 	request.BackupPolicy = backupPolicy
-	if err = r.handleBackupRepo(request); err != nil {
-		return nil, err
+	if !snapshotVolumes {
+		// if use volume snapshot, ignore backup repo
+		if err = r.handleBackupRepo(request); err != nil {
+			return nil, err
+		}
 	}
 
 	request.BackupMethod = backupMethod
@@ -349,11 +352,12 @@ func (r *BackupReconciler) patchBackupStatus(
 	request.Status.Path = dpbackup.BuildBackupPath(request.Backup, request.BackupPolicy.Spec.PathPrefix)
 	request.Status.Target = request.BackupPolicy.Spec.Target
 	request.Status.BackupMethod = request.BackupMethod
-	request.Status.BackupRepoName = request.BackupRepo.Name
+	if request.BackupRepo != nil {
+		request.Status.BackupRepoName = request.BackupRepo.Name
+	}
 	if request.BackupRepoPVC != nil {
 		request.Status.PersistentVolumeClaimName = request.BackupRepoPVC.Name
 	}
-
 	// init action status
 	actions, err := request.BuildActions()
 	if err != nil {
@@ -398,16 +402,17 @@ func (r *BackupReconciler) patchBackupObjectMeta(
 		request.Labels[v] = targetPod.Labels[v]
 	}
 
-	request.Labels[dataProtectionBackupRepoKey] = request.BackupRepo.Name
 	request.Labels[constant.AppManagedByLabelKey] = constant.AppName
 	request.Labels[dptypes.BackupTypeLabelKey] = request.GetBackupType()
-
 	// wait for the backup repo controller to prepare the essential resource.
 	wait := false
-	if (request.BackupRepo.AccessByMount() && request.BackupRepoPVC == nil) ||
-		(request.BackupRepo.AccessByTool() && request.ToolConfigSecret == nil) {
-		request.Labels[dataProtectionWaitRepoPreparationKey] = trueVal
-		wait = true
+	if request.BackupRepo != nil {
+		request.Labels[dataProtectionBackupRepoKey] = request.BackupRepo.Name
+		if (request.BackupRepo.AccessByMount() && request.BackupRepoPVC == nil) ||
+			(request.BackupRepo.AccessByTool() && request.ToolConfigSecret == nil) {
+			request.Labels[dataProtectionWaitRepoPreparationKey] = trueVal
+			wait = true
+		}
 	}
 
 	// set annotations

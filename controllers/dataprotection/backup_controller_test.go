@@ -74,6 +74,7 @@ var _ = Describe("Backup Controller test", func() {
 		// non-namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ActionSetSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeSignature, true, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupRepoSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageProviderSignature, ml)
 		testapps.ClearResources(&testCtx, generics.VolumeSnapshotClassSignature, ml)
@@ -328,7 +329,7 @@ var _ = Describe("Backup Controller test", func() {
 
 			BeforeEach(func() {
 				// mock VolumeSnapshotClass for volume snapshot
-				testk8s.CreateVolumeSnapshotClass(&testCtx, testutil.DefaultStorageProvisoner)
+				testk8s.CreateVolumeSnapshotClass(&testCtx, testutil.DefaultCSIDriver)
 
 				By("create a backup from backupPolicy " + testdp.BackupPolicyName)
 				backup = testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {

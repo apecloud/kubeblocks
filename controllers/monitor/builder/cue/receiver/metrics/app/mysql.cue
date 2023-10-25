@@ -32,7 +32,10 @@ output:
       transport: "tcp"
       collection_interval: "`settings.CollectionInterval`"
   	}
-    resource_attributes:
-      receiver: "apecloudmysql"
+    resource_attributes: {
+    	receiver: "apecloudmysql"
+      job: "oteld-app-metrics"
+    }
+
   }
 

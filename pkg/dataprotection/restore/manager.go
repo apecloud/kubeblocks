@@ -295,11 +295,9 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 			}
 			if prepareActions[i].Status == dpv1alpha1.RestoreActionCompleted && currentOrder < restoreJobReplicas {
 				currentOrder += 1
-				if prepareDataConfig.IsSerialPolicy() {
-					// if the restore policy is Serial, should delete the completed job to release the pvc.
-					if err := deleteRestoreJob(reqCtx, cli, prepareActions[i].ObjectKey, r.Restore.Namespace); err != nil {
-						return nil, err
-					}
+				// volume restore policy is Serial, should delete the completed job to release the pvc.
+				if err = deleteRestoreJob(reqCtx, cli, prepareActions[i].ObjectKey, r.Restore.Namespace); err != nil {
+					return nil, err
 				}
 			}
 		}
@@ -536,12 +534,12 @@ func (r *RestoreManager) CheckJobsDone(
 			ObjectKey:  buildJobKeyForActionStatus(fetchedJobs[i].Name),
 			BackupName: backupSet.Backup.Name,
 		}
-		done, err := CheckJobDone(fetchedJobs[i])
+		done, _, errMsg := utils.IsJobFinished(fetchedJobs[i])
 		switch {
-		case err != nil:
+		case errMsg != "":
 			existFailedJob = true
 			statusAction.Status = dpv1alpha1.RestoreActionFailed
-			statusAction.Message = err.Error()
+			statusAction.Message = errMsg
 			SetRestoreStatusAction(restoreActions, statusAction)
 		case done:
 			statusAction.Status = dpv1alpha1.RestoreActionCompleted

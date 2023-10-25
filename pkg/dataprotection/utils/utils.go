@@ -59,7 +59,12 @@ func AddTolerations(podSpec *corev1.PodSpec) (err error) {
 	return nil
 }
 
+// IsJobFinished if the job is completed or failed, return true.
+// if the job is failed, return the failed message.
 func IsJobFinished(job *batchv1.Job) (bool, batchv1.JobConditionType, string) {
+	if job == nil {
+		return false, "", ""
+	}
 	for _, c := range job.Status.Conditions {
 		if c.Status != corev1.ConditionTrue {
 			continue
@@ -68,7 +73,7 @@ func IsJobFinished(job *batchv1.Job) (bool, batchv1.JobConditionType, string) {
 			return true, c.Type, ""
 		}
 		if c.Type == batchv1.JobFailed {
-			return true, c.Type, c.Reason + "/" + c.Message
+			return true, c.Type, c.Reason + ":" + c.Message
 		}
 	}
 	return false, "", ""

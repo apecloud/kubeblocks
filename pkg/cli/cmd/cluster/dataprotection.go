@@ -473,9 +473,9 @@ type CreateRestoreOptions struct {
 	Backup string `json:"backup,omitempty"`
 
 	// point in time recovery args
-	RestoreTime             *time.Time `json:"restoreTime,omitempty"`
-	RestoreTimeStr          string     `json:"restoreTimeStr,omitempty"`
-	RestoreManagementPolicy string     `json:"volumeRestorePolicy,omitempty"`
+	RestoreTime         *time.Time `json:"restoreTime,omitempty"`
+	RestoreTimeStr      string     `json:"restoreTimeStr,omitempty"`
+	VolumeRestorePolicy string     `json:"volumeRestorePolicy,omitempty"`
 
 	create.CreateOptions `json:"-"`
 }
@@ -523,7 +523,7 @@ func (o *CreateRestoreOptions) runRestoreFromBackup() error {
 	if err != nil {
 		return err
 	}
-	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, o.RestoreManagementPolicy, len(clusterObj.Spec.ComponentSpecs), clusterObj.Spec.ComponentSpecs[0].Name, restoreTimeStr)
+	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, o.VolumeRestorePolicy, len(clusterObj.Spec.ComponentSpecs), clusterObj.Spec.ComponentSpecs[0].Name, restoreTimeStr)
 	if err != nil {
 		return err
 	}
@@ -601,7 +601,7 @@ func NewCreateRestoreCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) 
 	}
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Backup name")
 	cmd.Flags().StringVar(&o.RestoreTimeStr, "restore-to-time", "", "point in time recovery(PITR)")
-	cmd.Flags().StringVar(&o.RestoreManagementPolicy, "volume-restore-policy", "Parallel", "the volume claim restore policy, supported values: [Serial, Parallel]")
+	cmd.Flags().StringVar(&o.VolumeRestorePolicy, "volume-restore-policy", "Parallel", "the volume claim restore policy, supported values: [Serial, Parallel]")
 	return cmd
 }
 
@@ -1148,7 +1148,7 @@ func (o *DescribeBackupOptions) enhancePrintFailureReason(backupName, failureRea
 	ctx := context.Background()
 	// get the latest job log details.
 	labels := fmt.Sprintf("%s=%s",
-		dptypes.DataProtectionLabelBackupNameKey, backupName,
+		dptypes.BackupNameLabelKey, backupName,
 	)
 	jobList, err := o.client.BatchV1().Jobs("").List(ctx, metav1.ListOptions{LabelSelector: labels})
 	if err != nil {

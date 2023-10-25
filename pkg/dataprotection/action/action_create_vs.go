@@ -36,6 +36,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
 )
 
 // CreateVolumeSnapshotAction is an action that creates the volume snapshot.
@@ -197,8 +198,7 @@ func (c *CreateVolumeSnapshotAction) getVolumeSnapshotClassName(
 	vsCli intctrlutil.VolumeSnapshotCompatClient,
 	scName string) (string, error) {
 	scObj := storagev1.StorageClass{}
-	// ignore if not found storage class, use the default volume snapshot class
-	if err := cli.Get(ctx, client.ObjectKey{Name: scName}, &scObj); client.IgnoreNotFound(err) != nil {
+	if err := cli.Get(ctx, client.ObjectKey{Name: scName}, &scObj); err != nil {
 		return "", err
 	}
 
@@ -228,7 +228,7 @@ func ensureVolumeSnapshotReady(
 		if isVolumeSnapshotConfigError(snap) {
 			return false, nil, errors.New(*snap.Status.Error.Message)
 		}
-		if snap.Status.ReadyToUse != nil && *snap.Status.ReadyToUse {
+		if boolptr.IsSetToTrue(snap.Status.ReadyToUse) {
 			return true, snap, nil
 		}
 	}

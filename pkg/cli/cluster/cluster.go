@@ -183,7 +183,7 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 		// filter back-up job pod
 		for _, pod := range objs.Pods.Items {
 			labels := pod.GetLabels()
-			if labels[dptypes.DataProtectionLabelBackupNameKey] == "" {
+			if labels[dptypes.BackupNameLabelKey] == "" {
 				podList = append(podList, pod)
 			}
 		}
@@ -251,7 +251,7 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 		}
 		// filter backups with cluster uid for excluding same cluster name
 		for _, v := range backups {
-			sourceClusterUID := v.Labels[dptypes.DataProtectionLabelClusterUIDKey]
+			sourceClusterUID := v.Labels[dptypes.ClusterUIDLabelKey]
 			if sourceClusterUID == "" || sourceClusterUID == string(objs.Cluster.UID) {
 				objs.Backups = append(objs.Backups, v)
 			}

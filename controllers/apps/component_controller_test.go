@@ -444,7 +444,7 @@ var _ = Describe("Cluster Controller", func() {
 							Name:      backupKey.Name,
 							Namespace: backupKey.Namespace,
 							Labels: map[string]string{
-								dptypes.DataProtectionLabelBackupNameKey: backupKey.Name,
+								dptypes.BackupNameLabelKey: backupKey.Name,
 							}},
 						Spec: snapshotv1.VolumeSnapshotSpec{
 							Source: snapshotv1.VolumeSnapshotSource{

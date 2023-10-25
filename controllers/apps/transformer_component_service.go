@@ -72,7 +72,7 @@ func (t *ComponentServiceTransformer) buildService(synthesizeComp *component.Syn
 	// TODO: service.ServiceName
 	serviceName := constant.GenerateComponentServiceEndpoint(clusterName, synthesizeComp.Name, string(service.ServiceName), namespace)
 	labels := constant.GetComponentWellKnownLabels(clusterName, compName)
-	svc := builder.NewServiceBuilder(namespace, serviceName).
+	builder := builder.NewServiceBuilder(namespace, serviceName).
 		AddLabelsInMap(labels).
 		SetSpec(&corev1.ServiceSpec{
 			Ports:                         service.Ports,
@@ -94,20 +94,16 @@ func (t *ComponentServiceTransformer) buildService(synthesizeComp *component.Syn
 			AllocateLoadBalancerNodePorts: service.AllocateLoadBalancerNodePorts,
 			LoadBalancerClass:             service.LoadBalancerClass,
 			InternalTrafficPolicy:         service.InternalTrafficPolicy,
-		}).
-		GetObject()
+		})
 
-	// TODO: role selector
+	// TODO(component): role selector
 	if len(service.RoleSelector) > 0 {
 		if err := t.checkRoles(synthesizeComp, service.Name, service.RoleSelector); err != nil {
 			return nil, err
 		}
-		if svc.Spec.Selector == nil {
-			svc.Spec.Selector = make(map[string]string)
-		}
-		svc.Spec.Selector[constant.RoleLabelKey] = strings.Join(service.RoleSelector, ",")
+		builder.AddSelector(constant.RoleLabelKey, strings.Join(service.RoleSelector, ","))
 	}
-	return svc, nil
+	return builder.GetObject(), nil
 }
 
 func (t *ComponentServiceTransformer) checkRoles(synthesizeComp *component.SynthesizedComponent,

@@ -17,52 +17,44 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package binding
+package grpcserver
 
 import (
-	"context"
 	"testing"
 
+	"github.com/apecloud/kubeblocks/lorry/dcs"
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"go.uber.org/zap/zapcore"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"github.com/spf13/viper"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
-
-// These tests use Ginkgo (BDD-style Go testing framework). Refer to
-// http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
-
-var ctx context.Context
-var cancel context.CancelFunc
 
 func init() {
 	viper.AutomaticEnv()
+	viper.SetDefault("KB_POD_NAME", "pod-test")
+	viper.SetDefault("KB_CLUSTER_COMP_NAME", "cluster-component-test")
+	viper.SetDefault("KB_NAMESPACE", "namespace-test")
+	ctrl.SetLogger(zap.New())
 }
 
-func TestAPIs(t *testing.T) {
+func TestVolumeOperations(t *testing.T) {
 	RegisterFailHandler(Fail)
-
-	RunSpecs(t, "Probe Binding Suite")
+	RunSpecs(t, "GRPC Server. Suite")
 }
 
 var _ = BeforeSuite(func() {
-	if viper.GetBool("ENABLE_DEBUG_LOG") {
-		logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true), func(o *zap.Options) {
-			o.TimeEncoder = zapcore.ISO8601TimeEncoder
-		}))
-	}
-
-	ctx, cancel = context.WithCancel(context.TODO())
-
-	go func() {
-		defer GinkgoRecover()
-	}()
+	// Init mock dcs store
+	InitMockDCSStore()
 })
 
 var _ = AfterSuite(func() {
-	cancel()
 })
+
+func InitMockDCSStore() {
+	ctrl := gomock.NewController(GinkgoT())
+	mockDCSStore := dcs.NewMockDCS(ctrl)
+	mockDCSStore.EXPECT().GetClusterFromCache().Return(&dcs.Cluster{}).AnyTimes()
+	dcs.SetStore(mockDCSStore)
+}

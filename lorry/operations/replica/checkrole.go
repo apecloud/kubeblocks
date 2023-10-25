@@ -56,7 +56,7 @@ type CheckRole struct {
 var checkrole operations.Operation = &CheckRole{}
 
 func init() {
-	err := operations.Register("checkrole", checkrole)
+	err := operations.Register(strings.ToLower(string(util.CheckRoleOperation)), checkrole)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -114,8 +114,7 @@ func (s *CheckRole) Do(ctx context.Context, req *operations.OpsRequest) (*operat
 		return resp, nil
 	}
 
-	k8sStore := s.dcsStore.(*dcs.KubernetesStore)
-	cluster := k8sStore.GetClusterFromCache()
+	cluster := s.dcsStore.GetClusterFromCache()
 
 	ctx1, cancel := context.WithTimeout(ctx, s.ProbeTimeout)
 	defer cancel()

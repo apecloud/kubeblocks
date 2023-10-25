@@ -60,7 +60,7 @@ func NewDBManagerBase(logger logr.Logger) (*DBManagerBase, error) {
 }
 
 func (mgr *DBManagerBase) IsDBStartupReady() bool {
-	return mgr.DBStartupReady
+	return true
 }
 
 func (mgr *DBManagerBase) GetLogger() logr.Logger {

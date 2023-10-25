@@ -21,6 +21,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"strings"
@@ -35,6 +36,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/lorry/dcs"
 	"github.com/apecloud/kubeblocks/lorry/engines/register"
+	"github.com/apecloud/kubeblocks/lorry/grpcserver"
 	"github.com/apecloud/kubeblocks/lorry/highavailability"
 	"github.com/apecloud/kubeblocks/lorry/httpserver"
 	opsregister "github.com/apecloud/kubeblocks/lorry/operations/register"
@@ -43,18 +45,8 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-var (
-	grpcPort int
-)
-
-const (
-	DefaultGRPCPort = 50001
-)
-
 func init() {
 	viper.AutomaticEnv()
-	viper.SetDefault(constant.KBEnvCharacterType, "custom")
-	flag.IntVar(&grpcPort, "grpcport", DefaultGRPCPort, "lorry grpc default port")
 }
 
 func main() {
@@ -103,20 +95,15 @@ func main() {
 		}
 	}
 
-	// // start grpc server for role probe
-	// listen, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
-	// if err != nil {
-	// 	panic(fmt.Errorf("fatal error listen on port %d: %v", grpcPort, err))
-	// }
-
-	// healthServer := customgrpc.NewGRPCServer()
-	// server := grpc.NewServer()
-	// health.RegisterHealthServer(server, healthServer)
-
-	// err = server.Serve(listen)
-	// if err != nil {
-	// 	panic(fmt.Errorf("fatal error grpcserver serve failed: %v", err))
-	// }
+	// start grpc server for role probe
+	grpcServer, err := grpcserver.NewGRPCServer()
+	if err != nil {
+		panic(fmt.Errorf("fatal error grpcserver create failed: %v", err))
+	}
+	err = grpcServer.StartNonBlocking()
+	if err != nil {
+		panic(fmt.Errorf("fatal error grpcserver serve failed: %v", err))
+	}
 
 	// Start HTTP Server
 	ops := opsregister.Operations()

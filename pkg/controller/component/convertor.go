@@ -43,7 +43,9 @@ func covertObject(convertors map[string]convertor, obj any, args ...any) error {
 			return err
 		}
 		fieldValue := reflect.ValueOf(obj).Elem().FieldByName(fieldName)
-		if fieldValue.IsValid() && fieldValue.Type().AssignableTo(reflect.TypeOf(val)) {
+		if reflect.TypeOf(val) == nil || reflect.ValueOf(val).IsZero() {
+			fieldValue.Set(reflect.Zero(fieldValue.Type()))
+		} else if fieldValue.IsValid() && fieldValue.Type().AssignableTo(reflect.TypeOf(val)) {
 			fieldValue.Set(reflect.ValueOf(val))
 		} else {
 			panic("not assignable")

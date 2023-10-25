@@ -246,7 +246,7 @@ func (r *BackupReconciler) prepareBackupRequest(
 	}
 
 	targetPods, err := getTargetPods(reqCtx, r.Client,
-		backup.Annotations[dataProtectionBackupTargetPodKey], backupPolicy)
+		backup.Annotations[dptypes.BackupTargetPodLabelKey], backupPolicy)
 	if err != nil || len(targetPods) == 0 {
 		return nil, fmt.Errorf("failed to get target pods by backup policy %s/%s",
 			backupPolicy.Namespace, backupPolicy.Name)
@@ -391,15 +391,16 @@ func (r *BackupReconciler) patchBackupObjectMeta(
 		if err := setClusterSnapshotAnnotation(request.Backup, cluster); err != nil {
 			return false, err
 		}
-		request.Labels[dptypes.DataProtectionLabelClusterUIDKey] = string(cluster.UID)
+		request.Labels[dptypes.ClusterUIDLabelKey] = string(cluster.UID)
 	}
+
 	for _, v := range getClusterLabelKeys() {
 		request.Labels[v] = targetPod.Labels[v]
 	}
 
 	request.Labels[dataProtectionBackupRepoKey] = request.BackupRepo.Name
 	request.Labels[constant.AppManagedByLabelKey] = constant.AppName
-	request.Labels[dataProtectionLabelBackupTypeKey] = request.GetBackupType()
+	request.Labels[dptypes.BackupTypeLabelKey] = request.GetBackupType()
 
 	// wait for the backup repo controller to prepare the essential resource.
 	wait := false
@@ -410,7 +411,7 @@ func (r *BackupReconciler) patchBackupObjectMeta(
 	}
 
 	// set annotations
-	request.Annotations[dataProtectionBackupTargetPodKey] = targetPod.Name
+	request.Annotations[dptypes.BackupTargetPodLabelKey] = targetPod.Name
 
 	// set finalizer
 	controllerutil.AddFinalizer(request.Backup, dptypes.DataProtectionFinalizerName)

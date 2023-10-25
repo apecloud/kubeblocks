@@ -146,22 +146,6 @@ func getTimeFormat(envs []corev1.EnvVar) string {
 	return time.RFC3339
 }
 
-// CheckJobDone if the job is completed or failed, return true.
-// if the job is failed, return an error to describe the failed message.
-func CheckJobDone(job *batchv1.Job) (bool, error) {
-	if job == nil {
-		return false, nil
-	}
-	for _, condition := range job.Status.Conditions {
-		if condition.Type == batchv1.JobComplete {
-			return true, nil
-		} else if condition.Type == batchv1.JobFailed {
-			return true, fmt.Errorf(condition.Reason + ": " + condition.Message)
-		}
-	}
-	return false, nil
-}
-
 func compareWithBackupStopTime(backupI, backupJ dpv1alpha1.Backup) bool {
 	endTimeI := backupI.GetEndTime()
 	endTimeJ := backupJ.GetEndTime()

@@ -115,12 +115,12 @@ var _ = Describe("Restore Controller test", func() {
 			}
 			restoreFactory := testdp.NewRestoreactory(testCtx.DefaultNamespace, testdp.RestoreName).
 				SetBackup(backup.Name, testCtx.DefaultNamespace).
-				SetShedulingSpec(schedulingSpec)
+				SetSchedulingSpec(schedulingSpec)
 
 			change(restoreFactory)
 
 			if isSerialPolicy {
-				restoreFactory.SetVolumeRestoreManagementPolicy(dpv1alpha1.SerialManagementPolicy)
+				restoreFactory.SetVolumeClaimRestorePolicy(dpv1alpha1.VolumeClaimRestorePolicySerial)
 			}
 			restore := restoreFactory.Create(&testCtx).GetObject()
 
@@ -230,7 +230,7 @@ var _ = Describe("Restore Controller test", func() {
 				testRestoreWithVolumeClaimsTemplate(2, 1)
 			})
 
-			It("test volumeClaimsTemplate when volumeClaimManagementPolicy is Serial", func() {
+			It("test volumeClaimsTemplate when volumeClaimRestorePolicy is Serial", func() {
 				replicas := 2
 				startingIndex := 1
 				restore := initResourcesAndWaitRestore(true, false, true, dpv1alpha1.RestorePhaseRunning,

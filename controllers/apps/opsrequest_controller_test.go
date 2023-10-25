@@ -512,7 +512,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			vs.Name = backupKey.Name
 			vs.Namespace = backupKey.Namespace
 			vs.Labels = map[string]string{
-				dptypes.DataProtectionLabelBackupNameKey: backupKey.Name,
+				dptypes.BackupNameLabelKey: backupKey.Name,
 			}
 			pvcName := ""
 			vs.Spec = snapshotv1.VolumeSnapshotSpec{

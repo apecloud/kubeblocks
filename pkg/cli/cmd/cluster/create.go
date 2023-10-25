@@ -238,10 +238,11 @@ type CreateOptions struct {
 	RBACEnabled       bool                     `json:"-"`
 	Storages          []string                 `json:"-"`
 	ServiceRef        []string                 `json:"-"`
+
 	// backup name to restore in creation
-	Backup                  string `json:"backup,omitempty"`
-	RestoreTime             string `json:"restoreTime,omitempty"`
-	RestoreManagementPolicy string `json:"-"`
+	Backup              string `json:"backup,omitempty"`
+	RestoreTime         string `json:"restoreTime,omitempty"`
+	VolumeRestorePolicy string `json:"-"`
 
 	// backup config
 	BackupConfig *appsv1alpha1.ClusterBackup `json:"backupConfig,omitempty"`
@@ -276,7 +277,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.
 
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 	cmd.Flags().StringVar(&o.RestoreTime, "restore-to-time", "", "Set a time for point in time recovery")
-	cmd.Flags().StringVar(&o.RestoreManagementPolicy, "volume-restore-policy", "Parallel", "the volume claim restore policy, supported values: [Serial, Parallel]")
+	cmd.Flags().StringVar(&o.VolumeRestorePolicy, "volume-restore-policy", "Parallel", "the volume claim restore policy, supported values: [Serial, Parallel]")
 	cmd.Flags().BoolVar(&o.RBACEnabled, "rbac-enabled", false, "Specify whether rbac resources will be created by kbcli, otherwise KubeBlocks server will try to create rbac resources")
 	cmd.PersistentFlags().BoolVar(&o.EditBeforeCreate, "edit", o.EditBeforeCreate, "Edit the API resource before creating")
 	cmd.PersistentFlags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
@@ -322,7 +323,7 @@ func setMonitor(monitoringInterval uint8, components []map[string]interface{}) {
 	}
 }
 
-func getRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, managementPolicy string, compSpecsCount int, firstCompName string, restoreTime string) (string, error) {
+func getRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, volumeRestorePolicy string, compSpecsCount int, firstCompName string, restoreTime string) (string, error) {
 	componentName := backup.Labels[constant.KBAppComponentLabelKey]
 	if len(componentName) == 0 {
 		if compSpecsCount != 1 {
@@ -332,13 +333,13 @@ func getRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, managementPolicy 
 	}
 	backupNameString := fmt.Sprintf(`"%s":"%s"`, constant.BackupNameKeyForRestore, backup.Name)
 	backupNamespaceString := fmt.Sprintf(`"%s":"%s"`, constant.BackupNamespaceKeyForRestore, backup.Namespace)
-	managementPolicyString := fmt.Sprintf(`"%s":"%s"`, constant.VolumeManagementPolicyKeyForRestore, managementPolicy)
+	volumeRestorePolicyString := fmt.Sprintf(`"%s":"%s"`, constant.VolumeRestorePolicyKeyForRestore, volumeRestorePolicy)
 	var restoreTimeString string
 	if restoreTime != "" {
 		restoreTimeString = fmt.Sprintf(`",%s":"%s"`, constant.RestoreTimeKeyForRestore, restoreTime)
 	}
 
-	restoreFromBackupAnnotation := fmt.Sprintf(`{"%s":{%s,%s,%s%s}}`, componentName, backupNameString, backupNamespaceString, managementPolicyString, restoreTimeString)
+	restoreFromBackupAnnotation := fmt.Sprintf(`{"%s":{%s,%s,%s%s}}`, componentName, backupNameString, backupNamespaceString, volumeRestorePolicyString, restoreTimeString)
 	return restoreFromBackupAnnotation, nil
 }
 
@@ -435,7 +436,7 @@ func setBackup(o *CreateOptions, components []map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, o.RestoreManagementPolicy, len(components), components[0]["name"].(string), restoreTimeStr)
+	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, o.VolumeRestorePolicy, len(components), components[0]["name"].(string), restoreTimeStr)
 	if err != nil {
 		return err
 	}

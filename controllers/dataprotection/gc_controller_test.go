@@ -31,6 +31,7 @@ import (
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
@@ -113,9 +114,9 @@ var _ = Describe("Data Protection Garbage Collection Controller", func() {
 			}
 
 			autoBackupLabel := map[string]string{
-				dataProtectionLabelAutoBackupKey:   "true",
-				dataProtectionLabelBackupPolicyKey: testdp.BackupPolicyName,
-				dataProtectionLabelBackupMethodKey: testdp.BackupMethodName,
+				dptypes.AutoBackupLabelKey:     "true",
+				dptypes.BackupScheduleLabelKey: testdp.BackupPolicyName,
+				dptypes.BackupMethodLabelKey:   testdp.BackupMethodName,
 			}
 
 			createBackup := func(name string) *dpv1alpha1.Backup {

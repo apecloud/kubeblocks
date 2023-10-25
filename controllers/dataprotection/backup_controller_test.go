@@ -162,7 +162,7 @@ var _ = Describe("Backup Controller test", func() {
 				By("backup should have completed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
-					g.Expect(fetched.Labels[dptypes.DataProtectionLabelClusterUIDKey]).Should(Equal(string(cluster.UID)))
+					g.Expect(fetched.Labels[dptypes.ClusterUIDLabelKey]).Should(Equal(string(cluster.UID)))
 					g.Expect(fetched.Labels[constant.AppInstanceLabelKey]).Should(Equal(testdp.ClusterName))
 					g.Expect(fetched.Labels[constant.KBAppComponentLabelKey]).Should(Equal(testdp.ComponentName))
 					g.Expect(fetched.Annotations[constant.ClusterSnapshotAnnotationKey]).ShouldNot(BeEmpty())

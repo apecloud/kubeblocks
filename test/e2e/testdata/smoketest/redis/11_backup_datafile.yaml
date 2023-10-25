@@ -1,0 +1,13 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: Backup
+metadata:
+  name: backup-redis-cluster
+spec:
+  backupPolicyName: redis-cluster-redis-backup-policy
+  retentionPeriod: 7d
+  backupMethod: datafile
+  deletionPolicy: Delete
+status:
+  duration: 60s
+  backupRepoName: my-repo
+  phase: Completed

@@ -29,11 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -54,12 +52,7 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
-	componentSpecs, err := getComponentSpecs(c.Client, transCtx)
-	if err != nil {
-		return err
-	}
-
-	serviceAccounts, serviceAccountsNeedCrb, err := buildServiceAccounts(transCtx, componentSpecs)
+	serviceAccounts, serviceAccountsNeedCrb, err := buildServiceAccounts(transCtx)
 	if err != nil {
 		return err
 	}
@@ -233,36 +226,6 @@ func isRoleBindingExist(transCtx *clusterTransformContext, serviceAccountName st
 	return true
 }
 
-func getComponentSpecs(cli client.Client, transCtx *clusterTransformContext) ([]appsv1alpha1.ClusterComponentSpec, error) {
-	cluster := transCtx.Cluster
-	clusterDef := transCtx.ClusterDef
-	componentSpecs := make([]appsv1alpha1.ClusterComponentSpec, 0, 1)
-	compSpecMap := cluster.Spec.GetDefNameMappingComponents()
-	for _, compDef := range clusterDef.Spec.ComponentDefs {
-		comps := compSpecMap[compDef.Name]
-		if len(comps) == 0 {
-			// if componentSpecs is empty, it may be generated from the cluster template and cluster.
-			reqCtx := ictrlutil.RequestCtx{
-				Ctx: transCtx.Context,
-				Log: log.Log.WithName("rbac"),
-			}
-			synthesizedComponent, err := component.BuildSynthesizedComponentWrapper(reqCtx, cli, cluster, nil)
-			if err != nil {
-				return nil, err
-			}
-			if synthesizedComponent == nil {
-				continue
-			}
-			comps = []appsv1alpha1.ClusterComponentSpec{{
-				ServiceAccountName: synthesizedComponent.ServiceAccountName,
-				ComponentDefRef:    compDef.Name,
-			}}
-		}
-		componentSpecs = append(componentSpecs, comps...)
-	}
-	return componentSpecs, nil
-}
-
 func getDefaultBackupPolicyTemplate(transCtx *clusterTransformContext, clusterDefName string) (*appsv1alpha1.BackupPolicyTemplate, error) {
 	backupPolicyTPLs := &appsv1alpha1.BackupPolicyTemplateList{}
 	if err := transCtx.Client.List(transCtx.Context, backupPolicyTPLs, client.MatchingLabels{constant.ClusterDefLabelKey: clusterDefName}); err != nil {
@@ -279,7 +242,7 @@ func getDefaultBackupPolicyTemplate(transCtx *clusterTransformContext, clusterDe
 	return &backupPolicyTPLs.Items[0], nil
 }
 
-func buildServiceAccounts(transCtx *clusterTransformContext, componentSpecs []appsv1alpha1.ClusterComponentSpec) (map[string]*corev1.ServiceAccount, map[string]*corev1.ServiceAccount, error) {
+func buildServiceAccounts(transCtx *clusterTransformContext) (map[string]*corev1.ServiceAccount, map[string]*corev1.ServiceAccount, error) {
 	serviceAccounts := map[string]*corev1.ServiceAccount{}
 	serviceAccountsNeedCrb := map[string]*corev1.ServiceAccount{}
 	clusterDef := transCtx.ClusterDef
@@ -288,13 +251,13 @@ func buildServiceAccounts(transCtx *clusterTransformContext, componentSpecs []ap
 	if err != nil {
 		return serviceAccounts, serviceAccountsNeedCrb, err
 	}
-	for _, compSpec := range componentSpecs {
+	for _, compSpec := range transCtx.ComponentSpecs {
 		serviceAccountName := compSpec.ServiceAccountName
-		volumeProtectionEnable := isVolumeProtectionEnabled(clusterDef, &compSpec)
-		dataProtectionEnable := isDataProtectionEnabled(backupPolicyTPL, &compSpec)
+		volumeProtectionEnable := isVolumeProtectionEnabled(clusterDef, compSpec)
+		dataProtectionEnable := isDataProtectionEnabled(backupPolicyTPL, compSpec)
 		if serviceAccountName == "" {
 			// If probe, volume protection, and data protection are disabled at the same tme, then do not create a service account.
-			if !isProbesEnabled(clusterDef, &compSpec) && !volumeProtectionEnable && !dataProtectionEnable {
+			if !isProbesEnabled(clusterDef, compSpec) && !volumeProtectionEnable && !dataProtectionEnable {
 				continue
 			}
 			serviceAccountName = "kb-" + cluster.Name

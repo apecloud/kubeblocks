@@ -471,9 +471,9 @@ func (r *BackupPolicyTplTransformer) mergeClusterBackup(
 
 // getClusterComponentSpec returns the first component name of the componentDefRef.
 func (r *BackupPolicyTplTransformer) getClusterComponentSpec() *appsv1alpha1.ClusterComponentSpec {
-	for _, v := range r.OrigCluster.Spec.ComponentSpecs {
+	for _, v := range r.clusterTransformContext.ComponentSpecs {
 		if v.ComponentDefRef == r.backupPolicy.ComponentDefRef {
-			return &v
+			return v
 		}
 	}
 	return nil

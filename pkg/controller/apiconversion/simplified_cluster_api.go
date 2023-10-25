@@ -63,7 +63,8 @@ func hasSimplifiedClusterAPI(cluster *appsv1alpha1.Cluster) bool {
 
 func fillSimplifiedClusterAPI(cluster *appsv1alpha1.Cluster, clusterCompDef *appsv1alpha1.ClusterComponentDefinition) *appsv1alpha1.ClusterComponentSpec {
 	clusterCompSpec := &appsv1alpha1.ClusterComponentSpec{
-		Name: clusterCompDef.Name,
+		Name:            clusterCompDef.Name,
+		ComponentDefRef: clusterCompDef.Name,
 	}
 	if cluster.Spec.Replicas != nil {
 		clusterCompSpec.Replicas = *cluster.Spec.Replicas

@@ -51,11 +51,11 @@ func (t *RestoreTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 		}
 		return err
 	}
-	for _, spec := range cluster.Spec.ComponentSpecs {
+	for _, spec := range transCtx.ComponentSpecs {
 		if cluster.Annotations[constant.RestoreFromBackupAnnotationKey] == "" {
 			continue
 		}
-		synthesizeComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, t.Client, cluster, &spec)
+		synthesizeComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, t.Client, cluster, spec)
 		if err != nil {
 			return commitError(err)
 		}

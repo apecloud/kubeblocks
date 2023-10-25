@@ -93,7 +93,7 @@ func (t *ClusterServiceTransformer) buildService(transCtx *clusterTransformConte
 func (t *ClusterServiceTransformer) checkComponent(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster,
 	service *appsv1alpha1.ClusterService) (*appsv1alpha1.ComponentDefinition, error) {
 	compName := service.ComponentSelector
-	for _, comp := range cluster.Spec.ComponentSpecs {
+	for _, comp := range transCtx.ComponentSpecs {
 		if comp.Name == compName {
 			compDef, ok := transCtx.ComponentDefs[comp.ComponentDef]
 			if !ok {

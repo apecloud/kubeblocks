@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package reconcile
 
 import (
+	"fmt"
 	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 	monitortype "github.com/apecloud/kubeblocks/controllers/monitor/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -58,9 +59,6 @@ func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) erro
 
 	instanceMap, err := BuildInstanceMapForPipline(systemDatasources, appDatasources, metricsExporters, logsExporters, reqCtx.OTeld)
 	if err != nil {
-		return err
-	}
-	if err = monitortype.VerifyOteldInstance(metricsExporters, logsExporters, instanceMap); err != nil {
 		return err
 	}
 
@@ -104,8 +102,13 @@ func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList,
 			pipline.ProcessorMap[monitortype.MemoryProcessorName] = true
 		}
 
-		for _, exporter := range dataSource.Spec.ExporterNames {
-			pipline.ExporterMap[exporter] = true
+		for _, exporterRef := range dataSource.Spec.ExporterNames {
+			for _, exporter := range metricsExporters.Items {
+				if exporter.Name == exporterRef {
+					pipline.ExporterMap[fmt.Sprintf(ExporterNamePattern, exporter.Spec.Type, exporter.Name)] = true
+				}
+			}
+
 		}
 		oteldInstance.MetricsPipline = append(oteldInstance.MetricsPipline, pipline)
 
@@ -138,7 +141,7 @@ func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList,
 			systemMetricsPipline.ProcessorMap[monitortype.MemoryProcessorName] = true
 		}
 		for _, exporter := range metricsExporters.Items {
-			systemMetricsPipline.ExporterMap[string(exporter.Spec.Type)] = true
+			systemMetricsPipline.ExporterMap[fmt.Sprintf(ExporterNamePattern, exporter.Spec.Type, exporter.Name)] = true
 		}
 		instance.AppMetricsPiplien = systemMetricsPipline
 
@@ -152,7 +155,7 @@ func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList,
 			logPipline.ProcessorMap[monitortype.MemoryProcessorName] = true
 		}
 		for _, exporter := range logsExporters.Items {
-			logPipline.ExporterMap[string(exporter.Spec.Type)] = true
+			logPipline.ExporterMap[fmt.Sprintf(ExporterNamePattern, exporter.Spec.Type, exporter.Name)] = true
 		}
 		instance.LogsPipline = logPipline
 	}

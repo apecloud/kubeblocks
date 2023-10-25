@@ -30,6 +30,8 @@ import (
 const (
 	SystemMetricsCUEPattern = "receiver/metrics/system/%s.cue"
 
+	MetricsPattern = "metrics/%s"
+
 	ExporterTplPattern  = "exporter/%s.cue"
 	ReceiverNamePattern = "receiver_creator/%s"
 	ServicePath         = "service/service.cue"
@@ -181,7 +183,10 @@ func (cg *OteldConfigGenerater) appendExporter(cfg yaml.MapSlice, metricsExporte
 		switch exporter.Spec.Type {
 		case v1alpha1.PrometheusSinkType:
 			exporterConfig := exporter.Spec.MetricsSinkSource.PrometheusConfig
-			valueMap := map[string]any{"endpoint": exporterConfig.Endpoint}
+			valueMap := map[string]any{"name": exporter.Name}
+			if exporterConfig.Endpoint != "" {
+				valueMap["endpoint"] = exporterConfig.Endpoint
+			}
 			tplName := fmt.Sprintf(ExporterTplPattern, v1alpha1.PrometheusSinkType)
 			metricsExporter, err := buildSliceFromCUE(tplName, valueMap)
 			if err != nil {
@@ -197,7 +202,10 @@ func (cg *OteldConfigGenerater) appendExporter(cfg yaml.MapSlice, metricsExporte
 		switch exporter.Spec.Type {
 		case v1alpha1.LokiSinkType:
 			exporterConfig := exporter.Spec.LokiConfig
-			valueMap := map[string]any{"endpoint": exporterConfig.Endpoint}
+			valueMap := map[string]any{"name": exporter.Name}
+			if exporterConfig.Endpoint != "" {
+				valueMap["endpoint"] = exporterConfig.Endpoint
+			}
 			tplName := fmt.Sprintf(ExporterTplPattern, v1alpha1.LokiSinkType)
 			logsExporter, err := buildSliceFromCUE(tplName, valueMap)
 			if err != nil {
@@ -253,9 +261,9 @@ func (cg *OteldConfigGenerater) buildPiplineItem(instance *OteldInstance) yaml.M
 				exporterSlice = append(exporterSlice, name)
 			}
 			metricsSlice = append(metricsSlice, yaml.MapItem{Key: "exporters", Value: exporterSlice})
-		}
-		if len(metricsSlice) > 0 {
-			pipline = append(pipline, yaml.MapItem{Key: "metrics", Value: metricsSlice})
+			if len(metricsSlice) > 0 {
+				pipline = append(pipline, yaml.MapItem{Key: fmt.Sprintf(MetricsPattern, mPipline.Name), Value: metricsSlice})
+			}
 		}
 	}
 
@@ -280,7 +288,6 @@ func (cg *OteldConfigGenerater) buildPiplineItem(instance *OteldInstance) yaml.M
 		metricsSlice = append(metricsSlice, yaml.MapItem{Key: "exporters", Value: exporterSlice})
 
 		pipline = append(pipline, yaml.MapItem{Key: "metrics/app", Value: metricsSlice})
-
 	}
 
 	if len(instance.AppDataSources) > 0 {

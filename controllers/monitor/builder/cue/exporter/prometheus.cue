@@ -16,6 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 parameters: {
+	name: *"default" | string
 	endpoint: *"${env:HOST_IP}:1234" | string
 	send_timestamps: *false | bool
 	metric_expiration: *"20s" | string
@@ -24,7 +25,7 @@ parameters: {
 }
 
 output: {
-	prometheus: {
+	"prometheus/\(parameters.name)": {
 		endpoint: parameters.endpoint
 		send_timestamps: parameters.send_timestamps
 		metric_expiration: parameters.metric_expiration

@@ -16,6 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 parameters: {
+	name: *"default" | string
 	endpoint: *"http://10.110.97.135/loki/api/v1/push" | string
 	sending_queue: {
 		enabled: *true | bool
@@ -28,11 +29,10 @@ parameters: {
 		max_interval: *"60s" | string
 		max_elapsed_time: *"300s" | string
 	}
-
 }
 
 output:
-  loki: {
+  "loki/\(parameters.name)": {
   	endpoint: parameters.endpoint
     sending_queue: {
     	enabled: parameters.sending_queue.enabled

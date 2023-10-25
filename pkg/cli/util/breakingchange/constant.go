@@ -51,7 +51,7 @@ const (
 	xtrabackupMethodName     = "xtrabackup"
 	datafileMethodName       = "datafile"
 
-	//action set name
+	// action set name
 	pgBasebackupActionSet  = "postgres-basebackup"
 	xtrabackupActionSet    = "xtrabackup-for-apecloud-mysql"
 	volumeSnapshotForMysql = "volumesnapshot-for-apecloud-mysql"

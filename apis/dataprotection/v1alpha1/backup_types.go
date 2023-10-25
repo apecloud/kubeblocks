@@ -37,7 +37,7 @@ type BackupSpec struct {
 	// deletionPolicy determines whether the backup contents stored in backup repository
 	// should be deleted when the backup custom resource is deleted.
 	// Supported values are "Retain" and "Delete".
-	// "Retain" means that the backup can not be deleted and the phase will always be Deleting.
+	// "Retain" means that the backup can not be deleted and remains in 'Deleting' phase.
 	// "Delete" means that the backup content and its physical snapshot on backup repository are deleted.
 	// +kubebuilder:validation:Enum=Delete;Retain
 	// +kubebuilder:validation:Required

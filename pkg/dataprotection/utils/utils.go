@@ -163,24 +163,17 @@ func VolumeSnapshotEnabled(ctx context.Context, cli client.Client, pod *corev1.P
 		return false, fmt.Errorf(`can not find any volume by targetVolumes %v on pod "%s"`, volumes, pod.Name)
 	}
 	// get the storageClass by pvc
-	storageClassMap := map[string]string{}
 	for i := range pvcNames {
 		pvc := &corev1.PersistentVolumeClaim{}
 		if err := cli.Get(ctx, types.NamespacedName{Name: pvcNames[i], Namespace: pod.Namespace}, pvc); err != nil {
 			return false, nil
 		}
-		if pvc.Spec.StorageClassName == nil {
-			return false, nil
-		}
-		storageClassMap[*pvc.Spec.StorageClassName] = pvcNames[i]
-	}
-	for k := range storageClassMap {
-		enabled, err := intctrlutil.IsVolumeSnapshotEnabled(ctx, cli, k)
+		enabled, err := intctrlutil.IsVolumeSnapshotEnabled(ctx, cli, pvc.Spec.VolumeName)
 		if err != nil {
 			return false, err
 		}
 		if !enabled {
-			return false, fmt.Errorf(`cannot find any VolumeSnapshotClass of persistentVolumeClaim "%s" to do volume snapshot on pod "%s"`, storageClassMap[k], pod.Name)
+			return false, fmt.Errorf(`cannot find any VolumeSnapshotClass of persistentVolumeClaim "%s" to do volume snapshot on pod "%s"`, pvc.Name, pod.Name)
 		}
 	}
 	return true, nil

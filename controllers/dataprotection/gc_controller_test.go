@@ -66,6 +66,7 @@ var _ = Describe("Data Protection Garbage Collection Controller", func() {
 		// non-namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ActionSetSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeSignature, true, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupRepoSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageProviderSignature, ml)
 	}

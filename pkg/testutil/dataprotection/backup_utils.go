@@ -124,12 +124,19 @@ func NewFakeBackup(testCtx *testutil.TestContext,
 }
 
 func NewFakeCluster(testCtx *testutil.TestContext) *BackupClusterInfo {
-	createPVC := func(name string) *corev1.PersistentVolumeClaim {
-		return testapps.NewPersistentVolumeClaimFactory(
+	createPVCAndPV := func(name string) *corev1.PersistentVolumeClaim {
+		pvName := "pv-" + name
+		pvc := testapps.NewPersistentVolumeClaimFactory(
 			testCtx.DefaultNamespace, name, ClusterName, ComponentName, "data").
+			SetVolumeName(pvName).
 			SetStorage("1Gi").
 			SetStorageClass(StorageClassName).
 			Create(testCtx).GetObject()
+
+		testapps.NewPersistentVolumeFactory(testCtx.DefaultNamespace, pvName, name).
+			SetStorage("1Gi").
+			SetClaimRef(pvc).SetCSIDriver(testutil.DefaultCSIDriver).Create(testCtx)
+		return pvc
 	}
 
 	podFactory := func(name string) *testapps.MockPodFactory {
@@ -148,10 +155,10 @@ func NewFakeCluster(testCtx *testutil.TestContext) *BackupClusterInfo {
 	_ = testapps.CreateStorageClass(testCtx, StorageClassName, true)
 
 	By("mocking a pvc belonging to the pod 0")
-	pvc := createPVC("data-" + podName + "-0")
+	pvc := createPVCAndPV("data-" + podName + "-0")
 
 	By("mocking a pvc belonging to the pod 1")
-	pvc1 := createPVC("data-" + podName + "-1")
+	pvc1 := createPVCAndPV("data-" + podName + "-1")
 
 	By("mocking pod 0 belonging to the statefulset")
 	volume := corev1.Volume{Name: DataVolumeName, VolumeSource: corev1.VolumeSource{

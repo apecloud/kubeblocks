@@ -54,7 +54,7 @@ type upgradeHandler interface {
 
 // registerUpgradeHandler registers the breakingChange handlers to upgradeHandlerMapper.
 // the version format should contain "MAJOR.MINOR", such as "0.6".
-func registerUpgradeHandler(fromVersions []string, toVersion string, upgradeHandler upgradeHandler) error {
+func registerUpgradeHandler(fromVersions []string, toVersion string, upgradeHandler upgradeHandler) {
 	formatErr := func(version string) error {
 		return fmt.Errorf("the version %s is incorrect format, at least contains MAJOR and MINOR, such as MAJOR.MINOR", version)
 	}
@@ -76,7 +76,6 @@ func registerUpgradeHandler(fromVersions []string, toVersion string, upgradeHand
 		formVersions: majorMinorFromVersions,
 		handler:      upgradeHandler,
 	}
-	return nil
 }
 
 // getUpgradeHandler gets the upgrade handler according to fromVersion and toVersion from upgradeHandlerMapper.

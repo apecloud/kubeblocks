@@ -536,12 +536,12 @@ func (r *RestoreManager) CheckJobsDone(
 			ObjectKey:  buildJobKeyForActionStatus(fetchedJobs[i].Name),
 			BackupName: backupSet.Backup.Name,
 		}
-		done, err := CheckJobDone(fetchedJobs[i])
+		done, _, errMsg := utils.IsJobFinished(fetchedJobs[i])
 		switch {
-		case err != nil:
+		case errMsg != "":
 			existFailedJob = true
 			statusAction.Status = dpv1alpha1.RestoreActionFailed
-			statusAction.Message = err.Error()
+			statusAction.Message = errMsg
 			SetRestoreStatusAction(restoreActions, statusAction)
 		case done:
 			statusAction.Status = dpv1alpha1.RestoreActionCompleted

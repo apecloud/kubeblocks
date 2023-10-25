@@ -279,8 +279,6 @@ const (
 	AccountPasswdForSecret = "password"
 )
 
-const DefaultBackupPvcInitCapacity = "20Gi"
-
 const (
 	ComponentStatusDefaultPodName = "Unknown"
 )
@@ -302,8 +300,8 @@ const (
 )
 
 const (
-	BackupNameKeyForRestore             = "name"
-	BackupNamespaceKeyForRestore        = "namespace"
-	VolumeManagementPolicyKeyForRestore = "managementPolicy"
-	RestoreTimeKeyForRestore            = "restoreTime"
+	BackupNameKeyForRestore          = "name"
+	BackupNamespaceKeyForRestore     = "namespace"
+	VolumeRestorePolicyKeyForRestore = "volumeRestorePolicy"
+	RestoreTimeKeyForRestore         = "restoreTime"
 )

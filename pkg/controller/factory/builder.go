@@ -732,8 +732,8 @@ func BuildBackup(cluster *appsv1alpha1.Cluster,
 	backupKey types.NamespacedName,
 	backupMethod string) *dpv1alpha1.Backup {
 	return builder.NewBackupBuilder(backupKey.Namespace, backupKey.Name).
-		AddLabels(dptypes.DataProtectionLabelBackupMethodKey, backupMethod).
-		AddLabels(dptypes.DataProtectionLabelBackupPolicyKey, backupPolicyName).
+		AddLabels(dptypes.BackupMethodLabelKey, backupMethod).
+		AddLabels(dptypes.BackupPolicyLabelKey, backupPolicyName).
 		AddLabels(constant.KBManagedByKey, "cluster").
 		AddLabels(constant.AppNameLabelKey, component.ClusterDefName).
 		AddLabels(constant.AppInstanceLabelKey, cluster.Name).

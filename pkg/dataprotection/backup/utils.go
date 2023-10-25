@@ -148,7 +148,7 @@ func BuildBackupWorkloadLabels(backup *dpv1alpha1.Backup) map[string]string {
 			delete(labels, v)
 		}
 	}
-	labels[types.DataProtectionLabelBackupNameKey] = backup.Name
+	labels[types.BackupNameLabelKey] = backup.Name
 	return labels
 }
 

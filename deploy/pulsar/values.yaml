@@ -68,3 +68,5 @@ metrics:
 
 
 clusterDomain: ".cluster.local"
+
+cloudProvider: ""

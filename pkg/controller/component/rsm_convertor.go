@@ -22,11 +22,11 @@ package component
 import (
 	"errors"
 
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // BuildRSMFrom builds a new Component object based on Cluster, SynthesizedComponent.

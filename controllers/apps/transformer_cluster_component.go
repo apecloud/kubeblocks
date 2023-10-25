@@ -55,12 +55,14 @@ func (c *ClusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
-	if cluster.Spec.ComponentSpecs == nil {
+	// has no components defined
+	if len(transCtx.ComponentSpecs) == 0 {
 		return nil
 	}
+
 	protoCompSpecMap := make(map[string]*appsv1alpha1.ClusterComponentSpec)
-	for _, spec := range cluster.Spec.ComponentSpecs {
-		protoCompSpecMap[spec.Name] = &spec
+	for _, spec := range transCtx.ComponentSpecs {
+		protoCompSpecMap[spec.Name] = spec
 	}
 
 	protoCompSet := sets.KeySet(protoCompSpecMap)
@@ -73,35 +75,31 @@ func (c *ClusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 
 	createCompObjects := func() error {
 		for compName := range createCompSet {
-			protoComp, err := component.BuildProtoComponent(reqCtx, c.Client, cluster, protoCompSpecMap[compName])
+			comp, err := component.BuildProtoComponent2(cluster, protoCompSpecMap[compName])
 			if err != nil {
 				return err
 			}
-			graphCli.Create(dag, protoComp)
+			graphCli.Create(dag, comp)
 		}
 		return nil
 	}
 
 	updateCompObjects := func() error {
 		for compName := range updateCompSet {
-			runningComp, err := getCacheSnapshotComp(reqCtx, c.Client, compName, cluster.Namespace)
-			if err != nil && apierrors.IsNotFound(err) {
+			runningComp, err1 := getCacheSnapshotComp(reqCtx, c.Client, compName, cluster.Namespace)
+			if err1 != nil && !apierrors.IsNotFound(err1) {
+				return err1
+			}
+			comp, err2 := component.BuildProtoComponent2(cluster, protoCompSpecMap[compName])
+			if err2 != nil {
+				return err2
+			}
+			if err1 != nil { // non-exist
 				// to be backwards compatible with old API versions, for components that are already running but don't have a component CR, component CR needs to be generated.
-				protoComp, err := component.BuildProtoComponent(reqCtx, c.Client, cluster, protoCompSpecMap[compName])
-				if err != nil {
-					return err
-				}
-				graphCli.Create(dag, protoComp)
-				continue
-			} else if err != nil {
-				return err
+				graphCli.Create(dag, comp)
+			} else {
+				graphCli.Update(dag, runningComp, copyAndMergeComponent(runningComp, comp, cluster))
 			}
-			protoComp, err := component.BuildProtoComponent(reqCtx, c.Client, cluster, protoCompSpecMap[compName])
-			if err != nil {
-				return err
-			}
-			newObj := copyAndMergeComponent(runningComp, protoComp, cluster)
-			graphCli.Update(dag, runningComp, newObj)
 		}
 		return nil
 	}
@@ -167,9 +165,9 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component, clust
 
 // getCacheSnapshotComp gets the component object from cache snapshot
 func getCacheSnapshotComp(reqCtx ictrlutil.RequestCtx, cli client.Client, compName, namespace string) (*appsv1alpha1.Component, error) {
-	runningComp := &appsv1alpha1.Component{}
-	if err := ictrlutil.ValidateExistence(reqCtx.Ctx, cli, types.NamespacedName{Name: compName, Namespace: namespace}, runningComp, false); err != nil {
+	comp := &appsv1alpha1.Component{}
+	if err := ictrlutil.ValidateExistence(reqCtx.Ctx, cli, types.NamespacedName{Name: compName, Namespace: namespace}, comp, false); err != nil {
 		return nil, err
 	}
-	return runningComp, nil
+	return comp, nil
 }

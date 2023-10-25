@@ -50,6 +50,25 @@ func BuildProtoComponent(reqCtx ictrlutil.RequestCtx,
 	return buildProtoCompFromConvertor(reqCtx, cli, cluster, clusterCompSpec)
 }
 
+// BuildProtoComponent2 builds a new Component object from cluster component spec and definition.
+func BuildProtoComponent2(cluster *appsv1alpha1.Cluster,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.Component, error) {
+	builder := builder.NewComponentBuilder(cluster.Namespace, clusterCompSpec.Name, cluster.Name, clusterCompSpec.ComponentDef).
+		SetAffinity(clusterCompSpec.Affinity).
+		SetTolerations(clusterCompSpec.Tolerations).
+		SetReplicas(clusterCompSpec.Replicas).
+		SetResources(clusterCompSpec.Resources).
+		SetMonitor(clusterCompSpec.Monitor).
+		SetServiceAccountName(clusterCompSpec.ServiceAccountName).
+		SetVolumeClaimTemplates(clusterCompSpec.VolumeClaimTemplates).
+		SetUpdateStrategy(clusterCompSpec.UpdateStrategy).
+		SetEnabledLogs(clusterCompSpec.EnabledLogs).
+		SetServiceRefs(clusterCompSpec.ServiceRefs).
+		SetClassRef(clusterCompSpec.ClassDefRef).
+		SetTLSConfig(clusterCompSpec.TLS, clusterCompSpec.Issuer)
+	return builder.GetObject(), nil
+}
+
 // BuildComponentDefinition constructs a ComponentDefinition object based on the following rules:
 // 1. If the clusterCompSpec.EnableComponentDefinition feature gate is enabled, return the ComponentDefinition object corresponding to clusterCompSpec.ComponentDef directly.
 // 2. Otherwise, generate the corresponding ComponentDefinition object from converting clusterComponentDefinition.

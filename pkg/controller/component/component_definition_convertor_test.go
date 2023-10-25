@@ -56,7 +56,7 @@ var _ = Describe("Component Definition Convertor", func() {
 				WorkloadType:  appsv1alpha1.Consensus,
 				CharacterType: "mysql",
 				ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{
-					appsv1alpha1.ComponentConfigSpec{
+					{
 						ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 							Name:        "mysql-config",
 							TemplateRef: "mysql-config-template",
@@ -67,7 +67,7 @@ var _ = Describe("Component Definition Convertor", func() {
 					},
 				},
 				ScriptSpecs: []appsv1alpha1.ComponentTemplateSpec{
-					appsv1alpha1.ComponentTemplateSpec{
+					{
 						Name:        "mysql-scripts",
 						TemplateRef: "mysql-scripts",
 						VolumeName:  "scripts",
@@ -92,15 +92,15 @@ var _ = Describe("Component Definition Convertor", func() {
 					},
 				},
 				LogConfigs: []appsv1alpha1.LogConfig{
-					appsv1alpha1.LogConfig{
+					{
 						Name:            "error",
 						FilePathPattern: "/data/mysql/log/mysqld-error.log",
 					},
-					appsv1alpha1.LogConfig{
+					{
 						Name:            "slow",
 						FilePathPattern: "/data/mysql/log/mysqld-slowquery.log",
 					},
-					appsv1alpha1.LogConfig{
+					{
 						Name:            "general",
 						FilePathPattern: "/data/mysql/log/mysqld.log",
 					},
@@ -108,31 +108,31 @@ var _ = Describe("Component Definition Convertor", func() {
 				PodSpec: &corev1.PodSpec{
 					Volumes: []corev1.Volume{},
 					Containers: []corev1.Container{
-						corev1.Container{
+						{
 							Name:    "mysql",
 							Command: []string{"/entrypoint.sh"},
 							Env: []corev1.EnvVar{
-								corev1.EnvVar{
+								{
 									Name:  "port",
 									Value: "3306",
 								},
 							},
 							VolumeMounts: []corev1.VolumeMount{
-								corev1.VolumeMount{
+								{
 									Name:      dataVolumeName,
 									MountPath: "/data/mysql",
 								},
-								corev1.VolumeMount{
+								{
 									Name:      logVolumeName,
 									MountPath: "/data/log",
 								},
 							},
 							Ports: []corev1.ContainerPort{
-								corev1.ContainerPort{
+								{
 									Name:          "mysql",
 									ContainerPort: 3306,
 								},
-								corev1.ContainerPort{
+								{
 									Name:          "paxos",
 									ContainerPort: 13306,
 								},
@@ -153,7 +153,7 @@ var _ = Describe("Component Definition Convertor", func() {
 				},
 				Service: &appsv1alpha1.ServiceSpec{
 					Ports: []appsv1alpha1.ServicePort{
-						appsv1alpha1.ServicePort{
+						{
 							Name: "data",
 							Port: 3306,
 							TargetPort: intstr.IntOrString{
@@ -161,7 +161,7 @@ var _ = Describe("Component Definition Convertor", func() {
 								StrVal: "mysql",
 							},
 						},
-						appsv1alpha1.ServicePort{
+						{
 							Name: "paxos",
 							Port: 13306,
 							TargetPort: intstr.IntOrString{
@@ -179,7 +179,7 @@ var _ = Describe("Component Definition Convertor", func() {
 						AccessMode: appsv1alpha1.ReadWrite,
 					},
 					Followers: []appsv1alpha1.ConsensusMember{
-						appsv1alpha1.ConsensusMember{
+						{
 							Name:       "follower",
 							AccessMode: appsv1alpha1.Readonly,
 						},
@@ -197,11 +197,11 @@ var _ = Describe("Component Definition Convertor", func() {
 						CommandExecutorEnvItem: appsv1alpha1.CommandExecutorEnvItem{
 							Image: "image",
 							Env: []corev1.EnvVar{
-								corev1.EnvVar{
+								{
 									Name:  "user",
 									Value: "user",
 								},
-								corev1.EnvVar{
+								{
 									Name:  "password",
 									Value: "password",
 								},
@@ -219,7 +219,7 @@ var _ = Describe("Component Definition Convertor", func() {
 						LetterCase: appsv1alpha1.MixedCases,
 					},
 					Accounts: []appsv1alpha1.SystemAccountConfig{
-						appsv1alpha1.SystemAccountConfig{
+						{
 							Name: appsv1alpha1.AdminAccount,
 							ProvisionPolicy: appsv1alpha1.ProvisionPolicy{
 								Type:  appsv1alpha1.CreateByStmt,
@@ -229,7 +229,7 @@ var _ = Describe("Component Definition Convertor", func() {
 								},
 							},
 						},
-						appsv1alpha1.SystemAccountConfig{
+						{
 							Name: appsv1alpha1.ReplicatorAccount,
 							ProvisionPolicy: appsv1alpha1.ProvisionPolicy{
 								Type: appsv1alpha1.ReferToExisting,
@@ -242,21 +242,21 @@ var _ = Describe("Component Definition Convertor", func() {
 					},
 				},
 				VolumeTypes: []appsv1alpha1.VolumeTypeSpec{
-					appsv1alpha1.VolumeTypeSpec{
+					{
 						Name: dataVolumeName,
 						Type: appsv1alpha1.VolumeTypeData,
 					},
-					appsv1alpha1.VolumeTypeSpec{
+					{
 						Name: logVolumeName,
 						Type: appsv1alpha1.VolumeTypeLog,
 					},
 				},
 				CustomLabelSpecs: []appsv1alpha1.CustomLabelSpec{
-					appsv1alpha1.CustomLabelSpec{
+					{
 						Key:   "scope",
 						Value: "scope",
 						Resources: []appsv1alpha1.GVKResource{
-							appsv1alpha1.GVKResource{
+							{
 								GVK: "v1/pod",
 								Selector: map[string]string{
 									"managed-by": "kubeblocks",
@@ -269,7 +269,7 @@ var _ = Describe("Component Definition Convertor", func() {
 				VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{
 					HighWatermark: defaultHighWatermark,
 					Volumes: []appsv1alpha1.ProtectedVolume{
-						appsv1alpha1.ProtectedVolume{
+						{
 							Name:          logVolumeName,
 							HighWatermark: &lowerHighWatermark,
 						},
@@ -330,13 +330,13 @@ var _ = Describe("Component Definition Convertor", func() {
 				clusterCompVer := &appsv1alpha1.ClusterComponentVersion{
 					VersionsCtx: appsv1alpha1.VersionsContext{
 						InitContainers: []corev1.Container{
-							corev1.Container{
+							{
 								Name:  "init",
 								Image: "init",
 							},
 						},
 						Containers: []corev1.Container{
-							corev1.Container{
+							{
 								Name:  "mysql",
 								Image: "image",
 							},
@@ -462,7 +462,7 @@ var _ = Describe("Component Definition Convertor", func() {
 			It("w/ comp version", func() {
 				clusterCompVer := &appsv1alpha1.ClusterComponentVersion{
 					ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{
-						appsv1alpha1.ComponentConfigSpec{
+						{
 							ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 								Name:        "agamotto-config",
 								TemplateRef: "agamotto-config-template",
@@ -545,12 +545,12 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(err).Should(Succeed())
 
 				expectedAccounts := []appsv1alpha1.ComponentSystemAccount{
-					appsv1alpha1.ComponentSystemAccount{
+					{
 						Name:                     string(clusterCompDef.SystemAccounts.Accounts[0].Name),
 						PasswordGenerationPolicy: clusterCompDef.SystemAccounts.PasswordConfig,
 						Statement:                clusterCompDef.SystemAccounts.Accounts[0].ProvisionPolicy.Statements.CreationStatement,
 					},
-					appsv1alpha1.ComponentSystemAccount{
+					{
 						Name:                     string(clusterCompDef.SystemAccounts.Accounts[1].Name),
 						PasswordGenerationPolicy: clusterCompDef.SystemAccounts.PasswordConfig,
 						SecretRef:                clusterCompDef.SystemAccounts.Accounts[1].ProvisionPolicy.SecretRef,
@@ -612,17 +612,17 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(err).Should(Succeed())
 
 				expectedRoles := []appsv1alpha1.ComponentReplicaRole{
-					appsv1alpha1.ComponentReplicaRole{
+					{
 						Name:        "leader",
 						Serviceable: true,
 						Writable:    true,
 					},
-					appsv1alpha1.ComponentReplicaRole{
+					{
 						Name:        "follower",
 						Serviceable: true,
 						Writable:    false,
 					},
-					appsv1alpha1.ComponentReplicaRole{
+					{
 						Name:        "learner",
 						Serviceable: true,
 						Writable:    false,

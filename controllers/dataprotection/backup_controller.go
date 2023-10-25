@@ -34,6 +34,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
@@ -209,9 +210,9 @@ func (r *BackupReconciler) handleNewPhase(
 
 	// set and patch backup object meta, including labels, annotations and finalizers
 	// if the backup object meta is changed, the backup object will be patched.
-	if patched, err := r.patchBackupObjectMeta(backup, request); err != nil {
+	if wait, err := r.patchBackupObjectMeta(backup, request); err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
-	} else if patched {
+	} else if wait {
 		return intctrlutil.Reconciled()
 	}
 
@@ -389,6 +390,23 @@ func (r *BackupReconciler) patchBackupObjectMeta(
 	request *dpbackup.Request) (bool, error) {
 	targetPod := request.TargetPods[0]
 
+	encryptPassword := func() (string, error) {
+		target := request.BackupPolicy.Spec.Target
+		if target == nil || target.ConnectionCredential == nil {
+			return "", nil
+		}
+		secret := &corev1.Secret{}
+		if err := r.Client.Get(request.Ctx, types.NamespacedName{Name: target.ConnectionCredential.SecretName, Namespace: request.Namespace}, secret); err != nil {
+			return "", err
+		}
+		e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
+		ciphertext, err := e.Encrypt(secret.Data[target.ConnectionCredential.PasswordKey])
+		if err != nil {
+			return "", err
+		}
+		return ciphertext, nil
+	}
+
 	// get KubeBlocks cluster and set labels and annotations for backup
 	// TODO(ldm): we should remove this dependency of cluster in the future
 	cluster := getCluster(request.Ctx, r.Client, targetPod)
@@ -397,6 +415,17 @@ func (r *BackupReconciler) patchBackupObjectMeta(
 			return false, err
 		}
 		request.Labels[dptypes.ClusterUIDLabelKey] = string(cluster.UID)
+		backupType := dputils.GetBackupType(request.ActionSet, request.BackupMethod.SnapshotVolumes)
+		if backupType == dpv1alpha1.BackupTypeFull {
+			// save the connection credential password for cluster.
+			ciphertext, err := encryptPassword()
+			if err != nil {
+				return false, err
+			}
+			if ciphertext != "" {
+				request.Annotations[dptypes.ConnectionPasswordKey] = ciphertext
+			}
+		}
 	}
 
 	for _, v := range getClusterLabelKeys() {
@@ -426,7 +455,7 @@ func (r *BackupReconciler) patchBackupObjectMeta(
 		return wait, nil
 	}
 
-	return true, r.Client.Patch(request.Ctx, request.Backup, client.MergeFrom(original))
+	return wait, r.Client.Patch(request.Ctx, request.Backup, client.MergeFrom(original))
 }
 
 // getBackupRepo returns the backup repo specified by the backup object or the policy.

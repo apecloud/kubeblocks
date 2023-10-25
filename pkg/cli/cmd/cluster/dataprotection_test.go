@@ -48,6 +48,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
 	"github.com/apecloud/kubeblocks/pkg/cli/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 var _ = Describe("DataProtection", func() {
@@ -279,6 +280,9 @@ var _ = Describe("DataProtection", func() {
 		newClusterObj := &appsv1alpha1.Cluster{}
 		Expect(cluster.GetK8SClientObject(tf.FakeDynamicClient, newClusterObj, types.ClusterGVR(), testing.Namespace, newClusterName)).Should(Succeed())
 		Expect(clusterObj.Spec.ComponentSpecs[0].Replicas).Should(Equal(int32(1)))
+		// check if cluster contains the annotation for restoring
+		Expect(newClusterObj.Annotations[constant.RestoreFromBackupAnnotationKey]).Should(ContainSubstring(constant.ConnectionPassword))
+		Expect(newClusterObj.Annotations[constant.RestoreFromBackupAnnotationKey]).Should(ContainSubstring(constant.BackupNamespaceKeyForRestore))
 		By("restore new cluster from source cluster which is deleted")
 		// mock cluster is not lived in kubernetes
 		mockBackupInfo(tf.FakeDynamicClient, backupName, "deleted-cluster", nil, "")
@@ -440,6 +444,7 @@ func mockBackupInfo(dynamic dynamic.Interface, backupName, clusterName string, t
 				"name": backupName,
 				"annotations": map[string]any{
 					constant.ClusterSnapshotAnnotationKey: clusterString,
+					dptypes.ConnectionPasswordKey:         "test-password",
 				},
 				"labels": map[string]any{
 					constant.AppInstanceLabelKey:    clusterName,

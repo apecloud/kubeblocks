@@ -38,6 +38,21 @@ type MockClusterDefFactory struct {
 	BaseFactory[appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterDefinition, MockClusterDefFactory]
 }
 
+func getDefaultConnectionCredential() map[string]string {
+	return map[string]string{
+		"username":          "root",
+		"SVC_FQDN":          "$(SVC_FQDN)",
+		"HEADLESS_SVC_FQDN": "$(HEADLESS_SVC_FQDN)",
+		"RANDOM_PASSWD":     "$(RANDOM_PASSWD)",
+		"tcpEndpoint":       "tcp:$(SVC_FQDN):$(SVC_PORT_mysql)",
+		"paxosEndpoint":     "paxos:$(SVC_FQDN):$(SVC_PORT_paxos)",
+		"UUID":              "$(UUID)",
+		"UUID_B64":          "$(UUID_B64)",
+		"UUID_STR_B64":      "$(UUID_STR_B64)",
+		"UUID_HEX":          "$(UUID_HEX)",
+	}
+}
+
 func NewClusterDefFactory(name string) *MockClusterDefFactory {
 	f := &MockClusterDefFactory{}
 	f.Init("", name,
@@ -46,14 +61,14 @@ func NewClusterDefFactory(name string) *MockClusterDefFactory {
 				ComponentDefs: []appsv1alpha1.ClusterComponentDefinition{},
 			},
 		}, f)
-	f.SetConnectionCredential(defaultConnectionCredential, nil)
+	f.SetConnectionCredential(getDefaultConnectionCredential(), nil)
 	return f
 }
 
 func NewClusterDefFactoryWithConnCredential(name string) *MockClusterDefFactory {
 	f := NewClusterDefFactory(name)
 	f.AddComponentDef(StatefulMySQLComponent, "conn-cred")
-	f.SetConnectionCredential(defaultConnectionCredential, &defaultSvcSpec)
+	f.SetConnectionCredential(getDefaultConnectionCredential(), &defaultSvcSpec)
 	return f
 }
 

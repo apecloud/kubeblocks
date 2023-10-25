@@ -38,7 +38,7 @@ import (
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -55,21 +55,21 @@ var _ = Describe("BackupRepo controller", func() {
 		By("clean resources")
 		// non-namespaced
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupRepoSignature, true, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.StorageProviderSignature, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.CSIDriverSignature, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupRepoSignature, true, ml)
+		testapps.ClearResources(&testCtx, generics.StorageProviderSignature, ml)
+		testapps.ClearResources(&testCtx, generics.CSIDriverSignature, ml)
 
 		// namespaced
 		inNS := client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMgrNS))
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupSignature, true, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.StorageClassSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.StorageClassSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.SecretSignature, inNS, ml)
 
 		// namespace2
 		inNS2 := client.InNamespace(namespace2)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupSignature, true, inNS2, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS2, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS2, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS2, ml)
 
 		// delete namespace2
 		Eventually(func(g Gomega) {

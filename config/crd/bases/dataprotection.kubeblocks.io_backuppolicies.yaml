@@ -335,7 +335,10 @@ spec:
                       passwordKey:
                         default: password
                         description: passwordKey specifies the map key of the password
-                          in the connection credential secret.
+                          in the connection credential secret. this password will
+                          be saved in the backup annotation for full backup. you can
+                          use the environment variable DP_ENCRYPTION_KEY to specify
+                          encrypted key.
                         type: string
                       portKey:
                         description: portKey specifies the map key of the port in

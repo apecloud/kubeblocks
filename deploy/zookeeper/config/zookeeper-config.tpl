@@ -10,8 +10,6 @@ syncLimit=5
 # do not use /tmp for storage, /tmp here is just
 # example sakes.
 dataDir=/zookeeper/data
-# dataLogDir
-dataLogDir=/zookeeper/log
 # the port at which the clients will connect
 clientPort=2181
 # the maximum number of client connections.
@@ -32,11 +30,11 @@ clientPort=2181
 ## Metrics Providers
 #
 # https://prometheus.io Metrics Exporter
-#metricsProvider.className=org.apache.zookeeper.metrics.prometheus.PrometheusMetricsProvider
-#metricsProvider.httpPort=7000
-#metricsProvider.exportJvmInfo=true
+metricsProvider.className=org.apache.zookeeper.metrics.prometheus.PrometheusMetricsProvider
+metricsProvider.httpPort=7000
+metricsProvider.exportJvmInfo=true
 
-# Cluster params
+dataLogDir=/zookeeper/log
 standaloneEnabled=false
 reconfigEnabled=true
 4lw.commands.whitelist=srvr, mntr, ruok

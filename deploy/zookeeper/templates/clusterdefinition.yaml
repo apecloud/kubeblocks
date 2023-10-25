@@ -24,18 +24,11 @@ spec:
 {{/*          scrapePort: {{ .Values.metrics.service.port }}*/}}
       configSpecs:
         - name: zookeeper-config
-          templateRef: zookeeper-config-template
           namespace: {{ .Release.Namespace }}
+          templateRef: {{ include "zookeeper.name" . }}-config-template
+          constraintRef: {{ include "zookeeper.name" . }}-config-constraints
           volumeName: configs
           defaultMode: 0755
-{{/*          keys:*/}}
-{{/*            - zoo1.cfg*/}}
-{{/*      scriptSpecs:*/}}
-{{/*        - name: pulsar-scripts*/}}
-{{/*          templateRef: {{ include "pulsar.name" . }}-scripts*/}}
-{{/*          namespace: {{ .Release.Namespace }}*/}}
-{{/*          volumeName: scripts*/}}
-{{/*          defaultMode: 0555*/}}
       service:
         ports:
           - name: client
@@ -98,8 +91,6 @@ spec:
               runAsGroup: 0
               runAsNonRoot: true
               runAsUser: 10000
-{{/*            terminationMessagePath: /dev/termination-log*/}}
-{{/*            terminationMessagePolicy: File*/}}
             volumeMounts:
               - mountPath: /zookeeper/data
                 name: data
@@ -108,35 +99,3 @@ spec:
               - name: configs
                 mountPath: /opt/zookeeper/conf/zoo.cfg
                 subPath: zoo.cfg
-{{/*          - name: metrics*/}}
-{{/*            image: {{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}*/}}
-{{/*            imagePullPolicy: {{ default "IfNotPresent" .Values.images.metrics.pullPolicy }}*/}}
-{{/*            securityContext:*/}}
-{{/*              runAsNonRoot: false*/}}
-{{/*              runAsUser: 0*/}}
-{{/*            env:*/}}
-{{/*              - name: JOB_NAME*/}}
-{{/*                value: zookeeper*/}}
-{{/*              - name: SERVICE_PORT*/}}
-{{/*                value: "8000"*/}}
-{{/*              - name: POD_NAME*/}}
-{{/*                value: $(KB_POD_NAME)*/}}
-{{/*              - name: POD_NAMESPACE*/}}
-{{/*                value: $(KB_NAMESPACE)*/}}
-{{/*              {{- if .Values.debugEnabled }}*/}}
-{{/*              - name: LOG_LEVEL*/}}
-{{/*                value: debug*/}}
-{{/*              {{- else }}*/}}
-{{/*              - name: LOG_LEVEL*/}}
-{{/*                value: info*/}}
-{{/*              {{- end }}*/}}
-{{/*            command:*/}}
-{{/*              - "/bin/agamo tto"*/}}
-{{/*              - "--config=/opt/agamotto/agamotto-config.yaml"*/}}
-{{/*              - "--feature-gates=-pkg.translator.prometheus.NormalizeName"*/}}
-{{/*            ports:*/}}
-{{/*              - name: http-metrics*/}}
-{{/*                containerPort: {{ .Values.metrics.service.port }}*/}}
-{{/*            volumeMounts:*/}}
-{{/*              - name: agamotto-configuration*/}}
-{{/*                mountPath: /opt/agamotto*/}}

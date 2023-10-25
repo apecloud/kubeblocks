@@ -11,5 +11,5 @@ spec:
       versionsContext:
         containers:
           - name: zookeeper
-            image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
-            imagePullPolicy: {{ default "IfNotPresent" .Values.image.pullPolicy }}
+            image: {{ .Values.images.zookeeper.repository }}:{{ .Values.images.zookeeper.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.zookeeper.pullPolicy }}

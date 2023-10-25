@@ -20,7 +20,7 @@ if [ $(remote_file_exists "${DP_BACKUP_NAME}.tar.gz") == "true" ]; then
 fi
 
 
-# NOTE: restore from an old version backup, will be remove in 0.8
+# NOTE: restore from an old version backup, will be removed in 0.8
 if [ $(remote_file_exists "base.tar.gz") == "true" ]; then
   datasafed pull "base.tar.gz" - | gunzip | tar -xzvf - -C "${DATA_DIR}/"
 elif [ $(remote_file_exists "base.tar") == "true" ]; then

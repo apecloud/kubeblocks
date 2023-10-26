@@ -70,20 +70,6 @@ spec:
           - name: mysql
             port: 3306
             targetPort: mysql
-      rsmSpec:
-        roles:
-        - accessMode: ReadWrite
-          canVote: true
-          isLeader: true
-          name: leader
-        - accessMode: Readonly
-          canVote: true
-          isLeader: false
-          name: follower
-        - accessMode: Readonly
-          canVote: false
-          isLeader: false
-          name: learner
       horizontalScalePolicy:
         type: CloneVolume
         backupPolicyTemplateName: apecloud-mysql-backup-policy-for-hscale

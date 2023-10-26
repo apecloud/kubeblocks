@@ -12,18 +12,14 @@ replicas: 1
 
 ## @param cpu
 ##
-cpu: 0.5
+cpu: 2
 
 ## @param memory, the unit is Gi
 ##
-memory: 0.5
-
-## @param storage size, the unit is Gi
-##
-storage: 20
+memory: 6
 
 ## @param gpu
 ##
 gpu: 1
 
-developMode: false
+cpuMode: false

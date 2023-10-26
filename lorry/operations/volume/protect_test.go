@@ -118,7 +118,7 @@ var _ = Describe("Volume Protection Operation", func() {
 		protection := &Protection{
 			Requester: &mockVolumeStatsRequester{},
 		}
-		protection.Init(context.Background())
+		Expect(protection.Init(context.Background())).Should(Succeed())
 		protection.SendEvent = false
 		return protection
 	}
@@ -128,7 +128,7 @@ var _ = Describe("Volume Protection Operation", func() {
 			protection := &Protection{
 				Requester: &mockVolumeStatsRequester{},
 			}
-			protection.Init(context.Background())
+			Expect(protection.Init(context.Background())).Should(Succeed())
 			Expect(protection.Pod).Should(Equal(podName))
 			Expect(protection.HighWatermark).Should(Equal(volumeProtectionSpec.HighWatermark))
 			Expect(len(protection.Volumes)).Should(Equal(len(volumeProtectionSpec.Volumes)))
@@ -256,7 +256,7 @@ var _ = Describe("Volume Protection Operation", func() {
 			mock := obj.Requester.(*mockVolumeStatsRequester)
 			stats := statsv1alpha1.Summary{}
 			mock.summary, _ = json.Marshal(stats)
-			obj.Init(context.Background())
+			Expect(obj.Init(context.Background())).Should(Succeed())
 
 			_, err := obj.Do(context.Background(), nil)
 			Expect(err).ShouldNot(HaveOccurred())

@@ -47,7 +47,8 @@ var _ = Describe("GRPC Server", func() {
 		})
 
 		It("success", func() {
-			operations.Register(strings.ToLower(string(util.CheckRoleOperation)), &replica.CheckRole{})
+			err := operations.Register(strings.ToLower(string(util.CheckRoleOperation)), &replica.CheckRole{})
+			Expect(err).ShouldNot(HaveOccurred())
 			server, err := NewGRPCServer()
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(server).ShouldNot(BeNil())

@@ -28,9 +28,9 @@ import (
 )
 
 const (
-//testData  = `{"data":"data"}`
-//testKey   = "test"
-//redisHost = "127.0.0.1:6379"
+// testData  = `{"data":"data"}`
+// testKey   = "test"
+// redisHost = "127.0.0.1:6379"
 
 // userName = "kiminonawa"
 // password = "moss"

@@ -28,5 +28,5 @@ import (
 
 func TestEngine(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "foxlake Suite")
+	RunSpecs(t, "nebula Suite")
 }

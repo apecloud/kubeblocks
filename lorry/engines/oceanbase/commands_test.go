@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package foxlake
+package oceanbase
 
 import (
 	"fmt"
@@ -28,20 +28,20 @@ import (
 	"github.com/apecloud/kubeblocks/lorry/engines"
 )
 
-var _ = Describe("Foxlake Engine", func() {
+var _ = Describe("Oceanbase Engine", func() {
 	It("connection command", func() {
-		foxlake := NewCommands()
+		oceanbase := NewCommands()
 
-		Expect(foxlake.ConnectCommand(nil)).ShouldNot(BeNil())
+		Expect(oceanbase.ConnectCommand(nil)).ShouldNot(BeNil())
 		authInfo := &engines.AuthInfo{
 			UserName:   "user-test",
 			UserPasswd: "pwd-test",
 		}
-		Expect(foxlake.ConnectCommand(authInfo)).ShouldNot(BeNil())
+		Expect(oceanbase.ConnectCommand(authInfo)).ShouldNot(BeNil())
 	})
 
 	It("connection example", func() {
-		foxlake := NewCommands().(*Commands)
+		oceanbase := NewCommands().(*Commands)
 
 		info := &engines.ConnectionInfo{
 			User:     "user",
@@ -49,11 +49,23 @@ var _ = Describe("Foxlake Engine", func() {
 			Password: "*****",
 			Port:     "1234",
 		}
-		for k := range foxlake.examples {
+		for k := range oceanbase.examples {
 			fmt.Printf("%s Connection Example\n", k.String())
-			Expect(foxlake.ConnectExample(info, k.String())).ShouldNot(BeZero())
+			Expect(oceanbase.ConnectExample(info, k.String())).ShouldNot(BeZero())
 		}
 
-		Expect(foxlake.ConnectExample(info, "")).ShouldNot(BeZero())
+		Expect(oceanbase.ConnectExample(info, "")).ShouldNot(BeZero())
+	})
+
+	It("execute command", func() {
+		oceanbase := NewCommands()
+
+		cmd, _, err := oceanbase.ExecuteCommand(nil)
+		Expect(err).Should(BeNil())
+		Expect(cmd).ShouldNot(BeNil())
+		engines.EnvVarMap[engines.PASSWORD] = ""
+		cmd, _, err = oceanbase.ExecuteCommand(nil)
+		Expect(err).Should(BeNil())
+		Expect(cmd).ShouldNot(BeNil())
 	})
 })

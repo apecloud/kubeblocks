@@ -23,11 +23,23 @@ import (
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	"github.com/apecloud/kubeblocks/lorry/engines"
 )
 
 var _ = Describe("Mysql Engine", func() {
+	It("connection command", func() {
+		mysql := NewCommands()
+
+		Expect(mysql.ConnectCommand(nil)).ShouldNot(BeNil())
+		authInfo := &engines.AuthInfo{
+			UserName:   "user-test",
+			UserPasswd: "pwd-test",
+		}
+		Expect(mysql.ConnectCommand(authInfo)).ShouldNot(BeNil())
+	})
+
 	It("connection example", func() {
 		mysql := NewCommands().(*Commands)
 
@@ -40,9 +52,9 @@ var _ = Describe("Mysql Engine", func() {
 		}
 		for k := range mysql.examples {
 			fmt.Printf("%s Connection Example\n", k.String())
-			fmt.Println(mysql.ConnectExample(info, k.String()))
+			Expect(mysql.ConnectExample(info, k.String())).ShouldNot(BeEmpty())
 		}
 
-		fmt.Println(mysql.ConnectExample(info, ""))
+		Expect(mysql.ConnectExample(info, "")).ShouldNot(BeEmpty())
 	})
 })

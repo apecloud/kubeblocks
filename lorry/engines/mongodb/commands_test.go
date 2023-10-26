@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package foxlake
+package mongodb
 
 import (
 	"fmt"
@@ -28,20 +28,20 @@ import (
 	"github.com/apecloud/kubeblocks/lorry/engines"
 )
 
-var _ = Describe("Foxlake Engine", func() {
+var _ = Describe("MongoDB Engine", func() {
 	It("connection command", func() {
-		foxlake := NewCommands()
+		mongodb := NewCommands()
 
-		Expect(foxlake.ConnectCommand(nil)).ShouldNot(BeNil())
+		Expect(mongodb.ConnectCommand(nil)).ShouldNot(BeNil())
 		authInfo := &engines.AuthInfo{
 			UserName:   "user-test",
 			UserPasswd: "pwd-test",
 		}
-		Expect(foxlake.ConnectCommand(authInfo)).ShouldNot(BeNil())
+		Expect(mongodb.ConnectCommand(authInfo)).ShouldNot(BeNil())
 	})
 
 	It("connection example", func() {
-		foxlake := NewCommands().(*Commands)
+		mongodb := NewCommands().(*Commands)
 
 		info := &engines.ConnectionInfo{
 			User:     "user",
@@ -49,11 +49,11 @@ var _ = Describe("Foxlake Engine", func() {
 			Password: "*****",
 			Port:     "1234",
 		}
-		for k := range foxlake.examples {
+		for k := range mongodb.examples {
 			fmt.Printf("%s Connection Example\n", k.String())
-			Expect(foxlake.ConnectExample(info, k.String())).ShouldNot(BeZero())
+			Expect(mongodb.ConnectExample(info, k.String())).ShouldNot(BeZero())
 		}
 
-		Expect(foxlake.ConnectExample(info, "")).ShouldNot(BeZero())
+		Expect(mongodb.ConnectExample(info, "")).ShouldNot(BeZero())
 	})
 })

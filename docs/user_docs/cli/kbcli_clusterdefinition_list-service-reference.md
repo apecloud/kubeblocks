@@ -1,24 +1,24 @@
 ---
-title: kbcli dashboard list
+title: kbcli clusterdefinition list-service-reference
 ---
 
-List all dashboards.
+List cluster references declared in a cluster definition.
 
 ```
-kbcli dashboard list [flags]
+kbcli clusterdefinition list-service-reference [flags]
 ```
 
 ### Examples
 
 ```
-  # List all dashboards
-  kbcli dashboard list
+  # List cluster references name declared in a cluster definition.
+  kbcli clusterdefinition list-service-reference apecloud-mysql
 ```
 
 ### Options
 
 ```
-  -h, --help   help for list
+  -h, --help   help for list-service-reference
 ```
 
 ### Options inherited from parent commands
@@ -47,7 +47,7 @@ kbcli dashboard list [flags]
 
 ### SEE ALSO
 
-* [kbcli dashboard](kbcli_dashboard.md)	 - List and open the KubeBlocks dashboards.
+* [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

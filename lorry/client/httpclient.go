@@ -34,7 +34,6 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/apecloud/kubeblocks/lorry/httpserver"
 	. "github.com/apecloud/kubeblocks/lorry/util"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -144,7 +143,7 @@ func (cli *HTTPClient) CreateUser(ctx context.Context, userName, password string
 		"userName": userName,
 		"password": password,
 	}
-	req := &httpserver.Request{Parameters: parameters}
+	req := map[string]any{"parameters": parameters}
 	_, err := cli.Request(ctx, string(CreateUserOp), http.MethodPost, req)
 	return err
 }
@@ -153,7 +152,7 @@ func (cli *HTTPClient) DeleteUser(ctx context.Context, userName string) error {
 	parameters := map[string]any{
 		"userName": userName,
 	}
-	req := &httpserver.Request{Parameters: parameters}
+	req := map[string]any{"parameters": parameters}
 	_, err := cli.Request(ctx, string(DeleteUserOp), http.MethodPost, req)
 	return err
 }
@@ -162,7 +161,7 @@ func (cli *HTTPClient) DescribeUser(ctx context.Context, userName string) (map[s
 	parameters := map[string]any{
 		"userName": userName,
 	}
-	req := &httpserver.Request{Parameters: parameters}
+	req := map[string]any{"parameters": parameters}
 	resp, err := cli.Request(ctx, string(DescribeUserOp), http.MethodGet, req)
 	if err != nil {
 		return nil, err
@@ -180,7 +179,7 @@ func (cli *HTTPClient) GrantUserRole(ctx context.Context, userName, roleName str
 		"userName": userName,
 		"roleName": roleName,
 	}
-	req := &httpserver.Request{Parameters: parameters}
+	req := map[string]any{"parameters": parameters}
 	_, err := cli.Request(ctx, string(GrantUserRoleOp), http.MethodPost, req)
 	return err
 }
@@ -190,7 +189,7 @@ func (cli *HTTPClient) RevokeUserRole(ctx context.Context, userName, roleName st
 		"userName": userName,
 		"roleName": roleName,
 	}
-	req := &httpserver.Request{Parameters: parameters}
+	req := map[string]any{"parameters": parameters}
 	_, err := cli.Request(ctx, string(RevokeUserRoleOp), http.MethodPost, req)
 	return err
 }
@@ -233,7 +232,7 @@ func (cli *HTTPClient) LeaveMember(ctx context.Context) error {
 	return err
 }
 
-func (cli *HTTPClient) Request(ctx context.Context, operation, method string, req *httpserver.Request) (map[string]any, error) {
+func (cli *HTTPClient) Request(ctx context.Context, operation, method string, req map[string]any) (map[string]any, error) {
 	ctxWithReconcileTimeout, cancel := context.WithTimeout(ctx, cli.ReconcileTimeout)
 	defer cancel()
 

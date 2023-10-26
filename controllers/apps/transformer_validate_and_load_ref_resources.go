@@ -44,6 +44,13 @@ func (t *ValidateAndLoadRefResourcesTransformer) Transform(ctx graph.TransformCo
 		setProvisioningStartedCondition(&cluster.Status.Conditions, cluster.Name, cluster.Generation, err)
 	}()
 
+	if len(cluster.Spec.ClusterDefRef) == 0 && len(t.allCompDefRefs(cluster)) != len(cluster.Spec.ComponentSpecs) {
+		return newRequeueError(requeueDuration, "either cluster definition or component definition should be provided")
+	}
+	if len(t.allCompDefRefs(cluster)) != 0 && len(t.allCompDefRefs(cluster)) != len(cluster.Spec.ComponentSpecs) {
+		return newRequeueError(requeueDuration, "two kinds of definitions cannot be used together")
+	}
+
 	validateExistence := func(key client.ObjectKey, object client.Object) error {
 		err = transCtx.Client.Get(transCtx.Context, key, object)
 		if err != nil {
@@ -54,11 +61,16 @@ func (t *ValidateAndLoadRefResourcesTransformer) Transform(ctx graph.TransformCo
 
 	// validate cd & cv's existence
 	// if we can't get the referenced cd & cv, set provisioning condition failed, and jump to plan.Execute()
-	cd := &appsv1alpha1.ClusterDefinition{}
-	if err = validateExistence(types.NamespacedName{Name: cluster.Spec.ClusterDefRef}, cd); err != nil {
-		return err
+	var (
+		cd *appsv1alpha1.ClusterDefinition
+		cv *appsv1alpha1.ClusterVersion
+	)
+	if len(cluster.Spec.ClusterDefRef) > 0 {
+		cd = &appsv1alpha1.ClusterDefinition{}
+		if err = validateExistence(types.NamespacedName{Name: cluster.Spec.ClusterDefRef}, cd); err != nil {
+			return err
+		}
 	}
-	var cv *appsv1alpha1.ClusterVersion
 	if len(cluster.Spec.ClusterVersionRef) > 0 {
 		cv = &appsv1alpha1.ClusterVersion{}
 		if err = validateExistence(types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}, cv); err != nil {
@@ -68,7 +80,7 @@ func (t *ValidateAndLoadRefResourcesTransformer) Transform(ctx graph.TransformCo
 
 	// validate cd & cv's availability
 	// if wrong phase, set provisioning condition failed, and jump to plan.Execute()
-	if cd.Status.Phase != appsv1alpha1.AvailablePhase || (cv != nil && cv.Status.Phase != appsv1alpha1.AvailablePhase) {
+	if (cd != nil && cd.Status.Phase != appsv1alpha1.AvailablePhase) || (cv != nil && cv.Status.Phase != appsv1alpha1.AvailablePhase) {
 		message := fmt.Sprintf("ref resource is unavailable, this problem needs to be solved first. cd: %s", cd.Name)
 		if cv != nil {
 			message = fmt.Sprintf("%s, cv: %s", message, cv.Name)
@@ -79,6 +91,9 @@ func (t *ValidateAndLoadRefResourcesTransformer) Transform(ctx graph.TransformCo
 
 	// inject cd & cv into the shared ctx
 	transCtx.ClusterDef = cd
+	if cd == nil {
+		transCtx.ClusterDef = &appsv1alpha1.ClusterDefinition{}
+	}
 	transCtx.ClusterVer = cv
 	if cv == nil {
 		transCtx.ClusterVer = &appsv1alpha1.ClusterVersion{}
@@ -91,6 +106,17 @@ func (t *ValidateAndLoadRefResourcesTransformer) Transform(ctx graph.TransformCo
 	return nil
 }
 
+func (t *ValidateAndLoadRefResourcesTransformer) allCompDefRefs(cluster *appsv1alpha1.Cluster) []string {
+	refs := make([]string, 0)
+	for _, comp := range cluster.Spec.ComponentSpecs {
+		if len(comp.ComponentDef) == 0 {
+			continue
+		}
+		refs = append(refs, comp.ComponentDef)
+	}
+	return refs
+}
+
 func (t *ValidateAndLoadRefResourcesTransformer) checkComponentDefinitions(ctx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
 	for _, comp := range cluster.Spec.ComponentSpecs {
 		if len(comp.ComponentDef) == 0 {
@@ -101,7 +127,7 @@ func (t *ValidateAndLoadRefResourcesTransformer) checkComponentDefinitions(ctx *
 			return err
 		}
 		if compDef.Status.Phase != appsv1alpha1.AvailablePhase {
-			return fmt.Errorf("the componetn definition referenced is unavailable: %s", comp.ComponentDef)
+			return fmt.Errorf("the component definition referenced is unavailable: %s", comp.ComponentDef)
 		}
 		if ctx.ComponentDefs == nil {
 			ctx.ComponentDefs = make(map[string]*appsv1alpha1.ComponentDefinition)

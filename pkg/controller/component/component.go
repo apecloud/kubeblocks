@@ -87,7 +87,7 @@ func BuildComponentDefinitionLow(clusterDef *appsv1alpha1.ClusterDefinition, clu
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ComponentDefinition, error) {
 	if clusterCompSpec.ComponentDefRef == "" {
-		return nil, fmt.Errorf("expected cluster component definition ref is empty: %s-%s", cluster.Name, clusterCompSpec.Name)
+		return nil, fmt.Errorf("cluster component definition ref is empty: %s-%s", cluster.Name, clusterCompSpec.Name)
 	}
 	clusterCompDef, clusterCompVer, err := getClusterCompDefAndVersion(clusterDef, clusterVer, cluster, clusterCompSpec)
 	if err != nil {

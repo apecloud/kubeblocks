@@ -52,6 +52,11 @@ func NewComponentDefinitionFactoryExt(name, provider, description, serviceKind, 
 	return f
 }
 
+func (f *MockComponentDefinitionFactory) SetDefaultSpec() *MockComponentDefinitionFactory {
+	f.Get().Spec = defaultComponentDefSpec
+	return f
+}
+
 // SetRuntime adds a new container to runtime, or updates it to @container if it's already existed.
 // If @container is nil, the default MySQL container (defaultMySQLContainer) will be used.
 func (f *MockComponentDefinitionFactory) SetRuntime(container *corev1.Container) *MockComponentDefinitionFactory {

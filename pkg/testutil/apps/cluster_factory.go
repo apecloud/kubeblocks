@@ -78,6 +78,12 @@ func (factory *MockClusterFactory) lastComponentRef(update updateFn) *MockCluste
 	return factory
 }
 
+func (factory *MockClusterFactory) SetCompDef(compDef string) *MockClusterFactory {
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+		comp.ComponentDef = compDef
+	})
+}
+
 func (factory *MockClusterFactory) SetReplicas(replicas int32) *MockClusterFactory {
 	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
 		comp.Replicas = replicas

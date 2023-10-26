@@ -42,7 +42,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -547,31 +546,119 @@ var _ = Describe("Cluster Controller", func() {
 		})).ShouldNot(HaveOccurred())
 	}
 
-	// TODO: add case: empty image in cd, should report applyResourceFailed condition
-	Context("when creating cluster without clusterversion", func() {
+	Context("provisioning cluster w/o component definition", func() {
 		BeforeEach(func() {
-			createAllWorkloadTypesClusterDef(true)
+			createAllWorkloadTypesClusterDef()
 		})
 
-		It("should reconcile to create cluster with no error", func() {
-			By("Creating a cluster")
-			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				clusterDefObj.Name, "").
+		It("create cluster w/o cluster version", func() {
+			By("creating a cluster w/o cluster version")
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, "").
 				AddComponent(statelessCompName, statelessCompDefName).SetReplicas(3).
 				AddComponent(statefulCompName, statefulCompDefName).SetReplicas(3).
 				AddComponent(consensusCompName, consensusCompDefName).SetReplicas(3).
 				AddComponent(replicationCompName, replicationCompDefName).SetReplicas(3).
-				WithRandomName().Create(&testCtx).GetObject()
+				WithRandomName().
+				Create(&testCtx).
+				GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-			By("Waiting for the cluster controller to create resources completely")
+			By("waiting for the cluster controller to create resources completely")
 			waitForCreatingResourceCompletely(clusterKey, statelessCompName, statefulCompName, consensusCompName, replicationCompName)
+		})
+
+		It("create cluster with component object", func() {
+			createClusterObj(consensusCompName, consensusCompDefName)
+
+			By("check component created")
+			compKey := types.NamespacedName{
+				Namespace: clusterKey.Namespace,
+				Name:      clusterKey.Name + "-" + consensusCompName,
+			}
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
+				g.Expect(comp.Generation).Should(BeEquivalentTo(1))
+				for k, v := range constant.GetComponentWellKnownLabels(clusterObj.Name, consensusCompName) {
+					g.Expect(comp.Labels).Should(HaveKeyWithValue(k, v))
+				}
+				g.Expect(comp.Spec.Cluster).Should(Equal(clusterObj.Name))
+				g.Expect(comp.Spec.CompDef).Should(BeEmpty())
+			})).Should(Succeed())
 		})
 	})
 
-	Context("when creating cluster with multiple kinds of components", func() {
+	Context("provisioning cluster w/ component definition", func() {
 		BeforeEach(func() {
+			createAllWorkloadTypesClusterDef()
+		})
+
+		AfterEach(func() {
 			cleanEnv()
+		})
+
+		It("cluster component created", func() {
+			createClusterObjV2(consensusCompName, componentDefObj.Name)
+
+			By("check component created")
+			compKey := types.NamespacedName{
+				Namespace: clusterKey.Namespace,
+				Name:      clusterKey.Name + "-" + consensusCompName,
+			}
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
+				g.Expect(comp.Generation).Should(BeEquivalentTo(1))
+				for k, v := range constant.GetComponentWellKnownLabels(clusterObj.Name, consensusCompName) {
+					g.Expect(comp.Labels).Should(HaveKeyWithValue(k, v))
+				}
+				g.Expect(comp.Spec.Cluster).Should(Equal(clusterObj.Name))
+				g.Expect(comp.Spec.CompDef).Should(Equal(componentDefObj.Name))
+			})).Should(Succeed())
+		})
+	})
+
+	Context("cluster deletion", func() {
+		BeforeEach(func() {
+			createAllWorkloadTypesClusterDef()
+		})
+
+		var (
+			createObjV1 = func() { createClusterObj(consensusCompName, consensusCompDefName) }
+			createObjV2 = func() { createClusterObjV2(consensusCompName, componentDefObj.Name) }
+		)
+		for _, createObj := range []func(){createObjV1, createObjV2} {
+			It("should deleted after all the sub-resources", func() {
+				createObj()
+
+				By("check component created")
+				compKey := types.NamespacedName{
+					Namespace: clusterKey.Namespace,
+					Name:      clusterKey.Name + "-" + consensusCompName,
+				}
+				Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
+
+				By("set finalizer for component to prevent it from deletion")
+				finalizer := "test/finalizer"
+				Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *appsv1alpha1.Component) {
+					comp.Finalizers = append(comp.Finalizers, finalizer)
+				})()).ShouldNot(HaveOccurred())
+
+				By("delete the cluster")
+				testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
+
+				By("check cluster keep existing")
+				Consistently(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
+
+				By("remove finalizer of component to get it deleted")
+				Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *appsv1alpha1.Component) {
+					comp.Finalizers = nil
+				})()).ShouldNot(HaveOccurred())
+
+				By("wait for the cluster to terminate")
+				Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
+			})
+		}
+	})
+
+	Context("create cluster with multiple kinds of components", func() {
+		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
 		})
 
@@ -740,7 +827,6 @@ var _ = Describe("Cluster Controller", func() {
 			deleteCluster(appsv1alpha1.Halt)
 
 			By("check should preserved PVC,Secret,CM resources")
-
 			checkPreservedObjects := func(uid types.UID) (*corev1.PersistentVolumeClaimList, *corev1.SecretList, *corev1.ConfigMapList) {
 				checkObject := func(obj client.Object) {
 					clusterJSON, ok := obj.GetAnnotations()[constant.LastAppliedClusterAnnotationKey]
@@ -801,7 +887,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 
-	When("creating cluster with all workloadTypes (being Stateless|Stateful|Consensus|Replication) component", func() {
+	Context("create cluster with all workloadTypes (being Stateless|Stateful|Consensus|Replication) component", func() {
 		compNameNDef := map[string]string{
 			statelessCompName:   statelessCompDefName,
 			statefulCompName:    statefulCompDefName,
@@ -812,6 +898,7 @@ var _ = Describe("Cluster Controller", func() {
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
 		})
+
 		AfterEach(func() {
 			cleanEnv()
 		})
@@ -843,7 +930,7 @@ var _ = Describe("Cluster Controller", func() {
 		}
 	})
 
-	Context("test cluster Failed/Abnormal phase", func() {
+	Context("cluster status phase as Failed/Abnormal", func() {
 		It("test cluster conditions", func() {
 			By("init cluster")
 			cluster := testapps.CreateConsensusMysqlCluster(&testCtx, clusterDefNameRand,
@@ -954,81 +1041,6 @@ var _ = Describe("Cluster Controller", func() {
 					g.Expect(condition).ShouldNot(BeNil())
 					g.Expect(condition.Reason).Should(Equal(ReasonApplyResourcesFailed))
 				})).Should(Succeed())
-		})
-	})
-
-	Context("cluster deletion", func() {
-		BeforeEach(func() {
-			createAllWorkloadTypesClusterDef()
-		})
-		It("should deleted after all the sub-resources", func() {
-			createClusterObj(consensusCompName, consensusCompDefName)
-
-			By("Waiting for the cluster enter running phase")
-			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
-
-			workloadKey := types.NamespacedName{
-				Namespace: clusterKey.Namespace,
-				Name:      clusterKey.Name + "-" + consensusCompName,
-			}
-
-			By("checking workload exists")
-			Eventually(testapps.CheckObjExists(&testCtx, workloadKey, &workloads.ReplicatedStateMachine{}, true)).Should(Succeed())
-
-			finalizerName := "test/finalizer"
-			By("set finalizer for workload to prevent it from deletion")
-			Expect(testapps.GetAndChangeObj(&testCtx, workloadKey, func(wl *workloads.ReplicatedStateMachine) {
-				wl.ObjectMeta.Finalizers = append(wl.ObjectMeta.Finalizers, finalizerName)
-			})()).ShouldNot(HaveOccurred())
-
-			By("Delete the cluster")
-			testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
-
-			By("checking cluster keep existing")
-			Consistently(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
-
-			By("remove finalizer of sts to get it deleted")
-			Expect(testapps.GetAndChangeObj(&testCtx, workloadKey, func(wl *workloads.ReplicatedStateMachine) {
-				wl.ObjectMeta.Finalizers = nil
-			})()).ShouldNot(HaveOccurred())
-
-			By("Wait for the cluster to terminate")
-			Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
-		})
-	})
-
-	Context("cluster provisioning w/o component definition", func() {
-		BeforeEach(func() {
-			createAllWorkloadTypesClusterDef()
-		})
-
-		It("cluster component created", func() {
-			createClusterObj(consensusCompName, consensusCompDefName)
-
-			By("check component created")
-			compKey := types.NamespacedName{
-				Namespace: clusterKey.Namespace,
-				Name:      clusterKey.Name + "-" + consensusCompName,
-			}
-			Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
-		})
-	})
-
-	Context("cluster provisioning w/ component definition", func() {
-		BeforeEach(func() {
-			createAllWorkloadTypesClusterDef()
-		})
-
-		It("cluster component created", func() {
-			createClusterObjV2(consensusCompName, componentDefObj.Name)
-
-			By("check component created")
-			compKey := types.NamespacedName{
-				Namespace: clusterKey.Namespace,
-				Name:      clusterKey.Name + "-" + consensusCompName,
-			}
-			Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
 		})
 	})
 })

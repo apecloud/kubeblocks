@@ -615,7 +615,7 @@ else ifeq ($(TEST_TYPE), mongodb)
 	$(HELM) template mongodb-cluster deploy/mongodb-cluster > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
 else ifeq ($(TEST_TYPE), pulsar)
 	$(HELM) dependency build deploy/pulsar-cluster --skip-refresh
-	$(HELM) template pulsar-cluster deploy/pulsar-cluster > test/e2e/testdata/smoketest/pulsar/00_pulsarcluster.yaml
+	$(HELM) template pulsar-cluster -s templates/cluster.yaml deploy/pulsar-cluster > test/e2e/testdata/smoketest/pulsar/00_pulsarcluster.yaml
 else ifeq ($(TEST_TYPE), nebula)
 	$(HELM) dependency build deploy/nebula-cluster --skip-refresh
 	$(HELM) upgrade --install nebula deploy/nebula

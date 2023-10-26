@@ -538,19 +538,20 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 		return nil
 	}
 
-	tryToGetLorryGrpcPort := func(container *corev1.Container) int {
+	tryToGetLorryGrpcPort := func(container *corev1.Container) *corev1.ContainerPort {
 		for i, port := range container.Ports {
 			if port.Name == constant.LorryGRPCPortName {
-				return int(container.Ports[i].ContainerPort)
+				return &container.Ports[i]
 			}
 		}
-		return 0
+		return nil
 	}
 
 	// if role probe container exists, update the readiness probe, env and serving container port
 	if container := tryToGetRoleProbeContainer(); container != nil {
-		portNum := tryToGetLorryGrpcPort(container)
-		if portNum == 0 {
+		port := tryToGetLorryGrpcPort(container)
+		var portNum int
+		if port == nil {
 			portNum = probeGRPCPort
 			grpcPort := corev1.ContainerPort{
 				Name:          roleProbeGRPCPortName,
@@ -558,6 +559,12 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 				Protocol:      "TCP",
 			}
 			container.Ports = append(container.Ports, grpcPort)
+		} else {
+			// if containerPort is invalid, adjust it
+			if port.ContainerPort < 0 || port.ContainerPort > 65536 {
+				port.ContainerPort = int32(probeGRPCPort)
+			}
+			portNum = int(port.ContainerPort)
 		}
 		readinessProbe.Exec.Command = []string{
 			grpcHealthProbeBinaryPath,

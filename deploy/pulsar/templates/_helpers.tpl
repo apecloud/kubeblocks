@@ -45,7 +45,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 Create full image name
 */}}
 {{- define "pulsar.imageFullName" -}}
-{{- printf "%s:%s" ( .image.repository | default .root.Values.defaultPulsarImage.repository ) ( .image.tag | default .root.Values.defaultPulsarImage.tag | default .root.Chart.AppVersion ) -}}
+{{- printf "%s/%s:%s" ( .image.registry | default .root.Values.defaultPulsarImage.registry ) ( .image.repository | default .root.Values.defaultPulsarImage.repository ) ( .image.tag | default .root.Values.defaultPulsarImage.tag | default .root.Chart.AppVersion ) -}}
 {{- end -}}
 
 {{/*

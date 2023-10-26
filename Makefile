@@ -615,7 +615,7 @@ else ifeq ($(TEST_TYPE), mongodb)
 	$(HELM) template mongodb-cluster deploy/mongodb-cluster > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
 else ifeq ($(TEST_TYPE), pulsar)
 	$(HELM) dependency build deploy/pulsar-cluster --skip-refresh
-	$(HELM) template pulsar-cluster deploy/pulsar-cluster > test/e2e/testdata/smoketest/pulsar/00_pulsarcluster.yaml
+	$(HELM) template pulsar-cluster -s templates/cluster.yaml deploy/pulsar-cluster > test/e2e/testdata/smoketest/pulsar/00_pulsarcluster.yaml
 else ifeq ($(TEST_TYPE), nebula)
 	$(HELM) dependency build deploy/nebula-cluster --skip-refresh
 	$(HELM) upgrade --install nebula deploy/nebula
@@ -709,7 +709,7 @@ else
 endif
 
 .PHONY: test-e2e
-test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
+test-e2e: helm-package install-s3-csi-driver render-smoke-testdata-manifests ## Run E2E tests.
 	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) TEST_TYPE=$(TEST_TYPE) SKIP_CASE=$(SKIP_CASE) CONFIG_TYPE=$(CONFIG_TYPE) -C test/e2e run
 
 .PHONY: render-smoke-testdata-manifests-local

@@ -444,7 +444,7 @@ var _ = Describe("Cluster Controller", func() {
 							Name:      backupKey.Name,
 							Namespace: backupKey.Namespace,
 							Labels: map[string]string{
-								dptypes.DataProtectionLabelBackupNameKey: backupKey.Name,
+								dptypes.BackupNameLabelKey: backupKey.Name,
 							}},
 						Spec: snapshotv1.VolumeSnapshotSpec{
 							Source: snapshotv1.VolumeSnapshotSource{
@@ -1633,7 +1633,7 @@ var _ = Describe("Cluster Controller", func() {
 				backupScheduleKey := client.ObjectKey{Name: backupScheduleName, Namespace: clusterKey.Namespace}
 				if backup == nil {
 					Eventually(testapps.CheckObjExists(&testCtx, backupScheduleKey,
-						&dpv1alpha1.BackupSchedule{}, false)).Should(Succeed())
+						&dpv1alpha1.BackupSchedule{}, true)).Should(Succeed())
 					continue
 				}
 				Eventually(testapps.CheckObj(&testCtx, backupScheduleKey, checkSchedule)).Should(Succeed())

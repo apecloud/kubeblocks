@@ -3,12 +3,12 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: mongocluster-snapshot
+  name: mongo-cluster-snapshot
   annotations:
-    kubeblocks.io/restore-from-backup: "{\"mongodb\":\"backup-snapshot-mongocluster\"}"
+    kubeblocks.io/restore-from-backup: '{"mongodb":{"name":"backup-mongodb-cluster-snapshot","namespace":"default","managementPolicy":"Parallel"}}'
 spec:
   clusterDefinitionRef: mongodb
-  clusterVersionRef: mongodb-5.0.14
+  clusterVersionRef: mongodb-5.0
   terminationPolicy: Halt
   affinity:
     topologyKeys:

@@ -122,6 +122,37 @@ var _ = Describe("Backup Deleter Test", func() {
 			job := &batchv1.Job{}
 			key := BuildDeleteBackupFilesJobKey(backup)
 			Eventually(testapps.CheckObjExists(&testCtx, key, job, true)).Should(Succeed())
+
+			By("delete backup with job running")
+			backupKey := client.ObjectKeyFromObject(backup)
+			Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+				status, err := deleter.DeleteBackupFiles(fetched)
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(status).Should(Equal(DeletionStatusDeleting))
+			})).Should(Succeed())
+
+			By("delete backup with job succeed")
+			testdp.ReplaceK8sJobStatus(&testCtx, key, batchv1.JobComplete)
+			Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+				status, err := deleter.DeleteBackupFiles(fetched)
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(status).Should(Equal(DeletionStatusSucceeded))
+			})).Should(Succeed())
+
+			By("delete backup with job failed")
+			testdp.ReplaceK8sJobStatus(&testCtx, key, batchv1.JobFailed)
+			Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+				status, err := deleter.DeleteBackupFiles(fetched)
+				Expect(err).Should(HaveOccurred())
+				Expect(status).Should(Equal(DeletionStatusFailed))
+			})).Should(Succeed())
+		})
+
+		It("delete backup with backup repo", func() {
+			backup.Status.BackupRepoName = testdp.BackupRepoName
+			status, err := deleter.DeleteBackupFiles(backup)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(status).Should(Equal(DeletionStatusSucceeded))
 		})
 	})
 

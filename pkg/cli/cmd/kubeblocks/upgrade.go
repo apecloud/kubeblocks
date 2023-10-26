@@ -42,6 +42,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/cli/spinner"
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
 	"github.com/apecloud/kubeblocks/pkg/cli/util"
+	"github.com/apecloud/kubeblocks/pkg/cli/util/breakingchange"
 	"github.com/apecloud/kubeblocks/pkg/cli/util/helm"
 	"github.com/apecloud/kubeblocks/pkg/cli/util/prompt"
 )
@@ -124,7 +125,7 @@ func (o *InstallOptions) Upgrade() error {
 	if err = o.checkVersion(v); err != nil {
 		return err
 	}
-
+	o.OldVersion = kbVersion
 	// double check when KubeBlocks version change
 	if !o.autoApprove && o.Version != "" {
 		oldVersion, err := version.NewVersion(kbVersion)
@@ -136,12 +137,15 @@ func (o *InstallOptions) Upgrade() error {
 			return err
 		}
 		upgradeWarn := ""
-		if oldVersion.GreaterThan(newVersion) {
+		switch {
+		case oldVersion.GreaterThan(newVersion):
 			upgradeWarn = printer.BoldYellow(fmt.Sprintf("Warning: You're attempting to downgrade KubeBlocks version from %s to %s, this action may cause your clusters and some KubeBlocks feature unavailable.\nEnsure you proceed after reviewing detailed release notes at https://github.com/apecloud/kubeblocks/releases.", kbVersion, o.Version))
-		} else {
+		default:
+			if err = breakingchange.ValidateUpgradeVersion(kbVersion, o.Version); err != nil {
+				return err
+			}
 			upgradeWarn = fmt.Sprintf("Upgrade KubeBlocks from %s to %s", kbVersion, o.Version)
 		}
-
 		if err = prompt.Confirm(nil, o.In, upgradeWarn, "Please type 'Yes/yes' to confirm your operation:"); err != nil {
 			return err
 		}

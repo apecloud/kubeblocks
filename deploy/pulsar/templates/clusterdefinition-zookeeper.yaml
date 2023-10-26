@@ -113,7 +113,7 @@ spec:
               - name: zookeeper-config-env
                 mountPath: /opt/pulsar/none
           - name: metrics
-            image: {{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
+            image: {{ .Values.images.metrics.registry }}/{{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.metrics.pullPolicy }}
             securityContext:
               runAsNonRoot: false

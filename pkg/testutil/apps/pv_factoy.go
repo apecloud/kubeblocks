@@ -76,3 +76,13 @@ func (f *MockPersistentVolumeFactory) SetClaimRef(obj client.Object) *MockPersis
 	}
 	return f
 }
+
+func (f *MockPersistentVolumeFactory) SetCSIDriver(driverName string) *MockPersistentVolumeFactory {
+	f.Get().Spec.CSI = &corev1.CSIPersistentVolumeSource{
+		Driver:       driverName,
+		VolumeHandle: f.Get().Name,
+	}
+	// clear default persistentVolumeSource
+	f.Get().Spec.PersistentVolumeSource.HostPath = nil
+	return f
+}

@@ -98,7 +98,7 @@ var _ = Describe("clusterdefinition list components", func() {
 			GroupVersion:         schema.GroupVersion{Group: types.AppsAPIGroup, Version: types.AppsAPIVersion},
 			Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, testing.FakeResourceNotFound(types.ClusterDefGVR(), clusterdefinitionName+"-no-exist"))},
 		}
-		Expect(run(o)).Should(HaveOccurred())
+		Expect(listComponents(o)).Should(HaveOccurred())
 
 	})
 

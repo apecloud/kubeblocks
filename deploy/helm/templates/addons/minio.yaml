@@ -26,7 +26,8 @@ spec:
       setValues:
         - auth.rootUser=kubeblocks
         - auth.rootPassword=kubeblocks
-
+        - extraEnvVars[0].name=MINIO_BROWSER_LOGIN_ANIMATION
+        - extraEnvVars[0].value=off
   installable:
     autoInstall: false
 

@@ -91,9 +91,9 @@ spec:
                 description: deletionPolicy determines whether the backup contents
                   stored in backup repository should be deleted when the backup custom
                   resource is deleted. Supported values are "Retain" and "Delete".
-                  "Retain" means that the backup content and its physical snapshot
-                  on backup repository are kept. "Delete" means that the backup content
-                  and its physical snapshot on backup repository are deleted.
+                  "Retain" means that the backup can not be deleted and remains in
+                  'Deleting' phase. "Delete" means that the backup content and its
+                  physical snapshot on backup repository are deleted.
                 type: string
               parentBackupName:
                 description: parentBackupName determines the parent backup name for
@@ -605,10 +605,8 @@ spec:
                         default: Any
                         description: 'strategy specifies the strategy to select the
                           target pod when multiple pods are selected. Valid values
-                          are: - All: select all pods that match the labelsSelector.
-                          - Any: select any one pod that match the labelsSelector.'
+                          are: - Any: select any one pod that match the labelsSelector.'
                         enum:
-                        - All
                         - Any
                         type: string
                     type: object

@@ -1,0 +1,13 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: Backup
+metadata:
+  name: backup-postgresql-cluster
+spec:
+  backupPolicyName: pg-cluster-postgresql-backup-policy
+  retentionPeriod: 7d
+  backupMethod: pg-basebackup
+  deletionPolicy: Delete
+status:
+  duration: 60s
+  backupRepoName: my-repo
+  phase: Completed

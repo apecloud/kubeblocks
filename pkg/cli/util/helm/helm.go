@@ -56,6 +56,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/cli/testing"
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
+	"github.com/apecloud/kubeblocks/pkg/cli/util/breakingchange"
 )
 
 const defaultTimeout = time.Second * 600
@@ -74,6 +75,7 @@ type InstallOpts struct {
 	Atomic          bool
 	DisableHooks    bool
 	ForceUninstall  bool
+	Upgrader        breakingchange.Upgrader
 
 	// for helm template
 	DryRun     *bool
@@ -555,6 +557,11 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (*release.Release, e
 		cancel()
 	}()
 
+	// save resources of old version
+	if err = i.Upgrader.SaveOldResources(); err != nil {
+		return nil, err
+	}
+
 	// update crds before helm upgrade
 	for _, obj := range chartRequested.CRDObjects() {
 		// Read in the resources
@@ -569,6 +576,11 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (*release.Release, e
 		if _, err := cfg.KubeClient.Update(original, target, false); err != nil {
 			return nil, errors.Wrapf(err, "failed to update CRD %s", obj.Name)
 		}
+	}
+
+	// transform old resources to new resources and clear the tmp dir which saved the old resources.
+	if err = i.Upgrader.TransformResourcesAndClear(); err != nil {
+		return nil, err
 	}
 
 	released, err := client.RunWithContext(ctx, i.Name, chartRequested, vals)

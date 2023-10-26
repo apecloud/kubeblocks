@@ -538,14 +538,37 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 		return nil
 	}
 
+	tryToGetLorryGrpcPort := func(container *corev1.Container) *corev1.ContainerPort {
+		for i, port := range container.Ports {
+			if port.Name == constant.LorryGRPCPortName {
+				return &container.Ports[i]
+			}
+		}
+		return nil
+	}
+
 	// if role probe container exists, update the readiness probe, env and serving container port
 	if container := tryToGetRoleProbeContainer(); container != nil {
-		// presume the second port is the grpc port.
-		// this is an easily broken contract between rsm controller and cluster controller.
-		// TODO(free6om): design a better way to do this
+		port := tryToGetLorryGrpcPort(container)
+		var portNum int
+		if port == nil {
+			portNum = probeGRPCPort
+			grpcPort := corev1.ContainerPort{
+				Name:          roleProbeGRPCPortName,
+				ContainerPort: int32(portNum),
+				Protocol:      "TCP",
+			}
+			container.Ports = append(container.Ports, grpcPort)
+		} else {
+			// if containerPort is invalid, adjust it
+			if port.ContainerPort < 0 || port.ContainerPort > 65536 {
+				port.ContainerPort = int32(probeGRPCPort)
+			}
+			portNum = int(port.ContainerPort)
+		}
 		readinessProbe.Exec.Command = []string{
 			grpcHealthProbeBinaryPath,
-			fmt.Sprintf(grpcHealthProbeArgsFormat, int(container.Ports[1].ContainerPort)),
+			fmt.Sprintf(grpcHealthProbeArgsFormat, portNum),
 		}
 		readinessProbe.HTTPGet = nil
 		container.ReadinessProbe = readinessProbe

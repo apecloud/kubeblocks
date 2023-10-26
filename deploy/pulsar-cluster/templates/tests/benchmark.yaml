@@ -109,7 +109,7 @@ spec:
           mountPath: /benchmark/driver-kop/pulsar_to_kafka.yaml
           subPath: pulsar_to_kafka.yaml
           readOnly: true
-  restartPolicy: Never
+  restartPolicy: OnFailure
   volumes:
     - name: out
       emptyDir: {}

@@ -188,12 +188,12 @@ func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
 		&policyv1.PodDisruptionBudgetList{},
 		&corev1.ServiceAccountList{},
 		&rbacv1.RoleBindingList{},
+		&workloads.ReplicatedStateMachineList{},
+		&appsv1alpha1.ComponentList{},
 	}
 	nonNamespacedKindsPlus := []client.ObjectList{
 		&rbacv1.ClusterRoleBindingList{},
 	}
-	namespacedKindsPlus = append(namespacedKindsPlus, &workloads.ReplicatedStateMachineList{})
-
 	return append(namespacedKinds, namespacedKindsPlus...), append(nonNamespacedKinds, nonNamespacedKindsPlus...)
 }
 

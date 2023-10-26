@@ -21,6 +21,8 @@ package apps
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -74,6 +76,10 @@ func (t *ClusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 	createCompSet := protoCompSet.Difference(clusterStatusCompSet)
 	updateCompSet := protoCompSet.Intersection(clusterStatusCompSet)
 	deleteCompSet := clusterStatusCompSet.Difference(protoCompSet)
+	if len(deleteCompSet) > 0 {
+		return fmt.Errorf("cluster components cannot be removed at runtime: %s",
+			strings.Join(deleteCompSet.UnsortedList(), ","))
+	}
 
 	createCompObjects := func() error {
 		for compName := range createCompSet {
@@ -107,18 +113,6 @@ func (t *ClusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 		return nil
 	}
 
-	deleteCompObjects := func() error {
-		for compName := range deleteCompSet {
-			runningComp, err := getCacheSnapshotComp(transCtx.Context, t.Client, compName, cluster.Namespace)
-			if err != nil {
-				return err
-			}
-			graphCli.Delete(dag, runningComp)
-			t.removeClusterCompStatus(cluster, compName)
-		}
-		return nil
-	}
-
 	// component objects to be created
 	if err := createCompObjects(); err != nil {
 		return err
@@ -126,11 +120,6 @@ func (t *ClusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 
 	// component objects to be updated
 	if err := updateCompObjects(); err != nil {
-		return err
-	}
-
-	// component objects to be deleted
-	if err := deleteCompObjects(); err != nil {
 		return err
 	}
 

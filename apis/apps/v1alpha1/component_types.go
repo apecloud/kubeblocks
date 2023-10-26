@@ -131,6 +131,7 @@ type ComponentStatus struct {
 	Message ComponentMessageMap `json:"message,omitempty"`
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},shortName=cmp

@@ -37,6 +37,7 @@ import (
 func BuildProtoComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.Component, error) {
 	fullCompName := constant.GenerateClusterComponentPattern(cluster.Name, clusterCompSpec.Name)
 	builder := builder.NewComponentBuilder(cluster.Namespace, fullCompName, cluster.Name, clusterCompSpec.ComponentDef).
+		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, clusterCompSpec.Name)).
 		SetAffinity(clusterCompSpec.Affinity).
 		SetTolerations(clusterCompSpec.Tolerations).
 		SetReplicas(clusterCompSpec.Replicas).

@@ -22,6 +22,7 @@ package action_test
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/action"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -71,6 +73,10 @@ var _ = Describe("CreateVolumeSnapshotAction Test", func() {
 		})
 
 		It("should success to execute action", func() {
+			pvc := testdp.NewFakePVC(&testCtx, pvcName)
+			Expect(testapps.ChangeObj(&testCtx, pvc, func(claim *corev1.PersistentVolumeClaim) {
+				claim.Spec.VolumeName = volumeName
+			})).Should(Succeed())
 			act := &action.CreateVolumeSnapshotAction{
 				Name:  actionName,
 				Owner: testdp.NewFakeBackup(&testCtx, nil),
@@ -80,11 +86,15 @@ var _ = Describe("CreateVolumeSnapshotAction Test", func() {
 				},
 				PersistentVolumeClaimWrappers: []action.PersistentVolumeClaimWrapper{
 					{
-						PersistentVolumeClaim: *testdp.NewFakePVC(&testCtx, pvcName),
+						PersistentVolumeClaim: *pvc,
 						VolumeName:            volumeName,
 					},
 				},
 			}
+
+			// mock pv
+			testapps.NewPersistentVolumeFactory(testCtx.DefaultNamespace, volumeName, pvcName).
+				SetCSIDriver(testutil.DefaultCSIDriver).SetStorage("1Gi").Create(&testCtx)
 
 			By("execute action, its status should be running")
 			status, err := act.Execute(buildActionCtx())

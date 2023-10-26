@@ -212,7 +212,6 @@ func (c *CreateVolumeSnapshotAction) getVolumeSnapshotClassName(
 		}
 	}
 	return "", nil
-	return pv.Spec.CSI.Driver, nil
 }
 
 func ensureVolumeSnapshotReady(

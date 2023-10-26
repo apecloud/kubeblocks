@@ -6,7 +6,7 @@ metadata:
   name: kb-mysql-cluster
   namespace: default
   labels:
-    helm.sh/chart: apecloud-mysql-cluster-0.7.0-alpha.0
+    helm.sh/chart: apecloud-mysql-cluster-0.8.0-alpha.0
     app.kubernetes.io/version: "8.0.30"
     app.kubernetes.io/instance: mysql-cluster
 ---
@@ -16,7 +16,7 @@ kind: ClusterRoleBinding
 metadata:
   name: kb-mysql-cluster
   labels:
-    helm.sh/chart: apecloud-mysql-cluster-0.7.0-alpha.0
+    helm.sh/chart: apecloud-mysql-cluster-0.8.0-alpha.0
     app.kubernetes.io/version: "8.0.30"
     app.kubernetes.io/instance: mysql-cluster
 roleRef:
@@ -34,7 +34,7 @@ kind: RoleBinding
 metadata:
   name: kb-mysql-cluster
   labels:
-    helm.sh/chart: apecloud-mysql-cluster-0.7.0-alpha.0
+    helm.sh/chart: apecloud-mysql-cluster-0.8.0-alpha.0
     app.kubernetes.io/version: "8.0.30"
     app.kubernetes.io/instance: mysql-cluster
 roleRef:
@@ -53,7 +53,7 @@ metadata:
   name: mysql-cluster
   namespace: default
   labels: 
-    helm.sh/chart: apecloud-mysql-cluster-0.7.0-alpha.0
+    helm.sh/chart: apecloud-mysql-cluster-0.8.0-alpha.0
     app.kubernetes.io/version: "8.0.30"
     app.kubernetes.io/instance: mysql-cluster
 spec:

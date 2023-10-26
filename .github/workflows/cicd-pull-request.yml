@@ -43,8 +43,10 @@ jobs:
 
           TEST_PACKAGES=`bash .github/utils/utils.sh --type 16 \
               --trigger-type "$TRIGGER_MODE" \
-              --test-pkgs "pkg|apis|controllers|cmd|lorry" \
-              --test-check "mod-vendor|lint|staticcheck"`
+              --test-pkgs "${{ vars.TEST_PKGS }}" \
+              --test-check "${{ vars.TEST_CHECK }}" \
+              --test-pkgs-first "${{ vars.TEST_PKGS_FIRST }}" \
+              --ignore-pkgs "${{ vars.SKIP_CHECK_PKG }}"`
           echo "$TEST_PACKAGES"
           echo "matrix={\"include\":[$TEST_PACKAGES]}" >> $GITHUB_OUTPUT
 
@@ -75,12 +77,12 @@ jobs:
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
 
-      - name: make test ${{ matrix.ops }}
+      - name: make ${{ matrix.ops }}
         if: ${{ ! contains(matrix.ops, '/') }}
         run: |
           make ${{ matrix.ops }}
 
-      - name: make ${{ matrix.ops }}
+      - name: make test ${{ matrix.ops }}
         if: ${{ contains(matrix.ops, '/') }}
         run: |
           make test TEST_PACKAGES=./${{ matrix.ops }}/...
@@ -109,7 +111,7 @@ jobs:
         run: |
           bash .github/utils/utils.sh --type 14 \
               --file cover.out \
-              --ignore-pkgs "cmd/|pkg/cli|pkg/client|pkg/controller/model|controllers/k8score"
+              --ignore-pkgs "${{ vars.IGNORE_COVERAGE_PKG }}"
 
       - name: upload coverage report
         uses: codecov/codecov-action@v3

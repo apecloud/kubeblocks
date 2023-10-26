@@ -143,6 +143,8 @@ spec:
             - name: PULSAR_LOG_LEVEL
               value: DEBUG
             {{- end }}
+            - name: SERVICE_PORT
+              value: "8080"
             - name: POD_NAME
               value: $(KB_POD_NAME)
             - name: PULSAR_PREFIX_brokerServicePort
@@ -211,7 +213,7 @@ spec:
             - name: pulsar-client-config
               mountPath: /opt/pulsar/client-conf
           - name: metrics
-            image: {{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
+            image: {{ .Values.images.metrics.registry }}/{{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.metrics.pullPolicy }}
             securityContext:
               runAsNonRoot: false
@@ -331,6 +333,8 @@ spec:
             - name: PULSAR_LOG_LEVEL
               value: DEBUG
             {{- end }}
+            - name: SERVICE_PORT
+              value: "8080"
             - name: brokerWebServiceURL
               value: http://$(brokerSVC):80
             - name: brokerServiceURL
@@ -382,7 +386,7 @@ spec:
               - name: pulsar-proxy-config
                 mountPath: /opt/pulsar/conf
           - name: metrics
-            image: {{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
+            image: {{ .Values.images.metrics.registry }}/{{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.metrics.pullPolicy }}
             securityContext:
               runAsNonRoot: false
@@ -482,6 +486,8 @@ spec:
             - name: PULSAR_LOG_LEVEL
               value: DEBUG
             {{- end }}
+            - name: SERVICE_PORT
+              value: "8000"
             - name: cluster_domain
               value: {{ .Values.clusterDomain }}
             lifecycle:
@@ -536,7 +542,7 @@ spec:
               - name: pulsar-bookies-config
                 mountPath: /opt/pulsar/conf
           - name: metrics
-            image: {{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
+            image: {{ .Values.images.metrics.registry }}/{{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.metrics.pullPolicy }}
             securityContext:
               runAsNonRoot: false
@@ -649,6 +655,8 @@ spec:
             - name: PULSAR_LOG_LEVEL
               value: DEBUG
             {{- end }}
+            - name: SERVICE_PORT
+              value: "8000"
             - name: httpServerEnabled
               value: "true"
             - name: httpServerPort
@@ -668,7 +676,7 @@ spec:
             - name: recovery-config-env
               mountPath: /opt/pulsar/none
           - name: metrics
-            image: {{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
+            image: {{ .Values.images.metrics.registry }}/{{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.metrics.pullPolicy }}
             securityContext:
               runAsNonRoot: false
@@ -751,6 +759,8 @@ spec:
               - name: PULSAR_LOG_LEVEL
                 value: DEBUG
               {{- end }}
+              - name: SERVICE_PORT
+                value: "8000"
               - name: EXTERNAL_PROVIDED_SERVERS
                 value: "false"
               - name: OPTS
@@ -800,7 +810,7 @@ spec:
               - name: zookeeper-config-env
                 mountPath: /opt/pulsar/none
           - name: metrics
-            image: {{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
+            image: {{ .Values.images.metrics.registry }}/{{ .Values.images.metrics.repository }}:{{ .Values.images.metrics.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.metrics.pullPolicy }}
             securityContext:
               runAsNonRoot: false

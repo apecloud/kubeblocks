@@ -185,6 +185,7 @@ func (r *BackupReconciler) handleDeletingPhase(reqCtx intctrlutil.RequestCtx, ba
 	}
 
 	if backup.Spec.DeletionPolicy == dpv1alpha1.BackupDeletionPolicyRetain {
+		r.Recorder.Event(backup, corev1.EventTypeWarning, "Retain", "can not delete the backup if deletionPolicy is Retain")
 		return intctrlutil.Reconciled()
 	}
 
@@ -246,7 +247,7 @@ func (r *BackupReconciler) prepareBackupRequest(
 	}
 
 	targetPods, err := getTargetPods(reqCtx, r.Client,
-		backup.Annotations[dataProtectionBackupTargetPodKey], backupPolicy)
+		backup.Annotations[dptypes.BackupTargetPodLabelKey], backupPolicy)
 	if err != nil || len(targetPods) == 0 {
 		return nil, fmt.Errorf("failed to get target pods by backup policy %s/%s",
 			backupPolicy.Namespace, backupPolicy.Name)
@@ -283,8 +284,11 @@ func (r *BackupReconciler) prepareBackupRequest(
 	}
 
 	request.BackupPolicy = backupPolicy
-	if err = r.handleBackupRepo(request); err != nil {
-		return nil, err
+	if !snapshotVolumes {
+		// if use volume snapshot, ignore backup repo
+		if err = r.handleBackupRepo(request); err != nil {
+			return nil, err
+		}
 	}
 
 	request.BackupMethod = backupMethod
@@ -349,11 +353,12 @@ func (r *BackupReconciler) patchBackupStatus(
 	request.Status.Path = dpbackup.BuildBackupPath(request.Backup, request.BackupPolicy.Spec.PathPrefix)
 	request.Status.Target = request.BackupPolicy.Spec.Target
 	request.Status.BackupMethod = request.BackupMethod
-	request.Status.BackupRepoName = request.BackupRepo.Name
+	if request.BackupRepo != nil {
+		request.Status.BackupRepoName = request.BackupRepo.Name
+	}
 	if request.BackupRepoPVC != nil {
 		request.Status.PersistentVolumeClaimName = request.BackupRepoPVC.Name
 	}
-
 	// init action status
 	actions, err := request.BuildActions()
 	if err != nil {
@@ -372,14 +377,8 @@ func (r *BackupReconciler) patchBackupStatus(
 	request.Status.Phase = dpv1alpha1.BackupPhaseRunning
 	request.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
 
-	duration, err := original.Spec.RetentionPeriod.ToDuration()
-	if err != nil {
-		return fmt.Errorf("failed to parse retention period %s, %v", original.Spec.RetentionPeriod, err)
-	}
-	if duration.Seconds() > 0 {
-		request.Status.Expiration = &metav1.Time{
-			Time: request.Status.StartTimestamp.Add(duration),
-		}
+	if err = setExpirationByCreationTime(request.Backup); err != nil {
+		return err
 	}
 	return r.Client.Status().Patch(request.Ctx, request.Backup, client.MergeFrom(original))
 }
@@ -397,26 +396,28 @@ func (r *BackupReconciler) patchBackupObjectMeta(
 		if err := setClusterSnapshotAnnotation(request.Backup, cluster); err != nil {
 			return false, err
 		}
-		request.Labels[dptypes.DataProtectionLabelClusterUIDKey] = string(cluster.UID)
+		request.Labels[dptypes.ClusterUIDLabelKey] = string(cluster.UID)
 	}
+
 	for _, v := range getClusterLabelKeys() {
 		request.Labels[v] = targetPod.Labels[v]
 	}
 
-	request.Labels[dataProtectionBackupRepoKey] = request.BackupRepo.Name
 	request.Labels[constant.AppManagedByLabelKey] = constant.AppName
-	request.Labels[dataProtectionLabelBackupTypeKey] = request.GetBackupType()
-
+	request.Labels[dptypes.BackupTypeLabelKey] = request.GetBackupType()
 	// wait for the backup repo controller to prepare the essential resource.
 	wait := false
-	if (request.BackupRepo.AccessByMount() && request.BackupRepoPVC == nil) ||
-		(request.BackupRepo.AccessByTool() && request.ToolConfigSecret == nil) {
-		request.Labels[dataProtectionWaitRepoPreparationKey] = trueVal
-		wait = true
+	if request.BackupRepo != nil {
+		request.Labels[dataProtectionBackupRepoKey] = request.BackupRepo.Name
+		if (request.BackupRepo.AccessByMount() && request.BackupRepoPVC == nil) ||
+			(request.BackupRepo.AccessByTool() && request.ToolConfigSecret == nil) {
+			request.Labels[dataProtectionWaitRepoPreparationKey] = trueVal
+			wait = true
+		}
 	}
 
 	// set annotations
-	request.Annotations[dataProtectionBackupTargetPodKey] = targetPod.Name
+	request.Annotations[dptypes.BackupTargetPodLabelKey] = targetPod.Name
 
 	// set finalizer
 	controllerutil.AddFinalizer(request.Backup, dptypes.DataProtectionFinalizerName)
@@ -510,6 +511,18 @@ func (r *BackupReconciler) handleRunningPhase(
 		duration := request.Status.CompletionTimestamp.Sub(request.Status.StartTimestamp.Time).Round(time.Second)
 		request.Status.Duration = &metav1.Duration{Duration: duration}
 	}
+	if request.Spec.RetentionPeriod != "" {
+		// set expiration time
+		duration, err := request.Spec.RetentionPeriod.ToDuration()
+		if err != nil {
+			return r.updateStatusIfFailed(reqCtx, backup, request.Backup, fmt.Errorf("failed to parse retention period %s, %v", request.Spec.RetentionPeriod, err))
+		}
+		if duration.Seconds() > 0 {
+			request.Status.Expiration = &metav1.Time{
+				Time: request.Status.CompletionTimestamp.Add(duration),
+			}
+		}
+	}
 	r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedBackup", "Completed backup")
 	if err = r.Client.Status().Patch(reqCtx.Ctx, request.Backup, client.MergeFrom(backup)); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -544,6 +557,7 @@ func (r *BackupReconciler) handleCompletedPhase(
 	if err := r.deleteExternalResources(reqCtx, backup); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
+
 	return intctrlutil.Reconciled()
 }
 
@@ -555,6 +569,11 @@ func (r *BackupReconciler) updateStatusIfFailed(
 	sendWarningEventForError(r.Recorder, backup, err)
 	backup.Status.Phase = dpv1alpha1.BackupPhaseFailed
 	backup.Status.FailureReason = err.Error()
+
+	// set expiration time for failed backup, make sure the failed backup will be
+	// deleted after the expiration time.
+	_ = setExpirationByCreationTime(backup)
+
 	if errUpdate := r.Client.Status().Patch(reqCtx.Ctx, backup, client.MergeFrom(original)); errUpdate != nil {
 		return intctrlutil.CheckedRequeueWithError(errUpdate, reqCtx.Log, "")
 	}
@@ -670,5 +689,36 @@ func setClusterSnapshotAnnotation(backup *dpv1alpha1.Backup, cluster *appsv1alph
 		backup.Annotations = map[string]string{}
 	}
 	backup.Annotations[constant.ClusterSnapshotAnnotationKey] = *clusterString
+	return nil
+}
+
+func setExpirationByCreationTime(backup *dpv1alpha1.Backup) error {
+	// if expiration is already set, do not update it.
+	if backup.Status.Expiration != nil {
+		return nil
+	}
+
+	duration, err := backup.Spec.RetentionPeriod.ToDuration()
+	if err != nil {
+		return fmt.Errorf("failed to parse retention period %s, %v", backup.Spec.RetentionPeriod, err)
+	}
+
+	// if duration is zero, the backup will be kept forever.
+	// Do not set expiration time for it.
+	if duration.Seconds() == 0 {
+		return nil
+	}
+
+	var expiration *metav1.Time
+	if backup.Status.StartTimestamp != nil {
+		expiration = &metav1.Time{
+			Time: backup.Status.StartTimestamp.Add(duration),
+		}
+	} else {
+		expiration = &metav1.Time{
+			Time: backup.CreationTimestamp.Add(duration),
+		}
+	}
+	backup.Status.Expiration = expiration
 	return nil
 }

@@ -38,7 +38,7 @@ import (
 )
 
 const (
-	timeout  time.Duration = time.Second * 1000
+	timeout  time.Duration = time.Second * 1500
 	interval time.Duration = time.Second * 10
 )
 
@@ -46,7 +46,7 @@ type Options struct {
 	Dynamic dynamic.Interface
 }
 
-var arr = []string{"00", "componentresourceconstraint", "restore", "class", "cv", "snapshot"}
+var arr = []string{"00", "componentresourceconstraint", "restore", "class", "cv", "backup"}
 
 func SmokeTest() {
 	BeforeEach(func() {

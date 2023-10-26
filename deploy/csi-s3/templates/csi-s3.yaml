@@ -62,7 +62,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: driver-registrar
-          image: {{ .Values.images.registrar }}
+          image: "{{ template "csi-s3.imageFullName" (dict "image" .Values.images.registrar "root" .) }}"
           args:
             - "--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)"
             - "--v=4"
@@ -87,8 +87,8 @@ spec:
             capabilities:
               add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
-          image: {{ .Values.images.csi }}
-          imagePullPolicy: IfNotPresent
+          image: "{{ template "csi-s3.imageFullName" (dict "image" .Values.images.csi "root" .) }}"
+          imagePullPolicy: "{{ template "csi-s3.imagePullPolicy" (dict "image" .Values.images.csi "root" .) }}"
           args:
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--nodeid=$(NODE_ID)"

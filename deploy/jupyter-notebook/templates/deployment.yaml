@@ -14,6 +14,18 @@ spec:
       labels:
         {{- include "jupyter.selectorLabels" . | nindent 8 }}
     spec:
+      initContainers:
+        - name: init-container
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              cp /tmp/docs-QA-assistantor.ipynb /home/jovyan/work
+              chmod 777 /home/jovyan/work/docs-QA-assistantor.ipynb
+          volumeMounts:
+            - name: data-volume
+              mountPath: /home/jovyan/work
       containers:
         - name: {{ .Chart.Name }}
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}

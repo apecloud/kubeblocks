@@ -109,8 +109,8 @@ func (r *BackupScheduleReconciler) deleteExternalResources(
 	if err := r.Client.List(reqCtx.Ctx, cronJobList,
 		client.InNamespace(backupSchedule.Namespace),
 		client.MatchingLabels{
-			dataProtectionLabelBackupScheduleKey: backupSchedule.Name,
-			constant.AppManagedByLabelKey:        constant.AppName,
+			dptypes.BackupScheduleLabelKey: backupSchedule.Name,
+			constant.AppManagedByLabelKey:  constant.AppName,
 		},
 	); err != nil {
 		return err

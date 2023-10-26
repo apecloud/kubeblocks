@@ -12,7 +12,7 @@ on:
         required: false
         default: ''
       TEST_TYPE:
-        description: 'test type (e.g. mysql|postgres|redis|mongo|kafka|pulsar|weaviate|qdrant|smarte|scale|greptimedb|nebula|risingwave|starrocks|oceanbase|foxlake|oracle-mysql|asmysql|openldap|polardbx|milvus|clickhouse|pika|opensearch|elasticsearch|llm|orioledb|official-pg)'
+        description: 'test type (e.g. apecloud-mysql|postgres|redis|mongo|kafka|pulsar|weaviate|qdrant|smarte|scale|greptimedb|nebula|risingwave|starrocks|oceanbase|foxlake|oracle-mysql|asmysql|openldap|polardbx|milvus|clickhouse|pika|opensearch|elasticsearch|vllm|orioledb|official-pg|ggml)'
         required: false
         default: ''
       CLOUD_PROVIDER:
@@ -23,6 +23,7 @@ on:
         options:
           - gke
           - eks
+          - k3s
       CLUSTER_VERSION:
         description: 'k8s cluster version (e.g. 1.26)'
         required: false
@@ -50,7 +51,7 @@ on:
         required: false
         default: ''
 
-run-name: kbcli:${{ inputs.PRE_VERSION }} to ${{ inputs.VERSION }} ${{ inputs.CLOUD_PROVIDER }}:${{ inputs.CLUSTER_VERSION }}:${{ inputs.INSTANCE_TYPE }}
+run-name: kbcli:${{ inputs.PRE_VERSION }} to ${{ inputs.VERSION }} ${{ inputs.CLOUD_PROVIDER }}:${{ inputs.CLUSTER_VERSION }}:${{ inputs.INSTANCE_TYPE }} ${{ inputs.TEST_TYPE }}
 
 env:
   GH_TOKEN: ${{ github.token }}
@@ -87,6 +88,7 @@ jobs:
   e2e:
     name: ${{ inputs.CLOUD_PROVIDER }}
     needs: check
+    if: ${{ inputs.CLOUD_PROVIDER != 'k3s' }}
     uses: apecloud/apecloud-cd/.github/workflows/kbcli-test-k8s.yml@main
     with:
       CLOUD_PROVIDER: "${{ inputs.CLOUD_PROVIDER }}"
@@ -95,6 +97,19 @@ jobs:
       CLUSTER_VERSION: "${{ inputs.CLUSTER_VERSION }}"
       INSTANCE_TYPE: "${{ inputs.INSTANCE_TYPE }}"
       REGION: "${{ needs.check.outputs.cluster-region }}"
+      BRANCH_NAME: "${{ inputs.BRANCH_NAME }}"
+      ARGS: "${{ inputs.ARGS }}"
+      TEST_TYPE: "${{ inputs.TEST_TYPE }}"
+    secrets: inherit
+
+  k3s:
+    needs: check
+    if: ${{ inputs.CLOUD_PROVIDER == 'k3s' }}
+    uses: apecloud/apecloud-cd/.github/workflows/kbcli-test-k3s.yml@main
+    with:
+      KB_VERSION: "${{ needs.check.outputs.release-version }}"
+      KB_PRE_VERSION: "${{ inputs.PRE_VERSION }}"
+      CLUSTER_VERSION: "${{ inputs.CLUSTER_VERSION }}"
       BRANCH_NAME: "${{ inputs.BRANCH_NAME }}"
       ARGS: "${{ inputs.ARGS }}"
       TEST_TYPE: "${{ inputs.TEST_TYPE }}"

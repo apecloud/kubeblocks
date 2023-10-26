@@ -21,7 +21,7 @@ spec:
     preBackup: []
     postBackup: []
     backupData:
-      image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
+      image: {{ include "apecloud-mysql.bakcupToolImage" . }}
       runOnTargetPodNode: true
       command:
       - sh
@@ -33,7 +33,7 @@ spec:
         intervalSeconds: 5
   restore:
     prepareData:
-      image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
+      image: {{ include "apecloud-mysql.bakcupToolImage" . }}
       command:
       - sh
       - -c
@@ -51,15 +51,23 @@ spec:
   backupType: Full
   env:
   - name: DATA_DIR
-    value: /data/mysql/data
+    value: {{ .Values.mysqlConfigs.dataDir }}
+  - name: DATA_MOUNT_DIR
+    value: {{ .Values.mysqlConfigs.dataMountPath }}
   - name: SIGNAL_FILE
     value: .restore_new_cluster
   backup: {}
   restore:
     prepareData:
-      image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
+      image: {{ include "apecloud-mysql.bakcupToolImage" . }}
       command:
       - sh
       - -c
-      - touch {{ .Values.mysqlConfigs.dataDir }}/${SIGNAL_FILE}; sync
+      - |
+        touch ${DATA_DIR}/${SIGNAL_FILE};
+        # compatible with binlog of 0.6/0.5
+        binlog_dir=${DATA_MOUNT_DIR}/binlog
+        mkdir $binlog_dir
+        cp ${DATA_DIR}/mysql-bin.* ${binlog_dir}
+        sync
     postReady: []

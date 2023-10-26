@@ -51,12 +51,12 @@ type RestoreManager struct {
 	Scheme  *k8sruntime.Scheme
 
 	// private
-	namespace              string
-	restoreTime            string
-	volumeManagementPolicy dpv1alpha1.VolumeClaimManagementPolicy
-	startingIndex          int32
-	replicas               int32
-	restoreLabels          map[string]string
+	namespace           string
+	restoreTime         string
+	volumeRestorePolicy dpv1alpha1.VolumeClaimRestorePolicy
+	startingIndex       int32
+	replicas            int32
+	restoreLabels       map[string]string
 }
 
 func NewRestoreManager(ctx context.Context,
@@ -67,15 +67,15 @@ func NewRestoreManager(ctx context.Context,
 	replicas, startingIndex int32,
 ) *RestoreManager {
 	return &RestoreManager{
-		Cluster:                cluster,
-		Client:                 cli,
-		Ctx:                    ctx,
-		Scheme:                 scheme,
-		replicas:               replicas,
-		startingIndex:          startingIndex,
-		namespace:              cluster.Namespace,
-		volumeManagementPolicy: dpv1alpha1.ParallelManagementPolicy,
-		restoreLabels:          restoreLabels,
+		Cluster:             cluster,
+		Client:              cli,
+		Ctx:                 ctx,
+		Scheme:              scheme,
+		replicas:            replicas,
+		startingIndex:       startingIndex,
+		namespace:           cluster.Namespace,
+		volumeRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicyParallel,
+		restoreLabels:       restoreLabels,
 	}
 }
 
@@ -174,8 +174,8 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 			},
 			RestoreTime: r.restoreTime,
 			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
-				SchedulingSpec:              schedulingSpec,
-				VolumeClaimManagementPolicy: r.volumeManagementPolicy,
+				SchedulingSpec:           schedulingSpec,
+				VolumeClaimRestorePolicy: r.volumeRestorePolicy,
 				RestoreVolumeClaimsTemplate: &dpv1alpha1.RestoreVolumeClaimsTemplate{
 					Replicas:      r.replicas,
 					StartingIndex: r.startingIndex,
@@ -290,8 +290,8 @@ func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.Synt
 	if namespace := backupSource[constant.BackupNamespaceKeyForRestore]; namespace != "" {
 		r.namespace = namespace
 	}
-	if managementPolicy := backupSource[constant.VolumeManagementPolicyKeyForRestore]; managementPolicy != "" {
-		r.volumeManagementPolicy = dpv1alpha1.VolumeClaimManagementPolicy(managementPolicy)
+	if volumeRestorePolicy := backupSource[constant.VolumeRestorePolicyKeyForRestore]; volumeRestorePolicy != "" {
+		r.volumeRestorePolicy = dpv1alpha1.VolumeClaimRestorePolicy(volumeRestorePolicy)
 	}
 	r.restoreTime = backupSource[constant.RestoreTimeKeyForRestore]
 	backup := &dpv1alpha1.Backup{}

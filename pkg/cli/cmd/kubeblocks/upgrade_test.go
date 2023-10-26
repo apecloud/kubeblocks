@@ -50,6 +50,16 @@ var _ = Describe("kubeblocks upgrade", func() {
 		tf.Cleanup()
 	})
 
+	mockKubeBlocksDeploy := func() *appsv1.Deployment {
+		deploy := &appsv1.Deployment{}
+		deploy.SetLabels(map[string]string{
+			"app.kubernetes.io/component": "apps",
+			"app.kubernetes.io/name":      types.KubeBlocksChartName,
+			"app.kubernetes.io/version":   "0.3.0",
+		})
+		return deploy
+	}
+
 	It("check upgrade", func() {
 		var cfg string
 		cmd = newUpgradeCmd(tf, streams)
@@ -73,21 +83,12 @@ var _ = Describe("kubeblocks upgrade", func() {
 	})
 
 	It("double-check when version change", func() {
-		mockDeploy := func() *appsv1.Deployment {
-			deploy := &appsv1.Deployment{}
-			deploy.SetLabels(map[string]string{
-				"app.kubernetes.io/name":    types.KubeBlocksChartName,
-				"app.kubernetes.io/version": "0.3.0",
-			})
-			return deploy
-		}
-
 		o := &InstallOptions{
 			Options: Options{
 				IOStreams: streams,
 				HelmCfg:   helm.NewFakeConfig(namespace),
 				Namespace: "default",
-				Client:    testing.FakeClientSet(mockDeploy()),
+				Client:    testing.FakeClientSet(mockKubeBlocksDeploy()),
 				Dynamic:   testing.FakeDynamicClient(),
 			},
 			Version: "0.5.0-fake",
@@ -102,21 +103,12 @@ var _ = Describe("kubeblocks upgrade", func() {
 	})
 
 	It("helm ValueOpts upgrade", func() {
-		mockDeploy := func() *appsv1.Deployment {
-			deploy := &appsv1.Deployment{}
-			deploy.SetLabels(map[string]string{
-				"app.kubernetes.io/name":    types.KubeBlocksChartName,
-				"app.kubernetes.io/version": "0.3.0",
-			})
-			return deploy
-		}
-
 		o := &InstallOptions{
 			Options: Options{
 				IOStreams: streams,
 				HelmCfg:   helm.NewFakeConfig(namespace),
 				Namespace: "default",
-				Client:    testing.FakeClientSet(mockDeploy()),
+				Client:    testing.FakeClientSet(mockKubeBlocksDeploy()),
 				Dynamic:   testing.FakeDynamicClient(),
 			},
 			Version: "",
@@ -126,21 +118,12 @@ var _ = Describe("kubeblocks upgrade", func() {
 	})
 
 	It("run upgrade", func() {
-		mockDeploy := func() *appsv1.Deployment {
-			deploy := &appsv1.Deployment{}
-			deploy.SetLabels(map[string]string{
-				"app.kubernetes.io/name":    types.KubeBlocksChartName,
-				"app.kubernetes.io/version": "0.3.0",
-			})
-			return deploy
-		}
-
 		o := &InstallOptions{
 			Options: Options{
 				IOStreams: streams,
 				HelmCfg:   helm.NewFakeConfig(namespace),
 				Namespace: "default",
-				Client:    testing.FakeClientSet(mockDeploy()),
+				Client:    testing.FakeClientSet(mockKubeBlocksDeploy()),
 				Dynamic:   testing.FakeDynamicClient(),
 			},
 			Version: version.DefaultKubeBlocksVersion,

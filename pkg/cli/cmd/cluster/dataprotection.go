@@ -61,6 +61,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/cli/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
 )
 
 var (
@@ -82,11 +83,17 @@ var (
         kbcli cluster edit-bp <backup-policy-name>
 	`)
 	createBackupExample = templates.Examples(`
+		# Create a backup for the cluster, use the default backup policy and volume snapshot backup method
+		kbcli cluster backup mycluster
+
 		# create a backup with a specified method, run "kbcli cluster desc-backup-policy mycluster" to show supported backup methods
 		kbcli cluster backup mycluster --method volume-snapshot
 
 		# create a backup with specified backup policy, run "kbcli cluster list-backup-policy mycluster" to show the cluster supported backup policies
 		kbcli cluster backup mycluster --method volume-snapshot --policy <backup-policy-name>
+
+		# create a backup from a parent backup
+		kbcli cluster backup mycluster --parent-backup parent-backup-name
 	`)
 	listBackupExample = templates.Examples(`
 		# list all backups
@@ -116,10 +123,12 @@ var (
 const annotationTrueValue = "true"
 
 type CreateBackupOptions struct {
-	BackupMethod string `json:"backupMethod"`
-	BackupName   string `json:"backupName"`
-	Role         string `json:"role,omitempty"`
-	BackupPolicy string `json:"backupPolicy"`
+	BackupMethod     string `json:"backupMethod"`
+	BackupName       string `json:"backupName"`
+	BackupPolicy     string `json:"backupPolicy"`
+	DeletionPolicy   string `json:"deletionPolicy"`
+	RetentionPeriod  string `json:"retentionPeriod"`
+	ParentBackupName string `json:"parentBackupName"`
 
 	create.CreateOptions `json:"-"`
 }
@@ -158,22 +167,72 @@ func (o *CreateBackupOptions) Validate() error {
 	if o.Name == "" {
 		return fmt.Errorf("missing cluster name")
 	}
+
+	// if backup policy is not specified, use the default backup policy
 	if o.BackupPolicy == "" {
 		if err := o.completeDefaultBackupPolicy(); err != nil {
 			return err
 		}
-	} else {
-		// check if backup policy exists
-		if _, err := o.Dynamic.Resource(types.BackupPolicyGVR()).Namespace(o.Namespace).Get(context.TODO(), o.BackupPolicy, metav1.GetOptions{}); err != nil {
-			return err
-		}
 	}
+
+	// check if backup policy exists
+	backupPolicyObj, err := o.Dynamic.Resource(types.BackupPolicyGVR()).Namespace(o.Namespace).Get(context.TODO(), o.BackupPolicy, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	backupPolicy := &dpv1alpha1.BackupPolicy{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(backupPolicyObj.Object, backupPolicy); err != nil {
+		return err
+	}
+
 	if o.BackupMethod == "" {
 		// TODO(ldm): if backup policy only has one backup method, use it as default
 		//  backup method.
-		return fmt.Errorf("missing backup method")
+		// if backup policy don't have any backup method, return error
+		if len(backupPolicy.Spec.BackupMethods) == 0 {
+			return fmt.Errorf("missing backup method")
+		}
+
+		// if backup policy has only one backup method, use it as default backup method
+		if len(backupPolicy.Spec.BackupMethods) == 1 {
+			o.BackupMethod = backupPolicy.Spec.BackupMethods[0].Name
+		}
+
+		// if backup policy has multiple backup methods, use method which volume snapshot is true as default backup method
+		for _, method := range backupPolicy.Spec.BackupMethods {
+			if boolptr.IsSetToTrue(method.SnapshotVolumes) {
+				o.BackupMethod = method.Name
+				break
+			}
+		}
 	}
 	// TODO: check if pvc exists
+
+	// valid retention period
+	if o.RetentionPeriod != "" {
+		_, err := dpv1alpha1.RetentionPeriod(o.RetentionPeriod).ToDuration()
+		if err != nil {
+			return fmt.Errorf("invalid retention period, please refer to examples [1y, 1m, 1d, 1h, 1m] or combine them [1y1m1d1h1m]")
+		}
+	}
+
+	// check if parent backup exists
+	if o.ParentBackupName != "" {
+		parentBackupObj, err := o.Dynamic.Resource(types.BackupGVR()).Namespace(o.Namespace).Get(context.TODO(), o.ParentBackupName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		parentBackup := &dpv1alpha1.Backup{}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(parentBackupObj.Object, parentBackup); err != nil {
+			return err
+		}
+		if parentBackup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
+			return fmt.Errorf("parent backup %s is not completed", o.ParentBackupName)
+		}
+		if parentBackup.Labels[constant.AppInstanceLabelKey] != o.Name {
+			return fmt.Errorf("parent backup %s is not belong to cluster %s", o.ParentBackupName, o.Name)
+		}
+	}
 	return nil
 }
 
@@ -255,9 +314,12 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *
 		},
 	}
 
-	cmd.Flags().StringVar(&o.BackupMethod, "method", "", "Backup method that defined in backup policy (required)")
+	cmd.Flags().StringVar(&o.BackupMethod, "method", "", "Backup methods are defined in backup policy (required), if only one backup method in backup policy, use it as default backup method, if multiple backup methods in backup policy, use method which volume snapshot is true as default backup method")
 	cmd.Flags().StringVar(&o.BackupName, "name", "", "Backup name")
-	cmd.Flags().StringVar(&o.BackupPolicy, "policy", "", "Backup policy name, this flag will be ignored when backup-type is snapshot")
+	cmd.Flags().StringVar(&o.BackupPolicy, "policy", "", "Backup policy name, if not specified, use the cluster default backup policy")
+	cmd.Flags().StringVar(&o.DeletionPolicy, "deletion-policy", "Delete", "Deletion policy for backup, determine whether the backup content in backup repo will be deleted after the backup is deleted, supported values: [Delete, Retain]")
+	cmd.Flags().StringVar(&o.RetentionPeriod, "retention-period", "", "Retention period for backup, supported values: [1y, 1mo, 1d, 1h, 1m] or combine them [1y1mo1d1h1m], if not specified, the backup will not be automatically deleted, you need to manually delete it.")
+	cmd.Flags().StringVar(&o.ParentBackupName, "parent-backup", "", "Parent backup name, used for incremental backup")
 
 	return cmd
 }
@@ -411,9 +473,9 @@ type CreateRestoreOptions struct {
 	Backup string `json:"backup,omitempty"`
 
 	// point in time recovery args
-	RestoreTime             *time.Time `json:"restoreTime,omitempty"`
-	RestoreTimeStr          string     `json:"restoreTimeStr,omitempty"`
-	RestoreManagementPolicy string     `json:"volumeRestorePolicy,omitempty"`
+	RestoreTime         *time.Time `json:"restoreTime,omitempty"`
+	RestoreTimeStr      string     `json:"restoreTimeStr,omitempty"`
+	VolumeRestorePolicy string     `json:"volumeRestorePolicy,omitempty"`
 
 	create.CreateOptions `json:"-"`
 }
@@ -461,7 +523,7 @@ func (o *CreateRestoreOptions) runRestoreFromBackup() error {
 	if err != nil {
 		return err
 	}
-	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, o.RestoreManagementPolicy, len(clusterObj.Spec.ComponentSpecs), clusterObj.Spec.ComponentSpecs[0].Name, restoreTimeStr)
+	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, o.VolumeRestorePolicy, len(clusterObj.Spec.ComponentSpecs), clusterObj.Spec.ComponentSpecs[0].Name, restoreTimeStr)
 	if err != nil {
 		return err
 	}
@@ -539,7 +601,7 @@ func NewCreateRestoreCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) 
 	}
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Backup name")
 	cmd.Flags().StringVar(&o.RestoreTimeStr, "restore-to-time", "", "point in time recovery(PITR)")
-	cmd.Flags().StringVar(&o.RestoreManagementPolicy, "volume-restore-policy", "Parallel", "the volume claim restore policy, supported values: [Serial, Parallel]")
+	cmd.Flags().StringVar(&o.VolumeRestorePolicy, "volume-restore-policy", "Parallel", "the volume claim restore policy, supported values: [Serial, Parallel]")
 	return cmd
 }
 
@@ -1086,7 +1148,7 @@ func (o *DescribeBackupOptions) enhancePrintFailureReason(backupName, failureRea
 	ctx := context.Background()
 	// get the latest job log details.
 	labels := fmt.Sprintf("%s=%s",
-		dptypes.DataProtectionLabelBackupNameKey, backupName,
+		dptypes.BackupNameLabelKey, backupName,
 	)
 	jobList, err := o.client.BatchV1().Jobs("").List(ctx, metav1.ListOptions{LabelSelector: labels})
 	if err != nil {

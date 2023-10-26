@@ -145,7 +145,7 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 			GenerateName: s.BackupSchedule.Name + "-",
 			Namespace:    s.BackupSchedule.Namespace,
 			Labels: map[string]string{
-				dptypes.DataProtectionLabelBackupScheduleKey: s.BackupSchedule.Name,
+				dptypes.BackupScheduleLabelKey: s.BackupSchedule.Name,
 			},
 		},
 		Spec: appsv1alpha1.OpsRequestSpec{
@@ -188,7 +188,7 @@ func (s *Scheduler) reconcileReconfigure() error {
 	opsList := appsv1alpha1.OpsRequestList{}
 	if err := s.Client.List(s.Ctx, &opsList,
 		client.InNamespace(s.BackupSchedule.Namespace),
-		client.MatchingLabels{dptypes.DataProtectionLabelBackupScheduleKey: s.BackupPolicy.Name}); err != nil {
+		client.MatchingLabels{dptypes.BackupScheduleLabelKey: s.BackupPolicy.Name}); err != nil {
 		return err
 	}
 	if len(opsList.Items) > 0 {
@@ -255,8 +255,8 @@ func (s *Scheduler) buildCronJob(
 		}
 		cronjob.Labels[k] = v
 	}
-	cronjob.Labels[dptypes.DataProtectionLabelBackupScheduleKey] = s.BackupSchedule.Name
-	cronjob.Labels[dptypes.DataProtectionLabelBackupMethodKey] = schedulePolicy.BackupMethod
+	cronjob.Labels[dptypes.BackupScheduleLabelKey] = s.BackupSchedule.Name
+	cronjob.Labels[dptypes.BackupMethodLabelKey] = schedulePolicy.BackupMethod
 	return cronjob, nil
 }
 
@@ -309,9 +309,9 @@ func (s *Scheduler) reconcileCronJob(schedulePolicy *dpv1alpha1.SchedulePolicy) 
 	if err := s.Client.List(s.Ctx, cronJobList,
 		client.InNamespace(s.BackupSchedule.Namespace),
 		client.MatchingLabels{
-			dptypes.DataProtectionLabelBackupScheduleKey: s.BackupSchedule.Name,
-			dptypes.DataProtectionLabelBackupMethodKey:   schedulePolicy.BackupMethod,
-			constant.AppManagedByLabelKey:                constant.AppName,
+			dptypes.BackupScheduleLabelKey: s.BackupSchedule.Name,
+			dptypes.BackupMethodLabelKey:   schedulePolicy.BackupMethod,
+			constant.AppManagedByLabelKey:  constant.AppName,
 		},
 	); err != nil {
 		return err
@@ -320,7 +320,7 @@ func (s *Scheduler) reconcileCronJob(schedulePolicy *dpv1alpha1.SchedulePolicy) 
 	}
 
 	// schedule is disabled, delete cronjob if exists
-	if schedulePolicy == nil || !boolptr.IsSetToTrue(schedulePolicy.Enabled) {
+	if !boolptr.IsSetToTrue(schedulePolicy.Enabled) {
 		if len(cronJob.Name) != 0 {
 			// delete the old cronjob.
 			if err := dputils.RemoveDataProtectionFinalizer(s.Ctx, s.Client, cronJob); err != nil {

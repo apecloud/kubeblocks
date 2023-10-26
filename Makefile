@@ -205,7 +205,7 @@ module: ## Run go mod tidy->verify against go modules.
 	$(GO) mod tidy -compat=1.21
 	$(GO) mod verify
 
-TEST_PACKAGES ?= ./pkg/... ./apis/... ./controllers/... ./cmd/...
+TEST_PACKAGES ?= ./pkg/... ./apis/... ./controllers/... ./cmd/... ./lorry/...
 
 CLUSTER_TYPES=minikube k3d
 .PHONY: add-k8s-host
@@ -615,7 +615,7 @@ else ifeq ($(TEST_TYPE), mongodb)
 	$(HELM) template mongodb-cluster deploy/mongodb-cluster > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
 else ifeq ($(TEST_TYPE), pulsar)
 	$(HELM) dependency build deploy/pulsar-cluster --skip-refresh
-	$(HELM) template pulsar-cluster deploy/pulsar-cluster > test/e2e/testdata/smoketest/pulsar/00_pulsarcluster.yaml
+	$(HELM) template pulsar-cluster -s templates/cluster.yaml deploy/pulsar-cluster > test/e2e/testdata/smoketest/pulsar/00_pulsarcluster.yaml
 else ifeq ($(TEST_TYPE), nebula)
 	$(HELM) dependency build deploy/nebula-cluster --skip-refresh
 	$(HELM) upgrade --install nebula deploy/nebula
@@ -709,8 +709,8 @@ else
 endif
 
 .PHONY: test-e2e
-test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
-	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) TEST_TYPE=$(TEST_TYPE) SKIP_CASE=$(SKIP_CASE) -C test/e2e run
+test-e2e: helm-package install-s3-csi-driver render-smoke-testdata-manifests ## Run E2E tests.
+	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) TEST_TYPE=$(TEST_TYPE) SKIP_CASE=$(SKIP_CASE) CONFIG_TYPE=$(CONFIG_TYPE) -C test/e2e run
 
 .PHONY: render-smoke-testdata-manifests-local
 render-smoke-testdata-manifests-local: ## Helm Install CD And CV
@@ -770,12 +770,16 @@ else
 endif
 
 .PHONY: test-e2e-local
-test-e2e-local: generate-cluster-role render-smoke-testdata-manifests-local render-smoke-testdata-manifests ## Run E2E tests on local.
+test-e2e-local: generate-cluster-role install-s3-csi-driver render-smoke-testdata-manifests-local render-smoke-testdata-manifests ## Run E2E tests on local.
 	$(MAKE) -e TEST_TYPE=$(TEST_TYPE) -C test/e2e run
 
 .PHONY: generate-cluster-role
 generate-cluster-role:
 	$(HELM) template -s templates/rbac/cluster_pod_required_role.yaml deploy/helm | kubectl apply -f -
+
+.PHONY: install-s3-csi-driver
+install-s3-csi-driver:
+	$(HELM) upgrade --install csi-s3 deploy/csi-s3
 
 # NOTE: include must be placed at the end
 include docker/docker.mk

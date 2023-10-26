@@ -100,7 +100,7 @@ var (
 	}
 
 	roleProbe = &workloads.RoleProbe{
-		ProbeActions: []workloads.Action{{Command: []string{"cmd"}}},
+		CustomHandler: []workloads.Action{{Command: []string{"cmd"}}},
 	}
 
 	reconfiguration = workloads.MembershipReconfiguration{

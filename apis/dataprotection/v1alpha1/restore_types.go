@@ -124,13 +124,13 @@ type PrepareDataConfig struct {
 	// +optional
 	RestoreVolumeClaimsTemplate *RestoreVolumeClaimsTemplate `json:"volumeClaimsTemplate,omitempty"`
 
-	// VolumeClaimManagementPolicy defines recovery strategy for persistent volume claim.
+	// VolumeClaimRestorePolicy defines restore policy for persistent volume claim.
 	// Supported policies are as follows:
 	// 1. Parallel: parallel recovery of persistent volume claim.
 	// 2. Serial: restore the persistent volume claim in sequence, and wait until the previous persistent volume claim is restored before restoring a new one.
 	// +kubebuilder:default=Parallel
 	// +kubebuilder:validation:Required
-	VolumeClaimManagementPolicy VolumeClaimManagementPolicy `json:"volumeClaimManagementPolicy"`
+	VolumeClaimRestorePolicy VolumeClaimRestorePolicy `json:"volumeClaimRestorePolicy"`
 
 	// scheduling spec for restoring pod.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.prepareDataConfig.schedulingSpec"
@@ -413,5 +413,5 @@ func (p *PrepareDataConfig) IsSerialPolicy() bool {
 	if p == nil {
 		return false
 	}
-	return p.VolumeClaimManagementPolicy == SerialManagementPolicy
+	return p.VolumeClaimRestorePolicy == VolumeClaimRestorePolicySerial
 }

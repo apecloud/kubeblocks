@@ -489,8 +489,8 @@ func FakeBackupWithCluster(cluster *appsv1alpha1.Cluster, backupName string) *dp
 			Name:      backupName,
 			Namespace: Namespace,
 			Labels: map[string]string{
-				constant.AppInstanceLabelKey:             cluster.Name,
-				dptypes.DataProtectionLabelClusterUIDKey: string(cluster.UID),
+				constant.AppInstanceLabelKey: cluster.Name,
+				dptypes.ClusterUIDLabelKey:   string(cluster.UID),
 			},
 		},
 	}
@@ -625,7 +625,8 @@ func FakeKBDeploy(version string) *appsv1.Deployment {
 		},
 	}
 	deploy.SetLabels(map[string]string{
-		"app.kubernetes.io/name": types.KubeBlocksChartName,
+		"app.kubernetes.io/name":      types.KubeBlocksChartName,
+		"app.kubernetes.io/component": "apps",
 	})
 	if len(version) > 0 {
 		deploy.Labels["app.kubernetes.io/version"] = version

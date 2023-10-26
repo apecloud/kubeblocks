@@ -55,7 +55,7 @@ var _ = Describe("ReplicatedStateMachine Webhook", func() {
 					},
 					Service: &corev1.Service{},
 					RoleProbe: &RoleProbe{
-						ProbeActions: []Action{
+						CustomHandler: []Action{
 							{
 								Image:   "foo",
 								Command: []string{"bar"},

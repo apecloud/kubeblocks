@@ -1,0 +1,18 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupRepo
+metadata:
+  name: my-repo
+  annotations:
+    dataprotection.kubeblocks.io/is-default-repo: "true"
+spec:
+  storageProviderRef: s3
+  pvReclaimPolicy: Retain
+  volumeCapacity: 100Gi
+  config:
+    bucket: smoke-test-hl
+    endpoint: ""
+    mountOptions: --memory-limit 1000 --dir-mode 0777 --file-mode 0666
+    region: us-west-2
+  credential:
+    name: s3-credential-for-backuprepo
+    namespace: kb-system

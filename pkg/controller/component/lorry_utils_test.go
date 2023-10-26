@@ -41,11 +41,13 @@ var _ = Describe("probe_utils", func() {
 		var container *corev1.Container
 		var component *SynthesizedComponent
 		var probeServiceHTTPPort int
+		var probeServiceGRPCPort int
 		var clusterDefProbe *appsv1alpha1.ClusterDefinitionProbe
 
 		BeforeEach(func() {
 			container = buildBasicContainer()
 			probeServiceHTTPPort = 3501
+			probeServiceGRPCPort = 50001
 
 			clusterDefProbe = &appsv1alpha1.ClusterDefinitionProbe{}
 			clusterDefProbe.PeriodSeconds = 1
@@ -99,7 +101,7 @@ var _ = Describe("probe_utils", func() {
 		})
 
 		It("should build role service container", func() {
-			buildLorryServiceContainer(component, container, probeServiceHTTPPort)
+			buildLorryServiceContainer(component, container, probeServiceHTTPPort, probeServiceGRPCPort)
 			Expect(container.Command).ShouldNot(BeEmpty())
 		})
 

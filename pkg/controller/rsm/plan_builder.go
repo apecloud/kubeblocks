@@ -120,7 +120,6 @@ func (b *PlanBuilder) rsmWalkFunc(v graph.Vertex) error {
 	case model.UPDATE:
 		err := b.cli.Update(b.transCtx.Context, vertex.Obj)
 		if err != nil && !apierrors.IsNotFound(err) {
-			b.transCtx.Logger.Error(err, fmt.Sprintf("update %T error: %s", vertex.Obj, vertex.OriObj.GetName()))
 			return err
 		}
 	case model.DELETE:

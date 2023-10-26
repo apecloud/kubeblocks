@@ -80,20 +80,20 @@ spec:
       {{- end }}
       containers:
         - name: csi-provisioner
-          image: {{ .Values.images.provisioner }}
+          image: "{{ template "csi-s3.imageFullName" (dict "image" .Values.images.provisioner "root" .) }}"
           args:
             - "--csi-address=$(ADDRESS)"
             - "--v=4"
           env:
             - name: ADDRESS
               value: {{ .Values.kubeletPath }}/plugins/ru.yandex.s3.csi/csi.sock
-          imagePullPolicy: "IfNotPresent"
+          imagePullPolicy: "{{ template "csi-s3.imagePullPolicy" (dict "image" .Values.images.provisioner "root" .) }}"
           volumeMounts:
             - name: socket-dir
               mountPath: {{ .Values.kubeletPath }}/plugins/ru.yandex.s3.csi
         - name: csi-s3
-          image: {{ .Values.images.csi }}
-          imagePullPolicy: IfNotPresent
+          image: "{{ template "csi-s3.imageFullName" (dict "image" .Values.images.csi "root" .) }}"
+          imagePullPolicy: "{{ template "csi-s3.imagePullPolicy" (dict "image" .Values.images.csi "root" .) }}"
           args:
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--nodeid=$(NODE_ID)"

@@ -99,24 +99,23 @@ var _ = Describe("bench", func() {
 	It("test sysbench run", func() {
 		o := &SysBenchOptions{
 			BenchBaseOptions: BenchBaseOptions{
-				Driver:      "mysql",
-				Database:    "test",
-				Host:        "svc-1",
-				Port:        3306,
-				User:        "test",
-				Password:    "test",
-				ClusterName: "test",
-				factory:     tf,
-				namespace:   namespace,
-				IOStreams:   streams,
+				Driver:    "mysql",
+				Database:  "test",
+				Host:      "svc-1",
+				Port:      3306,
+				User:      "test",
+				Password:  "test",
+				factory:   tf,
+				namespace: namespace,
+				IOStreams: streams,
 			},
 			Type:     []string{"oltp_read_only"},
 			Tables:   1,
 			Size:     100,
 			Duration: 60,
 		}
-		o.dynamic, _ = tf.DynamicClient()
-		o.client, _ = tf.KubernetesClientSet()
+		Expect(o.Complete([]string{})).Should(BeNil())
+		Expect(o.Validate()).ShouldNot(BeNil())
 		Expect(o.Run()).Should(BeNil())
 	})
 
@@ -128,22 +127,21 @@ var _ = Describe("bench", func() {
 	It("test pgbench run", func() {
 		o := &PgBenchOptions{
 			BenchBaseOptions: BenchBaseOptions{
-				Driver:      pgBenchDriver,
-				Database:    "test",
-				Host:        "svc-1",
-				Port:        3306,
-				User:        "test",
-				Password:    "test",
-				ClusterName: "test",
-				factory:     tf,
-				namespace:   namespace,
-				IOStreams:   streams,
+				Driver:    pgBenchDriver,
+				Database:  "test",
+				Host:      "svc-1",
+				Port:      3306,
+				User:      "test",
+				Password:  "test",
+				factory:   tf,
+				namespace: namespace,
+				IOStreams: streams,
 			},
 			Scale:   100,
 			Clients: []int{1},
 		}
-		o.dynamic, _ = tf.DynamicClient()
-		o.client, _ = tf.KubernetesClientSet()
+		Expect(o.Complete([]string{})).Should(BeNil())
+		Expect(o.Validate()).ShouldNot(BeNil())
 		Expect(o.Run()).Should(BeNil())
 	})
 
@@ -155,23 +153,22 @@ var _ = Describe("bench", func() {
 	It("test ycsb run", func() {
 		o := &YcsbOptions{
 			BenchBaseOptions: BenchBaseOptions{
-				Driver:      "mysql",
-				Database:    "test",
-				Host:        "svc-1",
-				Port:        3306,
-				User:        "test",
-				Password:    "test",
-				ClusterName: "test",
-				factory:     tf,
-				namespace:   namespace,
-				IOStreams:   streams,
+				Driver:    "mysql",
+				Database:  "test",
+				Host:      "svc-1",
+				Port:      3306,
+				User:      "test",
+				Password:  "test",
+				factory:   tf,
+				namespace: namespace,
+				IOStreams: streams,
 			},
 			RecordCount:    1000,
 			OperationCount: 1000,
 			Threads:        []int{1},
 		}
-		o.dynamic, _ = tf.DynamicClient()
-		o.client, _ = tf.KubernetesClientSet()
+		Expect(o.Complete([]string{})).Should(BeNil())
+		Expect(o.Validate()).ShouldNot(BeNil())
 		Expect(o.Run()).Should(BeNil())
 	})
 

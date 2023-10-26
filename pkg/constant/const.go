@@ -125,7 +125,6 @@ const (
 	PVLastClaimPolicyAnnotationKey              = "apps.kubeblocks.io/pv-last-claim-policy"
 	HaltRecoveryAllowInconsistentCVAnnotKey     = "clusters.apps.kubeblocks.io/allow-inconsistent-cv"
 	HaltRecoveryAllowInconsistentResAnnotKey    = "clusters.apps.kubeblocks.io/allow-inconsistent-resource"
-	LeaderAnnotationKey                         = "cs.apps.kubeblocks.io/leader"
 	PrimaryAnnotationKey                        = "rs.apps.kubeblocks.io/primary"
 	DisableUpgradeInsConfigurationAnnotationKey = "config.kubeblocks.io/disable-reconfigure"
 	LastAppliedConfigAnnotationKey              = "config.kubeblocks.io/last-applied-configuration"
@@ -274,8 +273,6 @@ const (
 	AccountPasswdForSecret = "password"
 )
 
-const DefaultBackupPvcInitCapacity = "20Gi"
-
 const (
 	ComponentStatusDefaultPodName = "Unknown"
 )
@@ -297,8 +294,8 @@ const (
 )
 
 const (
-	BackupNameKeyForRestore             = "name"
-	BackupNamespaceKeyForRestore        = "namespace"
-	VolumeManagementPolicyKeyForRestore = "managementPolicy"
-	RestoreTimeKeyForRestore            = "restoreTime"
+	BackupNameKeyForRestore          = "name"
+	BackupNamespaceKeyForRestore     = "namespace"
+	VolumeRestorePolicyKeyForRestore = "volumeRestorePolicy"
+	RestoreTimeKeyForRestore         = "restoreTime"
 )

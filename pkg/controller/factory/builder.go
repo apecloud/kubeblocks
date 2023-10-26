@@ -42,6 +42,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -465,9 +466,11 @@ func buildRoleInfo(component *component.SynthesizedComponent) ([]workloads.Repli
 		strategy        *workloads.MemberUpdateStrategy
 	)
 
-	actions := buildActionFromCharacterType(component.CharacterType, component.WorkloadType == appsv1alpha1.Consensus)
-	if actions != nil && component.Probes != nil && component.Probes.RoleProbe != nil {
-		probe = &workloads.RoleProbe{ProbeActions: actions}
+	handler := convertCharacterTypeToHandler(component.CharacterType, component.WorkloadType == appsv1alpha1.Consensus)
+
+	if handler != nil && component.Probes != nil && component.Probes.RoleProbe != nil {
+		probe = &workloads.RoleProbe{}
+		probe.BuiltinHandler = (*string)(handler)
 		roleProbe := component.Probes.RoleProbe
 		probe.PeriodSeconds = roleProbe.PeriodSeconds
 		probe.TimeoutSeconds = roleProbe.TimeoutSeconds
@@ -477,7 +480,6 @@ func buildRoleInfo(component *component.SynthesizedComponent) ([]workloads.Repli
 		probe.RoleUpdateMechanism = workloads.DirectAPIServerEventUpdate
 	}
 
-	// TODO(free6om): set default reconfiguration actions after relative addon refactored
 	reconfiguration = nil
 
 	switch component.WorkloadType {
@@ -554,104 +556,30 @@ func buildRoleInfoFromConsensus(consensusSpec *appsv1alpha1.ConsensusSetSpec) ([
 	return roles, strategy
 }
 
-// buildActionFromCharacterType is a temporary workaround to provide vary engines' role probe functionality,
-// as there is no way to configure these fields in Cluster API currently.
-// TODO(free6om): remove this after ComponentDefinition API re-designed.
-func buildActionFromCharacterType(characterType string, isConsensus bool) []workloads.Action {
+func convertCharacterTypeToHandler(characterType string, isConsensus bool) *common.BuiltinHandler {
+	var handler common.BuiltinHandler
 	kind := strings.ToLower(characterType)
 	switch kind {
 	case "mysql": //nolint:goconst
 		if isConsensus {
-			return []workloads.Action{
-				{
-					Image: "arey/mysql-client:latest",
-					Command: []string{
-						"mysql",
-						"-h127.0.0.1",
-						"-P3306",
-						"-u$KB_RSM_USERNAME",
-						"-p$KB_RSM_PASSWORD",
-						"-N",
-						"-B",
-						"-e",
-						"\"select role from information_schema.wesql_cluster_local\"",
-						"|",
-						"xargs echo -n",
-					},
-				},
-				{
-					Command: []string{"echo $v_KB_RSM_LAST_STDOUT | tr '[:upper:]' '[:lower:]' | xargs echo -n"},
-				},
-			}
-		}
-		return []workloads.Action{
-			{
-				Image: "free6om/kubeblocks:latest",
-				Command: []string{
-					"curl http://127.0.0.1:3501/v1.0/bindings/mysql?operation=checkRole&workloadType=Replication",
-				},
-			},
-			{
-				Image: "jetbrainsinfra/jq:latest",
-				Command: []string{
-					"echo $v_KB_RSM_LAST_STDOUT | jq -r '.role' | tr '[:upper:]' '[:lower:]' | xargs echo -n",
-				},
-			},
+			handler = common.WeSQLHandler
+		} else {
+			handler = common.MySQLHandler
 		}
 	case "postgres", "postgresql":
-		return []workloads.Action{
-			{
-				Image: "governmentpaas/psql:latest",
-				Command: []string{
-					"PGPASSWORD=$KB_RSM_PASSWORD psql",
-					"-h 127.0.0.1",
-					"-p 5432",
-					"-U $KB_RSM_USERNAME",
-					"-w",
-					"-t",
-					"-c",
-					"\"select pg_is_in_recovery();\"",
-					"|",
-					"xargs echo -n",
-				},
-			},
-			{
-				Command: []string{"if [ \"f\" = \"$v_KB_RSM_LAST_STDOUT\" ]; then echo -n \"primary\"; else echo -n \"secondary\"; fi"},
-			},
-		}
+		handler = common.PostgresHandler
 	case "mongodb":
-		return []workloads.Action{
-			{
-				Image: "infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/mongo:5.0.14",
-				Command: []string{
-					"Status=$(export CLIENT=`which mongosh>/dev/null&&echo mongosh||echo mongo`; $CLIENT -u $KB_RSM_USERNAME -p $KB_RSM_PASSWORD 127.0.0.1:27017 --authenticationDatabase admin --quiet --eval \"JSON.stringify(rs.status())\") &&",
-					"MyState=$(echo $Status | jq '.myState') &&",
-					"echo $Status | jq \".members[] | select(.state == ($MyState | tonumber)) | .stateStr\" |tr '[:upper:]' '[:lower:]' | xargs echo -n",
-				},
-			},
-		}
+
+		handler = common.MongoDBHandler
 	case "etcd":
-		return []workloads.Action{
-			{
-				Image: "quay.io/coreos/etcd:v3.5.6",
-				Command: []string{
-					"Status=$(etcdctl --endpoints=127.0.0.1:2379 endpoint status -w simple --command-timeout=300ms --dial-timeout=100m) &&",
-					"IsLeader=$(echo $Status | awk -F ', ' '{print $5}') &&",
-					"IsLearner=$(echo $Status | awk -F ', ' '{print $6}') &&",
-					"if [ \"true\" = \"$IsLeader\" ]; then echo -n \"leader\"; elif [ \"true\" = \"$IsLearner\" ]; then echo -n \"learner\"; else echo -n \"follower\"; fi",
-				},
-			},
-		}
+		handler = common.ETCDHandler
 	case "redis":
-		return []workloads.Action{
-			{
-				Image: "infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/redis-stack-server:7.0.6-RC8",
-				Command: []string{
-					"Role=$(redis-cli --user $KB_RSM_USERNAME --pass $KB_RSM_PASSWORD --no-auth-warning info | grep role | awk -F ':' '{print $2}' | tr '[:upper:]' '[:lower:]' | tr -d '\r' | tr -d '\n') &&",
-					"if [ \"master\" = \"$Role\" ]; then echo -n \"primary\"; else echo -n \"secondary\"; fi",
-				},
-			},
-		}
+		handler = common.RedisHandler
+	case "kafka":
+		handler = common.KafkaHandler
+	}
+	if handler != "" {
+		return &handler
 	}
 	return nil
 }
@@ -804,8 +732,8 @@ func BuildBackup(cluster *appsv1alpha1.Cluster,
 	backupKey types.NamespacedName,
 	backupMethod string) *dpv1alpha1.Backup {
 	return builder.NewBackupBuilder(backupKey.Namespace, backupKey.Name).
-		AddLabels(dptypes.DataProtectionLabelBackupMethodKey, backupMethod).
-		AddLabels(dptypes.DataProtectionLabelBackupPolicyKey, backupPolicyName).
+		AddLabels(dptypes.BackupMethodLabelKey, backupMethod).
+		AddLabels(dptypes.BackupPolicyLabelKey, backupPolicyName).
 		AddLabels(constant.KBManagedByKey, "cluster").
 		AddLabels(constant.AppNameLabelKey, component.ClusterDefName).
 		AddLabels(constant.AppInstanceLabelKey, cluster.Name).

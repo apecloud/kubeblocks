@@ -165,7 +165,7 @@ func TestGetMemberAddrs(t *testing.T) {
 	ctx := context.TODO()
 	manager, mock, _ := MockDatabase(t)
 	defer mock.Close()
-	cluster := &dcs.Cluster{}
+	cluster := &dcs.Cluster{Namespace: "default"}
 
 	t.Run("get empty addrs", func(t *testing.T) {
 		addrs := manager.GetMemberAddrs(ctx, cluster)
@@ -182,7 +182,7 @@ func TestGetMemberAddrs(t *testing.T) {
 		addrs := manager.GetMemberAddrs(ctx, cluster)
 
 		assert.Equal(t, 1, len(addrs))
-		assert.Equal(t, "test.pg-headless:5432", addrs[0])
+		assert.Equal(t, "test.pg-headless.default.svc.cluster.local:5432", addrs[0])
 	})
 }
 

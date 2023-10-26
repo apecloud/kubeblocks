@@ -70,9 +70,6 @@ var _ = Describe("Lorry HTTP Client", func() {
 	})
 
 	Context("new HTTPClient", func() {
-		//port, closer := newTCPServer(t, 50001)
-		//defer closer()
-
 		It("without lorry service, return nil", func() {
 			podWithoutLorry := pod.DeepCopy()
 			podWithoutLorry.Spec.Containers[0].Ports = nil

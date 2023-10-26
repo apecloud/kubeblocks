@@ -204,12 +204,12 @@ func (ha *Ha) Start() {
 		return
 	}
 
-	//isPodReady, err := ha.IsPodReady()
-	//for err != nil || !isPodReady {
+	// isPodReady, err := ha.IsPodReady()
+	// for err != nil || !isPodReady {
 	//	ha.logger.Info("Waiting for dns resolution to be ready")
 	//	time.Sleep(3 * time.Second)
 	//	isPodReady, err = ha.IsPodReady()
-	//}
+	// }
 	ha.logger.Info("dns resolution is ready")
 
 	ha.logger.Info(fmt.Sprintf("cluster: %v", cluster))

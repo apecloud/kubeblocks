@@ -107,7 +107,11 @@ func NewGRPCServer() (*GRPCServer, error) {
 	if !ok {
 		return nil, errors.New("check role operation not found")
 	}
-	checkRoleOperation.Init(context.Background())
+	err := checkRoleOperation.Init(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
 	characterType := viper.GetString(constant.KBEnvCharacterType)
 	return &GRPCServer{
 		character:          characterType,

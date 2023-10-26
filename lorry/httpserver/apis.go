@@ -129,7 +129,7 @@ func OperationWrapper(op operations.Operation) fasthttp.RequestHandler {
 					logger.Error(err, "operation exec failed")
 				}
 				msg := NewErrorResponse("ERR_OPERATION_FAILED", err.Error())
-				respond(reqCtx, withError(fasthttp.StatusInternalServerError, msg))
+				respond(reqCtx, withError(statusCode, msg))
 				return
 			}
 		}

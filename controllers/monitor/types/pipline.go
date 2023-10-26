@@ -40,7 +40,8 @@ type Pipline struct {
 
 type OteldInstance struct {
 	MetricsPipline    []Pipline
-	LogsPipline       Pipline
+	LogPipline        []Pipline
+	AppLogsPipline    Pipline
 	AppMetricsPiplien Pipline
 	Oteld             *v1alpha1.OTeld
 	AppDataSources    []v1alpha1.AppDataSource
@@ -58,7 +59,8 @@ func NewOteldInstance(oteld *v1alpha1.OTeld) *OteldInstance {
 	return &OteldInstance{
 		Oteld:             oteld,
 		MetricsPipline:    []Pipline{},
-		LogsPipline:       Pipline{},
+		LogPipline:        []Pipline{},
+		AppLogsPipline:    Pipline{},
 		AppMetricsPiplien: Pipline{},
 		AppDataSources:    []v1alpha1.AppDataSource{},
 	}

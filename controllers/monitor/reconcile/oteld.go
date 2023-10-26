@@ -112,8 +112,14 @@ func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList,
 			}
 
 		}
-		oteldInstance.MetricsPipline = append(oteldInstance.MetricsPipline, pipline)
-
+		switch dataSource.Spec.Type {
+		case v1alpha1.MetricsDatasourceType:
+			oteldInstance.MetricsPipline = append(oteldInstance.MetricsPipline, pipline)
+		case v1alpha1.LogsDataSourceType:
+			oteldInstance.LogPipline = append(oteldInstance.LogPipline, pipline)
+		default:
+			return nil, fmt.Errorf("unknown data source type %s", dataSource.Spec.Type)
+		}
 		instanceMap[mode] = oteldInstance
 	}
 
@@ -159,7 +165,7 @@ func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList,
 		for _, exporter := range logsExporters.Items {
 			logPipline.ExporterMap[fmt.Sprintf(ExporterNamePattern, exporter.Spec.Type, exporter.Name)] = true
 		}
-		instance.LogsPipline = logPipline
+		instance.AppLogsPipline = logPipline
 	}
 
 	return instanceMap, nil

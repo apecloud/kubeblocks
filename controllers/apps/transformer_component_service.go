@@ -70,7 +70,7 @@ func (t *ComponentServiceTransformer) buildService(synthesizeComp *component.Syn
 	)
 
 	// TODO: service.ServiceName
-	serviceName := constant.GenerateComponentServiceEndpoint(clusterName, synthesizeComp.Name, string(service.ServiceName), namespace)
+	serviceName := constant.GenerateComponentServiceEndpoint(clusterName, synthesizeComp.Name, string(service.ServiceName))
 	labels := constant.GetComponentWellKnownLabels(clusterName, compName)
 	builder := builder.NewServiceBuilder(namespace, serviceName).
 		AddLabelsInMap(labels).

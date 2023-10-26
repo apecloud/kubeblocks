@@ -491,9 +491,9 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 		"$(UUID_B64)":             uuidB64,
 		"$(UUID_STR_B64)":         uuidStrB64,
 		"$(UUID_HEX)":             uuidHex,
-		"$(SVC_FQDN)":             constant.GenerateDefaultComponentServiceEndpoint(cluster.Name, component.Name, cluster.Namespace),
+		"$(SVC_FQDN)":             constant.GenerateDefaultComponentServiceEndpoint(cluster.Name, component.Name),
 		"$(KB_CLUSTER_COMP_NAME)": constant.GenerateClusterComponentPattern(cluster.Name, component.Name),
-		"$(HEADLESS_SVC_FQDN)":    constant.GenerateDefaultComponentHeadlessServiceEndpoint(cluster.Name, component.Name, cluster.Namespace),
+		"$(HEADLESS_SVC_FQDN)":    constant.GenerateDefaultComponentHeadlessServiceEndpoint(cluster.Name, component.Name),
 	}
 	if len(component.Services) > 0 {
 		for _, p := range component.Services[0].Spec.Ports {

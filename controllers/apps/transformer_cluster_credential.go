@@ -192,8 +192,7 @@ func (t *ClusterCredentialTransformer) buildEndpointFromClusterService(credentia
 func (t *ClusterCredentialTransformer) buildEndpointFromComponentService(cluster *appsv1alpha1.Cluster,
 	credential appsv1alpha1.ClusterCredential, service *appsv1alpha1.ComponentService, data *map[string]string) {
 	// TODO(component): service.ServiceName
-	serviceName := constant.GenerateComponentServiceEndpoint(cluster.Name, credential.ComponentName,
-		string(service.ServiceName), cluster.Namespace)
+	serviceName := constant.GenerateComponentServiceEndpoint(cluster.Name, credential.ComponentName, string(service.ServiceName))
 
 	port := int32(0)
 	if len(credential.PortName) == 0 {

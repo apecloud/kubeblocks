@@ -45,23 +45,23 @@ func GenerateComponentConnCredential(clusterName, compName, name string) string 
 }
 
 // GenerateComponentServiceEndpoint generates service endpoint of component
-func GenerateComponentServiceEndpoint(clusterName, compName, svcName, namespace string) string {
-	return fmt.Sprintf("%s-%s-%s.%s.svc", clusterName, compName, svcName, namespace)
+func GenerateComponentServiceEndpoint(clusterName, compName, svcName string) string {
+	return fmt.Sprintf("%s-%s-%s", clusterName, compName, svcName)
 }
 
 // GenerateDefaultComponentServiceEndpoint generates default service endpoint of component
-func GenerateDefaultComponentServiceEndpoint(clusterName, compName, namespace string) string {
-	return fmt.Sprintf("%s-%s.%s.svc", clusterName, compName, namespace)
+func GenerateDefaultComponentServiceEndpoint(clusterName, compName string) string {
+	return fmt.Sprintf("%s-%s", clusterName, compName)
 }
 
 // GenerateComponentHeadlessServiceEndpoint generates headless service endpoint of component
-func GenerateComponentHeadlessServiceEndpoint(clusterName, compName, svcName, namespace string) string {
-	return fmt.Sprintf("%s-%s-%s-headless.%s.svc", clusterName, compName, svcName, namespace)
+func GenerateComponentHeadlessServiceEndpoint(clusterName, compName, svcName string) string {
+	return fmt.Sprintf("%s-%s-%s-headless", clusterName, compName, svcName)
 }
 
 // GenerateDefaultComponentHeadlessServiceEndpoint generates default headless service endpoint of component
-func GenerateDefaultComponentHeadlessServiceEndpoint(clusterName, compName, namespace string) string {
-	return fmt.Sprintf("%s-%s-headless.%s.svc", clusterName, compName, namespace)
+func GenerateDefaultComponentHeadlessServiceEndpoint(clusterName, compName string) string {
+	return fmt.Sprintf("%s-%s-headless", clusterName, compName)
 }
 
 // GenerateClusterComponentPattern generates cluster and component pattern

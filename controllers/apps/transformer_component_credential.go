@@ -147,8 +147,7 @@ func (t *ComponentCredentialTransformer) buildEndpoint(synthesizeComp *component
 func (t *ComponentCredentialTransformer) buildEndpointFromService(synthesizeComp *component.SynthesizedComponent,
 	credential appsv1alpha1.ConnectionCredential, service *appsv1alpha1.ComponentService, data *map[string]string) {
 	// TODO(component): service.ServiceName
-	serviceName := constant.GenerateComponentServiceEndpoint(synthesizeComp.ClusterName,
-		synthesizeComp.Name, string(service.ServiceName), synthesizeComp.Namespace)
+	serviceName := constant.GenerateComponentServiceEndpoint(synthesizeComp.ClusterName, synthesizeComp.Name, string(service.ServiceName))
 
 	port := int32(0)
 	if len(credential.PortName) == 0 {

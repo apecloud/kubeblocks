@@ -119,10 +119,14 @@ data:
   init.sql: |
     CREATE EXTENSION pg_stat_statements;
   setup.sh: |
-    mkdir -p /home/postgres/pgdata/conf
-    chmod 777 -R /home/postgres/pgdata
-    cp /home/postgres/conf/postgresql.conf /home/postgres/pgdata/conf
-    chmod 777 -R /home/postgres/pgdata/conf
+    if [ -d "/home/postgres/pgdata/conf" ]; then
+      chmod 750 /home/postgres/pgdata/pgroot/data
+    else
+      mkdir -p /home/postgres/pgdata/conf
+      chmod 777 -R /home/postgres/pgdata
+      cp /home/postgres/conf/postgresql.conf /home/postgres/pgdata/conf
+      chmod 777 -R /home/postgres/pgdata/conf
+    fi
     source /dependency/conf
 
 {{/*    chmod 750 -R /home/postgres/pgdata*/}}

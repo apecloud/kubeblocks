@@ -39,6 +39,8 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	lorry "github.com/apecloud/kubeblocks/lorry/client"
+	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
@@ -100,6 +102,9 @@ func (t *ComponentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	if err != nil {
 		return err
 	}
+
+	// build configuration template annotations to rsm workload
+	buildRSMConfigTplAnnotations(rsm, synthesizeComp)
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	if obj == nil {
@@ -774,6 +779,43 @@ func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeC
 		}
 	}
 	return nil
+}
+
+// buildRSMConfigTplAnnotations builds config tpl annotations for rsm
+func buildRSMConfigTplAnnotations(rsm *workloads.ReplicatedStateMachine, synthesizedComp *component.SynthesizedComponent) {
+	configTplAnnotations := make(map[string]string)
+	for _, configTplSpec := range synthesizedComp.ConfigTemplates {
+		configTplAnnotations[core.GenerateTPLUniqLabelKeyWithConfig(configTplSpec.Name)] = core.GetComponentCfgName(synthesizedComp.ClusterName, synthesizedComp.Name, configTplSpec.Name)
+	}
+	for _, scriptTplSpec := range synthesizedComp.ScriptTemplates {
+		configTplAnnotations[core.GenerateTPLUniqLabelKeyWithConfig(scriptTplSpec.Name)] = core.GetComponentCfgName(synthesizedComp.ClusterName, synthesizedComp.Name, scriptTplSpec.Name)
+	}
+	updateRSMAnnotationsWithTemplate(rsm, configTplAnnotations)
+}
+
+func updateRSMAnnotationsWithTemplate(rsm *workloads.ReplicatedStateMachine, allTemplateAnnotations map[string]string) {
+	// full configmap upgrade
+	existLabels := make(map[string]string)
+	annotations := rsm.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	for key, val := range annotations {
+		if strings.HasPrefix(key, constant.ConfigurationTplLabelPrefixKey) {
+			existLabels[key] = val
+		}
+	}
+
+	// delete not exist configmap label
+	deletedLabels := cfgutil.MapKeyDifference(existLabels, allTemplateAnnotations)
+	for l := range deletedLabels.Iter() {
+		delete(annotations, l)
+	}
+
+	for key, val := range allTemplateAnnotations {
+		annotations[key] = val
+	}
+	rsm.SetAnnotations(annotations)
 }
 
 func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,

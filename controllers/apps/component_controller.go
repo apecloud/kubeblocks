@@ -89,20 +89,19 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&ComponentCredentialTransformer{},
 			// TODO(component): handle restore before component transformer
 			&ComponentRestoreTransformer{},
-			// handle the component workload
-			&ComponentWorkloadTransformer{Client: r.Client},
 			// TODO(component): transform backupPolicyTemplate to backuppolicy.dataprotection.kubeblocks.io and backupschedule.dataprotection.kubeblocks.io
 			&ComponentBackupPolicyTransformer{},
 			// handle tls volume and cert
 			&ComponentTLSTransformer{},
 			// render the component configurations
 			&ComponentConfigurationTransformer{Client: r.Client},
+			// handle the component workload
+			&ComponentWorkloadTransformer{Client: r.Client},
 			// add our finalizer to all objects
 			&ComponentOwnershipTransformer{},
 			// update component status
 			&ComponentStatusTransformer{Client: r.Client},
-		).
-		Build()
+		).Build()
 
 	// Execute stage
 	// errBuild not nil means build stage partial success or validation error

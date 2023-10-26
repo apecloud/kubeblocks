@@ -58,31 +58,6 @@ func createConfigObjects(cli client.Client, ctx context.Context, objs []client.O
 	return nil
 }
 
-func updateResourceAnnotationsWithTemplate(obj client.Object, allTemplateAnnotations map[string]string) {
-	// full configmap upgrade
-	existLabels := make(map[string]string)
-	annotations := obj.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-	for key, val := range annotations {
-		if strings.HasPrefix(key, constant.ConfigurationTplLabelPrefixKey) {
-			existLabels[key] = val
-		}
-	}
-
-	// delete not exist configmap label
-	deletedLabels := cfgutil.MapKeyDifference(existLabels, allTemplateAnnotations)
-	for l := range deletedLabels.Iter() {
-		delete(annotations, l)
-	}
-
-	for key, val := range allTemplateAnnotations {
-		annotations[key] = val
-	}
-	obj.SetAnnotations(annotations)
-}
-
 // buildConfigManagerWithComponent build the configmgr sidecar container and update it
 // into PodSpec if configuration reload option is on
 func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []appsv1alpha1.ComponentConfigSpec,

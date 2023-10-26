@@ -403,7 +403,7 @@ func (r *BackupPolicyTplTransformer) buildBackupTarget(
 		cc.PasswordKey = constant.AccountPasswdForSecret
 		cc.PasswordKey = constant.AccountNameForSecret
 	} else {
-		cc.SecretName = fmt.Sprintf("%s-conn-credential", clusterName)
+		cc.SecretName = constant.GenerateDefaultConnCredential(clusterName)
 		ccKey := targetTpl.ConnectionCredentialKey
 		if ccKey.PasswordKey != nil {
 			cc.PasswordKey = *ccKey.PasswordKey

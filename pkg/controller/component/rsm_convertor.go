@@ -22,6 +22,7 @@ package component
 import (
 	"errors"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -45,6 +46,8 @@ func BuildRSMFrom(cluster *appsv1alpha1.Cluster, synthesizeComp *SynthesizedComp
 		"credential":                &rsmCredentialConvertor{},
 		"membershipreconfiguration": &rsmMembershipReconfigurationConvertor{},
 		"memberupdatestrategy":      &rsmMemberUpdateStrategyConvertor{},
+		"podmanagementpolicy":       &rsmPodManagementPolicyConvertor{},
+		"updatestrategy":            &rsmUpdateStrategyConvertor{},
 	}
 	if err := covertObject(convertors, &protoRSM.Spec, cluster, synthesizeComp); err != nil {
 		return nil, err
@@ -72,6 +75,12 @@ type rsmMembershipReconfigurationConvertor struct{}
 
 // rsmMemberUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.MemberUpdateStrategy.
 type rsmMemberUpdateStrategyConvertor struct{}
+
+// rsmPodManagementPolicyConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.PodManagementPolicy.
+type rsmPodManagementPolicyConvertor struct{}
+
+// rsmUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into ReplicatedStateMachine.Spec.UpdateStrategy.
+type rsmUpdateStrategyConvertor struct{}
 
 // parseRSMConvertorArgs parses the args of rsm convertor.
 func parseRSMConvertorArgs(args ...any) (*appsv1alpha1.Cluster, *SynthesizedComponent, error) {
@@ -235,6 +244,29 @@ func (c *rsmMembershipReconfigurationConvertor) convert(args ...any) (any, error
 }
 
 func (c *rsmMemberUpdateStrategyConvertor) convert(args ...any) (any, error) {
+	_, synthesizeComp, err := parseRSMConvertorArgs(args...)
+	if err != nil {
+		return nil, err
+	}
+	switch *synthesizeComp.UpdateStrategy {
+	case appsv1alpha1.SerialStrategy:
+		return workloads.SerialUpdateStrategy, nil
+	case appsv1alpha1.ParallelStrategy:
+		return workloads.ParallelUpdateStrategy, nil
+	case appsv1alpha1.BestEffortParallelStrategy:
+		return workloads.BestEffortParallelUpdateStrategy, err
+	default:
+		return nil, err
+	}
+}
+
+func (c *rsmPodManagementPolicyConvertor) convert(args ...any) (any, error) {
+	// componentDefinition does not define PodManagementPolicy and StatefulSetUpdateStrategy.
+	// The Parallel strategy is used by default here. If necessary, the componentDefinition API can be expanded later
+	return appsv1.ParallelPodManagement, nil
+}
+
+func (c *rsmUpdateStrategyConvertor) convert(args ...any) (any, error) {
 	// cluster, synthesizeComp, err := parseRSMConvertorArgs(args...)
 	return "", nil // TODO
 }

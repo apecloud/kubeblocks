@@ -255,7 +255,7 @@ func buildDataScriptJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, clust
 		secretFrom := ops.Spec.ScriptSpec.Secret
 		if secretFrom == nil {
 			secretFrom = &appsv1alpha1.ScriptSecret{
-				Name:        fmt.Sprintf("%s-conn-credential", cluster.Name),
+				Name:        constant.GenerateDefaultConnCredential(cluster.Name),
 				PasswordKey: "password",
 				UsernameKey: "username",
 			}

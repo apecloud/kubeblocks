@@ -28,7 +28,7 @@ import (
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
+	lorryutil "github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type GrantOptions struct {

@@ -30,9 +30,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/controllers/k8score"
-	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	lorryutil "github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 // EventTimeOut timeout of the event

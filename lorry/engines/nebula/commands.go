@@ -17,30 +17,32 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package engine
+package nebula
 
 import (
 	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/apecloud/kubeblocks/lorry/engines"
 )
 
-var _ ClusterCommands = &nebula{}
+var _ engines.ClusterCommands = &Commands{}
 
-type nebula struct {
-	info     EngineInfo
-	examples map[ClientType]buildConnectExample
+type Commands struct {
+	info     engines.EngineInfo
+	examples map[engines.ClientType]engines.BuildConnectExample
 }
 
-func newNebula() *nebula {
-	return &nebula{
-		info: EngineInfo{
+func NewCommands() engines.ClusterCommands {
+	return &Commands{
+		info: engines.EngineInfo{
 			Client:    "nebula-console",
 			Container: "nebula-console",
 		},
-		examples: map[ClientType]buildConnectExample{
-			CLI: func(info *ConnectionInfo) string {
+		examples: map[engines.ClientType]engines.BuildConnectExample{
+			engines.CLI: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# nebula client connection example
 nebula --addr %s --port %s --user %s -port%s
 `, info.Host, info.Port, info.User, info.Password)
@@ -49,7 +51,7 @@ nebula --addr %s --port %s --user %s -port%s
 	}
 }
 
-func (r *nebula) ConnectCommand(connectInfo *AuthInfo) []string {
+func (r *Commands) ConnectCommand(connectInfo *engines.AuthInfo) []string {
 	userName := "root"
 	userPass := "nebula"
 
@@ -63,14 +65,14 @@ func (r *nebula) ConnectCommand(connectInfo *AuthInfo) []string {
 	return []string{"sh", "-c", strings.Join(nebulaCmd, " ")}
 }
 
-func (r *nebula) Container() string {
+func (r *Commands) Container() string {
 	return r.info.Container
 }
 
-func (r *nebula) ConnectExample(info *ConnectionInfo, client string) string {
-	return buildExample(info, client, r.examples)
+func (r *Commands) ConnectExample(info *engines.ConnectionInfo, client string) string {
+	return engines.BuildExample(info, client, r.examples)
 }
 
-func (r *nebula) ExecuteCommand([]string) ([]string, []corev1.EnvVar, error) {
+func (r *Commands) ExecuteCommand([]string) ([]string, []corev1.EnvVar, error) {
 	return nil, nil, fmt.Errorf("%s not implemented", r.info.Client)
 }

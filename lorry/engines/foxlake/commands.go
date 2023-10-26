@@ -17,32 +17,34 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package engine
+package foxlake
 
 import (
 	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/apecloud/kubeblocks/lorry/engines"
 )
 
-var _ ClusterCommands = &foxlake{}
+var _ engines.ClusterCommands = &Commands{}
 
-type foxlake struct {
-	info     EngineInfo
-	examples map[ClientType]buildConnectExample
+type Commands struct {
+	info     engines.EngineInfo
+	examples map[engines.ClientType]engines.BuildConnectExample
 }
 
-func newFoxLake() *foxlake {
-	return &foxlake{
-		info: EngineInfo{
+func NewCommands() engines.ClusterCommands {
+	return &Commands{
+		info: engines.EngineInfo{
 			Client:      "usql",
 			Container:   "foxlake",
 			UserEnv:     "$FOXLAKE_ROOT_USER",
 			PasswordEnv: "$FOXLAKE_ROOT_PASSWORD",
 		},
-		examples: map[ClientType]buildConnectExample{
-			CLI: func(info *ConnectionInfo) string {
+		examples: map[engines.ClientType]engines.BuildConnectExample{
+			engines.CLI: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# foxlake client connection example
 mysql -h%s -P%s -u%s -p%s
 `, info.Host, info.Port, info.User, info.Password)
@@ -51,7 +53,7 @@ mysql -h%s -P%s -u%s -p%s
 	}
 }
 
-func (r *foxlake) ConnectCommand(connectInfo *AuthInfo) []string {
+func (r *Commands) ConnectCommand(connectInfo *engines.AuthInfo) []string {
 	userName := r.info.UserEnv
 	userPass := r.info.PasswordEnv
 
@@ -65,14 +67,14 @@ func (r *foxlake) ConnectCommand(connectInfo *AuthInfo) []string {
 	return []string{"sh", "-c", strings.Join(foxlakeCmd, " ")}
 }
 
-func (r *foxlake) Container() string {
+func (r *Commands) Container() string {
 	return r.info.Container
 }
 
-func (r *foxlake) ConnectExample(info *ConnectionInfo, client string) string {
-	return buildExample(info, client, r.examples)
+func (r *Commands) ConnectExample(info *engines.ConnectionInfo, client string) string {
+	return engines.BuildExample(info, client, r.examples)
 }
 
-func (r *foxlake) ExecuteCommand([]string) ([]string, []corev1.EnvVar, error) {
+func (r *Commands) ExecuteCommand([]string) ([]string, []corev1.EnvVar, error) {
 	return nil, nil, fmt.Errorf("%s not implemented", r.info.Client)
 }

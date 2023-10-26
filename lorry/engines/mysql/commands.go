@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package engine
+package mysql
 
 import (
 	"fmt"
@@ -25,31 +25,33 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/apecloud/kubeblocks/lorry/engines"
 )
 
-var _ ClusterCommands = &mysql{}
+var _ engines.ClusterCommands = &Commands{}
 
-type mysql struct {
-	info     EngineInfo
-	examples map[ClientType]buildConnectExample
+type Commands struct {
+	info     engines.EngineInfo
+	examples map[engines.ClientType]engines.BuildConnectExample
 }
 
-func newMySQL() *mysql {
-	return &mysql{
-		info: EngineInfo{
+func NewCommands() engines.ClusterCommands {
+	return &Commands{
+		info: engines.EngineInfo{
 			Client:      "mysql",
 			PasswordEnv: "$MYSQL_ROOT_PASSWORD",
 			UserEnv:     "$MYSQL_ROOT_USER",
 			Database:    "mysql",
 		},
-		examples: map[ClientType]buildConnectExample{
-			CLI: func(info *ConnectionInfo) string {
+		examples: map[engines.ClientType]engines.BuildConnectExample{
+			engines.CLI: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# mysql client connection example
 mysql -h %s -P %s -u %s -p%s
 `, info.Host, info.Port, info.User, info.Password)
 			},
 
-			DJANGO: func(info *ConnectionInfo) string {
+			engines.DJANGO: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# .env
 DB_HOST=%s
 DB_NAME=%s
@@ -71,7 +73,7 @@ DATABASES = {
 `, info.Host, info.Database, info.User, info.Password, info.Port)
 			},
 
-			DOTNET: func(info *ConnectionInfo) string {
+			engines.DOTNET: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# appsettings.json
 {
   "ConnectionStrings": {
@@ -87,7 +89,7 @@ public void ConfigureServices(IServiceCollection services)
 `, info.Host, info.Port, info.Database, info.User, info.Password)
 			},
 
-			GO: func(info *ConnectionInfo) string {
+			engines.GO: func(info *engines.ConnectionInfo) string {
 				const goConnectExample = `# main.go
 package main
 
@@ -119,7 +121,7 @@ DSN=%s:%s@tcp(%s:%s)/%s?tls=true
 				return fmt.Sprintf("%s\n%s", dsn, goConnectExample)
 			},
 
-			JAVA: func(info *ConnectionInfo) string {
+			engines.JAVA: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`Class.forName("com.mysql.cj.jdbc.Driver");
 Connection conn = DriverManager.getConnection(
   "jdbc:mysql://%s:%s/%s?sslMode=VERIFY_IDENTITY",
@@ -128,7 +130,7 @@ Connection conn = DriverManager.getConnection(
 `, info.Host, info.Port, info.Database, info.User, info.Password)
 			},
 
-			NODEJS: func(info *ConnectionInfo) string {
+			engines.NODEJS: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# .env
 DATABASE_URL='mysql://%s:%s@%s:%s/%s?ssl={"rejectUnauthorized":true}'
 
@@ -140,7 +142,7 @@ connection.end();
 `, info.User, info.Password, info.Host, info.Port, info.Database)
 			},
 
-			PHP: func(info *ConnectionInfo) string {
+			engines.PHP: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# .env
 HOST=%s
 PORT=%s
@@ -157,7 +159,7 @@ DATABASE=%s
 `, info.Host, info.Port, info.User, info.Password, info.Database)
 			},
 
-			PRISMA: func(info *ConnectionInfo) string {
+			engines.PRISMA: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# .env
 DATABASE_URL='mysql://%s:%s@%s:%s/%s?sslaccept=strict'
 
@@ -174,7 +176,7 @@ datasource db {
 `, info.User, info.Password, info.Host, info.Port, info.Database)
 			},
 
-			PYTHON: func(info *ConnectionInfo) string {
+			engines.PYTHON: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# run the following command in the terminal to install dependencies
 pip install python-dotenv mysqlclient
 
@@ -202,7 +204,7 @@ connection = MySQLdb.connect(
 `, info.Host, info.Port, info.User, info.Password, info.Database)
 			},
 
-			RAILS: func(info *ConnectionInfo) string {
+			engines.RAILS: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# Gemfile
 gem 'mysql2'
 
@@ -218,7 +220,7 @@ development:
 `, info.Database, info.User, info.Host, info.Password)
 			},
 
-			RUST: func(info *ConnectionInfo) string {
+			engines.RUST: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# run the following command in the terminal
 export DATABASE_URL="mysql://%s:%s@%s:%s/%s"
 
@@ -243,7 +245,7 @@ mysql = "*"
 `, info.User, info.Password, info.Host, info.Port, info.Database)
 			},
 
-			SYMFONY: func(info *ConnectionInfo) string {
+			engines.SYMFONY: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# .env
 DATABASE_URL='mysql://%s:%s@%s:%s/%s'
 `, info.User, info.Password, info.Host, info.Port, info.Database)
@@ -252,7 +254,7 @@ DATABASE_URL='mysql://%s:%s@%s:%s/%s'
 	}
 }
 
-func (m *mysql) ConnectCommand(connectInfo *AuthInfo) []string {
+func (m *Commands) ConnectCommand(connectInfo *engines.AuthInfo) []string {
 	userName := m.info.UserEnv
 	userPass := m.info.PasswordEnv
 
@@ -270,29 +272,29 @@ func (m *mysql) ConnectCommand(connectInfo *AuthInfo) []string {
 	return []string{"sh", "-c", strings.Join(mysqlCmd, " ")}
 }
 
-func (m *mysql) Container() string {
+func (m *Commands) Container() string {
 	return m.info.Container
 }
 
-func (m *mysql) ConnectExample(info *ConnectionInfo, client string) string {
+func (m *Commands) ConnectExample(info *engines.ConnectionInfo, client string) string {
 	if len(info.Database) == 0 {
 		info.Database = m.info.Database
 	}
-	return buildExample(info, client, m.examples)
+	return engines.BuildExample(info, client, m.examples)
 }
 
-func (m *mysql) ExecuteCommand(scripts []string) ([]string, []corev1.EnvVar, error) {
+func (m *Commands) ExecuteCommand(scripts []string) ([]string, []corev1.EnvVar, error) {
 	cmd := []string{}
 	cmd = append(cmd, "/bin/sh", "-c", "-ex")
 	cmd = append(cmd, fmt.Sprintf("%s -u%s -p%s -e %s", m.info.Client,
-		fmt.Sprintf("$%s", envVarMap[user]),
-		fmt.Sprintf("$%s", envVarMap[password]),
+		fmt.Sprintf("$%s", engines.EnvVarMap[engines.USER]),
+		fmt.Sprintf("$%s", engines.EnvVarMap[engines.PASSWORD]),
 		strconv.Quote(strings.Join(scripts, " "))))
 
 	envs := []corev1.EnvVar{
 		{
 			Name:  "MYSQL_HOST",
-			Value: fmt.Sprintf("$(%s)", envVarMap[host]),
+			Value: fmt.Sprintf("$(%s)", engines.EnvVarMap[engines.HOST]),
 		},
 	}
 	return cmd, envs, nil

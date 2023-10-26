@@ -17,7 +17,21 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package engine
+package engines
+
+type EngineType string
+
+const (
+	MySQL        EngineType = "mysql"
+	PostgreSQL   EngineType = "postgresql"
+	Redis        EngineType = "redis"
+	MongoDB      EngineType = "mongodb"
+	Nebula       EngineType = "nebula"
+	PulsarBroker EngineType = "pulsar-broker"
+	PulsarProxy  EngineType = "pulsar-proxy"
+	FoxLake      EngineType = "foxlake"
+	Oceanbase    EngineType = "oceanbase"
+)
 
 type ClientType string
 

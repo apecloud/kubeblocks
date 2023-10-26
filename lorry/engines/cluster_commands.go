@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package engine
+package engines
 
 import (
 	"fmt"
@@ -28,32 +28,24 @@ import (
 )
 
 const (
-	stateMysql        = "mysql"
-	statePostgreSQL   = "postgresql"
-	stateRedis        = "redis"
-	stateMongoDB      = "mongodb"
-	stateNebula       = "nebula"
-	statePulsarBroker = "pulsar-broker"
-	statePulsarProxy  = "pulsar-proxy"
-	stateFoxLake      = "foxlake"
-	stateOceanbase    = "oceanbase"
+	HOST     = "host"
+	PORT     = "port"
+	USER     = "user"
+	PASSWORD = "password"
+	COMMAND  = "command"
 )
 
-const (
-	host     = "host"
-	port     = "port"
-	user     = "user"
-	password = "password"
-	command  = "command"
-)
+type NewCommandFunc func() ClusterCommands
 
 var (
-	envVarMap = map[string]string{
-		host:     "KB_HOST",
-		port:     "KB_PORT",
-		user:     "KB_USER",
-		password: "KB_PASSWD",
+	EnvVarMap = map[string]string{
+		HOST:     "KB_HOST",
+		PORT:     "KB_PORT",
+		USER:     "KB_USER",
+		PASSWORD: "KB_PASSWD",
 	}
+
+	NewCommandFuncs = map[string]NewCommandFunc{}
 )
 
 // AuthInfo is the authentication information for the database
@@ -77,29 +69,13 @@ type EngineInfo struct {
 	Database    string
 }
 
-func New(typeName string) (ClusterCommands, error) {
-	switch typeName {
-	case stateMysql:
-		return newMySQL(), nil
-	case statePostgreSQL:
-		return newPostgreSQL(), nil
-	case stateRedis:
-		return newRedis(), nil
-	case stateMongoDB:
-		return newMongoDB(), nil
-	case stateNebula:
-		return newNebula(), nil
-	case statePulsarBroker:
-		return newPulsar("broker"), nil
-	case statePulsarProxy:
-		return newPulsar("proxy"), nil
-	case stateFoxLake:
-		return newFoxLake(), nil
-	case stateOceanbase:
-		return newOceanbase(), nil
-	default:
+func NewClusterCommands(typeName string) (ClusterCommands, error) {
+	newFunc, ok := NewCommandFuncs[typeName]
+	if !ok {
 		return nil, fmt.Errorf("unsupported engine type: %s", typeName)
 	}
+
+	return newFunc(), nil
 }
 
 type ConnectionInfo struct {
@@ -113,9 +89,9 @@ type ConnectionInfo struct {
 	HeadlessEndpoint string
 }
 
-type buildConnectExample func(info *ConnectionInfo) string
+type BuildConnectExample func(info *ConnectionInfo) string
 
-func buildExample(info *ConnectionInfo, client string, examples map[ClientType]buildConnectExample) string {
+func BuildExample(info *ConnectionInfo, client string, examples map[ClientType]BuildConnectExample) string {
 	// if client is not specified, output all examples
 	if len(client) == 0 {
 		var keys = make([]string, len(examples))

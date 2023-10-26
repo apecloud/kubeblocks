@@ -31,11 +31,16 @@ import (
 
 	"github.com/apecloud/kubeblocks/lorry/engines"
 	"github.com/apecloud/kubeblocks/lorry/engines/etcd"
+	"github.com/apecloud/kubeblocks/lorry/engines/foxlake"
 	"github.com/apecloud/kubeblocks/lorry/engines/mongodb"
 	"github.com/apecloud/kubeblocks/lorry/engines/mysql"
+	"github.com/apecloud/kubeblocks/lorry/engines/nebula"
+	"github.com/apecloud/kubeblocks/lorry/engines/oceanbase"
 	"github.com/apecloud/kubeblocks/lorry/engines/polardbx"
+	"github.com/apecloud/kubeblocks/lorry/engines/postgres"
 	"github.com/apecloud/kubeblocks/lorry/engines/postgres/apecloudpostgres"
 	"github.com/apecloud/kubeblocks/lorry/engines/postgres/officalpostgres"
+	"github.com/apecloud/kubeblocks/lorry/engines/pulsar"
 	"github.com/apecloud/kubeblocks/lorry/engines/redis"
 	"github.com/apecloud/kubeblocks/lorry/engines/wesql"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -54,19 +59,25 @@ var configDir string
 func init() {
 	pflag.StringVar(&configDir, "config-path", "/config/lorry/components/", "Lorry default config directory for builtin type")
 
-	RegisterManagerNewFunc("mysql", "consensus", wesql.NewManager)
-	RegisterManagerNewFunc("mysql", "replication", mysql.NewManager)
-	RegisterManagerNewFunc("redis", "replication", redis.NewManager)
-	RegisterManagerNewFunc("etcd", "consensus", etcd.NewManager)
-	RegisterManagerNewFunc("mongodb", "consensus", mongodb.NewManager)
-	RegisterManagerNewFunc("polardbx", "consensus", polardbx.NewManager)
-	RegisterManagerNewFunc("postgresql", "replication", officalpostgres.NewManager)
-	RegisterManagerNewFunc("postgresql", "consensus", apecloudpostgres.NewManager)
+	RegisterEngine("mysql", "consensus", wesql.NewManager, mysql.NewCommands)
+	RegisterEngine("mysql", "replication", mysql.NewManager, mysql.NewCommands)
+	RegisterEngine("redis", "replication", redis.NewManager, redis.NewCommands)
+	RegisterEngine("etcd", "consensus", etcd.NewManager, nil)
+	RegisterEngine("mongodb", "consensus", mongodb.NewManager, mongodb.NewCommands)
+	RegisterEngine("polardbx", "consensus", polardbx.NewManager, mysql.NewCommands)
+	RegisterEngine("postgresql", "replication", officalpostgres.NewManager, postgres.NewCommands)
+	RegisterEngine("postgresql", "consensus", apecloudpostgres.NewManager, postgres.NewCommands)
+	RegisterEngine("foxlake", "", nil, foxlake.NewCommands)
+	RegisterEngine("nebula", "", nil, nebula.NewCommands)
+	RegisterEngine("pulsar-proxy", "", nil, pulsar.NewProxyCommands)
+	RegisterEngine("pulsar-broker", "", nil, pulsar.NewBrokerCommands)
+	RegisterEngine("oceanbase", "", nil, oceanbase.NewCommands)
 }
 
-func RegisterManagerNewFunc(characterType, workloadType string, newFunc managerNewFunc) {
+func RegisterEngine(characterType, workloadType string, newFunc managerNewFunc, newCommand engines.NewCommandFunc) {
 	key := strings.ToLower(characterType + "_" + workloadType)
 	managerNewFuncs[key] = newFunc
+	engines.NewCommandFuncs[characterType] = newCommand
 }
 
 func GetManagerNewFunc(characterType, workloadType string) managerNewFunc {

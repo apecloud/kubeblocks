@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package engine
+package postgres
 
 import (
 	"fmt"
@@ -25,32 +25,34 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/apecloud/kubeblocks/lorry/engines"
 )
 
-var _ ClusterCommands = &postgresql{}
+var _ engines.ClusterCommands = &Commands{}
 
-type postgresql struct {
-	info     EngineInfo
-	examples map[ClientType]buildConnectExample
+type Commands struct {
+	info     engines.EngineInfo
+	examples map[engines.ClientType]engines.BuildConnectExample
 }
 
-func newPostgreSQL() *postgresql {
-	return &postgresql{
-		info: EngineInfo{
+func NewCommands() engines.ClusterCommands {
+	return &Commands{
+		info: engines.EngineInfo{
 			Client:      "psql",
 			Container:   "postgresql",
 			PasswordEnv: "$PGPASSWORD",
 			UserEnv:     "$PGUSER",
 			Database:    "postgres",
 		},
-		examples: map[ClientType]buildConnectExample{
-			CLI: func(info *ConnectionInfo) string {
+		examples: map[engines.ClientType]engines.BuildConnectExample{
+			engines.CLI: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# psql client connection example
 psql -h%s -p %s -U %s %s
 `, info.Host, info.Port, info.User, info.Database)
 			},
 
-			DJANGO: func(info *ConnectionInfo) string {
+			engines.DJANGO: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# .env
 DB_HOST=%s
 DB_NAME=%s
@@ -72,14 +74,14 @@ DATABASES = {
 `, info.Host, info.Database, info.User, info.Password, info.Port)
 			},
 
-			DOTNET: func(info *ConnectionInfo) string {
+			engines.DOTNET: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# Startup.cs
 var connectionString = "Host=%s;Port=%s;Username=%s;Password=%s;Database=%s";
 await using var dataSource = NpgsqlDataSource.Create(connectionString);
 `, info.Host, info.Port, info.User, info.Password, info.Database)
 			},
 
-			GO: func(info *ConnectionInfo) string {
+			engines.GO: func(info *engines.ConnectionInfo) string {
 				const goConnectExample = `# main.go
 package main
 
@@ -111,14 +113,14 @@ DSN=%s:%s@tcp(%s:%s)/%s
 				return fmt.Sprintf("%s\n%s", dsn, goConnectExample)
 			},
 
-			JAVA: func(info *ConnectionInfo) string {
+			engines.JAVA: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`Class.forName("org.postgresql.Driver");
 Connection conn = DriverManager.getConnection(
   "jdbc:postgresql://%s:%s/%s?user=%s&password=%s");
 `, info.Host, info.Port, info.Database, info.User, info.Password)
 			},
 
-			NODEJS: func(info *ConnectionInfo) string {
+			engines.NODEJS: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# .env
 DATABASE_URL='postgres://%s:%s@%s:%s/%s'
 
@@ -130,7 +132,7 @@ connection.end();
 `, info.User, info.Password, info.Host, info.Port, info.Database)
 			},
 
-			PHP: func(info *ConnectionInfo) string {
+			engines.PHP: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# .env
 HOST=%s
 PORT=%s
@@ -146,7 +148,7 @@ DATABASE=%s
 `, info.Host, info.Port, info.User, info.Password, info.Database)
 			},
 
-			PRISMA: func(info *ConnectionInfo) string {
+			engines.PRISMA: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# .env
 DATABASE_URL='postgres://%s:%s@%s:%s/%s'
 
@@ -163,7 +165,7 @@ datasource db {
 `, info.User, info.Password, info.Host, info.Port, info.Database)
 			},
 
-			PYTHON: func(info *ConnectionInfo) string {
+			engines.PYTHON: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# run the following command in the terminal to install dependencies
 pip install python-dotenv psycopg2
 
@@ -190,7 +192,7 @@ connection = psycopg2.connect(
 `, info.Host, info.Port, info.User, info.Password, info.Database)
 			},
 
-			RAILS: func(info *ConnectionInfo) string {
+			engines.RAILS: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# Gemfile
 gem 'pg'
 
@@ -205,7 +207,7 @@ development:
 `, info.Database, info.User, info.Host, info.Password)
 			},
 
-			RUST: func(info *ConnectionInfo) string {
+			engines.RUST: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# run the following command in the terminal
 export DATABASE_URL="postgresql://%s:%s@%s:%s/%s"
 
@@ -225,7 +227,7 @@ version = "0.0.1"
 `, info.User, info.Password, info.Host, info.Port, info.Database)
 			},
 
-			SYMFONY: func(info *ConnectionInfo) string {
+			engines.SYMFONY: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# .env
 DATABASE_URL='postgresql://%s:%s@%s:%s/%s'
 `, info.User, info.Password, info.Host, info.Port, info.Database)
@@ -234,7 +236,7 @@ DATABASE_URL='postgresql://%s:%s@%s:%s/%s'
 	}
 }
 
-func (m *postgresql) ConnectCommand(connectInfo *AuthInfo) []string {
+func (m *Commands) ConnectCommand(connectInfo *engines.AuthInfo) []string {
 	userName := m.info.UserEnv
 	userPass := m.info.PasswordEnv
 
@@ -249,18 +251,18 @@ func (m *postgresql) ConnectCommand(connectInfo *AuthInfo) []string {
 	return []string{"sh", "-c", strings.Join(cmd, " ")}
 }
 
-func (m *postgresql) Container() string {
+func (m *Commands) Container() string {
 	return m.info.Container
 }
 
-func (m *postgresql) ConnectExample(info *ConnectionInfo, client string) string {
+func (m *Commands) ConnectExample(info *engines.ConnectionInfo, client string) string {
 	if len(info.Database) == 0 {
 		info.Database = m.info.Database
 	}
-	return buildExample(info, client, m.examples)
+	return engines.BuildExample(info, client, m.examples)
 }
 
-func (m *postgresql) ExecuteCommand(scripts []string) ([]string, []corev1.EnvVar, error) {
+func (m *Commands) ExecuteCommand(scripts []string) ([]string, []corev1.EnvVar, error) {
 	cmd := []string{}
 	cmd = append(cmd, "/bin/sh", "-c", "-ex")
 	args := []string{}
@@ -275,15 +277,15 @@ func (m *postgresql) ExecuteCommand(scripts []string) ([]string, []corev1.EnvVar
 	envVars := []corev1.EnvVar{
 		{
 			Name:  "PGHOST",
-			Value: fmt.Sprintf("$(%s)", envVarMap[host]),
+			Value: fmt.Sprintf("$(%s)", engines.EnvVarMap[engines.HOST]),
 		},
 		{
 			Name:  "PGUSER",
-			Value: fmt.Sprintf("$(%s)", envVarMap[user]),
+			Value: fmt.Sprintf("$(%s)", engines.EnvVarMap[engines.USER]),
 		},
 		{
 			Name:  "PGPASSWORD",
-			Value: fmt.Sprintf("$(%s)", envVarMap[password]),
+			Value: fmt.Sprintf("$(%s)", engines.EnvVarMap[engines.PASSWORD]),
 		},
 		{
 			Name:  "PGDATABASE",

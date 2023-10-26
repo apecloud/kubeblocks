@@ -17,33 +17,35 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package engine
+package mongodb
 
 import (
 	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/apecloud/kubeblocks/lorry/engines"
 )
 
-var _ ClusterCommands = &mongodb{}
+var _ engines.ClusterCommands = &Commands{}
 
-type mongodb struct {
-	info     EngineInfo
-	examples map[ClientType]buildConnectExample
+type Commands struct {
+	info     engines.EngineInfo
+	examples map[engines.ClientType]engines.BuildConnectExample
 }
 
-func newMongoDB() *mongodb {
-	return &mongodb{
-		info: EngineInfo{
+func NewCommands() engines.ClusterCommands {
+	return &Commands{
+		info: engines.EngineInfo{
 			Client:      "mongosh",
 			Container:   "mongodb",
 			UserEnv:     "$MONGODB_ROOT_USER",
 			PasswordEnv: "$MONGODB_ROOT_PASSWORD",
 			Database:    "admin",
 		},
-		examples: map[ClientType]buildConnectExample{
-			CLI: func(info *ConnectionInfo) string {
+		examples: map[engines.ClientType]engines.BuildConnectExample{
+			engines.CLI: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# mongodb client connection example
 mongosh mongodb://%s:%s@%s/%s
 `, info.User, info.Password, info.Host, info.Database)
@@ -52,7 +54,7 @@ mongosh mongodb://%s:%s@%s/%s
 	}
 }
 
-func (r mongodb) ConnectCommand(connectInfo *AuthInfo) []string {
+func (r Commands) ConnectCommand(connectInfo *engines.AuthInfo) []string {
 	userName := r.info.UserEnv
 	userPass := r.info.PasswordEnv
 
@@ -66,17 +68,17 @@ func (r mongodb) ConnectCommand(connectInfo *AuthInfo) []string {
 	return []string{"sh", "-c", strings.Join(mongodbCmd, " ")}
 }
 
-func (r mongodb) Container() string {
+func (r Commands) Container() string {
 	return r.info.Container
 }
 
-func (r mongodb) ConnectExample(info *ConnectionInfo, client string) string {
+func (r Commands) ConnectExample(info *engines.ConnectionInfo, client string) string {
 	if len(info.Database) == 0 {
 		info.Database = r.info.Database
 	}
-	return buildExample(info, client, r.examples)
+	return engines.BuildExample(info, client, r.examples)
 }
 
-func (r mongodb) ExecuteCommand([]string) ([]string, []corev1.EnvVar, error) {
+func (r Commands) ExecuteCommand([]string) ([]string, []corev1.EnvVar, error) {
 	return nil, nil, fmt.Errorf("%s not implemented", r.info.Client)
 }

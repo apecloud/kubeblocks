@@ -17,29 +17,16 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package engine
+package foxlake
 
 import (
-	"fmt"
+	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Foxlake Engine", func() {
-	It("connection example", func() {
-		foxlake := newFoxLake()
-
-		info := &ConnectionInfo{
-			User:     "user",
-			Host:     "host",
-			Password: "*****",
-			Port:     "1234",
-		}
-		for k := range foxlake.examples {
-			fmt.Printf("%s Connection Example\n", k.String())
-			fmt.Println(foxlake.ConnectExample(info, k.String()))
-		}
-
-		fmt.Println(foxlake.ConnectExample(info, ""))
-	})
-})
+func TestEngine(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "foxlake Suite")
+}

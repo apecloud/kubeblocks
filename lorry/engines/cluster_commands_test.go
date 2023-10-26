@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package engine
+package engines
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -26,8 +26,9 @@ import (
 
 var _ = Describe("Engine", func() {
 	It("new engine", func() {
-		for _, typeName := range []string{stateMysql, statePostgreSQL, stateRedis, statePostgreSQL, stateNebula, stateFoxLake} {
-			engine, _ := New(typeName)
+		for _, engineType := range []EngineType{MySQL, PostgreSQL, Redis, PostgreSQL, Nebula, FoxLake} {
+			typeName := string(engineType)
+			engine, _ := NewClusterCommands(typeName)
 			Expect(engine).ShouldNot(BeNil())
 
 			url := engine.ConnectCommand(nil)
@@ -35,7 +36,7 @@ var _ = Describe("Engine", func() {
 			// it is a tricky way to check the container name
 			// for the moment, we only support mysql, postgresql and redis
 			// and the container name is the same as the state name
-			if typeName == stateMysql {
+			if typeName == string(MySQL) {
 				// for wesql vtgate component we wuold use the first container, but its name is not mysql
 				Expect(engine.Container()).Should(Equal(""))
 			} else {
@@ -47,21 +48,23 @@ var _ = Describe("Engine", func() {
 
 	It("new unknown engine", func() {
 		typeName := "unknown-type"
-		engine, err := New(typeName)
+		engine, err := NewClusterCommands(typeName)
 		Expect(engine).Should(BeNil())
 		Expect(err).Should(HaveOccurred())
 	})
 
 	It("new execute command ", func() {
-		for _, typeName := range []string{stateMysql, statePostgreSQL, stateRedis} {
-			engine, _ := New(typeName)
+		for _, engineType := range []EngineType{MySQL, PostgreSQL, Redis} {
+			typeName := string(engineType)
+			engine, _ := NewClusterCommands(typeName)
 			Expect(engine).ShouldNot(BeNil())
 
 			_, _, err := engine.ExecuteCommand([]string{"some", "cmd"})
 			Expect(err).Should(Succeed())
 		}
-		for _, typeName := range []string{stateMongoDB, stateNebula} {
-			engine, _ := New(typeName)
+		for _, engineType := range []EngineType{MongoDB, Nebula} {
+			typeName := string(engineType)
+			engine, _ := NewClusterCommands(typeName)
 			Expect(engine).ShouldNot(BeNil())
 
 			_, _, err := engine.ExecuteCommand([]string{"some", "cmd"})

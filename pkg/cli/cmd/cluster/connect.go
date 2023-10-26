@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/lorry/engine"
+	"github.com/apecloud/kubeblocks/lorry/engines"
 	"github.com/apecloud/kubeblocks/pkg/cli/cluster"
 	"github.com/apecloud/kubeblocks/pkg/cli/exec"
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
@@ -78,7 +78,7 @@ type ConnectOptions struct {
 	clientType   string
 	showExample  bool
 	showPassword bool
-	engine       engine.ClusterCommands
+	engine       engines.ClusterCommands
 
 	privateEndPoint bool
 	svc             *corev1.Service
@@ -123,7 +123,7 @@ func NewConnectCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra
 
 	util.CheckErr(cmd.RegisterFlagCompletionFunc("client", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var types []string
-		for _, t := range engine.ClientTypes() {
+		for _, t := range engines.ClientTypes() {
 			if strings.HasPrefix(t, toComplete) {
 				types = append(types, t)
 			}
@@ -254,13 +254,13 @@ func (o *ConnectOptions) connect() error {
 
 	var err error
 
-	if o.engine, err = engine.New(o.componentDef.CharacterType); err != nil {
+	if o.engine, err = engines.NewClusterCommands(o.componentDef.CharacterType); err != nil {
 		return err
 	}
 
-	var authInfo *engine.AuthInfo
+	var authInfo *engines.AuthInfo
 	if len(o.userName) > 0 {
-		authInfo = &engine.AuthInfo{}
+		authInfo = &engines.AuthInfo{}
 		authInfo.UserName = o.userName
 		authInfo.UserPasswd = o.userPasswd
 	} else if authInfo, err = o.getAuthInfo(); err != nil {
@@ -275,7 +275,7 @@ func (o *ConnectOptions) connect() error {
 	return o.ExecOptions.Run()
 }
 
-func (o *ConnectOptions) getAuthInfo() (*engine.AuthInfo, error) {
+func (o *ConnectOptions) getAuthInfo() (*engines.AuthInfo, error) {
 	// select secrets by labels, admin account is preferred
 	labels := fmt.Sprintf("%s=%s,%s=%s,%s=%s",
 		constant.AppInstanceLabelKey, o.clusterName,
@@ -290,7 +290,7 @@ func (o *ConnectOptions) getAuthInfo() (*engine.AuthInfo, error) {
 	if len(secrets.Items) == 0 {
 		return nil, nil
 	}
-	return &engine.AuthInfo{
+	return &engines.AuthInfo{
 		UserName:   string(secrets.Items[0].Data["username"]),
 		UserPasswd: string(secrets.Items[0].Data["password"]),
 	}, nil
@@ -332,13 +332,13 @@ func (o *ConnectOptions) getTargetPod() error {
 	return nil
 }
 
-func (o *ConnectOptions) getConnectionInfo() (*engine.ConnectionInfo, error) {
+func (o *ConnectOptions) getConnectionInfo() (*engines.ConnectionInfo, error) {
 	// make sure component and componentDef are set before this step
 	if o.component == nil || o.componentDef == nil {
 		return nil, fmt.Errorf("failed to get component or component def")
 	}
 
-	info := &engine.ConnectionInfo{}
+	info := &engines.ConnectionInfo{}
 	getter := cluster.ObjectsGetter{
 		Client:    o.Client,
 		Dynamic:   o.Dynamic,
@@ -389,7 +389,7 @@ func (o *ConnectOptions) getConnectionInfo() (*engine.ConnectionInfo, error) {
 		return nil, fmt.Errorf("failed to find any cluster endpoints")
 	}
 
-	if o.engine, err = engine.New(o.componentDef.CharacterType); err != nil {
+	if o.engine, err = engines.NewClusterCommands(o.componentDef.CharacterType); err != nil {
 		return nil, err
 	}
 

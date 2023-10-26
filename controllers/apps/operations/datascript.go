@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/lorry/engine"
+	"github.com/apecloud/kubeblocks/lorry/engines"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	componetutil "github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -239,7 +239,7 @@ func getTargetService(reqCtx intctrlutil.RequestCtx, cli client.Client, clusterO
 
 func buildDataScriptJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster, component *appsv1alpha1.ClusterComponentSpec,
 	ops *appsv1alpha1.OpsRequest, charType string) ([]*batchv1.Job, error) {
-	engineForJob, err := engine.New(charType)
+	engineForJob, err := engines.NewClusterCommands(charType)
 	if err != nil || engineForJob == nil {
 		return nil, &FastFaileError{message: err.Error()}
 	}

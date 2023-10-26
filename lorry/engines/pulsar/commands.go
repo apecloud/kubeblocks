@@ -17,47 +17,57 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package engine
+package pulsar
 
 import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/apecloud/kubeblocks/lorry/engines"
 )
 
-type pulsar struct {
-	info     EngineInfo
-	examples map[ClientType]buildConnectExample
+type Commands struct {
+	info     engines.EngineInfo
+	examples map[engines.ClientType]engines.BuildConnectExample
 }
 
-var _ ClusterCommands = &pulsar{}
+var _ engines.ClusterCommands = &Commands{}
 
-func newPulsar(containName string) *pulsar {
-	return &pulsar{
-		info: EngineInfo{
+func NewBrokerCommands() engines.ClusterCommands {
+	return NewCommands("broker")
+}
+
+func NewProxyCommands() engines.ClusterCommands {
+	return NewCommands("proxy")
+}
+
+func NewCommands(containName string) engines.ClusterCommands {
+	return &Commands{
+		info: engines.EngineInfo{
 			Client:    "pulsar-shell",
 			Container: containName,
 		},
-		examples: map[ClientType]buildConnectExample{
-			CLI: func(info *ConnectionInfo) string {
+		examples: map[engines.ClientType]engines.BuildConnectExample{
+			engines.CLI: func(info *engines.ConnectionInfo) string {
 				return "# pulsar client connection example\n bin/pulsar-shell"
 			},
 		},
 	}
 }
 
-func (r *pulsar) ConnectCommand(connectInfo *AuthInfo) []string {
+func (r *Commands) ConnectCommand(connectInfo *engines.AuthInfo) []string {
 	return []string{"sh", "-c", "bin/pulsar-shell"}
 }
 
-func (r *pulsar) Container() string {
+func (r *Commands) Container() string {
 	return r.info.Container
 }
 
-func (r *pulsar) ConnectExample(info *ConnectionInfo, client string) string {
-	return buildExample(info, client, r.examples)
+func (r *Commands) ConnectExample(info *engines.ConnectionInfo, client string) string {
+	return engines.BuildExample(info, client, r.examples)
 }
 
-func (r *pulsar) ExecuteCommand([]string) ([]string, []corev1.EnvVar, error) {
+func (r *Commands) ExecuteCommand([]string) ([]string, []corev1.EnvVar, error) {
 	return nil, nil, fmt.Errorf("%s not implemented", r.info.Client)
 }

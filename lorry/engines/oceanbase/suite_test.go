@@ -17,30 +17,16 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package engine
+package oceanbase
 
 import (
-	"fmt"
+	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Mysql Engine", func() {
-	It("connection example", func() {
-		mysql := newMySQL()
-
-		info := &ConnectionInfo{
-			User:     "user",
-			Host:     "host",
-			Password: "*****",
-			Database: "test-db",
-			Port:     "1234",
-		}
-		for k := range mysql.examples {
-			fmt.Printf("%s Connection Example\n", k.String())
-			fmt.Println(mysql.ConnectExample(info, k.String()))
-		}
-
-		fmt.Println(mysql.ConnectExample(info, ""))
-	})
-})
+func TestEngine(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "oceanbase Suite")
+}

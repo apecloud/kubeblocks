@@ -66,6 +66,7 @@ var _ = Describe("Backup Deleter Test", func() {
 		// non-namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ActionSetSignature, true, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.StorageClassSignature, true, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeSignature, true, ml)
 	}
 
 	BeforeEach(func() {
@@ -119,7 +120,7 @@ var _ = Describe("Backup Deleter Test", func() {
 			By("create restore")
 			restoreFactory := testdp.NewRestoreactory(testCtx.DefaultNamespace, testdp.RestoreName).
 				SetBackup(backup.Name, testCtx.DefaultNamespace).
-				SetShedulingSpec(schedulingSpec)
+				SetSchedulingSpec(schedulingSpec)
 
 			change(restoreFactory)
 
@@ -189,7 +190,7 @@ var _ = Describe("Backup Deleter Test", func() {
 			checkPVC(startingIndex, useVolumeSnapshot)
 		})
 
-		It("test with BuildPrepareDataJobs function and Parallel volumeManagementPolicy", func() {
+		It("test with BuildPrepareDataJobs function and Parallel volumeRestorePolicy", func() {
 			reqCtx := getReqCtx()
 			startingIndex := 1
 			restoreMGR, backupSet := initResources(reqCtx, startingIndex, false, func(f *testdp.MockRestoreFactory) {
@@ -208,13 +209,13 @@ var _ = Describe("Backup Deleter Test", func() {
 			checkPVC(startingIndex, false)
 		})
 
-		It("test with BuildPrepareDataJobs function and Serial volumeManagementPolicy", func() {
+		It("test with BuildPrepareDataJobs function and Serial volumeRestorePolicy", func() {
 			reqCtx := getReqCtx()
 			startingIndex := 1
 			restoreMGR, backupSet := initResources(reqCtx, startingIndex, false, func(f *testdp.MockRestoreFactory) {
 				f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
 					testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex)).
-					SetVolumeRestoreManagementPolicy(dpv1alpha1.SerialManagementPolicy)
+					SetVolumeClaimRestorePolicy(dpv1alpha1.VolumeClaimRestorePolicySerial)
 			})
 
 			actionSetName := "preparedata-0"

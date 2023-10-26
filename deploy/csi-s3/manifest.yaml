@@ -4,10 +4,10 @@ helm_chart:
 requirements:
   k8s_version: ">=1.13"
 images:
-  - full: images.attacher
-  - full: images.registrar
-  - full: images.provisioner
-  - full: images.csi
+  - full: "images.defaultImage.registry/images.attacher.repository:images.attacher.tag"
+  - full: "images.defaultImage.registry/images.registrar.repository:images.registrar.tag"
+  - full: "images.defaultImage.registry/images.attacher.provisioner:images.provisioner.tag"
+  - full: "images.defaultImage.registry/images.csi:images.csi.tag"
 user_values:
   - name: storageClass.create
     title:

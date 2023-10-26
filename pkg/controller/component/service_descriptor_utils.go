@@ -38,19 +38,19 @@ import (
 
 func GenServiceReferencesLegacy(reqCtx intctrlutil.RequestCtx,
 	cli roclient.ReadonlyClient,
+	clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterVer *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster,
-	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
-	clusterCompVer *appsv1alpha1.ClusterComponentVersion,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (map[string]*appsv1alpha1.ServiceDescriptor, error) {
 	var (
 		compDef *appsv1alpha1.ComponentDefinition
 		comp    *appsv1alpha1.Component
 		err     error
 	)
-	if compDef, err = BuildComponentDefinitionFrom(clusterCompDef, clusterCompVer, cluster.Name); err != nil {
+	if compDef, err = BuildComponentDefinitionLow(clusterDef, clusterVer, cluster, clusterCompSpec); err != nil {
 		return nil, err
 	}
-	if comp, err = BuildComponentFrom(cluster, clusterCompDef, clusterCompVer, clusterCompSpec); err != nil {
+	if comp, err = BuildProtoComponent(cluster, clusterCompSpec); err != nil {
 		return nil, err
 	}
 	return GenServiceReferences(reqCtx, cli, cluster, compDef, comp)

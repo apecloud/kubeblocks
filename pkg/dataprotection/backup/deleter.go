@@ -235,7 +235,9 @@ func (d *Deleter) DeleteVolumeSnapshots(backup *dpv1alpha1.Backup) error {
 
 	snaps := &vsv1.VolumeSnapshotList{}
 	if err := vsCli.List(snaps, client.InNamespace(backup.Namespace),
-		client.MatchingLabels(BuildBackupWorkloadLabels(backup))); err != nil {
+		client.MatchingLabels(map[string]string{
+			dptypes.BackupNameLabelKey: backup.Name,
+		})); err != nil {
 		return client.IgnoreNotFound(err)
 	}
 

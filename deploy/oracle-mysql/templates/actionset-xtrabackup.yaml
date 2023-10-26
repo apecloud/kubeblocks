@@ -9,18 +9,18 @@ spec:
   backupType: Full
   env:
   - name: DATA_DIR
-    value: /var/lib/mysql
+    value: {{ .Values.dataMountPath }}
   backup:
     preBackup: []
     postBackup: []
     backupData:
       image: docker.io/perconalab/percona-xtrabackup:8.0.32
-      runOnTargetPodNode: false
+      runOnTargetPodNode: true
       command:
       - bash
       - -c
       - |
-        {{- .Files.Get "dataprotection/bakcup.sh" | nindent 8 }}
+        {{- .Files.Get "dataprotection/backup.sh" | nindent 8 }}
       syncProgress:
         enabled: true
         intervalSeconds: 5

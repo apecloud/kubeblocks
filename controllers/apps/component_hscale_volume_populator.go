@@ -456,11 +456,8 @@ func isVolumeSnapshotEnabled(ctx context.Context, cli client.Client,
 	if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
-	if pvc.Spec.StorageClassName == nil {
-		return false, nil
-	}
 
-	return intctrlutil.IsVolumeSnapshotEnabled(ctx, cli, *pvc.Spec.StorageClassName)
+	return intctrlutil.IsVolumeSnapshotEnabled(ctx, cli, pvc.Spec.VolumeName)
 }
 
 func getBackupMethods(backupPolicy *dpv1alpha1.BackupPolicy, useVolumeSnapshot bool) []string {

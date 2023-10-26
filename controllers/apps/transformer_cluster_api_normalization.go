@@ -56,7 +56,7 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	}
 	for i, compSpec := range transCtx.ComponentSpecs {
 		if len(compSpec.ComponentDef) == 0 {
-			compDef, err := t.buildComponentDefinition(transCtx, compSpec)
+			compDef, err := component.BuildComponentDefinitionLow(transCtx.ClusterDef, transCtx.ClusterVer, cluster, compSpec)
 			if err != nil {
 				return err
 			}
@@ -69,20 +69,4 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 		}
 	}
 	return nil
-}
-
-func (t *ClusterAPINormalizationTransformer) buildComponentDefinition(transCtx *clusterTransformContext,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ComponentDefinition, error) {
-	if clusterCompSpec.ComponentDefRef == "" {
-		return nil, fmt.Errorf("expected cluster component def ref is empty: %s-%s", transCtx.Cluster.Name, clusterCompSpec.Name)
-	}
-	clusterCompDef := transCtx.ClusterDef.GetComponentDefByName(clusterCompSpec.ComponentDefRef)
-	if clusterCompDef == nil {
-		return nil, fmt.Errorf("referenced cluster component def is not defined: %s-%s", transCtx.Cluster.Name, clusterCompSpec.Name)
-	}
-	var clusterCompVer *appsv1alpha1.ClusterComponentVersion
-	if transCtx.ClusterVer != nil {
-		clusterCompVer = transCtx.ClusterVer.Spec.GetDefNameMappingComponents()[clusterCompSpec.ComponentDefRef]
-	}
-	return component.BuildComponentDefinitionFrom(clusterCompDef, clusterCompVer, transCtx.Cluster.Name)
 }

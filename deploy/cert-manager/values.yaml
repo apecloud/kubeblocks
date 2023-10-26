@@ -1,1 +1,13 @@
 version: "v1.12.3"
+
+images:
+  defaultImage:
+    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+    pullPolicy: IfNotPresent
+    tag: v1.12.3
+  cainjector:
+    repository: apecloud/cert-manager-cainjector
+  controller:
+    repository: apecloud/cert-manager-controller
+  webhook:
+    repository: apecloud/cert-manager-webhook

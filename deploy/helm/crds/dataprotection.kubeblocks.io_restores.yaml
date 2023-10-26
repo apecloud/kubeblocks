@@ -1430,9 +1430,9 @@ spec:
                     x-kubernetes-validations:
                     - message: forbidden to update spec.prepareDataConfig.schedulingSpec
                       rule: self == oldSelf
-                  volumeClaimManagementPolicy:
+                  volumeClaimRestorePolicy:
                     default: Parallel
-                    description: 'VolumeClaimManagementPolicy defines recovery strategy
+                    description: 'VolumeClaimRestorePolicy defines restore policy
                       for persistent volume claim. Supported policies are as follows:
                       1. Parallel: parallel recovery of persistent volume claim. 2.
                       Serial: restore the persistent volume claim in sequence, and
@@ -2011,7 +2011,7 @@ spec:
                     - message: forbidden to update spec.prepareDataConfig.volumeClaimsTemplate
                       rule: self == oldSelf
                 required:
-                - volumeClaimManagementPolicy
+                - volumeClaimRestorePolicy
                 type: object
               readyConfig:
                 description: configuration for the action of "postReady" phase.

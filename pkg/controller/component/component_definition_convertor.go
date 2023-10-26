@@ -31,8 +31,8 @@ import (
 
 // TODO(component): type check
 
-// BuildComponentDefinitionFrom builds a ComponentDefinition from a ClusterComponentDefinition and a ClusterComponentVersion.
-func BuildComponentDefinitionFrom(clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
+// buildComponentDefinitionFrom builds a ComponentDefinition from a ClusterComponentDefinition and a ClusterComponentVersion.
+func buildComponentDefinitionFrom(clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
 	clusterCompVer *appsv1alpha1.ClusterComponentVersion,
 	clusterName string) (*appsv1alpha1.ComponentDefinition, error) {
 	if clusterCompDef == nil {

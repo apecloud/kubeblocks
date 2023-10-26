@@ -41,7 +41,7 @@ var _ = Describe("cluster util", func() {
 	baseObjsWithBackupPods := func() []runtime.Object {
 		podsWithBackup := testing.FakePods(4, testing.Namespace, testing.ClusterName)
 		labels := podsWithBackup.Items[0].GetLabels()
-		labels[dptypes.DataProtectionLabelBackupNameKey] = testing.BackupName
+		labels[dptypes.BackupNameLabelKey] = testing.BackupName
 		podsWithBackup.Items[0].SetLabels(labels)
 		return []runtime.Object{
 			podsWithBackup,

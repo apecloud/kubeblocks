@@ -20,11 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
@@ -50,15 +48,10 @@ func (t *ComponentConfigurationTransformer) Transform(ctx graph.TransformContext
 		return nil
 	}
 
-	// get rsm and dependOnObjs which will be used in configuration render
-	var rsm *workloads.ReplicatedStateMachine
+	// get dependOnObjs which will be used in configuration render
 	var dependOnObjs []client.Object
 	for _, vertex := range dag.Vertices() {
 		v, _ := vertex.(*model.ObjectVertex)
-		if rsmV, ok := v.Obj.(*workloads.ReplicatedStateMachine); ok {
-			rsm = rsmV
-			continue
-		}
 		if cm, ok := v.Obj.(*corev1.ConfigMap); ok {
 			dependOnObjs = append(dependOnObjs, cm)
 			continue
@@ -67,10 +60,6 @@ func (t *ComponentConfigurationTransformer) Transform(ctx graph.TransformContext
 			dependOnObjs = append(dependOnObjs, secret)
 			continue
 		}
-	}
-
-	if rsm == nil {
-		return errors.New("rsm workload not found")
 	}
 
 	// configuration render
@@ -89,7 +78,6 @@ func (t *ComponentConfigurationTransformer) Transform(ctx graph.TransformContext
 		nil,
 		cluster,
 		synthesizeComp,
-		rsm,
 		synthesizeComp.PodSpec,
 		dependOnObjs); err != nil {
 		return err

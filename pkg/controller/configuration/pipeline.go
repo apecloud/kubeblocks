@@ -43,8 +43,7 @@ type ReconcileCtx struct {
 	Component  *component.SynthesizedComponent
 	PodSpec    *corev1.PodSpec
 
-	Object client.Object
-	Cache  []client.Object
+	Cache []client.Object
 }
 
 type pipeline struct {
@@ -192,9 +191,6 @@ func (p *pipeline) BuildConfigManagerSidecar() *pipeline {
 
 func (p *pipeline) UpdateConfigRelatedObject() *pipeline {
 	updateMeta := func() error {
-		if p.ctx.Object != nil {
-			updateResourceAnnotationsWithTemplate(p.ctx.Object, p.renderWrapper.templateAnnotations)
-		}
 		if err := injectTemplateEnvFrom(p.ctx.Cluster, p.ctx.Component, p.ctx.PodSpec, p.Client, p.Context, p.renderWrapper.renderedObjs); err != nil {
 			return err
 		}

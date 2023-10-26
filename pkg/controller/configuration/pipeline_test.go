@@ -27,7 +27,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/golang/mock/gomock"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,7 +36,6 @@ import (
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -55,12 +53,6 @@ var _ = Describe("ConfigurationPipelineTest", func() {
 	var configConstraint *appsv1alpha1.ConfigConstraint
 	var configurationObj *appsv1alpha1.Configuration
 	var k8sMockClient *testutil.K8sClientMockHelper
-
-	mockStatefulSet := func() *appsv1.StatefulSet {
-		stsObj, err := factory.BuildSts(clusterObj, clusterComponent)
-		Expect(err).Should(Succeed())
-		return stsObj
-	}
 
 	mockAPIResource := func(lazyFetcher testutil.Getter) {
 		k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult(
@@ -154,7 +146,6 @@ max_connections = '1000'
 				ClusterVer: clusterVersionObj,
 				Component:  clusterComponent,
 				PodSpec:    clusterComponent.PodSpec,
-				Object:     mockStatefulSet(),
 			})
 
 			By("mock api resource for configuration")
@@ -173,7 +164,7 @@ max_connections = '1000'
 
 			err := createPipeline.Prepare().
 				UpdateConfiguration(). // reconcile Configuration
-				Configuration().       // sync Configuration
+				Configuration(). // sync Configuration
 				CreateConfigTemplate().
 				UpdatePodVolumes().
 				BuildConfigManagerSidecar().

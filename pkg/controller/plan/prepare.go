@@ -36,7 +36,6 @@ func RenderConfigNScriptFiles(resourceCtx *intctrlutil.ResourceCtx,
 	clusterVersion *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
-	compObject client.Object,
 	podSpec *corev1.PodSpec,
 	localObjs []client.Object) error {
 	return configuration.NewConfigReconcileTask(
@@ -44,7 +43,6 @@ func RenderConfigNScriptFiles(resourceCtx *intctrlutil.ResourceCtx,
 		cluster,
 		clusterVersion,
 		component,
-		compObject,
 		podSpec,
 		localObjs).Reconcile()
 }

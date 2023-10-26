@@ -66,6 +66,11 @@ const (
 )
 
 var (
+	defaultBuiltinHandler         = "default"
+	defaultLifecycleActionHandler = &appsv1alpha1.LifecycleActionHandler{
+		BuiltinHandler: &defaultBuiltinHandler,
+	}
+
 	zeroResRequirements = corev1.ResourceRequirements{
 		Limits: map[corev1.ResourceName]resource.Quantity{
 			corev1.ResourceCPU:    resource.MustParse("0"),
@@ -242,6 +247,134 @@ var (
 			Name: DataVolumeName,
 			Type: appsv1alpha1.VolumeTypeData,
 		}},
+	}
+
+	defaultComponentDefSpec = appsv1alpha1.ComponentDefinitionSpec{
+		Provider:       "kubeblocks.io",
+		Description:    "ApeCloud MySQL is a database that is compatible with MySQL syntax and achieves high availability\n  through the utilization of the RAFT consensus protocol.",
+		ServiceKind:    "mysql",
+		ServiceVersion: "8.0.30",
+		Runtime: corev1.PodSpec{
+			Containers: []corev1.Container{
+				defaultMySQLContainer,
+			},
+		},
+		Volumes: []appsv1alpha1.ComponentVolume{
+			{
+				Name:         DataVolumeName,
+				NeedSnapshot: true,
+			},
+			{
+				Name:         LogVolumeName,
+				NeedSnapshot: true,
+			},
+		},
+		Services: []appsv1alpha1.ComponentService{
+			{
+				Name:        "default",
+				ServiceName: "rw",
+				ServiceSpec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Protocol: corev1.ProtocolTCP,
+							Port:     3306,
+							TargetPort: intstr.IntOrString{
+								Type:   intstr.String,
+								StrVal: "mysql",
+							},
+						},
+					},
+				},
+				RoleSelector: []string{"leader"},
+			},
+			{
+				Name:        "ro",
+				ServiceName: "ro",
+				ServiceSpec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Protocol: corev1.ProtocolTCP,
+							Port:     3306,
+							TargetPort: intstr.IntOrString{
+								Type:   intstr.String,
+								StrVal: "mysql",
+							},
+						},
+					},
+				},
+				RoleSelector: []string{"follower"},
+			},
+		},
+		SystemAccounts: []appsv1alpha1.ComponentSystemAccount{
+			{
+				Name:                "root",
+				IsSystemInitAccount: true,
+				PasswordGenerationPolicy: appsv1alpha1.PasswordConfig{
+					Length:     16,
+					NumDigits:  8,
+					NumSymbols: 8,
+					LetterCase: appsv1alpha1.MixedCases,
+				},
+			},
+			{
+				Name:      "admin",
+				Statement: "CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWORD)'; GRANT ALL PRIVILEGES ON *.* TO $(USERNAME);",
+				PasswordGenerationPolicy: appsv1alpha1.PasswordConfig{
+					Length:     10,
+					NumDigits:  5,
+					NumSymbols: 0,
+					LetterCase: appsv1alpha1.MixedCases,
+				},
+			},
+		},
+		ConnectionCredentials: []appsv1alpha1.ConnectionCredential{
+			{
+				Name:        "root",
+				ServiceName: "default",
+				AccountName: "root",
+			},
+			{
+				Name:        "admin",
+				ServiceName: "default",
+				AccountName: "admin",
+			},
+		},
+		Roles: []appsv1alpha1.ComponentReplicaRole{
+			{
+				Name:        "leader",
+				Serviceable: true,
+				Writable:    true,
+			},
+			{
+				Name:        "follower",
+				Serviceable: true,
+				Writable:    false,
+			},
+			{
+				Name:        "learner",
+				Serviceable: false,
+				Writable:    false,
+			},
+		},
+		LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{
+			PostStart: defaultLifecycleActionHandler,
+			PreStop:   defaultLifecycleActionHandler,
+			RoleProbe: &appsv1alpha1.RoleProbeSpec{
+				LifecycleActionHandler: *defaultLifecycleActionHandler,
+				FailureThreshold:       3,
+				PeriodSeconds:          1,
+				TimeoutSeconds:         5,
+			},
+			Switchover:       nil,
+			MemberJoin:       defaultLifecycleActionHandler,
+			MemberLeave:      defaultLifecycleActionHandler,
+			Readonly:         defaultLifecycleActionHandler,
+			Readwrite:        defaultLifecycleActionHandler,
+			DataPopulate:     defaultLifecycleActionHandler,
+			DataAssemble:     defaultLifecycleActionHandler,
+			Reconfigure:      defaultLifecycleActionHandler,
+			AccountProvision: defaultLifecycleActionHandler,
+		},
 	}
 
 	defaultRedisService = appsv1alpha1.ServiceSpec{

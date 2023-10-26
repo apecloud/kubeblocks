@@ -57,6 +57,7 @@ var _ = Describe("Cluster Controller", func() {
 	const (
 		clusterDefName     = "test-clusterdef"
 		clusterVersionName = "test-clusterversion"
+		compDefName        = "test-compdef"
 		clusterName        = "test-cluster" // this become cluster prefix name if used with testapps.NewClusterFactory().WithRandomName()
 		// REVIEW:
 		// - setup componentName and componentDefName as map entry pair
@@ -76,6 +77,7 @@ var _ = Describe("Cluster Controller", func() {
 		clusterVersionNameRand string
 		clusterDefObj          *appsv1alpha1.ClusterDefinition
 		clusterVersionObj      *appsv1alpha1.ClusterVersion
+		componentDefObj        *appsv1alpha1.ComponentDefinition
 		clusterObj             *appsv1alpha1.Cluster
 		clusterKey             types.NamespacedName
 		allSettings            map[string]interface{}
@@ -155,6 +157,13 @@ var _ = Describe("Cluster Controller", func() {
 			AddComponentVersion(replicationCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 			AddComponentVersion(statelessCompDefName).AddContainerShort("nginx", testapps.NginxImage).
 			Create(&testCtx).GetObject()
+
+		By("Create a ComponentDefinition obj")
+		componentDefObj = testapps.NewComponentDefinitionFactory(compDefName).
+			WithRandomName().
+			SetDefaultSpec().
+			Create(&testCtx).
+			GetObject()
 	}
 
 	waitForCreatingResourceCompletely := func(clusterKey client.ObjectKey, compNames ...string) {
@@ -306,7 +315,24 @@ var _ = Describe("Cluster Controller", func() {
 			GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-		By("Waiting for the cluster enter running phase")
+		By("Waiting for the cluster enter provisioning phase")
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
+	}
+
+	// createClusterObjV2 creates cluster objects with new component definition API enabled.
+	createClusterObjV2 := func(compName, compDefName string) {
+		By("Creating a cluster")
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "", "").
+			WithRandomName().
+			AddComponent(compName, "").
+			SetCompDef(compDefName).
+			SetReplicas(1).
+			Create(&testCtx).
+			GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		By("Waiting for the cluster enter provisioning phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 	}
@@ -977,8 +1003,25 @@ var _ = Describe("Cluster Controller", func() {
 			createAllWorkloadTypesClusterDef()
 		})
 
-		It("check component created", func() {
+		It("cluster component created", func() {
 			createClusterObj(consensusCompName, consensusCompDefName)
+
+			By("check component created")
+			compKey := types.NamespacedName{
+				Namespace: clusterKey.Namespace,
+				Name:      clusterKey.Name + "-" + consensusCompName,
+			}
+			Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
+		})
+	})
+
+	Context("cluster provisioning w/ component definition", func() {
+		BeforeEach(func() {
+			createAllWorkloadTypesClusterDef()
+		})
+
+		It("cluster component created", func() {
+			createClusterObjV2(consensusCompName, componentDefObj.Name)
 
 			By("check component created")
 			compKey := types.NamespacedName{

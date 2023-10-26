@@ -268,7 +268,7 @@ func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client
 	}*/
 
 	for _, account := range cmpd.Spec.SystemAccounts {
-		if len(account.Statement) == 0 && account.SecretRef == nil {
+		if !account.IsSystemInitAccount && len(account.Statement) == 0 && account.SecretRef == nil {
 			return fmt.Errorf("the Statement or SecretRef must be provided to create system account: %s", account.Name)
 		}
 	}

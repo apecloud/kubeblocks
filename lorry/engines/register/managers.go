@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -54,11 +53,7 @@ var managerNewFuncs = make(map[string]managerNewFunc)
 // so only one dbmanager is initialized and cached here during execution.
 var dbManager engines.DBManager
 
-var configDir string
-
 func init() {
-	pflag.StringVar(&configDir, "config-path", "/config/lorry/components/", "Lorry default config directory for builtin type")
-
 	RegisterEngine("mysql", "consensus", wesql.NewManager, mysql.NewCommands)
 	RegisterEngine("mysql", "replication", mysql.NewManager, mysql.NewCommands)
 	RegisterEngine("redis", "replication", redis.NewManager, redis.NewCommands)
@@ -106,7 +101,7 @@ func NewClusterCommands(typeName string) (engines.ClusterCommands, error) {
 	return newFunc(), nil
 }
 
-func InitDBManager() error {
+func InitDBManager(configDir string) error {
 	if dbManager != nil {
 		return nil
 	}

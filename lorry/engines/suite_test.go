@@ -20,23 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package engines
 
 import (
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Cluster commands", func() {
-	It("new commands", func() {
-		for _, engineType := range []EngineType{MySQL, PostgreSQL, Redis, PostgreSQL, Nebula, FoxLake} {
-			typeName := string(engineType)
-			engine, _ := newClusterCommands(typeName)
-			Expect(engine).Should(BeNil())
-		}
-	})
-
-	It("new unknown engine", func() {
-		typeName := "unknown-type"
-		engine, err := newClusterCommands(typeName)
-		Expect(engine).Should(BeNil())
-		Expect(err).Should(HaveOccurred())
-	})
-})
+func TestEngine(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "engines Suite")
+}

@@ -456,6 +456,7 @@ func (store *KubernetesStore) CreateHaConfig(cluster *Cluster) error {
 
 func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 	configmapName := store.getHAConfigName()
+	deleteMembers := make(map[string]MemberToDelete)
 	configmap, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Get(context.TODO(), configmapName, metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -467,6 +468,7 @@ func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 			index:              "",
 			ttl:                viper.GetInt("KB_TTL"),
 			maxLagOnSwitchover: 1048576,
+			DeleteMembers:      deleteMembers,
 		}, err
 	}
 
@@ -486,7 +488,6 @@ func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 		enable, err = strconv.ParseBool(enableStr)
 	}
 
-	deleteMembers := make(map[string]MemberToDelete)
 	str := annotations["delete-members"]
 	if str != "" {
 		err := json.Unmarshal([]byte(str), &deleteMembers)

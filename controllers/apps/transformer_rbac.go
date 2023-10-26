@@ -206,7 +206,7 @@ func isRoleBindingExist(transCtx *clusterTransformContext, serviceAccountName st
 		return false
 	}
 
-	if rb.RoleRef.Name != constant.RBACClusterRoleName {
+	if rb.RoleRef.Name != constant.RBACRoleName {
 		transCtx.Logger.V(1).Info("rbac manager: ClusterRole not match", "ClusterRole",
 			constant.RBACRoleName, "rolebinding.RoleRef", rb.RoleRef.Name)
 	}

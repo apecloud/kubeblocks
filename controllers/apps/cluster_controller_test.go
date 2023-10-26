@@ -114,6 +114,7 @@ var _ = Describe("Cluster Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS, ml)
@@ -297,11 +298,12 @@ var _ = Describe("Cluster Controller", func() {
 
 	createClusterObj := func(compName, compDefName string) {
 		By("Creating a cluster")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
+			WithRandomName().
 			AddComponent(compName, compDefName).
 			SetReplicas(1).
-			Create(&testCtx).GetObject()
+			Create(&testCtx).
+			GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster enter running phase")
@@ -967,6 +969,23 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("Wait for the cluster to terminate")
 			Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
+		})
+	})
+
+	Context("cluster provisioning w/o component definition", func() {
+		BeforeEach(func() {
+			createAllWorkloadTypesClusterDef()
+		})
+
+		It("check component created", func() {
+			createClusterObj(consensusCompName, consensusCompDefName)
+
+			By("check component created")
+			compKey := types.NamespacedName{
+				Namespace: clusterKey.Namespace,
+				Name:      clusterKey.Name + "-" + consensusCompName,
+			}
+			Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
 		})
 	})
 })

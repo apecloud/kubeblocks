@@ -28,13 +28,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // BuildProtoComponent builds a new Component object from cluster component spec and definition.
 func BuildProtoComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.Component, error) {
-	builder := builder.NewComponentBuilder(cluster.Namespace, clusterCompSpec.Name, cluster.Name, clusterCompSpec.ComponentDef).
+	fullCompName := constant.GenerateClusterComponentPattern(cluster.Name, clusterCompSpec.Name)
+	builder := builder.NewComponentBuilder(cluster.Namespace, fullCompName, cluster.Name, clusterCompSpec.ComponentDef).
 		SetAffinity(clusterCompSpec.Affinity).
 		SetTolerations(clusterCompSpec.Tolerations).
 		SetReplicas(clusterCompSpec.Replicas).

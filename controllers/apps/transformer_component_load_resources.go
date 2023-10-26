@@ -72,7 +72,7 @@ func (t *ComponentLoadResourcesTransformer) Transform(ctx graph.TransformContext
 	transCtx.CompDef = compDef
 	transCtx.Cluster = cluster
 
-	synthesizeComp, err := component.BuildSynthesizedComponent(reqCtx, transCtx.Client, cluster, compDef, comp)
+	synthesizeComp, err := component.BuildSynthesizedComponent(reqCtx, transCtx.Client, compDef, cluster, comp)
 	if err != nil {
 		message := fmt.Sprintf("Component %s BuildSynthesizedComponent failed: %s", comp.Name, err.Error())
 		return newRequeueError(requeueDuration, message)

@@ -38,51 +38,31 @@ import (
 )
 
 // BuildSynthesizedComponentWrapper builds a new SynthesizedComponent object with a given ClusterComponentSpec.
+// TODO(component): check all the usages to handle the simplified cluster API at caller.
 func BuildSynthesizedComponentWrapper(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
-) (*SynthesizedComponent, error) {
-
-	// if clusterCompSpec is nil, try to build clusterCompSpec from simplified api defined in cluster
-	if clusterCompSpec == nil {
-		if err := handleSimplifiedAPI(reqCtx, cli, cluster, clusterCompSpec); err != nil {
-			return nil, err
-		}
-	}
-
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*SynthesizedComponent, error) {
 	if clusterCompSpec == nil {
 		return nil, nil
 	}
-
 	compDef, err := BuildComponentDefinition(reqCtx, cli, cluster, clusterCompSpec)
 	if err != nil {
 		return nil, err
 	}
-	comp, err := BuildProtoComponent(reqCtx, cli, cluster, clusterCompSpec)
+	comp, err := BuildProtoComponent(cluster, clusterCompSpec)
 	if err != nil {
 		return nil, err
 	}
-	return buildSynthesizeComponent(reqCtx, cli, cluster, compDef, comp)
+	return BuildSynthesizedComponent(reqCtx, cli, compDef, cluster, comp)
 }
 
 // BuildSynthesizedComponent builds a new SynthesizedComponent object, which is a mixture of component-related configs from input Cluster, ComponentDefinition and Component.
 func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	cli roclient.ReadonlyClient,
-	cluster *appsv1alpha1.Cluster,
 	compDef *appsv1alpha1.ComponentDefinition,
-	comp *appsv1alpha1.Component,
-) (*SynthesizedComponent, error) {
-	return buildSynthesizeComponent(reqCtx, cli, cluster, compDef, comp)
-}
-
-// buildSynthesizeComponent builds a new Component object, which is a mixture of component-related configs from input Cluster, ComponentDefinition and Component.
-func buildSynthesizeComponent(reqCtx intctrlutil.RequestCtx,
-	cli roclient.ReadonlyClient,
 	cluster *appsv1alpha1.Cluster,
-	compDef *appsv1alpha1.ComponentDefinition,
-	comp *appsv1alpha1.Component,
-) (*SynthesizedComponent, error) {
+	comp *appsv1alpha1.Component) (*SynthesizedComponent, error) {
 	if cluster == nil || compDef == nil || comp == nil {
 		return nil, nil
 	}
@@ -353,152 +333,6 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx, cli roclient.R
 		reqCtx.Log.Error(err, "failed to merge componentRef")
 		return err
 	}
-
-	return nil
-}
-
-// handleSimplifiedAPI handles simplified api for cluster.
-// TODO(xingran): handleSimplifiedAPI should also support the new componentDefinition API.
-func handleSimplifiedAPI(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) error {
-	if clusterCompSpec != nil {
-		return nil
-	}
-
-	hasSimplifiedAPI := func() bool {
-		return cluster.Spec.Replicas != nil ||
-			!cluster.Spec.Resources.CPU.IsZero() ||
-			!cluster.Spec.Resources.Memory.IsZero() ||
-			!cluster.Spec.Storage.Size.IsZero() ||
-			cluster.Spec.Monitor.MonitoringInterval != nil ||
-			cluster.Spec.Network != nil ||
-			len(cluster.Spec.Tenancy) > 0 ||
-			len(cluster.Spec.AvailabilityPolicy) > 0
-	}
-
-	fillSimplifiedAPI := func(cd *appsv1alpha1.ClusterDefinition, clusterCompDef *appsv1alpha1.ClusterComponentDefinition) {
-		if clusterCompDef == nil {
-			return
-		}
-		// fill simplified api only to first defined component
-		if len(cd.Spec.ComponentDefs) == 0 ||
-			cd.Spec.ComponentDefs[0].Name != clusterCompDef.Name {
-			return
-		}
-		// return if none of simplified api is defined
-		if !hasSimplifiedAPI() {
-			return
-		}
-		if clusterCompSpec == nil {
-			clusterCompSpec = &appsv1alpha1.ClusterComponentSpec{}
-			clusterCompSpec.Name = clusterCompDef.Name
-		}
-		if cluster.Spec.Replicas != nil {
-			clusterCompSpec.Replicas = *cluster.Spec.Replicas
-		}
-		dataVolumeName := "data"
-		for _, v := range clusterCompDef.VolumeTypes {
-			if v.Type == appsv1alpha1.VolumeTypeData {
-				dataVolumeName = v.Name
-			}
-		}
-		if !cluster.Spec.Resources.CPU.IsZero() || !cluster.Spec.Resources.Memory.IsZero() {
-			clusterCompSpec.Resources.Limits = corev1.ResourceList{}
-		}
-		if !cluster.Spec.Resources.CPU.IsZero() {
-			clusterCompSpec.Resources.Limits["cpu"] = cluster.Spec.Resources.CPU
-		}
-		if !cluster.Spec.Resources.Memory.IsZero() {
-			clusterCompSpec.Resources.Limits["memory"] = cluster.Spec.Resources.Memory
-		}
-		if !cluster.Spec.Storage.Size.IsZero() {
-			clusterCompSpec.VolumeClaimTemplates = []appsv1alpha1.ClusterComponentVolumeClaimTemplate{
-				{
-					Name: dataVolumeName,
-					Spec: appsv1alpha1.PersistentVolumeClaimSpec{
-						AccessModes: []corev1.PersistentVolumeAccessMode{
-							corev1.ReadWriteOnce,
-						},
-						Resources: corev1.ResourceRequirements{
-							Requests: corev1.ResourceList{
-								"storage": cluster.Spec.Storage.Size,
-							},
-						},
-					},
-				},
-			}
-		}
-		if cluster.Spec.Monitor.MonitoringInterval != nil {
-			if len(cluster.Spec.Monitor.MonitoringInterval.StrVal) == 0 && cluster.Spec.Monitor.MonitoringInterval.IntVal == 0 {
-				clusterCompSpec.Monitor = false
-			} else {
-				clusterCompSpec.Monitor = true
-				// TODO: should also set interval
-			}
-		}
-		if cluster.Spec.Network != nil {
-			clusterCompSpec.Services = []appsv1alpha1.ClusterComponentService{}
-			if cluster.Spec.Network.HostNetworkAccessible {
-				svc := appsv1alpha1.ClusterComponentService{
-					Name:        "vpc",
-					ServiceType: "LoadBalancer",
-				}
-				switch getCloudProvider() {
-				case CloudProviderAWS:
-					svc.Annotations = map[string]string{
-						"service.beta.kubernetes.io/aws-load-balancer-type":     "nlb",
-						"service.beta.kubernetes.io/aws-load-balancer-internal": "true",
-					}
-				case CloudProviderGCP:
-					svc.Annotations = map[string]string{
-						"networking.gke.io/load-balancer-type": "Internal",
-					}
-				case CloudProviderAliyun:
-					svc.Annotations = map[string]string{
-						"service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type": "intranet",
-					}
-				case CloudProviderAzure:
-					svc.Annotations = map[string]string{
-						"service.beta.kubernetes.io/azure-load-balancer-internal": "true",
-					}
-				}
-				clusterCompSpec.Services = append(clusterCompSpec.Services, svc)
-			}
-			if cluster.Spec.Network.PubliclyAccessible {
-				svc := appsv1alpha1.ClusterComponentService{
-					Name:        "public",
-					ServiceType: "LoadBalancer",
-				}
-				switch getCloudProvider() {
-				case CloudProviderAWS:
-					svc.Annotations = map[string]string{
-						"service.beta.kubernetes.io/aws-load-balancer-type":     "nlb",
-						"service.beta.kubernetes.io/aws-load-balancer-internal": "false",
-					}
-				case CloudProviderAliyun:
-					svc.Annotations = map[string]string{
-						"service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type": "internet",
-					}
-				case CloudProviderAzure:
-					svc.Annotations = map[string]string{
-						"service.beta.kubernetes.io/azure-load-balancer-internal": "false",
-					}
-				}
-				clusterCompSpec.Services = append(clusterCompSpec.Services, svc)
-			}
-		}
-	}
-
-	cd, _, err := getClusterDefAndVersion(reqCtx, cli, cluster)
-	if err != nil {
-		return err
-	}
-
-	clusterCompDef, _, err := getClusterCompDefAndVersion(reqCtx, cli, cluster, clusterCompSpec)
-	if err != nil {
-		return err
-	}
-
-	fillSimplifiedAPI(cd, clusterCompDef)
 
 	return nil
 }

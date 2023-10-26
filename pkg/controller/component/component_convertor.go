@@ -73,8 +73,8 @@ type tlsConvertor struct{}
 // issuerConvertor is an implementation of the convertor interface, used to convert the given object into Component.Spec.Issuer.
 type issuerConvertor struct{}
 
-// BuildComponentFrom builds a new Component object based on Cluster, ClusterComponentDefinition, ClusterComponentVersion and ClusterComponentSpec.
-func BuildComponentFrom(cluster *appsv1alpha1.Cluster,
+// buildComponentFrom builds a new Component object based on Cluster, ClusterComponentDefinition, ClusterComponentVersion and ClusterComponentSpec.
+func buildComponentFrom(cluster *appsv1alpha1.Cluster,
 	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
 	clusterCompVer *appsv1alpha1.ClusterComponentVersion,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.Component, error) {

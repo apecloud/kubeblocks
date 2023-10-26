@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -31,28 +32,8 @@ import (
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// BuildProtoComponent builds a new Component object from cluster componentSpec.
-func BuildProtoComponent(reqCtx ictrlutil.RequestCtx,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.Component, error) {
-	if clusterCompSpec.ComponentDef == "" {
-		if clusterCompSpec.ComponentDefRef == "" {
-			return nil, errors.New("invalid component spec")
-		}
-		if cluster.Spec.ClusterDefRef == "" {
-			return nil, errors.New("clusterDefRef is required when component def is not provided")
-		}
-	}
-	if clusterCompSpec.ComponentDef != "" {
-		return buildProtoCompFromCompDef(reqCtx, cli, cluster, clusterCompSpec)
-	}
-	return buildProtoCompFromConvertor(reqCtx, cli, cluster, clusterCompSpec)
-}
-
-// BuildProtoComponent2 builds a new Component object from cluster component spec and definition.
-func BuildProtoComponent2(cluster *appsv1alpha1.Cluster,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.Component, error) {
+// BuildProtoComponent builds a new Component object from cluster component spec and definition.
+func BuildProtoComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.Component, error) {
 	builder := builder.NewComponentBuilder(cluster.Namespace, clusterCompSpec.Name, cluster.Name, clusterCompSpec.ComponentDef).
 		SetAffinity(clusterCompSpec.Affinity).
 		SetTolerations(clusterCompSpec.Tolerations).
@@ -84,111 +65,68 @@ func BuildComponentDefinition(reqCtx ictrlutil.RequestCtx,
 			return nil, errors.New("clusterDefRef is required  when component def is not provided")
 		}
 	}
+
 	if clusterCompSpec.ComponentDef != "" {
-		cmpd := &appsv1alpha1.ComponentDefinition{}
-		if err := ictrlutil.ValidateExistence(reqCtx.Ctx, cli, types.NamespacedName{Name: clusterCompSpec.ComponentDef}, cmpd, false); err != nil {
+		compDef := &appsv1alpha1.ComponentDefinition{}
+		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: clusterCompSpec.ComponentDef}, compDef); err != nil {
 			return nil, err
 		}
-		return cmpd, nil
+		return compDef, nil
+	} else {
+		clusterDef, clusterVer, err := getClusterDefAndVersion(reqCtx.Ctx, cli, cluster)
+		if err != nil {
+			return nil, err
+		}
+		return BuildComponentDefinitionLow(clusterDef, clusterVer, cluster, clusterCompSpec)
 	}
-	return buildCompDefFromConvertor(reqCtx, cli, cluster, clusterCompSpec)
 }
 
-// buildCompDefFromConvertor builds a new ComponentDefinition object based on converting clusterComponentDefinition to ComponentDefinition.
-func buildCompDefFromConvertor(reqCtx ictrlutil.RequestCtx,
-	cli client.Client,
+func BuildComponentDefinitionLow(clusterDef *appsv1alpha1.ClusterDefinition, clusterVer *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ComponentDefinition, error) {
-	clusterCompDef, clusterCompVer, err := getClusterCompDefAndVersion(reqCtx, cli, cluster, clusterCompSpec)
+	if clusterCompSpec.ComponentDefRef == "" {
+		return nil, fmt.Errorf("expected cluster component definition ref is empty: %s-%s", cluster.Name, clusterCompSpec.Name)
+	}
+	clusterCompDef, clusterCompVer, err := getClusterCompDefAndVersion(clusterDef, clusterVer, cluster, clusterCompSpec)
 	if err != nil {
 		return nil, err
 	}
-	return BuildComponentDefinitionFrom(clusterCompDef, clusterCompVer, cluster.Name)
-}
-
-// buildProtoCompFromConvertor builds a new Component object based on converting clusterComponentDefinition to ComponentDefinition.
-func buildProtoCompFromConvertor(reqCtx ictrlutil.RequestCtx,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.Component, error) {
-	clusterCompDef, clusterCompVer, err := getClusterCompDefAndVersion(reqCtx, cli, cluster, clusterCompSpec)
-	if err != nil {
-		return nil, err
-	}
-	return BuildComponentFrom(cluster, clusterCompDef, clusterCompVer, clusterCompSpec)
-}
-
-// buildProtoCompFromCompDef builds a new Component object based on ComponentDefinition API.
-func buildProtoCompFromCompDef(reqCtx ictrlutil.RequestCtx,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.Component, error) {
-
-	if clusterCompSpec == nil || clusterCompSpec.ComponentDef == "" {
-		return nil, errors.New("invalid component spec")
-	}
-
-	cmpd := &appsv1alpha1.ComponentDefinition{}
-	if err := ictrlutil.ValidateExistence(reqCtx.Ctx, cli, types.NamespacedName{Name: clusterCompSpec.ComponentDef}, cmpd, false); err != nil {
-		return nil, err
-	}
-
-	comp := builder.NewComponentBuilder(cluster.Namespace, clusterCompSpec.Name, cluster.Name, clusterCompSpec.ComponentDef).
-		SetAffinity(clusterCompSpec.Affinity).
-		SetTolerations(clusterCompSpec.Tolerations).
-		SetReplicas(clusterCompSpec.Replicas).
-		SetResources(clusterCompSpec.Resources).
-		SetMonitor(clusterCompSpec.Monitor).
-		SetServiceAccountName(clusterCompSpec.ServiceAccountName).
-		SetVolumeClaimTemplates(clusterCompSpec.VolumeClaimTemplates).
-		SetUpdateStrategy(clusterCompSpec.UpdateStrategy).
-		SetEnabledLogs(clusterCompSpec.EnabledLogs).
-		SetServiceRefs(clusterCompSpec.ServiceRefs).
-		SetClassRef(clusterCompSpec.ClassDefRef).
-		SetTLSConfig(clusterCompSpec.TLS, clusterCompSpec.Issuer).
-		GetObject()
-
-	return comp, nil
-}
-
-// getClusterCompDefAndVersion gets ClusterComponentDefinition and ClusterComponentVersion object from cluster.
-func getClusterCompDefAndVersion(reqCtx ictrlutil.RequestCtx,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ClusterComponentDefinition, *appsv1alpha1.ClusterComponentVersion, error) {
-	if clusterCompSpec == nil {
-		return nil, nil, nil
-	}
-	if cluster.Spec.ClusterDefRef == "" || cluster.Spec.ClusterVersionRef == "" {
-		return nil, nil, errors.New("clusterDefRef and ClusterVersionRef is required when enableComponentDefinition is false")
-	}
-	cd, cv, err := getClusterDefAndVersion(reqCtx, cli, cluster)
-	if err != nil {
-		return nil, nil, err
-	}
-	var clusterCompDef *appsv1alpha1.ClusterComponentDefinition
-	var clusterCompVer *appsv1alpha1.ClusterComponentVersion
-	clusterCompDef = cd.GetComponentDefByName(clusterCompSpec.ComponentDefRef)
-	if clusterCompDef == nil {
-		return nil, nil, fmt.Errorf("referenced component definition does not exist, cluster: %s, component: %s, component definition ref:%s", cluster.Name, clusterCompSpec.Name, clusterCompSpec.ComponentDefRef)
-	}
-	if cv != nil {
-		clusterCompVer = cv.Spec.GetDefNameMappingComponents()[clusterCompSpec.ComponentDefRef]
-	}
-	return clusterCompDef, clusterCompVer, nil
+	return buildComponentDefinitionFrom(clusterCompDef, clusterCompVer, cluster.Name)
 }
 
 // getClusterDefAndVersion gets ClusterDefinition and ClusterVersion object from cluster.
-func getClusterDefAndVersion(reqCtx ictrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, error) {
-	cd := &appsv1alpha1.ClusterDefinition{}
-	if err := ictrlutil.ValidateExistence(reqCtx.Ctx, cli, types.NamespacedName{Name: cluster.Spec.ClusterDefRef}, cd, false); err != nil {
+func getClusterDefAndVersion(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, error) {
+	clusterDef := &appsv1alpha1.ClusterDefinition{}
+	if err := ictrlutil.ValidateExistence(ctx, cli, types.NamespacedName{Name: cluster.Spec.ClusterDefRef},
+		clusterDef, false); err != nil {
 		return nil, nil, err
 	}
 
-	cv := &appsv1alpha1.ClusterVersion{}
-	if err := ictrlutil.ValidateExistence(reqCtx.Ctx, cli, types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}, cv, false); err != nil {
-		return nil, nil, err
+	var clusterVer *appsv1alpha1.ClusterVersion
+	if len(cluster.Spec.ClusterVersionRef) > 0 {
+		clusterVerObj := &appsv1alpha1.ClusterVersion{}
+		if err := ictrlutil.ValidateExistence(ctx, cli, types.NamespacedName{Name: cluster.Spec.ClusterVersionRef},
+			clusterVerObj, false); err != nil {
+			return nil, nil, err
+		}
+		clusterVer = clusterVerObj
 	}
 
-	return cd, cv, nil
+	return clusterDef, clusterVer, nil
+}
+
+// getClusterCompDefAndVersion gets ClusterComponentDefinition and ClusterComponentVersion object from cluster.
+func getClusterCompDefAndVersion(clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterVer *appsv1alpha1.ClusterVersion,
+	cluster *appsv1alpha1.Cluster,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ClusterComponentDefinition, *appsv1alpha1.ClusterComponentVersion, error) {
+	clusterCompDef := clusterDef.GetComponentDefByName(clusterCompSpec.ComponentDefRef)
+	if clusterCompDef == nil {
+		return nil, nil, fmt.Errorf("referenced cluster component definiton is not defined: %s-%s", cluster.Name, clusterCompSpec.Name)
+	}
+	var clusterCompVer *appsv1alpha1.ClusterComponentVersion
+	if clusterVer != nil {
+		clusterCompVer = clusterVer.Spec.GetDefNameMappingComponents()[clusterCompSpec.ComponentDefRef]
+	}
+	return clusterCompDef, clusterCompVer, nil
 }

@@ -75,7 +75,7 @@ func (c *ClusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 
 	createCompObjects := func() error {
 		for compName := range createCompSet {
-			comp, err := component.BuildProtoComponent2(cluster, protoCompSpecMap[compName])
+			comp, err := component.BuildProtoComponent(cluster, protoCompSpecMap[compName])
 			if err != nil {
 				return err
 			}
@@ -90,7 +90,7 @@ func (c *ClusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 			if err1 != nil && !apierrors.IsNotFound(err1) {
 				return err1
 			}
-			comp, err2 := component.BuildProtoComponent2(cluster, protoCompSpecMap[compName])
+			comp, err2 := component.BuildProtoComponent(cluster, protoCompSpecMap[compName])
 			if err2 != nil {
 				return err2
 			}

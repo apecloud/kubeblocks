@@ -547,17 +547,6 @@ const (
 	Noop                  SwitchPolicyType = "Noop"
 )
 
-// SwitchStepRole defines the role to execute the switch command.
-// +enum
-// +kubebuilder:validation:Enum={NewPrimary, OldPrimary, Secondaries}
-type SwitchStepRole string
-
-const (
-	NewPrimary  SwitchStepRole = "NewPrimary"
-	OldPrimary  SwitchStepRole = "OldPrimary"
-	Secondaries SwitchStepRole = "Secondaries"
-)
-
 // VolumeType defines volume type for backup data or log.
 // +enum
 // +kubebuilder:validation:Enum={data,log}

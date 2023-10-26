@@ -23,6 +23,8 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
 // +genclient
@@ -625,6 +627,12 @@ type ComponentSwitchoverSpec struct {
 
 type RoleProbeSpec struct {
 	LifecycleActionHandler `json:",inline"`
+
+	// RoleUpdateMechanism specifies the way how pod role label being updated.
+	// +kubebuilder:default=ReadinessProbeEventUpdate
+	// +kubebuilder:validation:Enum={ReadinessProbeEventUpdate, DirectAPIServerEventUpdate}
+	// +optional
+	RoleUpdateMechanism workloads.RoleUpdateMechanism `json:"roleUpdateMechanism,omitempty"`
 
 	// Number of seconds after the container has started before liveness probes are initiated.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes

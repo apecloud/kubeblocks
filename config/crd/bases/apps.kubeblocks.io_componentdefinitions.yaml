@@ -3211,6 +3211,14 @@ spec:
                           Default to 10 seconds. Minimum value is 1.
                         format: int32
                         type: integer
+                      roleUpdateMechanism:
+                        default: ReadinessProbeEventUpdate
+                        description: RoleUpdateMechanism specifies the way how pod
+                          role label being updated.
+                        enum:
+                        - ReadinessProbeEventUpdate
+                        - DirectAPIServerEventUpdate
+                        type: string
                       successThreshold:
                         description: Minimum consecutive successes for the probe to
                           be considered successful after having failed. Defaults to

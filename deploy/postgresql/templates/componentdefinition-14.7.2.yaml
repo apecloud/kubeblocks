@@ -11,7 +11,7 @@ spec:
   serviceVersion: 14.7.2
   services:
     - name: postgresql
-      serviceName: $(KB_CLUSTER_NAME)-$(KB_COMPONENT_NAME)
+      serviceName: postgresql
       ports:
         - name: tcp-postgresql
           port: 5432
@@ -117,6 +117,8 @@ spec:
       passwordGenerationPolicy: *defaultPasswdGenerationPolicy
   lifecycleActions:
     roleProbe:
+      builtinHandlerName: postgres
+      roleUpdateMechanism: DirectAPIServerEventUpdate
       failureThreshold: 2
       periodSeconds: 1
       timeoutSeconds: 1

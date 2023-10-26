@@ -59,8 +59,8 @@ func GenerateComponentHeadlessServiceEndpoint(clusterName, compName, svcName, na
 	return fmt.Sprintf("%s-%s-%s-headless.%s.svc", clusterName, compName, svcName, namespace)
 }
 
-// GenerateDefalutComponentHeadlessServiceEndpoint generates default headless service endpoint of component
-func GenerateDefalutComponentHeadlessServiceEndpoint(clusterName, compName, namespace string) string {
+// GenerateDefaultComponentHeadlessServiceEndpoint generates default headless service endpoint of component
+func GenerateDefaultComponentHeadlessServiceEndpoint(clusterName, compName, namespace string) string {
 	return fmt.Sprintf("%s-%s-headless.%s.svc", clusterName, compName, namespace)
 }
 

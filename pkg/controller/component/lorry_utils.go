@@ -54,20 +54,18 @@ var (
 	}
 )
 
-func buildLorryContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedComponent) error {
+// buildLorryContainers builds lorry containers for component.
+// In the new ComponentDefinition API, StatusProbe and RunningProbe have been removed.
+// TODO(xingran): workloadType and characterType dependency should be removed from lorry container.
+func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *SynthesizedComponent) error {
 	container := buildBasicContainer()
 	var lorryContainers []corev1.Container
-	componentProbes := component.Probes
-	if componentProbes == nil {
-		return nil
-	}
-	reqCtx.Log.V(3).Info("lorry", "settings", componentProbes)
 	lorrySvcHTTPPort := viper.GetInt32("PROBE_SERVICE_HTTP_PORT")
 	// override by new env name
 	if viper.IsSet("LORRY_SERVICE_HTTP_PORT") {
 		lorrySvcHTTPPort = viper.GetInt32("LORRY_SERVICE_HTTP_PORT")
 	}
-	availablePorts, err := getAvailableContainerPorts(component.PodSpec.Containers, []int32{lorrySvcHTTPPort})
+	availablePorts, err := getAvailableContainerPorts(synthesizeComp.PodSpec.Containers, []int32{lorrySvcHTTPPort})
 	lorrySvcHTTPPort = availablePorts[0]
 	if err != nil {
 		reqCtx.Log.Info("get lorry container port failed", "error", err)
@@ -75,27 +73,19 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 	}
 	lorrySvcGRPCPort := viper.GetInt("PROBE_SERVICE_GRPC_PORT")
 
-	if componentProbes.RoleProbe != nil && (component.RSMSpec == nil || component.RSMSpec.RoleProbe == nil) {
+	// inject role probe container
+	compRoleProbe := synthesizeComp.LifecycleActions.RoleProbe
+	reqCtx.Log.V(3).Info("lorry", "settings", compRoleProbe)
+	if compRoleProbe != nil {
 		roleChangedContainer := container.DeepCopy()
-		buildRoleProbeContainer(component, roleChangedContainer, componentProbes.RoleProbe, int(lorrySvcHTTPPort))
+		buildRoleProbeContainer(synthesizeComp, roleChangedContainer, compRoleProbe, int(lorrySvcHTTPPort))
 		lorryContainers = append(lorryContainers, *roleChangedContainer)
 	}
 
-	if componentProbes.StatusProbe != nil {
-		statusProbeContainer := container.DeepCopy()
-		buildStatusProbeContainer(component.CharacterType, statusProbeContainer, componentProbes.StatusProbe, int(lorrySvcHTTPPort))
-		lorryContainers = append(lorryContainers, *statusProbeContainer)
-	}
-
-	if componentProbes.RunningProbe != nil {
-		runningProbeContainer := container.DeepCopy()
-		buildRunningProbeContainer(component.CharacterType, runningProbeContainer, componentProbes.RunningProbe, int(lorrySvcHTTPPort))
-		lorryContainers = append(lorryContainers, *runningProbeContainer)
-	}
-
-	if volumeProtectionEnabled(component) {
+	// inject volume protection probe container
+	if volumeProtectionEnabled(synthesizeComp) {
 		c := container.DeepCopy()
-		buildVolumeProtectionProbeContainer(component.CharacterType, c, int(lorrySvcHTTPPort))
+		buildVolumeProtectionProbeContainer(synthesizeComp.CharacterType, c, int(lorrySvcHTTPPort))
 		lorryContainers = append(lorryContainers, *c)
 	}
 
@@ -108,10 +98,10 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		lorryContainers = append(lorryContainers, *weSyncerContainer)
 	}
 
-	buildLorryServiceContainer(component, &lorryContainers[0], int(lorrySvcHTTPPort), lorrySvcGRPCPort)
+	buildLorryServiceContainer(synthesizeComp, &lorryContainers[0], int(lorrySvcHTTPPort), lorrySvcGRPCPort)
 
 	reqCtx.Log.V(1).Info("lorry", "containers", lorryContainers)
-	component.PodSpec.Containers = append(component.PodSpec.Containers, lorryContainers...)
+	synthesizeComp.PodSpec.Containers = append(synthesizeComp.PodSpec.Containers, lorryContainers...)
 	return nil
 }
 
@@ -144,7 +134,7 @@ func buildBasicContainer() *corev1.Container {
 		GetObject()
 }
 
-func buildLorryServiceContainer(component *SynthesizedComponent, container *corev1.Container, lorrySvcHTTPPort, lorrySvcGRPCPort int) {
+func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container *corev1.Container, lorrySvcHTTPPort, lorrySvcGRPCPort int) {
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	container.Command = []string{"lorry",
@@ -152,8 +142,8 @@ func buildLorryServiceContainer(component *SynthesizedComponent, container *core
 		"--grpcport", strconv.Itoa(lorrySvcGRPCPort),
 	}
 
-	if len(component.PodSpec.Containers) > 0 {
-		mainContainer := component.PodSpec.Containers[0]
+	if len(synthesizeComp.PodSpec.Containers) > 0 {
+		mainContainer := synthesizeComp.PodSpec.Containers[0]
 		if len(mainContainer.Ports) > 0 {
 			port := mainContainer.Ports[0]
 			dbPort := port.ContainerPort
@@ -165,8 +155,9 @@ func buildLorryServiceContainer(component *SynthesizedComponent, container *core
 		}
 
 		dataVolumeName := dataVolume
-		for _, v := range component.VolumeTypes {
-			if v.Type == appsv1alpha1.VolumeTypeData {
+		for _, v := range synthesizeComp.Volumes {
+			// TODO(xingran): how to convert needSnapshot to original volumeTypeData ?
+			if v.NeedSnapshot {
 				dataVolumeName = v.Name
 			}
 		}
@@ -184,16 +175,16 @@ func buildLorryServiceContainer(component *SynthesizedComponent, container *core
 		}
 	}
 
-	secretName := fmt.Sprintf("%s-conn-credential", component.ClusterName)
+	secretName := constant.GenerateDefaultConnCredential(synthesizeComp.ClusterName)
 	container.Env = append(container.Env,
 		corev1.EnvVar{
 			Name:      constant.KBEnvCharacterType,
-			Value:     component.CharacterType,
+			Value:     synthesizeComp.CharacterType,
 			ValueFrom: nil,
 		},
 		corev1.EnvVar{
 			Name:      constant.KBEnvWorkloadType,
-			Value:     string(component.WorkloadType),
+			Value:     string(synthesizeComp.WorkloadType),
 			ValueFrom: nil,
 		},
 		corev1.EnvVar{
@@ -233,8 +224,9 @@ func buildLorryServiceContainer(component *SynthesizedComponent, container *core
 	}
 
 	// pass the volume protection spec to lorry container through env.
-	if volumeProtectionEnabled(component) {
-		container.Env = append(container.Env, env4VolumeProtection(*component.VolumeProtection))
+	// TODO(xingran & leon):  volume protection should be based on componentDefinition.Spec.Volume
+	if volumeProtectionEnabled(synthesizeComp) {
+		container.Env = append(container.Env, env4VolumeProtection(*synthesizeComp.VolumeProtection))
 	}
 }
 
@@ -244,7 +236,7 @@ func buildWeSyncerContainer(weSyncerContainer *corev1.Container, probeSvcHTTPPor
 }
 
 func buildRoleProbeContainer(component *SynthesizedComponent, roleChangedContainer *corev1.Container,
-	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
+	roleProbe *appsv1alpha1.RoleProbeSpec, probeSvcHTTPPort int) {
 	roleChangedContainer.Name = constant.RoleProbeContainerName
 	bindingType := strings.ToLower(component.CharacterType)
 	workloadType := component.WorkloadType
@@ -254,9 +246,9 @@ func buildRoleProbeContainer(component *SynthesizedComponent, roleChangedContain
 	probe := &corev1.Probe{}
 	probe.Exec = nil
 	probe.HTTPGet = httpGet
-	probe.PeriodSeconds = probeSetting.PeriodSeconds
-	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
-	probe.FailureThreshold = probeSetting.FailureThreshold
+	probe.PeriodSeconds = roleProbe.PeriodSeconds
+	probe.TimeoutSeconds = roleProbe.TimeoutSeconds
+	probe.FailureThreshold = roleProbe.FailureThreshold
 	roleChangedContainer.ReadinessProbe = probe
 	roleChangedContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }

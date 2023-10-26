@@ -89,7 +89,7 @@ func CreateVolumeSnapshotClass(testCtx *testutil.TestContext) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "default-vs",
 		},
-		Driver:         testutil.DefaultStorageProvisoner,
+		Driver:         testutil.DefaultCSIDriver,
 		DeletionPolicy: vsv1.VolumeSnapshotContentDelete,
 	}
 	CreateK8sResource(testCtx, volumeSnapshotClass)

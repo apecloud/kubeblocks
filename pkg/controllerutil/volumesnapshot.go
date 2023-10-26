@@ -25,7 +25,7 @@ import (
 
 	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	storagev1 "k8s.io/api/storage/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -165,12 +165,17 @@ func typeofV1Beta1(v any) any {
 }
 
 // IsVolumeSnapshotEnabled checks if the CSI supports the volume snapshot.
-func IsVolumeSnapshotEnabled(ctx context.Context, cli client.Client, storageClassName string) (bool, error) {
-	storageClass := storagev1.StorageClass{}
-	if err := cli.Get(ctx, types.NamespacedName{Name: storageClassName}, &storageClass); err != nil {
-		return false, client.IgnoreNotFound(err)
+func IsVolumeSnapshotEnabled(ctx context.Context, cli client.Client, pvName string) (bool, error) {
+	if len(pvName) == 0 {
+		return false, nil
 	}
-
+	pv := &corev1.PersistentVolume{}
+	if err := cli.Get(ctx, types.NamespacedName{Name: pvName}, pv); err != nil {
+		return false, err
+	}
+	if pv.Spec.CSI == nil {
+		return false, nil
+	}
 	vsCli := VolumeSnapshotCompatClient{
 		Client: cli,
 		Ctx:    ctx,
@@ -180,7 +185,7 @@ func IsVolumeSnapshotEnabled(ctx context.Context, cli client.Client, storageClas
 		return false, err
 	}
 	for _, vsc := range vscList.Items {
-		if vsc.Driver == storageClass.Provisioner {
+		if vsc.Driver == pv.Spec.CSI.Driver {
 			return true, nil
 		}
 	}

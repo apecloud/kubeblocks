@@ -18,6 +18,9 @@ metadata:
 data:
   broker.conf: |-
     {{- .Files.Get "config/broker-config.tpl" | nindent 4 }}
+    {{- if eq .Values.cloudProvider "huaweiCloud" }}
+    loadBalancerOverrideBrokerNicSpeedGbps=2
+    {{- end }}
 ---
 
 apiVersion: v1

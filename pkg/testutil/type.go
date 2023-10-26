@@ -60,6 +60,7 @@ const (
 	envExistingClusterType   = "EXISTING_CLUSTER_TYPE"
 	envUseExistingCluster    = "USE_EXISTING_CLUSTER"
 	DefaultStorageProvisoner = "kubernetes.io/no-provisioner"
+	DefaultCSIDriver         = "hostpath.csi.k8s.io"
 )
 
 func init() {

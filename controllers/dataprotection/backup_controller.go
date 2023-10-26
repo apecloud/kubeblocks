@@ -185,6 +185,7 @@ func (r *BackupReconciler) handleDeletingPhase(reqCtx intctrlutil.RequestCtx, ba
 	}
 
 	if backup.Spec.DeletionPolicy == dpv1alpha1.BackupDeletionPolicyRetain {
+		r.Recorder.Event(backup, corev1.EventTypeWarning, "Retain", "can not delete the backup if deletionPolicy is Retain")
 		return intctrlutil.Reconciled()
 	}
 
@@ -246,7 +247,7 @@ func (r *BackupReconciler) prepareBackupRequest(
 	}
 
 	targetPods, err := getTargetPods(reqCtx, r.Client,
-		backup.Annotations[dataProtectionBackupTargetPodKey], backupPolicy)
+		backup.Annotations[dptypes.BackupTargetPodLabelKey], backupPolicy)
 	if err != nil || len(targetPods) == 0 {
 		return nil, fmt.Errorf("failed to get target pods by backup policy %s/%s",
 			backupPolicy.Namespace, backupPolicy.Name)
@@ -283,8 +284,11 @@ func (r *BackupReconciler) prepareBackupRequest(
 	}
 
 	request.BackupPolicy = backupPolicy
-	if err = r.handleBackupRepo(request); err != nil {
-		return nil, err
+	if !snapshotVolumes {
+		// if use volume snapshot, ignore backup repo
+		if err = r.handleBackupRepo(request); err != nil {
+			return nil, err
+		}
 	}
 
 	request.BackupMethod = backupMethod
@@ -349,11 +353,12 @@ func (r *BackupReconciler) patchBackupStatus(
 	request.Status.Path = dpbackup.BuildBackupPath(request.Backup, request.BackupPolicy.Spec.PathPrefix)
 	request.Status.Target = request.BackupPolicy.Spec.Target
 	request.Status.BackupMethod = request.BackupMethod
-	request.Status.BackupRepoName = request.BackupRepo.Name
+	if request.BackupRepo != nil {
+		request.Status.BackupRepoName = request.BackupRepo.Name
+	}
 	if request.BackupRepoPVC != nil {
 		request.Status.PersistentVolumeClaimName = request.BackupRepoPVC.Name
 	}
-
 	// init action status
 	actions, err := request.BuildActions()
 	if err != nil {
@@ -391,26 +396,28 @@ func (r *BackupReconciler) patchBackupObjectMeta(
 		if err := setClusterSnapshotAnnotation(request.Backup, cluster); err != nil {
 			return false, err
 		}
-		request.Labels[dptypes.DataProtectionLabelClusterUIDKey] = string(cluster.UID)
+		request.Labels[dptypes.ClusterUIDLabelKey] = string(cluster.UID)
 	}
+
 	for _, v := range getClusterLabelKeys() {
 		request.Labels[v] = targetPod.Labels[v]
 	}
 
-	request.Labels[dataProtectionBackupRepoKey] = request.BackupRepo.Name
 	request.Labels[constant.AppManagedByLabelKey] = constant.AppName
-	request.Labels[dataProtectionLabelBackupTypeKey] = request.GetBackupType()
-
+	request.Labels[dptypes.BackupTypeLabelKey] = request.GetBackupType()
 	// wait for the backup repo controller to prepare the essential resource.
 	wait := false
-	if (request.BackupRepo.AccessByMount() && request.BackupRepoPVC == nil) ||
-		(request.BackupRepo.AccessByTool() && request.ToolConfigSecret == nil) {
-		request.Labels[dataProtectionWaitRepoPreparationKey] = trueVal
-		wait = true
+	if request.BackupRepo != nil {
+		request.Labels[dataProtectionBackupRepoKey] = request.BackupRepo.Name
+		if (request.BackupRepo.AccessByMount() && request.BackupRepoPVC == nil) ||
+			(request.BackupRepo.AccessByTool() && request.ToolConfigSecret == nil) {
+			request.Labels[dataProtectionWaitRepoPreparationKey] = trueVal
+			wait = true
+		}
 	}
 
 	// set annotations
-	request.Annotations[dataProtectionBackupTargetPodKey] = targetPod.Name
+	request.Annotations[dptypes.BackupTargetPodLabelKey] = targetPod.Name
 
 	// set finalizer
 	controllerutil.AddFinalizer(request.Backup, dptypes.DataProtectionFinalizerName)

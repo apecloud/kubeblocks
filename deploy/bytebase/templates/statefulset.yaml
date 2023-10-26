@@ -27,8 +27,8 @@ spec:
     spec:
       containers:
         - name: bytebase
-          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
-          imagePullPolicy: {{.Values.image.pullPolicy}}
+          image: {{ .Values.images.bytebase.registry  }}/{{ .Values.images.bytebase.repository }}:{{ .Values.images.bytebase.tag }}
+          imagePullPolicy: {{.Values.images.bytebase.pullPolicy}}
           env:
             - name: PG_URL
             {{ if $existingPgURLSecret }}

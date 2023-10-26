@@ -209,16 +209,16 @@ const (
 	PostReady   RestoreStage = "postReady"
 )
 
-// VolumeClaimManagementPolicy defines recovery strategy for persistent volume claim.
+// VolumeClaimRestorePolicy defines restore policy for persistent volume claim.
 // Supported policies are as follows:
 // 1. Parallel: parallel recovery of persistent volume claim.
 // 2. Serial: restore the persistent volume claim in sequence, and wait until the
 // previous persistent volume claim is restored before restoring a new one.
 // +enum
 // +kubebuilder:validation:Enum={Parallel,Serial}
-type VolumeClaimManagementPolicy string
+type VolumeClaimRestorePolicy string
 
 const (
-	ParallelManagementPolicy VolumeClaimManagementPolicy = "Parallel"
-	SerialManagementPolicy   VolumeClaimManagementPolicy = "Serial"
+	VolumeClaimRestorePolicyParallel VolumeClaimRestorePolicy = "Parallel"
+	VolumeClaimRestorePolicySerial   VolumeClaimRestorePolicy = "Serial"
 )

@@ -234,9 +234,6 @@ postgresql_slave_init_db() {
     done
     local -r backup_args=("-D" "$PGDATA" "-U" "$POSTGRES_USER" "-h" "$POSTGRESQL_MASTER_HOST" "-p" "$POSTGRESQL_MASTER_PORT_NUMBER" "-X" "stream" "-w" "-v" "-P")
     local backup_cmd=()
-    if am_i_root; then
-        backup_cmd+=("gosu" "$POSTGRES_USER")
-    fi
     backup_cmd+=("$POSTGRESQL_BIN_DIR"/pg_basebackup)
     local replication_counter=$POSTGRESQL_INIT_MAX_TIMEOUT
     while ! PGPASSWORD=$POSTGRES_PASSWORD "${backup_cmd[@]}" "${backup_args[@]}"; do

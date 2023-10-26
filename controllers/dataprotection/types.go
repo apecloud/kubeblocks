@@ -37,15 +37,6 @@ const (
 	maxConcurDataProtectionReconKey = "MAXCONCURRENTRECONCILES_DATAPROTECTION"
 
 	// label keys
-	dataProtectionLabelBackupScheduleKey = "dataprotection.kubeblocks.io/backup-schedule"
-	dataProtectionLabelBackupPolicyKey   = "dataprotection.kubeblocks.io/backup-policy"
-	dataProtectionLabelBackupMethodKey   = "dataprotection.kubeblocks.io/backup-method"
-	dataProtectionLabelBackupTypeKey     = "dataprotection.kubeblocks.io/backup-type"
-	dataProtectionLabelAutoBackupKey     = "dataprotection.kubeblocks.io/autobackup"
-
-	dataProtectionBackupTargetPodKey          = "dataprotection.kubeblocks.io/target-pod-name"
-	dataProtectionAnnotationCreateByPolicyKey = "dataprotection.kubeblocks.io/created-by-policy"
-
 	dataProtectionBackupRepoKey          = "dataprotection.kubeblocks.io/backup-repo-name"
 	dataProtectionWaitRepoPreparationKey = "dataprotection.kubeblocks.io/wait-repo-preparation"
 	dataProtectionIsToolConfigKey        = "dataprotection.kubeblocks.io/is-tool-config"
@@ -93,7 +84,7 @@ const (
 
 	// annotation keys
 	annSelectedNode = "volume.kubernetes.io/selected-node"
-	annPopulateFrom = "dataprotections.kubeblocks.io/populate-from"
+	annPopulateFrom = "dataprotection.kubeblocks.io/populate-from"
 
 	// event reason
 	reasonStartToVolumePopulate = "StartToVolumePopulate"

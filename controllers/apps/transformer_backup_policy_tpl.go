@@ -215,7 +215,9 @@ func (r *BackupPolicyTplTransformer) transformBackupSchedule(
 		// build a new backup schedule from the backup policy template.
 		return r.buildBackupSchedule(scheduleName, backupPolicy), model.ActionCreatePtr()
 	}
-	return backupSchedule, nil
+	// sync backup schedule
+	r.syncBackupSchedule(backupSchedule)
+	return backupSchedule, model.ActionUpdatePtr()
 }
 
 func (r *BackupPolicyTplTransformer) buildBackupSchedule(
@@ -245,6 +247,25 @@ func (r *BackupPolicyTplTransformer) buildBackupSchedule(
 	}
 	backupSchedule.Spec.Schedules = schedules
 	return backupSchedule
+}
+
+func (r *BackupPolicyTplTransformer) syncBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule) {
+	scheduleMethodMap := map[string]struct{}{}
+	for _, s := range backupSchedule.Spec.Schedules {
+		scheduleMethodMap[s.BackupMethod] = struct{}{}
+	}
+	// sync the newly added schedule policies.
+	for _, s := range r.backupPolicy.Schedules {
+		if _, ok := scheduleMethodMap[s.BackupMethod]; ok {
+			continue
+		}
+		backupSchedule.Spec.Schedules = append(backupSchedule.Spec.Schedules, dpv1alpha1.SchedulePolicy{
+			BackupMethod:    s.BackupMethod,
+			CronExpression:  s.CronExpression,
+			Enabled:         s.Enabled,
+			RetentionPeriod: r.backupPolicy.RetentionPeriod,
+		})
+	}
 }
 
 // syncBackupPolicy syncs labels and annotations of the backup policy with the cluster changes.
@@ -425,7 +446,7 @@ func (r *BackupPolicyTplTransformer) mergeClusterBackup(
 			r.EventRecorder.Event(r.Cluster, corev1.EventTypeWarning,
 				"BackupPolicyNotFound", "backup policy is nil, can not enable cluster backup")
 		}
-		return nil
+		return backupSchedule
 	}
 
 	backup := cluster.Spec.Backup

@@ -179,6 +179,7 @@ func (c *rsmRoleProbeConvertor) convert(args ...any) (any, error) {
 		FailureThreshold:    synthesizeComp.LifecycleActions.RoleProbe.FailureThreshold,
 	}
 
+	rsmRoleProbe.RoleUpdateMechanism = synthesizeComp.LifecycleActions.RoleProbe.RoleUpdateMechanism
 	if synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != nil {
 		rsmRoleProbe.BuiltinHandler = synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler
 	}

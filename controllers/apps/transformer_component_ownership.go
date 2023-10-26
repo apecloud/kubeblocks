@@ -40,10 +40,10 @@ func (f *ComponentOwnershipTransformer) Transform(ctx graph.TransformContext, da
 	comp := transCtx.Component
 
 	objects := graphCli.FindAll(dag, &appsv1alpha1.Component{}, model.HaveDifferentTypeWithOption)
-	controllerutil.AddFinalizer(comp, constant.DBComponentDefinitionFinalizerName)
+	controllerutil.AddFinalizer(comp, constant.DBComponentFinalizerName)
 
 	for _, object := range objects {
-		if err := intctrlutil.SetOwnership(comp, object, rscheme, constant.DBComponentDefinitionFinalizerName); err != nil {
+		if err := intctrlutil.SetOwnership(comp, object, rscheme, constant.DBComponentFinalizerName); err != nil {
 			if _, ok := err.(*controllerutil.AlreadyOwnedError); ok {
 				continue
 			}

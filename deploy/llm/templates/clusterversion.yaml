@@ -285,7 +285,7 @@ spec:
       versionsContext:
         initContainers:
           - name: download
-            image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/baichuan2-7b-gguf:ggml-model-q4
+            image: {{ .Values.model.registry | default "docker.io" }}/{{ .Values.model.baichuan2_7b.ggml.repository}}:{{ default .Chart.AppVersion .Values.model.baichuan2_7b.ggml.version }}
             command: ["sh", "-c", "cp /models/ggml-model-q4.gguf /models-target/"]
             volumeMounts:
               - name: models

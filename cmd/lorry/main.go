@@ -45,8 +45,11 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
+var configDir string
+
 func init() {
 	viper.AutomaticEnv()
+	pflag.StringVar(&configDir, "config-path", "/config/lorry/components/", "Lorry default config directory for builtin type")
 }
 
 func main() {
@@ -73,7 +76,7 @@ func main() {
 	ctrl.SetLogger(kzap.New(kopts...))
 
 	// Initialize DB Manager
-	err = register.InitDBManager()
+	err = register.InitDBManager(configDir)
 	if err != nil {
 		panic(errors.Wrap(err, "DB manager initialize failed"))
 	}

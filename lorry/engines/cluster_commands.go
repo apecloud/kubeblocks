@@ -69,7 +69,7 @@ type EngineInfo struct {
 	Database    string
 }
 
-func NewClusterCommands(typeName string) (ClusterCommands, error) {
+func newClusterCommands(typeName string) (ClusterCommands, error) {
 	newFunc, ok := NewCommandFuncs[typeName]
 	if !ok {
 		return nil, fmt.Errorf("unsupported engine type: %s", typeName)

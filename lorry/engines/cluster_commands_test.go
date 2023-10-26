@@ -28,7 +28,7 @@ var _ = Describe("Engine", func() {
 	It("new engine", func() {
 		for _, engineType := range []EngineType{MySQL, PostgreSQL, Redis, PostgreSQL, Nebula, FoxLake} {
 			typeName := string(engineType)
-			engine, _ := NewClusterCommands(typeName)
+			engine, _ := newClusterCommands(typeName)
 			Expect(engine).ShouldNot(BeNil())
 
 			url := engine.ConnectCommand(nil)
@@ -48,7 +48,7 @@ var _ = Describe("Engine", func() {
 
 	It("new unknown engine", func() {
 		typeName := "unknown-type"
-		engine, err := NewClusterCommands(typeName)
+		engine, err := newClusterCommands(typeName)
 		Expect(engine).Should(BeNil())
 		Expect(err).Should(HaveOccurred())
 	})
@@ -56,7 +56,7 @@ var _ = Describe("Engine", func() {
 	It("new execute command ", func() {
 		for _, engineType := range []EngineType{MySQL, PostgreSQL, Redis} {
 			typeName := string(engineType)
-			engine, _ := NewClusterCommands(typeName)
+			engine, _ := newClusterCommands(typeName)
 			Expect(engine).ShouldNot(BeNil())
 
 			_, _, err := engine.ExecuteCommand([]string{"some", "cmd"})
@@ -64,7 +64,7 @@ var _ = Describe("Engine", func() {
 		}
 		for _, engineType := range []EngineType{MongoDB, Nebula} {
 			typeName := string(engineType)
-			engine, _ := NewClusterCommands(typeName)
+			engine, _ := newClusterCommands(typeName)
 			Expect(engine).ShouldNot(BeNil())
 
 			_, _, err := engine.ExecuteCommand([]string{"some", "cmd"})

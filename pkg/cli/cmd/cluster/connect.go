@@ -36,6 +36,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/lorry/engines"
+	"github.com/apecloud/kubeblocks/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/cli/cluster"
 	"github.com/apecloud/kubeblocks/pkg/cli/exec"
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
@@ -254,7 +255,7 @@ func (o *ConnectOptions) connect() error {
 
 	var err error
 
-	if o.engine, err = engines.NewClusterCommands(o.componentDef.CharacterType); err != nil {
+	if o.engine, err = register.NewClusterCommands(o.componentDef.CharacterType); err != nil {
 		return err
 	}
 
@@ -389,7 +390,7 @@ func (o *ConnectOptions) getConnectionInfo() (*engines.ConnectionInfo, error) {
 		return nil, fmt.Errorf("failed to find any cluster endpoints")
 	}
 
-	if o.engine, err = engines.NewClusterCommands(o.componentDef.CharacterType); err != nil {
+	if o.engine, err = register.NewClusterCommands(o.componentDef.CharacterType); err != nil {
 		return nil, err
 	}
 

@@ -97,6 +97,15 @@ func GetDBManager() (engines.DBManager, error) {
 	return nil, errors.Errorf("no db manager")
 }
 
+func NewClusterCommands(typeName string) (engines.ClusterCommands, error) {
+	newFunc, ok := engines.NewCommandFuncs[typeName]
+	if !ok {
+		return nil, fmt.Errorf("unsupported engine type: %s", typeName)
+	}
+
+	return newFunc(), nil
+}
+
 func InitDBManager() error {
 	if dbManager != nil {
 		return nil

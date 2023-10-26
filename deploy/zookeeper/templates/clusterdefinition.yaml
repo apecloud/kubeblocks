@@ -17,11 +17,11 @@ spec:
       characterType: zookeeper
       statefulSpec:
         updateStrategy: BestEffortParallel
-{{/*      monitor:*/}}
-{{/*        builtIn: false*/}}
-{{/*        exporterConfig:*/}}
-{{/*          scrapePath: /metrics*/}}
-{{/*          scrapePort: {{ .Values.metrics.service.port }}*/}}
+      logConfigs:
+        {{- range $name,$pattern := .Values.logConfigs }}
+        - name: {{ $name }}
+          filePathPattern: {{ $pattern }}
+        {{- end }}
       configSpecs:
         - name: zookeeper-config
           namespace: {{ .Release.Namespace }}
@@ -51,6 +51,10 @@ spec:
                 value: "true"
               - name: ZOO_4LW_COMMANDS_WHITELIST
                 value: "srvr, mntr, ruok"
+              - name: ZOO_LOG_DIR
+                value: "/opt/zookeeper/logs"
+              - name: ZOO_LOG4J_PROP
+                value: "INFO,ROLLINGFILE"
               - name: DEBUG_MODEL
                 value: "true"
             ports:

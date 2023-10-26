@@ -26,3 +26,7 @@ containerPorts:
 metrics:
   service:
     port: 1234
+
+logConfigs:
+  info: /opt/zookeeper/logs/zookeeper-*-server-*.log
+  audit: /opt/zookeeper/logs/zookeeper_audit.log

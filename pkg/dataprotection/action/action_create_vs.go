@@ -27,8 +27,8 @@ import (
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -169,10 +169,8 @@ func (c *CreateVolumeSnapshotAction) createVolumeSnapshotIfNotExist(ctx Context,
 		},
 	}
 
-	if pvc.Spec.StorageClassName != nil && *pvc.Spec.StorageClassName != "" {
-		if vscName, err = c.getVolumeSnapshotClassName(ctx.Ctx, ctx.Client, vsCli, *pvc.Spec.StorageClassName); err != nil {
-			return err
-		}
+	if vscName, err = c.getVolumeSnapshotClassName(ctx.Ctx, ctx.Client, vsCli, pvc.Spec.VolumeName); err != nil {
+		return err
 	}
 
 	if vscName != "" {
@@ -196,18 +194,20 @@ func (c *CreateVolumeSnapshotAction) getVolumeSnapshotClassName(
 	ctx context.Context,
 	cli client.Client,
 	vsCli intctrlutil.VolumeSnapshotCompatClient,
-	scName string) (string, error) {
-	scObj := storagev1.StorageClass{}
-	if err := cli.Get(ctx, client.ObjectKey{Name: scName}, &scObj); err != nil {
+	pvName string) (string, error) {
+	pv := &corev1.PersistentVolume{}
+	if err := cli.Get(ctx, types.NamespacedName{Name: pvName}, pv); err != nil {
 		return "", err
 	}
-
+	if pv.Spec.CSI == nil {
+		return "", nil
+	}
 	vscList := vsv1.VolumeSnapshotClassList{}
 	if err := vsCli.List(&vscList); err != nil {
 		return "", err
 	}
 	for _, item := range vscList.Items {
-		if item.Driver == scObj.Provisioner {
+		if item.Driver == pv.Spec.CSI.Driver {
 			return item.Name, nil
 		}
 	}

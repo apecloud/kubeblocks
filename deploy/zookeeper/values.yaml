@@ -9,10 +9,6 @@ images:
     repository: docker.io/dtweave/zookeeper
     pullPolicy: IfNotPresent
     tag: v3.7-1.0.0
-  metrics:
-    repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/agamotto
-    pullPolicy: IfNotPresent
-    tag: 0.1.2-beta.2
 
 ## @param containerPorts.client ZooKeeper client container port
 ## @param containerPorts.tls ZooKeeper TLS container port
@@ -24,10 +20,6 @@ containerPorts:
   quorum: 2888
   election: 3888
   http: 8000
-
-metrics:
-  service:
-    port: 1234
 
 logConfigs:
   info: /opt/zookeeper/logs/zookeeper-*-server-*.log

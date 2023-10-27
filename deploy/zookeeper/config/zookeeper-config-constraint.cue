@@ -26,18 +26,18 @@
   // the location where ZooKeeper will store the in-memory database snapshots and, unless specified otherwise, the transaction log of updates to the database.Be careful where you put the transaction log. A dedicated transaction log device is key to consistent good performance. Putting the log on a busy device will adversely effect performance.
 	"dataDir": string | *"/zookeeper/data"
 
-  //
+  // This option will direct the machine to write the transaction log to the dataLogDir rather than the dataDir. This allows a dedicated log device to be used, and helps avoid competition between logging and snapshots.
 	"dataLogDir": string | *"/zookeeper/log"
 
-  //
+  // When set to false, a single server can be started in replicated mode, a lone participant can run with observers, and a cluster can reconfigure down to one node, and up from one node.
 	"standaloneEnabled": bool | *false
 
-	//
+	// This controls the enabling or disabling of Dynamic Reconfiguration feature
 	"reconfigEnabled": bool | *true
 
-  //
+  // A list of comma separated Four Letter Words commands that user wants to use
 	"4lw.commands.whitelist": string | *"srvr, mntr, ruok"
 
-   //
+   // Dynamic Config File
 	"dynamicConfigFile": string | *"/opt/zookeeper/conf/zoo.cfg.dynamic"
 }

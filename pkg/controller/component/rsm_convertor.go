@@ -248,16 +248,21 @@ func (c *rsmMemberUpdateStrategyConvertor) convert(args ...any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	var memberUpdateStrategy *workloads.MemberUpdateStrategy
 	switch *synthesizeComp.UpdateStrategy {
 	case appsv1alpha1.SerialStrategy:
-		return workloads.SerialUpdateStrategy, nil
+		memberSerialUpdateStrategy := workloads.SerialUpdateStrategy
+		memberUpdateStrategy = &memberSerialUpdateStrategy
 	case appsv1alpha1.ParallelStrategy:
-		return workloads.ParallelUpdateStrategy, nil
+		memberParallelUpdateStrategy := workloads.ParallelUpdateStrategy
+		memberUpdateStrategy = &memberParallelUpdateStrategy
 	case appsv1alpha1.BestEffortParallelStrategy:
-		return workloads.BestEffortParallelUpdateStrategy, err
+		memberBestEffortParallelUpdateStrategy := workloads.BestEffortParallelUpdateStrategy
+		memberUpdateStrategy = &memberBestEffortParallelUpdateStrategy
 	default:
 		return nil, err
 	}
+	return memberUpdateStrategy, err
 }
 
 func (c *rsmPodManagementPolicyConvertor) convert(args ...any) (any, error) {

@@ -50,6 +50,10 @@ const (
 	KBClusterCompNamePlaceHolder    = "$(KB_CLUSTER_COMP_NAME)"
 	KBClusterUIDPostfix8PlaceHolder = "$(KB_CLUSTER_UID_POSTFIX_8)"
 	KBToolsImagePlaceHolder         = "$(KUBEBLOCKS_TOOLS_IMAGE)"
+
+	// KBComponentConnCredentialPlaceHolder is the prefix of the placeholder for componentDefinition connection credential secret name
+	// TODO(xingran): This is a temporary solution used to reference component connection credentials defined in ComponentDefinition. The suffix is ComponentDefinition.Spec.ConnectionCredentials[x].Name, There will be a unified referencing scheme designed in the future.
+	KBComponentConnCredentialPlaceHolder = "$(COMPONENT_CONN_CREDENTIAL_SECRET_NAME)"
 )
 
 const (

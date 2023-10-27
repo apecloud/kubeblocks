@@ -146,8 +146,12 @@ func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		return nil, err
 	}
 
-	// synthesizeComp podSpec containers placeholder replacement
+	// replace podSpec containers env default credential placeholder
 	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForConnCredential(cluster.GetName()))
+
+	// replace podSpec containers env component connection credential placeholder
+	// TODO(xingran): This is a temporary solution used to reference component connection credentials defined in ComponentDefinition. it will be refactored in the future.
+	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForCompConnCredential(cluster.GetName(), synthesizeComp.Name))
 
 	return synthesizeComp, nil
 }
@@ -422,6 +426,13 @@ func GetEnvReplacementMapForConnCredential(clusterName string) map[string]string
 	}
 }
 
+// GetEnvReplacementMapForCompConnCredential gets the replacement map for component connect credential
+func GetEnvReplacementMapForCompConnCredential(clusterName, componentName string) map[string]string {
+	return map[string]string{
+		constant.KBComponentConnCredentialPlaceHolder: constant.GenerateClusterComponentPattern(clusterName, componentName),
+	}
+}
+
 func replaceContainerPlaceholderTokens(component *SynthesizedComponent, namedValuesMap map[string]string) {
 	// replace env[].valueFrom.secretKeyRef.name variables
 	for _, cc := range [][]corev1.Container{component.PodSpec.InitContainers, component.PodSpec.Containers} {
@@ -433,12 +444,12 @@ func replaceContainerPlaceholderTokens(component *SynthesizedComponent, namedVal
 
 // GetReplacementMapForBuiltInEnv gets the replacement map for KubeBlocks built-in environment variables.
 func GetReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName string) map[string]string {
-	cc := fmt.Sprintf("%s-%s", clusterName, componentName)
+	cc := constant.GenerateClusterComponentPattern(clusterName, componentName)
 	replacementMap := map[string]string{
 		constant.KBClusterNamePlaceHolder:     clusterName,
 		constant.KBCompNamePlaceHolder:        componentName,
 		constant.KBClusterCompNamePlaceHolder: cc,
-		constant.KBComponentEnvCMPlaceHolder:  fmt.Sprintf("%s-env", cc),
+		constant.KBComponentEnvCMPlaceHolder:  constant.GenerateClusterComponentEnvPattern(clusterName, componentName),
 	}
 	if len(clusterUID) > 8 {
 		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = clusterUID[len(clusterUID)-8:]

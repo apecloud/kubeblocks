@@ -22,16 +22,14 @@ spec:
       roleSelector:
         - primary
   connectionCredentials:
-    - name: postgresql
+    - name: postgresql-init
       serviceName: postgresql
       portName: tcp-postgresql
-      ## accountName: kbadmin
-      ## credentialSecret:
+      accountName: postgresql-init
     - name: pgbouncer
       serviceName: postgresql
       portName: tcp-pgbouncer
-      ## accountName: kbadmin
-      ## credentialSecret:
+      accountName: postgresql-init
   updateStrategy: BestEffortParallel
   volumes:
     - name: data
@@ -88,6 +86,13 @@ spec:
       volumeName: scripts
       defaultMode: 0555
   systemAccounts:
+    - name: postgresql-init
+      isSystemInitAccount: true
+      passwordGenerationPolicy:
+        length: 16
+        numDigits: 8
+        numSymbols: 8
+        letterCase: MixedCases
     - name: kbadmin
       isSystemInitAccount: false
       statement: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
@@ -153,13 +158,13 @@ spec:
           - name: PGUSER
             valueFrom:
               secretKeyRef:
-                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                name: $(COMPONENT_CONN_CREDENTIAL_SECRET_NAME)-postgresql-init
                 key: username
                 optional: false
           - name: PGPASSWORD
             valueFrom:
               secretKeyRef:
-                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                name: $(COMPONENT_CONN_CREDENTIAL_SECRET_NAME)-postgresql-init
                 key: password
                 optional: false
   runtime:
@@ -260,13 +265,13 @@ spec:
           - name: PGUSER_SUPERUSER
             valueFrom:
               secretKeyRef:
-                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                name: $(COMPONENT_CONN_CREDENTIAL_SECRET_NAME)-postgresql-init
                 key: username
                 optional: false
           - name: PGPASSWORD_SUPERUSER
             valueFrom:
               secretKeyRef:
-                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                name: $(COMPONENT_CONN_CREDENTIAL_SECRET_NAME)-postgresql-init
                 key: password
                 optional: false
           - name: PGUSER_ADMIN
@@ -274,7 +279,7 @@ spec:
           - name: PGPASSWORD_ADMIN
             valueFrom:
               secretKeyRef:
-                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                name: $(COMPONENT_CONN_CREDENTIAL_SECRET_NAME)-postgresql-init
                 key: password
                 optional: false
           - name: PGUSER_STANDBY
@@ -282,19 +287,19 @@ spec:
           - name: PGPASSWORD_STANDBY
             valueFrom:
               secretKeyRef:
-                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                name: $(COMPONENT_CONN_CREDENTIAL_SECRET_NAME)-postgresql-init
                 key: password
                 optional: false
           - name: PGUSER
             valueFrom:
               secretKeyRef:
-                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                name: $(COMPONENT_CONN_CREDENTIAL_SECRET_NAME)-postgresql-init
                 key: username
                 optional: false
           - name: PGPASSWORD
             valueFrom:
               secretKeyRef:
-                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                name: $(COMPONENT_CONN_CREDENTIAL_SECRET_NAME)-postgresql-init
                 key: password
                 optional: false
       - name: pgbouncer
@@ -334,13 +339,13 @@ spec:
           - name: POSTGRESQL_USERNAME
             valueFrom:
               secretKeyRef:
-                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                name: $(COMPONENT_CONN_CREDENTIAL_SECRET_NAME)-postgresql-init
                 key: username
                 optional: false
           - name: POSTGRESQL_PASSWORD
             valueFrom:
               secretKeyRef:
-                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                name: $(COMPONENT_CONN_CREDENTIAL_SECRET_NAME)-postgresql-init
                 key: password
                 optional: false
           - name: POSTGRESQL_PORT
@@ -365,13 +370,13 @@ spec:
           - name: DATA_SOURCE_PASS
             valueFrom:
               secretKeyRef:
-                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                name: $(COMPONENT_CONN_CREDENTIAL_SECRET_NAME)-postgresql-init
                 key: password
                 optional: false
           - name: DATA_SOURCE_USER
             valueFrom:
               secretKeyRef:
-                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                name: $(COMPONENT_CONN_CREDENTIAL_SECRET_NAME)-postgresql-init
                 key: username
                 optional: false
         command:

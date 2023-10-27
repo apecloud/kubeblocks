@@ -69,6 +69,11 @@ func GenerateClusterComponentPattern(clusterName, compName string) string {
 	return fmt.Sprintf("%s-%s", clusterName, compName)
 }
 
+// GenerateClusterComponentEnvPattern generates cluster and component pattern
+func GenerateClusterComponentEnvPattern(clusterName, compName string) string {
+	return fmt.Sprintf("%s-%s-env", clusterName, compName)
+}
+
 // GenerateRSMNamePattern generates rsm name pattern
 func GenerateRSMNamePattern(clusterName, compName string) string {
 	return fmt.Sprintf("%s-%s", clusterName, compName)

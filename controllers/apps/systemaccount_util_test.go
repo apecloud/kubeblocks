@@ -99,7 +99,7 @@ func mockCreateByRefSystemAccount(name appsv1alpha1.AccountName, scope appsv1alp
 			Scope: scope,
 			SecretRef: &appsv1alpha1.ProvisionSecretRef{
 				Namespace: testCtx.DefaultNamespace,
-				Name:      "$(CONN_CREDENTIAL_SECRET_NAME)",
+				Name:      constant.KBConnCredentialPlaceHolder,
 			},
 		},
 	}

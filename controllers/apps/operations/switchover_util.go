@@ -345,7 +345,7 @@ func buildSwitchoverEnvs(ctx context.Context,
 		return nil, errors.New("switchover spec not found")
 	}
 	// replace secret env and merge envs defined in SwitchoverSpec
-	replaceSwitchoverConnCredentialEnv(cluster.Name, componentDef.SwitchoverSpec)
+	replaceSwitchoverConnCredentialEnv(cluster.Name, componentDef.SwitchoverSpec, componentSpec)
 	var switchoverEnvs []corev1.EnvVar
 	switch switchover.InstanceName {
 	case constant.KBSwitchoverCandidateInstanceForAnyPod:
@@ -372,14 +372,16 @@ func buildSwitchoverEnvs(ctx context.Context,
 }
 
 // replaceSwitchoverConnCredentialEnv replaces the connection credential environment variables for the switchover job.
-func replaceSwitchoverConnCredentialEnv(clusterName string, switchoverSpec *appsv1alpha1.SwitchoverSpec) {
+func replaceSwitchoverConnCredentialEnv(clusterName string, switchoverSpec *appsv1alpha1.SwitchoverSpec, componentSpec *appsv1alpha1.ClusterComponentSpec) {
 	if switchoverSpec == nil {
 		return
 	}
-	namedValuesMap := intctrlcomp.GetEnvReplacementMapForConnCredential(clusterName)
+	connCredentialMap := intctrlcomp.GetEnvReplacementMapForConnCredential(clusterName)
+	compConnCredentialMap := intctrlcomp.GetEnvReplacementMapForCompConnCredential(clusterName, componentSpec.Name)
 	replaceEnvVars := func(cmdExecutorConfig *appsv1alpha1.CmdExecutorConfig) {
 		if cmdExecutorConfig != nil {
-			cmdExecutorConfig.Env = intctrlcomp.ReplaceSecretEnvVars(namedValuesMap, cmdExecutorConfig.Env)
+			cmdExecutorConfig.Env = intctrlcomp.ReplaceSecretEnvVars(connCredentialMap, cmdExecutorConfig.Env)
+			cmdExecutorConfig.Env = intctrlcomp.ReplaceSecretEnvVars(compConnCredentialMap, cmdExecutorConfig.Env)
 		}
 	}
 	replaceEnvVars(switchoverSpec.WithCandidate.CmdExecutorConfig)

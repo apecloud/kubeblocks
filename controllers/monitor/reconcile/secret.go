@@ -32,37 +32,38 @@ import (
 
 const OteldSecretName = "oteld-secret"
 
-func Secret(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
+func Secret(reqCtx types.ReconcileCtx, params types.OTeldParams) (err error) {
+	var desired []*corev1.Secret
+
+	buildSecretFn := func(mode monitorv1alpha1.Mode, cg *types.OteldConfigGenerater) (err error) {
+		var secret *corev1.Secret
+
+		daemonSetInstance := reqCtx.OteldCfgRef.GetOteldInstance(mode)
+		if daemonSetInstance == nil {
+			return
+		}
+		if secret, err = buildSecretForOteld(daemonSetInstance, reqCtx.OTeld.Namespace, reqCtx.OteldCfgRef.Exporters, mode, cg); err != nil {
+			return
+		}
+		desired = append(desired, secret)
+		if secret, err = buildEngineSecretForOteld(daemonSetInstance, reqCtx.OTeld.Namespace, mode, cg); err != nil {
+			return
+		}
+		desired = append(desired, secret)
+		return
+	}
+
 	if !reqCtx.OTeld.UseSecret() {
 		return nil
 	}
 
-	desired := make([]*corev1.Secret, 0)
 	cg := types.NewConfigGenerator()
-	daemonSetInstance := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDaemonSet)
-	if daemonSetInstance != nil {
-		secret, _ := buildSecretForOteld(daemonSetInstance, reqCtx.OTeld.Namespace, reqCtx.OteldCfgRef.Exporters, monitorv1alpha1.ModeDaemonSet, cg)
-		if secret != nil {
-			desired = append(desired, secret)
-		}
-		engineSecret, _ := buildEngineSecretForOteld(daemonSetInstance, reqCtx.OTeld.Namespace, monitorv1alpha1.ModeDaemonSet, cg)
-		if engineSecret != nil {
-			desired = append(desired, engineSecret)
-		}
+	if err = buildSecretFn(monitorv1alpha1.ModeDaemonSet, cg); err != nil {
+		return err
 	}
-
-	deploymentInstance := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDeployment)
-	if deploymentInstance != nil {
-		secret, _ := buildSecretForOteld(deploymentInstance, reqCtx.OTeld.Namespace, reqCtx.OteldCfgRef.Exporters, monitorv1alpha1.ModeDeployment, cg)
-		if secret != nil {
-			desired = append(desired, secret)
-		}
-		engineSecret, _ := buildEngineSecretForOteld(deploymentInstance, reqCtx.OTeld.Namespace, monitorv1alpha1.ModeDeployment, cg)
-		if engineSecret != nil {
-			desired = append(desired, engineSecret)
-		}
+	if err = buildSecretFn(monitorv1alpha1.ModeDeployment, cg); err != nil {
+		return err
 	}
-
 	return expectedSecret(reqCtx, params, desired)
 }
 

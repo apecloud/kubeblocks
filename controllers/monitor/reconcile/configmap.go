@@ -30,36 +30,37 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/monitor/types"
 )
 
-func ConfigMap(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
+func ConfigMap(reqCtx types.ReconcileCtx, params types.OTeldParams) (err error) {
+	var desired []*corev1.ConfigMap
+
+	buildConfigMapFn := func(mode monitorv1alpha1.Mode, cg *types.OteldConfigGenerater) (err error) {
+		var configmap *corev1.ConfigMap
+		daemont := reqCtx.OteldCfgRef.GetOteldInstance(mode)
+		if daemont == nil {
+			return
+		}
+		if configmap, err = buildConfigMapForOteld(daemont, reqCtx.OTeld.Namespace, reqCtx.OteldCfgRef.Exporters, mode, cg); err != nil {
+			return
+		}
+		desired = append(desired, configmap)
+		if configmap, err = buildEngineConfigForOteld(daemont, reqCtx.OTeld.Namespace, mode, cg); err != nil {
+			return
+		}
+		desired = append(desired, configmap)
+		return
+	}
+
 	if reqCtx.OTeld.UseSecret() {
-		return nil
+		return
 	}
 
-	desired := make([]*corev1.ConfigMap, 0)
 	cg := types.NewConfigGenerator()
-	if daemont := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDaemonSet); daemont != nil {
-		configmap, _ := buildConfigMapForOteld(daemont, reqCtx.OTeld.Namespace, reqCtx.OteldCfgRef.Exporters, monitorv1alpha1.ModeDaemonSet, cg)
-		if configmap != nil {
-			desired = append(desired, configmap)
-		}
-
-		engineConfig, _ := buildEngineConfigForOteld(daemont, reqCtx.OTeld.Namespace, monitorv1alpha1.ModeDaemonSet, cg)
-		if engineConfig != nil {
-			desired = append(desired, engineConfig)
-		}
+	if err = buildConfigMapFn(monitorv1alpha1.ModeDaemonSet, cg); err != nil {
+		return err
 	}
-
-	if deployment := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDeployment); deployment != nil {
-		configmap, _ := buildConfigMapForOteld(deployment, reqCtx.OTeld.Namespace, reqCtx.OteldCfgRef.Exporters, monitorv1alpha1.ModeDeployment, cg)
-		if configmap != nil {
-			desired = append(desired, configmap)
-		}
-		engineConfig, _ := buildEngineConfigForOteld(deployment, reqCtx.OTeld.Namespace, monitorv1alpha1.ModeDeployment, cg)
-		if engineConfig != nil {
-			desired = append(desired, engineConfig)
-		}
+	if err = buildConfigMapFn(monitorv1alpha1.ModeDeployment, cg); err != nil {
+		return err
 	}
-
 	return expectedConfigMap(reqCtx, params, desired)
 }
 

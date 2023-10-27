@@ -204,11 +204,7 @@ func buildAppConfigVolume(useSecret bool, mode v1alpha1.Mode) corev1.Volume {
 	}
 }
 
-func buildSvcForOtel(oteld *v1alpha1.OTeld, namespace string, mode v1alpha1.Mode) (*corev1.Service, error) {
-	if oteld == nil {
-		return nil, nil
-	}
-
+func buildSvcForOtel(oteld *v1alpha1.OTeld, namespace string, mode v1alpha1.Mode) *corev1.Service {
 	name := fmt.Sprintf(OteldServiceNamePattern, mode)
 	port := oteld.Spec.MetricsPort
 	if oteld.Spec.MetricsPort != 0 {
@@ -254,7 +250,7 @@ func buildSvcForOtel(oteld *v1alpha1.OTeld, namespace string, mode v1alpha1.Mode
 		AddPorts(svcPort, metricsPort).
 		SetType(svcTypes).
 		SetAnnotations(annos).
-		GetObject(), nil
+		GetObject()
 }
 
 func buildConfigMapForOteld(instance *types.OteldInstance, namespace string, exporters *types.Exporters, mode v1alpha1.Mode, gc *types.OteldConfigGenerater) (*corev1.ConfigMap, error) {

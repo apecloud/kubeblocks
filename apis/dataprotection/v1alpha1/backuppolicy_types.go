@@ -110,7 +110,7 @@ type ConnectionCredential struct {
 
 	// passwordKey specifies the map key of the password in the connection credential secret.
 	// this password will be saved in the backup annotation for full backup.
-	// you can use the environment variable DP_ENCRYPTION_KEY to specify encrypted key.
+	// you can use the environment variable DP_ENCRYPTION_KEY to specify encryption key.
 	// +kubebuilder:default=password
 	PasswordKey string `json:"passwordKey,omitempty"`
 

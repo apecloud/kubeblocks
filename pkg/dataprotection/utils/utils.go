@@ -37,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -196,4 +197,13 @@ func CovertEnvToMap(env []corev1.EnvVar) map[string]string {
 		envMap[v.Name] = v.Value
 	}
 	return envMap
+}
+
+func GetBackupType(actionSet *dpv1alpha1.ActionSet, useSnapshot *bool) dpv1alpha1.BackupType {
+	if actionSet != nil {
+		return actionSet.Spec.BackupType
+	} else if boolptr.IsSetToTrue(useSnapshot) {
+		return dpv1alpha1.BackupTypeFull
+	}
+	return ""
 }

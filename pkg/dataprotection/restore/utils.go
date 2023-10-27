@@ -38,6 +38,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 )
 
 func SetRestoreCondition(restore *dpv1alpha1.Restore, status metav1.ConditionStatus, conditionType, reason, message string) {
@@ -219,12 +220,7 @@ func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 	// TODO: check if there is permission for cross namespace recovery.
 
 	// check if the backup is completed exclude continuous backup.
-	var backupType dpv1alpha1.BackupType
-	if backupSet.ActionSet != nil {
-		backupType = backupSet.ActionSet.Spec.BackupType
-	} else if backupSet.UseVolumeSnapshot {
-		backupType = dpv1alpha1.BackupTypeFull
-	}
+	backupType := utils.GetBackupType(backupSet.ActionSet, &backupSet.UseVolumeSnapshot)
 	if backupType != dpv1alpha1.BackupTypeContinuous && backupSet.Backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
 		err = intctrlutil.NewFatalError(fmt.Sprintf(`phase of backup "%s" is not completed`, backupName))
 		return err

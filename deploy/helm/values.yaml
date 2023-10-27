@@ -308,12 +308,11 @@ admissionWebhooks:
 dataProtection:
   enabled: true
   enableVolumeSnapshot: false
-  backupPVCName: ""
-  backupPVCInitCapacity: ""
-  backupPVCStorageClassName: ""
-  backupPVCCreatePolicy: ""
-  backupPVConfigMapName: ""
-  backupPVConfigMapNamespace: ""
+  # customizing the encryption key is strongly recommended.
+  # if you do not specify a custom key, the default key will be used.
+  # using the default key can potentially lead to the exposure of database passwords
+  # if 'get/list' role of the backup CR are compromised.
+  encryptionKey: ""
 
   image:
     registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com

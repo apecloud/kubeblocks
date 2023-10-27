@@ -327,13 +327,15 @@ func (r *RestoreManager) createRestoreAndWait(restore *dpv1alpha1.Restore) error
 			return err
 		}
 	}
-	if restore.Status.Phase == dpv1alpha1.RestorePhaseCompleted {
+
+	switch restore.Status.Phase {
+	case dpv1alpha1.RestorePhaseCompleted:
 		return nil
+	case dpv1alpha1.RestorePhaseFailed:
+		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed, `restore "%s" status is Failed, you can describe it and re-restore the cluster.`, restore.GetName())
+	default:
+		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting, `waiting for restore "%s" successfully`, restore.GetName())
 	}
-	if restore.Status.Phase == dpv1alpha1.RestorePhaseFailed {
-		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed, `restore "%s" is failed, you can describe it and re-restore the cluster.`, restore.GetName())
-	}
-	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting, `waiting for restore "%s" successfully`, restore.GetName())
 }
 
 func (r *RestoreManager) cleanupClusterAnnotations() error {

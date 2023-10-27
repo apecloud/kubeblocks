@@ -288,7 +288,8 @@ func (r *ReconfigureReconciler) performUpgrade(params reconfigureParams) (ctrl.R
 			params.Client,
 			params.Ctx,
 			params.ConfigMap,
-			reconciled(returnedStatus, policy.GetPolicyName(), appsv1alpha1.CFailedAndPausePhase),
+			reconciled(returnedStatus, policy.GetPolicyName(), appsv1alpha1.CFailedAndPausePhase,
+				withFailed(err, false)),
 		)
 	case ESNone:
 		params.Ctx.Recorder.Eventf(

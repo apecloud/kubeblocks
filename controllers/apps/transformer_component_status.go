@@ -56,8 +56,8 @@ const (
 	podScheduledFailedTimeout = 30 * time.Second
 )
 
-// ComponentStatusTransformer computes the current status: read the underlying rsm status and update the component status
-type ComponentStatusTransformer struct {
+// componentStatusTransformer computes the current status: read the underlying rsm status and update the component status
+type componentStatusTransformer struct {
 	client.Client
 }
 
@@ -78,10 +78,10 @@ type componentStatusHandler struct {
 	podsReady bool
 }
 
-var _ graph.Transformer = &ComponentStatusTransformer{}
+var _ graph.Transformer = &componentStatusTransformer{}
 
-func (t *ComponentStatusTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*ComponentTransformContext)
+func (t *componentStatusTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*componentTransformContext)
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      transCtx.Context,
 		Log:      transCtx.Logger,

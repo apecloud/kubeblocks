@@ -26,12 +26,12 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
-type ComponentMetaTransformer struct{}
+type componentMetaTransformer struct{}
 
-var _ graph.Transformer = &ComponentMetaTransformer{}
+var _ graph.Transformer = &componentMetaTransformer{}
 
-func (t *ComponentMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*ComponentTransformContext)
+func (t *componentMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*componentTransformContext)
 	component := transCtx.Component
 
 	if !controllerutil.ContainsFinalizer(component, constant.DBComponentFinalizerName) {

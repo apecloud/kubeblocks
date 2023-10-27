@@ -73,34 +73,34 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	plan, errBuild := planBuilder.
 		AddTransformer(
 			// handle component deletion first
-			&ComponentDeletionTransformer{},
-			&ComponentMetaTransformer{},
+			&componentDeletionTransformer{},
+			&componentMetaTransformer{},
 			// validate referenced componentDefinition objects existence and availability, and build synthesized component
-			&ComponentLoadResourcesTransformer{},
+			&componentLoadResourcesTransformer{},
 			// do spec & definition consistency validation
-			&ComponentValidationTransformer{},
-			// TODO(component): handle RBAC for component workloads
-			&ComponentRBACTransformer{},
+			&componentValidationTransformer{},
 			// handle the component PDB
-			&ComponentPDBTransformer{},
+			&componentPDBTransformer{},
 			// handle the component services
-			&ComponentServiceTransformer{},
+			&componentServiceTransformer{},
 			// handle the connection credentials
-			&ComponentCredentialTransformer{},
-			// TODO(component): handle restore before component transformer
-			&ComponentRestoreTransformer{},
-			// TODO(component): transform backupPolicyTemplate to backuppolicy.dataprotection.kubeblocks.io and backupschedule.dataprotection.kubeblocks.io
-			&ComponentBackupPolicyTransformer{},
+			&componentCredentialTransformer{},
 			// handle tls volume and cert
-			&ComponentTLSTransformer{},
+			&componentTLSTransformer{},
 			// render the component configurations
-			&ComponentConfigurationTransformer{Client: r.Client},
+			&componentConfigurationTransformer{Client: r.Client},
+			// TODO(component): handle restore before component transformer
+			&componentRestoreTransformer{},
 			// handle the component workload
-			&ComponentWorkloadTransformer{Client: r.Client},
+			&componentWorkloadTransformer{Client: r.Client},
+			// TODO(component): transform backupPolicyTemplate to backuppolicy.dataprotection.kubeblocks.io and backupschedule.dataprotection.kubeblocks.io
+			&componentBackupPolicyTransformer{},
+			// handle RBAC for component workloads
+			&componentRBACTransformer{},
 			// add our finalizer to all objects
-			&ComponentOwnershipTransformer{},
+			&componentOwnershipTransformer{},
 			// update component status
-			&ComponentStatusTransformer{Client: r.Client},
+			&componentStatusTransformer{Client: r.Client},
 		).Build()
 
 	// Execute stage

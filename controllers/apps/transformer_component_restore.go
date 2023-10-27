@@ -24,13 +24,13 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-// ComponentRestoreTransformer handles the component PDB
-type ComponentRestoreTransformer struct{}
+// componentRestoreTransformer handles the component PDB
+type componentRestoreTransformer struct{}
 
-var _ graph.Transformer = &ComponentRestoreTransformer{}
+var _ graph.Transformer = &componentRestoreTransformer{}
 
-func (t *ComponentRestoreTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	cctx, _ := ctx.(*ComponentTransformContext)
+func (t *componentRestoreTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	cctx, _ := ctx.(*componentTransformContext)
 	if model.IsObjectDeleting(cctx.ComponentOrig) {
 		return nil
 	}

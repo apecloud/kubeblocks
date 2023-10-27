@@ -29,15 +29,15 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// ComponentConfigurationTransformer handles component configuration render
-type ComponentConfigurationTransformer struct {
+// componentConfigurationTransformer handles component configuration render
+type componentConfigurationTransformer struct {
 	client.Client
 }
 
-var _ graph.Transformer = &ComponentConfigurationTransformer{}
+var _ graph.Transformer = &componentConfigurationTransformer{}
 
-func (t *ComponentConfigurationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*ComponentTransformContext)
+func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*componentTransformContext)
 
 	comp := transCtx.Component
 	cluster := transCtx.Cluster

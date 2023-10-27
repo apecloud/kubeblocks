@@ -189,8 +189,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// TODO(component): transform backupPolicyTemplate to backuppolicy.dataprotection.kubeblocks.io
 			// and backupschedule.dataprotection.kubeblocks.io
 			&BackupPolicyTplTransformer{},
-			// TODO(component): handle rbac for pod
-			&RBACTransformer{Client: r.Client},
 			// add our finalizer to all objects
 			&ClusterOwnershipTransformer{},
 			// make all workload objects depending on credential secret

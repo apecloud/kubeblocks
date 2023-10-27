@@ -51,8 +51,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
-// ComponentWorkloadTransformer handles component rsm workload generation
-type ComponentWorkloadTransformer struct {
+// componentWorkloadTransformer handles component rsm workload generation
+type componentWorkloadTransformer struct {
 	client.Client
 }
 
@@ -70,10 +70,10 @@ type componentWorkloadOps struct {
 	protoRSM *workloads.ReplicatedStateMachine
 }
 
-var _ graph.Transformer = &ComponentWorkloadTransformer{}
+var _ graph.Transformer = &componentWorkloadTransformer{}
 
-func (t *ComponentWorkloadTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*ComponentTransformContext)
+func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*componentTransformContext)
 	cluster := transCtx.Cluster
 	comp := transCtx.Component
 	compOrig := transCtx.ComponentOrig
@@ -124,7 +124,7 @@ func (t *ComponentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	return err
 }
 
-func (t *ComponentWorkloadTransformer) RSMObject(ctx graph.TransformContext,
+func (t *componentWorkloadTransformer) RSMObject(ctx graph.TransformContext,
 	cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) (*workloads.ReplicatedStateMachine, error) {
 	rsms := &workloads.ReplicatedStateMachineList{}
 	inNS := client.InNamespace(cluster.GetNamespace())
@@ -138,7 +138,7 @@ func (t *ComponentWorkloadTransformer) RSMObject(ctx graph.TransformContext,
 	return &rsms.Items[0], nil
 }
 
-func (t *ComponentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG,
+func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG,
 	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, rsm *workloads.ReplicatedStateMachine) error {
 	// TODO(xingran): Some RSM workload operations should be moved down to Lorry implementation. Subsequent operations such as horizontal scaling will be removed from the component controller
 	if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, obj, rsm); err != nil {
@@ -156,7 +156,7 @@ func (t *ComponentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 	return nil
 }
 
-func (t *ComponentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.RequestCtx, dag *graph.DAG,
+func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.RequestCtx, dag *graph.DAG,
 	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, rsm *workloads.ReplicatedStateMachine) error {
 	cwo := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, obj, rsm, dag)
 

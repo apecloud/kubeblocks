@@ -30,21 +30,20 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-// ComponentPDBTransformer handles the component PDB
-type ComponentPDBTransformer struct{}
+// componentPDBTransformer handles the component PDB
+type componentPDBTransformer struct{}
 
-var _ graph.Transformer = &ComponentPDBTransformer{}
+var _ graph.Transformer = &componentPDBTransformer{}
 
-func (t *ComponentPDBTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	cctx, _ := ctx.(*ComponentTransformContext)
-	cluster := cctx.Cluster
-	comp := cctx.Component
-	compOrig := cctx.ComponentOrig
-	synthesizeComp := cctx.SynthesizeComponent
-
-	if model.IsObjectDeleting(compOrig) {
+func (t *componentPDBTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*componentTransformContext)
+	if model.IsObjectDeleting(transCtx.ComponentOrig) {
 		return nil
 	}
+
+	cluster := transCtx.Cluster
+	comp := transCtx.Component
+	synthesizeComp := transCtx.SynthesizeComponent
 
 	obj, err := t.PDBObject(ctx, cluster, comp)
 	if err != nil {
@@ -61,7 +60,7 @@ func (t *ComponentPDBTransformer) Transform(ctx graph.TransformContext, dag *gra
 		pdb = factory.BuildPDB(cluster, synthesizeComp)
 	}
 
-	graphCli, _ := cctx.Client.(model.GraphClient)
+	graphCli, _ := transCtx.Client.(model.GraphClient)
 	if obj == nil {
 		if pdb == nil {
 			// do nothing
@@ -78,7 +77,7 @@ func (t *ComponentPDBTransformer) Transform(ctx graph.TransformContext, dag *gra
 	return nil
 }
 
-func (t *ComponentPDBTransformer) PDBObject(ctx graph.TransformContext,
+func (t *componentPDBTransformer) PDBObject(ctx graph.TransformContext,
 	cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) (*policyv1.PodDisruptionBudget, error) {
 	pdbs := &policyv1.PodDisruptionBudgetList{}
 	inNS := client.InNamespace(cluster.GetNamespace())
@@ -92,7 +91,7 @@ func (t *ComponentPDBTransformer) PDBObject(ctx graph.TransformContext,
 	return &pdbs.Items[0], nil
 }
 
-func (t *ComponentPDBTransformer) handleUpdate(cli model.GraphClient, dag *graph.DAG, obj, pdb *policyv1.PodDisruptionBudget) {
+func (t *componentPDBTransformer) handleUpdate(cli model.GraphClient, dag *graph.DAG, obj, pdb *policyv1.PodDisruptionBudget) {
 	objCopy := obj.DeepCopy()
 	if pdb.Annotations != nil {
 		for k, v := range objCopy.Annotations {

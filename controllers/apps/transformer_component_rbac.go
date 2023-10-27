@@ -20,20 +20,250 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"fmt"
+	"time"
+
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// ComponentRBACTransformer handles the component PDB
-type ComponentRBACTransformer struct{}
+// componentRBACTransformer puts the RBAC objects at the beginning of the DAG
+type componentRBACTransformer struct{}
 
-var _ graph.Transformer = &ComponentRBACTransformer{}
+var _ graph.Transformer = &componentRBACTransformer{}
 
-func (t *ComponentRBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	cctx, _ := ctx.(*ComponentTransformContext)
-	if model.IsObjectDeleting(cctx.ComponentOrig) {
+func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*componentTransformContext)
+	if model.IsObjectDeleting(transCtx.ComponentOrig) {
 		return nil
 	}
-	// TODO(component)
+
+	cluster := transCtx.Cluster
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+
+	serviceAccount, needCRB, err := buildServiceAccounts(transCtx)
+	if err != nil {
+		return err
+	}
+
+	if !viper.GetBool(constant.EnableRBACManager) {
+		transCtx.Logger.V(1).Info("rbac manager is disabled")
+		if !isServiceAccountExist(transCtx, serviceAccount.Name) {
+			transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning,
+				string(ictrlutil.ErrorTypeNotFound), fmt.Sprintf("ServiceAccount %s is not exist", serviceAccount.Name))
+			return ictrlutil.NewRequeueError(time.Second, "RBAC manager is disabled, but service account is not exist")
+		}
+	}
+
+	var parent client.Object
+	rb := factory.BuildRoleBinding(cluster, serviceAccount.Name)
+	graphCli.Create(dag, rb)
+	parent = rb
+	if needCRB {
+		crb := factory.BuildClusterRoleBinding(cluster, serviceAccount.Name)
+		graphCli.Create(dag, crb)
+		graphCli.DependOn(dag, parent, crb)
+		parent = crb
+	}
+
+	createServiceAccount(serviceAccount, graphCli, dag, parent)
+	rsmList := graphCli.FindAll(dag, &workloads.ReplicatedStateMachine{})
+	for _, rsm := range rsmList {
+		// serviceaccount must be created before workload
+		graphCli.DependOn(dag, rsm, serviceAccount)
+	}
+
 	return nil
+}
+
+func isProbesEnabled(compDef *appsv1alpha1.ComponentDefinition) bool {
+	// TODO(component): lorry
+	return compDef.Spec.LifecycleActions != nil && compDef.Spec.LifecycleActions.RoleProbe != nil
+}
+
+func isDataProtectionEnabled(backupTpl *appsv1alpha1.BackupPolicyTemplate, comp *appsv1alpha1.Component) bool {
+	if backupTpl != nil {
+		for _, policy := range backupTpl.Spec.BackupPolicies {
+			// TODO(component): the definition of component referenced by backup policy.
+			if policy.ComponentDefRef == comp.Spec.CompDef {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isVolumeProtectionEnabled(compDef *appsv1alpha1.ComponentDefinition) bool {
+	for _, vol := range compDef.Spec.Volumes {
+		if vol.HighWatermark > 0 && vol.HighWatermark < 100 {
+			return true
+		}
+	}
+	return false
+}
+
+func isServiceAccountExist(transCtx *componentTransformContext, serviceAccountName string) bool {
+	cluster := transCtx.Cluster
+	namespaceName := types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      serviceAccountName,
+	}
+	sa := &corev1.ServiceAccount{}
+	if err := transCtx.Client.Get(transCtx.Context, namespaceName, sa); err != nil {
+		// KubeBlocks will create a rolebinding only if it has RBAC access priority and
+		// the rolebinding is not already present.
+		if errors.IsNotFound(err) {
+			transCtx.Logger.V(1).Info("ServiceAccount not exists", "namespaceName", namespaceName)
+			return false
+		}
+		transCtx.Logger.Error(err, "get ServiceAccount failed")
+		return false
+	}
+	return true
+}
+
+func isClusterRoleBindingExist(transCtx *componentTransformContext, serviceAccountName string) bool {
+	cluster := transCtx.Cluster
+	namespaceName := types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      "kb-" + cluster.Name,
+	}
+	crb := &rbacv1.ClusterRoleBinding{}
+	if err := transCtx.Client.Get(transCtx.Context, namespaceName, crb); err != nil {
+		// KubeBlocks will create a cluster role binding only if it has RBAC access priority and
+		// the cluster role binding is not already present.
+		if errors.IsNotFound(err) {
+			transCtx.Logger.V(1).Info("ClusterRoleBinding not exists", "namespaceName", namespaceName)
+			return false
+		}
+		transCtx.Logger.Error(err, fmt.Sprintf("get cluster role binding failed: %s", namespaceName))
+		return false
+	}
+
+	if crb.RoleRef.Name != constant.RBACClusterRoleName {
+		transCtx.Logger.V(1).Info("rbac manager: ClusterRole not match", "ClusterRole",
+			constant.RBACClusterRoleName, "clusterrolebinding.RoleRef", crb.RoleRef.Name)
+	}
+
+	isServiceAccountMatch := false
+	for _, sub := range crb.Subjects {
+		if sub.Kind == rbacv1.ServiceAccountKind && sub.Name == serviceAccountName {
+			isServiceAccountMatch = true
+			break
+		}
+	}
+
+	if !isServiceAccountMatch {
+		transCtx.Logger.V(1).Info("rbac manager: ServiceAccount not match", "ServiceAccount",
+			serviceAccountName, "clusterrolebinding.Subjects", crb.Subjects)
+	}
+	return true
+}
+
+func isRoleBindingExist(transCtx *componentTransformContext, serviceAccountName string) bool {
+	cluster := transCtx.Cluster
+	namespaceName := types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      "kb-" + cluster.Name,
+	}
+	rb := &rbacv1.RoleBinding{}
+	if err := transCtx.Client.Get(transCtx.Context, namespaceName, rb); err != nil {
+		// KubeBlocks will create a role binding only if it has RBAC access priority and
+		// the role binding is not already present.
+		if errors.IsNotFound(err) {
+			transCtx.Logger.V(1).Info("RoleBinding not exists", "namespaceName", namespaceName)
+			return false
+		}
+		transCtx.Logger.Error(err, fmt.Sprintf("get role binding failed: %s", namespaceName))
+		return false
+	}
+
+	if rb.RoleRef.Name != constant.RBACRoleName {
+		transCtx.Logger.V(1).Info("rbac manager: ClusterRole not match", "ClusterRole",
+			constant.RBACRoleName, "rolebinding.RoleRef", rb.RoleRef.Name)
+	}
+
+	isServiceAccountMatch := false
+	for _, sub := range rb.Subjects {
+		if sub.Kind == rbacv1.ServiceAccountKind && sub.Name == serviceAccountName {
+			isServiceAccountMatch = true
+			break
+		}
+	}
+
+	if !isServiceAccountMatch {
+		transCtx.Logger.V(1).Info("rbac manager: ServiceAccount not match", "ServiceAccount",
+			serviceAccountName, "rolebinding.Subjects", rb.Subjects)
+	}
+	return true
+}
+
+func getDefaultBackupPolicyTemplate(transCtx *componentTransformContext, clusterDefName string) (*appsv1alpha1.BackupPolicyTemplate, error) {
+	backupPolicyTPLs := &appsv1alpha1.BackupPolicyTemplateList{}
+	if err := transCtx.Client.List(transCtx.Context, backupPolicyTPLs, client.MatchingLabels{constant.ClusterDefLabelKey: clusterDefName}); err != nil {
+		return nil, err
+	}
+	if len(backupPolicyTPLs.Items) == 0 {
+		return nil, nil
+	}
+	for _, item := range backupPolicyTPLs.Items {
+		if item.Annotations[dptypes.DefaultBackupPolicyTemplateAnnotationKey] == trueVal {
+			return &item, nil
+		}
+	}
+	return &backupPolicyTPLs.Items[0], nil
+}
+
+func buildServiceAccounts(transCtx *componentTransformContext) (*corev1.ServiceAccount, bool, error) {
+	var (
+		cluster = transCtx.Cluster
+		comp    = transCtx.Component
+		compDef = transCtx.CompDef
+	)
+
+	// TODO(component): dependency on cluster definition
+	backupPolicyTPL, err := getDefaultBackupPolicyTemplate(transCtx, cluster.Spec.ClusterDefRef)
+	if err != nil {
+		return nil, false, err
+	}
+
+	serviceAccountName := comp.Spec.ServiceAccountName
+	volumeProtectionEnable := isVolumeProtectionEnabled(compDef)
+	dataProtectionEnable := isDataProtectionEnabled(backupPolicyTPL, comp)
+	if serviceAccountName == "" {
+		// If probe, volume protection, and data protection are disabled at the same tme, then do not create a service account.
+		if !isProbesEnabled(compDef) && !volumeProtectionEnable && !dataProtectionEnable {
+			return nil, false, nil
+		}
+		serviceAccountName = fmt.Sprintf("kb-%s", comp.Name)
+	}
+
+	if isRoleBindingExist(transCtx, serviceAccountName) && isServiceAccountExist(transCtx, serviceAccountName) {
+		// Volume protection requires the clusterRoleBinding permission, if volume protection is not enabled or the corresponding clusterRoleBinding already exists, then skip.
+		if !volumeProtectionEnable || isClusterRoleBindingExist(transCtx, serviceAccountName) {
+			return nil, false, nil
+		}
+	}
+
+	// if volume protection is enabled, the service account needs to be bound to the clusterRoleBinding.
+	return factory.BuildServiceAccount(cluster, serviceAccountName), volumeProtectionEnable, nil
+}
+
+func createServiceAccount(serviceAccount *corev1.ServiceAccount, graphCli model.GraphClient, dag *graph.DAG, parent client.Object) {
+	// serviceAccount must be created before roleBinding and clusterRoleBinding
+	graphCli.Create(dag, serviceAccount)
+	graphCli.DependOn(dag, parent, serviceAccount)
 }

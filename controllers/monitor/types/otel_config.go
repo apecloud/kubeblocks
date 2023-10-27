@@ -255,12 +255,24 @@ func (cg *OteldConfigGenerater) appendServices(cfg yaml.MapSlice, instance *Otel
 	serviceSlice := yaml.MapSlice{}
 	piplneItem := cg.buildPiplineItem(instance)
 	serviceSlice = append(serviceSlice, piplneItem)
-	extensionSlice, err := buildSliceFromCUE(ServicePath, map[string]any{})
+	valmap := buildServiceValMap(instance)
+	extensionSlice, err := buildSliceFromCUE(ServicePath, valmap)
 	if err != nil {
 		return nil, err
 	}
 	serviceSlice = append(serviceSlice, extensionSlice...)
 	return append(cfg, yaml.MapItem{Key: "service", Value: serviceSlice}), nil
+}
+
+func buildServiceValMap(instance *OteldInstance) map[string]any {
+	valMap := map[string]any{}
+	if instance.Oteld.Spec.LogsLevel != "" {
+		valMap["log_level"] = instance.Oteld.Spec.LogsLevel
+	}
+	if instance.Oteld.Spec.MetricsPort != 0 {
+		valMap["metrics_port"] = instance.Oteld.Spec.MetricsPort
+	}
+	return valMap
 }
 
 func (cg *OteldConfigGenerater) buildPiplineItem(instance *OteldInstance) yaml.MapItem {

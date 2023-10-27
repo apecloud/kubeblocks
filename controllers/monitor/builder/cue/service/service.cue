@@ -16,8 +16,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 parameters: {
-	logLevel: *"debug" | string
-  metricsPort: *6668 | int
+	log_level: *"debug" | string
+  metrics_port: *6668 | int
 }
 
 output: {

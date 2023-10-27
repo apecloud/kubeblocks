@@ -22,6 +22,18 @@ package client
 import "context"
 
 type Client interface {
+	// GetRole return the replication role(like primary/secondary) of the target replica
+	GetRole(ctx context.Context) (string, error)
+
+	// user related funcs
+	CreateUser(ctx context.Context, userName, password string) error
+	DeleteUser(ctx context.Context, userName string) error
+	DescribeUser(ctx context.Context, userName string) (map[string]any, error)
+	GrantUserRole(ctx context.Context, userName, roleName string) error
+	RevokeUserRole(ctx context.Context, userName, roleName string) error
+	ListUsers(ctx context.Context) ([]map[string]any, error)
+	ListSystemAccounts(ctx context.Context) ([]map[string]any, error)
+
 	// JoinMember sends a join member operation request to Lorry, located on the target pod that is about to join.
 	JoinMember(ctx context.Context) error
 

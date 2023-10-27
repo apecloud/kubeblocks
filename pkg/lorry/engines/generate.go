@@ -19,4 +19,4 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package engines
 
-//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../hack/boilerplate.go.txt -package engines -destination dbmanager_mock.go github.com/apecloud/kubeblocks/pkg/lorry/engines DBManager
+//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../hack/boilerplate.go.txt -package engines -destination dbmanager_mock.go github.com/apecloud/kubeblocks/pkg/lorry/engines DBManager

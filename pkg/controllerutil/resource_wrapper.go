@@ -179,11 +179,11 @@ func (r *ResourceFetcher[T]) Complete() error {
 	return r.Err
 }
 
-type fetcher struct {
-	ResourceFetcher[fetcher]
+type Fetcher struct {
+	ResourceFetcher[Fetcher]
 }
 
-func NewResourceFetcher(resourceCtx *ResourceCtx) *fetcher {
-	f := &fetcher{}
+func NewResourceFetcher(resourceCtx *ResourceCtx) *Fetcher {
+	f := &Fetcher{}
 	return f.Init(resourceCtx, f)
 }

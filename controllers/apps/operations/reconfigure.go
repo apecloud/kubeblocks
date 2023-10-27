@@ -45,7 +45,6 @@ func init() {
 		OpsHandler:                         &reAction,
 		ProcessingReasonInClusterCondition: ProcessingReasonReconfiguring,
 	}
-	intctrlutil.ConfigEventHandlerMap["ops_status_reconfigure"] = &reAction
 	opsManager.RegisterOps(appsv1alpha1.ReconfiguringType, reconfigureBehaviour)
 }
 
@@ -58,84 +57,19 @@ func (r *reconfigureAction) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx,
 	return nil
 }
 
-func (r *reconfigureAction) Handle(eventContext intctrlutil.ConfigEventContext, lastOpsRequest string, phase appsv1alpha1.OpsPhase, cfgError error) error {
-	var (
-		opsRequest = &appsv1alpha1.OpsRequest{}
-		cm         = eventContext.ConfigMap
-		cli        = eventContext.Client
-		ctx        = eventContext.ReqCtx.Ctx
-	)
-
-	opsRes := &OpsResource{
-		OpsRequest: opsRequest,
-		Recorder:   eventContext.ReqCtx.Recorder,
-		Cluster:    eventContext.Cluster,
-	}
-
-	if len(lastOpsRequest) == 0 {
-		return nil
-	}
-	if err := cli.Get(ctx, client.ObjectKey{
-		Name:      lastOpsRequest,
-		Namespace: cm.Namespace,
-	}, opsRequest); err != nil {
-		return err
-	}
-
-	opsDeepCopy := opsRequest.DeepCopy()
-	if err := patchReconfigureOpsStatus(opsRes, eventContext.ConfigSpecName,
-		handleReconfigureStatusProgress(eventContext.PolicyStatus, phase, &opsRequest.Status)); err != nil {
-		return err
-	}
-
-	switch phase {
-	case appsv1alpha1.OpsSucceedPhase:
-		// only update the condition of the opsRequest.
-		eventContext.ReqCtx.Recorder.Eventf(opsRequest,
-			corev1.EventTypeNormal,
-			appsv1alpha1.ReasonReconfigureSucceed,
-			"the reconfigure has been processed successfully")
-		return PatchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
-			appsv1alpha1.NewReconfigureRunningCondition(opsRequest,
-				appsv1alpha1.ReasonReconfigureSucceed,
-				eventContext.ConfigSpecName,
-				formatConfigPatchToMessage(eventContext.ConfigPatch, &eventContext.PolicyStatus)),
-			appsv1alpha1.NewSucceedCondition(opsRequest))
-	case appsv1alpha1.OpsFailedPhase:
-		eventContext.ReqCtx.Recorder.Eventf(opsRequest,
-			corev1.EventTypeWarning,
-			appsv1alpha1.ReasonReconfigureFailed,
-			"failed to process the reconfigure, error: %v", cfgError)
-		return PatchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
-			appsv1alpha1.NewReconfigureRunningCondition(opsRequest,
-				appsv1alpha1.ReasonReconfigureFailed,
-				eventContext.ConfigSpecName,
-				formatConfigPatchToMessage(eventContext.ConfigPatch, &eventContext.PolicyStatus)),
-			appsv1alpha1.NewReconfigureFailedCondition(opsRequest, cfgError))
-	default:
-		return PatchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
-			appsv1alpha1.NewReconfigureRunningCondition(opsRequest,
-				appsv1alpha1.ReasonReconfigureRunning,
-				eventContext.ConfigSpecName))
-	}
-}
-
-func handleReconfigureStatusProgress(execStatus core.PolicyExecStatus, phase appsv1alpha1.OpsPhase, opsStatus *appsv1alpha1.OpsRequestStatus) handleReconfigureOpsStatus {
+func handleReconfigureStatusProgress(result *appsv1alpha1.ReconcileDetail, opsStatus *appsv1alpha1.OpsRequestStatus, phase appsv1alpha1.ConfigurationPhase) handleReconfigureOpsStatus {
 	return func(cmStatus *appsv1alpha1.ConfigurationItemStatus) (err error) {
-		cmStatus.LastAppliedStatus = execStatus.ExecStatus
-		cmStatus.UpdatePolicy = appsv1alpha1.UpgradePolicy(execStatus.PolicyName)
-		cmStatus.SucceedCount = execStatus.SucceedCount
-		cmStatus.ExpectedCount = execStatus.ExpectedCount
+		// the Pending phase is waiting to be executed, and there is currently no valid ReconcileDetail information.
+		if result != nil && phase != appsv1alpha1.CPendingPhase {
+			cmStatus.LastAppliedStatus = result.ExecResult
+			cmStatus.UpdatePolicy = appsv1alpha1.UpgradePolicy(result.Policy)
+			cmStatus.SucceedCount = result.SucceedCount
+			cmStatus.ExpectedCount = result.ExpectedCount
+			cmStatus.Message = result.ErrMessage
+			cmStatus.Status = string(phase)
+		}
 		if cmStatus.SucceedCount != core.Unconfirmed && cmStatus.ExpectedCount != core.Unconfirmed {
 			opsStatus.Progress = getSlowestReconfiguringProgress(opsStatus.ReconfiguringStatus.ConfigurationStatus)
-		}
-		switch phase {
-		case appsv1alpha1.OpsSucceedPhase:
-			cmStatus.Status = appsv1alpha1.ReasonReconfigureSucceed
-		case appsv1alpha1.OpsFailedPhase:
-			cmStatus.Status = appsv1alpha1.ReasonReconfigureFailed
-		default:
-			cmStatus.Status = appsv1alpha1.ReasonReconfigureRunning
 		}
 		return
 	}
@@ -143,7 +77,7 @@ func handleReconfigureStatusProgress(execStatus core.PolicyExecStatus, phase app
 
 func handleNewReconfigureRequest(configPatch *core.ConfigPatchInfo, lastAppliedConfigs map[string]string) handleReconfigureOpsStatus {
 	return func(cmStatus *appsv1alpha1.ConfigurationItemStatus) (err error) {
-		cmStatus.Status = appsv1alpha1.ReasonReconfigureMerged
+		cmStatus.Status = appsv1alpha1.ReasonReconfigurePersisted
 		cmStatus.LastAppliedConfiguration = lastAppliedConfigs
 		if configPatch != nil {
 			cmStatus.UpdatedParameters = appsv1alpha1.UpdatedParameters{
@@ -156,48 +90,11 @@ func handleNewReconfigureRequest(configPatch *core.ConfigPatchInfo, lastAppliedC
 	}
 }
 
-func (r *reconfigureAction) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
-	status := opsRes.OpsRequest.Status
-	if len(status.Conditions) == 0 {
-		return status.Phase, 30 * time.Second, nil
-	}
-	condition := status.Conditions[len(status.Conditions)-1]
-	isNoChanged := isNoChange(condition)
-	if isSucceedPhase(condition) || isNoChanged {
-		// TODO Sync reload progress from config manager.
-		return appsv1alpha1.OpsSucceedPhase, 0, nil
-	}
-	if isFailedPhase(condition) {
-		// TODO Sync reload progress from config manager.
-		return appsv1alpha1.OpsFailedPhase, 0, nil
-	}
-	if !isRunningPhase(condition) {
-		return appsv1alpha1.OpsRunningPhase, 30 * time.Second, nil
-	}
-
-	ops := &opsRes.OpsRequest.Spec
-	if ops.Reconfigure == nil || len(ops.Reconfigure.Configurations) == 0 {
-		return appsv1alpha1.OpsFailedPhase, 0, nil
-	}
-	phase, err := r.syncReconfigureOperatorStatus(reqCtx, cli, opsRes)
-	switch {
-	default:
-		return appsv1alpha1.OpsRunningPhase, 30 * time.Second, nil
-	case err != nil:
-		return "", 30 * time.Second, err
-	case phase == appsv1alpha1.OpsFailedPhase:
-		return appsv1alpha1.OpsFailedPhase, 0, err
-	case phase == appsv1alpha1.OpsSucceedPhase:
-		return appsv1alpha1.OpsSucceedPhase, 0, nil
-	}
-}
-
-func (r *reconfigureAction) syncReconfigureOperatorStatus(ctx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, error) {
-
+func (r *reconfigureAction) syncDependResources(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*intctrlutil.Fetcher, error) {
 	ops := &opsRes.OpsRequest.Spec
 	configSpec := ops.Reconfigure.Configurations[0]
 	fetcher := intctrlutil.NewResourceFetcher(&intctrlutil.ResourceCtx{
-		Context:       ctx.Ctx,
+		Context:       reqCtx.Ctx,
 		Client:        cli,
 		Namespace:     opsRes.Cluster.Namespace,
 		ClusterName:   ops.ClusterRef,
@@ -211,48 +108,46 @@ func (r *reconfigureAction) syncReconfigureOperatorStatus(ctx intctrlutil.Reques
 		ConfigMap(configSpec.Name).
 		Complete()
 	if err != nil {
-		return appsv1alpha1.OpsRunningPhase, err
+		return nil, err
+	}
+	return fetcher, nil
+}
+
+func (r *reconfigureAction) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
+	status := opsRes.OpsRequest.Status
+	if len(status.Conditions) == 0 {
+		return status.Phase, 30 * time.Second, nil
+	}
+	if isNoChange(status.Conditions) {
+		return appsv1alpha1.OpsSucceedPhase, 0, nil
 	}
 
-	item := fetcher.ConfigurationObj.Spec.GetConfigurationItem(configSpec.Name)
-	if item == nil {
-		return appsv1alpha1.OpsRunningPhase, nil
+	ops := &opsRes.OpsRequest.Spec
+	if ops.Reconfigure == nil || len(ops.Reconfigure.Configurations) == 0 {
+		return appsv1alpha1.OpsFailedPhase, 0, nil
 	}
 
-	switch intctrlutil.GetConfigSpecReconcilePhase(fetcher.ConfigMapObj, *item, fetcher.ConfigurationObj.Status.GetItemStatus(configSpec.Name)) {
-	default:
-		return appsv1alpha1.OpsRunningPhase, nil
+	resource, err := r.syncDependResources(reqCtx, cli, opsRes)
+	if err != nil {
+		return "", 30 * time.Second, err
+	}
+	configSpec := ops.Reconfigure.Configurations[0]
+	item := resource.ConfigurationObj.Spec.GetConfigurationItem(configSpec.Name)
+	itemStatus := resource.ConfigurationObj.Status.GetItemStatus(configSpec.Name)
+	if item == nil || itemStatus == nil {
+		return appsv1alpha1.OpsRunningPhase, 30 * time.Second, nil
+	}
+
+	switch phase := reconfiguringPhase(resource, *item, itemStatus); phase {
+	case appsv1alpha1.CCreatingPhase, appsv1alpha1.CInitPhase:
+		return appsv1alpha1.OpsFailedPhase, 0, core.MakeError("the configuration is creating or initializing, is not ready to reconfigure")
 	case appsv1alpha1.CFailedAndPausePhase:
-		return appsv1alpha1.OpsFailedPhase, nil
+		return appsv1alpha1.OpsFailedPhase, 0, nil
 	case appsv1alpha1.CFinishedPhase:
-		return appsv1alpha1.OpsSucceedPhase, nil
+		return appsv1alpha1.OpsSucceedPhase, 0, nil
+	default:
+		return syncStatus(cli, reqCtx, opsRes, itemStatus, phase)
 	}
-}
-
-func isExpectedPhase(condition metav1.Condition, expectedTypes []string, expectedStatus metav1.ConditionStatus) bool {
-	for _, t := range expectedTypes {
-		if t == condition.Type && condition.Status == expectedStatus {
-			return true
-		}
-	}
-	return false
-}
-
-func isSucceedPhase(condition metav1.Condition) bool {
-	return isExpectedPhase(condition, []string{appsv1alpha1.ConditionTypeSucceed, appsv1alpha1.ReasonReconfigureSucceed}, metav1.ConditionTrue)
-}
-
-func isNoChange(condition metav1.Condition) bool {
-	return isExpectedPhase(condition, []string{appsv1alpha1.ReasonReconfigureNoChanged}, metav1.ConditionTrue)
-}
-
-func isFailedPhase(condition metav1.Condition) bool {
-	return isExpectedPhase(condition, []string{appsv1alpha1.ConditionTypeFailed, appsv1alpha1.ReasonReconfigureFailed}, metav1.ConditionFalse)
-}
-
-func isRunningPhase(condition metav1.Condition) bool {
-	return isExpectedPhase(condition, []string{appsv1alpha1.ReasonReconfigureRunning, appsv1alpha1.ReasonReconfigureMerged},
-		metav1.ConditionTrue)
 }
 
 func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) error {
@@ -269,21 +164,20 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 	}
 
 	// TODO support multi tpl conditions merge
+	item := reconfigure.Configurations[0]
 	opsPipeline := newPipeline(reconfigureContext{
 		cli:           cli,
 		reqCtx:        reqCtx,
 		resource:      resource,
-		config:        reconfigure.Configurations[0],
+		config:        item,
 		clusterName:   clusterName,
 		componentName: componentName,
 	})
 
 	result := opsPipeline.
-		ClusterDef().
-		ClusterVer().
+		Configuration().
 		Validate().
-		Configuration(). // for new configuration
-		ConfigMap(opsPipeline.config.Name).
+		ConfigMap(item.Name).
 		ConfigConstraints().
 		Merge().
 		UpdateOpsLabel().
@@ -296,7 +190,7 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 
 	reqCtx.Recorder.Eventf(resource.OpsRequest,
 		corev1.EventTypeNormal,
-		appsv1alpha1.ReasonReconfigureMerged,
+		appsv1alpha1.ReasonReconfigurePersisted,
 		"the reconfiguring operation of component[%s] in cluster[%s] merged successfully", componentName, clusterName)
 
 	// merged successfully
@@ -319,9 +213,51 @@ func needReconfigure(request *appsv1alpha1.OpsRequest) bool {
 
 	// Check if the reconfiguring operation has been processed.
 	for _, condition := range request.Status.Conditions {
-		if isExpectedPhase(condition, []string{appsv1alpha1.ReasonReconfigureMerged, appsv1alpha1.ReasonReconfigureNoChanged}, metav1.ConditionTrue) {
+		if isExpectedPhase(condition, []string{appsv1alpha1.ReasonReconfigurePersisted, appsv1alpha1.ReasonReconfigureNoChanged}, metav1.ConditionTrue) {
 			return false
 		}
 	}
 	return true
+}
+
+func syncStatus(cli client.Client, reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, status *appsv1alpha1.ConfigurationItemDetailStatus, phase appsv1alpha1.ConfigurationPhase) (appsv1alpha1.OpsPhase, time.Duration, error) {
+	opsDeepCopy := opsRes.OpsRequest.DeepCopy()
+	if err := patchReconfigureOpsStatus(opsRes, status.Name,
+		handleReconfigureStatusProgress(status.ReconcileDetail, &opsRes.OpsRequest.Status, phase)); err != nil {
+		return "", 30 * time.Second, err
+	}
+	if err := PatchOpsStatusWithOpsDeepCopy(reqCtx.Ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
+		appsv1alpha1.NewReconfigureRunningCondition(opsRes.OpsRequest,
+			appsv1alpha1.ReasonReconfigureRunning,
+			status.Name)); err != nil {
+		return "", 30 * time.Second, err
+	}
+	return appsv1alpha1.OpsRunningPhase, 30 * time.Second, nil
+}
+
+func reconfiguringPhase(resource *intctrlutil.Fetcher,
+	detail appsv1alpha1.ConfigurationItemDetail,
+	status *appsv1alpha1.ConfigurationItemDetailStatus) appsv1alpha1.ConfigurationPhase {
+	if status.ReconcileDetail == nil || status.ReconcileDetail.CurrentRevision != status.UpdateRevision {
+		return appsv1alpha1.CPendingPhase
+	}
+	return intctrlutil.GetConfigSpecReconcilePhase(resource.ConfigMapObj, detail, status)
+}
+
+func isExpectedPhase(condition metav1.Condition, expectedTypes []string, expectedStatus metav1.ConditionStatus) bool {
+	for _, t := range expectedTypes {
+		if t == condition.Type && condition.Status == expectedStatus {
+			return true
+		}
+	}
+	return false
+}
+
+func isNoChange(conditions []metav1.Condition) bool {
+	for i := len(conditions); i > 0; i-- {
+		if isExpectedPhase(conditions[i-1], []string{appsv1alpha1.ReasonReconfigureNoChanged}, metav1.ConditionTrue) {
+			return true
+		}
+	}
+	return false
 }

@@ -116,6 +116,7 @@ var _ = Describe("Component", func() {
 			AddVolumeClaimTemplate(testapps.DataVolumeName, testapps.NewPVCSpec(defaultVolumeSize)).
 			GetObject()
 
+		clusterObj.SetUID(types.UID(clusterObj.Name))
 		reqCtx = intctrlutil.RequestCtx{Ctx: ctx, Log: logger, Recorder: recorder}
 		dag = newDAGWithPlaceholder(clusterObj.Namespace, clusterName, statefulCompName)
 	}

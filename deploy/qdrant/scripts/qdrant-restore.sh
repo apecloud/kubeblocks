@@ -5,7 +5,7 @@ set -o pipefail
 export PATH="$PATH:$DP_DATASAFED_BIN_PATH"
 export DATASAFED_BACKEND_BASE_PATH="$DP_BACKUP_BASE_PATH"
 mkdir -p ${DATA_DIR}
-res=`ls -A ${DATA_DIR}`
+res=`find ${DATA_DIR} -type f`
 if [ ! -z "${res}" ]; then
   echo "${DATA_DIR} is not empty! Please make sure that the directory is empty before restoring the backup."
   exit 1

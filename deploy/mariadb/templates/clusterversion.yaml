@@ -1,0 +1,13 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: mariadb
+spec:
+  clusterDefinitionRef: mariadb
+  componentVersions:
+  - componentDefRef: mariadb-compdef
+    versionsContext:
+      containers:
+      - name: mariadb-container
+        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}

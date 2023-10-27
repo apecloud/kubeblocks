@@ -41,43 +41,60 @@ spec:
               collectionInterval:
                 description: CollectionInterval is the interval of the data source
                 type: string
-              componentName:
+              components:
                 description: ComponentName is the component name of the data source
-                type: string
-              containerName:
-                description: ContainerName is the container name of the data source
-                type: string
-              externalLabels:
-                additionalProperties:
-                  type: string
-                type: object
-              logs:
-                description: LogsConfig is the logs config
-                properties:
-                  enabled:
-                    type: boolean
-                  logCollector:
-                    additionalProperties:
-                      properties:
-                        include:
-                          items:
-                            type: string
-                          type: array
-                      type: object
-                    type: object
-                type: object
-              metrics:
-                description: MetricsConfig is the metrics config
-                properties:
-                  collectionInterval:
-                    type: string
-                  enabled:
-                    type: boolean
-                  enabledMetrics:
-                    items:
+                items:
+                  properties:
+                    componentName:
                       type: string
-                    type: array
-                type: object
+                    containers:
+                      items:
+                        properties:
+                          collectorName:
+                            description: CollectorName is the collector name of the
+                              data source to collect
+                            type: string
+                          containerName:
+                            description: ContainerName is the container name of the
+                              data source to collect
+                            type: string
+                          externalLabels:
+                            additionalProperties:
+                              type: string
+                            description: ExternalLabels is the external labels added
+                              to the data source
+                            type: object
+                          logs:
+                            description: LogsConfig is the logs config
+                            properties:
+                              enabled:
+                                type: boolean
+                              logCollector:
+                                additionalProperties:
+                                  properties:
+                                    include:
+                                      items:
+                                        type: string
+                                      type: array
+                                  type: object
+                                type: object
+                            type: object
+                          metrics:
+                            description: MetricsConfig is the metrics config
+                            properties:
+                              collectionInterval:
+                                type: string
+                              enabled:
+                                type: boolean
+                              enabledMetrics:
+                                items:
+                                  type: string
+                                type: array
+                            type: object
+                        type: object
+                      type: array
+                  type: object
+                type: array
               mode:
                 description: Mode represents how the OTeld should be deployed (deployment,
                   daemonset, statefulset or sidecar)

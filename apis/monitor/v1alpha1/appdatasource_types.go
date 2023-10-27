@@ -44,6 +44,30 @@ type LogsDataSource struct {
 	LogCollector map[string]InputConfig `json:"logCollector,omitempty"`
 }
 
+type Container struct {
+
+	// ContainerName is the container name of the data source to collect
+	ContainerName string `json:"containerName,omitempty"`
+
+	// CollectorName is the collector name of the data source to collect
+	CollectorName string `json:"collectorName,omitempty"`
+
+	// MetricsConfig is the metrics config
+	Metrics *MetricsDataSource `json:"metrics,omitempty"`
+
+	// LogsConfig is the logs config
+	Logs *LogsDataSource `json:"logs,omitempty"`
+
+	// ExternalLabels is the external labels added to the data source
+	ExternalLabels map[string]string `json:"externalLabels,omitempty"`
+}
+
+type Component struct {
+	ComponentName string `json:"componentName,omitempty"`
+
+	Containers []Container `json:"containers,omitempty"`
+}
+
 // AppDataSourceSpec defines the desired state of AppDataSource
 type AppDataSourceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
@@ -64,19 +88,7 @@ type AppDataSourceSpec struct {
 
 	// ComponentName is the component name of the data source
 	// +kubebuilder:validation:Required
-	ComponentName string `json:"componentName,omitempty"`
-
-	// ContainerName is the container name of the data source
-	// +kubebuilder:validation:Required
-	ContainerName string `json:"containerName,omitempty"`
-
-	// MetricsConfig is the metrics config
-	Metrics *MetricsDataSource `json:"metrics,omitempty"`
-
-	// LogsConfig is the logs config
-	Logs *LogsDataSource `json:"logs,omitempty"`
-
-	ExternalLabels map[string]string `json:"externalLabels,omitempty"`
+	Components []Component `json:"components,omitempty"`
 
 	// CollectionInterval is the interval of the data source
 	CollectionInterval string `json:"collectionInterval,omitempty"`

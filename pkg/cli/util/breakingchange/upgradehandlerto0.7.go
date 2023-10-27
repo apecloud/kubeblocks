@@ -24,17 +24,21 @@ import (
 	"fmt"
 	"strings"
 
+	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/dynamic"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )
 
 var _ upgradeHandler = &upgradeHandlerTo7{}
@@ -57,6 +61,11 @@ func (u *upgradeHandlerTo7) snapshot(dynamic dynamic.Interface) (map[string][]un
 	if err := fillResourcesMap(dynamic, resourcesMap, types.BackupGVR()); err != nil {
 		return nil, err
 	}
+
+	// get stateful_set objs
+	if err := fillResourcesMap(dynamic, resourcesMap, types.StatefulSetGVR()); err != nil {
+		return nil, err
+	}
 	return resourcesMap, nil
 }
 
@@ -70,6 +79,10 @@ func (u *upgradeHandlerTo7) transform(dynamic dynamic.Interface, resourcesMap ma
 				}
 			case types.KindBackup:
 				if err := u.transformBackup(dynamic, obj); err != nil {
+					return err
+				}
+			case types.KindStatefulSet:
+				if err := u.transformStatefulSet(dynamic, obj); err != nil {
 					return err
 				}
 			}
@@ -399,6 +412,63 @@ func (u *upgradeHandlerTo7) transformBackup(dynamic dynamic.Interface, obj unstr
 	newObj.Object["status"] = newStatusData
 	if _, err := dynamic.Resource(types.BackupGVR()).Namespace(newObj.GetNamespace()).UpdateStatus(context.TODO(), newObj, metav1.UpdateOptions{}); err != nil {
 		return fmt.Errorf("update status of backup %s failed: %s", obj.GetName(), err.Error())
+	}
+	return nil
+}
+
+func (u *upgradeHandlerTo7) transformStatefulSet(dynamic dynamic.Interface, obj unstructured.Unstructured) error {
+	// filter objects not managed by KB
+	labels := obj.GetLabels()
+	if labels == nil || labels[constant.AppManagedByLabelKey] != constant.AppName {
+		return nil
+	}
+	// create a rsm
+	serviceName, _, _ := unstructured.NestedString(obj.Object, "spec", "serviceName")
+	matchLabels, _, _ := unstructured.NestedStringMap(obj.Object, "spec", "selector", "matchLabels")
+	replicas, _, _ := unstructured.NestedInt64(obj.Object, "spec", "replicas")
+	podManagementPolicy, _, _ := unstructured.NestedString(obj.Object, "spec", "podManagementPolicy")
+	pvcsUnstructured, _, _ := unstructured.NestedSlice(obj.Object, "spec", "volumeClaimTemplates")
+	var pvcs []corev1.PersistentVolumeClaim
+	for _, pvcUnstructured := range pvcsUnstructured {
+		pvc := &corev1.PersistentVolumeClaim{}
+		pvcU, _ := pvcUnstructured.(map[string]interface{})
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(pvcU, pvc); err != nil {
+			return err
+		}
+		pvcs = append(pvcs, *pvc)
+	}
+	template, _, _ := unstructured.NestedMap(obj.Object, "spec", "template")
+	podTemplate := &corev1.PodTemplateSpec{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(template, podTemplate); err != nil {
+		return err
+	}
+	updateStrategy, _, _ := unstructured.NestedString(obj.Object, "spec", "updateStrategy")
+	rsm := builder.NewReplicatedStateMachineBuilder(obj.GetNamespace(), obj.GetName()).
+		AddAnnotationsInMap(obj.GetAnnotations()).
+		AddLabelsInMap(obj.GetLabels()).
+		SetServiceName(serviceName).
+		AddMatchLabelsInMap(matchLabels).
+		SetReplicas(int32(replicas)).
+		SetPodManagementPolicy(v1.PodManagementPolicyType(podManagementPolicy)).
+		SetVolumeClaimTemplates(pvcs...).
+		SetTemplate(*podTemplate).
+		SetUpdateStrategyType(v1.StatefulSetUpdateStrategyType(updateStrategy)).
+		GetObject()
+	gvk := schema.GroupVersionKind{
+		Group:   types.RSMGVR().Group,
+		Version: types.RSMGVR().Version,
+		Kind:    types.KindRSM,
+	}
+	rsm.SetGroupVersionKind(gvk)
+
+	unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(rsm)
+	if err != nil {
+		return err
+	}
+	_, err = dynamic.Resource(types.RSMGVR()).Namespace(obj.GetNamespace()).Create(context.TODO(),
+		&unstructured.Unstructured{Object: unstructuredMap}, metav1.CreateOptions{})
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return fmt.Errorf("create rsm %s failed: %s", rsm.Name, err.Error())
 	}
 	return nil
 }

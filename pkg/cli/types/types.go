@@ -22,6 +22,7 @@ package types
 import (
 	"fmt"
 
+
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
 const (
@@ -108,6 +110,8 @@ const (
 	KindOps                             = "OpsRequest"
 	KindBackupSchedule                  = "BackupSchedule"
 	KindBackupPolicyTemplate            = "BackupPolicyTemplate"
+	KindStatefulSet                     = "StatefulSet"
+	KindRSM                             = "ReplicatedStateMachine"
 )
 
 // K8S rbac API group
@@ -183,6 +187,11 @@ const (
 	ResourceYcsb        = "ycsbs"
 	ResourceTpcc        = "tpccs"
 	ResourceTpch        = "tpches"
+)
+
+// Workload API group
+const (
+	ResourceRSM = "replicatedstatemachines"
 )
 
 const (
@@ -309,6 +318,10 @@ func SecretGVR() schema.GroupVersionResource {
 
 func StatefulSetGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: appsv1.GroupName, Version: K8sCoreAPIVersion, Resource: ResourceStatefulSets}
+}
+
+func RSMGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: workloads.GroupVersion.Group, Version: workloads.GroupVersion.Version, Resource: ResourceRSM}
 }
 
 func DaemonSetGVR() schema.GroupVersionResource {

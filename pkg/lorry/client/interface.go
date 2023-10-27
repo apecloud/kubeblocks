@@ -25,7 +25,7 @@ type Client interface {
 	// GetRole return the replication role(like primary/secondary) of the target replica
 	GetRole(ctx context.Context) (string, error)
 
-	// user related funcs
+	// user management funcs
 	CreateUser(ctx context.Context, userName, password string) error
 	DeleteUser(ctx context.Context, userName string) error
 	DescribeUser(ctx context.Context, userName string) (map[string]any, error)

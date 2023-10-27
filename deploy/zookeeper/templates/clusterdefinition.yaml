@@ -1,0 +1,105 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: zookeeper
+  labels:
+    {{- include "zookeeper.labels" . | nindent 4 }}
+spec:
+  type: zookeeper
+  connectionCredential:
+    username: ""
+    password: ""
+    endpoint: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_client)"
+  componentDefs:
+    - name: zookeeper
+      workloadType: Stateful
+      characterType: zookeeper
+      statefulSpec:
+        updateStrategy: BestEffortParallel
+      logConfigs:
+        {{- range $name,$pattern := .Values.logConfigs }}
+        - name: {{ $name }}
+          filePathPattern: {{ $pattern }}
+        {{- end }}
+      configSpecs:
+        - name: zookeeper-config
+          namespace: {{ .Release.Namespace }}
+          templateRef: {{ include "zookeeper.name" . }}-config-template
+          constraintRef: {{ include "zookeeper.name" . }}-config-constraints
+          volumeName: configs
+          defaultMode: 0755
+      service:
+        ports:
+          - name: client
+            port: 2181
+            targetPort: client
+      podSpec:
+        securityContext:
+          fsGroup: 0
+          runAsGroup: 0
+          runAsNonRoot: true
+          runAsUser: 10000
+        containers:
+          - name: zookeeper
+            env:
+              - name: K8S_REPLICAS
+                value: "$(KB_REPLICA_COUNT)"
+              - name: STANDALONE_ENABLE
+                value: "false"
+              - name: RE_CONFIG_ENABLE
+                value: "true"
+              - name: ZOO_4LW_COMMANDS_WHITELIST
+                value: "srvr, mntr, ruok"
+              - name: ZOO_LOG_DIR
+                value: "/opt/zookeeper/logs"
+              - name: ZOO_LOG4J_PROP
+                value: "INFO,ROLLINGFILE"
+              - name: DEBUG_MODEL
+                value: "true"
+            ports:
+              - name: client
+                containerPort: {{ .Values.containerPorts.client }}
+              - name: tcp-quorum
+                containerPort: {{ .Values.containerPorts.quorum }}
+              - name: tcp-election
+                containerPort: {{ .Values.containerPorts.election }}
+              - name: http
+                containerPort: {{ .Values.containerPorts.http }}
+            livenessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 30
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              exec:
+                command: [ '/bin/bash', '-c', 'echo "ruok" | timeout 2 nc -w 2 localhost {{ .Values.containerPorts.client }} | grep imok' ]
+            readinessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              exec:
+                command: [ '/bin/bash', '-c', 'echo "ruok" | timeout 2 nc -w 2 localhost {{ .Values.containerPorts.client }} | grep imok' ]
+            resources:
+              requests:
+                cpu: 50m
+                memory: 256Mi
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
+              privileged: false
+              runAsGroup: 0
+              runAsNonRoot: true
+              runAsUser: 10000
+            volumeMounts:
+              - mountPath: /zookeeper/data
+                name: data
+              - mountPath: /zookeeper/log
+                name: data-log
+              - name: configs
+                mountPath: /opt/zookeeper/conf/zoo.cfg
+                subPath: zoo.cfg

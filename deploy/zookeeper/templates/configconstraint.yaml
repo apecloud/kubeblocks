@@ -1,0 +1,28 @@
+{{- $cc := .Files.Get "config/config-effect-scope.yaml" | fromYaml }}
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: {{ include "zookeeper.name" . }}-config-constraints
+  labels:
+    {{- include "zookeeper.labels" . | nindent 4 }}
+spec:
+  # zookeeper configuration file format
+  formatterConfig:
+    format: props-plus
+
+  # define parameter validation rules
+  cfgSchemaTopLevelName: ZookeeperParameter
+
+  ## define immutable parameter list
+  {{- if hasKey $cc "immutableParameters" }}
+  immutableParameters:
+    {{- $params := get $cc "immutableParameters" }}
+    {{- range $params }}
+    - {{ . }}
+    {{- end }}
+  {{- end}}
+
+  # ConfigurationSchema that impose restrictions on engine parameter's rule
+  configurationSchema:
+    cue: |-
+      {{- .Files.Get "config/zookeeper-config-constraint.cue" | nindent 6 }}

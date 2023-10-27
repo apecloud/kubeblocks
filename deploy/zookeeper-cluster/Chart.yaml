@@ -1,0 +1,35 @@
+apiVersion: v2
+name: zookeeper-cluster
+description: A Zookeeper Cluster Helm chart for KubeBlocks.
+
+# A chart can be either an 'application' or a 'library' chart.
+type: application
+
+# This is the chart version.
+version: 0.7.0-alpha.0
+
+# This is the version number of the application being deployed.
+appVersion: "3.7.1"
+
+dependencies:
+  - name: kblib
+    version: 0.1.0
+    repository: file://../kblib
+    alias: extra
+
+home: https://zookeeper.apache.org/
+icon: https://www.apache.org/logos/res/zookeeper/zookeeper.png
+keywords:
+  - zookeeper
+  - zookeeper-cluster
+  - synchronization
+  - naming
+  - etcd
+
+maintainers:
+  - name: ApeCloud
+    url: https://github.com/apecloud/kubeblocks/deploy
+  - name: kissycn
+    url: https://github.com/kissycn
+
+

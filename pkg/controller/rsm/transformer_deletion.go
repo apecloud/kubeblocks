@@ -54,4 +54,3 @@ func (t *ObjectDeletionTransformer) Transform(ctx graph.TransformContext, dag *g
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
 	return graph.ErrPrematureStop
 }
-

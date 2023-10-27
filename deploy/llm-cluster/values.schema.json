@@ -46,8 +46,8 @@
       "maximum": 1000
     },
     "gpu": {
-      "title": "CPU",
-      "description": "CPU cores.",
+      "title": "GPU",
+      "description": "GPU cores.",
       "type": [
         "number",
         "string"

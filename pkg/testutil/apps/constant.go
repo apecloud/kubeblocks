@@ -34,7 +34,7 @@ const (
 	ConfVolumeName      = "conf"
 	DataVolumeName      = "data"
 	ScriptsVolumeName   = "scripts"
-	ServiceDefaultName  = ""
+	ServiceDefaultName  = "default"
 	ServiceHeadlessName = "headless"
 	ServiceVPCName      = "vpc-lb"
 	ServiceInternetName = "internet-lb"

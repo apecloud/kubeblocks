@@ -108,3 +108,13 @@ func (builder *ServiceBuilder) SetSpec(spec *corev1.ServiceSpec) *ServiceBuilder
 	}
 	return builder
 }
+
+func (builder *ServiceBuilder) Optimize4ExternalTraffic() *ServiceBuilder {
+	if builder.get().Spec.Type == corev1.ServiceTypeLoadBalancer && len(builder.get().Spec.ExternalTrafficPolicy) == 0 {
+		// Set externalTrafficPolicy to Local has two benefits:
+		// 1. preserve client IP
+		// 2. improve network performance by reducing one hop
+		builder.get().Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyTypeLocal
+	}
+	return builder
+}

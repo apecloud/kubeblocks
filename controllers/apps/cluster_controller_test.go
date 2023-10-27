@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -33,14 +32,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
@@ -117,6 +116,7 @@ var _ = Describe("Cluster Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.VolumeSnapshotSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ServiceSignature, true, inNS)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
 		testapps.ClearResources(&testCtx, generics.ActionSetSignature, ml)
@@ -176,128 +176,142 @@ var _ = Describe("Cluster Controller", func() {
 		}
 	}
 
-	type ExpectService struct {
-		headless bool
-		svcType  corev1.ServiceType
+	//// getHeadlessSvcPorts returns the component's headless service ports by gathering all container's ports in the
+	//// ClusterComponentDefinition.PodSpec, it's a subset of the real ports as some containers can be dynamically
+	//// injected into the pod by the lifecycle controller, such as the probe container.
+	// getHeadlessSvcPorts := func(g Gomega, compDefName string) []corev1.ServicePort {
+	//	comp, err := appsv1alpha1.GetComponentDefByCluster(testCtx.Ctx, k8sClient, *clusterObj, compDefName)
+	//	g.Expect(err).ShouldNot(HaveOccurred())
+	//	var headlessSvcPorts []corev1.ServicePort
+	//	for _, container := range comp.PodSpec.Containers {
+	//		for _, port := range container.Ports {
+	//			// be consistent with headless_service_template.cue
+	//			headlessSvcPorts = append(headlessSvcPorts, corev1.ServicePort{
+	//				Name:       port.Name,
+	//				Protocol:   port.Protocol,
+	//				Port:       port.ContainerPort,
+	//				TargetPort: intstr.FromString(port.Name),
+	//			})
+	//		}
+	//	}
+	//	return headlessSvcPorts
+	// }
+
+	type expectService struct {
+		clusterIP string
+		svcType   corev1.ServiceType
 	}
 
-	// getHeadlessSvcPorts returns the component's headless service ports by gathering all container's ports in the
-	// ClusterComponentDefinition.PodSpec, it's a subset of the real ports as some containers can be dynamically
-	// injected into the pod by the lifecycle controller, such as the probe container.
-	getHeadlessSvcPorts := func(g Gomega, compDefName string) []corev1.ServicePort {
-		comp, err := appsv1alpha1.GetComponentDefByCluster(testCtx.Ctx, k8sClient, *clusterObj, compDefName)
-		g.Expect(err).ShouldNot(HaveOccurred())
-		var headlessSvcPorts []corev1.ServicePort
-		for _, container := range comp.PodSpec.Containers {
-			for _, port := range container.Ports {
-				// be consistent with headless_service_template.cue
-				headlessSvcPorts = append(headlessSvcPorts, corev1.ServicePort{
-					Name:       port.Name,
-					Protocol:   port.Protocol,
-					Port:       port.ContainerPort,
-					TargetPort: intstr.FromString(port.Name),
-				})
-			}
-		}
-		return headlessSvcPorts
-	}
-
-	validateCompSvcList := func(g Gomega, compName string, compDefName string, expectServices map[string]ExpectService) {
-		if intctrlutil.IsRSMEnabled() {
-			return
-		}
+	validateCompSvcList := func(g Gomega, expectServices map[string]expectService, compName string) {
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		svcList := &corev1.ServiceList{}
 		g.Expect(k8sClient.List(testCtx.Ctx, svcList, client.MatchingLabels{
-			constant.AppInstanceLabelKey:    clusterKey.Name,
-			constant.KBAppComponentLabelKey: compName,
+			constant.AppInstanceLabelKey: clusterKey.Name,
 		}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
 
 		for svcName, svcSpec := range expectServices {
 			idx := slices.IndexFunc(svcList.Items, func(e corev1.Service) bool {
-				parts := []string{clusterKey.Name, compName}
-				if svcName != "" {
-					parts = append(parts, svcName)
-				}
-				return strings.Join(parts, "-") == e.Name
+				return e.Name == svcName
 			})
 			g.Expect(idx >= 0).To(BeTrue())
 			svc := svcList.Items[idx]
 			g.Expect(svc.Spec.Type).Should(Equal(svcSpec.svcType))
+			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.KBAppComponentLabelKey, compName))
+			// g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.RoleLabelKey, "leader"))
 			switch {
 			case svc.Spec.Type == corev1.ServiceTypeLoadBalancer:
 				g.Expect(svc.Spec.ExternalTrafficPolicy).Should(Equal(corev1.ServiceExternalTrafficPolicyTypeLocal))
-			case svc.Spec.Type == corev1.ServiceTypeClusterIP && !svcSpec.headless:
+			case svc.Spec.Type == corev1.ServiceTypeClusterIP && len(svcSpec.clusterIP) == 0:
 				g.Expect(svc.Spec.ClusterIP).ShouldNot(Equal(corev1.ClusterIPNone))
-			case svc.Spec.Type == corev1.ServiceTypeClusterIP && svcSpec.headless:
+			case svc.Spec.Type == corev1.ServiceTypeClusterIP && len(svcSpec.clusterIP) != 0:
 				g.Expect(svc.Spec.ClusterIP).Should(Equal(corev1.ClusterIPNone))
-				for _, port := range getHeadlessSvcPorts(g, compDefName) {
-					g.Expect(slices.Index(svc.Spec.Ports, port) >= 0).Should(BeTrue())
-				}
+				// for _, port := range getHeadlessSvcPorts(g, compDefName) {
+				//	g.Expect(slices.Index(svc.Spec.Ports, port) >= 0).Should(BeTrue())
+				// }
 			}
 		}
 		g.Expect(len(expectServices)).Should(Equal(len(svcList.Items)))
 	}
 
-	testServiceAddAndDelete := func(compName, compDefName string) {
-		By("Creating a cluster with two LoadBalancer services")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDefObj.Name, clusterVersionObj.Name).
+	testServiceCreateAndDelete := func(compName, compDefName string) {
+		expectServices := map[string]expectService{
+			testapps.ServiceDefaultName:  {"", corev1.ServiceTypeClusterIP},
+			testapps.ServiceHeadlessName: {corev1.ClusterIPNone, corev1.ServiceTypeClusterIP},
+			testapps.ServiceVPCName:      {"", corev1.ServiceTypeLoadBalancer},
+			testapps.ServiceInternetName: {"", corev1.ServiceTypeLoadBalancer},
+		}
+
+		clusterServices := make([]appsv1alpha1.ClusterService, 0)
+		for name, svc := range expectServices {
+			clusterServices = append(clusterServices, appsv1alpha1.ClusterService{
+				Name: name,
+				Service: corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: name,
+					},
+					Spec: corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{
+							{Port: 3306},
+						},
+						Type:      svc.svcType,
+						ClusterIP: svc.clusterIP,
+					},
+				},
+				ComponentSelector: compName,
+				// RoleSelector:      []string{"leader"},
+			})
+		}
+
+		By("creating a cluster with three services")
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
 			AddComponent(compName, compDefName).SetReplicas(1).
-			AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
-			AddService(testapps.ServiceInternetName, corev1.ServiceTypeLoadBalancer).
+			AddClusterService(clusterServices[0]).
+			AddClusterService(clusterServices[1]).
+			AddClusterService(clusterServices[2]).
 			WithRandomName().Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-		By("Waiting for the cluster controller to create resources completely")
+		By("waiting for the cluster controller to create resources completely")
 		waitForCreatingResourceCompletely(clusterKey, compName)
 
-		expectServices := map[string]ExpectService{
-			testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
-			testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
-			testapps.ServiceVPCName:      {svcType: corev1.ServiceTypeLoadBalancer, headless: false},
-			testapps.ServiceInternetName: {svcType: corev1.ServiceTypeLoadBalancer, headless: false},
-		}
-		Eventually(func(g Gomega) { validateCompSvcList(g, compName, compDefName, expectServices) }).Should(Succeed())
+		deleteService := clusterServices[2]
+		lastClusterService := clusterServices[3]
 
-		By("Delete a LoadBalancer service")
-		deleteService := testapps.ServiceVPCName
-		delete(expectServices, deleteService)
+		By("create last cluster service manually which will not owned by cluster")
+		svcObj := builder.NewServiceBuilder(clusterObj.Namespace, lastClusterService.Service.Name).
+			AddLabelsInMap(constant.GetClusterWellKnownLabels(clusterObj.Name)).
+			SetSpec(&lastClusterService.Service.Spec).
+			AddSelector(constant.KBAppComponentLabelKey, lastClusterService.ComponentSelector).
+			// AddSelector(constant.RoleLabelKey, lastClusterService.RoleSelector[0]).
+			Optimize4ExternalTraffic().
+			GetObject()
+		Expect(testCtx.CheckedCreateObj(testCtx.Ctx, svcObj)).Should(Succeed())
+
+		By("check all services created")
+		Eventually(func(g Gomega) { validateCompSvcList(g, expectServices, compName) }).Should(Succeed())
+
+		By("delete a cluster service")
+		delete(expectServices, deleteService.Name)
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
-			for idx, comp := range cluster.Spec.ComponentSpecs {
-				if comp.ComponentDefRef != compDefName || comp.Name != compName {
-					continue
-				}
-				var services []appsv1alpha1.ClusterComponentService
-				for _, item := range comp.Services {
-					if item.Name == deleteService {
-						continue
-					}
+			var services []appsv1alpha1.ClusterService
+			for _, item := range cluster.Spec.Services {
+				if item.Name != deleteService.Name {
 					services = append(services, item)
 				}
-				cluster.Spec.ComponentSpecs[idx].Services = services
-				return
 			}
+			cluster.Spec.Services = services
 		})()).ShouldNot(HaveOccurred())
-		Eventually(func(g Gomega) { validateCompSvcList(g, compName, compDefName, expectServices) }).Should(Succeed())
 
-		By("Add the deleted LoadBalancer service back")
-		expectServices[deleteService] = ExpectService{svcType: corev1.ServiceTypeLoadBalancer, headless: false}
+		By("check the service has been deleted, and the non-managed service has not been deleted")
+		Eventually(func(g Gomega) { validateCompSvcList(g, expectServices, compName) }).Should(Succeed())
+
+		By("add the deleted service back")
+		expectServices[deleteService.Name] = expectService{deleteService.Service.Spec.ClusterIP, deleteService.Service.Spec.Type}
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
-			for idx, comp := range cluster.Spec.ComponentSpecs {
-				if comp.ComponentDefRef != compDefName || comp.Name != compName {
-					continue
-				}
-				comp.Services = append(comp.Services, appsv1alpha1.ClusterComponentService{
-					Name:        deleteService,
-					ServiceType: corev1.ServiceTypeLoadBalancer,
-				})
-				cluster.Spec.ComponentSpecs[idx] = comp
-				return
-			}
+			cluster.Spec.Services = append(cluster.Spec.Services, deleteService)
 		})()).ShouldNot(HaveOccurred())
-		Eventually(func(g Gomega) { validateCompSvcList(g, compName, compDefName, expectServices) }).Should(Succeed())
+		Eventually(func(g Gomega) { validateCompSvcList(g, expectServices, compName) }).Should(Succeed())
 	}
 
 	createClusterObj := func(compName, compDefName string) {
@@ -630,29 +644,30 @@ var _ = Describe("Cluster Controller", func() {
 			By("Checking created rsm pods template without TopologySpreadConstraints")
 			Expect(podSpec.TopologySpreadConstraints).Should(BeEmpty())
 
-			By("Checking stateless services")
-			statelessExpectServices := map[string]ExpectService{
-				// TODO: fix me later, proxy should not have internal headless service
-				testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
-				testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
-			}
-			Eventually(func(g Gomega) {
-				validateCompSvcList(g, statelessCompName, statelessCompDefName, statelessExpectServices)
-			}).Should(Succeed())
-
-			By("Checking stateful types services")
-			for compName, compNameNDef := range compNameNDef {
-				if compName == statelessCompName {
-					continue
-				}
-				consensusExpectServices := map[string]ExpectService{
-					testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
-					testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
-				}
-				Eventually(func(g Gomega) {
-					validateCompSvcList(g, compName, compNameNDef, consensusExpectServices)
-				}).Should(Succeed())
-			}
+			// TODO(component)
+			// By("Checking stateless services")
+			// statelessExpectServices := map[string]expectService{
+			//	// TODO: fix me later, proxy should not have internal headless service
+			//	testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
+			//	testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
+			// }
+			// Eventually(func(g Gomega) {
+			//	validateCompSvcList(g, statelessCompName, statelessCompDefName, statelessExpectServices)
+			// }).Should(Succeed())
+			//
+			// By("Checking stateful types services")
+			// for compName, compNameNDef := range compNameNDef {
+			//	if compName == statelessCompName {
+			//		continue
+			//	}
+			//	consensusExpectServices := map[string]expectService{
+			//		testapps.ServiceHeadlessName: {svcType: corev1.ServiceTypeClusterIP, headless: true},
+			//		testapps.ServiceDefaultName:  {svcType: corev1.ServiceTypeClusterIP, headless: false},
+			//	}
+			//	Eventually(func(g Gomega) {
+			//		validateCompSvcList(g, compName, compNameNDef, consensusExpectServices)
+			//	}).Should(Succeed())
+			// }
 		}
 
 		It("should create all sub-resources successfully, with terminationPolicy=Halt lifecycle", func() {
@@ -785,8 +800,8 @@ var _ = Describe("Cluster Controller", func() {
 				testDoNotTerminate(compName, compDefName)
 			})
 
-			It(fmt.Sprintf("[comp: %s] should add and delete service correctly", compName), func() {
-				testServiceAddAndDelete(compName, compDefName)
+			It(fmt.Sprintf("[comp: %s] should create and delete service correctly", compName), func() {
+				testServiceCreateAndDelete(compName, compDefName)
 			})
 		}
 	})

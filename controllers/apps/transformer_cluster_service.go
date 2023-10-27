@@ -27,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -48,6 +49,12 @@ func (t *ClusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 
 	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
+
+	clusterServices, err := t.listClusterServices(transCtx, cluster)
+	if err != nil {
+		return err
+	}
+
 	for _, svc := range cluster.Spec.Services {
 		service, err := t.buildService(transCtx, cluster, &svc)
 		if err != nil {
@@ -56,7 +63,13 @@ func (t *ClusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 		if err = t.createOrUpdate(ctx, dag, graphCli, service); err != nil {
 			return err
 		}
+		delete(clusterServices, service.Name)
 	}
+
+	for svc := range clusterServices {
+		graphCli.Delete(dag, clusterServices[svc])
+	}
+
 	return nil
 }
 
@@ -69,7 +82,8 @@ func (t *ClusterServiceTransformer) buildService(transCtx *clusterTransformConte
 
 	builder := builder.NewServiceBuilder(namespace, service.Service.Name).
 		AddLabelsInMap(constant.GetClusterWellKnownLabels(clusterName)).
-		SetSpec(&service.Service.Spec)
+		SetSpec(&service.Service.Spec).
+		Optimize4ExternalTraffic()
 
 	if len(service.ComponentSelector) > 0 {
 		compDef, err := t.checkComponent(transCtx, cluster, service)
@@ -138,4 +152,20 @@ func (t *ClusterServiceTransformer) createOrUpdate(ctx graph.TransformContext,
 		graphCli.Update(dag, obj, objCopy)
 	}
 	return nil
+}
+
+func (t *ClusterServiceTransformer) listClusterServices(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) (map[string]*corev1.Service, error) {
+	svcList := &corev1.ServiceList{}
+	labels := client.MatchingLabels(constant.GetClusterWellKnownLabels(cluster.Name))
+	if err := transCtx.Client.List(transCtx.Context, svcList, labels, client.InNamespace(cluster.Namespace)); err != nil {
+		return nil, err
+	}
+
+	services := make(map[string]*corev1.Service)
+	for i, svc := range svcList.Items {
+		if model.IsOwnerOf(cluster, &svc) {
+			services[svc.Name] = &svcList.Items[i]
+		}
+	}
+	return services, nil
 }

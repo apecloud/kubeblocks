@@ -84,8 +84,8 @@ func newAllFieldsClusterObj(
 		clusterDefObj.Name, clusterVersionObj.Name).
 		AddComponent(mysqlCompName, mysqlCompDefName).SetReplicas(1).
 		AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-		AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
-		AddService(testapps.ServiceInternetName, corev1.ServiceTypeLoadBalancer).
+		AddComponentService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
+		AddComponentService(testapps.ServiceInternetName, corev1.ServiceTypeLoadBalancer).
 		GetObject()
 	key := client.ObjectKeyFromObject(clusterObj)
 	if needCreate {

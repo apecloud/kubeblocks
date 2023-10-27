@@ -94,7 +94,8 @@ func (t *componentServiceTransformer) buildService(synthesizeComp *component.Syn
 			AllocateLoadBalancerNodePorts: service.AllocateLoadBalancerNodePorts,
 			LoadBalancerClass:             service.LoadBalancerClass,
 			InternalTrafficPolicy:         service.InternalTrafficPolicy,
-		})
+		}).
+		Optimize4ExternalTraffic()
 
 	// TODO(component): role selector
 	if len(service.RoleSelector) > 0 {

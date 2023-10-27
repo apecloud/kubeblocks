@@ -67,6 +67,16 @@ func (factory *MockClusterFactory) AddComponent(compName string, compDefName str
 	return factory
 }
 
+func (factory *MockClusterFactory) AddClusterService(service appsv1alpha1.ClusterService) *MockClusterFactory {
+	services := factory.Get().Spec.Services
+	if len(services) == 0 {
+		services = []appsv1alpha1.ClusterService{}
+	}
+	services = append(services, service)
+	factory.Get().Spec.Services = services
+	return factory
+}
+
 type updateFn func(comp *appsv1alpha1.ClusterComponentSpec)
 
 func (factory *MockClusterFactory) lastComponentRef(update updateFn) *MockClusterFactory {
@@ -166,7 +176,7 @@ func (factory *MockClusterFactory) SetIssuer(issuer *appsv1alpha1.Issuer) *MockC
 	})
 }
 
-func (factory *MockClusterFactory) AddService(serviceName string, serviceType corev1.ServiceType) *MockClusterFactory {
+func (factory *MockClusterFactory) AddComponentService(serviceName string, serviceType corev1.ServiceType) *MockClusterFactory {
 	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
 		comp.Services = append(comp.Services,
 			appsv1alpha1.ClusterComponentService{

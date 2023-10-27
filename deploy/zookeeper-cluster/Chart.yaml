@@ -6,7 +6,7 @@ description: A Zookeeper Cluster Helm chart for KubeBlocks.
 type: application
 
 # This is the chart version.
-version: 0.1.0-alpha.0
+version: 0.7.0-alpha.0
 
 # This is the version number of the application being deployed.
 appVersion: "3.7.1"

@@ -26,11 +26,11 @@ import (
 )
 
 func DoMerge(baseData map[string]string, patch map[string]appsv1alpha1.ConfigParams, cc *appsv1alpha1.ConfigConstraint, configSpec appsv1alpha1.ComponentConfigSpec) (map[string]string, error) {
-	var err error
-	var newCfg map[string]string
+	var (
+		updatedFiles  = make(map[string]string, len(patch))
+		updatedParams = make([]core.ParamPairs, 0, len(patch))
+	)
 
-	updatedFiles := make(map[string]string, len(patch))
-	updatedParams := make([]core.ParamPairs, 0, len(patch))
 	for key, params := range patch {
 		if params.Content != nil {
 			updatedFiles[key] = *params.Content
@@ -42,10 +42,7 @@ func DoMerge(baseData map[string]string, patch map[string]appsv1alpha1.ConfigPar
 			})
 		}
 	}
-	if newCfg, err = mergeUpdatedParams(baseData, updatedFiles, updatedParams, cc, configSpec); err != nil {
-		return nil, err
-	}
-	return newCfg, nil
+	return mergeUpdatedParams(baseData, updatedFiles, updatedParams, cc, configSpec)
 }
 
 func mergeUpdatedParams(base map[string]string,

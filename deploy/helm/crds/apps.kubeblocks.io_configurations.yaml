@@ -322,6 +322,37 @@ spec:
                       - FailedAndRetry
                       - Finished
                       type: string
+                    reconcileDetail:
+                      description: reconcileDetail describes the details of the configuration
+                        change execution.
+                      properties:
+                        currentRevision:
+                          description: currentRevision is the current revision of
+                            configurationItem.
+                          type: string
+                        errMessage:
+                          description: errMessage is the error message when the configuration
+                            change execution fails.
+                          type: string
+                        execResult:
+                          description: execResult is the result of the latest execution.
+                          type: string
+                        expectedCount:
+                          default: -1
+                          description: expectedCount is the number of pods that need
+                            to be executed for configuration changes.
+                          format: int32
+                          type: integer
+                        policy:
+                          description: policy is the policy of the latest execution.
+                          type: string
+                        succeedCount:
+                          default: -1
+                          description: succeedCount is the number of pods for which
+                            configuration changes were successfully executed.
+                          format: int32
+                          type: integer
+                      type: object
                     updateRevision:
                       description: updateRevision is the update revision of configurationItem.
                       type: string

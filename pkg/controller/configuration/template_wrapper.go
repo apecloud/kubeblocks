@@ -28,10 +28,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -40,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
@@ -98,7 +97,6 @@ func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, localO
 
 func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent, localObjs []client.Object, configuration *appsv1alpha1.Configuration) error {
-	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	revision := fromConfiguration(configuration)
 	for _, configSpec := range component.ConfigTemplates {
 		var item *appsv1alpha1.ConfigurationItemDetail
@@ -121,7 +119,7 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster
 		if err := applyUpdatedParameters(item, newCMObj, configSpec, wrapper.cli, wrapper.ctx); err != nil {
 			return err
 		}
-		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, newCMObj, scheme, configuration); err != nil {
+		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, newCMObj, configuration); err != nil {
 			return err
 		}
 		if err := updateConfigMetaForCM(newCMObj, item, revision); err != nil {
@@ -223,7 +221,6 @@ func (wrapper *renderWrapper) rerenderConfigTemplate(cluster *appsv1alpha1.Clust
 
 func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent,
 	localObjs []client.Object) error {
-	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	for _, templateSpec := range component.ScriptTemplates {
 		cmName := core.GetComponentCfgName(cluster.Name, component.Name, templateSpec.Name)
 		object := findMatchedLocalObject(localObjs, client.ObjectKey{
@@ -239,20 +236,20 @@ func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1alpha1.Cluster
 		if err != nil {
 			return err
 		}
-		if err := wrapper.addRenderedObject(templateSpec, cm, scheme, nil); err != nil {
+		if err := wrapper.addRenderedObject(templateSpec, cm, nil); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1alpha1.ComponentTemplateSpec, cm *corev1.ConfigMap, scheme *runtime.Scheme, configuration *appsv1alpha1.Configuration) (err error) {
+func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1alpha1.ComponentTemplateSpec, cm *corev1.ConfigMap, configuration *appsv1alpha1.Configuration) (err error) {
 	// The owner of the configmap object is a cluster,
 	// in order to manage the life cycle of configmap
 	if configuration != nil {
-		err = controllerutil.SetControllerReference(configuration, cm, scheme)
+		err = intctrlutil.SetControllerReference(configuration, cm)
 	} else {
-		err = controllerutil.SetOwnerReference(wrapper.cluster, cm, scheme)
+		err = intctrlutil.SetOwnerReference(wrapper.cluster, cm)
 	}
 	if err != nil {
 		return err

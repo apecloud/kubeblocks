@@ -125,7 +125,7 @@ func (c *clusterPlanBuilder) Init() error {
 	if err := c.cli.Get(c.transCtx.Context, c.req.NamespacedName, cluster); err != nil {
 		return err
 	}
-	c.AddTransformer(&initTransformer{cluster: cluster})
+	c.AddTransformer(&clusterInitTransformer{cluster: cluster})
 	return nil
 }
 

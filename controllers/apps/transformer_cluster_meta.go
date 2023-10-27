@@ -26,11 +26,11 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
-type AssureMetaTransformer struct{}
+type ClusterAssureMetaTransformer struct{}
 
-var _ graph.Transformer = &AssureMetaTransformer{}
+var _ graph.Transformer = &ClusterAssureMetaTransformer{}
 
-func (t *AssureMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *ClusterAssureMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster
 

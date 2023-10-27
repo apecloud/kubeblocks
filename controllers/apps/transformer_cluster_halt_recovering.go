@@ -34,9 +34,11 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
-type HaltRecoveryTransformer struct{}
+type ClusterHaltRecoveryTransformer struct{}
 
-func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+var _ graph.Transformer = &ClusterHaltRecoveryTransformer{}
+
+func (t *ClusterHaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster
 
@@ -210,5 +212,3 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 	}
 	return nil
 }
-
-var _ graph.Transformer = &HaltRecoveryTransformer{}

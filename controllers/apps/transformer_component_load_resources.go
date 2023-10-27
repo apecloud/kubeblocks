@@ -62,7 +62,7 @@ func (t *ComponentLoadResourcesTransformer) Transform(ctx graph.TransformContext
 	}
 
 	// get and init cluster context
-	// TODO(xingran): In order to backward compatibility in KubeBlocks version 0.7.0, the cluster field is still required. However, if in the future the Component objects can be used independently, the Cluster field should be removed from the component.Spec
+	// TODO(xingran): In order to backward compatibility in KubeBlocks version 0.8.0, the cluster field is still required. However, if in the future the Component objects can be used independently, the Cluster field should be removed from the component.Spec
 	cluster := &appsv1alpha1.Cluster{}
 	err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: comp.Spec.Cluster, Namespace: comp.Namespace}, cluster)
 	if err != nil {

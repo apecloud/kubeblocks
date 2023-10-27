@@ -171,11 +171,11 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// handle cluster deletion first
 			&ClusterDeletionTransformer{},
 			// check is recovering from halted cluster
-			&HaltRecoveryTransformer{},
+			&ClusterHaltRecoveryTransformer{},
 			// update finalizer and cd&cv labels
-			&AssureMetaTransformer{},
+			&ClusterAssureMetaTransformer{},
 			// validate cd & cv's existence and availability
-			&ValidateAndLoadRefResourcesTransformer{},
+			&ClusterValidateAndLoadRefResourcesTransformer{},
 			// normalize the cluster and component API
 			&ClusterAPINormalizationTransformer{},
 			// handle cluster services
@@ -183,7 +183,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// create default cluster connection credential secret object
 			&ClusterCredentialTransformer{},
 			// TODO(component): handle restore before ClusterComponentTransformer
-			&RestoreTransformer{Client: r.Client},
+			&ClusterRestoreTransformer{Client: r.Client},
 			// create all cluster components objects
 			&ClusterComponentTransformer{Client: r.Client},
 			// TODO(component): transform backupPolicyTemplate to backuppolicy.dataprotection.kubeblocks.io
@@ -192,7 +192,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// TODO(component): handle rbac for pod
 			&RBACTransformer{Client: r.Client},
 			// add our finalizer to all objects
-			&OwnershipTransformer{},
+			&ClusterOwnershipTransformer{},
 			// make all workload objects depending on credential secret
 			&SecretTransformer{},
 			// update cluster status

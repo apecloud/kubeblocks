@@ -25,13 +25,13 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-type initTransformer struct {
+type clusterInitTransformer struct {
 	cluster *appsv1alpha1.Cluster
 }
 
-var _ graph.Transformer = &initTransformer{}
+var _ graph.Transformer = &clusterInitTransformer{}
 
-func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *clusterInitTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	transCtx.Cluster, transCtx.OrigCluster = t.cluster, t.cluster.DeepCopy()
 	graphCli, _ := transCtx.Client.(model.GraphClient)

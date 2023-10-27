@@ -28,7 +28,6 @@ output: {
 	    node: "${env:NODE_NAME}"
 	    namespace: "`namespace`"
 	    pod: "`name`"
-	    job: "oteld-app-metrics"
   	}
   	pod: {
     	app_kubernetes_io_component: "`labels[\"app.kubernetes.io/component\"]`"
@@ -40,7 +39,6 @@ output: {
 	    node: "${env:NODE_NAME}"
 	    namespace: "`namespace`"
 	    pod: "`name`"
-	    job: "oteld-app-metrics"
     }
 	  "k8s.node": {
 	  	kubernetes_io_arch: "`labels[\"kubernetes.io/arch\"]`"
@@ -48,7 +46,6 @@ output: {
       kubernetes_io_os: "`labels[\"kubernetes.io/os\"]`"
       node: "`name`"
       hostname: "`hostname`"
-      job: "oteld-system"
 	  }
   }
 }

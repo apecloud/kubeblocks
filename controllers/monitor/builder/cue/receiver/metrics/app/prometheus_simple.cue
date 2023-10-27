@@ -25,6 +25,7 @@ output:
 	"prometheus_simple": {
 		rule: "type == \"container\" && monitor_type == \"prometheus\" && config != nil && config.EnabledMetrics"
     	config: {
+    		collection_interval: "`settings.CollectionInterval`"
     		metrics_path: "`config.Prometheus == nil ? \"/metrics\" : config.Prometheus.MetricsPath`"
         endpoint: "`endpoint`:`envs[\"SERVICE_PORT\"]`"
         disable_keep_alives: "`config.Prometheus == nil ? false : config.Prometheus.DisableKeepAlives`"

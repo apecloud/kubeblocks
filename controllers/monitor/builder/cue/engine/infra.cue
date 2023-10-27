@@ -25,15 +25,15 @@ output: {
 
 		}
 
-  	"apecloud-mysql/mysql/vttablet/vttablet": {
+  	"apecloud-mysql/mysql/vttablet/prometheus": {
   		enabled_metrics: true
       enabled_logs: false
       metrics_collector:
         collection_interval: "30s"
   	}
 
-  	"apecloud-mysql/vtgate/vtgate/mysql": {
-  		enabled_metrics: false
+  	"apecloud-mysql/vtgate/vtgate/prometheus": {
+  		enabled_metrics: true
       enabled_logs: true
       logs_collector: {
       	errorlog:
@@ -41,6 +41,8 @@ output: {
         queryLog:
           include: ["/vtdataroot/vtgate_querylog.txt"]
       }
+      metrics_collector:
+				collection_interval: "30s"
   	}
 
   	"apecloud-mysql/vtcontroller/vtconsensus/vtcontroller": {
@@ -82,35 +84,35 @@ output: {
         	include: ["/data/mongodb/logs/mongodb.log*"]
   	}
 
-  	"pulsar/pulsar-broker/broker/*": {
+  	"pulsar/pulsar-broker/broker/prometheus": {
   		enabled_metrics: true
     	enabled_logs: false
     	metrics_collector:
       	collection_interval: "30s"
   	}
 
-  	"pulsar/pulsar-proxy/proxy/*": {
+  	"pulsar/pulsar-proxy/proxy/prometheus": {
   		enabled_metrics: true
     	enabled_logs: false
     	metrics_collector:
       	collection_interval: "30s"
   	}
 
-  	"pulsar/bookies/bookies/*": {
+  	"pulsar/bookies/bookies/prometheus": {
   		enabled_metrics: true
     	enabled_logs: false
     	metrics_collector:
       	collection_interval: "30s"
   	}
 
-  	"pulsar/bookies-recovery/bookies-recovery/*":{
+  	"pulsar/bookies-recovery/bookies-recovery/prometheus":{
   		enabled_metrics: true
     	enabled_logs: false
     	metrics_collector:
       	collection_interval: "30s"
   	}
 
-  	"pulsar/zookeeper/zookeeper/*": {
+  	"pulsar/zookeeper/zookeeper/prometheus": {
   		enabled_metrics: true
     	enabled_logs: false
     	metrics_collector:

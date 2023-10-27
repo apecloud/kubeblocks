@@ -746,18 +746,18 @@ func BuildVolumeSnapshotClass(name string, driver string) *snapshotv1.VolumeSnap
 		GetObject()
 }
 
-func BuildServiceAccount(cluster *appsv1alpha1.Cluster) *corev1.ServiceAccount {
+func BuildServiceAccount(cluster *appsv1alpha1.Cluster, saName string) *corev1.ServiceAccount {
+	// TODO(component): compName
 	wellKnownLabels := constant.GetKBWellKnownLabels(cluster.Spec.ClusterDefRef, cluster.Name, "")
-	delete(wellKnownLabels, constant.KBAppComponentLabelKey)
-	return builder.NewServiceAccountBuilder(cluster.Namespace, fmt.Sprintf("kb-%s", cluster.Name)).
+	return builder.NewServiceAccountBuilder(cluster.Namespace, saName).
 		AddLabelsInMap(wellKnownLabels).
 		GetObject()
 }
 
-func BuildRoleBinding(cluster *appsv1alpha1.Cluster) *rbacv1.RoleBinding {
+func BuildRoleBinding(cluster *appsv1alpha1.Cluster, saName string) *rbacv1.RoleBinding {
+	// TODO(component): compName
 	wellKnownLabels := constant.GetKBWellKnownLabels(cluster.Spec.ClusterDefRef, cluster.Name, "")
-	delete(wellKnownLabels, constant.KBAppComponentLabelKey)
-	return builder.NewRoleBindingBuilder(cluster.Namespace, fmt.Sprintf("kb-%s", cluster.Name)).
+	return builder.NewRoleBindingBuilder(cluster.Namespace, saName).
 		AddLabelsInMap(wellKnownLabels).
 		SetRoleRef(rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,
@@ -767,15 +767,15 @@ func BuildRoleBinding(cluster *appsv1alpha1.Cluster) *rbacv1.RoleBinding {
 		AddSubjects(rbacv1.Subject{
 			Kind:      rbacv1.ServiceAccountKind,
 			Namespace: cluster.Namespace,
-			Name:      fmt.Sprintf("kb-%s", cluster.Name),
+			Name:      saName,
 		}).
 		GetObject()
 }
 
-func BuildClusterRoleBinding(cluster *appsv1alpha1.Cluster) *rbacv1.ClusterRoleBinding {
+func BuildClusterRoleBinding(cluster *appsv1alpha1.Cluster, saName string) *rbacv1.ClusterRoleBinding {
+	// TODO(component): compName
 	wellKnownLabels := constant.GetKBWellKnownLabels(cluster.Spec.ClusterDefRef, cluster.Name, "")
-	delete(wellKnownLabels, constant.KBAppComponentLabelKey)
-	return builder.NewClusterRoleBindingBuilder(cluster.Namespace, fmt.Sprintf("kb-%s", cluster.Name)).
+	return builder.NewClusterRoleBindingBuilder(cluster.Namespace, saName).
 		AddLabelsInMap(wellKnownLabels).
 		SetRoleRef(rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,
@@ -785,7 +785,7 @@ func BuildClusterRoleBinding(cluster *appsv1alpha1.Cluster) *rbacv1.ClusterRoleB
 		AddSubjects(rbacv1.Subject{
 			Kind:      rbacv1.ServiceAccountKind,
 			Namespace: cluster.Namespace,
-			Name:      fmt.Sprintf("kb-%s", cluster.Name),
+			Name:      saName,
 		}).
 		GetObject()
 }

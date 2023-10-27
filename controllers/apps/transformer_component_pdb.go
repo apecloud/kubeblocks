@@ -36,15 +36,14 @@ type ComponentPDBTransformer struct{}
 var _ graph.Transformer = &ComponentPDBTransformer{}
 
 func (t *ComponentPDBTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	cctx, _ := ctx.(*ComponentTransformContext)
-	cluster := cctx.Cluster
-	comp := cctx.Component
-	compOrig := cctx.ComponentOrig
-	synthesizeComp := cctx.SynthesizeComponent
-
-	if model.IsObjectDeleting(compOrig) {
+	transCtx, _ := ctx.(*ComponentTransformContext)
+	if model.IsObjectDeleting(transCtx.ComponentOrig) {
 		return nil
 	}
+
+	cluster := transCtx.Cluster
+	comp := transCtx.Component
+	synthesizeComp := transCtx.SynthesizeComponent
 
 	obj, err := t.PDBObject(ctx, cluster, comp)
 	if err != nil {
@@ -61,7 +60,7 @@ func (t *ComponentPDBTransformer) Transform(ctx graph.TransformContext, dag *gra
 		pdb = factory.BuildPDB(cluster, synthesizeComp)
 	}
 
-	graphCli, _ := cctx.Client.(model.GraphClient)
+	graphCli, _ := transCtx.Client.(model.GraphClient)
 	if obj == nil {
 		if pdb == nil {
 			// do nothing

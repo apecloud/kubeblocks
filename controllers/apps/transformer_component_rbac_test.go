@@ -92,7 +92,7 @@ var _ = Describe("object rbac transformer test.", func() {
 		}
 
 		dag = mockDAG(graphCli, cluster)
-		transformer = &RBACTransformer{}
+		transformer = &ComponentRBACTransformer{}
 		allSettings = viper.AllSettings()
 		viper.SetDefault(constant.EnableRBACManager, true)
 	})
@@ -112,8 +112,8 @@ var _ = Describe("object rbac transformer test.", func() {
 				&corev1.ServiceAccount{}, false)).Should(Succeed())
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
 
-			serviceAccount := factory.BuildServiceAccount(cluster)
-			roleBinding := factory.BuildRoleBinding(cluster)
+			serviceAccount := factory.BuildServiceAccount(cluster, serviceAccountName)
+			roleBinding := factory.BuildRoleBinding(cluster, serviceAccount.Name)
 
 			dagExpected := mockDAG(graphCli, cluster)
 			graphCli.Create(dagExpected, serviceAccount)
@@ -136,9 +136,9 @@ var _ = Describe("object rbac transformer test.", func() {
 				&corev1.ServiceAccount{}, false)).Should(Succeed())
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
 
-			serviceAccount := factory.BuildServiceAccount(cluster)
-			roleBinding := factory.BuildRoleBinding(cluster)
-			clusterRoleBinding := factory.BuildClusterRoleBinding(cluster)
+			serviceAccount := factory.BuildServiceAccount(cluster, serviceAccountName)
+			roleBinding := factory.BuildRoleBinding(cluster, serviceAccount.Name)
+			clusterRoleBinding := factory.BuildClusterRoleBinding(cluster, serviceAccount.Name)
 
 			dagExpected := mockDAG(graphCli, cluster)
 			graphCli.Create(dagExpected, serviceAccount)

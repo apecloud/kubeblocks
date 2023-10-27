@@ -67,12 +67,10 @@ func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		return nil, nil
 	}
 
-	compName, found := strings.CutPrefix(comp.Name, fmt.Sprintf("%s-", cluster.Name))
-	if !found {
-		return nil, fmt.Errorf("component object name has no cluster name as prefix: %s", comp.Name)
+	compName, err := ShortName(cluster.Name, comp.Name)
+	if err != nil {
+		return nil, err
 	}
-
-	var err error
 	compDefObj := compDef.DeepCopy()
 	synthesizeComp := &SynthesizedComponent{
 		Namespace:             cluster.Namespace,

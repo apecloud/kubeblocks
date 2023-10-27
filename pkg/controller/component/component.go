@@ -22,6 +22,7 @@ package component
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,10 +34,22 @@ import (
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
+func FullName(clusterName, compName string) string {
+	return constant.GenerateClusterComponentPattern(clusterName, compName)
+}
+
+func ShortName(clusterName, compName string) (string, error) {
+	name, found := strings.CutPrefix(compName, fmt.Sprintf("%s-", clusterName))
+	if !found {
+		return "", fmt.Errorf("the component name has no cluster name as prefix: %s", compName)
+	}
+	return name, nil
+}
+
 // BuildProtoComponent builds a new Component object from cluster component spec and definition.
 func BuildProtoComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.Component, error) {
-	fullCompName := constant.GenerateClusterComponentPattern(cluster.Name, clusterCompSpec.Name)
-	builder := builder.NewComponentBuilder(cluster.Namespace, fullCompName, cluster.Name, clusterCompSpec.ComponentDef).
+	compName := FullName(cluster.Name, clusterCompSpec.Name)
+	builder := builder.NewComponentBuilder(cluster.Namespace, compName, cluster.Name, clusterCompSpec.ComponentDef).
 		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, clusterCompSpec.Name)).
 		SetAffinity(clusterCompSpec.Affinity).
 		SetTolerations(clusterCompSpec.Tolerations).

@@ -187,16 +187,16 @@ func (u *upgradeHandlerTo7) buildBackupMethod(componentDefName, backupType strin
 			buildBackupMethod(datafileMethodName, redisDatafileActionSet, redisMountPath, false)
 		case componentMongodb:
 			buildBackupMethod(datafileMethodName, mongoDatafileActionSet, mongodbMountPath, false)
+		case componentQdrant:
+			buildBackupMethod(datafileMethodName, qdrantSnapshotActionSet, qdrantMountPath, false)
 		}
 	case backupTypeSnapshot:
 		switch componentDefName {
-		case componentPostgresql:
-			buildBackupMethod(volumeSnapshotMethodName, "", "", true)
 		case componentMysql:
 			buildBackupMethod(volumeSnapshotMethodName, volumeSnapshotForMysql, mysqlMountPath, true)
 		case componentMongodb:
 			buildBackupMethod(volumeSnapshotMethodName, volumeSnapshotForMongo, mongodbMountPath, true)
-		case componentRedis:
+		default:
 			buildBackupMethod(volumeSnapshotMethodName, "", "", true)
 		}
 	default:
@@ -278,10 +278,10 @@ func (u *upgradeHandlerTo7) buildBackupMethodSchedule(obj unstructured.Unstructu
 		var enable bool
 		schedulePolicy.Enabled = &enable
 		schedulePolicies = append(schedulePolicies, schedulePolicy)
-	case componentRedis:
-		schedulePolicies = append(schedulePolicies, buildSchedulePolicy(datafileMethodName, datafile))
 	case componentPostgresql:
 		schedulePolicies = append(schedulePolicies, buildSchedulePolicy(pgbasebackupMethodName, datafile))
+	case componentRedis, componentQdrant:
+		schedulePolicies = append(schedulePolicies, buildSchedulePolicy(datafileMethodName, datafile))
 	}
 	// set volume-snapshot
 	schedulePolicies = append(schedulePolicies, buildSchedulePolicy(volumeSnapshotMethodName, snapshot))
@@ -338,6 +338,9 @@ func (u *upgradeHandlerTo7) transformBackup(dynamic dynamic.Interface, obj unstr
 	newStatusData["totalSize"] = statusMap["totalSize"]
 	newStatusData["duration"] = statusMap["duration"]
 	newStatusData["phase"] = statusMap["phase"]
+	if newStatusData["phase"] == "InProgress" {
+		newStatusData["phase"] = dpv1alpha1.BackupPhaseRunning
+	}
 	// covert timeRange
 	manifests, _, _ := unstructured.NestedMap(statusMap, "manifests")
 	if manifests != nil {
@@ -385,6 +388,9 @@ func (u *upgradeHandlerTo7) transformBackup(dynamic dynamic.Interface, obj unstr
 		case strings.Contains(backupToolName, "mongodb"):
 			volumeMounts = append(volumeMounts, corev1.VolumeMount{Name: dataVolumeName, MountPath: mongodbMountPath})
 			actionSetName = mongoDatafileActionSet
+		case strings.Contains(backupToolName, "qdrant"):
+			volumeMounts = append(volumeMounts, corev1.VolumeMount{Name: dataVolumeName, MountPath: qdrantMountPath})
+			actionSetName = qdrantSnapshotActionSet
 		}
 	}
 	newStatusData[backupMethodKey] = map[string]interface{}{

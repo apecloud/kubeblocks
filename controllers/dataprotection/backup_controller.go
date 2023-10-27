@@ -34,7 +34,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
@@ -390,23 +389,6 @@ func (r *BackupReconciler) patchBackupObjectMeta(
 	request *dpbackup.Request) (bool, error) {
 	targetPod := request.TargetPods[0]
 
-	encryptPassword := func() (string, error) {
-		target := request.BackupPolicy.Spec.Target
-		if target == nil || target.ConnectionCredential == nil {
-			return "", nil
-		}
-		secret := &corev1.Secret{}
-		if err := r.Client.Get(request.Ctx, types.NamespacedName{Name: target.ConnectionCredential.SecretName, Namespace: request.Namespace}, secret); err != nil {
-			return "", err
-		}
-		e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
-		ciphertext, err := e.Encrypt(secret.Data[target.ConnectionCredential.PasswordKey])
-		if err != nil {
-			return "", err
-		}
-		return ciphertext, nil
-	}
-
 	// get KubeBlocks cluster and set labels and annotations for backup
 	// TODO(ldm): we should remove this dependency of cluster in the future
 	cluster := getCluster(request.Ctx, r.Client, targetPod)
@@ -414,18 +396,10 @@ func (r *BackupReconciler) patchBackupObjectMeta(
 		if err := setClusterSnapshotAnnotation(request.Backup, cluster); err != nil {
 			return false, err
 		}
-		request.Labels[dptypes.ClusterUIDLabelKey] = string(cluster.UID)
-		backupType := dputils.GetBackupType(request.ActionSet, request.BackupMethod.SnapshotVolumes)
-		if backupType == dpv1alpha1.BackupTypeFull {
-			// save the connection credential password for cluster.
-			ciphertext, err := encryptPassword()
-			if err != nil {
-				return false, err
-			}
-			if ciphertext != "" {
-				request.Annotations[dptypes.ConnectionPasswordKey] = ciphertext
-			}
+		if err := r.setConnectionPasswordAnnotation(request); err != nil {
+			return false, err
 		}
+		request.Labels[dptypes.ClusterUIDLabelKey] = string(cluster.UID)
 	}
 
 	for _, v := range getClusterLabelKeys() {
@@ -684,6 +658,38 @@ func (r *BackupReconciler) deleteExternalResources(
 		return err
 	}
 	return r.deleteExternalJobs(reqCtx, backup)
+}
+
+// setConnectionPasswordAnnotation sets the encrypted password of the connection credential to the backup's annotations
+func (r *BackupReconciler) setConnectionPasswordAnnotation(request *dpbackup.Request) error {
+	encryptPassword := func() (string, error) {
+		target := request.BackupPolicy.Spec.Target
+		if target == nil || target.ConnectionCredential == nil {
+			return "", nil
+		}
+		secret := &corev1.Secret{}
+		if err := r.Client.Get(request.Ctx, client.ObjectKey{Name: target.ConnectionCredential.SecretName, Namespace: request.Namespace}, secret); err != nil {
+			return "", err
+		}
+		e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
+		ciphertext, err := e.Encrypt(secret.Data[target.ConnectionCredential.PasswordKey])
+		if err != nil {
+			return "", err
+		}
+		return ciphertext, nil
+	}
+	backupType := dputils.GetBackupType(request.ActionSet, request.BackupMethod.SnapshotVolumes)
+	if backupType == dpv1alpha1.BackupTypeFull {
+		// save the connection credential password for cluster.
+		ciphertext, err := encryptPassword()
+		if err != nil {
+			return err
+		}
+		if ciphertext != "" {
+			request.Backup.Annotations[dptypes.ConnectionPasswordKey] = ciphertext
+		}
+	}
+	return nil
 }
 
 // getClusterObjectString gets the cluster object and convert it to string.

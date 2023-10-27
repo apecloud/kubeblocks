@@ -26,7 +26,9 @@ output:
   	rule: "type == \"k8s.node\""
   	config:
   	  collection_interval: parameters.collection_interval
-  	resource_attributes:
+  	resource_attributes: {
+  		job: "oteld-node-metrics"
       receiver: "apecloudnode"
+  	}
   }
 

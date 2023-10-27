@@ -23,9 +23,9 @@ parameters: {
 output: {
 	telemetry: {
   	logs:
-      level: parameters.logLevel
+      level: parameters.log_level
     metrics:
-      address: "${env:HOST_IP}:" + "\(parameters.metricsPort)"
+      address: "${env:HOST_IP}:" + "\(parameters.metrics_port)"
     resource: {
     	node: "${env:NODE_NAME}"
       job: "oteld-telemetry"

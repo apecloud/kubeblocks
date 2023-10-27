@@ -269,15 +269,38 @@ parameters:
 			g.Expect(err).ShouldNot(HaveOccurred())
 		}
 
-		completePreCheckJob := func(repo *dpv1alpha1.BackupRepo) {
+		preCheckResouceName := func(repo *dpv1alpha1.BackupRepo) string {
 			reconCtx := reconcileContext{repo: repo}
-			jobName := reconCtx.preCheckResourceName()
+			return reconCtx.preCheckResourceName()
+		}
+
+		completePreCheckJob := func(repo *dpv1alpha1.BackupRepo) {
+			jobName := preCheckResouceName(repo)
 			namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 			Eventually(testapps.GetAndChangeObjStatus(&testCtx, types.NamespacedName{Name: jobName, Namespace: namespace}, func(job *batchv1.Job) {
 				job.Status.Conditions = append(job.Status.Conditions, batchv1.JobCondition{
 					Type:   batchv1.JobComplete,
 					Status: corev1.ConditionTrue,
 				})
+			})).Should(Succeed())
+		}
+
+		completePreCheckJobWithError := func(repo *dpv1alpha1.BackupRepo, message string) {
+			jobName := preCheckResouceName(repo)
+			namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, types.NamespacedName{Name: jobName, Namespace: namespace}, func(job *batchv1.Job) {
+				job.Status.Conditions = append(job.Status.Conditions, batchv1.JobCondition{
+					Type:    batchv1.JobFailed,
+					Status:  corev1.ConditionTrue,
+					Reason:  "Failed",
+					Message: message,
+				})
+			})).Should(Succeed())
+		}
+
+		removePVCProtectionFinalizer := func(pvcKey types.NamespacedName) {
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
+				controllerutil.RemoveFinalizer(pvc, pvcProtectionFinalizer)
 			})).Should(Succeed())
 		}
 
@@ -550,6 +573,93 @@ parameters:
 				g.Expect(cond.Status).Should(BeEquivalentTo(corev1.ConditionFalse))
 				g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonPrepareStorageClassFailed))
 				g.Expect(cond.Message).Should(ContainSubstring(`cannot unmarshal string into Go value of type v1.StorageClass`))
+			})).Should(Succeed())
+		})
+
+		It("should run a pre-check job", func() {
+			By("creating a backup repo")
+			createBackupRepoSpec(nil)
+
+			By("checking the pre-check job resources")
+			pvcName := preCheckResouceName(repo)
+			jobName := preCheckResouceName(repo)
+			namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+			checkResources := func(exists bool) {
+				Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{Name: jobName, Namespace: namespace},
+					&batchv1.Job{}, exists)).WithOffset(1).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{Name: pvcName, Namespace: namespace},
+					&corev1.PersistentVolumeClaim{}, exists)).WithOffset(1).Should(Succeed())
+			}
+			checkResources(true)
+
+			By("checking repo's status, it should fail if the pre-check job has failed")
+			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+				g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoPreChecking))
+			})).Should(Succeed())
+			completePreCheckJobWithError(repo, "connect to endpoint failed")
+			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+				g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoFailed))
+				cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypePreCheckPassed)
+				g.Expect(cond).NotTo(BeNil())
+				g.Expect(cond.Status).Should(BeEquivalentTo(corev1.ConditionFalse))
+				g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonPreCheckFailed))
+				g.Expect(cond.Message).Should(ContainSubstring(`connect to endpoint failed`))
+			})).Should(Succeed())
+
+			By("checking the resources, they should be deleted")
+			removePVCProtectionFinalizer(types.NamespacedName{Name: pvcName, Namespace: namespace})
+			checkResources(false)
+
+			By("updating the repo, it should run the pre-check job again")
+			Eventually(testapps.GetAndChangeObj(&testCtx, credentialSecretKey, func(cred *corev1.Secret) {
+				cred.Data["new-key"] = []byte("new-value")
+			})).Should(Succeed())
+			checkResources(true)
+			completePreCheckJob(repo)
+			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+				g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoReady))
+			})).Should(Succeed())
+		})
+
+		It("should remove the stale pre-check job if the repo spec has changed too quickly", func() {
+			resourceName := preCheckResouceName(repo)
+			namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+			updateRepoAndCheckResources := func(content string, lastJobUID types.UID) (string, types.UID) {
+				Eventually(testapps.GetAndChangeObj(&testCtx, credentialSecretKey, func(cred *corev1.Secret) {
+					cred.Data["new-key"] = []byte(content)
+				})).WithOffset(1).Should(Succeed())
+				var digest string
+				var uid types.UID
+				Eventually(func(g Gomega) {
+					pvc := &corev1.PersistentVolumeClaim{}
+					err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKey{Name: resourceName, Namespace: namespace}, pvc)
+					g.Expect(err).ToNot(HaveOccurred())
+					job := &batchv1.Job{}
+					err = testCtx.Cli.Get(testCtx.Ctx, client.ObjectKey{Name: resourceName, Namespace: namespace}, job)
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(pvc.Annotations[dataProtectionBackupRepoDigestAnnotationKey]).To(
+						BeEquivalentTo(job.Annotations[dataProtectionBackupRepoDigestAnnotationKey]))
+					digest = job.Annotations[dataProtectionBackupRepoDigestAnnotationKey]
+					uid = job.UID
+					g.Expect(digest).ToNot(BeEmpty())
+					g.Expect(uid).ToNot(Equal(lastJobUID))
+				}).WithOffset(1).Should(Succeed())
+				return digest, uid
+			}
+
+			By("updating the repo, and then get the digest from the pre-check resources")
+			digest1, uid1 := updateRepoAndCheckResources("value1", "")
+
+			By("updating the repo again, and then get the digest")
+			removePVCProtectionFinalizer(types.NamespacedName{Name: resourceName, Namespace: namespace})
+			digest2, uid2 := updateRepoAndCheckResources("value2", uid1)
+
+			By("checking the digests are different")
+			Expect(digest1).ToNot(Equal(digest2))
+			Expect(uid1).ToNot(Equal(uid2))
+			completePreCheckJob(repo)
+			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+				g.Expect(repo.Annotations[dataProtectionBackupRepoDigestAnnotationKey]).To(Equal(digest2))
 			})).Should(Succeed())
 		})
 
@@ -853,6 +963,93 @@ new-item=new-value
 				By("checking the secret is deleted")
 				Eventually(testapps.CheckObjExists(&testCtx, toolConfigSecretKey, &corev1.Secret{}, false)).Should(Succeed())
 			})
+
+			It("should run a pre-check job", func() {
+				By("creating a backup repo")
+				createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
+					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodTool
+				})
+
+				By("checking the pre-check job resources")
+				secretName := preCheckResouceName(repo)
+				jobName := preCheckResouceName(repo)
+				namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+				checkResources := func(exists bool) {
+					Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{Name: jobName, Namespace: namespace},
+						&batchv1.Job{}, exists)).WithOffset(1).Should(Succeed())
+					Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{Name: secretName, Namespace: namespace},
+						&corev1.Secret{}, exists)).WithOffset(1).Should(Succeed())
+				}
+				checkResources(true)
+
+				By("checking repo's status, it should fail if the pre-check job has failed")
+				Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+					g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoPreChecking))
+				})).Should(Succeed())
+				completePreCheckJobWithError(repo, "connect to endpoint failed")
+				Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+					g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoFailed))
+					cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypePreCheckPassed)
+					g.Expect(cond).NotTo(BeNil())
+					g.Expect(cond.Status).Should(BeEquivalentTo(corev1.ConditionFalse))
+					g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonPreCheckFailed))
+					g.Expect(cond.Message).Should(ContainSubstring(`connect to endpoint failed`))
+				})).Should(Succeed())
+
+				By("checking the resources, they should be deleted")
+				checkResources(false)
+
+				By("updating the repo, it should run the pre-check job again")
+				Eventually(testapps.GetAndChangeObj(&testCtx, credentialSecretKey, func(cred *corev1.Secret) {
+					cred.Data["new-key"] = []byte("new-value")
+				})).Should(Succeed())
+				checkResources(true)
+				completePreCheckJob(repo)
+				Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+					g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoReady))
+				})).Should(Succeed())
+			})
+
+			It("should remove the stale pre-check job if the repo spec has changed too quickly", func() {
+				resourceName := preCheckResouceName(repo)
+				namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+				updateRepoAndCheckResources := func(content string, lastJobUID types.UID) (string, types.UID) {
+					Eventually(testapps.GetAndChangeObj(&testCtx, credentialSecretKey, func(cred *corev1.Secret) {
+						cred.Data["new-key"] = []byte(content)
+					})).WithOffset(1).Should(Succeed())
+					var digest string
+					var uid types.UID
+					Eventually(func(g Gomega) {
+						secret := &corev1.Secret{}
+						err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKey{Name: resourceName, Namespace: namespace}, secret)
+						g.Expect(err).ToNot(HaveOccurred())
+						job := &batchv1.Job{}
+						err = testCtx.Cli.Get(testCtx.Ctx, client.ObjectKey{Name: resourceName, Namespace: namespace}, job)
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(secret.Annotations[dataProtectionBackupRepoDigestAnnotationKey]).To(
+							BeEquivalentTo(job.Annotations[dataProtectionBackupRepoDigestAnnotationKey]))
+						digest = job.Annotations[dataProtectionBackupRepoDigestAnnotationKey]
+						uid = job.UID
+						g.Expect(digest).ToNot(BeEmpty())
+						g.Expect(uid).ToNot(Equal(lastJobUID))
+					}).WithOffset(1).Should(Succeed())
+					return digest, uid
+				}
+
+				By("updating the repo, and then get the digest from the pre-check resources")
+				digest1, uid1 := updateRepoAndCheckResources("value1", "")
+
+				By("updating the repo again, and then get the digest")
+				digest2, uid2 := updateRepoAndCheckResources("value2", uid1)
+
+				By("checking the digests are different")
+				Expect(digest1).ToNot(Equal(digest2))
+				Expect(uid1).ToNot(Equal(uid2))
+				completePreCheckJob(repo)
+				Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+					g.Expect(repo.Annotations[dataProtectionBackupRepoDigestAnnotationKey]).To(Equal(digest2))
+				})).Should(Succeed())
+			})
 		})
 
 		It("should block the deletion of the BackupRepo if derived objects are not deleted", func() {
@@ -895,18 +1092,14 @@ new-item=new-value
 				Name:      (&reconcileContext{repo: repo}).preCheckResourceName(),
 				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 			}
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
-				controllerutil.RemoveFinalizer(pvc, pvcProtectionFinalizer)
-			})).Should(Succeed())
+			removePVCProtectionFinalizer(pvcKey)
 
 			By("releasing the PVC")
 			pvcKey = types.NamespacedName{
 				Namespace: namespace2,
 				Name:      pvcName,
 			}
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
-				controllerutil.RemoveFinalizer(pvc, pvcProtectionFinalizer)
-			})).Should(Succeed())
+			removePVCProtectionFinalizer(pvcKey)
 
 			By("checking the BackupRepo, it should have been deleted")
 			Eventually(func(g Gomega) {

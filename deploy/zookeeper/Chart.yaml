@@ -1,0 +1,23 @@
+apiVersion: v2
+name: zookeeper
+description: Apache ZooKeeper is a centralized service for maintaining configuration information, naming, providing distributed synchronization, and providing group services.
+
+type: application
+
+version: 0.7.0-alpha.0
+
+appVersion: "3.7.1"
+
+home: https://zookeeper.apache.org/
+icon: https://www.apache.org/logos/res/zookeeper/zookeeper.png
+keywords:
+  - zookeeper
+  - synchronization
+  - naming
+  - etcd
+
+maintainers:
+  - name: ApeCloud
+    url: https://github.com/apecloud/kubeblocks/deploy
+  - name: kissycn
+    url: https://github.com/kissycn

@@ -288,6 +288,11 @@ func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.Synt
 	}
 	if namespace := backupSource[constant.BackupNamespaceKeyForRestore]; namespace != "" {
 		r.namespace = namespace
+		// TODO: support restore backup to different namespace
+		if namespace != r.Cluster.Namespace {
+			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed,
+				"unsupported restore backup to different namespace, backup namespace: %s, cluster namespace: %s", namespace, r.Cluster.Namespace)
+		}
 	}
 	if volumeRestorePolicy := backupSource[constant.VolumeRestorePolicyKeyForRestore]; volumeRestorePolicy != "" {
 		r.volumeRestorePolicy = dpv1alpha1.VolumeClaimRestorePolicy(volumeRestorePolicy)

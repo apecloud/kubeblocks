@@ -33,7 +33,7 @@ type MemoryLimiterConfig struct {
 }
 
 type BatchConfig struct {
-	Enabeld bool `json:"enabled,omitempty"`
+	Enabled bool `json:"enabled,omitempty"`
 }
 
 // OTeldSpec defines the desired state of CollectorDataSource
@@ -53,7 +53,7 @@ type OTeldSpec struct {
 	// CollectionInterval is the default collect interval of the oteld collection
 	CollectionInterval string `json:"collectionInterval"`
 
-	MemoryLimiter MemoryLimiterConfig `json:"memeryLimit,omitempty"`
+	MemoryLimiter MemoryLimiterConfig `json:"memoryLimiter,omitempty"`
 
 	Batch BatchConfig `json:"batch,omitempty"`
 

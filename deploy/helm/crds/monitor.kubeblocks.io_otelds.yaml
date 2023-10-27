@@ -50,7 +50,7 @@ spec:
               logLevel:
                 description: LogsLevel is the level of the oteld collector logs
                 type: string
-              memeryLimit:
+              memoryLimiter:
                 properties:
                   enabled:
                     description: MemoryLimit is the memory limit of the oteld

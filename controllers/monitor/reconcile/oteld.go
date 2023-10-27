@@ -97,25 +97,30 @@ func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList,
 			}
 		}
 
-		if oteldInstance.Oteld.Spec.Batch.Enabeld {
+		if oteldInstance.Oteld.Spec.Batch.Enabled {
 			pipline.ProcessorMap[monitortype.BatchProcessorName] = true
 		}
 		if oteldInstance.Oteld.Spec.MemoryLimiter.Enabled {
 			pipline.ProcessorMap[monitortype.MemoryProcessorName] = true
 		}
-
-		for _, exporterRef := range dataSource.Spec.ExporterNames {
-			for _, exporter := range metricsExporters.Items {
-				if exporter.Name == exporterRef {
-					pipline.ExporterMap[fmt.Sprintf(ExporterNamePattern, exporter.Spec.Type, exporter.Name)] = true
-				}
-			}
-
-		}
 		switch dataSource.Spec.Type {
 		case v1alpha1.MetricsDatasourceType:
+			for _, exporterRef := range dataSource.Spec.ExporterNames {
+				for _, exporter := range metricsExporters.Items {
+					if exporter.Name == exporterRef {
+						pipline.ExporterMap[fmt.Sprintf(ExporterNamePattern, exporter.Spec.Type, exporter.Name)] = true
+					}
+				}
+			}
 			oteldInstance.MetricsPipline = append(oteldInstance.MetricsPipline, pipline)
 		case v1alpha1.LogsDataSourceType:
+			for _, exporterRef := range dataSource.Spec.ExporterNames {
+				for _, exporter := range logsExporters.Items {
+					if exporter.Name == exporterRef {
+						pipline.ExporterMap[fmt.Sprintf(ExporterNamePattern, exporter.Spec.Type, exporter.Name)] = true
+					}
+				}
+			}
 			oteldInstance.LogPipline = append(oteldInstance.LogPipline, pipline)
 		default:
 			return nil, fmt.Errorf("unknown data source type %s", dataSource.Spec.Type)
@@ -142,7 +147,7 @@ func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList,
 	for _, instance := range instanceMap {
 		systemMetricsPipline := monitortype.NewPipline()
 		systemMetricsPipline.Name = monitortype.AppMetricsCreatorName
-		if instance.Oteld.Spec.Batch.Enabeld {
+		if instance.Oteld.Spec.Batch.Enabled {
 			systemMetricsPipline.ProcessorMap[monitortype.BatchProcessorName] = true
 		}
 		if instance.Oteld.Spec.MemoryLimiter.Enabled {
@@ -156,7 +161,7 @@ func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList,
 		logPipline := monitortype.NewPipline()
 		logPipline.Name = monitortype.LogCreatorName
 		logPipline.ReceiverMap[monitortype.LogCreatorName] = monitortype.Receiver{}
-		if instance.Oteld.Spec.Batch.Enabeld {
+		if instance.Oteld.Spec.Batch.Enabled {
 			logPipline.ProcessorMap[monitortype.BatchProcessorName] = true
 		}
 		if instance.Oteld.Spec.MemoryLimiter.Enabled {

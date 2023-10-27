@@ -293,26 +293,26 @@ func (cg *OteldConfigGenerater) buildPiplineItem(instance *OteldInstance) yaml.M
 
 	if instance.LogPipline != nil {
 		logsSlice := yaml.MapSlice{}
-		for _, mPipline := range instance.MetricsPipline {
+		for _, lPipline := range instance.LogPipline {
 			receiverSlice := []string{}
-			for receiverName := range mPipline.ReceiverMap {
+			for receiverName := range lPipline.ReceiverMap {
 				receiverSlice = append(receiverSlice, fmt.Sprintf("filelog/%s", receiverName))
 			}
 			logsSlice = append(logsSlice, yaml.MapItem{Key: "receivers", Value: receiverSlice})
 
 			processorSlice := []string{}
-			for name := range mPipline.ProcessorMap {
+			for name := range lPipline.ProcessorMap {
 				processorSlice = append(processorSlice, name)
 			}
 			logsSlice = append(logsSlice, yaml.MapItem{Key: "processors", Value: processorSlice})
 
 			exporterSlice := []string{}
-			for name := range mPipline.ExporterMap {
+			for name := range lPipline.ExporterMap {
 				exporterSlice = append(exporterSlice, name)
 			}
 			logsSlice = append(logsSlice, yaml.MapItem{Key: "exporters", Value: exporterSlice})
 			if len(logsSlice) > 0 {
-				pipline = append(pipline, yaml.MapItem{Key: fmt.Sprintf(LogsPattern, mPipline.Name), Value: logsSlice})
+				pipline = append(pipline, yaml.MapItem{Key: fmt.Sprintf(LogsPattern, lPipline.Name), Value: logsSlice})
 			}
 		}
 	}

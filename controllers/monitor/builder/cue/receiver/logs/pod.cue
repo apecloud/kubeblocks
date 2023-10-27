@@ -20,7 +20,7 @@ parameters: {
 }
 
 output: {
-  "filelog/pods": {
+  "filelog/pod": {
   	include: parameters.include
    	include_file_name: true
    	include_file_path: true
@@ -28,11 +28,11 @@ output: {
    	storage: "file_storage/oteld"
    	resource: {
    		type: "pods"
-   	  "'loki.resource.labels'": ["host_name", "host_ip"]
+   	  "'loki.resource.labels'": "host_name, host_ip"
    	  "'loki.format'": "raw"
    	}
    	attributes:
-   	  "'loki.attribute.labels'": ["namespace", "pod", "pod_id", "container", "restart_num", "log.file.path", "log.file.name"]
+   	  "'loki.attribute.labels'": "namespace, pod, pod_id, container, restart_num, log.file.path, log.file.name"
    	retry_on_failure: {
    		enabled: true
    	  initial_interval: "5s"
@@ -41,7 +41,7 @@ output: {
    		{
    			type: "add"
    	    field: "resource.host_name"
-   	    value: 'EXPR(env("PWD"))'
+   	    value: "'EXPR(env(\"PWD\"))'"
    	  },
    		{
    			type: "add"

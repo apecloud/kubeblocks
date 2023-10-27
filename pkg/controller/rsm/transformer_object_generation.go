@@ -555,6 +555,15 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 		return nil
 	}
 
+	tryToGetLorryHTTPPort := func(container *corev1.Container) *corev1.ContainerPort {
+		for i, port := range container.Ports {
+			if port.Name == constant.LorryHTTPPortName {
+				return &container.Ports[i]
+			}
+		}
+		return nil
+	}
+
 	// if role probe container exists, update the readiness probe, env and serving container port
 	if container := tryToGetRoleProbeContainer(); container != nil {
 		if roleProbe.RoleUpdateMechanism == workloads.ReadinessProbeEventUpdate {
@@ -579,7 +588,30 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 				grpcHealthProbeBinaryPath,
 				fmt.Sprintf(grpcHealthProbeArgsFormat, portNum),
 			}
+		} else {
+			port := tryToGetLorryHTTPPort(container)
+			var portNum int
+			if port == nil {
+				portNum = probeDaemonPort
+				httpPort := corev1.ContainerPort{
+					Name:          constant.LorryHTTPPortName,
+					ContainerPort: int32(portNum),
+					Protocol:      "TCP",
+				}
+				container.Ports = append(container.Ports, httpPort)
+			} else {
+				// if containerPort is invalid, adjust it
+				if port.ContainerPort < 0 || port.ContainerPort > 65536 {
+					port.ContainerPort = int32(probeDaemonPort)
+				}
+				portNum = int(port.ContainerPort)
+			}
+			readinessProbe.HTTPGet = &corev1.HTTPGetAction{
+				Path: httpRoleProbePath,
+				Port: intstr.FromInt(portNum),
+			}
 		}
+		container.ReadinessProbe = readinessProbe
 		for _, e := range env {
 			if slices.IndexFunc(container.Env, func(v corev1.EnvVar) bool {
 				return v.Name == e.Name

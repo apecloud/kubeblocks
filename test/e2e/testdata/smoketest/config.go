@@ -25,8 +25,14 @@ func Config() {
 
 	Context("Configure running e2e information", func() {
 		It("create a secret to save the access key and ", func() {
-			accessKey := e2eutil.ExecCommand("aws configure get aws_access_key_id")
-			secretKey := e2eutil.ExecCommand("aws configure get aws_secret_access_key")
+			var accessKey, secretKey string
+			if ConfigType == "s3" {
+				accessKey = e2eutil.ExecCommand("aws configure get aws_access_key_id")
+				secretKey = e2eutil.ExecCommand("aws configure get aws_secret_access_key")
+			} else {
+				accessKey = e2eutil.ExecCommand("aliyun configure get access_key_id")
+				secretKey = e2eutil.ExecCommand("aliyun configure get access_key_secret")
+			}
 			createSecret := "kubectl create secret generic " + ConfigType + "-credential-for-backuprepo \\\n" +
 				"  -n kb-system \\\n" +
 				"  --from-literal=accessKeyId=" + e2eutil.StringStrip(accessKey) + " \\\n" +

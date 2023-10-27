@@ -1,4 +1,3 @@
-set -e
 set -o pipefail
 
 # if the script exits with a non-zero exit code, touch a file to indicate that the backup failed,
@@ -29,6 +28,7 @@ while true; do
 done
 echo "INFO: start to save data file..."
 cd ${DATA_DIR}
+# NOTE: if files changed during taring, the exit code will be 1 when it ends.
 tar -czvf - ./ | datasafed push - "${DP_BACKUP_NAME}.tar.gz"
 echo "INFO: save data file successfully"
 TOTAL_SIZE=$(datasafed stat / | grep TotalSize | awk '{print $2}')

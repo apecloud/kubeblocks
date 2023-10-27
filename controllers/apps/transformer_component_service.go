@@ -36,13 +36,13 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-// ComponentServiceTransformer handles component services.
-type ComponentServiceTransformer struct{}
+// componentServiceTransformer handles component services.
+type componentServiceTransformer struct{}
 
-var _ graph.Transformer = &ComponentServiceTransformer{}
+var _ graph.Transformer = &componentServiceTransformer{}
 
-func (t *ComponentServiceTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	cctx, _ := ctx.(*ComponentTransformContext)
+func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	cctx, _ := ctx.(*componentTransformContext)
 	if model.IsObjectDeleting(cctx.ComponentOrig) {
 		return nil
 	}
@@ -61,7 +61,7 @@ func (t *ComponentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 	return nil
 }
 
-func (t *ComponentServiceTransformer) buildService(synthesizeComp *component.SynthesizedComponent,
+func (t *componentServiceTransformer) buildService(synthesizeComp *component.SynthesizedComponent,
 	service *appsv1alpha1.ComponentService) (*corev1.Service, error) {
 	var (
 		namespace   = synthesizeComp.Namespace
@@ -106,7 +106,7 @@ func (t *ComponentServiceTransformer) buildService(synthesizeComp *component.Syn
 	return builder.GetObject(), nil
 }
 
-func (t *ComponentServiceTransformer) checkRoles(synthesizeComp *component.SynthesizedComponent,
+func (t *componentServiceTransformer) checkRoles(synthesizeComp *component.SynthesizedComponent,
 	name string, roles []string) error {
 	definedRoles := make(map[string]bool)
 	for _, role := range synthesizeComp.Roles {
@@ -120,7 +120,7 @@ func (t *ComponentServiceTransformer) checkRoles(synthesizeComp *component.Synth
 	return nil
 }
 
-func (t *ComponentServiceTransformer) createOrUpdate(ctx graph.TransformContext,
+func (t *componentServiceTransformer) createOrUpdate(ctx graph.TransformContext,
 	dag *graph.DAG, graphCli model.GraphClient, service *corev1.Service) error {
 	key := types.NamespacedName{
 		Namespace: service.Namespace,

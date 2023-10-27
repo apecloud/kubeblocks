@@ -29,13 +29,13 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// ComponentOwnershipTransformer adds finalizer to all none component objects
-type ComponentOwnershipTransformer struct{}
+// componentOwnershipTransformer adds finalizer to all none component objects
+type componentOwnershipTransformer struct{}
 
-var _ graph.Transformer = &ComponentOwnershipTransformer{}
+var _ graph.Transformer = &componentOwnershipTransformer{}
 
-func (f *ComponentOwnershipTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*ComponentTransformContext)
+func (f *componentOwnershipTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*componentTransformContext)
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	comp := transCtx.Component
 

@@ -25,13 +25,13 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-// ComponentDeletionTransformer handles component deletion
-type ComponentDeletionTransformer struct{}
+// componentDeletionTransformer handles component deletion
+type componentDeletionTransformer struct{}
 
-var _ graph.Transformer = &ComponentDeletionTransformer{}
+var _ graph.Transformer = &componentDeletionTransformer{}
 
-func (t *ComponentDeletionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*ComponentTransformContext)
+func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*componentTransformContext)
 	if transCtx.Component.GetDeletionTimestamp().IsZero() {
 		return nil
 	}

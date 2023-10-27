@@ -40,8 +40,8 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// ComponentTransformContext a graph.TransformContext implementation for Cluster reconciliation
-type ComponentTransformContext struct {
+// componentTransformContext a graph.TransformContext implementation for Cluster reconciliation
+type componentTransformContext struct {
 	context.Context
 	Client roclient.ReadonlyClient
 	record.EventRecorder
@@ -53,19 +53,19 @@ type ComponentTransformContext struct {
 	SynthesizeComponent *component.SynthesizedComponent
 }
 
-func (c *ComponentTransformContext) GetContext() context.Context {
+func (c *componentTransformContext) GetContext() context.Context {
 	return c.Context
 }
 
-func (c *ComponentTransformContext) GetClient() roclient.ReadonlyClient {
+func (c *componentTransformContext) GetClient() roclient.ReadonlyClient {
 	return c.Client
 }
 
-func (c *ComponentTransformContext) GetRecorder() record.EventRecorder {
+func (c *componentTransformContext) GetRecorder() record.EventRecorder {
 	return c.EventRecorder
 }
 
-func (c *ComponentTransformContext) GetLogger() logr.Logger {
+func (c *componentTransformContext) GetLogger() logr.Logger {
 	return c.Logger
 }
 
@@ -73,7 +73,7 @@ func (c *ComponentTransformContext) GetLogger() logr.Logger {
 type componentPlanBuilder struct {
 	req          ctrl.Request
 	cli          client.Client
-	transCtx     *ComponentTransformContext
+	transCtx     *componentTransformContext
 	transformers graph.TransformerChain
 }
 
@@ -82,10 +82,10 @@ type componentPlan struct {
 	dag      *graph.DAG
 	walkFunc graph.WalkFunc
 	cli      client.Client
-	transCtx *ComponentTransformContext
+	transCtx *componentTransformContext
 }
 
-var _ graph.TransformContext = &ComponentTransformContext{}
+var _ graph.TransformContext = &componentTransformContext{}
 var _ graph.PlanBuilder = &componentPlanBuilder{}
 var _ graph.Plan = &componentPlan{}
 
@@ -99,7 +99,7 @@ func (c *componentPlanBuilder) Init() error {
 
 	c.transCtx.Component = comp
 	c.transCtx.ComponentOrig = comp.DeepCopy()
-	c.transformers = append(c.transformers, &InitComponentTransformer{
+	c.transformers = append(c.transformers, &componentInitTransformer{
 		Component:     c.transCtx.Component,
 		ComponentOrig: c.transCtx.ComponentOrig,
 	})
@@ -147,7 +147,7 @@ func NewComponentPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req 
 	return &componentPlanBuilder{
 		req: req,
 		cli: cli,
-		transCtx: &ComponentTransformContext{
+		transCtx: &componentTransformContext{
 			Context:       ctx.Ctx,
 			Client:        model.NewGraphClient(cli),
 			EventRecorder: ctx.Recorder,

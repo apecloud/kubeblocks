@@ -36,13 +36,13 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-// ComponentCredentialTransformer handles referenced resources validation and load them into context
-type ComponentCredentialTransformer struct{}
+// componentCredentialTransformer handles referenced resources validation and load them into context
+type componentCredentialTransformer struct{}
 
-var _ graph.Transformer = &ComponentCredentialTransformer{}
+var _ graph.Transformer = &componentCredentialTransformer{}
 
-func (t *ComponentCredentialTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	cctx, _ := ctx.(*ComponentTransformContext)
+func (t *componentCredentialTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	cctx, _ := ctx.(*componentTransformContext)
 	if model.IsObjectDeleting(cctx.ComponentOrig) {
 		return nil
 	}
@@ -61,7 +61,7 @@ func (t *ComponentCredentialTransformer) Transform(ctx graph.TransformContext, d
 	return nil
 }
 
-func (t *ComponentCredentialTransformer) buildConnCredential(ctx graph.TransformContext,
+func (t *componentCredentialTransformer) buildConnCredential(ctx graph.TransformContext,
 	synthesizeComp *component.SynthesizedComponent, credential appsv1alpha1.ConnectionCredential) (*corev1.Secret, error) {
 	secret := factory.BuildConnCredential4Component(synthesizeComp, credential.Name)
 	if len(credential.SecretName) != 0 {
@@ -76,7 +76,7 @@ func (t *ComponentCredentialTransformer) buildConnCredential(ctx graph.Transform
 	return secret, nil
 }
 
-func (t *ComponentCredentialTransformer) buildFromExistedSecret(ctx graph.TransformContext,
+func (t *componentCredentialTransformer) buildFromExistedSecret(ctx graph.TransformContext,
 	credential appsv1alpha1.ConnectionCredential, secret *corev1.Secret) error {
 	namespace := func() string {
 		namespace := credential.SecretNamespace
@@ -100,7 +100,7 @@ func (t *ComponentCredentialTransformer) buildFromExistedSecret(ctx graph.Transf
 	return nil
 }
 
-func (t *ComponentCredentialTransformer) buildFromServiceAndAccount(ctx graph.TransformContext,
+func (t *componentCredentialTransformer) buildFromServiceAndAccount(ctx graph.TransformContext,
 	synthesizeComp *component.SynthesizedComponent, credential appsv1alpha1.ConnectionCredential, secret *corev1.Secret) error {
 	data := make(map[string]string)
 	if len(credential.ServiceName) > 0 {
@@ -118,7 +118,7 @@ func (t *ComponentCredentialTransformer) buildFromServiceAndAccount(ctx graph.Tr
 	return nil
 }
 
-func (t *ComponentCredentialTransformer) buildEndpoint(synthesizeComp *component.SynthesizedComponent,
+func (t *componentCredentialTransformer) buildEndpoint(synthesizeComp *component.SynthesizedComponent,
 	credential appsv1alpha1.ConnectionCredential, data *map[string]string) error {
 	var service *appsv1alpha1.ComponentService
 	for i, svc := range synthesizeComp.ComponentServices {
@@ -144,7 +144,7 @@ func (t *ComponentCredentialTransformer) buildEndpoint(synthesizeComp *component
 	return nil
 }
 
-func (t *ComponentCredentialTransformer) buildEndpointFromService(synthesizeComp *component.SynthesizedComponent,
+func (t *componentCredentialTransformer) buildEndpointFromService(synthesizeComp *component.SynthesizedComponent,
 	credential appsv1alpha1.ConnectionCredential, service *appsv1alpha1.ComponentService, data *map[string]string) {
 	// TODO(component): service.ServiceName
 	serviceName := constant.GenerateComponentServiceEndpoint(synthesizeComp.ClusterName, synthesizeComp.Name, string(service.ServiceName))
@@ -166,7 +166,7 @@ func (t *ComponentCredentialTransformer) buildEndpointFromService(synthesizeComp
 	(*data)["port"] = fmt.Sprintf("%d", port)
 }
 
-func (t *ComponentCredentialTransformer) buildCredential(ctx graph.TransformContext,
+func (t *componentCredentialTransformer) buildCredential(ctx graph.TransformContext,
 	namespace, accountName string, data *map[string]string) error {
 	key := types.NamespacedName{
 		Namespace: namespace,
@@ -181,7 +181,7 @@ func (t *ComponentCredentialTransformer) buildCredential(ctx graph.TransformCont
 	return nil
 }
 
-func (t *ComponentCredentialTransformer) createOrUpdate(ctx graph.TransformContext,
+func (t *componentCredentialTransformer) createOrUpdate(ctx graph.TransformContext,
 	dag *graph.DAG, graphCli model.GraphClient, secret *corev1.Secret) error {
 	key := types.NamespacedName{
 		Namespace: secret.Namespace,

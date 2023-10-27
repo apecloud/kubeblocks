@@ -26,13 +26,13 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
-// ComponentValidationTransformer validates the consistency between spec & definition.
-type ComponentValidationTransformer struct{}
+// componentValidationTransformer validates the consistency between spec & definition.
+type componentValidationTransformer struct{}
 
-var _ graph.Transformer = &ComponentValidationTransformer{}
+var _ graph.Transformer = &componentValidationTransformer{}
 
-func (t *ComponentValidationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*ComponentTransformContext)
+func (t *componentValidationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*componentTransformContext)
 	comp := transCtx.Component
 
 	err := validateEnabledLogs(comp, transCtx.CompDef)

@@ -25,14 +25,14 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-type InitComponentTransformer struct {
+type componentInitTransformer struct {
 	Component     *appsv1alpha1.Component
 	ComponentOrig *appsv1alpha1.Component
 }
 
-var _ graph.Transformer = &InitComponentTransformer{}
+var _ graph.Transformer = &componentInitTransformer{}
 
-func (t *InitComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *componentInitTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	// put the Component object first, it will be root vertex of DAG
 	rootVertex := &model.ObjectVertex{Obj: t.Component, OriObj: t.ComponentOrig, Action: model.ActionStatusPtr()}
 	dag.AddVertex(rootVertex)

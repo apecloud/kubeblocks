@@ -40,13 +40,13 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// ComponentRBACTransformer puts the RBAC objects at the beginning of the DAG
-type ComponentRBACTransformer struct{}
+// componentRBACTransformer puts the RBAC objects at the beginning of the DAG
+type componentRBACTransformer struct{}
 
-var _ graph.Transformer = &ComponentRBACTransformer{}
+var _ graph.Transformer = &componentRBACTransformer{}
 
-func (t *ComponentRBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*ComponentTransformContext)
+func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*componentTransformContext)
 	if model.IsObjectDeleting(transCtx.ComponentOrig) {
 		return nil
 	}
@@ -115,7 +115,7 @@ func isVolumeProtectionEnabled(compDef *appsv1alpha1.ComponentDefinition) bool {
 	return false
 }
 
-func isServiceAccountExist(transCtx *ComponentTransformContext, serviceAccountName string) bool {
+func isServiceAccountExist(transCtx *componentTransformContext, serviceAccountName string) bool {
 	cluster := transCtx.Cluster
 	namespaceName := types.NamespacedName{
 		Namespace: cluster.Namespace,
@@ -135,7 +135,7 @@ func isServiceAccountExist(transCtx *ComponentTransformContext, serviceAccountNa
 	return true
 }
 
-func isClusterRoleBindingExist(transCtx *ComponentTransformContext, serviceAccountName string) bool {
+func isClusterRoleBindingExist(transCtx *componentTransformContext, serviceAccountName string) bool {
 	cluster := transCtx.Cluster
 	namespaceName := types.NamespacedName{
 		Namespace: cluster.Namespace,
@@ -173,7 +173,7 @@ func isClusterRoleBindingExist(transCtx *ComponentTransformContext, serviceAccou
 	return true
 }
 
-func isRoleBindingExist(transCtx *ComponentTransformContext, serviceAccountName string) bool {
+func isRoleBindingExist(transCtx *componentTransformContext, serviceAccountName string) bool {
 	cluster := transCtx.Cluster
 	namespaceName := types.NamespacedName{
 		Namespace: cluster.Namespace,
@@ -211,7 +211,7 @@ func isRoleBindingExist(transCtx *ComponentTransformContext, serviceAccountName 
 	return true
 }
 
-func getDefaultBackupPolicyTemplate(transCtx *ComponentTransformContext, clusterDefName string) (*appsv1alpha1.BackupPolicyTemplate, error) {
+func getDefaultBackupPolicyTemplate(transCtx *componentTransformContext, clusterDefName string) (*appsv1alpha1.BackupPolicyTemplate, error) {
 	backupPolicyTPLs := &appsv1alpha1.BackupPolicyTemplateList{}
 	if err := transCtx.Client.List(transCtx.Context, backupPolicyTPLs, client.MatchingLabels{constant.ClusterDefLabelKey: clusterDefName}); err != nil {
 		return nil, err
@@ -227,7 +227,7 @@ func getDefaultBackupPolicyTemplate(transCtx *ComponentTransformContext, cluster
 	return &backupPolicyTPLs.Items[0], nil
 }
 
-func buildServiceAccounts(transCtx *ComponentTransformContext) (*corev1.ServiceAccount, bool, error) {
+func buildServiceAccounts(transCtx *componentTransformContext) (*corev1.ServiceAccount, bool, error) {
 	var (
 		cluster = transCtx.Cluster
 		comp    = transCtx.Component

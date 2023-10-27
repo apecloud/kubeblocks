@@ -34,13 +34,13 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 )
 
-// ComponentTLSTransformer handles component configuration render
-type ComponentTLSTransformer struct{}
+// componentTLSTransformer handles component configuration render
+type componentTLSTransformer struct{}
 
-var _ graph.Transformer = &ComponentTLSTransformer{}
+var _ graph.Transformer = &componentTLSTransformer{}
 
-func (t *ComponentTLSTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*ComponentTransformContext)
+func (t *componentTLSTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*componentTransformContext)
 	synthesizeComp := transCtx.SynthesizeComponent
 
 	// update podSpec tls volume and volumeMount

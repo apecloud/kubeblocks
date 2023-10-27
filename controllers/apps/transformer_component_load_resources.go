@@ -30,13 +30,13 @@ import (
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// ComponentLoadResourcesTransformer handles referenced resources validation and load them into context
-type ComponentLoadResourcesTransformer struct{}
+// componentLoadResourcesTransformer handles referenced resources validation and load them into context
+type componentLoadResourcesTransformer struct{}
 
-var _ graph.Transformer = &ComponentLoadResourcesTransformer{}
+var _ graph.Transformer = &componentLoadResourcesTransformer{}
 
-func (t *ComponentLoadResourcesTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*ComponentTransformContext)
+func (t *componentLoadResourcesTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*componentTransformContext)
 	reqCtx := ictrlutil.RequestCtx{
 		Ctx:      transCtx.Context,
 		Log:      transCtx.Logger,

@@ -92,7 +92,7 @@ var _ = Describe("object rbac transformer test.", func() {
 		}
 
 		dag = mockDAG(graphCli, cluster)
-		transformer = &ComponentRBACTransformer{}
+		transformer = &componentRBACTransformer{}
 		allSettings = viper.AllSettings()
 		viper.SetDefault(constant.EnableRBACManager, true)
 	})

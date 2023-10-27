@@ -66,7 +66,7 @@ var _ = Describe("Backup Controller test", func() {
 		// job to delete the backup between the ClearResources function delete
 		// the job and get the job list, resulting the ClearResources panic.
 		Eventually(testapps.List(&testCtx, generics.BackupSignature, inNS)).Should(HaveLen(0))
-
+		testapps.ClearResources(&testCtx, generics.SecretSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
@@ -143,6 +143,7 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Status.PersistentVolumeClaimName).Should(Equal(repoPVCName))
 					g.Expect(fetched.Status.Path).Should(Equal(dpbackup.BuildBackupPath(fetched, backupPolicy.Spec.PathPrefix)))
 					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
+					g.Expect(fetched.Annotations[dptypes.ConnectionPasswordKey]).ShouldNot(BeEmpty())
 				})).Should(Succeed())
 
 				By("check backup job's nodeName equals pod's nodeName")

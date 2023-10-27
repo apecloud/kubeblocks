@@ -138,7 +138,7 @@ risingwave:
       ## @param risingwave.metaStore.etcd.endpoint
       ## etcd endpoint.
       ##
-      endpoints: ""
+      endpoints: "REPLACE-WITH-YOUR-ETCD-ENDPOINT:2379"
 
       ## @param risingwave.metaStore.etcd.authentication
       ## etcd authentication.
@@ -167,17 +167,17 @@ risingwave:
       ## @param risingwave.stateStore.s3.endpoint
       ## Endpoint for S3 compatible services. Leave it empty for standard AWS S3.
       ##
-      endpoint: ""
+      endpoint: "https://s3.REPLACE-WITH-YOUR-REGION.amazonaws.com.cn"
 
       ## @param risingwave.stateStore.s3.region
       ## Region of S3 bucket.
       ##
-      region: ""
+      region: "REPLACE-WITH-YOUR-REGION"
 
       ## @param risingwave.stateStore.s3.bucket
       ## S3 bucket name.
       ##
-      bucket: ""
+      bucket: "REPLACE-WITH-YOUR-BUCKET"
 
       ## @param risingwave.stateStore.s3.credentials
       ## S3 credentials.
@@ -192,9 +192,9 @@ risingwave:
         ## @param risingwave.stateStore.s3.credentials.accessKey
         ## S3 access key.
         ##
-        accessKey: ""
+        accessKey: "REPLACE-WITH-YOUR-AK"
 
         ## @param risingwave.stateStore.s3.credentials.secretAccessKey
         ## S3 secret access key.
         ##
-        secretAccessKey: ""
+        secretAccessKey: "REPLACE-WITH-YOUR-SK"

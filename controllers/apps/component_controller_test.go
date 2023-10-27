@@ -657,7 +657,6 @@ var _ = Describe("Cluster Controller", func() {
 		By("Get the latest cluster def")
 		Expect(k8sClient.Get(testCtx.Ctx, client.ObjectKeyFromObject(clusterDefObj), clusterDefObj)).Should(Succeed())
 		for i, comp := range cluster.Spec.ComponentSpecs {
-			//lorry.SetMockClient(&mockLorryClient{replicas: updatedReplicas, clusterKey: clusterKey, compName: comp.Name}, nil)
 			newMockLorryClient(clusterKey, comp.Name, updatedReplicas)
 
 			By(fmt.Sprintf("H-scale component %s with policy %s", comp.Name, hscalePolicy(comp)))

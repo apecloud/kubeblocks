@@ -597,7 +597,6 @@ var _ = Describe("OpsRequest Controller", func() {
 		})
 
 		It("HorizontalScaling when the number of pods is inconsistent with the number of replicas", func() {
-			//lorry.SetMockClient(&mockLorryClient{replicas: 2, clusterKey: clusterKey, compName: mysqlCompName}, nil)
 			newMockLorryClient(clusterKey, mysqlCompName, 2)
 			defer lorry.UnsetMockClient()
 

@@ -28,14 +28,16 @@ import (
 
 	monitorv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/monitor/types"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 const OteldSecretName = "oteld-secret"
 
 func Secret(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
-	desired := make([]*corev1.Secret, 0)
+	if !reqCtx.OTeld.UseSecret() {
+		return nil
+	}
 
+	desired := make([]*corev1.Secret, 0)
 	cg := types.NewConfigGenerator()
 	daemonSetInstance := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDaemonSet)
 	if daemonSetInstance != nil {
@@ -61,15 +63,7 @@ func Secret(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 		}
 	}
 
-	if err := expectedSecret(reqCtx, params, desired); err != nil {
-		return err
-	}
-
-	if err := deleteSecret(reqCtx, params, desired); err != nil {
-		return err
-	}
-
-	return nil
+	return expectedSecret(reqCtx, params, desired)
 }
 
 func expectedSecret(reqCtx types.ReconcileCtx, params types.OTeldParams, desired []*corev1.Secret) error {
@@ -121,34 +115,34 @@ func expectedSecret(reqCtx types.ReconcileCtx, params types.OTeldParams, desired
 	return nil
 }
 
-func deleteSecret(reqCtx types.ReconcileCtx, params types.OTeldParams, desired []*corev1.Secret) error {
-	listopts := []client.ListOption{
-		client.InNamespace(reqCtx.OTeld.Namespace),
-		client.MatchingLabels(map[string]string{
-			constant.AppManagedByLabelKey: constant.AppName,
-			constant.AppNameLabelKey:      OTeldName,
-		}),
-	}
-
-	secretList := &corev1.SecretList{}
-	if params.Client.List(reqCtx.Ctx, secretList, listopts...) != nil {
-		return nil
-	}
-
-	for _, configMap := range secretList.Items {
-		isdel := true
-		for _, keep := range desired {
-			if keep.Name == configMap.Name && keep.Namespace == configMap.Namespace {
-				isdel = false
-				break
-			}
-		}
-
-		if isdel {
-			if err := params.Client.Delete(reqCtx.Ctx, &configMap); err != nil {
-				return fmt.Errorf("failed to delete: %w", err)
-			}
-		}
-	}
-	return nil
-}
+// func deleteSecret(reqCtx types.ReconcileCtx, params types.OTeldParams, desired []*corev1.Secret) error {
+//	listopts := []client.ListOption{
+//		client.InNamespace(reqCtx.OTeld.Namespace),
+//		client.MatchingLabels(map[string]string{
+//			constant.AppManagedByLabelKey: constant.AppName,
+//			constant.AppNameLabelKey:      OTeldName,
+//		}),
+//	}
+//
+//	secretList := &corev1.SecretList{}
+//	if params.Client.List(reqCtx.Ctx, secretList, listopts...) != nil {
+//		return nil
+//	}
+//
+//	for _, configMap := range secretList.Items {
+//		isdel := true
+//		for _, keep := range desired {
+//			if keep.Name == configMap.Name && keep.Namespace == configMap.Namespace {
+//				isdel = false
+//				break
+//			}
+//		}
+//
+//		if isdel {
+//			if err := params.Client.Delete(reqCtx.Ctx, &configMap); err != nil {
+//				return fmt.Errorf("failed to delete: %w", err)
+//			}
+//		}
+//	}
+//	return nil
+// }

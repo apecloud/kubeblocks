@@ -152,20 +152,8 @@ func buildPodSpecForOteld(oTeld *v1alpha1.OTeld, mode v1alpha1.Mode) corev1.PodS
 			VolumeSource: corev1.VolumeSource{
 				HostPath: &corev1.HostPathVolumeSource{Path: "/"}},
 		}).
-		AddVolumes(corev1.Volume{
-			Name: "oteld-config-volume",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: fmt.Sprintf(OteldSecretNamePattern, mode),
-				}},
-		}).
-		AddVolumes(corev1.Volume{
-			Name: "engine-config-volume",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: fmt.Sprintf(OteldEngineSecretNamePattern, mode),
-				}},
-		}).
+		AddVolumes(buildOTelConfigVolume(oTeld.UseSecret(), mode)).
+		AddVolumes(buildAppConfigVolume(oTeld.UseSecret(), mode)).
 		SetSecurityContext(corev1.PodSecurityContext{
 			RunAsUser:    cfgutil.ToPointer(int64(0)),
 			RunAsGroup:   cfgutil.ToPointer(int64(0)),
@@ -174,6 +162,46 @@ func buildPodSpecForOteld(oTeld *v1alpha1.OTeld, mode v1alpha1.Mode) corev1.PodS
 		}).
 		SetNodeSelector(oTeld.Spec.NodeSelector).
 		GetObject().Spec
+}
+
+func buildOTelConfigVolume(useSecret bool, mode v1alpha1.Mode) corev1.Volume {
+	volumeSource := corev1.VolumeSource{
+		ConfigMap: &corev1.ConfigMapVolumeSource{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: fmt.Sprintf(OteldConfigMapNamePattern, mode),
+			}},
+	}
+
+	if useSecret {
+		volumeSource = corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: fmt.Sprintf(OteldSecretNamePattern, mode),
+			}}
+	}
+	return corev1.Volume{
+		Name:         "oteld-config-volume",
+		VolumeSource: volumeSource,
+	}
+}
+
+func buildAppConfigVolume(useSecret bool, mode v1alpha1.Mode) corev1.Volume {
+	volumeSource := corev1.VolumeSource{
+		ConfigMap: &corev1.ConfigMapVolumeSource{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: fmt.Sprintf(OteldEngineConfigMapNamePattern, mode),
+			}},
+	}
+
+	if useSecret {
+		volumeSource = corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: fmt.Sprintf(OteldEngineSecretNamePattern, mode),
+			}}
+	}
+	return corev1.Volume{
+		Name:         "engine-config-volume",
+		VolumeSource: volumeSource,
+	}
 }
 
 func buildSvcForOtel(oteld *v1alpha1.OTeld, namespace string, mode v1alpha1.Mode) (*corev1.Service, error) {
@@ -230,7 +258,7 @@ func buildSvcForOtel(oteld *v1alpha1.OTeld, namespace string, mode v1alpha1.Mode
 }
 
 func buildConfigMapForOteld(instance *types.OteldInstance, namespace string, exporters *types.Exporters, mode v1alpha1.Mode, gc *types.OteldConfigGenerater) (*corev1.ConfigMap, error) {
-	if instance == nil || instance.Oteld == nil || !instance.Oteld.Spec.UseConfigMap {
+	if instance == nil || instance.Oteld == nil {
 		return nil, nil
 	}
 
@@ -256,7 +284,7 @@ func buildConfigMapForOteld(instance *types.OteldInstance, namespace string, exp
 }
 
 func buildEngineConfigForOteld(instance *types.OteldInstance, namespace string, mode v1alpha1.Mode, gc *types.OteldConfigGenerater) (*corev1.ConfigMap, error) {
-	if instance == nil || instance.Oteld == nil || !instance.Oteld.Spec.UseConfigMap {
+	if instance == nil || instance.Oteld == nil {
 		return nil, nil
 	}
 
@@ -308,7 +336,7 @@ func buildSecretForOteld(instance *types.OteldInstance, namespace string, export
 }
 
 func buildEngineSecretForOteld(instance *types.OteldInstance, namespace string, mode v1alpha1.Mode, gc *types.OteldConfigGenerater) (*corev1.Secret, error) {
-	if instance == nil || instance.Oteld == nil || !instance.Oteld.Spec.UseConfigMap {
+	if instance == nil || instance.Oteld == nil {
 		return nil, nil
 	}
 

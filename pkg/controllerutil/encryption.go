@@ -48,7 +48,7 @@ func NewEncryptor(encryptionKey string) *encryptor {
 func (e *encryptor) deriveKey() {
 	key := make([]byte, 32)
 	k := hkdf.New(sha256.New, e.encryptionKey, []byte(purposeEncryptionKey), nil)
-	io.ReadFull(k, key)
+	_, _ = io.ReadFull(k, key)
 	e.encryptionHashKey = key
 }
 

@@ -207,7 +207,7 @@ var _ = Describe("Backup Controller test", func() {
 		})
 
 		Context("creates a backup with retentionPeriod", func() {
-			It("create an valid backup", func() {
+			It("create a valid backup", func() {
 				By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
 				backup := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
 					backup.Spec.RetentionPeriod = "1h"
@@ -229,7 +229,7 @@ var _ = Describe("Backup Controller test", func() {
 
 				testdp.PatchK8sJobStatus(&testCtx, getJobKey(), batchv1.JobComplete)
 
-				By("check backup expiration is update by completion time when backup is completed")
+				By("check backup expiration is updated by completion time when backup is completed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
 					g.Expect(fetched.Status.CompletionTimestamp).ShouldNot(BeNil())

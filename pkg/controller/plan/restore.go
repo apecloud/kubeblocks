@@ -28,7 +28,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -289,13 +288,24 @@ func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.Synt
 	}
 	if namespace := backupSource[constant.BackupNamespaceKeyForRestore]; namespace != "" {
 		r.namespace = namespace
+		// TODO: support restore backup to different namespace
+		if namespace != r.Cluster.Namespace {
+			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed,
+				"unsupported restore backup to different namespace, backup namespace: %s, cluster namespace: %s", namespace, r.Cluster.Namespace)
+		}
 	}
 	if volumeRestorePolicy := backupSource[constant.VolumeRestorePolicyKeyForRestore]; volumeRestorePolicy != "" {
 		r.volumeRestorePolicy = dpv1alpha1.VolumeClaimRestorePolicy(volumeRestorePolicy)
 	}
 	r.restoreTime = backupSource[constant.RestoreTimeKeyForRestore]
+
+	name := backupSource[constant.BackupNameKeyForRestore]
+	if name == "" {
+		return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed,
+			"failed to restore component %s, backup name is empty", synthesizedComponent.Name)
+	}
 	backup := &dpv1alpha1.Backup{}
-	if err = r.Client.Get(r.Ctx, types.NamespacedName{Name: backupSource[constant.BackupNameKeyForRestore], Namespace: r.Cluster.Namespace}, backup); err != nil {
+	if err = r.Client.Get(r.Ctx, client.ObjectKey{Namespace: r.namespace, Name: name}, backup); err != nil {
 		return nil, err
 	}
 	return backup, nil
@@ -317,13 +327,15 @@ func (r *RestoreManager) createRestoreAndWait(restore *dpv1alpha1.Restore) error
 			return err
 		}
 	}
-	if restore.Status.Phase == dpv1alpha1.RestorePhaseCompleted {
+
+	switch restore.Status.Phase {
+	case dpv1alpha1.RestorePhaseCompleted:
 		return nil
+	case dpv1alpha1.RestorePhaseFailed:
+		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed, `restore "%s" status is Failed, you can describe it and re-restore the cluster.`, restore.GetName())
+	default:
+		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting, `waiting for restore "%s" successfully`, restore.GetName())
 	}
-	if restore.Status.Phase == dpv1alpha1.RestorePhaseFailed {
-		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed, `restore "%s" is Failed, you can describe it and re-restore the cluster.`, restore.GetName())
-	}
-	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting, `waiting for restore "%s" successfully`, restore.GetName())
 }
 
 func (r *RestoreManager) cleanupClusterAnnotations() error {

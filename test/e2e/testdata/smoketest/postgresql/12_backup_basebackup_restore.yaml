@@ -5,7 +5,7 @@ kind: Cluster
 metadata:
   name: pg-cluster-snapshot
   annotations:
-    kubeblocks.io/restore-from-backup: '{"postgresql":{"name":"backup-postgresql-cluster","namespace":"default","managementPolicy":"Parallel"}}'
+    kubeblocks.io/restore-from-backup: '{"postgresql":{"name":"backup-postgresql-cluster","namespace":"default","volumeRestorePolicy":"Parallel"}}'
 spec:
   clusterDefinitionRef: postgresql
   clusterVersionRef: postgresql-14.7.2-latest

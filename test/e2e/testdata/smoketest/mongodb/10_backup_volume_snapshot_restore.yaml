@@ -5,7 +5,7 @@ kind: Cluster
 metadata:
   name: mongo-cluster-snapshot
   annotations:
-    kubeblocks.io/restore-from-backup: '{"mongodb":{"name":"backup-mongodb-cluster-snapshot","namespace":"default","managementPolicy":"Parallel"}}'
+    kubeblocks.io/restore-from-backup: '{"mongodb":{"name":"backup-mongodb-cluster-snapshot","namespace":"default","volumeRestorePolicy":"Parallel"}}'
 spec:
   clusterDefinitionRef: mongodb
   clusterVersionRef: mongodb-5.0

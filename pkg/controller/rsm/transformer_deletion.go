@@ -20,11 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm
 
 import (
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // ObjectDeletionTransformer handles object and its secondary resources' deletion
@@ -50,26 +47,10 @@ func (t *ObjectDeletionTransformer) Transform(ctx graph.TransformContext, dag *g
 		return err
 	}
 	for _, object := range snapshot {
-		if viper.GetBool(FeatureGateRSMCompatibilityMode) {
-			if !managedByRSM(object) {
-				continue
-			}
-		}
 		graphCli.Delete(dag, object)
 	}
 	graphCli.Delete(dag, obj)
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
 	return graph.ErrPrematureStop
-}
-
-func managedByRSM(object client.Object) bool {
-	labels := object.GetLabels()
-	if labels == nil {
-		return false
-	}
-	if manager, ok := labels[workloadsManagedByLabelKey]; ok && manager == kindReplicatedStateMachine {
-		return true
-	}
-	return false
 }

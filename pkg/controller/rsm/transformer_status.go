@@ -60,11 +60,13 @@ func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *gra
 		generation := rsm.Status.ObservedGeneration
 		rsm.Status.StatefulSetStatus = sts.Status
 		rsm.Status.ObservedGeneration = generation
-		currentGeneration, err := strconv.ParseInt(sts.Labels[rsmGenerationLabelKey], 10, 64)
-		if err != nil {
-			return err
+		if currentGenerationLabel, ok := sts.Labels[rsmGenerationLabelKey]; ok {
+			currentGeneration, err := strconv.ParseInt(currentGenerationLabel, 10, 64)
+			if err != nil {
+				return err
+			}
+			rsm.Status.CurrentGeneration = currentGeneration
 		}
-		rsm.Status.CurrentGeneration = currentGeneration
 		// read all pods belong to the sts, hence belong to the rsm
 		pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, sts)
 		if err != nil {

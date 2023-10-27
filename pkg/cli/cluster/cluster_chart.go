@@ -86,9 +86,6 @@ func BuildChartInfo(t ClusterType) (*ChartInfo, error) {
 		return nil, err
 	}
 
-	if err = c.buildClusterDef(); err != nil {
-		return nil, err
-	}
 	return c, nil
 }
 

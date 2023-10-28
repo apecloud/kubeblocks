@@ -21,6 +21,7 @@ package monitor
 
 import (
 	"context"
+	"errors"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -91,9 +92,30 @@ func (o *OTeldReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	if err := o.runTasks(reqCtx, oteld); err != nil {
+		return o.updateErrMessageAndRequeue(reqCtx, oteld, err)
+	}
+
+	if err := o.updateOTeldStatus(reqCtx, oteld); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
+}
+
+func (o *OTeldReconciler) updateErrMessageAndRequeue(ctx intctrlutil.RequestCtx, oteld *monitorv1alpha1.OTeld, err error) (ctrl.Result, error) {
+	patch := client.MergeFrom(oteld.DeepCopy())
+	oteld.Status.Message = err.Error()
+	// TODO add condition details
+	// oteld.Status.Conditions
+	if err2 := o.Client.Status().Patch(ctx.Ctx, oteld, patch); err2 != nil {
+		err = errors.Join(err, err2)
+	}
+	return intctrlutil.CheckedRequeueWithError(err, ctx.Log, "")
+}
+
+func (o *OTeldReconciler) updateOTeldStatus(ctx intctrlutil.RequestCtx, oteld *monitorv1alpha1.OTeld) error {
+	patch := client.MergeFrom(oteld.DeepCopy())
+	oteld.Status.ObservedGeneration = oteld.Generation
+	return o.Client.Status().Patch(ctx.Ctx, oteld, patch)
 }
 
 func (o *OTeldReconciler) runTasks(reqCtx intctrlutil.RequestCtx, oteld *monitorv1alpha1.OTeld) error {

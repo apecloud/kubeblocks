@@ -115,7 +115,9 @@ func newSystemLogSlice(instance *OteldInstance) (yaml.MapSlice, error) {
 	for _, pipline := range instance.LogPipline {
 		for name, receiver := range pipline.ReceiverMap {
 			valMap := map[string]any{}
-			yaml.Unmarshal([]byte(receiver.Parameter), &valMap)
+			if err := yaml.Unmarshal([]byte(receiver.Parameter), &valMap); err != nil {
+				return nil, err
+			}
 			receiver, err := buildSliceFromCUE(fmt.Sprintf("receiver/logs/%s.cue", name), valMap)
 			if err != nil {
 				return nil, err
@@ -279,7 +281,7 @@ func (cg *OteldConfigGenerater) buildPiplineItem(instance *OteldInstance) yaml.M
 
 	pipline := yaml.MapSlice{}
 
-	if instance.MetricsPipline != nil {
+	if len(instance.MetricsPipline) != 0 {
 		metricsSlice := yaml.MapSlice{}
 		for _, mPipline := range instance.MetricsPipline {
 			receiverSlice := []string{}
@@ -303,7 +305,7 @@ func (cg *OteldConfigGenerater) buildPiplineItem(instance *OteldInstance) yaml.M
 		}
 	}
 
-	if instance.LogPipline != nil {
+	if len(instance.LogPipline) != 0 {
 		logsSlice := yaml.MapSlice{}
 		for _, lPipline := range instance.LogPipline {
 			receiverSlice := []string{}
@@ -352,7 +354,7 @@ func (cg *OteldConfigGenerater) buildPiplineItem(instance *OteldInstance) yaml.M
 		pipline = append(pipline, yaml.MapItem{Key: "metrics/app", Value: metricsSlice})
 	}
 
-	if len(instance.AppDataSources) > 0 {
+	if instance.AppLogsPipline.Name != "" {
 		logPipline := instance.AppLogsPipline
 
 		logsSlice := yaml.MapSlice{}

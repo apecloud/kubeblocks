@@ -1,0 +1,16 @@
+apiVersion: monitor.kubeblocks.io/v1alpha1
+kind: LogsExporterSink
+metadata:
+  annotations:
+    meta.helm.sh/release-name: oteld
+    meta.helm.sh/release-namespace: default
+  labels:
+    app.kubernetes.io/managed-by: Helm
+  name: loki
+  namespace: default
+spec:
+  lokiConfig:
+    endpoint: http://loki-gateway.kb-system/loki/api/v1/push
+    namespace: default
+    serviceConnectionCredential: loki-service
+  type: loki

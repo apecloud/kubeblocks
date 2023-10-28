@@ -41,14 +41,24 @@ spec:
                     type: boolean
                 type: object
               collectionInterval:
-                description: CollectionInterval is the default collect interval of
+                default: 15s
+                description: collectionInterval is the default collect interval of
                   the oteld collection
                 type: string
               image:
-                description: Image is the image of the oteld
+                description: image is the image of the oteld
                 type: string
               logLevel:
-                description: LogsLevel is the level of the oteld collector logs
+                default: info
+                description: logsLevel is the level of the oteld collector logs
+                enum:
+                - debug
+                - info
+                - warn
+                - error
+                - dpanic
+                - panic
+                - fatal
                 type: string
               memoryLimiter:
                 properties:
@@ -57,10 +67,11 @@ spec:
                     type: boolean
                 type: object
               metricsPort:
-                description: MetricsPort is the port of the oteld metrics
+                description: metricsPort is the port of the oteld metrics
                 type: integer
               mode:
-                description: Mode represents how the OTeld should be deployed (deployment,
+                default: daemonset
+                description: mode represents how the OTeld should be deployed (deployment,
                   daemonset, statefulset or sidecar)
                 enum:
                 - daemonset
@@ -71,12 +82,12 @@ spec:
               nodeSelector:
                 additionalProperties:
                   type: string
-                description: NodeSelector to schedule OpenTelemetry Collector pods.
+                description: nodeSelector to schedule OpenTelemetry Collector pods.
                   This is only relevant to daemonset, statefulset, and deployment
                   mode
                 type: object
               resources:
-                description: Resources is the resource requirements for the oteld
+                description: resources is the resource requirements for the oteld
                 properties:
                   claims:
                     description: "Claims lists the names of resources, defined in
@@ -123,16 +134,127 @@ spec:
                       More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                     type: object
                 type: object
+              systemDataSource:
+                description: systemDataSource is the system data source
+                properties:
+                  collectionInterval:
+                    description: collectionInterval is the interval of the data source
+                    format: int64
+                    type: integer
+                  enabledK8SClusterExporter:
+                    description: enabledK8sClusterMetrics indicates whether to collect
+                      k8s apiService metrics
+                    type: boolean
+                  enabledK8SNodeStatesMetrics:
+                    description: enabledK8sNodeStatesMetrics indicates whether to
+                      collect kubelet states metrics
+                    type: boolean
+                  enabledNodeExporter:
+                    description: enabledNodeMetrics indicates whether to collect node
+                      metrics
+                    type: boolean
+                  enabledPodLogs:
+                    description: enabledPodLogs indicates whether to collect pod logs
+                    type: boolean
+                  logsExporterRef:
+                    description: logsExporterRef is the exporter to export system
+                      logs
+                    type: string
+                  metricsExporterRef:
+                    description: metricsExporterRef is the exporter to export system
+                      metrics
+                    type: string
+                type: object
               useConfigMap:
-                description: UseConfigMap indicates whether to use configmap to store
+                description: useConfigMap indicates whether to use configmap to store
                   oteld config
                 type: boolean
-            required:
-            - collectionInterval
-            - useConfigMap
             type: object
           status:
             description: OTeldStatus defines the observed state of CollectorDataSource
+            properties:
+              conditions:
+                description: conditions describes oteld detail status.
+                items:
+                  description: "Condition contains details for one aspect of the current
+                    state of this API Resource. --- This struct is intended for direct
+                    use as an array at the field path .status.conditions.  For example,
+                    \n type FooStatus struct{ // Represents the observations of a
+                    foo's current state. // Known .status.conditions.type are: \"Available\",
+                    \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge
+                    // +listType=map // +listMapKey=type Conditions []metav1.Condition
+                    `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\"
+                    protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
+                  properties:
+                    lastTransitionTime:
+                      description: lastTransitionTime is the last time the condition
+                        transitioned from one status to another. This should be when
+                        the underlying condition changed.  If that is not known, then
+                        using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: message is a human readable message indicating
+                        details about the transition. This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: observedGeneration represents the .metadata.generation
+                        that the condition was set based upon. For instance, if .metadata.generation
+                        is currently 12, but the .status.conditions[x].observedGeneration
+                        is 9, the condition is out of date with respect to the current
+                        state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: reason contains a programmatic identifier indicating
+                        the reason for the condition's last transition. Producers
+                        of specific condition types may define expected values and
+                        meanings for this field, and whether the values are considered
+                        a guaranteed API. The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                        --- Many .condition.type values are consistent across resources
+                        like Available, but because arbitrary conditions can be useful
+                        (see .node.status.conditions), the ability to deconflict is
+                        important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              message:
+                description: message describes cluster details message in current
+                  phase.
+                type: string
+              observedGeneration:
+                description: observedGeneration is the most recent generation observed
+                  for this StatefulSet. It corresponds to the StatefulSet's generation,
+                  which is updated on mutation by the API Server.
+                format: int64
+                type: integer
             type: object
         type: object
     served: true

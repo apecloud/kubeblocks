@@ -266,7 +266,10 @@ func buildConfigMapForOteld(instance *types.OteldInstance, namespace string, exp
 		constant.AppInstanceLabelKey:  name,
 	}
 
-	configData, _ := gc.GenerateOteldConfiguration(instance, exporters.MetricsExporter, exporters.LogsExporter, mode)
+	configData, err := gc.GenerateOteldConfiguration(instance, exporters.MetricsExporter, exporters.LogsExporter, mode)
+	if err != nil {
+		return nil, err
+	}
 	marshal, err := yaml.Marshal(configData)
 	if err != nil {
 		return nil, err

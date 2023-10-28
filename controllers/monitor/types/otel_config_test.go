@@ -82,27 +82,31 @@ func fakeInstance() *OteldInstance {
 		AppDataSources: []v1alpha1.AppDataSource{
 			{
 				Spec: v1alpha1.AppDataSourceSpec{
-					Mode:          v1alpha1.ModeDaemonSet,
-					ClusterName:   "test",
-					ComponentName: "test",
-					ContainerName: "test",
-					Metrics: &v1alpha1.MetricsDataSource{
-						Enable:             true,
-						CollectionInterval: "15s",
-						EnabledMetrics: []string{
-							"test_metrics",
-						},
-					},
-					Logs: &v1alpha1.LogsDataSource{
-						Enable: true,
-						LogCollector: map[string]v1alpha1.InputConfig{
-							"test": {
-								Include: []string{
-									"test",
+					Mode:        v1alpha1.ModeDaemonSet,
+					ClusterName: "test",
+					Components: []v1alpha1.Component{{
+						ComponentName: "test",
+						Containers: []v1alpha1.Container{{
+							ContainerName: "test",
+							Metrics: &v1alpha1.MetricsDataSource{
+								Enable:             true,
+								CollectionInterval: "15s",
+								EnabledMetrics: []string{
+									"test_metrics",
 								},
 							},
-						},
-					},
+							Logs: &v1alpha1.LogsDataSource{
+								Enable: true,
+								LogCollector: map[string]v1alpha1.InputConfig{
+									"test": {
+										Include: []string{
+											"test",
+										},
+									},
+								},
+							},
+						}},
+					}},
 				},
 			},
 		},

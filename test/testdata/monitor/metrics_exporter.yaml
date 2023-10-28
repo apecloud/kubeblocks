@@ -1,0 +1,16 @@
+apiVersion: monitor.kubeblocks.io/v1alpha1
+kind: MetricsExporterSink
+metadata:
+  annotations:
+    meta.helm.sh/release-name: oteld
+    meta.helm.sh/release-namespace: default
+  labels:
+    app.kubernetes.io/managed-by: Helm
+  name: prometheus
+  namespace: default
+spec:
+  prometheusConfig:
+    endpoint: ${env:HOST_IP}:1234
+    namespace: default
+    serviceConnectionCredential: prometheus-service
+  type: prometheus

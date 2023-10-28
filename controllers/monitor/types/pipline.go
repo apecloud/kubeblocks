@@ -47,8 +47,9 @@ type OteldInstance struct {
 	AppDataSources    []v1alpha1.AppDataSource
 }
 
-func NewPipline() Pipline {
+func NewPipeline(name string) Pipline {
 	return Pipline{
+		Name:         name,
 		ReceiverMap:  make(map[string]Receiver),
 		ProcessorMap: make(map[string]bool),
 		ExporterMap:  make(map[string]bool),

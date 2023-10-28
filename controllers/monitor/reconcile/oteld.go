@@ -49,17 +49,17 @@ func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) erro
 		return err
 	}
 
-	systemDatasources := &v1alpha1.CollectorDataSourceList{}
-	if err := k8sClient.List(ctx, systemDatasources, client.InNamespace(reqCtx.OTeld.GetNamespace())); err != nil {
-		return err
-	}
+	// systemDatasources := &v1alpha1.CollectorDataSourceList{}
+	// if err := k8sClient.List(ctx, systemDatasources, client.InNamespace(reqCtx.OTeld.GetNamespace())); err != nil {
+	//	return err
+	// }
 
 	appDatasources := &v1alpha1.AppDataSourceList{}
 	if err := k8sClient.List(ctx, appDatasources, client.InNamespace(reqCtx.OTeld.GetNamespace())); err != nil {
 		return err
 	}
 
-	instanceMap, err := BuildInstanceMapForPipline(systemDatasources, appDatasources, metricsExporters, logsExporters, reqCtx.OTeld)
+	instanceMap, err := BuildInstanceMapForPipline(appDatasources, metricsExporters, logsExporters, reqCtx.OTeld)
 	if err != nil {
 		return err
 	}
@@ -68,65 +68,68 @@ func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) erro
 	return nil
 }
 
-func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList,
-	appDatasources *v1alpha1.AppDataSourceList,
+func BuildInstanceMapForPipline(appDatasources *v1alpha1.AppDataSourceList,
 	metricsExporters *v1alpha1.MetricsExporterSinkList,
 	logsExporters *v1alpha1.LogsExporterSinkList,
 	oteld *v1alpha1.OTeld) (map[v1alpha1.Mode]*monitortype.OteldInstance, error) {
+
 	instanceMap := map[v1alpha1.Mode]*monitortype.OteldInstance{
 		DefaultMode: monitortype.NewOteldInstance(oteld),
 	}
-	for _, dataSource := range datasources.Items {
-		mode := dataSource.Spec.Mode
-		if mode == "" {
-			mode = DefaultMode
-		}
-		oteldInstance, ok := instanceMap[mode]
-		if !ok {
-			oteldInstance = monitortype.NewOteldInstance(oteld)
-		}
-		if oteldInstance.MetricsPipline == nil {
-			oteldInstance.MetricsPipline = []monitortype.Pipline{}
-		}
-		pipline := monitortype.NewPipline()
-		pipline.Name = dataSource.Name
-		for _, data := range dataSource.Spec.DataSourceList {
-			pipline.ReceiverMap[data.Name] = monitortype.Receiver{
-				Parameter:          data.Parameter,
-				CollectionInterval: dataSource.Spec.CollectionInterval,
-			}
-		}
-
-		if oteldInstance.Oteld.Spec.Batch.Enabled {
-			pipline.ProcessorMap[monitortype.BatchProcessorName] = true
-		}
-		if oteldInstance.Oteld.Spec.MemoryLimiter.Enabled {
-			pipline.ProcessorMap[monitortype.MemoryProcessorName] = true
-		}
-		switch dataSource.Spec.Type {
-		case v1alpha1.MetricsDatasourceType:
-			for _, exporterRef := range dataSource.Spec.ExporterNames {
-				for _, exporter := range metricsExporters.Items {
-					if exporter.Name == exporterRef {
-						pipline.ExporterMap[fmt.Sprintf(ExporterNamePattern, exporter.Spec.Type, exporter.Name)] = true
-					}
-				}
-			}
-			oteldInstance.MetricsPipline = append(oteldInstance.MetricsPipline, pipline)
-		case v1alpha1.LogsDataSourceType:
-			for _, exporterRef := range dataSource.Spec.ExporterNames {
-				for _, exporter := range logsExporters.Items {
-					if exporter.Name == exporterRef {
-						pipline.ExporterMap[fmt.Sprintf(ExporterNamePattern, exporter.Spec.Type, exporter.Name)] = true
-					}
-				}
-			}
-			oteldInstance.LogPipline = append(oteldInstance.LogPipline, pipline)
-		default:
-			return nil, fmt.Errorf("unknown data source type %s", dataSource.Spec.Type)
-		}
-		instanceMap[mode] = oteldInstance
+	if err := buildSystemInstanceMap(oteld, instanceMap, metricsExporters, logsExporters); err != nil {
+		return nil, err
 	}
+
+	// for _, dataSource := range datasources.Items {
+	//	mode := dataSource.Spec.Mode
+	//	if mode == "" {
+	//		mode = DefaultMode
+	//	}
+	//	oteldInstance, ok := instanceMap[mode]
+	//	if !ok {
+	//		oteldInstance = monitortype.NewOteldInstance(oteld)
+	//	}
+	//	if oteldInstance.MetricsPipline == nil {
+	//		oteldInstance.MetricsPipline = []monitortype.Pipline{}
+	//	}
+	//	pipline := monitortype.NewPipeline(dataSource.Name)
+	//	for _, data := range dataSource.Spec.DataSourceList {
+	//		pipline.ReceiverMap[data.Name] = monitortype.Receiver{
+	//			Parameter:          data.Parameter,
+	//			CollectionInterval: dataSource.Spec.CollectionInterval,
+	//		}
+	//	}
+	//
+	//	if oteldInstance.Oteld.Spec.Batch.Enabled {
+	//		pipline.ProcessorMap[monitortype.BatchProcessorName] = true
+	//	}
+	//	if oteldInstance.Oteld.Spec.MemoryLimiter.Enabled {
+	//		pipline.ProcessorMap[monitortype.MemoryProcessorName] = true
+	//	}
+	//	switch dataSource.Spec.Type {
+	//	case v1alpha1.MetricsDatasourceType:
+	//		for _, exporterRef := range dataSource.Spec.ExporterNames {
+	//			for _, exporter := range metricsExporters.Items {
+	//				if exporter.Name == exporterRef {
+	//					pipline.ExporterMap[fmt.Sprintf(ExporterNamePattern, exporter.Spec.Type, exporter.Name)] = true
+	//				}
+	//			}
+	//		}
+	//		oteldInstance.MetricsPipline = append(oteldInstance.MetricsPipline, pipline)
+	//	case v1alpha1.LogsDataSourceType:
+	//		for _, exporterRef := range dataSource.Spec.ExporterNames {
+	//			for _, exporter := range logsExporters.Items {
+	//				if exporter.Name == exporterRef {
+	//					pipline.ExporterMap[fmt.Sprintf(ExporterNamePattern, exporter.Spec.Type, exporter.Name)] = true
+	//				}
+	//			}
+	//		}
+	//		oteldInstance.LogPipline = append(oteldInstance.LogPipline, pipline)
+	//	default:
+	//		return nil, fmt.Errorf("unknown data source type %s", dataSource.Spec.Type)
+	//	}
+	//	instanceMap[mode] = oteldInstance
+	// }
 
 	for _, dataSource := range appDatasources.Items {
 		mode := dataSource.Spec.Mode
@@ -145,8 +148,7 @@ func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList,
 	}
 
 	for _, instance := range instanceMap {
-		systemMetricsPipline := monitortype.NewPipline()
-		systemMetricsPipline.Name = monitortype.AppMetricsCreatorName
+		systemMetricsPipline := monitortype.NewPipeline(monitortype.AppMetricsCreatorName)
 		if instance.Oteld.Spec.Batch.Enabled {
 			systemMetricsPipline.ProcessorMap[monitortype.BatchProcessorName] = true
 		}
@@ -158,8 +160,7 @@ func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList,
 		}
 		instance.AppMetricsPiplien = systemMetricsPipline
 
-		logPipline := monitortype.NewPipline()
-		logPipline.Name = monitortype.LogCreatorName
+		logPipline := monitortype.NewPipeline(monitortype.LogCreatorName)
 		logPipline.ReceiverMap[monitortype.LogCreatorName] = monitortype.Receiver{}
 		if instance.Oteld.Spec.Batch.Enabled {
 			logPipline.ProcessorMap[monitortype.BatchProcessorName] = true
@@ -174,4 +175,21 @@ func BuildInstanceMapForPipline(datasources *v1alpha1.CollectorDataSourceList,
 	}
 
 	return instanceMap, nil
+}
+
+func buildSystemInstanceMap(oteld *v1alpha1.OTeld,
+	instanceMap map[v1alpha1.Mode]*monitortype.OteldInstance,
+	exporters *v1alpha1.MetricsExporterSinkList,
+	logsExporters *v1alpha1.LogsExporterSinkList) error {
+	if oteld.Spec.SystemDataSource == nil {
+		return nil
+	}
+
+	systemDataSource := oteld.Spec.SystemDataSource
+	return newOTeldHelper(systemDataSource, instanceMap, oteld, exporters, logsExporters).
+		buildAPIServicePipeline().
+		buildK8sNodeStatesPipeline().
+		buildNodePipeline().
+		buildPodLogsPipeline().
+		complete()
 }

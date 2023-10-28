@@ -51,7 +51,7 @@ func ConfigMap(reqCtx types.ReconcileCtx, params types.OTeldParams) (err error) 
 	}
 
 	if reqCtx.OTeld.UseSecret() {
-		return
+		return nil
 	}
 
 	cg := types.NewConfigGenerator()

@@ -23,4 +23,9 @@ const (
 	MonitorNamespaceEnvName = "OTELD_NAMESPACE"
 
 	MonitorFinalizerName = "monitor.kubeblocks.io/finalizer"
+
+	APIServiceReceiverTPLName    = "k8s_cluster"
+	K8SNodeStatesReceiverTPLName = "kubeletstats"
+	NodeExporterReceiverTPLName  = "node"
+	PodLogsReceiverTPLName       = "pod"
 )

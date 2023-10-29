@@ -401,7 +401,7 @@ var _ = Describe("DataProtection", func() {
 		Expect(cmd).ShouldNot(BeNil())
 		By("test describe-backup-policy cmd with cluster and backupPolicy")
 		tf.FakeDynamicClient = testing.FakeDynamicClient()
-		o := describeBackupPolicyOptions{
+		o := DescribeBackupPolicyOptions{
 			Factory:   tf,
 			IOStreams: streams,
 		}
@@ -419,7 +419,7 @@ var _ = Describe("DataProtection", func() {
 		Expect(o.Run()).Should(Succeed())
 
 		By("test describe-backup-policy with backupPolicy")
-		o = describeBackupPolicyOptions{
+		o = DescribeBackupPolicyOptions{
 			Factory:   tf,
 			IOStreams: streams,
 		}

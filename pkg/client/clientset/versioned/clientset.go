@@ -25,6 +25,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/extensions/v1alpha1"
+	monitorv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/monitor/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/storage/v1alpha1"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/workloads/v1alpha1"
 	discovery "k8s.io/client-go/discovery"
@@ -37,6 +38,7 @@ type Interface interface {
 	AppsV1alpha1() appsv1alpha1.AppsV1alpha1Interface
 	DataprotectionV1alpha1() dataprotectionv1alpha1.DataprotectionV1alpha1Interface
 	ExtensionsV1alpha1() extensionsv1alpha1.ExtensionsV1alpha1Interface
+	MonitorV1alpha1() monitorv1alpha1.MonitorV1alpha1Interface
 	StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface
 	WorkloadsV1alpha1() workloadsv1alpha1.WorkloadsV1alpha1Interface
 }
@@ -47,6 +49,7 @@ type Clientset struct {
 	appsV1alpha1           *appsv1alpha1.AppsV1alpha1Client
 	dataprotectionV1alpha1 *dataprotectionv1alpha1.DataprotectionV1alpha1Client
 	extensionsV1alpha1     *extensionsv1alpha1.ExtensionsV1alpha1Client
+	monitorV1alpha1        *monitorv1alpha1.MonitorV1alpha1Client
 	storageV1alpha1        *storagev1alpha1.StorageV1alpha1Client
 	workloadsV1alpha1      *workloadsv1alpha1.WorkloadsV1alpha1Client
 }
@@ -64,6 +67,11 @@ func (c *Clientset) DataprotectionV1alpha1() dataprotectionv1alpha1.Dataprotecti
 // ExtensionsV1alpha1 retrieves the ExtensionsV1alpha1Client
 func (c *Clientset) ExtensionsV1alpha1() extensionsv1alpha1.ExtensionsV1alpha1Interface {
 	return c.extensionsV1alpha1
+}
+
+// MonitorV1alpha1 retrieves the MonitorV1alpha1Client
+func (c *Clientset) MonitorV1alpha1() monitorv1alpha1.MonitorV1alpha1Interface {
+	return c.monitorV1alpha1
 }
 
 // StorageV1alpha1 retrieves the StorageV1alpha1Client
@@ -132,6 +140,10 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
+	cs.monitorV1alpha1, err = monitorv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
 	cs.storageV1alpha1, err = storagev1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
@@ -164,6 +176,7 @@ func New(c rest.Interface) *Clientset {
 	cs.appsV1alpha1 = appsv1alpha1.New(c)
 	cs.dataprotectionV1alpha1 = dataprotectionv1alpha1.New(c)
 	cs.extensionsV1alpha1 = extensionsv1alpha1.New(c)
+	cs.monitorV1alpha1 = monitorv1alpha1.New(c)
 	cs.storageV1alpha1 = storagev1alpha1.New(c)
 	cs.workloadsV1alpha1 = workloadsv1alpha1.New(c)
 

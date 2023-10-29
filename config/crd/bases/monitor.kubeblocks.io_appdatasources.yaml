@@ -73,8 +73,11 @@ spec:
                                 additionalProperties:
                                   properties:
                                     include:
+                                      description: include is the configuration for
+                                        the file log collector
                                       items:
                                         type: string
+                                      minItems: 1
                                       type: array
                                   type: object
                                 type: object

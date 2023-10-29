@@ -27,23 +27,85 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 type ExporterRef struct {
+	// exporterRef is the exporter to export metrics
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
 	ExporterNames []string `json:"exporterRef"`
 }
 
-type DataSourceType string
+type MetricsCollector struct {
+	ExporterRef ExporterRef `json:",inline"`
 
-const (
-	MetricsDatasourceType DataSourceType = "metrics"
-	LogsDataSourceType    DataSourceType = "logs"
-)
-
-type DataSource struct {
-	// Name is the name of the data source
+	// containerName is the container name of the data source to collect
 	// +kubebuilder:validation:Required
-	Name string `json:"name"`
+	ContainerName string `json:"containerName"`
 
-	// Parameter is the parameter of the data source
-	Parameter string `json:"parameter,omitempty"`
+	// component is the component name of the data source to collect
+	// +kubebuilder:validation:Required
+	Component string `json:"component"`
+
+	// monitorType describes the monitor type, e.g: prometheus, mysql, pg, redis
+	// +optional
+	// TODO add validation for monitorType, support type?
+	MonitorType string `json:"monitorType"`
+
+	// collectionInterval describes the collection interval.
+	// +optional
+	CollectionInterval string `json:"collectionInterval,omitempty"`
+
+	// metricsSelector describes which metrics are collected.
+	// +optional
+	MetricsSelector []string `json:"metricsSelector,omitempty"`
+}
+
+type MetricsCollectorSpec struct {
+	// metrics describes the metrics collector for each container
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +patchMergeKey=containerName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=containerName
+	Metrics []MetricsCollector `json:"metrics"`
+
+	// externalLabels describes which labels are added to metrics.
+	// +optional
+	ExternalLabels map[string]string `json:"externalLabels,omitempty"`
+}
+
+type LogsCollector struct {
+	ExporterRef ExporterRef `json:",inline"`
+
+	// containerName is the container name of the data source to collect
+	// +kubebuilder:validation:Required
+	ContainerName string `json:"containerName"`
+
+	// component is the component name of the data source to collect
+	// +kubebuilder:validation:Required
+	Component string `json:"component"`
+
+	// logs describes the logs collector for each container
+	// +optional
+	// Logs map[string]InputConfig `json:"logs,omitempty"`
+
+	// logsTypes describes the logs types to collect, e.g: error, general, runninglog, slowlog, etc.
+	// +optional
+	LogsTypes []string `json:"logsTypes,omitempty"`
+}
+
+type LogsCollectorSpec struct {
+	// logs describes the logs collector for each container
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +patchMergeKey=containerName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=containerName
+	Logs []LogsCollector `json:"logs"`
+
+	// externalLabels describes which labels are added to metrics.
+	// +optional
+	ExternalLabels map[string]string `json:"externalLabels,omitempty"`
 }
 
 // CollectorDataSourceSpec defines the desired state of CollectorDataSource
@@ -51,24 +113,18 @@ type CollectorDataSourceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Mode represents how the OTeld should be deployed (deployment, daemonset, statefulset or sidecar)
+	// clusterRef references cluster.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
+	ClusterRef string `json:"clusterRef"`
+
+	// metricsCollector describes the metrics collector
 	// +optional
-	Mode Mode `json:"mode,omitempty"`
+	MetricsCollector *MetricsCollectorSpec `json:"metricsCollectorSpec,omitempty"`
 
-	// ExporterRef is the exporters to export data source
-	// +kubebuilder:validation:Required
-	ExporterRef `json:",inline"`
-
-	// Type is the type of the data source
-	// +kubebuilder:validation:Required
-	Type DataSourceType `json:"type"`
-
-	// CollectionInterval is the interval of the data source
-	CollectionInterval string `json:"collectionInterval,omitempty"`
-
-	// DataSourceList is the list of the data source
-	// +kubebuilder:validation:Required
-	DataSourceList []DataSource `json:"dataSourceList"`
+	// logsCollector describes the logs collector
+	// +optional
+	LogsCollector *LogsCollectorSpec `json:"logsCollectorSpec,omitempty"`
 }
 
 // CollectorDataSourceStatus defines the observed state of CollectorDataSource

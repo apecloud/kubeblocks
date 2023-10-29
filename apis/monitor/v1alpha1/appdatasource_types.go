@@ -35,6 +35,9 @@ type MetricsDataSource struct {
 }
 
 type InputConfig struct {
+	// include is the configuration for the file log collector
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
 	Include []string `json:"include,omitempty"`
 }
 

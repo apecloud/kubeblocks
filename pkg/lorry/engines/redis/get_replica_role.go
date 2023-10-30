@@ -24,17 +24,7 @@ import (
 	"strings"
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-)
-
-const (
-	PRIMARY   = "primary"
-	SECONDARY = "secondary"
-	MASTER    = "master"
-	SLAVE     = "slave"
-	LEADER    = "Leader"
-	FOLLOWER  = "Follower"
-	LEARNER   = "Learner"
-	CANDIDATE = "Candidate"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 )
 
 func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (string, error) {
@@ -56,11 +46,11 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (s
 			}
 		}
 	}
-	if role == MASTER {
-		return PRIMARY, nil
+	if role == engines.MASTER {
+		return engines.PRIMARY, nil
 	}
-	if role == SLAVE {
-		return SECONDARY, nil
+	if role == engines.SLAVE {
+		return engines.SECONDARY, nil
 	}
 	return role, nil
 }

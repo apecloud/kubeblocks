@@ -25,17 +25,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-)
-
-const (
-	PRIMARY   = "primary"
-	SECONDARY = "secondary"
-	MASTER    = "master"
-	SLAVE     = "slave"
-	LEADER    = "Leader"
-	FOLLOWER  = "Follower"
-	LEARNER   = "Learner"
-	CANDIDATE = "Candidate"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 )
 
 func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (string, error) {
@@ -48,10 +38,10 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (s
 	}
 
 	if cluster.Leader.Name != mgr.CurrentMemberName {
-		return SECONDARY, nil
+		return engines.SECONDARY, nil
 	}
 
-	return PRIMARY, nil
+	return engines.PRIMARY, nil
 	// slaveRunning, err := mgr.isSlaveRunning(ctx)
 	// if err != nil {
 	// 	return "", err

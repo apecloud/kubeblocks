@@ -60,3 +60,14 @@ func ClientTypes() []string {
 func (t ClientType) String() string {
 	return string(t)
 }
+
+const (
+	PRIMARY   = "primary"
+	SECONDARY = "secondary"
+	MASTER    = "master"
+	SLAVE     = "slave"
+	LEADER    = "Leader"
+	FOLLOWER  = "Follower"
+	LEARNER   = "Learner"
+	CANDIDATE = "Candidate"
+)

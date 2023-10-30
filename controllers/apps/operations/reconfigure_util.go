@@ -245,7 +245,7 @@ func makeReconfiguringResult(err error, ops ...func(*reconfiguringResult)) recon
 }
 
 func constructReconfiguringConditions(result reconfiguringResult, resource *OpsResource, configSpec *appsv1alpha1.ComponentConfigSpec) *metav1.Condition {
-	if result.noFormatFilesUpdated || result.configPatch.IsModify {
+	if result.noFormatFilesUpdated || (result.configPatch != nil && result.configPatch.IsModify) {
 		return appsv1alpha1.NewReconfigureRunningCondition(
 			resource.OpsRequest,
 			appsv1alpha1.ReasonReconfigurePersisted,

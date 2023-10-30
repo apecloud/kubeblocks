@@ -42,7 +42,7 @@ const (
 	mysqlCompName    = "mysql"
 )
 
-var _ = Describe("Oteld Monitor Controller", func() {
+var _ = Describe("OTeld Monitor Controller", func() {
 
 	const (
 		clusterDefName     = "test-clusterdef"

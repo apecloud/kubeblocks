@@ -34,7 +34,7 @@ var _ = Describe("monitor_controller", func() {
 
 	BeforeEach(func() {
 		instance = &types.OteldInstance{
-			Oteld: &appsv1alpha1.OTeld{},
+			OTeld: &appsv1alpha1.OTeld{},
 		}
 	})
 

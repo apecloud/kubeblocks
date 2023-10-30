@@ -115,20 +115,20 @@ func (w *oteldWrapper) buildPodLogsPipeline() *oteldWrapper {
 	return w
 }
 
-func (w *oteldWrapper) createPipeline(mode v1alpha1.Mode, name string, collectType collectType) *types.Pipline {
+func (w *oteldWrapper) createPipeline(mode v1alpha1.Mode, name string, collectType collectType) *types.Pipeline {
 	var instance *types.OteldInstance
 
 	if instance = w.instanceMap[mode]; instance == nil {
 		instance = types.NewOteldInstance(w.OTeld, w.cli, w.ctx)
 		w.instanceMap[mode] = instance
 	}
-	if instance.MetricsPipline == nil {
-		instance.MetricsPipline = []types.Pipline{}
+	if instance.MetricsPipeline == nil {
+		instance.MetricsPipeline = []types.Pipeline{}
 	}
 	return foundOrCreatePipeline(instance, name, collectType)
 }
 
-func (w *oteldWrapper) buildProcessor(pipeline *types.Pipline) {
+func (w *oteldWrapper) buildProcessor(pipeline *types.Pipeline) {
 	if w.Spec.Batch.Enabled {
 		pipeline.ProcessorMap[types.BatchProcessorName] = true
 	}
@@ -137,7 +137,7 @@ func (w *oteldWrapper) buildProcessor(pipeline *types.Pipline) {
 	}
 }
 
-func (w *oteldWrapper) buildMetricsExporter(pipeline *types.Pipline) {
+func (w *oteldWrapper) buildMetricsExporter(pipeline *types.Pipeline) {
 	for _, exporter := range w.metricsExporters.Items {
 		if exporter.Name == w.source.MetricsExporterRef {
 			pipeline.ExporterMap[fmt.Sprintf(ExporterNamePattern, exporter.Spec.Type, exporter.Name)] = true
@@ -147,7 +147,7 @@ func (w *oteldWrapper) buildMetricsExporter(pipeline *types.Pipline) {
 	w.errs = append(w.errs, cfgcore.MakeError("the metrics exporter[%s] relied on by %s was not found.", w.source.MetricsExporterRef, pipeline.Name))
 }
 
-func (w *oteldWrapper) buildLogsExporter(pipeline *types.Pipline) {
+func (w *oteldWrapper) buildLogsExporter(pipeline *types.Pipeline) {
 	for _, exporter := range w.logsExporters.Items {
 		if exporter.Name == w.source.LogsExporterRef {
 			pipeline.ExporterMap[fmt.Sprintf(ExporterNamePattern, exporter.Spec.Type, exporter.Name)] = true
@@ -157,13 +157,13 @@ func (w *oteldWrapper) buildLogsExporter(pipeline *types.Pipline) {
 	w.errs = append(w.errs, cfgcore.MakeError("the logs exporter[%s] relied on by %s was not found.", w.source.LogsExporterRef, pipeline.Name))
 }
 
-func (w *oteldWrapper) appendAllMetricsExporter(pipeline *types.Pipline) {
+func (w *oteldWrapper) appendAllMetricsExporter(pipeline *types.Pipeline) {
 	for _, exporter := range w.metricsExporters.Items {
 		pipeline.ExporterMap[fmt.Sprintf(ExporterNamePattern, exporter.Spec.Type, exporter.Name)] = true
 	}
 }
 
-func (w *oteldWrapper) appendAllLogsExporter(pipeline *types.Pipline) {
+func (w *oteldWrapper) appendAllLogsExporter(pipeline *types.Pipeline) {
 	for _, exporter := range w.logsExporters.Items {
 		pipeline.ExporterMap[fmt.Sprintf(ExporterNamePattern, exporter.Spec.Type, exporter.Name)] = true
 	}
@@ -182,17 +182,17 @@ func (w *oteldWrapper) appendUserDataSource() *oteldWrapper {
 	return w
 }
 
-func (w *oteldWrapper) buildFixedPipline() *oteldWrapper {
+func (w *oteldWrapper) buildFixedPipeline() *oteldWrapper {
 	for _, instance := range w.instanceMap {
-		logsPipline := types.NewPipeline(LogsCreatorName)
-		w.buildProcessor(&logsPipline)
-		w.appendAllLogsExporter(&logsPipline)
-		instance.AppLogsPipline = &logsPipline
+		logsPipeline := types.NewPipeline(LogsCreatorName)
+		w.buildProcessor(&logsPipeline)
+		w.appendAllLogsExporter(&logsPipeline)
+		instance.AppLogsPipeline = &logsPipeline
 
-		metricsPipline := types.NewPipeline(AppMetricsCreatorName)
-		w.buildProcessor(&metricsPipline)
-		w.appendAllMetricsExporter(&metricsPipline)
-		instance.AppMetricsPiplien = &metricsPipline
+		metricsPipeline := types.NewPipeline(AppMetricsCreatorName)
+		w.buildProcessor(&metricsPipeline)
+		w.appendAllMetricsExporter(&metricsPipeline)
+		instance.AppMetricsPipelien = &metricsPipeline
 	}
 	return w
 }
@@ -201,8 +201,8 @@ func (w *oteldWrapper) complete() error {
 	return errors.Join(w.errs...)
 }
 
-func foundOrCreatePipeline(instance *types.OteldInstance, name string, collectType collectType) *types.Pipline {
-	foundPipeline := func(pipelines []types.Pipline) *types.Pipline {
+func foundOrCreatePipeline(instance *types.OteldInstance, name string, collectType collectType) *types.Pipeline {
+	foundPipeline := func(pipelines []types.Pipeline) *types.Pipeline {
 		for i := range pipelines {
 			pipeline := &pipelines[i]
 			if pipeline.Name == name {
@@ -211,7 +211,7 @@ func foundOrCreatePipeline(instance *types.OteldInstance, name string, collectTy
 		}
 		return nil
 	}
-	checkAndCreate := func(pipeline []types.Pipline, update func(pipeline types.Pipline) *types.Pipline) *types.Pipline {
+	checkAndCreate := func(pipeline []types.Pipeline, update func(pipeline types.Pipeline) *types.Pipeline) *types.Pipeline {
 		if p := foundPipeline(pipeline); p != nil {
 			return p
 		}
@@ -221,14 +221,14 @@ func foundOrCreatePipeline(instance *types.OteldInstance, name string, collectTy
 
 	switch collectType {
 	case collectTypeMetrics:
-		return checkAndCreate(instance.MetricsPipline, func(pipeline types.Pipline) *types.Pipline {
-			instance.MetricsPipline = append(instance.MetricsPipline, pipeline)
-			return &instance.MetricsPipline[len(instance.MetricsPipline)-1]
+		return checkAndCreate(instance.MetricsPipeline, func(pipeline types.Pipeline) *types.Pipeline {
+			instance.MetricsPipeline = append(instance.MetricsPipeline, pipeline)
+			return &instance.MetricsPipeline[len(instance.MetricsPipeline)-1]
 		})
 	case collectTypeLogs:
-		return checkAndCreate(instance.LogPipline, func(pipeline types.Pipline) *types.Pipline {
-			instance.LogPipline = append(instance.LogPipline, pipeline)
-			return &instance.LogPipline[len(instance.LogPipline)-1]
+		return checkAndCreate(instance.LogPipeline, func(pipeline types.Pipeline) *types.Pipeline {
+			instance.LogPipeline = append(instance.LogPipeline, pipeline)
+			return &instance.LogPipeline[len(instance.LogPipeline)-1]
 		})
 	default:
 		return nil

@@ -60,7 +60,7 @@ var _ = Describe("monitor_controller", func() {
 
 func fakeInstance() *OteldInstance {
 	return &OteldInstance{
-		MetricsPipline: []Pipline{
+		MetricsPipeline: []Pipeline{
 			{
 				Name: "metrics",
 				ReceiverMap: map[string]Receiver{
@@ -73,7 +73,7 @@ func fakeInstance() *OteldInstance {
 				},
 			},
 		},
-		Oteld: &v1alpha1.OTeld{
+		OTeld: &v1alpha1.OTeld{
 			Spec: v1alpha1.OTeldSpec{
 				Mode:               v1alpha1.ModeDaemonSet,
 				CollectionInterval: "15s",

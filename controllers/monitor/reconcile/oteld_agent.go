@@ -85,7 +85,7 @@ func buildDaemonSetForOteld(instance *types.OteldInstance, namespace string, nam
 		MatchLabels: commonLabels,
 	}
 
-	template := instance.Oteld
+	template := instance.OTeld
 	podTemplate := corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: commonLabels,

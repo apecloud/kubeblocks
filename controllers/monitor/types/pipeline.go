@@ -36,7 +36,7 @@ type Exporters struct {
 	LogsExporter    []v1alpha1.LogsExporterSink
 }
 
-type Pipline struct {
+type Pipeline struct {
 	Name         string
 	ReceiverMap  map[string]Receiver
 	ProcessorMap map[string]bool
@@ -44,19 +44,19 @@ type Pipline struct {
 }
 
 type OteldInstance struct {
-	MetricsPipline    []Pipline
-	LogPipline        []Pipline
-	AppLogsPipline    *Pipline
-	AppMetricsPiplien *Pipline
-	Oteld             *v1alpha1.OTeld
-	AppDataSources    []v1alpha1.CollectorDataSource
+	MetricsPipeline    []Pipeline
+	LogPipeline        []Pipeline
+	AppLogsPipeline    *Pipeline
+	AppMetricsPipelien *Pipeline
+	OTeld              *v1alpha1.OTeld
+	AppDataSources     []v1alpha1.CollectorDataSource
 
 	Cli client.Client
 	Ctx context.Context
 }
 
-func NewPipeline(name string) Pipline {
-	return Pipline{
+func NewPipeline(name string) Pipeline {
+	return Pipeline{
 		Name:         name,
 		ReceiverMap:  make(map[string]Receiver),
 		ProcessorMap: make(map[string]bool),
@@ -66,13 +66,13 @@ func NewPipeline(name string) Pipline {
 
 func NewOteldInstance(oteld *v1alpha1.OTeld, cli client.Client, ctx context.Context) *OteldInstance {
 	return &OteldInstance{
-		Cli:               cli,
-		Ctx:               ctx,
-		Oteld:             oteld,
-		MetricsPipline:    []Pipline{},
-		LogPipline:        []Pipline{},
-		AppLogsPipline:    &Pipline{},
-		AppMetricsPiplien: &Pipline{},
-		AppDataSources:    []v1alpha1.CollectorDataSource{},
+		Cli:                cli,
+		Ctx:                ctx,
+		OTeld:              oteld,
+		MetricsPipeline:    []Pipeline{},
+		LogPipeline:        []Pipeline{},
+		AppLogsPipeline:    &Pipeline{},
+		AppMetricsPipelien: &Pipeline{},
+		AppDataSources:     []v1alpha1.CollectorDataSource{},
 	}
 }

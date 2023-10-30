@@ -254,7 +254,7 @@ func buildSvcForOtel(oteld *v1alpha1.OTeld, namespace string, mode v1alpha1.Mode
 }
 
 func buildConfigMapForOteld(instance *types.OteldInstance, namespace string, exporters *types.Exporters, mode v1alpha1.Mode, gc *types.OteldConfigGenerater) (*corev1.ConfigMap, error) {
-	if instance == nil || instance.Oteld == nil {
+	if instance == nil || instance.OTeld == nil {
 		return nil, nil
 	}
 
@@ -278,12 +278,12 @@ func buildConfigMapForOteld(instance *types.OteldInstance, namespace string, exp
 	return builder.NewConfigMapBuilder(namespace, name).
 		SetData(map[string]string{"config.yaml": string(marshal)}).
 		AddLabelsInMap(commonLabels).
-		SetOwnerReferences(instance.Oteld.APIVersion, instance.Oteld.Kind, instance.Oteld).
+		SetOwnerReferences(instance.OTeld.APIVersion, instance.OTeld.Kind, instance.OTeld).
 		GetObject(), nil
 }
 
 func buildEngineConfigForOteld(instance *types.OteldInstance, namespace string, mode v1alpha1.Mode, gc *types.OteldConfigGenerater) (*corev1.ConfigMap, error) {
-	if instance == nil || instance.Oteld == nil {
+	if instance == nil || instance.OTeld == nil {
 		return nil, nil
 	}
 
@@ -304,12 +304,12 @@ func buildEngineConfigForOteld(instance *types.OteldInstance, namespace string, 
 	return builder.NewConfigMapBuilder(namespace, name).
 		SetData(map[string]string{"kb_engine.yaml": string(marshal)}).
 		AddLabelsInMap(commonLabels).
-		SetOwnerReferences(instance.Oteld.APIVersion, instance.Oteld.Kind, instance.Oteld).
+		SetOwnerReferences(instance.OTeld.APIVersion, instance.OTeld.Kind, instance.OTeld).
 		GetObject(), nil
 }
 
 func buildSecretForOteld(instance *types.OteldInstance, namespace string, exporters *types.Exporters, mode v1alpha1.Mode, gc *types.OteldConfigGenerater) (*corev1.Secret, error) {
-	if instance == nil || instance.Oteld == nil {
+	if instance == nil || instance.OTeld == nil {
 		return nil, nil
 	}
 
@@ -330,12 +330,12 @@ func buildSecretForOteld(instance *types.OteldInstance, namespace string, export
 	return builder.NewSecretBuilder(namespace, name).
 		PutData("config.yaml", marshal).
 		AddLabelsInMap(commonLabels).
-		SetOwnerReferences(instance.Oteld.APIVersion, instance.Oteld.Kind, instance.Oteld).
+		SetOwnerReferences(instance.OTeld.APIVersion, instance.OTeld.Kind, instance.OTeld).
 		GetObject(), nil
 }
 
 func buildEngineSecretForOteld(instance *types.OteldInstance, namespace string, mode v1alpha1.Mode, gc *types.OteldConfigGenerater) (*corev1.Secret, error) {
-	if instance == nil || instance.Oteld == nil {
+	if instance == nil || instance.OTeld == nil {
 		return nil, nil
 	}
 
@@ -356,6 +356,6 @@ func buildEngineSecretForOteld(instance *types.OteldInstance, namespace string, 
 	return builder.NewSecretBuilder(namespace, name).
 		PutData("kb_engine.yaml", marshal).
 		AddLabelsInMap(commonLabels).
-		SetOwnerReferences(instance.Oteld.APIVersion, instance.Oteld.Kind, instance.Oteld).
+		SetOwnerReferences(instance.OTeld.APIVersion, instance.OTeld.Kind, instance.OTeld).
 		GetObject(), nil
 }

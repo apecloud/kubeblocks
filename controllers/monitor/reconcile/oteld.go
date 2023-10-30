@@ -54,7 +54,7 @@ func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) erro
 		return err
 	}
 
-	instanceMap, err := BuildInstanceMapForPipline(userDateSources, metricsExporters, logsExporters, reqCtx.OTeld, params.Client, reqCtx.Ctx)
+	instanceMap, err := BuildInstanceMapForPipeline(userDateSources, metricsExporters, logsExporters, reqCtx.OTeld, params.Client, reqCtx.Ctx)
 	if err != nil {
 		return err
 	}
@@ -63,7 +63,7 @@ func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) erro
 	return nil
 }
 
-func BuildInstanceMapForPipline(appDatasources *v1alpha1.CollectorDataSourceList,
+func BuildInstanceMapForPipeline(appDatasources *v1alpha1.CollectorDataSourceList,
 	metricsExporters *v1alpha1.MetricsExporterSinkList,
 	logsExporters *v1alpha1.LogsExporterSinkList,
 	oteld *v1alpha1.OTeld,
@@ -98,6 +98,6 @@ func buildSystemInstanceMap(oteld *v1alpha1.OTeld,
 		buildNodePipeline().
 		buildPodLogsPipeline().
 		appendUserDataSource().
-		buildFixedPipline().
+		buildFixedPipeline().
 		complete()
 }

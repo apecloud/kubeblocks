@@ -38,10 +38,10 @@ func Service(reqCtx types.ReconcileCtx, params types.OTeldParams) error {
 	desired := make([]*corev1.Service, 0)
 
 	if daemon := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDaemonSet); daemon != nil {
-		desired = append(desired, buildSvcForOtel(daemon.Oteld, reqCtx.OTeld.Namespace, monitorv1alpha1.ModeDaemonSet))
+		desired = append(desired, buildSvcForOtel(daemon.OTeld, reqCtx.OTeld.Namespace, monitorv1alpha1.ModeDaemonSet))
 	}
 	if deploy := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDeployment); deploy != nil {
-		desired = append(desired, buildSvcForOtel(deploy.Oteld, reqCtx.OTeld.Namespace, monitorv1alpha1.ModeDeployment))
+		desired = append(desired, buildSvcForOtel(deploy.OTeld, reqCtx.OTeld.Namespace, monitorv1alpha1.ModeDeployment))
 	}
 	return expectedService(reqCtx, params, desired)
 }

@@ -21,8 +21,13 @@ package apps
 
 import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // componentDeletionTransformer handles component deletion
@@ -37,13 +42,44 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	comp := transCtx.Component
+	cluster := transCtx.Cluster
+	obj := transCtx.Component
 
-	// TODO: get the resource own by component for example rsm and delete them
+	ml := labelsForCompDelete(obj, cluster.Name)
+	snapshot, err := model.ReadCacheSnapshot(transCtx, obj, ml, kindsForCompDelete()...)
+	if err != nil {
+		return err
+	}
+	for _, object := range snapshot {
+		graphCli.Delete(dag, object)
+	}
 
 	transCtx.Component.Status.Phase = appsv1alpha1.DeletingClusterCompPhase
-	graphCli.Delete(dag, comp)
+	graphCli.Delete(dag, obj)
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
 	return graph.ErrPrematureStop
+}
+
+func compOwnedKinds() []client.ObjectList {
+	return []client.ObjectList{
+		&workloads.ReplicatedStateMachineList{},
+		&corev1.ServiceList{},
+		&corev1.ConfigMapList{},
+		&corev1.SecretList{},
+	}
+}
+
+func kindsForCompDelete() []client.ObjectList {
+	kinds := compOwnedKinds()
+	kinds = append(kinds, &batchv1.JobList{})
+	return kinds
+}
+
+func labelsForCompDelete(comp *appsv1alpha1.Component, clusterName string) map[string]string {
+	return map[string]string{
+		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.AppInstanceLabelKey:    clusterName,
+		constant.KBAppComponentLabelKey: comp.Name,
+	}
 }

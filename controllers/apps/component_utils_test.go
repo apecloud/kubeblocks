@@ -129,7 +129,7 @@ var _ = Describe("Component Utils", func() {
 
 			By("test getObjectListByCustomLabels function")
 			stsList = &appsv1.StatefulSetList{}
-			matchLabel := getComponentMatchLabels(cluster.Name, consensusCompName)
+			matchLabel := constant.GetComponentWellKnownLabels(cluster.Name, consensusCompName)
 			_ = getObjectListByCustomLabels(ctx, k8sClient, *cluster, stsList, client.MatchingLabels(matchLabel))
 			Expect(len(stsList.Items) > 0).Should(BeTrue())
 

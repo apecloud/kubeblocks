@@ -58,7 +58,7 @@ var (
 // In the new ComponentDefinition API, StatusProbe and RunningProbe have been removed.
 // TODO(xingran): workloadType and characterType dependency should be removed from lorry container.
 func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *SynthesizedComponent) error {
-	container := buildBasicContainer()
+	container := buildBasicContainer(synthesizeComp)
 	var lorryContainers []corev1.Container
 	lorrySvcHTTPPort := viper.GetInt32("PROBE_SERVICE_HTTP_PORT")
 	// override by new env name
@@ -105,26 +105,45 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 	return nil
 }
 
-func buildBasicContainer() *corev1.Container {
+func buildBasicContainer(synthesizeComp *SynthesizedComponent) *corev1.Container {
+	var (
+		secretName     string
+		sysInitAccount *appsv1alpha1.ComponentSystemAccount
+	)
+
+	// TODO(lorry): use the buildIn kbprobe system account as the default credential
+	for index, sysAccount := range synthesizeComp.SystemAccounts {
+		if sysAccount.IsSystemInitAccount {
+			sysInitAccount = &synthesizeComp.SystemAccounts[index]
+			break
+		}
+	}
+	if sysInitAccount != nil {
+		secretName = constant.GenerateComponentConnCredential(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
+	} else {
+		secretName = constant.GenerateDefaultConnCredential(synthesizeComp.ClusterName)
+	}
 	return builder.NewContainerBuilder("string").
 		SetImage("infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/google_containers/pause:3.6").
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddCommands("/pause").
 		AddEnv(corev1.EnvVar{
-			Name: "KB_SERVICE_USER",
+			Name: constant.KBEnvServiceUser,
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
-					Key:                  "username",
-					LocalObjectReference: corev1.LocalObjectReference{Name: "$(CONN_CREDENTIAL_SECRET_NAME)"},
-				},
+					Key: constant.AccountNameForSecret,
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					}},
 			}},
 			corev1.EnvVar{
-				Name: "KB_SERVICE_PASSWORD",
+				Name: constant.KBEnvServicePassword,
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
-						Key:                  "password",
-						LocalObjectReference: corev1.LocalObjectReference{Name: "$(CONN_CREDENTIAL_SECRET_NAME)"},
-					},
+						Key: constant.AccountPasswdForSecret,
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: secretName,
+						}},
 				},
 			}).
 		SetStartupProbe(corev1.Probe{
@@ -175,7 +194,23 @@ func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container 
 		}
 	}
 
-	secretName := constant.GenerateDefaultConnCredential(synthesizeComp.ClusterName)
+	var (
+		secretName     string
+		sysInitAccount *appsv1alpha1.ComponentSystemAccount
+	)
+
+	// TODO(lorry): use the buildIn kbprobe system account as the default credential
+	for index, sysAccount := range synthesizeComp.SystemAccounts {
+		if sysAccount.IsSystemInitAccount {
+			sysInitAccount = &synthesizeComp.SystemAccounts[index]
+			break
+		}
+	}
+	if sysInitAccount != nil {
+		secretName = constant.GenerateComponentConnCredential(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
+	} else {
+		secretName = constant.GenerateDefaultConnCredential(synthesizeComp.ClusterName)
+	}
 	container.Env = append(container.Env,
 		corev1.EnvVar{
 			Name:      constant.KBEnvCharacterType,

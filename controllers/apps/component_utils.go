@@ -63,15 +63,6 @@ func GetClusterByObject(ctx context.Context,
 	return cluster, nil
 }
 
-// getComponentMatchLabels gets the labels for matching the cluster component
-func getComponentMatchLabels(clusterName, componentName string) map[string]string {
-	return client.MatchingLabels{
-		constant.AppInstanceLabelKey:    clusterName,
-		constant.KBAppComponentLabelKey: componentName,
-		constant.AppManagedByLabelKey:   constant.AppName,
-	}
-}
-
 // IsProbeTimeout checks if the application of the pod is probe timed out.
 func IsProbeTimeout(probes *appsv1alpha1.ClusterDefinitionProbes, podsReadyTime *metav1.Time) bool {
 	if podsReadyTime == nil {
@@ -445,47 +436,33 @@ func UpdateCustomLabelToPods(ctx context.Context,
 	graphCli := model.NewGraphClient(cli)
 	pods := graphCli.FindAll(dag, &corev1.Pod{})
 
-	for _, customLabelSpec := range component.CustomLabelSpecs {
-		for _, resource := range customLabelSpec.Resources {
-			gvk, err := parseCustomLabelPattern(resource.GVK)
-			if err != nil {
-				return err
-			}
-			if gvk.Kind != constant.PodKind {
+	for labelKey, labelValue := range component.Labels {
+		podList := &corev1.PodList{}
+		matchLabels := constant.GetComponentWellKnownLabels(cluster.Name, component.Name)
+		if err := getObjectListByCustomLabels(ctx, cli, *cluster, podList, client.MatchingLabels(matchLabels)); err != nil {
+			return err
+		}
+
+		for i := range podList.Items {
+			idx := slices.IndexFunc(pods, func(obj client.Object) bool {
+				return obj.GetName() == podList.Items[i].Name
+			})
+			// pod already in dag, merge labels
+			if idx >= 0 {
+				updateObjLabel(cluster.Name, string(cluster.UID), component.Name, labelKey, string(labelValue), pods[idx])
 				continue
 			}
-
-			podList := &corev1.PodList{}
-			matchLabels := getComponentMatchLabels(cluster.Name, component.Name)
-			for k, v := range resource.Selector {
-				matchLabels[k] = v
-			}
-			if err = getObjectListByCustomLabels(ctx, cli, *cluster, podList, client.MatchingLabels(matchLabels)); err != nil {
-				return err
-			}
-
-			for i := range podList.Items {
-				idx := slices.IndexFunc(pods, func(obj client.Object) bool {
-					return obj.GetName() == podList.Items[i].Name
-				})
-				// pod already in dag, merge labels
-				if idx >= 0 {
-					updateObjLabel(cluster.Name, string(cluster.UID), component.Name, customLabelSpec, pods[idx])
-					continue
-				}
-				pod := &podList.Items[i]
-				updateObjLabel(cluster.Name, string(cluster.UID), component.Name, customLabelSpec, pod)
-				graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), nil)
-			}
+			pod := &podList.Items[i]
+			updateObjLabel(cluster.Name, string(cluster.UID), component.Name, labelKey, string(labelValue), pod)
+			graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), nil)
 		}
 	}
 	return nil
 }
 
-func updateObjLabel(clusterName, uid, componentName string, customLabelSpec appsv1alpha1.CustomLabelSpec,
-	obj client.Object) {
-	key := replaceKBEnvPlaceholderTokens(clusterName, uid, componentName, customLabelSpec.Key)
-	value := replaceKBEnvPlaceholderTokens(clusterName, uid, componentName, customLabelSpec.Value)
+func updateObjLabel(clusterName, uid, componentName, labelKey, labelValue string, obj client.Object) {
+	key := replaceKBEnvPlaceholderTokens(clusterName, uid, componentName, labelKey)
+	value := replaceKBEnvPlaceholderTokens(clusterName, uid, componentName, labelValue)
 
 	labels := obj.GetLabels()
 	if labels == nil {
@@ -520,7 +497,7 @@ func updateCustomLabelToObjs(clusterName, uid, componentName string,
 				if gvk.Kind != kind {
 					continue
 				}
-				updateObjLabel(clusterName, uid, componentName, customLabelSpec, obj)
+				updateObjLabel(clusterName, uid, componentName, customLabelSpec.Key, customLabelSpec.Value, obj)
 			}
 		}
 	}

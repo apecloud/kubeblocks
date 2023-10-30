@@ -63,8 +63,8 @@ func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext
 	}
 
 	// configuration render
-	// In versions prior to KubeBlocks 0.7.0, users were able to access the ClusterVersion object in configuration template rendering to retrieve the corresponding values.
-	// However, after KubeBlocks 0.7.0 version, the ClusterVersion will be deprecated. This means that the previous functionality will be affected, and this change was expected.
+	// In versions prior to KubeBlocks 0.8.0, users were able to access the ClusterVersion object in configuration template rendering to retrieve the corresponding values.
+	// However, after KubeBlocks 0.8.0 version, the ClusterVersion will be deprecated. This means that the previous functionality will be affected, and this change was expected.
 	// In this case, the ClusterVersion will be set to nil, and there will be a subsequent refactoring of the configuration rendering module to remove the ClusterVersion entirely.
 	// TODO(xingran): remove clusterVersion in configuration rendering
 	if err := plan.RenderConfigNScriptFiles(

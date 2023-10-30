@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/pkg/errors"
+	"github.com/sethvargo/go-password/password"
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -109,7 +111,17 @@ func (t *componentCredentialTransformer) buildFromServiceAndAccount(ctx graph.Tr
 		}
 	}
 	if len(credential.AccountName) > 0 {
-		if err := t.buildCredential(ctx, synthesizeComp.Namespace, credential.AccountName, &data); err != nil {
+		var compSystemAccount *appsv1alpha1.ComponentSystemAccount
+		for index, sysAccount := range synthesizeComp.SystemAccounts {
+			if sysAccount.Name != credential.AccountName {
+				continue
+			}
+			compSystemAccount = &synthesizeComp.SystemAccounts[index]
+		}
+		if compSystemAccount == nil {
+			return errors.New("connection credential references a system account not defined")
+		}
+		if err := t.buildCredential(ctx, compSystemAccount, synthesizeComp.Namespace, credential.AccountName, &data); err != nil {
 			return err
 		}
 	}
@@ -167,6 +179,7 @@ func (t *componentCredentialTransformer) buildEndpointFromService(synthesizeComp
 }
 
 func (t *componentCredentialTransformer) buildCredential(ctx graph.TransformContext,
+	compSysAccount *appsv1alpha1.ComponentSystemAccount,
 	namespace, accountName string, data *map[string]string) error {
 	key := types.NamespacedName{
 		Namespace: namespace,
@@ -174,6 +187,20 @@ func (t *componentCredentialTransformer) buildCredential(ctx graph.TransformCont
 	}
 	secret := &corev1.Secret{}
 	if err := ctx.GetClient().Get(ctx.GetContext(), key, secret); err != nil {
+		// TODO(xingran): if account is system init account, create secret, it may be moved to SystemAccount Controller.
+		if apierrors.IsNotFound(err) && compSysAccount.IsSystemInitAccount {
+			// TODO(component): define the username and password pattern
+			passwd, err := password.Generate(int(compSysAccount.PasswordGenerationPolicy.Length),
+				int(compSysAccount.PasswordGenerationPolicy.NumDigits), int(compSysAccount.PasswordGenerationPolicy.NumSymbols), false, false)
+			if err != nil {
+				return err
+			}
+			secret.StringData = make(map[string]string)
+			secret.StringData["username"] = accountName
+			secret.StringData["password"] = passwd
+			maps.Copy(*data, secret.StringData)
+			return nil
+		}
 		return err
 	}
 	// TODO(component): which field should to use from accounts?

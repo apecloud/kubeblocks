@@ -206,12 +206,28 @@ func (c *rsmRoleProbeConvertor) convert(args ...any) (any, error) {
 }
 
 func (c *rsmCredentialConvertor) convert(args ...any) (any, error) {
-	cluster, _, err := parseRSMConvertorArgs(args...)
+	var (
+		secretName     string
+		sysInitAccount *appsv1alpha1.ComponentSystemAccount
+	)
+
+	cluster, synthesizeComp, err := parseRSMConvertorArgs(args...)
 	if err != nil {
 		return nil, err
 	}
 
-	secretName := constant.GenerateDefaultConnCredential(cluster.Name)
+	// use the system init account as the default credential
+	for index, sysAccount := range synthesizeComp.SystemAccounts {
+		if sysAccount.IsSystemInitAccount {
+			sysInitAccount = &synthesizeComp.SystemAccounts[index]
+			break
+		}
+	}
+	if sysInitAccount != nil {
+		secretName = constant.GenerateComponentConnCredential(cluster.Name, synthesizeComp.Name, sysInitAccount.Name)
+	} else {
+		secretName = constant.GenerateDefaultConnCredential(cluster.Name)
+	}
 	credential := &workloads.Credential{
 		Username: workloads.CredentialVar{
 			ValueFrom: &corev1.EnvVarSource{

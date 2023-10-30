@@ -68,6 +68,7 @@ func (t *ClusterCredentialTransformer) transformClusterCredentialLegacy(transCtx
 	synthesizedComponent := t.buildSynthesizedComponentLegacy(transCtx)
 	if synthesizedComponent != nil {
 		secret := factory.BuildConnCredential(transCtx.ClusterDef, transCtx.Cluster, synthesizedComponent)
+
 		if secret != nil {
 			graphCli.Create(dag, secret)
 		}

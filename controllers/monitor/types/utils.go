@@ -36,6 +36,10 @@ func fromCollectorDataSource(dataSourceSpec v1alpha1.CollectorDataSourceSpec, cl
 	configs := make([]ScrapeConfig, 0)
 	clusterName := dataSourceSpec.ClusterRef
 
+	if cli == nil || ctx == nil {
+		return nil, core.MakeError("client or context is nil")
+	}
+
 	resource := intctrlutil.NewResourceFetcher(&intctrlutil.ResourceCtx{
 		Context:     ctx,
 		Client:      cli,

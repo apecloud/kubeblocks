@@ -331,7 +331,7 @@ func (cg *OteldConfigGenerater) buildPipelineItem(instance *OteldInstance) yaml.
 		}
 	}
 
-	if instance.AppMetricsPipelien.Name != "" {
+	if instance.AppMetricsPipelien != nil && instance.AppMetricsPipelien.Name != "" {
 		metricsPipeline := instance.AppMetricsPipelien
 
 		metricsSlice := yaml.MapSlice{}
@@ -354,7 +354,7 @@ func (cg *OteldConfigGenerater) buildPipelineItem(instance *OteldInstance) yaml.
 		pipeline = append(pipeline, yaml.MapItem{Key: "metrics/app", Value: metricsSlice})
 	}
 
-	if instance.AppLogsPipeline.Name != "" {
+	if instance.AppLogsPipeline != nil && instance.AppLogsPipeline.Name != "" {
 		logPipeline := instance.AppLogsPipeline
 
 		logsSlice := yaml.MapSlice{}

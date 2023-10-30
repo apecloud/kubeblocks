@@ -380,7 +380,10 @@ func (mgr *Manager) ReadCheck(ctx context.Context, db *sql.DB) bool {
 			// no healthy check records, return true
 			return true
 		}
-		if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1049 {
+		mysqlErr, ok := err.(*mysql.MySQLError)
+		if ok && (mysqlErr.Number == 1049 || mysqlErr.Number == 1146) {
+			// error 1049: database does not exists
+			// error 1146: table does not exists
 			// no healthy database, return true
 			return true
 		}

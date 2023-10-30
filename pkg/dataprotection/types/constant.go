@@ -66,6 +66,8 @@ const (
 	AutoBackupLabelKey = "dataprotection.kubeblocks.io/autobackup"
 	// BackupTargetPodLabelKey specifies the backup target pod label key.
 	BackupTargetPodLabelKey = "dataprotection.kubeblocks.io/target-pod-name"
+	// ConnectionPasswordKey specifies the password of the connection credential.
+	ConnectionPasswordKey = "dataprotection.kubeblocks.io/connection-password"
 )
 
 // env names
@@ -96,10 +98,11 @@ const (
 	DPTimeFormat = "DP_TIME_FORMAT"
 	// DPBackupStopTime backup stop time
 	DPBackupStopTime = "DP_BACKUP_STOP_TIME" // backup stop time
-	// DPDatasafedLocalBackendPath force datasafed to use local backend with the path
-	DPDatasafedLocalBackendPath = "DP_DATASAFED_LOCAL_BACKEND_PATH"
 	// DPDatasafedBinPath the path containing the datasafed binary
 	DPDatasafedBinPath = "DP_DATASAFED_BIN_PATH"
+	// DPDatasafedLocalBackendPath force datasafed to use local backend with the path
+	// NOTE: do not add 'DP_' for this constant, it is the datasafed built-in environment.
+	DPDatasafedLocalBackendPath = "DATASAFED_LOCAL_BACKEND_PATH"
 )
 
 const (

@@ -106,9 +106,14 @@ var _ = Describe("create cluster by cluster type", func() {
 		}
 		o.Format = printer.YAML
 		Expect(o.CreateOptions.Complete()).Should(Succeed())
+		o.DryRun = "client"
+		o.Client = testing.FakeClientSet()
+		fakeDiscovery1, _ := o.Client.Discovery().(*fakediscovery.FakeDiscovery)
+		fakeDiscovery1.FakedServerVersion = &version.Info{Major: "1", Minor: "27", GitVersion: "v1.27.0"}
 		Expect(o.complete(mysqlCmd)).Should(Succeed())
 		Expect(o.Name).ShouldNot(BeEmpty())
 		Expect(o.values).ShouldNot(BeNil())
+		Expect(o.chartInfo.ClusterDef).Should(Equal(apeCloudMysql))
 
 		By("validate")
 		o.chartInfo.ClusterDef = testing.ClusterDefName

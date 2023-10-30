@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -33,9 +34,12 @@ var _ graph.Transformer = &componentMetaTransformer{}
 func (t *componentMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
 	component := transCtx.Component
+	componentOrig := transCtx.ComponentOrig
+	needUpdate := false
 
 	if !controllerutil.ContainsFinalizer(component, constant.DBComponentFinalizerName) {
 		controllerutil.AddFinalizer(component, constant.DBComponentFinalizerName)
+		needUpdate = true
 	}
 
 	labels := component.Labels
@@ -45,7 +49,16 @@ func (t *componentMetaTransformer) Transform(ctx graph.TransformContext, dag *gr
 	labelName := labels[constant.ComponentDefinitionLabelKey]
 	if labelName != component.Spec.CompDef {
 		labels[constant.ComponentDefinitionLabelKey] = component.Spec.CompDef
-		component.Labels = labels
+		needUpdate = true
 	}
-	return nil
+
+	if !needUpdate {
+		return nil
+	}
+
+	component.Labels = labels
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	graphCli.Update(dag, componentOrig, component)
+
+	return graph.ErrPrematureStop
 }

@@ -42,10 +42,9 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	cluster := transCtx.Cluster
 	obj := transCtx.Component
 
-	ml := labelsForCompDelete(obj, cluster.Name)
+	ml := labelsForCompDelete(obj)
 	snapshot, err := model.ReadCacheSnapshot(transCtx, obj, ml, kindsForCompDelete()...)
 	if err != nil {
 		return err
@@ -76,10 +75,10 @@ func kindsForCompDelete() []client.ObjectList {
 	return kinds
 }
 
-func labelsForCompDelete(comp *appsv1alpha1.Component, clusterName string) map[string]string {
+func labelsForCompDelete(comp *appsv1alpha1.Component) map[string]string {
 	return map[string]string{
 		constant.AppManagedByLabelKey:   constant.AppName,
-		constant.AppInstanceLabelKey:    clusterName,
+		constant.AppInstanceLabelKey:    comp.Spec.Cluster,
 		constant.KBAppComponentLabelKey: comp.Name,
 	}
 }

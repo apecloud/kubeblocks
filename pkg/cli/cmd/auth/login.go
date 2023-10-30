@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	DefaultBaseURL = "https://tenent2.jp.auth0.com"
+	DefaultBaseURL = "https://apecloud.authing.cn/oidc"
 )
 
 type LoginOptions struct {

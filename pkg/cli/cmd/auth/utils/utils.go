@@ -47,3 +47,21 @@ func NewRequest(ctx context.Context, url string, payload url.Values) (*http.Requ
 	req.Header.Set("Accept", "application/json")
 	return req, nil
 }
+
+func NewFullRequest(ctx context.Context, url string, method string, header map[string]string, payload url.Values) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(
+		ctx,
+		method,
+		url,
+		strings.NewReader(payload.Encode()),
+	)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+	for key, value := range header {
+		req.Header.Set(key, value)
+	}
+	return req, nil
+}

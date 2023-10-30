@@ -74,7 +74,7 @@ func (p *TokenProvider) Login(ctx context.Context) (*authenticator.UserInfoRespo
 		if err != nil {
 			return nil, "", errors.Wrap(err, "could not authenticate with cloud")
 		}
-		userInfo, err = p.issued.getUserInfo(tokenResult.AccessToken)
+		userInfo, err = p.issued.getUserInfo(tokenResult.IDToken)
 		if err != nil {
 			return nil, "", errors.Wrap(err, "could not get user info from cloud")
 		}

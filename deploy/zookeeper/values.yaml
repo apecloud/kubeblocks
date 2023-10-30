@@ -1,0 +1,26 @@
+# Default values for zookeeper.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# clusterVersionOverride
+
+images:
+  zookeeper:
+    repository: docker.io/dtweave/zookeeper
+    pullPolicy: IfNotPresent
+    tag: v3.7-1.0.0
+
+## @param containerPorts.client ZooKeeper client container port
+## @param containerPorts.tls ZooKeeper TLS container port
+## @param containerPorts.follower ZooKeeper follower container port
+## @param containerPorts.election ZooKeeper election container port
+##
+containerPorts:
+  client: 2181
+  quorum: 2888
+  election: 3888
+  http: 8000
+
+logConfigs:
+  info: /opt/zookeeper/logs/zookeeper-*-server-*.log
+  audit: /opt/zookeeper/logs/zookeeper_audit.log

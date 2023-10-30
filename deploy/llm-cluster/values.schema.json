@@ -2,6 +2,12 @@
   "$schema": "http://json-schema.org/schema#",
   "type": "object",
   "properties": {
+    "cpuMode": {
+      "title": "CPU Mode",
+      "description": "Set to true if no GPU is available",
+      "type": "boolean",
+      "default": false
+    },
     "version": {
       "title": "Version",
       "description": "Cluster version.",
@@ -23,7 +29,7 @@
         "number",
         "string"
       ],
-      "default": 0.5,
+      "default": 2,
       "minimum": 0.5,
       "maximum": 64,
       "multipleOf": 0.5
@@ -35,24 +41,13 @@
         "number",
         "string"
       ],
-      "default": 0.5,
+      "default": 6,
       "minimum": 0.5,
       "maximum": 1000
     },
-    "storage": {
-      "title": "Storage(Gi)",
-      "description": "Storage size, the unit is Gi.",
-      "type": [
-        "number",
-        "string"
-      ],
-      "default": 20,
-      "minimum": 1,
-      "maximum": 10000
-    },
     "gpu": {
-      "title": "CPU",
-      "description": "CPU cores.",
+      "title": "GPU",
+      "description": "GPU cores.",
       "type": [
         "number",
         "string"

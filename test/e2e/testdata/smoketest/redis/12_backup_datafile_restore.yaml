@@ -5,7 +5,7 @@ kind: Cluster
 metadata:
   name: redis-cluster-datafile
   annotations:
-    kubeblocks.io/restore-from-backup: '{"redis":{"name":"backup-redis-cluster","namespace":"default","managementPolicy":"Parallel"}}'
+    kubeblocks.io/restore-from-backup: '{"redis":{"name":"backup-redis-cluster","namespace":"default","volumeRestorePolicy":"Parallel"}}'
 spec:
   clusterDefinitionRef: redis  # ref clusterDefinition.name
   clusterVersionRef: redis-7.0.6 # ref clusterVersion.name

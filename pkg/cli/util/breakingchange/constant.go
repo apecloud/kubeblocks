@@ -24,6 +24,7 @@ const (
 	componentRedis      = "redis"
 	componentMysql      = "mysql"
 	componentMongodb    = "mongodb"
+	componentQdrant     = "qdrant"
 
 	// data volume name
 	dataVolumeName = "data"
@@ -33,6 +34,7 @@ const (
 	mongodbMountPath = "/data/mongodb"
 	pgsqlMountPath   = "/home/postgres/pgdata"
 	redisMountPath   = "/data"
+	qdrantMountPath  = "/qdrant/storage"
 )
 
 // Version Scope: [0.5, 0.6]
@@ -52,10 +54,11 @@ const (
 	datafileMethodName       = "datafile"
 
 	// action set name
-	pgBasebackupActionSet  = "postgres-basebackup"
-	xtrabackupActionSet    = "xtrabackup-for-apecloud-mysql"
-	volumeSnapshotForMysql = "volumesnapshot-for-apecloud-mysql"
-	redisDatafileActionSet = "redis-physical-backup"
-	volumeSnapshotForMongo = "mongodb-volumesnapshot"
-	mongoDatafileActionSet = "mongodb-physical-backup"
+	pgBasebackupActionSet   = "postgres-basebackup"
+	xtrabackupActionSet     = "xtrabackup-for-apecloud-mysql"
+	volumeSnapshotForMysql  = "volumesnapshot-for-apecloud-mysql"
+	redisDatafileActionSet  = "redis-physical-backup"
+	volumeSnapshotForMongo  = "mongodb-volumesnapshot"
+	mongoDatafileActionSet  = "mongodb-physical-backup"
+	qdrantSnapshotActionSet = "qdrant-snapshot"
 )

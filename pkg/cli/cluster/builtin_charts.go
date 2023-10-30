@@ -68,10 +68,12 @@ var (
 	redisChart embed.FS
 	//go:embed charts/mongodb-cluster.tgz
 	mongodbChart embed.FS
+	//go:embed charts/llm-cluster.tgz
+	llmChart embed.FS
 )
 
 func IsbuiltinCharts(chart string) bool {
-	return chart == "mysql" || chart == "postgresql" || chart == "kafka" || chart == "redis" || chart == "mongodb"
+	return chart == "mysql" || chart == "postgresql" || chart == "kafka" || chart == "redis" || chart == "mongodb" || chart == "llm"
 }
 
 // internal_chart registers embed chart
@@ -120,6 +122,15 @@ func init() {
 		alias:   "",
 	}
 	if err := mongodb.register("mongodb"); err != nil {
+		fmt.Println(err.Error())
+	}
+
+	llm := &embedConfig{
+		chartFS: llmChart,
+		name:    "llm-cluster.tgz",
+		alias:   "",
+	}
+	if err := llm.register("llm"); err != nil {
 		fmt.Println(err.Error())
 	}
 

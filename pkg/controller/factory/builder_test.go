@@ -231,6 +231,23 @@ var _ = Describe("builder", func() {
 
 		})
 
+		It("builds Conn. Credential during restoring from backup", func() {
+			originalPassword := "test-passw0rd"
+			encryptionKey := "encryptionKey"
+			viper.Set(constant.CfgKeyDPEncryptionKey, encryptionKey)
+			var (
+				clusterDefObj                             = testapps.NewClusterDefFactoryWithConnCredential("conn-cred").GetObject()
+				clusterDef, cluster, synthesizedComponent = newClusterObjs(clusterDefObj)
+			)
+			e := intctrlutil.NewEncryptor(encryptionKey)
+			ciphertext, _ := e.Encrypt([]byte(originalPassword))
+			cluster.Annotations[constant.RestoreFromBackupAnnotationKey] = fmt.Sprintf(`{"%s":{"%s":"%s"}}`,
+				synthesizedComponent.Name, constant.ConnectionPassword, ciphertext)
+			credential := BuildConnCredential(clusterDef, cluster, synthesizedComponent)
+			Expect(credential).ShouldNot(BeNil())
+			Expect(credential.StringData["RANDOM_PASSWD"]).Should(Equal(originalPassword))
+		})
+
 		It("builds StatefulSet correctly", func() {
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
 

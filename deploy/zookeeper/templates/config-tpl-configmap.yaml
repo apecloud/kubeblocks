@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "zookeeper.name" . }}-config-template
+  labels:
+    {{- include "zookeeper.labels" . | nindent 4 }}
+data:
+  zoo.cfg: |-
+    {{- .Files.Get "config/zookeeper-config.tpl" | nindent 4 }}

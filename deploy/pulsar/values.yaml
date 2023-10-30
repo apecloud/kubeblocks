@@ -69,4 +69,5 @@ metrics:
 
 clusterDomain: ".cluster.local"
 
+# cloud provider: ["aws","gcp","aliyun","tencentCloud", "huaweiCloud", "azure"]
 cloudProvider: ""

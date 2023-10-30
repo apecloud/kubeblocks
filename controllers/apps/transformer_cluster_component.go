@@ -95,7 +95,7 @@ func (t *ClusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 
 	updateCompObjects := func() error {
 		for compName := range updateCompSet {
-			runningComp, err1 := getCacheSnapshotComp(transCtx.Context, t.Client, compName, cluster.Namespace)
+			runningComp, err1 := getCacheSnapshotComp(transCtx.Context, t.Client, cluster, compName)
 			if err1 != nil && !apierrors.IsNotFound(err1) {
 				return err1
 			}
@@ -127,7 +127,18 @@ func (t *ClusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 }
 
 func (t *ClusterComponentTransformer) reconcileComponentsStatus(transCtx *clusterTransformContext, dag *graph.DAG) error {
-	// TODO(component)
+	for compName := range transCtx.Cluster.Status.Components {
+		comp, err := getCacheSnapshotComp(transCtx.Context, t.Client, transCtx.Cluster, compName)
+		if err != nil {
+			return err
+		}
+		status := t.buildClusterCompStatus(comp)
+		if len(status.Phase) == 0 {
+			continue
+		}
+		transCtx.Cluster.Status.Components[compName] = status
+		fmt.Printf("status - comp %s status %s\n", compName, status.Phase)
+	}
 	return nil
 }
 
@@ -139,12 +150,21 @@ func (t *ClusterComponentTransformer) initClusterCompStatus(cluster *appsv1alpha
 	status[compName] = appsv1alpha1.ClusterComponentStatus{
 		Phase: appsv1alpha1.CreatingClusterCompPhase,
 	}
+	fmt.Printf("init - comp %s status %s\n", compName, appsv1alpha1.CreatingClusterCompPhase)
 	cluster.Status.Components = status
 }
 
 func (t *ClusterComponentTransformer) removeClusterCompStatus(cluster *appsv1alpha1.Cluster, compName string) {
 	if cluster.Status.Components != nil {
 		delete(cluster.Status.Components, compName)
+	}
+}
+
+func (t *ClusterComponentTransformer) buildClusterCompStatus(comp *appsv1alpha1.Component) appsv1alpha1.ClusterComponentStatus {
+	// TODO(component): conditions & roles(?)
+	return appsv1alpha1.ClusterComponentStatus{
+		Phase:   comp.Status.Phase,
+		Message: comp.Status.Message,
 	}
 }
 
@@ -179,9 +199,13 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component, clust
 }
 
 // getCacheSnapshotComp gets the component object from cache snapshot
-func getCacheSnapshotComp(ctx context.Context, cli client.Client, compName, namespace string) (*appsv1alpha1.Component, error) {
+func getCacheSnapshotComp(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, compName string) (*appsv1alpha1.Component, error) {
+	compKey := types.NamespacedName{
+		Name:      component.FullName(cluster.Name, compName),
+		Namespace: cluster.Namespace,
+	}
 	comp := &appsv1alpha1.Component{}
-	if err := ictrlutil.ValidateExistence(ctx, cli, types.NamespacedName{Name: compName, Namespace: namespace}, comp, false); err != nil {
+	if err := ictrlutil.ValidateExistence(ctx, cli, compKey, comp, false); err != nil {
 		return nil, err
 	}
 	return comp, nil

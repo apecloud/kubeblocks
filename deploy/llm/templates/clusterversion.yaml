@@ -22,6 +22,8 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
   name: vllm-baichuan2-13b
+  annotations:
+    kubeblocks.io/is-default-cluster-version: "true"
   labels:
     {{- include "llm.labels" . | nindent 4 }}
 spec:
@@ -164,6 +166,8 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
   name: ggml-baichuan-7b-q4
+  annotations:
+    kubeblocks.io/is-default-cluster-version: "true"
   labels:
     {{- include "llm.labels" . | nindent 4 }}
 spec:

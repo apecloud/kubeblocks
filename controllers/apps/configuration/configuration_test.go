@@ -62,8 +62,9 @@ func mockConfigResource() (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint) {
 			constant.CMConfigurationSpecProviderLabelKey, configSpecName,
 			constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
 		),
-		testapps.WithAnnotations(constant.KBParameterUpdateSourceAnnotationKey,
-			constant.ReconfigureManagerSource,
+		testapps.WithAnnotations(
+			constant.KBParameterUpdateSourceAnnotationKey, constant.ReconfigureManagerSource,
+			constant.ConfigurationRevision, "1",
 			constant.CMInsEnableRerenderTemplateKey, "true"))
 
 	By("Create a config constraint obj")

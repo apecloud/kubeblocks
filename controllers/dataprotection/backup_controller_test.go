@@ -66,7 +66,7 @@ var _ = Describe("Backup Controller test", func() {
 		// job to delete the backup between the ClearResources function delete
 		// the job and get the job list, resulting the ClearResources panic.
 		Eventually(testapps.List(&testCtx, generics.BackupSignature, inNS)).Should(HaveLen(0))
-
+		testapps.ClearResources(&testCtx, generics.SecretSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
@@ -143,6 +143,7 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Status.PersistentVolumeClaimName).Should(Equal(repoPVCName))
 					g.Expect(fetched.Status.Path).Should(Equal(dpbackup.BuildBackupPath(fetched, backupPolicy.Spec.PathPrefix)))
 					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
+					g.Expect(fetched.Annotations[dptypes.ConnectionPasswordKey]).ShouldNot(BeEmpty())
 				})).Should(Succeed())
 
 				By("check backup job's nodeName equals pod's nodeName")
@@ -206,7 +207,7 @@ var _ = Describe("Backup Controller test", func() {
 		})
 
 		Context("creates a backup with retentionPeriod", func() {
-			It("create an valid backup", func() {
+			It("create a valid backup", func() {
 				By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
 				backup := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
 					backup.Spec.RetentionPeriod = "1h"
@@ -228,7 +229,7 @@ var _ = Describe("Backup Controller test", func() {
 
 				testdp.PatchK8sJobStatus(&testCtx, getJobKey(), batchv1.JobComplete)
 
-				By("check backup expiration is update by completion time when backup is completed")
+				By("check backup expiration is updated by completion time when backup is completed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
 					g.Expect(fetched.Status.CompletionTimestamp).ShouldNot(BeNil())

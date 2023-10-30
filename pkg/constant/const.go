@@ -40,6 +40,9 @@ const (
 
 	// storage config keys
 	CfgKeyDefaultStorageClass = "DEFAULT_STORAGE_CLASS"
+
+	// customized encryption key for encrypting the password of connection credential.
+	CfgKeyDPEncryptionKey = "DP_ENCRYPTION_KEY"
 )
 
 const (
@@ -314,4 +317,5 @@ const (
 	BackupNamespaceKeyForRestore     = "namespace"
 	VolumeRestorePolicyKeyForRestore = "volumeRestorePolicy"
 	RestoreTimeKeyForRestore         = "restoreTime"
+	ConnectionPassword               = "connectionPassword"
 )

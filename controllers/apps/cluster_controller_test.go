@@ -627,4 +627,177 @@ var _ = Describe("Cluster Controller", func() {
 			})).Should(Succeed())
 		})
 	})
+
+	When("create cluster with backup configuration", func() {
+		const (
+			compName         = statefulCompName
+			compDefName      = statefulCompDefName
+			backupRepoName   = "test-backup-repo"
+			backupMethodName = "test-backup-method"
+		)
+
+		BeforeEach(func() {
+			cleanEnv()
+			createAllWorkloadTypesClusterDef()
+			createBackupPolicyTpl(clusterDefObj, clusterVersionName)
+		})
+
+		createClusterWithBackup := func(backup *appsv1alpha1.ClusterBackup) {
+			By("Creating a cluster")
+			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+				clusterDefObj.Name, clusterVersionObj.Name).
+				AddComponent(compName, compDefName).WithRandomName().SetBackup(backup).
+				Create(&testCtx).GetObject()
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			By("Waiting for the cluster controller to create resources completely")
+			waitForCreatingResourceCompletely(clusterKey)
+		}
+
+		It("Creating cluster without backup", func() {
+			createClusterWithBackup(nil)
+			Eventually(testapps.List(&testCtx, generics.BackupPolicySignature,
+				client.MatchingLabels{
+					constant.AppInstanceLabelKey: clusterKey.Name,
+				}, client.InNamespace(clusterKey.Namespace))).ShouldNot(BeEmpty())
+		})
+
+		It("Creating cluster with backup", func() {
+			var (
+				boolTrue  = true
+				boolFalse = false
+				int64Ptr  = func(in int64) *int64 {
+					return &in
+				}
+				retention = func(s string) dpv1alpha1.RetentionPeriod {
+					return dpv1alpha1.RetentionPeriod(s)
+				}
+			)
+
+			var testCases = []struct {
+				desc   string
+				backup *appsv1alpha1.ClusterBackup
+			}{
+				{
+					desc: "backup with snapshot method",
+					backup: &appsv1alpha1.ClusterBackup{
+						Enabled:                 &boolTrue,
+						RetentionPeriod:         retention("1d"),
+						Method:                  vsBackupMethodName,
+						CronExpression:          "*/1 * * * *",
+						StartingDeadlineMinutes: int64Ptr(int64(10)),
+						PITREnabled:             &boolTrue,
+						RepoName:                backupRepoName,
+					},
+				},
+				{
+					desc: "disable backup",
+					backup: &appsv1alpha1.ClusterBackup{
+						Enabled:                 &boolFalse,
+						RetentionPeriod:         retention("1d"),
+						Method:                  vsBackupMethodName,
+						CronExpression:          "*/1 * * * *",
+						StartingDeadlineMinutes: int64Ptr(int64(10)),
+						PITREnabled:             &boolTrue,
+						RepoName:                backupRepoName,
+					},
+				},
+				{
+					desc: "backup with backup tool",
+					backup: &appsv1alpha1.ClusterBackup{
+						Enabled:                 &boolTrue,
+						RetentionPeriod:         retention("2d"),
+						Method:                  backupMethodName,
+						CronExpression:          "*/1 * * * *",
+						StartingDeadlineMinutes: int64Ptr(int64(10)),
+						RepoName:                backupRepoName,
+						PITREnabled:             &boolFalse,
+					},
+				},
+				{
+					desc:   "backup is nil",
+					backup: nil,
+				},
+			}
+
+			for _, t := range testCases {
+				By(t.desc)
+				backup := t.backup
+				createClusterWithBackup(backup)
+
+				checkSchedule := func(g Gomega, schedule *dpv1alpha1.BackupSchedule) {
+					var policy *dpv1alpha1.SchedulePolicy
+					for i, s := range schedule.Spec.Schedules {
+						if s.BackupMethod == backup.Method {
+							Expect(*s.Enabled).Should(BeEquivalentTo(*backup.Enabled))
+							policy = &schedule.Spec.Schedules[i]
+						}
+					}
+					if backup.Enabled != nil && *backup.Enabled {
+						Expect(policy).ShouldNot(BeNil())
+						Expect(policy.RetentionPeriod).Should(BeEquivalentTo(backup.RetentionPeriod))
+						Expect(policy.CronExpression).Should(BeEquivalentTo(backup.CronExpression))
+					}
+				}
+
+				checkPolicy := func(g Gomega, policy *dpv1alpha1.BackupPolicy) {
+					if backup != nil && backup.RepoName != "" {
+						g.Expect(*policy.Spec.BackupRepoName).Should(BeEquivalentTo(backup.RepoName))
+					}
+					g.Expect(policy.Spec.BackupMethods).ShouldNot(BeEmpty())
+					// expect for image tage env in backupMethod
+					var existImageTagEnv bool
+					for _, v := range policy.Spec.BackupMethods {
+						for _, e := range v.Env {
+							if e.Name == testapps.EnvKeyImageTag && e.Value == testapps.DefaultImageTag {
+								existImageTagEnv = true
+								break
+							}
+						}
+					}
+					g.Expect(existImageTagEnv).Should(BeTrue())
+				}
+
+				By("checking backup policy")
+				backupPolicyName := generateBackupPolicyName(clusterKey.Name, compDefName, "")
+				backupPolicyKey := client.ObjectKey{Name: backupPolicyName, Namespace: clusterKey.Namespace}
+				backupPolicy := &dpv1alpha1.BackupPolicy{}
+				Eventually(testapps.CheckObjExists(&testCtx, backupPolicyKey, backupPolicy, true)).Should(Succeed())
+				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, checkPolicy)).Should(Succeed())
+
+				By("checking backup schedule")
+				backupScheduleName := generateBackupScheduleName(clusterKey.Name, compDefName, "")
+				backupScheduleKey := client.ObjectKey{Name: backupScheduleName, Namespace: clusterKey.Namespace}
+				if backup == nil {
+					Eventually(testapps.CheckObjExists(&testCtx, backupScheduleKey,
+						&dpv1alpha1.BackupSchedule{}, true)).Should(Succeed())
+					continue
+				}
+				Eventually(testapps.CheckObj(&testCtx, backupScheduleKey, checkSchedule)).Should(Succeed())
+			}
+		})
+	})
 })
+
+func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition, mappingClusterVersions ...string) {
+	By("Creating a BackupPolicyTemplate")
+	bpt := testapps.NewBackupPolicyTemplateFactory(backupPolicyTPLName).
+		AddLabels(constant.ClusterDefLabelKey, clusterDefObj.Name).
+		SetClusterDefRef(clusterDefObj.Name)
+	for _, v := range clusterDefObj.Spec.ComponentDefs {
+		bpt = bpt.AddBackupPolicy(v.Name).
+			AddBackupMethod(backupMethodName, false, actionSetName, mappingClusterVersions...).
+			SetBackupMethodVolumeMounts("data", "/data").
+			AddBackupMethod(vsBackupMethodName, true, vsActionSetName).
+			SetBackupMethodVolumes([]string{"data"}).
+			AddSchedule(backupMethodName, "0 0 * * *", true).
+			AddSchedule(vsBackupMethodName, "0 0 * * *", true)
+		switch v.WorkloadType {
+		case appsv1alpha1.Consensus:
+			bpt.SetTargetRole("leader")
+		case appsv1alpha1.Replication:
+			bpt.SetTargetRole("primary")
+		}
+	}
+	bpt.Create(&testCtx)
+}

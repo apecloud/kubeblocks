@@ -31,12 +31,13 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
-var (
-	primary        string
-	candidate      string
-	sqlchannelAddr string
-)
+type SwitchOptions struct {
+	primary   string
+	candidate string
+	lorryAddr string
+}
 
+var switchOptions = &SwitchOptions{}
 var SwitchCmd = &cobra.Command{
 	Use:   "switchover",
 	Short: "execute a switchover request.",
@@ -51,17 +52,16 @@ lorryctl switchover  --primary xxx --candidate xxx
 			return
 		}
 
-		url := "http://" + sqlchannelAddr + "/v1.0/bindings/" + characterType
-		if primary == "" && candidate == "" {
+		url := "http://" + switchOptions.lorryAddr + "/v1.0/bindings/" + characterType
+		if switchOptions.primary == "" && switchOptions.candidate == "" {
 			fmt.Println("Primary or Candidate must be specified")
 			return
 		}
 
-		payload := fmt.Sprintf(`{"operation": "switchover", "metadata": {"leader": "%s", "candidate": "%s"}}`, primary, candidate)
+		payload := fmt.Sprintf(`{"operation": "switchover", "metadata": {"leader": "%s", "candidate": "%s"}}`, switchOptions.primary, switchOptions.candidate)
 		// fmt.Println(payload)
 
 		client := http.Client{}
-		// Insert order using Dapr output binding via HTTP Post
 		req, err := http.NewRequest("POST", url, strings.NewReader(payload))
 		if err != nil {
 			fmt.Printf("New request error: %v", err)
@@ -69,10 +69,10 @@ lorryctl switchover  --primary xxx --candidate xxx
 
 		resp, err := client.Do(req)
 		if err != nil {
-			fmt.Printf("Request SQLChannel error: %v", err)
+			fmt.Printf("Request Lorry error: %v", err)
 			return
 		}
-		fmt.Println("SQLChannel Response:")
+		fmt.Println("Lorry Response:")
 		bodyBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
 			fmt.Printf("request error: %v", err)
@@ -82,9 +82,9 @@ lorryctl switchover  --primary xxx --candidate xxx
 }
 
 func init() {
-	SwitchCmd.Flags().StringVarP(&primary, "primary", "l", "", "The primary pod name")
-	SwitchCmd.Flags().StringVarP(&candidate, "candidate", "c", "", "The candidate pod name")
-	SwitchCmd.Flags().StringVarP(&sqlchannelAddr, "sqlchannel-addr", "", "localhost:3501", "The addr of sqlchannel to request")
+	SwitchCmd.Flags().StringVarP(&switchOptions.primary, "primary", "l", "", "The primary pod name")
+	SwitchCmd.Flags().StringVarP(&switchOptions.candidate, "candidate", "c", "", "The candidate pod name")
+	SwitchCmd.Flags().StringVarP(&switchOptions.lorryAddr, "lorry-addr", "", "localhost:3501", "The addr of lorry to request")
 	SwitchCmd.Flags().BoolP("help", "h", false, "Print this help message")
 
 	RootCmd.AddCommand(SwitchCmd)

@@ -110,16 +110,16 @@ func (mr *MockDCSMockRecorder) CreateSwitchover(arg0, arg1 interface{}) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSwitchover", reflect.TypeOf((*MockDCS)(nil).CreateSwitchover), arg0, arg1)
 }
 
-// DeleteCluser mocks base method.
-func (m *MockDCS) DeleteCluser() {
+// DeleteCluster mocks base method.
+func (m *MockDCS) DeleteCluster() {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "DeleteCluser")
+	m.ctrl.Call(m, "DeleteCluster")
 }
 
-// DeleteCluser indicates an expected call of DeleteCluser.
-func (mr *MockDCSMockRecorder) DeleteCluser() *gomock.Call {
+// DeleteCluster indicates an expected call of DeleteCluster.
+func (mr *MockDCSMockRecorder) DeleteCluster() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCluser", reflect.TypeOf((*MockDCS)(nil).DeleteCluser))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCluster", reflect.TypeOf((*MockDCS)(nil).DeleteCluster))
 }
 
 // DeleteSwitchover mocks base method.
@@ -296,16 +296,16 @@ func (mr *MockDCSMockRecorder) ReleaseLease() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReleaseLease", reflect.TypeOf((*MockDCS)(nil).ReleaseLease))
 }
 
-// ResetCluser mocks base method.
-func (m *MockDCS) ResetCluser() {
+// ResetCluster mocks base method.
+func (m *MockDCS) ResetCluster() {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "ResetCluser")
+	m.ctrl.Call(m, "ResetCluster")
 }
 
-// ResetCluser indicates an expected call of ResetCluser.
-func (mr *MockDCSMockRecorder) ResetCluser() *gomock.Call {
+// ResetCluster indicates an expected call of ResetCluster.
+func (mr *MockDCSMockRecorder) ResetCluster() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetCluser", reflect.TypeOf((*MockDCS)(nil).ResetCluser))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetCluster", reflect.TypeOf((*MockDCS)(nil).ResetCluster))
 }
 
 // UpdateHaConfig mocks base method.

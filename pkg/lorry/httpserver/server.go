@@ -32,7 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 )
 
-// Server is an interface for the Dapr HTTP server.
+// Server is an interface for the Lorry HTTP server.
 type Server interface {
 	io.Closer
 	Router() fasthttp.RequestHandler
@@ -41,7 +41,7 @@ type Server interface {
 
 type server struct {
 	config  Config
-	api     API
+	api     OperationAPI
 	servers []*fasthttp.Server
 }
 

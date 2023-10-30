@@ -233,8 +233,8 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 	return members, nil
 }
 
-func (store *KubernetesStore) ResetCluser()  {}
-func (store *KubernetesStore) DeleteCluser() {}
+func (store *KubernetesStore) ResetCluster()  {}
+func (store *KubernetesStore) DeleteCluster() {}
 
 func (store *KubernetesStore) GetLeaderConfigMap() (*corev1.ConfigMap, error) {
 	leaderName := store.getLeaderName()

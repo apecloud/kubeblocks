@@ -38,7 +38,7 @@ const (
 
 type option = func(ctx *fasthttp.RequestCtx)
 
-type API interface {
+type OperationAPI interface {
 	Endpoints() []Endpoint
 	RegisterOperations(map[string]operations.Operation)
 }

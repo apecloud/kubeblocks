@@ -28,42 +28,42 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/lorry/client"
 )
 
-type RevokeUserRoleOptions struct {
+type GrantUserRoleOptions struct {
 	lorryAddr string
 	userName  string
 	roleName  string
 }
 
-var revokeUserRoleOptions = &RevokeUserRoleOptions{}
+var grantUserRoleOptions = &GrantUserRoleOptions{}
 
-var RevokeUserRoleCmd = &cobra.Command{
-	Use:   "revokeuserrole",
-	Short: "revoke user role.",
+var GrantUserRoleCmd = &cobra.Command{
+	Use:   "grant-role",
+	Short: "grant user role.",
 	Example: `
-lorryctl  revokeuserrole --username xxx --rolename xxx 
+lorryctl  grant-role --username xxx --rolename xxx 
   `,
 	Args: cobra.MinimumNArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		lorryClient, err := client.NewHTTPClientWithURL(revokeUserRoleOptions.lorryAddr)
+		lorryClient, err := client.NewHTTPClientWithURL(grantUserRoleOptions.lorryAddr)
 		if err != nil {
 			fmt.Printf("new lorry http client failed: %v\n", err)
 			return
 		}
 
-		err = lorryClient.RevokeUserRole(context.TODO(), revokeUserRoleOptions.userName, revokeUserRoleOptions.roleName)
+		err = lorryClient.GrantUserRole(context.TODO(), grantUserRoleOptions.userName, grantUserRoleOptions.roleName)
 		if err != nil {
-			fmt.Printf("revoke user role failed: %v\n", err)
+			fmt.Printf("grant user role failed: %v\n", err)
 			return
 		}
-		fmt.Printf("revoke user role success")
+		fmt.Printf("grant user role success")
 	},
 }
 
 func init() {
-	RevokeUserRoleCmd.Flags().StringVarP(&revokeUserRoleOptions.userName, "username", "", "", "The name of user to revoke")
-	RevokeUserRoleCmd.Flags().StringVarP(&revokeUserRoleOptions.roleName, "rolename", "", "", "The name of role to revoke")
-	RevokeUserRoleCmd.Flags().StringVarP(&revokeUserRoleOptions.lorryAddr, "lorry-addr", "", "http://localhost:3501/v1.0/", "The addr of lorry to request")
-	RevokeUserRoleCmd.Flags().BoolP("help", "h", false, "Print this help message")
+	GrantUserRoleCmd.Flags().StringVarP(&grantUserRoleOptions.userName, "username", "", "", "The name of user to grant")
+	GrantUserRoleCmd.Flags().StringVarP(&grantUserRoleOptions.roleName, "rolename", "", "", "The name of role to grant")
+	GrantUserRoleCmd.Flags().StringVarP(&grantUserRoleOptions.lorryAddr, "lorry-addr", "", "http://localhost:3501/v1.0/", "The addr of lorry to request")
+	GrantUserRoleCmd.Flags().BoolP("help", "h", false, "Print this help message")
 
-	RootCmd.AddCommand(RevokeUserRoleCmd)
+	RootCmd.AddCommand(GrantUserRoleCmd)
 }

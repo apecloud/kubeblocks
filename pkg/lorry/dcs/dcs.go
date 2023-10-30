@@ -31,8 +31,8 @@ type DCS interface {
 	GetClusterName() string
 	GetCluster() (*Cluster, error)
 	GetClusterFromCache() *Cluster
-	ResetCluser()
-	DeleteCluser()
+	ResetCluster()
+	DeleteCluster()
 
 	// cluster scole ha config
 	GetHaConfig() (*HaConfig, error)

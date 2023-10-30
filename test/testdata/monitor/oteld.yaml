@@ -25,4 +25,4 @@ spec:
     enabledPodLogs: true
     logsExporterRef: "loki"
 
-    collectionInterval: 15
+    collectionInterval: 15s

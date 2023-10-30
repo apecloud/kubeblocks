@@ -68,7 +68,7 @@ func (w *oteldWrapper) buildAPIServicePipeline() *oteldWrapper {
 
 	pipeline := w.createPipeline(v1alpha1.ModeDeployment, k8sclusterPipeline, collectTypeMetrics)
 	pipeline.ReceiverMap[constant.APIServiceReceiverTPLName] = types.Receiver{
-		CollectionInterval: w.source.CollectionInterval.String(),
+		CollectionInterval: w.source.CollectionInterval,
 	}
 	w.buildProcessor(pipeline)
 	w.buildMetricsExporter(pipeline)
@@ -82,7 +82,7 @@ func (w *oteldWrapper) buildK8sNodeStatesPipeline() *oteldWrapper {
 
 	pipeline := w.createPipeline(v1alpha1.ModeDaemonSet, k8snodePipeline, collectTypeMetrics)
 	pipeline.ReceiverMap[constant.K8SNodeStatesReceiverTPLName] = types.Receiver{
-		CollectionInterval: w.source.CollectionInterval.String(),
+		CollectionInterval: w.source.CollectionInterval,
 	}
 	w.buildProcessor(pipeline)
 	w.buildMetricsExporter(pipeline)
@@ -96,7 +96,7 @@ func (w *oteldWrapper) buildNodePipeline() *oteldWrapper {
 
 	pipeline := w.createPipeline(v1alpha1.ModeDaemonSet, k8snodePipeline, collectTypeMetrics)
 	pipeline.ReceiverMap[constant.NodeExporterReceiverTPLName] = types.Receiver{
-		CollectionInterval: w.source.CollectionInterval.String(),
+		CollectionInterval: w.source.CollectionInterval,
 	}
 	w.buildProcessor(pipeline)
 	w.buildMetricsExporter(pipeline)

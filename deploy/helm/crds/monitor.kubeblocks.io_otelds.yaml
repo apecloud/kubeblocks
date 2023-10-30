@@ -139,8 +139,7 @@ spec:
                 properties:
                   collectionInterval:
                     description: collectionInterval is the interval of the data source
-                    format: int64
-                    type: integer
+                    type: string
                   enabledK8SClusterExporter:
                     description: enabledK8sClusterMetrics indicates whether to collect
                       k8s apiService metrics

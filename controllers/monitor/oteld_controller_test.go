@@ -111,7 +111,7 @@ func mockOTeldInstance() *v1alpha1.OTeld {
 				EnabledNodeExporter:         true,
 				MetricsExporterRef:          "prometheus",
 				LogsExporterRef:             "loki",
-				CollectionInterval:          15 * time.Second,
+				CollectionInterval:          "15s",
 			},
 		},
 	}

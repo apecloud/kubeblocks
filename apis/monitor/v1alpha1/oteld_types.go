@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
-	"time"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -63,7 +61,7 @@ type SystemDataSource struct {
 	EnabledPodLogs bool `json:"enabledPodLogs,omitempty"`
 
 	// collectionInterval is the interval of the data source
-	CollectionInterval time.Duration `json:"collectionInterval,omitempty"`
+	CollectionInterval string `json:"collectionInterval,omitempty"`
 }
 
 // OTeldSpec defines the desired state of CollectorDataSource

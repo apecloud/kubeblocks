@@ -1,13 +1,28 @@
 ---
-title: kbcli dataprotection
+title: kbcli dataprotection describe-backup-policy
 ---
 
-Data protection command.
+Describe a backup policy
+
+```
+kbcli dataprotection describe-backup-policy [flags]
+```
+
+### Examples
+
+```
+  # describe a backup policy
+  kbcli cluster describe-backup-policy mypolicy
+  
+  # describe the default backup policy of the specified cluster
+  kbcli cluster describe-backup-policy --cluster mycluster
+```
 
 ### Options
 
 ```
-  -h, --help   help for dataprotection
+      --cluster strings   The cluster name
+  -h, --help              help for describe-backup-policy
 ```
 
 ### Options inherited from parent commands
@@ -20,7 +35,6 @@ Data protection command.
       --certificate-authority string   Path to a cert file for the certificate authority
       --client-certificate string      Path to a client certificate file for TLS
       --client-key string              Path to a client key file for TLS
-      --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
       --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
@@ -36,14 +50,7 @@ Data protection command.
 
 ### SEE ALSO
 
-
-* [kbcli dataprotection backup](kbcli_dataprotection_backup.md)	 - Create a backup for the cluster.
-* [kbcli dataprotection delete-backup](kbcli_dataprotection_delete-backup.md)	 - Delete a backup.
-* [kbcli dataprotection describe-backup](kbcli_dataprotection_describe-backup.md)	 - Describe a backup
-* [kbcli dataprotection describe-backup-policy](kbcli_dataprotection_describe-backup-policy.md)	 - Describe a backup policy
-* [kbcli dataprotection list-backup-policy](kbcli_dataprotection_list-backup-policy.md)	 - List backup policies
-* [kbcli dataprotection list-backups](kbcli_dataprotection_list-backups.md)	 - List backups.
-* [kbcli dataprotection restore](kbcli_dataprotection_restore.md)	 - Restore a new cluster from backup
+* [kbcli dataprotection](kbcli_dataprotection.md)	 - Data protection command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

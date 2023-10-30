@@ -654,15 +654,20 @@ func NewListBackupPolicyCmd(f cmdutil.Factory, streams genericiooptions.IOStream
 			o.Names = nil
 			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			util.CheckErr(o.Complete())
-			util.CheckErr(printBackupPolicyList(*o))
+			util.CheckErr(PrintBackupPolicyList(*o))
 		},
 	}
 	o.AddFlags(cmd)
 	return cmd
 }
 
-// printBackupPolicyList prints the backup policy list.
-func printBackupPolicyList(o list.ListOptions) error {
+// PrintBackupPolicyList prints the backup policy list.
+func PrintBackupPolicyList(o list.ListOptions) error {
+	var backupPolicyNameMap = make(map[string]bool)
+	for _, name := range o.Names {
+		backupPolicyNameMap[name] = true
+	}
+
 	// if format is JSON or YAML, use default printer to output the result.
 	if o.Format == printer.JSON || o.Format == printer.YAML {
 		_, err := o.Run()
@@ -698,6 +703,9 @@ func printBackupPolicyList(o list.ListOptions) error {
 		}
 		if !ok {
 			defaultPolicy = "false"
+		}
+		if len(o.Names) > 0 && !backupPolicyNameMap[backupPolicy.Name] {
+			continue
 		}
 		createTime := obj.GetCreationTimestamp()
 		tbl.AddRow(obj.GetName(), obj.GetNamespace(), defaultPolicy, obj.GetLabels()[constant.AppInstanceLabelKey],
@@ -947,7 +955,7 @@ func (o *editBackupPolicyOptions) applyChanges(backupPolicy *dpv1alpha1.BackupPo
 	return nil
 }
 
-type describeBackupPolicyOptions struct {
+type DescribeBackupPolicyOptions struct {
 	namespace string
 	dynamic   dynamic.Interface
 	Factory   cmdutil.Factory
@@ -960,7 +968,7 @@ type describeBackupPolicyOptions struct {
 	genericiooptions.IOStreams
 }
 
-func (o *describeBackupPolicyOptions) Complete() error {
+func (o *DescribeBackupPolicyOptions) Complete() error {
 	var err error
 
 	if o.client, err = o.Factory.KubernetesClientSet(); err != nil {
@@ -977,7 +985,7 @@ func (o *describeBackupPolicyOptions) Complete() error {
 	return nil
 }
 
-func (o *describeBackupPolicyOptions) Validate() error {
+func (o *DescribeBackupPolicyOptions) Validate() error {
 	// must specify one of the cluster name or backup policy name
 	if len(o.ClusterNames) == 0 && len(o.Names) == 0 {
 		return fmt.Errorf("missing cluster name or backup policy name")
@@ -986,7 +994,7 @@ func (o *describeBackupPolicyOptions) Validate() error {
 	return nil
 }
 
-func (o *describeBackupPolicyOptions) Run() error {
+func (o *DescribeBackupPolicyOptions) Run() error {
 	var backupPolicyNameMap = make(map[string]bool)
 	for _, name := range o.Names {
 		backupPolicyNameMap[name] = true
@@ -1000,7 +1008,7 @@ func (o *describeBackupPolicyOptions) Run() error {
 	}
 
 	if len(backupPolicyList.Items) == 0 {
-		fmt.Fprintf(o.Out, "No backup policy found")
+		fmt.Fprintf(o.Out, "No backup policy found\n")
 		return nil
 	}
 
@@ -1026,7 +1034,7 @@ func (o *describeBackupPolicyOptions) Run() error {
 	return nil
 }
 
-func (o *describeBackupPolicyOptions) printBackupPolicyObj(obj *dpv1alpha1.BackupPolicy) error {
+func (o *DescribeBackupPolicyOptions) printBackupPolicyObj(obj *dpv1alpha1.BackupPolicy) error {
 	printer.PrintLine("Summary:")
 	realPrintPairStringToLine("Name", obj.Name)
 	realPrintPairStringToLine("Cluster", obj.Labels[constant.AppInstanceLabelKey])
@@ -1048,17 +1056,16 @@ func (o *describeBackupPolicyOptions) printBackupPolicyObj(obj *dpv1alpha1.Backu
 }
 
 func NewDescribeBackupPolicyCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
-	o := &describeBackupPolicyOptions{
+	o := &DescribeBackupPolicyOptions{
 		Factory:   f,
 		IOStreams: streams,
 	}
 	cmd := &cobra.Command{
-		Use:                   "describe-backup-policy",
-		DisableFlagsInUseLine: true,
-		Aliases:               []string{"desc-backup-policy"},
-		Short:                 "Describe backup policy",
-		Example:               describeBackupPolicyExample,
-		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Use:               "describe-backup-policy",
+		Aliases:           []string{"desc-backup-policy"},
+		Short:             "Describe backup policy",
+		Example:           describeBackupPolicyExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.ClusterNames = args
 			o.LabelSelector = util.BuildLabelSelectorByNames(o.LabelSelector, args)

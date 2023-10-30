@@ -34,7 +34,6 @@ spec:
       configSpecs:
         - name: tdengine-taos-config
           templateRef: tdengine-config-template
-          constraintRef: tdengine-taos-config-constraints
           volumeName: taos-config
           namespace: {{ .Release.Namespace }}
         - name: metrics-configuration

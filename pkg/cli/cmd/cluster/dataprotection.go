@@ -31,6 +31,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/maps"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,7 +62,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/cli/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
-	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
 )
 
 var (
@@ -186,25 +186,7 @@ func (o *CreateBackupOptions) Validate() error {
 	}
 
 	if o.BackupMethod == "" {
-		// TODO(ldm): if backup policy only has one backup method, use it as default
-		//  backup method.
-		// if backup policy don't have any backup method, return error
-		if len(backupPolicy.Spec.BackupMethods) == 0 {
-			return fmt.Errorf("missing backup method")
-		}
-
-		// if backup policy has only one backup method, use it as default backup method
-		if len(backupPolicy.Spec.BackupMethods) == 1 {
-			o.BackupMethod = backupPolicy.Spec.BackupMethods[0].Name
-		}
-
-		// if backup policy has multiple backup methods, use method which volume snapshot is true as default backup method
-		for _, method := range backupPolicy.Spec.BackupMethods {
-			if boolptr.IsSetToTrue(method.SnapshotVolumes) {
-				o.BackupMethod = method.Name
-				break
-			}
-		}
+		return fmt.Errorf("backup method can not be empty, you can specify it by --method")
 	}
 	// TODO: check if pvc exists
 
@@ -320,8 +302,62 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *
 	cmd.Flags().StringVar(&o.DeletionPolicy, "deletion-policy", "Delete", "Deletion policy for backup, determine whether the backup content in backup repo will be deleted after the backup is deleted, supported values: [Delete, Retain]")
 	cmd.Flags().StringVar(&o.RetentionPeriod, "retention-period", "", "Retention period for backup, supported values: [1y, 1mo, 1d, 1h, 1m] or combine them [1y1mo1d1h1m], if not specified, the backup will not be automatically deleted, you need to manually delete it.")
 	cmd.Flags().StringVar(&o.ParentBackupName, "parent-backup", "", "Parent backup name, used for incremental backup")
-
+	// register backup flag completion func
+	o.RegisterBackupFlagCompletionFunc(cmd, f)
 	return cmd
+}
+func (o *CreateBackupOptions) RegisterBackupFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
+	getClusterName := func(cmd *cobra.Command, args []string) string {
+		clusterName, _ := cmd.Flags().GetString("cluster")
+		if clusterName != "" {
+			return clusterName
+		}
+		if len(args) > 0 {
+			return args[0]
+		}
+		return ""
+	}
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"deletion-policy",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return []string{string(dpv1alpha1.BackupDeletionPolicyRetain), string(dpv1alpha1.BackupDeletionPolicyDelete)}, cobra.ShellCompDirectiveNoFileComp
+		}))
+
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"policy",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			label := fmt.Sprintf("%s=%s", constant.AppInstanceLabelKey, getClusterName(cmd, args))
+			return util.CompGetResourceWithLabels(f, cmd, util.GVRToString(types.BackupPolicyGVR()), []string{label}, toComplete), cobra.ShellCompDirectiveNoFileComp
+		}))
+
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"method",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			namespace, _ := cmd.Flags().GetString("namespace")
+			if namespace == "" {
+				namespace, _, _ = f.ToRawKubeConfigLoader().Namespace()
+			}
+			var (
+				labelSelector string
+				clusterName   = getClusterName(cmd, args)
+			)
+			if clusterName != "" {
+				labelSelector = fmt.Sprintf("%s=%s", constant.AppInstanceLabelKey, clusterName)
+			}
+			dynamicClient, _ := f.DynamicClient()
+			objs, _ := dynamicClient.Resource(types.BackupPolicyGVR()).Namespace(namespace).List(context.TODO(), metav1.ListOptions{
+				LabelSelector: labelSelector,
+			})
+			methodMap := map[string]struct{}{}
+			for _, v := range objs.Items {
+				backupPolicy := &dpv1alpha1.BackupPolicy{}
+				_ = runtime.DefaultUnstructuredConverter.FromUnstructured(v.Object, backupPolicy)
+				for _, m := range backupPolicy.Spec.BackupMethods {
+					methodMap[m.Name] = struct{}{}
+				}
+			}
+			return maps.Keys(methodMap), cobra.ShellCompDirectiveNoFileComp
+		}))
 }
 
 func PrintBackupList(o ListBackupOptions) error {

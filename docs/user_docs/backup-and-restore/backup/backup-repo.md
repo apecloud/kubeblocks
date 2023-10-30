@@ -158,10 +158,10 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.6.0 -n kb-system
    ```
 
    The above command creates a default backup repository `my-repo`.
-   
-   * `my-repo` is the name of the created backup repository. If you do not specify a name, the system creates a random name, following the format `backuprepo-xxxxx`.
-   * `--default` means that this repository is set as the default repository. Note that there can only be one default global repository. If there exist multiple default repositories, KubeBlocks cannot decide which one to use (similar to the default StorageClass of Kubernetes), which further results in backup failure. Using `kbcli` to create BackupRepo can avoid such problems because `kbcli` checks whether there is another default repository before creating a new one.
-   * `--provider` specifies the storage type, i.e. `storageProvider`, and is required for creating a BakcupRepo. The available values are `s3`, `oss`, and `minio`. Parameters for different storage providers vary and you can run `kbcli backuprepo create --provider STORAGE-PROVIDER-NAME -h` to view the flags for different storage providers.
+
+* `my-repo` is the name of the created backup repository. If you do not specify a name, the system creates a random name, following the format `backuprepo-xxxxx`.
+* `--default` means that this repository is set as the default repository. Note that there can only be one default global repository. If there exist multiple default repositories, KubeBlocks cannot decide which one to use (similar to the default StorageClass of Kubernetes), which further results in backup failure. Using `kbcli` to create BackupRepo can avoid such problems because `kbcli` checks whether there is another default repository before creating a new one.
+* `--provider` specifies the storage type, i.e. `storageProvider`, and is required for creating a BakcupRepo. The available values are `s3`, `oss`, and `minio`. Parameters for different storage providers vary and you can run `kbcli backuprepo create --provider STORAGE-PROVIDER-NAME -h` to view the flags for different storage providers.
 
    </TabItem>
 
@@ -179,10 +179,10 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.6.0 -n kb-system
    ```
 
    The above command creates a default backup repository `my-repo`.
-   
-   * `my-repo` is the name of the created backup repository. If you do not specify a name, the system creates a random name, following the format `backuprepo-xxxxx`.
-   * `--default` means that this repository is set as the default repository. Note that there can only be one default global repository. If there exist multiple default repositories, KubeBlocks cannot decide which one to use (similar to the default StorageClass of Kubernetes), which further results in backup failure. Using `kbcli` to create BackupRepo can avoid such problems because `kbcli` checks whether there is another default repository before creating a new one.
-   * `--provider` specifies the storage type, i.e. `storageProvider`, and is required for creating a BakcupRepo. The available values are `s3`, `oss`, and `minio`. Parameters for different storage providers vary and you can run `kbcli backuprepo create --provider STORAGE-PROVIDER-NAME -h` to view the flags for different storage providers.
+
+* `my-repo` is the name of the created backup repository. If you do not specify a name, the system creates a random name, following the format `backuprepo-xxxxx`.
+* `--default` means that this repository is set as the default repository. Note that there can only be one default global repository. If there exist multiple default repositories, KubeBlocks cannot decide which one to use (similar to the default StorageClass of Kubernetes), which further results in backup failure. Using `kbcli` to create BackupRepo can avoid such problems because `kbcli` checks whether there is another default repository before creating a new one.
+* `--provider` specifies the storage type, i.e. `storageProvider`, and is required for creating a BakcupRepo. The available values are `s3`, `oss`, and `minio`. Parameters for different storage providers vary and you can run `kbcli backuprepo create --provider STORAGE-PROVIDER-NAME -h` to view the flags for different storage providers.
 
    </TabItem>
 
@@ -199,11 +199,10 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.6.0 -n kb-system
    ```
 
    The above command creates a default backup repository `my-repo`.
-   
-   * `my-repo` is the name of the created backup repository. If you do not specify a name, the system creates a random name, following the format `backuprepo-xxxxx`.
-   * `--default` means that this repository is set as the default repository. Note that there can only be one default global repository. If there exist multiple default repositories, KubeBlocks cannot decide which one to use (similar to the default StorageClass of Kubernetes), which further results in backup failure. Using `kbcli` to create BackupRepo can avoid such problems because `kbcli` checks whether there is another default repository before creating a new one.
-   * `--provider` specifies the storage type, i.e. `storageProvider`, and is required for creating a BakcupRepo. The available values are `s3`, `oss`, and `minio`. Parameters for different storage providers vary and you can run `kbcli backuprepo create --provider STORAGE-PROVIDER-NAME -h` to view the flags for different storage providers.
-   * `--endpoint` specifies the endpoint of MinIO server. If you install MinIO by above instructions, the endpoint is `http://minio.default.svc.cluster.local:9000`, and the `default` is the namespace where MinIO is installed.
+* `my-repo` is the name of the created backup repository. If you do not specify a name, the system creates a random name, following the format `backuprepo-xxxxx`.
+* `--default` means that this repository is set as the default repository. Note that there can only be one default global repository. If there exist multiple default repositories, KubeBlocks cannot decide which one to use (similar to the default StorageClass of Kubernetes), which further results in backup failure. Using `kbcli` to create BackupRepo can avoid such problems because `kbcli` checks whether there is another default repository before creating a new one.
+* `--provider` specifies the storage type, i.e. `storageProvider`, and is required for creating a BakcupRepo. The available values are `s3`, `oss`, and `minio`. Parameters for different storage providers vary and you can run `kbcli backuprepo create --provider STORAGE-PROVIDER-NAME -h` to view the flags for different storage providers.
+* `--endpoint` specifies the endpoint of MinIO server. If you install MinIO by above instructions, the endpoint is `http://minio.default.svc.cluster.local:9000`, and the `default` is the namespace where MinIO is installed.
 
    </TabItem>
 

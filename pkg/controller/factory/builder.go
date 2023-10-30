@@ -49,6 +49,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (
@@ -477,6 +478,30 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 		}
 	}
 
+	// get restore password if exists during recovery.
+	getRestorePassword := func() string {
+		valueString := cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
+		if len(valueString) == 0 {
+			return ""
+		}
+		backupMap := map[string]map[string]string{}
+		err := json.Unmarshal([]byte(valueString), &backupMap)
+		if err != nil {
+			return ""
+		}
+		backupSource, ok := backupMap[component.Name]
+		if !ok {
+			return ""
+		}
+		password, ok := backupSource[constant.ConnectionPassword]
+		if !ok {
+			return ""
+		}
+		e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
+		password, _ = e.Decrypt([]byte(password))
+		return password
+	}
+
 	// TODO: do JIT value generation for lower CPU resources
 	// 1st pass replace variables
 	uuidVal := uuid.New()
@@ -485,8 +510,15 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 	uuidB64 := base64.RawStdEncoding.EncodeToString(uuidBytes)
 	uuidStrB64 := base64.RawStdEncoding.EncodeToString([]byte(strings.ReplaceAll(uuidStr, "-", "")))
 	uuidHex := hex.EncodeToString(uuidBytes)
+	randomPassword := randomString(8)
+	restorePassword := getRestorePassword()
+	// check if a connection password is specified during recovery.
+	// if exists, replace the random password
+	if restorePassword != "" {
+		randomPassword = restorePassword
+	}
 	m := map[string]string{
-		"$(RANDOM_PASSWD)":        randomString(8),
+		"$(RANDOM_PASSWD)":        randomPassword,
 		"$(UUID)":                 uuidStr,
 		"$(UUID_B64)":             uuidB64,
 		"$(UUID_STR_B64)":         uuidStrB64,

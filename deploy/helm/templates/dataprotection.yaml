@@ -87,6 +87,11 @@ spec:
             - name: ENABLE_WEBHOOKS
               value: "true"
             {{- end }}
+            - name: DP_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kubeblocks.fullname" . }}-secret
+                  key: dataProtectionEncryptionKey
             - name: DATASAFED_IMAGE
               value: "{{ .Values.dataProtection.image.registry | default "docker.io" }}/{{ .Values.dataProtection.image.datasafed.repository }}:{{ .Values.dataProtection.image.datasafed.tag | default "latest" }}"
           {{- with .Values.securityContext }}

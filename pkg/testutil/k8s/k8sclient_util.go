@@ -301,15 +301,22 @@ func WithConstructSequenceResult(mockObjs map[client.ObjectKey][]MockGetReturned
 		if !ok {
 			return fmt.Errorf("not existed key: %v", key)
 		}
+
 		index := sequenceAccessCounter[key]
 		mockReturned := accessibleSequence[index]
-		if mockReturned.Err == nil {
-			SetGetReturnedObject(obj, mockReturned.Object)
-		}
 		if index < len(accessibleSequence)-1 {
 			sequenceAccessCounter[key]++
 		}
-		return mockReturned.Err
+
+		switch {
+		case mockReturned.Err != nil:
+			return mockReturned.Err
+		case mockReturned.Object != nil:
+			SetGetReturnedObject(obj, mockReturned.Object)
+			return nil
+		default:
+			return apierrors.NewNotFound(schema.GroupResource{Group: "unknown", Resource: "unknown"}, key.Name)
+		}
 	}
 }
 

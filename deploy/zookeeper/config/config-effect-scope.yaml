@@ -1,0 +1,12 @@
+immutableParameters:
+  - dataDir
+  - dataLogDir
+  - standaloneEnabled
+  - reconfigEnabled
+  - dynamicConfigFile
+
+#staticParameters:
+#  - zookeeperSessionExpiredPolicy
+#
+#dynamicParameters:
+#  - forceDeleteNamespaceAllowed

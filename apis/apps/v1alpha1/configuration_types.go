@@ -74,6 +74,33 @@ type ConfigurationSpec struct {
 	ConfigItemDetails []ConfigurationItemDetail `json:"configItemDetails,omitempty"`
 }
 
+type ReconcileDetail struct {
+	// policy is the policy of the latest execution.
+	// +optional
+	Policy string `json:"policy"`
+	// execResult is the result of the latest execution.
+	// +optional
+	ExecResult string `json:"execResult"`
+
+	// currentRevision is the current revision of configurationItem.
+	// +optional
+	CurrentRevision string `json:"currentRevision,omitempty"`
+
+	// succeedCount is the number of pods for which configuration changes were successfully executed.
+	// +kubebuilder:default=-1
+	// +optional
+	SucceedCount int32 `json:"succeedCount,omitempty"`
+
+	// expectedCount is the number of pods that need to be executed for configuration changes.
+	// +kubebuilder:default=-1
+	// +optional
+	ExpectedCount int32 `json:"expectedCount,omitempty"`
+
+	// errMessage is the error message when the configuration change execution fails.
+	// +optional
+	ErrMessage string `json:"errMessage,omitempty"`
+}
+
 type ConfigurationItemDetailStatus struct {
 	// name is a config template name.
 	// +kubebuilder:validation:Required
@@ -100,6 +127,10 @@ type ConfigurationItemDetailStatus struct {
 	// message field describes the reasons of abnormal status.
 	// +optional
 	Message *string `json:"message,omitempty"`
+
+	// reconcileDetail describes the details of the configuration change execution.
+	// +optional
+	ReconcileDetail *ReconcileDetail `json:"reconcileDetail,omitempty"`
 }
 
 // ConfigurationStatus defines the observed state of Configuration

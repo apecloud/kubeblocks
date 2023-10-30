@@ -1,0 +1,36 @@
+annotations:
+  category: Database
+apiVersion: v2
+name: mariadb
+type: application
+version: 0.7.0-alpha.0
+description: MariaDB is an open-source relational database management system developed from a branch of MySQL. 
+dependencies:
+  - name: kblib
+    version: 0.1.0
+    repository: file://../kblib
+    alias: extra
+
+# This is the version number of the  Mariadb being deployed,
+# rather than the version number of  Mariadb-Scale itself.
+# From a user's perspective, the version  number of the frontend
+# proxy of the Mariadb being used is not relevant.
+appVersion: "10.6.15"
+
+keywords:
+  - mariadb
+  - database
+  - sql
+  - cluster
+  - raft
+
+home: https://github.com/apecloud/kubeblocks/tree/main/deploy/mariadb-cluster
+icon: https://kubeblocks.io/img/logo.png
+
+maintainers:
+  - name: yinmin2020
+    url: https://kubeblocks.io/
+
+sources:
+  - https://github.com/apecloud/kubeblocks/
+  - https://github.com/apecloud/kubeblocks/tree/main/deploy/mariadb

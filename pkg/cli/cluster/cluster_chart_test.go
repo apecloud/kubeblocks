@@ -41,7 +41,6 @@ var _ = Describe("cluster engine", func() {
 		c, err := BuildChartInfo(clusterType)
 		Expect(err).Should(Succeed())
 		Expect(c).ShouldNot(BeNil())
-		Expect(c.ClusterDef).ShouldNot(BeEmpty())
 		Expect(c.Schema).ShouldNot(BeNil())
 		Expect(c.SubSchema).ShouldNot(BeNil())
 		Expect(c.SubChartName).ShouldNot(BeEmpty())

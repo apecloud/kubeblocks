@@ -26,7 +26,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -34,6 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
@@ -139,12 +139,11 @@ func createEnvFromConfigmap(cluster *appsv1alpha1.Cluster, componentName string,
 	if !apierrors.IsNotFound(err) {
 		return nil, err
 	}
-	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	cm.Name = cmKey.Name
 	cm.Namespace = cmKey.Namespace
 	cm.Data = envMap
 	cm.Labels = constant.GetKBConfigMapWellKnownLabels(template.Name, cluster.Spec.ClusterDefRef, cluster.Name, componentName)
-	if err := controllerutil.SetOwnerReference(cluster, cm, scheme); err != nil {
+	if err := intctrlutil.SetOwnerReference(cluster, cm); err != nil {
 		return nil, err
 	}
 	return cm, cli.Create(ctx, cm)

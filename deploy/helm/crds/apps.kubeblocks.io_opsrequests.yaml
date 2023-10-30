@@ -1064,6 +1064,9 @@ spec:
                           description: lastStatus describes the last status for the
                             reconfiguring controller.
                           type: string
+                        message:
+                          description: message describes the details about this operation.
+                          type: string
                         name:
                           description: name is a config template name.
                           maxLength: 63

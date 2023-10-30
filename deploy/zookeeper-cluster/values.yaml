@@ -1,0 +1,47 @@
+# Default values for zookeeper-cluster.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+terminationPolicy: Delete
+
+# clusterVersionOverride
+
+## @param replicas specify cluster replicas
+##
+replicas: 3
+
+## @param cpu
+##
+cpu: 1
+
+## @param memory, the unit is Gi
+##
+memory: 2
+
+## @param requests.cpu if not set, use cpu
+## @param requests.memory, if not set, use memory
+##
+#requests:
+#  cpu: 1
+#  memory: 1
+
+persistence:
+  ## `data` volume settings
+  ##
+  data:
+    ## @param shard[*].persistence.data.storageClassName Storage class of backing PVC
+    ## If defined, storageClassName: <storageClass>
+    ## If set to "-", storageClassName: "", which disables dynamic provisioning
+    ## If undefined (the default) or set to null, no storageClassName spec is
+    ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+    ##   GKE, AWS & OpenStack)
+    ##
+    storageClassName:
+    ## @param shard[*].persistence.size Size of data volume
+    ##
+    size: 10Gi
+  dataLog:
+    storageClassName:
+    ## @param shard[*].persistence.size Size of data volume
+    ##
+    size: 10Gi

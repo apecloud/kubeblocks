@@ -601,6 +601,10 @@ type ConfigurationItemStatus struct {
 	// +optional
 	Status string `json:"status,omitempty"`
 
+	// message describes the details about this operation.
+	// +optional
+	Message string `json:"message,omitempty"`
+
 	// succeedCount describes the number of successful reconfiguring.
 	// +kubebuilder:default=0
 	// +optional

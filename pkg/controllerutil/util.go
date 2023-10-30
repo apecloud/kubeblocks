@@ -25,8 +25,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -134,4 +136,14 @@ func MergeMetadataMap(originalMap map[string]string, targetMap *map[string]strin
 			(*targetMap)[k] = v
 		}
 	}
+}
+
+var innerScheme, _ = appsv1alpha1.SchemeBuilder.Build()
+
+func SetOwnerReference(owner, object metav1.Object) error {
+	return controllerutil.SetOwnerReference(owner, object, innerScheme)
+}
+
+func SetControllerReference(owner, object metav1.Object) error {
+	return controllerutil.SetControllerReference(owner, object, innerScheme)
 }

@@ -154,6 +154,7 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 
 		It("EmptyConfigSpecTest", func() {
 
+			k8sMockClient.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithTimes(1)))
 			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult(
 				[]client.Object{
 					clusterDefObj,

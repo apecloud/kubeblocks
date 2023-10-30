@@ -93,21 +93,71 @@ var _ = Describe("Oteld Monitor Controller", func() {
 })
 
 func mockOTeldInstance() *v1alpha1.OTeld {
-	oteld := testapps.CreateCustomizedObj(&testCtx, "monitor/oteld.yaml", &v1alpha1.OTeld{},
-		testCtx.UseDefaultNamespace(),
-		testapps.WithName("oteld"))
+
+	oteld := &v1alpha1.OTeld{
+		Spec: v1alpha1.OTeldSpec{
+			Image: "docker.io/apecloud/oteld:0.1.0-beta.1",
+			Batch: v1alpha1.BatchConfig{
+				Enabled: true,
+			},
+			CollectionInterval: "15s",
+			LogsLevel:          "debug",
+			MetricsPort:        8888,
+			UseConfigMap:       true,
+			SystemDataSource: &v1alpha1.SystemDataSource{
+				EnabledPodLogs:              true,
+				EnabledK8sNodeStatesMetrics: true,
+				EnabledK8sClusterExporter:   false,
+				EnabledNodeExporter:         true,
+				MetricsExporterRef:          "prometheus",
+				LogsExporterRef:             "loki",
+				CollectionInterval:          15 * time.Second,
+			},
+		},
+	}
+	oteld.SetName("oteld-test")
+	oteld.SetNamespace(testCtx.DefaultNamespace)
+	oteld = testapps.CreateK8sResource(&testCtx, oteld).(*v1alpha1.OTeld)
 
 	testapps.CreateCustomizedObj(&testCtx, "monitor/collectordatasource.yaml", &v1alpha1.CollectorDataSource{},
 		testCtx.UseDefaultNamespace(),
 		testapps.WithName(metricsSinkName))
 
-	testapps.CreateCustomizedObj(&testCtx, "monitor/metrics_exporter.yaml", &v1alpha1.MetricsExporterSink{},
-		testCtx.UseDefaultNamespace(),
-		testapps.WithName(metricsSinkName))
+	prometheus := v1alpha1.MetricsExporterSink{
+		Spec: v1alpha1.MetricsExporterSinkSpec{
+			Type: v1alpha1.PrometheusSinkType,
+			MetricsSinkSource: v1alpha1.MetricsSinkSource{
+				PrometheusConfig: &v1alpha1.PrometheusConfig{
+					Namespace: testCtx.DefaultNamespace,
+					ServiceRef: v1alpha1.ServiceRef{
+						Endpoint:                    "${env:HOST_IP}:1234",
+						Namespace:                   "default",
+						ServiceConnectionCredential: "prometheus-service",
+					},
+				},
+			},
+		},
+	}
+	prometheus.SetName("prometheus")
+	prometheus.SetNamespace(testCtx.DefaultNamespace)
+	testapps.CreateK8sResource(&testCtx, &prometheus)
 
-	testapps.CreateCustomizedObj(&testCtx, "monitor/logs_exporter.yaml", &v1alpha1.LogsExporterSink{},
-		testCtx.UseDefaultNamespace(),
-		testapps.WithName(logsSinkName))
-
+	loki := v1alpha1.LogsExporterSink{
+		Spec: v1alpha1.LogsExporterSinkSpec{
+			Type: v1alpha1.LokiSinkType,
+			SinkSource: v1alpha1.SinkSource{
+				LokiConfig: &v1alpha1.LokiConfig{
+					ServiceRef: v1alpha1.ServiceRef{
+						Endpoint:                    "http://loki-gateway.kb-system/loki/api/v1/push",
+						Namespace:                   "default",
+						ServiceConnectionCredential: "loki-service",
+					},
+				},
+			},
+		},
+	}
+	loki.SetName("loki")
+	loki.SetNamespace(testCtx.DefaultNamespace)
+	testapps.CreateK8sResource(&testCtx, &loki)
 	return oteld
 }

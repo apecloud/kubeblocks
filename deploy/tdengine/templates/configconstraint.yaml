@@ -7,11 +7,11 @@ metadata:
     {{- include "tdengine.labels" . | nindent 4 }}
 spec:
   # configmap reference
-  reloadOptions:
-    tplScriptTrigger:
-      sync: true
-      scriptConfigMapRef: tdengine-reload-script
-      namespace: {{ .Release.Namespace }}
+{{/*  reloadOptions:*/}}
+{{/*    tplScriptTrigger:*/}}
+{{/*      sync: true*/}}
+{{/*      scriptConfigMapRef: tdengine-reload-script*/}}
+{{/*      namespace: {{ .Release.Namespace }}*/}}
 
   # top level mysql configuration type
   cfgSchemaTopLevelName: TaosParameter

@@ -36,10 +36,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/organization"
 )
 
-const (
-	DefaultBaseURL = "https://apecloud.authing.cn/oidc"
-)
-
 type LoginOptions struct {
 	authorize.Options
 	Region      string
@@ -267,19 +263,19 @@ func IsLoggedIn() bool {
 		return false
 	}
 
-	if !authorize.IsValidToken(tokenResult.AccessToken) {
+	if !authorize.IsValidToken(tokenResult.IDToken) {
 		return false
 	}
 
-	return checkTokenAvailable(tokenResult.AccessToken, DefaultBaseURL)
+	return checkTokenAvailable(tokenResult.IDToken)
 }
 
 // CheckTokenAvailable Check whether the token is available by getting user info.
-func checkTokenAvailable(token, domain string) bool {
-	URL := fmt.Sprintf("%s/userinfo", domain)
-	req, err := utils.NewRequest(context.TODO(), URL, url.Values{
-		"access_token": []string{token},
-	})
+func checkTokenAvailable(token string) bool {
+	URL := fmt.Sprintf("https://%s/api/v1/user", utils.OpenAPIHost)
+	req, err := utils.NewFullRequest(context.TODO(), URL, http.MethodGet, map[string]string{
+		"Authorization": "Bearer " + token,
+	}, url.Values{})
 	if err != nil {
 		return false
 	}
@@ -303,9 +299,9 @@ func getAuthURL(region string) string {
 	var authURL string
 	switch region {
 	case "jp":
-		authURL = DefaultBaseURL
+		authURL = utils.DefaultBaseURL
 	default:
-		authURL = DefaultBaseURL
+		authURL = utils.DefaultBaseURL
 	}
 	return authURL
 }

@@ -38,8 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/auth/utils"
 )
 
-const openAPIHost = "cloudapi.apecloud.cn"
-
 type OIDCWellKnownEndpoints struct {
 	AuthorizationEndpoint string `json:"authorization_endpoint"`
 	TokenEndpoint         string `json:"token_endpoint"`
@@ -197,7 +195,7 @@ func (p *PKCEAuthenticator) GetToken(ctx context.Context, authorization interfac
 }
 
 func (p *PKCEAuthenticator) GetUserInfo(ctx context.Context, token string) (*UserInfoResponse, error) {
-	URL := fmt.Sprintf("https://%s/api/v1/user", openAPIHost)
+	URL := fmt.Sprintf("https://%s/api/v1/user", utils.OpenAPIHost)
 	req, err := utils.NewFullRequest(ctx, URL, http.MethodGet, map[string]string{
 		"Authorization": "Bearer " + token,
 	}, url.Values{})

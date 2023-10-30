@@ -1,7 +1,7 @@
 annotations:
   category: Database
 apiVersion: v2
-name: mariadb
+name: mariadb-cluster
 type: application
 version: 0.7.0-alpha.0
 description: MariaDB is an open-source relational database management system developed from a branch of MySQL. 

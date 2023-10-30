@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	monitorv1alpha1 "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 	monitorcontrollers "github.com/apecloud/kubeblocks/controllers/monitor"
 	"github.com/apecloud/kubeblocks/controllers/monitor/types"
@@ -49,6 +50,7 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
 
 	utilruntime.Must(monitorv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme

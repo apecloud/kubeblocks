@@ -30,24 +30,24 @@ type ExporterRef struct {
 	// exporterRef is the exporter to export metrics
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
-	ExporterNames []string `json:"exporterRef"`
+	ExporterNames []string `json:"exporterRefs"`
 }
 
 type MetricsCollector struct {
-	ExporterRef ExporterRef `json:",inline"`
+	ExporterRef `json:",inline"`
 
-	// containerName is the container name of the data source to collect
-	// +kubebuilder:validation:Required
-	ContainerName string `json:"containerName"`
-
-	// component is the component name of the data source to collect
-	// +kubebuilder:validation:Required
-	Component string `json:"component"`
+	//// containerName is the container name of the data source to collect
+	//// +kubebuilder:validation:Required
+	// ContainerName string `json:"containerName"`
+	//
+	//// component is the component name of the data source to collect
+	//// +kubebuilder:validation:Required
+	// Component string `json:"component"`
 
 	// monitorType describes the monitor type, e.g: prometheus, mysql, pg, redis
 	// +optional
 	// TODO add validation for monitorType, support type?
-	MonitorType string `json:"monitorType"`
+	MonitorType string `json:"monitorType,omitempty"`
 
 	// collectionInterval describes the collection interval.
 	// +optional
@@ -58,54 +58,43 @@ type MetricsCollector struct {
 	MetricsSelector []string `json:"metricsSelector,omitempty"`
 }
 
-type MetricsCollectorSpec struct {
-	// metrics describes the metrics collector for each container
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	// +patchMergeKey=containerName
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=containerName
-	Metrics []MetricsCollector `json:"metrics"`
+type LogsCollector struct {
+	ExporterRef `json:",inline"`
 
+	// logTypes describes the logs types to collect, e.g: error, general, runninglog, slowlog, etc.
+	// +optional
+	LogTypes []string `json:"logTypes,omitempty"`
+}
+
+type ScrapeConfig struct {
 	// externalLabels describes which labels are added to metrics.
 	// +optional
 	ExternalLabels map[string]string `json:"externalLabels,omitempty"`
-}
-
-type LogsCollector struct {
-	ExporterRef ExporterRef `json:",inline"`
 
 	// containerName is the container name of the data source to collect
 	// +kubebuilder:validation:Required
 	ContainerName string `json:"containerName"`
 
-	// component is the component name of the data source to collect
-	// +kubebuilder:validation:Required
-	Component string `json:"component"`
-
-	// logs describes the logs collector for each container
+	// logsCollector describes the logs collector
 	// +optional
-	// Logs map[string]InputConfig `json:"logs,omitempty"`
+	Logs *LogsCollector `json:"logs"`
 
-	// logsTypes describes the logs types to collect, e.g: error, general, runninglog, slowlog, etc.
+	// metricsCollector describes the metrics collector
 	// +optional
-	LogsTypes []string `json:"logsTypes,omitempty"`
+	Metrics *MetricsCollector `json:"metrics"`
 }
 
-type LogsCollectorSpec struct {
-	// logs describes the logs collector for each container
+type CollectorSpec struct {
+	// componentName is cluster component name.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=22
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	ComponentName string `json:"componentName"`
+
+	// scrapeConfigs describes the scrape configs
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
-	// +patchMergeKey=containerName
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=containerName
-	Logs []LogsCollector `json:"logs"`
-
-	// externalLabels describes which labels are added to metrics.
-	// +optional
-	ExternalLabels map[string]string `json:"externalLabels,omitempty"`
+	ScrapeConfigs []ScrapeConfig `json:"scrapeConfigs"`
 }
 
 // CollectorDataSourceSpec defines the desired state of CollectorDataSource
@@ -118,13 +107,22 @@ type CollectorDataSourceSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
 	ClusterRef string `json:"clusterRef"`
 
+	// collectorSpecs describes the collector specs
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	CollectorSpecs []CollectorSpec `json:"collectorSpecs"`
+
 	// metricsCollector describes the metrics collector
 	// +optional
-	MetricsCollector *MetricsCollectorSpec `json:"metricsCollectorSpec,omitempty"`
-
-	// logsCollector describes the logs collector
-	// +optional
-	LogsCollector *LogsCollectorSpec `json:"logsCollectorSpec,omitempty"`
+	// MetricsCollector *MetricsCollectorSpec `json:"metricsCollectorSpec,omitempty"`
+	//
+	//// logsCollector describes the logs collector
+	//// +optional
+	// LogsCollector *LogsCollectorSpec `json:"logsCollectorSpec,omitempty"`
 }
 
 // CollectorDataSourceStatus defines the observed state of CollectorDataSource

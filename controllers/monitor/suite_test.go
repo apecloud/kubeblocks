@@ -40,6 +40,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/monitor/types"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 )
 
@@ -78,6 +79,11 @@ var _ = BeforeSuite(func() {
 
 	err = monitorv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
+	model.AddScheme(monitorv1alpha1.AddToScheme)
+
+	err = appsv1alpha1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+	model.AddScheme(appsv1alpha1.AddToScheme)
 
 	//+kubebuilder:scaffold:scheme
 

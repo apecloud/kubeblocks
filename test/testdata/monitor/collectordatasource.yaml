@@ -1,0 +1,27 @@
+apiVersion: monitor.kubeblocks.io/v1alpha1
+kind: CollectorDataSource
+metadata:
+  name: mysql-metric
+spec:
+  clusterRef: "test-cluster"
+  collectorSpecs:
+    - componentName: mysql
+      scrapeConfigs:
+        - containerName: mysql
+          externalLabels: ##用户自定义tag
+            label1: value1
+            label2: value2
+          metrics:
+            monitorType: mysql
+            collectionInterval: 30s
+            exporterRefs:
+              - datadog-metric
+            filterMetric:
+              - xxxx*
+              - yyyy*
+          logs:
+            exporterRefs:
+              - datadog-metric
+            logTypes:
+              - error
+              - general

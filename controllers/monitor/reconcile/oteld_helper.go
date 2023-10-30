@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package reconcile
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -27,10 +28,13 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/monitor/types"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type oteldWrapper struct {
 	*v1alpha1.OTeld
+	cli client.Client
+	ctx context.Context
 
 	errs []error
 
@@ -104,7 +108,7 @@ func (w *oteldWrapper) createPipeline(mode v1alpha1.Mode, name string, logsColle
 	var instance *types.OteldInstance
 
 	if instance = w.instanceMap[mode]; instance == nil {
-		instance = types.NewOteldInstance(w.OTeld)
+		instance = types.NewOteldInstance(w.OTeld, w.cli, w.ctx)
 		w.instanceMap[mode] = instance
 	}
 	if instance.MetricsPipline == nil {
@@ -180,12 +184,16 @@ func newOTeldHelper(source *v1alpha1.SystemDataSource,
 	instanceMap map[v1alpha1.Mode]*types.OteldInstance,
 	oteld *v1alpha1.OTeld,
 	metricsExporters *v1alpha1.MetricsExporterSinkList,
-	logsExporters *v1alpha1.LogsExporterSinkList) *oteldWrapper {
+	logsExporters *v1alpha1.LogsExporterSinkList,
+	cli client.Client,
+	ctx context.Context) *oteldWrapper {
 	return &oteldWrapper{
 		OTeld:            oteld,
 		source:           source,
 		instanceMap:      instanceMap,
 		logsExporters:    logsExporters,
 		metricsExporters: metricsExporters,
+		cli:              cli,
+		ctx:              ctx,
 	}
 }

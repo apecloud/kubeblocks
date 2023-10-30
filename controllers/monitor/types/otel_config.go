@@ -425,46 +425,31 @@ func (cg *OteldConfigGenerater) GenerateEngineConfiguration(instance *OteldInsta
 	cfg = append(cfg, infraSlice...)
 	defaultConfigSlice := yaml.MapSlice{}
 	for _, clusterDatasource := range instance.AppDataSources {
-		for _, componentDatasource := range clusterDatasource.Spec.Components {
-			for _, datasource := range componentDatasource.Containers {
-				valMap = buildEngineValMap(clusterDatasource.Spec.ClusterName, componentDatasource.ComponentName, datasource)
-				configSlice, err := buildSliceFromCUE(EngineTplPath, valMap)
-				if err != nil {
-					return nil, err
-				}
-				defaultConfigSlice = append(defaultConfigSlice, configSlice...)
-			}
+		scrapConfigs, err := fromCollectorDataSource(clusterDatasource.Spec, instance.Cli, instance.Ctx, clusterDatasource.Namespace)
+		if err != nil {
+			return nil, err
 		}
+		for _, config := range scrapConfigs {
+			configSlice, err := buildSliceFromCUE(EngineTplPath, config)
+			if err != nil {
+				return nil, err
+			}
+			defaultConfigSlice = append(defaultConfigSlice, configSlice...)
+		}
+		// for _, componentDatasource := range clusterDatasource.Spec.Components {
+		//	for _, datasource := range componentDatasource.Containers {
+		//		valMap = buildEngineValMap(clusterDatasource.Spec.ClusterName, componentDatasource.ComponentName, datasource)
+		//		configSlice, err := buildSliceFromCUE(EngineTplPath, valMap)
+		//		if err != nil {
+		//			return nil, err
+		//		}
+		//		defaultConfigSlice = append(defaultConfigSlice, configSlice...)
+		//	}
+		// }
 	}
 	cfg = append(cfg, yaml.MapItem{Key: "scrape_configs", Value: defaultConfigSlice})
 	cg.engineCache[mode] = cfg
 	return cfg, nil
-}
-
-func buildEngineValMap(clusterName string, componentName string, source v1alpha1.Container) map[string]any {
-	if source.CollectorName == "" {
-		source.CollectorName = source.ContainerName
-	}
-	valMap := map[string]any{
-		"cluster_name":    clusterName,
-		"component_name":  componentName,
-		"container_name":  source.ContainerName,
-		"collector_name":  source.CollectorName,
-		"metrics.enabled": source.Metrics != nil && source.Metrics.Enable,
-		"logs.enabled":    source.Logs != nil && source.Logs.Enable,
-	}
-	if source.Metrics != nil {
-		if len(source.Metrics.EnabledMetrics) > 0 {
-			valMap["metrics.enabled_metrics"] = source.Metrics.EnabledMetrics
-		}
-		valMap["metrics.collection_interval"] = source.Metrics.CollectionInterval
-	}
-	if source.Logs != nil {
-		if source.Logs.LogCollector != nil {
-			valMap["logs.logs_collector"] = source.Logs.LogCollector
-		}
-	}
-	return valMap
 }
 
 func buildEngineInfraValMap(instance *OteldInstance) map[string]any {

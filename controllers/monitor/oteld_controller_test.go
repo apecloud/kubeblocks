@@ -24,8 +24,10 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -35,12 +37,52 @@ var OTeldSignature = func(_ v1alpha1.OTeld, _ *v1alpha1.OTeld, _ v1alpha1.OTeldL
 const (
 	logsSinkName    = "loki"
 	metricsSinkName = "prometheus"
+
+	mysqlCompDefName = "replicasets"
+	mysqlCompName    = "mysql"
 )
 
 var _ = Describe("Oteld Monitor Controller", func() {
+
+	const (
+		clusterDefName     = "test-clusterdef"
+		clusterVersionName = "test-clusterversion"
+		clusterName        = "test-cluster"
+	)
+
 	Context("OTeld Controller", func() {
+
+		var cluster *appsv1alpha1.Cluster
+
+		BeforeEach(func() {
+			clusterDef := testapps.NewClusterDefFactory(clusterDefName).
+				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
+				AddLogConfig("error", "/data/mysql/log/mysqld-error.log").
+				AddLogConfig("slow", "/data/mysql/log/mysqld-slowquery.log").
+				AddLogConfig("general", "/data/mysql/log/mysqld.log").
+				Create(&testCtx).
+				GetObject()
+			clusterVersion := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
+				AddComponentVersion(mysqlCompDefName).
+				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+				Create(&testCtx).
+				GetObject()
+			pvcSpec := testapps.NewPVCSpec("1Gi")
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+				clusterDef.Name, clusterVersion.Name).
+				AddComponent(mysqlCompName, mysqlCompDefName).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
+				Create(&testCtx).
+				GetObject()
+		})
+
 		It("reconcile", func() {
 			otled := mockOTeldInstance()
+
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster),
+				func(g Gomega, cluster *appsv1alpha1.Cluster) {
+					Expect(cluster.Name).Should(Equal(clusterName))
+				}), time.Second*30, time.Second*1).Should(Succeed())
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(otled),
 				func(g Gomega, oteld *v1alpha1.OTeld) {
@@ -54,6 +96,10 @@ func mockOTeldInstance() *v1alpha1.OTeld {
 	oteld := testapps.CreateCustomizedObj(&testCtx, "monitor/oteld.yaml", &v1alpha1.OTeld{},
 		testCtx.UseDefaultNamespace(),
 		testapps.WithName("oteld"))
+
+	testapps.CreateCustomizedObj(&testCtx, "monitor/collectordatasource.yaml", &v1alpha1.CollectorDataSource{},
+		testCtx.UseDefaultNamespace(),
+		testapps.WithName(metricsSinkName))
 
 	testapps.CreateCustomizedObj(&testCtx, "monitor/metrics_exporter.yaml", &v1alpha1.MetricsExporterSink{},
 		testCtx.UseDefaultNamespace(),

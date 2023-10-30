@@ -42,110 +42,94 @@ spec:
                 x-kubernetes-validations:
                 - message: forbidden to update spec.clusterRef
                   rule: self == oldSelf
-              logsCollectorSpec:
-                description: logsCollector describes the logs collector
-                properties:
-                  externalLabels:
-                    additionalProperties:
+              collectorSpecs:
+                description: collectorSpecs describes the collector specs
+                items:
+                  properties:
+                    componentName:
+                      description: componentName is cluster component name.
+                      maxLength: 22
+                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
-                    description: externalLabels describes which labels are added to
-                      metrics.
-                    type: object
-                  logs:
-                    description: logs describes the logs collector for each container
-                    items:
-                      properties:
-                        component:
-                          description: component is the component name of the data
-                            source to collect
-                          type: string
-                        containerName:
-                          description: containerName is the container name of the
-                            data source to collect
-                          type: string
-                        exporterRef:
-                          description: exporterRef is the exporter to export metrics
-                          items:
+                    scrapeConfigs:
+                      description: scrapeConfigs describes the scrape configs
+                      items:
+                        properties:
+                          containerName:
+                            description: containerName is the container name of the
+                              data source to collect
                             type: string
-                          minItems: 1
-                          type: array
-                        logsTypes:
-                          description: 'logsTypes describes the logs types to collect,
-                            e.g: error, general, runninglog, slowlog, etc.'
-                          items:
-                            type: string
-                          type: array
-                      required:
-                      - component
-                      - containerName
-                      - exporterRef
-                      type: object
-                    minItems: 1
-                    type: array
-                    x-kubernetes-list-map-keys:
-                    - containerName
-                    x-kubernetes-list-type: map
-                required:
-                - logs
-                type: object
-              metricsCollectorSpec:
-                description: metricsCollector describes the metrics collector
-                properties:
-                  externalLabels:
-                    additionalProperties:
-                      type: string
-                    description: externalLabels describes which labels are added to
-                      metrics.
-                    type: object
-                  metrics:
-                    description: metrics describes the metrics collector for each
-                      container
-                    items:
-                      properties:
-                        collectionInterval:
-                          description: collectionInterval describes the collection
-                            interval.
-                          type: string
-                        component:
-                          description: component is the component name of the data
-                            source to collect
-                          type: string
-                        containerName:
-                          description: containerName is the container name of the
-                            data source to collect
-                          type: string
-                        exporterRef:
-                          description: exporterRef is the exporter to export metrics
-                          items:
-                            type: string
-                          minItems: 1
-                          type: array
-                        metricsSelector:
-                          description: metricsSelector describes which metrics are
-                            collected.
-                          items:
-                            type: string
-                          type: array
-                        monitorType:
-                          description: 'monitorType describes the monitor type, e.g:
-                            prometheus, mysql, pg, redis TODO add validation for monitorType,
-                            support type?'
-                          type: string
-                      required:
-                      - component
-                      - containerName
-                      - exporterRef
-                      type: object
-                    minItems: 1
-                    type: array
-                    x-kubernetes-list-map-keys:
-                    - containerName
-                    x-kubernetes-list-type: map
-                required:
-                - metrics
-                type: object
+                          externalLabels:
+                            additionalProperties:
+                              type: string
+                            description: externalLabels describes which labels are
+                              added to metrics.
+                            type: object
+                          logs:
+                            description: logsCollector describes the logs collector
+                            properties:
+                              exporterRefs:
+                                description: exporterRef is the exporter to export
+                                  metrics
+                                items:
+                                  type: string
+                                minItems: 1
+                                type: array
+                              logTypes:
+                                description: 'logTypes describes the logs types to
+                                  collect, e.g: error, general, runninglog, slowlog,
+                                  etc.'
+                                items:
+                                  type: string
+                                type: array
+                            required:
+                            - exporterRefs
+                            type: object
+                          metrics:
+                            description: metricsCollector describes the metrics collector
+                            properties:
+                              collectionInterval:
+                                description: collectionInterval describes the collection
+                                  interval.
+                                type: string
+                              exporterRefs:
+                                description: exporterRef is the exporter to export
+                                  metrics
+                                items:
+                                  type: string
+                                minItems: 1
+                                type: array
+                              metricsSelector:
+                                description: metricsSelector describes which metrics
+                                  are collected.
+                                items:
+                                  type: string
+                                type: array
+                              monitorType:
+                                description: 'monitorType describes the monitor type,
+                                  e.g: prometheus, mysql, pg, redis TODO add validation
+                                  for monitorType, support type?'
+                                type: string
+                            required:
+                            - exporterRefs
+                            type: object
+                        required:
+                        - containerName
+                        type: object
+                      minItems: 1
+                      type: array
+                  required:
+                  - componentName
+                  - scrapeConfigs
+                  type: object
+                minItems: 1
+                type: array
+                x-kubernetes-list-map-keys:
+                - componentName
+                x-kubernetes-list-type: map
             required:
             - clusterRef
+            - collectorSpecs
             type: object
           status:
             description: CollectorDataSourceStatus defines the observed state of CollectorDataSource

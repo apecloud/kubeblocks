@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package reconcile
 
 import (
+	"context"
 	"fmt"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -49,17 +50,12 @@ func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) erro
 		return err
 	}
 
-	// systemDatasources := &v1alpha1.CollectorDataSourceList{}
-	// if err := k8sClient.List(ctx, systemDatasources, client.InNamespace(reqCtx.OTeld.GetNamespace())); err != nil {
-	//	return err
-	// }
-
-	appDatasources := &v1alpha1.AppDataSourceList{}
-	if err := k8sClient.List(ctx, appDatasources, client.InNamespace(reqCtx.OTeld.GetNamespace())); err != nil {
+	userDateSources := &v1alpha1.CollectorDataSourceList{}
+	if err := k8sClient.List(ctx, userDateSources); err != nil {
 		return err
 	}
 
-	instanceMap, err := BuildInstanceMapForPipline(appDatasources, metricsExporters, logsExporters, reqCtx.OTeld)
+	instanceMap, err := BuildInstanceMapForPipline(userDateSources, metricsExporters, logsExporters, reqCtx.OTeld, params.Client, reqCtx.Ctx)
 	if err != nil {
 		return err
 	}
@@ -68,15 +64,17 @@ func OTeld(reqCtx monitortype.ReconcileCtx, params monitortype.OTeldParams) erro
 	return nil
 }
 
-func BuildInstanceMapForPipline(appDatasources *v1alpha1.AppDataSourceList,
+func BuildInstanceMapForPipline(appDatasources *v1alpha1.CollectorDataSourceList,
 	metricsExporters *v1alpha1.MetricsExporterSinkList,
 	logsExporters *v1alpha1.LogsExporterSinkList,
-	oteld *v1alpha1.OTeld) (map[v1alpha1.Mode]*monitortype.OteldInstance, error) {
+	oteld *v1alpha1.OTeld,
+	cli client.Client,
+	ctx context.Context) (map[v1alpha1.Mode]*monitortype.OteldInstance, error) {
 
 	instanceMap := map[v1alpha1.Mode]*monitortype.OteldInstance{
-		DefaultMode: monitortype.NewOteldInstance(oteld),
+		DefaultMode: monitortype.NewOteldInstance(oteld, cli, ctx),
 	}
-	if err := buildSystemInstanceMap(oteld, instanceMap, metricsExporters, logsExporters); err != nil {
+	if err := buildSystemInstanceMap(oteld, instanceMap, metricsExporters, logsExporters, cli, ctx); err != nil {
 		return nil, err
 	}
 
@@ -132,16 +130,10 @@ func BuildInstanceMapForPipline(appDatasources *v1alpha1.AppDataSourceList,
 	// }
 
 	for _, dataSource := range appDatasources.Items {
-		mode := dataSource.Spec.Mode
-		if mode == "" {
-			mode = DefaultMode
-		}
+		mode := v1alpha1.ModeDaemonSet
 		oteldInstance, ok := instanceMap[mode]
 		if !ok {
-			oteldInstance = monitortype.NewOteldInstance(oteld)
-		}
-		if oteldInstance.AppDataSources == nil {
-			oteldInstance.AppDataSources = []v1alpha1.AppDataSource{}
+			oteldInstance = monitortype.NewOteldInstance(oteld, cli, ctx)
 		}
 		oteldInstance.AppDataSources = append(oteldInstance.AppDataSources, dataSource)
 		instanceMap[mode] = oteldInstance
@@ -180,13 +172,15 @@ func BuildInstanceMapForPipline(appDatasources *v1alpha1.AppDataSourceList,
 func buildSystemInstanceMap(oteld *v1alpha1.OTeld,
 	instanceMap map[v1alpha1.Mode]*monitortype.OteldInstance,
 	exporters *v1alpha1.MetricsExporterSinkList,
-	logsExporters *v1alpha1.LogsExporterSinkList) error {
-	if oteld.Spec.SystemDataSource == nil {
+	logsExporters *v1alpha1.LogsExporterSinkList,
+	cli client.Client,
+	ctx context.Context) error {
+	systemDataSource := oteld.Spec.SystemDataSource
+	if systemDataSource == nil {
 		return nil
 	}
 
-	systemDataSource := oteld.Spec.SystemDataSource
-	return newOTeldHelper(systemDataSource, instanceMap, oteld, exporters, logsExporters).
+	return newOTeldHelper(systemDataSource, instanceMap, oteld, exporters, logsExporters, cli, ctx).
 		buildAPIServicePipeline().
 		buildK8sNodeStatesPipeline().
 		buildNodePipeline().

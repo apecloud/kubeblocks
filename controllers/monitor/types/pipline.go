@@ -19,7 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package types
 
-import "github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
+import (
+	"context"
+
+	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
 
 type Receiver struct {
 	Parameter          string
@@ -44,7 +49,10 @@ type OteldInstance struct {
 	AppLogsPipline    Pipline
 	AppMetricsPiplien Pipline
 	Oteld             *v1alpha1.OTeld
-	AppDataSources    []v1alpha1.AppDataSource
+	AppDataSources    []v1alpha1.CollectorDataSource
+
+	Cli client.Client
+	Ctx context.Context
 }
 
 func NewPipeline(name string) Pipline {
@@ -56,13 +64,15 @@ func NewPipeline(name string) Pipline {
 	}
 }
 
-func NewOteldInstance(oteld *v1alpha1.OTeld) *OteldInstance {
+func NewOteldInstance(oteld *v1alpha1.OTeld, cli client.Client, ctx context.Context) *OteldInstance {
 	return &OteldInstance{
+		Cli:               cli,
+		Ctx:               ctx,
 		Oteld:             oteld,
 		MetricsPipline:    []Pipline{},
 		LogPipline:        []Pipline{},
 		AppLogsPipline:    Pipline{},
 		AppMetricsPiplien: Pipline{},
-		AppDataSources:    []v1alpha1.AppDataSource{},
+		AppDataSources:    []v1alpha1.CollectorDataSource{},
 	}
 }

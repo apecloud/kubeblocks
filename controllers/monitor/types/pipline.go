@@ -46,8 +46,8 @@ type Pipline struct {
 type OteldInstance struct {
 	MetricsPipline    []Pipline
 	LogPipline        []Pipline
-	AppLogsPipline    Pipline
-	AppMetricsPiplien Pipline
+	AppLogsPipline    *Pipline
+	AppMetricsPiplien *Pipline
 	Oteld             *v1alpha1.OTeld
 	AppDataSources    []v1alpha1.CollectorDataSource
 
@@ -71,8 +71,8 @@ func NewOteldInstance(oteld *v1alpha1.OTeld, cli client.Client, ctx context.Cont
 		Oteld:             oteld,
 		MetricsPipline:    []Pipline{},
 		LogPipline:        []Pipline{},
-		AppLogsPipline:    Pipline{},
-		AppMetricsPiplien: Pipline{},
+		AppLogsPipline:    &Pipline{},
+		AppMetricsPiplien: &Pipline{},
 		AppDataSources:    []v1alpha1.CollectorDataSource{},
 	}
 }

@@ -21,7 +21,6 @@ package reconcile
 
 import (
 	"context"
-	"fmt"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -74,96 +73,8 @@ func BuildInstanceMapForPipline(appDatasources *v1alpha1.CollectorDataSourceList
 	instanceMap := map[v1alpha1.Mode]*monitortype.OteldInstance{
 		DefaultMode: monitortype.NewOteldInstance(oteld, cli, ctx),
 	}
-	if err := buildSystemInstanceMap(oteld, instanceMap, metricsExporters, logsExporters, cli, ctx); err != nil {
+	if err := buildSystemInstanceMap(oteld, instanceMap, metricsExporters, logsExporters, appDatasources, cli, ctx); err != nil {
 		return nil, err
-	}
-
-	// for _, dataSource := range datasources.Items {
-	//	mode := dataSource.Spec.Mode
-	//	if mode == "" {
-	//		mode = DefaultMode
-	//	}
-	//	oteldInstance, ok := instanceMap[mode]
-	//	if !ok {
-	//		oteldInstance = monitortype.NewOteldInstance(oteld)
-	//	}
-	//	if oteldInstance.MetricsPipline == nil {
-	//		oteldInstance.MetricsPipline = []monitortype.Pipline{}
-	//	}
-	//	pipline := monitortype.NewPipeline(dataSource.Name)
-	//	for _, data := range dataSource.Spec.DataSourceList {
-	//		pipline.ReceiverMap[data.Name] = monitortype.Receiver{
-	//			Parameter:          data.Parameter,
-	//			CollectionInterval: dataSource.Spec.CollectionInterval,
-	//		}
-	//	}
-	//
-	//	if oteldInstance.Oteld.Spec.Batch.Enabled {
-	//		pipline.ProcessorMap[monitortype.BatchProcessorName] = true
-	//	}
-	//	if oteldInstance.Oteld.Spec.MemoryLimiter.Enabled {
-	//		pipline.ProcessorMap[monitortype.MemoryProcessorName] = true
-	//	}
-	//	switch dataSource.Spec.Type {
-	//	case v1alpha1.MetricsDatasourceType:
-	//		for _, exporterRef := range dataSource.Spec.ExporterNames {
-	//			for _, exporter := range metricsExporters.Items {
-	//				if exporter.Name == exporterRef {
-	//					pipline.ExporterMap[fmt.Sprintf(ExporterNamePattern, exporter.Spec.Type, exporter.Name)] = true
-	//				}
-	//			}
-	//		}
-	//		oteldInstance.MetricsPipline = append(oteldInstance.MetricsPipline, pipline)
-	//	case v1alpha1.LogsDataSourceType:
-	//		for _, exporterRef := range dataSource.Spec.ExporterNames {
-	//			for _, exporter := range logsExporters.Items {
-	//				if exporter.Name == exporterRef {
-	//					pipline.ExporterMap[fmt.Sprintf(ExporterNamePattern, exporter.Spec.Type, exporter.Name)] = true
-	//				}
-	//			}
-	//		}
-	//		oteldInstance.LogPipline = append(oteldInstance.LogPipline, pipline)
-	//	default:
-	//		return nil, fmt.Errorf("unknown data source type %s", dataSource.Spec.Type)
-	//	}
-	//	instanceMap[mode] = oteldInstance
-	// }
-
-	for _, dataSource := range appDatasources.Items {
-		mode := v1alpha1.ModeDaemonSet
-		oteldInstance, ok := instanceMap[mode]
-		if !ok {
-			oteldInstance = monitortype.NewOteldInstance(oteld, cli, ctx)
-		}
-		oteldInstance.AppDataSources = append(oteldInstance.AppDataSources, dataSource)
-		instanceMap[mode] = oteldInstance
-	}
-
-	for _, instance := range instanceMap {
-		systemMetricsPipline := monitortype.NewPipeline(monitortype.AppMetricsCreatorName)
-		if instance.Oteld.Spec.Batch.Enabled {
-			systemMetricsPipline.ProcessorMap[monitortype.BatchProcessorName] = true
-		}
-		if instance.Oteld.Spec.MemoryLimiter.Enabled {
-			systemMetricsPipline.ProcessorMap[monitortype.MemoryProcessorName] = true
-		}
-		for _, exporter := range metricsExporters.Items {
-			systemMetricsPipline.ExporterMap[fmt.Sprintf(ExporterNamePattern, exporter.Spec.Type, exporter.Name)] = true
-		}
-		instance.AppMetricsPiplien = systemMetricsPipline
-
-		logPipline := monitortype.NewPipeline(monitortype.LogCreatorName)
-		logPipline.ReceiverMap[monitortype.LogCreatorName] = monitortype.Receiver{}
-		if instance.Oteld.Spec.Batch.Enabled {
-			logPipline.ProcessorMap[monitortype.BatchProcessorName] = true
-		}
-		if instance.Oteld.Spec.MemoryLimiter.Enabled {
-			logPipline.ProcessorMap[monitortype.MemoryProcessorName] = true
-		}
-		for _, exporter := range logsExporters.Items {
-			logPipline.ExporterMap[fmt.Sprintf(ExporterNamePattern, exporter.Spec.Type, exporter.Name)] = true
-		}
-		instance.AppLogsPipline = logPipline
 	}
 
 	return instanceMap, nil
@@ -173,6 +84,7 @@ func buildSystemInstanceMap(oteld *v1alpha1.OTeld,
 	instanceMap map[v1alpha1.Mode]*monitortype.OteldInstance,
 	exporters *v1alpha1.MetricsExporterSinkList,
 	logsExporters *v1alpha1.LogsExporterSinkList,
+	datasources *v1alpha1.CollectorDataSourceList,
 	cli client.Client,
 	ctx context.Context) error {
 	systemDataSource := oteld.Spec.SystemDataSource
@@ -180,10 +92,12 @@ func buildSystemInstanceMap(oteld *v1alpha1.OTeld,
 		return nil
 	}
 
-	return newOTeldHelper(systemDataSource, instanceMap, oteld, exporters, logsExporters, cli, ctx).
+	return newOTeldHelper(systemDataSource, instanceMap, oteld, exporters, logsExporters, datasources, cli, ctx).
 		buildAPIServicePipeline().
 		buildK8sNodeStatesPipeline().
 		buildNodePipeline().
 		buildPodLogsPipeline().
+		appendUserDataSource().
+		buildFixedPipline().
 		complete()
 }

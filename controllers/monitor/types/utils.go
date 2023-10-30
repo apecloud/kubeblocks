@@ -22,13 +22,28 @@ package types
 import (
 	"context"
 
+	"gopkg.in/yaml.v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/monitor/builder"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
+
+func buildSliceFromCUE(tplName string, valMap map[string]any) (yaml.MapSlice, error) {
+	bytes, err := builder.BuildFromCUEForOTel(tplName, valMap, "output")
+	if err != nil {
+		return nil, err
+	}
+	extensionSlice := yaml.MapSlice{}
+	err = yaml.Unmarshal(bytes, &extensionSlice)
+	if err != nil {
+		return nil, err
+	}
+	return extensionSlice, nil
+}
 
 type ScrapeConfig map[string]any
 

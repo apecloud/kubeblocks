@@ -12,21 +12,22 @@ on:
         required: false
         default: ''
       TEST_TYPE:
-        description: 'test type (e.g. mysql|postgres|redis|mongo|kafka|pulsar|weaviate|qdrant|smarte|scale|greptimedb|nebula|risingwave|starrocks|oceanbase|foxlake|oracle-mysql|asmysql|openldap)'
+        description: 'test type (e.g. apecloud-mysql|postgres|redis|mongo|kafka|pulsar|weaviate|qdrant|smarte|scale|greptimedb|nebula|risingwave|starrocks|oceanbase|foxlake|oracle-mysql|asmysql|openldap|polardbx|milvus|clickhouse|pika|opensearch|elasticsearch|vllm|orioledb|official-pg|ggml|zookeeper|mariadb)'
         required: false
         default: ''
       CLOUD_PROVIDER:
         description: 'cloud provider'
         required: true
-        default: 'eks'
+        default: 'gke'
         type: choice
         options:
-          - eks
           - gke
+          - eks
+          - k3s
       CLUSTER_VERSION:
-        description: 'k8s cluster version (e.g. 1.25)'
+        description: 'k8s cluster version (e.g. 1.26)'
         required: false
-        default: '1.25'
+        default: '1.26'
         type: choice
         options:
           - 1.27
@@ -50,7 +51,7 @@ on:
         required: false
         default: ''
 
-run-name: kbcli:${{ inputs.PRE_VERSION }} to ${{ inputs.VERSION }} ${{ inputs.CLOUD_PROVIDER }}:${{ inputs.CLUSTER_VERSION }}:${{ inputs.INSTANCE_TYPE }}
+run-name: kbcli:${{ inputs.PRE_VERSION }} to ${{ inputs.VERSION }} ${{ inputs.CLOUD_PROVIDER }}:${{ inputs.CLUSTER_VERSION }}:${{ inputs.INSTANCE_TYPE }} ${{ inputs.TEST_TYPE }}
 
 env:
   GH_TOKEN: ${{ github.token }}
@@ -78,7 +79,7 @@ jobs:
           
           CLUSTER_REGION=""
           if [[ "${{ inputs.CLOUD_PROVIDER }}" == 'eks' && -z "$CLUSTER_REGION" ]]; then
-              CLUSTER_REGION="${{ vars.REGION_AWK_EKS }}"
+              CLUSTER_REGION="${{ vars.REGION_AWS_EKS }}"
           elif [[ "${{ inputs.CLOUD_PROVIDER }}" == 'gke' && -z "$CLUSTER_REGION" ]]; then
               CLUSTER_REGION="${{ vars.REGION_GCP_GEK }}"
           fi

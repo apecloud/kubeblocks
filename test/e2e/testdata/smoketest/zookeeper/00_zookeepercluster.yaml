@@ -1,0 +1,50 @@
+---
+# Source: zookeeper-cluster/templates/cluster.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: zk-cluster
+  labels:
+    
+    helm.sh/chart: zookeeper-cluster-0.7.0-alpha.0
+    app.kubernetes.io/version: "3.7.1"
+    app.kubernetes.io/instance: zk-cluster
+spec:
+  clusterDefinitionRef: zookeeper
+  clusterVersionRef: zookeeper-3.7.1
+  terminationPolicy: Delete  
+  affinity:
+    podAntiAffinity: Preferred
+    topologyKeys:
+      - kubernetes.io/hostname
+    tenancy: SharedNode
+  componentSpecs:
+    - name: zookeeper
+      componentDefRef: zookeeper
+      replicas: 3
+      serviceAccountName: kb-zk-cluster      
+      monitor: false      
+      resources:
+        limits:
+          cpu: "1"
+          memory: "2Gi"
+        requests:
+          cpu: "1"
+          memory: "2Gi"
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: 
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 10Gi
+        - name: data-log # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: 
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 10Gi

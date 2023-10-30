@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: mariadb-cluster-vscale-
+spec:
+  clusterRef: mariadb-cluster
+  type: VerticalScaling
+  verticalScaling:
+    - componentName: mariadb
+      requests:
+        cpu: "0.5"
+        memory: "0.5Gi"

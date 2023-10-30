@@ -16,7 +16,7 @@ import (
 func GetClientSet(logger logr.Logger) (*kubernetes.Clientset, error) {
 	restConfig, err := ctlruntime.GetConfig()
 	if err != nil {
-		errors.Wrap(err, "kubeconfig not found")
+		return nil, errors.Wrap(err, "get kubeconfig failed")
 	}
 	clientset, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
@@ -30,7 +30,7 @@ func GetClientSet(logger logr.Logger) (*kubernetes.Clientset, error) {
 func GetRESTClient(logger logr.Logger) (*rest.RESTClient, error) {
 	restConfig, err := ctlruntime.GetConfig()
 	if err != nil {
-		errors.Wrap(err, "kubeconfig not found")
+		return nil, errors.Wrap(err, "get kubeconfig failed")
 	}
 	_ = appsv1alpha1.AddToScheme(clientsetscheme.Scheme)
 	restConfig.GroupVersion = &appsv1alpha1.GroupVersion

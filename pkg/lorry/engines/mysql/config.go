@@ -29,6 +29,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -82,12 +83,12 @@ func NewConfig(properties map[string]string) (*Config, error) {
 		config.url = "root:@tcp(127.0.0.1:3306)/mysql?multiStatements=true"
 	}
 
-	if viper.IsSet("KB_SERVICE_USER") {
-		config.username = viper.GetString("KB_SERVICE_USER")
+	if viper.IsSet(constant.KBEnvServiceUser) {
+		config.username = viper.GetString(constant.KBEnvServiceUser)
 	}
 
-	if viper.IsSet("KB_SERVICE_PASSWORD") {
-		config.password = viper.GetString("KB_SERVICE_PASSWORD")
+	if viper.IsSet(constant.KBEnvServicePassword) {
+		config.password = viper.GetString(constant.KBEnvServicePassword)
 	}
 
 	if val, ok := properties[pemPathKey]; ok {

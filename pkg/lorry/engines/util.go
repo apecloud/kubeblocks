@@ -40,7 +40,7 @@ func MaxInt64(x, y int64) int64 {
 	return y
 }
 
-func GetSQLChannelProc() (*os.Process, error) {
+func GetLorryProc() (*os.Process, error) {
 	// sqlChannel pid is usually 1
 	sqlChannelPid := os.Getppid()
 	sqlChannelProc, err := os.FindProcess(sqlChannelPid)

@@ -232,13 +232,13 @@ func (mgr *DBManagerBase) Unlock(context.Context) error {
 // but rather to sends SIGUSR2 to activate sql channel to start database
 func (mgr *DBManagerBase) Start(context.Context, *dcs.Cluster) error {
 	mgr.Logger.Info("send SIGUSR2 to activate sql channel")
-	sqlChannelProc, err := GetSQLChannelProc()
+	lorryProc, err := GetLorryProc()
 	if err != nil {
 		mgr.Logger.Error(err, "can't find sql channel process")
 		return err
 	}
 
-	err = sqlChannelProc.Signal(syscall.SIGUSR2)
+	err = lorryProc.Signal(syscall.SIGUSR2)
 	if err != nil {
 		mgr.Logger.Error(err, "send SIGUSR2 to sql channel failed")
 		return err
@@ -250,13 +250,13 @@ func (mgr *DBManagerBase) Start(context.Context, *dcs.Cluster) error {
 // but rather to sends SIGUSR1 to deactivate sql channel to stop starting database
 func (mgr *DBManagerBase) Stop() error {
 	mgr.Logger.Info("send SIGUSR1 to deactivate sql channel")
-	sqlChannelProc, err := GetSQLChannelProc()
+	lorryProc, err := GetLorryProc()
 	if err != nil {
 		mgr.Logger.Error(err, "can't find sql channel process")
 		return err
 	}
 
-	err = sqlChannelProc.Signal(syscall.SIGUSR1)
+	err = lorryProc.Signal(syscall.SIGUSR1)
 	if err != nil {
 		mgr.Logger.Error(err, "send SIGUSR1 to sql channel failed")
 		return err

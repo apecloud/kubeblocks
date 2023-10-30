@@ -173,7 +173,7 @@ func (c *componentPlanBuilder) componentWalkFunc(v graph.Vertex) error {
 	case model.UPDATE:
 		err := c.cli.Update(c.transCtx.Context, vertex.Obj)
 		if err != nil && !apierrors.IsNotFound(err) {
-			c.transCtx.Logger.Error(err, fmt.Sprintf("update %T error: %s", vertex.Obj, vertex.OriObj.GetName()))
+			c.transCtx.Logger.Error(err, fmt.Sprintf("update %T error: %s", vertex.Obj, vertex.Obj.GetName()))
 			return err
 		}
 	case model.DELETE:

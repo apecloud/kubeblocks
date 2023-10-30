@@ -186,7 +186,7 @@ func (o *CreateBackupOptions) Validate() error {
 	}
 
 	if o.BackupMethod == "" {
-		return fmt.Errorf("backup method can not be empty, you can input by --method")
+		return fmt.Errorf("backup method can not be empty, you can specify it by --method")
 	}
 	// TODO: check if pvc exists
 

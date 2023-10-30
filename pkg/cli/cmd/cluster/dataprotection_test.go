@@ -159,7 +159,7 @@ var _ = Describe("DataProtection", func() {
 			By("test without method")
 			initClient(defaultBackupPolicy)
 			o.Dynamic = tf.FakeDynamicClient
-			Expect(o.Validate().Error()).Should(ContainSubstring("backup method can not be empty, you can input by --method"))
+			Expect(o.Validate().Error()).Should(ContainSubstring("backup method can not be empty, you can specify it by --method"))
 
 			By("test with one default backupPolicy")
 			initClient(defaultBackupPolicy)
@@ -176,7 +176,7 @@ var _ = Describe("DataProtection", func() {
 			By("test backup with default backupPolicy")
 			cmd := NewCreateBackupCmd(tf, streams)
 			Expect(cmd).ShouldNot(BeNil())
-			cmd.Flags().Set("method", testing.BackupMethodName)
+			_ = cmd.Flags().Set("method", testing.BackupMethodName)
 			cmd.Run(cmd, []string{testing.ClusterName})
 
 			By("test with specified backupMethod and backupPolicy")

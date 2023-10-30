@@ -110,7 +110,8 @@ func updateConfigPhaseWithResult(cli client.Client, ctx intctrlutil.RequestCtx, 
 		config.ObjectMeta.Annotations = map[string]string{}
 	}
 
-	if result.Failed {
+	if result.Failed && !result.Retry {
+		ctx.Log.Info(fmt.Sprintf("failed to reconcile and disable retry for configmap[%+v]", client.ObjectKeyFromObject(config)))
 		config.ObjectMeta.Annotations[constant.DisableUpgradeInsConfigurationAnnotationKey] = strconv.FormatBool(true)
 	}
 

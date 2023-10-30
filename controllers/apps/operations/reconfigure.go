@@ -142,11 +142,11 @@ func (r *reconfigureAction) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli c
 	case appsv1alpha1.CCreatingPhase, appsv1alpha1.CInitPhase:
 		return appsv1alpha1.OpsFailedPhase, 0, core.MakeError("the configuration is creating or initializing, is not ready to reconfigure")
 	case appsv1alpha1.CFailedAndPausePhase:
-		return appsv1alpha1.OpsFailedPhase, 0, nil
+		return syncStatus(cli, reqCtx, opsRes, itemStatus, phase, appsv1alpha1.OpsFailedPhase, appsv1alpha1.ReasonReconfigureFailed)
 	case appsv1alpha1.CFinishedPhase:
-		return appsv1alpha1.OpsSucceedPhase, 0, nil
+		return syncStatus(cli, reqCtx, opsRes, itemStatus, phase, appsv1alpha1.OpsSucceedPhase, appsv1alpha1.ReasonReconfigureSucceed)
 	default:
-		return syncStatus(cli, reqCtx, opsRes, itemStatus, phase)
+		return syncStatus(cli, reqCtx, opsRes, itemStatus, phase, appsv1alpha1.OpsRunningPhase, appsv1alpha1.ReasonReconfigureRunning)
 	}
 }
 
@@ -220,19 +220,23 @@ func needReconfigure(request *appsv1alpha1.OpsRequest) bool {
 	return true
 }
 
-func syncStatus(cli client.Client, reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, status *appsv1alpha1.ConfigurationItemDetailStatus, phase appsv1alpha1.ConfigurationPhase) (appsv1alpha1.OpsPhase, time.Duration, error) {
+func syncStatus(cli client.Client,
+	reqCtx intctrlutil.RequestCtx,
+	opsRes *OpsResource,
+	status *appsv1alpha1.ConfigurationItemDetailStatus,
+	phase appsv1alpha1.ConfigurationPhase,
+	opsPhase appsv1alpha1.OpsPhase,
+	reconfigurePhase string) (appsv1alpha1.OpsPhase, time.Duration, error) {
 	opsDeepCopy := opsRes.OpsRequest.DeepCopy()
 	if err := patchReconfigureOpsStatus(opsRes, status.Name,
 		handleReconfigureStatusProgress(status.ReconcileDetail, &opsRes.OpsRequest.Status, phase)); err != nil {
 		return "", 30 * time.Second, err
 	}
 	if err := PatchOpsStatusWithOpsDeepCopy(reqCtx.Ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
-		appsv1alpha1.NewReconfigureRunningCondition(opsRes.OpsRequest,
-			appsv1alpha1.ReasonReconfigureRunning,
-			status.Name)); err != nil {
+		appsv1alpha1.NewReconfigureRunningCondition(opsRes.OpsRequest, reconfigurePhase, status.Name)); err != nil {
 		return "", 30 * time.Second, err
 	}
-	return appsv1alpha1.OpsRunningPhase, 30 * time.Second, nil
+	return opsPhase, 30 * time.Second, nil
 }
 
 func reconfiguringPhase(resource *intctrlutil.Fetcher,

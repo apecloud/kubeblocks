@@ -40,18 +40,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/postgres"
 )
 
-const (
-	ServiceType = "postgresql"
-	PRIMARY     = "primary"
-	SECONDARY   = "secondary"
-	MASTER      = "master"
-	SLAVE       = "slave"
-	LEADER      = "Leader"
-	FOLLOWER    = "Follower"
-	LEARNER     = "Learner"
-	CANDIDATE   = "Candidate"
-)
-
 type Manager struct {
 	postgres.Manager
 	syncStandbys   *postgres.PGStandby
@@ -183,7 +171,7 @@ func (mgr *Manager) IsLeaderWithHost(ctx context.Context, host string) (bool, er
 	}
 
 	mgr.Logger.Info(fmt.Sprintf("get member:%s role:%s", host, role))
-	return role == PRIMARY, nil
+	return role == engines.PRIMARY, nil
 }
 
 func (mgr *Manager) IsDBStartupReady() bool {
@@ -218,9 +206,9 @@ func (mgr *Manager) GetMemberRoleWithHost(ctx context.Context, host string) (str
 	}
 
 	if cast.ToBool(result[0]["pg_is_in_recovery"]) {
-		return SECONDARY, nil
+		return engines.SECONDARY, nil
 	} else {
-		return PRIMARY, nil
+		return engines.PRIMARY, nil
 	}
 }
 

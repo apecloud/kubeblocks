@@ -239,7 +239,7 @@ func TestGetMemberRoleWithHost(t *testing.T) {
 	ctx := context.TODO()
 	manager, mock, _ := MockDatabase(t)
 	defer mock.Close()
-	roles := []string{FOLLOWER, CANDIDATE, LEADER, LEARNER, ""}
+	roles := []string{engines.FOLLOWER, engines.CANDIDATE, engines.LEADER, engines.LEARNER, ""}
 
 	t.Run("query paxos role failed", func(t *testing.T) {
 		mock.ExpectQuery("select paxos_role from consensus_member_status;").

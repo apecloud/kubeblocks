@@ -34,18 +34,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/postgres"
 )
 
-const (
-	ServiceType = "postgresql"
-	PRIMARY     = "primary"
-	SECONDARY   = "secondary"
-	MASTER      = "master"
-	SLAVE       = "slave"
-	LEADER      = "Leader"
-	FOLLOWER    = "Follower"
-	LEARNER     = "Learner"
-	CANDIDATE   = "Candidate"
-)
-
 type Manager struct {
 	postgres.Manager
 	memberAddrs  []string
@@ -115,7 +103,7 @@ func (mgr *Manager) IsLeaderWithHost(ctx context.Context, host string) (bool, er
 		return false, errors.Errorf("check is leader with host:%s failed, err:%v", host, err)
 	}
 
-	return role == LEADER, nil
+	return role == engines.LEADER, nil
 }
 
 func (mgr *Manager) IsDBStartupReady() bool {
@@ -208,13 +196,13 @@ func (mgr *Manager) GetMemberRoleWithHost(ctx context.Context, host string) (str
 	var role string
 	switch cast.ToInt(resMap[0]["paxos_role"]) {
 	case 0:
-		role = FOLLOWER
+		role = engines.FOLLOWER
 	case 1:
-		role = CANDIDATE
+		role = engines.CANDIDATE
 	case 2:
-		role = LEADER
+		role = engines.LEADER
 	case 3:
-		role = LEARNER
+		role = engines.LEARNER
 	default:
 		mgr.Logger.Info(fmt.Sprintf("get invalid role number:%d", cast.ToInt(resMap[0]["paxos_role"])))
 		role = ""

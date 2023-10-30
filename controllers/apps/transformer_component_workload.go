@@ -88,7 +88,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 		return nil
 	}
 
-	obj, err := t.RSMObject(ctx, cluster, comp)
+	runningRSM, err := t.RSMObject(ctx, cluster, comp)
 	if err != nil {
 		return err
 	}
@@ -98,27 +98,25 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 
 	// build rsm workload
 	// TODO(xingran): BuildRSMWrapper relies on the deprecated fields of the component, for example component.WorkloadType, which should be removed in the future
-	rsm, err := factory.BuildRSMWrapper(cluster, synthesizeComp)
+	protoRSM, err := factory.BuildRSMWrapper(cluster, synthesizeComp)
 	if err != nil {
 		return err
 	}
 
 	// build configuration template annotations to rsm workload
-	buildRSMConfigTplAnnotations(rsm, synthesizeComp)
+	buildRSMConfigTplAnnotations(protoRSM, synthesizeComp)
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	if obj == nil {
-		if rsm == nil {
-			// do nothing
-		} else {
-			graphCli.Create(dag, rsm)
+	if runningRSM == nil {
+		if protoRSM != nil {
+			graphCli.Create(dag, protoRSM)
 			return nil
 		}
 	} else {
-		if rsm == nil {
-			graphCli.Delete(dag, obj)
+		if protoRSM == nil {
+			graphCli.Delete(dag, runningRSM)
 		} else {
-			err = t.handleUpdate(reqCtx, graphCli, dag, cluster, synthesizeComp, obj, rsm)
+			err = t.handleUpdate(reqCtx, graphCli, dag, cluster, synthesizeComp, runningRSM, protoRSM)
 		}
 	}
 	return err
@@ -139,14 +137,14 @@ func (t *componentWorkloadTransformer) RSMObject(ctx graph.TransformContext,
 }
 
 func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG,
-	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, rsm *workloads.ReplicatedStateMachine) error {
+	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, runningRSM, protoRSM *workloads.ReplicatedStateMachine) error {
 	// TODO(xingran): Some RSM workload operations should be moved down to Lorry implementation. Subsequent operations such as horizontal scaling will be removed from the component controller
-	if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, obj, rsm); err != nil {
+	if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, runningRSM, protoRSM); err != nil {
 		return err
 	}
 
-	objCopy := copyAndMerge(obj, rsm, cluster)
-	cli.Update(dag, obj, objCopy)
+	objCopy := copyAndMerge(runningRSM, protoRSM, cluster)
+	cli.Update(dag, runningRSM, objCopy)
 
 	// to work around that the scaled PVC will be deleted at object action.
 	newRsmObj, _ := objCopy.(*workloads.ReplicatedStateMachine)

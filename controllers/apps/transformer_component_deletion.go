@@ -20,14 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 // componentDeletionTransformer handles component deletion
@@ -44,7 +46,8 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	obj := transCtx.Component
 
-	ml := labelsForCompDelete(obj)
+	compShortName, err := component.ShortName(obj.Spec.Cluster, obj.Name)
+	ml := constant.GetComponentWellKnownLabels(obj.Spec.Cluster, compShortName)
 	snapshot, err := model.ReadCacheSnapshot(transCtx, obj, ml, kindsForCompDelete()...)
 	if err != nil {
 		return err
@@ -73,12 +76,4 @@ func kindsForCompDelete() []client.ObjectList {
 	kinds := compOwnedKinds()
 	kinds = append(kinds, &batchv1.JobList{})
 	return kinds
-}
-
-func labelsForCompDelete(comp *appsv1alpha1.Component) map[string]string {
-	return map[string]string{
-		constant.AppManagedByLabelKey:   constant.AppName,
-		constant.AppInstanceLabelKey:    comp.Spec.Cluster,
-		constant.KBAppComponentLabelKey: comp.Name,
-	}
 }

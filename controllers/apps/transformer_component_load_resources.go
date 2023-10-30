@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -63,10 +64,6 @@ func (t *componentLoadResourcesTransformer) Transform(ctx graph.TransformContext
 	if err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
-	if compDef.Status.Phase != appsv1alpha1.AvailablePhase {
-		message := fmt.Sprintf("ComponentDefinition referenced is unavailable: %s", compDef.Name)
-		return newRequeueError(requeueDuration, message)
-	}
 
 	transCtx.CompDef = compDef
 	transCtx.Cluster = cluster
@@ -97,6 +94,10 @@ func (t *componentLoadResourcesTransformer) getOrBuildCompDef(reqCtx ictrlutil.R
 		err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: transCtx.Component.Spec.CompDef}, compDef)
 		if err != nil {
 			return nil, err
+		}
+		if compDef.Status.Phase != appsv1alpha1.AvailablePhase {
+			message := fmt.Sprintf("ComponentDefinition referenced is unavailable: %s", compDef.Name)
+			return nil, errors.New(message)
 		}
 	}
 	return compDef, nil

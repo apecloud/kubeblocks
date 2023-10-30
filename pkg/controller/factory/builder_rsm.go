@@ -34,14 +34,8 @@ import (
 
 // BuildRSMWrapper builds a ReplicatedStateMachine object based on Cluster, SynthesizedComponent.
 func BuildRSMWrapper(cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
-	if synthesizeComp.ClusterCompDefName == "" {
-		// build rsm from new ClusterDefinition API, and convert componentDefinition attributes to rsm attributes.
-		return BuildRSMFromConvertor(cluster, synthesizeComp)
-	}
-
-	// build rsm from old ClusterDefinition API
-	// TODO(xingran): it will be deprecated in the future.
-	return BuildRSM(cluster, synthesizeComp)
+	// build rsm from new ClusterDefinition API, and convert componentDefinition attributes to rsm attributes.
+	return BuildRSMFromConvertor(cluster, synthesizeComp)
 }
 
 // BuildRSMFromConvertor builds a ReplicatedStateMachine object based on the new ComponentDefinition and Component API, and does not depend on the deprecated fields in the SynthesizedComponent.

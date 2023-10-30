@@ -21,7 +21,6 @@ package component
 
 import (
 	"fmt"
-
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -307,31 +306,40 @@ func (c *compDefConnCredentialsConvertor) convert(args ...any) (any, error) {
 
 func (c *compDefUpdateStrategyConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	var compDefUpdateStrategy *appsv1alpha1.UpdateStrategy
 	switch clusterCompDef.WorkloadType {
 	case appsv1alpha1.Consensus:
-		if clusterCompDef.ConsensusSpec == nil {
-			return nil, nil
+		if clusterCompDef.ConsensusSpec != nil {
+			updateStrategy := &clusterCompDef.ConsensusSpec.UpdateStrategy
+			compDefUpdateStrategy = updateStrategy
+		} else {
+			updateStrategy := appsv1alpha1.BestEffortParallelStrategy
+			compDefUpdateStrategy = &updateStrategy
 		}
-		return &clusterCompDef.ConsensusSpec.UpdateStrategy, nil
 	case appsv1alpha1.Replication:
-		if clusterCompDef.ReplicationSpec == nil {
-			return nil, nil
+		if clusterCompDef.ReplicationSpec != nil {
+			updateStrategy := &clusterCompDef.ReplicationSpec.UpdateStrategy
+			compDefUpdateStrategy = updateStrategy
+		} else {
+			updateStrategy := appsv1alpha1.BestEffortParallelStrategy
+			compDefUpdateStrategy = &updateStrategy
 		}
-		return &clusterCompDef.ReplicationSpec.UpdateStrategy, nil
 	case appsv1alpha1.Stateful:
-		if clusterCompDef.StatefulSpec == nil {
-			return nil, nil
+		if clusterCompDef.StatefulSpec != nil {
+			updateStrategy := &clusterCompDef.StatefulSpec.UpdateStrategy
+			compDefUpdateStrategy = updateStrategy
+		} else {
+			updateStrategy := appsv1alpha1.BestEffortParallelStrategy
+			compDefUpdateStrategy = &updateStrategy
 		}
-		return &clusterCompDef.StatefulSpec.UpdateStrategy, nil
 	case appsv1alpha1.Stateless:
-		if clusterCompDef.StatelessSpec == nil {
-			return nil, nil
-		}
-		// TODO: check the UpdateStrategy
-		return &clusterCompDef.StatelessSpec.UpdateStrategy.Type, nil
+		// TODO: check the UpdateStrategy of stateless
+		updateStrategy := appsv1alpha1.BestEffortParallelStrategy
+		compDefUpdateStrategy = &updateStrategy
 	default:
 		panic(fmt.Sprintf("unknown workload type: %s", clusterCompDef.WorkloadType))
 	}
+	return compDefUpdateStrategy, nil
 }
 
 func (c *compDefRolesConvertor) convert(args ...any) (any, error) {

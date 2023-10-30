@@ -21,23 +21,23 @@ package apps
 
 import (
 	"context"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"time"
-
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -124,26 +124,25 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		AddTransformer(
 			// handle component deletion first
 			&componentDeletionTransformer{},
+			// handle finalizers and referenced definition labels
 			&componentMetaTransformer{},
-			// validate referenced componentDefinition objects existence and availability, and build synthesized component
-			&componentLoadResourcesTransformer{},
-			// do spec & definition consistency validation
+			// validate referenced componentDefinition objects, and build synthesized component
+			&componentLoadResourcesTransformer{Client: r.Client},
+			// do validation for the spec & definition consistency
 			&componentValidationTransformer{},
-			// handle the component PDB
+			// handle component PDB
 			&componentPDBTransformer{},
-			// handle the component services
+			// handle component services
 			&componentServiceTransformer{},
-			// handle the connection credentials
+			// handle component connection credentials
 			&componentCredentialTransformer{},
 			// handle tls volume and cert
 			&componentTLSTransformer{},
-			// render the component configurations
+			// render component configurations
 			&componentConfigurationTransformer{Client: r.Client},
-			// TODO(component): handle restore before component transformer
-			&componentRestoreTransformer{},
 			// handle the component workload
 			&componentWorkloadTransformer{Client: r.Client},
-			// TODO(component): transform backupPolicyTemplate to backuppolicy.dataprotection.kubeblocks.io and backupschedule.dataprotection.kubeblocks.io
+			// generate backuppolicy and backupschedule from backupPolicyTemplate
 			&componentBackupPolicyTransformer{},
 			// handle RBAC for component workloads
 			&componentRBACTransformer{},

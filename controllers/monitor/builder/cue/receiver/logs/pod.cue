@@ -20,41 +20,41 @@ parameters: {
 }
 
 output: {
-  "filelog/pod": {
-  	include: parameters.include
-   	include_file_name: true
-   	include_file_path: true
-   	start_at: "beginning"
-   	storage: "file_storage/oteld"
-   	resource: {
-   		type: "pods"
-   	  "'loki.resource.labels'": "host_name, host_ip"
-   	  "'loki.format'": "raw"
-   	}
-   	attributes:
-   	  "'loki.attribute.labels'": "namespace, pod, pod_id, container, restart_num, log.file.path, log.file.name"
-   	retry_on_failure: {
-   		enabled: true
-   	  initial_interval: "5s"
-   	}
-   	operators: [
-   		{
-   			type: "add"
-   	    field: "resource.host_name"
-   	    value: "'EXPR(env(\"PWD\"))'"
-   	  },
-   		{
-   			type: "add"
-   	    field: "resource.host_ip"
-   	    value: "'EXPR(env(\"PWD\"))'"
-   	  },
-   		{
-   			type: "regex_parser"
-   	    id: "parser_pods_logs_dir"
-   	    parse_from: "attributes['log.file.path']"
-   	    regex: "'^/var/log/pods/(?P<namespace>[^_]+)_(?P<pod>[^_]+)_(?P<pod_id>[^_]+)/(?P<container>[^/]+)/(?P<restart_num>\\d+).log$'"
-   	    on_error: "send"
-   	  },
-   	]
-  }
+	"filelog/pod": {
+		include:           parameters.include
+		include_file_name: true
+		include_file_path: true
+		start_at:          "beginning"
+		storage:           "file_storage/oteld"
+		resource: {
+			type:                   "pods"
+			"loki.resource.labels": "host_name, host_ip"
+			"loki.format":          "raw"
+		}
+		attributes:
+			"loki.attribute.labels": "namespace, pod, pod_id, container, restart_num, log.file.path, log.file.name"
+		retry_on_failure: {
+			enabled:          true
+			initial_interval: "5s"
+		}
+		operators: [
+			{
+				type:  "add"
+				field: "resource.host_name"
+				value: "EXPR(env(\"PWD\"))"
+			},
+			{
+				type:  "add"
+				field: "resource.host_ip"
+				value: "EXPR(env(\"PWD\"))"
+			},
+			{
+				type:       "regex_parser"
+				id:         "parser_pods_logs_dir"
+				parse_from: "attributes['log.file.path']"
+				regex:      "^/var/log/pods/(?P<namespace>[^_]+)_(?P<pod>[^_]+)_(?P<pod_id>[^_]+)/(?P<container>[^/]+)/(?P<restart_num>\\d+).log$"
+				on_error:   "send"
+			},
+		]
+	}
 }

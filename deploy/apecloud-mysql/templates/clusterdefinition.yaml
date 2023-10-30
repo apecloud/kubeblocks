@@ -519,6 +519,8 @@ spec:
                     optional: false
               - name: CELL
                 value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
+              - name: SERVICE_PORT
+                value: "15001"
               - name: VTGATE_MYSQL_PORT
                 value: "15306"
               - name: VTGATE_WEB_PORT

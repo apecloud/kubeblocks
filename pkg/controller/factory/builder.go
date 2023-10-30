@@ -729,7 +729,7 @@ func BuildRestoreJob(cluster *appsv1alpha1.Cluster, synthesizedComponent *compon
 	}
 	compSpec := cluster.Spec.GetComponentByName(synthesizedComponent.Name)
 	if compSpec != nil {
-		tolerations, err := component.BuildTolerations(cluster, compSpec.Tolerations)
+		tolerations, err := component.BuildTolerations(cluster, compSpec)
 		if err != nil {
 			return nil, err
 		}

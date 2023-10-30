@@ -342,7 +342,7 @@ func buildDataScriptJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, clust
 		// add labels
 		job.Labels = getDataScriptJobLabels(cluster.Name, component.Name, ops.Name)
 		// add tolerations
-		tolerations, err := componetutil.BuildTolerations(cluster, component.Tolerations)
+		tolerations, err := componetutil.BuildTolerations(cluster, component)
 		if err != nil {
 			return nil, &FastFaileError{message: err.Error()}
 		}

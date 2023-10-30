@@ -231,12 +231,12 @@ func (r *RestoreManager) buildSchedulingSpec(comp *component.SynthesizedComponen
 	var err error
 	schedulingSpec := dpv1alpha1.SchedulingSpec{}
 	compSpec := r.Cluster.Spec.GetComponentByName(comp.Name)
-	affinity := component.BuildAffinity(r.Cluster, compSpec.Affinity)
-	if schedulingSpec.Affinity, err = component.BuildPodAffinity(r.Cluster, affinity, comp); err != nil {
+	affinity := component.BuildAffinity(r.Cluster, compSpec)
+	if schedulingSpec.Affinity, err = component.BuildPodAffinity(r.Cluster.Name, comp.Name, affinity); err != nil {
 		return schedulingSpec, err
 	}
-	schedulingSpec.TopologySpreadConstraints = component.BuildPodTopologySpreadConstraints(r.Cluster, affinity, comp)
-	if schedulingSpec.Tolerations, err = component.BuildTolerations(r.Cluster, compSpec.Tolerations); err != nil {
+	schedulingSpec.TopologySpreadConstraints = component.BuildPodTopologySpreadConstraints(r.Cluster.Name, comp.Name, affinity)
+	if schedulingSpec.Tolerations, err = component.BuildTolerations(r.Cluster, compSpec); err != nil {
 		return schedulingSpec, err
 	}
 	return schedulingSpec, nil

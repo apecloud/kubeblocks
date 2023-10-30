@@ -336,7 +336,7 @@ func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, co
 	// add toleration
 	clusterComp := cluster.Spec.GetComponentByName(compKey.componentName)
 	if clusterComp != nil {
-		tolerations, err := componetutil.BuildTolerations(cluster, clusterComp.Tolerations)
+		tolerations, err := componetutil.BuildTolerations(cluster, clusterComp)
 		if err != nil {
 			return err
 		}

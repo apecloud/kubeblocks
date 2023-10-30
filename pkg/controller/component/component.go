@@ -49,10 +49,15 @@ func ShortName(clusterName, compName string) (string, error) {
 // BuildProtoComponent builds a new Component object from cluster component spec and definition.
 func BuildProtoComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.Component, error) {
 	compName := FullName(cluster.Name, clusterCompSpec.Name)
+	affinities := BuildAffinity(cluster, clusterCompSpec)
+	tolerations, err := BuildTolerations(cluster, clusterCompSpec)
+	if err != nil {
+		return nil, err
+	}
 	builder := builder.NewComponentBuilder(cluster.Namespace, compName, cluster.Name, clusterCompSpec.ComponentDef).
 		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, clusterCompSpec.Name)).
-		SetAffinity(clusterCompSpec.Affinity).
-		SetTolerations(clusterCompSpec.Tolerations).
+		SetAffinity(affinities).
+		SetTolerations(tolerations).
 		SetReplicas(clusterCompSpec.Replicas).
 		SetResources(clusterCompSpec.Resources).
 		SetMonitor(clusterCompSpec.Monitor).

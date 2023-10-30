@@ -104,7 +104,7 @@ func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	}
 
 	// build affinity and tolerations
-	if err := buildAffinitiesAndTolerations(cluster, synthesizeComp, comp); err != nil {
+	if err := buildAffinitiesAndTolerations(comp, synthesizeComp); err != nil {
 		reqCtx.Log.Error(err, "build affinities and tolerations failed.")
 		return nil, err
 	}
@@ -155,16 +155,15 @@ func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 }
 
 // buildAffinitiesAndTolerations builds affinities and tolerations for component.
-func buildAffinitiesAndTolerations(cluster *appsv1alpha1.Cluster, synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
-	var err error
-	affinity := BuildAffinity(cluster, comp.Spec.Affinity)
-	if synthesizeComp.PodSpec.Affinity, err = BuildPodAffinity(cluster, affinity, synthesizeComp); err != nil {
+func buildAffinitiesAndTolerations(comp *appsv1alpha1.Component, synthesizeComp *SynthesizedComponent) error {
+	podAffinity, err := BuildPodAffinity(synthesizeComp.ClusterName, synthesizeComp.Name, comp.Spec.Affinity)
+	if err != nil {
 		return err
 	}
-	synthesizeComp.PodSpec.TopologySpreadConstraints = BuildPodTopologySpreadConstraints(cluster, affinity, synthesizeComp)
-	if synthesizeComp.PodSpec.Tolerations, err = BuildTolerations(cluster, comp.Spec.Tolerations); err != nil {
-		return err
-	}
+	synthesizeComp.PodSpec.Affinity = podAffinity
+	synthesizeComp.PodSpec.TopologySpreadConstraints =
+		BuildPodTopologySpreadConstraints(synthesizeComp.ClusterName, synthesizeComp.Name, comp.Spec.Affinity)
+	synthesizeComp.PodSpec.Tolerations = comp.Spec.Tolerations
 	return nil
 }
 

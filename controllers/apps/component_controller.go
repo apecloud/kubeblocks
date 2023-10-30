@@ -142,8 +142,6 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentConfigurationTransformer{Client: r.Client},
 			// handle the component workload
 			&componentWorkloadTransformer{Client: r.Client},
-			// generate backuppolicy and backupschedule from backupPolicyTemplate
-			&componentBackupPolicyTransformer{},
 			// handle RBAC for component workloads
 			&componentRBACTransformer{},
 			// add our finalizer to all objects

@@ -144,6 +144,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&ClusterRestoreTransformer{Client: r.Client},
 			// create all cluster components objects
 			&ClusterComponentTransformer{Client: r.Client},
+			// build backuppolicy and backupschedule from backupPolicyTemplate
+			&clusterBackupPolicyTransformer{},
 			// add our finalizer to all objects
 			&ClusterOwnershipTransformer{},
 			// make all workload objects depending on credential secret

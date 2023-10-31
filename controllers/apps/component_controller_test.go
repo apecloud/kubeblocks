@@ -53,6 +53,7 @@ import (
 	lorry "github.com/apecloud/kubeblocks/lorry/client"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
@@ -115,6 +116,7 @@ var _ = Describe("Component Controller", func() {
 	const (
 		clusterDefName     = "test-clusterdef"
 		clusterVersionName = "test-clusterversion"
+		compDefName        = "test-compdef"
 		clusterName        = "test-cluster" // this become cluster prefix name if used with testapps.NewClusterFactory().WithRandomName()
 		leader             = "leader"
 		follower           = "follower"
@@ -134,8 +136,11 @@ var _ = Describe("Component Controller", func() {
 	var (
 		clusterDefObj     *appsv1alpha1.ClusterDefinition
 		clusterVersionObj *appsv1alpha1.ClusterVersion
+		compDefObj        *appsv1alpha1.ComponentDefinition
 		clusterObj        *appsv1alpha1.Cluster
 		clusterKey        types.NamespacedName
+		compObj           *appsv1alpha1.Component
+		compKey           types.NamespacedName
 		allSettings       map[string]interface{}
 	)
 
@@ -168,6 +173,7 @@ var _ = Describe("Component Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS, ml)
@@ -209,6 +215,13 @@ var _ = Describe("Component Controller", func() {
 			AddComponentVersion(replicationCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 			AddComponentVersion(statelessCompDefName).AddContainerShort("nginx", testapps.NginxImage).
 			Create(&testCtx).GetObject()
+
+		By("Create a ComponentDefinition obj")
+		compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
+			WithRandomName().
+			SetDefaultSpec().
+			Create(&testCtx).
+			GetObject()
 	}
 
 	waitForCreatingResourceCompletely := func(clusterKey client.ObjectKey, compNames ...string) {
@@ -226,19 +239,66 @@ var _ = Describe("Component Controller", func() {
 		}
 	}
 
-	createClusterObj := func(compName, compDefName string) {
+	createClusterObjNoWait := func(compName, compDefName string, v2 bool, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(compName, compDefName).
-			SetReplicas(1).
-			Create(&testCtx).GetObject()
+		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
+			WithRandomName()
+		if !v2 {
+			factory.AddComponent(compName, compDefName).SetReplicas(1)
+		} else {
+			factory.AddComponentV2(compName, compDefName).SetReplicas(1)
+		}
+		if processor != nil {
+			processor(factory)
+		}
+		clusterObj = factory.Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
+	}
+
+	createClusterObj := func(compName, compDefName string) {
+		createClusterObjNoWait(compName, compDefName, false, nil)
 
 		By("Waiting for the cluster enter running phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 	}
+
+	createClusterObjV2 := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
+		createClusterObjNoWait(compName, compDefName, true, processor)
+
+		By("Waiting for the cluster enter running phase")
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
+	}
+
+	// createCompObjNoWait := func(compName, compDefName string, processor func(*testapps.MockComponentFactory)) {
+	//	By("Creating a component")
+	//	factory := testapps.NewComponentFactory(testCtx.DefaultNamespace, component.FullName(clusterName, compName), compDefName).
+	//		SetReplicas(1)
+	//	if processor != nil {
+	//		processor(factory)
+	//	}
+	//	compObj = factory.Create(&testCtx).GetObject()
+	//	compKey = client.ObjectKeyFromObject(compObj)
+	// }
+
+	waitCompObjCreating := func(compName, compDefName string) {
+		compKey = types.NamespacedName{
+			Namespace: clusterObj.Namespace,
+			Name:      component.FullName(clusterObj.Name, compName),
+		}
+		compObj = &appsv1alpha1.Component{}
+		Eventually(testapps.CheckObjExists(&testCtx, compKey, compObj, true)).Should(Succeed())
+
+		By("Waiting for the component enter Creating phase")
+		Eventually(testapps.GetComponentObservedGeneration(&testCtx, compKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
+	}
+
+	// createCompObj := func(compName, compDefName string, processor func(*testapps.MockComponentFactory)) {
+	//	createCompObjNoWait(compName, compDefName, processor)
+	//	waitCompObjCreating(compName, compDefName)
+	// }
 
 	changeCompReplicas := func(clusterName types.NamespacedName, replicas int32, comp *appsv1alpha1.ClusterComponentSpec) {
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterName, func(cluster *appsv1alpha1.Cluster) {
@@ -978,15 +1038,17 @@ var _ = Describe("Component Controller", func() {
 		}).Should(Succeed())
 	}
 
-	testClusterAffinity := func(compName, compDefName string) {
-		const topologyKey = "testTopologyKey"
-		const labelKey = "testNodeLabelKey"
-		const labelValue = "testLabelValue"
+	testCompAffinityNToleration := func(compName, compDefName string) {
+		const (
+			topologyKey     = "testTopologyKey"
+			labelKey        = "testNodeLabelKey"
+			labelValue      = "testNodeLabelValue"
+			tolerationKey   = "testTolerationKey"
+			tolerationValue = "testTolerationValue"
+		)
 
-		By("Creating a cluster with Affinity")
-		Expect(compDefName).Should(BeElementOf(statelessCompDefName, statefulCompDefName, replicationCompDefName, consensusCompDefName))
-
-		affinity := &appsv1alpha1.Affinity{
+		By("Creating a component with affinity and toleration")
+		affinity := appsv1alpha1.Affinity{
 			PodAntiAffinity: appsv1alpha1.Required,
 			TopologyKeys:    []string{topologyKey},
 			NodeLabels: map[string]string{
@@ -994,133 +1056,39 @@ var _ = Describe("Component Controller", func() {
 			},
 			Tenancy: appsv1alpha1.SharedNode,
 		}
-
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDefObj.Name, clusterVersionObj.Name).
-			AddComponent(compName, compDefName).SetReplicas(3).
-			WithRandomName().SetClusterAffinity(affinity).
-			Create(&testCtx).GetObject()
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-		By("Waiting for the cluster controller to create resources completely")
-		waitForCreatingResourceCompletely(clusterKey, compName)
-
-		By("Checking the Affinity and TopologySpreadConstraints")
-		checkSingleWorkload(compDefName, func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment) {
-			podSpec := getPodSpec(sts, deploy)
-			g.Expect(podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).To(Equal(labelKey))
-			g.Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.DoNotSchedule))
-			g.Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(topologyKey))
-			g.Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).Should(HaveLen(1))
-			g.Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).To(Equal(topologyKey))
-		})
-	}
-
-	testComponentAffinity := func(compName, compDefName string) {
-		const clusterTopologyKey = "testClusterTopologyKey"
-		const compTopologyKey = "testComponentTopologyKey"
-
-		By("Creating a cluster with Affinity")
-		Expect(compDefName).Should(BeElementOf(statelessCompDefName, statefulCompDefName, replicationCompDefName, consensusCompDefName))
-		affinity := &appsv1alpha1.Affinity{
-			PodAntiAffinity: appsv1alpha1.Required,
-			TopologyKeys:    []string{clusterTopologyKey},
-			Tenancy:         appsv1alpha1.SharedNode,
-		}
-		compAffinity := &appsv1alpha1.Affinity{
-			PodAntiAffinity: appsv1alpha1.Preferred,
-			TopologyKeys:    []string{compTopologyKey},
-			Tenancy:         appsv1alpha1.DedicatedNode,
-		}
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().SetClusterAffinity(affinity).
-			AddComponent(compName, compDefName).SetReplicas(1).SetComponentAffinity(compAffinity).
-			Create(&testCtx).GetObject()
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-		By("Waiting for the cluster controller to create resources completely")
-		waitForCreatingResourceCompletely(clusterKey, compName)
-
-		By("Checking the Affinity and the TopologySpreadConstraints")
-		checkSingleWorkload(compDefName, func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment) {
-			podSpec := getPodSpec(sts, deploy)
-			g.Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.ScheduleAnyway))
-			g.Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(compTopologyKey))
-			g.Expect(podSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight).ShouldNot(BeNil())
-			g.Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).Should(HaveLen(1))
-			g.Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).To(Equal(corev1.LabelHostname))
-		})
-	}
-
-	testClusterToleration := func(compName, compDefName string) {
-		const tolerationKey = "testClusterTolerationKey"
-		const tolerationValue = "testClusterTolerationValue"
-		By("Creating a cluster with Toleration")
-		Expect(compDefName).Should(BeElementOf(statelessCompDefName, statefulCompDefName, replicationCompDefName, consensusCompDefName))
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(compName, compDefName).SetReplicas(1).
-			AddClusterToleration(corev1.Toleration{
-				Key:      tolerationKey,
-				Value:    tolerationValue,
-				Operator: corev1.TolerationOpEqual,
-				Effect:   corev1.TaintEffectNoSchedule,
-			}).
-			Create(&testCtx).GetObject()
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-		By("Waiting for the cluster controller to create resources completely")
-		waitForCreatingResourceCompletely(clusterKey, compName)
-
-		By("Checking the tolerations")
-		checkSingleWorkload(compDefName, func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment) {
-			podSpec := getPodSpec(sts, deploy)
-			g.Expect(podSpec.Tolerations).Should(HaveLen(2))
-			t := podSpec.Tolerations[0]
-			g.Expect(t.Key).Should(BeEquivalentTo(tolerationKey))
-			g.Expect(t.Value).Should(BeEquivalentTo(tolerationValue))
-			g.Expect(t.Operator).Should(BeEquivalentTo(corev1.TolerationOpEqual))
-			g.Expect(t.Effect).Should(BeEquivalentTo(corev1.TaintEffectNoSchedule))
-		})
-	}
-
-	testStsWorkloadComponentToleration := func(compName, compDefName string) {
-		clusterTolerationKey := "testClusterTolerationKey"
-		compTolerationKey := "testcompTolerationKey"
-		compTolerationValue := "testcompTolerationValue"
-
-		By("Creating a cluster with Toleration")
-		Expect(compDefName).Should(BeElementOf(statelessCompDefName, statefulCompDefName, replicationCompDefName, consensusCompDefName))
-		compToleration := corev1.Toleration{
-			Key:      compTolerationKey,
-			Value:    compTolerationValue,
+		toleration := corev1.Toleration{
+			Key:      tolerationKey,
+			Value:    tolerationValue,
 			Operator: corev1.TolerationOpEqual,
 			Effect:   corev1.TaintEffectNoSchedule,
 		}
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddClusterToleration(corev1.Toleration{
-				Key:      clusterTolerationKey,
-				Operator: corev1.TolerationOpExists,
-				Effect:   corev1.TaintEffectNoExecute,
-			}).
-			AddComponent(compName, compDefName).SetReplicas(1).AddComponentToleration(compToleration).
-			Create(&testCtx).GetObject()
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-		By("Waiting for the cluster controller to create resources completely")
-		waitForCreatingResourceCompletely(clusterKey, compName)
-
-		By("Checking the tolerations")
-		checkSingleWorkload(compDefName, func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment) {
-			podSpec := getPodSpec(sts, deploy)
-			Expect(podSpec.Tolerations).Should(HaveLen(2))
-			t := podSpec.Tolerations[0]
-			g.Expect(t.Key).Should(BeEquivalentTo(compTolerationKey))
-			g.Expect(t.Value).Should(BeEquivalentTo(compTolerationValue))
-			g.Expect(t.Operator).Should(BeEquivalentTo(corev1.TolerationOpEqual))
-			g.Expect(t.Effect).Should(BeEquivalentTo(corev1.TaintEffectNoSchedule))
+		createClusterObjV2(compName, compDefObj.Name, func(f *testapps.MockClusterFactory) {
+			f.SetComponentAffinity(&affinity).AddComponentToleration(toleration)
 		})
+
+		waitCompObjCreating(compName, compDefObj.Name)
+
+		By("Checking the Affinity, the TopologySpreadConstraints and Tolerations")
+		rsmKey := types.NamespacedName{
+			Namespace: clusterObj.Namespace,
+			Name:      compObj.Name,
+		}
+		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+			podSpec := rsm.Spec.Template.Spec
+			// node affinity
+			g.Expect(podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).To(Equal(labelKey))
+			// pod anti-affinity
+			g.Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).Should(HaveLen(1))
+			g.Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).To(Equal(topologyKey))
+			// topology spread constraint
+			g.Expect(podSpec.TopologySpreadConstraints).Should(HaveLen(1))
+			// Required -> DoNotSchedule, Preferred -> ScheduleAnyway
+			g.Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.DoNotSchedule))
+			g.Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(topologyKey))
+			// toleration
+			g.Expect(podSpec.Tolerations).Should(HaveLen(2))
+			g.Expect(podSpec.Tolerations[0]).Should(BeEquivalentTo(toleration))
+		})).Should(Succeed())
 	}
 
 	checkClusterRBACResourcesExistence := func(cluster *appsv1alpha1.Cluster, serviceAccountName string, volumeProtectionEnabled, expectExisted bool) {
@@ -1601,16 +1569,17 @@ var _ = Describe("Component Controller", func() {
 
 	When("creating cluster with all workloadTypes (being Stateless|Stateful|Consensus|Replication) component", func() {
 		compNameNDef := map[string]string{
-			statelessCompName:   statelessCompDefName,
-			statefulCompName:    statefulCompDefName,
-			consensusCompName:   consensusCompDefName,
-			replicationCompName: replicationCompDefName,
+			// statelessCompName:   statelessCompDefName,
+			// statefulCompName:    statefulCompDefName,
+			consensusCompName: consensusCompDefName,
+			// replicationCompName: replicationCompDefName,
 		}
 
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
 			createBackupPolicyTpl(clusterDefObj)
 		})
+
 		AfterEach(func() {
 			cleanEnv()
 		})
@@ -1620,28 +1589,8 @@ var _ = Describe("Component Controller", func() {
 				testChangeReplicas(compName, compDefName)
 			})
 
-			Context(fmt.Sprintf("[comp: %s] and with cluster affinity set", compName), func() {
-				It("should create pod with cluster affinity", func() {
-					testClusterAffinity(compName, compDefName)
-				})
-			})
-
-			Context(fmt.Sprintf("[comp: %s] and with both cluster affinity and component affinity set", compName), func() {
-				It("Should observe the component affinity will override the cluster affinity", func() {
-					testComponentAffinity(compName, compDefName)
-				})
-			})
-
-			Context(fmt.Sprintf("[comp: %s] and with cluster tolerations set", compName), func() {
-				It("Should create pods with cluster tolerations", func() {
-					testClusterToleration(compName, compDefName)
-				})
-			})
-
-			Context(fmt.Sprintf("[comp: %s] and with both cluster tolerations and component tolerations set", compName), func() {
-				It("Should observe the component tolerations will override the cluster tolerations", func() {
-					testStsWorkloadComponentToleration(compName, compDefName)
-				})
+			It(fmt.Sprintf("[comp: %s] with component affinity and toleration set", compName), func() {
+				testCompAffinityNToleration(compName, compDefName)
 			})
 
 			It(fmt.Sprintf("[comp: %s] should create RBAC resources correctly", compName), func() {

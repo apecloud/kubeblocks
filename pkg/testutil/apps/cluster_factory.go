@@ -67,6 +67,15 @@ func (factory *MockClusterFactory) AddComponent(compName string, compDefName str
 	return factory
 }
 
+func (factory *MockClusterFactory) AddComponentV2(compName string, compDefName string) *MockClusterFactory {
+	comp := appsv1alpha1.ClusterComponentSpec{
+		Name:         compName,
+		ComponentDef: compDefName,
+	}
+	factory.Get().Spec.ComponentSpecs = append(factory.Get().Spec.ComponentSpecs, comp)
+	return factory
+}
+
 func (factory *MockClusterFactory) AddClusterService(service appsv1alpha1.ClusterService) *MockClusterFactory {
 	services := factory.Get().Spec.Services
 	if len(services) == 0 {

@@ -36,6 +36,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
@@ -199,6 +200,125 @@ var _ = Describe("Cluster Controller", func() {
 			}
 		}
 		g.Expect(len(expectServices)).Should(Equal(len(svcList.Items)))
+	}
+
+	testClusterAffinityNToleration := func(compName, compDefName string) {
+		const (
+			clusterTopologyKey     = "testClusterTopologyKey"
+			clusterLabelKey        = "testClusterNodeLabelKey"
+			clusterLabelValue      = "testClusterNodeLabelValue"
+			clusterTolerationKey   = "testClusterTolerationKey"
+			clusterTolerationValue = "testClusterTolerationValue"
+		)
+
+		Expect(compDefName).Should(BeElementOf(statelessCompDefName, statefulCompDefName, replicationCompDefName, consensusCompDefName))
+
+		By("Creating a cluster with Affinity and Toleration")
+		affinity := appsv1alpha1.Affinity{
+			PodAntiAffinity: appsv1alpha1.Required,
+			TopologyKeys:    []string{clusterTopologyKey},
+			NodeLabels: map[string]string{
+				clusterLabelKey: clusterLabelValue,
+			},
+			Tenancy: appsv1alpha1.SharedNode,
+		}
+		toleration := corev1.Toleration{
+			Key:      clusterTolerationKey,
+			Value:    clusterTolerationValue,
+			Operator: corev1.TolerationOpEqual,
+			Effect:   corev1.TaintEffectNoSchedule,
+		}
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
+			WithRandomName().
+			AddComponent(compName, compDefName).SetReplicas(1).
+			SetClusterAffinity(&affinity).
+			AddClusterToleration(toleration).
+			Create(&testCtx).
+			GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		By("Waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, compName)
+
+		By("Checking the Affinity and Toleration")
+		compKey := types.NamespacedName{
+			Namespace: clusterObj.Namespace,
+			Name:      component.FullName(clusterObj.Name, compName),
+		}
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
+			g.Expect(*comp.Spec.Affinity).Should(BeEquivalentTo(affinity))
+			g.Expect(comp.Spec.Tolerations).Should(HaveLen(2))
+			g.Expect(comp.Spec.Tolerations[0]).Should(BeEquivalentTo(toleration))
+		})).Should(Succeed())
+	}
+
+	testComponentAffinityNToleration := func(compName, compDefName string) {
+		const (
+			clusterTopologyKey     = "testClusterTopologyKey"
+			clusterLabelKey        = "testClusterNodeLabelKey"
+			clusterLabelValue      = "testClusterNodeLabelValue"
+			compTopologyKey        = "testCompTopologyKey"
+			compLabelKey           = "testCompNodeLabelKey"
+			compLabelValue         = "testCompNodeLabelValue"
+			clusterTolerationKey   = "testClusterTolerationKey"
+			clusterTolerationValue = "testClusterTolerationValue"
+			compTolerationKey      = "testCompTolerationKey"
+			compTolerationValue    = "testCompTolerationValue"
+		)
+
+		Expect(compDefName).Should(BeElementOf(statelessCompDefName, statefulCompDefName, replicationCompDefName, consensusCompDefName))
+
+		By("Creating a cluster with Affinity and Toleration")
+		affinity := appsv1alpha1.Affinity{
+			PodAntiAffinity: appsv1alpha1.Required,
+			TopologyKeys:    []string{clusterTopologyKey},
+			NodeLabels: map[string]string{
+				clusterLabelKey: clusterLabelValue,
+			},
+			Tenancy: appsv1alpha1.SharedNode,
+		}
+		compAffinity := appsv1alpha1.Affinity{
+			PodAntiAffinity: appsv1alpha1.Preferred,
+			TopologyKeys:    []string{compTopologyKey},
+			NodeLabels: map[string]string{
+				compLabelKey: compLabelValue,
+			},
+			Tenancy: appsv1alpha1.DedicatedNode,
+		}
+		toleration := corev1.Toleration{
+			Key:      clusterTolerationKey,
+			Value:    clusterTolerationValue,
+			Operator: corev1.TolerationOpEqual,
+			Effect:   corev1.TaintEffectNoSchedule,
+		}
+		compToleration := corev1.Toleration{
+			Key:      compTolerationKey,
+			Value:    compTolerationValue,
+			Operator: corev1.TolerationOpEqual,
+			Effect:   corev1.TaintEffectNoSchedule,
+		}
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
+			WithRandomName().
+			AddComponent(compName, compDefName).SetReplicas(1).SetComponentAffinity(&compAffinity).AddComponentToleration(compToleration).
+			SetClusterAffinity(&affinity).
+			AddClusterToleration(toleration).
+			Create(&testCtx).
+			GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		By("Waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, compName)
+
+		By("Checking the Affinity and Toleration")
+		compKey := types.NamespacedName{
+			Namespace: clusterObj.Namespace,
+			Name:      component.FullName(clusterObj.Name, compName),
+		}
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
+			g.Expect(*comp.Spec.Affinity).Should(BeEquivalentTo(compAffinity))
+			g.Expect(comp.Spec.Tolerations).Should(HaveLen(2))
+			g.Expect(comp.Spec.Tolerations[0]).Should(BeEquivalentTo(compToleration))
+		})).Should(Succeed())
 	}
 
 	testServiceCreateAndDelete := func(compName, compDefName string) {
@@ -550,6 +670,14 @@ var _ = Describe("Cluster Controller", func() {
 
 			It(fmt.Sprintf("[comp: %s] should delete cluster resources immediately if deleting cluster with terminationPolicy=WipeOut", compName), func() {
 				testWipeOut(compName, compDefName)
+			})
+
+			It(fmt.Sprintf("[comp: %s] with cluster affinity and tolerations set", compName), func() {
+				testClusterAffinityNToleration(compName, compDefName)
+			})
+
+			It(fmt.Sprintf("[comp: %s] with both cluster and component affinity and tolerations set", compName), func() {
+				testComponentAffinityNToleration(compName, compDefName)
 			})
 
 			It(fmt.Sprintf("[comp: %s] should create and delete service correctly", compName), func() {

@@ -45,7 +45,7 @@ func (factory *MockComponentFactory) SetAffinity(affinity *appsv1alpha1.Affinity
 	return factory
 }
 
-func (factory *MockComponentFactory) SetToleration(toleration corev1.Toleration) *MockComponentFactory {
+func (factory *MockComponentFactory) AddToleration(toleration corev1.Toleration) *MockComponentFactory {
 	tolerations := factory.Get().Spec.Tolerations
 	if len(tolerations) == 0 {
 		tolerations = []corev1.Toleration{}

@@ -109,10 +109,6 @@ spec:
                 required:
                 - class
                 type: object
-              cluster:
-                description: cluster is the name of the Cluster to which the component
-                  belongs.
-                type: string
               compDef:
                 description: compDef is the name of the referenced componentDefinition.
                 type: string
@@ -528,7 +524,6 @@ spec:
                   type: object
                 type: array
             required:
-            - cluster
             - compDef
             - replicas
             type: object

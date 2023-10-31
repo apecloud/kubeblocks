@@ -46,11 +46,16 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	obj := transCtx.Component
 
-	compShortName, err := component.ShortName(obj.Spec.Cluster, obj.Name)
-	ml := constant.GetComponentWellKnownLabels(obj.Spec.Cluster, compShortName)
+	clusterName, err := getClusterName(obj)
+	if err != nil {
+		return newRequeueError(requeueDuration, err.Error())
+	}
+
+	compName, err := component.ShortName(clusterName, obj.Name)
+	ml := constant.GetComponentWellKnownLabels(clusterName, compName)
 	snapshot, err := model.ReadCacheSnapshot(transCtx, obj, ml, kindsForCompDelete()...)
 	if err != nil {
-		return err
+		return newRequeueError(requeueDuration, err.Error())
 	}
 	for _, object := range snapshot {
 		graphCli.Delete(dag, object)

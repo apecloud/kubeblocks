@@ -562,7 +562,6 @@ var _ = Describe("Cluster Controller", func() {
 				for k, v := range constant.GetComponentWellKnownLabels(clusterObj.Name, consensusCompName) {
 					g.Expect(comp.Labels).Should(HaveKeyWithValue(k, v))
 				}
-				g.Expect(comp.Spec.Cluster).Should(Equal(clusterObj.Name))
 				g.Expect(comp.Spec.CompDef).Should(BeEmpty())
 			})).Should(Succeed())
 		})
@@ -590,7 +589,6 @@ var _ = Describe("Cluster Controller", func() {
 				for k, v := range constant.GetComponentWellKnownLabels(clusterObj.Name, consensusCompName) {
 					g.Expect(comp.Labels).Should(HaveKeyWithValue(k, v))
 				}
-				g.Expect(comp.Spec.Cluster).Should(Equal(clusterObj.Name))
 				g.Expect(comp.Spec.CompDef).Should(Equal(componentDefObj.Name))
 			})).Should(Succeed())
 		})

@@ -26,10 +26,6 @@ import (
 
 // ComponentSpec defines the desired state of Component
 type ComponentSpec struct {
-	// cluster is the name of the Cluster to which the component belongs.
-	// +kubebuilder:validation:Required
-	Cluster string `json:"cluster"`
-
 	// compDef is the name of the referenced componentDefinition.
 	// +kubebuilder:validation:Required
 	CompDef string `json:"compDef"`

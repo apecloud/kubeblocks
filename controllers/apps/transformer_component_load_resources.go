@@ -53,9 +53,14 @@ func (t *componentLoadResourcesTransformer) Transform(ctx graph.TransformContext
 		setProvisioningStartedCondition(&comp.Status.Conditions, comp.Name, comp.Generation, err)
 	}()
 
+	clusterName, err := getClusterName(comp)
+	if err != nil {
+		return newRequeueError(requeueDuration, err.Error())
+	}
+
 	// TODO(xingran): In order to backward compatibility in KubeBlocks version 0.8.0, the cluster field is still required. However, if in the future the Component objects can be used independently, the Cluster field should be removed from the component.Spec
 	cluster := &appsv1alpha1.Cluster{}
-	err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: comp.Spec.Cluster, Namespace: comp.Namespace}, cluster)
+	err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: clusterName, Namespace: comp.Namespace}, cluster)
 	if err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}

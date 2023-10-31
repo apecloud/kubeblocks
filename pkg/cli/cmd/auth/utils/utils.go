@@ -48,12 +48,12 @@ func NewRequest(ctx context.Context, url string, payload url.Values) (*http.Requ
 	return req, nil
 }
 
-func NewFullRequest(ctx context.Context, url string, method string, header map[string]string, payload url.Values) (*http.Request, error) {
+func NewFullRequest(ctx context.Context, url string, method string, header map[string]string, body string) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(
 		ctx,
 		method,
 		url,
-		strings.NewReader(payload.Encode()),
+		strings.NewReader(body),
 	)
 	if err != nil {
 		return nil, err

@@ -146,5 +146,22 @@ var _ = Describe("token provider", func() {
 		It("test IsValidToken", func() {
 			Expect(IsValidToken("test_token")).To(BeFalse())
 		})
+
+		It("test getTokenFromCache", func() {
+			tokenProvider := &TokenProvider{
+				cached: mockCached,
+				issued: mockIssued,
+			}
+			isAccessTokenValid := func(tokenResponse authenticator.TokenResponse) bool { return IsValidToken(tokenResponse.AccessToken) }
+			_, _ = tokenProvider.getTokenFromCache(isAccessTokenValid)
+		})
+
+		It("test getRefreshToken", func() {
+			tokenProvider := &TokenProvider{
+				cached: mockCached,
+				issued: mockIssued,
+			}
+			_ = tokenProvider.getRefreshToken("")
+		})
 	})
 })

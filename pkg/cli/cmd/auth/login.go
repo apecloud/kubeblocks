@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
@@ -275,7 +274,7 @@ func checkTokenAvailable(token string) bool {
 	URL := fmt.Sprintf("https://%s/api/v1/user", utils.OpenAPIHost)
 	req, err := utils.NewFullRequest(context.TODO(), URL, http.MethodGet, map[string]string{
 		"Authorization": "Bearer " + token,
-	}, url.Values{})
+	}, "")
 	if err != nil {
 		return false
 	}

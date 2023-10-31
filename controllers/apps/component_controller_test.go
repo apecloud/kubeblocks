@@ -130,6 +130,7 @@ var _ = Describe("Component Controller", func() {
 		consensusCompDefName   = "consensus"
 		replicationCompName    = "replication"
 		replicationCompDefName = "replication"
+		defaultCompName        = "default"
 		actionSetName          = "test-actionset"
 	)
 
@@ -216,7 +217,7 @@ var _ = Describe("Component Controller", func() {
 			AddComponentVersion(statelessCompDefName).AddContainerShort("nginx", testapps.NginxImage).
 			Create(&testCtx).GetObject()
 
-		By("Create a ComponentDefinition obj")
+		By("Create a componentDefinition obj")
 		compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
 			WithRandomName().
 			SetDefaultSpec().
@@ -1038,6 +1039,24 @@ var _ = Describe("Component Controller", func() {
 		}).Should(Succeed())
 	}
 
+	testCompFinalizerNLabel := func(compName, compDefName string) {
+	}
+
+	testCompExternalResource := func(compName, compDefName string) {
+	}
+
+	testCompService := func(compName, compDefName string) {
+	}
+
+	testCompConnCredential := func(compName, compDefName string) {
+	}
+
+	testCompTLSConfig := func(compName, compDefName string) {
+	}
+
+	testCompConfiguration := func(compName, compDefName string) {
+	}
+
 	testCompAffinityNToleration := func(compName, compDefName string) {
 		const (
 			topologyKey     = "testTopologyKey"
@@ -1108,8 +1127,6 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	testClusterRBAC := func(compName, compDefName string, volumeProtectionEnabled bool) {
-		Expect(compDefName).Should(BeElementOf(statelessCompDefName, statefulCompDefName, replicationCompDefName, consensusCompDefName))
-
 		By("Creating a cluster with target service account name")
 		serviceAccountName := "test-service-account"
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
@@ -1149,9 +1166,7 @@ var _ = Describe("Component Controller", func() {
 		testClusterRBAC(compName, compDefName, false)
 	}
 
-	testReCreateClusterWithRBAC := func(compName, compDefName string) {
-		Expect(compDefName).Should(BeElementOf(statelessCompDefName, statefulCompDefName, replicationCompDefName, consensusCompDefName))
-
+	testRecreateClusterWithRBAC := func(compName, compDefName string) {
 		randomStr, _ := password.Generate(6, 0, 0, true, false)
 		serviceAccountName := "test-sa-" + randomStr
 
@@ -1497,6 +1512,57 @@ var _ = Describe("Component Controller", func() {
 		checkWorkloadGenerationAndToolsImage(int64(2), 0, 1)
 	}
 
+	Context("component resources provisioning", func() {
+		BeforeEach(func() {
+			createAllWorkloadTypesClusterDef()
+			createBackupPolicyTpl(clusterDefObj)
+		})
+
+		AfterEach(func() {
+			cleanEnv()
+		})
+
+		It(fmt.Sprintf("component finalizers and labels"), func() {
+			testCompFinalizerNLabel(defaultCompName, compDefName)
+		})
+
+		It(fmt.Sprintf("component referenced resources"), func() {
+			testCompExternalResource(defaultCompName, compDefName)
+		})
+
+		It(fmt.Sprintf("with component services"), func() {
+			testCompService(defaultCompName, compDefName)
+		})
+
+		It(fmt.Sprintf("with component conn credentials"), func() {
+			testCompConnCredential(defaultCompName, compDefName)
+		})
+
+		It(fmt.Sprintf("with component TlS"), func() {
+			testCompTLSConfig(defaultCompName, compDefName)
+		})
+
+		It(fmt.Sprintf("with component configurations"), func() {
+			testCompConfiguration(defaultCompName, compDefName)
+		})
+
+		It(fmt.Sprintf("with component affinity and toleration set"), func() {
+			testCompAffinityNToleration(defaultCompName, compDefName)
+		})
+
+		It(fmt.Sprintf("should create RBAC resources correctly"), func() {
+			testClusterRBAC(defaultCompName, compDefName, true)
+		})
+
+		It(fmt.Sprintf("should create RBAC resources correctly if only supports backup"), func() {
+			testClusterRBACForBackup(defaultCompName, compDefName)
+		})
+
+		It(fmt.Sprintf("should re-create RBAC resources correctly"), func() {
+			testRecreateClusterWithRBAC(defaultCompName, compDefName)
+		})
+	})
+
 	Context("when creating cluster with multiple kinds of components", func() {
 		BeforeEach(func() {
 			cleanEnv()
@@ -1569,10 +1635,10 @@ var _ = Describe("Component Controller", func() {
 
 	When("creating cluster with all workloadTypes (being Stateless|Stateful|Consensus|Replication) component", func() {
 		compNameNDef := map[string]string{
-			// statelessCompName:   statelessCompDefName,
-			// statefulCompName:    statefulCompDefName,
-			consensusCompName: consensusCompDefName,
-			// replicationCompName: replicationCompDefName,
+			statelessCompName:   statelessCompDefName,
+			statefulCompName:    statefulCompDefName,
+			consensusCompName:   consensusCompDefName,
+			replicationCompName: replicationCompDefName,
 		}
 
 		BeforeEach(func() {
@@ -1587,22 +1653,6 @@ var _ = Describe("Component Controller", func() {
 		for compName, compDefName := range compNameNDef {
 			It(fmt.Sprintf("[comp: %s] should create/delete pods to match the desired replica number if updating cluster's replica number to a valid value", compName), func() {
 				testChangeReplicas(compName, compDefName)
-			})
-
-			It(fmt.Sprintf("[comp: %s] with component affinity and toleration set", compName), func() {
-				testCompAffinityNToleration(compName, compDefName)
-			})
-
-			It(fmt.Sprintf("[comp: %s] should create RBAC resources correctly", compName), func() {
-				testClusterRBAC(compName, compDefName, true)
-			})
-
-			It(fmt.Sprintf("[comp: %s] should create RBAC resources correctly if only supports backup", compName), func() {
-				testClusterRBACForBackup(compName, compDefName)
-			})
-
-			It(fmt.Sprintf("[comp: %s] should re-create cluster and RBAC resources correctly", compName), func() {
-				testReCreateClusterWithRBAC(compName, compDefName)
 			})
 
 			It(fmt.Sprintf("[comp: %s] update kubeblocks-tools image", compName), func() {

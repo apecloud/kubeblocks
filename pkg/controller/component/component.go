@@ -72,7 +72,7 @@ func BuildProtoComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1a
 }
 
 // BuildComponentDefinition constructs a ComponentDefinition object based on the following rules:
-// 1. If the clusterCompSpec.EnableComponentDefinition feature gate is enabled, return the ComponentDefinition object corresponding to clusterCompSpec.ComponentDef directly.
+// 1. If the clusterCompSpec.ComponentDef is enabled, return the ComponentDefinition object corresponding to clusterCompSpec.ComponentDef directly.
 // 2. Otherwise, generate the corresponding ComponentDefinition object from converting clusterComponentDefinition.
 func BuildComponentDefinition(reqCtx ictrlutil.RequestCtx,
 	cli client.Client,

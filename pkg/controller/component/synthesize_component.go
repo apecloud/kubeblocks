@@ -273,9 +273,10 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx, cli roclient.R
 	clusterCompVer = cv.Spec.GetDefNameMappingComponents()[clusterCompSpec.ComponentDefRef]
 
 	buildWorkload := func() {
+		synthesizeComp.ClusterDefName = cd.Name
+		synthesizeComp.ClusterCompDefName = clusterCompDef.Name
 		synthesizeComp.WorkloadType = clusterCompDef.WorkloadType
 		synthesizeComp.CharacterType = clusterCompDef.CharacterType
-		synthesizeComp.ClusterCompDefName = clusterCompDef.Name
 		synthesizeComp.HorizontalScalePolicy = clusterCompDef.HorizontalScalePolicy
 		synthesizeComp.StatelessSpec = clusterCompDef.StatelessSpec
 		synthesizeComp.StatefulSpec = clusterCompDef.StatefulSpec

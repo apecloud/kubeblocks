@@ -21,10 +21,12 @@ package component
 
 import (
 	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )
 
@@ -276,7 +278,9 @@ func (c *compDefLabelsConvertor) convert(args ...any) (any, error) {
 	}
 
 	labels := make(map[string]appsv1alpha1.BuiltInString, 0)
-	// TODO: clusterCompDef.CustomLabelSpecs -> labels
+	for _, customLabel := range clusterCompDef.CustomLabelSpecs {
+		labels[customLabel.Key] = appsv1alpha1.BuiltInString(customLabel.Value)
+	}
 	return labels, nil
 }
 
@@ -348,7 +352,19 @@ func (c *compDefRolesConvertor) convert(args ...any) (any, error) {
 	case appsv1alpha1.Consensus:
 		return c.convertConsensusRole(clusterCompDef)
 	case appsv1alpha1.Replication:
-		return nil, nil
+		defaultRoles := []appsv1alpha1.ComponentReplicaRole{
+			{
+				Name:        constant.Primary,
+				Serviceable: true,
+				Writable:    true,
+			},
+			{
+				Name:        constant.Secondary,
+				Serviceable: false,
+				Writable:    false,
+			},
+		}
+		return defaultRoles, nil
 	case appsv1alpha1.Stateful:
 		return nil, nil
 	case appsv1alpha1.Stateless:
@@ -402,7 +418,7 @@ func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
 	lifecycleActions := &appsv1alpha1.ComponentLifecycleActions{}
 
 	if clusterCompDef.Probes != nil && clusterCompDef.Probes.RoleProbe != nil {
-		lifecycleActions.RoleProbe = c.convertRoleProbe(clusterCompDef.Probes.RoleProbe)
+		lifecycleActions.RoleProbe = c.convertRoleProbe(clusterCompDef.Probes.RoleProbe, clusterCompDef.CharacterType)
 	}
 
 	if clusterCompDef.SwitchoverSpec != nil {
@@ -421,27 +437,35 @@ func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
 	return lifecycleActions, nil // TODO
 }
 
-func (c *compDefLifecycleActionsConvertor) convertRoleProbe(probe *appsv1alpha1.ClusterDefinitionProbe) *appsv1alpha1.RoleProbeSpec {
-	if probe.Commands == nil || len(probe.Commands.Writes) == 0 || len(probe.Commands.Queries) == 0 {
+func (c *compDefLifecycleActionsConvertor) convertRoleProbe(probe *appsv1alpha1.ClusterDefinitionProbe, characterType string) *appsv1alpha1.RoleProbeSpec {
+	if probe == nil {
 		return nil
 	}
+
+	roleProbeSpec := &appsv1alpha1.RoleProbeSpec{
+		TimeoutSeconds:   probe.TimeoutSeconds,
+		PeriodSeconds:    probe.PeriodSeconds,
+		FailureThreshold: probe.FailureThreshold,
+	}
+
+	if probe.Commands == nil || len(probe.Commands.Writes) == 0 || len(probe.Commands.Queries) == 0 {
+		buildInHandlerName := characterType
+		roleProbeSpec.BuiltinHandler = &buildInHandlerName
+		roleProbeSpec.CustomHandler = nil
+		return roleProbeSpec
+	}
+
 	commands := probe.Commands.Writes
 	if len(probe.Commands.Writes) == 0 {
 		commands = probe.Commands.Queries
 	}
-
-	return &appsv1alpha1.RoleProbeSpec{
-		TimeoutSeconds:   probe.TimeoutSeconds,
-		PeriodSeconds:    probe.PeriodSeconds,
-		FailureThreshold: probe.FailureThreshold,
-		LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
-			CustomHandler: &appsv1alpha1.Action{
-				Exec: &appsv1alpha1.ExecAction{
-					Command: commands,
-				},
-			},
+	roleProbeSpec.BuiltinHandler = nil
+	roleProbeSpec.CustomHandler = &appsv1alpha1.Action{
+		Exec: &appsv1alpha1.ExecAction{
+			Command: commands,
 		},
 	}
+	return roleProbeSpec
 }
 
 func (c *compDefLifecycleActionsConvertor) convertSwitchover(switchover *appsv1alpha1.SwitchoverSpec,

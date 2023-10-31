@@ -140,6 +140,19 @@ spec:
       configSpecs:
       scriptsSpecs:
       podSpec:
+        initContainers:
+        - name: volume-permissions
+          imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
+          command:
+          - /bin/bash
+          - -ec
+          - |
+            chown -R 1001:1001 /bitnami/etcd
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+          - name: data
+            mountPath: /bitnami/etcd
         containers:
           - name: etcd
             imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}

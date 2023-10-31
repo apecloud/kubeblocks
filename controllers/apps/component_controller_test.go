@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes/scheme"
 	controllerruntime "sigs.k8s.io/controller-runtime"
@@ -1056,44 +1057,35 @@ var _ = Describe("Component Controller", func() {
 
 	testCompService := func(compName, compDefName string) {
 		createClusterObjV2(compName, compDefObj.Name, nil)
-		// Services: []appsv1alpha1.ComponentService{
-		//	{
-		//		Name:        "default",
-		//		ServiceName: "rw",
-		//		ServiceSpec: corev1.ServiceSpec{
-		//			Ports: []corev1.ServicePort{
-		//				{
-		//					Protocol: corev1.ProtocolTCP,
-		//					Port:     3306,
-		//					TargetPort: intstr.IntOrString{
-		//						Type:   intstr.String,
-		//						StrVal: "mysql",
-		//					},
-		//				},
-		//			},
-		//		},
-		//		RoleSelector: []string{"leader"},
-		//	},
-		//	{
-		//		Name:        "ro",
-		//		ServiceName: "ro",
-		//		ServiceSpec: corev1.ServiceSpec{
-		//			Ports: []corev1.ServicePort{
-		//				{
-		//					Protocol: corev1.ProtocolTCP,
-		//					Port:     3306,
-		//					TargetPort: intstr.IntOrString{
-		//						Type:   intstr.String,
-		//						StrVal: "mysql",
-		//					},
-		//				},
-		//			},
-		//		},
-		//		RoleSelector: []string{"follower"},
-		//	},
-		// },
 
-		By("check default component services")
+		targetPort := corev1.ServicePort{
+			Protocol: corev1.ProtocolTCP,
+			Port:     3306,
+			TargetPort: intstr.IntOrString{
+				Type:   intstr.String,
+				StrVal: "mysql",
+			},
+		}
+
+		By("check rw component services")
+		rwSvcKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateComponentServiceEndpoint(clusterObj.Name, compName, "rw"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, rwSvcKey, func(g Gomega, svc *corev1.Service) {
+			g.Expect(svc.Spec.Ports).Should(ContainElements(targetPort))
+			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.RoleLabelKey, "leader"))
+		})).Should(Succeed())
+
+		By("check ro component services")
+		roSvcKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateComponentServiceEndpoint(clusterObj.Name, compName, "ro"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, roSvcKey, func(g Gomega, svc *corev1.Service) {
+			g.Expect(svc.Spec.Ports).Should(ContainElements(targetPort))
+			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.RoleLabelKey, "follower"))
+		})).Should(Succeed())
 	}
 
 	testCompSystemAccount := func(compName, compDefName string) {

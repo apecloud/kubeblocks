@@ -33,11 +33,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 // ClusterDeletionTransformer handles cluster deletion
@@ -46,18 +46,15 @@ type ClusterDeletionTransformer struct{}
 var _ graph.Transformer = &ClusterDeletionTransformer{}
 
 func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*ClusterTransformContext)
+	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.OrigCluster
 	if !cluster.IsDeleting() {
 		return nil
 	}
 
-	transCtx.Cluster.Status.Phase = appsv1alpha1.DeletingClusterPhase
+	graphCli, _ := transCtx.Client.(model.GraphClient)
 
-	root, err := ictrltypes.FindRootVertex(dag)
-	if err != nil {
-		return err
-	}
+	transCtx.Cluster.Status.Phase = appsv1alpha1.DeletingClusterPhase
 
 	// list all kinds to be deleted based on v1alpha1.TerminationPolicyType
 	var toDeleteNamespacedKinds, toDeleteNonNamespacedKinds []client.ObjectList
@@ -130,9 +127,7 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 			// annotated last-applied Cluster spec
 			annot[constant.LastAppliedClusterAnnotationKey] = clusterJSON
 			o.SetAnnotations(annot)
-			vertex := &ictrltypes.LifecycleVertex{Obj: o, ObjCopy: origObj, Action: ictrltypes.ActionUpdatePtr()}
-			dag.AddVertex(vertex)
-			dag.Connect(root, vertex)
+			graphCli.Update(dag, origObj, o)
 		}
 		return nil
 	}
@@ -168,15 +163,13 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	delObjs = append(delObjs, toDeleteObjs(nonNamespacedObjs)...)
 
 	for _, o := range delObjs {
-		vertex := &ictrltypes.LifecycleVertex{Obj: o, Action: ictrltypes.ActionDeletePtr()}
-		dag.AddVertex(vertex)
-		dag.Connect(root, vertex)
+		graphCli.Delete(dag, o)
 	}
 	// set cluster action to noop until all the sub-resources deleted
 	if len(delObjs) == 0 {
-		root.Action = ictrltypes.ActionDeletePtr()
+		graphCli.Delete(dag, cluster)
 	} else {
-		root.Action = ictrltypes.ActionStatusPtr()
+		graphCli.Status(dag, cluster, transCtx.Cluster)
 		// requeue since pvc isn't owned by cluster, and deleting it won't trigger event
 		return newRequeueError(time.Second*1, "not all sub-resources deleted")
 	}
@@ -210,8 +203,10 @@ func kindsForDelete() ([]client.ObjectList, []client.ObjectList) {
 		&corev1.SecretList{},
 		&corev1.ConfigMapList{},
 		&corev1.PersistentVolumeClaimList{},
-		&dataprotectionv1alpha1.BackupPolicyList{},
+		&dpv1alpha1.BackupPolicyList{},
+		&dpv1alpha1.BackupScheduleList{},
 		&batchv1.JobList{},
+		&dpv1alpha1.RestoreList{},
 	}
 	return append(namespacedKinds, namespacedKindsPlus...), nonNamespacedKinds
 }
@@ -219,7 +214,7 @@ func kindsForDelete() ([]client.ObjectList, []client.ObjectList) {
 func kindsForWipeOut() ([]client.ObjectList, []client.ObjectList) {
 	namespacedKinds, nonNamespacedKinds := kindsForDelete()
 	namespacedKindsPlus := []client.ObjectList{
-		&dataprotectionv1alpha1.BackupList{},
+		&dpv1alpha1.BackupList{},
 	}
 	return append(namespacedKinds, namespacedKindsPlus...), nonNamespacedKinds
 }

@@ -26,10 +26,11 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 )
 
 var _ = Describe("MySQL data protection function", func() {
@@ -63,8 +64,8 @@ var _ = Describe("MySQL data protection function", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupSignature, true, inNS)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.RestoreJobSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.ActionSetSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.RestoreSignature, inNS, ml)
 
 	}
 
@@ -100,7 +101,6 @@ var _ = Describe("MySQL data protection function", func() {
 			Create(&testCtx).GetObject()
 
 		By("Create a cluster obj")
-
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
@@ -118,18 +118,17 @@ var _ = Describe("MySQL data protection function", func() {
 	}
 
 	createBackupObj := func() {
-		By("By creating a backupTool")
-		backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
-			&dpv1alpha1.BackupTool{}, testapps.RandomizedObjName())
+		By("By creating a actionSet")
+		actionSet := testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml",
+			&dpv1alpha1.ActionSet{}, testapps.RandomizedObjName())
 
 		By("By creating a backupPolicy from backupPolicyTemplate: " + backupPolicyTemplateName)
-		backupPolicyObj := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+		backupPolicyObj := testdp.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 			WithRandomName().
-			AddDataFilePolicy().
-			SetBackupToolName(backupTool.Name).
-			AddMatchLabels(constant.AppInstanceLabelKey, clusterKey.Name).
-			SetTargetSecretName(component.GenerateConnCredential(clusterKey.Name)).
-			SetPVC(backupRemotePVCName).
+			SetTarget(constant.AppInstanceLabelKey, clusterKey.Name).
+			SetTargetConnectionCredential(component.GenerateConnCredential(clusterKey.Name)).
+			AddBackupMethod(testdp.BackupMethodName, false, actionSet.Name).
+			SetBackupMethodVolumeMounts(testapps.DataVolumeName, "/data").
 			Create(&testCtx).GetObject()
 		backupPolicyKey := client.ObjectKeyFromObject(backupPolicyObj)
 
@@ -142,14 +141,14 @@ var _ = Describe("MySQL data protection function", func() {
 
 		By("By check backupPolicy available")
 		Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, backupPolicy *dpv1alpha1.BackupPolicy) {
-			g.Expect(backupPolicy.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
+			g.Expect(backupPolicy.Status.Phase).To(Equal(dpv1alpha1.BackupPolicyAvailable))
 		})).Should(Succeed())
 
 		By("By creating a backup from backupPolicy: " + backupPolicyKey.Name)
-		backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+		backup := testdp.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 			WithRandomName().
 			SetBackupPolicyName(backupPolicyKey.Name).
-			SetBackupType(dpv1alpha1.BackupTypeDataFile).
+			SetBackupMethod(testdp.BackupMethodName).
 			Create(&testCtx).GetObject()
 		backupKey = client.ObjectKeyFromObject(backup)
 	}
@@ -162,7 +161,7 @@ var _ = Describe("MySQL data protection function", func() {
 
 		It("should be completed", func() {
 			Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, backup *dpv1alpha1.Backup) {
-				g.Expect(backup.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
+				g.Expect(backup.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
 			})).Should(Succeed())
 		})
 	})

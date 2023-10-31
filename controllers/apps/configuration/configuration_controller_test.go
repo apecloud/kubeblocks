@@ -28,10 +28,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
 var _ = Describe("Configuration Controller", func() {
@@ -88,6 +88,29 @@ var _ = Describe("Configuration Controller", func() {
 				g.Expect(itemStatus).ShouldNot(BeNil())
 				g.Expect(itemStatus.UpdateRevision).Should(BeEquivalentTo("2"))
 				g.Expect(itemStatus.Phase).Should(BeEquivalentTo(appsv1alpha1.CFinishedPhase))
+			}, time.Second*60, time.Second*1).Should(Succeed())
+		})
+
+		It("Invalid component test", func() {
+			_, _, clusterObj, clusterVersionObj, synthesizedComp := mockReconcileResource()
+
+			cfgKey := client.ObjectKey{
+				Name:      core.GenerateComponentConfigurationName(clusterName, "invalid-component"),
+				Namespace: testCtx.DefaultNamespace,
+			}
+
+			Expect(initConfiguration(&intctrlutil.ResourceCtx{
+				Client:        k8sClient,
+				Context:       ctx,
+				Namespace:     testCtx.DefaultNamespace,
+				ClusterName:   clusterName,
+				ComponentName: "invalid-component",
+			}, synthesizedComp, clusterObj, clusterVersionObj)).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				cfg := &appsv1alpha1.Configuration{}
+				g.Expect(k8sClient.Get(ctx, cfgKey, cfg)).Should(Succeed())
+				g.Expect(cfg.Status.Message).Should(ContainSubstring("not found cluster component"))
 			}, time.Second*60, time.Second*1).Should(Succeed())
 		})
 	})

@@ -62,7 +62,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: driver-registrar
-          image: {{ .Values.images.registrar }}
+          image: "{{ template "csi-s3.imageFullName" (dict "image" .Values.images.registrar "root" .) }}"
           args:
             - "--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)"
             - "--v=4"
@@ -71,7 +71,7 @@ spec:
             - name: ADDRESS
               value: /csi/csi.sock
             - name: DRIVER_REG_SOCK_PATH
-              value: /var/lib/kubelet/plugins/ru.yandex.s3.csi/csi.sock
+              value: {{ .Values.kubeletPath }}/plugins/ru.yandex.s3.csi/csi.sock
             - name: KUBE_NODE_NAME
               valueFrom:
                 fieldRef:
@@ -87,8 +87,8 @@ spec:
             capabilities:
               add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
-          image: {{ .Values.images.csi }}
-          imagePullPolicy: IfNotPresent
+          image: "{{ template "csi-s3.imageFullName" (dict "image" .Values.images.csi "root" .) }}"
+          imagePullPolicy: "{{ template "csi-s3.imagePullPolicy" (dict "image" .Values.images.csi "root" .) }}"
           args:
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--nodeid=$(NODE_ID)"
@@ -104,22 +104,22 @@ spec:
             - name: plugin-dir
               mountPath: /csi
             - name: pods-mount-dir
-              mountPath: /var/lib/kubelet/pods
+              mountPath: {{ .Values.kubeletPath }}/pods
               mountPropagation: "Bidirectional"
             - name: fuse-device
               mountPath: /dev/fuse
       volumes:
         - name: registration-dir
           hostPath:
-            path: /var/lib/kubelet/plugins_registry/
+            path: {{ .Values.kubeletPath }}/plugins_registry/
             type: DirectoryOrCreate
         - name: plugin-dir
           hostPath:
-            path: /var/lib/kubelet/plugins/ru.yandex.s3.csi
+            path: {{ .Values.kubeletPath }}/plugins/ru.yandex.s3.csi
             type: DirectoryOrCreate
         - name: pods-mount-dir
           hostPath:
-            path: /var/lib/kubelet/pods
+            path: {{ .Values.kubeletPath }}/pods
             type: Directory
         - name: fuse-device
           hostPath:

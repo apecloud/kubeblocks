@@ -2,8 +2,6 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
   name: mongodb-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
-  annotations:
-    kubeblocks.io/is-default-cluster-version: "true"
   labels:
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:
@@ -90,6 +88,31 @@ spec:
       switchoverSpec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:4.4
+
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: mongodb-5.0.20
+  annotations:
+    kubeblocks.io/is-default-cluster-version: "true"
+  labels:
+    {{- include "mongodb.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: mongodb
+  componentVersions:
+    - componentDefRef: mongodb
+      versionsContext:
+        containers:
+          - name: mongodb
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:5.0.20
+            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+      systemAccountSpec:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:5.0.20
+      switchoverSpec:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:5.0.20
 
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1

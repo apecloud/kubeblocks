@@ -5,8 +5,8 @@
 replicaCount: 1
 
 image:
-  registry: registry.cn-hangzhou.aliyuncs.com/google_containers/
-  repository: hostpathplugin
+  registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+  repository: apecloud/hostpathplugin
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
@@ -71,31 +71,31 @@ affinity:
 sidecars:
   healthmonitor:
     image:
-      repository: csi-external-health-monitor-controller
+      repository: apecloud/csi-external-health-monitor-controller
       tag: v0.7.0
   registrar:
     image:
-      repository: csi-node-driver-registrar
+      repository: apecloud/csi-node-driver-registrar
       tag: v2.6.0
   livenessprobe:
     image:
-      repository: livenessprobe
+      repository: apecloud/livenessprobe
       tag: v2.8.0
   attacher:
     image:
-      repository: csi-attacher
+      repository: apecloud/csi-attacher
       tag: v4.0.0
   provisioner:
     image:
-      repository: csi-provisioner
+      repository: apecloud/csi-provisioner
       tag: v3.3.0
   resizer:
     image:
-      repository: csi-resizer
+      repository: apecloud/csi-resizer
       tag: v1.6.0
   snapshotter:
     image:
-      repository: csi-snapshotter
+      repository: apecloud/csi-snapshotter
       tag: v6.1.0
 
 storageClass:

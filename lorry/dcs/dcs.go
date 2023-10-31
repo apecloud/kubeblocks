@@ -20,8 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dcs
 
 import (
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type DCS interface {
@@ -47,12 +47,12 @@ type DCS interface {
 	DeleteSwitchover() error
 
 	// cluster scope leader lock
-	AttempAcquireLock() error
-	CreateLock() error
-	IsLockExist() (bool, error)
-	HasLock() bool
-	ReleaseLock() error
-	UpdateLock() error
+	AttempAcquireLease() error
+	CreateLease() error
+	IsLeaseExist() (bool, error)
+	HasLease() bool
+	ReleaseLease() error
+	UpdateLease() error
 
 	GetLeader() (*Leader, error)
 }
@@ -60,7 +60,7 @@ type DCS interface {
 var dcs DCS
 
 func init() {
-	viper.SetDefault("KB_TTL", 5)
+	viper.SetDefault("KB_TTL", 15)
 	viper.SetDefault("KB_MAX_LAG", 10)
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 }

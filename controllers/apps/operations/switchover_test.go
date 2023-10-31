@@ -31,10 +31,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
 var (
@@ -153,7 +153,7 @@ var _ = Describe("", func() {
 				AddContainer(container).
 				AddAppInstanceLabel(clusterObj.Name).
 				AddAppComponentLabel(consensusComp).
-				AddAppManangedByLabel().
+				AddAppManagedByLabel().
 				SetReplicas(2).
 				Create(&testCtx).GetObject()
 

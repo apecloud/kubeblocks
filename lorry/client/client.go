@@ -33,13 +33,13 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/apecloud/kubeblocks/internal/cli/exec"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	. "github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/cli/exec"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 const (
-	urlTemplate = "http://localhost:%d/v1.0/bindings/%s"
+	urlTemplate = "http://%s:%d/v1.0/bindings/%s"
 )
 
 type Client interface {
@@ -100,7 +100,7 @@ func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, 
 		return nil, fmt.Errorf("pod %v has no ip", pod.Name)
 	}
 
-	port, err := intctrlutil.GuessLorryHTTPPort(pod)
+	port, err := intctrlutil.GetLorryHTTPPort(pod)
 	if err != nil {
 		// not lorry in the pod, just return nil without error
 		return nil, nil
@@ -123,7 +123,7 @@ func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, 
 		Client:           client,
 		Port:             port,
 		CharacterType:    characterType,
-		URL:              fmt.Sprintf(urlTemplate, port, characterType),
+		URL:              fmt.Sprintf(urlTemplate, ip, port, characterType),
 		CacheTTL:         60 * time.Second,
 		RequestTimeout:   30 * time.Second,
 		ReconcileTimeout: 500 * time.Millisecond,
@@ -200,10 +200,15 @@ func (cli *OperationClient) Request(ctx context.Context, operation string) (map[
 	ctxWithReconcileTimeout, cancel := context.WithTimeout(ctx, cli.ReconcileTimeout)
 	defer cancel()
 
+	body, err := getBodyWithOperation(operation)
+	if err != nil {
+		return nil, err
+	}
+
 	// Request sql channel via http request
 	url := fmt.Sprintf("%s?operation=%s", cli.URL, operation)
 
-	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, url, http.MethodPost, nil)
+	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, url, http.MethodPost, body)
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +225,7 @@ func (cli *OperationClient) Request(ctx context.Context, operation string) (map[
 	return result, nil
 }
 
-func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, url, method string, body io.Reader) (*http.Response, error) {
+func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, url, method string, body []byte) (*http.Response, error) {
 	ch := make(chan *OperationResult, 1)
 	go cli.InvokeComponent(ctxWithReconcileTimeout, url, method, body, ch)
 	var resp *http.Response
@@ -235,10 +240,10 @@ func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout con
 	return resp, err
 }
 
-func (cli *OperationClient) InvokeComponent(ctxWithReconcileTimeout context.Context, url, method string, body io.Reader, ch chan *OperationResult) {
+func (cli *OperationClient) InvokeComponent(ctxWithReconcileTimeout context.Context, url, method string, body []byte, ch chan *OperationResult) {
 	ctxWithRequestTimeout, cancel := context.WithTimeout(context.Background(), cli.RequestTimeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctxWithRequestTimeout, method, url, body)
+	req, err := http.NewRequestWithContext(ctxWithRequestTimeout, method, url, bytes.NewBuffer(body))
 	if err != nil || req == nil {
 		operationRes := &OperationResult{
 			response: nil,
@@ -249,7 +254,7 @@ func (cli *OperationClient) InvokeComponent(ctxWithReconcileTimeout context.Cont
 		return
 	}
 
-	mapKey := GetMapKeyFromRequest(req)
+	mapKey := GetMapKeyFromRequest(req, body)
 	operationRes, ok := cli.cache[mapKey]
 	if ok {
 		delete(cli.cache, mapKey)
@@ -273,17 +278,10 @@ func (cli *OperationClient) InvokeComponent(ctxWithReconcileTimeout context.Cont
 	}
 }
 
-func GetMapKeyFromRequest(req *http.Request) string {
+func GetMapKeyFromRequest(req *http.Request, body []byte) string {
 	var buf bytes.Buffer
 	buf.WriteString(req.URL.String())
-
-	if req.Body != nil {
-		all, err := io.ReadAll(req.Body)
-		if err != nil {
-			return ""
-		}
-		buf.Write(all)
-	}
+	buf.Write(body)
 	keys := make([]string, 0, len(req.Header))
 	for k := range req.Header {
 		keys = append(keys, k)
@@ -292,7 +290,6 @@ func GetMapKeyFromRequest(req *http.Request) string {
 	for _, k := range keys {
 		buf.WriteString(fmt.Sprintf("%s:%s", k, req.Header[k]))
 	}
-
 	return buf.String()
 }
 
@@ -322,7 +319,7 @@ func NewHTTPClientWithChannelPod(pod *corev1.Pod, characterType string) (*Operat
 	if err != nil {
 		return nil, err
 	}
-	port, err := intctrlutil.GetProbeHTTPPort(pod)
+	port, err := intctrlutil.GetLorryHTTPPort(pod)
 	if err != nil {
 		return nil, err
 	}
@@ -388,4 +385,19 @@ func parseResponse(data []byte, operation string, charType string) (SQLChannelRe
 	// convert it to SQLChannelResponse
 	err := json.Unmarshal(data, &response)
 	return response, err
+}
+
+func getBodyWithOperation(operation string) ([]byte, error) {
+	meta := struct {
+		Operation string            `json:"operation"`
+		Metadata  map[string]string `json:"metadata"`
+	}{
+		Operation: operation,
+		Metadata:  map[string]string{},
+	}
+	binary, err := json.Marshal(meta)
+	if err != nil {
+		return nil, err
+	}
+	return binary, nil
 }

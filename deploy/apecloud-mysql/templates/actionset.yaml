@@ -1,0 +1,73 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: ActionSet
+metadata:
+  name: xtrabackup-for-apecloud-mysql
+  labels:
+    clusterdefinition.kubeblocks.io/name: apecloud-mysql
+spec:
+  backupType: Full
+  env:
+    - name: DATA_DIR
+      value: {{ .Values.mysqlConfigs.dataDir }}
+    - name: LOG_BIN
+      value: {{ .Values.mysqlConfigs.logBin }}
+    - name: DP_DB_PORT
+      value: "3306"
+    - name: DATA_MOUNT_DIR
+      value: {{ .Values.mysqlConfigs.dataMountPath }}
+    - name: SIGNAL_FILE
+      value: .xtrabackup_restore_new_cluster
+  backup:
+    preBackup: []
+    postBackup: []
+    backupData:
+      image: {{ include "apecloud-mysql.bakcupToolImage" . }}
+      runOnTargetPodNode: true
+      command:
+      - sh
+      - -c
+      - |
+        {{- .Files.Get "dataprotection/backup.sh" | nindent 8 }}
+      syncProgress:
+        enabled: true
+        intervalSeconds: 5
+  restore:
+    prepareData:
+      image: {{ include "apecloud-mysql.bakcupToolImage" . }}
+      command:
+      - sh
+      - -c
+      - |
+        {{- .Files.Get "dataprotection/restore.sh" | nindent 8 }}
+    postReady: []
+---
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: ActionSet
+metadata:
+  name: volumesnapshot-for-apecloud-mysql
+  labels:
+    clusterdefinition.kubeblocks.io/name: apecloud-mysql
+spec:
+  backupType: Full
+  env:
+  - name: DATA_DIR
+    value: {{ .Values.mysqlConfigs.dataDir }}
+  - name: DATA_MOUNT_DIR
+    value: {{ .Values.mysqlConfigs.dataMountPath }}
+  - name: SIGNAL_FILE
+    value: .restore_new_cluster
+  backup: {}
+  restore:
+    prepareData:
+      image: {{ include "apecloud-mysql.bakcupToolImage" . }}
+      command:
+      - sh
+      - -c
+      - |
+        touch ${DATA_DIR}/${SIGNAL_FILE};
+        # compatible with binlog of 0.6/0.5
+        binlog_dir=${DATA_MOUNT_DIR}/binlog
+        mkdir $binlog_dir
+        cp ${DATA_DIR}/mysql-bin.* ${binlog_dir}
+        sync
+    postReady: []

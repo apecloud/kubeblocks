@@ -24,10 +24,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
-	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/plan"
+	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type RestoreTransformer struct {
@@ -37,7 +37,7 @@ type RestoreTransformer struct {
 var _ graph.Transformer = &RestoreTransformer{}
 
 func (t *RestoreTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*ClusterTransformContext)
+	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster
 	clusterDef := transCtx.ClusterDef
 	clusterVer := transCtx.ClusterVer
@@ -54,19 +54,18 @@ func (t *RestoreTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 		return err
 	}
 	for _, spec := range cluster.Spec.ComponentSpecs {
+		if cluster.Annotations[constant.RestoreFromBackupAnnotationKey] == "" {
+			continue
+		}
+
 		comp, err := components.NewComponent(reqCtx, t.Client, clusterDef, clusterVer, cluster, spec.Name, nil)
 		if err != nil {
 			return err
 		}
 		syncComp := comp.GetSynthesizedComponent()
-		if cluster.Annotations[constant.RestoreFromBackUpAnnotationKey] != "" {
-			if err = plan.DoRestore(reqCtx.Ctx, t.Client, cluster, syncComp, rscheme); err != nil {
-				return commitError(err)
-			}
-		} else if cluster.Annotations[constant.RestoreFromTimeAnnotationKey] != "" {
-			if err = plan.DoPITR(reqCtx.Ctx, t.Client, cluster, syncComp, rscheme); err != nil {
-				return commitError(err)
-			}
+		restoreMGR := plan.NewRestoreManager(reqCtx.Ctx, t.Client, cluster, rscheme, nil, syncComp.Replicas, 0)
+		if err = restoreMGR.DoRestore(syncComp); err != nil {
+			return commitError(err)
 		}
 	}
 	return nil

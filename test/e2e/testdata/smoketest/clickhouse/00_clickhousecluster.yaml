@@ -1,0 +1,25 @@
+---
+# Source: clickhouse-cluster/templates/cluster.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: test-clickhouse-cluster
+  labels: 
+    helm.sh/chart: clickhouse-cluster-0.7.0-alpha.0
+    app.kubernetes.io/name: clickhouse-cluster
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "22.9.4"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  clusterDefinitionRef: clickhouse  # ref clusterdefinition.name
+  clusterVersionRef: clickhouse-22.9.4 # ref clusterversion.name
+  terminationPolicy: Halt
+  affinity:
+    topologyKeys: 
+      - kubernetes.io/hostname
+  componentSpecs:
+    - name: shard-0
+      componentDefRef: clickhouse
+      monitor: false
+      replicas: 2
+      serviceAccountName: kb-test-clickhouse-cluster

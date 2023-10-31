@@ -7,12 +7,9 @@ jobs:
   make-test:
     runs-on: [self-hosted ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: make test
         run:  |
-          mkdir -p ./bin
-          cp -r /go/bin/controller-gen ./bin/controller-gen
-          cp -r /go/bin/setup-envtest ./bin/setup-envtest
           make mod-vendor lint test
 
 

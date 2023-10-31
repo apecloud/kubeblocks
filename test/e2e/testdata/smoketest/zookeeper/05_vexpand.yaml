@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: zk-cluster-vexpand-
+spec:
+  clusterRef: zk-cluster
+  type: VolumeExpansion
+  volumeExpansion:
+    - componentName: zookeeper
+      volumeClaimTemplates:
+        - name: data
+          storage: "20Gi"

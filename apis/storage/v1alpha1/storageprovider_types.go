@@ -47,6 +47,12 @@ type StorageProviderSpec struct {
 	// +optional
 	PersistentVolumeClaimTemplate string `json:"persistentVolumeClaimTemplate,omitempty"`
 
+	// A Go template for rendering a config used by the datasafed command.
+	// The template will be rendered with the following variables:
+	// - Parameters: a map of parameters defined in the ParametersSchema.
+	// +optional
+	DatasafedConfigTemplate string `json:"datasafedConfigTemplate,omitempty"`
+
 	// The schema describes the parameters required by this StorageProvider,
 	// when rendering the templates.
 	// +optional
@@ -85,6 +91,9 @@ type StorageProviderStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster
+// +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase"
+// +kubebuilder:printcolumn:name="CSIDRIVER",type="string",JSONPath=".spec.csiDriverName"
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // StorageProvider is the Schema for the storageproviders API
 // StorageProvider describes how to provision PVCs for a specific storage system (e.g. S3, NFS, etc),

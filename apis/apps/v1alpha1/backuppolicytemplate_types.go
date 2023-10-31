@@ -18,6 +18,8 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
 // BackupPolicyTemplateSpec defines the desired state of BackupPolicyTemplate
@@ -54,101 +56,80 @@ type BackupPolicy struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	ComponentDefRef string `json:"componentDefRef"`
 
-	// retention describe how long the Backup should be retained. if not set, will be retained forever.
+	// retentionPeriod determines a duration up to which the backup should be kept.
+	// controller will remove all backups that are older than the RetentionPeriod.
+	// For example, RetentionPeriod of `30d` will keep only the backups of last 30 days.
+	// Sample duration format:
+	// - years: 	2y
+	// - months: 	6mo
+	// - days: 		30d
+	// - hours: 	12h
+	// - minutes: 	30m
+	// You can also combine the above durations. For example: 30d12h30m
 	// +optional
-	Retention *RetentionSpec `json:"retention,omitempty"`
+	// +kubebuilder:default="7d"
+	RetentionPeriod dpv1alpha1.RetentionPeriod `json:"retentionPeriod,omitempty"`
 
-	// schedule policy for backup.
-	// +optional
-	Schedule Schedule `json:"schedule,omitempty"`
-
-	// the policy for snapshot backup.
-	// +optional
-	Snapshot *SnapshotPolicy `json:"snapshot,omitempty"`
-
-	// the policy for datafile backup.
-	// +optional
-	Datafile *CommonBackupPolicy `json:"datafile,omitempty"`
-
-	// the policy for logfile backup.
-	// +optional
-	Logfile *CommonBackupPolicy `json:"logfile,omitempty"`
-}
-
-type RetentionSpec struct {
-	// ttl is a time string ending with the 'd'|'D'|'h'|'H' character to describe how long
-	// the Backup should be retained. if not set, will be retained forever.
-	// +kubebuilder:validation:Pattern:=`^\d+[d|D|h|H]$`
-	// +optional
-	TTL *string `json:"ttl,omitempty"`
-}
-
-type Schedule struct {
-	// startingDeadlineMinutes defines the deadline in minutes for starting the backup job
-	// if it misses scheduled time for any reason.
-	// +optional
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Maximum=1440
-	StartingDeadlineMinutes *int64 `json:"startingDeadlineMinutes,omitempty"`
-
-	// schedule policy for snapshot backup.
-	// +optional
-	Snapshot *SchedulePolicy `json:"snapshot,omitempty"`
-
-	// schedule policy for datafile backup.
-	// +optional
-	Datafile *SchedulePolicy `json:"datafile,omitempty"`
-
-	// schedule policy for logfile backup.
-	// +optional
-	Logfile *SchedulePolicy `json:"logfile,omitempty"`
-}
-
-type SchedulePolicy struct {
-	// the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
-	// +kubebuilder:validation:Required
-	CronExpression string `json:"cronExpression"`
-
-	// enable or disable the schedule.
-	// +kubebuilder:validation:Required
-	Enable bool `json:"enable"`
-}
-
-type SnapshotPolicy struct {
-	BasePolicy `json:",inline"`
-
-	// execute hook commands for backup.
-	// +optional
-	Hooks *BackupPolicyHook `json:"hooks,omitempty"`
-}
-
-type CommonBackupPolicy struct {
-	BasePolicy `json:",inline"`
-
-	// which backup tool to perform database backup, only support one tool.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	BackupToolName string `json:"backupToolName,omitempty"`
-}
-
-type BasePolicy struct {
 	// target instance for backup.
 	// +optional
 	Target TargetInstance `json:"target"`
 
-	// the number of automatic backups to retain. Value must be non-negative integer.
-	// 0 means NO limit on the number of backups.
-	// +kubebuilder:default=7
+	// schedule policy for backup.
 	// +optional
-	BackupsHistoryLimit int32 `json:"backupsHistoryLimit,omitempty"`
+	Schedules []SchedulePolicy `json:"schedules,omitempty"`
 
-	// count of backup stop retries on fail.
-	// +optional
-	OnFailAttempted int32 `json:"onFailAttempted,omitempty"`
+	// backupMethods defines the backup methods.
+	// +kubebuilder:validation:Required
+	BackupMethods []BackupMethod `json:"backupMethods"`
+}
 
-	// define how to update metadata for backup status.
+type BackupMethod struct {
+	dpv1alpha1.BackupMethod `json:",inline"`
+
+	// envMapping defines the variables of cluster mapped to env values' keys.
 	// +optional
-	BackupStatusUpdates []BackupStatusUpdate `json:"backupStatusUpdates,omitempty"`
+	EnvMapping []EnvMappingVar `json:"envMapping,omitempty"`
+}
+
+type EnvMappingVar struct {
+	// env key which needs to mapping.
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
+
+	// valueFrom defines source of the env value.
+	// +kubebuilder:validation:Required
+	ValueFrom ValueFrom `json:"valueFrom"`
+}
+
+type ValueFrom struct {
+	// mapped ClusterVersionRef to env value.
+	// +kubebuilder:validation:Required
+	ClusterVersionRef []ClusterVersionMapping `json:"clusterVersionRef"`
+}
+
+type ClusterVersionMapping struct {
+	// the array of ClusterVersion name which can be mapped to the env value.
+	// +kubebuilder:validation:Required
+	Names []string `json:"names"`
+
+	// mapping value for the specified ClusterVersion names.
+	// +kubebuilder:validation:Required
+	MappingValue string `json:"mappingValue"`
+}
+
+type SchedulePolicy struct {
+	// enabled specifies whether the backup schedule is enabled or not.
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// backupMethod specifies the backup method name that is defined in backupPolicy.
+	// +kubebuilder:validation:Required
+	BackupMethod string `json:"backupMethod"`
+
+	// the cron expression for schedule, the timezone is in UTC.
+	// see https://en.wikipedia.org/wiki/Cron.
+	// +kubebuilder:validation:Required
+	CronExpression string `json:"cronExpression"`
 }
 
 type TargetInstance struct {
@@ -185,51 +166,13 @@ type ConnectionCredentialKey struct {
 	// if not set, the default key is "username".
 	// +optional
 	UsernameKey *string `json:"usernameKey,omitempty"`
-}
 
-// BackupPolicyHook defines for the database execute commands before and after backup.
-type BackupPolicyHook struct {
-	// pre backup to perform commands
-	// +optional
-	PreCommands []string `json:"preCommands,omitempty"`
+	// hostKey specifies the map key of the host in the connection credential secret.
+	HostKey *string `json:"hostKey,omitempty"`
 
-	// post backup to perform commands
-	// +optional
-	PostCommands []string `json:"postCommands,omitempty"`
-
-	// exec command with image
-	// +optional
-	Image string `json:"image,omitempty"`
-
-	// which container can exec command
-	// +optional
-	ContainerName string `json:"containerName,omitempty"`
-}
-
-type BackupStatusUpdate struct {
-	// specify the json path of backup object for patch.
-	// example: manifests.backupLog -- means patch the backup json path of status.manifests.backupLog.
-	// +optional
-	Path string `json:"path,omitempty"`
-
-	// which container name that kubectl can execute.
-	// +optional
-	ContainerName string `json:"containerName,omitempty"`
-
-	// the shell Script commands to collect backup status metadata.
-	// The script must exist in the container of ContainerName and the output format must be set to JSON.
-	// Note that outputting to stderr may cause the result format to not be in JSON.
-	// +optional
-	Script string `json:"script,omitempty"`
-
-	// useTargetPodServiceAccount defines whether this job requires the service account of the backup target pod.
-	// if true, will use the service account of the backup target pod. otherwise, will use the system service account.
-	// +optional
-	UseTargetPodServiceAccount bool `json:"useTargetPodServiceAccount,omitempty"`
-
-	// when to update the backup status, pre: before backup, post: after backup
-	// +kubebuilder:validation:Required
-	UpdateStage BackupStatusUpdateStage `json:"updateStage"`
+	// portKey specifies the map key of the port in the connection credential secret.
+	// +kubebuilder:default=port
+	PortKey *string `json:"portKey,omitempty"`
 }
 
 // BackupPolicyTemplateStatus defines the observed state of BackupPolicyTemplate

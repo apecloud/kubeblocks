@@ -2,8 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.12.1
   labels:
     app.kubernetes.io/name: kubeblocks
   name: backups.dataprotection.kubeblocks.io
@@ -19,14 +18,17 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.backupType
-      name: TYPE
+    - jsonPath: .spec.backupPolicyName
+      name: POLICY
+      type: string
+    - jsonPath: .spec.backupMethod
+      name: METHOD
+      type: string
+    - jsonPath: .status.backupRepoName
+      name: REPO
       type: string
     - jsonPath: .status.phase
       name: STATUS
-      type: string
-    - jsonPath: .status.sourceCluster
-      name: SOURCE-CLUSTER
       type: string
     - jsonPath: .status.totalSize
       name: TOTAL-SIZE
@@ -35,15 +37,18 @@ spec:
       name: DURATION
       type: string
     - jsonPath: .metadata.creationTimestamp
-      name: CREATE-TIME
+      name: CREATION-TIME
       type: string
     - jsonPath: .status.completionTimestamp
       name: COMPLETION-TIME
       type: string
+    - jsonPath: .status.expiration
+      name: EXPIRATION-TIME
+      type: string
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Backup is the Schema for the backups API (defined by User).
+        description: Backup is the Schema for the backups API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -60,135 +65,452 @@ spec:
           spec:
             description: BackupSpec defines the desired state of Backup.
             properties:
+              backupMethod:
+                description: backupMethod specifies the backup method name that is
+                  defined in backupPolicy.
+                type: string
+                x-kubernetes-validations:
+                - message: forbidden to update spec.backupMethod
+                  rule: self == oldSelf
               backupPolicyName:
-                description: Which backupPolicy is applied to perform this backup
+                description: Which backupPolicy is applied to perform this backup.
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
-              backupType:
-                default: datafile
-                description: Backup Type. datafile or logfile or snapshot. If not
-                  set, datafile is the default type.
-                enum:
-                - datafile
-                - logfile
-                - snapshot
+                x-kubernetes-validations:
+                - message: forbidden to update spec.backupPolicyName
+                  rule: self == oldSelf
+              deletionPolicy:
+                allOf:
+                - enum:
+                  - Delete
+                  - Retain
+                - enum:
+                  - Delete
+                  - Retain
+                default: Delete
+                description: deletionPolicy determines whether the backup contents
+                  stored in backup repository should be deleted when the backup custom
+                  resource is deleted. Supported values are "Retain" and "Delete".
+                  "Retain" means that the backup can not be deleted and remains in
+                  'Deleting' phase. "Delete" means that the backup content and its
+                  physical snapshot on backup repository are deleted.
                 type: string
               parentBackupName:
-                description: if backupType is incremental, parentBackupName is required.
+                description: parentBackupName determines the parent backup name for
+                  incremental or differential backup.
+                type: string
+                x-kubernetes-validations:
+                - message: forbidden to update spec.parentBackupName
+                  rule: self == oldSelf
+              retentionPeriod:
+                description: "retentionPeriod determines a duration up to which the
+                  backup should be kept. Controller will remove all backups that are
+                  older than the RetentionPeriod. For example, RetentionPeriod of
+                  `30d` will keep only the backups of last 30 days. Sample duration
+                  format: - years: \t2y - months: \t6mo - days: \t\t30d - hours: \t12h
+                  - minutes: \t30m You can also combine the above durations. For example:
+                  30d12h30m. If not set, the backup will be kept forever."
                 type: string
             required:
+            - backupMethod
             - backupPolicyName
-            - backupType
             type: object
           status:
             description: BackupStatus defines the observed state of Backup.
             properties:
-              availableReplicas:
-                description: availableReplicas available replicas for statefulSet
-                  which created by backup.
-                format: int32
-                type: integer
-              backupToolName:
-                description: backupToolName references the backup tool name.
+              actions:
+                description: actions records the actions information for this backup.
+                items:
+                  properties:
+                    actionType:
+                      description: actionType is the type of the action.
+                      type: string
+                    availableReplicas:
+                      description: availableReplicas available replicas for statefulSet
+                        action.
+                      format: int32
+                      type: integer
+                    completionTimestamp:
+                      description: completionTimestamp records the time an action
+                        was completed.
+                      format: date-time
+                      type: string
+                    failureReason:
+                      description: failureReason is an error that caused the backup
+                        to fail.
+                      type: string
+                    name:
+                      description: name is the name of the action.
+                      type: string
+                    objectRef:
+                      description: objectRef is the object reference for the action.
+                      properties:
+                        apiVersion:
+                          description: API version of the referent.
+                          type: string
+                        fieldPath:
+                          description: 'If referring to a piece of an object instead
+                            of an entire object, this string should contain a valid
+                            JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                            For example, if the object reference is to a container
+                            within a pod, this would take on a value like: "spec.containers{name}"
+                            (where "name" refers to the name of the container that
+                            triggered the event) or if no container name is specified
+                            "spec.containers[2]" (container with index 2 in this pod).
+                            This syntax is chosen only to have some well-defined way
+                            of referencing a part of an object. TODO: this design
+                            is not final and this field is subject to change in the
+                            future.'
+                          type: string
+                        kind:
+                          description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                          type: string
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                          type: string
+                        namespace:
+                          description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
+                          type: string
+                        resourceVersion:
+                          description: 'Specific resourceVersion to which this reference
+                            is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
+                          type: string
+                        uid:
+                          description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                          type: string
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    phase:
+                      description: phase is the current state of the action.
+                      type: string
+                    startTimestamp:
+                      description: startTimestamp records the time an action was started.
+                      format: date-time
+                      type: string
+                    timeRange:
+                      description: timeRange records the time range of backed up data,
+                        for PITR, this is the time range of recoverable data.
+                      properties:
+                        end:
+                          description: end records the end time of backup.
+                          format: date-time
+                          type: string
+                        start:
+                          description: start records the start time of backup.
+                          format: date-time
+                          type: string
+                      type: object
+                    totalSize:
+                      description: totalSize is the total size of backed up data size.
+                        A string with capacity units in the format of "1Gi", "1Mi",
+                        "1Ki".
+                      type: string
+                    volumeSnapshots:
+                      description: volumeSnapshots records the volume snapshot status
+                        for the action.
+                      items:
+                        properties:
+                          contentName:
+                            description: contentName is the name of the volume snapshot
+                              content.
+                            type: string
+                          name:
+                            description: name is the name of the volume snapshot.
+                            type: string
+                          size:
+                            description: size is the size of the volume snapshot.
+                            type: string
+                          volumeName:
+                            description: volumeName is the name of the volume.
+                            type: string
+                        type: object
+                      type: array
+                  type: object
+                type: array
+              backupMethod:
+                description: backupMethod records the backup method information for
+                  this backup. Refer to BackupMethod for more details.
+                properties:
+                  actionSetName:
+                    description: actionSetName refers to the ActionSet object that
+                      defines the backup actions. For volume snapshot backup, the
+                      actionSet is not required, the controller will use the CSI volume
+                      snapshotter to create the snapshot.
+                    type: string
+                  env:
+                    description: env specifies the environment variables for the backup
+                      workload.
+                    items:
+                      description: EnvVar represents an environment variable present
+                        in a Container.
+                      properties:
+                        name:
+                          description: Name of the environment variable. Must be a
+                            C_IDENTIFIER.
+                          type: string
+                        value:
+                          description: 'Variable references $(VAR_NAME) are expanded
+                            using the previously defined environment variables in
+                            the container and any service environment variables. If
+                            a variable cannot be resolved, the reference in the input
+                            string will be unchanged. Double $$ are reduced to a single
+                            $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+                            "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+                            Escaped references will never be expanded, regardless
+                            of whether the variable exists or not. Defaults to "".'
+                          type: string
+                        valueFrom:
+                          description: Source for the environment variable's value.
+                            Cannot be used if value is not empty.
+                          properties:
+                            configMapKeyRef:
+                              description: Selects a key of a ConfigMap.
+                              properties:
+                                key:
+                                  description: The key to select.
+                                  type: string
+                                name:
+                                  description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                    TODO: Add other useful fields. apiVersion, kind,
+                                    uid?'
+                                  type: string
+                                optional:
+                                  description: Specify whether the ConfigMap or its
+                                    key must be defined
+                                  type: boolean
+                              required:
+                              - key
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            fieldRef:
+                              description: 'Selects a field of the pod: supports metadata.name,
+                                metadata.namespace, `metadata.labels[''<KEY>'']`,
+                                `metadata.annotations[''<KEY>'']`, spec.nodeName,
+                                spec.serviceAccountName, status.hostIP, status.podIP,
+                                status.podIPs.'
+                              properties:
+                                apiVersion:
+                                  description: Version of the schema the FieldPath
+                                    is written in terms of, defaults to "v1".
+                                  type: string
+                                fieldPath:
+                                  description: Path of the field to select in the
+                                    specified API version.
+                                  type: string
+                              required:
+                              - fieldPath
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            resourceFieldRef:
+                              description: 'Selects a resource of the container: only
+                                resources limits and requests (limits.cpu, limits.memory,
+                                limits.ephemeral-storage, requests.cpu, requests.memory
+                                and requests.ephemeral-storage) are currently supported.'
+                              properties:
+                                containerName:
+                                  description: 'Container name: required for volumes,
+                                    optional for env vars'
+                                  type: string
+                                divisor:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  description: Specifies the output format of the
+                                    exposed resources, defaults to "1"
+                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                  x-kubernetes-int-or-string: true
+                                resource:
+                                  description: 'Required: resource to select'
+                                  type: string
+                              required:
+                              - resource
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            secretKeyRef:
+                              description: Selects a key of a secret in the pod's
+                                namespace
+                              properties:
+                                key:
+                                  description: The key of the secret to select from.  Must
+                                    be a valid secret key.
+                                  type: string
+                                name:
+                                  description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                    TODO: Add other useful fields. apiVersion, kind,
+                                    uid?'
+                                  type: string
+                                optional:
+                                  description: Specify whether the Secret or its key
+                                    must be defined
+                                  type: boolean
+                              required:
+                              - key
+                              type: object
+                              x-kubernetes-map-type: atomic
+                          type: object
+                      required:
+                      - name
+                      type: object
+                    type: array
+                  name:
+                    description: the name of backup method.
+                    pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                    type: string
+                  runtimeSettings:
+                    description: runtimeSettings specifies runtime settings for the
+                      backup workload container.
+                    properties:
+                      resources:
+                        description: 'resources specifies the resource required by
+                          container. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
+                        properties:
+                          claims:
+                            description: "Claims lists the names of resources, defined
+                              in spec.resourceClaims, that are used by this container.
+                              \n This is an alpha field and requires enabling the
+                              DynamicResourceAllocation feature gate. \n This field
+                              is immutable. It can only be set for containers."
+                            items:
+                              description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                              properties:
+                                name:
+                                  description: Name must match the name of one entry
+                                    in pod.spec.resourceClaims of the Pod where this
+                                    field is used. It makes that resource available
+                                    inside a container.
+                                  type: string
+                              required:
+                              - name
+                              type: object
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - name
+                            x-kubernetes-list-type: map
+                          limits:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: 'Limits describes the maximum amount of compute
+                              resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            type: object
+                          requests:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: 'Requests describes the minimum amount of
+                              compute resources required. If Requests is omitted for
+                              a container, it defaults to Limits if that is explicitly
+                              specified, otherwise to an implementation-defined value.
+                              Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            type: object
+                        type: object
+                    type: object
+                  snapshotVolumes:
+                    default: false
+                    description: snapshotVolumes specifies whether to take snapshots
+                      of persistent volumes. if true, the BackupScript is not required,
+                      the controller will use the CSI volume snapshotter to create
+                      the snapshot.
+                    type: boolean
+                  targetVolumes:
+                    description: targetVolumes specifies which volumes from the target
+                      should be mounted in the backup workload.
+                    properties:
+                      volumeMounts:
+                        description: volumeMounts specifies the mount for the volumes
+                          specified in `Volumes` section.
+                        items:
+                          description: VolumeMount describes a mounting of a Volume
+                            within a container.
+                          properties:
+                            mountPath:
+                              description: Path within the container at which the
+                                volume should be mounted.  Must not contain ':'.
+                              type: string
+                            mountPropagation:
+                              description: mountPropagation determines how mounts
+                                are propagated from the host to container and the
+                                other way around. When not set, MountPropagationNone
+                                is used. This field is beta in 1.10.
+                              type: string
+                            name:
+                              description: This must match the Name of a Volume.
+                              type: string
+                            readOnly:
+                              description: Mounted read-only if true, read-write otherwise
+                                (false or unspecified). Defaults to false.
+                              type: boolean
+                            subPath:
+                              description: Path within the volume from which the container's
+                                volume should be mounted. Defaults to "" (volume's
+                                root).
+                              type: string
+                            subPathExpr:
+                              description: Expanded path within the volume from which
+                                the container's volume should be mounted. Behaves
+                                similarly to SubPath but environment variable references
+                                $(VAR_NAME) are expanded using the container's environment.
+                                Defaults to "" (volume's root). SubPathExpr and SubPath
+                                are mutually exclusive.
+                              type: string
+                          required:
+                          - mountPath
+                          - name
+                          type: object
+                        type: array
+                      volumes:
+                        description: Volumes indicates the list of volumes of targeted
+                          application that should be mounted on the backup job.
+                        items:
+                          type: string
+                        type: array
+                    type: object
+                required:
+                - name
+                type: object
+              backupRepoName:
+                description: backupRepoName is the name of the backup repository.
                 type: string
               completionTimestamp:
-                description: Date/time when the backup finished being processed.
+                description: completionTimestamp records the time a backup was completed.
+                  Completion time is recorded even on failed backups. The server's
+                  time is used for CompletionTimestamp.
                 format: date-time
                 type: string
               duration:
                 description: The duration time of backup execution. When converted
-                  to a string, the form is "1h2m0.5s".
+                  to a string, the format is "1h2m0.5s".
                 type: string
               expiration:
-                description: The date and time when the Backup is eligible for garbage
-                  collection. 'null' means the Backup is NOT be cleaned except delete
+                description: expiration is when this backup is eligible for garbage
+                  collection. 'null' means the Backup will NOT be cleaned except delete
                   manual.
                 format: date-time
                 type: string
               failureReason:
-                description: The reason for a backup failure.
+                description: failureReason is an error that caused the backup to fail.
                 type: string
-              logFilePersistentVolumeClaimName:
-                description: logFilePersistentVolumeClaimName saves the logfile backup
-                  data.
+              formatVersion:
+                description: formatVersion is the backup format version, including
+                  major, minor and patch version.
                 type: string
-              manifests:
-                description: manifests determines the backup metadata info.
-                properties:
-                  backupLog:
-                    description: backupLog records startTime and stopTime of data
-                      logging.
-                    properties:
-                      startTime:
-                        description: startTime records the start time of data logging.
-                        format: date-time
-                        type: string
-                      stopTime:
-                        description: stopTime records the stop time of data logging.
-                        format: date-time
-                        type: string
-                    type: object
-                  backupSnapshot:
-                    description: snapshot records the volume snapshot metadata.
-                    properties:
-                      volumeSnapshotContentName:
-                        description: volumeSnapshotContentName specifies the name
-                          of a pre-existing VolumeSnapshotContent object representing
-                          an existing volume snapshot. This field should be set if
-                          the snapshot already exists and only needs a representation
-                          in Kubernetes. This field is immutable.
-                        type: string
-                      volumeSnapshotName:
-                        description: volumeSnapshotName records the volumeSnapshot
-                          name.
-                        type: string
-                    type: object
-                  backupTool:
-                    description: backupTool records information about backup files
-                      generated by the backup tool.
-                    properties:
-                      checkpoint:
-                        description: backup checkpoint, for incremental backup.
-                        type: string
-                      checksum:
-                        description: checksum of backup file, generated by md5 or
-                          sha1 or sha256.
-                        type: string
-                      filePath:
-                        description: filePath records the file path of backup.
-                        type: string
-                      logFilePath:
-                        description: logFilePath records the log file path of backup.
-                        type: string
-                      uploadTotalSize:
-                        description: Backup upload total size. A string with capacity
-                          units in the form of "1Gi", "1Mi", "1Ki".
-                        type: string
-                      volumeName:
-                        description: volumeName records volume name of backup data
-                          pvc.
-                        type: string
-                    type: object
-                  target:
-                    description: target records the target cluster metadata string,
-                      which is in JSON format.
-                    type: string
-                  userContext:
-                    additionalProperties:
-                      type: string
-                    description: userContext stores some loosely structured and extensible
-                      information.
-                    type: object
-                type: object
-              parentBackupName:
-                description: Records parentBackupName if backupType is incremental.
+              path:
+                description: path is the directory inside the backup repository where
+                  the backup data is stored. It is an absolute path in the backup
+                  repository.
                 type: string
               persistentVolumeClaimName:
-                description: remoteVolume saves the backup data.
+                description: persistentVolumeClaimName is the name of the persistent
+                  volume claim that is used to store the backup data.
                 type: string
               phase:
-                description: BackupPhase The current phase. Valid values are New,
-                  InProgress, Completed, Failed.
+                description: phase is the current state of the Backup.
                 enum:
                 - New
                 - InProgress
@@ -197,18 +519,213 @@ spec:
                 - Failed
                 - Deleting
                 type: string
-              sourceCluster:
-                description: sourceCluster records the source cluster information
-                  for this backup.
-                type: string
               startTimestamp:
-                description: Date/time when the backup started being processed.
+                description: startTimestamp records the time a backup was started.
+                  The server's time is used for StartTimestamp.
                 format: date-time
                 type: string
+              target:
+                description: target records the target information for this backup.
+                properties:
+                  connectionCredential:
+                    description: connectionCredential specifies the connection credential
+                      to connect to the target database cluster.
+                    properties:
+                      hostKey:
+                        description: hostKey specifies the map key of the host in
+                          the connection credential secret.
+                        type: string
+                      passwordKey:
+                        default: password
+                        description: passwordKey specifies the map key of the password
+                          in the connection credential secret. This password will
+                          be saved in the backup annotation for full backup. You can
+                          use the environment variable DP_ENCRYPTION_KEY to specify
+                          encryption key.
+                        type: string
+                      portKey:
+                        description: portKey specifies the map key of the port in
+                          the connection credential secret.
+                        type: string
+                      secretName:
+                        description: secretName refers to the Secret object that contains
+                          the connection credential.
+                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                        type: string
+                      usernameKey:
+                        default: username
+                        description: usernameKey specifies the map key of the user
+                          in the connection credential secret.
+                        type: string
+                    required:
+                    - secretName
+                    type: object
+                  podSelector:
+                    description: podSelector is used to find the target pod. The volumes
+                      of the target pod will be backed up.
+                    properties:
+                      matchExpressions:
+                        description: matchExpressions is a list of label selector
+                          requirements. The requirements are ANDed.
+                        items:
+                          description: A label selector requirement is a selector
+                            that contains values, a key, and an operator that relates
+                            the key and values.
+                          properties:
+                            key:
+                              description: key is the label key that the selector
+                                applies to.
+                              type: string
+                            operator:
+                              description: operator represents a key's relationship
+                                to a set of values. Valid operators are In, NotIn,
+                                Exists and DoesNotExist.
+                              type: string
+                            values:
+                              description: values is an array of string values. If
+                                the operator is In or NotIn, the values array must
+                                be non-empty. If the operator is Exists or DoesNotExist,
+                                the values array must be empty. This array is replaced
+                                during a strategic merge patch.
+                              items:
+                                type: string
+                              type: array
+                          required:
+                          - key
+                          - operator
+                          type: object
+                        type: array
+                      matchLabels:
+                        additionalProperties:
+                          type: string
+                        description: matchLabels is a map of {key,value} pairs. A
+                          single {key,value} in the matchLabels map is equivalent
+                          to an element of matchExpressions, whose key field is "key",
+                          the operator is "In", and the values array contains only
+                          "value". The requirements are ANDed.
+                        type: object
+                      strategy:
+                        default: Any
+                        description: 'strategy specifies the strategy to select the
+                          target pod when multiple pods are selected. Valid values
+                          are: - Any: select any one pod that match the labelsSelector.'
+                        enum:
+                        - Any
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  resources:
+                    description: resources specifies the kubernetes resources to back
+                      up.
+                    properties:
+                      excluded:
+                        description: excluded is a slice of namespaced-scoped resource
+                          type names to exclude in the kubernetes resources. The default
+                          value is empty.
+                        items:
+                          type: string
+                        type: array
+                      included:
+                        default:
+                        - '*'
+                        description: included is a slice of namespaced-scoped resource
+                          type names to include in the kubernetes resources. The default
+                          value is "*", which means all resource types will be included.
+                        items:
+                          type: string
+                        type: array
+                      selector:
+                        description: selector is a metav1.LabelSelector to filter
+                          the target kubernetes resources that need to be backed up.
+                          If not set, will do not back up any kubernetes resources.
+                        properties:
+                          matchExpressions:
+                            description: matchExpressions is a list of label selector
+                              requirements. The requirements are ANDed.
+                            items:
+                              description: A label selector requirement is a selector
+                                that contains values, a key, and an operator that
+                                relates the key and values.
+                              properties:
+                                key:
+                                  description: key is the label key that the selector
+                                    applies to.
+                                  type: string
+                                operator:
+                                  description: operator represents a key's relationship
+                                    to a set of values. Valid operators are In, NotIn,
+                                    Exists and DoesNotExist.
+                                  type: string
+                                values:
+                                  description: values is an array of string values.
+                                    If the operator is In or NotIn, the values array
+                                    must be non-empty. If the operator is Exists or
+                                    DoesNotExist, the values array must be empty.
+                                    This array is replaced during a strategic merge
+                                    patch.
+                                  items:
+                                    type: string
+                                  type: array
+                              required:
+                              - key
+                              - operator
+                              type: object
+                            type: array
+                          matchLabels:
+                            additionalProperties:
+                              type: string
+                            description: matchLabels is a map of {key,value} pairs.
+                              A single {key,value} in the matchLabels map is equivalent
+                              to an element of matchExpressions, whose key field is
+                              "key", the operator is "In", and the values array contains
+                              only "value". The requirements are ANDed.
+                            type: object
+                        type: object
+                        x-kubernetes-map-type: atomic
+                    type: object
+                  serviceAccountName:
+                    description: serviceAccountName specifies the service account
+                      to run the backup workload.
+                    type: string
+                type: object
+              timeRange:
+                description: timeRange records the time range of backed up data, for
+                  PITR, this is the time range of recoverable data.
+                properties:
+                  end:
+                    description: end records the end time of backup.
+                    format: date-time
+                    type: string
+                  start:
+                    description: start records the start time of backup.
+                    format: date-time
+                    type: string
+                type: object
               totalSize:
-                description: Backup total size. A string with capacity units in the
-                  form of "1Gi", "1Mi", "1Ki".
+                description: totalSize is the total size of backed up data size. A
+                  string with capacity units in the format of "1Gi", "1Mi", "1Ki".
+                  If no capacity unit is specified, it is assumed to be in bytes.
                 type: string
+              volumeSnapshots:
+                description: volumeSnapshots records the volume snapshot status for
+                  the action.
+                items:
+                  properties:
+                    contentName:
+                      description: contentName is the name of the volume snapshot
+                        content.
+                      type: string
+                    name:
+                      description: name is the name of the volume snapshot.
+                      type: string
+                    size:
+                      description: size is the size of the volume snapshot.
+                      type: string
+                    volumeName:
+                      description: volumeName is the name of the volume.
+                      type: string
+                  type: object
+                type: array
             type: object
         type: object
     served: true

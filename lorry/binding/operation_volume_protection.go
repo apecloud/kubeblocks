@@ -42,9 +42,9 @@ import (
 	statsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	. "github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 const (
@@ -95,13 +95,13 @@ func init() {
 	}
 
 	if err := optVolProt.Requester.init(context.Background()); err != nil {
-		optVolProt.Logger.Error(err, "init requester error")
+		optVolProt.Logger.Info("init requester failed", "error", err)
 		return
 	}
 
 	optVolProt.Pod = os.Getenv(constant.KBEnvPodName)
 	if err := optVolProt.initVolumes(); err != nil {
-		optVolProt.Logger.Error(err, "init volumes to monitor error")
+		optVolProt.Logger.Info("init volumes to monitor failed", "error", err)
 	}
 	optVolProt.Logger.Info(fmt.Sprintf("succeed to init volume protection, pod: %s, spec: %s", optVolProt.Pod, optVolProt.buildVolumesMsg()))
 }
@@ -403,7 +403,7 @@ var _ volumeStatsRequester = &httpsVolumeStatsRequester{}
 func (r *httpsVolumeStatsRequester) init(ctx context.Context) error {
 	var err error
 	if r.cli, err = httpClient(); err != nil {
-		r.logger.Error(err, "build HTTP client error at setup")
+		// r.logger.Error(err, "build HTTP client error at setup")
 		return err
 	}
 	// if r.req, err = httpRequest(ctx); err != nil {

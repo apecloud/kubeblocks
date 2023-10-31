@@ -16,98 +16,27 @@ limitations under the License.
 
 package v1alpha1
 
-// BackupPhase The current phase. Valid values are New, InProgress, Completed, Failed.
-// +enum
-// +kubebuilder:validation:Enum={New,InProgress,Running,Completed,Failed,Deleting}
-type BackupPhase string
-
-const (
-	BackupNew        BackupPhase = "New"
-	BackupInProgress BackupPhase = "InProgress"
-	BackupRunning    BackupPhase = "Running"
-	BackupCompleted  BackupPhase = "Completed"
-	BackupFailed     BackupPhase = "Failed"
-	BackupDeleting   BackupPhase = "Deleting"
+import (
+	"errors"
+	"strconv"
+	"strings"
+	"time"
+	"unicode"
 )
 
-// BackupType the backup type, marked backup set is datafile or logfile or snapshot.
+// Phase defines the BackupPolicy and ActionSet CR .status.phase
 // +enum
-// +kubebuilder:validation:Enum={datafile,logfile,snapshot}
-type BackupType string
+// +kubebuilder:validation:Enum={Available,Unavailable}
+type Phase string
 
 const (
-	BackupTypeDataFile BackupType = "datafile"
-	BackupTypeLogFile  BackupType = "logfile"
-	BackupTypeSnapshot BackupType = "snapshot"
+	AvailablePhase   Phase = "Available"
+	UnavailablePhase Phase = "Unavailable"
 )
 
-// BackupMethod the backup method
-// +enum
-// +kubebuilder:validation:Enum={snapshot,backupTool}
-type BackupMethod string
-
-const (
-	BackupMethodSnapshot   BackupMethod = "snapshot"
-	BackupMethodBackupTool BackupMethod = "backupTool"
-)
-
-// BaseBackupType the base backup type.
-// +enum
-// +kubebuilder:validation:Enum={full,snapshot}
-type BaseBackupType string
-
-// CreatePVCPolicy the policy how to create the PersistentVolumeClaim for backup.
-// +enum
-// +kubebuilder:validation:Enum={IfNotPresent,Never}
-type CreatePVCPolicy string
-
-const (
-	CreatePVCPolicyNever        CreatePVCPolicy = "Never"
-	CreatePVCPolicyIfNotPresent CreatePVCPolicy = "IfNotPresent"
-)
-
-// BackupPolicyPhase defines phases for BackupPolicy CR.
-// +enum
-// +kubebuilder:validation:Enum={Available,Failed}
-type BackupPolicyPhase string
-
-const (
-	PolicyAvailable BackupPolicyPhase = "Available"
-	PolicyFailed    BackupPolicyPhase = "Failed"
-)
-
-// RestoreJobPhase The current phase. Valid values are New, InProgressPhy, InProgressLogic, Completed, Failed.
-// +enum
-// +kubebuilder:validation:Enum={New,InProgressPhy,InProgressLogic,Completed,Failed}
-type RestoreJobPhase string
-
-const (
-	RestoreJobNew             RestoreJobPhase = "New"
-	RestoreJobInProgressPhy   RestoreJobPhase = "InProgressPhy"
-	RestoreJobInProgressLogic RestoreJobPhase = "InProgressLogic"
-	RestoreJobCompleted       RestoreJobPhase = "Completed"
-	RestoreJobFailed          RestoreJobPhase = "Failed"
-)
-
-// DeployKind which kind for run a backup tool.
-// +enum
-// +kubebuilder:validation:Enum={job,statefulSet}
-type DeployKind string
-
-const (
-	DeployKindJob         DeployKind = "job"
-	DeployKindStatefulSet DeployKind = "statefulSet"
-)
-
-// PodRestoreScope defines the scope pod for restore from backup.
-// +enum
-// +kubebuilder:validation:Enum={All,ReadWrite}
-type PodRestoreScope string
-
-const (
-	PodRestoreScopeAll       = "All"
-	PodRestoreScopeReadWrite = "ReadWrite"
-)
+func (p Phase) IsAvailable() bool {
+	return p == AvailablePhase
+}
 
 // BackupRepoPhase defines phases for BackupRepo CR.
 // +enum
@@ -119,4 +48,177 @@ const (
 	BackupRepoFailed      BackupRepoPhase = "Failed"
 	BackupRepoReady       BackupRepoPhase = "Ready"
 	BackupRepoDeleting    BackupRepoPhase = "Deleting"
+)
+
+// RetentionPeriod represents a duration in the format "1y2mo3w4d5h6m", where
+// y=year, mo=month, w=week, d=day, h=hour, m=minute.
+type RetentionPeriod string
+
+// ToDuration converts the RetentionPeriod to time.Duration.
+func (r RetentionPeriod) ToDuration() (time.Duration, error) {
+	if len(r.String()) == 0 {
+		return time.Duration(0), nil
+	}
+
+	minutes, err := r.toMinutes()
+	if err != nil {
+		return time.Duration(0), err
+	}
+	return time.Minute * time.Duration(minutes), nil
+}
+
+func (r RetentionPeriod) String() string {
+	return string(r)
+}
+
+func (r RetentionPeriod) toMinutes() (int, error) {
+	d, err := r.parseDuration()
+	if err != nil {
+		return 0, err
+	}
+	minutes := d.Minutes
+	minutes += d.Hours * 60
+	minutes += d.Days * 24 * 60
+	minutes += d.Weeks * 7 * 24 * 60
+	minutes += d.Months * 30 * 24 * 60
+	minutes += d.Years * 365 * 24 * 60
+	return minutes, nil
+}
+
+type duration struct {
+	Minutes int
+	Hours   int
+	Days    int
+	Weeks   int
+	Months  int
+	Years   int
+}
+
+var errInvalidDuration = errors.New("invalid duration provided")
+
+// parseDuration parses a duration from a string. The format is `6y5m234d37h`
+func (r RetentionPeriod) parseDuration() (duration, error) {
+	var (
+		d   duration
+		num int
+		err error
+	)
+
+	s := strings.TrimSpace(r.String())
+	for s != "" {
+		num, s, err = r.nextNumber(s)
+		if err != nil {
+			return duration{}, err
+		}
+
+		if len(s) == 0 {
+			return duration{}, errInvalidDuration
+		}
+
+		if len(s) > 1 && s[0] == 'm' && s[1] == 'o' {
+			d.Months = num
+			s = s[2:]
+			continue
+		}
+
+		switch s[0] {
+		case 'y':
+			d.Years = num
+		case 'w':
+			d.Weeks = num
+		case 'd':
+			d.Days = num
+		case 'h':
+			d.Hours = num
+		case 'm':
+			d.Minutes = num
+		default:
+			return duration{}, errInvalidDuration
+		}
+		s = s[1:]
+	}
+	return d, nil
+}
+
+func (r RetentionPeriod) nextNumber(input string) (num int, rest string, err error) {
+	if len(input) == 0 {
+		return 0, "", nil
+	}
+
+	var (
+		n        string
+		negative bool
+	)
+
+	if input[0] == '-' {
+		negative = true
+		input = input[1:]
+	}
+
+	for i, s := range input {
+		if !unicode.IsNumber(s) {
+			rest = input[i:]
+			break
+		}
+
+		n += string(s)
+	}
+
+	if len(n) == 0 {
+		return 0, input, errInvalidDuration
+	}
+
+	num, err = strconv.Atoi(n)
+	if err != nil {
+		return 0, input, err
+	}
+
+	if negative {
+		num = -num
+	}
+	return num, rest, nil
+}
+
+// RestorePhase The current phase. Valid values are Running, Completed, Failed, AsDataSource.
+// +enum
+// +kubebuilder:validation:Enum={Running,Completed,Failed,AsDataSource}
+type RestorePhase string
+
+const (
+	RestorePhaseRunning      RestorePhase = "Running"
+	RestorePhaseCompleted    RestorePhase = "Completed"
+	RestorePhaseFailed       RestorePhase = "Failed"
+	RestorePhaseAsDataSource RestorePhase = "AsDataSource"
+)
+
+// RestoreActionStatus the status of restore action.
+// +enum
+// +kubebuilder:validation:Enum={Processing,Completed,Failed}
+type RestoreActionStatus string
+
+const (
+	RestoreActionProcessing RestoreActionStatus = "Processing"
+	RestoreActionCompleted  RestoreActionStatus = "Completed"
+	RestoreActionFailed     RestoreActionStatus = "Failed"
+)
+
+type RestoreStage string
+
+const (
+	PrepareData RestoreStage = "prepareData"
+	PostReady   RestoreStage = "postReady"
+)
+
+// VolumeClaimRestorePolicy defines restore policy for persistent volume claim.
+// Supported policies are as follows:
+// 1. Parallel: parallel recovery of persistent volume claim.
+// 2. Serial: restore the persistent volume claim in sequence, and wait until the
+// previous persistent volume claim is restored before restoring a new one.
+// +enum
+// +kubebuilder:validation:Enum={Parallel,Serial}
+type VolumeClaimRestorePolicy string
+
+const (
+	VolumeClaimRestorePolicyParallel VolumeClaimRestorePolicy = "Parallel"
+	VolumeClaimRestorePolicySerial   VolumeClaimRestorePolicy = "Serial"
 )

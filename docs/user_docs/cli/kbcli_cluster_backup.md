@@ -11,28 +11,29 @@ kbcli cluster backup NAME [flags]
 ### Examples
 
 ```
-  # create a backup, the default type is snapshot.
+  # Create a backup for the cluster, use the default backup policy and volume snapshot backup method
   kbcli cluster backup mycluster
   
-  # create a snapshot backup
-  # create a snapshot of the cluster's persistent volume for backup
-  kbcli cluster backup mycluster --type snapshot
+  # create a backup with a specified method, run "kbcli cluster desc-backup-policy mycluster" to show supported backup methods
+  kbcli cluster backup mycluster --method volume-snapshot
   
-  # create a datafile backup
-  # backup all files under the data directory and save them to the specified storage, only full backup is supported now.
-  kbcli cluster backup mycluster --type datafile
+  # create a backup with specified backup policy, run "kbcli cluster list-backup-policy mycluster" to show the cluster supported backup policies
+  kbcli cluster backup mycluster --method volume-snapshot --policy <backup-policy-name>
   
-  # create a backup with specified backup policy
-  kbcli cluster backup mycluster --policy <backup-policy-name>
+  # create a backup from a parent backup
+  kbcli cluster backup mycluster --parent-backup parent-backup-name
 ```
 
 ### Options
 
 ```
-  -h, --help            help for backup
-      --name string     Backup name
-      --policy string   Backup policy name, this flag will be ignored when backup-type is snapshot
-      --type string     Backup type (default "snapshot")
+      --deletion-policy string    Deletion policy for backup, determine whether the backup content in backup repo will be deleted after the backup is deleted, supported values: [Delete, Retain] (default "Delete")
+  -h, --help                      help for backup
+      --method string             Backup methods are defined in backup policy (required), if only one backup method in backup policy, use it as default backup method, if multiple backup methods in backup policy, use method which volume snapshot is true as default backup method
+      --name string               Backup name
+      --parent-backup string      Parent backup name, used for incremental backup
+      --policy string             Backup policy name, if not specified, use the cluster default backup policy
+      --retention-period string   Retention period for backup, supported values: [1y, 1mo, 1d, 1h, 1m] or combine them [1y1mo1d1h1m], if not specified, the backup will not be automatically deleted, you need to manually delete it.
 ```
 
 ### Options inherited from parent commands

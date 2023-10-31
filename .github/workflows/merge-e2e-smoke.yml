@@ -8,7 +8,7 @@ on:
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   K3D_NAME: default
-  K3S_VERSION: v1.25
+  K3S_VERSION: v1.26
   BASE_BRANCH: origin/main
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
     outputs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           repository: ${{ github.event.pull_request.head.repo.full_name }}
@@ -47,7 +47,7 @@ jobs:
       runner-name4: ${{ steps.get_runner_name.outputs.runner_name4 }}
       runner-name5: ${{ steps.get_runner_name.outputs.runner_name5 }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: setup k3d k3s
         uses: apecloud/setup-k3d-k3s@v1
         with:
@@ -112,7 +112,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && always() }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: remove runner
         run: |
           RUNNER_NAME="${{ needs.e2e-test.outputs.runner-name1 }}|${{ needs.e2e-test.outputs.runner-name2 }}|${{ needs.e2e-test.outputs.runner-name3 }}|${{ needs.e2e-test.outputs.runner-name4 }}|${{ needs.e2e-test.outputs.runner-name5 }}"

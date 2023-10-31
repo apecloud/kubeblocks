@@ -14,13 +14,20 @@ spec:
   type: Helm
 
   helm:
-    chartLocationURL: oci://registry-1.docker.io/bitnamicharts/minio
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "minio" "version" "12.8.12" "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: 12.8.12
+      {{- end }}
 
     installValues:
       setValues:
         - auth.rootUser=kubeblocks
         - auth.rootPassword=kubeblocks
-
+        - extraEnvVars[0].name=MINIO_BROWSER_LOGIN_ANIMATION
+        - extraEnvVars[0].value=off
   installable:
     autoInstall: false
 

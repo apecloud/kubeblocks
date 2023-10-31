@@ -29,9 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
-	mock_proto "github.com/apecloud/kubeblocks/internal/configuration/proto/mocks"
-	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
+	mock_proto "github.com/apecloud/kubeblocks/pkg/configuration/proto/mocks"
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
 var operatorSyncPolicy = &syncPolicy{}

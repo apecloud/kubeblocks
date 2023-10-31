@@ -45,8 +45,8 @@ const (
 
 	// condition and event reasons
 
-	ReasonReconfigureMerging       = "ReconfigureMerging"
-	ReasonReconfigureMerged        = "ReconfigureMerged"
+	ReasonReconfigurePersisting    = "ReconfigurePersisting"
+	ReasonReconfigurePersisted     = "ReconfigurePersisted"
 	ReasonReconfigureFailed        = "ReconfigureFailed"
 	ReasonReconfigureRestartFailed = "ReconfigureRestartFailed"
 	ReasonReconfigureRestart       = "ReconfigureRestarted"

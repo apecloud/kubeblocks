@@ -28,10 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // ClusterSpec defines the desired state of Cluster.
@@ -64,6 +64,10 @@ type ClusterSpec struct {
 	// +listMapKey=name
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=128
+	// +kubebuilder:validation:XValidation:rule="self.all(x, size(self.filter(c, c.name == x.name)) == 1)",message="duplicated component"
+	// +kubebuilder:validation:XValidation:rule="self.all(x, oldSelf.exists(y, y.name == x.name))",message="component can not be added dynamically"
+	// +kubebuilder:validation:XValidation:rule="oldSelf.all(x, self.exists(y, y.name == x.name))",message="component can not be removed dynamically"
 	ComponentSpecs []ClusterComponentSpec `json:"componentSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// tenancy describes how pods are distributed across node.
@@ -116,18 +120,23 @@ type ClusterBackup struct {
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
 
-	// retentionPeriod is a time string ending with the 'd'|'D'|'h'|'H' character to describe how long
-	// the Backup should be retained. if not set, will be retained forever.
-	// +kubebuilder:validation:Pattern:=`^\d+[d|D|h|H]$`
-	// +kubebuilder:default="1d"
+	// retentionPeriod determines a duration up to which the backup should be kept.
+	// controller will remove all backups that are older than the RetentionPeriod.
+	// For example, RetentionPeriod of `30d` will keep only the backups of last 30 days.
+	// Sample duration format:
+	// - years: 	2y
+	// - months: 	6mo
+	// - days: 		30d
+	// - hours: 	12h
+	// - minutes: 	30m
+	// You can also combine the above durations. For example: 30d12h30m
+	// +kubebuilder:default="7d"
 	// +optional
-	RetentionPeriod *string `json:"retentionPeriod,omitempty"`
+	RetentionPeriod dpv1alpha1.RetentionPeriod `json:"retentionPeriod,omitempty"`
 
-	// backup method, support: snapshot, backupTool.
-	// +kubebuilder:validation:Enum=snapshot;backupTool
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=snapshot
-	Method dataprotectionv1alpha1.BackupMethod `json:"method"`
+	// backup method name to use, that is defined in backupPolicy.
+	// +optional
+	Method string `json:"method"`
 
 	// the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
 	// +optional
@@ -135,9 +144,9 @@ type ClusterBackup struct {
 
 	// startingDeadlineMinutes defines the deadline in minutes for starting the backup job
 	// if it misses scheduled time for any reason.
-	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=1440
+	// +optional
 	StartingDeadlineMinutes *int64 `json:"startingDeadlineMinutes,omitempty"`
 
 	// repoName is the name of the backupRepo, if not set, will use the default backupRepo.
@@ -213,6 +222,7 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	Name string `json:"name"`
 
 	// componentDefRef references componentDef defined in ClusterDefinition spec. Need to
@@ -220,6 +230,7 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDefRef is immutable"
 	ComponentDefRef string `json:"componentDefRef"`
 
 	// classDefRef references the class defined in ComponentClassDefinition.
@@ -350,12 +361,12 @@ type ClusterComponentStatus struct {
 
 	// consensusSetStatus specifies the mapping of role and pod name.
 	// +optional
-	//+kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use MembersStatus instead."
+	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use MembersStatus instead."
 	ConsensusSetStatus *ConsensusSetStatus `json:"consensusSetStatus,omitempty"`
 
 	// replicationSetStatus specifies the mapping of role and pod name.
 	// +optional
-	//+kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use MembersStatus instead."
+	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use MembersStatus instead."
 	ReplicationSetStatus *ReplicationSetStatus `json:"replicationSetStatus,omitempty"`
 
 	// members' status.
@@ -434,10 +445,12 @@ type ClusterComponentVolumeClaimTemplate struct {
 }
 
 func (r *ClusterComponentVolumeClaimTemplate) toVolumeClaimTemplate() corev1.PersistentVolumeClaimTemplate {
-	t := corev1.PersistentVolumeClaimTemplate{}
-	t.ObjectMeta.Name = r.Name
-	t.Spec = r.Spec.ToV1PersistentVolumeClaimSpec()
-	return t
+	return corev1.PersistentVolumeClaimTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: r.Name,
+		},
+		Spec: r.Spec.ToV1PersistentVolumeClaimSpec(),
+	}
 }
 
 type PersistentVolumeClaimSpec struct {
@@ -458,12 +471,9 @@ type PersistentVolumeClaimSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.
 	// +optional
 	StorageClassName *string `json:"storageClassName,omitempty" protobuf:"bytes,5,opt,name=storageClassName"`
-	// TODO:
-	// // preferStorageClassNames added support specifying storageclasses.storage.k8s.io names, in order
-	// // to adapt multi-cloud deployment, where storageclasses are all distinctly different among clouds.
-	// // +listType=set
-	// // +optional
-	// PreferSCNames []string `json:"preferStorageClassNames,omitempty"`
+	// volumeMode defines what type of volume is required by the claim.
+	// +optional
+	VolumeMode *corev1.PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,6,opt,name=volumeMode,casttype=PersistentVolumeMode"`
 }
 
 // ToV1PersistentVolumeClaimSpec converts to corev1.PersistentVolumeClaimSpec.
@@ -471,21 +481,21 @@ func (r *PersistentVolumeClaimSpec) ToV1PersistentVolumeClaimSpec() corev1.Persi
 	return corev1.PersistentVolumeClaimSpec{
 		AccessModes:      r.AccessModes,
 		Resources:        r.Resources,
-		StorageClassName: r.GetStorageClassName(viper.GetString(constant.CfgKeyDefaultStorageClass)),
+		StorageClassName: r.getStorageClassName(viper.GetString(constant.CfgKeyDefaultStorageClass)),
+		VolumeMode:       r.VolumeMode,
 	}
 }
 
-// GetStorageClassName returns PersistentVolumeClaimSpec.StorageClassName if a value is assigned; otherwise,
+// getStorageClassName returns PersistentVolumeClaimSpec.StorageClassName if a value is assigned; otherwise,
 // it returns preferSC argument.
-func (r *PersistentVolumeClaimSpec) GetStorageClassName(preferSC string) *string {
+func (r *PersistentVolumeClaimSpec) getStorageClassName(preferSC string) *string {
 	if r.StorageClassName != nil && *r.StorageClassName != "" {
 		return r.StorageClassName
 	}
-
-	if preferSC == "" {
-		return nil
+	if preferSC != "" {
+		return &preferSC
 	}
-	return &preferSC
+	return nil
 }
 
 type Affinity struct {

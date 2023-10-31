@@ -8,7 +8,7 @@ on:
 
 env:
   BASE_BRANCH: origin/main
-  GO_VERSION: "1.20.5"
+  GO_VERSION: "1.21"
 
 jobs:
   trigger-mode:
@@ -16,7 +16,7 @@ jobs:
     outputs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Get trigger mode
@@ -50,7 +50,7 @@ jobs:
       matrix:
         language: [ 'go' ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: install lib
         run: |
           sudo apt-get update

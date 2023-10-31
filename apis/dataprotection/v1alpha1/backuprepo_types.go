@@ -22,12 +22,30 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// AccessMethod is an enum type that defines the access method of the backup repo.
+type AccessMethod string
+
+const (
+	// AccessMethodMount means that the storage is mounted locally,
+	// so that remote files can be accessed just like a local file.
+	AccessMethodMount AccessMethod = "Mount"
+	// AccessMethodTool means to access the storage with a command-line tool,
+	// which helps to transfer files between the storage and local.
+	AccessMethodTool AccessMethod = "Tool"
+)
+
 // BackupRepoSpec defines the desired state of BackupRepo
 type BackupRepoSpec struct {
 	// The storage provider used by this backup repo.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="StorageProviderRef is immutable"
 	// +kubebuilder:validation:Required
 	StorageProviderRef string `json:"storageProviderRef"`
+
+	// Specifies the access method of the backup repo.
+	// +kubebuilder:validation:Enum={Mount,Tool}
+	// +kubebuilder:default=Mount
+	// +optional
+	AccessMethod AccessMethod `json:"accessMethod,omitempty"`
 
 	// The requested capacity for the PVC created by this backup repo.
 	// +optional
@@ -74,6 +92,10 @@ type BackupRepoStatus struct {
 	// +optional
 	BackupPVCName string `json:"backupPVCName,omitempty"`
 
+	// toolConfigSecretName is the name of the secret containing the configuration for the access tool.
+	// +optional
+	ToolConfigSecretName string `json:"toolConfigSecretName,omitempty"`
+
 	// isDefault indicates whether this backup repo is the default one.
 	// +optional
 	IsDefault bool `json:"isDefault,omitempty"`
@@ -87,6 +109,7 @@ type BackupRepoStatus struct {
 // +kubebuilder:resource:path=backuprepos,categories={kubeblocks},scope=Cluster
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase"
 // +kubebuilder:printcolumn:name="STORAGEPROVIDER",type="string",JSONPath=".spec.storageProviderRef"
+// +kubebuilder:printcolumn:name="ACCESSMETHOD",type="string",JSONPath=".spec.accessMethod"
 // +kubebuilder:printcolumn:name="DEFAULT",type="boolean",JSONPath=`.status.isDefault`
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
@@ -110,4 +133,12 @@ type BackupRepoList struct {
 
 func init() {
 	SchemeBuilder.Register(&BackupRepo{}, &BackupRepoList{})
+}
+
+func (repo *BackupRepo) AccessByMount() bool {
+	return repo.Spec.AccessMethod == "" || repo.Spec.AccessMethod == AccessMethodMount
+}
+
+func (repo *BackupRepo) AccessByTool() bool {
+	return repo.Spec.AccessMethod == AccessMethodTool
 }

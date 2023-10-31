@@ -24,7 +24,6 @@ import (
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -35,9 +34,9 @@ type FakeBackupPolicyTemplates struct {
 	Fake *FakeAppsV1alpha1
 }
 
-var backuppolicytemplatesResource = schema.GroupVersionResource{Group: "apps.kubeblocks.io", Version: "v1alpha1", Resource: "backuppolicytemplates"}
+var backuppolicytemplatesResource = v1alpha1.SchemeGroupVersion.WithResource("backuppolicytemplates")
 
-var backuppolicytemplatesKind = schema.GroupVersionKind{Group: "apps.kubeblocks.io", Version: "v1alpha1", Kind: "BackupPolicyTemplate"}
+var backuppolicytemplatesKind = v1alpha1.SchemeGroupVersion.WithKind("BackupPolicyTemplate")
 
 // Get takes name of the backupPolicyTemplate, and returns the corresponding backupPolicyTemplate object, and an error if there is any.
 func (c *FakeBackupPolicyTemplates) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.BackupPolicyTemplate, err error) {

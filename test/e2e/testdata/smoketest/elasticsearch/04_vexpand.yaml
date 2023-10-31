@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: elasticsearch-cluster-vexpand-
+spec:
+  clusterRef: elasticsearch-cluster
+  type: VolumeExpansion
+  volumeExpansion:
+    - componentName: elasticsearch
+      volumeClaimTemplates:
+        - name: data
+          storage: "21Gi"

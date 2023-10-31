@@ -27,14 +27,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
 // ValidateAndLoadRefResourcesTransformer handles referenced resources'(cd & cv) validation and load them into context
 type ValidateAndLoadRefResourcesTransformer struct{}
 
 func (t *ValidateAndLoadRefResourcesTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*ClusterTransformContext)
+	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster
 
 	var err error

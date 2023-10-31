@@ -35,8 +35,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // log is for logging in this package.
@@ -59,38 +60,38 @@ func (r *OpsRequest) SetupWebhookWithManager(mgr ctrl.Manager) error {
 var _ webhook.Validator = &OpsRequest{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *OpsRequest) ValidateCreate() error {
+func (r *OpsRequest) ValidateCreate() (admission.Warnings, error) {
 	opsRequestLog.Info("validate create", "name", r.Name)
-	return r.validateEntry(true)
+	return nil, r.validateEntry(true)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
+func (r *OpsRequest) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	opsRequestLog.Info("validate update", "name", r.Name)
 	lastOpsRequest := old.(*OpsRequest).DeepCopy()
 	// if no spec updated, we should skip validation.
 	// if not, we can not delete the OpsRequest when cluster has been deleted.
 	// because when cluster not existed, r.validate will report an error.
 	if reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
-		return nil
+		return nil, nil
 	}
 
 	if r.IsComplete() {
-		return fmt.Errorf("update OpsRequest: %s is forbidden when status.Phase is %s", r.Name, r.Status.Phase)
+		return nil, fmt.Errorf("update OpsRequest: %s is forbidden when status.Phase is %s", r.Name, r.Status.Phase)
 	}
 
 	// Keep the cancel consistent between the two opsRequest for comparing the diff.
 	lastOpsRequest.Spec.Cancel = r.Spec.Cancel
 	if !reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) && r.Status.Phase != "" {
-		return fmt.Errorf("update OpsRequest: %s is forbidden except for cancel when status.Phase is %s", r.Name, r.Status.Phase)
+		return nil, fmt.Errorf("update OpsRequest: %s is forbidden except for cancel when status.Phase is %s", r.Name, r.Status.Phase)
 	}
-	return r.validateEntry(false)
+	return nil, r.validateEntry(false)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *OpsRequest) ValidateDelete() error {
+func (r *OpsRequest) ValidateDelete() (admission.Warnings, error) {
 	opsRequestLog.Info("validate delete", "name", r.Name)
-	return nil
+	return nil, nil
 }
 
 // IsComplete checks if opsRequest has been completed.

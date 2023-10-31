@@ -64,7 +64,7 @@ spec:
                 containerPort: 6379
             volumeMounts:
               - name: data
-                mountPath: /data
+                mountPath: {{ .Values.dataMountPath }}
               - name: redis-config
                 mountPath: /etc/conf
               - name: scripts
@@ -74,6 +74,8 @@ spec:
               - name: pod-info
                 mountPath: /kb-podinfo
             env:
+              - name: SERVICE_PORT
+                value: "6379"
               - name: REDIS_REPL_USER
                 value: "kbreplicator"
               - name: REDIS_REPL_PASSWORD
@@ -81,6 +83,12 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+                    optional: false
+              - name: REDIS_DEFAULT_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
                     optional: false
               - name: REDIS_DEFAULT_PASSWORD
                 valueFrom:
@@ -231,7 +239,7 @@ spec:
           imagePullPolicy: IfNotPresent
           volumeMounts:
             - name: data
-              mountPath: /data
+              mountPath: {{ .Values.dataMountPath }}
             - name: redis-config
               mountPath: /etc/conf
             - name: sentinel-conf
@@ -278,7 +286,7 @@ spec:
               name: redis-sentinel
           volumeMounts:
             - name: data
-              mountPath: /data
+              mountPath: {{ .Values.dataMountPath }}
             - name: redis-config
               mountPath: /etc/conf
             - name: sentinel-conf

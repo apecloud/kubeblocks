@@ -1,0 +1,38 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: ActionSet
+metadata:
+  name: postgres-basebackup
+  labels:
+    clusterdefinition.kubeblocks.io/name: postgresql
+    {{- include "postgresql.labels" . | nindent 4 }}
+spec:
+  backupType: Full
+  env:
+    - name: DATA_DIR
+      value: {{ .Values.dataMountPath }}/pgroot/data
+    - name: IMAGE_TAG
+      value: 14.8.0-pgvector-v0.5.0
+  backup:
+    preBackup: []
+    postBackup: []
+    backupData:
+      image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:$(IMAGE_TAG)
+      runOnTargetPodNode: false
+      command:
+      - bash
+      - -c
+      - |
+        {{- .Files.Get "dataprotection/backup-info-collector.sh" | nindent 8 }}
+        {{- .Files.Get "dataprotection/pg-basebackup-backup.sh" | nindent 8 }}
+      syncProgress:
+        enabled: true
+        intervalSeconds: 5
+  restore:
+    prepareData:
+      image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:$(IMAGE_TAG)
+      command:
+      - bash
+      - -c
+      - |
+        {{- .Files.Get "dataprotection/pg-basebackup-restore.sh" | nindent 8 }}
+    postReady: []

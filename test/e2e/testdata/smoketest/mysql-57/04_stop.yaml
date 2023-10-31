@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: mysql-57-cluster-stop-
+spec:
+  clusterRef: mysql-57-cluster
+  ttlSecondsAfterSucceed: 27017
+  type: Stop
+  restart:
+    - componentName: mysql

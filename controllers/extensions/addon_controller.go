@@ -36,12 +36,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // AddonReconciler reconciles a Addon object
@@ -147,14 +146,14 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 func (r *AddonReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&extensionsv1alpha1.Addon{}).
-		Watches(&source.Kind{Type: &batchv1.Job{}}, handler.EnqueueRequestsFromMapFunc(r.findAddonJobs)).
+		Watches(&batchv1.Job{}, handler.EnqueueRequestsFromMapFunc(r.findAddonJobs)).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(maxConcurrentReconcilesKey),
 		}).
 		Complete(r)
 }
 
-func (r *AddonReconciler) findAddonJobs(job client.Object) []reconcile.Request {
+func (r *AddonReconciler) findAddonJobs(ctx context.Context, job client.Object) []reconcile.Request {
 	labels := job.GetLabels()
 	if _, ok := labels[constant.AddonNameLabelKey]; !ok {
 		return []reconcile.Request{}

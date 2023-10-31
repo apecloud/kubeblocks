@@ -25,20 +25,20 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/handler"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
-	"github.com/apecloud/kubeblocks/internal/controller/rsm"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/handler"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // ReplicatedStateMachineReconciler reconciles a ReplicatedStateMachine object
@@ -48,9 +48,9 @@ type ReplicatedStateMachineReconciler struct {
 	Recorder record.EventRecorder
 }
 
-//+kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=replicatedstatemachines,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=replicatedstatemachines/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=replicatedstatemachines/finalizers,verbs=update
+// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=replicatedstatemachines,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=replicatedstatemachines/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=replicatedstatemachines/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -74,6 +74,9 @@ func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ct
 	requeueError := func(err error) (ctrl.Result, error) {
 		if re, ok := err.(model.RequeueError); ok {
 			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
+		}
+		if apierrors.IsConflict(err) {
+			return intctrlutil.Requeue(reqCtx.Log, err.Error())
 		}
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -151,9 +154,9 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 
 		return ctrl.NewControllerManagedBy(mgr).
 			For(&workloads.ReplicatedStateMachine{}).
-			Watches(&source.Kind{Type: &appsv1.StatefulSet{}}, stsHandler).
-			Watches(&source.Kind{Type: &batchv1.Job{}}, jobHandler).
-			Watches(&source.Kind{Type: &corev1.Pod{}}, podHandler).
+			Watches(&appsv1.StatefulSet{}, stsHandler).
+			Watches(&batchv1.Job{}, jobHandler).
+			Watches(&corev1.Pod{}, podHandler).
 			Complete(r)
 	}
 
@@ -164,6 +167,6 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 		For(&workloads.ReplicatedStateMachine{}).
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&batchv1.Job{}).
-		Watches(&source.Kind{Type: &corev1.Pod{}}, podHandler).
+		Watches(&corev1.Pod{}, podHandler).
 		Complete(r)
 }

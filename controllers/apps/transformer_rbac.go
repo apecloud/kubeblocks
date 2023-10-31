@@ -32,13 +32,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controller/factory"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/factory"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // RBACTransformer puts the rbac at the beginning of the DAG
@@ -47,14 +48,10 @@ type RBACTransformer struct{}
 var _ graph.Transformer = &RBACTransformer{}
 
 func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*ClusterTransformContext)
+	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster
-	root, err := ictrltypes.FindRootVertex(dag)
-	if err != nil {
-		return err
-	}
+	graphCli, _ := transCtx.Client.(model.GraphClient)
 
-	parentVertex := root
 	componentSpecs, err := getComponentSpecs(transCtx)
 	if err != nil {
 		return err
@@ -81,28 +78,28 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 		return nil
 	}
 
+	var parent client.Object
 	rb := buildRoleBinding(cluster, serviceAccounts)
-	parentVertex = ictrltypes.LifecycleObjectCreate(dag, rb, parentVertex)
+	graphCli.Create(dag, rb)
+	parent = rb
 	if len(serviceAccountsNeedCrb) > 0 {
 		crb := buildClusterRoleBinding(cluster, serviceAccountsNeedCrb)
-		parentVertex = ictrltypes.LifecycleObjectCreate(dag, crb, parentVertex)
+		graphCli.Create(dag, crb)
+		graphCli.DependOn(dag, parent, crb)
+		parent = crb
 	}
 
-	saVertexs := createSaVertex(serviceAccounts, dag, parentVertex)
-	statefulSetVertices := ictrltypes.FindAll[*appsv1.StatefulSet](dag)
-	for _, statefulSetVertex := range statefulSetVertices {
+	sas := createServiceAccounts(serviceAccounts, graphCli, dag, parent)
+	stsList := graphCli.FindAll(dag, &appsv1.StatefulSet{})
+	for _, sts := range stsList {
 		// serviceaccount must be created before statefulset
-		for _, saVertex := range saVertexs {
-			dag.Connect(statefulSetVertex, saVertex)
-		}
+		graphCli.DependOn(dag, sts, sas...)
 	}
 
-	deploymentVertices := ictrltypes.FindAll[*appsv1.Deployment](dag)
-	for _, deploymentVertex := range deploymentVertices {
+	deployList := graphCli.FindAll(dag, &appsv1.Deployment{})
+	for _, deploy := range deployList {
 		// serviceaccount must be created before deployment
-		for _, saVertex := range saVertexs {
-			dag.Connect(deploymentVertex, saVertex)
-		}
+		graphCli.DependOn(dag, deploy, sas...)
 	}
 
 	return nil
@@ -138,7 +135,7 @@ func isVolumeProtectionEnabled(clusterDef *appsv1alpha1.ClusterDefinition, compS
 	return false
 }
 
-func isServiceAccountExist(transCtx *ClusterTransformContext, serviceAccountName string) bool {
+func isServiceAccountExist(transCtx *clusterTransformContext, serviceAccountName string) bool {
 	cluster := transCtx.Cluster
 	namespaceName := types.NamespacedName{
 		Namespace: cluster.Namespace,
@@ -158,7 +155,7 @@ func isServiceAccountExist(transCtx *ClusterTransformContext, serviceAccountName
 	return true
 }
 
-func isClusterRoleBindingExist(transCtx *ClusterTransformContext, serviceAccountName string) bool {
+func isClusterRoleBindingExist(transCtx *clusterTransformContext, serviceAccountName string) bool {
 	cluster := transCtx.Cluster
 	namespaceName := types.NamespacedName{
 		Namespace: cluster.Namespace,
@@ -196,7 +193,7 @@ func isClusterRoleBindingExist(transCtx *ClusterTransformContext, serviceAccount
 	return true
 }
 
-func isRoleBindingExist(transCtx *ClusterTransformContext, serviceAccountName string) bool {
+func isRoleBindingExist(transCtx *clusterTransformContext, serviceAccountName string) bool {
 	cluster := transCtx.Cluster
 	namespaceName := types.NamespacedName{
 		Namespace: cluster.Namespace,
@@ -234,7 +231,7 @@ func isRoleBindingExist(transCtx *ClusterTransformContext, serviceAccountName st
 	return true
 }
 
-func getComponentSpecs(transCtx *ClusterTransformContext) ([]appsv1alpha1.ClusterComponentSpec, error) {
+func getComponentSpecs(transCtx *clusterTransformContext) ([]appsv1alpha1.ClusterComponentSpec, error) {
 	cluster := transCtx.Cluster
 	clusterDef := transCtx.ClusterDef
 	componentSpecs := make([]appsv1alpha1.ClusterComponentSpec, 0, 1)
@@ -264,7 +261,7 @@ func getComponentSpecs(transCtx *ClusterTransformContext) ([]appsv1alpha1.Cluste
 	return componentSpecs, nil
 }
 
-func getDefaultBackupPolicyTemplate(transCtx *ClusterTransformContext, clusterDefName string) (*appsv1alpha1.BackupPolicyTemplate, error) {
+func getDefaultBackupPolicyTemplate(transCtx *clusterTransformContext, clusterDefName string) (*appsv1alpha1.BackupPolicyTemplate, error) {
 	backupPolicyTPLs := &appsv1alpha1.BackupPolicyTemplateList{}
 	if err := transCtx.Client.List(transCtx.Context, backupPolicyTPLs, client.MatchingLabels{constant.ClusterDefLabelKey: clusterDefName}); err != nil {
 		return nil, err
@@ -273,14 +270,14 @@ func getDefaultBackupPolicyTemplate(transCtx *ClusterTransformContext, clusterDe
 		return nil, nil
 	}
 	for _, item := range backupPolicyTPLs.Items {
-		if item.Annotations[constant.DefaultBackupPolicyTemplateAnnotationKey] == trueVal {
+		if item.Annotations[dptypes.DefaultBackupPolicyTemplateAnnotationKey] == trueVal {
 			return &item, nil
 		}
 	}
 	return &backupPolicyTPLs.Items[0], nil
 }
 
-func buildServiceAccounts(transCtx *ClusterTransformContext, componentSpecs []appsv1alpha1.ClusterComponentSpec) (map[string]*corev1.ServiceAccount, map[string]*corev1.ServiceAccount, error) {
+func buildServiceAccounts(transCtx *clusterTransformContext, componentSpecs []appsv1alpha1.ClusterComponentSpec) (map[string]*corev1.ServiceAccount, map[string]*corev1.ServiceAccount, error) {
 	serviceAccounts := map[string]*corev1.ServiceAccount{}
 	serviceAccountsNeedCrb := map[string]*corev1.ServiceAccount{}
 	clusterDef := transCtx.ClusterDef
@@ -346,12 +343,13 @@ func buildClusterRoleBinding(cluster *appsv1alpha1.Cluster, serviceAccounts map[
 	return clusterRoleBinding
 }
 
-func createSaVertex(serviceAccounts map[string]*corev1.ServiceAccount, dag *graph.DAG, parentVertex *ictrltypes.LifecycleVertex) []*ictrltypes.LifecycleVertex {
-	var saVertexes []*ictrltypes.LifecycleVertex
+func createServiceAccounts(serviceAccounts map[string]*corev1.ServiceAccount, graphCli model.GraphClient, dag *graph.DAG, parent client.Object) []client.Object {
+	var sas []client.Object
 	for _, sa := range serviceAccounts {
 		// serviceaccount must be created before rolebinding and clusterrolebinding
-		saVertex := ictrltypes.LifecycleObjectCreate(dag, sa, parentVertex)
-		saVertexes = append(saVertexes, saVertex)
+		graphCli.Create(dag, sa)
+		graphCli.DependOn(dag, parent, sa)
+		sas = append(sas, sa)
 	}
-	return saVertexes
+	return sas
 }

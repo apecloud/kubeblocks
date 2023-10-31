@@ -1,0 +1,15 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: zookeeper-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  labels:
+    {{- include "zookeeper.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: zookeeper
+  componentVersions:
+    - componentDefRef: zookeeper
+      versionsContext:
+        containers:
+          - name: zookeeper
+            image: {{ .Values.images.zookeeper.repository }}:{{ .Values.images.zookeeper.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.zookeeper.pullPolicy }}

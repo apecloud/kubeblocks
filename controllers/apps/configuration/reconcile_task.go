@@ -22,11 +22,14 @@ package configuration
 import (
 	"strconv"
 
+	corev1 "k8s.io/api/core/v1"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controller/configuration"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type Task struct {
@@ -35,46 +38,77 @@ type Task struct {
 	Status *appsv1alpha1.ConfigurationItemDetailStatus
 	Name   string
 
-	Do         func(fetcher *Task, component *component.SynthesizedComponent, revision string) error
-	SyncStatus func(fetcher *Task, status *appsv1alpha1.ConfigurationItemDetailStatus) error
+	Do func(fetcher *Task, component *component.SynthesizedComponent, revision string) error
+}
+
+type TaskContext struct {
+	configuration *appsv1alpha1.Configuration
+	reqCtx        intctrlutil.RequestCtx
+	fetcher       *Task
 }
 
 func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.ConfigurationItemDetailStatus) Task {
 	return Task{
-		Name:   item.Name,
-		Status: status,
+		Name: item.Name,
 		Do: func(fetcher *Task, synComponent *component.SynthesizedComponent, revision string) error {
 			configSpec := item.ConfigSpec
 			if configSpec == nil {
 				return core.MakeError("not found config spec: %s", item.Name)
 			}
-			reconcileTask := configuration.NewReconcilePipeline(configuration.ReconcileCtx{
-				ResourceCtx: fetcher.ResourceCtx,
-				Cluster:     fetcher.ClusterObj,
-				ClusterVer:  fetcher.ClusterVerObj,
-				Component:   synComponent,
-				PodSpec:     synComponent.PodSpec,
-			}, item, status, configSpec)
-			return reconcileTask.ConfigMap(item.Name).
-				ConfigConstraints(configSpec.ConfigConstraintRef).
-				PrepareForTemplate().
-				RerenderTemplate().
-				ApplyParameters().
-				UpdateConfigVersion(revision).
-				Sync().
-				Complete()
+			if err := fetcher.ConfigMap(item.Name).Complete(); err != nil {
+				return err
+			}
+			// Do reconcile for config template
+			configMap := fetcher.ConfigMapObj
+			switch intctrlutil.GetConfigSpecReconcilePhase(configMap, item, status) {
+			default:
+				return syncStatus(configMap, status)
+			case appsv1alpha1.CPendingPhase,
+				appsv1alpha1.CMergeFailedPhase:
+				return syncImpl(fetcher, item, status, synComponent, revision, configSpec)
+			case appsv1alpha1.CCreatingPhase:
+				return nil
+			}
 		},
-		SyncStatus: syncStatus,
+		Status: status,
 	}
 }
 
-func syncStatus(fetcher *Task, status *appsv1alpha1.ConfigurationItemDetailStatus) (err error) {
-	err = fetcher.ConfigMap(status.Name).Complete()
-	if err != nil {
-		return
-	}
+func syncImpl(fetcher *Task,
+	item appsv1alpha1.ConfigurationItemDetail,
+	status *appsv1alpha1.ConfigurationItemDetailStatus,
+	component *component.SynthesizedComponent,
+	revision string,
+	configSpec *appsv1alpha1.ComponentConfigSpec) (err error) {
+	err = configuration.NewReconcilePipeline(configuration.ReconcileCtx{
+		ResourceCtx: fetcher.ResourceCtx,
+		Cluster:     fetcher.ClusterObj,
+		ClusterVer:  fetcher.ClusterVerObj,
+		Component:   component,
+		PodSpec:     component.PodSpec,
+	}, item, status, configSpec).
+		ConfigMap(item.Name).
+		ConfigConstraints(configSpec.ConfigConstraintRef).
+		PrepareForTemplate().
+		RerenderTemplate().
+		ApplyParameters().
+		UpdateConfigVersion(revision).
+		Sync().
+		Complete()
 
-	annotations := fetcher.ConfigMapObj.GetAnnotations()
+	if err != nil {
+		status.Message = cfgutil.ToPointer(err.Error())
+		status.Phase = appsv1alpha1.CMergeFailedPhase
+	} else {
+		status.Message = nil
+		status.Phase = appsv1alpha1.CMergedPhase
+	}
+	status.UpdateRevision = revision
+	return err
+}
+
+func syncStatus(configMap *corev1.ConfigMap, status *appsv1alpha1.ConfigurationItemDetailStatus) (err error) {
+	annotations := configMap.GetAnnotations()
 	// status.CurrentRevision = GetCurrentRevision(annotations)
 	revisions := RetrieveRevision(annotations)
 	if len(revisions) == 0 {
@@ -98,5 +132,13 @@ func updateLastDoneRevision(revision ConfigurationRevision, status *appsv1alpha1
 func updateRevision(revision ConfigurationRevision, status *appsv1alpha1.ConfigurationItemDetailStatus) {
 	if revision.StrRevision == status.UpdateRevision {
 		status.Phase = revision.Phase
+		status.ReconcileDetail = &appsv1alpha1.ReconcileDetail{
+			CurrentRevision: revision.StrRevision,
+			Policy:          revision.Result.Policy,
+			SucceedCount:    revision.Result.SucceedCount,
+			ExpectedCount:   revision.Result.ExpectedCount,
+			ExecResult:      revision.Result.ExecResult,
+			ErrMessage:      revision.Result.Message,
+		}
 	}
 }

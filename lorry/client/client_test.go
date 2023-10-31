@@ -35,9 +35,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	. "github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 func TestNewClientWithPod(t *testing.T) {
@@ -50,12 +51,12 @@ func TestNewClientWithPod(t *testing.T) {
 		GetObject()
 	pod.Spec.Containers[0].Ports = []corev1.ContainerPort{{
 		ContainerPort: int32(3501),
-		Name:          constant.ProbeHTTPPortName,
+		Name:          constant.LorryHTTPPortName,
 		Protocol:      "TCP",
 	},
 		{
 			ContainerPort: int32(port),
-			Name:          constant.ProbeGRPCPortName,
+			Name:          constant.LorryGRPCPortName,
 			Protocol:      "TCP",
 		},
 	}
@@ -96,6 +97,8 @@ func TestGetRole(t *testing.T) {
 	portStr := addr[index+1:]
 	port, _ := strconv.Atoi(portStr)
 
+	viper.Set(constant.KBToolsImage, "lorry")
+
 	cli, closer, err := initSQLChannelClient(port, t)
 	if err != nil {
 		t.Errorf("new sql channel client error: %v", err)
@@ -114,7 +117,7 @@ func TestGetRole(t *testing.T) {
 	})
 
 	t.Run("ResponseTimeout", func(t *testing.T) {
-		cli.ReconcileTimeout = 0 * time.Millisecond
+		cli.ReconcileTimeout = 0
 		_, err := cli.GetRole()
 		t.Logf("err: %v", err)
 		if err == nil {
@@ -311,16 +314,17 @@ func initSQLChannelClient(httpPort int, t *testing.T) (*OperationClient, func(),
 	port, closer := newTCPServer(t, 50001)
 	podName := "pod-for-sqlchannel-test"
 	pod := testapps.NewPodFactory("default", podName).
-		AddContainer(corev1.Container{Name: testapps.DefaultNginxContainerName, Image: testapps.NginxImage}).GetObject()
+		AddContainer(corev1.Container{Name: viper.GetString(constant.KBToolsImage), Image: viper.GetString(constant.KBToolsImage)}).
+		GetObject()
 	pod.Spec.Containers[0].Ports = []corev1.ContainerPort{
 		{
 			ContainerPort: int32(httpPort),
-			Name:          constant.ProbeHTTPPortName,
+			Name:          constant.LorryHTTPPortName,
 			Protocol:      "TCP",
 		},
 		{
 			ContainerPort: int32(port),
-			Name:          constant.ProbeGRPCPortName,
+			Name:          constant.LorryGRPCPortName,
 			Protocol:      "TCP",
 		},
 	}

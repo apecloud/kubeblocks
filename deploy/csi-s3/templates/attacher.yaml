@@ -87,20 +87,20 @@ spec:
       {{- end }}
       containers:
         - name: csi-attacher
-          image: {{ .Values.images.attacher }}
+          image: "{{ template "csi-s3.imageFullName" (dict "image" .Values.images.attacher "root" .) }}"
           args:
             - "--v=4"
             - "--csi-address=$(ADDRESS)"
           env:
             - name: ADDRESS
-              value: /var/lib/kubelet/plugins/ru.yandex.s3.csi/csi.sock
-          imagePullPolicy: "IfNotPresent"
+              value: {{ .Values.kubeletPath }}/plugins/ru.yandex.s3.csi/csi.sock
+          imagePullPolicy: "{{ template "csi-s3.imagePullPolicy" (dict "image" .Values.images.attacher "root" .) }}"
           volumeMounts:
             - name: socket-dir
-              mountPath: /var/lib/kubelet/plugins/ru.yandex.s3.csi
+              mountPath: {{ .Values.kubeletPath }}/plugins/ru.yandex.s3.csi
       volumes:
         - name: socket-dir
           hostPath:
-            path: /var/lib/kubelet/plugins/ru.yandex.s3.csi
+            path: {{ .Values.kubeletPath }}/plugins/ru.yandex.s3.csi
             type: DirectoryOrCreate
 {{- end -}}

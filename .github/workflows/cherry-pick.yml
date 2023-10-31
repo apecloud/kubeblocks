@@ -10,7 +10,7 @@ jobs:
     if: github.event.issue.pull_request != '' && contains(github.event.comment.body, '/cherry-pick')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0

@@ -23,14 +23,13 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"syscall"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/dcs"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type DBManager interface {
@@ -178,39 +177,11 @@ func (mgr *DBManagerBase) IsRootCreated(context.Context) (bool, error) {
 	return true, nil
 }
 
-// Start does not directly mean to start a database instance,
-// but rather to sends SIGUSR2 to activate sql channel to start database
 func (mgr *DBManagerBase) Start(context.Context, *dcs.Cluster) error {
-	mgr.Logger.Info("send SIGUSR2 to activate sql channel")
-	sqlChannelProc, err := GetSQLChannelProc()
-	if err != nil {
-		mgr.Logger.Error(err, "can't find sql channel process")
-		return err
-	}
-
-	err = sqlChannelProc.Signal(syscall.SIGUSR2)
-	if err != nil {
-		mgr.Logger.Error(err, "send SIGUSR2 to sql channel failed")
-		return err
-	}
 	return nil
 }
 
-// Stop does not directly mean to stop a database instance,
-// but rather to sends SIGUSR1 to deactivate sql channel to stop starting database
 func (mgr *DBManagerBase) Stop() error {
-	mgr.Logger.Info("send SIGUSR1 to deactivate sql channel")
-	sqlChannelProc, err := GetSQLChannelProc()
-	if err != nil {
-		mgr.Logger.Error(err, "can't find sql channel process")
-		return err
-	}
-
-	err = sqlChannelProc.Signal(syscall.SIGUSR1)
-	if err != nil {
-		mgr.Logger.Error(err, "send SIGUSR1 to sql channel failed")
-		return err
-	}
 	return nil
 }
 
@@ -220,6 +191,14 @@ func (mgr *DBManagerBase) CreateRoot(context.Context) error {
 
 func (mgr *DBManagerBase) ShutDownWithWait() {
 	mgr.Logger.Info("Override me if need")
+}
+
+func (*DBManagerBase) JoinCurrentMemberToCluster(context.Context, *dcs.Cluster) error {
+	return nil
+}
+
+func (*DBManagerBase) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string) error {
+	return nil
 }
 
 func RegisterManager(characterType, workloadType string, manager DBManager) {
@@ -306,11 +285,11 @@ func (*FakeManager) IsFirstMember() bool {
 }
 
 func (*FakeManager) JoinCurrentMemberToCluster(context.Context, *dcs.Cluster) error {
-	return fmt.Errorf("NotSupported")
+	return nil
 }
 
 func (*FakeManager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string) error {
-	return fmt.Errorf("NotSuppported")
+	return nil
 }
 
 func (*FakeManager) Promote(context.Context, *dcs.Cluster) error {

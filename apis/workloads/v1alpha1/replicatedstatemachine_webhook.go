@@ -27,6 +27,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // log is for logging in this package.
@@ -57,24 +58,24 @@ func (r *ReplicatedStateMachine) Default() {
 var _ webhook.Validator = &ReplicatedStateMachine{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *ReplicatedStateMachine) ValidateCreate() error {
+func (r *ReplicatedStateMachine) ValidateCreate() (admission.Warnings, error) {
 	replicatedstatemachinelog.Info("validate create", "name", r.Name)
 
-	return r.validate()
+	return nil, r.validate()
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *ReplicatedStateMachine) ValidateUpdate(old runtime.Object) error {
+func (r *ReplicatedStateMachine) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	replicatedstatemachinelog.Info("validate update", "name", r.Name)
 
-	return r.validate()
+	return nil, r.validate()
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *ReplicatedStateMachine) ValidateDelete() error {
+func (r *ReplicatedStateMachine) ValidateDelete() (admission.Warnings, error) {
 	replicatedstatemachinelog.Info("validate delete", "name", r.Name)
 
-	return r.validate()
+	return nil, r.validate()
 }
 
 func (r *ReplicatedStateMachine) validate() error {

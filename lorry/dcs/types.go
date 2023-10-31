@@ -21,6 +21,9 @@ package dcs
 
 import (
 	"fmt"
+
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type Cluster struct {
@@ -91,7 +94,8 @@ func (c *Cluster) GetMemberAddrWithPort(member Member) string {
 }
 
 func (c *Cluster) GetMemberAddr(member Member) string {
-	return fmt.Sprintf("%s.%s-headless", member.Name, c.ClusterCompName)
+	clusterDomain := viper.GetString(constant.KubernetesClusterDomainEnv)
+	return fmt.Sprintf("%s.%s-headless.%s.svc.%s", member.Name, c.ClusterCompName, c.Namespace, clusterDomain)
 }
 
 func (c *Cluster) GetMemberAddrWithName(name string) string {
@@ -114,6 +118,7 @@ type MemberToDelete struct {
 type HaConfig struct {
 	index              string
 	ttl                int
+	enable             bool
 	maxLagOnSwitchover int64
 	DeleteMembers      map[string]MemberToDelete
 	resource           any
@@ -121,6 +126,10 @@ type HaConfig struct {
 
 func (c *HaConfig) GetTTL() int {
 	return c.ttl
+}
+
+func (c *HaConfig) IsEnable() bool {
+	return c.enable
 }
 
 func (c *HaConfig) GetMaxLagOnSwitchover() int64 {

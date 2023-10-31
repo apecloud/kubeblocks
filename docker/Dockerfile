@@ -1,7 +1,7 @@
 # Build the manager binary
 ARG DIST_IMG=gcr.io/distroless/static:nonroot
 
-ARG GO_VERSION=1.20
+ARG GO_VERSION=1.21
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} as builder
 
@@ -26,19 +26,18 @@ ENV GOPROXY=${GOPROXY}
 
 WORKDIR /src
 # Copy the Go Modules manifests
-#COPY go.mod go.mod
-#COPY go.sum go.sum
+COPY go.mod go.mod
+COPY go.sum go.sum
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
-RUN --mount=type=bind,target=. \
-    --mount=type=cache,target=/go/pkg/mod \
+RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
 # Copy the go source
 #COPY cmd/manager/main.go cmd/manager/main.go
 #COPY cmd/manager/ cmd/manager/
 #COPY apis/ apis/
-#COPY internal/ internal/
+#COPY pkg/ pkg/
 #COPY controllers/ controllers/
 #COPY test/testdata/testdata.go test/testdata/testdata.go
 

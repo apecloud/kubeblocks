@@ -1,0 +1,6 @@
+name: postgresql
+spec:
+  version: v1
+  metadata:
+    - name: url # Required
+      value: "user=postgres password=docker host=localhost port=5432 dbname=postgres pool_min_conns=1 pool_max_conns=10"

@@ -30,8 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 func newRequeueError(after time.Duration, reason string) error {
@@ -59,7 +59,7 @@ func getAppInstanceML(cluster appsv1alpha1.Cluster) client.MatchingLabels {
 }
 
 // getClusterOwningNamespacedObjects reads namespaced objects owned by our cluster with kinds.
-func getClusterOwningNamespacedObjects(transCtx *ClusterTransformContext,
+func getClusterOwningNamespacedObjects(transCtx *clusterTransformContext,
 	cluster appsv1alpha1.Cluster,
 	labels client.MatchingLabels,
 	kinds []client.ObjectList) (clusterOwningObjects, error) {
@@ -68,7 +68,7 @@ func getClusterOwningNamespacedObjects(transCtx *ClusterTransformContext,
 }
 
 // getClusterOwningNonNamespacedObjects reads non-namespaced objects owned by our cluster with kinds.
-func getClusterOwningNonNamespacedObjects(transCtx *ClusterTransformContext,
+func getClusterOwningNonNamespacedObjects(transCtx *clusterTransformContext,
 	_ appsv1alpha1.Cluster,
 	labels client.MatchingLabels,
 	kinds []client.ObjectList) (clusterOwningObjects, error) {
@@ -76,7 +76,7 @@ func getClusterOwningNonNamespacedObjects(transCtx *ClusterTransformContext,
 }
 
 // getClusterOwningObjectsWithOptions reads objects owned by our cluster with kinds and specified options.
-func getClusterOwningObjectsWithOptions(transCtx *ClusterTransformContext,
+func getClusterOwningObjectsWithOptions(transCtx *clusterTransformContext,
 	kinds []client.ObjectList,
 	opts ...client.ListOption) (clusterOwningObjects, error) {
 	// list what kinds of object cluster owns

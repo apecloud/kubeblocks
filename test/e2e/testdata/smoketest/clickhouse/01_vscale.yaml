@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: clickhouse-cluster-vscale-
+spec:
+  clusterRef: test-clickhouse-cluster
+  type: VerticalScaling
+  verticalScaling:
+    - componentName: shard-0
+      requests:
+        cpu: "500m"
+        memory: 500Mi

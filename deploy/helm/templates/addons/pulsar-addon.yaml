@@ -23,6 +23,13 @@ spec:
       version: {{ default .Chart.Version .Values.versionOverride }}
       {{- end }}
 
+    installValues:
+      {{- $cloudProvider := (include "kubeblocks.cloudProvider" .) }}
+      {{- if eq $cloudProvider "huaweiCloud" }}
+      setValues:
+        - cloudProvider=huaweiCloud
+      {{- end }}
+
   installable:
     autoInstall: true
 

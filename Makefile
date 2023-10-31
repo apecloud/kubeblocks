@@ -15,7 +15,7 @@
 # Variables                                                                    #
 ################################################################################
 APP_NAME = kubeblocks
-VERSION ?= 0.7.0-alpha.0
+VERSION ?= 0.8.0-alpha.0
 GITHUB_PROXY ?=
 INIT_ENV ?= false
 TEST_TYPE ?= wesql
@@ -152,14 +152,14 @@ client-sdk-gen: module ## Generate CRD client code.
 .PHONY: manager-go-generate
 manager-go-generate: ## Run go generate against lifecycle manager code.
 ifeq ($(SKIP_GO_GEN), false)
-	$(GO) generate -x ./internal/configuration/proto
+	$(GO) generate -x ./pkg/configuration/proto
 endif
 
 .PHONY: test-go-generate
 test-go-generate: ## Run go generate against test code.
-	$(GO) generate -x ./internal/testutil/k8s/mocks/...
-	$(GO) generate -x ./internal/configuration/container/mocks/...
-	$(GO) generate -x ./internal/configuration/proto/mocks/...
+	$(GO) generate -x ./pkg/testutil/k8s/mocks/...
+	$(GO) generate -x ./pkg/configuration/container/mocks/...
+	$(GO) generate -x ./pkg/configuration/proto/mocks/...
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -202,10 +202,10 @@ mod-vendor: module ## Run go mod vendor against go modules.
 
 .PHONY: module
 module: ## Run go mod tidy->verify against go modules.
-	$(GO) mod tidy -compat=1.20
+	$(GO) mod tidy -compat=1.21
 	$(GO) mod verify
 
-TEST_PACKAGES ?= ./internal/... ./apis/... ./controllers/... ./cmd/...
+TEST_PACKAGES ?= ./pkg/... ./apis/... ./controllers/... ./cmd/... ./lorry/...
 
 CLUSTER_TYPES=minikube k3d
 .PHONY: add-k8s-host
@@ -284,7 +284,7 @@ kbcli-fast: build-kbcli-embed-chart
 	@mv bin/kbcli.$(OS).$(ARCH) bin/kbcli
 
 create-kbcli-embed-charts-dir:
-	mkdir -p internal/cli/cluster/charts/
+	mkdir -p pkg/cli/cluster/charts/
 build-single-kbcli-embed-chart.%: chart=$(word 2,$(subst ., ,$@))
 build-single-kbcli-embed-chart.%:
 	$(HELM) dependency update deploy/$(chart) --skip-refresh
@@ -293,7 +293,7 @@ ifeq ($(VERSION), latest)
 else
 	$(HELM) package deploy/$(chart) --version $(VERSION)
 endif
-	mv $(chart)-*.tgz internal/cli/cluster/charts/$(chart).tgz
+	mv $(chart)-*.tgz pkg/cli/cluster/charts/$(chart).tgz
 
 .PHONY: build-kbcli-embed-chart
 build-kbcli-embed-chart: helmtool create-kbcli-embed-charts-dir \
@@ -302,6 +302,7 @@ build-kbcli-embed-chart: helmtool create-kbcli-embed-charts-dir \
 	build-single-kbcli-embed-chart.postgresql-cluster \
 	build-single-kbcli-embed-chart.kafka-cluster \
 	build-single-kbcli-embed-chart.mongodb-cluster \
+	build-single-kbcli-embed-chart.llm-cluster \
 #	build-single-kbcli-embed-chart.neon-cluster
 #	build-single-kbcli-embed-chart.postgresql-cluster \
 #	build-single-kbcli-embed-chart.clickhouse-cluster \
@@ -397,7 +398,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 
 .PHONY: reviewable
 reviewable: generate build-checks test check-license-header ## Run code checks to proceed with PR reviews.
-	$(GO) mod tidy -compat=1.20
+	$(GO) mod tidy -compat=1.21
 
 .PHONY: check-diff
 check-diff: reviewable ## Run git code diff checker.
@@ -477,8 +478,8 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v4.5.7
-CONTROLLER_TOOLS_VERSION ?= v0.9.0
+KUSTOMIZE_VERSION ?= v5.1.1
+CONTROLLER_TOOLS_VERSION ?= v0.12.1
 CUE_VERSION ?= v0.4.3
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "$(GITHUB_PROXY)https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
@@ -490,12 +491,15 @@ ifeq (, $(shell ls $(LOCALBIN)/kustomize 2>/dev/null))
 endif
 
 .PHONY: controller-gen
-controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
-$(CONTROLLER_GEN): $(LOCALBIN)
-ifeq (, $(shell ls $(LOCALBIN)/controller-gen 2>/dev/null))
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
-endif
-
+controller-gen: $(LOCALBIN) ## Download controller-gen locally if necessary.
+	@{ \
+	set -e ;\
+	if [ ! -f "$(CONTROLLER_GEN)" ] || [ "$$($(CONTROLLER_GEN) --version 2>&1 | awk '{print $$NF}')" != "$(CONTROLLER_TOOLS_VERSION)" ]; then \
+        echo 'Installing controller-gen@$(CONTROLLER_TOOLS_VERSION)...' ;\
+        GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION) ;\
+        echo 'Successfully installed' ;\
+    fi \
+	}
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
@@ -503,7 +507,6 @@ $(ENVTEST): $(LOCALBIN)
 ifeq (, $(shell ls $(LOCALBIN)/setup-envtest 2>/dev/null))
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 endif
-
 
 .PHONY: install-docker-buildx
 install-docker-buildx: ## Create `docker buildx` builder.
@@ -514,9 +517,8 @@ install-docker-buildx: ## Create `docker buildx` builder.
 		echo "Buildx builder $(BUILDX_BUILDER) already exists"; \
 	fi
 
-
 .PHONY: golangci
-golangci: GOLANGCILINT_VERSION = v1.51.2
+golangci: GOLANGCILINT_VERSION = v1.54.2
 golangci: ## Download golangci-lint locally if necessary.
 ifneq ($(shell which golangci-lint),)
 	@echo golangci-lint is already installed
@@ -614,7 +616,7 @@ else ifeq ($(TEST_TYPE), mongodb)
 	$(HELM) template mongodb-cluster deploy/mongodb-cluster > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
 else ifeq ($(TEST_TYPE), pulsar)
 	$(HELM) dependency build deploy/pulsar-cluster --skip-refresh
-	$(HELM) template pulsar-cluster deploy/pulsar-cluster > test/e2e/testdata/smoketest/pulsar/00_pulsarcluster.yaml
+	$(HELM) template pulsar-cluster -s templates/cluster.yaml deploy/pulsar-cluster > test/e2e/testdata/smoketest/pulsar/00_pulsarcluster.yaml
 else ifeq ($(TEST_TYPE), nebula)
 	$(HELM) dependency build deploy/nebula-cluster --skip-refresh
 	$(HELM) upgrade --install nebula deploy/nebula
@@ -635,7 +637,7 @@ else ifeq ($(TEST_TYPE), risingwave)
 else ifeq ($(TEST_TYPE), etcd)
 	$(HELM) dependency build deploy/etcd-cluster --skip-refresh
 	$(HELM) upgrade --install etcd deploy/etcd
-	$(HELM) template etcd-cluster deploy/etcd-cluster > test/e2e/testdata/smoketest/etcd/00_etcdcluster.yaml
+	$(HELM) template etcd-cluster -s templates/cluster.yaml deploy/etcd-cluster > test/e2e/testdata/smoketest/etcd/00_etcdcluster.yaml
 else ifeq ($(TEST_TYPE), oracle)
 	$(HELM) dependency build deploy/oracle-mysql-cluster --skip-refresh
 	$(HELM) upgrade --install oracle deploy/oracle-mysql
@@ -664,13 +666,60 @@ else ifeq ($(TEST_TYPE), orioledb)
 	$(HELM) dependency build deploy/orioledb-cluster --skip-refresh
 	$(HELM) upgrade --install orioledb deploy/orioledb
 	$(HELM) template oriole-cluster deploy/orioledb-cluster > test/e2e/testdata/smoketest/orioledb/00_orioledbcluster.yaml
+else ifeq ($(TEST_TYPE), weaviate)
+	$(HELM) dependency build deploy/weaviate-cluster --skip-refresh
+	$(HELM) upgrade --install weaviate deploy/weaviate
+	$(HELM) template weaviate-cluster deploy/weaviate-cluster > test/e2e/testdata/smoketest/weaviate/00_weaviatecluster.yaml
+else ifeq ($(TEST_TYPE), mysql-80)
+	$(HELM) dependency build deploy/mysql-cluster --skip-refresh
+	$(HELM) upgrade --install mysql deploy/mysql
+	$(HELM) template mysqlcluster deploy/mysql-cluster > test/e2e/testdata/smoketest/mysql-80/00_mysqlcluster.yaml
+else ifeq ($(TEST_TYPE), mysql-57)
+	$(HELM) dependency build deploy/mysql-cluster --skip-refresh
+	$(HELM) upgrade --install mysql deploy/mysql
+else ifeq ($(TEST_TYPE), polardbx)
+	$(HELM) dependency build deploy/polardbx-cluster --skip-refresh
+	$(HELM) upgrade --install polardbx deploy/polardbx
+	$(HELM) template pxc deploy/polardbx-cluster > test/e2e/testdata/smoketest/polardbx/00_polardbxcluster.yaml
+else ifeq ($(TEST_TYPE), opensearch)
+	$(HELM) dependency build deploy/opensearch-cluster --skip-refresh
+	$(HELM) upgrade --install opensearch deploy/opensearch
+	$(HELM) template opensearch-cluster deploy/opensearch-cluster > test/e2e/testdata/smoketest/opensearch/00_opensearchcluster.yaml
+else ifeq ($(TEST_TYPE), elasticsearch)
+	$(HELM) dependency build deploy/elasticsearch-cluster --skip-refresh
+	$(HELM) upgrade --install elasticsearch deploy/elasticsearch
+	$(HELM) template elasticsearch-cluster deploy/elasticsearch-cluster > test/e2e/testdata/smoketest/elasticsearch/00_elasticsearchcluster.yaml
+else ifeq ($(TEST_TYPE), llm)
+	$(HELM) dependency build deploy/llm-cluster --skip-refresh
+	$(HELM) upgrade --install llm deploy/llm
+	$(HELM) template llm-cluster deploy/llm-cluster > test/e2e/testdata/smoketest/llm/00_llmcluster.yaml
+else ifeq ($(TEST_TYPE), tdengine)
+	$(HELM) dependency build deploy/tdengine-cluster --skip-refresh
+	$(HELM) upgrade --install tdengine deploy/tdengine
+	$(HELM) template td-cluster deploy/tdengine-cluster > test/e2e/testdata/smoketest/tdengine/00_tdenginecluster.yaml
+else ifeq ($(TEST_TYPE), milvus)
+	$(HELM) dependency build deploy/milvus-cluster --skip-refresh
+	$(HELM) upgrade --install milvus deploy/milvus
+	$(HELM) template milvus-cluster deploy/milvus-cluster > test/e2e/testdata/smoketest/milvus/00_milvuscluster.yaml
+else ifeq ($(TEST_TYPE), clickhouse)
+	$(HELM) dependency build deploy/clickhouse-cluster --skip-refresh
+	$(HELM) upgrade --install clickhouse deploy/clickhouse
+	$(HELM) template test -s templates/cluster.yaml deploy/clickhouse-cluster > test/e2e/testdata/smoketest/clickhouse/00_clickhousecluster.yaml
+else ifeq ($(TEST_TYPE), zookeeper)
+	$(HELM) dependency build deploy/zookeeper-cluster --skip-refresh
+	$(HELM) upgrade --install zookeeper deploy/zookeeper
+	$(HELM) template zk-cluster deploy/zookeeper-cluster > test/e2e/testdata/smoketest/zookeeper/00_zookeepercluster.yaml
+else ifeq ($(TEST_TYPE), mariadb)
+	$(HELM) dependency build deploy/mariadb-cluster --skip-refresh
+	$(HELM) upgrade --install mariadb deploy/mariadb
+	$(HELM) template mariadb-cluster deploy/mariadb-cluster > test/e2e/testdata/smoketest/mariadb/00_mariadbcluster.yaml
 else
 	$(error "test type does not exist")
 endif
 
 .PHONY: test-e2e
-test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
-	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) TEST_TYPE=$(TEST_TYPE) SKIP_CASE=$(SKIP_CASE) -C test/e2e run
+test-e2e: helm-package install-s3-csi-driver render-smoke-testdata-manifests ## Run E2E tests.
+	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) TEST_TYPE=$(TEST_TYPE) SKIP_CASE=$(SKIP_CASE) CONFIG_TYPE=$(CONFIG_TYPE) -C test/e2e run
 
 .PHONY: render-smoke-testdata-manifests-local
 render-smoke-testdata-manifests-local: ## Helm Install CD And CV
@@ -707,17 +756,43 @@ else ifeq ($(TEST_TYPE), oceanbase)
 	$(HELM) upgrade --install official-postgresql deploy/official-postgresql
 else ifeq ($(TEST_TYPE), openldap)
 	$(HELM) upgrade --install openldap deploy/openldap
+else ifeq ($(TEST_TYPE), weaviate)
+	$(HELM) upgrade --install weaviate deploy/weaviate
+else ifeq ($(TEST_TYPE), mysql-80)
+	$(HELM) upgrade --install mysql deploy/mysql
+else ifeq ($(TEST_TYPE), mysql-57)
+	$(HELM) upgrade --install mysql deploy/mysql
+else ifeq ($(TEST_TYPE), polardbx)
+	$(HELM) upgrade --install polardbx deploy/polardbx
+else ifeq ($(TEST_TYPE), opensearch)
+	$(HELM) upgrade --install opensearch deploy/opensearch
+else ifeq ($(TEST_TYPE), elasticsearch)
+	$(HELM) upgrade --install elasticsearch deploy/elasticsearch
+else ifeq ($(TEST_TYPE), llm)
+	$(HELM) upgrade --install llm deploy/llm
+else ifeq ($(TEST_TYPE), milvus)
+	$(HELM) upgrade --install milvus deploy/milvus
+else ifeq ($(TEST_TYPE), clickhouse)
+	$(HELM) upgrade --install clickhouse deploy/clickhouse
+else ifeq ($(TEST_TYPE), zookeeper)
+	$(HELM) upgrade --install zookeeper deploy/zookeeper
+else ifeq ($(TEST_TYPE), mariadb)
+	$(HELM) upgrade --install mariadb deploy/mariadb
 else
 	$(error "test type does not exist")
 endif
 
 .PHONY: test-e2e-local
-test-e2e-local: generate-cluster-role render-smoke-testdata-manifests-local render-smoke-testdata-manifests ## Run E2E tests on local.
+test-e2e-local: generate-cluster-role install-s3-csi-driver render-smoke-testdata-manifests-local render-smoke-testdata-manifests ## Run E2E tests on local.
 	$(MAKE) -e TEST_TYPE=$(TEST_TYPE) -C test/e2e run
 
 .PHONY: generate-cluster-role
 generate-cluster-role:
 	$(HELM) template -s templates/rbac/cluster_pod_required_role.yaml deploy/helm | kubectl apply -f -
+
+.PHONY: install-s3-csi-driver
+install-s3-csi-driver:
+	$(HELM) upgrade --install csi-s3 deploy/csi-s3
 
 # NOTE: include must be placed at the end
 include docker/docker.mk

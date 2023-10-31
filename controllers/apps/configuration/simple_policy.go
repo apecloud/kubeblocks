@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
 
 type simplePolicy struct {
@@ -53,8 +53,14 @@ func (s *simplePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error)
 		funcs = GetReplicationRollingUpgradeFuncs()
 		compLists = fromStatefulSetObjects(params.ComponentUnits)
 	case appsv1alpha1.Stateless:
-		funcs = GetDeploymentRollingUpgradeFuncs()
-		compLists = fromDeploymentObjects(params.DeploymentUnits)
+		// NODE: stateless component uses the StatefulSet object
+		if len(params.RSMList) != 0 {
+			funcs = GetStatefulSetRollingUpgradeFuncs()
+			compLists = fromStatefulSetObjects(params.ComponentUnits)
+		} else {
+			funcs = GetDeploymentRollingUpgradeFuncs()
+			compLists = fromDeploymentObjects(params.DeploymentUnits)
+		}
 	}
 	return restartAndCheckComponent(params, funcs, compLists)
 }

@@ -1,0 +1,58 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: ActionSet
+metadata:
+  name: mongodb-physical-backup
+  labels:
+    clusterdefinition.kubeblocks.io/name: mongodb
+    {{- include "mongodb.labels" . | nindent 4 }}
+spec:
+  env:
+    - name: DATA_DIR
+      value: {{ .Values.dataMountPath }}/db
+  backupType: Full
+  backup:
+    preBackup: []
+    postBackup: []
+    backupData:
+      image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+      runOnTargetPodNode: true
+      syncProgress:
+        enabled: true
+        intervalSeconds: 5
+      command:
+      - bash
+      - -c
+      - |
+        {{- .Files.Get "dataprotection/backup-info-collector.sh" | nindent 8 }}
+        {{- .Files.Get "dataprotection/datafile-backup.sh" | nindent 8 }}
+
+  restore:
+    prepareData:
+      image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+      command:
+      - bash
+      - -c
+      - |
+        {{- .Files.Get "dataprotection/datafile-restore.sh" | nindent 8 }}
+    postReady: []
+---
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: ActionSet
+metadata:
+  name: mongodb-volumesnapshot
+  labels:
+    clusterdefinition.kubeblocks.io/name: apecloud-mysql
+spec:
+  backupType: Full
+  env:
+    - name: DATA_DIR
+      value: {{ .Values.dataMountPath }}/db
+  backup: {}
+  restore:
+    prepareData:
+      image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+      command:
+      - bash
+      - -c
+      - "touch ${DATA_DIR}/mongodb.backup; sync"
+    postReady: []

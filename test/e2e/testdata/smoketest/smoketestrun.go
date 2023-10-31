@@ -32,13 +32,13 @@ import (
 	"k8s.io/client-go/dynamic"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/pkg/cli/types"
 	. "github.com/apecloud/kubeblocks/test/e2e"
 	e2eutil "github.com/apecloud/kubeblocks/test/e2e/util"
 )
 
 const (
-	timeout  time.Duration = time.Second * 1000
+	timeout  time.Duration = time.Second * 1500
 	interval time.Duration = time.Second * 10
 )
 
@@ -46,7 +46,7 @@ type Options struct {
 	Dynamic dynamic.Interface
 }
 
-var arr = []string{"00", "componentresourceconstraint", "restore", "class", "cv", "snapshot"}
+var arr = []string{"00", "componentresourceconstraint", "restore", "class", "cv", "backup"}
 
 func SmokeTest() {
 	BeforeEach(func() {

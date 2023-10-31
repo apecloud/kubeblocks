@@ -31,10 +31,10 @@ import (
 	"github.com/go-logr/logr"
 	probing "github.com/prometheus-community/pro-bing"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	dcs3 "github.com/apecloud/kubeblocks/lorry/dcs"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type Ha struct {
@@ -49,7 +49,11 @@ var ha *Ha
 
 func NewHa(logger logr.Logger) *Ha {
 
-	dcs, _ := dcs3.NewKubernetesStore(logger)
+	dcs, err := dcs3.NewKubernetesStore(logger)
+	if err != nil {
+		logger.Error(err, "get k8s store failed")
+		return nil
+	}
 	characterType := viper.GetString(constant.KBEnvCharacterType)
 	if characterType == "" {
 		logger.Error(nil, "%s not set", "characterType", constant.KBEnvCharacterType)
@@ -87,6 +91,10 @@ func (ha *Ha) RunCycle() {
 		return
 	}
 
+	if !cluster.HaConfig.IsEnable() {
+		return
+	}
+
 	currentMember := cluster.GetMemberWithName(ha.dbManager.GetCurrentMemberName())
 
 	if cluster.HaConfig.IsDeleting(currentMember) {
@@ -97,8 +105,8 @@ func (ha *Ha) RunCycle() {
 
 	if !ha.dbManager.IsRunning() {
 		ha.logger.Info("DB Service is not running,  wait for lorryctl to start it")
-		if ha.dcs.HasLock() {
-			_ = ha.dcs.ReleaseLock()
+		if ha.dcs.HasLease() {
+			_ = ha.dcs.ReleaseLease()
 		}
 		_ = ha.dbManager.Start(ha.ctx, cluster)
 		return
@@ -123,8 +131,8 @@ func (ha *Ha) RunCycle() {
 
 	case !ha.dbManager.IsCurrentMemberHealthy(ha.ctx, cluster):
 		ha.logger.Info("DB Service is not healthy,  do some recover")
-		if ha.dcs.HasLock() {
-			_ = ha.dcs.ReleaseLock()
+		if ha.dcs.HasLease() {
+			_ = ha.dcs.ReleaseLease()
 		}
 	//	dbManager.Recover()
 
@@ -132,25 +140,25 @@ func (ha *Ha) RunCycle() {
 		ha.logger.Info("Cluster has no leader, attempt to take the leader")
 		if ha.IsHealthiestMember(ha.ctx, cluster) {
 			cluster.Leader.DBState = DBState
-			if ha.dcs.AttempAcquireLock() == nil {
+			if ha.dcs.AttempAcquireLease() == nil {
 				err := ha.dbManager.Promote(ha.ctx, cluster)
 				if err != nil {
 					ha.logger.Error(err, "Take the leader failed")
-					_ = ha.dcs.ReleaseLock()
+					_ = ha.dcs.ReleaseLease()
 				} else {
 					ha.logger.Info("Take the leader success!")
 				}
 			}
 		}
 
-	case ha.dcs.HasLock():
+	case ha.dcs.HasLease():
 		ha.logger.Info("This member is Cluster's leader")
 		if cluster.Switchover != nil {
 			if cluster.Switchover.Leader == ha.dbManager.GetCurrentMemberName() ||
 				(cluster.Switchover.Candidate != "" && cluster.Switchover.Candidate != ha.dbManager.GetCurrentMemberName()) {
 				if ha.HasOtherHealthyMember(cluster) {
 					_ = ha.dbManager.Demote(ha.ctx)
-					_ = ha.dcs.ReleaseLock()
+					_ = ha.dcs.ReleaseLease()
 					break
 				}
 
@@ -168,7 +176,7 @@ func (ha *Ha) RunCycle() {
 			// role services as the source of truth.
 			// for replicationset cluster,  HasOtherHealthyLeader will always be false.
 			ha.logger.Info("Release leader")
-			_ = ha.dcs.ReleaseLock()
+			_ = ha.dcs.ReleaseLease()
 			break
 		}
 		err := ha.dbManager.Promote(ha.ctx, cluster)
@@ -178,13 +186,13 @@ func (ha *Ha) RunCycle() {
 		}
 
 		ha.logger.Info("Refresh leader ttl")
-		_ = ha.dcs.UpdateLock()
+		_ = ha.dcs.UpdateLease()
 
 		if int(cluster.Replicas) < len(ha.dbManager.GetMemberAddrs(ha.ctx, cluster)) && cluster.Replicas != 0 {
 			ha.DecreaseClusterReplicas(cluster)
 		}
 
-	case !ha.dcs.HasLock():
+	case !ha.dcs.HasLease():
 		if cluster.Switchover != nil {
 			break
 		}
@@ -248,20 +256,26 @@ func (ha *Ha) Start() {
 		isRootCreated, err = ha.dbManager.IsRootCreated(ha.ctx)
 	}
 
-	isExist, _ := ha.dcs.IsLockExist()
+	isExist, _ := ha.dcs.IsLeaseExist()
 	for !isExist {
 		if ok, _ := ha.dbManager.IsLeader(context.Background(), cluster); ok {
-			_ = ha.dcs.Initialize(cluster)
+			err := ha.dcs.Initialize(cluster)
+			if err != nil {
+				ha.logger.Error(err, "DCS initialize failed")
+				time.Sleep(5 * time.Second)
+				continue
+			}
 			break
 		}
+
 		ha.logger.Info("Waiting for the database Leader to be ready.")
 		time.Sleep(5 * time.Second)
-		isExist, _ = ha.dcs.IsLockExist()
+		isExist, _ = ha.dcs.IsLeaseExist()
 	}
 
 	for {
 		ha.RunCycle()
-		time.Sleep(1 * time.Second)
+		time.Sleep(10 * time.Second)
 	}
 }
 
@@ -277,7 +291,7 @@ func (ha *Ha) DecreaseClusterReplicas(cluster *dcs3.Cluster) {
 		ha.logger.Info(fmt.Sprintf("The last pod %s is the primary member and cannot be deleted. waiting "+
 			"for The controller to perform a switchover to a new primary member before this pod can be removed. ", deleteHost))
 		_ = ha.dbManager.Demote(ha.ctx)
-		_ = ha.dcs.ReleaseLock()
+		_ = ha.dcs.ReleaseLease()
 		return
 	}
 	memberName := strings.Split(deleteHost, ".")[0]
@@ -359,7 +373,7 @@ func (ha *Ha) DeleteCurrentMember(ctx context.Context, cluster *dcs3.Cluster) er
 	defer ha.deleteLock.Unlock()
 
 	// if current member is leader, take a switchover first
-	if ha.dcs.HasLock() {
+	if ha.dcs.HasLease() {
 		for cluster.Switchover != nil {
 			ha.logger.Info("cluster is doing switchover, wait for it to finish")
 			return nil

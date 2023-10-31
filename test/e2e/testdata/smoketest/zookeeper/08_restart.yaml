@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: zk-cluster-restart-
+spec:
+  clusterRef: zk-cluster
+  ttlSecondsAfterSucceed: 27017
+  type: Restart
+  restart:
+    - componentName: zookeeper

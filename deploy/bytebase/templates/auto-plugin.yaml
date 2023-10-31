@@ -8,7 +8,7 @@ spec:
       serviceAccountName: kubeblocks
       containers:
         - name: bytebase-python-script
-          image: registry.cn-hangzhou.aliyuncs.com/apecloud/python11-tools:stable
+          image: {{ .Values.images.python.registry }}/{{ .Values.images.python.repository }}:{{ .Values.images.python.tag }}
           command:
             - /bin/sh
             - -c

@@ -24,16 +24,16 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/yaml"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("", func() {
-
 	It("test GetMinAvailable", func() {
 		prefer := intstr.IntOrString{}
 		clusterCompSpec := &ClusterComponentSpec{}
@@ -58,7 +58,8 @@ var _ = Describe("", func() {
 		pvcSpec := r.ToV1PersistentVolumeClaimSpec()
 		Expect(pvcSpec.AccessModes).Should(BeEquivalentTo(r.AccessModes))
 		Expect(pvcSpec.Resources).Should(BeEquivalentTo(r.Resources))
-		Expect(pvcSpec.StorageClassName).Should(BeEquivalentTo(r.GetStorageClassName(viper.GetString(constant.CfgKeyDefaultStorageClass))))
+		Expect(pvcSpec.StorageClassName).Should(BeEquivalentTo(r.getStorageClassName(viper.GetString(constant.CfgKeyDefaultStorageClass))))
+		Expect(pvcSpec.VolumeMode).Should(BeEquivalentTo(r.VolumeMode))
 	})
 
 	It("test ToV1PersistentVolumeClaimSpec with default storage class", func() {
@@ -70,14 +71,24 @@ var _ = Describe("", func() {
 		viper.Set(constant.CfgKeyDefaultStorageClass, "")
 	})
 
-	It("test GetStorageClassName", func() {
+	It("test ToV1PersistentVolumeClaimSpec with volume mode", func() {
+		for _, mode := range []corev1.PersistentVolumeMode{corev1.PersistentVolumeBlock, corev1.PersistentVolumeFilesystem} {
+			r := PersistentVolumeClaimSpec{
+				VolumeMode: &mode,
+			}
+			pvcSpec := r.ToV1PersistentVolumeClaimSpec()
+			Expect(pvcSpec.VolumeMode).Should(BeEquivalentTo(r.VolumeMode))
+		}
+	})
+
+	It("test getStorageClassName", func() {
 		preferSC := "prefer-sc"
 		r := PersistentVolumeClaimSpec{}
 		r.StorageClassName = nil
-		Expect(r.GetStorageClassName(preferSC)).Should(BeEquivalentTo(&preferSC))
+		Expect(r.getStorageClassName(preferSC)).Should(BeEquivalentTo(&preferSC))
 		scName := "test-sc"
 		r.StorageClassName = &scName
-		Expect(r.GetStorageClassName(preferSC)).Should(BeEquivalentTo(&scName))
+		Expect(r.getStorageClassName(preferSC)).Should(BeEquivalentTo(&scName))
 	})
 
 	It("test IsDeleting", func() {

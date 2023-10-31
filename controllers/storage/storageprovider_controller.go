@@ -33,10 +33,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // StorageProviderReconciler reconciles a StorageProvider object
@@ -194,8 +193,8 @@ func (r *StorageProviderReconciler) deleteExternalResources(
 func (r *StorageProviderReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&storagev1alpha1.StorageProvider{}).
-		Watches(&source.Kind{Type: &storagev1.CSIDriver{}},
-			handler.EnqueueRequestsFromMapFunc(func(object client.Object) []reconcile.Request {
+		Watches(&storagev1.CSIDriver{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, object client.Object) []reconcile.Request {
 				r.mu.Lock()
 				defer r.mu.Unlock()
 				driverName := object.GetName()

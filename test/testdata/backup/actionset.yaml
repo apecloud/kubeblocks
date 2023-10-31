@@ -1,0 +1,52 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: ActionSet
+metadata:
+  name: action-set-
+spec:
+  backupType: Full
+  env:
+  - name: DATA_DIR
+    value: /var/lib/mysql
+  - name: IMAGE_TAG
+    value: latest
+  backup:
+    backupData:
+      image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/percona-xtrabackup:$(IMAGE_TAG)
+      runOnTargetPodNode: true
+      command:
+      - sh
+      - -c
+      - echo "DB_HOST=${DP_DB_HOST} DB_USER=${DP_DB_USER} DB_PASSWORD=${DP_DB_PASSWORD} DATA_DIR=${DATA_DIR} BACKUP_DIR=${DP_BACKUP_DIR} BACKUP_NAME=${DP_BACKUP_NAME}";
+        mkdir -p /${BACKUP_DIR};
+        xtrabackup --compress --backup  --safe-slave-backup --slave-info --stream=xbstream --host=${DP_DB_HOST} \
+        --user=${DP_DB_USER} --password=${DP_DB_PASSWORD} --datadir=${DATA_DIR} > /${DP_BACKUP_DIR}/${DP_BACKUP_NAME}.xbstream
+  restore:
+    prepareData:
+      image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/percona-xtrabackup:$(IMAGE_TAG)
+      command:
+      - sh
+      - -c
+      - |
+        echo "BACKUP_DIR=${DP_BACKUP_DIR} BACKUP_NAME=${DP_BACKUP_NAME} DATA_DIR=${DATA_DIR}" && \
+        mkdir -p /tmp/data/ && cd /tmp/data \
+        && xbstream -x < /${DP_BACKUP_DIR}/${DP_BACKUP_NAME}.xbstream \
+        && xtrabackup --decompress  --target-dir=/tmp/data/ \
+        && find . -name "*.qp"|xargs rm -f \
+        && rm -rf ${DATA_DIR}/* \
+        && rsync -avrP /tmp/data/ ${DATA_DIR}/ \
+        && rm -rf /tmp/data/ \
+        && chmod -R 0777 ${DATA_DIR}
+    postReady:
+    - exec:
+        command:
+        - sh
+        - -c
+        - touch ${DATA_DIR}/standby.signal
+        container: postgres
+    - job:
+        image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/percona-xtrabackup:$(IMAGE_TAG)
+        runOnTargetPodNode: true
+        command:
+        - sh
+        - -c
+        - PGPASSWORD=$DP_DB_PASSWORD psql -U ${DP_DB_USER} -h ${DP_DP_HOST} -c "select pg_is_in_recovery();"

@@ -1,0 +1,30 @@
+---
+# Source: mongodb-cluster/templates/replicaset.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: mongo-cluster-datafile
+  annotations:
+    kubeblocks.io/restore-from-backup: '{"mongodb":{"name":"backup-mongodb-cluster","namespace":"default","volumeRestorePolicy":"Parallel"}}'
+spec:
+  clusterDefinitionRef: mongodb
+  clusterVersionRef: mongodb-5.0
+  terminationPolicy: Halt
+  affinity:
+    topologyKeys:
+      - kubernetes.io/hostname
+  componentSpecs:
+    - name: mongodb
+      componentDefRef: mongodb
+      monitor: false
+      replicas: 3
+      serviceAccountName: kb-mongodb-cluster
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 21Gi

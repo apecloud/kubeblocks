@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: clickhouse-cluster-hscale-out-
+spec:
+  clusterRef: test-clickhouse-cluster
+  type: HorizontalScaling
+  horizontalScaling:
+    - componentName: shard-0
+      replicas: 3

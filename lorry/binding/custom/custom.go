@@ -33,11 +33,11 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/internal/common"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	. "github.com/apecloud/kubeblocks/lorry/binding"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	. "github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/common"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // HTTPCustom is a binding for an http url endpoint invocation
@@ -47,7 +47,7 @@ type HTTPCustom struct {
 	BaseOperations
 }
 
-var perNodeRegx = regexp.MustCompile("[a-zA-Z0-9]+")
+var perNodeRegx = regexp.MustCompile("^[^,]*$")
 
 // NewHTTPCustom returns a new HTTPCustom.
 func NewHTTPCustom() *HTTPCustom {

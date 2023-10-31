@@ -1,0 +1,18 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupRepo
+metadata:
+  name: my-repo
+  annotations:
+    dataprotection.kubeblocks.io/is-default-repo: "true"
+spec:
+  storageProviderRef: s3
+  pvReclaimPolicy: Retain
+  volumeCapacity: 100Gi
+  config:
+    bucket: kb-hl-test
+    mountOptions: ""
+    endpoint: ""
+    region: cn-zhangjiakou
+  credential:
+    name: oss-credential-for-backuprepo
+    namespace: kb-system

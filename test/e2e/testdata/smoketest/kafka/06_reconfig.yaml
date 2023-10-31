@@ -1,0 +1,18 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: kafka-cluster-reconfiguring-
+spec:
+  clusterRef: kafka-cluster
+  reconfigure:
+    componentName: broker
+    configurations:
+      - keys:
+          - key: kafka-configuration-tpl
+            parameters:
+              - key: MaxRAMPercentage
+                value: "200"
+              - key: MaxGCPauseMillis
+                value: "30"
+        name: kafka-consensusset-config
+  type: Reconfiguring

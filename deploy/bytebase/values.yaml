@@ -1,11 +1,18 @@
 # Default values for bytebase.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
-image:
-  registry: registry.cn-hangzhou.aliyuncs.com
-  repository: apecloud/bytebase
-  tag: beta1
-  pullPolicy: IfNotPresent
+images:
+  bytebase:
+    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+    repository: apecloud/bytebase
+    tag: beta1
+    pullPolicy: IfNotPresent
+  python:
+    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+    repository: apecloud/python11-tools
+    tag: stable
+    pullPolicy: ""
+
 
 bytebase:
   option:

@@ -1,13 +1,32 @@
 ---
 images:
+  defaultImage:
+    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+    pullPolicy: IfNotPresent
   # Source: quay.io/k8scsi/csi-attacher:v3.0.1
-  attacher: registry.cn-hangzhou.aliyuncs.com/apecloud/csi-attacher:v3.4.0
+  attacher:
+    registry: ""
+    repository: apecloud/csi-attacher
+    tag: v3.4.0
+    pullPolicy: ""
   # Source: quay.io/k8scsi/csi-node-driver-registrar:v1.2.0
-  registrar: registry.cn-hangzhou.aliyuncs.com/apecloud/csi-node-driver-registrar:v2.5.1
+  registrar:
+    registry: ""
+    repository: apecloud/csi-node-driver-registrar
+    tag: v2.5.1
+    pullPolicy: ""
   # Source: quay.io/k8scsi/csi-provisioner:v2.1.0
-  provisioner: registry.cn-hangzhou.aliyuncs.com/apecloud/csi-provisioner:v3.1.0
+  provisioner:
+    registry: ""
+    repository: apecloud/csi-provisioner
+    tag: v3.1.0
+    pullPolicy: ""
   # Main image
-  csi: registry.cn-hangzhou.aliyuncs.com/apecloud/csi-s3-driver:0.31.3
+  csi:
+    registry: ""
+    repository: apecloud/csi-s3-driver
+    tag: 0.31.3
+    pullPolicy: ""
 
 storageClass:
   # Specifies whether the storage class should be created
@@ -76,3 +95,6 @@ csiName: s3
 
 # Check if this CSI has been installed multiple times. if true, only install storageClass and secret.
 multiCSI: false
+
+# kubelet path in the host
+kubeletPath: /var/lib/kubelet

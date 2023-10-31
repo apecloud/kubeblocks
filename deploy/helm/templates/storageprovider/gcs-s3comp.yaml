@@ -1,0 +1,81 @@
+# gcs-s3comp is a storage provider for [Google Cloud Storage](https://cloud.google.com/storage/), by using its S3-compatible API.
+apiVersion: storage.kubeblocks.io/v1alpha1
+kind: StorageProvider
+metadata:
+  name: gcs-s3comp
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+spec:
+  csiDriverName: ru.yandex.s3.csi
+  csiDriverSecretTemplate: |
+    {{ `{{- $endpoint := index .Parameters "endpoint" }}` }}
+    {{ `{{- if not $endpoint }}` }}
+      {{ `{{- $endpoint = (printf "https://storage.googleapis.com") }}` }}
+    {{ `{{- end }}` }}
+    accessKeyID: {{ `{{ index .Parameters "accessKeyId" }}` }}
+    secretAccessKey: {{ `{{ index .Parameters "secretAccessKey" }}` }}
+    endpoint: {{ `{{ $endpoint }}` }}
+
+  storageClassTemplate: |
+    provisioner: ru.yandex.s3.csi
+    parameters:
+      mounter: geesefs
+      # you can set mount options here, for example limit memory cache size (recommended)
+      options: {{ `{{ printf "--memory-limit 1000 --dir-mode 0777 --file-mode 0666 %s --subdomain" (index .Parameters "mountOptions") }}` }}
+      bucket: {{ `{{ index .Parameters "bucket" }}` }}
+      csi.storage.k8s.io/provisioner-secret-name: {{ `{{ .CSIDriverSecretRef.Name }}` }}
+      csi.storage.k8s.io/provisioner-secret-namespace: {{ `{{ .CSIDriverSecretRef.Namespace }}` }}
+      csi.storage.k8s.io/controller-publish-secret-name: {{ `{{ .CSIDriverSecretRef.Name }}` }}
+      csi.storage.k8s.io/controller-publish-secret-namespace: {{ `{{ .CSIDriverSecretRef.Namespace }}` }}
+      csi.storage.k8s.io/node-stage-secret-name: {{ `{{ .CSIDriverSecretRef.Name }}` }}
+      csi.storage.k8s.io/node-stage-secret-namespace: {{ `{{ .CSIDriverSecretRef.Namespace }}` }}
+      csi.storage.k8s.io/node-publish-secret-name: {{ `{{ .CSIDriverSecretRef.Name }}` }}
+      csi.storage.k8s.io/node-publish-secret-namespace: {{ `{{ .CSIDriverSecretRef.Namespace }}` }}
+
+  datasafedConfigTemplate: |
+    [storage]
+    type = s3
+    provider = GCS
+    env_auth = false
+    access_key_id = {{ `{{ index .Parameters "accessKeyId" }}` }}
+    secret_access_key = {{ `{{ index .Parameters "secretAccessKey" }}` }}
+    {{ `{{- $endpoint := index .Parameters "endpoint" }}` }}
+    {{ `{{- if not $endpoint }}` }}
+      {{ `{{- $endpoint = (printf "https://storage.googleapis.com") }}` }}
+    {{ `{{- end }}` }}
+    endpoint = {{ `{{ $endpoint }}` }}
+    root = {{ `{{ index .Parameters "bucket" }}` }}
+    chunk_size = 50Mi
+
+  parametersSchema:
+    openAPIV3Schema:
+      type: "object"
+      properties:
+        region:
+          type: string
+          description: "GCS region, e.g. auto"
+        bucket:
+          type: string
+          description: "GCS bucket"
+        endpoint:
+          type: string
+          description: "GCS endpoint (optional)"
+        mountOptions:
+          type: string
+          description: "mount options for geesefs"
+        accessKeyId:
+          type: string
+          description: "GCS access key"
+        secretAccessKey:
+          type: string
+          description: "GCS secret key"
+
+      required:
+        - bucket
+        - region
+        - accessKeyId
+        - secretAccessKey
+
+    credentialFields:
+      - accessKeyId
+      - secretAccessKey

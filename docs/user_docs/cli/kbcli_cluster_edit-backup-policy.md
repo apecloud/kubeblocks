@@ -14,8 +14,8 @@ kbcli cluster edit-backup-policy
   # edit backup policy
   kbcli cluster edit-backup-policy <backup-policy-name>
   
-  # enable pitr
-  kbcli cluster edit-backup-policy <backup-policy-name> --set schedule.logfile.enable=true
+  # update backup Repo
+  kbcli cluster edit-backup-policy <backup-policy-name> --set backupRepoName=<backup-repo-name>
   
   # using short cmd to edit backup policy
   kbcli cluster edit-bp <backup-policy-name>

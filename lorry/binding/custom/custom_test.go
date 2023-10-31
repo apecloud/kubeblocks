@@ -32,16 +32,21 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/apecloud/kubeblocks/internal/common"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	"github.com/apecloud/kubeblocks/lorry/binding"
 	"github.com/apecloud/kubeblocks/lorry/component"
 	. "github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/common"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 func TestInit(t *testing.T) {
 	hs, s := setUpHost("leader", t)
-	defer s.Close()
+	mechanism := viper.GetString(binding.RSMRoleUpdateMechanismVarName)
+	viper.Set(binding.RSMRoleUpdateMechanismVarName, "")
+	defer func() {
+		s.Close()
+		viper.Set(binding.RSMRoleUpdateMechanismVarName, mechanism)
+	}()
 
 	tests := map[string]struct {
 		input     string

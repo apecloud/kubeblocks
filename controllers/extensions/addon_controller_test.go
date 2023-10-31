@@ -39,11 +39,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
-	"github.com/apecloud/kubeblocks/internal/testutil"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/testutil"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("Addon controller", func() {
@@ -55,21 +55,21 @@ var _ = Describe("Addon controller", func() {
 		By("clean resources")
 		// non-namespaced
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.AddonSignature, true, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.AddonSignature, true, ml)
 
 		inNS := client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMgrNS))
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.JobSignature, true, inNS,
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS,
 			client.HasLabels{
 				constant.AddonNameLabelKey,
 			})
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.JobSignature, true, inNS,
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS,
 			client.HasLabels{
 				constant.AppManagedByLabelKey,
 			})
 
 		// delete rest mocked objects
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.SecretSignature, inNS, ml)
 
 		// By("deleting the Namespace to perform the tests")
 		// Eventually(func(g Gomega) {

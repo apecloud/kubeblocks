@@ -1,0 +1,26 @@
+---
+# Source: postgresql-cluster/templates/cluster.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: pg-cluster-snapshot
+  annotations:
+    kubeblocks.io/restore-from-backup: '{"postgresql":{"name":"backup-postgresql-cluster-snapshot","namespace":"default","volumeRestorePolicy":"Parallel"}}'
+spec:
+  clusterDefinitionRef: postgresql
+  clusterVersionRef: postgresql-14.7.2-latest
+  terminationPolicy: WipeOut
+  componentSpecs:
+    - name: postgresql
+      componentDefRef: postgresql
+      serviceAccountName: kb-mycluster-pgcluster
+      monitor: false
+      replicas: 1
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 21Gi

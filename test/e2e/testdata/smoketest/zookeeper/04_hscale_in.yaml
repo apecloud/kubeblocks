@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: zk-cluster-hscale-in-
+spec:
+  clusterRef: zk-cluster
+  type: HorizontalScaling
+  horizontalScaling:
+    - componentName: zookeeper
+      replicas: 2

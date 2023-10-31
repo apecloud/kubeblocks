@@ -26,27 +26,29 @@
 
 ## What is KubeBlocks
 
-KubeBlocks is an open-source Kubernetes operator that manages relational, NoSQL, vector, and streaming databases on the public cloud or on-premise. It is designed for production purposes, providing reliable, performant, observable, and cost-effective data infrastructure for most scenarios. The name KubeBlocks is inspired by Kubernetes and LEGO blocks, signifying that building data infrastructure on Kubernetes can be both productive and enjoyable, like playing with construction toys.
+KubeBlocks is an open source system software that runs and manages data infrastructure on Kubernetes. It could manage various data/database engines, including RDBMSs (MySQL, PostgreSQL), Caches(Redis), NoSQLs (MongoDB), MQs(Kafka, Pulsar), and vector databases(Milvus, Qdrant, Weaviate), and the community is actively integrating more types of data/database engines into KubeBlocks. KubeBlocks helps developers, SREs, and platform engineers deploy and maintain dedicated DBPaaS, and supports a variety of public clouds and on-premise environments. 
+
+KubeBlocks is designed for production purposes, providing secure, cost-effective, high-available and extensible DBPaaS solution for enterprise. The name KubeBlocks is inspired by Kubernetes and LEGO blocks, signifying that integrating data infrastructure on K8s can be standard and productive, like playing with LEGO blocks. The core of KubeBlocks is a K8s operator, which defines a set of CRDs to abstract the common attributes of various data/database engines, thereby supporting the rapid integration of a new data/database system into KubeBlocks while keeping the same operating experience and expected behaviors.
 
 ### Why you need KubeBlocks
 
-When adopting a multi-cloud or hybrid cloud strategy, it is essential to prioritize application portability and use software or services that offer consistent functionality across different infrastructures. Kubernetes has helped in achieving this goal to some extent, and KubeBlocks can further enhance the experience. KubeBlocks integrates popular database engines and provides rich management functions, along with declarative APIs, on various infrastructures. Furthermore, KubeBlocks offers the following benefits:
+KubeBlocks integrates the most popular data/database engines and provides rich management functions, along with declarative APIs, on various environments. Furthermore, KubeBlocks offers the following benefits:
 
-* Performance
+* Cost-effective
   
-  You do not have to learn database tuning. KubeBlocks can leverage storage and computing resources to achieve optimal database performance.
+  KubeBlocks optimizes the kernel and parameters of MySQL and PostgreSQL databases for containerized and cloud environments, and its performance exceeds that of RDS with the same hardware (see our blogs for test reports).
 
 * Reliability
   
-  You do not need to worry about data loss or service outages. KubeBlocks provides fault tolerance at the node or availability zone levels, which maximizes database reliability.
+  KubeBlocks supports high-availability cluster configurations for multiple database engines, and supports Raft replication cluster for MySQL to achieve enhanced availability with durability guarantees.
 
 * Observability
   
-  You can track new metrics under one roof. KubeBlocks integrates observability platforms such as Prometheus stack, AWS AMP, Aliyun ARMS, etc., and provides beautiful templates with insights.
+  KubeBlocks collects monitoring metrics from richful data sources, integrates with the Prometheus stack, and provides insightful Grafana templates. In addition, troubleshooting tools such as slow logs are also provided.
 
 * Extensibility
   
-  You can integrate and use new database engines with ease. KubeBlocks provides a good abstraction of the database control plane, allowing for efficient support of new database engines with a consistent user experience.
+  KubeBlocks provides the addon mechanism for integrating new data/database engines. So it can be extended to run the databases your project needs.
 
 ### Goals
 - Being open and cloud-neutral
@@ -58,7 +60,7 @@ When adopting a multi-cloud or hybrid cloud strategy, it is essential to priorit
 ### Key features
 
 - Be compatible with AWS, GCP, Azure, and more
-- Supports MySQL, PostgreSQL, Redis, MongoDB, Kafka, and more
+- Supports various data infrastructure systems, including MySQL, PostgreSQL, Redis, MongoDB, Kafka, Pulsar and more
 - Provides production-level performance, resilience, scalability, and observability
 - Simplifies day-2 operations, such as upgrading, scaling, monitoring, backup, and restore
 - Contains a powerful and intuitive command line tool
@@ -69,7 +71,7 @@ When adopting a multi-cloud or hybrid cloud strategy, it is essential to priorit
 
 ## Community
 
-- KubeBlocks [Slack Channel](https://kubeblocks.slack.com/join/shared_invite/zt-22cx5p0y9-~BDNuPqxkdgswI_FSdx_8g)
+- KubeBlocks [Slack Channel](https://join.slack.com/t/kubeblocks/shared_invite/zt-23vym7xpx-Xu3xcE7HmcqGKvTX4U9yTg)
 - KubeBlocks Github [Discussions](https://github.com/apecloud/kubeblocks/discussions)
 
 ## Contributing to KubeBlocks

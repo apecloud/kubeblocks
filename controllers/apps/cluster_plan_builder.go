@@ -25,6 +25,8 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
+	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -37,11 +39,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
+	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 const (
@@ -50,10 +56,8 @@ const (
 	clusterWeight
 )
 
-// TODO: cluster plan builder can be abstracted as a common flow
-
-// ClusterTransformContext a graph.TransformContext implementation for Cluster reconciliation
-type ClusterTransformContext struct {
+// clusterTransformContext a graph.TransformContext implementation for Cluster reconciliation
+type clusterTransformContext struct {
 	context.Context
 	Client roclient.ReadonlyClient
 	record.EventRecorder
@@ -68,7 +72,7 @@ type ClusterTransformContext struct {
 type clusterPlanBuilder struct {
 	req          ctrl.Request
 	cli          client.Client
-	transCtx     *ClusterTransformContext
+	transCtx     *clusterTransformContext
 	transformers graph.TransformerChain
 }
 
@@ -77,29 +81,39 @@ type clusterPlan struct {
 	dag      *graph.DAG
 	walkFunc graph.WalkFunc
 	cli      client.Client
-	transCtx *ClusterTransformContext
+	transCtx *clusterTransformContext
 }
 
-var _ graph.TransformContext = &ClusterTransformContext{}
+var _ graph.TransformContext = &clusterTransformContext{}
 var _ graph.PlanBuilder = &clusterPlanBuilder{}
 var _ graph.Plan = &clusterPlan{}
 
 // TransformContext implementation
 
-func (c *ClusterTransformContext) GetContext() context.Context {
+func (c *clusterTransformContext) GetContext() context.Context {
 	return c.Context
 }
 
-func (c *ClusterTransformContext) GetClient() roclient.ReadonlyClient {
+func (c *clusterTransformContext) GetClient() roclient.ReadonlyClient {
 	return c.Client
 }
 
-func (c *ClusterTransformContext) GetRecorder() record.EventRecorder {
+func (c *clusterTransformContext) GetRecorder() record.EventRecorder {
 	return c.EventRecorder
 }
 
-func (c *ClusterTransformContext) GetLogger() logr.Logger {
+func (c *clusterTransformContext) GetLogger() logr.Logger {
 	return c.Logger
+}
+
+func init() {
+	model.AddScheme(appsv1alpha1.AddToScheme)
+	model.AddScheme(dpv1alpha1.AddToScheme)
+	model.AddScheme(snapshotv1.AddToScheme)
+	model.AddScheme(snapshotv1beta1.AddToScheme)
+	model.AddScheme(extensionsv1alpha1.AddToScheme)
+	model.AddScheme(workloadsv1alpha1.AddToScheme)
+	model.AddScheme(storagev1alpha1.AddToScheme)
 }
 
 // PlanBuilder implementation
@@ -109,13 +123,7 @@ func (c *clusterPlanBuilder) Init() error {
 	if err := c.cli.Get(c.transCtx.Context, c.req.NamespacedName, cluster); err != nil {
 		return err
 	}
-
-	c.transCtx.Cluster = cluster
-	c.transCtx.OrigCluster = cluster.DeepCopy()
-	c.transformers = append(c.transformers, &initTransformer{
-		cluster:       c.transCtx.Cluster,
-		originCluster: c.transCtx.OrigCluster,
-	})
+	c.AddTransformer(&initTransformer{cluster: cluster})
 	return nil
 }
 
@@ -172,7 +180,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 func (p *clusterPlan) Execute() error {
 	less := func(v1, v2 graph.Vertex) bool {
 		getWeight := func(v graph.Vertex) int {
-			lifecycleVertex, ok := v.(*ictrltypes.LifecycleVertex)
+			lifecycleVertex, ok := v.(*model.ObjectVertex)
 			if !ok {
 				return defaultWeight
 			}
@@ -211,9 +219,9 @@ func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ct
 	return &clusterPlanBuilder{
 		req: req,
 		cli: cli,
-		transCtx: &ClusterTransformContext{
+		transCtx: &clusterTransformContext{
 			Context:       ctx.Ctx,
-			Client:        cli,
+			Client:        model.NewGraphClient(cli),
 			EventRecorder: ctx.Recorder,
 			Logger:        ctx.Log,
 		},
@@ -221,25 +229,25 @@ func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ct
 }
 
 func (c *clusterPlanBuilder) defaultWalkFuncWithLogging(vertex graph.Vertex) error {
-	node, ok := vertex.(*ictrltypes.LifecycleVertex)
+	node, ok := vertex.(*model.ObjectVertex)
 	err := c.defaultWalkFunc(vertex)
-	if err != nil {
-		if !ok {
-			c.transCtx.Logger.Error(err, "")
-		} else {
-			if node.Action == nil {
-				c.transCtx.Logger.Error(err, fmt.Sprintf("%T", node))
-			} else {
-				c.transCtx.Logger.Error(err, fmt.Sprintf("%s %T error", *node.Action, node.Obj))
-			}
-		}
+	switch {
+	case err == nil:
+		return err
+	case !ok:
+		c.transCtx.Logger.Error(err, "")
+	case node.Action == nil:
+		c.transCtx.Logger.Error(err, fmt.Sprintf("%T", node))
+	case apierrors.IsConflict(err):
+		return err
+	default:
+		c.transCtx.Logger.Error(err, fmt.Sprintf("%s %T error", *node.Action, node.Obj))
 	}
 	return err
 }
 
-// TODO: retry strategy on error
 func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
-	node, ok := vertex.(*ictrltypes.LifecycleVertex)
+	node, ok := vertex.(*model.ObjectVertex)
 	if !ok {
 		return fmt.Errorf("wrong vertex type %v", vertex)
 	}
@@ -256,28 +264,24 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 	return c.reconcileObject(node)
 }
 
-func (c *clusterPlanBuilder) reconcileObject(node *ictrltypes.LifecycleVertex) error {
+func (c *clusterPlanBuilder) reconcileObject(node *model.ObjectVertex) error {
 	switch *node.Action {
-	case ictrltypes.CREATE:
+	case model.CREATE:
 		err := c.cli.Create(c.transCtx.Context, node.Obj)
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
-	case ictrltypes.UPDATE:
-		if node.Immutable {
-			return nil
-		}
+	case model.UPDATE:
 		err := c.cli.Update(c.transCtx.Context, node.Obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
-	case ictrltypes.PATCH:
-		patch := client.MergeFrom(node.ObjCopy)
+	case model.PATCH:
+		patch := client.MergeFrom(node.OriObj)
 		if err := c.cli.Patch(c.transCtx.Context, node.Obj, patch); err != nil && !apierrors.IsNotFound(err) {
-			c.transCtx.Logger.Error(err, fmt.Sprintf("patch %T error", node.ObjCopy))
 			return err
 		}
-	case ictrltypes.DELETE:
+	case model.DELETE:
 		if controllerutil.RemoveFinalizer(node.Obj, constant.DBClusterFinalizerName) {
 			err := c.cli.Update(c.transCtx.Context, node.Obj)
 			if err != nil && !apierrors.IsNotFound(err) {
@@ -287,53 +291,40 @@ func (c *clusterPlanBuilder) reconcileObject(node *ictrltypes.LifecycleVertex) e
 		// delete secondary objects
 		if _, ok := node.Obj.(*appsv1alpha1.Cluster); !ok {
 			err := intctrlutil.BackgroundDeleteObject(c.cli, c.transCtx.Context, node.Obj)
-			// err := c.cli.Delete(c.transCtx.Context, node.obj)
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
 		}
-	case ictrltypes.STATUS:
-		patch := client.MergeFrom(node.ObjCopy)
+	case model.STATUS:
+		patch := client.MergeFrom(node.OriObj)
 		if err := c.cli.Status().Patch(c.transCtx.Context, node.Obj, patch); err != nil {
 			return err
 		}
 		// handle condition and phase changing triggered events
 		if newCluster, ok := node.Obj.(*appsv1alpha1.Cluster); ok {
-			oldCluster, _ := node.ObjCopy.(*appsv1alpha1.Cluster)
+			oldCluster, _ := node.OriObj.(*appsv1alpha1.Cluster)
 			c.emitConditionUpdatingEvent(oldCluster.Status.Conditions, newCluster.Status.Conditions)
 			c.emitStatusUpdatingEvent(oldCluster.Status, newCluster.Status)
 		}
-	case ictrltypes.NOOP:
+	case model.NOOP:
 		// nothing
 	}
 	return nil
 }
 
-func (c *clusterPlanBuilder) reconcileCluster(node *ictrltypes.LifecycleVertex) error {
+func (c *clusterPlanBuilder) reconcileCluster(node *model.ObjectVertex) error {
 	cluster := node.Obj.(*appsv1alpha1.Cluster).DeepCopy()
-	origCluster := node.ObjCopy.(*appsv1alpha1.Cluster)
+	origCluster := node.OriObj.(*appsv1alpha1.Cluster)
 	switch *node.Action {
 	// cluster.meta and cluster.spec might change
-	case ictrltypes.STATUS:
+	case model.STATUS:
 		if !reflect.DeepEqual(cluster.ObjectMeta, origCluster.ObjectMeta) || !reflect.DeepEqual(cluster.Spec, origCluster.Spec) {
-			// TODO: we should Update instead of Patch cluster object,
-			// TODO: but Update failure happens too frequently as other controllers are updating cluster object too.
-			// TODO: use Patch here, revert to Update after refactoring done
-			// if err := c.cli.Update(c.ctx.Ctx, cluster); err != nil {
-			//	tmpCluster := &appsv1alpha1.Cluster{}
-			//	err = c.cli.Get(c.ctx.Ctx,client.ObjectKeyFromObject(origCluster), tmpCluster)
-			//	c.ctx.Log.Error(err, fmt.Sprintf("update %T error, orig: %v, curr: %v, api-server: %v", origCluster, origCluster, cluster, tmpCluster))
-			//	return err
-			// }
 			patch := client.MergeFrom(origCluster.DeepCopy())
 			if err := c.cli.Patch(c.transCtx.Context, cluster, patch); err != nil {
-				// log for debug
-				// TODO:(free6om) make error message smaller when refactor done.
-				c.transCtx.Logger.Error(err, fmt.Sprintf("patch %T error, orig: %v, curr: %v", origCluster, origCluster, cluster))
 				return err
 			}
 		}
-	case ictrltypes.CREATE, ictrltypes.UPDATE:
+	case model.CREATE, model.UPDATE:
 		return fmt.Errorf("cluster can't be created or updated: %s", cluster.Name)
 	}
 	return nil

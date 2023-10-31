@@ -24,7 +24,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,10 +33,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
 var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
@@ -146,44 +145,6 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		Expect(err).Should(BeNil())
 	}
 
-	testWarningEventOnPVC := func(reqCtx intctrlutil.RequestCtx, clusterObject *appsv1alpha1.Cluster, opsRes *OpsResource) {
-		// init resources for volume expansion
-		comp := opsRes.Cluster.Spec.GetComponentByName(consensusCompName)
-		newOps, pvcNames := initResourcesForVolumeExpansion(clusterObject, opsRes, "4Gi", int(comp.Replicas))
-
-		By("mock run volumeExpansion action and reconcileAction")
-		mockVolumeExpansionActionAndReconcile(reqCtx, opsRes, newOps, pvcNames)
-
-		By("test warning event and volumeExpansion failed")
-		// test when the event does not reach the conditions
-		event := &corev1.Event{
-			Count:   1,
-			Type:    corev1.EventTypeWarning,
-			Reason:  VolumeResizeFailed,
-			Message: "You've reached the maximum modification rate per volume limit. Wait at least 6 hours between modifications per EBS volume.",
-		}
-		stsInvolvedObject := corev1.ObjectReference{
-			Name:      pvcNames[0],
-			Kind:      constant.PersistentVolumeClaimKind,
-			Namespace: "default",
-		}
-		event.InvolvedObject = stsInvolvedObject
-		pvcEventHandler := PersistentVolumeClaimEventHandler{}
-		Expect(pvcEventHandler.Handle(k8sClient, reqCtx, eventRecorder, event)).Should(Succeed())
-
-		// test when the event reaches the conditions
-		event.Count = 5
-		event.FirstTimestamp = metav1.Time{Time: time.Now()}
-		event.LastTimestamp = metav1.Time{Time: time.Now().Add(61 * time.Second)}
-		Expect(pvcEventHandler.Handle(k8sClient, reqCtx, eventRecorder, event)).Should(Succeed())
-		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(newOps), func(g Gomega, tmpOps *appsv1alpha1.OpsRequest) {
-			progressDetails := tmpOps.Status.Components[consensusCompName].ProgressDetails
-			g.Expect(len(progressDetails) > 0).Should(BeTrue())
-			progressDetail := findStatusProgressDetail(progressDetails, getPVCProgressObjectKey(pvcNames[0]))
-			g.Expect(progressDetail.Status == appsv1alpha1.FailedProgressStatus).Should(BeTrue())
-		})).Should(Succeed())
-	}
-
 	testVolumeExpansion := func(reqCtx intctrlutil.RequestCtx, clusterObject *appsv1alpha1.Cluster, opsRes *OpsResource, randomStr string) {
 		// mock cluster is Running to support volume expansion ops
 		Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
@@ -251,7 +212,6 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		By("test handle the invalid volumeExpansion OpsRequest")
 		pvc := &corev1.PersistentVolumeClaim{}
 		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: pvcNames[0], Namespace: testCtx.DefaultNamespace}, pvc)).Should(Succeed())
-		Expect(handleVolumeExpansionWithPVC(intctrlutil.RequestCtx{Ctx: ctx}, k8sClient, pvc)).Should(Succeed())
 
 		Eventually(testapps.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObject))).Should(Equal(appsv1alpha1.RunningClusterPhase))
 	}
@@ -284,9 +244,6 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 
 			By("Test VolumeExpansion")
 			testVolumeExpansion(reqCtx, clusterObject, opsRes, randomStr)
-
-			By("Test Warning Event occurs during volume expanding")
-			testWarningEventOnPVC(reqCtx, clusterObject, opsRes)
 
 			By("Test delete the Running VolumeExpansion OpsRequest")
 			testDeleteRunningVolumeExpansion(clusterObject, opsRes)

@@ -28,16 +28,21 @@ import (
 
 type DataprotectionV1alpha1Interface interface {
 	RESTClient() rest.Interface
+	ActionSetsGetter
 	BackupsGetter
 	BackupPoliciesGetter
 	BackupReposGetter
-	BackupToolsGetter
-	RestoreJobsGetter
+	BackupSchedulesGetter
+	RestoresGetter
 }
 
 // DataprotectionV1alpha1Client is used to interact with features provided by the dataprotection.kubeblocks.io group.
 type DataprotectionV1alpha1Client struct {
 	restClient rest.Interface
+}
+
+func (c *DataprotectionV1alpha1Client) ActionSets() ActionSetInterface {
+	return newActionSets(c)
 }
 
 func (c *DataprotectionV1alpha1Client) Backups(namespace string) BackupInterface {
@@ -52,12 +57,12 @@ func (c *DataprotectionV1alpha1Client) BackupRepos() BackupRepoInterface {
 	return newBackupRepos(c)
 }
 
-func (c *DataprotectionV1alpha1Client) BackupTools() BackupToolInterface {
-	return newBackupTools(c)
+func (c *DataprotectionV1alpha1Client) BackupSchedules(namespace string) BackupScheduleInterface {
+	return newBackupSchedules(c, namespace)
 }
 
-func (c *DataprotectionV1alpha1Client) RestoreJobs(namespace string) RestoreJobInterface {
-	return newRestoreJobs(c, namespace)
+func (c *DataprotectionV1alpha1Client) Restores(namespace string) RestoreInterface {
+	return newRestores(c, namespace)
 }
 
 // NewForConfig creates a new DataprotectionV1alpha1Client for the given config.

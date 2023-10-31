@@ -45,6 +45,7 @@ Usage: $(basename "$0") <options>
     -pn, --pr-number          The pull request number
     -tp, --test-pkgs          The test packages
     -tc, --test-check         The test check
+    -tf, --test-pkgs-first    The test packages first level directory
 EOF
 }
 
@@ -72,6 +73,7 @@ main() {
     local PR_NUMBER=""
     local TEST_PACKAGES=""
     local TEST_PKGS=""
+    local TEST_PKGS_FIRST=""
     local TEST_CHECK=""
 
     parse_command_line "$@"
@@ -247,6 +249,12 @@ parse_command_line() {
             -tc|--test-check)
                 if [[ -n "${2:-}" ]]; then
                     TEST_CHECK="$2"
+                    shift
+                fi
+                ;;
+            -tf|--test-pkgs-first)
+                if [[ -n "${2:-}" ]]; then
+                    TEST_PKGS_FIRST="$2"
                     shift
                 fi
                 ;;
@@ -497,7 +505,7 @@ get_trigger_mode() {
             .github/*|.devcontainer/*|githooks/*|examples/*)
                 add_trigger_mode "[other]"
             ;;
-            internal/cli/cmd/*)
+            pkg/cli/cmd/*)
                 add_trigger_mode "[cli][test]"
             ;;
             *)
@@ -615,9 +623,29 @@ set_size_label() {
     fi
 }
 
+skip_check_pkg() {
+    check_pkg=${1:-""}
+    skip="false"
+    if [[ -z "$check_pkg" ]]; then
+        echo "$skip"
+        return
+    fi
+    for skip_pkg in $(echo "$IGNORE_PKGS" | sed 's/|/ /g'); do
+        if [[ "$check_pkg" == "$skip_pkg" ]]; then
+            skip="true"
+            break
+        fi
+    done
+    echo "$skip"
+}
+
 set_test_packages() {
     pkgs_dir=$1
     if ( find $pkgs_dir -maxdepth 1 -type f -name '*_test.go' ) > /dev/null; then
+        skip_check=$(skip_check_pkg "$pkgs_dir")
+        if [[ "$skip_check" == "true" ]]; then
+            return
+        fi
         if [[ -z "$TEST_PACKAGES" ]]; then
             TEST_PACKAGES="{\"ops\":\"$pkgs_dir\"}"
         else
@@ -642,6 +670,10 @@ get_test_packages() {
     fi
     for check in $( echo "$TEST_CHECK" | sed 's/|/ /g' ); do
         set_test_check $check
+    done
+
+    for pkgs_first in $( echo "$TEST_PKGS_FIRST" | sed 's/|/ /g' ); do
+        set_test_check "./$pkgs_first"
     done
 
     for pkgs in $( echo "$TEST_PKGS" | sed 's/|/ /g' ); do

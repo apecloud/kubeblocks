@@ -40,9 +40,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	viper "github.com/apecloud/kubeblocks/internal/viperx"
 	k8scomponent "github.com/apecloud/kubeblocks/lorry/component/kubernetes"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type KubernetesStore struct {
@@ -124,7 +124,7 @@ func (store *KubernetesStore) Initialize(cluster *Cluster) error {
 		store.logger.Error(err, "Create Ha ConfigMap failed")
 	}
 
-	err = store.CreateLock()
+	err = store.CreateLease()
 	if err != nil {
 		store.logger.Error(err, "Create Leader ConfigMap failed")
 	}
@@ -244,7 +244,7 @@ func (store *KubernetesStore) GetLeaderConfigMap() (*corev1.ConfigMap, error) {
 	return leaderConfigMap, err
 }
 
-func (store *KubernetesStore) IsLockExist() (bool, error) {
+func (store *KubernetesStore) IsLeaseExist() (bool, error) {
 	leaderConfigMap, err := store.GetLeaderConfigMap()
 	appCluster, ok := store.cluster.resource.(*appsv1alpha1.Cluster)
 	if leaderConfigMap != nil && ok && leaderConfigMap.CreationTimestamp.Before(&appCluster.CreationTimestamp) {
@@ -255,8 +255,8 @@ func (store *KubernetesStore) IsLockExist() (bool, error) {
 	return leaderConfigMap != nil, err
 }
 
-func (store *KubernetesStore) CreateLock() error {
-	isExist, err := store.IsLockExist()
+func (store *KubernetesStore) CreateLease() error {
+	isExist, err := store.IsLeaseExist()
 	if isExist || err != nil {
 		return err
 	}
@@ -347,7 +347,7 @@ func (store *KubernetesStore) DeleteLeader() error {
 	return err
 }
 
-func (store *KubernetesStore) AttempAcquireLock() error {
+func (store *KubernetesStore) AttempAcquireLease() error {
 	now := strconv.FormatInt(time.Now().Unix(), 10)
 	ttl := store.cluster.HaConfig.ttl
 	leaderName := store.currentMemberName
@@ -366,7 +366,7 @@ func (store *KubernetesStore) AttempAcquireLock() error {
 	}
 	cm, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 	if err != nil {
-		store.logger.Error(err, "Acquire lock failed")
+		store.logger.Error(err, "Acquire lease failed")
 	} else {
 		store.cluster.Leader.Resource = cm
 	}
@@ -374,16 +374,16 @@ func (store *KubernetesStore) AttempAcquireLock() error {
 	return err
 }
 
-func (store *KubernetesStore) HasLock() bool {
+func (store *KubernetesStore) HasLease() bool {
 	return store.cluster != nil && store.cluster.Leader != nil && store.cluster.Leader.Name == store.currentMemberName
 }
 
-func (store *KubernetesStore) UpdateLock() error {
+func (store *KubernetesStore) UpdateLease() error {
 	configMap := store.cluster.Leader.Resource.(*corev1.ConfigMap)
 
 	annotations := configMap.GetAnnotations()
 	if annotations["leader"] != store.currentMemberName {
-		return errors.Errorf("lost lock")
+		return errors.Errorf("lost lease")
 	}
 	ttl := store.cluster.HaConfig.ttl
 	annotations["ttl"] = strconv.Itoa(ttl)
@@ -399,8 +399,8 @@ func (store *KubernetesStore) UpdateLock() error {
 	return err
 }
 
-func (store *KubernetesStore) ReleaseLock() error {
-	store.logger.Info("release lock")
+func (store *KubernetesStore) ReleaseLease() error {
+	store.logger.Info("release lease")
 	configMap := store.cluster.Leader.Resource.(*corev1.ConfigMap)
 	configMap.Annotations["leader"] = ""
 
@@ -410,7 +410,7 @@ func (store *KubernetesStore) ReleaseLock() error {
 	}
 	_, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 	if err != nil {
-		store.logger.Error(err, "release lock failed")
+		store.logger.Error(err, "release lease failed")
 	}
 	// TODO: if response status code is 409, it means operation conflict.
 	return err
@@ -425,12 +425,18 @@ func (store *KubernetesStore) CreateHaConfig(cluster *Cluster) error {
 
 	store.logger.Info(fmt.Sprintf("Create Ha ConfigMap: %s", haName))
 	ttl := viper.GetString(constant.KBEnvTTL)
-	maxLag := viper.GetString("KB_MAX_LAG")
+	maxLag := viper.GetString(constant.KBEnvMaxLag)
+	enableHA := viper.GetString(constant.KBEnvEnableHA)
+	if enableHA == "" {
+		// disable HA by default
+		enableHA = "true"
+	}
 	haConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: haName,
 			Annotations: map[string]string{
 				"ttl":                ttl,
+				"enable":             enableHA,
 				"MaxLagOnSwitchover": maxLag,
 			},
 		},
@@ -445,6 +451,7 @@ func (store *KubernetesStore) CreateHaConfig(cluster *Cluster) error {
 
 func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 	configmapName := store.getHAConfigName()
+	deleteMembers := make(map[string]MemberToDelete)
 	configmap, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Get(context.TODO(), configmapName, metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -456,6 +463,7 @@ func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 			index:              "",
 			ttl:                viper.GetInt("KB_TTL"),
 			maxLagOnSwitchover: 1048576,
+			DeleteMembers:      deleteMembers,
 		}, err
 	}
 
@@ -468,7 +476,13 @@ func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 	if err != nil {
 		maxLagOnSwitchover = 1048576
 	}
-	deleteMembers := make(map[string]MemberToDelete)
+
+	enable := false
+	enableStr := annotations["enable"]
+	if enableStr != "" {
+		enable, err = strconv.ParseBool(enableStr)
+	}
+
 	str := annotations["delete-members"]
 	if str != "" {
 		err := json.Unmarshal([]byte(str), &deleteMembers)
@@ -480,6 +494,7 @@ func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 	return &HaConfig{
 		index:              configmap.ResourceVersion,
 		ttl:                ttl,
+		enable:             enable,
 		maxLagOnSwitchover: int64(maxLagOnSwitchover),
 		DeleteMembers:      deleteMembers,
 		resource:           configmap,

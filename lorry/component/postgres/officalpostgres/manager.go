@@ -24,6 +24,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -45,6 +47,7 @@ type Manager struct {
 	postgres.Manager
 	syncStandbys   *postgres.PGStandby
 	recoveryParams map[string]map[string]string
+	pgControlData  map[string]string
 }
 
 var Mgr *Manager
@@ -91,6 +94,7 @@ func (mgr *Manager) cleanDBState() {
 	mgr.UnsetIsLeader()
 	mgr.recoveryParams = nil
 	mgr.syncStandbys = nil
+	mgr.pgControlData = nil
 	mgr.DBState = &dcs.DBState{
 		Extra: map[string]string{},
 	}
@@ -143,6 +147,13 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 		}
 		mgr.recoveryParams = recoveryParams
 	}
+
+	pgControlData := mgr.getPgControlData()
+	if pgControlData == nil {
+		mgr.Logger.Error(err, "get pg controlData failed")
+		return nil
+	}
+	mgr.pgControlData = pgControlData
 
 	return mgr.DBState
 }
@@ -279,18 +290,12 @@ func (mgr *Manager) getReplicationMode(ctx context.Context) (string, error) {
 		return mgr.DBState.Extra[postgres.ReplicationMode], nil
 	}
 
-	sql := "select pg_catalog.current_setting('synchronous_commit');"
-	resp, err := mgr.Query(ctx, sql)
+	synchronousCommit, err := mgr.GetPgCurrentSetting(ctx, "synchronous_commit")
 	if err != nil {
 		return "", err
 	}
 
-	resMap, err := postgres.ParseQuery(string(resp))
-	if err != nil {
-		return "", errors.Errorf("parse query response:%s failed, err:%v", string(resp), err)
-	}
-
-	switch cast.ToString(resMap[0]["current_setting"]) {
+	switch synchronousCommit {
 	case "off":
 		return postgres.Asynchronous, nil
 	case "local":
@@ -374,20 +379,13 @@ func (mgr *Manager) getSyncStandbys(ctx context.Context) *postgres.PGStandby {
 		return mgr.syncStandbys
 	}
 
-	sql := "select pg_catalog.current_setting('synchronous_standby_names');"
-	resp, err := mgr.Query(ctx, sql)
+	synchronousStandbyNames, err := mgr.GetPgCurrentSetting(ctx, "synchronous_standby_names")
 	if err != nil {
-		mgr.Logger.Error(err, fmt.Sprintf("query sql:%s failed", sql))
+		mgr.Logger.Error(err, "get synchronous_standby_names failed")
 		return nil
 	}
 
-	resMap, err := postgres.ParseQuery(string(resp))
-	if err != nil {
-		mgr.Logger.Error(err, fmt.Sprintf("parse query response:%s failed", string(resp)))
-		return nil
-	}
-
-	syncStandbys, err := postgres.ParsePGSyncStandby(cast.ToString(resMap[0]["current_setting"]))
+	syncStandbys, err := postgres.ParsePGSyncStandby(synchronousStandbyNames)
 	if err != nil {
 		mgr.Logger.Error(err, "parse pg sync standby failed")
 		return nil
@@ -411,11 +409,120 @@ func (mgr *Manager) handleRewind(ctx context.Context, cluster *dcs.Cluster) erro
 		return nil
 	}
 
-	return mgr.executeRewind()
+	if !mgr.canRewind() {
+		return nil
+	}
+
+	return mgr.executeRewind(ctx)
 }
 
-func (mgr *Manager) executeRewind() error {
+func (mgr *Manager) canRewind() bool {
+	_, err := postgres.PgRewind("--help")
+	if err != nil {
+		mgr.Logger.Error(err, "unable to execute pg_rewind")
+		return false
+	}
+
+	pgControlData := mgr.getPgControlData()
+	if pgControlData["wal_log_hints setting"] != "on" && pgControlData["Data page checksum version"] == "0" {
+		mgr.Logger.Info("unable to execute pg_rewind due to configuration not allowed")
+	}
+
+	return true
+}
+
+func (mgr *Manager) executeRewind(ctx context.Context) error {
+	if mgr.IsRunning() {
+		return errors.New("can't run rewind when pg is running")
+	}
+
+	err := mgr.checkArchiveReadyWal(ctx)
+	if err != nil {
+		return err
+	}
+
+	// TODO: checkpoint
+
 	return nil
+}
+
+func (mgr *Manager) checkArchiveReadyWal(ctx context.Context) error {
+	archiveMode, _ := mgr.GetPgCurrentSetting(ctx, "archive_mode")
+	archiveCommand, _ := mgr.GetPgCurrentSetting(ctx, "archive_command")
+
+	if (archiveMode != "on" && archiveMode != "always") || archiveCommand == "" {
+		mgr.Logger.Info("archive is not enabled")
+		return nil
+	}
+
+	// starting from PostgreSQL 10, the "wal" directory has been renamed to "pg_wal"
+	archiveDir := mgr.DataDir + "pg_wal/archive_status"
+	var walFileList []string
+	err := filepath.Walk(archiveDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		fileName := strings.Split(info.Name(), ".")
+		if len(fileName) == 2 && fileName[1] == "ready" {
+			walFileList = append(walFileList, fileName[0])
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if len(walFileList) == 0 {
+		mgr.Logger.Info("no ready wal file exist")
+		return nil
+	}
+
+	sort.Strings(walFileList)
+	for _, wal := range walFileList {
+		walFileName := archiveDir + wal + ".ready"
+		_, err = postgres.ExecCommand(buildArchiverCommand(archiveCommand, wal, archiveDir))
+		if err != nil {
+			return err
+		}
+
+		err = fs.Rename(walFileName, archiveDir+wal+".done")
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func buildArchiverCommand(archiveCommand, walFileName, walDir string) string {
+	cmd := ""
+
+	i := 0
+	archiveCommandLength := len(archiveCommand)
+	for i < archiveCommandLength {
+		if archiveCommand[i] == '%' && i+1 < archiveCommandLength {
+			i += 1
+			switch archiveCommand[i] {
+			case 'p':
+				cmd += walDir + walFileName
+			case 'f':
+				cmd += walFileName
+			case 'r':
+				cmd += "000000010000000000000001"
+			case '%':
+				cmd += "%"
+			default:
+				cmd += "%"
+				i -= 1
+			}
+		} else {
+			cmd += string(archiveCommand[i])
+		}
+		i += 1
+	}
+
+	return cmd
 }
 
 func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluster) bool {
@@ -530,14 +637,14 @@ func (mgr *Manager) getLocalTimeLineAndLsnFromControlData() (bool, int64, int64)
 	var timeLine, lsn int64
 
 	pgControlData := mgr.getPgControlData()
-	if slices.Contains([]string{"shut down in recovery", "in archive recovery"}, (*pgControlData)["Database cluster state"]) {
+	if slices.Contains([]string{"shut down in recovery", "in archive recovery"}, (pgControlData)["Database cluster state"]) {
 		inRecovery = true
-		lsnStr = (*pgControlData)["Minimum recovery ending location"]
-		timeLineStr = (*pgControlData)["Min recovery ending loc's timeline"]
-	} else if (*pgControlData)["Database cluster state"] == "shut down" {
+		lsnStr = (pgControlData)["Minimum recovery ending location"]
+		timeLineStr = (pgControlData)["Min recovery ending loc's timeline"]
+	} else if (pgControlData)["Database cluster state"] == "shut down" {
 		inRecovery = false
-		lsnStr = (*pgControlData)["Latest checkpoint location"]
-		timeLineStr = (*pgControlData)["Latest checkpoint's TimeLineID"]
+		lsnStr = (pgControlData)["Latest checkpoint location"]
+		timeLineStr = (pgControlData)["Latest checkpoint's TimeLineID"]
 	}
 
 	if lsnStr != "" {
@@ -609,24 +716,27 @@ func (mgr *Manager) getReceivedTimeLine(ctx context.Context, host string) int64 
 	return cast.ToInt64(resMap[0]["received_tli"])
 }
 
-func (mgr *Manager) getPgControlData() *map[string]string {
+func (mgr *Manager) getPgControlData() map[string]string {
+	if mgr.pgControlData != nil {
+		return mgr.pgControlData
+	}
+
 	result := map[string]string{}
 
 	resp, err := postgres.ExecCommand("pg_controldata")
 	if err != nil {
 		mgr.Logger.Error(err, "get pg control data failed")
-		return &result
+		return nil
 	}
 
-	stdoutList := strings.Split(resp, "\n")
-	for _, s := range stdoutList {
+	controlDataList := strings.Split(resp, "\n")
+	for _, s := range controlDataList {
 		out := strings.Split(s, ":")
 		if len(out) == 2 {
 			result[out[0]] = strings.TrimSpace(out[1])
 		}
 	}
-
-	return &result
+	return result
 }
 
 func (mgr *Manager) checkRecoveryConf(ctx context.Context, leaderName string) (bool, bool) {
@@ -698,31 +808,13 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 		return nil
 	}
 
-	err := mgr.prePromote()
-	if err != nil {
-		return err
-	}
-
 	resp, err := postgres.PgCtl("promote")
 	if err != nil {
 		mgr.Logger.Error(err, "promote failed")
 		return err
 	}
 
-	err = mgr.postPromote()
-	if err != nil {
-		return err
-	}
-
 	mgr.Logger.Info("promote success", "response", resp)
-	return nil
-}
-
-func (mgr *Manager) prePromote() error {
-	return nil
-}
-
-func (mgr *Manager) postPromote() error {
 	return nil
 }
 
@@ -761,6 +853,7 @@ func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 	err := mgr.handleRewind(ctx, cluster)
 	if err != nil {
 		mgr.Logger.Error(err, "handle rewind failed")
+		return err
 	}
 
 	needChange, needRestart := mgr.checkRecoveryConf(ctx, cluster.Leader.Name)

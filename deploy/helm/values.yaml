@@ -12,7 +12,7 @@ versionOverride:
 ## @param image.imagePullSecrets KubeBlocks image pull secrets
 ## @param image.tools.repository KubeBlocks tools image repository
 image:
-  registry: registry.cn-hangzhou.aliyuncs.com
+  registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
   repository: apecloud/kubeblocks
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
@@ -217,7 +217,7 @@ resources: {}
   #   memory: 128Mi
   # requests:
   #   cpu: 10m
-  #   memory: 64Mi
+#   memory: 64Mi
 
 ## @param priorityClassName
 ##
@@ -246,10 +246,10 @@ nodeSelector: {}
 ## @param tolerations
 ##
 tolerations:
-  - key: kb-controller
-    operator: Equal
-    value: "true"
-    effect: NoSchedule
+- key: kb-controller
+  operator: Equal
+  value: "true"
+  effect: NoSchedule
 
 
 ## @param affinity
@@ -257,33 +257,33 @@ tolerations:
 affinity:
   nodeAffinity:
     preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 100
-        preference:
-          matchExpressions:
-            - key: kb-controller
-              operator: In
-              values:
-                - "true"
+    - weight: 100
+      preference:
+        matchExpressions:
+        - key: kb-controller
+          operator: In
+          values:
+          - "true"
 
 ## @param data plane settings
 ##
 dataPlane:
   tolerations:
-    - key: kb-data
-      operator: Equal
-      value: "true"
-      effect: NoSchedule
+  - key: kb-data
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
 
   affinity:
     nodeAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          preference:
-            matchExpressions:
-              - key: kb-data
-                operator: In
-                values:
-                  - "true"
+      - weight: 100
+        preference:
+          matchExpressions:
+          - key: kb-data
+            operator: In
+            values:
+            - "true"
 
 ## AdmissionWebhooks settings
 ##
@@ -298,35 +298,32 @@ admissionWebhooks:
 ## Data protection settings
 ##
 ## @param dataProtection.enabled - set the dataProtection controllers for backup functions
-## @param dataProtection.enableVolumeSnapshot - set this to true if cluster does have snapshot.storage.k8s.io API installed
-## @param dataProtection.backupPVCName - set the default pvc to store the file for backup
-## @param dataProtection.backupPVCInitCapacity - set the default pvc initCapacity if the pvc need to be created by backup controller
-## @param dataProtection.backupPVCStorageClassName - set the default pvc storageClassName if the pvc need to be created by backup controller
-## @param dataProtection.backupPVCCreatePolicy - set the default create policy of the pvc, optional values: IfNotPresent, Never
-## @param dataProtection.backupPVConfigMapName - set the default configmap name which contains key "persistentVolume" and value of the persistentVolume struct.
-## @param dataProtection.backupPVConfigMapNamespace - set the default configmap namespace of pv template.
+## @param dataProtection.gcFrequencySeconds - the frequency of garbage collection
 dataProtection:
   enabled: true
-  enableVolumeSnapshot: false
-  backupPVCName: ""
-  backupPVCInitCapacity: ""
-  backupPVCStorageClassName: ""
-  backupPVCCreatePolicy: ""
-  backupPVConfigMapName: ""
-  backupPVConfigMapNamespace: ""
+  # customizing the encryption key is strongly recommended.
+  # if you do not specify a custom key, the default key will be used.
+  # using the default key can potentially lead to the exposure of database passwords
+  # if 'get/list' role of the backup CR are compromised.
+  encryptionKey: ""
+  gcFrequencySeconds: 3600
 
   image:
-    registry: registry.cn-hangzhou.aliyuncs.com
+    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
     repository: apecloud/kubeblocks-dataprotection
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
     tag: ""
-    imagePullSecrets: [ ]
+    imagePullSecrets: []
+    datasafed:
+      repository: apecloud/datasafed
+      tag: "0.0.3"
 
 ## BackupRepo settings
 ##
 ## @param backupRepo.create - creates a backup repo during installation
 ## @param backupRepo.default - set the created repo as the default
+## @param backupRepo.accessMethod - the access method for the backup repo, options: [Mount, Tool]
 ## @param backupRepo.storageProvider - the storage provider used by the repo, options: [s3, oss, minio]
 ## @param backupRepo.pvReclaimPolicy - the PV reclaim policy, options: [Retain, Delete]
 ## @param backupRepo.volumeCapacity - the capacity for creating PVC
@@ -335,6 +332,7 @@ dataProtection:
 backupRepo:
   create: false
   default: true
+  accessMethod: Tool
   storageProvider: ""
   pvReclaimPolicy: "Retain"
   volumeCapacity: ""
@@ -346,10 +344,10 @@ backupRepo:
     accessKeyId: ""
     secretAccessKey: ""
 
-## Addon controller settings, this will require cluster-admin clusterrole.
-##
-## @param addonController.enabled
-## @param addonController.jobTTL - is addon job time-to-live period, this value is time.Duration-parseable string.
+  ## Addon controller settings, this will require cluster-admin clusterrole.
+  ##
+  ## @param addonController.enabled
+  ## @param addonController.jobTTL - is addon job time-to-live period, this value is time.Duration-parseable string.
   ## default value is "5m" if not provided.
 ## @param addonController.jobImagePullPolicy - addon install job image pull policy.
 addonController:
@@ -369,7 +367,7 @@ addonChartLocationBase: file://
 ## @param addonChartsImage - addon charts image, used to copy Helm charts to the addon job container.
 ## @param addonChartsImage.chartsPath - the helm charts path in the addon charts image.
 addonChartsImage:
-  registry: registry.cn-hangzhou.aliyuncs.com
+  registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
   repository: apecloud/kubeblocks-charts
   pullPolicy: IfNotPresent
   tag: ""
@@ -377,10 +375,10 @@ addonChartsImage:
 
 ## @param addonHelmInstallOptions - addon helm install options.
 addonHelmInstallOptions:
-  - "--atomic"
-  - "--cleanup-on-fail"
-  - "--wait"
-  - "--insecure-skip-tls-verify"
+- "--atomic"
+- "--cleanup-on-fail"
+- "--wait"
+- "--insecure-skip-tls-verify"
 
 ## Prometheus Addon
 ##
@@ -397,7 +395,7 @@ prometheus:
     ## alertmanager container image
     ##
     image:
-      repository: registry.cn-hangzhou.aliyuncs.com/apecloud/alertmanager
+      repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/alertmanager
       tag: v0.24.0
 
     ## ConfigMap override where fullname is {{.Release.Name}}-{{.Values.alertmanager.configMapOverrideName}}
@@ -410,21 +408,21 @@ prometheus:
     ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
     ##
     tolerations:
-      - key: kb-controller
-        operator: Equal
-        value: "true"
-        effect: NoSchedule
+    - key: kb-controller
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
 
     affinity:
       nodeAffinity:
         preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            preference:
-              matchExpressions:
-                - key: kb-controller
-                  operator: In
-                  values:
-                    - "true"
+        - weight: 100
+          preference:
+            matchExpressions:
+            - key: kb-controller
+              operator: In
+              values:
+              - "true"
 
     persistentVolume:
       ## If true, alertmanager will create/use a Persistent Volume Claim
@@ -471,7 +469,7 @@ prometheus:
       #   memory: 32Mi
       # requests:
       #   cpu: 10m
-      #   memory: 32Mi
+    #   memory: 32Mi
 
     ## Security context to be added to alertmanager pods
     ##
@@ -565,7 +563,7 @@ prometheus:
     ## node-exporter container image
     ##
     image:
-      repository: registry.cn-hangzhou.aliyuncs.com/apecloud/node-exporter
+      repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/node-exporter
       tag: v1.3.1
 
   configmapReload:
@@ -573,13 +571,13 @@ prometheus:
       ## configmap-reload container image
       ##
       image:
-        repository: registry.cn-hangzhou.aliyuncs.com/apecloud/configmap-reload
+        repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/configmap-reload
         tag: v0.5.0
     alertmanager:
       ## configmap-reload container image
       ##
       image:
-        repository: registry.cn-hangzhou.aliyuncs.com/apecloud/configmap-reload
+        repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/configmap-reload
         tag: v0.5.0
 
   server:
@@ -590,7 +588,7 @@ prometheus:
     ## Prometheus server container image
     ##
     image:
-      repository: registry.cn-hangzhou.aliyuncs.com/apecloud/prometheus
+      repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/prometheus
       tag: v2.44.0
 
     global:
@@ -607,8 +605,8 @@ prometheus:
     ## Additional Prometheus server container flags
     ##
     extraFlags:
-      - web.enable-lifecycle
-      - web.enable-remote-write-receiver
+    - web.enable-lifecycle
+    - web.enable-remote-write-receiver
 
     ## Additional Prometheus server container arguments
     ##
@@ -631,21 +629,21 @@ prometheus:
     ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
     ##
     tolerations:
-      - key: kb-controller
-        operator: Equal
-        value: "true"
-        effect: NoSchedule
+    - key: kb-controller
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
 
     affinity:
       nodeAffinity:
         preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            preference:
-              matchExpressions:
-                - key: kb-controller
-                  operator: In
-                  values:
-                    - "true"
+        - weight: 100
+          preference:
+            matchExpressions:
+            - key: kb-controller
+              operator: In
+              values:
+              - "true"
 
     persistentVolume:
       ## If true, Prometheus server will create/use a Persistent Volume Claim
@@ -685,7 +683,7 @@ prometheus:
       #   memory: 512Mi
       # requests:
       #   cpu: 500m
-      #   memory: 512Mi
+    #   memory: 512Mi
 
     ## Prometheus' data retention period (default if not specified is 15 days)
     ##
@@ -790,10 +788,10 @@ prometheus:
   ##
   alertmanagerFiles:
     alertmanager.yml:
-      global: { }
+      global: {}
 
       receivers:
-        - name: default-receiver
+      - name: default-receiver
 
       route:
         receiver: default-receiver
@@ -1306,117 +1304,117 @@ prometheus:
   serverFiles:
     prometheus.yml:
       rule_files:
-        - /etc/config/recording_rules.yml
-        - /etc/config/alerting_rules.yml
-        - /etc/config/kubelet_alert_rules.yml
-        - /etc/config/mysql_alert_rules.yml
-        - /etc/config/postgresql_alert_rules.yml
-        - /etc/config/redis_alert_rules.yml
-        - /etc/config/kafka_alert_rules.yml
-        - /etc/config/mongodb_alert_rules.yml
+      - /etc/config/recording_rules.yml
+      - /etc/config/alerting_rules.yml
+      - /etc/config/kubelet_alert_rules.yml
+      - /etc/config/mysql_alert_rules.yml
+      - /etc/config/postgresql_alert_rules.yml
+      - /etc/config/redis_alert_rules.yml
+      - /etc/config/kafka_alert_rules.yml
+      - /etc/config/mongodb_alert_rules.yml
 
       scrape_configs:
-        - job_name: prometheus
-          static_configs:
-            - targets:
-                - localhost:9090
+      - job_name: prometheus
+        static_configs:
+        - targets:
+          - localhost:9090
 
-        # Scrape config for kubeblocks managed service endpoints.
-        #
-        # The relabeling allows the actual service scrape endpoint to be configured
-        # via the following annotations:
-        #
-        # * `monitor.kubeblocks.io/scrape`: Only scrape services that have a value of
-        # `true`.
-        # * `monitor.kubeblocks.io/scheme`: If the metrics endpoint is secured then you will need
-        # to set this to `https` & most likely set the `tls_config` of the scrape config.
-        # * `monitor.kubeblocks.io/path`: If the metrics path is not `/metrics` override this.
-        # * `monitor.kubeblocks.io/port`: If the metrics are exposed on a different port to the
-        # service then set this appropriately.
-        # * `monitor.kubeblocks.io/param_<parameter>`: If the metrics endpoint uses parameters
-        # then you can set any parameter
-        - job_name: 'kubeblocks-service'
-          honor_labels: true
+      # Scrape config for kubeblocks managed service endpoints.
+      #
+      # The relabeling allows the actual service scrape endpoint to be configured
+      # via the following annotations:
+      #
+      # * `monitor.kubeblocks.io/scrape`: Only scrape services that have a value of
+      # `true`.
+      # * `monitor.kubeblocks.io/scheme`: If the metrics endpoint is secured then you will need
+      # to set this to `https` & most likely set the `tls_config` of the scrape config.
+      # * `monitor.kubeblocks.io/path`: If the metrics path is not `/metrics` override this.
+      # * `monitor.kubeblocks.io/port`: If the metrics are exposed on a different port to the
+      # service then set this appropriately.
+      # * `monitor.kubeblocks.io/param_<parameter>`: If the metrics endpoint uses parameters
+      # then you can set any parameter
+      - job_name: 'kubeblocks-service'
+        honor_labels: true
 
-          kubernetes_sd_configs:
-            - role: endpoints
+        kubernetes_sd_configs:
+        - role: endpoints
 
-          relabel_configs:
-            - source_labels: [ __meta_kubernetes_service_label_app_kubernetes_io_managed_by ]
-              action: keep
-              regex: kubeblocks
-            - source_labels: [ __meta_kubernetes_service_label_monitor_kubeblocks_io_managed_by ]
-              action: drop
-              regex: agamotto
-            - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_scrape ]
-              action: keep
-              regex: true
-            - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_scheme ]
-              action: replace
-              target_label: __scheme__
-              regex: (https?)
-            - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_path ]
-              action: replace
-              target_label: __metrics_path__
-              regex: (.+)
-            - source_labels: [ __address__, __meta_kubernetes_service_annotation_monitor_kubeblocks_io_port ]
-              action: replace
-              target_label: __address__
-              regex: (.+?)(?::\d+)?;(\d+)
-              replacement: $1:$2
-            - action: labelmap
-              regex: __meta_kubernetes_service_annotation_monitor_kubeblocks_io_param_(.+)
-              replacement: __param_$1
-            - action: labelmap
-              regex: __meta_kubernetes_service_label_(.+)
-            - source_labels: [ __meta_kubernetes_namespace ]
-              action: replace
-              target_label: namespace
-            - source_labels: [ __meta_kubernetes_service_name ]
-              action: replace
-              target_label: service
-            - source_labels: [ __meta_kubernetes_pod_node_name ]
-              action: replace
-              target_label: node
-            - source_labels: [ __meta_kubernetes_pod_name ]
-              action: replace
-              target_label: pod
-            - source_labels: [ __meta_kubernetes_pod_phase ]
-              regex: Pending|Succeeded|Failed|Completed
-              action: drop
+        relabel_configs:
+        - source_labels: [__meta_kubernetes_service_label_app_kubernetes_io_managed_by]
+          action: keep
+          regex: kubeblocks
+        - source_labels: [__meta_kubernetes_service_label_monitor_kubeblocks_io_managed_by]
+          action: drop
+          regex: agamotto
+        - source_labels: [__meta_kubernetes_service_annotation_monitor_kubeblocks_io_scrape]
+          action: keep
+          regex: true
+        - source_labels: [__meta_kubernetes_service_annotation_monitor_kubeblocks_io_scheme]
+          action: replace
+          target_label: __scheme__
+          regex: (https?)
+        - source_labels: [__meta_kubernetes_service_annotation_monitor_kubeblocks_io_path]
+          action: replace
+          target_label: __metrics_path__
+          regex: (.+)
+        - source_labels: [__address__, __meta_kubernetes_service_annotation_monitor_kubeblocks_io_port]
+          action: replace
+          target_label: __address__
+          regex: (.+?)(?::\d+)?;(\d+)
+          replacement: $1:$2
+        - action: labelmap
+          regex: __meta_kubernetes_service_annotation_monitor_kubeblocks_io_param_(.+)
+          replacement: __param_$1
+        - action: labelmap
+          regex: __meta_kubernetes_service_label_(.+)
+        - source_labels: [__meta_kubernetes_namespace]
+          action: replace
+          target_label: namespace
+        - source_labels: [__meta_kubernetes_service_name]
+          action: replace
+          target_label: service
+        - source_labels: [__meta_kubernetes_pod_node_name]
+          action: replace
+          target_label: node
+        - source_labels: [__meta_kubernetes_pod_name]
+          action: replace
+          target_label: pod
+        - source_labels: [__meta_kubernetes_pod_phase]
+          regex: Pending|Succeeded|Failed|Completed
+          action: drop
 
-        - job_name: 'kubeblocks-agamotto'
-          honor_labels: true
+      - job_name: 'kubeblocks-agamotto'
+        honor_labels: true
 
-          kubernetes_sd_configs:
-            - role: endpoints
+        kubernetes_sd_configs:
+        - role: endpoints
 
-          relabel_configs:
-            - source_labels: [ __meta_kubernetes_service_label_monitor_kubeblocks_io_managed_by ]
-              action: keep
-              regex: agamotto
-            - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_scrape ]
-              action: keep
-              regex: true
-            - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_scheme ]
-              action: replace
-              target_label: __scheme__
-              regex: (https?)
-            - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_path ]
-              action: replace
-              target_label: __metrics_path__
-              regex: (.+)
-            - source_labels: [ __address__, __meta_kubernetes_service_annotation_monitor_kubeblocks_io_port ]
-              action: replace
-              target_label: __address__
-              regex: (.+?)(?::\d+)?;(\d+)
-              replacement: $1:$2
-            - action: labelmap
-              regex: __meta_kubernetes_service_annotation_monitor_kubeblocks_io_param_(.+)
-              replacement: __param_$1
-            - source_labels: [ __meta_kubernetes_pod_phase ]
-              regex: Pending|Succeeded|Failed|Completed
-              action: drop
+        relabel_configs:
+        - source_labels: [__meta_kubernetes_service_label_monitor_kubeblocks_io_managed_by]
+          action: keep
+          regex: agamotto
+        - source_labels: [__meta_kubernetes_service_annotation_monitor_kubeblocks_io_scrape]
+          action: keep
+          regex: true
+        - source_labels: [__meta_kubernetes_service_annotation_monitor_kubeblocks_io_scheme]
+          action: replace
+          target_label: __scheme__
+          regex: (https?)
+        - source_labels: [__meta_kubernetes_service_annotation_monitor_kubeblocks_io_path]
+          action: replace
+          target_label: __metrics_path__
+          regex: (.+)
+        - source_labels: [__address__, __meta_kubernetes_service_annotation_monitor_kubeblocks_io_port]
+          action: replace
+          target_label: __address__
+          regex: (.+?)(?::\d+)?;(\d+)
+          replacement: $1:$2
+        - action: labelmap
+          regex: __meta_kubernetes_service_annotation_monitor_kubeblocks_io_param_(.+)
+          replacement: __param_$1
+        - source_labels: [__meta_kubernetes_pod_phase]
+          regex: Pending|Succeeded|Failed|Completed
+          action: drop
 
   pushgateway:
     ## If false, pushgateway will not be installed
@@ -1476,7 +1474,7 @@ grafana:
   replicas: 1
 
   image:
-    repository: registry.cn-hangzhou.aliyuncs.com/apecloud/grafana
+    repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/grafana
     # Overrides the Grafana image tag whose default is the chart appVersion
     tag: 9.2.4
 
@@ -1489,27 +1487,27 @@ grafana:
     #   memory: 128Mi
     # requests:
     #   cpu: 100m
-    #   memory: 128Mi
+  #   memory: 128Mi
 
   ## Node tolerations for grafana scheduling to nodes with taints
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
   ##
   tolerations:
-    - key: kb-controller
-      operator: Equal
-      value: "true"
-      effect: NoSchedule
+  - key: kb-controller
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
 
   affinity:
     nodeAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          preference:
-            matchExpressions:
-              - key: kb-controller
-                operator: In
-                values:
-                  - "true"
+      - weight: 100
+        preference:
+          matchExpressions:
+          - key: kb-controller
+            operator: In
+            values:
+            - "true"
 
   ## Timezone for the default dashboards
   ## Other options are: browser or a specific timezone, i.e. Europe/Luxembourg
@@ -1521,7 +1519,7 @@ grafana:
 
   sidecar:
     image:
-      repository: registry.cn-hangzhou.aliyuncs.com/apecloud/k8s-sidecar
+      repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/k8s-sidecar
       tag: 1.19.2
 
     dashboards:
@@ -1573,7 +1571,7 @@ grafana:
     pathType: Prefix
 
     hosts:
-      - chart-example.local
+    - chart-example.local
     ## Extra paths to prepend to every host configuration. This is useful when working with annotation based services.
     extraPaths: []
     # - path: /*
@@ -1627,30 +1625,30 @@ snapshot-controller:
   ## @param snapshot-controller.image.repository -- Repository to pull the image from.
   ##
   image:
-    repository: registry.cn-hangzhou.aliyuncs.com/apecloud/snapshot-controller
+    repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/snapshot-controller
     tag: v6.2.1
 
   tolerations:
-    - key: kb-controller
-      operator: Equal
-      value: "true"
-      effect: NoSchedule
+  - key: kb-controller
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
 
   volumeSnapshotClasses:
-    - name: default-vsc
-      driver: hostpath.csi.k8s.io
-      deletionPolicy: Delete
+  - name: default-vsc
+    driver: hostpath.csi.k8s.io
+    deletionPolicy: Delete
 
   affinity:
     nodeAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          preference:
-            matchExpressions:
-              - key: kb-controller
-                operator: In
-                values:
-                  - "true"
+      - weight: 100
+        preference:
+          matchExpressions:
+          - key: kb-controller
+            operator: In
+            values:
+            - "true"
 
 kubeblocks-csi-driver:
   enabled: false
@@ -1685,18 +1683,18 @@ alertmanager-webhook-adaptor:
   ## Webhook-Adaptor container image
   ##
   image:
-    registry: registry.cn-hangzhou.aliyuncs.com
+    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
 
   affinity:
     nodeAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          preference:
-            matchExpressions:
-              - key: kb-controller
-                operator: In
-                values:
-                  - "true"
+      - weight: 100
+        preference:
+          matchExpressions:
+          - key: kb-controller
+            operator: In
+            values:
+            - "true"
 
   ## ConfigMap override where fullname is {{.Release.Name}}-{{.Values.configMapOverrideName}}
   ##
@@ -1704,7 +1702,7 @@ alertmanager-webhook-adaptor:
 
   ## Webhook-Adaptor ConfigMap Entries
   configFiles:
-    config.yaml: { }
+    config.yaml: {}
 
 csi-hostpath-driver:
   ## @param csi-hostpath-driver.enabled -- Enable csi-hostpath-driver chart.
@@ -1751,7 +1749,7 @@ enabledAlphaFeatureGates:
 agamotto:
   enabled: false
   image:
-    registry: registry.cn-hangzhou.aliyuncs.com
+    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
 
 
 provider: "" # cloud be "aws","gcp","aliyun","tencentCloud", "huaweiCloud", "azure"
@@ -1774,8 +1772,8 @@ storageClass:
   ##
   create: true
   mountOptions:
-    - noatime
-    - nobarrier
+  - noatime
+  - nobarrier
   provider:
     aws:
       volumeType: gp3
@@ -1803,3 +1801,5 @@ external-dns:
     operator: Equal
     value: "true"
     effect: NoSchedule
+
+developMode: false

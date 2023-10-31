@@ -15,14 +15,14 @@ kbcli cluster register [NAME] --source [CHART-URL] [flags]
   kbcli cluster register orioledb --source https://github.com/apecloud/helm-charts/releases/download/orioledb-cluster-0.6.0-beta.44/orioledb-cluster-0.6.0-beta.44.tgz
   
   # Register a cluster type from a local path file
-  kbcli cluster register neon -source internal/cli/cluster/charts/neon-cluster.tgz
+  kbcli cluster register neon -source pkg/cli/cluster/charts/neon-cluster.tgz
 ```
 
 ### Options
 
 ```
       --alias string    Set the cluster type alias
-      --auto-approve    Skip interactive approval when register an existed cluster type
+      --auto-approve    Skip interactive approval when registering an existed cluster type
   -h, --help            help for register
   -S, --source string   Specify the cluster type chart source, support a URL or a local file path
 ```

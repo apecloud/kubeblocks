@@ -1,0 +1,31 @@
+---
+# Source: weaviate-cluster/templates/cluster.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: weaviate-cluster
+  labels: 
+    helm.sh/chart: weaviate-cluster-0.7.0-alpha.0
+    app.kubernetes.io/name: weaviate-cluster
+    app.kubernetes.io/instance: weaviate-cluster
+    app.kubernetes.io/version: "1.18.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  clusterDefinitionRef: weaviate # ref clusterdefinition.name
+  clusterVersionRef: weaviate-1.18.0 # ref clusterversion.name
+  terminationPolicy: Delete
+  affinity:
+  componentSpecs:
+    - name: weaviate # user-defined
+      componentDefRef: weaviate # ref clusterdefinition components.name
+      monitor: false
+      replicas: 1
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: 
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 10Gi

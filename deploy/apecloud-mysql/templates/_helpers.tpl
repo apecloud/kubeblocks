@@ -170,3 +170,10 @@ Generate scripts configmap
 {{- $.Files.Get $path | nindent 2 }}
 {{- end }}
 {{- end }}
+
+{{/*
+Backup Tool image
+*/}}
+{{- define "apecloud-mysql.bakcupToolImage" -}}
+{{ .Values.backupTool.image.registry }}/{{ .Values.backupTool.image.repository}}:{{ .Values.backupTool.image.tag }}
+{{- end }}

@@ -21,10 +21,11 @@ package apps
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 // SecretTransformer puts all the secrets at the beginning of the DAG
@@ -33,18 +34,21 @@ type SecretTransformer struct{}
 var _ graph.Transformer = &SecretTransformer{}
 
 func (c *SecretTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	var secretVertices, noneRootVertices []graph.Vertex
-	secretVertices = ictrltypes.FindAll[*corev1.Secret](dag)
-	noneRootVertices = ictrltypes.FindAllNot[*appsv1alpha1.Cluster](dag)
-	for _, secretVertex := range secretVertices {
-		secret, _ := secretVertex.(*ictrltypes.LifecycleVertex)
-		secret.Immutable = true
-		for _, vertex := range noneRootVertices {
-			v, _ := vertex.(*ictrltypes.LifecycleVertex)
-			// connect all none secret vertices to all secret vertices
-			if _, ok := v.Obj.(*corev1.Secret); !ok {
-				if *v.Action != *ictrltypes.ActionDeletePtr() {
-					dag.Connect(vertex, secretVertex)
+	transCtx, _ := ctx.(*clusterTransformContext)
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+
+	var secrets, noneClusterObjects []client.Object
+	secrets = graphCli.FindAll(dag, &corev1.Secret{})
+	noneClusterObjects = graphCli.FindAll(dag, &appsv1alpha1.Cluster{}, model.HaveDifferentTypeWithOption)
+	for _, secret := range secrets {
+		if graphCli.IsAction(dag, secret, model.ActionUpdatePtr()) {
+			graphCli.Noop(dag, secret)
+		}
+		for _, object := range noneClusterObjects {
+			// manipulate all secrets first
+			if _, ok := object.(*corev1.Secret); !ok {
+				if !graphCli.IsAction(dag, secret, model.ActionDeletePtr()) {
+					graphCli.DependOn(dag, object, secret)
 				}
 			}
 		}

@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: elasticsearch-cluster-vscale-
+spec:
+  clusterRef: elasticsearch-cluster
+  type: VerticalScaling
+  verticalScaling:
+    - componentName: elasticsearch
+      requests:
+        cpu: "500m"
+        memory: 500Mi

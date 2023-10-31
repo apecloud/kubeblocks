@@ -26,9 +26,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/constant"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
 var _ = Describe("OpsRequest Controller", func() {
@@ -97,7 +97,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		It("Should Test Backup OpsRequest", func() {
 			By("test GetOpsRequestFromBackup function")
-			backup := &dataprotectionv1alpha1.Backup{}
+			backup := &dpv1alpha1.Backup{}
 			backup.Labels = map[string]string{
 				intctrlutil.OpsRequestNameLabelKey: "backup-ops",
 				intctrlutil.OpsRequestTypeLabelKey: string(appsv1alpha1.BackupType),

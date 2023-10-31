@@ -9,7 +9,7 @@ env:
   GH_TOKEN: ${{ github.token }}
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   TAG_NAME: ${{ github.ref_name }}
-  GO_VERSION: "1.20.5"
+  GO_VERSION: "1.21"
   CLI_NAME: 'kbcli'
   CLI_REPO: 'apecloud/kbcli'
   GITLAB_KBCLI_PROJECT_ID: 85948
@@ -25,7 +25,7 @@ jobs:
     name: Create Release kbcli
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: create release ${{ env.CLI_NAME }}
         id: create_release
         uses: softprops/action-gh-release@v1
@@ -48,7 +48,7 @@ jobs:
     name: Upload and release kbcli
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: install lib
         run: |
           sudo apt-get update
@@ -119,7 +119,7 @@ jobs:
       matrix:
         os: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64, windows-amd64, windows-arm64]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Download kbcli Artifact
         uses: actions/download-artifact@v3.0.2
         with:
@@ -182,7 +182,7 @@ jobs:
       tag-name: ${{ steps.send_message.outputs.tag_name }}
     if: ${{ always() && github.event.action == 'published' }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: send message
         id: send_message
         run: |
@@ -244,13 +244,18 @@ jobs:
 
   e2e-kbcli:
     needs: [ send-message, release-result ]
-    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.4
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.35
+    strategy:
+      fail-fast: false
+      matrix:
+        test-type: [ apecloud-mysql|postgresql|redis|mongodb|kafka|pulsar|weaviate|qdrant|smartengine|mysqlscale , greptimedb|nebula|risingwave|starrocks|etcd|oceanbase|foxlake|oracle-mysql|asmysql|openldap|milvus|clickhouse , polardbx|pika|opensearch|elasticsearch|tdengine|vllm|orioledb|official-pg|ggml|zookeeper|mariadb ]
     with:
       GITHUB_REPO: "apecloud/kubeblocks"
       BRANCH_NAME: "main"
       WORKFLOW_ID: "e2e-kbcli.yml"
-      APECD_REF: "v0.1.4"
+      APECD_REF: "v0.1.35"
       VERSION: "${{ needs.send-message.outputs.tag-name }}"
+      EXTRA_ARGS: "TEST_TYPE=${{ matrix.test-type }}"
     secrets: inherit
 
   delete-cache:
@@ -260,7 +265,7 @@ jobs:
       matrix:
         type: [image, kbcli, chart]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: delete ${{ matrix.type }} cache
         continue-on-error: true
         run: |

@@ -370,13 +370,36 @@ type BackupSpec struct {
 
 	// Which backupPolicy is applied to perform this backup
 	// +optional
-	BackupPolicyName string `json:"backupPolicyName"`
+	BackupPolicyName string `json:"backupPolicyName,omitempty"`
 
-	// Backup Type. datafile or logfile or snapshot. If not set, datafile is the default type.
-	// +kubebuilder:default=datafile
-	// +kubeBuilder:validation:Enum={datafile,logfile,snapshot}
+	// Backup method name that is defined in backupPolicy.
 	// +optional
-	BackupType string `json:"backupType"`
+	BackupMethod string `json:"backupMethod,omitempty"`
+
+	// deletionPolicy determines whether the backup contents stored in backup repository
+	// should be deleted when the backup custom resource is deleted.
+	// Supported values are "Retain" and "Delete".
+	// "Retain" means that the backup content and its physical snapshot on backup repository are kept.
+	// "Delete" means that the backup content and its physical snapshot on backup repository are deleted.
+	// +kubebuilder:validation:Enum=Delete;Retain
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=Delete
+	// +optional
+	DeletionPolicy string `json:"deletionPolicy,omitempty"`
+
+	// retentionPeriod determines a duration up to which the backup should be kept.
+	// Controller will remove all backups that are older than the RetentionPeriod.
+	// For example, RetentionPeriod of `30d` will keep only the backups of last 30 days.
+	// Sample duration format:
+	// - years: 	2y
+	// - months: 	6mo
+	// - days: 		30d
+	// - hours: 	12h
+	// - minutes: 	30m
+	// You can also combine the above durations. For example: 30d12h30m.
+	// If not set, the backup will be kept forever.
+	// +optional
+	RetentionPeriod string `json:"retentionPeriod,omitempty"`
 
 	// if backupType is incremental, parentBackupName is required.
 	// +optional
@@ -577,6 +600,10 @@ type ConfigurationItemStatus struct {
 	// status describes the current state of the reconfiguring state machine.
 	// +optional
 	Status string `json:"status,omitempty"`
+
+	// message describes the details about this operation.
+	// +optional
+	Message string `json:"message,omitempty"`
 
 	// succeedCount describes the number of successful reconfiguring.
 	// +kubebuilder:default=0

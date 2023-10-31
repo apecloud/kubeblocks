@@ -21,6 +21,7 @@ package configuration
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -28,11 +29,54 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/configuration/core"
-	"github.com/apecloud/kubeblocks/internal/configuration/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/configuration/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
+
+type options = func(*intctrlutil.Result)
+
+func reconciled(status ReturnedStatus, policy string, phase appsv1alpha1.ConfigurationPhase, options ...options) intctrlutil.Result {
+	result := intctrlutil.Result{
+		Policy:        policy,
+		Phase:         phase,
+		ExecResult:    string(status.Status),
+		SucceedCount:  status.SucceedCount,
+		ExpectedCount: status.ExpectedCount,
+		Retry:         true,
+	}
+	for _, option := range options {
+		option(&result)
+	}
+	return result
+}
+
+func unReconciled(phase appsv1alpha1.ConfigurationPhase, revision string, message string) intctrlutil.Result {
+	return intctrlutil.Result{
+		Phase:         phase,
+		Revision:      revision,
+		Message:       message,
+		SucceedCount:  core.NotStarted,
+		ExpectedCount: core.Unconfirmed,
+		Failed:        false,
+		Retry:         false,
+	}
+}
+
+func isReconciledResult(result intctrlutil.Result) bool {
+	return result.ExecResult != "" && result.Policy != ""
+}
+
+func withFailed(err error, retry bool) options {
+	return func(result *intctrlutil.Result) {
+		result.Retry = retry
+		if err != nil {
+			result.Failed = true
+			result.Message = err.Error()
+		}
+	}
+}
 
 func checkEnableCfgUpgrade(object client.Object) bool {
 	// check user's upgrade switch
@@ -51,7 +95,11 @@ func checkEnableCfgUpgrade(object client.Object) bool {
 	return true
 }
 
-func updateConfigPhase(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, phase appsv1alpha1.ConfigurationPhase, failed bool, retry bool) (ctrl.Result, error) {
+func updateConfigPhase(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, phase appsv1alpha1.ConfigurationPhase, message string) (ctrl.Result, error) {
+	return updateConfigPhaseWithResult(cli, ctx, config, unReconciled(phase, "", message))
+}
+
+func updateConfigPhaseWithResult(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, result intctrlutil.Result) (ctrl.Result, error) {
 	revision, ok := config.ObjectMeta.Annotations[constant.ConfigurationRevision]
 	if !ok || revision == "" {
 		return intctrlutil.Reconciled()
@@ -62,16 +110,22 @@ func updateConfigPhase(cli client.Client, ctx intctrlutil.RequestCtx, config *co
 		config.ObjectMeta.Annotations = map[string]string{}
 	}
 
-	if failed {
+	if result.Failed && !result.Retry {
+		ctx.Log.Info(fmt.Sprintf("failed to reconcile and disable retry for configmap[%+v]", client.ObjectKeyFromObject(config)))
 		config.ObjectMeta.Annotations[constant.DisableUpgradeInsConfigurationAnnotationKey] = strconv.FormatBool(true)
 	}
 
 	GcConfigRevision(config)
-	config.ObjectMeta.Annotations[core.GenerateRevisionPhaseKey(revision)] = string(phase)
+	if _, ok := config.ObjectMeta.Annotations[core.GenerateRevisionPhaseKey(revision)]; !ok || isReconciledResult(result) {
+		result.Revision = revision
+		b, _ := json.Marshal(result)
+		config.ObjectMeta.Annotations[core.GenerateRevisionPhaseKey(revision)] = string(b)
+	}
+
 	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
 		return intctrlutil.RequeueWithError(err, ctx.Log, "")
 	}
-	if retry {
+	if result.Retry {
 		return intctrlutil.RequeueAfter(ConfigReconcileInterval, ctx.Log, "")
 	}
 	return intctrlutil.Reconciled()
@@ -88,14 +142,14 @@ func checkAndApplyConfigsChanged(client client.Client, ctx intctrlutil.RequestCt
 
 	lastConfig, ok := annotations[constant.LastAppliedConfigAnnotationKey]
 	if !ok {
-		return updateAppliedConfigs(client, ctx, cm, configData, core.ReconfigureCreatedPhase)
+		return updateAppliedConfigs(client, ctx, cm, configData, core.ReconfigureCreatedPhase, nil)
 	}
 
 	return lastConfig == string(configData), nil
 }
 
 // updateAppliedConfigs updates hash label and last applied config
-func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, configData []byte, reconfigurePhase string) (bool, error) {
+func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, configData []byte, reconfigurePhase string, result *intctrlutil.Result) (bool, error) {
 
 	patch := client.MergeFrom(config.DeepCopy())
 	if config.ObjectMeta.Annotations == nil {
@@ -104,7 +158,11 @@ func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config 
 
 	GcConfigRevision(config)
 	if revision, ok := config.ObjectMeta.Annotations[constant.ConfigurationRevision]; ok && revision != "" {
-		config.ObjectMeta.Annotations[core.GenerateRevisionPhaseKey(revision)] = string(appsv1alpha1.CFinishedPhase)
+		if result == nil {
+			result = util.ToPointer(unReconciled(appsv1alpha1.CFinishedPhase, "", fmt.Sprintf("phase: %s", reconfigurePhase)))
+		}
+		b, _ := json.Marshal(result)
+		config.ObjectMeta.Annotations[core.GenerateRevisionPhaseKey(revision)] = string(b)
 	}
 	config.ObjectMeta.Annotations[constant.LastAppliedConfigAnnotationKey] = string(configData)
 	hash, err := util.ComputeHash(config.Data)

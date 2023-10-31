@@ -23,16 +23,16 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/apecloud/kubeblocks/internal/class"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/class"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	types2 "github.com/apecloud/kubeblocks/pkg/controller/client"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/plan"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type Component interface {

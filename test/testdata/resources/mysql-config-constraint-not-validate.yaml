@@ -11,7 +11,7 @@ spec:
   # ConfigurationSchema that impose restrictions on engine parameter's rule
   #  configurationSchema:
   #    # schema: auto generate from cue scripts
-  #    # example: ../../internal/configuration/testdata/mysql_openapi.json
+  #    # example: ../../pkg/configuration/testdata/mysql_openapi.json
   #    cue:
 
   #  require db instance restart

@@ -1,0 +1,10 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: clickhouse-cluster-restart-
+spec:
+  clusterRef: test-clickhouse-cluster
+  ttlSecondsAfterSucceed: 27017
+  type: Restart
+  restart:
+    - componentName: shard-0

@@ -336,10 +336,16 @@ func getRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, volumeRestorePoli
 	volumeRestorePolicyString := fmt.Sprintf(`"%s":"%s"`, constant.VolumeRestorePolicyKeyForRestore, volumeRestorePolicy)
 	var restoreTimeString string
 	if restoreTime != "" {
-		restoreTimeString = fmt.Sprintf(`",%s":"%s"`, constant.RestoreTimeKeyForRestore, restoreTime)
+		restoreTimeString = fmt.Sprintf(`,"%s":"%s"`, constant.RestoreTimeKeyForRestore, restoreTime)
 	}
 
-	restoreFromBackupAnnotation := fmt.Sprintf(`{"%s":{%s,%s,%s%s}}`, componentName, backupNameString, backupNamespaceString, volumeRestorePolicyString, restoreTimeString)
+	var passwordString string
+	connectionPassword := backup.Annotations[dptypes.ConnectionPasswordKey]
+	if connectionPassword != "" {
+		passwordString = fmt.Sprintf(`,"%s":"%s"`, constant.ConnectionPassword, connectionPassword)
+	}
+
+	restoreFromBackupAnnotation := fmt.Sprintf(`{"%s":{%s,%s,%s%s%s}}`, componentName, backupNameString, backupNamespaceString, volumeRestorePolicyString, restoreTimeString, passwordString)
 	return restoreFromBackupAnnotation, nil
 }
 

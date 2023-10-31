@@ -209,9 +209,9 @@ func (r *BackupReconciler) handleNewPhase(
 
 	// set and patch backup object meta, including labels, annotations and finalizers
 	// if the backup object meta is changed, the backup object will be patched.
-	if patched, err := r.patchBackupObjectMeta(backup, request); err != nil {
+	if wait, err := r.patchBackupObjectMeta(backup, request); err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
-	} else if patched {
+	} else if wait {
 		return intctrlutil.Reconciled()
 	}
 
@@ -396,6 +396,9 @@ func (r *BackupReconciler) patchBackupObjectMeta(
 		if err := setClusterSnapshotAnnotation(request.Backup, cluster); err != nil {
 			return false, err
 		}
+		if err := r.setConnectionPasswordAnnotation(request); err != nil {
+			return false, err
+		}
 		request.Labels[dptypes.ClusterUIDLabelKey] = string(cluster.UID)
 	}
 
@@ -426,7 +429,7 @@ func (r *BackupReconciler) patchBackupObjectMeta(
 		return wait, nil
 	}
 
-	return true, r.Client.Patch(request.Ctx, request.Backup, client.MergeFrom(original))
+	return wait, r.Client.Patch(request.Ctx, request.Backup, client.MergeFrom(original))
 }
 
 // getBackupRepo returns the backup repo specified by the backup object or the policy.
@@ -655,6 +658,38 @@ func (r *BackupReconciler) deleteExternalResources(
 		return err
 	}
 	return r.deleteExternalJobs(reqCtx, backup)
+}
+
+// setConnectionPasswordAnnotation sets the encrypted password of the connection credential to the backup's annotations
+func (r *BackupReconciler) setConnectionPasswordAnnotation(request *dpbackup.Request) error {
+	encryptPassword := func() (string, error) {
+		target := request.BackupPolicy.Spec.Target
+		if target == nil || target.ConnectionCredential == nil {
+			return "", nil
+		}
+		secret := &corev1.Secret{}
+		if err := r.Client.Get(request.Ctx, client.ObjectKey{Name: target.ConnectionCredential.SecretName, Namespace: request.Namespace}, secret); err != nil {
+			return "", err
+		}
+		e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
+		ciphertext, err := e.Encrypt(secret.Data[target.ConnectionCredential.PasswordKey])
+		if err != nil {
+			return "", err
+		}
+		return ciphertext, nil
+	}
+	backupType := dputils.GetBackupType(request.ActionSet, request.BackupMethod.SnapshotVolumes)
+	if backupType == dpv1alpha1.BackupTypeFull {
+		// save the connection credential password for cluster.
+		ciphertext, err := encryptPassword()
+		if err != nil {
+			return err
+		}
+		if ciphertext != "" {
+			request.Backup.Annotations[dptypes.ConnectionPasswordKey] = ciphertext
+		}
+	}
+	return nil
 }
 
 // getClusterObjectString gets the cluster object and convert it to string.

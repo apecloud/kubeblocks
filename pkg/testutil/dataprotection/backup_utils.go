@@ -62,6 +62,17 @@ func NewFakeBackupPolicy(testCtx *testutil.TestContext,
 		SetBackupMethodVolumes([]string{DataVolumeName}).
 		Apply(change).
 		Create(testCtx).GetObject()
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ClusterName,
+			Namespace: testCtx.DefaultNamespace,
+		},
+		StringData: map[string]string{
+			"password": "test-passw0rd",
+		},
+	}
+	Expect(testCtx.CreateObj(testCtx.Ctx, secret)).Should(Succeed())
 	Eventually(testapps.CheckObj(testCtx, client.ObjectKeyFromObject(bp),
 		func(g Gomega, bp *dpv1alpha1.BackupPolicy) {
 			g.Expect(bp.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.AvailablePhase))

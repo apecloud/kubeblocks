@@ -1,12 +1,12 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  generateName: milvus-cluster-vscale-
+  generateName: clickhouse-cluster-vscale-
 spec:
-  clusterRef: milvus-cluster
+  clusterRef: test-clickhouse-cluster
   type: VerticalScaling
   verticalScaling:
-    - componentName: milvus
-        requests:
-          cpu: "500m"
-          memory: 500Mi
+    - componentName: shard-0
+      requests:
+        cpu: "500m"
+        memory: 500Mi

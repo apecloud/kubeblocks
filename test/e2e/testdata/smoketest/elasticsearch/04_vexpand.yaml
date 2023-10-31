@@ -9,4 +9,4 @@ spec:
     - componentName: elasticsearch
       volumeClaimTemplates:
         - name: data
-          storage: "10Gi"
+          storage: "21Gi"

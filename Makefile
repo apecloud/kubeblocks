@@ -302,6 +302,7 @@ build-kbcli-embed-chart: helmtool create-kbcli-embed-charts-dir \
 	build-single-kbcli-embed-chart.postgresql-cluster \
 	build-single-kbcli-embed-chart.kafka-cluster \
 	build-single-kbcli-embed-chart.mongodb-cluster \
+	build-single-kbcli-embed-chart.llm-cluster \
 #	build-single-kbcli-embed-chart.neon-cluster
 #	build-single-kbcli-embed-chart.postgresql-cluster \
 #	build-single-kbcli-embed-chart.clickhouse-cluster \
@@ -636,7 +637,7 @@ else ifeq ($(TEST_TYPE), risingwave)
 else ifeq ($(TEST_TYPE), etcd)
 	$(HELM) dependency build deploy/etcd-cluster --skip-refresh
 	$(HELM) upgrade --install etcd deploy/etcd
-	$(HELM) template etcd-cluster deploy/etcd-cluster > test/e2e/testdata/smoketest/etcd/00_etcdcluster.yaml
+	$(HELM) template etcd-cluster -s templates/cluster.yaml deploy/etcd-cluster > test/e2e/testdata/smoketest/etcd/00_etcdcluster.yaml
 else ifeq ($(TEST_TYPE), oracle)
 	$(HELM) dependency build deploy/oracle-mysql-cluster --skip-refresh
 	$(HELM) upgrade --install oracle deploy/oracle-mysql
@@ -703,7 +704,15 @@ else ifeq ($(TEST_TYPE), milvus)
 else ifeq ($(TEST_TYPE), clickhouse)
 	$(HELM) dependency build deploy/clickhouse-cluster --skip-refresh
 	$(HELM) upgrade --install clickhouse deploy/clickhouse
-	$(HELM) template c-cluster deploy/clickhouse-cluster > test/e2e/testdata/smoketest/clickhouse/00_clickhousecluster.yaml
+	$(HELM) template test -s templates/cluster.yaml deploy/clickhouse-cluster > test/e2e/testdata/smoketest/clickhouse/00_clickhousecluster.yaml
+else ifeq ($(TEST_TYPE), zookeeper)
+	$(HELM) dependency build deploy/zookeeper-cluster --skip-refresh
+	$(HELM) upgrade --install zookeeper deploy/zookeeper
+	$(HELM) template zk-cluster deploy/zookeeper-cluster > test/e2e/testdata/smoketest/zookeeper/00_zookeepercluster.yaml
+else ifeq ($(TEST_TYPE), mariadb)
+	$(HELM) dependency build deploy/mariadb-cluster --skip-refresh
+	$(HELM) upgrade --install mariadb deploy/mariadb
+	$(HELM) template mariadb-cluster deploy/mariadb-cluster > test/e2e/testdata/smoketest/mariadb/00_mariadbcluster.yaml
 else
 	$(error "test type does not exist")
 endif
@@ -764,7 +773,11 @@ else ifeq ($(TEST_TYPE), llm)
 else ifeq ($(TEST_TYPE), milvus)
 	$(HELM) upgrade --install milvus deploy/milvus
 else ifeq ($(TEST_TYPE), clickhouse)
-	$(HELM) upgrade --install milvus deploy/clickhouse
+	$(HELM) upgrade --install clickhouse deploy/clickhouse
+else ifeq ($(TEST_TYPE), zookeeper)
+	$(HELM) upgrade --install zookeeper deploy/zookeeper
+else ifeq ($(TEST_TYPE), mariadb)
+	$(HELM) upgrade --install mariadb deploy/mariadb
 else
 	$(error "test type does not exist")
 endif

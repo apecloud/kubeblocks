@@ -5,7 +5,7 @@ title: kbcli cluster describe-backup-policy
 Describe backup policy
 
 ```
-kbcli cluster describe-backup-policy
+kbcli cluster describe-backup-policy [flags]
 ```
 
 ### Examples

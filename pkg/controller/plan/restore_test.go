@@ -25,11 +25,11 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/client-go/kubernetes/scheme"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -42,7 +42,7 @@ import (
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 )
 
-var _ = Describe("PITR Functions", func() {
+var _ = Describe("Restore", func() {
 	const defaultTTL = "7d"
 	const backupName = "test-backup-job"
 	const sourceCluster = "source-cluster"
@@ -89,7 +89,7 @@ var _ = Describe("PITR Functions", func() {
 
 	AfterEach(cleanEnv)
 
-	Context("Test PITR", func() {
+	Context("Cluster Restore", func() {
 		const (
 			clusterDefName     = "test-clusterdef"
 			clusterVersionName = "test-clusterversion"
@@ -265,6 +265,19 @@ var _ = Describe("PITR Functions", func() {
 			})).Should(Succeed())
 		})
 
+		It("unsupported restore to different namespace", func() {
+			const fakeNamespace = "fake-namespace"
+			restoreFromBackup := fmt.Sprintf(`{"%s": {"name":"%s", "namespace":"%s"}}`, mysqlCompName, backup.Name, fakeNamespace)
+			Expect(testapps.ChangeObj(&testCtx, cluster, func(tmpCluster *appsv1alpha1.Cluster) {
+				tmpCluster.Annotations = map[string]string{
+					constant.RestoreFromBackupAnnotationKey: restoreFromBackup,
+				}
+			})).Should(Succeed())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
+			restoreMGR := NewRestoreManager(ctx, k8sClient, cluster, scheme.Scheme, nil, 3, 0)
+			err := restoreMGR.DoRestore(synthesizedComponent)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRestoreFailed)).Should(BeTrue())
+		})
 	})
 })
 

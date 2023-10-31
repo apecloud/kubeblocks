@@ -22,6 +22,8 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
   name: vllm-baichuan2-13b
+  annotations:
+    kubeblocks.io/is-default-cluster-version: "true"
   labels:
     {{- include "llm.labels" . | nindent 4 }}
 spec:
@@ -164,6 +166,8 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
   name: ggml-baichuan-7b-q4
+  annotations:
+    kubeblocks.io/is-default-cluster-version: "true"
   labels:
     {{- include "llm.labels" . | nindent 4 }}
 spec:
@@ -268,6 +272,34 @@ spec:
             env:
               - name: MODEL
                 value: /models/codeshell-chat-q4_0.gguf
+            volumeMounts:
+              - name: models
+                mountPath: /models
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: ggml-baichuan2-7b-4q
+  labels:
+    {{- include "llm.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: ggml
+  componentVersions:
+    - componentDefRef: ggml
+      versionsContext:
+        initContainers:
+          - name: download
+            image: {{ .Values.model.registry | default "docker.io" }}/{{ .Values.model.baichuan2_7b.ggml.repository}}:{{ default .Chart.AppVersion .Values.model.baichuan2_7b.ggml.version }}
+            command: ["sh", "-c", "cp /models/ggml-model-q4.gguf /models-target/"]
+            volumeMounts:
+              - name: models
+                mountPath: /models-target
+        containers:
+          - name: ggml
+            image: {{ .Values.imageDev.registry | default "docker.io" }}/{{ .Values.imageDev.repository}}:{{ default .Chart.AppVersion .Values.imageDev.tagNew }}
+            env:
+                - name: MODEL
+                  value: /models/ggml-model-q4.gguf
             volumeMounts:
               - name: models
                 mountPath: /models

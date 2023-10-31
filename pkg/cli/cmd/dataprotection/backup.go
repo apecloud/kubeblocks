@@ -20,17 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/pkg/cli/create"
 	"github.com/apecloud/kubeblocks/pkg/cli/delete"
@@ -120,7 +116,7 @@ func newBackupCommand(f cmdutil.Factory, streams genericiooptions.IOStreams) *co
 	cmd.Flags().StringVar(&o.RetentionPeriod, "retention-period", "", "Retention period for backup, supported values: [1y, 1mo, 1d, 1h, 1m] or combine them [1y1mo1d1h1m], if not specified, the backup will not be automatically deleted, you need to manually delete it.")
 	cmd.Flags().StringVar(&o.ParentBackupName, "parent-backup", "", "Parent backup name, used for incremental backup")
 	util.RegisterClusterCompletionFunc(cmd, f)
-	registerBackupFlagCompletionFunc(cmd, f)
+	o.RegisterBackupFlagCompletionFunc(cmd, f)
 
 	return cmd
 }
@@ -203,37 +199,4 @@ func newListBackupCommand(f cmdutil.Factory, streams genericiooptions.IOStreams)
 	util.RegisterClusterCompletionFunc(cmd, f)
 
 	return cmd
-}
-
-func registerBackupFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
-	util.CheckErr(cmd.RegisterFlagCompletionFunc(
-		"method",
-		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			var methods []string
-			var labelSelector string
-			clusterName, _ := cmd.Flags().GetString("cluster")
-			if clusterName != "" {
-				labelSelector = util.BuildLabelSelectorByNames(labelSelector, []string{clusterName})
-			}
-			dynamic, err := f.DynamicClient()
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveError
-			}
-			backupPolicies, err := dynamic.Resource(types.BackupPolicyGVR()).List(context.TODO(), metav1.ListOptions{
-				LabelSelector: labelSelector,
-			})
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveError
-			}
-			for _, obj := range backupPolicies.Items {
-				backupPolicy := &dpv1alpha1.BackupPolicy{}
-				if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, backupPolicy); err != nil {
-					return nil, cobra.ShellCompDirectiveError
-				}
-				for _, method := range backupPolicy.Spec.BackupMethods {
-					methods = append(methods, method.Name)
-				}
-			}
-			return methods, cobra.ShellCompDirectiveDefault
-		}))
 }

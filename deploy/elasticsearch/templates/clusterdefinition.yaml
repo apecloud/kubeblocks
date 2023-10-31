@@ -170,7 +170,7 @@ spec:
           scrapePath: /metrics
           scrapePort: 9114 # Source: elasticsearch/templates/metrics/deployment.yaml
       characterType: elasticsearch-metrics
-      workloadType: Stateful
+      workloadType: Stateless
       service:
         ports:
         - name: metrics

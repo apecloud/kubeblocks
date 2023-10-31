@@ -17,12 +17,12 @@
 
 // required, command line input options for parameters and flags
 options: {
-	backupName:   string
-	namespace:    string
-	backupMethod: string
-	backupPolicy: string
-	deletionPolicy: string
-	retentionPeriod: string
+	backupName:       string
+	namespace:        string
+	backupMethod:     string
+	backupPolicy:     string
+	deletionPolicy:   string
+	retentionPeriod:  string
 	parentBackupName: string
 }
 

@@ -45,7 +45,7 @@ const (
 	mysqlVolumeName  = "mysql-config"
 )
 
-var _ = Describe("resource fetcher", func() {
+var _ = Describe("resource Fetcher", func() {
 
 	var (
 		k8sMockClient  *testutil.K8sClientMockHelper

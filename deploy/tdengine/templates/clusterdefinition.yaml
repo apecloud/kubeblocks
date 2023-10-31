@@ -34,7 +34,6 @@ spec:
       configSpecs:
         - name: tdengine-taos-config
           templateRef: tdengine-config-template
-          constraintRef: tdengine-taos-config-constraints
           volumeName: taos-config
           namespace: {{ .Release.Namespace }}
         - name: metrics-configuration
@@ -65,9 +64,9 @@ spec:
               - name: TZ
                 value: {{ .Values.timeZone }}
               - name: TAOS_FQDN
-                value: "$(KB_POD_FQDN)"
+                value: "$(KB_POD_FQDN).cluster.local"
               - name: TAOS_FIRST_EP
-                value: "$(KB_0_HOSTNAME).$(KB_NAMESPACE).svc:$(SVC_PORT)"
+                value: "$(KB_0_HOSTNAME).$(KB_NAMESPACE).svc.cluster.local:$(SVC_PORT)"
               - name: TAOS_ADAPTER_USERNAME
                 valueFrom:
                   secretKeyRef:

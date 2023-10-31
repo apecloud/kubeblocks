@@ -116,6 +116,30 @@ func (o *createSubCmdsOptions) complete(cmd *cobra.Command) error {
 
 	// get values from flags
 	o.values = getValuesFromFlags(cmd.LocalNonPersistentFlags())
+
+	// get all the rendered objects
+	objs, err := o.getObjectsInfo()
+	if err != nil {
+		return err
+	}
+
+	// find the cluster object
+	clusterObj, err := o.getClusterObj(objs)
+	if err != nil {
+		return err
+	}
+
+	// get clusterDef name
+	spec, ok := clusterObj.Object["spec"].(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("cannot find spec in cluster object")
+	}
+	clusterDef, ok := spec["clusterDefinitionRef"].(string)
+	if !ok {
+		return fmt.Errorf("cannot find clusterDefinitionRef in cluster spec")
+	}
+	o.chartInfo.ClusterDef = clusterDef
+
 	return nil
 }
 
@@ -127,23 +151,8 @@ func (o *createSubCmdsOptions) validate() error {
 }
 
 func (o *createSubCmdsOptions) run() error {
-	// move values that belong to sub chart to sub map
-	values := buildHelmValues(o.chartInfo, o.values)
 
-	// get Kubernetes version
-	kubeVersion, err := util.GetK8sVersion(o.Client.Discovery())
-	if err != nil || kubeVersion == "" {
-		return fmt.Errorf("failed to get Kubernetes version %v", err)
-	}
-
-	// get cluster manifests
-	manifests, err := cluster.GetManifests(o.chartInfo.Chart, o.Namespace, o.Name, kubeVersion, values)
-	if err != nil {
-		return err
-	}
-
-	// get objects to be created from manifests
-	objs, err := getObjectsInfo(o.Factory, manifests)
+	objs, err := o.getObjectsInfo()
 	if err != nil {
 		return err
 	}
@@ -249,4 +258,33 @@ func (o *createSubCmdsOptions) validateVersion() error {
 
 	fmt.Fprintf(o.Out, "Info: --version is not specified, %s is applied by default.\n", cv)
 	return nil
+}
+
+func (o *createSubCmdsOptions) getObjectsInfo() ([]*objectInfo, error) {
+	// move values that belong to sub chart to sub map
+	values := buildHelmValues(o.chartInfo, o.values)
+
+	// get Kubernetes version
+	kubeVersion, err := util.GetK8sVersion(o.Client.Discovery())
+	if err != nil || kubeVersion == "" {
+		return nil, fmt.Errorf("failed to get Kubernetes version %v", err)
+	}
+
+	// get cluster manifests
+	manifests, err := cluster.GetManifests(o.chartInfo.Chart, o.Namespace, o.Name, kubeVersion, values)
+	if err != nil {
+		return nil, err
+	}
+
+	// get objects to be created from manifests
+	return getObjectsInfo(o.Factory, manifests)
+}
+
+func (o *createSubCmdsOptions) getClusterObj(objs []*objectInfo) (*unstructured.Unstructured, error) {
+	for _, obj := range objs {
+		if obj.gvr == types.ClusterGVR() {
+			return obj.obj, nil
+		}
+	}
+	return nil, fmt.Errorf("failed to find cluster object from manifests rendered from %s chart", o.clusterType)
 }

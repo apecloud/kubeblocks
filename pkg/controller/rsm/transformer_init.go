@@ -37,7 +37,14 @@ func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	transCtx.rsm, transCtx.rsmOrig = t.ReplicatedStateMachine, t.ReplicatedStateMachine.DeepCopy()
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
+	// stop reconciliation if paused=true
+	if t.ReplicatedStateMachine.Spec.Paused {
+		graphCli.Root(dag, transCtx.rsmOrig, transCtx.rsm, model.ActionNoopPtr())
+		return graph.ErrPrematureStop
+	}
+
 	// init dag
 	graphCli.Root(dag, transCtx.rsmOrig, transCtx.rsm, model.ActionStatusPtr())
+
 	return nil
 }

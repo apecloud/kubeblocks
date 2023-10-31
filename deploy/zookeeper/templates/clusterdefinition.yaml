@@ -9,7 +9,8 @@ spec:
   connectionCredential:
     username: ""
     password: ""
-    endpoint: "$(SVC_FQDN)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_client)"
+    host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_client)"
   componentDefs:
     - name: zookeeper

@@ -134,6 +134,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentPDBTransformer{},
 			// handle component services
 			&componentServiceTransformer{},
+			// handle component system accounts
+			&componentAccountTransformer{},
 			// handle component connection credentials
 			&componentCredentialTransformer{},
 			// handle tls volume and cert

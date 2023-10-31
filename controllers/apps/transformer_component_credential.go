@@ -24,7 +24,6 @@ import (
 	"reflect"
 
 	"github.com/pkg/errors"
-	"github.com/sethvargo/go-password/password"
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -38,7 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-// componentCredentialTransformer handles referenced resources validation and load them into context
+// componentCredentialTransformer handles component connection credentials.
 type componentCredentialTransformer struct{}
 
 var _ graph.Transformer = &componentCredentialTransformer{}
@@ -52,7 +51,7 @@ func (t *componentCredentialTransformer) Transform(ctx graph.TransformContext, d
 	synthesizeComp := transCtx.SynthesizeComponent
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for _, credential := range synthesizeComp.ConnectionCredentials {
-		secret, err := t.buildConnCredential(ctx, synthesizeComp, credential)
+		secret, err := t.buildConnCredential(transCtx, synthesizeComp, credential)
 		if err != nil {
 			return err
 		}
@@ -63,22 +62,22 @@ func (t *componentCredentialTransformer) Transform(ctx graph.TransformContext, d
 	return nil
 }
 
-func (t *componentCredentialTransformer) buildConnCredential(ctx graph.TransformContext,
+func (t *componentCredentialTransformer) buildConnCredential(transCtx *componentTransformContext,
 	synthesizeComp *component.SynthesizedComponent, credential appsv1alpha1.ConnectionCredential) (*corev1.Secret, error) {
 	secret := factory.BuildConnCredential4Component(synthesizeComp, credential.Name)
 	if len(credential.SecretName) != 0 {
-		if err := t.buildFromExistedSecret(ctx, credential, secret); err != nil {
+		if err := t.buildFromExistedSecret(transCtx, credential, secret); err != nil {
 			return nil, err
 		}
 	} else {
-		if err := t.buildFromServiceAndAccount(ctx, synthesizeComp, credential, secret); err != nil {
+		if err := t.buildFromServiceAndAccount(transCtx, synthesizeComp, credential, secret); err != nil {
 			return nil, err
 		}
 	}
 	return secret, nil
 }
 
-func (t *componentCredentialTransformer) buildFromExistedSecret(ctx graph.TransformContext,
+func (t *componentCredentialTransformer) buildFromExistedSecret(transCtx *componentTransformContext,
 	credential appsv1alpha1.ConnectionCredential, secret *corev1.Secret) error {
 	namespace := func() string {
 		namespace := credential.SecretNamespace
@@ -92,7 +91,7 @@ func (t *componentCredentialTransformer) buildFromExistedSecret(ctx graph.Transf
 		Name:      credential.SecretName,
 	}
 	obj := &corev1.Secret{}
-	if err := ctx.GetClient().Get(ctx.GetContext(), secretKey, obj); err != nil {
+	if err := transCtx.GetClient().Get(transCtx.GetContext(), secretKey, obj); err != nil {
 		return err
 	}
 	secret.Immutable = obj.Immutable
@@ -102,7 +101,7 @@ func (t *componentCredentialTransformer) buildFromExistedSecret(ctx graph.Transf
 	return nil
 }
 
-func (t *componentCredentialTransformer) buildFromServiceAndAccount(ctx graph.TransformContext,
+func (t *componentCredentialTransformer) buildFromServiceAndAccount(transCtx *componentTransformContext,
 	synthesizeComp *component.SynthesizedComponent, credential appsv1alpha1.ConnectionCredential, secret *corev1.Secret) error {
 	data := make(map[string]string)
 	if len(credential.ServiceName) > 0 {
@@ -121,7 +120,7 @@ func (t *componentCredentialTransformer) buildFromServiceAndAccount(ctx graph.Tr
 		if systemAccount == nil {
 			return errors.New("connection credential references a system account not defined")
 		}
-		if err := t.buildCredential(ctx, synthesizeComp, systemAccount, &data); err != nil {
+		if err := t.buildCredential(transCtx, synthesizeComp, systemAccount, &data); err != nil {
 			return err
 		}
 	}
@@ -177,18 +176,18 @@ func (t *componentCredentialTransformer) buildEndpointFromService(synthesizeComp
 	(*data)["port"] = fmt.Sprintf("%d", port)
 }
 
-func (t *componentCredentialTransformer) buildCredential(ctx graph.TransformContext,
+func (t *componentCredentialTransformer) buildCredential(transCtx *componentTransformContext,
 	synthesizedComp *component.SynthesizedComponent, account *appsv1alpha1.ComponentSystemAccount, data *map[string]string) error {
 	secretKey := types.NamespacedName{
 		Namespace: synthesizedComp.Namespace,
 		Name:      constant.GenerateAccountSecretName(synthesizedComp.ClusterName, synthesizedComp.Name, account.Name),
 	}
 	secret := &corev1.Secret{}
-	if err := ctx.GetClient().Get(ctx.GetContext(), secretKey, secret); err != nil {
+	if err := transCtx.GetClient().Get(transCtx.GetContext(), secretKey, secret); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
-		if secret, err = t.getAccountSecretFromLocalCache(account); err != nil {
+		if secret, err = t.getAccountSecretFromLocalCache(transCtx, synthesizedComp, account); err != nil {
 			return err
 		}
 	}
@@ -197,19 +196,16 @@ func (t *componentCredentialTransformer) buildCredential(ctx graph.TransformCont
 	return nil
 }
 
-func (t *componentCredentialTransformer) getAccountSecretFromLocalCache(account *appsv1alpha1.ComponentSystemAccount) (*corev1.Secret, error) {
-	// TODO(xingran): if account is system init account, create secret, it may be moved to SystemAccount Controller.
-	// TODO(component): generates all account secret at component controller.
-	passwd, err := password.Generate(int(account.PasswordGenerationPolicy.Length),
-		int(account.PasswordGenerationPolicy.NumDigits), int(account.PasswordGenerationPolicy.NumSymbols), false, false)
-	if err != nil {
-		return nil, err
+func (t *componentCredentialTransformer) getAccountSecretFromLocalCache(transCtx *componentTransformContext,
+	synthesizedComp *component.SynthesizedComponent, account *appsv1alpha1.ComponentSystemAccount) (*corev1.Secret, error) {
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	secretKey := types.NamespacedName{
+		Namespace: synthesizedComp.Namespace,
+		Name:      constant.GenerateAccountSecretName(synthesizedComp.ClusterName, synthesizedComp.Name, account.Name),
 	}
-	secret := &corev1.Secret{
-		StringData: map[string]string{
-			constant.AccountNameForSecret:   account.Name,
-			constant.AccountPasswdForSecret: passwd,
-		},
+	secret := &corev1.Secret{}
+	if err := graphCli.Get(transCtx.GetContext(), secretKey, secret); err != nil {
+		return nil, err
 	}
 	return secret, nil
 }

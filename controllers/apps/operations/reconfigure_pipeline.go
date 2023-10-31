@@ -134,6 +134,7 @@ func (p *pipeline) doMergeImpl(parameters appsv1alpha1.ConfigurationItem) error 
 	}
 	filter := validate.WithKeySelector(configSpec.Keys)
 	for _, key := range parameters.Keys {
+		// patch parameters
 		if configSpec.ConfigConstraintRef != "" && filter(key.Key) {
 			if key.FileContent != "" {
 				return cfgcore.MakeError("not allowed to update file content: %s", key.Key)
@@ -145,10 +146,12 @@ func (p *pipeline) doMergeImpl(parameters appsv1alpha1.ConfigurationItem) error 
 			})
 			continue
 		}
+		// update file content
 		if len(key.Parameters) != 0 {
 			return cfgcore.MakeError("not allowed to patch parameters: %s", key.Key)
 		}
 		updateFileContent(item, key.Key, key.FileContent)
+		p.isFileUpdated = true
 	}
 	p.updatedObject = newConfigObj
 	return p.createUpdatePatch(item, configSpec)

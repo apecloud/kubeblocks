@@ -748,3 +748,7 @@ func ConvertRSMToSTS(rsm *workloads.ReplicatedStateMachine) *appsv1.StatefulSet 
 	sts.Status.ObservedGeneration = rsm.Status.ObservedGeneration
 	return sts
 }
+
+func getEnvConfigMapName(rsmName string) string {
+	return fmt.Sprintf("%s-rsm-env", rsmName)
+}

@@ -23,7 +23,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
@@ -49,7 +49,7 @@ type mysqlCommandChannel struct {
 const (
 	dbType = "DB_TYPE"
 
-	connectTimeout = 5 * time.Second
+	connectTimeout = 30 * time.Second
 
 	mysql             = "mysql"
 	patroni           = "patroni"
@@ -192,7 +192,7 @@ func sendRestRequest(ctx context.Context, body string, url string, method string
 	}
 	defer resp.Body.Close()
 
-	response, err := ioutil.ReadAll(resp.Body)
+	response, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}

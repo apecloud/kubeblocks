@@ -195,10 +195,10 @@ func (p *PKCEAuthenticator) GetToken(ctx context.Context, authorization interfac
 }
 
 func (p *PKCEAuthenticator) GetUserInfo(ctx context.Context, token string) (*UserInfoResponse, error) {
-	URL := fmt.Sprintf("%s/userinfo", p.AuthURL)
-	req, err := utils.NewRequest(ctx, URL, url.Values{
-		"access_token": []string{token},
-	})
+	URL := fmt.Sprintf("https://%s/api/v1/user", utils.OpenAPIHost)
+	req, err := utils.NewFullRequest(ctx, URL, http.MethodGet, map[string]string{
+		"Authorization": "Bearer " + token,
+	}, "")
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating request for userinfo")
 	}
@@ -264,26 +264,8 @@ func (p *PKCEAuthenticator) RefreshToken(ctx context.Context, refreshToken strin
 }
 
 func (p *PKCEAuthenticator) Logout(ctx context.Context, token string, openURLFunc func(URL string)) error {
-	URL := fmt.Sprintf("%s/oidc/logout", p.AuthURL)
-	req, err := utils.NewRequest(ctx, URL, url.Values{
-		"id_token_hint": []string{token},
-		"client_id":     []string{p.ClientID},
-	})
-	if err != nil {
-		return errors.Wrap(err, "error creating request for logout")
-	}
 
-	res, err := p.client.Do(req)
-	if err != nil {
-		return errors.Wrap(err, "error performing http request for logout")
-	}
-	defer res.Body.Close()
-
-	if _, err = checkErrorResponse(res); err != nil {
-		return err
-	}
-
-	logoutURL := fmt.Sprintf(p.AuthURL + "/oidc/logout?federated")
+	logoutURL := fmt.Sprintf(p.AuthURL + "/session/end?id_token_hint=" + token)
 	openURLFunc(logoutURL)
 
 	return nil

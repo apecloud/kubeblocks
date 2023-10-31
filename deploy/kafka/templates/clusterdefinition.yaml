@@ -185,6 +185,9 @@ spec:
             ports:
               - name: metrics
                 containerPort: 5556
+            env:
+              - name: SERVICE_PORT
+                value: "5556"
             volumeMounts:
               - name: jmx-config
                 mountPath: /etc/jmx-kafka
@@ -348,6 +351,9 @@ spec:
             volumeMounts:
               - name: jmx-config
                 mountPath: /etc/jmx-kafka
+            env:
+              - name: SERVICE_PORT
+                value: "5556"
 
     # controller(kraft) Ref: https://kafka.apache.org/documentation/#kraft_role
     - name: controller
@@ -484,6 +490,9 @@ spec:
             volumeMounts:
               - name: jmx-config
                 mountPath: /etc/jmx-kafka
+            env:
+              - name: SERVICE_PORT
+                value: "5556"
 
     - name: kafka-exporter
       workloadType: Stateless
@@ -518,3 +527,6 @@ spec:
               - name: scripts
                 mountPath: /scripts/setup.sh
                 subPath: kafka-exporter-setup.sh
+            env:
+              - name: SERVICE_PORT
+                value: "9308"

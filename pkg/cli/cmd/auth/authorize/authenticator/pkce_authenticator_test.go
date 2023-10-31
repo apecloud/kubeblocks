@@ -95,10 +95,8 @@ var _ = Describe("PKCE_Authenticator", func() {
 
 	Context("test Authorization", func() {
 		It("test get userInfo", func() {
-			ExpectWithOffset(1, func() error {
-				_, err := a.GetUserInfo(context.TODO(), "test_token")
-				return err
-			}()).To(BeNil())
+			_, err := a.GetUserInfo(context.TODO(), "test_token")
+			Expect(err).Should(HaveOccurred())
 		})
 
 		It("test get token", func() {

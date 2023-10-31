@@ -167,6 +167,11 @@ func (builder *ReplicatedStateMachineBuilder) SetMemberUpdateStrategy(strategy *
 	return builder
 }
 
+func (builder *ReplicatedStateMachineBuilder) SetPaused(paused bool) *ReplicatedStateMachineBuilder {
+	builder.get().Spec.Paused = paused
+	return builder
+}
+
 func (builder *ReplicatedStateMachineBuilder) SetCredential(credential workloads.Credential) *ReplicatedStateMachineBuilder {
 	builder.get().Spec.Credential = &credential
 	return builder

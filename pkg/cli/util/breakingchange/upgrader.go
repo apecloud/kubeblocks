@@ -131,9 +131,9 @@ func getMajorMinorVersion(version string) string {
 	return vs[0] + vs[1]
 }
 
-func fillResourcesMap(dynamic dynamic.Interface, resourcesMap map[string][]unstructured.Unstructured, gvr schema.GroupVersionResource) error {
+func fillResourcesMap(dynamic dynamic.Interface, resourcesMap map[string][]unstructured.Unstructured, gvr schema.GroupVersionResource, listOptions metav1.ListOptions) error {
 	// get custom resources
-	objList, err := dynamic.Resource(gvr).List(context.TODO(), metav1.ListOptions{})
+	objList, err := dynamic.Resource(gvr).List(context.TODO(), listOptions)
 	if err != nil {
 		return err
 	}

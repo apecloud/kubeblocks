@@ -86,6 +86,9 @@ func wrapGoTemplateRun(ctx context.Context, tplScriptPath string, tplContent str
 	values[buildInFilesObjectName] = newFiles(filepath.Dir(tplScriptPath))
 	engine := gotemplate.NewTplEngine(&values, constructReloadBuiltinFuncs(ctx, commandChannel, formatConfig), tplScriptPath, nil, nil)
 	_, err = engine.Render(tplContent)
+	if err != nil {
+		logger.Error(err, fmt.Sprintf("failed to render template[%s], dsn:[%s]", tplScriptPath, dsn))
+	}
 	return err
 }
 
@@ -99,7 +102,7 @@ func constructReloadBuiltinFuncs(ctx context.Context, cc DynamicParamUpdater, fo
 		},
 		builtInUpdateVariableFunctionName: func(sql string, args ...string) error {
 			r, err := cc.ExecCommand(ctx, sql, args...)
-			logger.V(1).Info(fmt.Sprintf("sql: [%s], result: [%v]", sql, r))
+			logger.V(1).Info(fmt.Sprintf("sql: [%s], result: [%v], err: [%+v]", sql, r, err))
 			return err
 		},
 		builtInParamsPatchFunctionName: func(updatedParams map[string]string, basefile, newfile string) error {

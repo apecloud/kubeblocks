@@ -57,17 +57,6 @@ spec:
           - name: "secondary"
             accessMode: Readonly
         updateStrategy: Serial
-      rsmSpec:
-        memberUpdateStrategy: Serial
-        roles:
-        - accessMode: ReadWrite
-          canVote: true
-          isLeader: true
-          name: primary
-        - accessMode: Readonly
-          canVote: true
-          isLeader: false
-          name: secondary
       probes:
         roleProbeTimeoutAfterPodsReady: 300
         roleProbe:

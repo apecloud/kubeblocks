@@ -188,8 +188,8 @@ A Command Line Interface for KubeBlocks`,
 
 	// Add subcommands
 	cmd.AddCommand(
-		// auth.NewLogin(ioStreams),
-		// auth.NewLogout(ioStreams),
+		auth.NewLogin(ioStreams),
+		auth.NewLogout(ioStreams),
 		// organization.NewOrganizationCmd(ioStreams),
 		// context.NewContextCmd(ioStreams),
 		playground.NewPlaygroundCmd(ioStreams),

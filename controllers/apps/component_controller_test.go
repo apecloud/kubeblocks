@@ -54,6 +54,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/factory"
+	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
@@ -267,9 +269,19 @@ var _ = Describe("Component Controller", func() {
 	createClusterObjV2 := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		createClusterObjNoWait(compName, compDefName, true, processor)
 
-		By("Waiting for the cluster enter running phase")
+		By("Waiting for the cluster enter Creating phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
+
+		By("Waiting for the component enter Creating phase")
+		compKey = types.NamespacedName{
+			Namespace: clusterObj.Namespace,
+			Name:      component.FullName(clusterObj.Name, compName),
+		}
+		compObj = &appsv1alpha1.Component{}
+		Eventually(testapps.CheckObjExists(&testCtx, compKey, compObj, true)).Should(Succeed())
+		Eventually(testapps.GetComponentObservedGeneration(&testCtx, compKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
 	}
 
 	// createCompObjNoWait := func(compName, compDefName string, processor func(*testapps.MockComponentFactory)) {
@@ -282,19 +294,6 @@ var _ = Describe("Component Controller", func() {
 	//	compObj = factory.Create(&testCtx).GetObject()
 	//	compKey = client.ObjectKeyFromObject(compObj)
 	// }
-
-	waitCompObjCreating := func(compName, compDefName string) {
-		compKey = types.NamespacedName{
-			Namespace: clusterObj.Namespace,
-			Name:      component.FullName(clusterObj.Name, compName),
-		}
-		compObj = &appsv1alpha1.Component{}
-		Eventually(testapps.CheckObjExists(&testCtx, compKey, compObj, true)).Should(Succeed())
-
-		By("Waiting for the component enter Creating phase")
-		Eventually(testapps.GetComponentObservedGeneration(&testCtx, compKey)).Should(BeEquivalentTo(1))
-		Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
-	}
 
 	// createCompObj := func(compName, compDefName string, processor func(*testapps.MockComponentFactory)) {
 	//	createCompObjNoWait(compName, compDefName, processor)
@@ -1040,9 +1039,16 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	testCompFinalizerNLabel := func(compName, compDefName string) {
-	}
+		createClusterObjV2(compName, compDefObj.Name, nil)
 
-	testCompExternalResource := func(compName, compDefName string) {
+		By("check component finalizers and labels")
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
+			g.Expect(comp.Finalizers).Should(ContainElements(constant.DBComponentFinalizerName))
+			g.Expect(comp.Labels).Should(HaveKeyWithValue(constant.ComponentDefinitionLabelKey, comp.Spec.CompDef))
+			g.Expect(comp.Labels).Should(HaveKeyWithValue(constant.AppManagedByLabelKey, constant.AppName))
+			g.Expect(comp.Labels).Should(HaveKeyWithValue(constant.AppInstanceLabelKey, clusterObj.Name))
+			g.Expect(comp.Labels).Should(HaveKeyWithValue(constant.KBAppComponentLabelKey, compName))
+		})).Should(Succeed())
 	}
 
 	testCompService := func(compName, compDefName string) {
@@ -1052,6 +1058,55 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	testCompTLSConfig := func(compName, compDefName string) {
+		createClusterObjV2(compName, compDefObj.Name, func(f *testapps.MockClusterFactory) {
+			issuer := &appsv1alpha1.Issuer{
+				Name: appsv1alpha1.IssuerKubeBlocks,
+			}
+			f.SetTLS(true).SetIssuer(issuer)
+		})
+
+		By("check TLS secret")
+		secretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      plan.GenerateTLSSecretName(clusterObj.Name, compName),
+		}
+		Eventually(testapps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
+			g.Expect(secret.Data).Should(HaveKey(factory.CAName))
+			g.Expect(secret.Data).Should(HaveKey(factory.CertName))
+			g.Expect(secret.Data).Should(HaveKey(factory.KeyName))
+		})).Should(Succeed())
+
+		By("check pod's volumes and mounts")
+		targetVolume := corev1.Volume{
+			Name: factory.VolumeName,
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: secretKey.Name,
+					Items: []corev1.KeyToPath{
+						{Key: factory.CAName, Path: factory.CAName},
+						{Key: factory.CertName, Path: factory.CertName},
+						{Key: factory.KeyName, Path: factory.KeyName},
+					},
+					Optional: func() *bool { o := false; return &o }(),
+				},
+			},
+		}
+		targetVolumeMount := corev1.VolumeMount{
+			Name:      factory.VolumeName,
+			MountPath: factory.MountPath,
+			ReadOnly:  true,
+		}
+		rsmKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      compObj.Name,
+		}
+		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+			podSpec := rsm.Spec.Template.Spec
+			g.Expect(podSpec.Volumes).Should(ContainElements(targetVolume))
+			for _, c := range podSpec.Containers {
+				g.Expect(c.VolumeMounts).Should(ContainElements(targetVolumeMount))
+			}
+		})).Should(Succeed())
 	}
 
 	testCompConfiguration := func(compName, compDefName string) {
@@ -1085,11 +1140,9 @@ var _ = Describe("Component Controller", func() {
 			f.SetComponentAffinity(&affinity).AddComponentToleration(toleration)
 		})
 
-		waitCompObjCreating(compName, compDefObj.Name)
-
 		By("Checking the Affinity, the TopologySpreadConstraints and Tolerations")
 		rsmKey := types.NamespacedName{
-			Namespace: clusterObj.Namespace,
+			Namespace: compObj.Namespace,
 			Name:      compObj.Name,
 		}
 		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
@@ -1524,10 +1577,6 @@ var _ = Describe("Component Controller", func() {
 
 		It(fmt.Sprintf("component finalizers and labels"), func() {
 			testCompFinalizerNLabel(defaultCompName, compDefName)
-		})
-
-		It(fmt.Sprintf("component referenced resources"), func() {
-			testCompExternalResource(defaultCompName, compDefName)
 		})
 
 		It(fmt.Sprintf("with component services"), func() {

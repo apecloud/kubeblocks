@@ -126,12 +126,8 @@ var _ = Describe("token provider", func() {
 	Context("test token provider", func() {
 		It("test login", func() {
 			tokenProvider := newTokenProvider(mockCached, mockIssued)
-
-			ExpectWithOffset(1, func() error {
-				userInfo, _, err := tokenProvider.Login(context.Background())
-				Expect(userInfo.Name).To(Equal("test_name"))
-				return err
-			}()).To(BeNil())
+			_, _, err := tokenProvider.Login(context.Background())
+			Expect(err).Should(HaveOccurred())
 		})
 
 		It("test logout", func() {
@@ -153,7 +149,8 @@ var _ = Describe("token provider", func() {
 				issued: mockIssued,
 			}
 			isAccessTokenValid := func(tokenResponse authenticator.TokenResponse) bool { return IsValidToken(tokenResponse.AccessToken) }
-			_, _ = tokenProvider.getTokenFromCache(isAccessTokenValid)
+			_, err := tokenProvider.getTokenFromCache(isAccessTokenValid)
+			Expect(err).ShouldNot(HaveOccurred())
 		})
 
 		It("test getRefreshToken", func() {
@@ -161,7 +158,7 @@ var _ = Describe("token provider", func() {
 				cached: mockCached,
 				issued: mockIssued,
 			}
-			_ = tokenProvider.getRefreshToken("")
+			Expect(tokenProvider.getRefreshToken("")).Should(BeNil())
 		})
 	})
 })

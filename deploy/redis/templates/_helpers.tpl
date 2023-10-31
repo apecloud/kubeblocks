@@ -58,11 +58,11 @@ Define image
 {{- end }}
 
 {{- define "redis-proxy.image" -}}
-{{ .Values.redisImage.registry | default "docker.io" }}/{{ .Values.redisImage.repository }}:{{ .Values.redisImage.tag }}
+{{ .Values.redisTwemproxyImage.registry | default "docker.io" }}/{{ .Values.redisTwemproxyImage.repository }}:{{ .Values.redisTwemproxyImage.tag }}
 {{- end }}
 
 {{- define "busybox.image" -}}
-{{ .Values.busyboxImage.registry | default "docker.io"}}/{{ .Values.busyboxImage.repository}}:{{ .Values.redisImage.tag }}
+{{ .Values.busyboxImage.registry | default "docker.io"}}/{{ .Values.busyboxImage.repository}}:{{ .Values.busyboxImage.tag }}
 {{- end }}}
 
 

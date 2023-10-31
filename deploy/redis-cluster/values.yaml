@@ -44,6 +44,6 @@ sentinel:
   replicas: 3
 
 proxy:
-  cpu: 2
-  memory: 6
+  cpu: 1
+  memory: 0.5
   replicas: 3

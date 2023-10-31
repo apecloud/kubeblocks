@@ -13,19 +13,19 @@ image:
   # Overrides the image tag whose default is the chart appVersion.
   tag: 7.0.6-RC8
 
-redisImage:
+redisTwemproxyImage:
   registry: docker.io
   repository: malexer/twemproxy
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: latest
+  tag: 0.5.0
 
 busyboxImage:
   registry: docker.io
   repository: busybox
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: latest
+  tag: 1.36
 
 imagePullSecrets: []
 nameOverride: ""

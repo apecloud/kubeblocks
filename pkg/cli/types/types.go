@@ -111,6 +111,7 @@ const (
 	KindBackupPolicyTemplate            = "BackupPolicyTemplate"
 	KindStatefulSet                     = "StatefulSet"
 	KindRSM                             = "ReplicatedStateMachine"
+	KindConfigMap                       = "ConfigMap"
 )
 
 // K8S rbac API group

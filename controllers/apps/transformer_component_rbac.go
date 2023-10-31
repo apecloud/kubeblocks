@@ -51,7 +51,6 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return nil
 	}
 
-	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
 	serviceAccount, needCRB, err := buildServiceAccounts(transCtx)
@@ -69,11 +68,11 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	}
 
 	var parent client.Object
-	rb := factory.BuildRoleBinding(cluster, serviceAccount.Name)
+	rb := factory.BuildRoleBinding(transCtx.Cluster, serviceAccount.Name)
 	graphCli.Create(dag, rb)
 	parent = rb
 	if needCRB {
-		crb := factory.BuildClusterRoleBinding(cluster, serviceAccount.Name)
+		crb := factory.BuildClusterRoleBinding(transCtx.Cluster, serviceAccount.Name)
 		graphCli.Create(dag, crb)
 		graphCli.DependOn(dag, parent, crb)
 		parent = crb
@@ -116,9 +115,9 @@ func isVolumeProtectionEnabled(compDef *appsv1alpha1.ComponentDefinition) bool {
 }
 
 func isServiceAccountExist(transCtx *componentTransformContext, serviceAccountName string) bool {
-	cluster := transCtx.Cluster
+	synthesizedComp := transCtx.SynthesizeComponent
 	namespaceName := types.NamespacedName{
-		Namespace: cluster.Namespace,
+		Namespace: synthesizedComp.Namespace,
 		Name:      serviceAccountName,
 	}
 	sa := &corev1.ServiceAccount{}
@@ -136,10 +135,10 @@ func isServiceAccountExist(transCtx *componentTransformContext, serviceAccountNa
 }
 
 func isClusterRoleBindingExist(transCtx *componentTransformContext, serviceAccountName string) bool {
-	cluster := transCtx.Cluster
+	synthesizedComp := transCtx.SynthesizeComponent
 	namespaceName := types.NamespacedName{
-		Namespace: cluster.Namespace,
-		Name:      "kb-" + cluster.Name,
+		Namespace: synthesizedComp.Namespace,
+		Name:      "kb-" + synthesizedComp.ClusterName,
 	}
 	crb := &rbacv1.ClusterRoleBinding{}
 	if err := transCtx.Client.Get(transCtx.Context, namespaceName, crb); err != nil {
@@ -174,10 +173,10 @@ func isClusterRoleBindingExist(transCtx *componentTransformContext, serviceAccou
 }
 
 func isRoleBindingExist(transCtx *componentTransformContext, serviceAccountName string) bool {
-	cluster := transCtx.Cluster
+	synthesizedComp := transCtx.SynthesizeComponent
 	namespaceName := types.NamespacedName{
-		Namespace: cluster.Namespace,
-		Name:      "kb-" + cluster.Name,
+		Namespace: synthesizedComp.Namespace,
+		Name:      "kb-" + synthesizedComp.ClusterName,
 	}
 	rb := &rbacv1.RoleBinding{}
 	if err := transCtx.Client.Get(transCtx.Context, namespaceName, rb); err != nil {

@@ -555,12 +555,17 @@ func BuildConnCredential4Component(comp *component.SynthesizedComponent, name st
 	return builder.NewSecretBuilder(comp.Namespace, secretName).AddLabelsInMap(labels).GetObject()
 }
 
-func BuildPDB(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) *policyv1.PodDisruptionBudget {
-	wellKnownLabels := constant.GetKBWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
-	return builder.NewPDBBuilder(cluster.Namespace, constant.GenerateClusterComponentPattern(cluster.Name, component.Name)).
-		AddLabelsInMap(wellKnownLabels).
-		AddLabelsInMap(constant.GetClusterCompDefLabel(component.ClusterCompDefName)).
-		AddSelectorsInMap(wellKnownLabels).
+func BuildPDB(synthesizedComp *component.SynthesizedComponent) *policyv1.PodDisruptionBudget {
+	var (
+		namespace   = synthesizedComp.Namespace
+		clusterName = synthesizedComp.ClusterName
+		compName    = synthesizedComp.Name
+		labels      = constant.GetKBWellKnownLabels(synthesizedComp.ClusterDefName, clusterName, compName)
+	)
+	return builder.NewPDBBuilder(namespace, constant.GenerateClusterComponentPattern(clusterName, compName)).
+		AddLabelsInMap(labels).
+		AddLabelsInMap(constant.GetClusterCompDefLabel(synthesizedComp.ClusterCompDefName)).
+		AddSelectorsInMap(labels).
 		GetObject()
 }
 

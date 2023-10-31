@@ -118,14 +118,14 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 				ClusterName:   cluster.GetNamespace(),
 				ComponentName: component.Name,
 			},
-			clusterVer, cluster, component, workload, podSpec, nil)
+			clusterVer, cluster, component, podSpec, nil)
 	}
 
 	// TODO: may add a PDB transform to Create/Update/Delete.
 	// if no these handle, the cluster controller will occur an error during reconciling.
 	// conditional build PodDisruptionBudget
 	if component.MinAvailable != nil {
-		pdb := factory.BuildPDB(cluster, component)
+		pdb := factory.BuildPDB(component)
 		resources = append(resources, pdb)
 	} else {
 		panic("this shouldn't happen")

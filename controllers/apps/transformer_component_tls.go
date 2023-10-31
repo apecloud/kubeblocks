@@ -41,24 +41,23 @@ var _ graph.Transformer = &componentTLSTransformer{}
 
 func (t *componentTLSTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
-	synthesizeComp := transCtx.SynthesizeComponent
+	synthesizedComp := transCtx.SynthesizeComponent
 
 	// update podSpec tls volume and volumeMount
-	if err := updateTLSVolumeAndVolumeMount(synthesizeComp.PodSpec, synthesizeComp.ClusterName, *synthesizeComp); err != nil {
+	if err := updateTLSVolumeAndVolumeMount(synthesizedComp.PodSpec, synthesizedComp.ClusterName, *synthesizedComp); err != nil {
 		return err
 	}
 
 	// build tls cert
-	if err := buildTLSCert(transCtx.Context, transCtx.Client, transCtx.Cluster, *synthesizeComp, dag); err != nil {
+	if err := buildTLSCert(transCtx.Context, transCtx.Client, *synthesizedComp, dag); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func buildTLSCert(ctx context.Context, cli roclient.ReadonlyClient, cluster *appsv1alpha1.Cluster,
-	synthesizeComp component.SynthesizedComponent, dag *graph.DAG) error {
-	tls := synthesizeComp.TLSConfig
+func buildTLSCert(ctx context.Context, cli roclient.ReadonlyClient, synthesizedComp component.SynthesizedComponent, dag *graph.DAG) error {
+	tls := synthesizedComp.TLSConfig
 	if tls == nil || !tls.Enable {
 		return nil
 	}
@@ -68,11 +67,11 @@ func buildTLSCert(ctx context.Context, cli roclient.ReadonlyClient, cluster *app
 
 	switch tls.Issuer.Name {
 	case appsv1alpha1.IssuerUserProvided:
-		if err := plan.CheckTLSSecretRef(ctx, cli, cluster.Namespace, tls.Issuer.SecretRef); err != nil {
+		if err := plan.CheckTLSSecretRef(ctx, cli, synthesizedComp.Namespace, tls.Issuer.SecretRef); err != nil {
 			return err
 		}
 	case appsv1alpha1.IssuerKubeBlocks:
-		secret, err := plan.ComposeTLSSecret(cluster.Namespace, cluster.Name, synthesizeComp.Name)
+		secret, err := plan.ComposeTLSSecret(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
 		if err != nil {
 			return err
 		}

@@ -381,8 +381,8 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds PDB correctly", func() {
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			pdb := BuildPDB(cluster, synthesizedComponent)
+			_, _, synthesizedComponent := newClusterObjs(nil)
+			pdb := BuildPDB(synthesizedComponent)
 			Expect(pdb).ShouldNot(BeNil())
 		})
 

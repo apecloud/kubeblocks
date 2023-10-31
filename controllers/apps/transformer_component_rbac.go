@@ -248,7 +248,7 @@ func buildServiceAccounts(transCtx *componentTransformContext) (*corev1.ServiceA
 		if !isProbesEnabled(compDef) && !volumeProtectionEnable && !dataProtectionEnable {
 			return nil, false, nil
 		}
-		serviceAccountName = fmt.Sprintf("kb-%s", comp.Name)
+		serviceAccountName = constant.GenerateDefaultCompServiceAccountPattern(comp.Name)
 	}
 
 	if isRoleBindingExist(transCtx, serviceAccountName) && isServiceAccountExist(transCtx, serviceAccountName) {

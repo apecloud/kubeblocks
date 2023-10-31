@@ -22,6 +22,7 @@ package apps
 import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -66,6 +67,7 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 func compOwnedKinds() []client.ObjectList {
 	return []client.ObjectList{
 		&workloads.ReplicatedStateMachineList{},
+		&policyv1.PodDisruptionBudgetList{},
 		&corev1.ServiceList{},
 		&corev1.ConfigMapList{},
 		&corev1.SecretList{},

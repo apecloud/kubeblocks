@@ -230,7 +230,7 @@ func buildServiceAccountName(synthesizeComp *SynthesizedComponent) {
 	if synthesizeComp.LifecycleActions == nil || synthesizeComp.LifecycleActions.RoleProbe == nil {
 		return
 	}
-	synthesizeComp.ServiceAccountName = constant.KBLowerPrefix + constant.KBHyphen + synthesizeComp.ClusterName
+	synthesizeComp.ServiceAccountName = constant.GenerateDefaultCompServiceAccountPattern(synthesizeComp.FullCompName)
 	// set component.PodSpec.ServiceAccountName
 	synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
 }

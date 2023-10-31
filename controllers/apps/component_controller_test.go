@@ -1091,31 +1091,25 @@ var _ = Describe("Component Controller", func() {
 	testCompSystemAccount := func(compName, compDefName string) {
 		createClusterObjV2(compName, compDefObj.Name, nil)
 
-		// SystemAccounts: []appsv1alpha1.ComponentSystemAccount{
-		//	{
-		//		Name:                "root",
-		//		IsSystemInitAccount: true,
-		//		PasswordGenerationPolicy: appsv1alpha1.PasswordConfig{
-		//			Length:     16,
-		//			NumDigits:  8,
-		//			NumSymbols: 8,
-		//			LetterCase: appsv1alpha1.MixedCases,
-		//		},
-		//	},
-		//	{
-		//		Name:      "admin",
-		//		Statement: "CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWORD)'; GRANT ALL PRIVILEGES ON *.* TO $(USERNAME);",
-		//		PasswordGenerationPolicy: appsv1alpha1.PasswordConfig{
-		//			Length:     10,
-		//			NumDigits:  5,
-		//			NumSymbols: 0,
-		//			LetterCase: appsv1alpha1.MixedCases,
-		//		},
-		//	},
-		// },
 		By("check root account")
+		rootSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterObj.Name, compName, "root"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, rootSecretKey, func(g Gomega, secret *corev1.Secret) {
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("root")))
+			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
+		})).Should(Succeed())
 
 		By("check admin account")
+		adminSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterObj.Name, compName, "admin"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
+			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
+		})).Should(Succeed())
 	}
 
 	testCompConnCredential := func(compName, compDefName string) {

@@ -331,16 +331,19 @@ var (
 				Name:        "leader",
 				Serviceable: true,
 				Writable:    true,
+				Votable:     true,
 			},
 			{
 				Name:        "follower",
 				Serviceable: true,
 				Writable:    false,
+				Votable:     true,
 			},
 			{
 				Name:        "learner",
 				Serviceable: false,
 				Writable:    false,
+				Votable:     false,
 			},
 		},
 		LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{

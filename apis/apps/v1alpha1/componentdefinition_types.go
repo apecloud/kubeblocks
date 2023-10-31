@@ -356,7 +356,7 @@ type ComponentReplicaRole struct {
 
 	// Serviceable indicates whether a replica with this role can provide services.
 	// Cannot be updated.
-	// +kubebuilder:default=true
+	// +kubebuilder:default=false
 	// +optional
 	Serviceable bool `json:"serviceable,omitempty"`
 
@@ -365,6 +365,12 @@ type ComponentReplicaRole struct {
 	// +kubebuilder:default=false
 	// +optional
 	Writable bool `json:"writable,omitempty"`
+
+	// Votable indicates whether a replica with this role is allowed to vote.
+	// Cannot be updated.
+	// +kubebuilder:default=false
+	// +optional
+	Votable bool `json:"votable,omitempty"`
 }
 
 // TargetPodSelector defines how to select pod(s) to execute a action.

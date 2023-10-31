@@ -3929,9 +3929,14 @@ spec:
                       pattern: ^.*[^\s]+.*$
                       type: string
                     serviceable:
-                      default: true
+                      default: false
                       description: Serviceable indicates whether a replica with this
                         role can provide services. Cannot be updated.
+                      type: boolean
+                    votable:
+                      default: false
+                      description: Votable indicates whether a replica with this role
+                        is allowed to vote. Cannot be updated.
                       type: boolean
                     writable:
                       default: false

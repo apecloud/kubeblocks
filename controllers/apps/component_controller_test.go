@@ -1051,10 +1051,119 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
+	testCompVolume := func(compName, compDefName string) {
+	}
+
 	testCompService := func(compName, compDefName string) {
+		createClusterObjV2(compName, compDefObj.Name, nil)
+		// Services: []appsv1alpha1.ComponentService{
+		//	{
+		//		Name:        "default",
+		//		ServiceName: "rw",
+		//		ServiceSpec: corev1.ServiceSpec{
+		//			Ports: []corev1.ServicePort{
+		//				{
+		//					Protocol: corev1.ProtocolTCP,
+		//					Port:     3306,
+		//					TargetPort: intstr.IntOrString{
+		//						Type:   intstr.String,
+		//						StrVal: "mysql",
+		//					},
+		//				},
+		//			},
+		//		},
+		//		RoleSelector: []string{"leader"},
+		//	},
+		//	{
+		//		Name:        "ro",
+		//		ServiceName: "ro",
+		//		ServiceSpec: corev1.ServiceSpec{
+		//			Ports: []corev1.ServicePort{
+		//				{
+		//					Protocol: corev1.ProtocolTCP,
+		//					Port:     3306,
+		//					TargetPort: intstr.IntOrString{
+		//						Type:   intstr.String,
+		//						StrVal: "mysql",
+		//					},
+		//				},
+		//			},
+		//		},
+		//		RoleSelector: []string{"follower"},
+		//	},
+		// },
+
+		By("check default component services")
+	}
+
+	testCompSystemAccount := func(compName, compDefName string) {
+		// SystemAccounts: []appsv1alpha1.ComponentSystemAccount{
+		//	{
+		//		Name:                "root",
+		//		IsSystemInitAccount: true,
+		//		PasswordGenerationPolicy: appsv1alpha1.PasswordConfig{
+		//			Length:     16,
+		//			NumDigits:  8,
+		//			NumSymbols: 8,
+		//			LetterCase: appsv1alpha1.MixedCases,
+		//		},
+		//	},
+		//	{
+		//		Name:      "admin",
+		//		Statement: "CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWORD)'; GRANT ALL PRIVILEGES ON *.* TO $(USERNAME);",
+		//		PasswordGenerationPolicy: appsv1alpha1.PasswordConfig{
+		//			Length:     10,
+		//			NumDigits:  5,
+		//			NumSymbols: 0,
+		//			LetterCase: appsv1alpha1.MixedCases,
+		//		},
+		//	},
+		// },
 	}
 
 	testCompConnCredential := func(compName, compDefName string) {
+		// ConnectionCredentials: []appsv1alpha1.ConnectionCredential{
+		//	{
+		//		Name:        "root",
+		//		ServiceName: "default",
+		//		AccountName: "root",
+		//	},
+		//	{
+		//		Name:        "admin",
+		//		ServiceName: "default",
+		//		AccountName: "admin",
+		//	},
+		// },
+	}
+
+	testCompRole := func(compName, compDefName string) {
+		createClusterObjV2(compName, compDefObj.Name, nil)
+
+		By("check default component roles")
+		targetRoles := []workloads.ReplicaRole{
+			{
+				Name:       "leader",
+				AccessMode: workloads.ReadWriteMode,
+				CanVote:    true,
+			},
+			{
+				Name:       "follower",
+				AccessMode: workloads.ReadonlyMode,
+				CanVote:    true,
+			},
+			{
+				Name:       "learner",
+				AccessMode: workloads.NoneMode,
+				CanVote:    false,
+			},
+		}
+		rsmKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      compObj.Name,
+		}
+		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+			g.Expect(rsm.Spec.Roles).Should(HaveExactElements(targetRoles))
+		})).Should(Succeed())
 	}
 
 	testCompTLSConfig := func(compName, compDefName string) {
@@ -1579,12 +1688,24 @@ var _ = Describe("Component Controller", func() {
 			testCompFinalizerNLabel(defaultCompName, compDefName)
 		})
 
+		It(fmt.Sprintf("with component volumes"), func() {
+			testCompVolume(defaultCompName, compDefName)
+		})
+
 		It(fmt.Sprintf("with component services"), func() {
 			testCompService(defaultCompName, compDefName)
 		})
 
+		It(fmt.Sprintf("with component system accounts"), func() {
+			testCompSystemAccount(defaultCompName, compDefName)
+		})
+
 		It(fmt.Sprintf("with component conn credentials"), func() {
 			testCompConnCredential(defaultCompName, compDefName)
+		})
+
+		It(fmt.Sprintf("with component roles"), func() {
+			testCompRole(defaultCompName, compDefName)
 		})
 
 		It(fmt.Sprintf("with component TlS"), func() {

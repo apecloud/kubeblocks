@@ -143,26 +143,16 @@ func (c *rsmRolesConvertor) convert(args ...any) (any, error) {
 	compReplicaRoles := synthesizeComp.Roles
 	for _, compReplicaRole := range compReplicaRoles {
 		rsmReplicaRole := workloads.ReplicaRole{
-			Name:     compReplicaRole.Name,
-			IsLeader: false,
-			CanVote:  false,
+			Name:       compReplicaRole.Name,
+			AccessMode: workloads.NoneMode,
+			CanVote:    compReplicaRole.Votable,
 		}
-
-		if compReplicaRole.Writable {
-			rsmReplicaRole.IsLeader = true
-			rsmReplicaRole.CanVote = true
-		}
-
-		// TODO(xingran): Serviceable equals to CanVote ?
 		if compReplicaRole.Serviceable {
-			rsmReplicaRole.CanVote = true
 			if compReplicaRole.Writable {
 				rsmReplicaRole.AccessMode = workloads.ReadWriteMode
 			} else {
 				rsmReplicaRole.AccessMode = workloads.ReadonlyMode
 			}
-		} else {
-			rsmReplicaRole.AccessMode = workloads.NoneMode
 		}
 		rsmReplicaRoles = append(rsmReplicaRoles, rsmReplicaRole)
 	}

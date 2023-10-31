@@ -23,36 +23,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package utils
 
 import (
-	"bytes"
-	"compress/gzip"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 )
-
-func bindataRead(data []byte, name string) ([]byte, error) {
-	gz, err := gzip.NewReader(bytes.NewBuffer(data))
-	if err != nil {
-		return nil, fmt.Errorf("read %q: %v", name, err)
-	}
-
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, gz)
-	clErr := gz.Close()
-
-	if err != nil {
-		return nil, fmt.Errorf("read %q: %v", name, err)
-	}
-	if clErr != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
-}
 
 type asset struct {
 	bytes []byte
@@ -96,23 +73,13 @@ func (fi bindataFileInfo) Sys() interface{} {
 	return nil
 }
 
-var _configConfigEnc = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xaa\xe6\x52\x50\x50\x4a\xce\xc9\x4c\xcd\x2b\x89\xcf\x4c\x51\xb2\x52\x50\x0a\xb1\xc8\xc8\xad\xf0\xb3\x0c\x4e\x2c\xa9\xc8\xac\xf4\x74\x31\x71\x2e\x4a\xcf\x2f\x8c\x0c\x0c\x0a\x0a\x8e\x28\x34\xcd\x4a\x74\x55\xe2\xaa\x05\x04\x00\x00\xff\xff\x86\x57\x81\x07\x35\x00\x00\x00")
+const clientID = "64e42ca02df49bffa50719a9"
 
-func configConfigEncBytes() ([]byte, error) {
-	return bindataRead(
-		_configConfigEnc,
-		"config/config.enc",
-	)
-}
+var clientIDJSON = fmt.Sprintf(`{"client_id": "%s"}`, clientID)
 
 func configConfigEnc() (*asset, error) {
-	bytes, err := configConfigEncBytes()
-	if err != nil {
-		return nil, err
-	}
-
 	info := bindataFileInfo{name: "config/config.enc", size: 53, mode: os.FileMode(0420), modTime: time.Unix(1688544460, 0)}
-	a := &asset{bytes: bytes, info: info}
+	a := &asset{bytes: []byte(clientIDJSON), info: info}
 	return a, nil
 }
 

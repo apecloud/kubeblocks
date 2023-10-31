@@ -30,7 +30,7 @@ spec:
               - ReadWriteOnce
             resources:
               requests:
-                storage: 20Gi
+                storage: 1Gi
 
     - name: metrics # user-defined
       componentDefRef: metrics # ref clusterdefinition componentDefs.name

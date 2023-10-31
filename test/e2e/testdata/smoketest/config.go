@@ -44,31 +44,42 @@ func Config() {
 
 	Context("Configure running e2e information", func() {
 		It("create a secret to save the access key and ", func() {
-			var accessKey, secretKey string
-			if ConfigType == "s3" {
-				accessKey = e2eutil.ExecCommand("aws configure get aws_access_key_id")
-				secretKey = e2eutil.ExecCommand("aws configure get aws_secret_access_key")
+			secret := "k get secret " + ConfigType + "-credential-for-backuprepo -n kb-system | grep " +
+				ConfigType + "-credential-for-backuprepo | awk '{print $1}'"
+			if len(e2eutil.ExecCommand(secret)) > 0 {
+				log.Println("secret " + ConfigType + "-credential-for-backuprepo already exists")
 			} else {
-				accessKey = e2eutil.ExecCommand("aliyun configure get access_key_id")
-				secretKey = e2eutil.ExecCommand("aliyun configure get access_key_secret")
+				var accessKey, secretKey string
+				if ConfigType == "s3" {
+					accessKey = e2eutil.ExecCommand("aws configure get aws_access_key_id")
+					secretKey = e2eutil.ExecCommand("aws configure get aws_secret_access_key")
+				} else {
+					accessKey = e2eutil.ExecCommand("aliyun configure get access_key_id")
+					secretKey = e2eutil.ExecCommand("aliyun configure get access_key_secret")
+				}
+				createSecret := "kubectl create secret generic " + ConfigType + "-credential-for-backuprepo \\\n" +
+					"  -n kb-system \\\n" +
+					"  --from-literal=accessKeyId=" + e2eutil.StringStrip(accessKey) + " \\\n" +
+					"  --from-literal=secretAccessKey=" + e2eutil.StringStrip(secretKey)
+				b := e2eutil.ExecuteCommand(createSecret)
+				Expect(b).Should(BeTrue())
 			}
-			createSecret := "kubectl create secret generic " + ConfigType + "-credential-for-backuprepo \\\n" +
-				"  -n kb-system \\\n" +
-				"  --from-literal=accessKeyId=" + e2eutil.StringStrip(accessKey) + " \\\n" +
-				"  --from-literal=secretAccessKey=" + e2eutil.StringStrip(secretKey)
-			b := e2eutil.ExecuteCommand(createSecret)
-			Expect(b).Should(BeTrue())
 		})
-
 		It(" configure backup-repo", func() {
-			var yaml string
-			if ConfigType == "oss" {
-				yaml = dir + "/testdata/config/backuprepo_oss.yaml"
+			repo := "kubectl get BackupRepo | grep my-repo | awk '{print $1}'"
+			if len(e2eutil.ExecCommand(repo)) > 0 {
+				log.Println("BackupRepo already exists")
 			} else {
-				yaml = dir + "/testdata/config/backuprepo_s3.yaml"
+				var yaml string
+				if ConfigType == "oss" {
+					yaml = dir + "/testdata/config/backuprepo_oss.yaml"
+				} else {
+					yaml = dir + "/testdata/config/backuprepo_s3.yaml"
+				}
+				b := e2eutil.OpsYaml(yaml, "create")
+				Expect(b).Should(BeTrue())
 			}
-			b := e2eutil.OpsYaml(yaml, "create")
-			Expect(b).Should(BeTrue())
+
 		})
 	})
 }
@@ -81,6 +92,13 @@ func DeleteConfig() {
 	})
 
 	Context("delete e2e config resources", func() {
+		It("Check backup exists ", func() {
+			backupArr := e2eutil.ExecCommandReadline("kubectl get backup | awk '{print $1}'")
+			if len(backupArr) > 0 {
+				deleteBackups := e2eutil.ExecuteCommand("kubectl delete backup --all")
+				Expect(deleteBackups).Should(BeTrue())
+			}
+		})
 		It("delete secret and backuprepo", func() {
 			deleteSecret := e2eutil.ExecuteCommand("kubectl delete secret " + ConfigType + "-credential-for-backuprepo -n kb-system")
 			Expect(deleteSecret).Should(BeTrue())

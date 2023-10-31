@@ -471,35 +471,3 @@ func updateObjLabel(clusterName, uid, componentName, labelKey, labelValue string
 	labels[key] = value
 	obj.SetLabels(labels)
 }
-
-func updateCustomLabelToObjs(clusterName, uid, componentName string,
-	customLabelSpecs []appsv1alpha1.CustomLabelSpec,
-	objs []client.Object) error {
-	for _, obj := range objs {
-		kinds, _, err := model.GetScheme().ObjectKinds(obj)
-		if err != nil {
-			return err
-		}
-		if len(kinds) != 1 {
-			return fmt.Errorf("expected exactly 1 kind for object %T, but found %s kinds", obj, kinds)
-		}
-		kind := kinds[0].Kind
-		if !slices.Contains(getCustomLabelSupportKind(), kind) {
-			continue
-		}
-
-		for _, customLabelSpec := range customLabelSpecs {
-			for _, res := range customLabelSpec.Resources {
-				gvk, err := parseCustomLabelPattern(res.GVK)
-				if err != nil {
-					return err
-				}
-				if gvk.Kind != kind {
-					continue
-				}
-				updateObjLabel(clusterName, uid, componentName, customLabelSpec.Key, customLabelSpec.Value, obj)
-			}
-		}
-	}
-	return nil
-}

@@ -262,6 +262,7 @@ func (r *componentStatusHandler) reconcileComponentPhase() error {
 	}
 
 	// patch the current componentSpec workload's custom labels
+	// TODO(xingran): remove this to independent transformer and patch to all sub-resources of component, and add custom annotations support.
 	if err := UpdateCustomLabelToPods(r.reqCtx.Ctx, r.cli, r.cluster, r.synthesizeComp, r.dag); err != nil {
 		r.reqCtx.Event(r.cluster, corev1.EventTypeWarning, "Component Controller PatchWorkloadCustomLabelFailed", err.Error())
 		return err

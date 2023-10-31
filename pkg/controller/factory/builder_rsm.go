@@ -71,7 +71,7 @@ func BuildRSMFromConvertor(cluster *appsv1alpha1.Cluster, synthesizeComp *compon
 	}
 	rsmBuilder.SetVolumeClaimTemplates(vcts...)
 
-	// TODO(xingran): call convertors to convert componentDef attributes to  attributes. including service, credential, roles, roleProbe, membershipReconfiguration, memberUpdateStrategy, etc.
+	// TODO(xingran): call convertors to convert componentDef attributes to rsm attributes. including service, credential, roles, roleProbe, membershipReconfiguration, memberUpdateStrategy, etc.
 	convertedRSM, err := component.BuildRSMFrom(cluster, synthesizeComp, rsmBuilder.GetObject())
 	if err != nil {
 		return nil, err
@@ -94,7 +94,7 @@ func BuildRSMFromConvertor(cluster *appsv1alpha1.Cluster, synthesizeComp *compon
 }
 
 // BuildRSM builds a ReplicatedStateMachine object based on the old CLusterDefinition API, and depends on the the deprecated fields in the SynthesizedComponent.
-// TODO(xingran): This function will be deprecated in the future, and the BuildRSMBaseOnCompDef function will be used instead.
+// TODO(xingran): This function will be deprecated in the future, and the BuildRSMFromConvertor function will be used instead, do not add new features to this function.
 func BuildRSM(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
 	commonLabels := constant.GetKBWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
 

@@ -36,7 +36,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -202,39 +201,23 @@ var _ = Describe("Component Utils", func() {
 			})
 		})
 
-		Context("updateCustomLabelToObjs func", func() {
-			It("should update label well", func() {
-				resource := &appsv1alpha1.GVKResource{GVK: "v1/Pod"}
-				customLabelSpec := appsv1alpha1.CustomLabelSpec{
-					Key:       "custom-label-key",
-					Value:     "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)",
-					Resources: []appsv1alpha1.GVKResource{*resource},
-				}
-				pod := builder.NewPodBuilder("foo", "bar").GetObject()
-				clusterName, uid, componentName := "foo", "1234-5678", "workload"
-				err := updateCustomLabelToObjs(clusterName, uid, componentName, []appsv1alpha1.CustomLabelSpec{customLabelSpec}, []client.Object{pod})
-				Expect(err).Should(BeNil())
-				Expect(pod.Labels).ShouldNot(BeNil())
-				Expect(pod.Labels[customLabelSpec.Key]).Should(Equal(fmt.Sprintf("%s-%s", clusterName, componentName)))
-			})
-		})
-
+		// TODO(xingran: add test case for updateCustomLabelToObjs func
 		Context("updateCustomLabelToPods func", func() {
 			It("should work well", func() {
 				_, _, cluster := testapps.InitClusterWithHybridComps(&testCtx, clusterDefName,
 					clusterVersionName, clusterName, statelessCompName, "stateful", consensusCompName)
 				sts := testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusCompName)
 				pods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
-				resource := &appsv1alpha1.GVKResource{GVK: "v1/Pod"}
-				customLabelSpec := appsv1alpha1.CustomLabelSpec{
-					Key:       "custom-label-key",
-					Value:     "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)",
-					Resources: []appsv1alpha1.GVKResource{*resource},
+				mockLabelKey := "mock-label-key"
+				mockLabelPlaceHolderValue := "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)"
+				customLabels := map[string]appsv1alpha1.BuiltInString{
+					mockLabelKey: appsv1alpha1.BuiltInString(mockLabelPlaceHolderValue),
 				}
 				comp := &component.SynthesizedComponent{
-					Name:             consensusCompName,
-					CustomLabelSpecs: []appsv1alpha1.CustomLabelSpec{customLabelSpec},
+					Name:   consensusCompName,
+					Labels: customLabels,
 				}
+
 				dag := graph.NewDAG()
 				dag.AddVertex(&model.ObjectVertex{Obj: pods[0], Action: model.ActionUpdatePtr()})
 				Expect(UpdateCustomLabelToPods(testCtx.Ctx, k8sClient, cluster, comp, dag)).Should(Succeed())
@@ -243,7 +226,7 @@ var _ = Describe("Component Utils", func() {
 				Expect(podList).Should(HaveLen(3))
 				for _, pod := range podList {
 					Expect(pod.GetLabels()).ShouldNot(BeNil())
-					Expect(pod.GetLabels()[customLabelSpec.Key]).Should(Equal(fmt.Sprintf("%s-%s", clusterName, comp.Name)))
+					Expect(pod.GetLabels()[string(customLabels[mockLabelKey])]).Should(Equal(fmt.Sprintf("%s-%s", clusterName, comp.Name)))
 				}
 			})
 		})

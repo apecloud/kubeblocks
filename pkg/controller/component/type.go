@@ -54,7 +54,7 @@ type SynthesizedComponent struct {
 	ComponentRefEnvs     []*corev1.EnvVar                       `json:"componentRefEnvs,omitempty"`
 	ServiceReferences    map[string]*v1alpha1.ServiceDescriptor `json:"serviceReferences,omitempty"`
 
-	// The following fields were introduced with the ComponentDefinition and Component API in KubeBlocks version 0.7.0
+	// The following fields were introduced with the ComponentDefinition and Component API in KubeBlocks version 0.8.0
 	Roles                 []v1alpha1.ComponentReplicaRole     `json:"roles,omitempty"`
 	Labels                map[string]v1alpha1.BuiltInString   `json:"labels,omitempty"`
 	ConnectionCredentials []v1alpha1.ConnectionCredential     `json:"connectionCredentials,omitempty"`
@@ -66,7 +66,7 @@ type SynthesizedComponent struct {
 	Volumes               []v1alpha1.ComponentVolume          `json:"volumes,omitempty"`
 	ComponentServices     []v1alpha1.ComponentService         `json:"componentServices,omitempty"`
 
-	// TODO(xingran): The following fields will be deprecated after version 0.7.0 and will be replaced with a new data structure.
+	// TODO(xingran): The following fields will be deprecated after version 0.8.0 and will be replaced with a new data structure.
 	CustomLabelSpecs    []v1alpha1.CustomLabelSpec        `json:"customLabelSpecs,omitempty"`    // The CustomLabelSpecs will be replaced with Labels in the future.
 	SwitchoverSpec      *v1alpha1.SwitchoverSpec          `json:"switchoverSpec,omitempty"`      // The SwitchoverSpec will be replaced with LifecycleActions.Switchover in the future.
 	Probes              *v1alpha1.ClusterDefinitionProbes `json:"probes,omitempty"`              // The Probes will be replaced with LifecycleActions.RoleProbe in the future.
@@ -75,7 +75,7 @@ type SynthesizedComponent struct {
 	Services            []corev1.Service                  `json:"services,omitempty"`            // The Services will be replaced with ComponentServices in the future.
 	StatefulSetWorkload v1alpha1.StatefulSetWorkload      `json:"statefulSetWorkload,omitempty"` // The StatefulSetWorkload will be replaced with UpdateStrategy in the future.
 
-	// TODO(xingran): The following fields will be deprecated after KubeBlocks version 0.7.0
+	// TODO(xingran): The following fields will be deprecated after KubeBlocks version 0.8.0
 	ClusterDefName        string                          `json:"clusterDefName,omitempty"`     // the name of the clusterDefinition
 	ClusterCompDefName    string                          `json:"clusterCompDefName,omitempty"` // the name of the clusterDefinition.Spec.ComponentDefs[*].Name or cluster.Spec.ComponentSpecs[*].ComponentDefRef
 	CharacterType         string                          `json:"characterType,omitempty"`

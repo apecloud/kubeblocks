@@ -287,7 +287,6 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx, cli roclient.R
 		synthesizeComp.Probes = clusterCompDef.Probes
 		synthesizeComp.VolumeTypes = clusterCompDef.VolumeTypes
 		synthesizeComp.VolumeProtection = clusterCompDef.VolumeProtectionSpec
-		synthesizeComp.CustomLabelSpecs = clusterCompDef.CustomLabelSpecs
 		synthesizeComp.SwitchoverSpec = clusterCompDef.SwitchoverSpec
 		synthesizeComp.MinAvailable = clusterCompSpec.GetMinAvailable(clusterCompDef.GetMinAvailable())
 	}

@@ -70,6 +70,8 @@ var _ = Describe("object deletion transformer test.", func() {
 			sts := mockUnderlyingSts(*rsm, rsm.Generation)
 			headLessSvc := buildHeadlessSvc(*rsm)
 			envConfig := buildEnvConfigMap(*rsm)
+			envConfigShouldNotBeDeleted := buildEnvConfigMap(*rsm)
+			envConfigShouldNotBeDeleted.Name = "env-cm-should-not-be-deleted"
 			actionName := getActionName(rsm.Name, int(rsm.Generation), 1, jobTypeSwitchover)
 			action := buildAction(rsm, actionName, jobTypeSwitchover, jobScenarioMembership, "", "")
 			k8sMock.EXPECT().
@@ -90,7 +92,7 @@ var _ = Describe("object deletion transformer test.", func() {
 				List(gomock.Any(), &corev1.ConfigMapList{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, list *corev1.ConfigMapList, _ ...client.ListOption) error {
 					Expect(list).ShouldNot(BeNil())
-					list.Items = []corev1.ConfigMap{*envConfig}
+					list.Items = []corev1.ConfigMap{*envConfig, *envConfigShouldNotBeDeleted}
 					return nil
 				}).Times(1)
 			k8sMock.EXPECT().

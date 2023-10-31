@@ -470,6 +470,7 @@ func (u *upgradeHandlerTo7) transformStatefulSet(dynamic dynamic.Interface, obj 
 		SetVolumeClaimTemplates(pvcs...).
 		SetTemplate(*podTemplate).
 		SetUpdateStrategyType(v1.StatefulSetUpdateStrategyType(updateStrategy)).
+		SetPaused(true).
 		GetObject()
 	gvk := schema.GroupVersionKind{
 		Group:   types.RSMGVR().Group,

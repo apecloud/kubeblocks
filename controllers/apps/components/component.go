@@ -1305,6 +1305,7 @@ func (c *rsmComponent) updateWorkload(rsmObj *workloads.ReplicatedStateMachine) 
 	rsmObjCopy.Spec.RoleProbe = rsmProto.Spec.RoleProbe
 	rsmObjCopy.Spec.MembershipReconfiguration = rsmProto.Spec.MembershipReconfiguration
 	rsmObjCopy.Spec.MemberUpdateStrategy = rsmProto.Spec.MemberUpdateStrategy
+	rsmObjCopy.Spec.Paused = rsmProto.Spec.Paused
 	rsmObjCopy.Spec.Credential = rsmProto.Spec.Credential
 
 	resolvePodSpecDefaultFields(rsmObj.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
@@ -1342,7 +1343,7 @@ func (c *rsmComponent) updatePDB(reqCtx intctrlutil.RequestCtx, cli client.Clien
 			pdbObj := pdbObjList[pos]
 			if !reflect.DeepEqual(pdbObj.Spec, pdbProto.Spec) {
 				pdbObj.Spec = pdbProto.Spec
-				graphCli.Update(c.dag, pdbProto, pdbObj)
+				graphCli.Update(c.dag, nil, pdbObj, model.ReplaceIfExistingOption)
 			}
 		}
 	}

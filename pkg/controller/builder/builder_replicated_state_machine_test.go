@@ -154,6 +154,7 @@ var _ = Describe("replicated_state_machine builder", func() {
 				},
 			},
 		}
+		paused := true
 		credential := workloads.Credential{
 			Username: workloads.CredentialVar{Value: "foo"},
 			Password: workloads.CredentialVar{Value: "bar"},
@@ -178,6 +179,7 @@ var _ = Describe("replicated_state_machine builder", func() {
 			SetMemberUpdateStrategy(&memberUpdateStrategy).
 			SetService(service).
 			SetAlternativeServices(alternativeServices).
+			SetPaused(paused).
 			SetCredential(credential).
 			GetObject()
 
@@ -218,6 +220,7 @@ var _ = Describe("replicated_state_machine builder", func() {
 		Expect(rsm.Spec.Service).Should(BeEquivalentTo(service))
 		Expect(rsm.Spec.AlternativeServices).ShouldNot(BeNil())
 		Expect(rsm.Spec.AlternativeServices).Should(Equal(alternativeServices))
+		Expect(rsm.Spec.Paused).Should(Equal(paused))
 		Expect(rsm.Spec.Credential).ShouldNot(BeNil())
 		Expect(*rsm.Spec.Credential).Should(Equal(credential))
 	})

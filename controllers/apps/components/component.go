@@ -1343,7 +1343,7 @@ func (c *rsmComponent) updatePDB(reqCtx intctrlutil.RequestCtx, cli client.Clien
 			pdbObj := pdbObjList[pos]
 			if !reflect.DeepEqual(pdbObj.Spec, pdbProto.Spec) {
 				pdbObj.Spec = pdbProto.Spec
-				graphCli.Update(c.dag, pdbProto, pdbObj)
+				graphCli.Update(c.dag, nil, pdbObj, model.ReplaceIfExistingOption)
 			}
 		}
 	}

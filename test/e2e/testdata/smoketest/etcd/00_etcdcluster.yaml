@@ -23,3 +23,12 @@ spec:
       monitor: false
       replicas: 3
       serviceAccountName: kb-etcd-cluster
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: 
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi

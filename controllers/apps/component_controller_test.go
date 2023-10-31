@@ -1089,6 +1089,8 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	testCompSystemAccount := func(compName, compDefName string) {
+		createClusterObjV2(compName, compDefObj.Name, nil)
+
 		// SystemAccounts: []appsv1alpha1.ComponentSystemAccount{
 		//	{
 		//		Name:                "root",
@@ -1111,21 +1113,39 @@ var _ = Describe("Component Controller", func() {
 		//		},
 		//	},
 		// },
+		By("check root account")
+
+		By("check admin account")
 	}
 
 	testCompConnCredential := func(compName, compDefName string) {
-		// ConnectionCredentials: []appsv1alpha1.ConnectionCredential{
-		//	{
-		//		Name:        "root",
-		//		ServiceName: "default",
-		//		AccountName: "root",
-		//	},
-		//	{
-		//		Name:        "admin",
-		//		ServiceName: "default",
-		//		AccountName: "admin",
-		//	},
-		// },
+		createClusterObjV2(compName, compDefObj.Name, nil)
+
+		By("check root conn credential")
+		serviceName := constant.GenerateComponentServiceEndpoint(clusterObj.Name, compName, "rw")
+		servicePort := "3306"
+		rootSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateComponentConnCredential(clusterObj.Name, compName, "root"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, rootSecretKey, func(g Gomega, secret *corev1.Secret) {
+			g.Expect(secret.Data).Should(HaveKeyWithValue("service", serviceName))
+			g.Expect(secret.Data).Should(HaveKeyWithValue("port", servicePort))
+			g.Expect(secret.Data).Should(HaveKeyWithValue("username", "root"))
+			// g.Expect(secret.Data).Should(HaveKeyWithValue("password", ""))
+		})).Should(Succeed())
+
+		By("check admin conn credential")
+		adminSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateComponentConnCredential(clusterObj.Name, compName, "admin"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
+			g.Expect(secret.Data).Should(HaveKeyWithValue("service", serviceName))
+			g.Expect(secret.Data).Should(HaveKeyWithValue("port", servicePort))
+			g.Expect(secret.Data).Should(HaveKeyWithValue("username", "admin"))
+			// g.Expect(secret.Data).Should(HaveKeyWithValue("password", ""))
+		})).Should(Succeed())
 	}
 
 	testCompRole := func(compName, compDefName string) {

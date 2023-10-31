@@ -39,11 +39,11 @@ type BatchConfig struct {
 type SystemDataSource struct {
 	// metricsExporterRef is the exporter to export system metrics
 	// +optional
-	MetricsExporterRef string `json:"metricsExporterRef,omitempty"`
+	MetricsExporterRef []string `json:"metricsExporterRef,omitempty"`
 
 	// logsExporterRef is the exporter to export system logs
 	// +optional
-	LogsExporterRef string `json:"logsExporterRef,omitempty"`
+	LogsExporterRef []string `json:"logsExporterRef,omitempty"`
 
 	// enabledNodeMetrics indicates whether to collect node metrics
 	// +optional

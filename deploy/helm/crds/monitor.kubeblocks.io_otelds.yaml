@@ -158,11 +158,15 @@ spec:
                   logsExporterRef:
                     description: logsExporterRef is the exporter to export system
                       logs
-                    type: string
+                    items:
+                      type: string
+                    type: array
                   metricsExporterRef:
                     description: metricsExporterRef is the exporter to export system
                       metrics
-                    type: string
+                    items:
+                      type: string
+                    type: array
                 type: object
               useConfigMap:
                 description: useConfigMap indicates whether to use configmap to store

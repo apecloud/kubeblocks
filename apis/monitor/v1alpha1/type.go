@@ -33,11 +33,12 @@ const (
 
 // MetricsSinkType defines the type for LogsExporterSink
 // +enum
-// +kubebuilder:validation:Enum={prometheus}
+// +kubebuilder:validation:Enum={prometheus, prometheusremotewrite}
 type MetricsSinkType string
 
 const (
-	PrometheusSinkType MetricsSinkType = "prometheus"
+	PrometheusSinkType            MetricsSinkType = "prometheus"
+	PrometheusRemoteWriteSinkType MetricsSinkType = "prometheusremotewrite"
 )
 
 type RetryPolicyOnFailure struct {

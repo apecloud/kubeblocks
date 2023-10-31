@@ -220,6 +220,19 @@ func (cg *OteldConfigGenerater) appendExporter(cfg yaml.MapSlice, metricsExporte
 			}
 
 			exporterSlice = append(exporterSlice, metricsExporter...)
+		case v1alpha1.PrometheusRemoteWriteSinkType:
+			exporterConfig := exporter.Spec.MetricsSinkSource.PrometheusRemoteWriteConfig
+			valueMap := map[string]any{"name": exporter.Name}
+			if exporterConfig.Endpoint != "" {
+				valueMap["endpoint"] = exporterConfig.Endpoint
+			}
+			tplName := fmt.Sprintf(ExporterTplPattern, v1alpha1.PrometheusRemoteWriteSinkType)
+			metricsExporter, err := buildSliceFromCUE(tplName, valueMap)
+			if err != nil {
+				return nil, err
+			}
+
+			exporterSlice = append(exporterSlice, metricsExporter...)
 		default:
 			continue
 		}

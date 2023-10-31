@@ -31,10 +31,18 @@ type PrometheusConfig struct {
 	Namespace string `json:"namespace"`
 }
 
+type PrometheusRemoteWriteConfig struct {
+	ServiceRef `json:",inline"`
+}
+
 type MetricsSinkSource struct {
-	// lokiConfig defines the config of the loki
+	// prometheusConfig defines the config of the loki
 	// +optional
 	PrometheusConfig *PrometheusConfig `json:"prometheusConfig,omitempty"`
+
+	// PrometheusRemotewriteConfig defines the config of the prometheus remote write
+	// +optional
+	PrometheusRemoteWriteConfig *PrometheusRemoteWriteConfig `json:"prometheusRemoteWriteConfig,omitempty"`
 }
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!

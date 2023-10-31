@@ -26,3 +26,13 @@ spec:
         - name: redis-sentinel
           image: {{ include "redis.image" . }}
           imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+  - componentDefRef: redis-proxy
+    versionsContext:
+      initContainers:
+        - name: init-redis-proxy
+          image: {{ include "busybox.image" . }}
+          imagePullPolicy: {{ default .Values.busyboxImage.pullPolicy "IfNotPresent" }}
+      containers:
+        - name: redis-proxy
+          image: {{ include "redis-proxy.image" . }}
+          imagePullPolicy: {{ default .Values.redisTwemproxyImage.pullPolicy "IfNotPresent" }}

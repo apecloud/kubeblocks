@@ -218,11 +218,11 @@ spec:
               - name: ALLOW_NONE_AUTHENTICATION
                 value: "yes"
               - name: ETCD_ADVERTISE_CLIENT_URLS
-                value: http://$(MY_POD_NAME).$(KB_CLUSTER_NAME)-etcd-headless.default.svc.cluster.local:2379
+                value: http://$(MY_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc.cluster.local:2379
               - name: ETCD_LISTEN_CLIENT_URLS
                 value: http://0.0.0.0:2379
               - name: ETCD_INITIAL_ADVERTISE_PEER_URLS
-                value: http://$(MY_POD_NAME).$(KB_CLUSTER_NAME)-etcd-headless.default.svc.cluster.local:2380
+                value: http://$(MY_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc.cluster.local:2380
               - name: ETCD_LISTEN_PEER_URLS
                 value: http://0.0.0.0:2380
               - name: ETCD_AUTO_COMPACTION_MODE

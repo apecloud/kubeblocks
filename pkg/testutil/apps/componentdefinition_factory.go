@@ -109,7 +109,7 @@ func (f *MockComponentDefinitionFactory) AddVolume(name string, snapshot bool, w
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) AddService(name, serviceName string, port int32, roleSelector []string) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) AddService(name, serviceName string, port int32, roleSelector string) *MockComponentDefinitionFactory {
 	serviceSpec := corev1.ServiceSpec{
 		Ports: []corev1.ServicePort{{
 			Port: port,
@@ -118,7 +118,7 @@ func (f *MockComponentDefinitionFactory) AddService(name, serviceName string, po
 	return f.AddServiceExt(name, serviceName, roleSelector, serviceSpec)
 }
 
-func (f *MockComponentDefinitionFactory) AddServiceExt(name, serviceName string, roleSelector []string, serviceSpec corev1.ServiceSpec) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) AddServiceExt(name, serviceName string, roleSelector string, serviceSpec corev1.ServiceSpec) *MockComponentDefinitionFactory {
 	svc := appsv1alpha1.ComponentService{
 		Name:         name,
 		ServiceName:  appsv1alpha1.BuiltInString(serviceName),

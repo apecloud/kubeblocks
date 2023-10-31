@@ -46,7 +46,10 @@ func GenerateComponentConnCredential(clusterName, compName, name string) string 
 
 // GenerateComponentServiceEndpoint generates service endpoint of component
 func GenerateComponentServiceEndpoint(clusterName, compName, svcName string) string {
-	return fmt.Sprintf("%s-%s-%s", clusterName, compName, svcName)
+	if len(svcName) > 0 {
+		return fmt.Sprintf("%s-%s-%s", clusterName, compName, svcName)
+	}
+	return fmt.Sprintf("%s-%s", clusterName, compName)
 }
 
 // GenerateDefaultComponentServiceEndpoint generates default service endpoint of component

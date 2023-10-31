@@ -11594,9 +11594,7 @@ spec:
                       description: RoleSelector extends the ServiceSpec.Selector by
                         allowing you to specify defined roles as selectors for the
                         service. Cannot be updated.
-                      items:
-                        type: string
-                      type: array
+                      type: string
                     selector:
                       additionalProperties:
                         type: string

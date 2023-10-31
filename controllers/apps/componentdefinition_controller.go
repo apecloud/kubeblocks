@@ -221,10 +221,8 @@ func (r *ComponentDefinitionReconciler) validateServices(cli client.Client, rctx
 		roleNames[strings.ToLower(role.Name)] = true
 	}
 	for _, svc := range cmpd.Spec.Services {
-		for _, roleName := range svc.RoleSelector {
-			if !roleNames[strings.ToLower(roleName)] {
-				return fmt.Errorf("the role that service selector used is not defined: %s", roleName)
-			}
+		if !roleNames[strings.ToLower(svc.RoleSelector)] {
+			return fmt.Errorf("the role that service selector used is not defined: %s", svc.RoleSelector)
 		}
 	}
 	return nil

@@ -228,13 +228,13 @@ func (c *compDefServicesConvertor) convert(args ...any) (any, error) {
 			Name:         "default",
 			ServiceName:  appsv1alpha1.BuiltInString(svc.Name),
 			ServiceSpec:  svc.Spec,
-			RoleSelector: []string{}, // TODO(component): service selector
+			RoleSelector: "", // TODO(component): service selector
 		},
 		{
 			Name:         "default-headless",
 			ServiceName:  appsv1alpha1.BuiltInString(headlessSvc.Name),
 			ServiceSpec:  headlessSvc.Spec,
-			RoleSelector: []string{}, // TODO(component): service selector
+			RoleSelector: "", // TODO(component): service selector
 		},
 	}
 	return services, nil

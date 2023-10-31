@@ -272,7 +272,7 @@ var (
 						},
 					},
 				},
-				RoleSelector: []string{"leader"},
+				RoleSelector: "leader",
 			},
 			{
 				Name:        "ro",
@@ -289,7 +289,7 @@ var (
 						},
 					},
 				},
-				RoleSelector: []string{"follower"},
+				RoleSelector: "follower",
 			},
 		},
 		SystemAccounts: []appsv1alpha1.ComponentSystemAccount{

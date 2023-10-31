@@ -69,7 +69,6 @@ func (t *componentServiceTransformer) buildService(synthesizeComp *component.Syn
 		compName    = synthesizeComp.Name
 	)
 
-	// TODO: service.ServiceName
 	serviceName := constant.GenerateComponentServiceEndpoint(clusterName, synthesizeComp.Name, string(service.ServiceName))
 	labels := constant.GetComponentWellKnownLabels(clusterName, compName)
 	builder := builder.NewServiceBuilder(namespace, serviceName).
@@ -97,26 +96,23 @@ func (t *componentServiceTransformer) buildService(synthesizeComp *component.Syn
 		}).
 		Optimize4ExternalTraffic()
 
-	// TODO(component): role selector
 	if len(service.RoleSelector) > 0 {
-		if err := t.checkRoles(synthesizeComp, service.Name, service.RoleSelector); err != nil {
+		if err := t.checkRoleSelector(synthesizeComp, service.Name, service.RoleSelector); err != nil {
 			return nil, err
 		}
-		builder.AddSelector(constant.RoleLabelKey, strings.Join(service.RoleSelector, ","))
+		builder.AddSelector(constant.RoleLabelKey, service.RoleSelector)
 	}
 	return builder.GetObject(), nil
 }
 
-func (t *componentServiceTransformer) checkRoles(synthesizeComp *component.SynthesizedComponent,
-	name string, roles []string) error {
+func (t *componentServiceTransformer) checkRoleSelector(synthesizeComp *component.SynthesizedComponent,
+	name string, roleSelector string) error {
 	definedRoles := make(map[string]bool)
 	for _, role := range synthesizeComp.Roles {
 		definedRoles[strings.ToLower(role.Name)] = true
 	}
-	for _, role := range roles {
-		if !definedRoles[strings.ToLower(role)] {
-			return fmt.Errorf("role selector for service is not defined, service: %s, role: %s", name, role)
-		}
+	if !definedRoles[strings.ToLower(roleSelector)] {
+		return fmt.Errorf("role selector for service is not defined, service: %s, role: %s", name, roleSelector)
 	}
 	return nil
 }

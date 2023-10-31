@@ -95,7 +95,7 @@ func (builder *ComponentDefinitionBuilder) AddVolume(name string, snapshot bool,
 	return builder
 }
 
-func (builder *ComponentDefinitionBuilder) AddService(name, serviceName string, port int32, roleSelector []string) *ComponentDefinitionBuilder {
+func (builder *ComponentDefinitionBuilder) AddService(name, serviceName string, port int32, roleSelector string) *ComponentDefinitionBuilder {
 	serviceSpec := corev1.ServiceSpec{
 		Ports: []corev1.ServicePort{{
 			Port: port,
@@ -104,7 +104,7 @@ func (builder *ComponentDefinitionBuilder) AddService(name, serviceName string, 
 	return builder.AddServiceExt(name, serviceName, roleSelector, serviceSpec)
 }
 
-func (builder *ComponentDefinitionBuilder) AddServiceExt(name, serviceName string, roleSelector []string, serviceSpec corev1.ServiceSpec) *ComponentDefinitionBuilder {
+func (builder *ComponentDefinitionBuilder) AddServiceExt(name, serviceName string, roleSelector string, serviceSpec corev1.ServiceSpec) *ComponentDefinitionBuilder {
 	svc := appsv1alpha1.ComponentService{
 		Name:         name,
 		ServiceName:  appsv1alpha1.BuiltInString(serviceName),

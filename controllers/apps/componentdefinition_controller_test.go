@@ -183,8 +183,8 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddService("default", "", 3306, []string{"leader"}).
-				AddService("readonly", "readonly", 3306, []string{"follower"}).
+				AddService("default", "", 3306, "leader").
+				AddService("readonly", "readonly", 3306, "follower").
 				AddRole("leader", true, true).
 				AddRole("follower", true, false).
 				Create(&testCtx).GetObject()
@@ -196,8 +196,8 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddService("default", "", 3306, []string{"leader"}).
-				AddService("default", "readonly", 3306, []string{"follower"}).
+				AddService("default", "", 3306, "leader").
+				AddService("default", "readonly", 3306, "follower").
 				AddRole("leader", true, true).
 				AddRole("follower", true, false).
 				Create(&testCtx).GetObject()
@@ -209,8 +209,8 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddService("default", "default", 3306, []string{"leader"}).
-				AddService("readonly", "default", 3306, []string{"follower"}).
+				AddService("default", "default", 3306, "leader").
+				AddService("readonly", "default", 3306, "follower").
 				AddRole("leader", true, true).
 				AddRole("follower", true, false).
 				Create(&testCtx).GetObject()
@@ -222,8 +222,8 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddService("default", "", 3306, []string{"leader"}).
-				AddService("readonly", "", 3306, []string{"follower"}).
+				AddService("default", "", 3306, "leader").
+				AddService("readonly", "", 3306, "follower").
 				AddRole("leader", true, true).
 				AddRole("follower", true, false).
 				Create(&testCtx).GetObject()
@@ -235,8 +235,8 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddService("default", "", 3306, []string{"leader"}).
-				AddService("readonly", defaultServiceName, 3306, []string{"follower"}).
+				AddService("default", "", 3306, "leader").
+				AddService("readonly", defaultServiceName, 3306, "follower").
 				AddRole("leader", true, true).
 				AddRole("follower", true, false).
 				Create(&testCtx).GetObject()
@@ -248,7 +248,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddServiceExt("default", "", []string{"leader"}, corev1.ServiceSpec{}).
+				AddServiceExt("default", "", "leader", corev1.ServiceSpec{}).
 				AddRole("leader", true, true).
 				AddRole("follower", true, false).
 				Create(&testCtx).GetObject()
@@ -260,9 +260,9 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddService("default", "", 3306, []string{"leader"}).
-				AddService("readonly", "readonly", 3306, []string{"follower"}).
-				AddService("undefined", "undefined", 3306, []string{"undefined"}).
+				AddService("default", "", 3306, "leader").
+				AddService("readonly", "readonly", 3306, "follower").
+				AddService("undefined", "undefined", 3306, "undefined").
 				AddRole("leader", true, true).
 				AddRole("follower", true, false).
 				Create(&testCtx).GetObject()
@@ -323,7 +323,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddService("default", "", 3306, []string{}).
+				AddService("default", "", 3306, "").
 				AddSystemAccount(string(appsv1alpha1.AdminAccount), false, "create user").
 				AddConnectionCredential("default", "default", "", string(appsv1alpha1.AdminAccount)).
 				SetLifecycleAction("AccountProvision", defaultAction).

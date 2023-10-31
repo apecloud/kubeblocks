@@ -265,7 +265,7 @@ type ComponentService struct {
 	// RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined roles as selectors for the service.
 	// Cannot be updated.
 	// +optional
-	RoleSelector []string `json:"roleSelector,omitempty"`
+	RoleSelector string `json:"roleSelector,omitempty"`
 }
 
 type ComponentSystemAccount struct {

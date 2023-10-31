@@ -134,15 +134,13 @@ spec:
         - name: mysql
           port: 3306
           targetPort: mysql
-      roleSelector:
-        - leader
+      roleSelector: leader
     - name: readonly
       ports:
         - name: mysql
           port: 3306
           targetPort: mysql
-      roleSelector:
-        - follower
+      roleSelector: follower
   configs:
     - name: mysql-consensusset-config
       templateRef: mysql8.0-config-template

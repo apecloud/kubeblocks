@@ -29,12 +29,11 @@ type ComponentBuilder struct {
 	BaseBuilder[appsv1alpha1.Component, *appsv1alpha1.Component, ComponentBuilder]
 }
 
-func NewComponentBuilder(namespace, name, cluster, componentDefinition string) *ComponentBuilder {
+func NewComponentBuilder(namespace, name, componentDefinition string) *ComponentBuilder {
 	builder := &ComponentBuilder{}
 	builder.init(namespace, name,
 		&appsv1alpha1.Component{
 			Spec: appsv1alpha1.ComponentSpec{
-				Cluster: cluster,
 				CompDef: componentDefinition,
 			},
 		}, builder)

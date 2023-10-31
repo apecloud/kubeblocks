@@ -23,8 +23,8 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -41,11 +41,8 @@ func (t *componentPDBTransformer) Transform(ctx graph.TransformContext, dag *gra
 		return nil
 	}
 
-	cluster := transCtx.Cluster
-	comp := transCtx.Component
-	synthesizeComp := transCtx.SynthesizeComponent
-
-	obj, err := t.PDBObject(ctx, cluster, comp)
+	synthesizedComp := transCtx.SynthesizeComponent
+	obj, err := t.PDBObject(ctx, synthesizedComp)
 	if err != nil {
 		return err
 	}
@@ -56,8 +53,8 @@ func (t *componentPDBTransformer) Transform(ctx graph.TransformContext, dag *gra
 	// The old MinAvailable field, which value is determined based on the deprecated "workloadType" field, is also no longer applicable in the new API.
 	// TODO(xingran): which should be removed when workloadType and ClusterCompDefName are removed
 	var pdb *policyv1.PodDisruptionBudget
-	if synthesizeComp.MinAvailable != nil {
-		pdb = factory.BuildPDB(cluster, synthesizeComp)
+	if synthesizedComp.MinAvailable != nil {
+		pdb = factory.BuildPDB(synthesizedComp)
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
@@ -77,11 +74,10 @@ func (t *componentPDBTransformer) Transform(ctx graph.TransformContext, dag *gra
 	return nil
 }
 
-func (t *componentPDBTransformer) PDBObject(ctx graph.TransformContext,
-	cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) (*policyv1.PodDisruptionBudget, error) {
+func (t *componentPDBTransformer) PDBObject(ctx graph.TransformContext, synthesizedComp *component.SynthesizedComponent) (*policyv1.PodDisruptionBudget, error) {
 	pdbs := &policyv1.PodDisruptionBudgetList{}
-	inNS := client.InNamespace(cluster.GetNamespace())
-	ml := client.MatchingLabels(constant.GetComponentWellKnownLabels(cluster.Name, comp.Name))
+	inNS := client.InNamespace(synthesizedComp.Namespace)
+	ml := client.MatchingLabels(constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name))
 	if err := ctx.GetClient().List(ctx.GetContext(), pdbs, inNS, ml); err != nil {
 		return nil, err
 	}

@@ -54,7 +54,7 @@ func BuildProtoComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1a
 	if err != nil {
 		return nil, err
 	}
-	builder := builder.NewComponentBuilder(cluster.Namespace, compName, cluster.Name, clusterCompSpec.ComponentDef).
+	builder := builder.NewComponentBuilder(cluster.Namespace, compName, clusterCompSpec.ComponentDef).
 		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, clusterCompSpec.Name)).
 		SetAffinity(affinities).
 		SetTolerations(tolerations).

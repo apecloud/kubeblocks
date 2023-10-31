@@ -35,4 +35,4 @@ spec:
       containers:
         - name: redis-proxy
           image: {{ include "redis-proxy.image" . }}
-          imagePullPolicy: {{ default .Values.redisImage.pullPolicy "IfNotPresent" }}
+          imagePullPolicy: {{ default .Values.redisTwemproxyImage.pullPolicy "IfNotPresent" }}

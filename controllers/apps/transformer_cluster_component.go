@@ -137,7 +137,6 @@ func (t *ClusterComponentTransformer) reconcileComponentsStatus(transCtx *cluste
 			continue
 		}
 		transCtx.Cluster.Status.Components[compName] = status
-		fmt.Printf("status - comp %s status %s\n", compName, status.Phase)
 	}
 	return nil
 }
@@ -150,7 +149,6 @@ func (t *ClusterComponentTransformer) initClusterCompStatus(cluster *appsv1alpha
 	status[compName] = appsv1alpha1.ClusterComponentStatus{
 		Phase: appsv1alpha1.CreatingClusterCompPhase,
 	}
-	fmt.Printf("init - comp %s status %s\n", compName, appsv1alpha1.CreatingClusterCompPhase)
 	cluster.Status.Components = status
 }
 

@@ -61,15 +61,17 @@ var _ = Describe("init transformer test.", func() {
 	})
 
 	Context("paused test", func() {
-		rsm.Spec.Paused = true
-		Expect(transformer.Transform(transCtx, dag)).Should(Equal(graph.ErrPrematureStop))
-		dagExpected := graph.NewDAG()
-		root := &model.ObjectVertex{
-			Obj:    rsm,
-			OriObj: rsm.DeepCopy(),
-			Action: model.ActionNoopPtr(),
-		}
-		dagExpected.AddVertex(root)
-		Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
+		It("should work well", func() {
+			rsm.Spec.Paused = true
+			Expect(transformer.Transform(transCtx, dag)).Should(Equal(graph.ErrPrematureStop))
+			dagExpected := graph.NewDAG()
+			root := &model.ObjectVertex{
+				Obj:    rsm,
+				OriObj: rsm.DeepCopy(),
+				Action: model.ActionNoopPtr(),
+			}
+			dagExpected.AddVertex(root)
+			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
+		})
 	})
 })

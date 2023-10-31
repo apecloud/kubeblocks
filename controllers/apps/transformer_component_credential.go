@@ -44,13 +44,13 @@ type componentCredentialTransformer struct{}
 var _ graph.Transformer = &componentCredentialTransformer{}
 
 func (t *componentCredentialTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	cctx, _ := ctx.(*componentTransformContext)
-	if model.IsObjectDeleting(cctx.ComponentOrig) {
+	transCtx, _ := ctx.(*componentTransformContext)
+	if model.IsObjectDeleting(transCtx.ComponentOrig) {
 		return nil
 	}
 
-	synthesizeComp := cctx.SynthesizeComponent
-	graphCli, _ := cctx.Client.(model.GraphClient)
+	synthesizeComp := transCtx.SynthesizeComponent
+	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for _, credential := range synthesizeComp.ConnectionCredentials {
 		secret, err := t.buildConnCredential(ctx, synthesizeComp, credential)
 		if err != nil {
@@ -111,21 +111,20 @@ func (t *componentCredentialTransformer) buildFromServiceAndAccount(ctx graph.Tr
 		}
 	}
 	if len(credential.AccountName) > 0 {
-		var compSystemAccount *appsv1alpha1.ComponentSystemAccount
-		for index, sysAccount := range synthesizeComp.SystemAccounts {
-			if sysAccount.Name != credential.AccountName {
-				continue
+		var systemAccount *appsv1alpha1.ComponentSystemAccount
+		for i, account := range synthesizeComp.SystemAccounts {
+			if account.Name == credential.AccountName {
+				systemAccount = &synthesizeComp.SystemAccounts[i]
+				break
 			}
-			compSystemAccount = &synthesizeComp.SystemAccounts[index]
 		}
-		if compSystemAccount == nil {
+		if systemAccount == nil {
 			return errors.New("connection credential references a system account not defined")
 		}
-		if err := t.buildCredential(ctx, compSystemAccount, synthesizeComp.Namespace, credential.AccountName, &data); err != nil {
+		if err := t.buildCredential(ctx, synthesizeComp, systemAccount, &data); err != nil {
 			return err
 		}
 	}
-	// TODO(component): define the format of conn-credential secret
 	secret.StringData = data
 	return nil
 }
@@ -158,7 +157,6 @@ func (t *componentCredentialTransformer) buildEndpoint(synthesizeComp *component
 
 func (t *componentCredentialTransformer) buildEndpointFromService(synthesizeComp *component.SynthesizedComponent,
 	credential appsv1alpha1.ConnectionCredential, service *appsv1alpha1.ComponentService, data *map[string]string) {
-	// TODO(component): service.ServiceName
 	serviceName := constant.GenerateComponentServiceEndpoint(synthesizeComp.ClusterName, synthesizeComp.Name, string(service.ServiceName))
 
 	port := int32(0)
@@ -174,38 +172,46 @@ func (t *componentCredentialTransformer) buildEndpointFromService(synthesizeComp
 	}
 
 	// TODO(component): define the service and port pattern
-	(*data)["service"] = serviceName
+	(*data)["endpoint"] = fmt.Sprintf("%s:%d", serviceName, port)
+	(*data)["host"] = serviceName
 	(*data)["port"] = fmt.Sprintf("%d", port)
 }
 
 func (t *componentCredentialTransformer) buildCredential(ctx graph.TransformContext,
-	compSysAccount *appsv1alpha1.ComponentSystemAccount,
-	namespace, accountName string, data *map[string]string) error {
-	key := types.NamespacedName{
-		Namespace: namespace,
-		Name:      accountName, // TODO(component): secret name
+	synthesizedComp *component.SynthesizedComponent, account *appsv1alpha1.ComponentSystemAccount, data *map[string]string) error {
+	secretKey := types.NamespacedName{
+		Namespace: synthesizedComp.Namespace,
+		Name:      constant.GenerateAccountSecretName(synthesizedComp.ClusterName, synthesizedComp.Name, account.Name),
 	}
 	secret := &corev1.Secret{}
-	if err := ctx.GetClient().Get(ctx.GetContext(), key, secret); err != nil {
-		// TODO(xingran): if account is system init account, create secret, it may be moved to SystemAccount Controller.
-		if apierrors.IsNotFound(err) && compSysAccount.IsSystemInitAccount {
-			// TODO(component): define the username and password pattern
-			passwd, err := password.Generate(int(compSysAccount.PasswordGenerationPolicy.Length),
-				int(compSysAccount.PasswordGenerationPolicy.NumDigits), int(compSysAccount.PasswordGenerationPolicy.NumSymbols), false, false)
-			if err != nil {
-				return err
-			}
-			secret.StringData = make(map[string]string)
-			secret.StringData["username"] = accountName
-			secret.StringData["password"] = passwd
-			maps.Copy(*data, secret.StringData)
-			return nil
+	if err := ctx.GetClient().Get(ctx.GetContext(), secretKey, secret); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
 		}
-		return err
+		if secret, err = t.getAccountSecretFromLocalCache(account); err != nil {
+			return err
+		}
 	}
 	// TODO(component): which field should to use from accounts?
 	maps.Copy(*data, secret.StringData)
 	return nil
+}
+
+func (t *componentCredentialTransformer) getAccountSecretFromLocalCache(account *appsv1alpha1.ComponentSystemAccount) (*corev1.Secret, error) {
+	// TODO(xingran): if account is system init account, create secret, it may be moved to SystemAccount Controller.
+	// TODO(component): generates all account secret at component controller.
+	passwd, err := password.Generate(int(account.PasswordGenerationPolicy.Length),
+		int(account.PasswordGenerationPolicy.NumDigits), int(account.PasswordGenerationPolicy.NumSymbols), false, false)
+	if err != nil {
+		return nil, err
+	}
+	secret := &corev1.Secret{
+		StringData: map[string]string{
+			constant.AccountNameForSecret:   account.Name,
+			constant.AccountPasswdForSecret: passwd,
+		},
+	}
+	return secret, nil
 }
 
 func (t *componentCredentialTransformer) createOrUpdate(ctx graph.TransformContext,

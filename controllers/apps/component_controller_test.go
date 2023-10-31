@@ -1129,10 +1129,11 @@ var _ = Describe("Component Controller", func() {
 			Name:      constant.GenerateComponentConnCredential(clusterObj.Name, compName, "root"),
 		}
 		Eventually(testapps.CheckObj(&testCtx, rootSecretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKeyWithValue("service", serviceName))
+			g.Expect(secret.Data).Should(HaveKeyWithValue("endpoint", fmt.Sprintf("%s:%s", serviceName, servicePort)))
+			g.Expect(secret.Data).Should(HaveKeyWithValue("host", serviceName))
 			g.Expect(secret.Data).Should(HaveKeyWithValue("port", servicePort))
-			g.Expect(secret.Data).Should(HaveKeyWithValue("username", "root"))
-			// g.Expect(secret.Data).Should(HaveKeyWithValue("password", ""))
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, "root"))
+			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
 		})).Should(Succeed())
 
 		By("check admin conn credential")
@@ -1141,10 +1142,11 @@ var _ = Describe("Component Controller", func() {
 			Name:      constant.GenerateComponentConnCredential(clusterObj.Name, compName, "admin"),
 		}
 		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKeyWithValue("service", serviceName))
+			g.Expect(secret.Data).Should(HaveKeyWithValue("endpoint", fmt.Sprintf("%s:%s", serviceName, servicePort)))
+			g.Expect(secret.Data).Should(HaveKeyWithValue("host", serviceName))
 			g.Expect(secret.Data).Should(HaveKeyWithValue("port", servicePort))
-			g.Expect(secret.Data).Should(HaveKeyWithValue("username", "admin"))
-			// g.Expect(secret.Data).Should(HaveKeyWithValue("password", ""))
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, "admin"))
+			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
 		})).Should(Succeed())
 	}
 

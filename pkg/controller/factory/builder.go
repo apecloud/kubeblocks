@@ -551,7 +551,7 @@ func BuildConnCredential4Cluster(cluster *appsv1alpha1.Cluster, name string) *co
 
 func BuildConnCredential4Component(comp *component.SynthesizedComponent, name string) *corev1.Secret {
 	secretName := constant.GenerateComponentConnCredential(comp.ClusterName, comp.Name, name)
-	labels := constant.GetKBWellKnownLabels(comp.ClusterDefName, comp.ClusterName, comp.Name)
+	labels := constant.GetComponentWellKnownLabels(comp.ClusterName, comp.Name)
 	return builder.NewSecretBuilder(comp.Namespace, secretName).AddLabelsInMap(labels).GetObject()
 }
 

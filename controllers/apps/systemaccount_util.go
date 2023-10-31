@@ -191,7 +191,7 @@ func renderSecret(key componentUniqueKey, username string, labels client.Matchin
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:  key.namespace,
-			Name:       strings.Join([]string{key.clusterName, key.componentName, username}, "-"),
+			Name:       constant.GenerateAccountSecretName(key.clusterName, key.componentName, username),
 			Labels:     labels,
 			Finalizers: []string{constant.DBClusterFinalizerName},
 		},

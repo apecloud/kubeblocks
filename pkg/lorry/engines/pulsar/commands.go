@@ -25,11 +25,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 )
 
 type Commands struct {
 	info     engines.EngineInfo
-	examples map[engines.ClientType]engines.BuildConnectExample
+	examples map[models.ClientType]engines.BuildConnectExample
 }
 
 var _ engines.ClusterCommands = &Commands{}
@@ -48,8 +49,8 @@ func NewCommands(containName string) engines.ClusterCommands {
 			Client:    "pulsar-shell",
 			Container: containName,
 		},
-		examples: map[engines.ClientType]engines.BuildConnectExample{
-			engines.CLI: func(info *engines.ConnectionInfo) string {
+		examples: map[models.ClientType]engines.BuildConnectExample{
+			models.CLI: func(info *engines.ConnectionInfo) string {
 				return "# pulsar client connection example\n bin/pulsar-shell"
 			},
 		},

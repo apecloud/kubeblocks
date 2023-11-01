@@ -89,6 +89,9 @@ func main() {
 
 	// Start HA
 	characterType := viper.GetString(constant.KBEnvCharacterType)
+	if viper.IsSet(constant.KBEnvBuiltinHandler) {
+		characterType = viper.GetString(constant.KBEnvBuiltinHandler)
+	}
 	workloadType := viper.GetString(constant.KBEnvWorkloadType)
 	if util.IsHAAvailable(characterType, workloadType) {
 		ha := highavailability.NewHa()

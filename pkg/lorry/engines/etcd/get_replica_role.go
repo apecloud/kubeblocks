@@ -23,7 +23,7 @@ import (
 	"context"
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 )
 
 func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (string, error) {
@@ -32,12 +32,12 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (s
 		return "", err
 	}
 
-	role := engines.FOLLOWER
+	role := models.FOLLOWER
 	switch {
 	case etcdResp.Leader == etcdResp.Header.MemberId:
-		role = engines.LEADER
+		role = models.LEADER
 	case etcdResp.IsLearner:
-		role = engines.LEARNER
+		role = models.LEARNER
 	}
 
 	return role, nil

@@ -37,6 +37,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/postgres"
 )
 
@@ -171,7 +172,7 @@ func (mgr *Manager) IsLeaderWithHost(ctx context.Context, host string) (bool, er
 	}
 
 	mgr.Logger.Info(fmt.Sprintf("get member:%s role:%s", host, role))
-	return role == engines.PRIMARY, nil
+	return role == models.PRIMARY, nil
 }
 
 func (mgr *Manager) IsDBStartupReady() bool {
@@ -206,9 +207,9 @@ func (mgr *Manager) GetMemberRoleWithHost(ctx context.Context, host string) (str
 	}
 
 	if cast.ToBool(result[0]["pg_is_in_recovery"]) {
-		return engines.SECONDARY, nil
+		return models.SECONDARY, nil
 	} else {
-		return engines.PRIMARY, nil
+		return models.PRIMARY, nil
 	}
 }
 

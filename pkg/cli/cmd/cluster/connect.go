@@ -42,6 +42,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/cli/util/flags"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 )
 
@@ -124,7 +125,7 @@ func NewConnectCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra
 
 	util.CheckErr(cmd.RegisterFlagCompletionFunc("client", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var types []string
-		for _, t := range engines.ClientTypes() {
+		for _, t := range models.ClientTypes() {
 			if strings.HasPrefix(t, toComplete) {
 				types = append(types, t)
 			}

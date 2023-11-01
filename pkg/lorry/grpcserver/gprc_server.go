@@ -35,14 +35,11 @@ import (
 	"google.golang.org/grpc/status"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type GRPCServer struct {
-	character          string
 	logger             logr.Logger
 	checkRoleOperation operations.Operation
 }
@@ -60,7 +57,6 @@ func init() {
 }
 
 func (s *GRPCServer) Check(ctx context.Context, in *health.HealthCheckRequest) (*health.HealthCheckResponse, error) {
-	s.logger.Info("role probe request", "type", s.character)
 	resp, err := s.checkRoleOperation.Do(ctx, nil)
 
 	var status = health.HealthCheckResponse_SERVING
@@ -112,9 +108,7 @@ func NewGRPCServer() (*GRPCServer, error) {
 		return nil, err
 	}
 
-	characterType := viper.GetString(constant.KBEnvCharacterType)
 	return &GRPCServer{
-		character:          characterType,
 		logger:             ctrl.Log.WithName("grpc"),
 		checkRoleOperation: checkRoleOperation,
 	}, nil

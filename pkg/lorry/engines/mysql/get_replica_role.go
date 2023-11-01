@@ -25,7 +25,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 )
 
 func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (string, error) {
@@ -38,10 +38,10 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (s
 	}
 
 	if cluster.Leader.Name != mgr.CurrentMemberName {
-		return engines.SECONDARY, nil
+		return models.SECONDARY, nil
 	}
 
-	return engines.PRIMARY, nil
+	return models.PRIMARY, nil
 	// slaveRunning, err := mgr.isSlaveRunning(ctx)
 	// if err != nil {
 	// 	return "", err

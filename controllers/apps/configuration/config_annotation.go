@@ -159,9 +159,9 @@ func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config 
 	GcConfigRevision(config)
 	if revision, ok := config.ObjectMeta.Annotations[constant.ConfigurationRevision]; ok && revision != "" {
 		if result == nil {
-			result.Revision = revision
 			result = util.ToPointer(unReconciled(appsv1alpha1.CFinishedPhase, "", fmt.Sprintf("phase: %s", reconfigurePhase)))
 		}
+		result.Revision = revision
 		b, _ := json.Marshal(result)
 		config.ObjectMeta.Annotations[core.GenerateRevisionPhaseKey(revision)] = string(b)
 	}

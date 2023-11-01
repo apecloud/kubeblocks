@@ -36,17 +36,17 @@ import (
 )
 
 type Result struct {
-	Phase      v1alpha1.ConfigurationPhase
-	Revision   string
-	Policy     string
-	ExecResult string
+	Phase      v1alpha1.ConfigurationPhase `json:"phase"`
+	Revision   string                      `json:"revision"`
+	Policy     string                      `json:"policy"`
+	ExecResult string                      `json:"execResult"`
 
-	SucceedCount  int32
-	ExpectedCount int32
+	SucceedCount  int32 `json:"succeedCount"`
+	ExpectedCount int32 `json:"expectedCount"`
 
-	Retry   bool
-	Failed  bool
-	Message string
+	Retry   bool   `json:"retry"`
+	Failed  bool   `json:"failed"`
+	Message string `json:"message"`
 }
 
 // MergeAndValidateConfigs merges and validates configuration files

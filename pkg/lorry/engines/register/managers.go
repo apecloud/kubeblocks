@@ -49,7 +49,7 @@ type managerNewFunc func(engines.Properties) (engines.DBManager, error)
 
 var managerNewFuncs = make(map[string]managerNewFunc)
 
-// DBPilot runs with a single database engine instance at a time,
+// Lorry runs with a single database engine instance at a time,
 // so only one dbmanager is initialized and cached here during execution.
 var dbManager engines.DBManager
 
@@ -67,6 +67,17 @@ func init() {
 	RegisterEngine("pulsar-proxy", "", nil, pulsar.NewProxyCommands)
 	RegisterEngine("pulsar-broker", "", nil, pulsar.NewBrokerCommands)
 	RegisterEngine("oceanbase", "", nil, oceanbase.NewCommands)
+
+	// support component definition without workloadtype
+	RegisterEngine("wesql", "", wesql.NewManager, mysql.NewCommands)
+	RegisterEngine("mysql", "", mysql.NewManager, mysql.NewCommands)
+	RegisterEngine("redis", "", redis.NewManager, redis.NewCommands)
+	RegisterEngine("etcd", "", etcd.NewManager, nil)
+	RegisterEngine("mongodb", "", mongodb.NewManager, mongodb.NewCommands)
+	RegisterEngine("polardbx", "", polardbx.NewManager, mysql.NewCommands)
+	RegisterEngine("postgresql", "", officalpostgres.NewManager, postgres.NewCommands)
+	RegisterEngine("offical-postgresql", "", officalpostgres.NewManager, postgres.NewCommands)
+	RegisterEngine("apecloud-postgresql", "", apecloudpostgres.NewManager, postgres.NewCommands)
 }
 
 func RegisterEngine(characterType, workloadType string, newFunc managerNewFunc, newCommand engines.NewCommandFunc) {
@@ -114,7 +125,7 @@ func InitDBManager(configDir string) error {
 
 	workloadType := viper.GetString(constant.KBEnvWorkloadType)
 	if workloadType == "" {
-		return fmt.Errorf("%s not set", constant.KBEnvWorkloadType)
+		ctrl.Log.Info(constant.KBEnvWorkloadType + " ENV not set")
 	}
 
 	err := GetAllComponent(configDir) // find all builtin config file and read

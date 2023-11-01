@@ -529,7 +529,7 @@ func (u *upgradeHandlerTo7) transformQdrantCluster(dynamic dynamic.Interface, ob
 	specMap["clusterVersionRef"] = "qdrant-1.5.0"
 	patchBytes, _ := json.Marshal(map[string]interface{}{"spec": specMap})
 	if _, err := dynamic.Resource(types.ClusterGVR()).Namespace(obj.GetNamespace()).Patch(context.TODO(), obj.GetName(), apitypes.MergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
-		return fmt.Errorf("update pulsar configmap %s failed: %s", obj.GetName(), err.Error())
+		return fmt.Errorf("update qdrant cluster %s failed: %s", obj.GetName(), err.Error())
 	}
 
 	return nil

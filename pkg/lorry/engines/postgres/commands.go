@@ -27,13 +27,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 )
 
 var _ engines.ClusterCommands = &Commands{}
 
 type Commands struct {
 	info     engines.EngineInfo
-	examples map[engines.ClientType]engines.BuildConnectExample
+	examples map[models.ClientType]engines.BuildConnectExample
 }
 
 func NewCommands() engines.ClusterCommands {
@@ -45,14 +46,14 @@ func NewCommands() engines.ClusterCommands {
 			UserEnv:     "$PGUSER",
 			Database:    "postgres",
 		},
-		examples: map[engines.ClientType]engines.BuildConnectExample{
-			engines.CLI: func(info *engines.ConnectionInfo) string {
+		examples: map[models.ClientType]engines.BuildConnectExample{
+			models.CLI: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# psql client connection example
 psql -h%s -p %s -U %s %s
 `, info.Host, info.Port, info.User, info.Database)
 			},
 
-			engines.DJANGO: func(info *engines.ConnectionInfo) string {
+			models.DJANGO: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# .env
 DB_HOST=%s
 DB_NAME=%s
@@ -74,14 +75,14 @@ DATABASES = {
 `, info.Host, info.Database, info.User, info.Password, info.Port)
 			},
 
-			engines.DOTNET: func(info *engines.ConnectionInfo) string {
+			models.DOTNET: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# Startup.cs
 var connectionString = "Host=%s;Port=%s;Username=%s;Password=%s;Database=%s";
 await using var dataSource = NpgsqlDataSource.Create(connectionString);
 `, info.Host, info.Port, info.User, info.Password, info.Database)
 			},
 
-			engines.GO: func(info *engines.ConnectionInfo) string {
+			models.GO: func(info *engines.ConnectionInfo) string {
 				const goConnectExample = `# main.go
 package main
 
@@ -113,14 +114,14 @@ DSN=%s:%s@tcp(%s:%s)/%s
 				return fmt.Sprintf("%s\n%s", dsn, goConnectExample)
 			},
 
-			engines.JAVA: func(info *engines.ConnectionInfo) string {
+			models.JAVA: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`Class.forName("org.postgresql.Driver");
 Connection conn = DriverManager.getConnection(
   "jdbc:postgresql://%s:%s/%s?user=%s&password=%s");
 `, info.Host, info.Port, info.Database, info.User, info.Password)
 			},
 
-			engines.NODEJS: func(info *engines.ConnectionInfo) string {
+			models.NODEJS: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# .env
 DATABASE_URL='postgres://%s:%s@%s:%s/%s'
 
@@ -132,7 +133,7 @@ connection.end();
 `, info.User, info.Password, info.Host, info.Port, info.Database)
 			},
 
-			engines.PHP: func(info *engines.ConnectionInfo) string {
+			models.PHP: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# .env
 HOST=%s
 PORT=%s
@@ -148,7 +149,7 @@ DATABASE=%s
 `, info.Host, info.Port, info.User, info.Password, info.Database)
 			},
 
-			engines.PRISMA: func(info *engines.ConnectionInfo) string {
+			models.PRISMA: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# .env
 DATABASE_URL='postgres://%s:%s@%s:%s/%s'
 
@@ -165,7 +166,7 @@ datasource db {
 `, info.User, info.Password, info.Host, info.Port, info.Database)
 			},
 
-			engines.PYTHON: func(info *engines.ConnectionInfo) string {
+			models.PYTHON: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# run the following command in the terminal to install dependencies
 pip install python-dotenv psycopg2
 
@@ -192,7 +193,7 @@ connection = psycopg2.connect(
 `, info.Host, info.Port, info.User, info.Password, info.Database)
 			},
 
-			engines.RAILS: func(info *engines.ConnectionInfo) string {
+			models.RAILS: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# Gemfile
 gem 'pg'
 
@@ -207,7 +208,7 @@ development:
 `, info.Database, info.User, info.Host, info.Password)
 			},
 
-			engines.RUST: func(info *engines.ConnectionInfo) string {
+			models.RUST: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# run the following command in the terminal
 export DATABASE_URL="postgresql://%s:%s@%s:%s/%s"
 
@@ -227,7 +228,7 @@ version = "0.0.1"
 `, info.User, info.Password, info.Host, info.Port, info.Database)
 			},
 
-			engines.SYMFONY: func(info *engines.ConnectionInfo) string {
+			models.SYMFONY: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# .env
 DATABASE_URL='postgresql://%s:%s@%s:%s/%s'
 `, info.User, info.Password, info.Host, info.Port, info.Database)

@@ -30,6 +30,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/postgres"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -239,7 +240,7 @@ func TestGetMemberRoleWithHost(t *testing.T) {
 	ctx := context.TODO()
 	manager, mock, _ := MockDatabase(t)
 	defer mock.Close()
-	roles := []string{engines.FOLLOWER, engines.CANDIDATE, engines.LEADER, engines.LEARNER, ""}
+	roles := []string{models.FOLLOWER, models.CANDIDATE, models.LEADER, models.LEARNER, ""}
 
 	t.Run("query paxos role failed", func(t *testing.T) {
 		mock.ExpectQuery("select paxos_role from consensus_member_status;").

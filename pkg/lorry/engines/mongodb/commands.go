@@ -26,13 +26,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 )
 
 var _ engines.ClusterCommands = &Commands{}
 
 type Commands struct {
 	info     engines.EngineInfo
-	examples map[engines.ClientType]engines.BuildConnectExample
+	examples map[models.ClientType]engines.BuildConnectExample
 }
 
 func NewCommands() engines.ClusterCommands {
@@ -44,8 +45,8 @@ func NewCommands() engines.ClusterCommands {
 			PasswordEnv: "$MONGODB_ROOT_PASSWORD",
 			Database:    "admin",
 		},
-		examples: map[engines.ClientType]engines.BuildConnectExample{
-			engines.CLI: func(info *engines.ConnectionInfo) string {
+		examples: map[models.ClientType]engines.BuildConnectExample{
+			models.CLI: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# mongodb client connection example
 mongosh mongodb://%s:%s@%s/%s
 `, info.User, info.Password, info.Host, info.Database)

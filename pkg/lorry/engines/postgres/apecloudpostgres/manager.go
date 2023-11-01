@@ -31,6 +31,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/postgres"
 )
 
@@ -103,7 +104,7 @@ func (mgr *Manager) IsLeaderWithHost(ctx context.Context, host string) (bool, er
 		return false, errors.Errorf("check is leader with host:%s failed, err:%v", host, err)
 	}
 
-	return role == engines.LEADER, nil
+	return role == models.LEADER, nil
 }
 
 func (mgr *Manager) IsDBStartupReady() bool {
@@ -196,13 +197,13 @@ func (mgr *Manager) GetMemberRoleWithHost(ctx context.Context, host string) (str
 	var role string
 	switch cast.ToInt(resMap[0]["paxos_role"]) {
 	case 0:
-		role = engines.FOLLOWER
+		role = models.FOLLOWER
 	case 1:
-		role = engines.CANDIDATE
+		role = models.CANDIDATE
 	case 2:
-		role = engines.LEADER
+		role = models.LEADER
 	case 3:
-		role = engines.LEARNER
+		role = models.LEARNER
 	default:
 		mgr.Logger.Info(fmt.Sprintf("get invalid role number:%d", cast.ToInt(resMap[0]["paxos_role"])))
 		role = ""

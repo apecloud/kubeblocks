@@ -26,13 +26,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 )
 
 var _ engines.ClusterCommands = &Commands{}
 
 type Commands struct {
 	info     engines.EngineInfo
-	examples map[engines.ClientType]engines.BuildConnectExample
+	examples map[models.ClientType]engines.BuildConnectExample
 }
 
 func NewCommands() engines.ClusterCommands {
@@ -41,8 +42,8 @@ func NewCommands() engines.ClusterCommands {
 			Client:    "redis-cli",
 			Container: "redis",
 		},
-		examples: map[engines.ClientType]engines.BuildConnectExample{
-			engines.CLI: func(info *engines.ConnectionInfo) string {
+		examples: map[models.ClientType]engines.BuildConnectExample{
+			models.CLI: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# redis client connection example
 redis-cli -h %s -p %s
 `, info.Host, info.Port)

@@ -17,27 +17,21 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package engines
+package models
 
-import (
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+type EngineType string
+
+const (
+	MySQL              EngineType = "mysql"
+	WeSQL              EngineType = "wesql"
+	PostgreSQL         EngineType = "postgresql"
+	OfficalPostgreSQL  EngineType = "offical-postgresql"
+	ApecloudPostgreSQL EngineType = "apecloud-postgresql"
+	Redis              EngineType = "redis"
+	MongoDB            EngineType = "mongodb"
+	Nebula             EngineType = "nebula"
+	PulsarBroker       EngineType = "pulsar-broker"
+	PulsarProxy        EngineType = "pulsar-proxy"
+	FoxLake            EngineType = "foxlake"
+	Oceanbase          EngineType = "oceanbase"
 )
-
-var _ = Describe("Cluster commands", func() {
-	It("new commands", func() {
-		for _, engineType := range []models.EngineType{models.MySQL, models.PostgreSQL, models.Redis, models.PostgreSQL, models.Nebula, models.FoxLake} {
-			typeName := string(engineType)
-			engine, _ := newClusterCommands(typeName)
-			Expect(engine).Should(BeNil())
-		}
-	})
-
-	It("new unknown engine", func() {
-		typeName := "unknown-type"
-		engine, err := newClusterCommands(typeName)
-		Expect(engine).Should(BeNil())
-		Expect(err).Should(HaveOccurred())
-	})
-})

@@ -19,7 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package util
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
+)
 
 const (
 	WorkloadTypeKey = "workloadType"
@@ -28,22 +32,22 @@ const (
 )
 
 func IsHAAvailable(characterType, workloadType string) bool {
-	switch strings.ToLower(characterType) {
-	case "mongodb":
+	switch models.EngineType(strings.ToLower(characterType)) {
+	case models.MongoDB:
 		return true
-	case "mysql":
+	case models.MySQL:
 		if strings.EqualFold(workloadType, Replication) || strings.EqualFold(workloadType, Consensus) {
 			return true
 		}
-	case "wesql":
+	case models.WeSQL:
 		return true
-	case "postgresql":
+	case models.PostgreSQL:
 		if strings.EqualFold(workloadType, Consensus) {
 			return true
 		}
-	case "offical-postgresql":
+	case models.ApecloudPostgreSQL:
 		return true
-	case "apecloud-postgresql":
+	case models.OfficalPostgreSQL:
 		return true
 	}
 	return false

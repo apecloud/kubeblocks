@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 )
 
 func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (string, error) {
@@ -46,11 +46,11 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (s
 			}
 		}
 	}
-	if role == engines.MASTER {
-		return engines.PRIMARY, nil
+	if role == models.MASTER {
+		return models.PRIMARY, nil
 	}
-	if role == engines.SLAVE {
-		return engines.SECONDARY, nil
+	if role == models.SLAVE {
+		return models.SECONDARY, nil
 	}
 	return role, nil
 }

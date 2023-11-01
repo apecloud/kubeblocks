@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -91,7 +92,7 @@ type ConnectionInfo struct {
 
 type BuildConnectExample func(info *ConnectionInfo) string
 
-func BuildExample(info *ConnectionInfo, client string, examples map[ClientType]BuildConnectExample) string {
+func BuildExample(info *ConnectionInfo, client string, examples map[models.ClientType]BuildConnectExample) string {
 	// if client is not specified, output all examples
 	if len(client) == 0 {
 		var keys = make([]string, len(examples))
@@ -104,7 +105,7 @@ func BuildExample(info *ConnectionInfo, client string, examples map[ClientType]B
 
 		var b strings.Builder
 		for _, k := range keys {
-			buildFn := examples[ClientType(k)]
+			buildFn := examples[models.ClientType(k)]
 			b.WriteString(fmt.Sprintf("========= %s connection example =========\n", k))
 			b.WriteString(buildFn(info))
 			b.WriteString("\n")
@@ -113,7 +114,7 @@ func BuildExample(info *ConnectionInfo, client string, examples map[ClientType]B
 	}
 
 	// return specified example
-	if buildFn, ok := examples[ClientType(client)]; ok {
+	if buildFn, ok := examples[models.ClientType(client)]; ok {
 		return buildFn(info)
 	}
 

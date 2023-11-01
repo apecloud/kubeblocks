@@ -32,6 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/action"
+	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
@@ -181,7 +182,10 @@ func (r *Request) buildBackupDataAction() (action.Action, error) {
 			BackOffLimit: r.BackupPolicy.Spec.BackoffLimit,
 		}, nil
 	}
-	return nil, fmt.Errorf("unsupported backup type %s", r.ActionSet.Spec.BackupType)
+	err = intctrlutil.NewErrorf(dperrors.ErrorTypeWaitForExternalHandler,
+		`wait for external handler to handle this backup type "%s"`, r.ActionSet.Spec.BackupType)
+	r.Recorder.Event(r.Backup, corev1.EventTypeWarning, string(dperrors.ErrorTypeWaitForExternalHandler), err.Error())
+	return nil, err
 }
 
 func (r *Request) buildCreateVolumeSnapshotAction() (action.Action, error) {

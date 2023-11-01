@@ -28,7 +28,6 @@ import (
 
 	vsv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,7 +46,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/action"
 	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
@@ -175,7 +173,7 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 }
 
 // handleDeletingPhase handles the deletion of backup. It will delete the backup CR
-// and the backup workload(job/statefulset).
+// and the backup workload(job).
 func (r *BackupReconciler) handleDeletingPhase(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) (ctrl.Result, error) {
 	// if backup phase is Deleting, delete the backup reference workloads,
 	// backup data stored in backup repository and volume snapshots.
@@ -217,6 +215,9 @@ func (r *BackupReconciler) handleNewPhase(
 
 	// set and patch backup status
 	if err = r.patchBackupStatus(backup, request); err != nil {
+		if intctrlutil.IsTargetError(err, dperrors.ErrorTypeWaitForExternalHandler) {
+			return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+		}
 		return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
 	}
 	return intctrlutil.Reconciled()
@@ -276,9 +277,6 @@ func (r *BackupReconciler) prepareBackupRequest(
 		actionSet, err := getActionSetByName(reqCtx, r.Client, backupMethod.ActionSetName)
 		if err != nil {
 			return nil, err
-		}
-		if actionSet.Spec.BackupType != dpv1alpha1.BackupTypeFull {
-			return nil, fmt.Errorf("only support backup type Full for actionSet %s", actionSet.Name)
 		}
 		request.ActionSet = actionSet
 	}
@@ -463,6 +461,10 @@ func (r *BackupReconciler) handleRunningPhase(
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
 	request, err := r.prepareBackupRequest(reqCtx, backup)
 	if err != nil {
+		// skip processing for ErrorTypeWaitForExternalHandler when Backup is Running
+		if intctrlutil.IsTargetError(err, dperrors.ErrorTypeWaitForExternalHandler) {
+			return intctrlutil.Reconciled()
+		}
 		return r.updateStatusIfFailed(reqCtx, backup.DeepCopy(), backup, err)
 	}
 
@@ -623,40 +625,10 @@ func (r *BackupReconciler) deleteVolumeSnapshots(reqCtx intctrlutil.RequestCtx,
 	return deleter.DeleteVolumeSnapshots(backup)
 }
 
-// deleteExternalStatefulSet deletes the external statefulSet.
-func (r *BackupReconciler) deleteExternalStatefulSet(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
-	key := client.ObjectKey{
-		Namespace: backup.Namespace,
-		Name:      backup.Name,
-	}
-	sts := &appsv1.StatefulSet{}
-	if err := r.Client.Get(reqCtx.Ctx, key, sts); err != nil {
-		return client.IgnoreNotFound(err)
-	} else if !model.IsOwnerOf(backup, sts) {
-		return nil
-	}
-
-	patch := client.MergeFrom(sts.DeepCopy())
-	controllerutil.RemoveFinalizer(sts, dptypes.DataProtectionFinalizerName)
-	if err := r.Client.Patch(reqCtx.Ctx, sts, patch); err != nil {
-		return err
-	}
-
-	if !sts.DeletionTimestamp.IsZero() {
-		return nil
-	}
-
-	reqCtx.Log.V(1).Info("delete statefulSet", "statefulSet", sts)
-	return intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, sts)
-}
-
 // deleteExternalResources deletes the external workloads that execute backup.
-// Currently, it only supports two types of workloads: statefulSet and job.
+// Currently, it only supports two types of workloads: job.
 func (r *BackupReconciler) deleteExternalResources(
 	reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
-	if err := r.deleteExternalStatefulSet(reqCtx, backup); err != nil {
-		return err
-	}
 	return r.deleteExternalJobs(reqCtx, backup)
 }
 

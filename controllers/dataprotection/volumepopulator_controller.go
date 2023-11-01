@@ -42,6 +42,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -128,14 +129,37 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 	if !matched {
 		return nil
 	}
+	restoreMgr, err := r.validateRestoreAndBuildMGR(reqCtx, pvc)
+	if err != nil {
+		return err
+	}
 	// if pvc has not bound pv, populate it.
 	if pvc.Spec.VolumeName == "" {
-		return r.populate(reqCtx, pvc)
+		return r.Populate(reqCtx, pvc, restoreMgr)
 	}
 	return r.cleanup(reqCtx, pvc)
 }
 
-func (r *VolumePopulatorReconciler) populate(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
+func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) (*dprestore.RestoreManager, error) {
+	restore := &dpv1alpha1.Restore{}
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: pvc.Spec.DataSourceRef.Name,
+		Namespace: pvc.Namespace}, restore); err != nil {
+		return nil, err
+	}
+	if restore.Spec.PrepareDataConfig == nil || restore.Spec.PrepareDataConfig.DataSourceRef == nil {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`spec.prepareDataConfig.datasourceRef of restore "%s" can not be empty`, restore.Name))
+	}
+	restoreMgr := dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme)
+	if err := dprestore.ValidateAndInitRestoreMGR(reqCtx, r.Client, r.Recorder, restoreMgr); err != nil {
+		if intctrlutil.IsTargetError(err, dperrors.ErrorTypeWaitForExternalHandler) {
+			r.Recorder.Event(pvc, corev1.EventTypeWarning, string(dperrors.ErrorTypeWaitForExternalHandler), err.Error())
+		}
+		return nil, err
+	}
+	return restoreMgr, nil
+}
+
+func (r *VolumePopulatorReconciler) Populate(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, restoreMgr *dprestore.RestoreManager) error {
 	wait, nodeName, err := r.waitForPVCSelectedNode(reqCtx, pvc)
 	if err != nil || wait {
 		return err
@@ -151,22 +175,22 @@ func (r *VolumePopulatorReconciler) populate(reqCtx intctrlutil.RequestCtx, pvc 
 	if err = r.updatePVCConditions(reqCtx, pvc, reasonPopulatingProcessing, "Populator started"); err != nil {
 		return err
 	}
-
-	restore, err := r.getRestoreCR(reqCtx, pvc, nodeName)
-	if err != nil {
-		return err
+	// set scheduling for restore
+	restoreMgr.Restore.Spec.PrepareDataConfig.SchedulingSpec = dpv1alpha1.SchedulingSpec{
+		Tolerations: []corev1.Toleration{
+			{Operator: corev1.TolerationOpExists},
+		},
 	}
-
-	restoreMgr := dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme)
-	if err = dprestore.ValidateAndInitRestoreMGR(reqCtx, r.Client, r.Recorder, restoreMgr); err != nil {
-		return err
+	if nodeName != "" {
+		restoreMgr.Restore.Spec.PrepareDataConfig.SchedulingSpec.NodeSelector = map[string]string{
+			corev1.LabelHostname: nodeName,
+		}
 	}
-
 	var populatePVC *corev1.PersistentVolumeClaim
 	for i, v := range restoreMgr.PrepareDataBackupSets {
 		if populatePVC == nil {
 			populatePVC, err = r.getPopulatePVC(reqCtx, pvc, v,
-				restore.Spec.PrepareDataConfig.DataSourceRef.VolumeSource, nodeName)
+				restoreMgr.Restore.Spec.PrepareDataConfig.DataSourceRef.VolumeSource, nodeName)
 			if err != nil {
 				return err
 			}
@@ -330,28 +354,6 @@ func (r *VolumePopulatorReconciler) getPopulatePVC(reqCtx intctrlutil.RequestCtx
 		}
 	}
 	return populatePVC, nil
-}
-
-func (r *VolumePopulatorReconciler) getRestoreCR(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, nodeName string) (*dpv1alpha1.Restore, error) {
-	restore := &dpv1alpha1.Restore{}
-	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: pvc.Spec.DataSourceRef.Name,
-		Namespace: pvc.Namespace}, restore); err != nil {
-		return nil, err
-	}
-	if restore.Spec.PrepareDataConfig == nil || restore.Spec.PrepareDataConfig.DataSourceRef == nil {
-		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`spec.prepareDataConfig.datasourceRef of restore "%s" can not be empty`, restore.Name))
-	}
-	restore.Spec.PrepareDataConfig.SchedulingSpec = dpv1alpha1.SchedulingSpec{
-		Tolerations: []corev1.Toleration{
-			{Operator: corev1.TolerationOpExists},
-		},
-	}
-	if nodeName != "" {
-		restore.Spec.PrepareDataConfig.SchedulingSpec.NodeSelector = map[string]string{
-			corev1.LabelHostname: nodeName,
-		}
-	}
-	return restore, nil
 }
 
 func (r *VolumePopulatorReconciler) rebindPVCAndPV(reqCtx intctrlutil.RequestCtx, populatePVC, pvc *corev1.PersistentVolumeClaim) error {

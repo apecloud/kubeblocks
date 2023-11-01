@@ -102,10 +102,10 @@ type CollectorDataSourceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// clusterRef references cluster.
+	// clusterDefinitionRef references cluster.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
-	ClusterRef string `json:"clusterRef"`
+	ClusterDefRef string `json:"clusterDefRef"`
 
 	// collectorSpecs describes the collector specs
 	// +kubebuilder:validation:Required

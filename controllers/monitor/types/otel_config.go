@@ -287,6 +287,9 @@ func buildServiceValMap(instance *OteldInstance) map[string]any {
 	if instance.OTeld.Spec.MetricsPort != 0 {
 		valMap["metrics_port"] = instance.OTeld.Spec.MetricsPort
 	}
+	if instance.OTeld.Spec.GlobalLabels != nil {
+		valMap["global_labels"] = instance.OTeld.Spec.GlobalLabels
+	}
 	return valMap
 }
 
@@ -438,7 +441,7 @@ func (cg *OteldConfigGenerater) GenerateEngineConfiguration(instance *OteldInsta
 	cfg = append(cfg, infraSlice...)
 	defaultConfigSlice := yaml.MapSlice{}
 	for _, clusterDatasource := range instance.AppDataSources {
-		scrapConfigs, err := fromCollectorDataSource(clusterDatasource.Spec, instance.Cli, instance.Ctx, clusterDatasource.Namespace)
+		scrapConfigs, err := fromCollectorDataSource(clusterDatasource.Name, clusterDatasource.Spec, instance.Cli, instance.Ctx, clusterDatasource.Namespace)
 		if err != nil {
 			return nil, err
 		}

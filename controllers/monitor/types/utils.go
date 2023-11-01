@@ -21,49 +21,40 @@ package types
 
 import (
 	"context"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type ScrapeConfig map[string]any
 
-func fromCollectorDataSource(dataSourceSpec v1alpha1.CollectorDataSourceSpec, cli client.Client, ctx context.Context, namespace string) ([]ScrapeConfig, error) {
+func fromCollectorDataSource(dataSourceName string, dataSourceSpec v1alpha1.CollectorDataSourceSpec, cli client.Client, ctx context.Context, namespace string) ([]ScrapeConfig, error) {
 	configs := make([]ScrapeConfig, 0)
-	clusterName := dataSourceSpec.ClusterRef
+	clusterDefName := dataSourceSpec.ClusterDefRef
 
 	if cli == nil || ctx == nil {
 		return nil, core.MakeError("client or context is nil")
 	}
 
-	resource := intctrlutil.NewResourceFetcher(&intctrlutil.ResourceCtx{
-		Context:     ctx,
-		Client:      cli,
-		ClusterName: clusterName,
-		Namespace:   namespace,
-	})
-
-	if err := resource.Cluster().ClusterDef().Complete(); err != nil {
+	clusterDef := &appsv1alpha1.ClusterDefinition{}
+	err := cli.Get(ctx, client.ObjectKey{Name: clusterDefName, Namespace: namespace}, clusterDef)
+	if err != nil {
 		return nil, err
 	}
-	clusterDefName := resource.ClusterObj.Spec.ClusterDefRef
+
 	for _, spec := range dataSourceSpec.CollectorSpecs {
-		resource.ComponentName = spec.ComponentName
-		if err := resource.ClusterComponent().ClusterDefComponent().Complete(); err != nil {
-			return nil, err
-		}
-		if resource.ClusterDefComObj == nil {
-			return nil, core.MakeError("failed to found componentDef[%s] in the clusterDefinition[%s]", resource.ComponentName, clusterDefName)
+		componentName := spec.ComponentName
+		component := clusterDef.GetComponentDefByName(componentName)
+		if component == nil {
+			return nil, core.MakeError("failed to found componentDef[%s] in the clusterDefinition[%s]", componentName, clusterDefName)
 		}
 		for _, config := range spec.ScrapeConfigs {
-			configs = append(configs, buildEngineValMap(clusterName,
-				resource.ComponentName,
+			configs = append(configs, buildEngineValMap(dataSourceName,
+				componentName,
 				config,
-				resource.ClusterDefComObj,
+				component,
 				clusterDefName),
 			)
 		}
@@ -71,14 +62,14 @@ func fromCollectorDataSource(dataSourceSpec v1alpha1.CollectorDataSourceSpec, cl
 	return configs, nil
 }
 
-func buildEngineValMap(clusterName string, componentName string, config v1alpha1.ScrapeConfig, obj *appsv1alpha1.ClusterComponentDefinition, clusterDefName string) ScrapeConfig {
+func buildEngineValMap(templateName string, componentName string, config v1alpha1.ScrapeConfig, obj *appsv1alpha1.ClusterComponentDefinition, clusterDefName string) ScrapeConfig {
 	monitorType := obj.CharacterType
 	if config.Metrics != nil && config.Metrics.MonitorType != "" {
 		monitorType = config.Metrics.MonitorType
 	}
 
 	valMap := map[string]any{
-		"cluster_name":    clusterName,
+		"template_name":   templateName,
 		"component_name":  componentName,
 		"container_name":  config.ContainerName,
 		"collector_name":  monitorType,

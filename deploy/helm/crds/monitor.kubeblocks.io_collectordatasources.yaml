@@ -36,8 +36,8 @@ spec:
           spec:
             description: CollectorDataSourceSpec defines the desired state of CollectorDataSource
             properties:
-              clusterRef:
-                description: clusterRef references cluster.
+              clusterDefRef:
+                description: clusterDefinitionRef references cluster.
                 type: string
                 x-kubernetes-validations:
                 - message: forbidden to update spec.clusterRef
@@ -128,7 +128,7 @@ spec:
                 - componentName
                 x-kubernetes-list-type: map
             required:
-            - clusterRef
+            - clusterDefRef
             - collectorSpecs
             type: object
           status:

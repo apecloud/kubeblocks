@@ -16,8 +16,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 parameters: {
-	log_level: *"debug" | string
+	log_level: *"info" | string
   metrics_port: *6668 | int
+  golbal_labels: [...string]
 }
 
 output: {
@@ -27,8 +28,7 @@ output: {
     metrics:
       address: "${env:HOST_IP}:" + "\(parameters.metrics_port)"
     resource: {
-    	node: "${env:NODE_NAME}"
-      job: "oteld-telemetry"
+    	parameters.golbal_labels
     }
   }
   extensions: ["memory_ballast", "apecloud_k8s_observer", "runtime_container", "apecloud_engine_observer", "file_storage/oteld"]

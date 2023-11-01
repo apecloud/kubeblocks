@@ -45,6 +45,12 @@ spec:
                 description: collectionInterval is the default collect interval of
                   the oteld collection
                 type: string
+              globalLabels:
+                additionalProperties:
+                  type: string
+                description: globalLabels is the external labels add to OTeld metrics
+                  and logs
+                type: object
               image:
                 description: image is the image of the oteld
                 type: string
@@ -69,16 +75,6 @@ spec:
               metricsPort:
                 description: metricsPort is the port of the oteld metrics
                 type: integer
-              mode:
-                default: daemonset
-                description: mode represents how the OTeld should be deployed (deployment,
-                  daemonset, statefulset or sidecar)
-                enum:
-                - daemonset
-                - deployment
-                - sidecar
-                - statefulset
-                type: string
               nodeSelector:
                 additionalProperties:
                   type: string
@@ -144,9 +140,9 @@ spec:
                     description: enabledK8sClusterMetrics indicates whether to collect
                       k8s apiService metrics
                     type: boolean
-                  enabledK8SNodeStatesMetrics:
-                    description: enabledK8sNodeStatesMetrics indicates whether to
-                      collect kubelet states metrics
+                  enabledK8SKubeletExporter:
+                    description: enabledK8sKubeletExporter indicates whether to collect
+                      kubelet states metrics
                     type: boolean
                   enabledNodeExporter:
                     description: enabledNodeMetrics indicates whether to collect node

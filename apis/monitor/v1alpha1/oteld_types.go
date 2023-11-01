@@ -52,9 +52,9 @@ type SystemDataSource struct {
 	// +optional
 	EnabledK8sClusterExporter bool `json:"enabledK8SClusterExporter,omitempty"`
 
-	// enabledK8sNodeStatesMetrics indicates whether to collect kubelet states metrics
+	// enabledK8sKubeletExporter indicates whether to collect kubelet states metrics
 	// +optional
-	EnabledK8sNodeStatesMetrics bool `json:"enabledK8SNodeStatesMetrics,omitempty"`
+	EnabledK8sKubeletExporter bool `json:"enabledK8SKubeletExporter,omitempty"`
 
 	// enabledPodLogs indicates whether to collect pod logs
 	// +optional
@@ -98,11 +98,6 @@ type OTeldSpec struct {
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
-	// mode represents how the OTeld should be deployed (deployment, daemonset, statefulset or sidecar)
-	// +kubebuilder:default="daemonset"
-	// +optional
-	Mode Mode `json:"mode,omitempty"`
-
 	// useConfigMap indicates whether to use configmap to store oteld config
 	// +optional
 	UseConfigMap bool `json:"useConfigMap"`
@@ -111,6 +106,10 @@ type OTeldSpec struct {
 	// This is only relevant to daemonset, statefulset, and deployment mode
 	// +optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// globalLabels is the external labels add to OTeld metrics and logs
+	// +optional
+	GlobalLabels map[string]string `json:"globalLabels,omitempty"`
 
 	// systemDataSource is the system data source
 	// +optional

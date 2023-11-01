@@ -755,6 +755,13 @@ func (in *OTeldSpec) DeepCopyInto(out *OTeldSpec) {
 			(*out)[key] = val
 		}
 	}
+	if in.GlobalLabels != nil {
+		in, out := &in.GlobalLabels, &out.GlobalLabels
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.SystemDataSource != nil {
 		in, out := &in.SystemDataSource, &out.SystemDataSource
 		*out = new(SystemDataSource)

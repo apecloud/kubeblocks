@@ -76,7 +76,7 @@ func (w *oteldWrapper) buildAPIServicePipeline() *oteldWrapper {
 }
 
 func (w *oteldWrapper) buildK8sNodeStatesPipeline() *oteldWrapper {
-	if !w.source.EnabledK8sNodeStatesMetrics {
+	if !w.source.EnabledK8sKubeletExporter {
 		return w
 	}
 
@@ -90,7 +90,7 @@ func (w *oteldWrapper) buildK8sNodeStatesPipeline() *oteldWrapper {
 }
 
 func (w *oteldWrapper) buildNodePipeline() *oteldWrapper {
-	if !w.source.EnabledK8sNodeStatesMetrics {
+	if !w.source.EnabledK8sKubeletExporter {
 		return w
 	}
 

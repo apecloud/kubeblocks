@@ -22,7 +22,6 @@ output: {
         slow:
           include: ["/data/mysql/log/mysqld-slowquery.log"]
       }
-
 		}
 
   	"apecloud-mysql/mysql/vttablet/prometheus": {

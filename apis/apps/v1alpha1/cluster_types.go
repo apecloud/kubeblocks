@@ -614,10 +614,10 @@ type ClusterService struct {
 	// +optional
 	ComponentSelector string `json:"componentSelector,omitempty"`
 
-	// RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined roles as selectors for the service.
+	// RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined roles as selector for the service.
 	// Cannot be updated.
 	// +optional
-	RoleSelector []string `json:"roleSelector,omitempty"`
+	RoleSelector string `json:"roleSelector,omitempty"`
 }
 
 type ClusterComponentService struct {

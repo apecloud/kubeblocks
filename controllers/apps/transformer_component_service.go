@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"strings"
 
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,15 +43,15 @@ type componentServiceTransformer struct{}
 var _ graph.Transformer = &componentServiceTransformer{}
 
 func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	cctx, _ := ctx.(*componentTransformContext)
-	if model.IsObjectDeleting(cctx.ComponentOrig) {
+	transCtx, _ := ctx.(*componentTransformContext)
+	if model.IsObjectDeleting(transCtx.ComponentOrig) {
 		return nil
 	}
 
-	synthesizeComp := cctx.SynthesizeComponent
-	graphCli, _ := cctx.Client.(model.GraphClient)
+	synthesizeComp := transCtx.SynthesizeComponent
+	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for _, service := range synthesizeComp.ComponentServices {
-		svc, err := t.buildService(synthesizeComp, &service)
+		svc, err := t.buildService(transCtx.Component, synthesizeComp, &service)
 		if err != nil {
 			return err
 		}
@@ -61,8 +62,8 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 	return nil
 }
 
-func (t *componentServiceTransformer) buildService(synthesizeComp *component.SynthesizedComponent,
-	service *appsv1alpha1.ComponentService) (*corev1.Service, error) {
+func (t *componentServiceTransformer) buildService(comp *appsv1alpha1.Component,
+	synthesizeComp *component.SynthesizedComponent, service *appsv1alpha1.ComponentService) (*corev1.Service, error) {
 	var (
 		namespace   = synthesizeComp.Namespace
 		clusterName = synthesizeComp.ClusterName
@@ -94,6 +95,7 @@ func (t *componentServiceTransformer) buildService(synthesizeComp *component.Syn
 			LoadBalancerClass:             service.LoadBalancerClass,
 			InternalTrafficPolicy:         service.InternalTrafficPolicy,
 		}).
+		AddSelectorsInMap(t.builtinSelector(comp)).
 		Optimize4ExternalTraffic()
 
 	if len(service.RoleSelector) > 0 {
@@ -103,6 +105,20 @@ func (t *componentServiceTransformer) buildService(synthesizeComp *component.Syn
 		builder.AddSelector(constant.RoleLabelKey, service.RoleSelector)
 	}
 	return builder.GetObject(), nil
+}
+
+func (t *componentServiceTransformer) builtinSelector(comp *appsv1alpha1.Component) map[string]string {
+	selectors := map[string]string{
+		constant.AppManagedByLabelKey:   "",
+		constant.AppInstanceLabelKey:    "",
+		constant.KBAppComponentLabelKey: "",
+	}
+	for _, key := range maps.Keys(selectors) {
+		if val, ok := comp.Labels[key]; ok {
+			selectors[key] = val
+		}
+	}
+	return selectors
 }
 
 func (t *componentServiceTransformer) checkRoleSelector(synthesizeComp *component.SynthesizedComponent,

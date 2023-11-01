@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"strings"
 
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -83,6 +84,7 @@ func (t *ClusterServiceTransformer) buildService(transCtx *clusterTransformConte
 	builder := builder.NewServiceBuilder(namespace, service.Service.Name).
 		AddLabelsInMap(constant.GetClusterWellKnownLabels(clusterName)).
 		SetSpec(&service.Service.Spec).
+		AddSelectorsInMap(t.builtinSelector(cluster)).
 		Optimize4ExternalTraffic()
 
 	if len(service.ComponentSelector) > 0 {
@@ -98,10 +100,23 @@ func (t *ClusterServiceTransformer) buildService(transCtx *clusterTransformConte
 			if err := t.checkComponentRoles(compDef, service); err != nil {
 				return nil, err
 			}
-			builder.AddSelector(constant.RoleLabelKey, strings.Join(service.RoleSelector, ","))
+			builder.AddSelector(constant.RoleLabelKey, service.RoleSelector)
 		}
 	}
 	return builder.GetObject(), nil
+}
+
+func (t *ClusterServiceTransformer) builtinSelector(cluster *appsv1alpha1.Cluster) map[string]string {
+	selectors := map[string]string{
+		constant.AppManagedByLabelKey: "",
+		constant.AppInstanceLabelKey:  "",
+	}
+	for _, key := range maps.Keys(selectors) {
+		if val, ok := cluster.Labels[key]; ok {
+			selectors[key] = val
+		}
+	}
+	return selectors
 }
 
 func (t *ClusterServiceTransformer) checkComponent(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster,
@@ -124,10 +139,8 @@ func (t *ClusterServiceTransformer) checkComponentRoles(compDef *appsv1alpha1.Co
 	for _, role := range compDef.Spec.Roles {
 		definedRoles[strings.ToLower(role.Name)] = true
 	}
-	for _, role := range service.RoleSelector {
-		if !definedRoles[strings.ToLower(role)] {
-			return fmt.Errorf("role selector for service is not defined, service: %s, role: %s", service.Name, role)
-		}
+	if !definedRoles[strings.ToLower(service.RoleSelector)] {
+		return fmt.Errorf("role selector for service is not defined, service: %s, role: %s", service.Name, service.RoleSelector)
 	}
 	return nil
 }

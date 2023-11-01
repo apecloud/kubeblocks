@@ -34,7 +34,7 @@ const (
 	KBEnvComponentName   = "KB_COMP_NAME"
 	KBEnvClusterCompName = "KB_CLUSTER_COMP_NAME"
 	KBEnvWorkloadType    = "KB_WORKLOAD_TYPE"
-	KBEnvBuiltinHandler  = "KB_BUIlTIN_HANDLER"
+	KBEnvBuiltinHandler  = "KB_BUILTIN_HANDLER"
 	KBEnvCharacterType   = "KB_SERVICE_CHARACTER_TYPE"
 	KBEnvServiceUser     = "KB_SERVICE_USER"
 	KBEnvServicePassword = "KB_SERVICE_PASSWORD"

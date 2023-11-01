@@ -1,7 +1,9 @@
+{{- $cvName := printf "mongodb-%s" (default .Chart.AppVersion .Values.clusterVersionOverride) -}}
+{{ if eq (include "mongodb.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" }}
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: mongodb-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  name: {{ $cvName }}
   labels:
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:
@@ -19,12 +21,15 @@ spec:
       switchoverSpec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+{{- end -}}
 
+{{- $cvName = "mongodb-4.0" -}}
+{{ if eq (include "mongodb.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" }}
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: mongodb-4.0
+  name: {{ $cvName }}
   labels:
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:
@@ -42,12 +47,15 @@ spec:
       switchoverSpec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:4.0
+{{- end -}}
 
+{{- $cvName = "mongodb-4.2" -}}
+{{ if eq (include "mongodb.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" }}
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: mongodb-4.2
+  name: {{ $cvName }}
   labels:
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:
@@ -65,12 +73,15 @@ spec:
       switchoverSpec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:4.2
+{{- end -}}
 
+{{- $cvName = "mongodb-4.4" -}}
+{{ if eq (include "mongodb.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" }}
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: mongodb-4.4
+  name: {{ $cvName }}
   labels:
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:
@@ -88,12 +99,15 @@ spec:
       switchoverSpec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:4.4
+{{- end -}}
 
+{{- $cvName = "mongodb-5.0.20" -}}
+{{ if eq (include "mongodb.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" }}
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: mongodb-5.0.20
+  name: {{ $cvName }}
   annotations:
     kubeblocks.io/is-default-cluster-version: "true"
   labels:
@@ -114,11 +128,15 @@ spec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:5.0.20
 
+{{- end -}}
+
+{{- $cvName = "mongodb-6.0" -}}
+{{ if eq (include "mongodb.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" }}
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: mongodb-6.0
+  name: {{ $cvName }}
   labels:
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:
@@ -136,3 +154,4 @@ spec:
       switchoverSpec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:6.0
+{{- end -}}

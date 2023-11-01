@@ -57,7 +57,7 @@ resources: { }
 persistence:
   ## @param shard[*].persistence.enabled Enable persistence using Persistent Volume Claims
   ##
-  enabled: false
+  enabled: true
   ## `data` volume settings
   ##
   data:
@@ -71,7 +71,7 @@ persistence:
     storageClassName:
     ## @param shard[*].persistence.size Size of data volume
     ##
-    size: 10Gi
+    size: 1Gi
 
 ingress:
   ## @param ingress.enabled Enable ingress record generation for etcd

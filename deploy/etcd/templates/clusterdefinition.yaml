@@ -10,18 +10,27 @@ spec:
     - name: etcd
       characterType: etcd
       workloadType: Consensus
-      consensusSpec:
-        leader:
-          name: "leader"
-          accessMode: ReadWrite
-        followers:
-          - name: "follower"
+      rsmSpec:
+        roles:
+          - name: leader
             accessMode: ReadWrite
-        updateStrategy: BestEffortParallel
-      probes:
+            isLeader: true
+            canVote: true
+          - name: follower
+            accessMode: ReadWrite
+            isLeader: false
+            canVote: true
         roleProbe:
-          periodSeconds: 1
-          failureThreshold: 3
+          customHandler:
+            - image: quay.io/coreos/etcd:v3.5.6
+              command:
+                - |
+                  Status=$(etcdctl --endpoints=127.0.0.1:2379 endpoint status -w simple --command-timeout=300ms --dial-timeout=100m) &&
+                  IsLeader=$(echo $Status | awk -F ', ' '{print $5}') &&
+                  IsLearner=$(echo $Status | awk -F ', ' '{print $6}') &&
+                  if [ "true" = "$IsLeader" ]; then echo -n "leader"; elif [ "true" = "$IsLearner" ]; then echo -n "learner"; else echo -n "follower"; fi
+          roleUpdateMechanism: DirectAPIServerEventUpdate
+        memberUpdateStrategy: BestEffortParallel
       service:
         ports:
           - name: client
@@ -61,13 +70,12 @@ spec:
                 # TODO: clusterDomain 'cluster.local' requires configurable
                 MY_PEER=$KB_POD_FQDN{{ .Values.clusterDomain }}
                 exec etcd --name ${HOSTNAME} \
+                --experimental-initial-corrupt-check=true \
                 --listen-peer-urls http://0.0.0.0:2380 \
                 --listen-client-urls http://0.0.0.0:2379 \
                 --advertise-client-urls http://${MY_PEER}:2379 \
                 --initial-advertise-peer-urls http://${MY_PEER}:2380 \
-                --initial-cluster-token etcd-cluster-1 \
                 --initial-cluster ${PEERS} \
-                --initial-cluster-state new \
                 --data-dir /var/run/etcd/default.etcd
   connectionCredential:
     username: root

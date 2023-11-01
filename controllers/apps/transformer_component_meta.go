@@ -37,8 +37,12 @@ func (t *componentMetaTransformer) Transform(ctx graph.TransformContext, dag *gr
 	componentOrig := transCtx.ComponentOrig
 	needUpdate := false
 
-	if !controllerutil.ContainsFinalizer(component, constant.DBComponentFinalizerName) {
-		controllerutil.AddFinalizer(component, constant.DBComponentFinalizerName)
+	// if !controllerutil.ContainsFinalizer(component, constant.DBComponentFinalizerName) {
+	//	controllerutil.AddFinalizer(component, constant.DBComponentFinalizerName)
+	//	needUpdate = true
+	// }
+	if !controllerutil.ContainsFinalizer(component, constant.DBClusterFinalizerName) {
+		controllerutil.AddFinalizer(component, constant.DBClusterFinalizerName)
 		needUpdate = true
 	}
 

@@ -572,46 +572,89 @@ var _ = Describe("Cluster Controller", func() {
 	testClusterCredential := func(compName, compDefName string) {
 	}
 
-	testDoNotTerminate := func(compName, compDefName string) {
-		createClusterObj(compName, compDefName, nil)
+	testClusterFinalizer := func(compName string, createObj func(appsv1alpha1.TerminationPolicyType)) {
+		createObj(appsv1alpha1.WipeOut)
 
-		// REVIEW: this test flow
+		By("wait component created")
+		compKey := types.NamespacedName{
+			Namespace: clusterKey.Namespace,
+			Name:      clusterKey.Name + "-" + compName,
+		}
+		Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
 
-		// REVIEW: why not set termination upon creation?
-		By("Update the cluster's termination policy to DoNotTerminate")
-		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
-			cluster.Spec.TerminationPolicy = appsv1alpha1.DoNotTerminate
+		By("set finalizer for component to prevent it from deletion")
+		finalizer := "test/finalizer"
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *appsv1alpha1.Component) {
+			comp.Finalizers = append(comp.Finalizers, finalizer)
 		})()).ShouldNot(HaveOccurred())
 
-		By("Delete the cluster")
+		By("delete the cluster")
 		testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
-		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
 
-		By("Update the cluster's termination policy to WipeOut")
-		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
-			cluster.Spec.TerminationPolicy = appsv1alpha1.WipeOut
+		By("check cluster keep existing")
+		Consistently(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
+
+		By("remove finalizer of component to get it deleted")
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *appsv1alpha1.Component) {
+			comp.Finalizers = nil
 		})()).ShouldNot(HaveOccurred())
 
-		By("Wait for the cluster to terminate")
+		By("wait for the cluster and component to terminate")
+		Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, false)).Should(Succeed())
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
 	}
 
-	testHaltNRecovery := func(compName, compDefName string) {
+	testDeleteClusterWithDoNotTerminate := func(createObj func(appsv1alpha1.TerminationPolicyType)) {
+		createObj(appsv1alpha1.DoNotTerminate)
+
+		By("delete the cluster")
+		testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
+		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
+	}
+
+	testDeleteClusterWithHalt := func(createObj func(appsv1alpha1.TerminationPolicyType)) {
+		createObj(appsv1alpha1.Halt)
+
+		preserveKinds := []client.ObjectList{
+			&corev1.PersistentVolumeClaimList{},
+			&corev1.SecretList{},
+			&corev1.ConfigMapList{},
+		}
+		transCtx := &clusterTransformContext{
+			Context: testCtx.Ctx,
+			Client:  testCtx.Cli,
+		}
+		preserveObjs, err := getClusterOwningNamespacedObjects(transCtx, *clusterObj, getAppInstanceML(*clusterObj), preserveKinds)
+		Expect(err).Should(Succeed())
+		for _, obj := range preserveObjs {
+			// Expect(obj.GetFinalizers()).Should(ContainElements(constant.DBClusterFinalizerName))
+			Expect(obj.GetAnnotations()).ShouldNot(HaveKey(constant.LastAppliedClusterAnnotationKey))
+		}
+
+		By("delete the cluster")
+		testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
+
+		By("wait for the cluster to terminate")
+		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
+
+		By("check expected preserved objects")
+		keptObjs, err := getClusterOwningNamespacedObjects(transCtx, *clusterObj, getAppInstanceML(*clusterObj), preserveKinds)
+		Expect(err).Should(Succeed())
+		for key, obj := range preserveObjs {
+			Expect(keptObjs).Should(HaveKey(key))
+			keptObj := keptObjs[key]
+			Expect(obj.GetUID()).Should(BeEquivalentTo(keptObj.GetUID()))
+			Expect(keptObj.GetFinalizers()).ShouldNot(ContainElements(constant.DBClusterFinalizerName))
+			Expect(keptObj.GetAnnotations()).Should(HaveKey(constant.LastAppliedClusterAnnotationKey))
+		}
+	}
+
+	testClusterHaltNRecovery := func(createObj func(appsv1alpha1.TerminationPolicyType)) {
 		// TODO(component)
 	}
 
-	testDelete := func(compName, compDefName string) {
-		// TODO(component)
-	}
-
-	testWipeOut := func(compName, compDefName string) {
-		createClusterObj(compName, compDefName, nil)
-
-		By("Waiting for the cluster enter running phase")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
-
-		By("Mocking a retained backup")
+	deleteClusterWithBackup := func(terminationPolicy appsv1alpha1.TerminationPolicyType, backupRetainPolicy string) {
+		By("mocking a retained backup")
 		backupPolicyName := "test-backup-policy"
 		backupName := "test-backup"
 		backupMethod := "test-backup-method"
@@ -619,23 +662,38 @@ var _ = Describe("Cluster Controller", func() {
 			SetBackupPolicyName(backupPolicyName).
 			SetBackupMethod(backupMethod).
 			SetLabels(map[string]string{
-				constant.AppInstanceLabelKey:      clusterKey.Name,
-				constant.BackupProtectionLabelKey: constant.BackupRetain,
+				constant.AppManagedByLabelKey:     constant.AppName,
+				constant.AppInstanceLabelKey:      clusterObj.Name,
+				constant.BackupProtectionLabelKey: backupRetainPolicy,
 			}).
 			WithRandomName().
 			Create(&testCtx).GetObject()
 		backupKey := client.ObjectKeyFromObject(backup)
+		Eventually(testapps.CheckObjExists(&testCtx, backupKey, &dpv1alpha1.Backup{}, true)).Should(Succeed())
 
-		// REVIEW: this test flow
-
-		By("Delete the cluster")
+		By("delete the cluster")
+		fmt.Printf("test - to delete cluster object : %s\n", clusterObj.Name)
 		testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
 
-		By("Wait for the cluster to terminate")
+		By("wait for the cluster to terminate")
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
 
-		By("Checking backup should exist")
-		Eventually(testapps.CheckObjExists(&testCtx, backupKey, &dpv1alpha1.Backup{}, true)).Should(Succeed())
+		By(fmt.Sprintf("checking the backup with TerminationPolicyType=%s", terminationPolicy))
+		if terminationPolicy == appsv1alpha1.WipeOut && backupRetainPolicy == constant.BackupDelete {
+			Eventually(testapps.CheckObjExists(&testCtx, backupKey, &dpv1alpha1.Backup{}, false)).Should(Succeed())
+		} else {
+			Consistently(testapps.CheckObjExists(&testCtx, backupKey, &dpv1alpha1.Backup{}, true)).Should(Succeed())
+		}
+	}
+
+	testDeleteClusterWithDelete := func(createObj func(appsv1alpha1.TerminationPolicyType)) {
+		createObj(appsv1alpha1.Delete)
+		deleteClusterWithBackup(appsv1alpha1.Delete, constant.BackupRetain)
+	}
+
+	testDeleteClusterWithWipeOut := func(createObj func(appsv1alpha1.TerminationPolicyType), backupRetainPolicy string) {
+		createObj(appsv1alpha1.WipeOut)
+		deleteClusterWithBackup(appsv1alpha1.WipeOut, backupRetainPolicy)
 	}
 
 	// getPVCName := func(vctName, compName string, i int) string {
@@ -694,40 +752,60 @@ var _ = Describe("Cluster Controller", func() {
 			createAllWorkloadTypesClusterDef()
 		})
 
-		var (
-			createObjV1 = func() { createClusterObj(consensusCompName, consensusCompDefName, nil) }
-			createObjV2 = func() { createClusterObjV2(consensusCompName, compDefObj.Name, nil) }
-		)
-		for _, createObj := range []func(){createObjV1, createObjV2} {
-			It("should deleted after all the sub-resources", func() {
-				createObj()
+		AfterEach(func() {
+			cleanEnv()
+		})
 
-				By("check component created")
+		var (
+			waitCompObjectReady = func(compName string) {
+				By("wait component created")
 				compKey := types.NamespacedName{
-					Namespace: clusterKey.Namespace,
-					Name:      clusterKey.Name + "-" + consensusCompName,
+					Namespace: clusterObj.Namespace,
+					Name:      constant.GenerateClusterComponentPattern(clusterObj.Name, compName),
 				}
 				Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
+			}
+			createObjV1 = func(policyType appsv1alpha1.TerminationPolicyType) {
+				createClusterObj(consensusCompName, consensusCompDefName, func(f *testapps.MockClusterFactory) {
+					f.SetTerminationPolicy(policyType)
+				})
+				waitCompObjectReady(consensusCompName)
+			}
+			createObjV2 = func(policyType appsv1alpha1.TerminationPolicyType) {
+				createClusterObjV2(consensusCompName, compDefObj.Name, func(f *testapps.MockClusterFactory) {
+					f.SetTerminationPolicy(policyType)
+				})
+				waitCompObjectReady(consensusCompName)
+			}
+		)
 
-				By("set finalizer for component to prevent it from deletion")
-				finalizer := "test/finalizer"
-				Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *appsv1alpha1.Component) {
-					comp.Finalizers = append(comp.Finalizers, finalizer)
-				})()).ShouldNot(HaveOccurred())
+		for _, createObj := range []func(appsv1alpha1.TerminationPolicyType){createObjV1, createObjV2} {
+			It("deleted after all the sub-resources", func() {
+				testClusterFinalizer(consensusCompName, createObj)
+			})
 
-				By("delete the cluster")
-				testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
+			It("delete cluster with terminationPolicy=DoNotTerminate", func() {
+				testDeleteClusterWithDoNotTerminate(createObj)
+			})
 
-				By("check cluster keep existing")
-				Consistently(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
+			It("delete cluster with terminationPolicy=Halt", func() {
+				testDeleteClusterWithHalt(createObj)
+			})
 
-				By("remove finalizer of component to get it deleted")
-				Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *appsv1alpha1.Component) {
-					comp.Finalizers = nil
-				})()).ShouldNot(HaveOccurred())
+			It("cluster Halt and Recovery", func() {
+				testClusterHaltNRecovery(createObj)
+			})
 
-				By("wait for the cluster to terminate")
-				Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
+			It("delete cluster with terminationPolicy=Delete", func() {
+				testDeleteClusterWithDelete(createObj)
+			})
+
+			It("delete cluster with terminationPolicy=WipeOut and backupRetainPolicy=Delete", func() {
+				testDeleteClusterWithWipeOut(createObj, constant.BackupDelete)
+			})
+
+			It("delete cluster with terminationPolicy=WipeOut and backupRetainPolicy=Retain", func() {
+				testDeleteClusterWithWipeOut(createObj, constant.BackupRetain)
 			})
 		}
 	})
@@ -749,22 +827,6 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		for compName, compDefName := range compNameNDef {
-			It(fmt.Sprintf("[comp: %s] should not terminate immediately if deleting cluster with terminationPolicy=DoNotTerminate", compName), func() {
-				testDoNotTerminate(compName, compDefName)
-			})
-
-			It(fmt.Sprintf("[comp: %s] should not terminate immediately if deleting cluster with terminationPolicy=DoNotTerminate", compName), func() {
-				testHaltNRecovery(compName, compDefName)
-			})
-
-			It(fmt.Sprintf("[comp: %s] should not terminate immediately if deleting cluster with terminationPolicy=DoNotTerminate", compName), func() {
-				testDelete(compName, compDefName)
-			})
-
-			It(fmt.Sprintf("[comp: %s] should delete cluster resources immediately if deleting cluster with terminationPolicy=WipeOut", compName), func() {
-				testWipeOut(compName, compDefName)
-			})
-
 			It(fmt.Sprintf("[comp: %s] with cluster affinity and tolerations set", compName), func() {
 				testClusterAffinityNToleration(compName, compDefName)
 			})

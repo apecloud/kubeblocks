@@ -177,7 +177,8 @@ func (c *componentPlanBuilder) componentWalkFunc(v graph.Vertex) error {
 			return err
 		}
 	case model.DELETE:
-		if controllerutil.RemoveFinalizer(vertex.Obj, constant.DBComponentFinalizerName) {
+		// if controllerutil.RemoveFinalizer(vertex.Obj, constant.DBComponentFinalizerName) {
+		if controllerutil.RemoveFinalizer(vertex.Obj, constant.DBClusterFinalizerName) {
 			err := c.cli.Update(c.transCtx.Context, vertex.Obj)
 			if err != nil && !apierrors.IsNotFound(err) {
 				c.transCtx.Logger.Error(err, fmt.Sprintf("delete %T error: %s", vertex.Obj, vertex.Obj.GetName()))

@@ -43,6 +43,11 @@ func NewClusterFactory(namespace, name, cdRef, cvRef string) *MockClusterFactory
 	return f
 }
 
+func (factory *MockClusterFactory) SetTerminationPolicy(policyType appsv1alpha1.TerminationPolicyType) *MockClusterFactory {
+	factory.Get().Spec.TerminationPolicy = policyType
+	return factory
+}
+
 func (factory *MockClusterFactory) SetClusterAffinity(affinity *appsv1alpha1.Affinity) *MockClusterFactory {
 	factory.Get().Spec.Affinity = affinity
 	return factory

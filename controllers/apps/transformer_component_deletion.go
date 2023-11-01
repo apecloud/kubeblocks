@@ -20,15 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -45,42 +37,42 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	obj := transCtx.Component
+	comp := transCtx.Component
 
-	clusterName, err := getClusterName(obj)
-	if err != nil {
-		return newRequeueError(requeueDuration, err.Error())
-	}
+	// clusterName, err := getClusterName(comp)
+	// if err != nil {
+	//	return newRequeueError(requeueDuration, err.Error())
+	// }
+	//
+	// compName, err := component.ShortName(clusterName, comp.Name)
+	// ml := constant.GetComponentWellKnownLabels(clusterName, compName)
+	// snapshot, err := model.ReadCacheSnapshot(transCtx, comp, ml, kindsForCompDelete()...)
+	// if err != nil {
+	//	return newRequeueError(requeueDuration, err.Error())
+	// }
+	// for _, object := range snapshot {
+	//	graphCli.Delete(dag, object)
+	// }
 
-	compName, err := component.ShortName(clusterName, obj.Name)
-	ml := constant.GetComponentWellKnownLabels(clusterName, compName)
-	snapshot, err := model.ReadCacheSnapshot(transCtx, obj, ml, kindsForCompDelete()...)
-	if err != nil {
-		return newRequeueError(requeueDuration, err.Error())
-	}
-	for _, object := range snapshot {
-		graphCli.Delete(dag, object)
-	}
-
-	transCtx.Component.Status.Phase = appsv1alpha1.DeletingClusterCompPhase
-	graphCli.Delete(dag, obj)
+	comp.Status.Phase = appsv1alpha1.DeletingClusterCompPhase
+	graphCli.Delete(dag, comp)
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
 	return graph.ErrPrematureStop
 }
 
-func compOwnedKinds() []client.ObjectList {
-	return []client.ObjectList{
-		&workloads.ReplicatedStateMachineList{},
-		&policyv1.PodDisruptionBudgetList{},
-		&corev1.ServiceList{},
-		&corev1.ConfigMapList{},
-		&corev1.SecretList{},
-	}
-}
-
-func kindsForCompDelete() []client.ObjectList {
-	kinds := compOwnedKinds()
-	kinds = append(kinds, &batchv1.JobList{})
-	return kinds
-}
+// func compOwnedKinds() []client.ObjectList {
+//	return []client.ObjectList{
+//		&workloads.ReplicatedStateMachineList{},
+//		&policyv1.PodDisruptionBudgetList{},
+//		&corev1.ServiceList{},
+//		&corev1.ConfigMapList{},
+//		&corev1.SecretList{},
+//	}
+// }
+//
+// func kindsForCompDelete() []client.ObjectList {
+//	kinds := compOwnedKinds()
+//	kinds = append(kinds, &batchv1.JobList{})
+//	return kinds
+// }

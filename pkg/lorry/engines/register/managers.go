@@ -32,6 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/etcd"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/foxlake"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/mongodb"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/mysql"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/nebula"
@@ -54,36 +55,36 @@ var managerNewFuncs = make(map[string]managerNewFunc)
 var dbManager engines.DBManager
 
 func init() {
-	RegisterEngine("mysql", "consensus", wesql.NewManager, mysql.NewCommands)
-	RegisterEngine("mysql", "replication", mysql.NewManager, mysql.NewCommands)
-	RegisterEngine("redis", "replication", redis.NewManager, redis.NewCommands)
-	RegisterEngine("etcd", "consensus", etcd.NewManager, nil)
-	RegisterEngine("mongodb", "consensus", mongodb.NewManager, mongodb.NewCommands)
-	RegisterEngine("polardbx", "consensus", polardbx.NewManager, mysql.NewCommands)
-	RegisterEngine("postgresql", "replication", officalpostgres.NewManager, postgres.NewCommands)
-	RegisterEngine("postgresql", "consensus", apecloudpostgres.NewManager, postgres.NewCommands)
-	RegisterEngine("foxlake", "", nil, foxlake.NewCommands)
-	RegisterEngine("nebula", "", nil, nebula.NewCommands)
-	RegisterEngine("pulsar-proxy", "", nil, pulsar.NewProxyCommands)
-	RegisterEngine("pulsar-broker", "", nil, pulsar.NewBrokerCommands)
-	RegisterEngine("oceanbase", "", nil, oceanbase.NewCommands)
+	RegisterEngine(models.MySQL, "consensus", wesql.NewManager, mysql.NewCommands)
+	RegisterEngine(models.MySQL, "replication", mysql.NewManager, mysql.NewCommands)
+	RegisterEngine(models.Redis, "replication", redis.NewManager, redis.NewCommands)
+	RegisterEngine(models.ETCD, "consensus", etcd.NewManager, nil)
+	RegisterEngine(models.MongoDB, "consensus", mongodb.NewManager, mongodb.NewCommands)
+	RegisterEngine(models.PolarDBX, "consensus", polardbx.NewManager, mysql.NewCommands)
+	RegisterEngine(models.PostgreSQL, "replication", officalpostgres.NewManager, postgres.NewCommands)
+	RegisterEngine(models.PostgreSQL, "consensus", apecloudpostgres.NewManager, postgres.NewCommands)
+	RegisterEngine(models.FoxLake, "", nil, foxlake.NewCommands)
+	RegisterEngine(models.Nebula, "", nil, nebula.NewCommands)
+	RegisterEngine(models.PulsarProxy, "", nil, pulsar.NewProxyCommands)
+	RegisterEngine(models.PulsarBroker, "", nil, pulsar.NewBrokerCommands)
+	RegisterEngine(models.Oceanbase, "", nil, oceanbase.NewCommands)
 
 	// support component definition without workloadtype
-	RegisterEngine("wesql", "", wesql.NewManager, mysql.NewCommands)
-	RegisterEngine("mysql", "", mysql.NewManager, mysql.NewCommands)
-	RegisterEngine("redis", "", redis.NewManager, redis.NewCommands)
-	RegisterEngine("etcd", "", etcd.NewManager, nil)
-	RegisterEngine("mongodb", "", mongodb.NewManager, mongodb.NewCommands)
-	RegisterEngine("polardbx", "", polardbx.NewManager, mysql.NewCommands)
-	RegisterEngine("postgresql", "", officalpostgres.NewManager, postgres.NewCommands)
-	RegisterEngine("offical-postgresql", "", officalpostgres.NewManager, postgres.NewCommands)
-	RegisterEngine("apecloud-postgresql", "", apecloudpostgres.NewManager, postgres.NewCommands)
+	RegisterEngine(models.WeSQL, "", wesql.NewManager, mysql.NewCommands)
+	RegisterEngine(models.MySQL, "", mysql.NewManager, mysql.NewCommands)
+	RegisterEngine(models.Redis, "", redis.NewManager, redis.NewCommands)
+	RegisterEngine(models.ETCD, "", etcd.NewManager, nil)
+	RegisterEngine(models.MongoDB, "", mongodb.NewManager, mongodb.NewCommands)
+	RegisterEngine(models.PolarDBX, "", polardbx.NewManager, mysql.NewCommands)
+	RegisterEngine(models.PostgreSQL, "", officalpostgres.NewManager, postgres.NewCommands)
+	RegisterEngine(models.OfficalPostgreSQL, "", officalpostgres.NewManager, postgres.NewCommands)
+	RegisterEngine(models.ApecloudPostgreSQL, "", apecloudpostgres.NewManager, postgres.NewCommands)
 }
 
-func RegisterEngine(characterType, workloadType string, newFunc managerNewFunc, newCommand engines.NewCommandFunc) {
-	key := strings.ToLower(characterType + "_" + workloadType)
+func RegisterEngine(characterType models.EngineType, workloadType string, newFunc managerNewFunc, newCommand engines.NewCommandFunc) {
+	key := strings.ToLower(string(characterType) + "_" + workloadType)
 	managerNewFuncs[key] = newFunc
-	engines.NewCommandFuncs[characterType] = newCommand
+	engines.NewCommandFuncs[string(characterType)] = newCommand
 }
 
 func GetManagerNewFunc(characterType, workloadType string) managerNewFunc {

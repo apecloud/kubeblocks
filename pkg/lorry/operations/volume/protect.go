@@ -137,23 +137,23 @@ func (p *Protection) Do(ctx context.Context, req *operations.OpsRequest) (*opera
 	return resp, err
 }
 
-func (o *Protection) initVolumes() error {
+func (p *Protection) initVolumes() error {
 	spec := &appsv1alpha1.VolumeProtectionSpec{}
 	raw := viper.GetString(constant.KBEnvVolumeProtectionSpec)
 	if err := json.Unmarshal([]byte(raw), spec); err != nil {
-		o.Logger.Error(err, "unmarshal volume protection spec error", "raw spec", raw)
+		p.Logger.Error(err, "unmarshal volume protection spec error", "raw spec", raw)
 		return err
 	}
 
-	o.HighWatermark = normalizeVolumeWatermark(&spec.HighWatermark, 0)
+	p.HighWatermark = normalizeVolumeWatermark(&spec.HighWatermark, 0)
 
-	if o.Volumes == nil {
-		o.Volumes = make(map[string]volumeExt)
+	if p.Volumes == nil {
+		p.Volumes = make(map[string]volumeExt)
 	}
 	for _, v := range spec.Volumes {
-		o.Volumes[v.Name] = volumeExt{
+		p.Volumes[v.Name] = volumeExt{
 			Name:          v.Name,
-			HighWatermark: normalizeVolumeWatermark(v.HighWatermark, o.HighWatermark),
+			HighWatermark: normalizeVolumeWatermark(v.HighWatermark, p.HighWatermark),
 			Stats: statsv1alpha1.VolumeStats{
 				Name: v.Name,
 			},
@@ -162,12 +162,12 @@ func (o *Protection) initVolumes() error {
 	return nil
 }
 
-func (o *Protection) disabled() bool {
+func (p *Protection) disabled() bool {
 	// TODO: check the role and skip secondary instances.
-	if len(o.Pod) == 0 || len(o.Volumes) == 0 {
+	if len(p.Pod) == 0 || len(p.Volumes) == 0 {
 		return true
 	}
-	for _, v := range o.Volumes {
+	for _, v := range p.Volumes {
 		// take (0, 100] as enabled
 		if v.HighWatermark > 0 && v.HighWatermark <= 100 {
 			return false
@@ -176,21 +176,21 @@ func (o *Protection) disabled() bool {
 	return true
 }
 
-func (o *Protection) updateVolumeStats(payload []byte) error {
+func (p *Protection) updateVolumeStats(payload []byte) error {
 	summary := &statsv1alpha1.Summary{}
 	if err := json.Unmarshal(payload, summary); err != nil {
-		o.Logger.Error(err, "stats summary obtained from kubelet error")
+		p.Logger.Error(err, "stats summary obtained from kubelet error")
 		return err
 	}
 	for _, pod := range summary.Pods {
-		if pod.PodRef.Name == o.Pod {
+		if pod.PodRef.Name == p.Pod {
 			for _, stats := range pod.VolumeStats {
-				if _, ok := o.Volumes[stats.Name]; !ok {
+				if _, ok := p.Volumes[stats.Name]; !ok {
 					continue
 				}
-				v := o.Volumes[stats.Name]
+				v := p.Volumes[stats.Name]
 				v.Stats = stats
-				o.Volumes[stats.Name] = v
+				p.Volumes[stats.Name] = v
 			}
 			break
 		}
@@ -198,11 +198,11 @@ func (o *Protection) updateVolumeStats(payload []byte) error {
 	return nil
 }
 
-func (o *Protection) checkUsage(ctx context.Context) (map[string]any, error) {
+func (p *Protection) checkUsage(ctx context.Context) (map[string]any, error) {
 	lower := make([]string, 0)
 	higher := make([]string, 0)
-	for name, v := range o.Volumes {
-		ret := o.checkVolumeWatermark(v)
+	for name, v := range p.Volumes {
+		ret := p.checkVolumeWatermark(v)
 		if ret == 0 {
 			lower = append(lower, name)
 		} else {
@@ -210,17 +210,17 @@ func (o *Protection) checkUsage(ctx context.Context) (map[string]any, error) {
 		}
 	}
 
-	volumeUsages := o.buildVolumesMsg()
-	readonly := o.Readonly
+	volumeUsages := p.buildVolumesMsg()
+	readonly := p.Readonly
 	// the instance is running normally and there have volume(s) over the space usage threshold.
 	if !readonly && len(higher) > 0 {
-		if err := o.highWatermark(ctx, volumeUsages); err != nil {
+		if err := p.highWatermark(ctx, volumeUsages); err != nil {
 			return volumeUsages, err
 		}
 	}
 	// the instance is protected in RO mode, and all volumes' space usage are under the threshold.
-	if readonly && len(lower) == len(o.Volumes) {
-		if err := o.lowWatermark(ctx, volumeUsages); err != nil {
+	if readonly && len(lower) == len(p.Volumes) {
+		if err := p.lowWatermark(ctx, volumeUsages); err != nil {
 			return volumeUsages, err
 		}
 	}
@@ -231,7 +231,7 @@ func (o *Protection) checkUsage(ctx context.Context) (map[string]any, error) {
 //
 //	returns 0 if the volume will not be taken in account or its space usage is under the threshold
 //	returns non-zero if the volume space usage is over the threshold
-func (o *Protection) checkVolumeWatermark(v volumeExt) int {
+func (p *Protection) checkVolumeWatermark(v volumeExt) int {
 	if v.HighWatermark == 0 { // disabled
 		return 0
 	}
@@ -245,57 +245,57 @@ func (o *Protection) checkVolumeWatermark(v volumeExt) int {
 	return 1
 }
 
-func (o *Protection) highWatermark(ctx context.Context, volumeUsages map[string]any) error {
-	if o.Readonly { // double check
+func (p *Protection) highWatermark(ctx context.Context, volumeUsages map[string]any) error {
+	if p.Readonly { // double check
 		return nil
 	}
-	if err := o.lockInstance(ctx); err != nil {
-		o.Logger.Error(err, "set instance to read-only error", "volumes", volumeUsages)
+	if err := p.lockInstance(ctx); err != nil {
+		p.Logger.Error(err, "set instance to read-only error", "volumes", volumeUsages)
 		return err
 	}
 
-	o.Logger.Info("set instance to read-only OK", "msg", volumeUsages)
-	o.Readonly = true
+	p.Logger.Info("set instance to read-only OK", "msg", volumeUsages)
+	p.Readonly = true
 
-	if err := o.sendEvent(ctx, reasonLock, volumeUsages); err != nil {
-		o.Logger.Error(err, "send volume protection (lock) event error", "volumes", volumeUsages)
+	if err := p.sendEvent(ctx, reasonLock, volumeUsages); err != nil {
+		p.Logger.Error(err, "send volume protection (lock) event error", "volumes", volumeUsages)
 		return err
 	}
 	return nil
 }
 
-func (o *Protection) lowWatermark(ctx context.Context, volumeUsages map[string]any) error {
-	if !o.Readonly { // double check
+func (p *Protection) lowWatermark(ctx context.Context, volumeUsages map[string]any) error {
+	if !p.Readonly { // double check
 		return nil
 	}
-	if err := o.unlockInstance(ctx); err != nil {
-		o.Logger.Error(err, "reset instance to read-write error", "volumes", volumeUsages)
+	if err := p.unlockInstance(ctx); err != nil {
+		p.Logger.Error(err, "reset instance to read-write error", "volumes", volumeUsages)
 		return err
 	}
 
-	o.Logger.Info("reset instance to read-write OK", "msg", volumeUsages)
-	o.Readonly = false
+	p.Logger.Info("reset instance to read-write OK", "msg", volumeUsages)
+	p.Readonly = false
 
-	if err := o.sendEvent(ctx, reasonUnlock, volumeUsages); err != nil {
-		o.Logger.Error(err, "send volume protection (unlock) event error", "volumes", volumeUsages)
+	if err := p.sendEvent(ctx, reasonUnlock, volumeUsages); err != nil {
+		p.Logger.Error(err, "send volume protection (unlock) event error", "volumes", volumeUsages)
 		return err
 	}
 	return nil
 }
 
-func (o *Protection) lockInstance(ctx context.Context) error {
-	return o.dbManager.Lock(ctx, "disk full")
+func (p *Protection) lockInstance(ctx context.Context) error {
+	return p.dbManager.Lock(ctx, "disk full")
 }
 
-func (o *Protection) unlockInstance(ctx context.Context) error {
-	return o.dbManager.Unlock(ctx)
+func (p *Protection) unlockInstance(ctx context.Context) error {
+	return p.dbManager.Unlock(ctx)
 }
 
-func (o *Protection) buildVolumesMsg() map[string]any {
+func (p *Protection) buildVolumesMsg() map[string]any {
 	volumes := make([]map[string]string, 0)
-	for _, v := range o.Volumes {
+	for _, v := range p.Volumes {
 		usage := make(map[string]string)
-		if v.HighWatermark != o.HighWatermark {
+		if v.HighWatermark != p.HighWatermark {
 			usage["highWatermark"] = fmt.Sprintf("%d", v.HighWatermark)
 		}
 		stats := v.Stats
@@ -307,14 +307,14 @@ func (o *Protection) buildVolumesMsg() map[string]any {
 		volumes = append(volumes, usage)
 	}
 	usages := map[string]any{
-		"highWatermark": fmt.Sprintf("%d", o.HighWatermark),
+		"highWatermark": fmt.Sprintf("%d", p.HighWatermark),
 		"volumes":       volumes,
 	}
 	return usages
 }
 
-func (o *Protection) sendEvent(ctx context.Context, reason string, volumeUsages map[string]any) error {
-	if o.SendEvent {
+func (p *Protection) sendEvent(ctx context.Context, reason string, volumeUsages map[string]any) error {
+	if p.SendEvent {
 		event, err := util.CreateEvent(reason, volumeUsages)
 		if err != nil {
 			return errors.Wrap(err, "create volume protection event failed")

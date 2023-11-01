@@ -287,7 +287,7 @@ func buildServiceValMap(instance *OteldInstance) map[string]any {
 	if instance.OTeld.Spec.MetricsPort != 0 {
 		valMap["metrics_port"] = instance.OTeld.Spec.MetricsPort
 	}
-	if instance.OTeld.Spec.GlobalLabels != nil {
+	if len(instance.OTeld.Spec.GlobalLabels) != 0 {
 		valMap["global_labels"] = instance.OTeld.Spec.GlobalLabels
 	}
 	return valMap

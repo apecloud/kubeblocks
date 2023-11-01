@@ -16,20 +16,27 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 parameters: {
-	log_level: *"info" | string
-  metrics_port: *6668 | int
-  golbal_labels: [...string]
+	log_level:    *"info" | string
+	metrics_port: *6668 | int
+	global_labels?: {
+		[string]: string
+	}
 }
 
 output: {
 	telemetry: {
-  	logs:
-      level: parameters.log_level
-    metrics:
-      address: "${env:HOST_IP}:" + "\(parameters.metrics_port)"
-    resource: {
-    	parameters.golbal_labels
-    }
-  }
-  extensions: ["memory_ballast", "apecloud_k8s_observer", "runtime_container", "apecloud_engine_observer", "file_storage/oteld"]
+		logs:
+			level: parameters.log_level
+		metrics:
+			address: "${env:HOST_IP}:" + "\(parameters.metrics_port)"
+		resource: {
+			node: "${env:NODE_NAME}"
+			if parameters.global_labels != _|_ {
+				for k, v in parameters.global_labels {
+					"\(k)": v
+				}
+			}
+		}
+	}
+	extensions: ["memory_ballast", "apecloud_k8s_observer", "runtime_container", "apecloud_engine_observer", "file_storage/oteld"]
 }

@@ -103,7 +103,7 @@ func (t *componentCredentialTransformer) buildFromExistedSecret(transCtx *compon
 
 func (t *componentCredentialTransformer) buildFromServiceAndAccount(transCtx *componentTransformContext,
 	synthesizeComp *component.SynthesizedComponent, credential appsv1alpha1.ConnectionCredential, secret *corev1.Secret) error {
-	data := make(map[string]string)
+	data := make(map[string][]byte)
 	if len(credential.ServiceName) > 0 {
 		if err := t.buildEndpoint(synthesizeComp, credential, &data); err != nil {
 			return err
@@ -124,12 +124,12 @@ func (t *componentCredentialTransformer) buildFromServiceAndAccount(transCtx *co
 			return err
 		}
 	}
-	secret.StringData = data
+	secret.Data = data
 	return nil
 }
 
 func (t *componentCredentialTransformer) buildEndpoint(synthesizeComp *component.SynthesizedComponent,
-	credential appsv1alpha1.ConnectionCredential, data *map[string]string) error {
+	credential appsv1alpha1.ConnectionCredential, data *map[string][]byte) error {
 	var service *appsv1alpha1.ComponentService
 	for i, svc := range synthesizeComp.ComponentServices {
 		if svc.Name == credential.ServiceName {
@@ -155,7 +155,7 @@ func (t *componentCredentialTransformer) buildEndpoint(synthesizeComp *component
 }
 
 func (t *componentCredentialTransformer) buildEndpointFromService(synthesizeComp *component.SynthesizedComponent,
-	credential appsv1alpha1.ConnectionCredential, service *appsv1alpha1.ComponentService, data *map[string]string) {
+	credential appsv1alpha1.ConnectionCredential, service *appsv1alpha1.ComponentService, data *map[string][]byte) {
 	serviceName := constant.GenerateComponentServiceEndpoint(synthesizeComp.ClusterName, synthesizeComp.Name, string(service.ServiceName))
 
 	port := int32(0)
@@ -171,13 +171,13 @@ func (t *componentCredentialTransformer) buildEndpointFromService(synthesizeComp
 	}
 
 	// TODO(component): define the service and port pattern
-	(*data)["endpoint"] = fmt.Sprintf("%s:%d", serviceName, port)
-	(*data)["host"] = serviceName
-	(*data)["port"] = fmt.Sprintf("%d", port)
+	(*data)["endpoint"] = []byte(fmt.Sprintf("%s:%d", serviceName, port))
+	(*data)["host"] = []byte(serviceName)
+	(*data)["port"] = []byte(fmt.Sprintf("%d", port))
 }
 
 func (t *componentCredentialTransformer) buildCredential(transCtx *componentTransformContext,
-	synthesizedComp *component.SynthesizedComponent, account *appsv1alpha1.ComponentSystemAccount, data *map[string]string) error {
+	synthesizedComp *component.SynthesizedComponent, account *appsv1alpha1.ComponentSystemAccount, data *map[string][]byte) error {
 	secretKey := types.NamespacedName{
 		Namespace: synthesizedComp.Namespace,
 		Name:      constant.GenerateAccountSecretName(synthesizedComp.ClusterName, synthesizedComp.Name, account.Name),
@@ -191,8 +191,7 @@ func (t *componentCredentialTransformer) buildCredential(transCtx *componentTran
 			return err
 		}
 	}
-	// TODO(component): which field should to use from accounts?
-	maps.Copy(*data, secret.StringData)
+	maps.Copy(*data, secret.Data)
 	return nil
 }
 

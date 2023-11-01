@@ -46,7 +46,7 @@ func GenerateComponentConnCredential(clusterName, compName, name string) string 
 
 // GenerateAccountSecretName generates the secret name of system accounts.
 func GenerateAccountSecretName(clusterName, compName, name string) string {
-	return fmt.Sprintf("%s-%s-%s", clusterName, compName, name)
+	return fmt.Sprintf("%s-%s-account-%s", clusterName, compName, name)
 }
 
 // GenerateComponentServiceEndpoint generates service endpoint of component

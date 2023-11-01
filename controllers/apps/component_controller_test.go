@@ -1057,9 +1057,6 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
-	testCompVolume := func(compName, compDefName string) {
-	}
-
 	testCompService := func(compName, compDefName string) {
 		createClusterObjV2(compName, compDefObj.Name, nil)
 
@@ -1130,15 +1127,16 @@ var _ = Describe("Component Controller", func() {
 		By("check root conn credential")
 		serviceName := constant.GenerateComponentServiceEndpoint(clusterObj.Name, compName, "rw")
 		servicePort := "3306"
+		endpoint := fmt.Sprintf("%s:%s", serviceName, servicePort)
 		rootSecretKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
 			Name:      constant.GenerateComponentConnCredential(clusterObj.Name, compName, "root"),
 		}
 		Eventually(testapps.CheckObj(&testCtx, rootSecretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKeyWithValue("endpoint", fmt.Sprintf("%s:%s", serviceName, servicePort)))
-			g.Expect(secret.Data).Should(HaveKeyWithValue("host", serviceName))
-			g.Expect(secret.Data).Should(HaveKeyWithValue("port", servicePort))
-			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, "root"))
+			g.Expect(secret.Data).Should(HaveKeyWithValue("endpoint", []byte(endpoint)))
+			g.Expect(secret.Data).Should(HaveKeyWithValue("host", []byte(serviceName)))
+			g.Expect(secret.Data).Should(HaveKeyWithValue("port", []byte(servicePort)))
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("root")))
 			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
 		})).Should(Succeed())
 
@@ -1148,10 +1146,10 @@ var _ = Describe("Component Controller", func() {
 			Name:      constant.GenerateComponentConnCredential(clusterObj.Name, compName, "admin"),
 		}
 		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKeyWithValue("endpoint", fmt.Sprintf("%s:%s", serviceName, servicePort)))
-			g.Expect(secret.Data).Should(HaveKeyWithValue("host", serviceName))
-			g.Expect(secret.Data).Should(HaveKeyWithValue("port", servicePort))
-			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, "admin"))
+			g.Expect(secret.Data).Should(HaveKeyWithValue("endpoint", []byte(endpoint)))
+			g.Expect(secret.Data).Should(HaveKeyWithValue("host", []byte(serviceName)))
+			g.Expect(secret.Data).Should(HaveKeyWithValue("port", []byte(servicePort)))
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
 			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
 		})).Should(Succeed())
 	}
@@ -1670,10 +1668,6 @@ var _ = Describe("Component Controller", func() {
 			testCompFinalizerNLabel(defaultCompName, compDefName)
 		})
 
-		It(fmt.Sprintf("with component volumes"), func() {
-			testCompVolume(defaultCompName, compDefName)
-		})
-
 		It(fmt.Sprintf("with component services"), func() {
 			testCompService(defaultCompName, compDefName)
 		})
@@ -1770,12 +1764,12 @@ var _ = Describe("Component Controller", func() {
 			horizontalScale(int(updatedReplicas), testk8s.DefaultStorageClassName, policyType, consensusCompDefName, replicationCompDefName)
 		}
 
-		It("should successfully h-scale with multiple components", func() {
+		It("h-scale with volume snapshot", func() {
 			testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
 			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 		})
 
-		It("should successfully h-scale with multiple components by backup tool", func() {
+		It("h-scale with backup tool", func() {
 			testk8s.MockDisableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
 			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 		})

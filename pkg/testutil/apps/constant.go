@@ -258,7 +258,7 @@ var (
 		},
 		Services: []appsv1alpha1.ComponentService{
 			{
-				Name:        "default",
+				Name:        "rw",
 				ServiceName: "rw",
 				ServiceSpec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
@@ -317,12 +317,12 @@ var (
 		ConnectionCredentials: []appsv1alpha1.ConnectionCredential{
 			{
 				Name:        "root",
-				ServiceName: "default",
+				ServiceName: "rw",
 				AccountName: "root",
 			},
 			{
 				Name:        "admin",
-				ServiceName: "default",
+				ServiceName: "rw",
 				AccountName: "admin",
 			},
 		},

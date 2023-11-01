@@ -83,6 +83,8 @@ spec:
                 subPath: user.yaml
               - mountPath: /milvus/tools
                 name: tools
+              - mountPath: /var/lib/milvus
+                name: data
             dnsPolicy: ClusterFirst
             enableServiceLinks: true
             ports:

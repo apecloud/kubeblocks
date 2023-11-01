@@ -80,21 +80,21 @@ const (
 
 // constant  for volume populator
 const (
-	populatePodPrefix = "kb-populate"
+	PopulatePodPrefix = "kb-populate"
 
 	// annotation keys
-	annSelectedNode = "volume.kubernetes.io/selected-node"
-	annPopulateFrom = "dataprotection.kubeblocks.io/populate-from"
+	AnnSelectedNode = "volume.kubernetes.io/selected-node"
+	AnnPopulateFrom = "dataprotection.kubeblocks.io/populate-from"
 
 	// event reason
-	reasonStartToVolumePopulate = "StartToVolumePopulate"
-	reasonVolumePopulateSucceed = "VolumePopulateSucceed"
-	reasonVolumePopulateFailed  = "VolumePopulateFailed"
+	ReasonStartToVolumePopulate = "StartToVolumePopulate"
+	ReasonVolumePopulateSucceed = "VolumePopulateSucceed"
+	ReasonVolumePopulateFailed  = "VolumePopulateFailed"
 
 	// pvc condition type and reason
-	reasonPopulatingFailed     = "Failed"
-	reasonPopulatingProcessing = "Processing"
-	reasonPopulatingSucceed    = "Succeed"
+	ReasonPopulatingFailed     = "Failed"
+	ReasonPopulatingProcessing = "Processing"
+	ReasonPopulatingSucceed    = "Succeed"
 
 	PersistentVolumeClaimPopulating corev1.PersistentVolumeClaimConditionType = "Populating"
 )

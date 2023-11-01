@@ -170,7 +170,6 @@ var _ = Describe("Restore", func() {
 				WithRandomName().SetLabels(backupTplLabels).
 				AddBackupPolicy(mysqlCompName).
 				SetClusterDefRef(clusterDefName).
-				SetRetentionPeriod(defaultTTL).
 				AddBackupMethod(testdp.BackupMethodName, false, fullBackupActionSetName).
 				SetBackupMethodVolumeMounts(testapps.DataVolumeName, "/data")
 

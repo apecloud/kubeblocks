@@ -28,16 +28,20 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
+	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 )
@@ -46,48 +50,84 @@ var (
 	errNoDefaultBackupRepo = fmt.Errorf("no default BackupRepo found")
 )
 
-func getBackupPolicyByName(
-	reqCtx intctrlutil.RequestCtx,
+// getBackupRepo returns the backup repo specified by the backup object or the policy.
+// if no backup repo specified, it will return the default one.
+func getBackupRepo(ctx context.Context,
 	cli client.Client,
-	name string) (*dpv1alpha1.BackupPolicy, error) {
-	backupPolicy := &dpv1alpha1.BackupPolicy{}
-	key := client.ObjectKey{
-		Namespace: reqCtx.Req.Namespace,
-		Name:      name,
+	backup *dpv1alpha1.Backup,
+	backupPolicy *dpv1alpha1.BackupPolicy) (*dpv1alpha1.BackupRepo, error) {
+	// use the specified backup repo
+	var repoName string
+	if val := backup.Labels[dataProtectionBackupRepoKey]; val != "" {
+		repoName = val
+	} else if backupPolicy.Spec.BackupRepoName != nil && *backupPolicy.Spec.BackupRepoName != "" {
+		repoName = *backupPolicy.Spec.BackupRepoName
 	}
-	if err := cli.Get(reqCtx.Ctx, key, backupPolicy); err != nil {
-		return nil, err
+	if repoName != "" {
+		repo := &dpv1alpha1.BackupRepo{}
+		if err := cli.Get(ctx, client.ObjectKey{Name: repoName}, repo); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil, intctrlutil.NewNotFound("backup repo %s not found", repoName)
+			}
+			return nil, err
+		}
+		return repo, nil
 	}
-	return backupPolicy, nil
+	// fallback to use the default repo
+	return getDefaultBackupRepo(ctx, cli)
 }
 
-// getActionSetByName gets the ActionSet by name.
-func getActionSetByName(reqCtx intctrlutil.RequestCtx,
-	cli client.Client, name string) (*dpv1alpha1.ActionSet, error) {
-	if name == "" {
-		return nil, nil
+func HandleBackupRepo(request *dpbackup.Request) error {
+	repo, err := getBackupRepo(request.Ctx, request.Client, request.Backup, request.BackupPolicy)
+	if err != nil {
+		return err
 	}
-	as := &dpv1alpha1.ActionSet{}
-	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: name}, as); err != nil {
-		reqCtx.Log.Error(err, "failed to get ActionSet for backup.", "ActionSet", name)
-		return nil, err
-	}
-	return as, nil
-}
+	request.BackupRepo = repo
 
-func getBackupMethodByName(name string, backupPolicy *dpv1alpha1.BackupPolicy) *dpv1alpha1.BackupMethod {
-	for _, m := range backupPolicy.Spec.BackupMethods {
-		if m.Name == name {
-			return &m
+	if repo.Status.Phase != dpv1alpha1.BackupRepoReady {
+		return dperrors.NewBackupRepoIsNotReady(repo.Name)
+	}
+
+	switch {
+	case repo.AccessByMount():
+		pvcName := repo.Status.BackupPVCName
+		if pvcName == "" {
+			return dperrors.NewBackupPVCNameIsEmpty(repo.Name, request.Spec.BackupPolicyName)
+		}
+		pvc := &corev1.PersistentVolumeClaim{}
+		pvcKey := client.ObjectKey{Namespace: request.Req.Namespace, Name: pvcName}
+		if err = request.Client.Get(request.Ctx, pvcKey, pvc); err != nil {
+			// will wait for the backuprepo controller to create the PVC,
+			// so ignore the NotFound error
+			return client.IgnoreNotFound(err)
+		}
+		// backupRepo PVC exists, record the PVC name
+		if err == nil {
+			request.BackupRepoPVC = pvc
+		}
+	case repo.AccessByTool():
+		toolConfigSecretName := repo.Status.ToolConfigSecretName
+		if toolConfigSecretName == "" {
+			return dperrors.NewToolConfigSecretNameIsEmpty(repo.Name)
+		}
+		secret := &corev1.Secret{}
+		secretKey := client.ObjectKey{Namespace: request.Req.Namespace, Name: toolConfigSecretName}
+		if err = request.Client.Get(request.Ctx, secretKey, secret); err != nil {
+			// will wait for the backuprepo controller to create the secret,
+			// so ignore the NotFound error
+			return client.IgnoreNotFound(err)
+		}
+		if err == nil {
+			request.ToolConfigSecret = secret
 		}
 	}
 	return nil
 }
 
-// getTargetPods gets the target pods by BackupPolicy. If podName is not empty,
+// GetTargetPods gets the target pods by BackupPolicy. If podName is not empty,
 // it will return the pod which name is podName. Otherwise, it will return the
 // pods which are selected by BackupPolicy selector and strategy.
-func getTargetPods(reqCtx intctrlutil.RequestCtx,
+func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 	cli client.Client, podName string,
 	backupPolicy *dpv1alpha1.BackupPolicy) ([]*corev1.Pod, error) {
 	selector := backupPolicy.Spec.Target.PodSelector
@@ -165,12 +205,12 @@ func getClusterLabelKeys() []string {
 }
 
 // sendWarningEventForError sends warning event for backup controller error
-func sendWarningEventForError(recorder record.EventRecorder, backup *dpv1alpha1.Backup, err error) {
+func sendWarningEventForError(recorder record.EventRecorder, obj client.Object, err error) {
 	controllerErr := intctrlutil.UnwrapControllerError(err)
 	if controllerErr != nil {
-		recorder.Eventf(backup, corev1.EventTypeWarning, string(controllerErr.Type), err.Error())
+		recorder.Eventf(obj, corev1.EventTypeWarning, string(controllerErr.Type), err.Error())
 	} else {
-		recorder.Eventf(backup, corev1.EventTypeWarning, "FailedCreatedBackup",
+		recorder.Eventf(obj, corev1.EventTypeWarning, "FailedCreatedBackup",
 			"Creating backup failed, error: %s", err.Error())
 	}
 }
@@ -219,6 +259,12 @@ func deleteRelatedJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, namespa
 		}
 	}
 	return nil
+}
+
+func RecorderEventAndRequeue(reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder,
+	obj client.Object, err error) (reconcile.Result, error) {
+	sendWarningEventForError(recorder, obj, err)
+	return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 }
 
 // ============================================================================
@@ -326,5 +372,5 @@ func fromFlattenName(flatten string) (name string, namespace string) {
 // restore functions
 
 func getPopulatePVCName(pvcUID types.UID) string {
-	return fmt.Sprintf("%s-%s", populatePodPrefix, pvcUID)
+	return fmt.Sprintf("%s-%s", PopulatePodPrefix, pvcUID)
 }

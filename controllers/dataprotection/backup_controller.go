@@ -28,10 +28,8 @@ import (
 
 	vsv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -50,7 +48,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/action"
 	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
@@ -195,7 +192,7 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 }
 
 // handleDeletingPhase handles the deletion of backup. It will delete the backup CR
-// and the backup workload(job/statefulset).
+// and the backup workload(job).
 func (r *BackupReconciler) handleDeletingPhase(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) (ctrl.Result, error) {
 	// if backup phase is Deleting, delete the backup reference workloads,
 	// backup data stored in backup repository and volume snapshots.
@@ -224,12 +221,15 @@ func (r *BackupReconciler) handleNewPhase(
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
 	request, err := r.prepareBackupRequest(reqCtx, backup)
 	if err != nil {
+		if intctrlutil.IsTargetError(err, dperrors.ErrorTypeWaitForExternalHandler) {
+			return RecorderEventAndRequeue(reqCtx, r.Recorder, backup, err)
+		}
 		return r.updateStatusIfFailed(reqCtx, backup.DeepCopy(), backup, err)
 	}
 
 	// set and patch backup object meta, including labels, annotations and finalizers
 	// if the backup object meta is changed, the backup object will be patched.
-	if wait, err := r.patchBackupObjectMeta(backup, request); err != nil {
+	if wait, err := PatchBackupObjectMeta(backup, request); err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
 	} else if wait {
 		return intctrlutil.Reconciled()
@@ -261,23 +261,12 @@ func (r *BackupReconciler) prepareBackupRequest(
 		request.Labels = make(map[string]string)
 	}
 
-	backupPolicy, err := getBackupPolicyByName(reqCtx, r.Client, backup.Spec.BackupPolicyName)
+	backupPolicy, err := dputils.GetBackupPolicyByName(reqCtx, r.Client, backup.Spec.BackupPolicyName)
 	if err != nil {
 		return nil, err
 	}
 
-	targetPods, err := getTargetPods(reqCtx, r.Client,
-		backup.Annotations[dptypes.BackupTargetPodLabelKey], backupPolicy)
-	if err != nil || len(targetPods) == 0 {
-		return nil, fmt.Errorf("failed to get target pods by backup policy %s/%s",
-			backupPolicy.Namespace, backupPolicy.Name)
-	}
-
-	if len(targetPods) > 1 {
-		return nil, fmt.Errorf("do not support more than one target pods")
-	}
-
-	backupMethod := getBackupMethodByName(backup.Spec.BackupMethod, backupPolicy)
+	backupMethod := dputils.GetBackupMethodByName(backup.Spec.BackupMethod, backupPolicy)
 	if backupMethod == nil {
 		return nil, intctrlutil.NewNotFound("backupMethod: %s not found",
 			backup.Spec.BackupMethod)
@@ -293,12 +282,13 @@ func (r *BackupReconciler) prepareBackupRequest(
 	}
 
 	if backupMethod.ActionSetName != "" {
-		actionSet, err := getActionSetByName(reqCtx, r.Client, backupMethod.ActionSetName)
+		actionSet, err := dputils.GetActionSetByName(reqCtx, r.Client, backupMethod.ActionSetName)
 		if err != nil {
 			return nil, err
-		}
-		if actionSet.Spec.BackupType != dpv1alpha1.BackupTypeFull {
-			return nil, fmt.Errorf("only support backup type Full for actionSet %s", actionSet.Name)
+		} else if actionSet.Spec.BackupType != dpv1alpha1.BackupTypeFull {
+			// TODO: refactor it if supports other backup type.
+			return nil, intctrlutil.NewErrorf(dperrors.ErrorTypeWaitForExternalHandler,
+				`wait for external handler to handle this backup type "%s"`, actionSet.Spec.BackupType)
 		}
 		request.ActionSet = actionSet
 	}
@@ -306,64 +296,24 @@ func (r *BackupReconciler) prepareBackupRequest(
 	request.BackupPolicy = backupPolicy
 	if !snapshotVolumes {
 		// if use volume snapshot, ignore backup repo
-		if err = r.handleBackupRepo(request); err != nil {
+		if err = HandleBackupRepo(request); err != nil {
 			return nil, err
 		}
 	}
-
 	request.BackupMethod = backupMethod
+
+	targetPods, err := GetTargetPods(reqCtx, r.Client,
+		backup.Annotations[dptypes.BackupTargetPodLabelKey], backupPolicy)
+	if err != nil || len(targetPods) == 0 {
+		return nil, fmt.Errorf("failed to get target pods by backup policy %s/%s",
+			backupPolicy.Namespace, backupPolicy.Name)
+	}
+
+	if len(targetPods) > 1 {
+		return nil, fmt.Errorf("do not support more than one target pods")
+	}
 	request.TargetPods = targetPods
 	return request, nil
-}
-
-// handleBackupRepo handles the backup repo, and get the backup repo PVC. If the
-// PVC is not present, it will add a special label and wait for the backup repo
-// controller to create the PVC.
-func (r *BackupReconciler) handleBackupRepo(request *dpbackup.Request) error {
-	repo, err := r.getBackupRepo(request.Ctx, request.Backup, request.BackupPolicy)
-	if err != nil {
-		return err
-	}
-	request.BackupRepo = repo
-
-	if repo.Status.Phase != dpv1alpha1.BackupRepoReady {
-		return dperrors.NewBackupRepoIsNotReady(repo.Name)
-	}
-
-	switch {
-	case repo.AccessByMount():
-		pvcName := repo.Status.BackupPVCName
-		if pvcName == "" {
-			return dperrors.NewBackupPVCNameIsEmpty(repo.Name, request.Spec.BackupPolicyName)
-		}
-		pvc := &corev1.PersistentVolumeClaim{}
-		pvcKey := client.ObjectKey{Namespace: request.Req.Namespace, Name: pvcName}
-		if err = r.Client.Get(request.Ctx, pvcKey, pvc); err != nil {
-			// will wait for the backuprepo controller to create the PVC,
-			// so ignore the NotFound error
-			return client.IgnoreNotFound(err)
-		}
-		// backupRepo PVC exists, record the PVC name
-		if err == nil {
-			request.BackupRepoPVC = pvc
-		}
-	case repo.AccessByTool():
-		toolConfigSecretName := repo.Status.ToolConfigSecretName
-		if toolConfigSecretName == "" {
-			return dperrors.NewToolConfigSecretNameIsEmpty(repo.Name)
-		}
-		secret := &corev1.Secret{}
-		secretKey := client.ObjectKey{Namespace: request.Req.Namespace, Name: toolConfigSecretName}
-		if err = r.Client.Get(request.Ctx, secretKey, secret); err != nil {
-			// will wait for the backuprepo controller to create the secret,
-			// so ignore the NotFound error
-			return client.IgnoreNotFound(err)
-		}
-		if err == nil {
-			request.ToolConfigSecret = secret
-		}
-	}
-	return nil
 }
 
 func (r *BackupReconciler) patchBackupStatus(
@@ -397,86 +347,10 @@ func (r *BackupReconciler) patchBackupStatus(
 	request.Status.Phase = dpv1alpha1.BackupPhaseRunning
 	request.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
 
-	if err = setExpirationByCreationTime(request.Backup); err != nil {
+	if err = dpbackup.SetExpirationByCreationTime(request.Backup); err != nil {
 		return err
 	}
 	return r.Client.Status().Patch(request.Ctx, request.Backup, client.MergeFrom(original))
-}
-
-// patchBackupObjectMeta patches backup object metaObject include cluster snapshot.
-func (r *BackupReconciler) patchBackupObjectMeta(
-	original *dpv1alpha1.Backup,
-	request *dpbackup.Request) (bool, error) {
-	targetPod := request.TargetPods[0]
-
-	// get KubeBlocks cluster and set labels and annotations for backup
-	// TODO(ldm): we should remove this dependency of cluster in the future
-	cluster := getCluster(request.Ctx, r.Client, targetPod)
-	if cluster != nil {
-		if err := setClusterSnapshotAnnotation(request.Backup, cluster); err != nil {
-			return false, err
-		}
-		if err := r.setConnectionPasswordAnnotation(request); err != nil {
-			return false, err
-		}
-		request.Labels[dptypes.ClusterUIDLabelKey] = string(cluster.UID)
-	}
-
-	for _, v := range getClusterLabelKeys() {
-		request.Labels[v] = targetPod.Labels[v]
-	}
-
-	request.Labels[constant.AppManagedByLabelKey] = constant.AppName
-	request.Labels[dptypes.BackupTypeLabelKey] = request.GetBackupType()
-	request.Labels[dptypes.BackupPolicyLabelKey] = request.Spec.BackupPolicyName
-	// wait for the backup repo controller to prepare the essential resource.
-	wait := false
-	if request.BackupRepo != nil {
-		request.Labels[dataProtectionBackupRepoKey] = request.BackupRepo.Name
-		if (request.BackupRepo.AccessByMount() && request.BackupRepoPVC == nil) ||
-			(request.BackupRepo.AccessByTool() && request.ToolConfigSecret == nil) {
-			request.Labels[dataProtectionWaitRepoPreparationKey] = trueVal
-			wait = true
-		}
-	}
-
-	// set annotations
-	request.Annotations[dptypes.BackupTargetPodLabelKey] = targetPod.Name
-
-	// set finalizer
-	controllerutil.AddFinalizer(request.Backup, dptypes.DataProtectionFinalizerName)
-
-	if reflect.DeepEqual(original.ObjectMeta, request.ObjectMeta) {
-		return wait, nil
-	}
-
-	return wait, r.Client.Patch(request.Ctx, request.Backup, client.MergeFrom(original))
-}
-
-// getBackupRepo returns the backup repo specified by the backup object or the policy.
-// if no backup repo specified, it will return the default one.
-func (r *BackupReconciler) getBackupRepo(ctx context.Context,
-	backup *dpv1alpha1.Backup,
-	backupPolicy *dpv1alpha1.BackupPolicy) (*dpv1alpha1.BackupRepo, error) {
-	// use the specified backup repo
-	var repoName string
-	if val := backup.Labels[dataProtectionBackupRepoKey]; val != "" {
-		repoName = val
-	} else if backupPolicy.Spec.BackupRepoName != nil && *backupPolicy.Spec.BackupRepoName != "" {
-		repoName = *backupPolicy.Spec.BackupRepoName
-	}
-	if repoName != "" {
-		repo := &dpv1alpha1.BackupRepo{}
-		if err := r.Client.Get(ctx, client.ObjectKey{Name: repoName}, repo); err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil, intctrlutil.NewNotFound("backup repo %s not found", repoName)
-			}
-			return nil, err
-		}
-		return repo, nil
-	}
-	// fallback to use the default repo
-	return getDefaultBackupRepo(ctx, r.Client)
 }
 
 func (r *BackupReconciler) handleRunningPhase(
@@ -484,6 +358,10 @@ func (r *BackupReconciler) handleRunningPhase(
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
 	request, err := r.prepareBackupRequest(reqCtx, backup)
 	if err != nil {
+		// external controller is already processing it, only mark reconciled
+		if intctrlutil.IsTargetError(err, dperrors.ErrorTypeWaitForExternalHandler) {
+			return intctrlutil.Reconciled()
+		}
 		return r.updateStatusIfFailed(reqCtx, backup.DeepCopy(), backup, err)
 	}
 
@@ -554,25 +432,6 @@ func (r *BackupReconciler) handleRunningPhase(
 	return intctrlutil.Reconciled()
 }
 
-func mergeActionStatus(original, new *dpv1alpha1.ActionStatus) dpv1alpha1.ActionStatus {
-	as := new.DeepCopy()
-	if original.StartTimestamp != nil {
-		as.StartTimestamp = original.StartTimestamp
-	}
-	return *as
-}
-
-func updateBackupStatusByActionStatus(backupStatus *dpv1alpha1.BackupStatus) {
-	for _, act := range backupStatus.Actions {
-		if act.TotalSize != "" && backupStatus.TotalSize == "" {
-			backupStatus.TotalSize = act.TotalSize
-		}
-		if act.TimeRange != nil && backupStatus.TimeRange == nil {
-			backupStatus.TimeRange = act.TimeRange
-		}
-	}
-}
-
 // handleCompletedPhase handles the backup object in completed phase.
 // It will delete the reference workloads.
 func (r *BackupReconciler) handleCompletedPhase(
@@ -596,7 +455,7 @@ func (r *BackupReconciler) updateStatusIfFailed(
 
 	// set expiration time for failed backup, make sure the failed backup will be
 	// deleted after the expiration time.
-	_ = setExpirationByCreationTime(backup)
+	_ = dpbackup.SetExpirationByCreationTime(backup)
 
 	if errUpdate := r.Client.Status().Patch(reqCtx.Ctx, backup, client.MergeFrom(original)); errUpdate != nil {
 		return intctrlutil.CheckedRequeueWithError(errUpdate, reqCtx.Log, "")
@@ -622,52 +481,91 @@ func (r *BackupReconciler) deleteVolumeSnapshots(reqCtx intctrlutil.RequestCtx,
 	return deleter.DeleteVolumeSnapshots(backup)
 }
 
-// deleteExternalStatefulSet deletes the external statefulSet.
-func (r *BackupReconciler) deleteExternalStatefulSet(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
-	key := client.ObjectKey{
-		Namespace: backup.Namespace,
-		Name:      backup.Name,
-	}
-	sts := &appsv1.StatefulSet{}
-	if err := r.Client.Get(reqCtx.Ctx, key, sts); err != nil {
-		return client.IgnoreNotFound(err)
-	} else if !model.IsOwnerOf(backup, sts) {
-		return nil
-	}
-
-	patch := client.MergeFrom(sts.DeepCopy())
-	controllerutil.RemoveFinalizer(sts, dptypes.DataProtectionFinalizerName)
-	if err := r.Client.Patch(reqCtx.Ctx, sts, patch); err != nil {
-		return err
-	}
-
-	if !sts.DeletionTimestamp.IsZero() {
-		return nil
-	}
-
-	reqCtx.Log.V(1).Info("delete statefulSet", "statefulSet", sts)
-	return intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, sts)
-}
-
 // deleteExternalResources deletes the external workloads that execute backup.
-// Currently, it only supports two types of workloads: statefulSet and job.
+// Currently, it only supports two types of workloads: job.
 func (r *BackupReconciler) deleteExternalResources(
 	reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
-	if err := r.deleteExternalStatefulSet(reqCtx, backup); err != nil {
-		return err
-	}
 	return r.deleteExternalJobs(reqCtx, backup)
 }
 
+// PatchBackupObjectMeta patches backup object metaObject include cluster snapshot.
+func PatchBackupObjectMeta(
+	original *dpv1alpha1.Backup,
+	request *dpbackup.Request) (bool, error) {
+	targetPod := request.TargetPods[0]
+
+	// get KubeBlocks cluster and set labels and annotations for backup
+	// TODO(ldm): we should remove this dependency of cluster in the future
+	cluster := getCluster(request.Ctx, request.Client, targetPod)
+	if cluster != nil {
+		if err := setClusterSnapshotAnnotation(request.Backup, cluster); err != nil {
+			return false, err
+		}
+		if err := setConnectionPasswordAnnotation(request); err != nil {
+			return false, err
+		}
+		request.Labels[dptypes.ClusterUIDLabelKey] = string(cluster.UID)
+	}
+
+	for _, v := range getClusterLabelKeys() {
+		request.Labels[v] = targetPod.Labels[v]
+	}
+
+	request.Labels[constant.AppManagedByLabelKey] = constant.AppName
+	request.Labels[dptypes.BackupTypeLabelKey] = request.GetBackupType()
+	request.Labels[dptypes.BackupPolicyLabelKey] = request.Spec.BackupPolicyName
+	// wait for the backup repo controller to prepare the essential resource.
+	wait := false
+	if request.BackupRepo != nil {
+		request.Labels[dataProtectionBackupRepoKey] = request.BackupRepo.Name
+		if (request.BackupRepo.AccessByMount() && request.BackupRepoPVC == nil) ||
+			(request.BackupRepo.AccessByTool() && request.ToolConfigSecret == nil) {
+			request.Labels[dataProtectionWaitRepoPreparationKey] = trueVal
+			wait = true
+		}
+	}
+
+	// set annotations
+	request.Annotations[dptypes.BackupTargetPodLabelKey] = targetPod.Name
+
+	// set finalizer
+	controllerutil.AddFinalizer(request.Backup, dptypes.DataProtectionFinalizerName)
+
+	if reflect.DeepEqual(original.ObjectMeta, request.ObjectMeta) {
+		return wait, nil
+	}
+
+	return wait, request.Client.Patch(request.Ctx, request.Backup, client.MergeFrom(original))
+}
+
+func mergeActionStatus(original, new *dpv1alpha1.ActionStatus) dpv1alpha1.ActionStatus {
+	as := new.DeepCopy()
+	if original.StartTimestamp != nil {
+		as.StartTimestamp = original.StartTimestamp
+	}
+	return *as
+}
+
+func updateBackupStatusByActionStatus(backupStatus *dpv1alpha1.BackupStatus) {
+	for _, act := range backupStatus.Actions {
+		if act.TotalSize != "" && backupStatus.TotalSize == "" {
+			backupStatus.TotalSize = act.TotalSize
+		}
+		if act.TimeRange != nil && backupStatus.TimeRange == nil {
+			backupStatus.TimeRange = act.TimeRange
+		}
+	}
+}
+
 // setConnectionPasswordAnnotation sets the encrypted password of the connection credential to the backup's annotations
-func (r *BackupReconciler) setConnectionPasswordAnnotation(request *dpbackup.Request) error {
+func setConnectionPasswordAnnotation(request *dpbackup.Request) error {
 	encryptPassword := func() (string, error) {
 		target := request.BackupPolicy.Spec.Target
 		if target == nil || target.ConnectionCredential == nil {
 			return "", nil
 		}
 		secret := &corev1.Secret{}
-		if err := r.Client.Get(request.Ctx, client.ObjectKey{Name: target.ConnectionCredential.SecretName, Namespace: request.Namespace}, secret); err != nil {
+		if err := request.Client.Get(request.Ctx, client.ObjectKey{Name: target.ConnectionCredential.SecretName, Namespace: request.Namespace}, secret); err != nil {
 			return "", err
 		}
 		e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
@@ -677,16 +575,13 @@ func (r *BackupReconciler) setConnectionPasswordAnnotation(request *dpbackup.Req
 		}
 		return ciphertext, nil
 	}
-	backupType := dputils.GetBackupType(request.ActionSet, request.BackupMethod.SnapshotVolumes)
-	if backupType == dpv1alpha1.BackupTypeFull {
-		// save the connection credential password for cluster.
-		ciphertext, err := encryptPassword()
-		if err != nil {
-			return err
-		}
-		if ciphertext != "" {
-			request.Backup.Annotations[dptypes.ConnectionPasswordKey] = ciphertext
-		}
+	// save the connection credential password for cluster.
+	ciphertext, err := encryptPassword()
+	if err != nil {
+		return err
+	}
+	if ciphertext != "" {
+		request.Backup.Annotations[dptypes.ConnectionPasswordKey] = ciphertext
 	}
 	return nil
 }
@@ -723,36 +618,5 @@ func setClusterSnapshotAnnotation(backup *dpv1alpha1.Backup, cluster *appsv1alph
 		backup.Annotations = map[string]string{}
 	}
 	backup.Annotations[constant.ClusterSnapshotAnnotationKey] = *clusterString
-	return nil
-}
-
-func setExpirationByCreationTime(backup *dpv1alpha1.Backup) error {
-	// if expiration is already set, do not update it.
-	if backup.Status.Expiration != nil {
-		return nil
-	}
-
-	duration, err := backup.Spec.RetentionPeriod.ToDuration()
-	if err != nil {
-		return fmt.Errorf("failed to parse retention period %s, %v", backup.Spec.RetentionPeriod, err)
-	}
-
-	// if duration is zero, the backup will be kept forever.
-	// Do not set expiration time for it.
-	if duration.Seconds() == 0 {
-		return nil
-	}
-
-	var expiration *metav1.Time
-	if backup.Status.StartTimestamp != nil {
-		expiration = &metav1.Time{
-			Time: backup.Status.StartTimestamp.Add(duration),
-		}
-	} else {
-		expiration = &metav1.Time{
-			Time: backup.CreationTimestamp.Add(duration),
-		}
-	}
-	backup.Status.Expiration = expiration
 	return nil
 }

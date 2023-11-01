@@ -244,7 +244,7 @@ func (r *clusterBackupPolicyTransformer) buildBackupSchedule(
 			BackupMethod:    s.BackupMethod,
 			CronExpression:  s.CronExpression,
 			Enabled:         s.Enabled,
-			RetentionPeriod: r.backupPolicy.RetentionPeriod,
+			RetentionPeriod: s.RetentionPeriod,
 		})
 	}
 	backupSchedule.Spec.Schedules = schedules
@@ -265,7 +265,7 @@ func (r *clusterBackupPolicyTransformer) syncBackupSchedule(backupSchedule *dpv1
 			BackupMethod:    s.BackupMethod,
 			CronExpression:  s.CronExpression,
 			Enabled:         s.Enabled,
-			RetentionPeriod: r.backupPolicy.RetentionPeriod,
+			RetentionPeriod: s.RetentionPeriod,
 		})
 	}
 }
@@ -317,7 +317,7 @@ func (r *clusterBackupPolicyTransformer) syncBackupPolicy(backupPolicy *dpv1alph
 		}
 		if r.getCompReplicas() == 1 {
 			delete(podSelector.LabelSelector.MatchLabels, constant.RoleLabelKey)
-		} else {
+		} else if podSelector.LabelSelector.MatchLabels[constant.RoleLabelKey] == "" {
 			podSelector.LabelSelector.MatchLabels[constant.RoleLabelKey] = role
 		}
 	}

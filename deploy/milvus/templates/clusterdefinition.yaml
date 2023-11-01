@@ -52,6 +52,7 @@ spec:
                 path: /healthz
                 port: 9091
                 scheme: HTTP
+              initialDelaySeconds: 60
               periodSeconds: 15
               successThreshold: 1
               timeoutSeconds: 10
@@ -83,6 +84,8 @@ spec:
                 subPath: user.yaml
               - mountPath: /milvus/tools
                 name: tools
+              - mountPath: /var/lib/milvus
+                name: data
             dnsPolicy: ClusterFirst
             enableServiceLinks: true
             ports:
@@ -164,7 +167,7 @@ spec:
                 command:
                   - /opt/bitnami/scripts/etcd/healthcheck.sh
               failureThreshold: 5
-              initialDelaySeconds: 60
+              initialDelaySeconds: 30
               periodSeconds: 30
               successThreshold: 1
               timeoutSeconds: 5

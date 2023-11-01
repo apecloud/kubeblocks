@@ -209,6 +209,7 @@ var (
 
 	defaultMySQLService = appsv1alpha1.ServiceSpec{
 		Ports: []appsv1alpha1.ServicePort{{
+			Name:     "mysql",
 			Protocol: corev1.ProtocolTCP,
 			Port:     3306,
 		}},

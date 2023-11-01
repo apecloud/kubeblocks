@@ -249,7 +249,6 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	createClusterObjNoWait := func(compName, compDefName string, v2 bool, processor func(*testapps.MockClusterFactory)) {
-		By("Creating a cluster")
 		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
 			WithRandomName()
 		if !v2 {
@@ -265,6 +264,7 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	createClusterObj := func(compName, compDefName string) {
+		By("Creating a cluster")
 		createClusterObjNoWait(compName, compDefName, false, nil)
 
 		By("Waiting for the cluster enter running phase")
@@ -273,6 +273,7 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	createClusterObjV2 := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
+		By("Creating a cluster with new component definition")
 		createClusterObjNoWait(compName, compDefName, true, processor)
 
 		By("Waiting for the cluster enter Creating phase")

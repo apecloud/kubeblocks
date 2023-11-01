@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/sethvargo/go-password/password"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -64,7 +65,7 @@ var _ = Describe("Cluster Controller", func() {
 	var (
 		clusterDefObj     *appsv1alpha1.ClusterDefinition
 		clusterVersionObj *appsv1alpha1.ClusterVersion
-		componentDefObj   *appsv1alpha1.ComponentDefinition
+		compDefObj        *appsv1alpha1.ComponentDefinition
 		clusterObj        *appsv1alpha1.Cluster
 		clusterKey        types.NamespacedName
 		allSettings       map[string]interface{}
@@ -122,6 +123,11 @@ var _ = Describe("Cluster Controller", func() {
 		cleanEnv()
 	})
 
+	randomStr := func() string {
+		str, _ := password.Generate(6, 0, 0, true, false)
+		return str
+	}
+
 	createAllWorkloadTypesClusterDef := func(noCreateAssociateCV ...bool) {
 		By("Create a clusterDefinition obj")
 		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
@@ -142,8 +148,8 @@ var _ = Describe("Cluster Controller", func() {
 			AddComponentVersion(statelessCompDefName).AddContainerShort("nginx", testapps.NginxImage).
 			Create(&testCtx).GetObject()
 
-		By("Create a ComponentDefinition obj")
-		componentDefObj = testapps.NewComponentDefinitionFactory(compDefName).
+		By("Create a componentDefinition obj")
+		compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
 			WithRandomName().
 			SetDefaultSpec().
 			Create(&testCtx).
@@ -401,48 +407,205 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(func(g Gomega) { validateCompSvcList(g, expectServices, compName) }).Should(Succeed())
 	}
 
-	createClusterObjNoWait := func(compName, compDefName string) {
-		By("Creating a cluster")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
-			WithRandomName().
-			AddComponent(compName, compDefName).
-			SetReplicas(1).
-			SetEnabledLogs("error").
-			AddVolumeClaimTemplate(testapps.DataVolumeName, testapps.NewPVCSpec("5Gi")).
-			Create(&testCtx).
-			GetObject()
+	createClusterObjNoWait := func(compName, compDefName string, v2 bool, processor func(*testapps.MockClusterFactory)) {
+		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
+			WithRandomName()
+		if !v2 {
+			factory.AddComponent(compName, compDefName).SetReplicas(1)
+			// SetEnabledLogs("error").
+			// AddVolumeClaimTemplate(testapps.DataVolumeName, testapps.NewPVCSpec("5Gi")).
+		} else {
+			factory.AddComponentV2(compName, compDefName).SetReplicas(1)
+			// SetEnabledLogs("error").
+			// AddVolumeClaimTemplate(testapps.DataVolumeName, testapps.NewPVCSpec("5Gi")).
+		}
+		if processor != nil {
+			processor(factory)
+		}
+		clusterObj = factory.Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 	}
 
-	createClusterObj := func(compName, compDefName string) {
-		createClusterObjNoWait(compName, compDefName)
+	createClusterObj := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
+		By("Creating a cluster")
+		createClusterObjNoWait(compName, compDefName, false, processor)
 
-		By("Waiting for the cluster enter provisioning phase")
+		By("Waiting for the cluster enter Creating phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 	}
 
 	// createClusterObjV2 creates cluster objects with new component definition API enabled.
-	createClusterObjV2 := func(compName, compDefName string) {
-		By("Creating a cluster")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "", "").
-			WithRandomName().
-			AddComponent(compName, "").
-			SetCompDef(compDefName).
-			SetReplicas(1).
-			SetEnabledLogs("error").
-			AddVolumeClaimTemplate(testapps.DataVolumeName, testapps.NewPVCSpec("5Gi")).
-			Create(&testCtx).
-			GetObject()
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
+	createClusterObjV2 := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
+		By("Creating a cluster with new component definition")
+		createClusterObjNoWait(compName, compDefName, true, processor)
 
-		By("Waiting for the cluster enter provisioning phase")
+		By("Waiting for the cluster enter Creating phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 	}
 
+	testClusterWithoutClusterVersion := func(compName, compDefName string) {
+		By("creating a cluster w/o cluster version")
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, "").
+			AddComponent(statelessCompName, statelessCompDefName).SetReplicas(3).
+			AddComponent(statefulCompName, statefulCompDefName).SetReplicas(3).
+			AddComponent(consensusCompName, consensusCompDefName).SetReplicas(3).
+			AddComponent(replicationCompName, replicationCompDefName).SetReplicas(3).
+			WithRandomName().
+			Create(&testCtx).
+			GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		By("waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, statelessCompName, statefulCompName, consensusCompName, replicationCompName)
+	}
+
+	testClusterComponent := func(compName, compDefName string) {
+		createClusterObj(compName, compDefName, nil)
+
+		By("check component created")
+		compKey := types.NamespacedName{
+			Namespace: clusterKey.Namespace,
+			Name:      clusterKey.Name + "-" + compName,
+		}
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
+			g.Expect(comp.Generation).Should(BeEquivalentTo(1))
+			for k, v := range constant.GetComponentWellKnownLabels(clusterObj.Name, compName) {
+				g.Expect(comp.Labels).Should(HaveKeyWithValue(k, v))
+			}
+			g.Expect(comp.Spec.CompDef).Should(BeEmpty())
+		})).Should(Succeed())
+	}
+
+	testClusterComponentV2 := func(compName, compDefName string) {
+		createClusterObjV2(compName, compDefName, nil)
+
+		By("check component created")
+		compKey := types.NamespacedName{
+			Namespace: clusterKey.Namespace,
+			Name:      clusterKey.Name + "-" + compName,
+		}
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
+			g.Expect(comp.Generation).Should(BeEquivalentTo(1))
+			for k, v := range constant.GetComponentWellKnownLabels(clusterObj.Name, compName) {
+				g.Expect(comp.Labels).Should(HaveKeyWithValue(k, v))
+			}
+			g.Expect(comp.Spec.CompDef).Should(Equal(compDefName))
+		})).Should(Succeed())
+	}
+
+	testClusterService := func(compName, compDefName string) {
+		randClusterName := fmt.Sprintf("%s-%s", clusterName, randomStr())
+		service := corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: randClusterName,
+			},
+			Spec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{
+					{
+						Protocol: corev1.ProtocolTCP,
+						Port:     3306,
+					},
+				},
+				Type: corev1.ServiceTypeLoadBalancer,
+			},
+		}
+		createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
+			f.SetName(randClusterName).
+				AddAppManagedByLabel().
+				AddAppInstanceLabel(randClusterName).
+				AddClusterService(appsv1alpha1.ClusterService{
+					Name:              service.Name,
+					Service:           service,
+					ComponentSelector: compName,
+					RoleSelector:      constant.Follower,
+				})
+		})
+
+		By("check cluster service created")
+		clusterSvcKey := types.NamespacedName{
+			Namespace: clusterKey.Namespace,
+			Name:      service.Name,
+		}
+		Eventually(testapps.CheckObj(&testCtx, clusterSvcKey, func(g Gomega, svc *corev1.Service) {
+			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.AppManagedByLabelKey, constant.AppName))
+			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.AppInstanceLabelKey, clusterObj.Name))
+			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.KBAppComponentLabelKey, compName))
+			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.RoleLabelKey, constant.Follower))
+			g.Expect(svc.Spec.ExternalTrafficPolicy).Should(BeEquivalentTo(corev1.ServiceExternalTrafficPolicyTypeLocal))
+		})).Should(Succeed())
+
+		By("check component service created")
+		compSvcKey := types.NamespacedName{
+			Namespace: clusterKey.Namespace,
+			Name:      constant.GenerateComponentServiceEndpoint(clusterObj.Name, compName, ""),
+		}
+		Eventually(testapps.CheckObj(&testCtx, compSvcKey, func(g Gomega, svc *corev1.Service) {
+			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.AppManagedByLabelKey, constant.AppName))
+			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.AppInstanceLabelKey, clusterObj.Name))
+			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.KBAppComponentLabelKey, compName))
+			g.Expect(svc.Spec.Selector).Should(HaveKey(constant.RoleLabelKey))
+			if compDefName == consensusCompDefName {
+				// default role selector for Consensus workload
+				g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.RoleLabelKey, constant.Leader))
+			}
+		})).Should(Succeed())
+
+		By("check component headless service created")
+		compHeadlessSvcKey := types.NamespacedName{
+			Namespace: clusterKey.Namespace,
+			Name:      constant.GenerateComponentServiceEndpoint(clusterObj.Name, compName, "headless"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, compHeadlessSvcKey, func(g Gomega, svc *corev1.Service) {
+			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.AppManagedByLabelKey, constant.AppName))
+			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.AppInstanceLabelKey, clusterObj.Name))
+			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.KBAppComponentLabelKey, compName))
+			g.Expect(svc.Spec.Selector).Should(HaveKey(constant.RoleLabelKey))
+			if compDefName == consensusCompDefName {
+				// default role selector for Consensus workload
+				g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.RoleLabelKey, constant.Leader))
+			}
+		})).Should(Succeed())
+	}
+
+	testClusterCredential := func(compName, compDefName string) {
+	}
+
+	testDoNotTerminate := func(compName, compDefName string) {
+		createClusterObj(compName, compDefName, nil)
+
+		// REVIEW: this test flow
+
+		// REVIEW: why not set termination upon creation?
+		By("Update the cluster's termination policy to DoNotTerminate")
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+			cluster.Spec.TerminationPolicy = appsv1alpha1.DoNotTerminate
+		})()).ShouldNot(HaveOccurred())
+
+		By("Delete the cluster")
+		testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
+		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
+
+		By("Update the cluster's termination policy to WipeOut")
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+			cluster.Spec.TerminationPolicy = appsv1alpha1.WipeOut
+		})()).ShouldNot(HaveOccurred())
+
+		By("Wait for the cluster to terminate")
+		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
+	}
+
+	testHaltNRecovery := func(compName, compDefName string) {
+		// TODO(component)
+	}
+
+	testDelete := func(compName, compDefName string) {
+		// TODO(component)
+	}
+
 	testWipeOut := func(compName, compDefName string) {
-		createClusterObj(compName, compDefName)
+		createClusterObj(compName, compDefName, nil)
 
 		By("Waiting for the cluster enter running phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
@@ -475,38 +638,6 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, backupKey, &dpv1alpha1.Backup{}, true)).Should(Succeed())
 	}
 
-	testDoNotTerminate := func(compName, compDefName string) {
-		createClusterObj(compName, compDefName)
-
-		// REVIEW: this test flow
-
-		// REVIEW: why not set termination upon creation?
-		By("Update the cluster's termination policy to DoNotTerminate")
-		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
-			cluster.Spec.TerminationPolicy = appsv1alpha1.DoNotTerminate
-		})()).ShouldNot(HaveOccurred())
-
-		By("Delete the cluster")
-		testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
-		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
-
-		By("Update the cluster's termination policy to WipeOut")
-		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
-			cluster.Spec.TerminationPolicy = appsv1alpha1.WipeOut
-		})()).ShouldNot(HaveOccurred())
-
-		By("Wait for the cluster to terminate")
-		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
-	}
-
-	testHaltNRecovery := func(compName, compDefName string) {
-		// TODO(component)
-	}
-
-	testDelete := func(compName, compDefName string) {
-		// TODO(component)
-	}
-
 	// getPVCName := func(vctName, compName string, i int) string {
 	//	return fmt.Sprintf("%s-%s-%s-%d", vctName, clusterKey.Name, compName, i)
 	//}
@@ -533,64 +664,28 @@ var _ = Describe("Cluster Controller", func() {
 			createAllWorkloadTypesClusterDef()
 		})
 
-		It("create cluster w/o cluster version", func() {
-			By("creating a cluster w/o cluster version")
-			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, "").
-				AddComponent(statelessCompName, statelessCompDefName).SetReplicas(3).
-				AddComponent(statefulCompName, statefulCompDefName).SetReplicas(3).
-				AddComponent(consensusCompName, consensusCompDefName).SetReplicas(3).
-				AddComponent(replicationCompName, replicationCompDefName).SetReplicas(3).
-				WithRandomName().
-				Create(&testCtx).
-				GetObject()
-			clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-			By("waiting for the cluster controller to create resources completely")
-			waitForCreatingResourceCompletely(clusterKey, statelessCompName, statefulCompName, consensusCompName, replicationCompName)
-		})
-
-		It("create cluster with component object", func() {
-			createClusterObj(consensusCompName, consensusCompDefName)
-
-			By("check component created")
-			compKey := types.NamespacedName{
-				Namespace: clusterKey.Namespace,
-				Name:      clusterKey.Name + "-" + consensusCompName,
-			}
-			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
-				g.Expect(comp.Generation).Should(BeEquivalentTo(1))
-				for k, v := range constant.GetComponentWellKnownLabels(clusterObj.Name, consensusCompName) {
-					g.Expect(comp.Labels).Should(HaveKeyWithValue(k, v))
-				}
-				g.Expect(comp.Spec.CompDef).Should(BeEmpty())
-			})).Should(Succeed())
-		})
-	})
-
-	Context("provisioning cluster w/ component definition", func() {
-		BeforeEach(func() {
-			createAllWorkloadTypesClusterDef()
-		})
-
 		AfterEach(func() {
 			cleanEnv()
 		})
 
-		It("cluster component created", func() {
-			createClusterObjV2(consensusCompName, componentDefObj.Name)
+		It("create cluster w/o cluster version", func() {
+			testClusterWithoutClusterVersion(consensusCompName, consensusCompDefName)
+		})
 
-			By("check component created")
-			compKey := types.NamespacedName{
-				Namespace: clusterKey.Namespace,
-				Name:      clusterKey.Name + "-" + consensusCompName,
-			}
-			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
-				g.Expect(comp.Generation).Should(BeEquivalentTo(1))
-				for k, v := range constant.GetComponentWellKnownLabels(clusterObj.Name, consensusCompName) {
-					g.Expect(comp.Labels).Should(HaveKeyWithValue(k, v))
-				}
-				g.Expect(comp.Spec.CompDef).Should(Equal(componentDefObj.Name))
-			})).Should(Succeed())
+		It("create cluster with legacy component definition", func() {
+			testClusterComponent(consensusCompName, consensusCompDefName)
+		})
+
+		It("create cluster with new component definition", func() {
+			testClusterComponentV2(consensusCompName, compDefObj.Name)
+		})
+
+		It("with cluster service set", func() {
+			testClusterService(consensusCompName, consensusCompDefName)
+		})
+
+		It("with cluster credential set", func() {
+			testClusterCredential(consensusCompName, consensusCompDefName)
 		})
 	})
 
@@ -600,8 +695,8 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		var (
-			createObjV1 = func() { createClusterObj(consensusCompName, consensusCompDefName) }
-			createObjV2 = func() { createClusterObjV2(consensusCompName, componentDefObj.Name) }
+			createObjV1 = func() { createClusterObj(consensusCompName, consensusCompDefName, nil) }
+			createObjV2 = func() { createClusterObjV2(consensusCompName, compDefObj.Name, nil) }
 		)
 		for _, createObj := range []func(){createObjV1, createObjV2} {
 			It("should deleted after all the sub-resources", func() {
@@ -695,8 +790,8 @@ var _ = Describe("Cluster Controller", func() {
 
 		It("test cluster conditions when cluster definition non-exist", func() {
 			By("create a cluster with cluster definition non-exist")
-			mockClusterDefName := fmt.Sprintf("%s-%s", consensusCompDefName, testCtx.GetRandomStr())
-			createClusterObjNoWait(consensusCompName, mockClusterDefName)
+			mockCompDefName := fmt.Sprintf("%s-%s", consensusCompDefName, testCtx.GetRandomStr())
+			createClusterObjNoWait(consensusCompName, mockCompDefName, false, nil)
 
 			By("check conditions")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
@@ -724,7 +819,7 @@ var _ = Describe("Cluster Controller", func() {
 			})).Should(Succeed())
 
 			By("create a cluster with the unavailable cluster version")
-			createClusterObjNoWait(consensusCompName, consensusCompDefName)
+			createClusterObjNoWait(consensusCompName, consensusCompDefName, false, nil)
 
 			By("expect the cluster provisioning condition as pre-check failed")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {

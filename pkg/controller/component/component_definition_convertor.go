@@ -178,7 +178,7 @@ func (c *compDefServicesConvertor) convert(args ...any) (any, error) {
 			headlessSvcBuilder = headlessSvcBuilder.AddContainerPorts(container.Ports...)
 		}
 	}
-	headlessSvc := headlessSvcBuilder.GetObject()
+	headlessSvc := c.removeDuplicatePorts(headlessSvcBuilder.GetObject())
 
 	services := []appsv1alpha1.ComponentService{
 		{
@@ -195,6 +195,19 @@ func (c *compDefServicesConvertor) convert(args ...any) (any, error) {
 		},
 	}
 	return services, nil
+}
+
+func (c *compDefServicesConvertor) removeDuplicatePorts(svc *corev1.Service) *corev1.Service {
+	ports := make(map[int32]bool)
+	servicePorts := make([]corev1.ServicePort, 0)
+	for _, port := range svc.Spec.Ports {
+		if !ports[port.Port] {
+			ports[port.Port] = true
+			servicePorts = append(servicePorts, port)
+		}
+	}
+	svc.Spec.Ports = servicePorts
+	return svc
 }
 
 func (c *compDefServicesConvertor) roleSelector(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) string {

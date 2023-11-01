@@ -77,14 +77,13 @@ func fakeInstance() *OteldInstance {
 		},
 		OTeld: &v1alpha1.OTeld{
 			Spec: v1alpha1.OTeldSpec{
-				Mode:               v1alpha1.ModeDaemonSet,
 				CollectionInterval: "15s",
 			},
 		},
 		AppDataSources: []v1alpha1.CollectorDataSource{
 			{
 				Spec: v1alpha1.CollectorDataSourceSpec{
-					ClusterRef: "test",
+					ClusterDefRef: "mysql",
 					CollectorSpecs: []v1alpha1.CollectorSpec{{
 						ComponentName: "test",
 						ScrapeConfigs: []v1alpha1.ScrapeConfig{{

@@ -187,6 +187,7 @@ func runTestCases(files []string) {
 			}, timeout, interval).Should(Succeed())
 			testResult = true
 		}
+		log.Println(testResult)
 		if testResult {
 			e2eResult := NewResult(fileName, testResult, "")
 			TestResults = append(TestResults, e2eResult)

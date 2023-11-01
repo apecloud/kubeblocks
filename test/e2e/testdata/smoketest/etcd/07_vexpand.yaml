@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: etcd-cluster-vexpand-
+spec:
+  clusterRef: etcd-cluster
+  type: VolumeExpansion
+  volumeExpansion:
+    - componentName: postgresql
+      volumeClaimTemplates:
+        - name: etcd
+          storage: "20Gi"

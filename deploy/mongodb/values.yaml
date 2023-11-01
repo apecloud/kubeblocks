@@ -97,3 +97,13 @@ metrics:
           exporters: [prometheus]
 
       extensions: [health_check]
+
+
+## @param enabledClusterVersions specifies the enabled cluster versions, if not set, all cluster versions are enabled
+## and will be rendered, installed. Otherwise, only the specified cluster versions will be rendered and installed.
+## Example:
+##   --set "enabledClusterVersions={mongodb-4.0,mongodb-4.2}"
+##   --set enabledClusterVersions=''   # this will enable all cluster versions
+##   --set enabledClusterVersions={}   # this will disable all cluster versions, the enabledClusterVersions has an empty
+##                                     # value and the length is 1
+enabledClusterVersions: [ ]

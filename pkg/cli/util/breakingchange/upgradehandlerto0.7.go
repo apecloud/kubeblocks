@@ -73,6 +73,14 @@ func (u *upgradeHandlerTo7) snapshot(dynamic dynamic.Interface) (map[string][]un
 	}); err != nil {
 		return nil, err
 	}
+
+	// get cluster objs for qdrant
+	if err := fillResourcesMap(dynamic, resourcesMap, types.ClusterGVR(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, "qdrant"),
+	}); err != nil {
+		return nil, err
+	}
+
 	return resourcesMap, nil
 }
 
@@ -94,6 +102,10 @@ func (u *upgradeHandlerTo7) transform(dynamic dynamic.Interface, resourcesMap ma
 				}
 			case types.KindConfigMap:
 				if err := u.transformConfigMap(dynamic, obj); err != nil {
+					return err
+				}
+			case types.KindCluster:
+				if err := u.transformQdrantCluster(dynamic, obj); err != nil {
 					return err
 				}
 			}
@@ -505,5 +517,20 @@ func (u *upgradeHandlerTo7) transformConfigMap(dynamic dynamic.Interface, obj un
 	if _, err := dynamic.Resource(types.ConfigmapGVR()).Namespace(obj.GetNamespace()).Patch(context.TODO(), obj.GetName(), apitypes.MergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
 		return fmt.Errorf("update pulsar configmap %s failed: %s", obj.GetName(), err.Error())
 	}
+	return nil
+}
+
+func (u *upgradeHandlerTo7) transformQdrantCluster(dynamic dynamic.Interface, obj unstructured.Unstructured) error {
+	labels := obj.GetLabels()
+	if labels[constant.ClusterDefLabelKey] != "qdrant" {
+		return nil
+	}
+	specMap, _, _ := unstructured.NestedMap(obj.Object, "spec")
+	specMap["clusterVersionRef"] = "qdrant-1.5.0"
+	patchBytes, _ := json.Marshal(map[string]interface{}{"spec": specMap})
+	if _, err := dynamic.Resource(types.ClusterGVR()).Namespace(obj.GetNamespace()).Patch(context.TODO(), obj.GetName(), apitypes.MergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
+		return fmt.Errorf("update qdrant cluster %s failed: %s", obj.GetName(), err.Error())
+	}
+
 	return nil
 }

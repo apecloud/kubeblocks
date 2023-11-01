@@ -36,11 +36,11 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	lorryutil "github.com/apecloud/kubeblocks/pkg/lorry/util"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 

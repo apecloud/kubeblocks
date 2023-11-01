@@ -1,8 +1,10 @@
+{{- $cvName := "postgresql-14.7.2" -}}
+{{ if eq (include "postgresql.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" }}
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
   # major version of the component defined in values.yaml
-  name: postgresql-14.7.2
+  name: {{ $cvName }}
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
@@ -24,12 +26,15 @@ spec:
     switchoverSpec:
       cmdExecutorConfig:
         image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+{{- end -}}
 
+{{- $cvName = "postgresql-12.14.1" -}}
+{{ if eq (include "postgresql.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" }}
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: postgresql-12.14.1
+  name: {{ $cvName }}
   annotations:
     kubeblocks.io/is-default-cluster-version: "false"
   labels:
@@ -73,12 +78,15 @@ spec:
       switchoverSpec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.1-pgvector-v0.5.0
+{{- end -}}
 
+{{- $cvName = "postgresql-12.15.0" -}}
+{{ if eq (include "postgresql.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" }}
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: postgresql-12.15.0
+  name: {{ $cvName}}
   annotations:
     kubeblocks.io/is-default-cluster-version: "false"
   labels:
@@ -117,12 +125,15 @@ spec:
       switchoverSpec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.15.0-pgvector-v0.5.0
+{{- end -}}
 
+{{- $cvName = "postgresql-14.8.0" -}}
+{{ if eq (include "postgresql.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" }}
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: postgresql-14.8.0
+  name: {{ $cvName }}
   annotations:
     kubeblocks.io/is-default-cluster-version: "true"
   labels:
@@ -146,13 +157,16 @@ spec:
       switchoverSpec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:14.8.0-pgvector-v0.5.0
+{{- end -}}
 
+{{- $cvName = "postgresql-12.14.0" -}}
+{{ if eq (include "postgresql.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" }}
 ---
 # Adding backward compatibility for clusterVersion 12.14.0, which will be removed in subsequent iterative versions.
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: postgresql-12.14.0
+  name: {{ $cvName }}
   annotations:
     kubeblocks.io/is-default-cluster-version: "false"
   labels:
@@ -195,3 +209,4 @@ spec:
       switchoverSpec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.0-pgvector-v0.5.0
+  {{- end -}}

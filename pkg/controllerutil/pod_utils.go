@@ -371,16 +371,14 @@ func GuessLorryHTTPPort(pod *corev1.Pod) (int32, error) {
 	return 0, fmt.Errorf("lorry port not found")
 }
 
-// GetProbeContainerName gets the probe container from pod
-func GetProbeContainerName(pod *corev1.Pod) (string, error) {
-	lorryImage := viper.GetString(constant.KBToolsImage)
+// GetLorryContainerName gets the probe container from pod
+func GetLorryContainerName(pod *corev1.Pod) (string, error) {
 	for _, container := range pod.Spec.Containers {
-		if container.Image == lorryImage {
+		if len(container.Command) > 0 && strings.Contains(container.Command[0], "lorry") {
 			return container.Name, nil
 		}
 	}
-	return "", fmt.Errorf("container %s not found", lorryImage)
-
+	return "", fmt.Errorf("lorry container not found")
 }
 
 // PodIsReadyWithLabel checks if pod is ready for ConsensusSet/ReplicationSet component,

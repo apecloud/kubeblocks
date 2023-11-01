@@ -436,7 +436,7 @@ spec:
         - name: risingwave-configuration
           mountPath: /risingwave/config
         livenessProbe:
-          failureThreshold: 3
+          failureThreshold: 5
           tcpSocket:
             port: svc
           initialDelaySeconds: 5
@@ -444,7 +444,7 @@ spec:
           successThreshold: 1
           timeoutSeconds: 30
         readinessProbe:
-          failureThreshold: 3
+          failureThreshold: 5
           tcpSocket:
             port: svc
           initialDelaySeconds: 5

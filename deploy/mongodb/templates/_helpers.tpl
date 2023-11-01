@@ -75,3 +75,23 @@ Get the password key.
 {{ index (lookup "apps.kubeblocks.io/v1alpha1" "ClusterDefinition" "" "mongodb").spec.connectionCredential "password"}}
 {{- end }}
 {{- end }}
+
+{{/*
+Check if cluster version is enabled, if enabledClusterVersions is empty, return true,
+otherwise, check if the cluster version is in the enabledClusterVersions list, if yes, return true,
+else return false.
+Parameters: cvName, values
+*/}}
+{{- define "mongodb.isClusterVersionEnabled" -}}
+{{- $cvName := .cvName -}}
+{{- $enabledClusterVersions := .values.enabledClusterVersions -}}
+{{- if eq (len $enabledClusterVersions) 0 -}}
+    {{- true -}}
+{{- else -}}
+    {{- range $enabledClusterVersions -}}
+        {{- if eq $cvName . -}}
+            {{- true -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+{{- end -}}

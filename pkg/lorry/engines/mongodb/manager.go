@@ -583,6 +583,7 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 		return err
 	}
 	defer client.Disconnect(ctx) //nolint:errcheck
+	mgr.Logger.Info("reconfig replset", "config", rsConfig)
 	return SetReplSetConfig(ctx, client, rsConfig)
 }
 
@@ -636,14 +637,37 @@ func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Clus
 	if rsStatus == nil {
 		return nil
 	}
+	healthMembers := map[string]struct{}{}
 	var otherLeader string
 	for _, member := range rsStatus.Members {
+		memberName := strings.Split(member.Name, ".")[0]
+		if member.State == 1 || member.State == 2 {
+			healthMembers[memberName] = struct{}{}
+		}
+
 		if member.State != 1 {
 			continue
 		}
-		memberName := strings.Split(member.Name, ".")[0]
 		if memberName != mgr.CurrentMemberName {
 			otherLeader = memberName
+		}
+	}
+	if otherLeader != "" {
+		return cluster.GetMemberWithName(otherLeader)
+	}
+
+	rsConfig, err := mgr.GetReplSetConfig(ctx)
+	if rsConfig == nil {
+		mgr.Logger.Error(err, "Get replSet config failed")
+		return nil
+	}
+
+	for _, mb := range rsConfig.Members {
+		memberName := strings.Split(mb.Host, ".")[0]
+		if mb.Priority == PrimaryPriority && memberName != mgr.CurrentMemberName {
+			if _, ok := healthMembers[memberName]; ok {
+				otherLeader = memberName
+			}
 		}
 	}
 

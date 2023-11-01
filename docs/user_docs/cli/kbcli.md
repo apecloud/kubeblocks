@@ -68,6 +68,8 @@ kbcli [flags]
 * [kbcli fault](kbcli_fault.md)	 - Inject faults to pod.
 * [kbcli infra](kbcli_infra.md)	 - infra command
 * [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands.
+* [kbcli login](kbcli_login.md)	 - Authenticate with the KubeBlocks Cloud
+* [kbcli logout](kbcli_logout.md)	 - Log out of the KubeBlocks Cloud
 * [kbcli migration](kbcli_migration.md)	 - Data migration between two data sources.
 * [kbcli options](kbcli_options.md)	 - Print the list of flags inherited by all commands.
 * [kbcli playground](kbcli_playground.md)	 - Bootstrap or destroy a playground KubeBlocks in local host or cloud.

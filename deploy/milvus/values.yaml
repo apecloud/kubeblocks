@@ -22,6 +22,9 @@ images:
   etcd:
     repository: docker.io/milvusdb/etcd
     tag: 3.5.5-r2
+  etcd_init:
+    repository: bitnami/os-shell
+    tag: 11-debian-11-r90
   milvus_init:
     repository: docker.io/milvusdb/milvus-operator
     tag: v0.7.8

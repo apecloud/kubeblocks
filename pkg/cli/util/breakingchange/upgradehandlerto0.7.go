@@ -53,17 +53,24 @@ type upgradeHandlerTo7 struct {
 func (u *upgradeHandlerTo7) snapshot(dynamic dynamic.Interface) (map[string][]unstructured.Unstructured, error) {
 	resourcesMap := map[string][]unstructured.Unstructured{}
 	// get backupPolicy objs
-	if err := fillResourcesMap(dynamic, resourcesMap, types.BackupPolicyGVR()); err != nil {
+	if err := fillResourcesMap(dynamic, resourcesMap, types.BackupPolicyGVR(), metav1.ListOptions{}); err != nil {
 		return nil, err
 	}
 
 	// get backup objs
-	if err := fillResourcesMap(dynamic, resourcesMap, types.BackupGVR()); err != nil {
+	if err := fillResourcesMap(dynamic, resourcesMap, types.BackupGVR(), metav1.ListOptions{}); err != nil {
 		return nil, err
 	}
 
 	// get stateful_set objs
-	if err := fillResourcesMap(dynamic, resourcesMap, types.StatefulSetGVR()); err != nil {
+	if err := fillResourcesMap(dynamic, resourcesMap, types.StatefulSetGVR(), metav1.ListOptions{}); err != nil {
+		return nil, err
+	}
+
+	// get configmap objs for pulsar
+	if err := fillResourcesMap(dynamic, resourcesMap, types.ConfigmapGVR(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", constant.AppNameLabelKey, "pulsar"),
+	}); err != nil {
 		return nil, err
 	}
 	return resourcesMap, nil
@@ -83,6 +90,10 @@ func (u *upgradeHandlerTo7) transform(dynamic dynamic.Interface, resourcesMap ma
 				}
 			case types.KindStatefulSet:
 				if err := u.transformStatefulSet(dynamic, obj); err != nil {
+					return err
+				}
+			case types.KindConfigMap:
+				if err := u.transformConfigMap(dynamic, obj); err != nil {
 					return err
 				}
 			}
@@ -459,6 +470,7 @@ func (u *upgradeHandlerTo7) transformStatefulSet(dynamic dynamic.Interface, obj 
 		SetVolumeClaimTemplates(pvcs...).
 		SetTemplate(*podTemplate).
 		SetUpdateStrategyType(v1.StatefulSetUpdateStrategyType(updateStrategy)).
+		SetPaused(true).
 		GetObject()
 	gvk := schema.GroupVersionKind{
 		Group:   types.RSMGVR().Group,
@@ -475,6 +487,23 @@ func (u *upgradeHandlerTo7) transformStatefulSet(dynamic dynamic.Interface, obj 
 		&unstructured.Unstructured{Object: unstructuredMap}, metav1.CreateOptions{})
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return fmt.Errorf("create rsm %s failed: %s", rsm.Name, err.Error())
+	}
+	return nil
+}
+
+func (u *upgradeHandlerTo7) transformConfigMap(dynamic dynamic.Interface, obj unstructured.Unstructured) error {
+	// transform pulsar broker env config map
+	configData, _, _ := unstructured.NestedMap(obj.Object, "data")
+	zkSVC, ok := configData["zookeeperSVC"]
+	if !ok {
+		return nil
+	}
+	zkServers := fmt.Sprintf("%s:2181", zkSVC)
+	configData["zookeeperServers"] = zkServers
+	configData["configurationStoreServers"] = zkServers
+	patchBytes, _ := json.Marshal(map[string]interface{}{"data": configData})
+	if _, err := dynamic.Resource(types.ConfigmapGVR()).Namespace(obj.GetNamespace()).Patch(context.TODO(), obj.GetName(), apitypes.MergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
+		return fmt.Errorf("update pulsar configmap %s failed: %s", obj.GetName(), err.Error())
 	}
 	return nil
 }

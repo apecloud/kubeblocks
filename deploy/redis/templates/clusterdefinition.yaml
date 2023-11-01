@@ -13,6 +13,53 @@ spec:
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_redis)"
   componentDefs:
+    - name: redis-proxy
+      workloadType: Stateful
+      characterType: redis
+      service:
+        ports:
+          - name: redis-proxy
+            targetPort: redis-proxy
+            port: 22121
+      scriptSpecs:
+        - name: redis-scripts
+          templateRef: redis-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 0555
+      volumeTypes:
+        - name: data
+          type: data
+      podSpec:
+        initContainers:
+          - name: init-redis-proxy
+            imagePullPolicy: IfNotPresent
+            volumeMounts:
+              - name: data
+                mountPath: {{ .Values.dataMountPath }}
+              - name: redis-config
+                mountPath: /etc/conf
+              - name: proxy-conf
+                mountPath: /etc/proxy
+              - name: scripts
+                mountPath: /scripts
+            command: ["/scripts/redis-proxy-setup.sh"]
+        containers:
+          - name: redis-proxy
+            imagePullPolicy: IfNotPresent
+            ports:
+              - containerPort: 22121
+                name: redis-proxy
+            volumeMounts:
+              - name: data
+                mountPath: {{ .Values.dataMountPath }}
+              - name: redis-config
+                mountPath: /etc/conf
+              - name: proxy-conf
+                mountPath: /etc/proxy
+              - name: scripts
+                mountPath: /scripts
+            command: ["sh", "-c", "nutcracker -c /etc/proxy/nutcracker.conf -v 4 -m 16384"]
     - name: redis
       workloadType: Replication
       characterType: redis

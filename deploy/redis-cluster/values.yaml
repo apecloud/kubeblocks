@@ -42,3 +42,8 @@ sentinel:
   memory: 0.2
   storage: 5
   replicas: 3
+
+proxy:
+  cpu: 1
+  memory: 0.5
+  replicas: 3

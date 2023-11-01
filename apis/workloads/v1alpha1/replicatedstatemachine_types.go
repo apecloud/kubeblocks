@@ -113,6 +113,10 @@ type ReplicatedStateMachineSpec struct {
 	// +optional
 	MemberUpdateStrategy *MemberUpdateStrategy `json:"memberUpdateStrategy,omitempty"`
 
+	// Paused indicates that the rsm is paused, means the reconciliation of this rsm object will be paused.
+	// +optional
+	Paused bool `json:"paused,omitempty"`
+
 	// Credential used to connect to DB engine
 	// +optional
 	Credential *Credential `json:"credential,omitempty"`

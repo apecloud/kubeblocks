@@ -218,6 +218,8 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
 				// r := updateConfigConfigmapResource(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test", mockUpdate)
 				r := testUpdateConfigConfigmapResource(reqCtx, k8sMockClient.Client(), opsRes, updatedCfg, clusterName, componentName)
 				Expect(r.err).Should(Succeed())
+				Expect(r.noFormatFilesUpdated).Should(BeFalse())
+				Expect(r.configPatch).ShouldNot(BeNil())
 				diff := r.configPatch
 				Expect(diff.IsModify).Should(BeTrue())
 				Expect(diff.UpdateConfig["my.cnf"]).Should(BeEquivalentTo(diffCfg))
@@ -265,6 +267,8 @@ z2=y2
 				// r := updateConfigConfigmapResource(updatedFiles, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test", mockUpdate)
 				r := testUpdateConfigConfigmapResource(reqCtx, k8sMockClient.Client(), opsRes, updatedFiles, clusterName, componentName)
 				Expect(r.err).Should(Succeed())
+				Expect(r.configPatch).Should(BeNil())
+				Expect(r.noFormatFilesUpdated).Should(BeTrue())
 			}
 
 			By("normal file update without configSpec keys")

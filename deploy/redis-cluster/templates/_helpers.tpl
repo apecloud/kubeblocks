@@ -22,6 +22,24 @@ Define redis cluster sentinel component.
             storage: {{ print .Values.sentinel.storage "Gi" }}
 {{- end }}
 
+
+{{/*
+Define redis cluster proxy component.
+*/}}
+{{- define "redis-cluster.proxy" }}
+- name: redis-proxy
+  componentDefRef: redis-proxy
+  serviceAccountName: {{ include "kblib.serviceAccountName" . }}
+  replicas: {{ .Values.proxy.replicas }}
+  resources:
+    limits:
+      cpu: {{ .Values.proxy.cpu | quote }}
+      memory: {{ print .Values.proxy.memory "Gi" | quote }}
+    requests:
+      cpu: {{ .Values.proxy.cpu | quote }}
+      memory: {{ print .Values.proxy.memory "Gi" | quote }}
+{{- end }}
+
 {{/*
 Define replica count.
 standalone mode: 1

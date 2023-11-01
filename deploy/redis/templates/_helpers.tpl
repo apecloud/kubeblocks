@@ -57,6 +57,15 @@ Define image
 {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
 {{- end }}
 
+{{- define "redis-proxy.image" -}}
+{{ .Values.redisTwemproxyImage.registry | default "docker.io" }}/{{ .Values.redisTwemproxyImage.repository }}:{{ .Values.redisTwemproxyImage.tag }}
+{{- end }}
+
+{{- define "busybox.image" -}}
+{{ .Values.busyboxImage.registry | default "docker.io"}}/{{ .Values.busyboxImage.repository}}:{{ .Values.busyboxImage.tag }}
+{{- end }}}
+
+
 {{/*
 Generate scripts configmap
 */}}

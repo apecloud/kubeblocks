@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: zk-cluster-vscale-
+spec:
+  clusterRef: zk-cluster
+  type: VerticalScaling
+  verticalScaling:
+    - componentName: zookeeper
+      requests:
+        cpu: "1.5"
+        memory: "2.5Gi"

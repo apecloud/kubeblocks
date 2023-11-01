@@ -724,3 +724,7 @@ func ParseAnnotationsOfScope(scope AnnotationScope, scopedAnnotations map[string
 	}
 	return annotations
 }
+
+func getEnvConfigMapName(rsmName string) string {
+	return fmt.Sprintf("%s-rsm-env", rsmName)
+}

@@ -32,9 +32,9 @@ import (
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
 	"github.com/apecloud/kubeblocks/pkg/cli/testing"
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
+	lorryutil "github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 var _ = Describe("Grant Account Options", func() {

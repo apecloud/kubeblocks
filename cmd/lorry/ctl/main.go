@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package main
 
 import (
-	"github.com/apecloud/kubeblocks/lorry/ctl"
+	"github.com/apecloud/kubeblocks/pkg/lorry/ctl"
 )
 
 func main() {

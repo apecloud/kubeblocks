@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -49,12 +50,12 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
-	lorry "github.com/apecloud/kubeblocks/lorry/client"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -73,40 +74,34 @@ var (
 	podAnnotationKey4Test = fmt.Sprintf("%s-test", constant.ComponentReplicasAnnotationKey)
 )
 
-type mockLorryClient struct {
-	clusterKey types.NamespacedName
-	compName   string
-	replicas   int
-}
-
-var _ lorry.Client = &mockLorryClient{}
-
-func (c *mockLorryClient) JoinMember(ctx context.Context) error {
-	return nil
-}
-
-func (c *mockLorryClient) LeaveMember(ctx context.Context) error {
-	var podList corev1.PodList
-	labels := client.MatchingLabels{
-		constant.AppInstanceLabelKey:    c.clusterKey.Name,
-		constant.KBAppComponentLabelKey: c.compName,
-	}
-	if err := testCtx.Cli.List(ctx, &podList, labels, client.InNamespace(c.clusterKey.Namespace)); err != nil {
-		return err
-	}
-	for _, pod := range podList.Items {
-		if pod.Annotations == nil {
-			panic(fmt.Sprintf("pod annotaions is nil: %s", pod.Name))
+var newMockLorryClient = func(clusterKey types.NamespacedName, compName string, replicas int) {
+	ctrl := gomock.NewController(GinkgoT())
+	mockLorryClient := lorry.NewMockClient(ctrl)
+	lorry.SetMockClient(mockLorryClient, nil)
+	mockLorryClient.EXPECT().JoinMember(gomock.Any()).Return(nil).AnyTimes()
+	mockLorryClient.EXPECT().LeaveMember(gomock.Any()).DoAndReturn(func(ctx context.Context) error {
+		var podList corev1.PodList
+		labels := client.MatchingLabels{
+			constant.AppInstanceLabelKey:    clusterKey.Name,
+			constant.KBAppComponentLabelKey: compName,
 		}
-		if pod.Annotations[podAnnotationKey4Test] == fmt.Sprintf("%d", c.replicas) {
-			continue
-		}
-		pod.Annotations[podAnnotationKey4Test] = fmt.Sprintf("%d", c.replicas)
-		if err := testCtx.Cli.Update(ctx, &pod); err != nil {
+		if err := testCtx.Cli.List(ctx, &podList, labels, client.InNamespace(clusterKey.Namespace)); err != nil {
 			return err
 		}
-	}
-	return nil
+		for _, pod := range podList.Items {
+			if pod.Annotations == nil {
+				panic(fmt.Sprintf("pod annotaions is nil: %s", pod.Name))
+			}
+			if pod.Annotations[podAnnotationKey4Test] == fmt.Sprintf("%d", replicas) {
+				continue
+			}
+			pod.Annotations[podAnnotationKey4Test] = fmt.Sprintf("%d", replicas)
+			if err := testCtx.Cli.Update(ctx, &pod); err != nil {
+				return err
+			}
+		}
+		return nil
+	}).AnyTimes()
 }
 
 var _ = Describe("Cluster Controller", func() {
@@ -662,7 +657,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("Get the latest cluster def")
 		Expect(k8sClient.Get(testCtx.Ctx, client.ObjectKeyFromObject(clusterDefObj), clusterDefObj)).Should(Succeed())
 		for i, comp := range cluster.Spec.ComponentSpecs {
-			lorry.SetMockClient(&mockLorryClient{replicas: updatedReplicas, clusterKey: clusterKey, compName: comp.Name}, nil)
+			newMockLorryClient(clusterKey, comp.Name, updatedReplicas)
 
 			By(fmt.Sprintf("H-scale component %s with policy %s", comp.Name, hscalePolicy(comp)))
 			horizontalScaleComp(updatedReplicas, &cluster.Spec.ComponentSpecs[i], storageClassName, hscalePolicy(comp))

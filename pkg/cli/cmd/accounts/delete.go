@@ -24,8 +24,8 @@ import (
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
 	"github.com/apecloud/kubeblocks/pkg/cli/util/prompt"
+	lorryutil "github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type DeleteUserOptions struct {

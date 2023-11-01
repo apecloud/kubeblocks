@@ -514,19 +514,27 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 	})
 
 	readinessProbe := &corev1.Probe{
-		ProbeHandler: corev1.ProbeHandler{
+		InitialDelaySeconds: roleProbe.InitialDelaySeconds,
+		TimeoutSeconds:      roleProbe.TimeoutSeconds,
+		PeriodSeconds:       roleProbe.PeriodSeconds,
+		SuccessThreshold:    roleProbe.SuccessThreshold,
+		FailureThreshold:    roleProbe.FailureThreshold,
+	}
+
+	if roleProbe.RoleUpdateMechanism == workloads.ReadinessProbeEventUpdate {
+		readinessProbe.ProbeHandler = corev1.ProbeHandler{
 			Exec: &corev1.ExecAction{
 				Command: []string{
 					grpcHealthProbeBinaryPath,
 					fmt.Sprintf(grpcHealthProbeArgsFormat, probeGRPCPort),
 				},
 			},
-		},
-		InitialDelaySeconds: roleProbe.InitialDelaySeconds,
-		TimeoutSeconds:      roleProbe.TimeoutSeconds,
-		PeriodSeconds:       roleProbe.PeriodSeconds,
-		SuccessThreshold:    roleProbe.SuccessThreshold,
-		FailureThreshold:    roleProbe.FailureThreshold,
+		}
+	} else {
+		readinessProbe.HTTPGet = &corev1.HTTPGetAction{
+			Path: httpRoleProbePath,
+			Port: intstr.FromInt(probeDaemonPort),
+		}
 	}
 
 	tryToGetRoleProbeContainer := func() *corev1.Container {
@@ -547,30 +555,62 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 		return nil
 	}
 
+	tryToGetLorryHTTPPort := func(container *corev1.Container) *corev1.ContainerPort {
+		for i, port := range container.Ports {
+			if port.Name == constant.LorryHTTPPortName {
+				return &container.Ports[i]
+			}
+		}
+		return nil
+	}
+
 	// if role probe container exists, update the readiness probe, env and serving container port
 	if container := tryToGetRoleProbeContainer(); container != nil {
-		port := tryToGetLorryGrpcPort(container)
-		var portNum int
-		if port == nil {
-			portNum = probeGRPCPort
-			grpcPort := corev1.ContainerPort{
-				Name:          roleProbeGRPCPortName,
-				ContainerPort: int32(portNum),
-				Protocol:      "TCP",
+		if roleProbe.RoleUpdateMechanism == workloads.ReadinessProbeEventUpdate {
+			port := tryToGetLorryGrpcPort(container)
+			var portNum int
+			if port == nil {
+				portNum = probeGRPCPort
+				grpcPort := corev1.ContainerPort{
+					Name:          roleProbeGRPCPortName,
+					ContainerPort: int32(portNum),
+					Protocol:      "TCP",
+				}
+				container.Ports = append(container.Ports, grpcPort)
+			} else {
+				// if containerPort is invalid, adjust it
+				if port.ContainerPort < 0 || port.ContainerPort > 65536 {
+					port.ContainerPort = int32(probeGRPCPort)
+				}
+				portNum = int(port.ContainerPort)
 			}
-			container.Ports = append(container.Ports, grpcPort)
+			readinessProbe.Exec.Command = []string{
+				grpcHealthProbeBinaryPath,
+				fmt.Sprintf(grpcHealthProbeArgsFormat, portNum),
+			}
 		} else {
-			// if containerPort is invalid, adjust it
-			if port.ContainerPort < 0 || port.ContainerPort > 65536 {
-				port.ContainerPort = int32(probeGRPCPort)
+			port := tryToGetLorryHTTPPort(container)
+			var portNum int
+			if port == nil {
+				portNum = probeDaemonPort
+				httpPort := corev1.ContainerPort{
+					Name:          constant.LorryHTTPPortName,
+					ContainerPort: int32(portNum),
+					Protocol:      "TCP",
+				}
+				container.Ports = append(container.Ports, httpPort)
+			} else {
+				// if containerPort is invalid, adjust it
+				if port.ContainerPort < 0 || port.ContainerPort > 65536 {
+					port.ContainerPort = int32(probeDaemonPort)
+				}
+				portNum = int(port.ContainerPort)
 			}
-			portNum = int(port.ContainerPort)
+			readinessProbe.HTTPGet = &corev1.HTTPGetAction{
+				Path: httpRoleProbePath,
+				Port: intstr.FromInt(portNum),
+			}
 		}
-		readinessProbe.Exec.Command = []string{
-			grpcHealthProbeBinaryPath,
-			fmt.Sprintf(grpcHealthProbeArgsFormat, portNum),
-		}
-		readinessProbe.HTTPGet = nil
 		container.ReadinessProbe = readinessProbe
 		for _, e := range env {
 			if slices.IndexFunc(container.Env, func(v corev1.EnvVar) bool {

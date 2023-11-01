@@ -42,9 +42,9 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
-	lorry "github.com/apecloud/kubeblocks/lorry/client"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -436,7 +436,7 @@ func (r *SystemAccountReconciler) getEngineFacts(reqCtx intctrlutil.RequestCtx, 
 		return appsv1alpha1.KBAccountInvalid, fmt.Errorf("no pod is running for cluster: %s, component %s", key.clusterName, key.componentName)
 	}
 
-	lorryClient, err := lorry.NewClientWithPod(target, key.characterType)
+	lorryClient, err := lorry.NewHTTPClientWithPod(target)
 	if err != nil {
 		return appsv1alpha1.KBAccountInvalid, err
 	}
@@ -444,13 +444,18 @@ func (r *SystemAccountReconciler) getEngineFacts(reqCtx intctrlutil.RequestCtx, 
 		return appsv1alpha1.KBAccountInvalid, errors.New("not lorry service")
 	}
 
-	accounts, err := lorryClient.GetSystemAccounts()
+	accounts, err := lorryClient.ListSystemAccounts(reqCtx.Ctx)
 	if err != nil {
 		return appsv1alpha1.KBAccountInvalid, err
 	}
 	accountsID := appsv1alpha1.KBAccountInvalid
 	for _, acc := range accounts {
-		updateFacts(appsv1alpha1.AccountName(acc), &accountsID)
+		accountName, ok := acc["userName"]
+		if !ok {
+			continue
+		}
+
+		updateFacts(appsv1alpha1.AccountName(accountName.(string)), &accountsID)
 	}
 	return accountsID, nil
 }

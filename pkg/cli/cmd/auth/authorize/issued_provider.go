@@ -96,10 +96,10 @@ func (c *CloudIssuedTokenProvider) refreshToken(refreshToken string) (*authentic
 	return tokenResponse, nil
 }
 
-func (c *CloudIssuedTokenProvider) logout(ctx context.Context, token string) error {
+func (c *CloudIssuedTokenProvider) logout(ctx context.Context, tokenRes *authenticator.TokenResponse) error {
 	end := c.printProgress("Logging out...")
 	defer end()
-	err := c.Authenticator.Logout(ctx, token, c.openURLFunc)
+	err := c.Authenticator.Logout(ctx, tokenRes, c.openURLFunc)
 	if err != nil {
 		return err
 	}

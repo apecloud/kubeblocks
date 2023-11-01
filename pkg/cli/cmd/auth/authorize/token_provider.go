@@ -92,7 +92,7 @@ func (p *TokenProvider) Logout(ctx context.Context) error {
 		return err
 	}
 
-	err = p.issued.logout(ctx, tokenResult.IDToken)
+	err = p.issued.logout(ctx, tokenResult)
 	if err != nil {
 		return err
 	}

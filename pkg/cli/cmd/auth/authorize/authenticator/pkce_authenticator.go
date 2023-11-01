@@ -263,9 +263,9 @@ func (p *PKCEAuthenticator) RefreshToken(ctx context.Context, refreshToken strin
 	}, nil
 }
 
-func (p *PKCEAuthenticator) Logout(ctx context.Context, token string, openURLFunc func(URL string)) error {
+func (p *PKCEAuthenticator) Logout(ctx context.Context, tokenRes *TokenResponse, openURLFunc func(URL string)) error {
 
-	logoutURL := fmt.Sprintf(p.AuthURL + "/session/end?id_token_hint=" + token)
+	logoutURL := fmt.Sprintf(p.AuthURL + "/session/end?id_token_hint=" + tokenRes.IDToken)
 	openURLFunc(logoutURL)
 
 	return nil

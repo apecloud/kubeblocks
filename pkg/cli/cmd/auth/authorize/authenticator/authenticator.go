@@ -34,7 +34,7 @@ type Authenticator interface {
 	GetAuthorization(ctx context.Context, openURLFunc func(URL string), states ...string) (interface{}, error)
 	GetToken(ctx context.Context, authorization interface{}) (*TokenResponse, error)
 	GetUserInfo(ctx context.Context, token string) (*UserInfoResponse, error)
-	Logout(ctx context.Context, token string, openURLFunc func(URL string)) error
+	Logout(ctx context.Context, tokenResult *TokenResponse, openURLFunc func(URL string)) error
 	RefreshToken(ctx context.Context, refreshToken string) (*TokenResponse, error)
 }
 

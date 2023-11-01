@@ -44,7 +44,7 @@ type IssuedTokenProvider interface {
 	authenticate(ctx context.Context) (*authenticator.TokenResponse, error)
 	refreshToken(refreshToken string) (*authenticator.TokenResponse, error)
 	getUserInfo(token string) (*authenticator.UserInfoResponse, error)
-	logout(ctx context.Context, token string) error
+	logout(ctx context.Context, tokenRes *authenticator.TokenResponse) error
 }
 
 type Provider interface {

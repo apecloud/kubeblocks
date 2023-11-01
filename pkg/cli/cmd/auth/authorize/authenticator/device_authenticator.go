@@ -237,9 +237,9 @@ func (d *DeviceAuthenticator) RefreshToken(ctx context.Context, refreshToken str
 	return nil, nil
 }
 
-func (d *DeviceAuthenticator) Logout(ctx context.Context, token string, openURLFunc func(URL string)) error {
+func (d *DeviceAuthenticator) Logout(ctx context.Context, tokenRes *TokenResponse, openURLFunc func(URL string)) error {
 	req, err := d.newRequest(ctx, "oidc/logout", url.Values{
-		"id_token_hint": []string{token},
+		"id_token_hint": []string{tokenRes.IDToken},
 		"client_id":     []string{d.ClientID},
 	})
 	if err != nil {

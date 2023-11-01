@@ -73,6 +73,7 @@ const (
 	ReasonDerivedObjectsDeleted     = "DerivedObjectsDeleted"
 	ReasonPreCheckPassed            = "PreCheckPassed"
 	ReasonPreCheckFailed            = "PreCheckFailed"
+	ReasonDigestChanged             = "DigestChanged"
 	ReasonUnknownError              = "UnknownError"
 	ReasonSkipped                   = "Skipped"
 )

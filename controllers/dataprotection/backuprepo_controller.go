@@ -26,10 +26,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/Masterminds/sprig/v3"
 	"github.com/go-logr/logr"
@@ -43,7 +46,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/clock"
+	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -59,6 +66,19 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+)
+
+const (
+	// TODO: make it configurable
+	defaultPreCheckTimeout = 15 * time.Minute
+	defaultCheckInterval   = 1 * time.Minute
+
+	preCheckContainerName = "pre-check"
+)
+
+var (
+	// for testing
+	wallClock clock.Clock = &clock.RealClock{}
 )
 
 type reconcileContext struct {
@@ -88,6 +108,11 @@ func (r *reconcileContext) digestChanged() bool {
 	return !r.hasSameDigest(r.repo)
 }
 
+func (r *reconcileContext) preCheckFinished() bool {
+	cond := meta.FindStatusCondition(r.repo.Status.Conditions, ConditionTypePreCheckPassed)
+	return cond != nil && cond.Status != metav1.ConditionUnknown
+}
+
 func (r *reconcileContext) hasSameDigest(obj client.Object) bool {
 	return obj.GetAnnotations()[dataProtectionBackupRepoDigestAnnotationKey] == r.getDigest()
 }
@@ -99,8 +124,9 @@ func (r *reconcileContext) preCheckResourceName() string {
 // BackupRepoReconciler reconciles a BackupRepo object
 type BackupRepoReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Scheme     *runtime.Scheme
+	Recorder   record.EventRecorder
+	RestConfig *rest.Config
 
 	secretRefMapper   refObjectMapper
 	providerRefMapper refObjectMapper
@@ -223,24 +249,11 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			"failed to update BackupRepo status")
 	}
 
-	if cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypePreCheckPassed); cond != nil {
-		if cond.Status != metav1.ConditionUnknown {
-			// clear pre-check resources if pre-check job is finished
-			if err := r.removePreCheckResources(reconCtx); err != nil {
-				return checkedRequeueWithError(err, reqCtx.Log,
-					"failed to remove pre-check resources")
-			}
-			// update the digest annotation when the job is done
-			if reconCtx.digestChanged() {
-				err := updateAnnotations(reconCtx.Ctx, r.Client, repo, map[string]string{
-					dataProtectionBackupRepoDigestAnnotationKey:     reconCtx.getDigest(),
-					dataProtectionNeedUpdateToolConfigAnnotationKey: trueVal,
-				})
-				if err != nil {
-					return checkedRequeueWithError(err, reqCtx.Log,
-						"failed to update digest annotation")
-				}
-			}
+	if reconCtx.preCheckFinished() {
+		// clear pre-check resources
+		if err := r.removePreCheckResources(reconCtx); err != nil {
+			return checkedRequeueWithError(err, reqCtx.Log,
+				"failed to remove pre-check resources")
 		}
 	}
 
@@ -583,9 +596,26 @@ func (r *BackupRepoReconciler) updateToolConfigSecrets(reconCtx *reconcileContex
 }
 
 func (r *BackupRepoReconciler) preCheckRepo(reconCtx *reconcileContext) (err error) {
-	if !reconCtx.digestChanged() {
+	if reconCtx.digestChanged() {
+		// invalidate the old status. reconCtx.preCheckFinished() depends on this value
+		err := updateCondition(reconCtx.Ctx, r.Client, reconCtx.repo, ConditionTypePreCheckPassed,
+			metav1.ConditionUnknown, ReasonDigestChanged, "")
+		if err != nil {
+			return err
+		}
+
+		err = updateAnnotations(reconCtx.Ctx, r.Client, reconCtx.repo, map[string]string{
+			dataProtectionBackupRepoDigestAnnotationKey:     reconCtx.getDigest(),
+			dataProtectionNeedUpdateToolConfigAnnotationKey: trueVal,
+		})
+		if err != nil {
+			return err
+		}
+	}
+	if reconCtx.preCheckFinished() {
 		return nil
 	}
+
 	status := metav1.ConditionUnknown
 	reason := ReasonUnknownError
 	message := ""
@@ -596,9 +626,10 @@ func (r *BackupRepoReconciler) preCheckRepo(reconCtx *reconcileContext) (err err
 		r.updateConditionInDefer(reconCtx.Ctx, reconCtx.repo, ConditionTypePreCheckPassed, reason, &status, &message, &err)
 	}()
 	var job *batchv1.Job
+	var pvc *corev1.PersistentVolumeClaim
 	switch {
 	case reconCtx.repo.AccessByMount():
-		job, err = r.runPreCheckJobForMounting(reconCtx)
+		job, pvc, err = r.runPreCheckJobForMounting(reconCtx)
 	case reconCtx.repo.AccessByTool():
 		job, err = r.runPreCheckJobForTool(reconCtx)
 	default:
@@ -610,15 +641,34 @@ func (r *BackupRepoReconciler) preCheckRepo(reconCtx *reconcileContext) (err err
 
 	finished, jobStatus, failureReason := utils.IsJobFinished(job)
 	if !finished {
-		// wait job to finish
-		return newDependencyError("wait job to finish")
+		duration := wallClock.Since(job.CreationTimestamp.Time)
+		if duration > defaultPreCheckTimeout {
+			// HACK: mark as failure
+			jobStatus = batchv1.JobFailed
+			failureReason = "timeout"
+		} else {
+			// wait job to finish
+			return intctrlutil.NewRequeueError(defaultCheckInterval, "wait job to finish")
+		}
 	}
 
 	if jobStatus == batchv1.JobFailed {
 		status = metav1.ConditionFalse
 		reason = ReasonPreCheckFailed
-		// TODO: collect the failure reason from the PVC or the log
-		message = fmt.Sprintf("pre-check failed: %s", failureReason)
+
+		// collect logs and events from these objects
+		info, err := r.collectPreCheckFailureMessage(reconCtx, job, pvc)
+		if err != nil {
+			return fmt.Errorf("failed to collectPreCheckFailureMessage, err: %w", err)
+		}
+		message = "Pre-check job failed, information collected for diagnosis.\n\n"
+		message += fmt.Sprintf("Job failure message: %s\n\n", failureReason)
+		message += info
+		// max length of metav1.Condition.Message is 32K
+		const messageLimit = 32 * 1024
+		if len(message) > messageLimit {
+			message = message[:messageLimit]
+		}
 	} else {
 		status = metav1.ConditionTrue
 		reason = ReasonPreCheckPassed
@@ -648,15 +698,15 @@ func (r *BackupRepoReconciler) removePreCheckResources(reconCtx *reconcileContex
 	return nil
 }
 
-func (r *BackupRepoReconciler) runPreCheckJobForMounting(reconCtx *reconcileContext) (job *batchv1.Job, err error) {
+func (r *BackupRepoReconciler) runPreCheckJobForMounting(reconCtx *reconcileContext) (job *batchv1.Job, pvc *corev1.PersistentVolumeClaim, err error) {
 	namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 	// create PVC
 	pvcName := reconCtx.preCheckResourceName()
-	pvc, err := r.createRepoPVC(reconCtx, pvcName, namespace, map[string]string{
+	pvc, err = r.createRepoPVC(reconCtx, pvcName, namespace, map[string]string{
 		dataProtectionBackupRepoDigestAnnotationKey: reconCtx.getDigest(),
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// run pre-check job
 	job = &batchv1.Job{}
@@ -668,11 +718,11 @@ func (r *BackupRepoReconciler) runPreCheckJobForMounting(reconCtx *reconcileCont
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,
 					Containers: []corev1.Container{{
-						Name:            "pre-check",
+						Name:            preCheckContainerName,
 						Image:           viper.GetString(constant.KBToolsImage),
 						ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)),
 						Command: []string{
-							"bash", "-c", `set -ex; echo "pre-check" > /backup/precheck.txt; sync`,
+							"sh", "-c", `set -ex; echo "pre-check" > /backup/precheck.txt; sync`,
 						},
 						VolumeMounts: []corev1.VolumeMount{{
 							Name:      "backup-pvc",
@@ -689,6 +739,7 @@ func (r *BackupRepoReconciler) runPreCheckJobForMounting(reconCtx *reconcileCont
 					}},
 				},
 			},
+			BackoffLimit: pointer.Int32(2),
 		}
 		job.Labels = map[string]string{
 			dataProtectionBackupRepoKey: reconCtx.repo.Name,
@@ -699,7 +750,7 @@ func (r *BackupRepoReconciler) runPreCheckJobForMounting(reconCtx *reconcileCont
 		return controllerutil.SetControllerReference(reconCtx.repo, job, r.Scheme)
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// these resources were created for the old generation of the backupRepo,
@@ -707,11 +758,11 @@ func (r *BackupRepoReconciler) runPreCheckJobForMounting(reconCtx *reconcileCont
 	if !reconCtx.hasSameDigest(pvc) || !reconCtx.hasSameDigest(job) {
 		err = r.removePreCheckResources(reconCtx)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return nil, fmt.Errorf("pre-check job or PVC digest not match, try again")
+		return nil, nil, fmt.Errorf("pre-check job or PVC digest not match, try again")
 	}
-	return job, nil
+	return job, pvc, nil
 }
 
 func (r *BackupRepoReconciler) runPreCheckJobForTool(reconCtx *reconcileContext) (job *batchv1.Job, err error) {
@@ -734,11 +785,11 @@ func (r *BackupRepoReconciler) runPreCheckJobForTool(reconCtx *reconcileContext)
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,
 					Containers: []corev1.Container{{
-						Name:            "pre-check",
+						Name:            preCheckContainerName,
 						Image:           viper.GetString(constant.KBToolsImage),
 						ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)),
 						Command: []string{
-							"bash", "-c",
+							"sh", "-c",
 							`
 set -ex
 export PATH="$PATH:$DP_DATASAFED_BIN_PATH"
@@ -747,6 +798,7 @@ echo "pre-check" | datasafed push - /precheck.txt`,
 					}},
 				},
 			},
+			BackoffLimit: pointer.Int32(2),
 		}
 		job.Labels = map[string]string{
 			dataProtectionBackupRepoKey: reconCtx.repo.Name,
@@ -768,6 +820,124 @@ echo "pre-check" | datasafed push - /precheck.txt`,
 		return nil, fmt.Errorf("pre-check job or tool config secret digest not match, try again")
 	}
 	return job, nil
+}
+
+func (r *BackupRepoReconciler) collectPreCheckFailureMessage(reconCtx *reconcileContext, job *batchv1.Job, pvc *corev1.PersistentVolumeClaim) (string, error) {
+	podList, err := utils.GetAssociatedPodsOfJob(reconCtx.Ctx, r.Client, job.Namespace, job.Name)
+	if err != nil {
+		return "", err
+	}
+	// sort pod with latest creation place front
+	slices.SortFunc(podList.Items, func(a, b corev1.Pod) int {
+		if a.CreationTimestamp.Equal(&(b.CreationTimestamp)) {
+			return 0
+		}
+		if a.CreationTimestamp.Before(&(b.CreationTimestamp)) {
+			return 1
+		}
+		return -1
+	})
+
+	prependSpaces := func(content string, spaces int) string {
+		prefix := ""
+		for i := 0; i < spaces; i++ {
+			prefix += " "
+		}
+		r := bytes.NewBufferString(content)
+		w := bytes.NewBuffer(nil)
+		w.Grow(r.Len())
+		for {
+			line, err := r.ReadString('\n')
+			if len(line) > 0 {
+				w.WriteString(prefix)
+				w.WriteString(line)
+			}
+			if err != nil {
+				break
+			}
+		}
+		return w.String()
+	}
+
+	var message string
+
+	// collect failure logs from the pod
+	const contentLimit = 4 * 1024
+	failureLogs, err := r.collectFailedPodLogs(reconCtx.Ctx, podList, preCheckContainerName, contentLimit)
+	if err != nil {
+		return "", err
+	}
+	if failureLogs == "" {
+		message += "No logs are available.\n\n"
+	} else {
+		message += fmt.Sprintf("Logs from the pre-check job:\n%s\n", prependSpaces(failureLogs, 2))
+	}
+
+	collectEvents := func(object client.Object) error {
+		gvk, err := r.Client.GroupVersionKindFor(object)
+		if err != nil {
+			return err
+		}
+		events, err := fetchObjectEvents(reconCtx.Ctx, r.Client, object)
+		if err != nil {
+			return err
+		}
+		// kind := object.GetObjectKind().GroupVersionKind().Kind
+		kind := gvk.Kind
+		if len(events.Items) == 0 {
+			message += fmt.Sprintf("No events are available for %s/%s.\n\n", kind, client.ObjectKeyFromObject(object))
+		} else {
+			content := utils.EventsToString(events)
+			if len(content) > contentLimit {
+				content = content[:contentLimit] + "[truncated]"
+			}
+			message += fmt.Sprintf("Events from %s/%s:\n%s\n", kind, client.ObjectKeyFromObject(object), content)
+		}
+		return nil
+	}
+
+	// collect events from the latest pod
+	if len(podList.Items) > 0 {
+		if err := collectEvents(&podList.Items[0]); err != nil {
+			return "", err
+		}
+	}
+	// collect events from the pvc
+	if pvc != nil {
+		if err := collectEvents(pvc); err != nil {
+			return "", err
+		}
+	}
+	// collect events from the job
+	if err := collectEvents(job); err != nil {
+		return "", err
+	}
+	return message, nil
+}
+
+func (r *BackupRepoReconciler) collectFailedPodLogs(ctx context.Context,
+	podList *corev1.PodList, containerName string, limit int64) (string, error) {
+	typedCli, err := corev1client.NewForConfig(r.RestConfig)
+	if err != nil {
+		return "", err
+	}
+	for _, pod := range podList.Items {
+		switch pod.Status.Phase {
+		case corev1.PodFailed:
+			currOpts := &corev1.PodLogOptions{
+				Container: containerName,
+			}
+			req := typedCli.Pods(pod.Namespace).GetLogs(pod.Name, currOpts)
+			stream, err := req.Stream(ctx)
+			if err != nil {
+				return "", err
+			}
+			limited := io.LimitReader(stream, limit)
+			data, _ := io.ReadAll(limited)
+			return string(data), nil
+		}
+	}
+	return "", nil
 }
 
 func (r *BackupRepoReconciler) constructPVCByTemplate(
@@ -1177,6 +1347,12 @@ func (r *BackupRepoReconciler) mapSecretToRepos(ctx context.Context, obj client.
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackupRepoReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &corev1.Event{}, "involvedObject.uid", func(rawObj client.Object) []string {
+		event := rawObj.(*corev1.Event)
+		return []string{string(event.InvolvedObject.UID)}
+	}); err != nil {
+		return err
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dpv1alpha1.BackupRepo{}).
 		Watches(&storagev1alpha1.StorageProvider{}, handler.EnqueueRequestsFromMapFunc(r.mapProviderToRepos)).
@@ -1212,6 +1388,9 @@ func isDependencyError(err error) bool {
 }
 
 func checkedRequeueWithError(err error, logger logr.Logger, msg string, keysAndValues ...interface{}) (reconcile.Result, error) {
+	if re, ok := err.(intctrlutil.RequeueError); ok {
+		return intctrlutil.RequeueAfter(re.RequeueAfter(), logger, re.Reason())
+	}
 	if apierrors.IsNotFound(err) || isDependencyError(err) {
 		return intctrlutil.Reconciled()
 	}
@@ -1379,4 +1558,16 @@ func cutName(name string) string {
 		return name[:63]
 	}
 	return name
+}
+
+// this method requires the corresponding field index to be added to the Manager
+func fetchObjectEvents(ctx context.Context, cli client.Client, object client.Object) (*corev1.EventList, error) {
+	eventList := &corev1.EventList{}
+	err := cli.List(ctx, eventList, client.MatchingFields{
+		"involvedObject.uid": string(object.GetUID()),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return eventList, nil
 }

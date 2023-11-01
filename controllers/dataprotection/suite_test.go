@@ -176,9 +176,10 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&BackupRepoReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("backup-repo-controller"),
+		Client:     k8sManager.GetClient(),
+		Scheme:     k8sManager.GetScheme(),
+		Recorder:   k8sManager.GetEventRecorderFor("backup-repo-controller"),
+		RestConfig: k8sManager.GetConfig(),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

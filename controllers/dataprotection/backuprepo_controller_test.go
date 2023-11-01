@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
@@ -31,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/clock/testing"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -663,6 +666,34 @@ parameters:
 			})).Should(Succeed())
 		})
 
+		It("should timeout if the pre-check job runs too long", func() {
+			fakeClock := testing.NewFakeClock(time.Now())
+			original := wallClock
+			wallClock = fakeClock
+			defer func() {
+				wallClock = original
+			}()
+			// create a new repo
+			createBackupRepoSpec(nil)
+			// make the job timed out
+			fakeClock.Step(defaultPreCheckTimeout * 2)
+			// trigger reconciliation
+			Eventually(testapps.GetAndChangeObj(&testCtx, repoKey, func(repo *dpv1alpha1.BackupRepo) {
+				if repo.Annotations == nil {
+					repo.Annotations = make(map[string]string)
+				}
+				repo.Annotations["touch"] = "whatever"
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+				g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoFailed))
+				cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypePreCheckPassed)
+				g.Expect(cond).ToNot(BeNil())
+				g.Expect(cond.Status).Should(BeEquivalentTo(metav1.ConditionFalse))
+				g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonPreCheckFailed))
+				g.Expect(cond.Message).Should(ContainSubstring("timeout"))
+			})).Should(Succeed())
+		})
+
 		createBackupAndCheckPVC := func(namespace string) (backup *dpv1alpha1.Backup, pvcName string) {
 			By("making sure the repo is ready")
 			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
@@ -956,14 +987,6 @@ new-item=new-value
 				})).Should(Succeed())
 			})
 
-			It("should delete the secret when the repo is deleted", func() {
-				By("deleting the Backup and BackupRepo")
-				testapps.DeleteObject(&testCtx, client.ObjectKeyFromObject(backup), &dpv1alpha1.Backup{})
-				testapps.DeleteObject(&testCtx, repoKey, &dpv1alpha1.BackupRepo{})
-				By("checking the secret is deleted")
-				Eventually(testapps.CheckObjExists(&testCtx, toolConfigSecretKey, &corev1.Secret{}, false)).Should(Succeed())
-			})
-
 			It("should run a pre-check job", func() {
 				By("creating a backup repo")
 				createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
@@ -1049,6 +1072,34 @@ new-item=new-value
 				Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
 					g.Expect(repo.Annotations[dataProtectionBackupRepoDigestAnnotationKey]).To(Equal(digest2))
 				})).Should(Succeed())
+			})
+
+			It("should delete resources for pre-checking when deleting the repo", func() {
+				By("preparing")
+				createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
+					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodTool
+				})
+				resourceName := preCheckResouceName(repo)
+				namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+				Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{Name: resourceName, Namespace: namespace},
+					&batchv1.Job{}, true)).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{Name: resourceName, Namespace: namespace},
+					&corev1.Secret{}, true)).Should(Succeed())
+
+				By("deleting the repo")
+				testapps.DeleteObject(&testCtx, repoKey, &dpv1alpha1.BackupRepo{})
+				Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{Name: resourceName, Namespace: namespace},
+					&batchv1.Job{}, false)).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{Name: resourceName, Namespace: namespace},
+					&corev1.Secret{}, false)).Should(Succeed())
+			})
+
+			It("should delete the secret when the repo is deleted", func() {
+				By("deleting the Backup and BackupRepo")
+				testapps.DeleteObject(&testCtx, client.ObjectKeyFromObject(backup), &dpv1alpha1.Backup{})
+				testapps.DeleteObject(&testCtx, repoKey, &dpv1alpha1.BackupRepo{})
+				By("checking the secret is deleted")
+				Eventually(testapps.CheckObjExists(&testCtx, toolConfigSecretKey, &corev1.Secret{}, false)).Should(Succeed())
 			})
 		})
 
@@ -1136,6 +1187,25 @@ new-item=new-value
 				err = testCtx.Cli.Get(testCtx.Ctx, pvcKey, pvc)
 				g.Expect(apierrors.IsNotFound(err)).Should(BeTrue())
 			}).Should(Succeed())
+		})
+
+		It("should delete resources for pre-checking when deleting the repo", func() {
+			By("preparing")
+			createBackupRepoSpec(nil)
+			resourceName := preCheckResouceName(repo)
+			namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+			Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{Name: resourceName, Namespace: namespace},
+				&batchv1.Job{}, true)).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{Name: resourceName, Namespace: namespace},
+				&corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
+			removePVCProtectionFinalizer(types.NamespacedName{Name: resourceName, Namespace: namespace})
+
+			By("deleting the repo")
+			testapps.DeleteObject(&testCtx, repoKey, &dpv1alpha1.BackupRepo{})
+			Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{Name: resourceName, Namespace: namespace},
+				&batchv1.Job{}, false)).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{Name: resourceName, Namespace: namespace},
+				&corev1.PersistentVolumeClaim{}, false)).Should(Succeed())
 		})
 
 		It("should update backupRepo.status.isDefault", func() {

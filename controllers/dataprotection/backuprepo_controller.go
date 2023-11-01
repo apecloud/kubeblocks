@@ -809,6 +809,9 @@ echo "pre-check" | datasafed push - /precheck.txt`,
 		utils.InjectDatasafedWithConfig(&job.Spec.Template.Spec, secretName, "")
 		return controllerutil.SetControllerReference(reconCtx.repo, job, r.Scheme)
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	// these resources were created for the old generation of the backupRepo,
 	// so remove them and then retry.
@@ -922,8 +925,7 @@ func (r *BackupRepoReconciler) collectFailedPodLogs(ctx context.Context,
 		return "", err
 	}
 	for _, pod := range podList.Items {
-		switch pod.Status.Phase {
-		case corev1.PodFailed:
+		if pod.Status.Phase == corev1.PodFailed {
 			currOpts := &corev1.PodLogOptions{
 				Container: containerName,
 			}

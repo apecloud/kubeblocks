@@ -11,6 +11,7 @@ spec:
   names:
     categories:
     - kubeblocks
+    - all
     kind: Component
     listKind: ComponentList
     plural: components
@@ -20,10 +21,6 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - description: cluster name
-      jsonPath: .spec.cluster
-      name: CLUSTER
-      type: string
     - description: component definition
       jsonPath: .spec.compDef
       name: COMPONENT-DEFINITION

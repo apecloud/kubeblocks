@@ -254,6 +254,19 @@ spec:
         - name: data
           type: data
       podSpec:
+        initContainers:
+        - name: volume-permissions
+          imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
+          command:
+          - /bin/bash
+          - -ec
+          - |
+            chown -R 1000:1000 /export
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+          - name: data
+            mountPath: /export
         containers:
           - name: minio
             imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
@@ -291,7 +304,7 @@ spec:
             serviceAccountName: "$(KB_CLUSTER_NAME-minio)"
             volumeMounts:
               - mountPath: /export
-                name: export
+                name: data
             volumes:
               - name: minio-user
                 secret:

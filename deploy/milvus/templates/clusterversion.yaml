@@ -9,6 +9,9 @@ spec:
   componentVersions:
     - componentDefRef: minio
       versionsContext:
+        initContainers:
+        - name: volume-permissions
+          image: {{ .Values.images.shell_tools.repository }}:{{ default .Chart.AppVersion .Values.images.shell_tools.tag }}
         containers:
         - name: minio
           image: {{ .Values.images.minio.repository }}:{{ default .Chart.AppVersion .Values.images.minio.tag }}
@@ -16,7 +19,7 @@ spec:
       versionsContext:
         initContainers:
         - name: volume-permissions
-          image: {{ .Values.images.etcd_init.repository }}:{{ default .Chart.AppVersion .Values.images.etcd_init.tag }}
+          image: {{ .Values.images.shell_tools.repository }}:{{ default .Chart.AppVersion .Values.images.shell_tools.tag }}
         containers:
           - name: etcd
             image: {{ .Values.images.etcd.repository }}:{{ default .Chart.AppVersion .Values.images.etcd.tag }}

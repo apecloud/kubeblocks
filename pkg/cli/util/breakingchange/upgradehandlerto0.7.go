@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apitypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/dynamic"
 
@@ -75,16 +74,9 @@ func (u *upgradeHandlerTo7) snapshot(dynamic dynamic.Interface) (map[string][]un
 		return nil, err
 	}
 
-	// get cd/cv objs for qdrant
-	if err := fillResourcesMap(dynamic, resourcesMap, types.ClusterDefGVR(), metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", constant.AppNameLabelKey, "qdrant"),
-	}); err != nil {
-		return nil, err
-
-	}
-
-	if err := fillResourcesMap(dynamic, resourcesMap, types.ClusterVersionGVR(), metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", constant.AppNameLabelKey, "qdrant"),
+	// get cluster objs for qdrant
+	if err := fillResourcesMap(dynamic, resourcesMap, types.ClusterGVR(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, "qdrant"),
 	}); err != nil {
 		return nil, err
 	}
@@ -112,12 +104,8 @@ func (u *upgradeHandlerTo7) transform(dynamic dynamic.Interface, resourcesMap ma
 				if err := u.transformConfigMap(dynamic, obj); err != nil {
 					return err
 				}
-			case types.KindClusterDef:
-				if err := u.transformQdrantCd(dynamic, obj); err != nil {
-					return err
-				}
-			case types.KindClusterVersion:
-				if err := u.transformQdrantCv(dynamic, obj); err != nil {
+			case types.KindCluster:
+				if err := u.transformQdrantCluster(dynamic, obj); err != nil {
 					return err
 				}
 			}
@@ -532,80 +520,15 @@ func (u *upgradeHandlerTo7) transformConfigMap(dynamic dynamic.Interface, obj un
 	return nil
 }
 
-func (u *upgradeHandlerTo7) transformQdrantCd(dynamic dynamic.Interface, obj unstructured.Unstructured) error {
-	if obj.GetName() != "qdrant" {
-		return nil
-	}
-
-	specMap, _, _ := unstructured.NestedMap(obj.Object, "spec")
-	componentDefs, _, _ := unstructured.NestedSlice(specMap, "componentDefs")
-	qdrantComp := componentDefs[0].(map[string]interface{})
-
-	// add web-ui service ports
-	service, _, _ := unstructured.NestedMap(qdrantComp, "service")
-	servicePorts, _, _ := unstructured.NestedSlice(service, "ports")
-	// append the webUiPort into the servicePorts
-	servicePorts = append(servicePorts, corev1.ServicePort{
-		Name:       "web-ui",
-		Port:       3000,
-		Protocol:   corev1.ProtocolTCP,
-		TargetPort: intstr.IntOrString{Type: 1, StrVal: "web-ui"},
-	})
-	service["ports"] = servicePorts
-	qdrantComp["service"] = service
-
-	// add web-ui container to podSpec
-	var runAsUser int64 = 0
-	qdrantPodSpec, _, _ := unstructured.NestedMap(qdrantComp, "podSpec")
-	qdrantContainers, _, _ := unstructured.NestedSlice(qdrantPodSpec, "containers")
-	// append the webUiContainer into the qdrantContainers
-	qdrantContainers = append(qdrantContainers, corev1.Container{
-		Name:            "web-ui",
-		ImagePullPolicy: corev1.PullIfNotPresent,
-		SecurityContext: &corev1.SecurityContext{
-			RunAsUser: &runAsUser,
-		},
-		Command: []string{"bash", "-c", " echo VITE_PORT=6333 >> .env; echo VITE_HOSTNAME=http://127.0.0.1 >> .env; npm run build; cd dist/ && serve"},
-		Ports: []corev1.ContainerPort{{
-			Name:          "web-ui",
-			ContainerPort: 3000,
-		}},
-	})
-
-	qdrantPodSpec["containers"] = qdrantContainers
-	qdrantComp["podSpec"] = qdrantPodSpec
-	componentDefs[0] = qdrantComp
-	specMap["componentDefs"] = componentDefs
-
-	patchBytes, _ := json.Marshal(map[string]interface{}{"spec": specMap})
-	if _, err := dynamic.Resource(types.ClusterDefGVR()).Namespace(obj.GetNamespace()).Patch(context.TODO(), obj.GetName(), apitypes.MergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
-		return fmt.Errorf("update pulsar configmap %s failed: %s", obj.GetName(), err.Error())
-	}
-	return nil
-}
-
-func (u *upgradeHandlerTo7) transformQdrantCv(dynamic dynamic.Interface, obj unstructured.Unstructured) error {
+func (u *upgradeHandlerTo7) transformQdrantCluster(dynamic dynamic.Interface, obj unstructured.Unstructured) error {
 	labels := obj.GetLabels()
-	if labels[constant.AppNameLabelKey] != "qdrant" {
+	if labels[constant.ClusterDefLabelKey] != "qdrant" {
 		return nil
 	}
-
 	specMap, _, _ := unstructured.NestedMap(obj.Object, "spec")
-	componentVersions, _, _ := unstructured.NestedSlice(specMap, "componentVersions")
-
-	// add web-ui container to versionContext
-	versionContext, _, _ := unstructured.NestedMap(componentVersions[0].(map[string]interface{}), "versionsContext")
-	containers, _, _ := unstructured.NestedSlice(versionContext, "containers")
-	containers = append(containers, corev1.Container{
-		Name:  "web-ui",
-		Image: "docker.io/apecloud/qdrant-web-ui:latest",
-	})
-	versionContext["containers"] = containers
-	componentVersions[0].(map[string]interface{})["versionsContext"] = versionContext
-	specMap["componentVersions"] = componentVersions
-
+	specMap["clusterVersionRef"] = "qdrant-1.5.0"
 	patchBytes, _ := json.Marshal(map[string]interface{}{"spec": specMap})
-	if _, err := dynamic.Resource(types.ClusterVersionGVR()).Namespace(obj.GetNamespace()).Patch(context.TODO(), obj.GetName(), apitypes.MergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
+	if _, err := dynamic.Resource(types.ClusterGVR()).Namespace(obj.GetNamespace()).Patch(context.TODO(), obj.GetName(), apitypes.MergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
 		return fmt.Errorf("update pulsar configmap %s failed: %s", obj.GetName(), err.Error())
 	}
 

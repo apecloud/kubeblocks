@@ -42,10 +42,8 @@ const (
 	dataProtectionIsToolConfigKey        = "dataprotection.kubeblocks.io/is-tool-config"
 
 	// annotation keys
-	dataProtectionSecretTemplateMD5AnnotationKey        = "dataprotection.kubeblocks.io/secret-template-md5"
-	dataProtectionTemplateValuesMD5AnnotationKey        = "dataprotection.kubeblocks.io/template-values-md5"
-	dataProtectionPVCTemplateMD5MD5AnnotationKey        = "dataprotection.kubeblocks.io/pvc-template-md5"
-	dataProtectionToolConfigTemplateMD5MD5AnnotationKey = "dataprotection.kubeblocks.io/tool-config-template-md5"
+	dataProtectionBackupRepoDigestAnnotationKey     = "dataprotection.kubeblocks.io/backup-repo-digest"
+	dataProtectionNeedUpdateToolConfigAnnotationKey = "dataprotection.kubeblocks.io/need-update-tool-config"
 )
 
 // condition constants
@@ -55,8 +53,8 @@ const (
 	ConditionTypeParametersChecked     = "ParametersChecked"
 	ConditionTypeStorageClassCreated   = "StorageClassCreated"
 	ConditionTypePVCTemplateChecked    = "PVCTemplateChecked"
-	ConditionTypeToolConfigChecked     = "ToolConfigSecretChecked"
 	ConditionTypeDerivedObjectsDeleted = "DerivedObjectsDeleted"
+	ConditionTypePreCheckPassed        = "PreCheckPassed"
 
 	// condition reasons
 	ReasonStorageProviderReady      = "StorageProviderReady"
@@ -68,14 +66,15 @@ const (
 	ReasonPrepareCSISecretFailed    = "PrepareCSISecretFailed"
 	ReasonPrepareStorageClassFailed = "PrepareStorageClassFailed"
 	ReasonBadPVCTemplate            = "BadPVCTemplate"
-	ReasonBadToolConfigTemplate     = "BadToolConfigTemplate"
 	ReasonStorageClassCreated       = "StorageClassCreated"
 	ReasonPVCTemplateChecked        = "PVCTemplateChecked"
-	ReasonToolConfigChecked         = "ToolConfigChecked"
 	ReasonHaveAssociatedBackups     = "HaveAssociatedBackups"
 	ReasonHaveResidualPVCs          = "HaveResidualPVCs"
 	ReasonDerivedObjectsDeleted     = "DerivedObjectsDeleted"
+	ReasonPreCheckPassed            = "PreCheckPassed"
+	ReasonPreCheckFailed            = "PreCheckFailed"
 	ReasonUnknownError              = "UnknownError"
+	ReasonSkipped                   = "Skipped"
 )
 
 // constant  for volume populator

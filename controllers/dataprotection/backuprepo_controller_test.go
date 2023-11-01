@@ -22,7 +22,7 @@ package dataprotection
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -58,18 +58,21 @@ var _ = Describe("BackupRepo controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupRepoSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageProviderSignature, ml)
 		testapps.ClearResources(&testCtx, generics.CSIDriverSignature, ml)
+		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 
 		// namespaced
 		inNS := client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMgrNS))
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.StorageClassSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.SecretSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.JobSignature, inNS, ml)
 
 		// namespace2
 		inNS2 := client.InNamespace(namespace2)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS2, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS2, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS2, ml)
+		testapps.ClearResources(&testCtx, generics.SecretSignature, inNS2, ml)
+		testapps.ClearResources(&testCtx, generics.JobSignature, inNS2, ml)
 
 		// delete namespace2
 		Eventually(func(g Gomega) {
@@ -113,7 +116,6 @@ var _ = Describe("BackupRepo controller", func() {
 	}
 
 	BeforeEach(func() {
-		viper.SetDefault(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
 		cleanEnv()
 		ensureNamespace(namespace2)
 	})
@@ -141,7 +143,7 @@ var _ = Describe("BackupRepo controller", func() {
 			credentialSecretKey = client.ObjectKeyFromObject(secret)
 		}
 
-		createBackupRepoSpec := func(mutateFunc func(repo *dpv1alpha1.BackupRepo)) {
+		createBackupRepoSpec := func(mutateFunc func(repo *dpv1alpha1.BackupRepo)) *dpv1alpha1.BackupRepo {
 			obj := &dpv1alpha1.BackupRepo{}
 			obj.GenerateName = "backuprepo-"
 			obj.Spec = dpv1alpha1.BackupRepoSpec{
@@ -162,6 +164,7 @@ var _ = Describe("BackupRepo controller", func() {
 			}
 			repo = testapps.CreateK8sResource(&testCtx, obj).(*dpv1alpha1.BackupRepo)
 			repoKey = client.ObjectKeyFromObject(repo)
+			return repo
 		}
 
 		createStorageProviderSpec := func(mutateFunc func(provider *storagev1alpha1.StorageProvider)) {
@@ -266,6 +269,18 @@ parameters:
 			g.Expect(err).ShouldNot(HaveOccurred())
 		}
 
+		completePreCheckJob := func(repo *dpv1alpha1.BackupRepo) {
+			reconCtx := reconcileContext{repo: repo}
+			jobName := reconCtx.preCheckResourceName()
+			namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, types.NamespacedName{Name: jobName, Namespace: namespace}, func(job *batchv1.Job) {
+				job.Status.Conditions = append(job.Status.Conditions, batchv1.JobCondition{
+					Type:   batchv1.JobComplete,
+					Status: corev1.ConditionTrue,
+				})
+			})).Should(Succeed())
+		}
+
 		BeforeEach(func() {
 			cleanEnv()
 			Expect(client.IgnoreAlreadyExists(testCtx.CreateNamespace())).To(Not(HaveOccurred()))
@@ -273,6 +288,7 @@ parameters:
 			createCSIDriverObjectSpec(defaultCSIDriverName)
 			createStorageProviderSpec(nil)
 			createBackupRepoSpec(nil)
+			completePreCheckJob(repo)
 		})
 
 		AfterEach(func() {
@@ -299,13 +315,13 @@ parameters:
 				provider.Name = "myprovider"
 			})
 
-			By("checking the status of the BackupRepo, should become ready")
+			By("checking the status of the BackupRepo")
 			Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
 				cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypeStorageProviderReady)
 				g.Expect(cond).ToNot(BeNil())
 				g.Expect(cond.Status).Should(BeEquivalentTo(metav1.ConditionTrue))
 				g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonStorageProviderReady))
-				g.Expect(repo.Status.Phase).To(Equal(dpv1alpha1.BackupRepoReady))
+				g.Expect(repo.Status.Phase).To(Equal(dpv1alpha1.BackupRepoPreChecking))
 			})).Should(Succeed())
 
 			By("updating the status of the storage provider to not ready")
@@ -553,9 +569,7 @@ parameters:
 				Name:      pvcName,
 				Namespace: namespace,
 			}
-			Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
-				g.Expect(pvc).ShouldNot(BeNil())
-			})).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
 			return backup, pvcName
 		}
 
@@ -586,6 +600,7 @@ spec:
 `
 				})
 				createBackupRepoSpec(nil)
+				completePreCheckJob(repo)
 				_, pvcName := createBackupAndCheckPVC(testCtx.DefaultNamespace)
 
 				Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{Name: pvcName, Namespace: testCtx.DefaultNamespace},
@@ -633,6 +648,7 @@ spec:
 `
 				})
 				createBackupRepoSpec(nil)
+				completePreCheckJob(repo)
 			})
 			It("should create the PVC based on the PersistentVolumeClaimTemplate", func() {
 				_, pvcName := createBackupAndCheckPVC(namespace2)
@@ -670,7 +686,6 @@ spec:
 		})
 
 		Context("with AccessMethodTool", func() {
-			var repo *dpv1alpha1.BackupRepo
 			var backup *dpv1alpha1.Backup
 			var toolConfigSecretKey types.NamespacedName
 
@@ -696,6 +711,7 @@ cred-key2={{ index .Parameters "cred-key2" }}
 				createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
 					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodTool
 				})
+				completePreCheckJob(repo)
 
 				Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, obj *dpv1alpha1.BackupRepo) {
 					g.Expect(obj.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoReady))
@@ -739,11 +755,12 @@ cred-key2={{ index .Parameters "cred-key2" }}
 				})
 				By("checking")
 				Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
-					g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoFailed))
-					cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypeToolConfigChecked)
+					g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoPreChecking))
+					cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypePreCheckPassed)
 					g.Expect(cond).NotTo(BeNil())
-					g.Expect(cond.Status).Should(BeEquivalentTo(corev1.ConditionFalse))
-					g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonBadToolConfigTemplate))
+					g.Expect(cond.Status).Should(BeEquivalentTo(corev1.ConditionUnknown))
+					g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonUnknownError))
+					g.Expect(cond.Message).Should(ContainSubstring("failed to render tool config template"))
 				})).Should(Succeed())
 			})
 
@@ -760,6 +777,7 @@ cred-key2={{ index .Parameters "cred-key2" }}
 				createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
 					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodTool
 				})
+				completePreCheckJob(repo)
 				By("checking")
 				Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
 					g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoReady))
@@ -794,6 +812,10 @@ cred-key2=cred-val2
 				Eventually(testapps.GetAndChangeObj(&testCtx, providerKey, func(provider *storagev1alpha1.StorageProvider) {
 					provider.Spec.DatasafedConfigTemplate += "new-item=new-value\n"
 				})).Should(Succeed())
+				completePreCheckJob(repo)
+				Eventually(testapps.CheckObj(&testCtx, repoKey, func(g Gomega, repo *dpv1alpha1.BackupRepo) {
+					g.Expect(repo.Status.Phase).Should(Equal(dpv1alpha1.BackupRepoReady))
+				})).Should(Succeed())
 				Eventually(testapps.CheckObj(&testCtx, toolConfigSecretKey, func(g Gomega, secret *corev1.Secret) {
 					g.Expect(secret.Data).Should(HaveKeyWithValue("datasafed.conf", []byte(`
 [storage]
@@ -810,6 +832,7 @@ new-item=new-value
 				Eventually(testapps.GetAndChangeObj(&testCtx, repoKey, func(repo *dpv1alpha1.BackupRepo) {
 					repo.Spec.Config["key1"] = "changed-val1"
 				})).Should(Succeed())
+				completePreCheckJob(repo)
 				Eventually(testapps.CheckObj(&testCtx, toolConfigSecretKey, func(g Gomega, secret *corev1.Secret) {
 					g.Expect(secret.Data).Should(HaveKeyWithValue("datasafed.conf", []byte(`
 [storage]
@@ -867,8 +890,17 @@ new-item=new-value
 				g.Expect(cond.Reason).Should(BeEquivalentTo(ReasonHaveResidualPVCs))
 			}).Should(Succeed())
 
-			By("releasing the PVC")
+			By("releasing the PVC for pre-checking")
 			pvcKey := types.NamespacedName{
+				Name:      (&reconcileContext{repo: repo}).preCheckResourceName(),
+				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
+			}
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
+				controllerutil.RemoveFinalizer(pvc, pvcProtectionFinalizer)
+			})).Should(Succeed())
+
+			By("releasing the PVC")
+			pvcKey = types.NamespacedName{
 				Namespace: namespace2,
 				Name:      pvcName,
 			}

@@ -38,6 +38,7 @@ spec:
               batch:
                 properties:
                   enabled:
+                    description: enabled indicates whether to enable batch
                     type: boolean
                 type: object
               collectionInterval:
@@ -73,7 +74,10 @@ spec:
                     type: boolean
                 type: object
               metricsPort:
-                description: metricsPort is the port of the oteld metrics
+                default: 8888
+                description: metricsPort is the port of the oteld metrics, the port
+                  must be larger than 1024.
+                minimum: 1024
                 type: integer
               nodeSelector:
                 additionalProperties:
@@ -134,6 +138,7 @@ spec:
                 description: systemDataSource is the system data source
                 properties:
                   collectionInterval:
+                    default: 15s
                     description: collectionInterval is the interval of the data source
                     type: string
                   enabledK8SClusterExporter:
@@ -165,6 +170,7 @@ spec:
                     type: array
                 type: object
               useConfigMap:
+                default: true
                 description: useConfigMap indicates whether to use configmap to store
                   oteld config
                 type: boolean

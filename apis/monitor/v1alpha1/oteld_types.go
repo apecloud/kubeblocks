@@ -29,10 +29,13 @@ import (
 
 type MemoryLimiterConfig struct {
 	// MemoryLimit is the memory limit of the oteld
+	// +optional
 	Enabled bool `json:"enabled,omitempty"`
 }
 
 type BatchConfig struct {
+	// enabled indicates whether to enable batch
+	// +optional
 	Enabled bool `json:"enabled,omitempty"`
 }
 
@@ -61,6 +64,8 @@ type SystemDataSource struct {
 	EnabledPodLogs bool `json:"enabledPodLogs,omitempty"`
 
 	// collectionInterval is the interval of the data source
+	// +kubebuilder:default="15s"
+	// +optional
 	CollectionInterval string `json:"collectionInterval,omitempty"`
 }
 
@@ -79,14 +84,16 @@ type OTeldSpec struct {
 	// +optional
 	LogsLevel string `json:"logLevel,omitempty"`
 
-	// metricsPort is the port of the oteld metrics
+	// metricsPort is the port of the oteld metrics, the port must be larger than 1024.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:default=8888
+	// +kubebuilder:validation:Minimum=1024
 	MetricsPort int `json:"metricsPort,omitempty"`
 
 	// collectionInterval is the default collect interval of the oteld collection
 	// +kubebuilder:default="15s"
 	// +optional
-	CollectionInterval string `json:"collectionInterval"`
+	CollectionInterval string `json:"collectionInterval,omitempty"`
 
 	// +optional
 	MemoryLimiter MemoryLimiterConfig `json:"memoryLimiter,omitempty"`
@@ -99,8 +106,9 @@ type OTeldSpec struct {
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
 	// useConfigMap indicates whether to use configmap to store oteld config
+	// +kubebuilder:default=true
 	// +optional
-	UseConfigMap bool `json:"useConfigMap"`
+	UseConfigMap bool `json:"useConfigMap,omitempty"`
 
 	// nodeSelector to schedule OpenTelemetry Collector pods.
 	// This is only relevant to daemonset, statefulset, and deployment mode

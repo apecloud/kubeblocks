@@ -70,80 +70,35 @@ func buildComponentDefinitionFrom(clusterCompDef *appsv1alpha1.ClusterComponentD
 // compDefProviderConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Provider.
 type compDefProviderConvertor struct{}
 
-// compDefDescriptionConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Description.
-type compDefDescriptionConvertor struct{}
-
-// compDefServiceKindConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.ServiceKind.
-type compDefServiceKindConvertor struct{}
-
-// compDefServiceVersionConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.ServiceVersion.
-type compDefServiceVersionConvertor struct{}
-
-// compDefRuntimeConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Runtime.
-type compDefRuntimeConvertor struct{}
-
-// compDefVolumesConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Volumes.
-type compDefVolumesConvertor struct{}
-
-// compDefServicesConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Services.
-type compDefServicesConvertor struct{}
-
-// compDefConfigsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Configs.
-type compDefConfigsConvertor struct{}
-
-// compDefLogConfigsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.LogConfigs.
-type compDefLogConfigsConvertor struct{}
-
-// compDefConnCredentialsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.ConnectionCredentials.
-type compDefConnCredentialsConvertor struct{}
-
-// compDefMonitorConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Monitor.
-type compDefMonitorConvertor struct{}
-
-// compDefScriptsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Scripts.
-type compDefScriptsConvertor struct{}
-
-// compDefPolicyRulesConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.PolicyRules.
-type compDefPolicyRulesConvertor struct{}
-
-// compDefLabelsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Labels.
-type compDefLabelsConvertor struct{}
-
-// compDefUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.UpdateStrategy.
-type compDefUpdateStrategyConvertor struct{}
-
-// compDefSystemAccountsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.SystemAccounts.
-type compDefSystemAccountsConvertor struct{}
-
-// compDefRolesConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Roles.
-type compDefRolesConvertor struct{}
-
-// compDefRoleArbitratorConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.RoleArbitrator.
-type compDefRoleArbitratorConvertor struct{}
-
-// compDefLifecycleActionsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.LifecycleActions.
-type compDefLifecycleActionsConvertor struct{}
-
-// compDefServiceRefDeclarationsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.ServiceRefDeclarations.
-type compDefServiceRefDeclarationsConvertor struct{}
-
 func (c *compDefProviderConvertor) convert(args ...any) (any, error) {
 	return "", nil
 }
+
+// compDefDescriptionConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Description.
+type compDefDescriptionConvertor struct{}
 
 func (c *compDefDescriptionConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
 	return clusterCompDef.Description, nil
 }
 
+// compDefServiceKindConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.ServiceKind.
+type compDefServiceKindConvertor struct{}
+
 func (c *compDefServiceKindConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
 	return clusterCompDef.CharacterType, nil
 }
 
+// compDefServiceVersionConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.ServiceVersion.
+type compDefServiceVersionConvertor struct{}
+
 func (c *compDefServiceVersionConvertor) convert(args ...any) (any, error) {
 	return "", nil
 }
+
+// compDefRuntimeConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Runtime.
+type compDefRuntimeConvertor struct{}
 
 func (c *compDefRuntimeConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
@@ -166,6 +121,9 @@ func (c *compDefRuntimeConvertor) convert(args ...any) (any, error) {
 	}
 	return *podSpec, nil
 }
+
+// compDefVolumesConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Volumes.
+type compDefVolumesConvertor struct{}
 
 func (c *compDefVolumesConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
@@ -199,6 +157,9 @@ func (c *compDefVolumesConvertor) convert(args ...any) (any, error) {
 	return volumes, nil
 }
 
+// compDefServicesConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Services.
+type compDefServicesConvertor struct{}
+
 func (c *compDefServicesConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
 	if clusterCompDef.Service == nil {
@@ -224,17 +185,31 @@ func (c *compDefServicesConvertor) convert(args ...any) (any, error) {
 			Name:         "default",
 			ServiceName:  "",
 			ServiceSpec:  svc.Spec,
-			RoleSelector: "", // TODO(component): service selector
+			RoleSelector: c.roleSelector(clusterCompDef),
 		},
 		{
 			Name:         "headless",
 			ServiceName:  "headless",
 			ServiceSpec:  headlessSvc.Spec,
-			RoleSelector: "", // TODO(component): service selector
+			RoleSelector: c.roleSelector(clusterCompDef),
 		},
 	}
 	return services, nil
 }
+
+func (c *compDefServicesConvertor) roleSelector(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) string {
+	switch clusterCompDef.WorkloadType {
+	case appsv1alpha1.Consensus:
+		return constant.Leader
+	case appsv1alpha1.Replication:
+		return constant.Primary
+	default:
+		return ""
+	}
+}
+
+// compDefConfigsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Configs.
+type compDefConfigsConvertor struct{}
 
 func (c *compDefConfigsConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
@@ -248,24 +223,39 @@ func (c *compDefConfigsConvertor) convert(args ...any) (any, error) {
 	return cfgcore.MergeConfigTemplates(clusterCompVer.ConfigSpecs, clusterCompDef.ConfigSpecs), nil
 }
 
+// compDefLogConfigsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.LogConfigs.
+type compDefLogConfigsConvertor struct{}
+
 func (c *compDefLogConfigsConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
 	return clusterCompDef.LogConfigs, nil
 }
+
+// compDefMonitorConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Monitor.
+type compDefMonitorConvertor struct{}
 
 func (c *compDefMonitorConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
 	return clusterCompDef.Monitor, nil
 }
 
+// compDefScriptsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Scripts.
+type compDefScriptsConvertor struct{}
+
 func (c *compDefScriptsConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
 	return clusterCompDef.ScriptSpecs, nil
 }
 
+// compDefPolicyRulesConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.PolicyRules.
+type compDefPolicyRulesConvertor struct{}
+
 func (c *compDefPolicyRulesConvertor) convert(args ...any) (any, error) {
 	return nil, nil
 }
+
+// compDefLabelsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Labels.
+type compDefLabelsConvertor struct{}
 
 func (c *compDefLabelsConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
@@ -279,6 +269,9 @@ func (c *compDefLabelsConvertor) convert(args ...any) (any, error) {
 	}
 	return labels, nil
 }
+
+// compDefSystemAccountsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.SystemAccounts.
+type compDefSystemAccountsConvertor struct{}
 
 func (c *compDefSystemAccountsConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
@@ -300,9 +293,15 @@ func (c *compDefSystemAccountsConvertor) convert(args ...any) (any, error) {
 	return accounts, nil
 }
 
+// compDefConnCredentialsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.ConnectionCredentials.
+type compDefConnCredentialsConvertor struct{}
+
 func (c *compDefConnCredentialsConvertor) convert(args ...any) (any, error) {
 	return nil, nil
 }
+
+// compDefUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.UpdateStrategy.
+type compDefUpdateStrategyConvertor struct{}
 
 func (c *compDefUpdateStrategyConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
@@ -341,6 +340,9 @@ func (c *compDefUpdateStrategyConvertor) convert(args ...any) (any, error) {
 	}
 	return compDefUpdateStrategy, nil
 }
+
+// compDefRolesConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Roles.
+type compDefRolesConvertor struct{}
 
 func (c *compDefRolesConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
@@ -398,14 +400,23 @@ func (c *compDefRolesConvertor) convertConsensusRole(clusterCompDef *appsv1alpha
 	return roles, nil
 }
 
+// compDefRoleArbitratorConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.RoleArbitrator.
+type compDefRoleArbitratorConvertor struct{}
+
 func (c *compDefRoleArbitratorConvertor) convert(args ...any) (any, error) {
 	return nil, nil
 }
+
+// compDefServiceRefDeclarationsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.ServiceRefDeclarations.
+type compDefServiceRefDeclarationsConvertor struct{}
 
 func (c *compDefServiceRefDeclarationsConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
 	return clusterCompDef.ServiceRefDeclarations, nil
 }
+
+// compDefLifecycleActionsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.LifecycleActions.
+type compDefLifecycleActionsConvertor struct{}
 
 func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)

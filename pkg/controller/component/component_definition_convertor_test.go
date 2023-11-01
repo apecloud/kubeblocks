@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var _ = Describe("Component Definition Convertor", func() {
@@ -173,17 +174,17 @@ var _ = Describe("Component Definition Convertor", func() {
 				StatefulSpec:  nil,
 				ConsensusSpec: &appsv1alpha1.ConsensusSetSpec{
 					Leader: appsv1alpha1.ConsensusMember{
-						Name:       "leader",
+						Name:       constant.Leader,
 						AccessMode: appsv1alpha1.ReadWrite,
 					},
 					Followers: []appsv1alpha1.ConsensusMember{
 						{
-							Name:       "follower",
+							Name:       constant.Follower,
 							AccessMode: appsv1alpha1.Readonly,
 						},
 					},
 					Learner: &appsv1alpha1.ConsensusMember{
-						Name:       "learner",
+						Name:       constant.Learner,
 						AccessMode: appsv1alpha1.Readonly,
 					},
 				},
@@ -430,8 +431,7 @@ var _ = Describe("Component Definition Convertor", func() {
 				}
 				Expect(services[0].ServiceSpec.Type).Should(Equal(corev1.ServiceTypeClusterIP))
 				Expect(services[0].ServiceSpec.ClusterIP).Should(BeEmpty())
-				// TODO(component): role selectors
-				// Expect(services[0].RoleSelector).Should(BeEquivalentTo("xxxx"))
+				Expect(services[0].RoleSelector).Should(BeEquivalentTo(constant.Leader))
 
 				// headless service
 				Expect(services[1].ServiceName).Should(BeEquivalentTo("headless"))
@@ -443,8 +443,7 @@ var _ = Describe("Component Definition Convertor", func() {
 				}
 				Expect(services[1].ServiceSpec.Type).Should(Equal(corev1.ServiceTypeClusterIP))
 				Expect(services[1].ServiceSpec.ClusterIP).Should(Equal(corev1.ClusterIPNone))
-				// TODO(component): role selectors
-				// Expect(services[1].RoleSelector).Should(BeEquivalentTo("xxxx"))
+				Expect(services[1].RoleSelector).Should(BeEquivalentTo(constant.Leader))
 			})
 		})
 

@@ -119,6 +119,9 @@ func InitDBManager(configDir string) error {
 
 	ctrl.Log.Info("Initialize DB manager")
 	characterType := viper.GetString(constant.KBEnvCharacterType)
+	if viper.IsSet(constant.KBEnvBuiltinHandler) {
+		characterType = viper.GetString(constant.KBEnvBuiltinHandler)
+	}
 	if characterType == "" {
 		return fmt.Errorf("%s not set", constant.KBEnvCharacterType)
 	}

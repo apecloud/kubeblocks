@@ -407,10 +407,7 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 		return
 	}
 	credential := rsm.Spec.Credential
-	image := viper.GetString("ROLE_PROBE_IMAGE")
-	if len(image) == 0 {
-		image = defaultRoleProbeAgentImage
-	}
+	image := viper.GetString(constant.KBToolsImage)
 	probeDaemonPort := viper.GetInt("ROLE_PROBE_SERVICE_PORT")
 	if probeDaemonPort == 0 {
 		probeDaemonPort = defaultRoleProbeDaemonPort

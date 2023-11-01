@@ -34,8 +34,7 @@ import (
 
 // buildComponentDefinitionFrom builds a ComponentDefinition from a ClusterComponentDefinition and a ClusterComponentVersion.
 func buildComponentDefinitionFrom(clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
-	clusterCompVer *appsv1alpha1.ClusterComponentVersion,
-	clusterName string) (*appsv1alpha1.ComponentDefinition, error) {
+	clusterCompVer *appsv1alpha1.ClusterComponentVersion) (*appsv1alpha1.ComponentDefinition, error) {
 	if clusterCompDef == nil {
 		return nil, nil
 	}
@@ -62,7 +61,7 @@ func buildComponentDefinitionFrom(clusterCompDef *appsv1alpha1.ClusterComponentD
 		"servicerefdeclarations": &compDefServiceRefDeclarationsConvertor{},
 	}
 	compDef := &appsv1alpha1.ComponentDefinition{}
-	if err := covertObject(convertors, &compDef.Spec, clusterCompDef, clusterCompVer, clusterName); err != nil {
+	if err := covertObject(convertors, &compDef.Spec, clusterCompDef, clusterCompVer); err != nil {
 		return nil, err
 	}
 	return compDef, nil
@@ -202,19 +201,16 @@ func (c *compDefVolumesConvertor) convert(args ...any) (any, error) {
 
 func (c *compDefServicesConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	clusterName := args[2].(string)
 	if clusterCompDef.Service == nil {
 		return nil, nil
 	}
 
-	svcName := fmt.Sprintf("%s-%s", clusterName, clusterCompDef.Name)
-	svc := builder.NewServiceBuilder("", svcName).
+	svc := builder.NewServiceBuilder("", "").
 		SetType(corev1.ServiceTypeClusterIP).
 		AddPorts(clusterCompDef.Service.ToSVCSpec().Ports...).
 		GetObject()
 
-	headlessSvcName := fmt.Sprintf("%s-headless", svcName)
-	headlessSvcBuilder := builder.NewHeadlessServiceBuilder("", headlessSvcName).
+	headlessSvcBuilder := builder.NewHeadlessServiceBuilder("", "").
 		AddPorts(clusterCompDef.Service.ToSVCSpec().Ports...)
 	if clusterCompDef.PodSpec != nil {
 		for _, container := range clusterCompDef.PodSpec.Containers {
@@ -226,13 +222,13 @@ func (c *compDefServicesConvertor) convert(args ...any) (any, error) {
 	services := []appsv1alpha1.ComponentService{
 		{
 			Name:         "default",
-			ServiceName:  appsv1alpha1.BuiltInString(svc.Name),
+			ServiceName:  "",
 			ServiceSpec:  svc.Spec,
 			RoleSelector: "", // TODO(component): service selector
 		},
 		{
-			Name:         "default-headless",
-			ServiceName:  appsv1alpha1.BuiltInString(headlessSvc.Name),
+			Name:         "headless",
+			ServiceName:  "headless",
 			ServiceSpec:  headlessSvc.Spec,
 			RoleSelector: "", // TODO(component): service selector
 		},
@@ -357,11 +353,13 @@ func (c *compDefRolesConvertor) convert(args ...any) (any, error) {
 				Name:        constant.Primary,
 				Serviceable: true,
 				Writable:    true,
+				Votable:     true,
 			},
 			{
 				Name:        constant.Secondary,
 				Serviceable: false,
 				Writable:    false,
+				Votable:     true,
 			},
 		}
 		return defaultRoles, nil
@@ -380,20 +378,21 @@ func (c *compDefRolesConvertor) convertConsensusRole(clusterCompDef *appsv1alpha
 	}
 
 	roles := make([]appsv1alpha1.ComponentReplicaRole, 0)
-	addRole := func(member appsv1alpha1.ConsensusMember) {
+	addRole := func(member appsv1alpha1.ConsensusMember, votable bool) {
 		roles = append(roles, appsv1alpha1.ComponentReplicaRole{
 			Name:        member.Name,
 			Serviceable: member.AccessMode != appsv1alpha1.None,
 			Writable:    member.AccessMode == appsv1alpha1.ReadWrite,
+			Votable:     votable,
 		})
 	}
 
-	addRole(clusterCompDef.ConsensusSpec.Leader)
+	addRole(clusterCompDef.ConsensusSpec.Leader, true)
 	for _, follower := range clusterCompDef.ConsensusSpec.Followers {
-		addRole(follower)
+		addRole(follower, true)
 	}
 	if clusterCompDef.ConsensusSpec.Learner != nil {
-		addRole(*clusterCompDef.ConsensusSpec.Learner)
+		addRole(*clusterCompDef.ConsensusSpec.Learner, false)
 	}
 
 	return roles, nil

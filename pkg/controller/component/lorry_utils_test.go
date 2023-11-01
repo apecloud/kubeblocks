@@ -45,7 +45,6 @@ var _ = Describe("probe_utils", func() {
 		var clusterDefProbe *appsv1alpha1.ClusterDefinitionProbe
 
 		BeforeEach(func() {
-			container = buildBasicContainer()
 			probeServiceHTTPPort = 3501
 			probeServiceGRPCPort = 50001
 
@@ -53,6 +52,7 @@ var _ = Describe("probe_utils", func() {
 			clusterDefProbe.PeriodSeconds = 1
 			clusterDefProbe.TimeoutSeconds = 1
 			clusterDefProbe.FailureThreshold = 1
+
 			component = &SynthesizedComponent{}
 			component.CharacterType = "mysql"
 			component.Services = append(component.Services, corev1.Service{
@@ -88,6 +88,8 @@ var _ = Describe("probe_utils", func() {
 			component.PodSpec = &corev1.PodSpec{
 				Containers: []corev1.Container{},
 			}
+
+			container = buildBasicContainer(component)
 		})
 
 		It("should build multiple probe containers", func() {

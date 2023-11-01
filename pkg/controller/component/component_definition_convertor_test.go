@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -423,8 +421,7 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(services).Should(HaveLen(2))
 
 				// service
-				svcName := fmt.Sprintf("%s-%s", clusterName, clusterCompDef.Name)
-				Expect(services[0].ServiceName).Should(BeEquivalentTo(svcName))
+				Expect(services[0].ServiceName).Should(BeEmpty())
 				Expect(services[0].ServiceSpec.Ports).Should(HaveLen(len(clusterCompDef.Service.Ports)))
 				for i := range services[0].ServiceSpec.Ports {
 					Expect(services[0].ServiceSpec.Ports[i].Name).Should(Equal(clusterCompDef.Service.Ports[i].Name))
@@ -437,7 +434,7 @@ var _ = Describe("Component Definition Convertor", func() {
 				// Expect(services[0].RoleSelector).Should(BeEquivalentTo("xxxx"))
 
 				// headless service
-				Expect(services[1].ServiceName).Should(BeEquivalentTo(svcName + "-headless"))
+				Expect(services[1].ServiceName).Should(BeEquivalentTo("headless"))
 				Expect(len(services[1].ServiceSpec.Ports)).Should(Equal(len(clusterCompDef.Service.Ports) + len(clusterCompDef.PodSpec.Containers[0].Ports)))
 				for i := range clusterCompDef.Service.Ports {
 					Expect(services[1].ServiceSpec.Ports[i].Name).Should(Equal(clusterCompDef.Service.Ports[i].Name))
@@ -616,16 +613,19 @@ var _ = Describe("Component Definition Convertor", func() {
 						Name:        "leader",
 						Serviceable: true,
 						Writable:    true,
+						Votable:     true,
 					},
 					{
 						Name:        "follower",
 						Serviceable: true,
 						Writable:    false,
+						Votable:     true,
 					},
 					{
 						Name:        "learner",
 						Serviceable: true,
 						Writable:    false,
+						Votable:     false,
 					},
 				}
 				Expect(res).Should(BeEquivalentTo(expectedRoles))

@@ -112,7 +112,7 @@ func BuildComponentDefinitionLow(clusterDef *appsv1alpha1.ClusterDefinition, clu
 	if err != nil {
 		return nil, err
 	}
-	return buildComponentDefinitionFrom(clusterCompDef, clusterCompVer, cluster.Name)
+	return buildComponentDefinitionFrom(clusterCompDef, clusterCompVer)
 }
 
 // getClusterDefAndVersion gets ClusterDefinition and ClusterVersion object from cluster.

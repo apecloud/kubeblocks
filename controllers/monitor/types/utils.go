@@ -30,6 +30,10 @@ import (
 
 type ScrapeConfig map[string]any
 
+type InputConfig struct {
+	Include []string `json:"include,omitempty"`
+}
+
 func fromCollectorDataSource(dataSourceName string, dataSourceSpec v1alpha1.CollectorDataSourceSpec, cli client.Client, ctx context.Context, namespace string) ([]ScrapeConfig, error) {
 	configs := make([]ScrapeConfig, 0)
 	clusterDefName := dataSourceSpec.ClusterDefRef
@@ -90,11 +94,11 @@ func buildEngineValMap(templateName string, componentName string, config v1alpha
 		return valMap
 	}
 
-	logCollector := map[string]v1alpha1.InputConfig{}
+	logCollector := map[string]InputConfig{}
 	isAll := isAllLogs(config.Logs.LogTypes)
 	for _, logConfig := range obj.LogConfigs {
 		if isAll || isMatchLogs(logConfig, config.Logs.LogTypes) {
-			logCollector[logConfig.Name] = v1alpha1.InputConfig{
+			logCollector[logConfig.Name] = InputConfig{
 				Include: []string{logConfig.FilePathPattern},
 			}
 		}

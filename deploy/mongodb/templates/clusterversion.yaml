@@ -1,5 +1,5 @@
 {{- $cvName := printf "mongodb-%s" (default .Chart.AppVersion .Values.clusterVersionOverride) -}}
-{{- if eq (include "mongodb.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" -}}
+{{ if eq (include "mongodb.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" }}
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
@@ -24,7 +24,7 @@ spec:
 {{- end -}}
 
 {{- $cvName = "mongodb-4.0" -}}
-{{- if eq (include "mongodb.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" -}}
+{{ if eq (include "mongodb.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" }}
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
@@ -50,7 +50,7 @@ spec:
 {{- end -}}
 
 {{- $cvName = "mongodb-4.2" -}}
-{{- if eq (include "mongodb.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" -}}
+{{ if eq (include "mongodb.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" }}
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
@@ -76,7 +76,7 @@ spec:
 {{- end -}}
 
 {{- $cvName = "mongodb-4.4" -}}
-{{- if eq (include "mongodb.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" -}}
+{{ if eq (include "mongodb.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" }}
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
@@ -102,7 +102,7 @@ spec:
 {{- end -}}
 
 {{- $cvName = "mongodb-5.0.20" -}}
-{{- if eq (include "mongodb.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" -}}
+{{ if eq (include "mongodb.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" }}
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
@@ -131,7 +131,7 @@ spec:
 {{- end -}}
 
 {{- $cvName = "mongodb-6.0" -}}
-{{- if eq (include "mongodb.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" -}}
+{{ if eq (include "mongodb.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" }}
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion

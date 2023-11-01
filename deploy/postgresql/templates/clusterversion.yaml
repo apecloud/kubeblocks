@@ -1,5 +1,5 @@
 {{- $cvName := "postgresql-14.7.2" -}}
-{{- if eq (include "postgresql.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" -}}
+{{ if eq (include "postgresql.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" }}
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
@@ -29,7 +29,7 @@ spec:
 {{- end -}}
 
 {{- $cvName = "postgresql-12.14.1" -}}
-{{- if eq (include "postgresql.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" -}}
+{{ if eq (include "postgresql.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" }}
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
@@ -81,7 +81,7 @@ spec:
 {{- end -}}
 
 {{- $cvName = "postgresql-12.15.0" -}}
-{{- if eq (include "postgresql.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" -}}
+{{ if eq (include "postgresql.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" }}
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
@@ -128,7 +128,7 @@ spec:
 {{- end -}}
 
 {{- $cvName = "postgresql-14.8.0" -}}
-{{- if eq (include "postgresql.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" -}}
+{{ if eq (include "postgresql.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" }}
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
@@ -160,7 +160,7 @@ spec:
 {{- end -}}
 
 {{- $cvName = "postgresql-12.14.0" -}}
-{{- if eq (include "postgresql.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" -}}
+{{ if eq (include "postgresql.isClusterVersionEnabled" (dict "cvName" $cvName "values" .Values)) "true" }}
 ---
 # Adding backward compatibility for clusterVersion 12.14.0, which will be removed in subsequent iterative versions.
 apiVersion: apps.kubeblocks.io/v1alpha1

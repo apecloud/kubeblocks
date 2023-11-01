@@ -47,7 +47,7 @@ func IsHAAvailable(characterType, workloadType string) bool {
 		}
 	case models.ApecloudPostgreSQL:
 		return true
-	case models.OfficalPostgreSQL:
+	case models.OfficialPostgreSQL:
 		return true
 	}
 	return false

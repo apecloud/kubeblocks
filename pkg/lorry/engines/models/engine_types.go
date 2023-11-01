@@ -25,7 +25,7 @@ const (
 	MySQL              EngineType = "mysql"
 	WeSQL              EngineType = "wesql"
 	PostgreSQL         EngineType = "postgresql"
-	OfficalPostgreSQL  EngineType = "offical-postgresql"
+	OfficialPostgreSQL EngineType = "official-postgresql"
 	ApecloudPostgreSQL EngineType = "apecloud-postgresql"
 	Redis              EngineType = "redis"
 	ETCD               EngineType = "etcd"

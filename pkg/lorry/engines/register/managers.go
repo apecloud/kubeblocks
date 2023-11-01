@@ -77,7 +77,7 @@ func init() {
 	RegisterEngine(models.MongoDB, "", mongodb.NewManager, mongodb.NewCommands)
 	RegisterEngine(models.PolarDBX, "", polardbx.NewManager, mysql.NewCommands)
 	RegisterEngine(models.PostgreSQL, "", officalpostgres.NewManager, postgres.NewCommands)
-	RegisterEngine(models.OfficalPostgreSQL, "", officalpostgres.NewManager, postgres.NewCommands)
+	RegisterEngine(models.OfficialPostgreSQL, "", officalpostgres.NewManager, postgres.NewCommands)
 	RegisterEngine(models.ApecloudPostgreSQL, "", apecloudpostgres.NewManager, postgres.NewCommands)
 }
 

@@ -115,3 +115,12 @@ dataMountPath: /home/postgres/pgdata
 
 logConfigs:
   running: /home/postgres/pgdata/pgroot/data/log/postgresql-*
+
+## @param enabledClusterVersions specifies the enabled cluster versions, if not set, all cluster versions are enabled
+## and will be rendered, installed. Otherwise, only the specified cluster versions will be rendered and installed.
+## Example:
+##   --set "enabledClusterVersions={postgresql-14.7.2,postgresql-12.14.1}"
+##   --set enabledClusterVersions=''   # this will enable all cluster versions
+##   --set enabledClusterVersions={}   # this will disable all cluster versions, the enabledClusterVersions has an empty
+##                                     # value and the length is 1
+enabledClusterVersions: [ ]

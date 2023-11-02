@@ -201,6 +201,7 @@ func kindsForDelete() ([]client.ObjectList, []client.ObjectList) {
 	namespacedKinds, nonNamespacedKinds := kindsForHalt()
 	namespacedKindsPlus := []client.ObjectList{
 		&corev1.SecretList{},
+		&corev1.ServiceList{},
 		&corev1.ConfigMapList{},
 		&corev1.PersistentVolumeClaimList{},
 		&dpv1alpha1.BackupPolicyList{},

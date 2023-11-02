@@ -21,6 +21,7 @@ package component
 
 import (
 	"fmt"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -441,7 +442,7 @@ func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
 	lifecycleActions := &appsv1alpha1.ComponentLifecycleActions{}
 
 	if clusterCompDef.Probes != nil && clusterCompDef.Probes.RoleProbe != nil {
-		lifecycleActions.RoleProbe = c.convertRoleProbe(clusterCompDef.Probes.RoleProbe, clusterCompDef.CharacterType)
+		lifecycleActions.RoleProbe = c.convertRoleProbe(clusterCompDef)
 	}
 
 	if clusterCompDef.SwitchoverSpec != nil {
@@ -460,27 +461,59 @@ func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
 	return lifecycleActions, nil // TODO
 }
 
-func (c *compDefLifecycleActionsConvertor) convertRoleProbe(probe *appsv1alpha1.ClusterDefinitionProbe, characterType string) *appsv1alpha1.RoleProbeSpec {
-	if probe == nil {
+func (c *compDefLifecycleActionsConvertor) convertBuildInHandlerName(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) constant.BuildInHandlerType {
+	if clusterCompDef == nil || clusterCompDef.CharacterType == "" {
+		return constant.UnKnownBuildInHandlerName
+	}
+	switch clusterCompDef.CharacterType {
+	case constant.MySQLCharacterType:
+		if clusterCompDef.WorkloadType == appsv1alpha1.Consensus {
+			return constant.WeSQLBuildInHandlerName
+		} else {
+			return constant.MySQLBuildInHandlerName
+		}
+	case constant.PostgreSQLCharacterType:
+		if clusterCompDef.WorkloadType == appsv1alpha1.Consensus {
+			return constant.ApeCloudPostgresqlBuildInHandlerName
+		} else {
+			return constant.PostgresqlBuildInHandlerName
+		}
+	case constant.RedisCharacterType:
+		return constant.RedisBuildInHandlerName
+	case constant.MongoDBCharacterType:
+		return constant.MongoDBBuildInHandlerName
+	case constant.ETCDCharacterType:
+		return constant.ETCDBuildInHandlerName
+	case constant.PolarDBXCharacterType:
+		return constant.PolarDBXBuildInHandlerName
+	default:
+		return constant.UnKnownBuildInHandlerName
+	}
+}
+
+func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) *appsv1alpha1.RoleProbeSpec {
+	if clusterCompDef == nil || clusterCompDef.Probes == nil || clusterCompDef.Probes.RoleProbe == nil {
 		return nil
 	}
 
+	clusterCompDefRoleProbe := clusterCompDef.Probes.RoleProbe
 	roleProbeSpec := &appsv1alpha1.RoleProbeSpec{
-		TimeoutSeconds:   probe.TimeoutSeconds,
-		PeriodSeconds:    probe.PeriodSeconds,
-		FailureThreshold: probe.FailureThreshold,
+		TimeoutSeconds:   clusterCompDefRoleProbe.TimeoutSeconds,
+		PeriodSeconds:    clusterCompDefRoleProbe.PeriodSeconds,
+		FailureThreshold: clusterCompDefRoleProbe.FailureThreshold,
 	}
 
-	if probe.Commands == nil || len(probe.Commands.Writes) == 0 || len(probe.Commands.Queries) == 0 {
-		buildInHandlerName := characterType
-		roleProbeSpec.BuiltinHandler = &buildInHandlerName
+	if clusterCompDefRoleProbe.Commands == nil || len(clusterCompDefRoleProbe.Commands.Writes) == 0 || len(clusterCompDefRoleProbe.Commands.Queries) == 0 {
+		buildInHandlerName := c.convertBuildInHandlerName(clusterCompDef)
+		roleProbeSpec.BuiltinHandler = (*string)(&buildInHandlerName)
+		roleProbeSpec.RoleUpdateMechanism = workloads.DirectAPIServerEventUpdate
 		roleProbeSpec.CustomHandler = nil
 		return roleProbeSpec
 	}
 
-	commands := probe.Commands.Writes
-	if len(probe.Commands.Writes) == 0 {
-		commands = probe.Commands.Queries
+	commands := clusterCompDefRoleProbe.Commands.Writes
+	if len(clusterCompDefRoleProbe.Commands.Writes) == 0 {
+		commands = clusterCompDefRoleProbe.Commands.Queries
 	}
 	roleProbeSpec.BuiltinHandler = nil
 	roleProbeSpec.CustomHandler = &appsv1alpha1.Action{

@@ -326,7 +326,6 @@ func (r *componentStatusHandler) syncComponentStatusToCluster() error {
 // 1. at least one pod is available
 // 2. with latest revision
 // 3. and with leader role label set
-// TODO(xingran): remove the dependency of the component's workload type.
 func (r *componentStatusHandler) isComponentAvailable(pods []*corev1.Pod) (bool, error) {
 	if isLatestRevision, err := component.IsComponentPodsWithLatestRevision(r.reqCtx.Ctx, r.cli, r.cluster, r.runningRSM); err != nil {
 		return false, err
@@ -334,9 +333,8 @@ func (r *componentStatusHandler) isComponentAvailable(pods []*corev1.Pod) (bool,
 		return false, nil
 	}
 
-	shouldCheckLeader := func() bool {
-		return r.synthesizeComp.WorkloadType == appsv1alpha1.Consensus || r.synthesizeComp.WorkloadType == appsv1alpha1.Replication
-	}()
+	shouldCheckRole := len(r.synthesizeComp.Roles) > 0
+
 	hasLeaderRoleLabel := func(pod *corev1.Pod) bool {
 		roleName, ok := pod.Labels[constant.RoleLabelKey]
 		if !ok {
@@ -349,21 +347,20 @@ func (r *componentStatusHandler) isComponentAvailable(pods []*corev1.Pod) (bool,
 		}
 		return false
 	}
+
+	hasPodAvailable := false
 	for _, pod := range pods {
 		if !podutils.IsPodAvailable(pod, 0, metav1.Time{Time: time.Now()}) {
 			continue
 		}
-		if !shouldCheckLeader {
-			continue
-		}
-		if _, ok := pod.Labels[constant.RoleLabelKey]; ok {
-			continue
-		}
-		if hasLeaderRoleLabel(pod) {
+		if shouldCheckRole && hasLeaderRoleLabel(pod) {
 			return true, nil
 		}
+		if !hasPodAvailable {
+			hasPodAvailable = !shouldCheckRole
+		}
 	}
-	return false, nil
+	return hasPodAvailable, nil
 }
 
 // isRunning checks if the component underlying rsm workload is running.

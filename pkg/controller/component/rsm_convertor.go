@@ -139,20 +139,29 @@ func (c *rsmRolesConvertor) convert(args ...any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	rsmReplicaRoles := make([]workloads.ReplicaRole, 0)
-	compReplicaRoles := synthesizeComp.Roles
-	for _, compReplicaRole := range compReplicaRoles {
-		rsmReplicaRole := workloads.ReplicaRole{
-			Name:       compReplicaRole.Name,
-			AccessMode: workloads.NoneMode,
-			CanVote:    compReplicaRole.Votable,
+	accessMode := func(role appsv1alpha1.ComponentReplicaRole) workloads.AccessMode {
+		switch {
+		case role.Serviceable && role.Writable:
+			return workloads.ReadWriteMode
+		case role.Serviceable:
+			return workloads.ReadonlyMode
+		default:
+			return workloads.NoneMode
 		}
-		if compReplicaRole.Serviceable {
-			if compReplicaRole.Writable {
-				rsmReplicaRole.AccessMode = workloads.ReadWriteMode
-			} else {
-				rsmReplicaRole.AccessMode = workloads.ReadonlyMode
-			}
+	}
+	rsmReplicaRoles := make([]workloads.ReplicaRole, 0)
+	for _, role := range synthesizeComp.Roles {
+		rsmReplicaRole := workloads.ReplicaRole{
+			Name:       role.Name,
+			AccessMode: accessMode(role),
+			CanVote:    role.Votable,
+			// HACK: Since the RSM relies on IsLeader field to determine whether a workload is available, we are using
+			// such a workaround to combine these two fields to provide the information.
+			// However, the condition will be broken if a service with multiple different roles that can be writable
+			// at the same time, such as Zookeeper.
+			// TODO: We need to discuss further whether we should rely on the concept of "Leader" in the case
+			//  where the KB controller does not provide HA functionality.
+			IsLeader: role.Serviceable && role.Writable,
 		}
 		rsmReplicaRoles = append(rsmReplicaRoles, rsmReplicaRole)
 	}

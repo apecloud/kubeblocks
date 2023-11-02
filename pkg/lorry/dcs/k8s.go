@@ -42,7 +42,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	k8scomponent "github.com/apecloud/kubeblocks/pkg/lorry/engines/kubernetes"
+	k8s "github.com/apecloud/kubeblocks/pkg/lorry/util/kubernetes"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -63,12 +63,12 @@ type KubernetesStore struct {
 func NewKubernetesStore() (*KubernetesStore, error) {
 	ctx := context.Background()
 	logger := ctrl.Log.WithName("DCS-K8S")
-	clientset, err := k8scomponent.GetClientSet(logger)
+	clientset, err := k8s.GetClientSet()
 	if err != nil {
 		err = errors.Wrap(err, "clientset init failed")
 		return nil, err
 	}
-	client, err := k8scomponent.GetRESTClient(logger)
+	client, err := k8s.GetRESTClient()
 	if err != nil {
 		err = errors.Wrap(err, "restclient init failed")
 		return nil, err

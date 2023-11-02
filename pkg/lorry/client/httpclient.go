@@ -31,8 +31,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	. "github.com/apecloud/kubeblocks/pkg/lorry/util"
@@ -49,6 +51,7 @@ type HTTPClient struct {
 	CacheTTL         time.Duration
 	ReconcileTimeout time.Duration
 	RequestTimeout   time.Duration
+	logger           logr.Logger
 }
 
 var _ Client = &HTTPClient{}
@@ -60,6 +63,7 @@ type OperationResult struct {
 }
 
 func NewHTTPClientWithPod(pod *corev1.Pod) (*HTTPClient, error) {
+	logger := ctrl.Log.WithName("Lorry HTTP client")
 	ip := pod.Status.PodIP
 	if ip == "" {
 		return nil, fmt.Errorf("pod %v has no ip", pod.Name)
@@ -67,7 +71,7 @@ func NewHTTPClientWithPod(pod *corev1.Pod) (*HTTPClient, error) {
 
 	port, err := intctrlutil.GetLorryHTTPPort(pod)
 	if err != nil {
-		// not lorry in the pod, just return nil without error
+		logger.Info("not lorry in the pod, just return nil without error")
 		return nil, nil
 	}
 
@@ -91,6 +95,7 @@ func NewHTTPClientWithPod(pod *corev1.Pod) (*HTTPClient, error) {
 		RequestTimeout:   30 * time.Second,
 		ReconcileTimeout: 500 * time.Millisecond,
 		cache:            make(map[string]*OperationResult),
+		logger:           ctrl.Log.WithName("Lorry HTTP client"),
 	}
 	return operationClient, nil
 }

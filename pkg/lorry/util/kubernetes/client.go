@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package kubernetes
 
 import (
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"k8s.io/client-go/kubernetes"
 	ctlruntime "sigs.k8s.io/controller-runtime"
@@ -32,7 +31,7 @@ import (
 )
 
 // GetClientSet returns a kubernetes clientset.
-func GetClientSet(logger logr.Logger) (*kubernetes.Clientset, error) {
+func GetClientSet() (*kubernetes.Clientset, error) {
 	restConfig, err := ctlruntime.GetConfig()
 	if err != nil {
 		return nil, errors.Wrap(err, "get kubeconfig failed")
@@ -46,7 +45,7 @@ func GetClientSet(logger logr.Logger) (*kubernetes.Clientset, error) {
 }
 
 // GetRESTClient returns a kubernetes restclient for KubeBlocks types.
-func GetRESTClient(logger logr.Logger) (*rest.RESTClient, error) {
+func GetRESTClient() (*rest.RESTClient, error) {
 	restConfig, err := ctlruntime.GetConfig()
 	if err != nil {
 		return nil, errors.Wrap(err, "get kubeconfig failed")

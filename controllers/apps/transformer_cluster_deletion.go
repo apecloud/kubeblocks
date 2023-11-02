@@ -185,11 +185,12 @@ func kindsForDoNotTerminate() ([]client.ObjectList, []client.ObjectList) {
 func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
 	namespacedKinds, nonNamespacedKinds := kindsForDoNotTerminate()
 	namespacedKindsPlus := []client.ObjectList{
+		&appsv1alpha1.ComponentList{},
+		&workloads.ReplicatedStateMachineList{},
 		&policyv1.PodDisruptionBudgetList{},
+		&corev1.ServiceList{},
 		&corev1.ServiceAccountList{},
 		&rbacv1.RoleBindingList{},
-		&workloads.ReplicatedStateMachineList{},
-		&appsv1alpha1.ComponentList{},
 	}
 	nonNamespacedKindsPlus := []client.ObjectList{
 		&rbacv1.ClusterRoleBindingList{},

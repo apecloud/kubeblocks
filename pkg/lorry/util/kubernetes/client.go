@@ -22,10 +22,9 @@ package kubernetes
 import (
 	"github.com/pkg/errors"
 	"k8s.io/client-go/kubernetes"
-	ctlruntime "sigs.k8s.io/controller-runtime"
-
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	ctlruntime "sigs.k8s.io/controller-runtime"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
@@ -44,8 +43,8 @@ func GetClientSet() (*kubernetes.Clientset, error) {
 	return clientset, nil
 }
 
-// GetRESTClient returns a kubernetes restclient for KubeBlocks types.
-func GetRESTClient() (*rest.RESTClient, error) {
+// GetRESTClientForKB returns a kubernetes restclient for KubeBlocks types.
+func GetRESTClientForKB() (*rest.RESTClient, error) {
 	restConfig, err := ctlruntime.GetConfig()
 	if err != nil {
 		return nil, errors.Wrap(err, "get kubeconfig failed")

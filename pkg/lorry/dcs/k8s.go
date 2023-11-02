@@ -68,7 +68,7 @@ func NewKubernetesStore() (*KubernetesStore, error) {
 		err = errors.Wrap(err, "clientset init failed")
 		return nil, err
 	}
-	client, err := k8s.GetRESTClient()
+	client, err := k8s.GetRESTClientForKB()
 	if err != nil {
 		err = errors.Wrap(err, "restclient init failed")
 		return nil, err

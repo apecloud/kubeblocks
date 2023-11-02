@@ -21,108 +21,184 @@ package client
 
 import (
 	"bytes"
+	context "context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
+	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/remotecommand"
+	cmdexec "k8s.io/kubectl/pkg/cmd/exec"
+	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/pkg/cli/exec"
+	"github.com/apecloud/kubeblocks/pkg/cli/scheme"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	. "github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
-// OperationHTTPClient is a mock client for operation, mainly used to hide curl command details.
-type OperationHTTPClient struct {
-	httpRequestPrefix string
-	RequestTimeout    time.Duration
-	containerName     string
-	characterType     string
+// K8sExecClient is a mock client for operation, mainly used to hide curl command details.
+type K8sExecClient struct {
+	cmdexec.StreamOptions
+	Executor       cmdexec.RemoteExecutor
+	restConfig     *rest.Config
+	restClient     *rest.RESTClient
+	lorryPort      int32
+	RequestTimeout time.Duration
+	logger         logr.Logger
 }
 
-// NewHTTPClientWithChannelPod create a new OperationHTTPClient with sqlchannel container
-func NewHTTPClientWithChannelPod(pod *corev1.Pod, characterType string) (*OperationHTTPClient, error) {
+// NewK8sExecClientWithPod create a new OperationHTTPClient with sqlchannel container
+func NewK8sExecClientWithPod(pod *corev1.Pod) (*K8sExecClient, error) {
 	var (
 		err error
 	)
+	logger := ctrl.Log.WithName("Lorry K8S Exec client")
 
-	if characterType == "" {
-		return nil, fmt.Errorf("pod %v chacterType must be set", pod.Name)
-	}
-
-	ip := pod.Status.PodIP
-	if ip == "" {
-		return nil, fmt.Errorf("pod %v has no ip", pod.Name)
-	}
-	container, err := intctrlutil.GetLorryContainerName(pod)
+	containerName, err := intctrlutil.GetLorryContainerName(pod)
 	if err != nil {
-		return nil, err
+		logger.Info("not lorry in the pod, just return nil without error")
+		return nil, nil
 	}
+
 	port, err := intctrlutil.GetLorryHTTPPort(pod)
 	if err != nil {
 		return nil, err
 	}
 
-	client := &OperationHTTPClient{
-		httpRequestPrefix: fmt.Sprintf(HTTPRequestPrefx, port, characterType),
-		RequestTimeout:    10 * time.Second,
-		containerName:     container,
-		characterType:     characterType,
+	streamOptions := cmdexec.StreamOptions{
+		IOStreams:     genericiooptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr},
+		Stdin:         true,
+		TTY:           true,
+		PodName:       pod.Name,
+		ContainerName: containerName,
+		Namespace:     pod.Namespace,
+	}
+
+	restConfig, err := ctrl.GetConfig()
+	if err != nil {
+		return nil, errors.Wrap(err, "get k8s config failed")
+	}
+
+	restConfig.GroupVersion = &schema.GroupVersion{Group: "", Version: "v1"}
+	restConfig.APIPath = "/api"
+	restConfig.NegotiatedSerializer = clientsetscheme.Codecs.WithoutConversion()
+	restClient, err := rest.RESTClientFor(restConfig)
+	if err != nil {
+		return nil, errors.Wrap(err, "create k8s client failed")
+	}
+
+	client := &K8sExecClient{
+		StreamOptions:  streamOptions,
+		lorryPort:      port,
+		restConfig:     restConfig,
+		restClient:     restClient,
+		RequestTimeout: 10 * time.Second,
+		logger:         logger,
+		Executor:       &cmdexec.DefaultRemoteExecutor{},
 	}
 	return client, nil
 }
 
-// SendRequest execs sql operation, this is a blocking operation and use pod EXEC subresource to send a http request to the lorry pod
-func (cli *OperationHTTPClient) SendRequest(exec *exec.ExecOptions, request SQLChannelRequest) (SQLChannelResponse, error) {
+func (cli *K8sExecClient) GetRole(ctx context.Context) (string, error) {
+	resp, err := cli.Request(ctx, string(GetRoleOperation), http.MethodGet, nil)
+	if err != nil {
+		return "", err
+	}
+
+	role, ok := resp["role"]
+	if !ok {
+		return "", nil
+	}
+
+	return role.(string), nil
+}
+
+// Request execs lorry operation, this is a blocking operation and use pod EXEC subresource to send a http request to the lorry pod
+func (cli *K8sExecClient) Request(ctx context.Context, operation, method string, req map[string]any) (map[string]any, error) {
 	var (
 		strBuffer bytes.Buffer
 		errBuffer bytes.Buffer
 		err       error
-		response  = SQLChannelResponse{}
 	)
+	curlCmd := fmt.Sprintf("curl -X %s -H 'Content-Type: application/json' http://localhost:%d/v1.0/%s",
+		strings.ToUpper(method), cli.lorryPort, strings.ToLower(operation))
 
-	if jsonData, err := json.Marshal(request); err != nil {
-		return response, err
-	} else {
-		exec.ContainerName = cli.containerName
+	if len(req) != 0 {
+		jsonData, err := json.Marshal(req)
+		if err != nil {
+			return nil, err
+		}
 		// escape single quote
-		data := strings.ReplaceAll(string(jsonData), "'", "\\'")
-		exec.Command = []string{"sh", "-c", fmt.Sprintf("%s -d '%s'", cli.httpRequestPrefix, data)}
+		body := strings.ReplaceAll(string(jsonData), "'", "\\'")
+		curlCmd = curlCmd + fmt.Sprintf("-d '%s'", body)
 	}
+	cmd := []string{"sh", "-c", curlCmd}
 
 	// redirect output to strBuffer to be parsed later
-	if err = exec.RunWithRedirect(&strBuffer, &errBuffer); err != nil {
-		return response, err
-	}
-	return parseResponse(strBuffer.Bytes(), request.Operation, cli.characterType)
-}
-
-type errorResponse struct {
-	ErrorCode string `json:"errorCode"`
-	Message   string `json:"message"`
-}
-
-// parseResponse parses response to errorResponse or SQLChannelResponse to capture error message.
-func parseResponse(data []byte, operation string, charType string) (SQLChannelResponse, error) {
-	errorResponse := errorResponse{}
-	response := SQLChannelResponse{}
-	if err := json.Unmarshal(data, &errorResponse); err != nil {
-		return response, err
-	} else if len(errorResponse.ErrorCode) > 0 {
-		return SQLChannelResponse{
-			Event:   RespEveFail,
-			Message: fmt.Sprintf("Operation `%s` on component of type `%s` is not supported yet.", operation, charType),
-			Metadata: SQLChannelMeta{
-				Operation: operation,
-				StartTime: time.Now(),
-				EndTime:   time.Now(),
-				Extra:     errorResponse.Message,
-			},
-		}, SQLChannelError{Reason: UnsupportedOps}
+	if err = cli.k8sExec(cmd, &strBuffer, &errBuffer); err != nil {
+		return nil, errors.Wrap(err, "K8S exec failed")
 	}
 
-	// convert it to SQLChannelResponse
-	err := json.Unmarshal(data, &response)
-	return response, err
+	errData := errBuffer.Bytes()
+	if len(errData) != 0 {
+		fmt.Println(string(errData))
+	}
+	data := strBuffer.Bytes()
+	if len(data) == 0 {
+		return nil, nil
+	}
+
+	result := map[string]any{}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, errors.Wrap(err, "decode result failed")
+	}
+	return result, nil
+}
+
+func (cli *K8sExecClient) k8sExec(cmd []string, outWriter io.Writer, errWriter io.Writer) error {
+	// ensure we can recover the terminal while attached
+	t := cli.SetupTTY()
+
+	var sizeQueue remotecommand.TerminalSizeQueue
+	if t.Raw {
+		// this call spawns a goroutine to monitor/update the terminal size
+		sizeQueue = t.MonitorSize(t.GetSize())
+
+		// unset p.Err if it was previously set because both stdout and stderr go over p.Out when tty is
+		// true
+		cli.ErrOut = nil
+	}
+
+	fn := func() error {
+		req := cli.restClient.Post().
+			Resource("pods").
+			Name(cli.PodName).
+			Namespace(cli.Namespace).
+			SubResource("exec")
+		req.VersionedParams(&corev1.PodExecOptions{
+			Container: cli.ContainerName,
+			Command:   cmd,
+			Stdin:     cli.Stdin,
+			Stdout:    outWriter != nil,
+			Stderr:    errWriter != nil,
+			TTY:       t.Raw,
+		}, scheme.ParameterCodec)
+
+		return cli.Executor.Execute("POST", req.URL(), cli.restConfig, cli.In, outWriter, errWriter, t.Raw, sizeQueue)
+	}
+
+	if err := t.Safe(fn); err != nil {
+		return err
+	}
+	return nil
 }

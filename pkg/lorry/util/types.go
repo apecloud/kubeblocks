@@ -70,7 +70,7 @@ const (
 	OperationFailed            = "Failed"
 	DefaultProbeTimeoutSeconds = 2
 
-	HTTPRequestPrefx string = "curl -X POST -H 'Content-Type: application/json' http://localhost:%d/v1.0/bindings/%s"
+	HTTPRequestPrefx string = "curl -X POST -H 'Content-Type: application/json' http://localhost:%d/v1.0/"
 
 	// this is a general script template, which can be used for all kinds of exec request to databases.
 	DataScriptRequestTpl string = `

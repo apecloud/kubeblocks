@@ -25,7 +25,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -43,11 +42,11 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/cli/scheme"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	. "github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 // K8sExecClient is a mock client for operation, mainly used to hide curl command details.
 type K8sExecClient struct {
+	lorryClient
 	cmdexec.StreamOptions
 	Executor       cmdexec.RemoteExecutor
 	restConfig     *rest.Config
@@ -106,21 +105,8 @@ func NewK8sExecClientWithPod(pod *corev1.Pod) (*K8sExecClient, error) {
 		logger:         logger,
 		Executor:       &cmdexec.DefaultRemoteExecutor{},
 	}
+	client.lorryClient = lorryClient{requester: client}
 	return client, nil
-}
-
-func (cli *K8sExecClient) GetRole(ctx context.Context) (string, error) {
-	resp, err := cli.Request(ctx, string(GetRoleOperation), http.MethodGet, nil)
-	if err != nil {
-		return "", err
-	}
-
-	role, ok := resp["role"]
-	if !ok {
-		return "", nil
-	}
-
-	return role.(string), nil
 }
 
 // Request execs lorry operation, this is a blocking operation and use pod EXEC subresource to send a http request to the lorry pod
@@ -151,8 +137,9 @@ func (cli *K8sExecClient) Request(ctx context.Context, operation, method string,
 
 	errData := errBuffer.Bytes()
 	if len(errData) != 0 {
-		fmt.Println(string(errData))
+		cli.logger.Info("k8s exec error output", "message", string(errData))
 	}
+
 	data := strBuffer.Bytes()
 	if len(data) == 0 {
 		return nil, nil

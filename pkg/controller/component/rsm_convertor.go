@@ -181,6 +181,7 @@ func (c *rsmRoleProbeConvertor) convert(args ...any) (any, error) {
 	rsmRoleProbe.RoleUpdateMechanism = synthesizeComp.LifecycleActions.RoleProbe.RoleUpdateMechanism
 	if synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != nil {
 		rsmRoleProbe.BuiltinHandler = synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler
+		rsmRoleProbe.RoleUpdateMechanism = workloads.DirectAPIServerEventUpdate
 	}
 
 	// TODO(xingran): RSM Action does not support args[] yet

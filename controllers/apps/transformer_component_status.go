@@ -108,8 +108,8 @@ func (t *componentStatusTransformer) Transform(ctx graph.TransformContext, dag *
 	cnt := len(runningRSMList)
 	switch {
 	case cnt == 0:
-		transCtx.Logger.Info(fmt.Sprintf("rsm not found, generation: %d", comp.Generation))
-		runningRSM = nil
+		transCtx.Logger.Info(fmt.Sprintf("skip reconcile component status because rsm not found, generation: %d", comp.Generation))
+		return nil
 	case cnt == 1:
 		runningRSM = runningRSMList[0]
 	default:

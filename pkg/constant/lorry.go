@@ -19,20 +19,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package constant
 
-// BuildInHandlerType defines build-in handler type of lorry
-type BuildInHandlerType string
+// BuiltInHandlerType defines build-in handler type of lorry
+type BuiltInHandlerType string
 
 const (
-	MySQLBuildInHandlerName              BuildInHandlerType = "mysql"
-	WeSQLBuildInHandlerName              BuildInHandlerType = "wesql"
-	RedisBuildInHandlerName              BuildInHandlerType = "redis"
-	MongoDBBuildInHandlerName            BuildInHandlerType = "mongodb"
-	ETCDBuildInHandlerName               BuildInHandlerType = "etcd"
-	PostgresqlBuildInHandlerName         BuildInHandlerType = "postgresql"
-	OfficialPostgresqlBuildInHandlerName BuildInHandlerType = "official-postgresql"
-	ApeCloudPostgresqlBuildInHandlerName BuildInHandlerType = "apecloud-postgresql"
-	PolarDBXBuildInHandlerName           BuildInHandlerType = "polardbx"
-	UnKnownBuildInHandlerName            BuildInHandlerType = "unknown"
+	MySQLBuiltInHandlerName              BuiltInHandlerType = "mysql"
+	WeSQLBuiltInHandlerName              BuiltInHandlerType = "wesql"
+	RedisBuiltInHandlerName              BuiltInHandlerType = "redis"
+	MongoDBBuiltInHandlerName            BuiltInHandlerType = "mongodb"
+	ETCDBuiltInHandlerName               BuiltInHandlerType = "etcd"
+	PostgresqlBuiltInHandlerName         BuiltInHandlerType = "postgresql"
+	OfficialPostgresqlBuiltInHandlerName BuiltInHandlerType = "official-postgresql"
+	ApeCloudPostgresqlBuiltInHandlerName BuiltInHandlerType = "apecloud-postgresql"
+	PolarDBXBuiltInHandlerName           BuiltInHandlerType = "polardbx"
+	UnKnownBuiltInHandlerName            BuiltInHandlerType = "unknown"
 )
 
 const (

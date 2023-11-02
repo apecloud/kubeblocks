@@ -461,33 +461,33 @@ func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
 	return lifecycleActions, nil // TODO
 }
 
-func (c *compDefLifecycleActionsConvertor) convertBuildInHandlerName(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) constant.BuildInHandlerType {
+func (c *compDefLifecycleActionsConvertor) convertBuildInHandlerName(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) constant.BuiltInHandlerType {
 	if clusterCompDef == nil || clusterCompDef.CharacterType == "" {
-		return constant.UnKnownBuildInHandlerName
+		return constant.UnKnownBuiltInHandlerName
 	}
 	switch clusterCompDef.CharacterType {
 	case constant.MySQLCharacterType:
 		if clusterCompDef.WorkloadType == appsv1alpha1.Consensus {
-			return constant.WeSQLBuildInHandlerName
+			return constant.WeSQLBuiltInHandlerName
 		} else {
-			return constant.MySQLBuildInHandlerName
+			return constant.MySQLBuiltInHandlerName
 		}
 	case constant.PostgreSQLCharacterType:
 		if clusterCompDef.WorkloadType == appsv1alpha1.Consensus {
-			return constant.ApeCloudPostgresqlBuildInHandlerName
+			return constant.ApeCloudPostgresqlBuiltInHandlerName
 		} else {
-			return constant.PostgresqlBuildInHandlerName
+			return constant.PostgresqlBuiltInHandlerName
 		}
 	case constant.RedisCharacterType:
-		return constant.RedisBuildInHandlerName
+		return constant.RedisBuiltInHandlerName
 	case constant.MongoDBCharacterType:
-		return constant.MongoDBBuildInHandlerName
+		return constant.MongoDBBuiltInHandlerName
 	case constant.ETCDCharacterType:
-		return constant.ETCDBuildInHandlerName
+		return constant.ETCDBuiltInHandlerName
 	case constant.PolarDBXCharacterType:
-		return constant.PolarDBXBuildInHandlerName
+		return constant.PolarDBXBuiltInHandlerName
 	default:
-		return constant.UnKnownBuildInHandlerName
+		return constant.UnKnownBuiltInHandlerName
 	}
 }
 

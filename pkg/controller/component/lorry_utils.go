@@ -78,7 +78,7 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 	reqCtx.Log.V(3).Info("lorry", "settings", compRoleProbe)
 	if compRoleProbe != nil {
 		roleChangedContainer := container.DeepCopy()
-		buildRoleProbeContainer(synthesizeComp, roleChangedContainer, compRoleProbe, int(lorrySvcHTTPPort))
+		buildRoleProbeContainer(roleChangedContainer, compRoleProbe, int(lorrySvcHTTPPort))
 		lorryContainers = append(lorryContainers, *roleChangedContainer)
 	}
 
@@ -214,6 +214,12 @@ func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container 
 	}
 	container.Env = append(container.Env,
 		corev1.EnvVar{
+			Name:      constant.KBEnvBuiltinHandler,
+			Value:     getDefaultBuiltInHandler(synthesizeComp),
+			ValueFrom: nil,
+		},
+		// TODO(xingran): remove KBEnvCharacterType and KBEnvWorkloadType in the future.
+		corev1.EnvVar{
 			Name:      constant.KBEnvCharacterType,
 			Value:     synthesizeComp.CharacterType,
 			ValueFrom: nil,
@@ -271,8 +277,7 @@ func buildWeSyncerContainer(weSyncerContainer *corev1.Container, probeSvcHTTPPor
 	weSyncerContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
-func buildRoleProbeContainer(component *SynthesizedComponent, roleChangedContainer *corev1.Container,
-	roleProbe *appsv1alpha1.RoleProbeSpec, probeSvcHTTPPort int) {
+func buildRoleProbeContainer(roleChangedContainer *corev1.Container, roleProbe *appsv1alpha1.RoleProbeSpec, probeSvcHTTPPort int) {
 	roleChangedContainer.Name = constant.RoleProbeContainerName
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = checkRoleURIFormat
@@ -344,4 +349,39 @@ func env4VolumeProtection(spec appsv1alpha1.VolumeProtectionSpec) corev1.EnvVar 
 		Name:  constant.KBEnvVolumeProtectionSpec,
 		Value: string(value),
 	}
+}
+
+// getDefaultBuiltInHandler gets the default built-in handler name.
+// the BuiltInHandler within the same synthesizeComp LifecycleActions should be consistent. we can take any one of them.
+func getDefaultBuiltInHandler(synthesizeComp *SynthesizedComponent) string {
+	if synthesizeComp.LifecycleActions == nil {
+		return string(constant.UnKnownBuiltInHandlerName)
+	}
+
+	if synthesizeComp.LifecycleActions.RoleProbe != nil && synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != nil {
+		return *synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler
+	}
+
+	actions := []struct {
+		LifeCycleActionHandlers *appsv1alpha1.LifecycleActionHandler
+	}{
+		{synthesizeComp.LifecycleActions.PostStart},
+		{synthesizeComp.LifecycleActions.PreStop},
+		{synthesizeComp.LifecycleActions.MemberJoin},
+		{synthesizeComp.LifecycleActions.MemberLeave},
+		{synthesizeComp.LifecycleActions.Readonly},
+		{synthesizeComp.LifecycleActions.Readwrite},
+		{synthesizeComp.LifecycleActions.DataPopulate},
+		{synthesizeComp.LifecycleActions.DataAssemble},
+		{synthesizeComp.LifecycleActions.Reconfigure},
+		{synthesizeComp.LifecycleActions.AccountProvision},
+	}
+
+	for _, action := range actions {
+		if action.LifeCycleActionHandlers != nil && action.LifeCycleActionHandlers.BuiltinHandler != nil {
+			return *action.LifeCycleActionHandlers.BuiltinHandler
+		}
+	}
+
+	return string(constant.UnKnownBuiltInHandlerName)
 }

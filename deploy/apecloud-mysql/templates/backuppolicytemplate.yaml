@@ -13,7 +13,7 @@ spec:
   - componentDefRef: mysql
     retentionPeriod: 7d
     target:
-      role: follower
+      role: leader
     backupMethods:
     - name: xtrabackup
       snapshotVolumes: false

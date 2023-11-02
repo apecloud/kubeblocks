@@ -69,7 +69,7 @@ func (u *upgradeHandlerTo7) snapshot(dynamic dynamic.Interface) (map[string][]un
 
 	// get configmap objs for pulsar
 	if err := fillResourcesMap(dynamic, resourcesMap, types.ConfigmapGVR(), metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", constant.AppNameLabelKey, "pulsar"),
+		LabelSelector: fmt.Sprintf("%s=%s", constant.CMTemplateNameLabelKey, brokerEnvTPL),
 	}); err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (u *upgradeHandlerTo7) transform(dynamic dynamic.Interface, resourcesMap ma
 					return err
 				}
 			case types.KindConfigMap:
-				if err := u.transformConfigMap(dynamic, obj); err != nil {
+				if err := u.transformPulsarConfigMap(dynamic, obj); err != nil {
 					return err
 				}
 			case types.KindCluster:
@@ -503,16 +503,21 @@ func (u *upgradeHandlerTo7) transformStatefulSet(dynamic dynamic.Interface, obj 
 	return nil
 }
 
-func (u *upgradeHandlerTo7) transformConfigMap(dynamic dynamic.Interface, obj unstructured.Unstructured) error {
+func (u *upgradeHandlerTo7) transformPulsarConfigMap(dynamic dynamic.Interface, obj unstructured.Unstructured) error {
 	// transform pulsar broker env config map
-	configData, _, _ := unstructured.NestedMap(obj.Object, "data")
-	zkSVC, ok := configData["zookeeperSVC"]
-	if !ok {
-		return nil
+	brokerEnvConfigName := strings.Replace(obj.GetName(), "broker-env", "env", 1)
+	tmpObj, err := dynamic.Resource(types.ConfigmapGVR()).Namespace(obj.GetNamespace()).Get(context.TODO(), brokerEnvConfigName, metav1.GetOptions{})
+	if err != nil {
+		return err
 	}
+	oldConfigData, _, _ := unstructured.NestedMap(tmpObj.Object, "data")
+	zkSVC := oldConfigData["zookeeperSVC"]
+	// update config map data
+	configData, _, _ := unstructured.NestedMap(obj.Object, "data")
 	zkServers := fmt.Sprintf("%s:2181", zkSVC)
-	configData["zookeeperServers"] = zkServers
-	configData["configurationStoreServers"] = zkServers
+	zookeeperServers := fmt.Sprintf("%s: %s", "zookeeperServers", zkServers)
+	configurationStoreServers := fmt.Sprintf("%s: %s", "configurationStoreServers", zkServers)
+	configData["conf"] = fmt.Sprintf("%s\n%s\n%s", configData["conf"], zookeeperServers, configurationStoreServers)
 	patchBytes, _ := json.Marshal(map[string]interface{}{"data": configData})
 	if _, err := dynamic.Resource(types.ConfigmapGVR()).Namespace(obj.GetNamespace()).Patch(context.TODO(), obj.GetName(), apitypes.MergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
 		return fmt.Errorf("update pulsar configmap %s failed: %s", obj.GetName(), err.Error())

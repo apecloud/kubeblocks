@@ -24,10 +24,10 @@ spec:
             imagePullPolicy: IfNotPresent
             volumeMounts:
               - mountPath: /var/lib/ldap
-                name: openldap
+                name: data
                 subPath: ldap-data
               - mountPath: /etc/ldap/slapd.d
-                name: openldap
+                name: data
                 subPath: ldap-config
             ports:
               - containerPort: 389

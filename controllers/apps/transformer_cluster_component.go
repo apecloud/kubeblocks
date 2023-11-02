@@ -20,14 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"context"
 	"fmt"
+	"reflect"
 	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -37,9 +36,7 @@ import (
 )
 
 // ClusterComponentTransformer transforms all cluster.Spec.ComponentSpecs to mapping Component objects
-type ClusterComponentTransformer struct {
-	client.Client
-}
+type ClusterComponentTransformer struct{}
 
 var _ graph.Transformer = &ClusterComponentTransformer{}
 
@@ -53,7 +50,6 @@ func (t *ClusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 	if len(transCtx.ComponentSpecs) == 0 {
 		return nil
 	}
-
 	if transCtx.OrigCluster.IsUpdating() {
 		return t.reconcileComponents(transCtx, dag)
 	}
@@ -62,7 +58,6 @@ func (t *ClusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 
 func (t *ClusterComponentTransformer) reconcileComponents(transCtx *clusterTransformContext, dag *graph.DAG) error {
 	cluster := transCtx.Cluster
-	graphCli, _ := transCtx.Client.(model.GraphClient)
 
 	protoCompSpecMap := make(map[string]*appsv1alpha1.ClusterComponentSpec)
 	for _, spec := range transCtx.ComponentSpecs {
@@ -81,77 +76,91 @@ func (t *ClusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 			strings.Join(deleteCompSet.UnsortedList(), ","))
 	}
 
-	createCompObjects := func() error {
-		for compName := range createCompSet {
-			comp, err := component.BuildProtoComponent(cluster, protoCompSpecMap[compName])
-			if err != nil {
-				return err
-			}
-			graphCli.Create(dag, comp)
-			t.initClusterCompStatus(cluster, compName)
-		}
-		return nil
-	}
-
-	updateCompObjects := func() error {
-		for compName := range updateCompSet {
-			runningComp, err1 := getCacheSnapshotComp(transCtx.Context, t.Client, cluster, compName)
-			if err1 != nil && !apierrors.IsNotFound(err1) {
-				return err1
-			}
-			comp, err2 := component.BuildProtoComponent(cluster, protoCompSpecMap[compName])
-			if err2 != nil {
-				return err2
-			}
-			if err1 != nil { // non-exist
-				// to be backwards compatible with old API versions, for components that are already running but don't have a component CR, component CR needs to be generated.
-				graphCli.Create(dag, comp)
-			} else {
-				graphCli.Update(dag, runningComp, copyAndMergeComponent(runningComp, comp, cluster))
-			}
-		}
-		return nil
-	}
-
 	// component objects to be created
-	if err := createCompObjects(); err != nil {
+	if err := t.handleCompsCreate(transCtx, dag, protoCompSpecMap, createCompSet); err != nil {
 		return err
 	}
 
 	// component objects to be updated
-	if err := updateCompObjects(); err != nil {
+	if err := t.handleCompsUpdate(transCtx, dag, protoCompSpecMap, updateCompSet); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (t *ClusterComponentTransformer) reconcileComponentsStatus(transCtx *clusterTransformContext, dag *graph.DAG) error {
-	for compName := range transCtx.Cluster.Status.Components {
-		comp, err := getCacheSnapshotComp(transCtx.Context, t.Client, transCtx.Cluster, compName)
+func (t *ClusterComponentTransformer) handleCompsCreate(transCtx *clusterTransformContext, dag *graph.DAG,
+	protoCompSpecMap map[string]*appsv1alpha1.ClusterComponentSpec, createCompSet sets.Set[string]) error {
+	cluster := transCtx.Cluster
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	for compName := range createCompSet {
+		comp, err := component.BuildProtoComponent(cluster, protoCompSpecMap[compName])
 		if err != nil {
+			return err
+		}
+		graphCli.Create(dag, comp)
+		t.initClusterCompStatus(cluster, compName)
+	}
+	return nil
+}
+
+func (t *ClusterComponentTransformer) initClusterCompStatus(cluster *appsv1alpha1.Cluster, compName string) {
+	if cluster.Status.Components == nil {
+		cluster.Status.Components = make(map[string]appsv1alpha1.ClusterComponentStatus)
+	}
+	cluster.Status.Components[compName] = appsv1alpha1.ClusterComponentStatus{}
+}
+
+func (t *ClusterComponentTransformer) handleCompsUpdate(transCtx *clusterTransformContext, dag *graph.DAG,
+	protoCompSpecMap map[string]*appsv1alpha1.ClusterComponentSpec, updateCompSet sets.Set[string]) error {
+	cluster := transCtx.Cluster
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	for compName := range updateCompSet {
+		runningComp, getErr := getRunningCompObject(transCtx, cluster, compName)
+		if getErr != nil && !apierrors.IsNotFound(getErr) {
+			return getErr
+		}
+		comp, buildErr := component.BuildProtoComponent(cluster, protoCompSpecMap[compName])
+		if buildErr != nil {
+			return buildErr
+		}
+		if getErr != nil { // non-exist
+			// to be backwards compatible with old API versions, for components that are already running but don't have a component CR, component CR needs to be generated.
+			graphCli.Create(dag, comp)
+		} else {
+			if newCompObj := copyAndMergeComponent(runningComp, comp); newCompObj != nil {
+				graphCli.Update(dag, runningComp, newCompObj)
+			}
+		}
+	}
+	return nil
+}
+
+func (t *ClusterComponentTransformer) reconcileComponentsStatus(transCtx *clusterTransformContext, dag *graph.DAG) error {
+	cluster := transCtx.Cluster
+	if cluster.Status.Components == nil {
+		cluster.Status.Components = make(map[string]appsv1alpha1.ClusterComponentStatus)
+	}
+	// We cannot use cluster.status.components because of simplified API generated component is not in it.
+	for _, compSpec := range transCtx.ComponentSpecs {
+		compKey := types.NamespacedName{
+			Namespace: cluster.Namespace,
+			Name:      component.FullName(cluster.Name, compSpec.Name),
+		}
+		comp := &appsv1alpha1.Component{}
+		if err := transCtx.Client.Get(transCtx.Context, compKey, comp); err != nil {
 			return err
 		}
 		status := t.buildClusterCompStatus(comp)
 		if len(status.Phase) == 0 {
 			continue
 		}
-		transCtx.Cluster.Status.Components[compName] = status
+		cluster.Status.Components[compSpec.Name] = status
 	}
 	return nil
 }
 
-func (t *ClusterComponentTransformer) initClusterCompStatus(cluster *appsv1alpha1.Cluster, compName string) {
-	status := cluster.Status.Components
-	if status == nil {
-		status = make(map[string]appsv1alpha1.ClusterComponentStatus)
-	}
-	status[compName] = appsv1alpha1.ClusterComponentStatus{
-		Phase: appsv1alpha1.CreatingClusterCompPhase,
-	}
-	cluster.Status.Components = status
-}
-
+// buildClusterCompStatus builds cluster component status from specified component object.
 func (t *ClusterComponentTransformer) buildClusterCompStatus(comp *appsv1alpha1.Component) appsv1alpha1.ClusterComponentStatus {
 	// TODO(component): conditions & roles(?)
 	return appsv1alpha1.ClusterComponentStatus{
@@ -160,10 +169,23 @@ func (t *ClusterComponentTransformer) buildClusterCompStatus(comp *appsv1alpha1.
 	}
 }
 
+// getRunningCompObject gets the component object from cache snapshot
+func getRunningCompObject(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster, compName string) (*appsv1alpha1.Component, error) {
+	compKey := types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      component.FullName(cluster.Name, compName),
+	}
+	comp := &appsv1alpha1.Component{}
+	if err := transCtx.Client.Get(transCtx.Context, compKey, comp); err != nil {
+		return nil, err
+	}
+	return comp, nil
+}
+
 // copyAndMergeComponent merges two component objects for updating:
 // 1. new a component object targetCompObj by copying from oldCompObj
 // 2. merge all fields can be updated from newCompObj into targetCompObj
-func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component, cluster *appsv1alpha1.Cluster) *appsv1alpha1.Component {
+func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *appsv1alpha1.Component {
 	compObjCopy := oldCompObj.DeepCopy()
 	compProto := newCompObj
 
@@ -187,18 +209,10 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component, clust
 	compObjCopy.Spec.Tolerations = compProto.Spec.Tolerations
 	compObjCopy.Spec.TLSConfig = compProto.Spec.TLSConfig
 
+	if reflect.DeepEqual(oldCompObj.Annotations, compObjCopy.Annotations) &&
+		reflect.DeepEqual(oldCompObj.Labels, compObjCopy.Labels) &&
+		reflect.DeepEqual(oldCompObj.Spec, compObjCopy.Spec) {
+		return nil
+	}
 	return compObjCopy
-}
-
-// getCacheSnapshotComp gets the component object from cache snapshot
-func getCacheSnapshotComp(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, compName string) (*appsv1alpha1.Component, error) {
-	compKey := types.NamespacedName{
-		Name:      component.FullName(cluster.Name, compName),
-		Namespace: cluster.Namespace,
-	}
-	comp := &appsv1alpha1.Component{}
-	if err := ictrlutil.ValidateExistence(ctx, cli, compKey, comp, false); err != nil {
-		return nil, err
-	}
-	return comp, nil
 }

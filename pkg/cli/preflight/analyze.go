@@ -31,7 +31,7 @@ import (
 	"helm.sh/helm/v3/pkg/cli/values"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
-	kbanalyzer "github.com/apecloud/kubeblocks/pkg/preflight/analyzer"
+	kbanalyzer "github.com/apecloud/kubeblocks/pkg/cli/preflight/analyzer"
 )
 
 type KBClusterCollectResult struct {

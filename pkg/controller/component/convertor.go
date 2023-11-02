@@ -31,31 +31,34 @@ type convertor interface {
 
 // covertObject converts the fields of an object with the given convertors.
 func covertObject(convertors map[string]convertor, obj any, args ...any) error {
-	tp := typeOfObject(obj)
+	tp := typeofObject(obj)
 	for i := 0; i < tp.NumField(); i++ {
 		fieldName := tp.Field(i).Name
 		c, ok := convertors[strings.ToLower(fieldName)]
 		if !ok || c == nil {
 			continue // leave the origin (default) value
 		}
+
 		val, err := c.convert(args...)
 		if err != nil {
 			return err
 		}
+
 		fieldValue := reflect.ValueOf(obj).Elem().FieldByName(fieldName)
-		if reflect.TypeOf(val) == nil || reflect.ValueOf(val).IsZero() {
+		switch {
+		case reflect.TypeOf(val) == nil || reflect.ValueOf(val).IsZero():
 			fieldValue.Set(reflect.Zero(fieldValue.Type()))
-		} else if fieldValue.IsValid() && fieldValue.Type().AssignableTo(reflect.TypeOf(val)) {
+		case fieldValue.IsValid() && fieldValue.Type().AssignableTo(reflect.TypeOf(val)):
 			fieldValue.Set(reflect.ValueOf(val))
-		} else {
+		default:
 			panic("not assignable")
 		}
 	}
 	return nil
 }
 
-// typeOfObject returns the typeOf an object.
-func typeOfObject(obj any) reflect.Type {
+// typeofObject returns the typeof an object.
+func typeofObject(obj any) reflect.Type {
 	val := reflect.ValueOf(obj)
 	if val.Kind() == reflect.Ptr {
 		return reflect.TypeOf(obj).Elem()

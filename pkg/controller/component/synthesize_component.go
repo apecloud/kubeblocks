@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -540,23 +539,6 @@ func overrideSwitchoverSpecAttr(switchoverSpec *appsv1alpha1.SwitchoverSpec, cvS
 //	component.PodSpec.Containers[0].Resources = actualResources
 //	return nil
 // }
-
-func getCloudProvider() CloudProvider {
-	k8sVersion := viper.GetString(constant.CfgKeyServerInfo)
-	if strings.Contains(k8sVersion, "eks") {
-		return CloudProviderAWS
-	}
-	if strings.Contains(k8sVersion, "gke") {
-		return CloudProviderGCP
-	}
-	if strings.Contains(k8sVersion, "aliyun") {
-		return CloudProviderAliyun
-	}
-	if strings.Contains(k8sVersion, "tke") {
-		return CloudProviderTencent
-	}
-	return CloudProviderUnknown
-}
 
 func GetConfigSpecByName(component *SynthesizedComponent, configSpec string) *appsv1alpha1.ComponentConfigSpec {
 	for i := range component.ConfigTemplates {

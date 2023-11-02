@@ -20,11 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 type componentMetaTransformer struct{}

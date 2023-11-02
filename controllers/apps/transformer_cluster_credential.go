@@ -113,9 +113,9 @@ func (t *ClusterCredentialTransformer) buildClusterCredential(transCtx *clusterT
 	secret := factory.BuildConnCredential4Cluster(cluster, credential.Name)
 
 	var compDef *appsv1alpha1.ComponentDefinition
-	if len(credential.ComponentName) > 0 {
-		// TODO(component): lookup comp def
-	}
+	// if len(credential.ComponentName) > 0 {
+	//	// TODO(component): lookup comp def
+	// }
 
 	data := make(map[string]string)
 	if len(credential.ServiceName) > 0 {

@@ -356,19 +356,6 @@ func getImageName(image string) string {
 	}
 }
 
-// getCustomLabelSupportKind returns the kinds that support custom label.
-func getCustomLabelSupportKind() []string {
-	return []string{
-		constant.CronJobKind,
-		constant.StatefulSetKind,
-		constant.DeploymentKind,
-		constant.ReplicaSetKind,
-		constant.ServiceKind,
-		constant.ConfigMapKind,
-		constant.PodKind,
-	}
-}
-
 // UpdateComponentInfoToPods patches current component's replicas to all belonging pods, as an annotation.
 func UpdateComponentInfoToPods(
 	ctx context.Context,

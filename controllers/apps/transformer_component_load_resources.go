@@ -21,8 +21,8 @@ package apps
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -121,7 +121,7 @@ func (t *componentLoadResourcesTransformer) isLegacyComponent(cluster *appsv1alp
 				if compSpec.ComponentDef == comp.Spec.CompDef {
 					return nil, nil
 				}
-				return nil, fmt.Errorf("runtime error - comp definitions refered in cluster and component are different: %s vs %s",
+				return nil, fmt.Errorf("runtime error - comp definitions referred in cluster and component are different: %s vs %s",
 					compSpec.ComponentDef, comp.Spec.CompDef)
 			}
 			targetCompSpec = &cluster.Spec.ComponentSpecs[i]

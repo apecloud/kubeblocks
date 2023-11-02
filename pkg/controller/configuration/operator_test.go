@@ -24,7 +24,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/golang/mock/gomock"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -34,7 +33,6 @@ import (
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -52,12 +50,6 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 	var configurationObj *appsv1alpha1.Configuration
 	var k8sMockClient *testutil.K8sClientMockHelper
 
-	mockStatefulSet := func() *appsv1.StatefulSet {
-		stsObj, err := factory.BuildSts(clusterObj, clusterComponent)
-		Expect(err).Should(Succeed())
-		return stsObj
-	}
-
 	createConfigReconcileTask := func() *configOperator {
 		task := NewConfigReconcileTask(&intctrlutil.ResourceCtx{
 			Client:        k8sMockClient.Client(),
@@ -69,7 +61,6 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 			clusterObj,
 			clusterVersionObj,
 			clusterComponent,
-			mockStatefulSet(),
 			clusterComponent.PodSpec,
 			nil)
 		return task

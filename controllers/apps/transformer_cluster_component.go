@@ -152,12 +152,6 @@ func (t *ClusterComponentTransformer) initClusterCompStatus(cluster *appsv1alpha
 	cluster.Status.Components = status
 }
 
-func (t *ClusterComponentTransformer) removeClusterCompStatus(cluster *appsv1alpha1.Cluster, compName string) {
-	if cluster.Status.Components != nil {
-		delete(cluster.Status.Components, compName)
-	}
-}
-
 func (t *ClusterComponentTransformer) buildClusterCompStatus(comp *appsv1alpha1.Component) appsv1alpha1.ClusterComponentStatus {
 	// TODO(component): conditions & roles(?)
 	return appsv1alpha1.ClusterComponentStatus{

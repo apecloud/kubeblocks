@@ -1661,43 +1661,43 @@ var _ = Describe("Component Controller", func() {
 			cleanEnv()
 		})
 
-		It(fmt.Sprintf("component finalizers and labels"), func() {
+		It("component finalizers and labels", func() {
 			testCompFinalizerNLabel(defaultCompName, compDefName)
 		})
 
-		It(fmt.Sprintf("with component services"), func() {
+		It("with component services", func() {
 			testCompService(defaultCompName, compDefName)
 		})
 
-		It(fmt.Sprintf("with component system accounts"), func() {
+		It("with component system accounts", func() {
 			testCompSystemAccount(defaultCompName, compDefName)
 		})
 
-		It(fmt.Sprintf("with component conn credentials"), func() {
+		It("with component conn credentials", func() {
 			testCompConnCredential(defaultCompName, compDefName)
 		})
 
-		It(fmt.Sprintf("with component roles"), func() {
+		It("with component roles", func() {
 			testCompRole(defaultCompName, compDefName)
 		})
 
-		It(fmt.Sprintf("with component TlS"), func() {
+		It("with component TlS", func() {
 			testCompTLSConfig(defaultCompName, compDefName)
 		})
 
-		It(fmt.Sprintf("with component configurations"), func() {
+		It("with component configurations", func() {
 			testCompConfiguration(defaultCompName, compDefName)
 		})
 
-		It(fmt.Sprintf("with component affinity and toleration set"), func() {
+		It("with component affinity and toleration set", func() {
 			testCompAffinityNToleration(defaultCompName, compDefName)
 		})
 
-		It(fmt.Sprintf("with component RBAC set"), func() {
+		It("with component RBAC set", func() {
 			testCompRBAC(defaultCompName, compDefName, "")
 		})
 
-		PIt(fmt.Sprintf("re-create component with RBAC set"), func() {
+		PIt("re-create component with RBAC set", func() {
 			testRecreateCompWithRBAC(defaultCompName, compDefName)
 		})
 	})

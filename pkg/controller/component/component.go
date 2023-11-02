@@ -143,7 +143,7 @@ func getClusterCompDefAndVersion(clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ClusterComponentDefinition, *appsv1alpha1.ClusterComponentVersion, error) {
 	clusterCompDef := clusterDef.GetComponentDefByName(clusterCompSpec.ComponentDefRef)
 	if clusterCompDef == nil {
-		return nil, nil, fmt.Errorf("referenced cluster component definiton is not defined: %s-%s", cluster.Name, clusterCompSpec.Name)
+		return nil, nil, fmt.Errorf("referenced cluster component definition is not defined: %s-%s", cluster.Name, clusterCompSpec.Name)
 	}
 	var clusterCompVer *appsv1alpha1.ClusterComponentVersion
 	if clusterVer != nil {

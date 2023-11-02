@@ -257,12 +257,13 @@ func (r *componentStatusHandler) reconcileComponentPhase() error {
 	}
 
 	// update component info to pods' annotations
+	// TODO(xingran): should be move this to rsm controller
 	if err := UpdateComponentInfoToPods(r.reqCtx.Ctx, r.cli, r.cluster, r.synthesizeComp, r.dag); err != nil {
 		return err
 	}
 
 	// patch the current componentSpec workload's custom labels
-	// TODO(xingran): remove this to independent transformer and patch to all sub-resources of component, and add custom annotations support.
+	// TODO(xingran): should be move this to rsm controller, and add custom annotations support. then add a independent transformer to deal with component level custom labels and annotations.
 	if err := UpdateCustomLabelToPods(r.reqCtx.Ctx, r.cli, r.cluster, r.synthesizeComp, r.dag); err != nil {
 		r.reqCtx.Event(r.cluster, corev1.EventTypeWarning, "Component Controller PatchWorkloadCustomLabelFailed", err.Error())
 		return err

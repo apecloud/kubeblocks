@@ -29,10 +29,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 const (

@@ -24,8 +24,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	"golang.org/x/exp/slices"
+
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 )
 
 const (

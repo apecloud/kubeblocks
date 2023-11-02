@@ -88,9 +88,9 @@ spec:
     - name: postgres
       isSystemInitAccount: true
       passwordGenerationPolicy:
-        length: 16
-        numDigits: 8
-        numSymbols: 8
+        length: 10
+        numDigits: 5
+        numSymbols: 0
         letterCase: MixedCases
     - name: kbadmin
       isSystemInitAccount: false

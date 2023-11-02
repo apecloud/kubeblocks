@@ -42,6 +42,8 @@ const (
 	backupTypeDatafile = "datafile"
 	backupTypeSnapshot = "snapshot"
 	backupTypeLogfile  = "logfile"
+
+	brokerEnvTPL = "pulsar-broker-env-tpl"
 )
 
 // Version Scope: [0.7]

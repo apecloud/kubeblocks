@@ -38,8 +38,26 @@ spec:
               batch:
                 properties:
                   enabled:
+                    default: true
                     description: enabled indicates whether to enable batch
                     type: boolean
+                  sendBatchMaxSize:
+                    description: SendBatchMaxSize is the maximum size of a batch.
+                      It must be larger than SendBatchSize. Larger batches are split
+                      into smaller units. Default value is 0, that means no maximum
+                      size.
+                    type: integer
+                  sendBatchSize:
+                    description: SendBatchSize is the size of a batch which after
+                      hit, will trigger it to be sent. When this is set to zero, the
+                      batch size is ignored and data will be sent immediately subject
+                      to only send_batch_max_size. kubebuilder:validation:required
+                    type: integer
+                  timeout:
+                    description: Timeout sets the time after which a batch will be
+                      sent regardless of size. When this is set to zero, batched data
+                      will be sent immediately.
+                    type: string
                 type: object
               collectionInterval:
                 default: 15s
@@ -69,9 +87,24 @@ spec:
                 type: string
               memoryLimiter:
                 properties:
+                  checkInterval:
+                    description: CheckInterval is the time between measurements of
+                      memory usage for the purposes of avoiding going over the limits.
+                      if set to zero, no checks will be performed.
+                    type: string
                   enabled:
-                    description: MemoryLimit is the memory limit of the oteld
+                    description: enabled indicates whether to enable memory limiter
                     type: boolean
+                  memoryLimitMib:
+                    description: MemoryLimitMiB is the maximum amount of memory, in
+                      MiB, targeted to be allocated by the process.
+                    format: int32
+                    type: integer
+                  memorySpikeLimitMib:
+                    description: MemorySpikeLimitMiB is the maximum, in MiB, spike
+                      expected between the measurements of memory usage.
+                    format: int32
+                    type: integer
                 type: object
               metricsPort:
                 default: 8888
@@ -141,21 +174,24 @@ spec:
                     default: 15s
                     description: collectionInterval is the interval of the data source
                     type: string
-                  enabledK8SClusterExporter:
-                    description: enabledK8sClusterMetrics indicates whether to collect
-                      k8s apiService metrics
-                    type: boolean
-                  enabledK8SKubeletExporter:
-                    description: enabledK8sKubeletExporter indicates whether to collect
-                      kubelet states metrics
-                    type: boolean
-                  enabledNodeExporter:
-                    description: enabledNodeMetrics indicates whether to collect node
+                  k8sClusterExporter:
+                    description: k8sClusterMetrics indicates how to collect k8s cluster
                       metrics
-                    type: boolean
-                  enabledPodLogs:
-                    description: enabledPodLogs indicates whether to collect pod logs
-                    type: boolean
+                    properties:
+                      enabled:
+                        type: boolean
+                    type: object
+                  k8sKubeletExporter:
+                    description: k8sKubeletExporter indicates how to collect kubelet
+                      states metrics
+                    properties:
+                      enabled:
+                        type: boolean
+                      metricsFilter:
+                        additionalProperties:
+                          type: boolean
+                        type: object
+                    type: object
                   logsExporterRef:
                     description: logsExporterRef is the exporter to export system
                       logs
@@ -168,6 +204,18 @@ spec:
                     items:
                       type: string
                     type: array
+                  nodeExporter:
+                    description: nodeExporter indicates how to collect node metrics
+                    properties:
+                      enabled:
+                        type: boolean
+                    type: object
+                  podLogs:
+                    description: podLogs indicates how to collect pod logs
+                    properties:
+                      enabled:
+                        type: boolean
+                    type: object
                 type: object
               useConfigMap:
                 default: true

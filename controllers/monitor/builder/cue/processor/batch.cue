@@ -15,17 +15,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+parameters: {
+	send_batch_max_size: *200 | int
+	send_batch_size: *200 | int
+	timeout: *"5s" | string
+}
+
 output: {
-	memory_limiter:{
-  	limit_mib: 512
-    spike_limit_mib: 128
-    check_interval: "10s"
-  }
   batch: {
   	send_batch_max_size: 200
     send_batch_size: 200
     timeout: "5s"
   }
 }
-
-

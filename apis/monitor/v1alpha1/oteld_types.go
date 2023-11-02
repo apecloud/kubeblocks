@@ -27,15 +27,78 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-type MemoryLimiterConfig struct {
-	// MemoryLimit is the memory limit of the oteld
+type MemoryLimiter struct {
+	// enabled indicates whether to enable memory limiter
 	// +optional
 	Enabled bool `json:"enabled,omitempty"`
+
+	// config indicates the memory limiter config
+	// +optional
+	Config *MemoryLimiterConfig `json:",inline"`
+}
+
+type MemoryLimiterConfig struct {
+	// MemoryLimitMiB is the maximum amount of memory, in MiB, targeted to be
+	// allocated by the process.
+	// +kubebuilder:validation:Required
+	MemoryLimit uint32 `json:"memoryLimitMib,omitempty"`
+
+	// MemorySpikeLimitMiB is the maximum, in MiB, spike expected between the
+	// measurements of memory usage.
+	// +kubebuilder:validation:Required
+	MemorySpikeLimit uint32 `json:"memorySpikeLimitMib,omitempty"`
+
+	// CheckInterval is the time between measurements of memory usage for the
+	// purposes of avoiding going over the limits. if set to zero, no
+	// checks will be performed.
+	// +kubebuilder:validation:Required
+	CheckInterval string `json:"checkInterval,omitempty"`
 }
 
 type BatchConfig struct {
-	// enabled indicates whether to enable batch
+	// Timeout sets the time after which a batch will be sent regardless of size.
+	// When this is set to zero, batched data will be sent immediately.
+	// +kubebuilder:validation:required
+	Timeout string `json:"timeout,omitempty"`
+
+	// SendBatchSize is the size of a batch which after hit, will trigger it to be sent.
+	// When this is set to zero, the batch size is ignored and data will be sent immediately
+	// subject to only send_batch_max_size.
+	// kubebuilder:validation:required
+	SendBatchSize int `json:"sendBatchSize,omitempty"`
+
+	// SendBatchMaxSize is the maximum size of a batch. It must be larger than SendBatchSize.
+	// Larger batches are split into smaller units.
+	// Default value is 0, that means no maximum size.
 	// +optional
+	SendBatchMaxSize int `json:"sendBatchMaxSize,omitempty"`
+}
+
+type Batch struct {
+	// enabled indicates whether to enable batch
+	// +kubebuilder:default=true
+	// +optional
+	Enabled bool `json:"enabled,omitempty"`
+
+	// config indicates the memory limiter config
+	// +optional
+	Config *BatchConfig `json:",inline"`
+}
+
+type NodeExporter struct {
+	Enabled bool `json:"enabled,omitempty"`
+}
+
+type K8sClusterExporter struct {
+	Enabled bool `json:"enabled,omitempty"`
+}
+
+type K8sKubeletExporter struct {
+	Enabled       bool            `json:"enabled,omitempty"`
+	MetricsFilter map[string]bool `json:"metricsFilter,omitempty"`
+}
+
+type PodLogs struct {
 	Enabled bool `json:"enabled,omitempty"`
 }
 
@@ -48,20 +111,21 @@ type SystemDataSource struct {
 	// +optional
 	LogsExporterRef []string `json:"logsExporterRef,omitempty"`
 
-	// enabledNodeMetrics indicates whether to collect node metrics
+	// nodeExporter indicates how to collect node metrics
 	// +optional
-	EnabledNodeExporter bool `json:"enabledNodeExporter,omitempty"`
-	// enabledK8sClusterMetrics indicates whether to collect k8s apiService metrics
-	// +optional
-	EnabledK8sClusterExporter bool `json:"enabledK8SClusterExporter,omitempty"`
+	NodeExporter NodeExporter `json:"nodeExporter,omitempty"`
 
-	// enabledK8sKubeletExporter indicates whether to collect kubelet states metrics
+	// k8sClusterMetrics indicates how to collect k8s cluster metrics
 	// +optional
-	EnabledK8sKubeletExporter bool `json:"enabledK8SKubeletExporter,omitempty"`
+	K8sClusterExporter K8sClusterExporter `json:"k8sClusterExporter,omitempty"`
 
-	// enabledPodLogs indicates whether to collect pod logs
+	// k8sKubeletExporter indicates how to collect kubelet states metrics
 	// +optional
-	EnabledPodLogs bool `json:"enabledPodLogs,omitempty"`
+	K8sKubeletExporter K8sKubeletExporter `json:"k8sKubeletExporter,omitempty"`
+
+	// podLogs indicates how to collect pod logs
+	// +optional
+	PodLogs PodLogs `json:"podLogs,omitempty"`
 
 	// collectionInterval is the interval of the data source
 	// +kubebuilder:default="15s"
@@ -96,10 +160,10 @@ type OTeldSpec struct {
 	CollectionInterval string `json:"collectionInterval,omitempty"`
 
 	// +optional
-	MemoryLimiter MemoryLimiterConfig `json:"memoryLimiter,omitempty"`
+	MemoryLimiter MemoryLimiter `json:"memoryLimiter,omitempty"`
 
 	// +optional
-	Batch BatchConfig `json:"batch,omitempty"`
+	Batch Batch `json:"batch,omitempty"`
 
 	// resources is the resource requirements for the oteld
 	// +optional

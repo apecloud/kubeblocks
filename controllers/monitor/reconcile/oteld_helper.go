@@ -62,7 +62,7 @@ const (
 )
 
 func (w *oteldWrapper) buildAPIServicePipeline() *oteldWrapper {
-	if !w.source.EnabledK8sClusterExporter {
+	if !w.source.K8sClusterExporter.Enabled {
 		return w
 	}
 
@@ -76,7 +76,7 @@ func (w *oteldWrapper) buildAPIServicePipeline() *oteldWrapper {
 }
 
 func (w *oteldWrapper) buildK8sNodeStatesPipeline() *oteldWrapper {
-	if !w.source.EnabledK8sKubeletExporter {
+	if !w.source.K8sKubeletExporter.Enabled {
 		return w
 	}
 
@@ -90,7 +90,7 @@ func (w *oteldWrapper) buildK8sNodeStatesPipeline() *oteldWrapper {
 }
 
 func (w *oteldWrapper) buildNodePipeline() *oteldWrapper {
-	if !w.source.EnabledK8sKubeletExporter {
+	if !w.source.NodeExporter.Enabled {
 		return w
 	}
 
@@ -104,7 +104,7 @@ func (w *oteldWrapper) buildNodePipeline() *oteldWrapper {
 }
 
 func (w *oteldWrapper) buildPodLogsPipeline() *oteldWrapper {
-	if !w.source.EnabledPodLogs {
+	if !w.source.PodLogs.Enabled {
 		return w
 	}
 

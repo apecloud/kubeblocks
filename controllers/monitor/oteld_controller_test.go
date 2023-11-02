@@ -97,21 +97,33 @@ func mockOTeldInstance() *v1alpha1.OTeld {
 	oteld := &v1alpha1.OTeld{
 		Spec: v1alpha1.OTeldSpec{
 			Image: "docker.io/apecloud/oteld:0.1.0-beta.1",
-			Batch: v1alpha1.BatchConfig{
+			Batch: v1alpha1.Batch{
 				Enabled: true,
+				Config: &v1alpha1.BatchConfig{
+					Timeout:       "15s",
+					SendBatchSize: 100,
+				},
 			},
 			CollectionInterval: "15s",
 			LogsLevel:          "debug",
 			MetricsPort:        8888,
 			UseConfigMap:       true,
 			SystemDataSource: &v1alpha1.SystemDataSource{
-				EnabledPodLogs:            true,
-				EnabledK8sKubeletExporter: true,
-				EnabledK8sClusterExporter: false,
-				EnabledNodeExporter:       true,
-				MetricsExporterRef:        []string{"prometheus"},
-				LogsExporterRef:           []string{"loki"},
-				CollectionInterval:        "15s",
+				PodLogs: v1alpha1.PodLogs{
+					Enabled: true,
+				},
+				NodeExporter: v1alpha1.NodeExporter{
+					Enabled: true,
+				},
+				K8sKubeletExporter: v1alpha1.K8sKubeletExporter{
+					Enabled: true,
+				},
+				K8sClusterExporter: v1alpha1.K8sClusterExporter{
+					Enabled: true,
+				},
+				MetricsExporterRef: []string{"prometheus"},
+				LogsExporterRef:    []string{"loki"},
+				CollectionInterval: "15s",
 			},
 		},
 	}

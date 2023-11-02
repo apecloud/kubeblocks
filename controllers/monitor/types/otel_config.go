@@ -80,7 +80,7 @@ func (cg *OteldConfigGenerater) GenerateOteldConfiguration(instance *OteldInstan
 	if cfg, err = cg.appendReceiver(cfg, instance); err != nil {
 		return nil, err
 	}
-	if cfg, err = cg.appendProcessor(cfg); err != nil {
+	if cfg, err = cg.appendProcessor(cfg, instance); err != nil {
 		return nil, err
 	}
 	if cfg, err = cg.appendExporter(cfg, metricsExporterList, logsExporterList); err != nil {
@@ -258,12 +258,48 @@ func (cg *OteldConfigGenerater) appendExporter(cfg yaml.MapSlice, metricsExporte
 	return append(cfg, yaml.MapItem{Key: "exporters", Value: exporterSlice}), nil
 }
 
-func (cg *OteldConfigGenerater) appendProcessor(cfg yaml.MapSlice) (yaml.MapSlice, error) {
-	processorSlice, err := buildSliceFromCUE("processor/processors.cue", map[string]any{})
-	if err != nil {
-		return nil, err
+func (cg *OteldConfigGenerater) appendProcessor(cfg yaml.MapSlice, instance *OteldInstance) (yaml.MapSlice, error) {
+	processorSlice := yaml.MapSlice{}
+	oteld := instance.OTeld
+	if oteld.Spec.Batch.Enabled == true {
+		batchConfig := fromBatchConfig(oteld.Spec.Batch.Config)
+		batchProcessor, err := buildSliceFromCUE("processor/batch.cue", batchConfig)
+		if err != nil {
+			return nil, err
+		}
+		processorSlice = append(processorSlice, batchProcessor...)
+	}
+	if oteld.Spec.MemoryLimiter.Enabled == true {
+		memoryLimiterConfig := fromMemoryLimiterConfig(oteld.Spec.MemoryLimiter.Config)
+		memoryProcessor, err := buildSliceFromCUE("processor/memory_limiter.cue", memoryLimiterConfig)
+		if err != nil {
+			return nil, err
+		}
+		processorSlice = append(processorSlice, memoryProcessor...)
 	}
 	return append(cfg, yaml.MapItem{Key: "processors", Value: processorSlice}), nil
+}
+
+func fromMemoryLimiterConfig(limiter *v1alpha1.MemoryLimiterConfig) map[string]any {
+	valMap := map[string]any{}
+	if limiter == nil {
+		return valMap
+	}
+	valMap["limit_mib"] = limiter.MemoryLimit
+	valMap["spike_limit_mib"] = limiter.MemorySpikeLimit
+	valMap["check_interval"] = limiter.CheckInterval
+	return valMap
+}
+
+func fromBatchConfig(batch *v1alpha1.BatchConfig) map[string]any {
+	valMap := map[string]any{}
+	if batch == nil {
+		return valMap
+	}
+	valMap["timeout"] = batch.Timeout
+	valMap["send_batch_size"] = batch.SendBatchSize
+	valMap["send_batch_max_size"] = batch.SendBatchMaxSize
+	return valMap
 }
 
 func (cg *OteldConfigGenerater) appendServices(cfg yaml.MapSlice, instance *OteldInstance) (yaml.MapSlice, error) {

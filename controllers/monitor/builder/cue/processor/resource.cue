@@ -16,15 +16,22 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 parameters: {
-	name: *"default" | string
-	endpoint: *"${env:HOST_IP}:1234" | string
+	global_labels?: [string]: string
 }
 
 output: {
-	"prometheusremotewrite/\(parameters.name)": {
-		endpoint: parameters.endpoint
-    timeout: "15s"
-		resource_to_telemetry_conversion:
-      enabled: true
-	}
+  resource:
+    attributes: {
+    	if parameters.global_labels != _|_ {
+  			[
+  			  for k, v in parameters.global_labels {
+  				  {
+  				  	key: k
+  					  value: v
+  					  action: "insert"
+  				  }
+				  }
+				]
+			}
+    }
 }

@@ -47,8 +47,9 @@ const (
 	LogCreatorName        = "receiver_creator/logs"
 	EngineTplPath         = "engine/engine_template.cue"
 
-	BatchProcessorName  = "batch"
-	MemoryProcessorName = "memory_limiter"
+	BatchProcessorName        = "batch"
+	MemoryProcessorName       = "memory_limiter"
+	GlobalLabelsProcessorName = "resource"
 )
 
 type OteldConfigGenerater struct {
@@ -277,7 +278,19 @@ func (cg *OteldConfigGenerater) appendProcessor(cfg yaml.MapSlice, instance *Ote
 		}
 		processorSlice = append(processorSlice, memoryProcessor...)
 	}
+	if len(oteld.Spec.GlobalLabels) > 0 {
+		resourceConfig := fromGlobalLabels(oteld.Spec.GlobalLabels)
+		globalLabelsProcessor, err := buildSliceFromCUE("processor/resource.cue", resourceConfig)
+		if err != nil {
+			return nil, err
+		}
+		processorSlice = append(processorSlice, globalLabelsProcessor...)
+	}
 	return append(cfg, yaml.MapItem{Key: "processors", Value: processorSlice}), nil
+}
+
+func fromGlobalLabels(labels map[string]string) map[string]any {
+	return map[string]any{"global_labels": labels}
 }
 
 func fromMemoryLimiterConfig(limiter *v1alpha1.MemoryLimiterConfig) map[string]any {

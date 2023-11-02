@@ -135,6 +135,9 @@ func (w *oteldWrapper) buildProcessor(pipeline *types.Pipeline) {
 	if w.Spec.MemoryLimiter.Enabled {
 		pipeline.ProcessorMap[types.MemoryProcessorName] = true
 	}
+	if len(w.Spec.GlobalLabels) > 0 {
+		pipeline.ProcessorMap[types.GlobalLabelsProcessorName] = true
+	}
 }
 
 func (w *oteldWrapper) buildMetricsExporter(pipeline *types.Pipeline) {

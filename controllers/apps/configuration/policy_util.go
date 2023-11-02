@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -37,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -206,65 +208,42 @@ func getURLFromPod(pod *corev1.Pod, portPort int) (string, error) {
 	return net.JoinHostPort(ip.String(), strconv.Itoa(portPort)), nil
 }
 
-func restartStatelessComponent(cli client.Client, ctx intctrlutil.RequestCtx, configKey string, expectedVersion string, deployObjs []client.Object, recordEvent func(obj client.Object)) (client.Object, error) {
-	cfgAnnotationKey := core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
-	deployRestart := func(deploy *appv1.Deployment, expectedVersion string) error {
-		patch := client.MergeFrom(deploy.DeepCopy())
-		if deploy.Spec.Template.Annotations == nil {
-			deploy.Spec.Template.Annotations = map[string]string{}
-		}
-		deploy.Spec.Template.Annotations[cfgAnnotationKey] = expectedVersion
-		if err := cli.Patch(ctx.Ctx, deploy, patch); err != nil {
-			return err
-		}
+func restartWorkloadComponent[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](cli client.Client, ctx context.Context, annotationKey, annotationValue string, obj PT, _ func(T, PT, L, PL)) error {
+	template := transformPodTemplate(obj)
+	if updatedVersion(template, annotationKey, annotationValue) {
 		return nil
 	}
 
-	for _, obj := range deployObjs {
-		deploy, ok := obj.(*appv1.Deployment)
-		if !ok {
-			continue
-		}
-		if updatedVersion(&deploy.Spec.Template, cfgAnnotationKey, expectedVersion) {
-			continue
-		}
-		if err := deployRestart(deploy, expectedVersion); err != nil {
-			return deploy, err
-		}
-		if recordEvent != nil {
-			recordEvent(deploy)
-		}
+	patch := client.MergeFrom(PT(obj.DeepCopy()))
+	if template.Annotations == nil {
+		template.Annotations = map[string]string{}
 	}
-	return nil, nil
+	template.Annotations[annotationKey] = annotationValue
+	if err := cli.Patch(ctx, obj, patch); err != nil {
+		return err
+	}
+	return nil
 }
 
-func restartStatefulComponent(cli client.Client, ctx intctrlutil.RequestCtx, configKey string, newVersion string, objs []client.Object, recordEvent func(obj client.Object)) (client.Object, error) {
+func restartComponent(cli client.Client, ctx intctrlutil.RequestCtx, configKey string, newVersion string, objs []client.Object, recordEvent func(obj client.Object)) (client.Object, error) {
+	var err error
 	cfgAnnotationKey := core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
-	stsRestart := func(sts *appv1.StatefulSet, expectedVersion string) error {
-		patch := client.MergeFrom(sts.DeepCopy())
-		if sts.Spec.Template.Annotations == nil {
-			sts.Spec.Template.Annotations = map[string]string{}
-		}
-		sts.Spec.Template.Annotations[cfgAnnotationKey] = expectedVersion
-		if err := cli.Patch(ctx.Ctx, sts, patch); err != nil {
-			return err
-		}
-		return nil
-	}
-
 	for _, obj := range objs {
-		sts, ok := obj.(*appv1.StatefulSet)
-		if !ok {
-			continue
+		switch w := obj.(type) {
+		case *appv1.StatefulSet:
+			err = restartWorkloadComponent(cli, ctx.Ctx, cfgAnnotationKey, newVersion, w, generics.StatefulSetSignature)
+		case *appv1.Deployment:
+			err = restartWorkloadComponent(cli, ctx.Ctx, cfgAnnotationKey, newVersion, w, generics.DeploymentSignature)
+		case *workloads.ReplicatedStateMachine:
+			err = restartWorkloadComponent(cli, ctx.Ctx, cfgAnnotationKey, newVersion, w, generics.RSMSignature)
+		default:
+			// ignore other types workload
 		}
-		if updatedVersion(&sts.Spec.Template, cfgAnnotationKey, newVersion) {
-			continue
-		}
-		if err := stsRestart(sts, newVersion); err != nil {
-			return sts, err
+		if err != nil {
+			return obj, err
 		}
 		if recordEvent != nil {
-			recordEvent(sts)
+			recordEvent(obj)
 		}
 	}
 	return nil, nil

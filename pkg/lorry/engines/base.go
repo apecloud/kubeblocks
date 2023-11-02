@@ -23,11 +23,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
-	"syscall"
-
 	"github.com/go-logr/logr"
 	"github.com/spf13/viper"
+	"strings"
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
@@ -228,39 +226,11 @@ func (mgr *DBManagerBase) Unlock(context.Context) error {
 	return errors.New("not implemented")
 }
 
-// Start does not directly mean to start a database instance,
-// but rather to sends SIGUSR2 to activate sql channel to start database
 func (mgr *DBManagerBase) Start(context.Context, *dcs.Cluster) error {
-	mgr.Logger.Info("send SIGUSR2 to activate sql channel")
-	lorryProc, err := GetLorryProc()
-	if err != nil {
-		mgr.Logger.Error(err, "can't find sql channel process")
-		return err
-	}
-
-	err = lorryProc.Signal(syscall.SIGUSR2)
-	if err != nil {
-		mgr.Logger.Error(err, "send SIGUSR2 to sql channel failed")
-		return err
-	}
 	return nil
 }
 
-// Stop does not directly mean to stop a database instance,
-// but rather to sends SIGUSR1 to deactivate sql channel to stop starting database
 func (mgr *DBManagerBase) Stop() error {
-	mgr.Logger.Info("send SIGUSR1 to deactivate sql channel")
-	lorryProc, err := GetLorryProc()
-	if err != nil {
-		mgr.Logger.Error(err, "can't find sql channel process")
-		return err
-	}
-
-	err = lorryProc.Signal(syscall.SIGUSR1)
-	if err != nil {
-		mgr.Logger.Error(err, "send SIGUSR1 to sql channel failed")
-		return err
-	}
 	return nil
 }
 

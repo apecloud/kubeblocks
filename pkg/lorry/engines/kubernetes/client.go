@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package kubernetes
 
 import (
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"k8s.io/client-go/kubernetes"
 	ctlruntime "sigs.k8s.io/controller-runtime"
@@ -31,25 +30,25 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
-// GetClientSet returns a kubernetes clientset.
-func GetClientSet(logger logr.Logger) (*kubernetes.Clientset, error) {
+// GetClientSet returns a kubernetes clientSet.
+func GetClientSet() (*kubernetes.Clientset, error) {
 	restConfig, err := ctlruntime.GetConfig()
 	if err != nil {
-		return nil, errors.Wrap(err, "get kubeconfig failed")
+		return nil, errors.Wrap(err, "get kubeConfig failed")
 	}
-	clientset, err := kubernetes.NewForConfig(restConfig)
+	clientSet, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return clientset, nil
+	return clientSet, nil
 }
 
-// GetRESTClient returns a kubernetes restclient for KubeBlocks types.
-func GetRESTClient(logger logr.Logger) (*rest.RESTClient, error) {
+// GetRESTClient returns a kubernetes restClient for KubeBlocks types.
+func GetRESTClient() (*rest.RESTClient, error) {
 	restConfig, err := ctlruntime.GetConfig()
 	if err != nil {
-		return nil, errors.Wrap(err, "get kubeconfig failed")
+		return nil, errors.Wrap(err, "get kubeConfig failed")
 	}
 	_ = appsv1alpha1.AddToScheme(clientsetscheme.Scheme)
 	restConfig.GroupVersion = &appsv1alpha1.GroupVersion

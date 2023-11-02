@@ -1160,16 +1160,19 @@ var _ = Describe("Component Controller", func() {
 				Name:       "leader",
 				AccessMode: workloads.ReadWriteMode,
 				CanVote:    true,
+				IsLeader:   true,
 			},
 			{
 				Name:       "follower",
 				AccessMode: workloads.ReadonlyMode,
 				CanVote:    true,
+				IsLeader:   false,
 			},
 			{
 				Name:       "learner",
 				AccessMode: workloads.NoneMode,
 				CanVote:    false,
+				IsLeader:   false,
 			},
 		}
 		rsmKey := types.NamespacedName{
@@ -1300,9 +1303,9 @@ var _ = Describe("Component Controller", func() {
 			Namespace: compObj.Namespace,
 			Name:      saName,
 		}
-		Eventually(testapps.CheckObjExists(&testCtx, saKey, &corev1.ServiceAccount{}, true)).Should(Succeed())
-		Eventually(testapps.CheckObjExists(&testCtx, rbKey, &rbacv1.RoleBinding{}, true)).Should(Succeed())
-		Eventually(testapps.CheckObjExists(&testCtx, crbKey, &rbacv1.ClusterRoleBinding{}, true)).Should(Succeed())
+		Eventually(testapps.CheckObjExists(&testCtx, saKey, &corev1.ServiceAccount{}, expectExisted)).Should(Succeed())
+		Eventually(testapps.CheckObjExists(&testCtx, rbKey, &rbacv1.RoleBinding{}, expectExisted)).Should(Succeed())
+		Eventually(testapps.CheckObjExists(&testCtx, crbKey, &rbacv1.ClusterRoleBinding{}, expectExisted)).Should(Succeed())
 	}
 
 	testCompRBAC := func(compName, compDefName, saName string) {
@@ -1360,6 +1363,35 @@ var _ = Describe("Component Controller", func() {
 			names = append(names, pod.Name)
 		}
 		return names
+	}
+
+	testReplicationWorkloadRunning := func(compName, compDefName string) {
+		By("Mock a cluster obj with replication componentDefRef.")
+		pvcSpec := testapps.NewPVCSpec("1Gi")
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+			AddComponent(compName, compDefName).
+			SetReplicas(testapps.DefaultReplicationReplicas).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
+			Create(&testCtx).GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		By("Waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, compDefName)
+
+		By("Checking statefulSet number")
+		rsmList := testk8s.ListAndCheckRSMItemsCount(&testCtx, clusterKey, 1)
+		rsm := &rsmList.Items[0]
+		sts := testapps.NewStatefulSetFactory(rsm.Namespace, rsm.Name, clusterKey.Name, compName).
+			SetReplicas(*rsm.Spec.Replicas).Create(&testCtx).GetObject()
+		mockPods := testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterObj.Name, compDefName, nil)
+		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+			testk8s.MockStatefulSetReady(sts)
+		})).ShouldNot(HaveOccurred())
+		Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
+			testk8s.MockRSMReady(rsm, mockPods...)
+		})).ShouldNot(HaveOccurred())
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 	}
 
 	testThreeReplicas := func(compName, compDefName string) {
@@ -1486,6 +1518,84 @@ var _ = Describe("Component Controller", func() {
 		By("Waiting the component be running")
 		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).
 			Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+	}
+
+	testRestoreClusterFromBackup := func(compName, compDefName string) {
+		By("mock backuptool object")
+		backupPolicyName := "test-backup-policy"
+		backupName := "test-backup"
+		_ = testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml",
+			&dpv1alpha1.ActionSet{}, testapps.RandomizedObjName())
+
+		By("creating backup")
+		backup := testdp.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+			SetBackupPolicyName(backupPolicyName).
+			SetBackupMethod(testdp.BackupMethodName).
+			Create(&testCtx).GetObject()
+
+		By("mocking backup status completed, we don't need backup reconcile here")
+		Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(backup), func(backup *dpv1alpha1.Backup) {
+			backup.Status.PersistentVolumeClaimName = "backup-pvc"
+			backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+			testdp.MockBackupStatusMethod(backup, testdp.BackupMethodName, testapps.DataVolumeName, testdp.ActionSetName)
+		})).Should(Succeed())
+
+		By("creating cluster with backup")
+		restoreFromBackup := fmt.Sprintf(`{"%s":{"name":"%s"}}`, compName, backupName)
+		pvcSpec := testapps.NewPVCSpec("1Gi")
+		replicas := 3
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+			AddComponent(compName, compDefName).
+			SetReplicas(int32(replicas)).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
+			AddAnnotations(constant.RestoreFromBackupAnnotationKey, restoreFromBackup).Create(&testCtx).GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		// mock pvcs have restored
+		mockComponentPVCsAndBound(clusterObj.Spec.GetComponentByName(compName), replicas, true, testk8s.DefaultStorageClassName)
+		By("wait for restore created")
+		ml := client.MatchingLabels{
+			constant.AppInstanceLabelKey:    clusterKey.Name,
+			constant.KBAppComponentLabelKey: compName,
+		}
+		Eventually(testapps.List(&testCtx, generics.RestoreSignature,
+			ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(1))
+
+		By("Mocking restore phase to Completed")
+		// mock prepareData restore completed
+		mockRestoreCompleted(ml)
+
+		By("Waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, compName)
+
+		rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
+		rsm := rsmList.Items[0]
+		sts := testapps.NewStatefulSetFactory(rsm.Namespace, rsm.Name, clusterKey.Name, compName).
+			SetReplicas(*rsm.Spec.Replicas).
+			Create(&testCtx).GetObject()
+		By("mock pod/sts are available and wait for component enter running phase")
+		mockPods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, compName)
+		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+			testk8s.MockStatefulSetReady(sts)
+		})).ShouldNot(HaveOccurred())
+		Expect(testapps.ChangeObjStatus(&testCtx, &rsm, func() {
+			testk8s.MockRSMReady(&rsm, mockPods...)
+		})).ShouldNot(HaveOccurred())
+		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+
+		By("the restore container has been removed from init containers")
+		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&rsm), func(g Gomega, tmpRSM *workloads.ReplicatedStateMachine) {
+			g.Expect(tmpRSM.Spec.Template.Spec.InitContainers).Should(BeEmpty())
+		})).Should(Succeed())
+
+		By("clean up annotations after cluster running")
+		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
+			g.Expect(tmpCluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
+			// mock postReady restore completed
+			mockRestoreCompleted(ml)
+			g.Expect(tmpCluster.Annotations[constant.RestoreFromBackupAnnotationKey]).Should(BeEmpty())
+		})).Should(Succeed())
 	}
 
 	testBackupError := func(compName, compDefName string) {
@@ -1697,7 +1807,7 @@ var _ = Describe("Component Controller", func() {
 			testCompRBAC(defaultCompName, compDefName, "")
 		})
 
-		PIt("re-create component with RBAC set", func() {
+		It("re-create component with RBAC set", func() {
 			testRecreateCompWithRBAC(defaultCompName, compDefName)
 		})
 	})
@@ -1870,138 +1980,26 @@ var _ = Describe("Component Controller", func() {
 	})
 
 	When("creating cluster with workloadType=consensus component", func() {
-		const (
-			compName    = consensusCompName
-			compDefName = consensusCompDefName
-		)
-
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
 			createBackupPolicyTpl(clusterDefObj)
+		})
+
+		AfterEach(func() {
+			cleanEnv()
+		})
+
+		// REVIEW/TODO: following test always failed at cluster.phase.observerGeneration=1 with cluster.phase.phase=creating
+		It("Should success with primary pod and secondary pod", func() {
+			testReplicationWorkloadRunning(replicationCompName, replicationCompDefName)
 		})
 
 		It("Should success with one leader pod and two follower pods", func() {
-			testThreeReplicas(compName, compDefName)
+			testThreeReplicas(consensusCompName, consensusCompDefName)
 		})
 
 		It("test restore cluster from backup", func() {
-			By("mock backuptool object")
-			backupPolicyName := "test-backup-policy"
-			backupName := "test-backup"
-			_ = testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml",
-				&dpv1alpha1.ActionSet{}, testapps.RandomizedObjName())
-
-			By("creating backup")
-			backup := testdp.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-				SetBackupPolicyName(backupPolicyName).
-				SetBackupMethod(testdp.BackupMethodName).
-				Create(&testCtx).GetObject()
-
-			By("mocking backup status completed, we don't need backup reconcile here")
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(backup), func(backup *dpv1alpha1.Backup) {
-				backup.Status.PersistentVolumeClaimName = "backup-pvc"
-				backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
-				testdp.MockBackupStatusMethod(backup, testdp.BackupMethodName, testapps.DataVolumeName, testdp.ActionSetName)
-			})).Should(Succeed())
-
-			By("creating cluster with backup")
-			restoreFromBackup := fmt.Sprintf(`{"%s":{"name":"%s"}}`, compName, backupName)
-			pvcSpec := testapps.NewPVCSpec("1Gi")
-			replicas := 3
-			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-				AddComponent(compName, compDefName).
-				SetReplicas(int32(replicas)).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-				AddAnnotations(constant.RestoreFromBackupAnnotationKey, restoreFromBackup).Create(&testCtx).GetObject()
-			clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-			// mock pvcs have restored
-			mockComponentPVCsAndBound(clusterObj.Spec.GetComponentByName(compName), replicas, true, testk8s.DefaultStorageClassName)
-			By("wait for restore created")
-			ml := client.MatchingLabels{
-				constant.AppInstanceLabelKey:    clusterKey.Name,
-				constant.KBAppComponentLabelKey: compName,
-			}
-			Eventually(testapps.List(&testCtx, generics.RestoreSignature,
-				ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(1))
-
-			By("Mocking restore phase to Completed")
-			// mock prepareData restore completed
-			mockRestoreCompleted(ml)
-
-			By("Waiting for the cluster controller to create resources completely")
-			waitForCreatingResourceCompletely(clusterKey, compName)
-
-			rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
-			rsm := rsmList.Items[0]
-			sts := testapps.NewStatefulSetFactory(rsm.Namespace, rsm.Name, clusterKey.Name, compName).
-				SetReplicas(*rsm.Spec.Replicas).
-				Create(&testCtx).GetObject()
-			By("mock pod/sts are available and wait for component enter running phase")
-			mockPods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, compName)
-			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
-				testk8s.MockStatefulSetReady(sts)
-			})).ShouldNot(HaveOccurred())
-			Expect(testapps.ChangeObjStatus(&testCtx, &rsm, func() {
-				testk8s.MockRSMReady(&rsm, mockPods...)
-			})).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
-
-			By("the restore container has been removed from init containers")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&rsm), func(g Gomega, tmpRSM *workloads.ReplicatedStateMachine) {
-				g.Expect(tmpRSM.Spec.Template.Spec.InitContainers).Should(BeEmpty())
-			})).Should(Succeed())
-
-			By("clean up annotations after cluster running")
-			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-				g.Expect(tmpCluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
-				// mock postReady restore completed
-				mockRestoreCompleted(ml)
-				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackupAnnotationKey]).Should(BeEmpty())
-			})).Should(Succeed())
-		})
-	})
-
-	When("creating cluster with workloadType=replication component", func() {
-		const (
-			compName    = replicationCompName
-			compDefName = replicationCompDefName
-		)
-		BeforeEach(func() {
-			createAllWorkloadTypesClusterDef()
-			createBackupPolicyTpl(clusterDefObj)
-		})
-
-		// REVIEW/TODO: following test always failed at cluster.phase.observerGeneration=1
-		//     with cluster.phase.phase=creating
-		It("Should success with primary pod and secondary pod", func() {
-			By("Mock a cluster obj with replication componentDefRef.")
-			pvcSpec := testapps.NewPVCSpec("1Gi")
-			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-				AddComponent(compName, compDefName).
-				SetReplicas(testapps.DefaultReplicationReplicas).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-				Create(&testCtx).GetObject()
-			clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-			By("Waiting for the cluster controller to create resources completely")
-			waitForCreatingResourceCompletely(clusterKey, compDefName)
-
-			By("Checking statefulSet number")
-			rsmList := testk8s.ListAndCheckRSMItemsCount(&testCtx, clusterKey, 1)
-			rsm := &rsmList.Items[0]
-			sts := testapps.NewStatefulSetFactory(rsm.Namespace, rsm.Name, clusterKey.Name, compName).
-				SetReplicas(*rsm.Spec.Replicas).Create(&testCtx).GetObject()
-			mockPods := testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterObj.Name, compDefName, nil)
-			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
-				testk8s.MockStatefulSetReady(sts)
-			})).ShouldNot(HaveOccurred())
-			Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
-				testk8s.MockRSMReady(rsm, mockPods...)
-			})).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
+			testRestoreClusterFromBackup(consensusCompName, consensusCompDefName)
 		})
 	})
 })

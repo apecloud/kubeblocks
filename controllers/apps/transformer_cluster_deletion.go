@@ -66,11 +66,7 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		return graph.ErrPrematureStop
 	case appsv1alpha1.Halt:
 		toDeleteNamespacedKinds, toDeleteNonNamespacedKinds = kindsForHalt()
-		toPreserveKinds = []client.ObjectList{
-			&corev1.PersistentVolumeClaimList{},
-			&corev1.SecretList{},
-			&corev1.ConfigMapList{},
-		}
+		toPreserveKinds = haltPreserveKinds()
 	case appsv1alpha1.Delete:
 		toDeleteNamespacedKinds, toDeleteNonNamespacedKinds = kindsForDelete()
 	case appsv1alpha1.WipeOut:
@@ -178,6 +174,14 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	return graph.ErrPrematureStop
 }
 
+func haltPreserveKinds() []client.ObjectList {
+	return []client.ObjectList{
+		&corev1.PersistentVolumeClaimList{},
+		&corev1.SecretList{},
+		&corev1.ConfigMapList{},
+	}
+}
+
 func kindsForDoNotTerminate() ([]client.ObjectList, []client.ObjectList) {
 	return []client.ObjectList{}, []client.ObjectList{}
 }
@@ -191,6 +195,10 @@ func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
 		&corev1.ServiceList{},
 		&corev1.ServiceAccountList{},
 		&rbacv1.RoleBindingList{},
+		&dpv1alpha1.BackupPolicyList{},
+		&dpv1alpha1.BackupScheduleList{},
+		&dpv1alpha1.RestoreList{},
+		&batchv1.JobList{},
 	}
 	nonNamespacedKindsPlus := []client.ObjectList{
 		&rbacv1.ClusterRoleBindingList{},
@@ -200,16 +208,7 @@ func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
 
 func kindsForDelete() ([]client.ObjectList, []client.ObjectList) {
 	namespacedKinds, nonNamespacedKinds := kindsForHalt()
-	namespacedKindsPlus := []client.ObjectList{
-		&corev1.SecretList{},
-		&corev1.ConfigMapList{},
-		&corev1.PersistentVolumeClaimList{},
-		&dpv1alpha1.BackupPolicyList{},
-		&dpv1alpha1.BackupScheduleList{},
-		&batchv1.JobList{},
-		&dpv1alpha1.RestoreList{},
-	}
-	return append(namespacedKinds, namespacedKindsPlus...), nonNamespacedKinds
+	return append(namespacedKinds, haltPreserveKinds()...), nonNamespacedKinds
 }
 
 func kindsForWipeOut() ([]client.ObjectList, []client.ObjectList) {

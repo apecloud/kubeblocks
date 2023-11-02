@@ -595,23 +595,38 @@ var _ = Describe("Cluster Controller", func() {
 	testDeleteClusterWithDoNotTerminate := func(createObj func(appsv1alpha1.TerminationPolicyType)) {
 		createObj(appsv1alpha1.DoNotTerminate)
 
+		By("check all other resources deleted")
+		transCtx := &clusterTransformContext{
+			Context: testCtx.Ctx,
+			Client:  testCtx.Cli,
+		}
+		namespacedKinds, clusteredKinds := kindsForWipeOut()
+		allKinds := append(namespacedKinds, clusteredKinds...)
+		createdObjs, err := getClusterOwningNamespacedObjects(transCtx, *clusterObj, getAppInstanceML(*clusterObj), allKinds)
+		Expect(err).Should(Succeed())
+
 		By("delete the cluster")
 		testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
-		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
+		Consistently(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
+
+		By("check all cluster resources again")
+		objs, err := getClusterOwningNamespacedObjects(transCtx, *clusterObj, getAppInstanceML(*clusterObj), allKinds)
+		Expect(err).Should(Succeed())
+		// check all objects existed before cluster deletion still be there
+		for key, obj := range createdObjs {
+			Expect(objs).Should(HaveKey(key))
+			Expect(obj.GetUID()).Should(BeEquivalentTo(objs[key].GetUID()))
+		}
 	}
 
 	testDeleteClusterWithHalt := func(createObj func(appsv1alpha1.TerminationPolicyType)) {
 		createObj(appsv1alpha1.Halt)
 
-		preserveKinds := []client.ObjectList{
-			&corev1.PersistentVolumeClaimList{},
-			&corev1.SecretList{},
-			&corev1.ConfigMapList{},
-		}
 		transCtx := &clusterTransformContext{
 			Context: testCtx.Ctx,
 			Client:  testCtx.Cli,
 		}
+		preserveKinds := haltPreserveKinds()
 		preserveObjs, err := getClusterOwningNamespacedObjects(transCtx, *clusterObj, getAppInstanceML(*clusterObj), preserveKinds)
 		Expect(err).Should(Succeed())
 		for _, obj := range preserveObjs {
@@ -635,6 +650,13 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(keptObj.GetFinalizers()).ShouldNot(ContainElements(constant.DBClusterFinalizerName))
 			Expect(keptObj.GetAnnotations()).Should(HaveKey(constant.LastAppliedClusterAnnotationKey))
 		}
+
+		By("check all other resources deleted")
+		namespacedKinds, clusteredKinds := kindsForHalt()
+		kindsToDelete := append(namespacedKinds, clusteredKinds...)
+		otherObjs, err := getClusterOwningNamespacedObjects(transCtx, *clusterObj, getAppInstanceML(*clusterObj), kindsToDelete)
+		Expect(err).Should(Succeed())
+		Expect(otherObjs).Should(HaveLen(0))
 	}
 
 	testClusterHaltNRecovery := func(createObj func(appsv1alpha1.TerminationPolicyType)) {
@@ -660,7 +682,6 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, backupKey, &dpv1alpha1.Backup{}, true)).Should(Succeed())
 
 		By("delete the cluster")
-		fmt.Printf("test - to delete cluster object : %s\n", clusterObj.Name)
 		testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
 
 		By("wait for the cluster to terminate")
@@ -672,6 +693,22 @@ var _ = Describe("Cluster Controller", func() {
 		} else {
 			Consistently(testapps.CheckObjExists(&testCtx, backupKey, &dpv1alpha1.Backup{}, true)).Should(Succeed())
 		}
+
+		By("check all other resources deleted")
+		transCtx := &clusterTransformContext{
+			Context: testCtx.Ctx,
+			Client:  testCtx.Cli,
+		}
+		var namespacedKinds, clusteredKinds []client.ObjectList
+		if terminationPolicy == appsv1alpha1.WipeOut && backupRetainPolicy == constant.BackupDelete {
+			namespacedKinds, clusteredKinds = kindsForWipeOut()
+		} else {
+			namespacedKinds, clusteredKinds = kindsForDelete()
+		}
+		kindsToDelete := append(namespacedKinds, clusteredKinds...)
+		otherObjs, err := getClusterOwningNamespacedObjects(transCtx, *clusterObj, getAppInstanceML(*clusterObj), kindsToDelete)
+		Expect(err).Should(Succeed())
+		Expect(otherObjs).Should(HaveLen(0))
 	}
 
 	testDeleteClusterWithDelete := func(createObj func(appsv1alpha1.TerminationPolicyType)) {

@@ -46,6 +46,7 @@ spec:
                 - "\"select role from information_schema.alisql_cluster_local\""
                 - "|"
                 - "xargs echo -n"
+        memberUpdateStrategy: Serial
       service:
         ports:
           - name: mysql
@@ -260,6 +261,7 @@ spec:
                 - "\"select role from information_schema.alisql_cluster_local\""
                 - "|"
                 - "xargs echo -n"
+        memberUpdateStrategy: Serial
       service:
         ports:
           - name: mysql

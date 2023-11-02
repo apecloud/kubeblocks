@@ -57,6 +57,10 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	if err != nil {
 		return err
 	}
+	if serviceAccount == nil {
+		transCtx.Logger.V(1).Info("buildServiceAccounts returns serviceAccount nil")
+		return nil
+	}
 
 	if !viper.GetBool(constant.EnableRBACManager) {
 		transCtx.Logger.V(1).Info("rbac manager is disabled")
@@ -81,7 +85,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	createServiceAccount(serviceAccount, graphCli, dag, parent)
 	rsmList := graphCli.FindAll(dag, &workloads.ReplicatedStateMachine{})
 	for _, rsm := range rsmList {
-		// serviceaccount must be created before workload
+		// serviceAccount must be created before workload
 		graphCli.DependOn(dag, rsm, serviceAccount)
 	}
 

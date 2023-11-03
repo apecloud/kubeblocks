@@ -21,7 +21,6 @@ package util
 
 import (
 	"strings"
-	"time"
 )
 
 type OperationKind string
@@ -70,8 +69,6 @@ const (
 	OperationFailed            = "Failed"
 	DefaultProbeTimeoutSeconds = 2
 
-	HTTPRequestPrefx string = "curl -X POST -H 'Content-Type: application/json' http://localhost:%d/v1.0/"
-
 	// this is a general script template, which can be used for all kinds of exec request to databases.
 	DataScriptRequestTpl string = `
 		response=$(curl -s -X POST -H 'Content-Type: application/json' http://%s:3501/v1.0/bindings/%s -d '%s')
@@ -116,64 +113,6 @@ const (
 	CustomizedRole RoleType = "customized"
 	InvalidRole    RoleType = "invalid"
 )
-
-// UserInfo is the user information for account management
-type UserInfo struct {
-	UserName string        `json:"userName"`
-	Password string        `json:"password,omitempty"`
-	Expired  string        `json:"expired,omitempty"`
-	ExpireAt time.Duration `json:"expireAt,omitempty"`
-	RoleName string        `json:"roleName,omitempty"`
-}
-
-// SQLChannelRequest is the request for sqlchannel
-type SQLChannelRequest struct {
-	Operation string                 `json:"operation"`
-	Metadata  map[string]interface{} `json:"metadata,omitempty"`
-}
-
-// SQLChannelResponse is the response for sqlchannel
-type SQLChannelResponse struct {
-	Event    string         `json:"event,omitempty"`
-	Message  string         `json:"message,omitempty"`
-	Metadata SQLChannelMeta `json:"metadata,omitempty"`
-}
-
-// SQLChannelMeta is the metadata for sqlchannel
-type SQLChannelMeta struct {
-	Operation string    `json:"operation,omitempty"`
-	StartTime time.Time `json:"startTime,omitempty"`
-	EndTime   time.Time `json:"endTime,omitempty"`
-	Extra     string    `json:"extra,omitempty"`
-}
-
-type errorReason string
-
-const (
-	UnsupportedOps errorReason = "unsupported operation"
-)
-
-// SQLChannelError is the error for sqlchannel, it implements error interface
-type SQLChannelError struct {
-	Reason errorReason
-}
-
-var _ error = SQLChannelError{}
-
-func (e SQLChannelError) Error() string {
-	return string(e.Reason)
-}
-
-// IsUnSupportedError checks if the error is unsupported operation error
-func IsUnSupportedError(err error) bool {
-	if err == nil {
-		return false
-	}
-	if e, ok := err.(SQLChannelError); ok {
-		return e.Reason == UnsupportedOps
-	}
-	return false
-}
 
 // ProbeError is the error for Lorry probe api, it implements error interface
 type ProbeError struct {

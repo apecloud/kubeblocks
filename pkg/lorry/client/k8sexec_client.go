@@ -56,7 +56,7 @@ type K8sExecClient struct {
 	logger         logr.Logger
 }
 
-// NewK8sExecClientWithPod create a new OperationHTTPClient with sqlchannel container
+// NewK8sExecClientWithPod create a new OperationHTTPClient with lorry container
 func NewK8sExecClientWithPod(pod *corev1.Pod) (*K8sExecClient, error) {
 	var (
 		err error

@@ -43,7 +43,7 @@ func GetClientSet() (*kubernetes.Clientset, error) {
 	return clientSet, nil
 }
 
-// GetRESTClientForKB returns a kubernetes restclient for KubeBlocks types.
+// GetRESTClientForKB returns a kubernetes restClient for KubeBlocks types.
 func GetRESTClientForKB() (*rest.RESTClient, error) {
 	restConfig, err := ctlruntime.GetConfig()
 	if err != nil {

@@ -33,7 +33,6 @@ import (
 	clusterutil "github.com/apecloud/kubeblocks/pkg/cli/cluster"
 	"github.com/apecloud/kubeblocks/pkg/cli/exec"
 	"github.com/apecloud/kubeblocks/pkg/cli/printer"
-	"github.com/apecloud/kubeblocks/pkg/cli/util"
 	lorryutil "github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
@@ -54,7 +53,6 @@ var (
 	errMissingUserName       = fmt.Errorf("please specify username")
 	errMissingRoleName       = fmt.Errorf("please specify at least ONE role name")
 	errInvalidRoleName       = fmt.Errorf("invalid role name, should be one of [SUPERUSER, READWRITE, READONLY] ")
-	errInvalidOp             = fmt.Errorf("invalid operation")
 	errCompNameOrInstName    = fmt.Errorf("please specify either --component or --instance, they are exclusive")
 	errClusterNameorInstName = fmt.Errorf("specify either cluster name or --instance")
 )
@@ -144,60 +142,6 @@ func (o *AccountBaseOptions) Complete(f cmdutil.Factory) error {
 	return nil
 }
 
-func (o *AccountBaseOptions) Run(cmd *cobra.Command, f cmdutil.Factory, streams genericiooptions.IOStreams) error {
-	var err error
-	response, err := o.Do()
-	if err != nil {
-		if lorryutil.IsUnSupportedError(err) {
-			return fmt.Errorf("command `%s` on characterType `%s` (defined in cluster: %s, component: %s) is not supported yet", cmd.Use, o.CharType, o.ClusterName, o.ComponentName)
-		}
-		return err
-	}
-
-	switch o.AccountOp {
-	case
-		lorryutil.DeleteUserOp,
-		lorryutil.RevokeUserRoleOp,
-		lorryutil.GrantUserRoleOp:
-		//o.printGeneralInfo(response)
-		err = nil
-	case lorryutil.CreateUserOp:
-		//o.printGeneralInfo(response)
-		if response.Event == lorryutil.RespEveSucc {
-			printer.Alert(o.Out, "Please do REMEMBER the password for the new user! Once forgotten, it cannot be retrieved!\n")
-		}
-		err = nil
-	case lorryutil.DescribeUserOp:
-		//err = o.printRoleInfo(response)
-	case lorryutil.ListUsersOp:
-		//err = o.printUserInfo(response)
-	default:
-		err = errInvalidOp
-	}
-	if err != nil {
-		return err
-	}
-
-	if o.Verbose {
-		fmt.Fprintln(o.Out, "")
-		o.printMeta(response)
-	}
-	return err
-}
-
-func (o *AccountBaseOptions) Do() (lorryutil.SQLChannelResponse, error) {
-	klog.V(1).Info(fmt.Sprintf("connect to cluster %s, component %s, instance %s\n", o.ClusterName, o.ComponentName, o.PodName))
-	response := lorryutil.SQLChannelResponse{}
-	//sqlClient, err := client.NewK8sExecClientWithPod(o.Pod)
-	//if err != nil {
-	//	return response, err
-	//}
-
-	//request := lorryutil.SQLChannelRequest{Operation: (string)(o.AccountOp), Metadata: o.RequestMeta}
-	//response, err = sqlClient.SendRequest(o.ExecOptions, request)
-	return response, nil
-}
-
 func (o *AccountBaseOptions) newTblPrinterWithStyle(title string, header []interface{}) *printer.TablePrinter {
 	tblPrinter := printer.NewTablePrinter(o.Out)
 	tblPrinter.SetStyle(printer.TerminalStyle)
@@ -209,14 +153,6 @@ func (o *AccountBaseOptions) newTblPrinterWithStyle(title string, header []inter
 func (o *AccountBaseOptions) printGeneralInfo(event, message string) {
 	tblPrinter := o.newTblPrinterWithStyle("QUERY RESULT", []interface{}{"RESULT", "MESSAGE"})
 	tblPrinter.AddRow(event, message)
-	tblPrinter.Print()
-}
-
-func (o *AccountBaseOptions) printMeta(response lorryutil.SQLChannelResponse) {
-	meta := response.Metadata
-	tblPrinter := o.newTblPrinterWithStyle("QUERY META", []interface{}{"START TIME", "END TIME", "OPERATION", "DATA"})
-	tblPrinter.SetStyle(printer.KubeCtlStyle)
-	tblPrinter.AddRow(util.TimeTimeFormat(meta.StartTime), util.TimeTimeFormat(meta.EndTime), meta.Operation, meta.Extra)
 	tblPrinter.Print()
 }
 

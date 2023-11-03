@@ -138,7 +138,7 @@ func OperationWrapper(op operations.Operation) fasthttp.RequestHandler {
 		if resp == nil {
 			respond(reqCtx, withEmpty())
 		} else {
-			body, _ := json.Marshal(resp.Data)
+			body, _ = json.Marshal(resp.Data)
 			respond(reqCtx, withMetadata(resp.Metadata), withJSON(statusCode, body))
 		}
 	}
@@ -153,7 +153,7 @@ func withJSON(code int, obj []byte) option {
 	}
 }
 
-// withError sets error code and jsonized error message.
+// withError sets error code and jsonify error message.
 func withError(code int, resp ErrorResponse) option {
 	b, _ := json.Marshal(&resp)
 	return withJSON(code, b)

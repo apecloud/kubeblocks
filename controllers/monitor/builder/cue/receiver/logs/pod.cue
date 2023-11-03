@@ -16,7 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 parameters: {
-	include: *["host/root/var/log/pods/**/**/*.log"] | [string]
+	include: *["/host/root/var/log/pods/**/**/*.log"] | [string]
 }
 
 output: {
@@ -52,7 +52,7 @@ output: {
 				type:       "regex_parser"
 				id:         "parser_pods_logs_dir"
 				parse_from: "attributes['log.file.path']"
-				regex:      "^/var/log/pods/(?P<namespace>[^_]+)_(?P<pod>[^_]+)_(?P<pod_id>[^_]+)/(?P<container>[^/]+)/(?P<restart_num>\\d+).log$"
+				regex:      "^/host/root/var/log/pods/(?P<namespace>[^_]+)_(?P<pod>[^_]+)_(?P<pod_id>[^_]+)/(?P<container>[^/]+)/(?P<restart_num>\\d+).log$"
 				on_error:   "send"
 			},
 		]

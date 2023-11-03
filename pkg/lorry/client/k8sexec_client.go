@@ -132,7 +132,17 @@ func (cli *K8sExecClient) Request(ctx context.Context, operation, method string,
 
 	// redirect output to strBuffer to be parsed later
 	if err = cli.k8sExec(cmd, &strBuffer, &errBuffer); err != nil {
-		return nil, errors.Wrap(err, "K8S exec failed")
+		data := strBuffer.Bytes()
+		if len(data) != 0 {
+			// curl emits result message to output
+			return nil, errors.Wrap(err, string(data))
+		}
+
+		errData := errBuffer.Bytes()
+		if len(errData) != 0 {
+			return nil, errors.Wrap(err, string(errData))
+		}
+		return nil, err
 	}
 
 	data := strBuffer.Bytes()

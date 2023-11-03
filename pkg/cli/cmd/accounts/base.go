@@ -172,7 +172,7 @@ func (o *AccountBaseOptions) Run(cmd *cobra.Command, f cmdutil.Factory, streams 
 	case lorryutil.DescribeUserOp:
 		err = o.printRoleInfo(response)
 	case lorryutil.ListUsersOp:
-		err = o.printUserInfo(response)
+		//err = o.printUserInfo(response)
 	default:
 		err = errInvalidOp
 	}
@@ -222,22 +222,11 @@ func (o *AccountBaseOptions) printMeta(response lorryutil.SQLChannelResponse) {
 	tblPrinter.Print()
 }
 
-func (o *AccountBaseOptions) printUserInfo(response lorryutil.SQLChannelResponse) error {
-	if response.Event == lorryutil.RespEveFail {
-		//o.printGeneralInfo(response)
-		return nil
-	}
-	// decode user info from metadata
-	users := []lorryutil.UserInfo{}
-	err := json.Unmarshal([]byte(response.Message), &users)
-	if err != nil {
-		return err
-	}
-
+func (o *AccountBaseOptions) printUserInfo(users []map[string]any) error {
 	// render user info with username and password expired boolean
 	tblPrinter := o.newTblPrinterWithStyle("USER INFO", []interface{}{"USERNAME", "EXPIRED"})
 	for _, user := range users {
-		tblPrinter.AddRow(user.UserName, user.Expired)
+		tblPrinter.AddRow(user["userName"], user["expired"])
 	}
 
 	tblPrinter.Print()

@@ -99,7 +99,7 @@ var _ = Describe("Describe Account Options", func() {
 			Expect(o.Validate(args)).Should(MatchError(errMissingUserName))
 
 			// set user name
-			o.info.UserName = "like"
+			o.userName = "like"
 			Expect(o.Validate(args)).Should(Succeed())
 		})
 
@@ -108,7 +108,7 @@ var _ = Describe("Describe Account Options", func() {
 			Expect(o).ShouldNot(BeNil())
 			o.ClusterName = clusterName
 			o.PodName = pods.Items[0].Name
-			o.info.UserName = "you"
+			o.userName = "you"
 
 			Expect(o.Complete(tf)).Should(Succeed())
 			Expect(o.RequestMeta).ShouldNot(BeNil())

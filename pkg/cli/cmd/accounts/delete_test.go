@@ -101,11 +101,11 @@ var _ = Describe("Delete Account Options", func() {
 			Expect(o.Validate(args)).Should(MatchError(errMissingUserName))
 
 			// set user name
-			o.info.UserName = "lilei"
+			o.userName = "lilei"
 			_, _ = in.Write([]byte("hanmeimei\n"))
 			Expect(o.Validate(args)).Should(HaveOccurred())
 			in.Reset()
-			_, _ = in.Write([]byte(o.info.UserName + "\n"))
+			_, _ = in.Write([]byte(o.userName + "\n"))
 			Expect(o.Validate(args)).Should(Succeed())
 		})
 
@@ -115,7 +115,7 @@ var _ = Describe("Delete Account Options", func() {
 
 			o.PodName = pods.Items[0].Name
 			o.ClusterName = clusterName
-			o.info.UserName = "lily"
+			o.userName = "lily"
 
 			Expect(o.Complete(tf)).Should(Succeed())
 			Expect(o.RequestMeta).ShouldNot(BeNil())

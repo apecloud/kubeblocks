@@ -22,6 +22,7 @@ package components
 import (
 	"fmt"
 
+	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -44,6 +45,7 @@ type componentWorkloadBuilder interface {
 	BuildVolumeMount() componentWorkloadBuilder
 	BuildTLSCert() componentWorkloadBuilder
 	BuildTLSVolume() componentWorkloadBuilder
+	BuildCustomVolumes() componentWorkloadBuilder
 
 	Complete() error
 }
@@ -69,6 +71,12 @@ func (b *rsmComponentWorkloadBuilder) BuildEnv() componentWorkloadBuilder {
 		return []client.Object{envCfg}, nil
 	}
 	return b.BuildWrapper(buildfn)
+}
+
+func (b *rsmComponentWorkloadBuilder) BuildCustomVolumes() componentWorkloadBuilder {
+	return b.BuildWrapper(func() ([]client.Object, error) {
+		return nil, doBuildCustomVolumes(b.getRuntime(), b.comp.GetCluster(), b.comp.GetName(), b.comp.GetNamespace())
+	})
 }
 
 func (b *rsmComponentWorkloadBuilder) BuildConfig() componentWorkloadBuilder {
@@ -317,5 +325,60 @@ func composeTLSVolumeMount() corev1.VolumeMount {
 		Name:      factory.VolumeName,
 		MountPath: factory.MountPath,
 		ReadOnly:  true,
+	}
+}
+
+func newSourceFromResource(name string, source any) corev1.Volume {
+	volume := corev1.Volume{
+		Name: name,
+	}
+	switch t := source.(type) {
+	default:
+		panic(fmt.Sprintf("unknown volume source type: %T", t))
+	case *corev1.ConfigMapVolumeSource:
+		volume.VolumeSource.ConfigMap = t
+	case *corev1.SecretVolumeSource:
+		volume.VolumeSource.Secret = t
+	}
+	return volume
+}
+
+func doBuildCustomVolumes(podSpec *corev1.PodSpec, cluster *appsv1alpha1.Cluster, componentName string, namespace string) error {
+	comp := cluster.Spec.GetComponentByName(componentName)
+	if comp == nil || comp.UserResourceRefs == nil {
+		return nil
+	}
+
+	volumes := podSpec.Volumes
+	for _, configMap := range comp.UserResourceRefs.ConfigMapRefs {
+		volumes = append(volumes, newSourceFromResource(configMap.Name, configMap.ConfigMap.DeepCopy()))
+	}
+	for _, secret := range comp.UserResourceRefs.SecretRefs {
+		volumes = append(volumes, newSourceFromResource(secret.Name, secret.Secret.DeepCopy()))
+	}
+	podSpec.Volumes = volumes
+	buildVolumeMountForContainers(podSpec, *comp.UserResourceRefs)
+	return nil
+}
+
+func buildVolumeMountForContainers(podSpec *corev1.PodSpec, resourceRefs appsv1alpha1.UserResourceRefs) {
+	for _, configMap := range resourceRefs.ConfigMapRefs {
+		newVolumeMount(podSpec, configMap.ResourceMeta)
+	}
+	for _, secret := range resourceRefs.SecretRefs {
+		newVolumeMount(podSpec, secret.ResourceMeta)
+	}
+}
+
+func newVolumeMount(podSpec *corev1.PodSpec, res appsv1alpha1.ResourceMeta) {
+	for i := range podSpec.Containers {
+		container := &podSpec.Containers[i]
+		if slices.Contains(res.AsVolumeFrom, container.Name) {
+			container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+				Name:      res.Name,
+				MountPath: res.MountPoint,
+				SubPath:   res.SubPath,
+			})
+		}
 	}
 }

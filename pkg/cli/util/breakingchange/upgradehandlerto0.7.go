@@ -141,7 +141,7 @@ func (u *upgradeHandlerTo7) transformBackupPolicy(dynamic dynamic.Interface, obj
 		}
 	}
 
-	_, found, _ := unstructured.NestedMap(specMap, "backupMethods")
+	_, found, _ := unstructured.NestedSlice(specMap, "backupMethods")
 	if found {
 		// if exist backupMethods, nothing to do.
 		return nil
@@ -519,7 +519,7 @@ func (u *upgradeHandlerTo7) transformDeployment(dynamic dynamic.Interface, obj u
 	}
 
 	// delete deployment
-	patchData, _ := json.Marshal(map[string]interface{}{"finalizers": nil})
+	patchData, _ := json.Marshal(map[string]map[string]interface{}{"metadata": {"finalizers": nil}})
 	if _, err := dynamic.Resource(types.DeployGVR()).Namespace(obj.GetNamespace()).Patch(context.TODO(), obj.GetName(), apitypes.MergePatchType, patchData, metav1.PatchOptions{}); err != nil {
 		return err
 	}

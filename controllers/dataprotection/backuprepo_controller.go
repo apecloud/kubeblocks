@@ -647,7 +647,14 @@ func (r *BackupRepoReconciler) preCheckRepo(reconCtx *reconcileContext) (err err
 			jobStatus = batchv1.JobFailed
 			failureReason = "timeout"
 		} else {
-			// wait job to finish
+			// Job and Pod both have activeDeadlineSeconds, but neither of them is suitable for our scenario.
+			// If job.spec.activeDeadlineSeconds is set, when the run times out, the job controller will delete
+			// the running pods directly to stop them; since the pods are deleted, we may not have time to collect
+			// the error logs.
+			// In the meantime, pod.spec.activeDeadlineSeconds may fail in some cases. When the configuration
+			// of a PVC based backup repository is wrong, the PVC provisioning will fail, which makes the pod
+			// get stuck in the "Pending" state, but activeDeadlineSeconds seems to start counting from the
+			// "Running" state, so the pod will not fail due to timeout.
 			return intctrlutil.NewRequeueError(defaultCheckInterval, "wait job to finish")
 		}
 	}

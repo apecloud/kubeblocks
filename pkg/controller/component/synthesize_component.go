@@ -128,11 +128,8 @@ func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	// build serviceAccountName
 	buildServiceAccountName(synthesizeComp)
 
-	// build lifecycleActions
-	buildLifecycleActions(synthesizeComp, compDefObj, comp)
-
 	// build lorryContainer
-	// TODO(xingran): buildLorryContainers relies on synthesizeComp.CharacterType and synthesizeComp.Probes, which will be deprecated in the future.
+	// TODO(xingran): buildLorryContainers relies on synthesizeComp.CharacterType and synthesizeComp.WorkloadType, which will be deprecated in the future.
 	if err := buildLorryContainers(reqCtx, synthesizeComp); err != nil {
 		reqCtx.Log.Error(err, "build probe container failed.")
 		return nil, err
@@ -232,10 +229,6 @@ func buildServiceAccountName(synthesizeComp *SynthesizedComponent) {
 	synthesizeComp.ServiceAccountName = constant.GenerateDefaultCompServiceAccountPattern(synthesizeComp.FullCompName)
 	// set component.PodSpec.ServiceAccountName
 	synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
-}
-
-// buildLifecycleActions builds lifecycleActions for component.
-func buildLifecycleActions(synthesizeComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) {
 }
 
 // buildBackwardCompatibleFields builds backward compatible fields for component which referenced a clusterComponentDefinition and clusterComponentVersion before KubeBlocks Version 0.7.0

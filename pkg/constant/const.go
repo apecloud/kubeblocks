@@ -62,7 +62,6 @@ const (
 const (
 	KBPrefix      = "KB"
 	KBLowerPrefix = "kb"
-	KBHyphen      = "-"
 )
 
 const (
@@ -95,7 +94,6 @@ const (
 	BackupToolTypeLabelKey                   = "kubeblocks.io/backup-tool-type"
 	AddonProviderLabelKey                    = "kubeblocks.io/provider" // AddonProviderLabelKey marks the addon provider
 	RoleLabelKey                             = "kubeblocks.io/role"     // RoleLabelKey consensusSet and replicationSet role label key
-	ModeKey                                  = "kubeblocks.io/mode"     // ModeKey is in enum of standalone/replication/raftGroup
 	VolumeTypeLabelKey                       = "kubeblocks.io/volume-type"
 	ClusterAccountLabelKey                   = "account.kubeblocks.io/name"
 	KBAppComponentLabelKey                   = "apps.kubeblocks.io/component-name"
@@ -111,7 +109,6 @@ const (
 	ClusterDefLabelKey                       = "clusterdefinition.kubeblocks.io/name"
 	ClusterVerLabelKey                       = "clusterversion.kubeblocks.io/name"
 	ComponentDefinitionLabelKey              = "componentdefinition.kubeblocks.io/name"
-	ComponentLabelKey                        = "component.kubeblocks.io/name"
 	CMConfigurationSpecProviderLabelKey      = "config.kubeblocks.io/config-spec"    // CMConfigurationSpecProviderLabelKey is ComponentConfigSpec name
 	CMConfigurationCMKeysLabelKey            = "config.kubeblocks.io/configmap-keys" // CMConfigurationCMKeysLabelKey Specify configmap keys
 	CMConfigurationTemplateNameLabelKey      = "config.kubeblocks.io/config-template-name"

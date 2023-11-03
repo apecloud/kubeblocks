@@ -346,7 +346,7 @@ func (r *ComponentDefinitionReconciler) validateConnectionCredentialAccount(cmpd
 	return fmt.Errorf("there is no matched account for connection credential: %s", cc.Name)
 }
 
-func (r *ComponentDefinitionReconciler) validateReplicaRoles(cli client.Client, rctx intctrlutil.RequestCtx,
+func (r *ComponentDefinitionReconciler) validateReplicaRoles(cli client.Client, reqCtx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
 	if !checkUniqueItem(cmpd.Spec.Roles, "Name") {
 		return fmt.Errorf("duplicate replica roles are not allowed")
@@ -354,12 +354,60 @@ func (r *ComponentDefinitionReconciler) validateReplicaRoles(cli client.Client, 
 	return nil
 }
 
-func (r *ComponentDefinitionReconciler) validateLifecycleActions(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
+func (r *ComponentDefinitionReconciler) validateLifecycleActions(cli client.Client, reqCtx intctrlutil.RequestCtx, cmpd *appsv1alpha1.ComponentDefinition) error {
+	if err := r.validateLifecycleActionBuiltInHandlers(cmpd.Spec.LifecycleActions); err != nil {
+		return err
+	}
 	return nil
 }
 
-func (r *ComponentDefinitionReconciler) validateComponentDefRef(cli client.Client, rctx intctrlutil.RequestCtx,
+func (r *ComponentDefinitionReconciler) validateLifecycleActionBuiltInHandlers(lifecycleActions *appsv1alpha1.ComponentLifecycleActions) error {
+	if lifecycleActions == nil {
+		return nil
+	}
+
+	builtInHandlerMap := make(map[string]bool)
+	supportedBuiltInHandlers := constant.GetSupportBuiltInHandlers()
+
+	if lifecycleActions.RoleProbe != nil && lifecycleActions.RoleProbe.BuiltinHandler != nil {
+		if !slices.Contains(supportedBuiltInHandlers, constant.BuiltInHandlerType(*lifecycleActions.RoleProbe.BuiltinHandler)) {
+			return fmt.Errorf("the builtin handler %s is not supported", *lifecycleActions.RoleProbe.BuiltinHandler)
+		}
+		builtInHandlerMap[*lifecycleActions.RoleProbe.BuiltinHandler] = true
+	}
+
+	actions := []struct {
+		LifeCycleActionHandlers *appsv1alpha1.LifecycleActionHandler
+	}{
+		{lifecycleActions.PostStart},
+		{lifecycleActions.PreStop},
+		{lifecycleActions.MemberJoin},
+		{lifecycleActions.MemberLeave},
+		{lifecycleActions.Readonly},
+		{lifecycleActions.Readwrite},
+		{lifecycleActions.DataPopulate},
+		{lifecycleActions.DataAssemble},
+		{lifecycleActions.Reconfigure},
+		{lifecycleActions.AccountProvision},
+	}
+
+	for _, action := range actions {
+		if action.LifeCycleActionHandlers != nil && action.LifeCycleActionHandlers.BuiltinHandler != nil {
+			if !slices.Contains(supportedBuiltInHandlers, constant.BuiltInHandlerType(*lifecycleActions.RoleProbe.BuiltinHandler)) {
+				return fmt.Errorf("the builtin handler %s is not supported", *lifecycleActions.RoleProbe.BuiltinHandler)
+			}
+			builtInHandlerMap[*lifecycleActions.RoleProbe.BuiltinHandler] = true
+		}
+	}
+
+	if len(builtInHandlerMap) > 1 {
+		return fmt.Errorf("the builtin handler within the same lifecycle actions should be consistent")
+	}
+
+	return nil
+}
+
+func (r *ComponentDefinitionReconciler) validateComponentDefRef(cli client.Client, reqCtx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
 	return nil
 }

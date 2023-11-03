@@ -43,3 +43,18 @@ const (
 	ETCDCharacterType       = "etcd"
 	PolarDBXCharacterType   = "polardbx"
 )
+
+// GetSupportBuiltInHandlers get support all built-in handlers by lorry
+func GetSupportBuiltInHandlers() []BuiltInHandlerType {
+	return []BuiltInHandlerType{
+		MySQLBuiltInHandlerName,
+		WeSQLBuiltInHandlerName,
+		RedisBuiltInHandlerName,
+		MongoDBBuiltInHandlerName,
+		ETCDBuiltInHandlerName,
+		PostgresqlBuiltInHandlerName,
+		OfficialPostgresqlBuiltInHandlerName,
+		ApeCloudPostgresqlBuiltInHandlerName,
+		PolarDBXBuiltInHandlerName,
+	}
+}

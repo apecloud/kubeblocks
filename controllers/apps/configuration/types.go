@@ -52,7 +52,7 @@ func GetConsensusRollingUpgradeFuncs() RollingUpgradeFuncs {
 		GetPodsFunc:          getConsensusPods,
 		RestartContainerFunc: commonStopContainerWithPod,
 		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
-		RestartComponent:     restartStatefulComponent,
+		RestartComponent:     restartComponent,
 	}
 }
 
@@ -61,7 +61,7 @@ func GetStatefulSetRollingUpgradeFuncs() RollingUpgradeFuncs {
 		GetPodsFunc:          getStatefulSetPods,
 		RestartContainerFunc: commonStopContainerWithPod,
 		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
-		RestartComponent:     restartStatefulComponent,
+		RestartComponent:     restartComponent,
 	}
 }
 
@@ -70,7 +70,7 @@ func GetReplicationRollingUpgradeFuncs() RollingUpgradeFuncs {
 		GetPodsFunc:          getReplicationSetPods,
 		RestartContainerFunc: commonStopContainerWithPod,
 		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
-		RestartComponent:     restartStatefulComponent,
+		RestartComponent:     restartComponent,
 	}
 }
 
@@ -79,6 +79,6 @@ func GetDeploymentRollingUpgradeFuncs() RollingUpgradeFuncs {
 		GetPodsFunc:          getDeploymentRollingPods,
 		RestartContainerFunc: commonStopContainerWithPod,
 		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
-		RestartComponent:     restartStatelessComponent,
+		RestartComponent:     restartComponent,
 	}
 }

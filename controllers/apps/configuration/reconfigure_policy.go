@@ -271,18 +271,20 @@ func makeReturnedStatus(status ExecStatus, ops ...func(status *ReturnedStatus)) 
 	return ret
 }
 
-func fromDeploymentObjects(units []appsv1.Deployment) []client.Object {
-	r := make([]client.Object, len(units))
-	for i, unit := range units {
-		r[i] = &unit
+func fromWorkloadObjects(params reconfigureParams) []client.Object {
+	r := make([]client.Object, 0)
+	for _, unit := range params.RSMList {
+		r = append(r, &unit)
 	}
-	return r
-}
-
-func fromStatefulSetObjects(units []appsv1.StatefulSet) []client.Object {
-	r := make([]client.Object, len(units))
-	for i, unit := range units {
-		r[i] = &unit
+	// migrated workload
+	if len(r) != 0 {
+		return r
+	}
+	for _, unit := range params.ComponentUnits {
+		r = append(r, &unit)
+	}
+	for _, unit := range params.DeploymentUnits {
+		r = append(r, &unit)
 	}
 	return r
 }

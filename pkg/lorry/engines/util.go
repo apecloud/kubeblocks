@@ -21,7 +21,6 @@ package engines
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -38,17 +37,6 @@ func MaxInt64(x, y int64) int64 {
 		return x
 	}
 	return y
-}
-
-func GetLorryProc() (*os.Process, error) {
-	// sqlChannel pid is usually 1
-	sqlChannelPid := os.Getppid()
-	sqlChannelProc, err := os.FindProcess(sqlChannelPid)
-	if err != nil {
-		return nil, err
-	}
-
-	return sqlChannelProc, nil
 }
 
 func GetIndex(memberName string) (int, error) {

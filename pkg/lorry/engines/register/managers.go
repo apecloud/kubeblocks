@@ -21,10 +21,10 @@ package register
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/spf13/afero"
 	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -51,8 +51,10 @@ type managerNewFunc func(engines.Properties) (engines.DBManager, error)
 var managerNewFuncs = make(map[string]managerNewFunc)
 
 // Lorry runs with a single database engine instance at a time,
-// so only one dbmanager is initialized and cached here during execution.
+// so only one dbManager is initialized and cached here during execution.
 var dbManager engines.DBManager
+
+var fs = afero.NewOsFs()
 
 func init() {
 	RegisterEngine(models.MySQL, "consensus", wesql.NewManager, mysql.NewCommands)
@@ -69,7 +71,7 @@ func init() {
 	RegisterEngine(models.PulsarBroker, "", nil, pulsar.NewBrokerCommands)
 	RegisterEngine(models.Oceanbase, "", nil, oceanbase.NewCommands)
 
-	// support component definition without workloadtype
+	// support component definition without workloadType
 	RegisterEngine(models.WeSQL, "", wesql.NewManager, mysql.NewCommands)
 	RegisterEngine(models.MySQL, "", mysql.NewManager, mysql.NewCommands)
 	RegisterEngine(models.Redis, "", redis.NewManager, redis.NewCommands)
@@ -187,7 +189,7 @@ func readConfig(filename string) (string, engines.Properties, error) {
 }
 
 func GetAllComponent(dir string) error {
-	files, err := os.ReadDir(dir)
+	files, err := afero.ReadDir(fs, dir)
 	if err != nil {
 		return err
 	}

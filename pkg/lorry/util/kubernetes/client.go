@@ -29,25 +29,25 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
-// GetClientSet returns a kubernetes clientset.
+// GetClientSet returns a kubernetes clientSet.
 func GetClientSet() (*kubernetes.Clientset, error) {
 	restConfig, err := ctlruntime.GetConfig()
 	if err != nil {
-		return nil, errors.Wrap(err, "get kubeconfig failed")
+		return nil, errors.Wrap(err, "get kubeConfig failed")
 	}
-	clientset, err := kubernetes.NewForConfig(restConfig)
+	clientSet, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return clientset, nil
+	return clientSet, nil
 }
 
 // GetRESTClientForKB returns a kubernetes restclient for KubeBlocks types.
 func GetRESTClientForKB() (*rest.RESTClient, error) {
 	restConfig, err := ctlruntime.GetConfig()
 	if err != nil {
-		return nil, errors.Wrap(err, "get kubeconfig failed")
+		return nil, errors.Wrap(err, "get kubeConfig failed")
 	}
 	_ = appsv1alpha1.AddToScheme(clientsetscheme.Scheme)
 	restConfig.GroupVersion = &appsv1alpha1.GroupVersion

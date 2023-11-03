@@ -21,6 +21,7 @@ package apps
 
 import (
 	"encoding/json"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	"strings"
 	"time"
 
@@ -163,7 +164,9 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	delObjs = append(delObjs, toDeleteObjs(nonNamespacedObjs)...)
 
 	for _, o := range delObjs {
-		graphCli.Delete(dag, o)
+		if !rsm.IsOwnedByRsm(o) {
+			graphCli.Delete(dag, o)
+		}
 	}
 	// set cluster action to noop until all the sub-resources deleted
 	if len(delObjs) == 0 {

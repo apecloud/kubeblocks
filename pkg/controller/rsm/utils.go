@@ -22,6 +22,7 @@ package rsm
 import (
 	"context"
 	"fmt"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"regexp"
 	"sort"
 	"strconv"
@@ -727,4 +728,13 @@ func ParseAnnotationsOfScope(scope AnnotationScope, scopedAnnotations map[string
 
 func getEnvConfigMapName(rsmName string) string {
 	return fmt.Sprintf("%s-rsm-env", rsmName)
+}
+
+func IsOwnedByRsm(obj client.Object) bool {
+	for _, ref := range obj.GetOwnerReferences() {
+		if ref.Kind == appsv1alpha1.ReplicatedStateMachineKind && ref.Controller != nil && *ref.Controller == true {
+			return true
+		}
+	}
+	return false
 }

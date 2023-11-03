@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -42,9 +43,12 @@ func mockServer(t *testing.T) *server {
 			return nil, models.ErrNoImplemented
 		}),
 		"fake-4": operations.NewFakeOperations(operations.FakeDo, func(ctx context.Context, request *operations.OpsRequest) (*operations.OpsResponse, error) {
-			return nil, fmt.Errorf("fake do error")
+			return nil, util.NewProbeError("fake probe error")
 		}),
 		"fake-5": operations.NewFakeOperations(operations.FakeDo, func(ctx context.Context, request *operations.OpsRequest) (*operations.OpsResponse, error) {
+			return nil, fmt.Errorf("fake do error")
+		}),
+		"fake-6": operations.NewFakeOperations(operations.FakeDo, func(ctx context.Context, request *operations.OpsRequest) (*operations.OpsResponse, error) {
 			return &operations.OpsResponse{
 				Data: map[string]any{
 					"data": request.Data,
@@ -119,8 +123,18 @@ func TestRouter(t *testing.T) {
 		assert.Equal(t, "operation exec failed: no implemented", response.Message)
 	})
 
-	t.Run("do check failed", func(t *testing.T) {
+	t.Run("do check probe error", func(t *testing.T) {
 		ctx := mockHttpRequest("/v1.0/fake-4", fasthttp.MethodPost, `{"data": "test"}`)
+		fakeRouterHandler(ctx)
+
+		response := parseErrorResponse(t, ctx.Response.Body())
+		assert.Equal(t, fasthttp.StatusUnavailableForLegalReasons, ctx.Response.StatusCode())
+		assert.Equal(t, "ERR_OPERATION_FAILED", response.ErrorCode)
+		assert.Equal(t, "operation exec failed: fake probe error", response.Message)
+	})
+
+	t.Run("do check failed", func(t *testing.T) {
+		ctx := mockHttpRequest("/v1.0/fake-5", fasthttp.MethodPost, `{"data": "test"}`)
 		fakeRouterHandler(ctx)
 
 		response := parseErrorResponse(t, ctx.Response.Body())
@@ -138,7 +152,7 @@ func TestRouter(t *testing.T) {
 	})
 
 	t.Run("return meta data", func(t *testing.T) {
-		ctx := mockHttpRequest("/v1.0/fake-5", fasthttp.MethodPost, `{"data": "test"}`)
+		ctx := mockHttpRequest("/v1.0/fake-6", fasthttp.MethodPost, `{"data": "test"}`)
 		fakeRouterHandler(ctx)
 
 		assert.Equal(t, fasthttp.StatusOK, ctx.Response.StatusCode())

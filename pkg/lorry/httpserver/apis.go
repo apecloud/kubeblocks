@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/valyala/fasthttp"
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
@@ -119,19 +120,19 @@ func OperationWrapper(op operations.Operation) fasthttp.RequestHandler {
 
 		statusCode := fasthttp.StatusOK
 		if err != nil {
-			if _, ok := err.(util.ProbeError); ok {
+			if ok := errors.As(err, &util.ProbeError{}); ok {
 				statusCode = fasthttp.StatusUnavailableForLegalReasons
 			} else {
-				if err == models.ErrNoImplemented {
+				if errors.Is(err, models.ErrNoImplemented) {
 					statusCode = fasthttp.StatusNotImplemented
 				} else {
 					statusCode = fasthttp.StatusInternalServerError
 					logger.Error(err, "operation exec failed")
 				}
-				msg := NewErrorResponse("ERR_OPERATION_FAILED", fmt.Sprintf("operation exec failed: %v", err))
-				respond(reqCtx, withError(statusCode, msg))
-				return
 			}
+			msg := NewErrorResponse("ERR_OPERATION_FAILED", fmt.Sprintf("operation exec failed: %v", err))
+			respond(reqCtx, withError(statusCode, msg))
+			return
 		}
 
 		if resp == nil {

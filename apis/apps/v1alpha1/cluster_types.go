@@ -177,6 +177,63 @@ type ClusterStorage struct {
 	Size resource.Quantity `json:"size,omitempty"`
 }
 
+type ResourceMeta struct {
+	// name is the name of the referenced the Configmap/Secret object.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// mountPath is the path at which to mount the volume.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=256
+	// +kubebuilder:validation:Pattern:=`^/[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	MountPoint string `json:"mountPoint"`
+
+	// subPath is a relative file path within the volume to mount.
+	// +optional
+	SubPath string `json:"subPath,omitempty"`
+
+	// asVolumeFrom defines the list of containers where volumeMounts will be injected into.
+	// +listType=set
+	// +optional
+	AsVolumeFrom []string `json:"asVolumeFrom,omitempty"`
+}
+
+type SecretRef struct {
+	ResourceMeta `json:",inline"`
+
+	// secret defines the secret volume source.
+	// +kubebuilder:validation:Required
+	Secret corev1.SecretVolumeSource `json:"secret"`
+}
+
+type ConfigMapRef struct {
+	ResourceMeta `json:",inline"`
+
+	// configMap defines the configmap volume source.
+	// +kubebuilder:validation:Required
+	ConfigMap corev1.ConfigMapVolumeSource `json:"configMap"`
+}
+
+type UserResourceRefs struct {
+	// secretRefs defines the user-defined secrets.
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	SecretRefs []SecretRef `json:"secretRefs,omitempty"`
+
+	// configMapRefs defines the user-defined configmaps.
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	ConfigMapRefs []ConfigMapRef `json:"configMapRefs,omitempty"`
+}
+
 // ClusterStatus defines the observed state of Cluster.
 type ClusterStatus struct {
 	// observedGeneration is the most recent generation observed for this
@@ -312,6 +369,10 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:default=false
 	// +optional
 	NoCreatePDB bool `json:"noCreatePDB,omitempty"`
+
+	// userResourceRefs defines the user-defined volumes.
+	// +optional
+	UserResourceRefs *UserResourceRefs `json:"userResourceRefs,omitempty"`
 }
 
 // GetMinAvailable wraps the 'prefer' value return. As for component replicaCount <= 1, it will return 0,

@@ -82,6 +82,7 @@ var _ = BeforeSuite(func() {
 
 	ctx, cancel = context.WithCancel(context.TODO())
 
+	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks:latest")
 	fmt.Printf("config settings: %v\n", viper.AllSettings())
 
@@ -175,9 +176,10 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&BackupRepoReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("backup-repo-controller"),
+		Client:     k8sManager.GetClient(),
+		Scheme:     k8sManager.GetScheme(),
+		Recorder:   k8sManager.GetEventRecorderFor("backup-repo-controller"),
+		RestConfig: k8sManager.GetConfig(),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

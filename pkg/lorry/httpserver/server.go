@@ -20,13 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package httpserver
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"time"
 
-	"github.com/fasthttp/router"
-	"github.com/pkg/errors"
+	fasthttprouter "github.com/fasthttp/router"
 	"github.com/valyala/fasthttp"
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
@@ -84,7 +84,7 @@ func (s *server) StartNonBlocking() error {
 	}
 
 	if len(listeners) == 0 {
-		return errors.Errorf("could not listen on any endpoint")
+		return errors.New("could not listen on any endpoint")
 	}
 
 	for _, listener := range listeners {
@@ -128,8 +128,8 @@ func (s *server) Router() fasthttp.RequestHandler {
 	return router.Handler
 }
 
-func (s *server) getRouter(endpoints []Endpoint) *router.Router {
-	router := router.New()
+func (s *server) getRouter(endpoints []Endpoint) *fasthttprouter.Router {
+	router := fasthttprouter.New()
 	for _, e := range endpoints {
 		path := fmt.Sprintf("/%s/%s", e.Version, e.Route)
 		router.Handle(e.Method, path, e.Handler)
@@ -144,14 +144,15 @@ func (s *server) getRouter(endpoints []Endpoint) *router.Router {
 }
 
 func (s *server) Close() error {
-	var merr error
+	errs := make([]error, len(s.servers))
 
-	for _, ln := range s.servers {
+	for i, ln := range s.servers {
 		// This calls `Close()` on the underlying listener.
 		if err := ln.Shutdown(); err != nil {
 			logger.Error(err, "server close failed")
+			errs[i] = err
 		}
 	}
 
-	return merr
+	return errors.Join()
 }

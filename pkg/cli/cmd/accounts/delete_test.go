@@ -35,7 +35,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/cli/testing"
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
-	lorryutil "github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 var _ = Describe("Delete Account Options", func() {
@@ -86,7 +85,6 @@ var _ = Describe("Delete Account Options", func() {
 			o := NewDeleteUserOptions(tf, streams)
 			Expect(o).ShouldNot(BeNil())
 			Expect(o.AccountBaseOptions).ShouldNot(BeNil())
-			Expect(o.AccountBaseOptions.AccountOp).Should(Equal(lorryutil.DeleteUserOp))
 		})
 
 		It("validate user name and password", func() {
@@ -118,8 +116,6 @@ var _ = Describe("Delete Account Options", func() {
 			o.userName = "lily"
 
 			Expect(o.Complete(tf)).Should(Succeed())
-			Expect(o.RequestMeta).ShouldNot(BeNil())
-			Expect(o.RequestMeta).Should(HaveLen(1))
 		})
 	})
 })

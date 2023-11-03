@@ -21,7 +21,6 @@ package accounts
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -60,10 +59,9 @@ var (
 	errClusterNameorInstName = fmt.Errorf("specify either cluster name or --instance")
 )
 
-func NewAccountBaseOptions(f cmdutil.Factory, streams genericiooptions.IOStreams, op lorryutil.OperationKind) *AccountBaseOptions {
+func NewAccountBaseOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *AccountBaseOptions {
 	return &AccountBaseOptions{
 		ExecOptions: exec.NewExecOptions(f, streams),
-		AccountOp:   op,
 	}
 }
 
@@ -170,7 +168,7 @@ func (o *AccountBaseOptions) Run(cmd *cobra.Command, f cmdutil.Factory, streams 
 		}
 		err = nil
 	case lorryutil.DescribeUserOp:
-		err = o.printRoleInfo(response)
+		//err = o.printRoleInfo(response)
 	case lorryutil.ListUsersOp:
 		//err = o.printUserInfo(response)
 	default:
@@ -233,22 +231,10 @@ func (o *AccountBaseOptions) printUserInfo(users []map[string]any) error {
 	return nil
 }
 
-func (o *AccountBaseOptions) printRoleInfo(response lorryutil.SQLChannelResponse) error {
-	if response.Event == lorryutil.RespEveFail {
-		//o.printGeneralInfo(response)
-		return nil
-	}
-
-	// decode role info from metadata
-	users := []lorryutil.UserInfo{}
-	err := json.Unmarshal([]byte(response.Message), &users)
-	if err != nil {
-		return err
-	}
-
+func (o *AccountBaseOptions) printRoleInfo(users []map[string]any) error {
 	tblPrinter := o.newTblPrinterWithStyle("USER INFO", []interface{}{"USERNAME", "ROLE"})
 	for _, user := range users {
-		tblPrinter.AddRow(user.UserName, user.RoleName)
+		tblPrinter.AddRow(user["userName"], user["roleName"])
 	}
 	tblPrinter.Print()
 	return nil

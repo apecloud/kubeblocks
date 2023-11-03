@@ -30,7 +30,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/cli/util/prompt"
 	"github.com/apecloud/kubeblocks/pkg/lorry/client"
-	lorryutil "github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type DeleteUserOptions struct {
@@ -41,7 +40,7 @@ type DeleteUserOptions struct {
 
 func NewDeleteUserOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *DeleteUserOptions {
 	return &DeleteUserOptions{
-		AccountBaseOptions: NewAccountBaseOptions(f, streams, lorryutil.DeleteUserOp),
+		AccountBaseOptions: NewAccountBaseOptions(f, streams),
 	}
 }
 

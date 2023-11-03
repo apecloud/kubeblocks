@@ -29,7 +29,6 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/client"
-	lorryutil "github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type DescribeUserOptions struct {
@@ -39,7 +38,7 @@ type DescribeUserOptions struct {
 
 func NewDescribeUserOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *DescribeUserOptions {
 	return &DescribeUserOptions{
-		AccountBaseOptions: NewAccountBaseOptions(f, streams, lorryutil.DescribeUserOp),
+		AccountBaseOptions: NewAccountBaseOptions(f, streams),
 	}
 }
 
@@ -79,6 +78,6 @@ func (o *DescribeUserOptions) Run(cmd *cobra.Command, f cmdutil.Factory, streams
 		o.printGeneralInfo("fail", err.Error())
 		return err
 	}
-	o.printUserInfo([]map[string]any{user})
+	o.printRoleInfo([]map[string]any{user})
 	return nil
 }

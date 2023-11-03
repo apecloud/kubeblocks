@@ -28,7 +28,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/accounts"
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
 	"github.com/apecloud/kubeblocks/pkg/cli/util"
-	lorryutil "github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 var (
@@ -159,7 +158,7 @@ func NewListAccountsCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *
 }
 
 func NewGrantOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
-	o := accounts.NewGrantOptions(f, streams, lorryutil.GrantUserRoleOp)
+	o := accounts.NewGrantOptions(f, streams)
 
 	cmd := &cobra.Command{
 		Use:               "grant-role",
@@ -178,7 +177,7 @@ func NewGrantOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *cob
 }
 
 func NewRevokeOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
-	o := accounts.NewGrantOptions(f, streams, lorryutil.RevokeUserRoleOp)
+	o := accounts.NewRevokeOptions(f, streams)
 
 	cmd := &cobra.Command{
 		Use:               "revoke-role",

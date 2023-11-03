@@ -23,7 +23,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -31,6 +30,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
+	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 func mockServer(t *testing.T) *server {

@@ -129,10 +129,10 @@ func OperationWrapper(op operations.Operation) fasthttp.RequestHandler {
 					statusCode = fasthttp.StatusInternalServerError
 					logger.Error(err, "operation exec failed")
 				}
+				msg := NewErrorResponse("ERR_OPERATION_FAILED", fmt.Sprintf("operation exec failed: %v", err))
+				respond(reqCtx, withError(statusCode, msg))
+				return
 			}
-			msg := NewErrorResponse("ERR_OPERATION_FAILED", fmt.Sprintf("operation exec failed: %v", err))
-			respond(reqCtx, withError(statusCode, msg))
-			return
 		}
 
 		if resp == nil {

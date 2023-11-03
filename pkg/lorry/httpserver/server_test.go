@@ -127,10 +127,8 @@ func TestRouter(t *testing.T) {
 		ctx := mockHttpRequest("/v1.0/fake-4", fasthttp.MethodPost, `{"data": "test"}`)
 		fakeRouterHandler(ctx)
 
-		response := parseErrorResponse(t, ctx.Response.Body())
-		assert.Equal(t, fasthttp.StatusUnavailableForLegalReasons, ctx.Response.StatusCode())
-		assert.Equal(t, "ERR_OPERATION_FAILED", response.ErrorCode)
-		assert.Equal(t, "operation exec failed: fake probe error", response.Message)
+		assert.Equal(t, fasthttp.StatusNoContent, ctx.Response.StatusCode())
+		assert.Empty(t, ctx.Response.Body())
 	})
 
 	t.Run("do check failed", func(t *testing.T) {
@@ -141,14 +139,6 @@ func TestRouter(t *testing.T) {
 		assert.Equal(t, fasthttp.StatusInternalServerError, ctx.Response.StatusCode())
 		assert.Equal(t, "ERR_OPERATION_FAILED", response.ErrorCode)
 		assert.Equal(t, "operation exec failed: fake do error", response.Message)
-	})
-
-	t.Run("return empty data", func(t *testing.T) {
-		ctx := mockHttpRequest("/v1.0/fake-1", fasthttp.MethodPost, `{"data": "test"}`)
-		fakeRouterHandler(ctx)
-
-		assert.Equal(t, fasthttp.StatusNoContent, ctx.Response.StatusCode())
-		assert.Empty(t, ctx.Response.Body())
 	})
 
 	t.Run("return meta data", func(t *testing.T) {

@@ -514,21 +514,33 @@ func (u *upgradeHandlerTo7) transformStatefulSet(dynamic dynamic.Interface, obj 
 
 func (u *upgradeHandlerTo7) transformDeployment(dynamic dynamic.Interface, obj unstructured.Unstructured) error {
 	labels := obj.GetLabels()
-	if labels == nil {
+	if labels == nil || labels[constant.AppManagedByLabelKey] != constant.AppName {
 		return nil
 	}
 
 	// delete deployment
+	patchData, _ := json.Marshal(map[string]interface{}{"finalizers": nil})
+	if _, err := dynamic.Resource(types.DeployGVR()).Namespace(obj.GetNamespace()).Patch(context.TODO(), obj.GetName(), apitypes.MergePatchType, patchData, metav1.PatchOptions{}); err != nil {
+		return err
+	}
 	if err := dynamic.Resource(types.DeployGVR()).Namespace(obj.GetNamespace()).Delete(context.TODO(), obj.GetName(), metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 	// delete env cm
-	if err := dynamic.Resource(types.ConfigmapGVR()).Namespace(obj.GetNamespace()).Delete(context.TODO(), fmt.Sprintf("%s-%s", obj.GetName(), "env"), metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+	envCMName := fmt.Sprintf("%s-%s", obj.GetName(), "env")
+	if _, err := dynamic.Resource(types.ConfigmapGVR()).Namespace(obj.GetNamespace()).Patch(context.TODO(), envCMName, apitypes.MergePatchType, patchData, metav1.PatchOptions{}); err != nil {
+		return err
+	}
+	if err := dynamic.Resource(types.ConfigmapGVR()).Namespace(obj.GetNamespace()).Delete(context.TODO(), envCMName, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 	// delete config cm
 	if compName, ok := labels[constant.KBAppComponentLabelKey]; ok {
-		err := dynamic.Resource(types.ConfigmapGVR()).Namespace(obj.GetNamespace()).Delete(context.TODO(), fmt.Sprintf("%s-%s-%s", obj.GetName(), compName, "config"), metav1.DeleteOptions{})
+		configCMName := fmt.Sprintf("%s-%s-%s", obj.GetName(), compName, "config")
+		if _, err := dynamic.Resource(types.ConfigmapGVR()).Namespace(obj.GetNamespace()).Patch(context.TODO(), configCMName, apitypes.MergePatchType, patchData, metav1.PatchOptions{}); err != nil {
+			return err
+		}
+		err := dynamic.Resource(types.ConfigmapGVR()).Namespace(obj.GetNamespace()).Delete(context.TODO(), configCMName, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -541,7 +553,6 @@ func (u *upgradeHandlerTo7) transformDeployment(dynamic dynamic.Interface, obj u
 		}
 		status := clusterObj.Object["status"].(map[string]interface{})
 		status["observedGeneration"] = 0
-		clusterObj.Object["status"] = status
 		if _, err = dynamic.Resource(types.ClusterGVR()).Namespace(obj.GetNamespace()).UpdateStatus(context.TODO(), clusterObj, metav1.UpdateOptions{}); err != nil {
 			return err
 		}

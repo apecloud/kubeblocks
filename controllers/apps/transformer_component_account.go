@@ -21,17 +21,16 @@ package apps
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -52,18 +51,40 @@ func (t *componentAccountTransformer) Transform(ctx graph.TransformContext, dag 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
 	for _, account := range synthesizeComp.SystemAccounts {
-		secret, err := t.buildSystemAccount(ctx, synthesizeComp, account)
+		exist, err := t.checkAccountSecretExist(ctx, synthesizeComp, account)
 		if err != nil {
 			return err
 		}
-		if err = t.createOrUpdate(ctx, dag, graphCli, secret); err != nil {
+		if exist {
+			continue
+		}
+		secret, err := t.buildAccountSecret(ctx, synthesizeComp, account)
+		if err != nil {
 			return err
 		}
+		graphCli.Create(dag, secret)
 	}
 	return nil
 }
 
-func (t *componentAccountTransformer) buildSystemAccount(ctx graph.TransformContext,
+func (t *componentAccountTransformer) checkAccountSecretExist(ctx graph.TransformContext,
+	synthesizeComp *component.SynthesizedComponent, account appsv1alpha1.ComponentSystemAccount) (bool, error) {
+	secretKey := types.NamespacedName{
+		Namespace: synthesizeComp.Namespace,
+		Name:      constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, account.Name),
+	}
+	err := ctx.GetClient().Get(ctx.GetContext(), secretKey, &corev1.Secret{})
+	switch {
+	case err == nil:
+		return true, nil
+	case apierrors.IsNotFound(err):
+		return false, nil
+	default:
+		return false, err
+	}
+}
+
+func (t *componentAccountTransformer) buildAccountSecret(ctx graph.TransformContext,
 	synthesizeComp *component.SynthesizedComponent, account appsv1alpha1.ComponentSystemAccount) (*corev1.Secret, error) {
 	var password []byte
 	if account.SecretRef != nil {
@@ -74,18 +95,7 @@ func (t *componentAccountTransformer) buildSystemAccount(ctx graph.TransformCont
 	} else {
 		password = t.generatePassword(account)
 	}
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: synthesizeComp.Namespace,
-			Name:      constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, account.Name),
-			Labels:    constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name),
-		},
-		Data: map[string][]byte{
-			constant.AccountNameForSecret:   []byte(account.Name),
-			constant.AccountPasswdForSecret: password,
-		},
-	}
-	return secret, nil
+	return t.buildAccountSecretWithPassword(synthesizeComp, account, password), nil
 }
 
 func (t *componentAccountTransformer) getPasswordFromSecret(ctx graph.TransformContext, account appsv1alpha1.ComponentSystemAccount) ([]byte, error) {
@@ -115,27 +125,14 @@ func (t *componentAccountTransformer) generatePassword(account appsv1alpha1.Comp
 	return []byte(passwd)
 }
 
-func (t *componentAccountTransformer) createOrUpdate(ctx graph.TransformContext,
-	dag *graph.DAG, graphCli model.GraphClient, secret *corev1.Secret) error {
-	key := types.NamespacedName{
-		Namespace: secret.Namespace,
-		Name:      secret.Name,
-	}
-	obj := &corev1.Secret{}
-	if err := ctx.GetClient().Get(ctx.GetContext(), key, obj); err != nil {
-		if apierrors.IsNotFound(err) {
-			graphCli.Create(dag, secret)
-			return nil
-		}
-		return err
-	}
-	objCopy := obj.DeepCopy()
-	objCopy.Immutable = secret.Immutable
-	objCopy.Data = secret.Data
-	objCopy.StringData = secret.StringData
-	objCopy.Type = secret.Type
-	if !reflect.DeepEqual(obj, objCopy) {
-		graphCli.Update(dag, obj, objCopy)
-	}
-	return nil
+func (t *componentAccountTransformer) buildAccountSecretWithPassword(synthesizeComp *component.SynthesizedComponent,
+	account appsv1alpha1.ComponentSystemAccount, password []byte) *corev1.Secret {
+	secretName := constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, account.Name)
+	labels := constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
+	return builder.NewSecretBuilder(synthesizeComp.Namespace, secretName).
+		AddLabelsInMap(labels).
+		PutData(constant.AccountNameForSecret, []byte(account.Name)).
+		PutData(constant.AccountPasswdForSecret, password).
+		SetImmutable(true).
+		GetObject()
 }

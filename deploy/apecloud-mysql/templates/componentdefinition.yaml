@@ -1,14 +1,14 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ComponentDefinition
 metadata:
-  name: {{ .Chart.name }}-{{ .Chart.version }}
+  name: apecloud-mysql-0.7.0
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
   provider: kubeblocks.io
-  description: {{ .Chart.description }}
+  description: ApeCloud MySQL is a database that is compatible with MySQL syntax and achieves high availability through the utilization of the RAFT consensus protocol.
   serviceKind: mysql
-  serviceVersion: {{ .Chart.appVersion }}
+  serviceVersion: 8.0.30
   runtime:
     containers:
       - name: mysql
@@ -33,7 +33,7 @@ spec:
                 key: password
                 optional: false
           - name: MYSQL_DATABASE
-            value: {{ - if .Values.auth.createDatabase }} {{ .Values.auth.database | quote }}  {{ - else }} "" {{ - end }}
+            value: {{- if .Values.auth.createDatabase }} {{ .Values.auth.database | quote }}  {{- else }} "" {{- end }}
           - name: MYSQL_USER
             value: {{ .Values.auth.username | default "" | quote }}
           - name: MYSQL_PASSWORD
@@ -98,11 +98,11 @@ spec:
             mountPath: /opt/agamotto
           - name: data
             mountPath: {{ .Values.mysqlConfigs.dataMountPath }}
-          {{ - if .Values.logCollector.enabled }}
+          {{- if .Values.logCollector.enabled }}
           - name: log-data
             mountPath: /var/log/kubeblocks
             readOnly: false
-          {{ - end }}
+          {{- end }}
           - name: scripts
             mountPath: /scripts
         ports:
@@ -112,12 +112,12 @@ spec:
           runAsNonRoot: false
           runAsUser: 0
     volumes:
-      {{ - if .Values.logCollector.enabled }}
+      {{- if .Values.logCollector.enabled }}
       - name: log-data
         hostPath:
           path: /var/log/kubeblocks
           type: DirectoryOrCreate
-      {{ - end }}
+      {{- end }}
       - name: annotations
         downwardAPI:
           items:
@@ -156,12 +156,12 @@ spec:
       templateRef: vttablet-config-template
       constraintRef: mysql-scale-vttablet-config-constraints
       volumeName: mysql-scale-config
-      namespace: { { .Release.Namespace } }
+      namespace: {{ .Release.Namespace }}
   logConfigs:
-    {{ - range $name,$pattern := .Values.logConfigs }}
+    {{- range $name,$pattern := .Values.logConfigs }}
     - name: {{ $name }}
       filePathPattern: {{ $pattern }}
-    {{ - end }}
+    {{- end }}
   monitor:
     builtIn: false
     exporterConfig:

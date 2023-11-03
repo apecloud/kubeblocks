@@ -110,6 +110,7 @@ const (
 	KindBackupSchedule                  = "BackupSchedule"
 	KindBackupPolicyTemplate            = "BackupPolicyTemplate"
 	KindStatefulSet                     = "StatefulSet"
+	KindDeployment                      = "Deployment"
 	KindRSM                             = "ReplicatedStateMachine"
 	KindConfigMap                       = "ConfigMap"
 )

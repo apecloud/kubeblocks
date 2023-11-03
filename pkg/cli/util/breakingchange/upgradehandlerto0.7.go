@@ -67,6 +67,11 @@ func (u *upgradeHandlerTo7) snapshot(dynamic dynamic.Interface) (map[string][]un
 		return nil, err
 	}
 
+	// get deployment objs
+	if err := fillResourcesMap(dynamic, resourcesMap, types.DeployGVR(), metav1.ListOptions{}); err != nil {
+		return nil, err
+	}
+
 	// get configmap objs for pulsar
 	if err := fillResourcesMap(dynamic, resourcesMap, types.ConfigmapGVR(), metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", constant.CMTemplateNameLabelKey, brokerEnvTPL),
@@ -98,6 +103,10 @@ func (u *upgradeHandlerTo7) transform(dynamic dynamic.Interface, resourcesMap ma
 				}
 			case types.KindStatefulSet:
 				if err := u.transformStatefulSet(dynamic, obj); err != nil {
+					return err
+				}
+			case types.KindDeployment:
+				if err := u.transformDeployment(dynamic, obj); err != nil {
 					return err
 				}
 			case types.KindConfigMap:
@@ -499,6 +508,43 @@ func (u *upgradeHandlerTo7) transformStatefulSet(dynamic dynamic.Interface, obj 
 		&unstructured.Unstructured{Object: unstructuredMap}, metav1.CreateOptions{})
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return fmt.Errorf("create rsm %s failed: %s", rsm.Name, err.Error())
+	}
+	return nil
+}
+
+func (u *upgradeHandlerTo7) transformDeployment(dynamic dynamic.Interface, obj unstructured.Unstructured) error {
+	labels := obj.GetLabels()
+	if labels == nil {
+		return nil
+	}
+
+	// delete deployment
+	if err := dynamic.Resource(types.DeployGVR()).Namespace(obj.GetNamespace()).Delete(context.TODO(), obj.GetName(), metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	// delete env cm
+	if err := dynamic.Resource(types.ConfigmapGVR()).Namespace(obj.GetNamespace()).Delete(context.TODO(), fmt.Sprintf("%s-%s", obj.GetName(), "env"), metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	// delete config cm
+	if compName, ok := labels[constant.KBAppComponentLabelKey]; ok {
+		err := dynamic.Resource(types.ConfigmapGVR()).Namespace(obj.GetNamespace()).Delete(context.TODO(), fmt.Sprintf("%s-%s-%s", obj.GetName(), compName, "config"), metav1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+	// update cluster status observedGeneration to 0 to trigger component owned objects regeneration.
+	if clusterName, ok := labels[constant.AppInstanceLabelKey]; ok {
+		clusterObj, err := dynamic.Resource(types.ClusterGVR()).Namespace(obj.GetNamespace()).Get(context.TODO(), clusterName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		status := clusterObj.Object["status"].(map[string]interface{})
+		status["observedGeneration"] = 0
+		clusterObj.Object["status"] = status
+		if _, err = dynamic.Resource(types.ClusterGVR()).Namespace(obj.GetNamespace()).UpdateStatus(context.TODO(), clusterObj, metav1.UpdateOptions{}); err != nil {
+			return err
+		}
 	}
 	return nil
 }

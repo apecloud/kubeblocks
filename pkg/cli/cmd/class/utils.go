@@ -55,7 +55,7 @@ func GetResourceConstraints(dynamic dynamic.Interface) (map[string]*v1alpha1.Com
 	result := make(map[string]*v1alpha1.ComponentResourceConstraint)
 	for idx := range constraintsList.Items {
 		cf := constraintsList.Items[idx]
-		if _, ok := cf.GetLabels()[types.ResourceConstraintProviderLabelKey]; !ok {
+		if _, ok := cf.GetLabels()[constant.ResourceConstraintProviderLabelKey]; !ok {
 			continue
 		}
 		result[cf.GetName()] = &cf

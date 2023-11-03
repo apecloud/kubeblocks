@@ -125,6 +125,7 @@ all: manager dataprotection kbcli lorry reloader ## Make all cmd binaries.
 manifests: test-go-generate controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./cmd/manager/...;./apis/...;./controllers/..." output:crd:artifacts:config=config/crd/bases
 	@$(MAKE) label-crds --no-print-directory
+	@mkdir -p $(CHART_PATH)/crds
 	@cp config/crd/bases/* $(CHART_PATH)/crds
 	@cp config/rbac/role.yaml $(CHART_PATH)/config/rbac/role.yaml
 	$(MAKE) client-sdk-gen
@@ -788,7 +789,7 @@ test-e2e-local: generate-cluster-role install-s3-csi-driver render-smoke-testdat
 
 .PHONY: generate-cluster-role
 generate-cluster-role:
-	$(HELM) template -s templates/rbac/cluster_pod_required_role.yaml deploy/helm | kubectl apply -f -
+	$(HELM) template -s templates/rbac/cluster_pod_required_role.yaml $(CHART_PATH) | kubectl apply -f -
 
 .PHONY: install-s3-csi-driver
 install-s3-csi-driver:

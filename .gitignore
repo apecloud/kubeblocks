@@ -66,3 +66,8 @@ deploy/**/charts
 
 # cli embed chart directory
 pkg/cli/cluster/charts/
+
+# generated code and CRDs by controller-gen
+**/zz_generated.deepcopy.go
+config/crd/bases/*
+deploy/helm/crds/*

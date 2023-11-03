@@ -702,9 +702,12 @@ func (r *componentStatusHandler) updateClusterMembersStatus() {
 }
 
 // updatePrimaryIndex updates the primary pod index to the pod annotations.
-// TODO: remove the dependency of the component's workload type.
+// TODO: the need to update primary info is because some database engines currently require external specification of the primary node.
+// Based on the specified primary node, the primary-secondary relationship can be established during startup. Examples of such engines include primary-secondary Redis.
+// In the future, there is a need for a better design to replace this kind of workaround.
 func (r *componentStatusHandler) updatePrimaryIndex() error {
-	if r.synthesizeComp.WorkloadType != appsv1alpha1.Replication {
+	// TODO(xingran): consider if there are alternative ways to determine whether it is necessary to specify primary info in the Controller
+	if r.synthesizeComp.RoleArbitrator == nil || *r.synthesizeComp.RoleArbitrator != appsv1alpha1.KubeBlocksRoleArbitrator {
 		return nil
 	}
 	podList, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name))
@@ -752,7 +755,7 @@ func (r *componentStatusHandler) updatePrimaryIndex() error {
 		if !ok || pi != primaryPodName {
 			origPod := pod.DeepCopy()
 			pod.Annotations[constant.PrimaryAnnotationKey] = primaryPodName
-			graphCli.Patch(r.dag, origPod, pod)
+			graphCli.Do(r.dag, origPod, pod, model.ActionUpdatePtr(), nil)
 		}
 	}
 	return nil

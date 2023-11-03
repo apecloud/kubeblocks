@@ -341,8 +341,9 @@ type ConnectionCredential struct {
 type ComponentRoleArbitrator string
 
 const (
-	External ComponentRoleArbitrator = "External"
-	Lorry    ComponentRoleArbitrator = "Lorry"
+	ExternalRoleArbitrator   ComponentRoleArbitrator = "External"
+	KubeBlocksRoleArbitrator ComponentRoleArbitrator = "KubeBlocks"
+	LorryRoleArbitrator      ComponentRoleArbitrator = "Lorry"
 )
 
 // ComponentReplicaRole represents a role that can be assumed by a component instance.

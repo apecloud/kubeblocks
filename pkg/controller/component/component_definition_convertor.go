@@ -418,6 +418,14 @@ func (c *compDefRolesConvertor) convertConsensusRole(clusterCompDef *appsv1alpha
 type compDefRoleArbitratorConvertor struct{}
 
 func (c *compDefRoleArbitratorConvertor) convert(args ...any) (any, error) {
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+
+	// TODO(xingran): it is hacky, should be refactored
+	if clusterCompDef.WorkloadType == appsv1alpha1.Replication && clusterCompDef.CharacterType == constant.RedisCharacterType {
+		roleArbitrator := appsv1alpha1.KubeBlocksRoleArbitrator
+		return &roleArbitrator, nil
+	}
+
 	return nil, nil
 }
 

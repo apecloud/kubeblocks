@@ -32,9 +32,9 @@ import (
 	"k8s.io/client-go/dynamic"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/cli/types"
 	. "github.com/apecloud/kubeblocks/test/e2e"
 	e2eutil "github.com/apecloud/kubeblocks/test/e2e/util"
+	"github.com/apecloud/kubeblocks/test/testutils"
 )
 
 const (
@@ -65,7 +65,7 @@ func SmokeTest() {
 			if err != nil {
 				logrus.WithError(err).Fatal("could not generate dynamic client for config")
 			}
-			objects, err := dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
+			objects, err := dynamic.Resource(testutils.AddonGVR()).List(context.TODO(), metav1.ListOptions{
 				LabelSelector: e2eutil.BuildAddonLabelSelector(),
 			})
 			if err != nil && !apierrors.IsNotFound(err) {

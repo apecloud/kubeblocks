@@ -16,26 +16,24 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 parameters: {
-	auth_type: *"serviceAccount" | string
+	auth_type:           *"serviceAccount" | string
 	collection_interval: *"15s" | string
-	endpoint: *"`endpoint`:`kubelet_endpoint_port`" | string
-	job: *"oteld-kubeletstats-metrics" | string
+	endpoint:            *"`endpoint`:`kubelet_endpoint_port`" | string
+	job:                 *"oteld-kubeletstats-metrics" | string
 }
 
 output:
-  apecloudkubeletstats: {
-  	rule: "type == \"k8s.node\""
-  	config: {
-  		auth_type: parameters.auth_type
+	apecloudkubeletstats: {
+		rule: "type == \"k8s.node\""
+		config: {
+			auth_type:           parameters.auth_type
 			collection_interval: parameters.collection_interval
-			endpoint: parameters.endpoint
+			endpoint:            parameters.endpoint
 			extra_metadata_labels: ["k8s.volume.type", "kubeblocks"]
 			metric_groups: ["container", "pod", "volume"]
 		}
-		resource_attributes:{
+		resource_attributes: {
 			receiver: "apecloudkubeletstats"
-      job: parameters.job
+			job:      parameters.job
 		}
-  }
-
-
+	}

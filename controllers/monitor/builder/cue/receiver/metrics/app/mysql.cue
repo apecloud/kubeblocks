@@ -18,24 +18,23 @@
 parameters: {
 	endpoint: *"`endpoint`:3306" | string
 	username: *"`envs[\"MYSQL_ROOT_USER\"]`" | string
-  password: *"`envs[\"MYSQL_ROOT_PASSWORD\"]`" | string
+	password: *"`envs[\"MYSQL_ROOT_PASSWORD\"]`" | string
 }
 
 output:
-  apecloudmysql: {
-  	rule: "type == \"container\" && monitor_type == \"mysql\" && config != nil && config.EnabledMetrics"
-  	config:{
-  		endpoint: parameters.endpoint
-  		username: parameters.username
-      password: parameters.password
-      allow_native_passwords: true
-      transport: "tcp"
-      collection_interval: "`settings.CollectionInterval`"
-  	}
-    resource_attributes: {
-    	receiver: "apecloudmysql"
-      job: "oteld-app-metrics"
-    }
+	apecloudmysql: {
+		rule: "type == \"container\" && monitor_type == \"mysql\" && config != nil && config.EnabledMetrics"
+		config: {
+			endpoint:               parameters.endpoint
+			username:               parameters.username
+			password:               parameters.password
+			allow_native_passwords: true
+			transport:              "tcp"
+			collection_interval:    "`settings.CollectionInterval`"
+		}
+		resource_attributes: {
+			receiver: "apecloudmysql"
+			job:      "oteld-app-metrics"
+		}
 
-  }
-
+	}

@@ -16,30 +16,30 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 parameters: {
-	job: *"oteld-app-metrics" | string
+	job:      *"oteld-app-metrics" | string
 	endpoint: *"`endpoint`:6379" | string
 	username: *"envs[\"REDIS_REPL_USER\"]" | string
 	password: *"envs[\"REDIS_REPL_PASSWORD\"]" | string
 }
 
 output:
-  apecloudredis: {
-  	rule: "type == \"container\" && monitor_type == \"redis\" && config != nil && config.EnabledMetrics"
+	apecloudredis: {
+		rule: "type == \"container\" && monitor_type == \"redis\" && config != nil && config.EnabledMetrics"
 		config: {
-			endpoint: parameters.endpoint
-			username: parameters.username
-			password: parameters.password
+			endpoint:      parameters.endpoint
+			username:      parameters.username
+			password:      parameters.password
 			password_file: ""
-			lua_script: ""
+			lua_script:    ""
 			tls: {
-				insecure: true
+				insecure:             true
 				insecure_skip_verify: true
 			}
 			collection_interval: "`settings.CollectionInterval`"
 		}
 
 		resource_attributes: {
-			job: parameters.job
+			job:      parameters.job
 			receiver: "apecloudredis"
 		}
-  }
+	}

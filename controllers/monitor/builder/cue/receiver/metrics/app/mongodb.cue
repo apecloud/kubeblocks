@@ -16,21 +16,21 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 output:
-  apecloudmongo: {
-  	rule: "type == \"container\" && monitor_type == \"mongodb\" && config != nil && config.EnabledMetrics"
+	apecloudmongo: {
+		rule: "type == \"container\" && monitor_type == \"mongodb\" && config != nil && config.EnabledMetrics"
 		config: {
-			endpoint: "`endpoint`:27017"
-      username: "`envs[\"MONGODB_ROOT_USER\"]`"
-      password: "`envs[\"MONGODB_ROOT_PASSWORD\"]`"
-      connect_params: "admin?ssl=false&authSource=admin"
-      collect_all: true
-      collection_interval: "`settings.CollectionInterval`"
-      direct_connect: true
-      global_conn_pool: false
-      compatible_mode: true
+			endpoint:            "`endpoint`:27017"
+			username:            "`envs[\"MONGODB_ROOT_USER\"]`"
+			password:            "`envs[\"MONGODB_ROOT_PASSWORD\"]`"
+			connect_params:      "admin?ssl=false&authSource=admin"
+			collect_all:         true
+			collection_interval: "`settings.CollectionInterval`"
+			direct_connect:      true
+			global_conn_pool:    false
+			compatible_mode:     true
 		}
 		resource_attributes: {
-		  job: "oteld-app-metrics"
-      receiver: "apecloudmongodb"
+			job:      "oteld-app-metrics"
+			receiver: "apecloudmongodb"
 		}
-  }
+	}

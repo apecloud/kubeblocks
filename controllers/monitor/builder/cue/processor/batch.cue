@@ -17,14 +17,14 @@
 
 parameters: {
 	send_batch_max_size: *200 | int
-	send_batch_size: *200 | int
-	timeout: *"5s" | string
+	send_batch_size:     *200 | int
+	timeout:             *"5s" | string
 }
 
 output: {
-  batch: {
-  	send_batch_max_size: 200
-    send_batch_size: 200
-    timeout: "5s"
-  }
+	batch: {
+		send_batch_max_size: 200
+		send_batch_size:     200
+		timeout:             "5s"
+	}
 }

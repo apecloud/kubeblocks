@@ -20,18 +20,18 @@ parameters: {
 }
 
 output: {
-  resource:
-    attributes: {
-    	if parameters.global_labels != _|_ {
-  			[
-  			  for k, v in parameters.global_labels {
-  				  {
-  				  	key: k
-  					  value: v
-  					  action: "insert"
-  				  }
-				  }
+	resource:
+		attributes: {
+			if parameters.global_labels != _|_ {
+				[
+					for k, v in parameters.global_labels {
+						{
+							key:    k
+							value:  v
+							action: "insert"
+						}
+					},
 				]
 			}
-    }
+		}
 }

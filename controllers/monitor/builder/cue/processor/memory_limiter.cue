@@ -16,15 +16,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 parameters: {
-	limit_mib: *512 | int
+	limit_mib:       *512 | int
 	spike_limit_mib: *128 | int
-	check_interval: *"10s" | string
+	check_interval:  *"10s" | string
 }
 
 output: {
-	memory_limiter:{
-  	limit_mib: parameters.limit_mib
-    spike_limit_mib: parameters.spike_limit_mib
-    check_interval: parameters.check_interval
-  }
+	memory_limiter: {
+		limit_mib:       parameters.limit_mib
+		spike_limit_mib: parameters.spike_limit_mib
+		check_interval:  parameters.check_interval
+	}
 }

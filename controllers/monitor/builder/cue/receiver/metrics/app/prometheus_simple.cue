@@ -16,19 +16,19 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 parameters: {
-	metrics_path: *"/metrics" | string,
-	endpoint: *"`endpoint`:`envs[\"VTTABLET_PORT\"]`" | string,
-	disable_keep_alives: *false | bool,
+	metrics_path:        *"/metrics" | string
+	endpoint:            *"`endpoint`:`envs[\"VTTABLET_PORT\"]`" | string
+	disable_keep_alives: *false | bool
 }
 
 output:
 	"prometheus_simple": {
 		rule: "type == \"container\" && monitor_type == \"prometheus\" && config != nil && config.EnabledMetrics"
-    	config: {
-    		collection_interval: "`settings.CollectionInterval`"
-    		metrics_path: "`config.Prometheus == nil ? \"/metrics\" : config.Prometheus.MetricsPath`"
-        endpoint: "`endpoint`:`envs[\"SERVICE_PORT\"]`"
-        disable_keep_alives: "`config.Prometheus == nil ? false : config.Prometheus.DisableKeepAlives`"
-        use_service_account: "`config.Prometheus == nil ? false : config.Prometheus.UseServiceAccount`"
-    	}
+		config: {
+			collection_interval: "`settings.CollectionInterval`"
+			metrics_path:        "`config.Prometheus == nil ? \"/metrics\" : config.Prometheus.MetricsPath`"
+			endpoint:            "`endpoint`:`envs[\"SERVICE_PORT\"]`"
+			disable_keep_alives: "`config.Prometheus == nil ? false : config.Prometheus.DisableKeepAlives`"
+			use_service_account: "`config.Prometheus == nil ? false : config.Prometheus.UseServiceAccount`"
+		}
 	}

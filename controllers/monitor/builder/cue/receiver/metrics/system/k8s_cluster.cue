@@ -17,7 +17,7 @@
 
 parameters: {
 	collection_interval: *"15s" | string
-	job: *"oteld-k8s-cluster-metrics" | string
+	job:                 *"oteld-k8s-cluster-metrics" | string
 }
 
 output:
@@ -28,7 +28,6 @@ output:
 		}
 		resource_attributes: {
 			receiver: "k8s_cluster"
-			job: parameters.job
+			job:      parameters.job
 		}
 	}
-

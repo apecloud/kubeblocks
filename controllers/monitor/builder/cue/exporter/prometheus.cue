@@ -16,19 +16,19 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 parameters: {
-	name: *"default" | string
-	endpoint: *"${env:HOST_IP}:1234" | string
-	send_timestamps: *false | bool
-	metric_expiration: *"20s" | string
-	enable_open_metrics: *false | bool
+	name:                                     *"default" | string
+	endpoint:                                 *"${env:HOST_IP}:1234" | string
+	send_timestamps:                          *false | bool
+	metric_expiration:                        *"20s" | string
+	enable_open_metrics:                      *false | bool
 	resource_to_telemetry_conversion_enabled: *true | bool
 }
 
 output: {
 	"prometheus/\(parameters.name)": {
-		endpoint: parameters.endpoint
-		send_timestamps: parameters.send_timestamps
-		metric_expiration: parameters.metric_expiration
+		endpoint:            parameters.endpoint
+		send_timestamps:     parameters.send_timestamps
+		metric_expiration:   parameters.metric_expiration
 		enable_open_metrics: parameters.enable_open_metrics
 		resource_to_telemetry_conversion:
 			enabled: parameters.resource_to_telemetry_conversion_enabled

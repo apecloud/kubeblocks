@@ -16,20 +16,20 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #meta: {
-	endpoint: *"test" | string
-	username: *"labels[\"conn_username\"]" | string
-	password: *"labels[\"conn_password\"]" | string
+	endpoint:            *"test" | string
+	username:            *"labels[\"conn_username\"]" | string
+	password:            *"labels[\"conn_password\"]" | string
 	collection_interval: *"15s" | string
-	transport: *"tcp" | string
+	transport:           *"tcp" | string
 }
 
 output: {
 	apecloudmysql: {
-		endpoint: parameters.endpoint
-		username: parameters.username
-		password: parameters.password
+		endpoint:            parameters.endpoint
+		username:            parameters.username
+		password:            parameters.password
 		collection_interval: parameters.collection_interval
-		transport: parameters.transport
+		transport:           parameters.transport
 	}
 }
 

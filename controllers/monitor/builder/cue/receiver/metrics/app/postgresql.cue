@@ -16,32 +16,32 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 parameters: {
-	enpoint: *"`endpoint`:5432" | string
-	username: *"`envs[\"PGUSER_SUPERUSER\"]`" | string
-	password: *"`envs[\"PGPASSWORD_SUPERUSER\"]`" | string
-	job: *"oteld-app-metrics" | string
-	databases: *["postgres"] | [string]
+	enpoint:           *"`endpoint`:5432" | string
+	username:          *"`envs[\"PGUSER_SUPERUSER\"]`" | string
+	password:          *"`envs[\"PGPASSWORD_SUPERUSER\"]`" | string
+	job:               *"oteld-app-metrics" | string
+	databases:         *["postgres"] | [string]
 	exclude_databases: *["template0", "template1"] | [string]
 }
 
 output:
 	apecloudpostgresql: {
 		rule: "type == \"container\" && monitor_type == \"postgresql\" && config != nil && config.EnabledMetrics"
-    config: {
-    	endpoint: parameters.enpoint
-      username: parameters.username
-      password: parameters.password
-      databases: parameters.databases
-      exclude_databases: parameters.exclude_databases
-      collection_interval: "`settings.CollectionInterval`"
-      transport: "tcp"
-      tls: {
-      	insecure: true
-        insecure_skip_verify: true
-      }
-    }
-    resource_attributes: {
-    	job: parameters.job
-      receiver: "apecloudpostgresql"
-    }
+		config: {
+			endpoint:            parameters.enpoint
+			username:            parameters.username
+			password:            parameters.password
+			databases:           parameters.databases
+			exclude_databases:   parameters.exclude_databases
+			collection_interval: "`settings.CollectionInterval`"
+			transport:           "tcp"
+			tls: {
+				insecure:             true
+				insecure_skip_verify: true
+			}
+		}
+		resource_attributes: {
+			job:      parameters.job
+			receiver: "apecloudpostgresql"
+		}
 	}

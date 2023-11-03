@@ -16,15 +16,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 parameters: {
-	name: *"default" | string
+	name:     *"default" | string
 	endpoint: *"${env:HOST_IP}:1234" | string
 }
 
 output: {
 	"prometheusremotewrite/\(parameters.name)": {
 		endpoint: parameters.endpoint
-    timeout: "15s"
+		timeout:  "15s"
 		resource_to_telemetry_conversion:
-      enabled: true
+			enabled: true
 	}
 }

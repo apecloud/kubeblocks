@@ -17,18 +17,16 @@
 
 parameters: {
 	collection_interval: *"15s" | string
-	job: *"oteld-node-metrics" | string
+	job:                 *"oteld-node-metrics" | string
 }
 
-
 output:
-  apecloudnode: {
-  	rule: "type == \"k8s.node\""
-  	config:
-  	  collection_interval: parameters.collection_interval
-  	resource_attributes: {
-  		job: "oteld-node-metrics"
-      receiver: "apecloudnode"
-  	}
-  }
-
+	apecloudnode: {
+		rule: "type == \"k8s.node\""
+		config:
+			collection_interval: parameters.collection_interval
+		resource_attributes: {
+			job:      "oteld-node-metrics"
+			receiver: "apecloudnode"
+		}
+	}

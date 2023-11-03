@@ -132,7 +132,7 @@ func (u *upgradeHandlerTo7) transformBackupPolicy(dynamic dynamic.Interface, obj
 		}
 	}
 
-	_, found, _ := unstructured.NestedMap(specMap, "backupMethods")
+	_, found, _ := unstructured.NestedSlice(specMap, "backupMethods")
 	if found {
 		// if exist backupMethods, nothing to do.
 		return nil

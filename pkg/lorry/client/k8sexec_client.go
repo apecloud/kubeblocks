@@ -116,7 +116,7 @@ func (cli *K8sExecClient) Request(ctx context.Context, operation, method string,
 		errBuffer bytes.Buffer
 		err       error
 	)
-	curlCmd := fmt.Sprintf("curl -X %s -H 'Content-Type: application/json' http://localhost:%d/v1.0/%s",
+	curlCmd := fmt.Sprintf("curl --fail-with-body --silent -X %s -H 'Content-Type: application/json' http://localhost:%d/v1.0/%s",
 		strings.ToUpper(method), cli.lorryPort, strings.ToLower(operation))
 
 	if len(req) != 0 {
@@ -126,7 +126,7 @@ func (cli *K8sExecClient) Request(ctx context.Context, operation, method string,
 		}
 		// escape single quote
 		body := strings.ReplaceAll(string(jsonData), "'", "\\'")
-		curlCmd = curlCmd + fmt.Sprintf("-d '%s'", body)
+		curlCmd = curlCmd + fmt.Sprintf(" -d '%s'", body)
 	}
 	cmd := []string{"sh", "-c", curlCmd}
 
@@ -135,13 +135,14 @@ func (cli *K8sExecClient) Request(ctx context.Context, operation, method string,
 		return nil, errors.Wrap(err, "K8S exec failed")
 	}
 
-	errData := errBuffer.Bytes()
-	if len(errData) != 0 {
-		cli.logger.Info("k8s exec error output", "message", string(errData))
-	}
-
 	data := strBuffer.Bytes()
 	if len(data) == 0 {
+		errData := errBuffer.Bytes()
+		if len(errData) != 0 {
+			cli.logger.Info("k8s exec error output", "message", string(errData))
+			return nil, errors.New(string(errData))
+		}
+
 		return nil, nil
 	}
 

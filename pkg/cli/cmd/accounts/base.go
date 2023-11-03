@@ -35,7 +35,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/cli/exec"
 	"github.com/apecloud/kubeblocks/pkg/cli/printer"
 	"github.com/apecloud/kubeblocks/pkg/cli/util"
-	"github.com/apecloud/kubeblocks/pkg/lorry/client"
 	lorryutil "github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
@@ -162,10 +161,10 @@ func (o *AccountBaseOptions) Run(cmd *cobra.Command, f cmdutil.Factory, streams 
 		lorryutil.DeleteUserOp,
 		lorryutil.RevokeUserRoleOp,
 		lorryutil.GrantUserRoleOp:
-		o.printGeneralInfo(response)
+		//o.printGeneralInfo(response)
 		err = nil
 	case lorryutil.CreateUserOp:
-		o.printGeneralInfo(response)
+		//o.printGeneralInfo(response)
 		if response.Event == lorryutil.RespEveSucc {
 			printer.Alert(o.Out, "Please do REMEMBER the password for the new user! Once forgotten, it cannot be retrieved!\n")
 		}
@@ -191,14 +190,14 @@ func (o *AccountBaseOptions) Run(cmd *cobra.Command, f cmdutil.Factory, streams 
 func (o *AccountBaseOptions) Do() (lorryutil.SQLChannelResponse, error) {
 	klog.V(1).Info(fmt.Sprintf("connect to cluster %s, component %s, instance %s\n", o.ClusterName, o.ComponentName, o.PodName))
 	response := lorryutil.SQLChannelResponse{}
-	sqlClient, err := client.NewHTTPClientWithChannelPod(o.Pod, o.CharType)
-	if err != nil {
-		return response, err
-	}
+	//sqlClient, err := client.NewK8sExecClientWithPod(o.Pod)
+	//if err != nil {
+	//	return response, err
+	//}
 
-	request := lorryutil.SQLChannelRequest{Operation: (string)(o.AccountOp), Metadata: o.RequestMeta}
-	response, err = sqlClient.SendRequest(o.ExecOptions, request)
-	return response, err
+	//request := lorryutil.SQLChannelRequest{Operation: (string)(o.AccountOp), Metadata: o.RequestMeta}
+	//response, err = sqlClient.SendRequest(o.ExecOptions, request)
+	return response, nil
 }
 
 func (o *AccountBaseOptions) newTblPrinterWithStyle(title string, header []interface{}) *printer.TablePrinter {
@@ -209,9 +208,9 @@ func (o *AccountBaseOptions) newTblPrinterWithStyle(title string, header []inter
 	return tblPrinter
 }
 
-func (o *AccountBaseOptions) printGeneralInfo(response lorryutil.SQLChannelResponse) {
+func (o *AccountBaseOptions) printGeneralInfo(event, message string) {
 	tblPrinter := o.newTblPrinterWithStyle("QUERY RESULT", []interface{}{"RESULT", "MESSAGE"})
-	tblPrinter.AddRow(response.Event, response.Message)
+	tblPrinter.AddRow(event, message)
 	tblPrinter.Print()
 }
 
@@ -225,7 +224,7 @@ func (o *AccountBaseOptions) printMeta(response lorryutil.SQLChannelResponse) {
 
 func (o *AccountBaseOptions) printUserInfo(response lorryutil.SQLChannelResponse) error {
 	if response.Event == lorryutil.RespEveFail {
-		o.printGeneralInfo(response)
+		//o.printGeneralInfo(response)
 		return nil
 	}
 	// decode user info from metadata
@@ -247,7 +246,7 @@ func (o *AccountBaseOptions) printUserInfo(response lorryutil.SQLChannelResponse
 
 func (o *AccountBaseOptions) printRoleInfo(response lorryutil.SQLChannelResponse) error {
 	if response.Event == lorryutil.RespEveFail {
-		o.printGeneralInfo(response)
+		//o.printGeneralInfo(response)
 		return nil
 	}
 

@@ -105,10 +105,10 @@ var _ = Describe("Create Account Options", func() {
 			Expect(o.Validate(args)).Should(MatchError(errMissingUserName))
 
 			// set user name
-			o.info.UserName = "fooUser"
+			o.userName = "fooUser"
 			Expect(o.Validate(args)).Should(Succeed())
 			// set password
-			o.info.Password = "fooPwd"
+			o.password = "fooPwd"
 			Expect(o.Validate(args)).Should(Succeed())
 		})
 
@@ -117,11 +117,11 @@ var _ = Describe("Create Account Options", func() {
 			Expect(o).ShouldNot(BeNil())
 			o.PodName = pods.Items[0].Name
 			o.ClusterName = clusterName
-			o.info.UserName = "foo-user"
+			o.userName = "foo-user"
 
-			Expect(o.info.Password).Should(HaveLen(0))
+			Expect(o.password).Should(HaveLen(0))
 			Expect(o.Complete(tf)).Should(Succeed())
-			Expect(o.info.Password).ShouldNot(BeEmpty())
+			Expect(o.password).ShouldNot(BeEmpty())
 		})
 	})
 })

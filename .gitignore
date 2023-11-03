@@ -66,3 +66,6 @@ deploy/**/charts
 
 # cli embed chart directory
 pkg/cli/cluster/charts/
+
+# generated code by controller-gen
+**/zz_generated.deepcopy.go

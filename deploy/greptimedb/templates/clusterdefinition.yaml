@@ -350,6 +350,20 @@ spec:
             port: 2380
             targetPort: peer
       podSpec:
+        initContainers:
+          - name: volume-permissions
+            image: busybox:1.28
+            imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
+            command:
+              - /bin/sh
+              - -ec
+              - |
+                chown -R 1001:1001 /var/lib/etcd
+            securityContext:
+              runAsUser: 0
+            volumeMounts:
+              - name: etcd-storage
+                mountPath: /var/lib/etcd
         containers:
           - name: etcd
             imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}

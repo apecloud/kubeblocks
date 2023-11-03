@@ -30,7 +30,7 @@ import (
 )
 
 func TestRegisterOperations(t *testing.T) {
-	fakeApi := &api{}
+	fakeAPI := &api{}
 	fakeOps := map[string]operations.Operation{
 		"fake-1": operations.NewFakeOperations(operations.FakeInit, func(ctx context.Context) error {
 			return fmt.Errorf("some error")
@@ -41,8 +41,8 @@ func TestRegisterOperations(t *testing.T) {
 		"fake-3": operations.NewFakeOperations(operations.FakeDefault, nil),
 	}
 
-	fakeApi.RegisterOperations(fakeOps)
-	assert.True(t, fakeApi.ready)
-	assert.Equal(t, 2, len(fakeApi.endpoints))
-	assert.Equal(t, "v1.0", fakeApi.endpoints[0].Version)
+	fakeAPI.RegisterOperations(fakeOps)
+	assert.True(t, fakeAPI.ready)
+	assert.Equal(t, 2, len(fakeAPI.endpoints))
+	assert.Equal(t, "v1.0", fakeAPI.endpoints[0].Version)
 }

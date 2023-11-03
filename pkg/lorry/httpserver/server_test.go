@@ -68,7 +68,7 @@ func mockServer(t *testing.T) *server {
 	return fakeServer
 }
 
-func mockHttpRequest(url string, method string, body string) *fasthttp.RequestCtx {
+func mockHTTPRequest(url string, method string, body string) *fasthttp.RequestCtx {
 	ctx := new(fasthttp.RequestCtx)
 	ctx.Request.SetRequestURI(url)
 	ctx.Request.Header.SetMethod(method)
@@ -94,7 +94,7 @@ func TestRouter(t *testing.T) {
 	fakeRouterHandler := fakeServer.apiLogger(handler)
 
 	t.Run("unmarshal HTTP body failed", func(t *testing.T) {
-		ctx := mockHttpRequest("/v1.0/fake-1", fasthttp.MethodPost, `test`)
+		ctx := mockHTTPRequest("/v1.0/fake-1", fasthttp.MethodPost, `test`)
 		fakeRouterHandler(ctx)
 
 		response := parseErrorResponse(t, ctx.Response.Body())
@@ -104,7 +104,7 @@ func TestRouter(t *testing.T) {
 	})
 
 	t.Run("pre check failed", func(t *testing.T) {
-		ctx := mockHttpRequest("/v1.0/fake-2", fasthttp.MethodPost, `{"data": "test"}`)
+		ctx := mockHTTPRequest("/v1.0/fake-2", fasthttp.MethodPost, `{"data": "test"}`)
 		fakeRouterHandler(ctx)
 
 		response := parseErrorResponse(t, ctx.Response.Body())
@@ -114,7 +114,7 @@ func TestRouter(t *testing.T) {
 	})
 
 	t.Run("do check not implemented", func(t *testing.T) {
-		ctx := mockHttpRequest("/v1.0/fake-3", fasthttp.MethodPost, `{"data": "test"}`)
+		ctx := mockHTTPRequest("/v1.0/fake-3", fasthttp.MethodPost, `{"data": "test"}`)
 		fakeRouterHandler(ctx)
 
 		response := parseErrorResponse(t, ctx.Response.Body())
@@ -124,7 +124,7 @@ func TestRouter(t *testing.T) {
 	})
 
 	t.Run("do check probe error", func(t *testing.T) {
-		ctx := mockHttpRequest("/v1.0/fake-4", fasthttp.MethodPost, `{"data": "test"}`)
+		ctx := mockHTTPRequest("/v1.0/fake-4", fasthttp.MethodPost, `{"data": "test"}`)
 		fakeRouterHandler(ctx)
 
 		assert.Equal(t, fasthttp.StatusNoContent, ctx.Response.StatusCode())
@@ -132,7 +132,7 @@ func TestRouter(t *testing.T) {
 	})
 
 	t.Run("do check failed", func(t *testing.T) {
-		ctx := mockHttpRequest("/v1.0/fake-5", fasthttp.MethodPost, `{"data": "test"}`)
+		ctx := mockHTTPRequest("/v1.0/fake-5", fasthttp.MethodPost, `{"data": "test"}`)
 		fakeRouterHandler(ctx)
 
 		response := parseErrorResponse(t, ctx.Response.Body())
@@ -142,7 +142,7 @@ func TestRouter(t *testing.T) {
 	})
 
 	t.Run("return meta data", func(t *testing.T) {
-		ctx := mockHttpRequest("/v1.0/fake-6", fasthttp.MethodPost, `{"data": "test"}`)
+		ctx := mockHTTPRequest("/v1.0/fake-6", fasthttp.MethodPost, `{"data": "test"}`)
 		fakeRouterHandler(ctx)
 
 		assert.Equal(t, fasthttp.StatusOK, ctx.Response.StatusCode())

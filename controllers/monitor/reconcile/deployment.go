@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package reconcile
 
 import (
+	"fmt"
 	"reflect"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -34,20 +35,25 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )
 
-const OTeldAPIServerName = "grafana"
+const (
+	OTeldAPIServerName         = "grafana"
+	OTeldDeploymentNamePattern = "%s-deployment"
+)
 
 func Deployment(reqCtx monitortypes.ReconcileCtx, params monitortypes.OTeldParams) error {
 	var (
 		k8sClient = params.Client
+		name      = reqCtx.OTeld.Name
 		namespace = reqCtx.OTeld.GetNamespace()
 	)
 
 	instance := reqCtx.OteldCfgRef.GetOteldInstance(monitorv1alpha1.ModeDeployment)
 
-	oteldDeployment := buildDeploymentForOteld(instance, namespace, OTeldName)
+	deploymentName := fmt.Sprintf(OTeldDeploymentNamePattern, name)
+	oteldDeployment := buildDeploymentForOteld(instance, namespace, deploymentName)
 
 	existingDeployment := &appsv1.Deployment{}
-	err := k8sClient.Get(reqCtx.Ctx, client.ObjectKey{Name: OTeldName, Namespace: namespace}, existingDeployment)
+	err := k8sClient.Get(reqCtx.Ctx, client.ObjectKey{Name: deploymentName, Namespace: namespace}, existingDeployment)
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			reqCtx.Log.Error(err, "Failed to find daemonset", "daemonset", existingDeployment.Name)

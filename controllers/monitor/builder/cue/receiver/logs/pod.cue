@@ -16,7 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 parameters: {
-	include: *["/var/log/pods/**/**/*.log"] | [string]
+	include: *["host/root/var/log/pods/**/**/*.log"] | [string]
 }
 
 output: {

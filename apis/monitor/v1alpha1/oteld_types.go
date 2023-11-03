@@ -29,6 +29,7 @@ import (
 
 type MemoryLimiter struct {
 	// enabled indicates whether to enable memory limiter
+	// +kubebuilder:default=true
 	// +optional
 	Enabled bool `json:"enabled,omitempty"`
 
@@ -159,9 +160,11 @@ type OTeldSpec struct {
 	// +optional
 	CollectionInterval string `json:"collectionInterval,omitempty"`
 
+	// memoryLimiter is the memory limiter config that used to limit the memory usage of oteld
 	// +optional
 	MemoryLimiter MemoryLimiter `json:"memoryLimiter,omitempty"`
 
+	// batch is the batch config that used to batch data before sending
 	// +optional
 	Batch Batch `json:"batch,omitempty"`
 

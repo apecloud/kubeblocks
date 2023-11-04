@@ -187,6 +187,7 @@ func (c *rsmComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Client, bu
 		if err = builder.BuildEnv().
 			BuildWorkload().
 			BuildPDB().
+			BuildCustomVolumes().
 			BuildConfig().
 			BuildTLSVolume().
 			BuildVolumeMount().

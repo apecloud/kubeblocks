@@ -7,6 +7,13 @@ metadata:
 data:
   start.sh: |
     #!/bin/sh
+    echo "model=${MODEL_NAME}"
+    country=`curl https://ifconfig.io/country_code`
+    if [ "$country" == "CN" ]; then
+      CLONE_MODEL_SCRIPT="git lfs install; git clone https://www.modelscope.cn/${MODEL_NAME}.git"
+      export MODEL_NAME="../${MODEL_NAME##*/}"
+    fi 
+    echo "model=${MODEL_NAME}"
     if [ -n "$CLONE_MODEL_SCRIPT" ]; then
       bash -c "$CLONE_MODEL_SCRIPT"
     fi
@@ -20,11 +27,11 @@ data:
     fi
   vllm-start.sh: |
     #!/bin/sh
-    echo "model=${MODEL_NAME}"
     ordinal=${KB_POD_NAME##*-}
     echo "current pod ordinal: $ordinal"
     echo "EXTRA_ARGS=${EXTRA_ARGS}"
     cd vllm
+    echo "model=${MODEL_NAME}" > log
     while true; do
       if [ $ordinal -eq 0 ]; then
         python -m vllm.entrypoints.api_server --host 0.0.0.0 --port 8000 --model ${MODEL_NAME} --gpu-memory-utilization 0.95 --max-num-seqs 512 --max-num-batched-tokens 8192 --tensor-parallel-size ${KB_VLLM_N} ${EXTRA_ARGS} > log

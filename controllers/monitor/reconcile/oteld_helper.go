@@ -48,6 +48,7 @@ type oteldWrapper struct {
 const (
 	k8sclusterPipeline = "api-service"
 	k8snodePipeline    = "datasource-metrics"
+	oteldSelfPipeline  = "self-metrics"
 	k8spodLogsPipeline = "podlogs"
 
 	AppMetricsCreatorName = "receiver_creator/app"
@@ -99,6 +100,17 @@ func (w *oteldWrapper) buildNodePipeline() *oteldWrapper {
 		CollectionInterval: w.source.CollectionInterval,
 	}
 	w.buildProcessor(pipeline)
+	w.buildMetricsExporter(pipeline)
+	return w
+}
+
+func (w *oteldWrapper) buildSelfPipeline() *oteldWrapper {
+	pipeline := w.createPipeline(v1alpha1.ModeDaemonSet, oteldSelfPipeline, collectTypeMetrics)
+	pipeline.ReceiverType = "prometheus"
+	pipeline.ReceiverMap[constant.OteldSelfReceiverTPLName] = types.Receiver{
+		CollectionInterval: w.source.CollectionInterval,
+		Parameter:          fmt.Sprintf("metrics_port: %d", w.OTeld.Spec.MetricsPort),
+	}
 	w.buildMetricsExporter(pipeline)
 	return w
 }

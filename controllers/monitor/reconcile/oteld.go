@@ -99,5 +99,6 @@ func buildSystemInstanceMap(oteld *v1alpha1.OTeld,
 		buildPodLogsPipeline().
 		appendUserDataSource().
 		buildFixedPipeline().
+		buildSelfPipeline().
 		complete()
 }

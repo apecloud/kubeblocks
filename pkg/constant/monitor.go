@@ -28,4 +28,5 @@ const (
 	K8SNodeStatesReceiverTPLName = "kubeletstats"
 	NodeExporterReceiverTPLName  = "node"
 	PodLogsReceiverTPLName       = "pod"
+	OteldSelfReceiverTPLName     = "oteld_self"
 )

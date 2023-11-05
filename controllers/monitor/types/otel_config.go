@@ -21,7 +21,9 @@ package types
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"gopkg.in/yaml.v2"
 
 	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
@@ -35,7 +37,7 @@ const (
 	LogsPattern    = "logs/%s"
 
 	ExporterTplPattern  = "exporter/%s.cue"
-	ReceiverNamePattern = "receiver_creator/%s"
+	ReceiverCreatorType = "receiver_creator"
 	ServicePath         = "service/service.cue"
 
 	ExtensionPath = "extension/extensions.cue"
@@ -133,7 +135,7 @@ func newReceiverCreatorSlice(instance *OteldInstance) (yaml.MapSlice, error) {
 	creators := yaml.MapSlice{}
 
 	for _, pipeline := range instance.MetricsPipeline {
-		creator, err := newMetricsReceiverCreator(pipeline.Name, pipeline.ReceiverMap)
+		creator, err := newMetricsReceiverCreator(pipeline.GetReceiverName(), pipeline.ReceiverMap)
 		if err != nil {
 			return nil, err
 		}
@@ -180,11 +182,6 @@ func newAppReceiverCreator() (yaml.MapItem, error) {
 }
 
 func newMetricsReceiverCreator(name string, receiverMap map[string]Receiver) (yaml.MapItem, error) {
-	infraTplName := MetricsInfraTplName
-	metricsSlice, err := buildSliceFromCUE(infraTplName, map[string]any{})
-	if err != nil {
-		return yaml.MapItem{}, err
-	}
 	receiverSlice := yaml.MapSlice{}
 	for name, params := range receiverMap {
 		tplName := fmt.Sprintf(SystemMetricsCUEPattern, name)
@@ -200,8 +197,25 @@ func newMetricsReceiverCreator(name string, receiverMap map[string]Receiver) (ya
 		receiverSlice = append(receiverSlice, receivers...)
 	}
 
-	metricsSlice = append(metricsSlice, yaml.MapItem{Key: "receivers", Value: receiverSlice})
-	return yaml.MapItem{Key: fmt.Sprintf(ReceiverNamePattern, name), Value: metricsSlice}, nil
+	if !isReceiverCreatorType(name) {
+		if len(receiverSlice) == 1 {
+			return receiverSlice[0], nil
+		}
+		return yaml.MapItem{}, core.MakeError("receiver creator name[%s] is invalid", name)
+	}
+
+	// build receiver creator attribute template
+	metricsSlice := yaml.MapSlice{yaml.MapItem{Key: "receivers", Value: receiverSlice}}
+	slice, err := buildSliceFromCUE(MetricsInfraTplName, map[string]any{})
+	if err != nil {
+		return yaml.MapItem{}, err
+	}
+	metricsSlice = append(metricsSlice, slice...)
+	return yaml.MapItem{Key: name, Value: metricsSlice}, nil
+}
+
+func isReceiverCreatorType(name string) bool {
+	return strings.HasPrefix(name, ReceiverCreatorType+"/")
 }
 
 func (cg *OteldConfigGenerater) appendExporter(cfg yaml.MapSlice, metricsExporters []v1alpha1.MetricsExporterSink, logsExporter []v1alpha1.LogsExporterSink) (yaml.MapSlice, error) {
@@ -343,56 +357,51 @@ func buildServiceValMap(instance *OteldInstance) map[string]any {
 }
 
 func (cg *OteldConfigGenerater) buildPipelineItem(instance *OteldInstance) yaml.MapItem {
-
 	pipeline := yaml.MapSlice{}
 
-	if len(instance.MetricsPipeline) != 0 {
+	for _, mPipeline := range instance.MetricsPipeline {
 		metricsSlice := yaml.MapSlice{}
-		for _, mPipeline := range instance.MetricsPipeline {
-			receiverSlice := []string{}
-			receiverSlice = append(receiverSlice, fmt.Sprintf(ReceiverNamePattern, mPipeline.Name))
-			metricsSlice = append(metricsSlice, yaml.MapItem{Key: "receivers", Value: receiverSlice})
+		receiverSlice := []string{}
+		receiverSlice = append(receiverSlice, mPipeline.GetReceiverName())
+		metricsSlice = append(metricsSlice, yaml.MapItem{Key: "receivers", Value: receiverSlice})
 
-			processorSlice := []string{}
-			for name := range mPipeline.ProcessorMap {
-				processorSlice = append(processorSlice, name)
-			}
-			metricsSlice = append(metricsSlice, yaml.MapItem{Key: "processors", Value: processorSlice})
+		processorSlice := []string{}
+		for name := range mPipeline.ProcessorMap {
+			processorSlice = append(processorSlice, name)
+		}
+		metricsSlice = append(metricsSlice, yaml.MapItem{Key: "processors", Value: processorSlice})
 
-			exporterSlice := []string{}
-			for name := range mPipeline.ExporterMap {
-				exporterSlice = append(exporterSlice, name)
-			}
-			metricsSlice = append(metricsSlice, yaml.MapItem{Key: "exporters", Value: exporterSlice})
-			if len(metricsSlice) > 0 {
-				pipeline = append(pipeline, yaml.MapItem{Key: fmt.Sprintf(MetricsPattern, mPipeline.Name), Value: metricsSlice})
-			}
+		exporterSlice := []string{}
+		for name := range mPipeline.ExporterMap {
+			exporterSlice = append(exporterSlice, name)
+		}
+		metricsSlice = append(metricsSlice, yaml.MapItem{Key: "exporters", Value: exporterSlice})
+		if len(metricsSlice) > 0 {
+			pipeline = append(pipeline, yaml.MapItem{Key: fmt.Sprintf(MetricsPattern, mPipeline.Name), Value: metricsSlice})
 		}
 	}
 
-	if len(instance.LogPipeline) != 0 {
+	for _, lPipeline := range instance.LogPipeline {
 		logsSlice := yaml.MapSlice{}
-		for _, lPipeline := range instance.LogPipeline {
-			receiverSlice := []string{}
-			for receiverName := range lPipeline.ReceiverMap {
-				receiverSlice = append(receiverSlice, fmt.Sprintf("filelog/%s", receiverName))
-			}
-			logsSlice = append(logsSlice, yaml.MapItem{Key: "receivers", Value: receiverSlice})
+		receiverSlice := []string{}
+		for receiverName := range lPipeline.ReceiverMap {
+			receiverSlice = append(receiverSlice, fmt.Sprintf("filelog/%s", receiverName))
+		}
+		logsSlice = append(logsSlice, yaml.MapItem{Key: "receivers", Value: receiverSlice})
 
-			processorSlice := []string{}
-			for name := range lPipeline.ProcessorMap {
-				processorSlice = append(processorSlice, name)
-			}
-			logsSlice = append(logsSlice, yaml.MapItem{Key: "processors", Value: processorSlice})
+		processorSlice := []string{}
+		for name := range lPipeline.ProcessorMap {
+			processorSlice = append(processorSlice, name)
+		}
+		logsSlice = append(logsSlice, yaml.MapItem{Key: "processors", Value: processorSlice})
 
-			exporterSlice := []string{}
-			for name := range lPipeline.ExporterMap {
-				exporterSlice = append(exporterSlice, name)
-			}
-			logsSlice = append(logsSlice, yaml.MapItem{Key: "exporters", Value: exporterSlice})
-			if len(logsSlice) > 0 {
-				pipeline = append(pipeline, yaml.MapItem{Key: fmt.Sprintf(LogsPattern, lPipeline.Name), Value: logsSlice})
-			}
+		exporterSlice := []string{}
+		for name := range lPipeline.ExporterMap {
+			exporterSlice = append(exporterSlice, name)
+		}
+		logsSlice = append(logsSlice, yaml.MapItem{Key: "exporters", Value: exporterSlice})
+		if len(logsSlice) > 0 {
+			pipeline = append(pipeline, yaml.MapItem{Key: fmt.Sprintf(LogsPattern, lPipeline.Name), Value: logsSlice})
 		}
 	}
 

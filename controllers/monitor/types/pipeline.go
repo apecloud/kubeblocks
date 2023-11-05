@@ -21,6 +21,7 @@ package types
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,6 +39,7 @@ type Exporters struct {
 
 type Pipeline struct {
 	Name         string
+	ReceiverType string
 	ReceiverMap  map[string]Receiver
 	ProcessorMap map[string]bool
 	ExporterMap  map[string]bool
@@ -58,10 +60,15 @@ type OteldInstance struct {
 func NewPipeline(name string) Pipeline {
 	return Pipeline{
 		Name:         name,
+		ReceiverType: ReceiverCreatorType,
 		ReceiverMap:  make(map[string]Receiver),
 		ProcessorMap: make(map[string]bool),
 		ExporterMap:  make(map[string]bool),
 	}
+}
+
+func (p *Pipeline) GetReceiverName() string {
+	return fmt.Sprintf("%s/%s", p.ReceiverType, p.Name)
 }
 
 func NewOteldInstance(oteld *v1alpha1.OTeld, cli client.Client, ctx context.Context) *OteldInstance {

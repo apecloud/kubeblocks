@@ -35,7 +35,7 @@ import (
 )
 
 func FullName(clusterName, compName string) string {
-	return constant.GenerateClusterComponentPattern(clusterName, compName)
+	return constant.GenerateClusterComponentName(clusterName, compName)
 }
 
 func ShortName(clusterName, compName string) (string, error) {

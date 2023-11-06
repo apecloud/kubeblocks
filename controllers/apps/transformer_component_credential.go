@@ -130,7 +130,7 @@ func (t *componentCredentialTransformer) buildFromServiceAndAccount(transCtx *co
 
 func (t *componentCredentialTransformer) buildEndpoint(synthesizeComp *component.SynthesizedComponent,
 	credential appsv1alpha1.ConnectionCredential, data *map[string][]byte) error {
-	var service *appsv1alpha1.ComponentService
+	var service *appsv1alpha1.Service
 	for i, svc := range synthesizeComp.ComponentServices {
 		if svc.Name == credential.ServiceName {
 			service = &synthesizeComp.ComponentServices[i]
@@ -141,11 +141,11 @@ func (t *componentCredentialTransformer) buildEndpoint(synthesizeComp *component
 		return fmt.Errorf("connection credential references a service not definied, credential: %s, service: %s",
 			credential.Name, credential.ServiceName)
 	}
-	if len(service.Ports) == 0 {
+	if len(service.Spec.Ports) == 0 {
 		return fmt.Errorf("connection credential references a service which doesn't define any ports, credential: %s, service: %s",
 			credential.Name, credential.ServiceName)
 	}
-	if len(credential.PortName) == 0 && len(service.Ports) > 1 {
+	if len(credential.PortName) == 0 && len(service.Spec.Ports) > 1 {
 		return fmt.Errorf("connection credential should specify which port to use for the referenced service, credential: %s, service: %s",
 			credential.Name, credential.ServiceName)
 	}
@@ -155,14 +155,14 @@ func (t *componentCredentialTransformer) buildEndpoint(synthesizeComp *component
 }
 
 func (t *componentCredentialTransformer) buildEndpointFromService(synthesizeComp *component.SynthesizedComponent,
-	credential appsv1alpha1.ConnectionCredential, service *appsv1alpha1.ComponentService, data *map[string][]byte) {
-	serviceName := constant.GenerateComponentServiceEndpoint(synthesizeComp.ClusterName, synthesizeComp.Name, string(service.ServiceName))
+	credential appsv1alpha1.ConnectionCredential, service *appsv1alpha1.Service, data *map[string][]byte) {
+	serviceName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, service.ServiceName)
 
 	port := int32(0)
 	if len(credential.PortName) == 0 {
-		port = service.Ports[0].Port
+		port = service.Spec.Ports[0].Port
 	} else {
-		for _, servicePort := range service.Ports {
+		for _, servicePort := range service.Spec.Ports {
 			if servicePort.Name == credential.PortName {
 				port = servicePort.Port
 				break

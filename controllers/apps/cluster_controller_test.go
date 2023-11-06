@@ -201,7 +201,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("Wait component created")
 		compKey := types.NamespacedName{
 			Namespace: clusterObj.Namespace,
-			Name:      constant.GenerateClusterComponentPattern(clusterObj.Name, compName),
+			Name:      constant.GenerateClusterComponentName(clusterObj.Name, compName),
 		}
 		Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
 	}
@@ -218,7 +218,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("Wait component created")
 		compKey := types.NamespacedName{
 			Namespace: clusterObj.Namespace,
-			Name:      constant.GenerateClusterComponentPattern(clusterObj.Name, compName),
+			Name:      constant.GenerateClusterComponentName(clusterObj.Name, compName),
 		}
 		Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
 	}
@@ -245,7 +245,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("check component created")
 		compKey := types.NamespacedName{
 			Namespace: clusterObj.Namespace,
-			Name:      constant.GenerateClusterComponentPattern(clusterObj.Name, compName),
+			Name:      constant.GenerateClusterComponentName(clusterObj.Name, compName),
 		}
 		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
 			g.Expect(comp.Generation).Should(BeEquivalentTo(1))
@@ -280,9 +280,10 @@ var _ = Describe("Cluster Controller", func() {
 			f.SetName(randClusterName).
 				AddAppManagedByLabel().
 				AddAppInstanceLabel(randClusterName).
-				AddClusterService(appsv1alpha1.ClusterService{
+				AddService(appsv1alpha1.Service{
 					Name:              service.Name,
-					Service:           service,
+					ServiceName:       service.Name,
+					Spec:              service.Spec,
 					ComponentSelector: compName,
 					RoleSelector:      constant.Follower,
 				})
@@ -304,7 +305,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("check component service created")
 		compSvcKey := types.NamespacedName{
 			Namespace: clusterKey.Namespace,
-			Name:      constant.GenerateComponentServiceEndpoint(clusterObj.Name, compName, ""),
+			Name:      constant.GenerateComponentServiceName(clusterObj.Name, compName, ""),
 		}
 		Eventually(testapps.CheckObj(&testCtx, compSvcKey, func(g Gomega, svc *corev1.Service) {
 			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.AppManagedByLabelKey, constant.AppName))
@@ -320,7 +321,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("check component headless service created")
 		compHeadlessSvcKey := types.NamespacedName{
 			Namespace: clusterKey.Namespace,
-			Name:      constant.GenerateComponentServiceEndpoint(clusterObj.Name, compName, "headless"),
+			Name:      constant.GenerateComponentServiceName(clusterObj.Name, compName, "headless"),
 		}
 		Eventually(testapps.CheckObj(&testCtx, compHeadlessSvcKey, func(g Gomega, svc *corev1.Service) {
 			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.AppManagedByLabelKey, constant.AppName))
@@ -495,41 +496,37 @@ var _ = Describe("Cluster Controller", func() {
 			testapps.ServiceInternetName: {"", corev1.ServiceTypeLoadBalancer},
 		}
 
-		clusterServices := make([]appsv1alpha1.ClusterService, 0)
+		services := make([]appsv1alpha1.Service, 0)
 		for name, svc := range expectServices {
-			clusterServices = append(clusterServices, appsv1alpha1.ClusterService{
-				Name: name,
-				Service: corev1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: name,
+			services = append(services, appsv1alpha1.Service{
+				Name:        name,
+				ServiceName: name,
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{Port: 3306},
 					},
-					Spec: corev1.ServiceSpec{
-						Ports: []corev1.ServicePort{
-							{Port: 3306},
-						},
-						Type:      svc.svcType,
-						ClusterIP: svc.clusterIP,
-					},
+					Type:      svc.svcType,
+					ClusterIP: svc.clusterIP,
 				},
 				ComponentSelector: compName,
 				// RoleSelector:      []string{"leader"},
 			})
 		}
 		createObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
-			f.AddClusterService(clusterServices[0]).
-				AddClusterService(clusterServices[1]).
-				AddClusterService(clusterServices[2])
+			f.AddService(services[0]).
+				AddService(services[1]).
+				AddService(services[2])
 		})
 
-		deleteService := clusterServices[2]
-		lastClusterService := clusterServices[3]
+		deleteService := services[2]
+		lastService := services[3]
 
 		By("create last cluster service manually which will not owned by cluster")
-		svcObj := builder.NewServiceBuilder(clusterObj.Namespace, lastClusterService.Service.Name).
+		svcObj := builder.NewServiceBuilder(clusterObj.Namespace, lastService.ServiceName).
 			AddLabelsInMap(constant.GetClusterWellKnownLabels(clusterObj.Name)).
-			SetSpec(&lastClusterService.Service.Spec).
-			AddSelector(constant.KBAppComponentLabelKey, lastClusterService.ComponentSelector).
-			// AddSelector(constant.RoleLabelKey, lastClusterService.RoleSelector[0]).
+			SetSpec(&lastService.Spec).
+			AddSelector(constant.KBAppComponentLabelKey, lastService.ComponentSelector).
+			// AddSelector(constant.RoleLabelKey, lastService.RoleSelector[0]).
 			Optimize4ExternalTraffic().
 			GetObject()
 		Expect(testCtx.CheckedCreateObj(testCtx.Ctx, svcObj)).Should(Succeed())
@@ -540,20 +537,20 @@ var _ = Describe("Cluster Controller", func() {
 		By("delete a cluster service")
 		delete(expectServices, deleteService.Name)
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
-			var services []appsv1alpha1.ClusterService
+			var svcs []appsv1alpha1.Service
 			for _, item := range cluster.Spec.Services {
 				if item.Name != deleteService.Name {
-					services = append(services, item)
+					svcs = append(svcs, item)
 				}
 			}
-			cluster.Spec.Services = services
+			cluster.Spec.Services = svcs
 		})()).ShouldNot(HaveOccurred())
 
 		By("check the service has been deleted, and the non-managed service has not been deleted")
 		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compName) }).Should(Succeed())
 
 		By("add the deleted service back")
-		expectServices[deleteService.Name] = expectService{deleteService.Service.Spec.ClusterIP, deleteService.Service.Spec.Type}
+		expectServices[deleteService.Name] = expectService{deleteService.Spec.ClusterIP, deleteService.Spec.Type}
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 			cluster.Spec.Services = append(cluster.Spec.Services, deleteService)
 		})()).ShouldNot(HaveOccurred())

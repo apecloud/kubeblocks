@@ -63,38 +63,18 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 }
 
 func (t *componentServiceTransformer) buildService(comp *appsv1alpha1.Component,
-	synthesizeComp *component.SynthesizedComponent, service *appsv1alpha1.ComponentService) (*corev1.Service, error) {
+	synthesizeComp *component.SynthesizedComponent, service *appsv1alpha1.Service) (*corev1.Service, error) {
 	var (
 		namespace   = synthesizeComp.Namespace
 		clusterName = synthesizeComp.ClusterName
 		compName    = synthesizeComp.Name
 	)
 
-	serviceName := constant.GenerateComponentServiceEndpoint(clusterName, synthesizeComp.Name, string(service.ServiceName))
+	serviceName := constant.GenerateComponentServiceName(clusterName, synthesizeComp.Name, service.ServiceName)
 	labels := constant.GetComponentWellKnownLabels(clusterName, compName)
 	builder := builder.NewServiceBuilder(namespace, serviceName).
 		AddLabelsInMap(labels).
-		SetSpec(&corev1.ServiceSpec{
-			Ports:                         service.Ports,
-			Selector:                      service.Selector,
-			ClusterIP:                     service.ClusterIP,
-			ClusterIPs:                    service.ClusterIPs,
-			Type:                          service.Type,
-			ExternalIPs:                   service.ExternalIPs,
-			SessionAffinity:               service.SessionAffinity,
-			LoadBalancerIP:                service.LoadBalancerIP,
-			LoadBalancerSourceRanges:      service.LoadBalancerSourceRanges,
-			ExternalName:                  service.ExternalName,
-			ExternalTrafficPolicy:         service.ExternalTrafficPolicy,
-			HealthCheckNodePort:           service.HealthCheckNodePort,
-			PublishNotReadyAddresses:      service.PublishNotReadyAddresses,
-			SessionAffinityConfig:         service.SessionAffinityConfig,
-			IPFamilies:                    service.IPFamilies,
-			IPFamilyPolicy:                service.IPFamilyPolicy,
-			AllocateLoadBalancerNodePorts: service.AllocateLoadBalancerNodePorts,
-			LoadBalancerClass:             service.LoadBalancerClass,
-			InternalTrafficPolicy:         service.InternalTrafficPolicy,
-		}).
+		SetSpec(&service.Spec).
 		AddSelectorsInMap(t.builtinSelector(comp)).
 		Optimize4ExternalTraffic()
 

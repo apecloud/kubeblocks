@@ -81,10 +81,10 @@ func (factory *MockClusterFactory) AddComponentV2(compName string, compDefName s
 	return factory
 }
 
-func (factory *MockClusterFactory) AddClusterService(service appsv1alpha1.ClusterService) *MockClusterFactory {
+func (factory *MockClusterFactory) AddService(service appsv1alpha1.Service) *MockClusterFactory {
 	services := factory.Get().Spec.Services
 	if len(services) == 0 {
-		services = []appsv1alpha1.ClusterService{}
+		services = []appsv1alpha1.Service{}
 	}
 	services = append(services, service)
 	factory.Get().Spec.Services = services

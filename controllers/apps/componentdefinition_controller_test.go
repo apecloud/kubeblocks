@@ -248,7 +248,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddServiceExt("default", "", "leader", corev1.ServiceSpec{}).
+				AddServiceExt("default", "", corev1.ServiceSpec{}, "leader").
 				AddRole("leader", true, true).
 				AddRole("follower", true, false).
 				Create(&testCtx).GetObject()

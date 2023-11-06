@@ -257,11 +257,11 @@ var (
 				NeedSnapshot: true,
 			},
 		},
-		Services: []appsv1alpha1.ComponentService{
+		Services: []appsv1alpha1.Service{
 			{
 				Name:        "rw",
 				ServiceName: "rw",
-				ServiceSpec: corev1.ServiceSpec{
+				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{
 							Protocol: corev1.ProtocolTCP,
@@ -278,7 +278,7 @@ var (
 			{
 				Name:        "ro",
 				ServiceName: "ro",
-				ServiceSpec: corev1.ServiceSpec{
+				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{
 							Protocol: corev1.ProtocolTCP,

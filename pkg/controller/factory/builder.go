@@ -523,9 +523,9 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 		"$(UUID_B64)":             uuidB64,
 		"$(UUID_STR_B64)":         uuidStrB64,
 		"$(UUID_HEX)":             uuidHex,
-		"$(SVC_FQDN)":             constant.GenerateDefaultComponentServiceEndpoint(cluster.Name, component.Name),
-		"$(KB_CLUSTER_COMP_NAME)": constant.GenerateClusterComponentPattern(cluster.Name, component.Name),
-		"$(HEADLESS_SVC_FQDN)":    constant.GenerateDefaultComponentHeadlessServiceEndpoint(cluster.Name, component.Name),
+		"$(SVC_FQDN)":             constant.GenerateDefaultComponentServiceName(cluster.Name, component.Name),
+		"$(KB_CLUSTER_COMP_NAME)": constant.GenerateClusterComponentName(cluster.Name, component.Name),
+		"$(HEADLESS_SVC_FQDN)":    constant.GenerateDefaultComponentHeadlessServiceName(cluster.Name, component.Name),
 	}
 	if len(component.Services) > 0 {
 		for _, p := range component.Services[0].Spec.Ports {
@@ -562,7 +562,7 @@ func BuildPDB(synthesizedComp *component.SynthesizedComponent) *policyv1.PodDisr
 		compName    = synthesizedComp.Name
 		labels      = constant.GetKBWellKnownLabels(synthesizedComp.ClusterDefName, clusterName, compName)
 	)
-	return builder.NewPDBBuilder(namespace, constant.GenerateClusterComponentPattern(clusterName, compName)).
+	return builder.NewPDBBuilder(namespace, constant.GenerateClusterComponentName(clusterName, compName)).
 		AddLabelsInMap(labels).
 		AddLabelsInMap(constant.GetClusterCompDefLabel(synthesizedComp.ClusterCompDefName)).
 		AddSelectorsInMap(labels).

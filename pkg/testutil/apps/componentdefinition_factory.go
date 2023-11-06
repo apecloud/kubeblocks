@@ -115,18 +115,18 @@ func (f *MockComponentDefinitionFactory) AddService(name, serviceName string, po
 			Port: port,
 		}},
 	}
-	return f.AddServiceExt(name, serviceName, roleSelector, serviceSpec)
+	return f.AddServiceExt(name, serviceName, serviceSpec, roleSelector)
 }
 
-func (f *MockComponentDefinitionFactory) AddServiceExt(name, serviceName string, roleSelector string, serviceSpec corev1.ServiceSpec) *MockComponentDefinitionFactory {
-	svc := appsv1alpha1.ComponentService{
+func (f *MockComponentDefinitionFactory) AddServiceExt(name, serviceName string, serviceSpec corev1.ServiceSpec, roleSelector string) *MockComponentDefinitionFactory {
+	svc := appsv1alpha1.Service{
 		Name:         name,
-		ServiceName:  appsv1alpha1.BuiltInString(serviceName),
-		ServiceSpec:  serviceSpec,
+		ServiceName:  serviceName,
+		Spec:         serviceSpec,
 		RoleSelector: roleSelector,
 	}
 	if f.Get().Spec.Services == nil {
-		f.Get().Spec.Services = make([]appsv1alpha1.ComponentService, 0)
+		f.Get().Spec.Services = make([]appsv1alpha1.Service, 0)
 	}
 	f.Get().Spec.Services = append(f.Get().Spec.Services, svc)
 	return f

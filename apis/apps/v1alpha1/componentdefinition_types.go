@@ -112,7 +112,7 @@ type ComponentDefinitionSpec struct {
 	// Services defines endpoints that can be used to access the component service to manage the component.
 	// Cannot be updated.
 	// +optional
-	Services []ComponentService `json:"services,omitempty"`
+	Services []Service `json:"services,omitempty"`
 
 	// The configs field provided by provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
@@ -243,29 +243,6 @@ type ComponentVolume struct {
 	// +kubebuilder:default=0
 	// +optional
 	HighWatermark int `json:"highWatermark,omitempty"`
-}
-
-type ComponentService struct {
-	// The name of the component service.
-	// Others can refer to this service by its name.
-	// Cannot be updated.
-	// +required
-	Name string `json:"name"`
-
-	// ServiceName defines the name of the service object.
-	// If not specified, the default service name with pattern <CLUSTER_NAME>-<COMPONENT_NAME> will be used.
-	// Only one default service name is allowed.
-	// Cannot be updated.
-	// +optional
-	ServiceName BuiltInString `json:"serviceName,omitempty"`
-
-	// Cannot be updated.
-	corev1.ServiceSpec `json:",inline"`
-
-	// RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined roles as selectors for the service.
-	// Cannot be updated.
-	// +optional
-	RoleSelector string `json:"roleSelector,omitempty"`
 }
 
 type ComponentSystemAccount struct {

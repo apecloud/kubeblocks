@@ -21,6 +21,7 @@ import (
 	"errors"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -584,4 +585,35 @@ var (
 type StatefulSetWorkload interface {
 	FinalStsUpdateStrategy() (appsv1.PodManagementPolicyType, appsv1.StatefulSetUpdateStrategy)
 	GetUpdateStrategy() UpdateStrategy
+}
+
+type Service struct {
+	// The name of the service.
+	// Others can refer to this service by its name. (e.g., connection credential)
+	// Cannot be updated.
+	// +required
+	Name string `json:"name"`
+
+	// ServiceName defines the name of the underlying service object.
+	// If not specified, the default service name with different patterns will be used:
+	//  - <CLUSTER_NAME>: for cluster-level services
+	//  - <CLUSTER_NAME>-<COMPONENT_NAME>: for component-level services
+	// Only one default service name is allowed.
+	// Cannot be updated.
+	// +optional
+	ServiceName string `json:"serviceName,omitempty"`
+
+	// Spec defines the behavior of a service.
+	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +optional
+	Spec corev1.ServiceSpec `json:"spec,omitempty"`
+
+	// ComponentSelector extends the ServiceSpec.Selector by allowing you to specify a component as selectors for the service.
+	// For component-level services, a default component selector with the component name will be added automatically.
+	// +optional
+	ComponentSelector string `json:"componentSelector,omitempty"`
+
+	// RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined role as selector for the service.
+	// +optional
+	RoleSelector string `json:"roleSelector,omitempty"`
 }

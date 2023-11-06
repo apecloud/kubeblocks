@@ -420,7 +420,7 @@ func GetEnvReplacementMapForConnCredential(clusterName string) map[string]string
 // GetEnvReplacementMapForCompConnCredential gets the replacement map for component connect credential
 func GetEnvReplacementMapForCompConnCredential(clusterName, componentName string) map[string]string {
 	return map[string]string{
-		constant.KBComponentConnCredentialPlaceHolder: constant.GenerateClusterComponentPattern(clusterName, componentName),
+		constant.KBComponentConnCredentialPlaceHolder: constant.GenerateClusterComponentName(clusterName, componentName),
 	}
 }
 
@@ -435,7 +435,7 @@ func replaceContainerPlaceholderTokens(component *SynthesizedComponent, namedVal
 
 // GetReplacementMapForBuiltInEnv gets the replacement map for KubeBlocks built-in environment variables.
 func GetReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName string) map[string]string {
-	cc := constant.GenerateClusterComponentPattern(clusterName, componentName)
+	cc := constant.GenerateClusterComponentName(clusterName, componentName)
 	replacementMap := map[string]string{
 		constant.KBClusterNamePlaceHolder:     clusterName,
 		constant.KBCompNamePlaceHolder:        componentName,

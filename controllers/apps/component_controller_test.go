@@ -1069,7 +1069,7 @@ var _ = Describe("Component Controller", func() {
 		By("check rw component services")
 		rwSvcKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
-			Name:      constant.GenerateComponentServiceEndpoint(clusterObj.Name, compName, "rw"),
+			Name:      constant.GenerateComponentServiceName(clusterObj.Name, compName, "rw"),
 		}
 		Eventually(testapps.CheckObj(&testCtx, rwSvcKey, func(g Gomega, svc *corev1.Service) {
 			g.Expect(svc.Spec.Ports).Should(ContainElements(targetPort))
@@ -1083,7 +1083,7 @@ var _ = Describe("Component Controller", func() {
 		By("check ro component services")
 		roSvcKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
-			Name:      constant.GenerateComponentServiceEndpoint(clusterObj.Name, compName, "ro"),
+			Name:      constant.GenerateComponentServiceName(clusterObj.Name, compName, "ro"),
 		}
 		Eventually(testapps.CheckObj(&testCtx, roSvcKey, func(g Gomega, svc *corev1.Service) {
 			g.Expect(svc.Spec.Ports).Should(ContainElements(targetPort))
@@ -1122,7 +1122,7 @@ var _ = Describe("Component Controller", func() {
 		createClusterObjV2(compName, compDefObj.Name, nil)
 
 		By("check root conn credential")
-		serviceName := constant.GenerateComponentServiceEndpoint(clusterObj.Name, compName, "rw")
+		serviceName := constant.GenerateComponentServiceName(clusterObj.Name, compName, "rw")
 		servicePort := "3306"
 		endpoint := fmt.Sprintf("%s:%s", serviceName, servicePort)
 		rootSecretKey := types.NamespacedName{

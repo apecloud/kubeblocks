@@ -417,32 +417,32 @@ var _ = Describe("Component Definition Convertor", func() {
 				res, err := convertor.convert(clusterCompDef, clusterName)
 				Expect(err).Should(Succeed())
 
-				services, ok := res.([]appsv1alpha1.ComponentService)
+				services, ok := res.([]appsv1alpha1.Service)
 				Expect(ok).Should(BeTrue())
 				Expect(services).Should(HaveLen(2))
 
 				// service
 				Expect(services[0].ServiceName).Should(BeEmpty())
-				Expect(services[0].ServiceSpec.Ports).Should(HaveLen(len(clusterCompDef.Service.Ports)))
-				for i := range services[0].ServiceSpec.Ports {
-					Expect(services[0].ServiceSpec.Ports[i].Name).Should(Equal(clusterCompDef.Service.Ports[i].Name))
-					Expect(services[0].ServiceSpec.Ports[i].Port).Should(Equal(clusterCompDef.Service.Ports[i].Port))
-					Expect(services[0].ServiceSpec.Ports[i].TargetPort).Should(Equal(clusterCompDef.Service.Ports[i].TargetPort))
+				Expect(services[0].Spec.Ports).Should(HaveLen(len(clusterCompDef.Service.Ports)))
+				for i := range services[0].Spec.Ports {
+					Expect(services[0].Spec.Ports[i].Name).Should(Equal(clusterCompDef.Service.Ports[i].Name))
+					Expect(services[0].Spec.Ports[i].Port).Should(Equal(clusterCompDef.Service.Ports[i].Port))
+					Expect(services[0].Spec.Ports[i].TargetPort).Should(Equal(clusterCompDef.Service.Ports[i].TargetPort))
 				}
-				Expect(services[0].ServiceSpec.Type).Should(Equal(corev1.ServiceTypeClusterIP))
-				Expect(services[0].ServiceSpec.ClusterIP).Should(BeEmpty())
+				Expect(services[0].Spec.Type).Should(Equal(corev1.ServiceTypeClusterIP))
+				Expect(services[0].Spec.ClusterIP).Should(BeEmpty())
 				Expect(services[0].RoleSelector).Should(BeEquivalentTo(constant.Leader))
 
 				// headless service
 				Expect(services[1].ServiceName).Should(BeEquivalentTo("headless"))
-				Expect(len(services[1].ServiceSpec.Ports)).Should(Equal(len(clusterCompDef.Service.Ports) + len(clusterCompDef.PodSpec.Containers[0].Ports)))
+				Expect(len(services[1].Spec.Ports)).Should(Equal(len(clusterCompDef.Service.Ports) + len(clusterCompDef.PodSpec.Containers[0].Ports)))
 				for i := range clusterCompDef.Service.Ports {
-					Expect(services[1].ServiceSpec.Ports[i].Name).Should(Equal(clusterCompDef.Service.Ports[i].Name))
-					Expect(services[1].ServiceSpec.Ports[i].Port).Should(Equal(clusterCompDef.Service.Ports[i].Port))
-					Expect(services[1].ServiceSpec.Ports[i].TargetPort).Should(Equal(clusterCompDef.Service.Ports[i].TargetPort))
+					Expect(services[1].Spec.Ports[i].Name).Should(Equal(clusterCompDef.Service.Ports[i].Name))
+					Expect(services[1].Spec.Ports[i].Port).Should(Equal(clusterCompDef.Service.Ports[i].Port))
+					Expect(services[1].Spec.Ports[i].TargetPort).Should(Equal(clusterCompDef.Service.Ports[i].TargetPort))
 				}
-				Expect(services[1].ServiceSpec.Type).Should(Equal(corev1.ServiceTypeClusterIP))
-				Expect(services[1].ServiceSpec.ClusterIP).Should(Equal(corev1.ClusterIPNone))
+				Expect(services[1].Spec.Type).Should(Equal(corev1.ServiceTypeClusterIP))
+				Expect(services[1].Spec.ClusterIP).Should(Equal(corev1.ClusterIPNone))
 				Expect(services[1].RoleSelector).Should(BeEquivalentTo(constant.Leader))
 			})
 		})

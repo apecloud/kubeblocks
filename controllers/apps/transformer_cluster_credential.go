@@ -136,8 +136,8 @@ func (t *ClusterCredentialTransformer) buildClusterCredential(transCtx *clusterT
 
 func (t *ClusterCredentialTransformer) buildServiceEndpoint(cluster *appsv1alpha1.Cluster, compDef *appsv1alpha1.ComponentDefinition,
 	credential appsv1alpha1.ClusterCredential, data *map[string]string) error {
-	clusterSvc, compSvc, ports := t.lookupMatchedService(cluster, compDef, credential)
-	if clusterSvc == nil && compSvc == nil {
+	serviceName, ports := t.lookupMatchedService(cluster, compDef, credential)
+	if len(serviceName) == 0 {
 		return fmt.Errorf("cluster credential references a service which is not definied: %s-%s", cluster.Name, credential.Name)
 	}
 	if len(ports) == 0 {
@@ -147,59 +147,37 @@ func (t *ClusterCredentialTransformer) buildServiceEndpoint(cluster *appsv1alpha
 		return fmt.Errorf("cluster credential should specify which port to use for the referenced service: %s-%s", cluster.Name, credential.Name)
 	}
 
-	if clusterSvc != nil {
-		t.buildEndpointFromClusterService(credential, clusterSvc, data)
-	} else {
-		t.buildEndpointFromComponentService(cluster, credential, compSvc, data)
-	}
+	t.buildEndpointFromService(credential, serviceName, ports, data)
 	return nil
 }
 
 func (t *ClusterCredentialTransformer) lookupMatchedService(cluster *appsv1alpha1.Cluster,
-	compDef *appsv1alpha1.ComponentDefinition, credential appsv1alpha1.ClusterCredential) (*appsv1alpha1.ClusterService, *appsv1alpha1.ComponentService, []corev1.ServicePort) {
+	compDef *appsv1alpha1.ComponentDefinition, credential appsv1alpha1.ClusterCredential) (string, []corev1.ServicePort) {
 	for i, svc := range cluster.Spec.Services {
 		if svc.Name == credential.ServiceName {
-			return &cluster.Spec.Services[i], nil, cluster.Spec.Services[i].Service.Spec.Ports
+			// TODO(component): service name
+			return svc.ServiceName, cluster.Spec.Services[i].Spec.Ports
 		}
 	}
 	if len(credential.ComponentName) > 0 && compDef != nil {
 		for i, svc := range compDef.Spec.Services {
 			if svc.Name == credential.ServiceName {
-				return nil, &compDef.Spec.Services[i], compDef.Spec.Services[i].Ports
+				// TODO(component): service.ServiceName
+				serviceName := constant.GenerateComponentServiceName(cluster.Name, credential.ComponentName, svc.ServiceName)
+				return serviceName, compDef.Spec.Services[i].Spec.Ports
 			}
 		}
 	}
-	return nil, nil, nil
+	return "", nil
 }
 
-func (t *ClusterCredentialTransformer) buildEndpointFromClusterService(credential appsv1alpha1.ClusterCredential,
-	service *appsv1alpha1.ClusterService, data *map[string]string) {
+func (t *ClusterCredentialTransformer) buildEndpointFromService(credential appsv1alpha1.ClusterCredential,
+	serviceName string, ports []corev1.ServicePort, data *map[string]string) {
 	port := int32(0)
 	if len(credential.PortName) == 0 {
-		port = service.Service.Spec.Ports[0].Port
+		port = ports[0].Port
 	} else {
-		for _, servicePort := range service.Service.Spec.Ports {
-			if servicePort.Name == credential.PortName {
-				port = servicePort.Port
-				break
-			}
-		}
-	}
-	// TODO(component): define the service and port pattern
-	(*data)["service"] = service.Name
-	(*data)["port"] = fmt.Sprintf("%d", port)
-}
-
-func (t *ClusterCredentialTransformer) buildEndpointFromComponentService(cluster *appsv1alpha1.Cluster,
-	credential appsv1alpha1.ClusterCredential, service *appsv1alpha1.ComponentService, data *map[string]string) {
-	// TODO(component): service.ServiceName
-	serviceName := constant.GenerateComponentServiceEndpoint(cluster.Name, credential.ComponentName, string(service.ServiceName))
-
-	port := int32(0)
-	if len(credential.PortName) == 0 {
-		port = service.Ports[0].Port
-	} else {
-		for _, servicePort := range service.Ports {
+		for _, servicePort := range ports {
 			if servicePort.Name == credential.PortName {
 				port = servicePort.Port
 				break

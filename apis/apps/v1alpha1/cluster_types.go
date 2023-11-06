@@ -74,7 +74,7 @@ type ClusterSpec struct {
 	// services defines the services to access a cluster.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
-	Services []ClusterService `json:"services,omitempty"`
+	Services []Service `json:"services,omitempty"`
 
 	// credentials defines the credentials used to access a cluster.
 	// +kubebuilder:pruning:PreserveUnknownFields
@@ -657,28 +657,6 @@ type TLSSecretRef struct {
 	// Key of TLS private key in Secret
 	// +kubebuilder:validation:Required
 	Key string `json:"key"`
-}
-
-type ClusterService struct {
-	// The name of the cluster service.
-	// Others can refer to this service by its name.
-	// Cannot be updated.
-	// +required
-	Name string `json:"name"`
-
-	// Cannot be updated.
-	// +required
-	Service corev1.Service `json:"service"`
-
-	// ComponentSelector extends the ServiceSpec.Selector by allowing you to specify a component as selectors for the service.
-	// Cannot be updated.
-	// +optional
-	ComponentSelector string `json:"componentSelector,omitempty"`
-
-	// RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined roles as selector for the service.
-	// Cannot be updated.
-	// +optional
-	RoleSelector string `json:"roleSelector,omitempty"`
 }
 
 type ClusterComponentService struct {

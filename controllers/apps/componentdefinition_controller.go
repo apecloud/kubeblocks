@@ -203,7 +203,7 @@ func (r *ComponentDefinitionReconciler) validateServices(cli client.Client, rctx
 
 	for i, svc := range cmpd.Spec.Services {
 		if len(svc.ServiceName) == 0 {
-			cmpd.Spec.Services[i].ServiceName = appsv1alpha1.BuiltInString(defaultServiceName)
+			cmpd.Spec.Services[i].ServiceName = defaultServiceName
 		}
 	}
 	if !checkUniqueItem(cmpd.Spec.Services, "ServiceName") {
@@ -211,7 +211,7 @@ func (r *ComponentDefinitionReconciler) validateServices(cli client.Client, rctx
 	}
 
 	for _, svc := range cmpd.Spec.Services {
-		if len(svc.Ports) == 0 {
+		if len(svc.Spec.Ports) == 0 {
 			return fmt.Errorf("there is no port defined for service: %s", svc.Name)
 		}
 	}
@@ -304,7 +304,7 @@ func (r *ComponentDefinitionReconciler) validateConnectionCredentialService(cmpd
 	}
 	for _, svc := range cmpd.Spec.Services {
 		if svc.Name == cc.ServiceName {
-			return r.validateConnectionCredentialPort(cmpd, cc, svc.Ports)
+			return r.validateConnectionCredentialPort(cmpd, cc, svc.Spec.Ports)
 		}
 	}
 	return fmt.Errorf("there is no matched service for connection credential: %s", cc.Name)

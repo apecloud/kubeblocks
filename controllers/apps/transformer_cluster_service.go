@@ -51,7 +51,7 @@ func (t *ClusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
-	clusterServices, err := t.listClusterServices(transCtx, cluster)
+	services, err := t.listClusterServices(transCtx, cluster)
 	if err != nil {
 		return err
 	}
@@ -64,31 +64,31 @@ func (t *ClusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 		if err = t.createOrUpdate(ctx, dag, graphCli, service); err != nil {
 			return err
 		}
-		delete(clusterServices, service.Name)
+		delete(services, service.Name)
 	}
 
-	for svc := range clusterServices {
-		graphCli.Delete(dag, clusterServices[svc])
+	for svc := range services {
+		graphCli.Delete(dag, services[svc])
 	}
 
 	return nil
 }
 
 func (t *ClusterServiceTransformer) buildService(transCtx *clusterTransformContext,
-	cluster *appsv1alpha1.Cluster, service *appsv1alpha1.ClusterService) (*corev1.Service, error) {
+	cluster *appsv1alpha1.Cluster, service *appsv1alpha1.Service) (*corev1.Service, error) {
 	var (
 		namespace   = cluster.Namespace
 		clusterName = cluster.Name
 	)
 
-	builder := builder.NewServiceBuilder(namespace, service.Service.Name).
+	builder := builder.NewServiceBuilder(namespace, service.ServiceName).
 		AddLabelsInMap(constant.GetClusterWellKnownLabels(clusterName)).
-		SetSpec(&service.Service.Spec).
+		SetSpec(&service.Spec).
 		AddSelectorsInMap(t.builtinSelector(cluster)).
 		Optimize4ExternalTraffic()
 
 	if len(service.ComponentSelector) > 0 {
-		compDef, err := t.checkComponent(transCtx, cluster, service)
+		compDef, err := t.checkComponent(transCtx, service)
 		if err != nil {
 			return nil, err
 		}
@@ -119,8 +119,7 @@ func (t *ClusterServiceTransformer) builtinSelector(cluster *appsv1alpha1.Cluste
 	return selectors
 }
 
-func (t *ClusterServiceTransformer) checkComponent(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster,
-	service *appsv1alpha1.ClusterService) (*appsv1alpha1.ComponentDefinition, error) {
+func (t *ClusterServiceTransformer) checkComponent(transCtx *clusterTransformContext, service *appsv1alpha1.Service) (*appsv1alpha1.ComponentDefinition, error) {
 	compName := service.ComponentSelector
 	for _, comp := range transCtx.ComponentSpecs {
 		if comp.Name == compName {
@@ -134,7 +133,7 @@ func (t *ClusterServiceTransformer) checkComponent(transCtx *clusterTransformCon
 	return nil, fmt.Errorf("the component of service selector is not exist, service: %s, component: %s", service.Name, compName)
 }
 
-func (t *ClusterServiceTransformer) checkComponentRoles(compDef *appsv1alpha1.ComponentDefinition, service *appsv1alpha1.ClusterService) error {
+func (t *ClusterServiceTransformer) checkComponentRoles(compDef *appsv1alpha1.ComponentDefinition, service *appsv1alpha1.Service) error {
 	definedRoles := make(map[string]bool)
 	for _, role := range compDef.Spec.Roles {
 		definedRoles[strings.ToLower(role.Name)] = true

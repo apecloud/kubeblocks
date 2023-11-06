@@ -23,25 +23,9 @@ import (
 	"fmt"
 )
 
-// GenerateDefaultConnCredential generates default connection credential name of cluster
-func GenerateDefaultConnCredential(clusterName string) string {
-	return GenerateClusterConnCredential(clusterName, "")
-}
-
-// GenerateClusterConnCredential generates connection credential name of cluster
-func GenerateClusterConnCredential(clusterName, name string) string {
-	if len(name) == 0 {
-		name = "conn-credential"
-	}
-	return fmt.Sprintf("%s-%s", clusterName, name)
-}
-
-// GenerateComponentConnCredential generates connection credential name of component
-func GenerateComponentConnCredential(clusterName, compName, name string) string {
-	if len(name) == 0 {
-		name = "conn-credential"
-	}
-	return fmt.Sprintf("%s-%s-%s", clusterName, compName, name)
+// GenerateClusterComponentName generates the cluster component name.
+func GenerateClusterComponentName(clusterName, compName string) string {
+	return fmt.Sprintf("%s-%s", clusterName, compName)
 }
 
 // GenerateAccountSecretName generates the secret name of system accounts.
@@ -49,32 +33,51 @@ func GenerateAccountSecretName(clusterName, compName, name string) string {
 	return fmt.Sprintf("%s-%s-account-%s", clusterName, compName, name)
 }
 
-// GenerateComponentServiceEndpoint generates service endpoint of component
-func GenerateComponentServiceEndpoint(clusterName, compName, svcName string) string {
+// GenerateComponentServiceName generates the service name for component.
+func GenerateComponentServiceName(clusterName, compName, svcName string) string {
 	if len(svcName) > 0 {
 		return fmt.Sprintf("%s-%s-%s", clusterName, compName, svcName)
 	}
 	return fmt.Sprintf("%s-%s", clusterName, compName)
 }
 
-// GenerateDefaultComponentServiceEndpoint generates default service endpoint of component
-func GenerateDefaultComponentServiceEndpoint(clusterName, compName string) string {
-	return fmt.Sprintf("%s-%s", clusterName, compName)
+// GenerateDefaultComponentServiceName generates the default service name for component.
+func GenerateDefaultComponentServiceName(clusterName, compName string) string {
+	return GenerateComponentServiceName(clusterName, compName, "")
 }
 
-// GenerateComponentHeadlessServiceEndpoint generates headless service endpoint of component
-func GenerateComponentHeadlessServiceEndpoint(clusterName, compName, svcName string) string {
-	return fmt.Sprintf("%s-%s-%s-headless", clusterName, compName, svcName)
-}
-
-// GenerateDefaultComponentHeadlessServiceEndpoint generates default headless service endpoint of component
-func GenerateDefaultComponentHeadlessServiceEndpoint(clusterName, compName string) string {
+// GenerateComponentHeadlessService generates the headless service name for component.
+func GenerateComponentHeadlessService(clusterName, compName, svcName string) string {
+	if len(svcName) > 0 {
+		return fmt.Sprintf("%s-%s-%s-headless", clusterName, compName, svcName)
+	}
 	return fmt.Sprintf("%s-%s-headless", clusterName, compName)
 }
 
-// GenerateClusterComponentPattern generates cluster and component pattern
-func GenerateClusterComponentPattern(clusterName, compName string) string {
-	return fmt.Sprintf("%s-%s", clusterName, compName)
+// GenerateDefaultComponentHeadlessServiceName generates the default headless service name for component.
+func GenerateDefaultComponentHeadlessServiceName(clusterName, compName string) string {
+	return GenerateComponentHeadlessService(clusterName, compName, "")
+}
+
+// GenerateDefaultConnCredential generates the default connection credential name for cluster.
+func GenerateDefaultConnCredential(clusterName string) string {
+	return GenerateClusterConnCredential(clusterName, "")
+}
+
+// GenerateClusterConnCredential generates the connection credential name for cluster.
+func GenerateClusterConnCredential(clusterName, name string) string {
+	if len(name) == 0 {
+		name = "conn-credential"
+	}
+	return fmt.Sprintf("%s-%s", clusterName, name)
+}
+
+// GenerateComponentConnCredential generates the connection credential name for component.
+func GenerateComponentConnCredential(clusterName, compName, name string) string {
+	if len(name) == 0 {
+		name = "conn-credential"
+	}
+	return fmt.Sprintf("%s-%s-%s", clusterName, compName, name)
 }
 
 // GenerateClusterComponentEnvPattern generates cluster and component pattern

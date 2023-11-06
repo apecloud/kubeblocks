@@ -82,7 +82,7 @@ jobs:
   e2e:
     name: ${{ inputs.CLOUD_PROVIDER }}
     needs: check
-    uses: apecloud/apecloud-cd/.github/workflows/smoke-test-k8s.yml@main
+    uses: apecloud/apecloud-cd/.github/workflows/smoke-test-k8s.yml@support/smoke_test
     with:
       CLOUD_PROVIDER: "${{ inputs.CLOUD_PROVIDER }}"
       KB_VERSION: "${{ needs.check.outputs.release-version }}"

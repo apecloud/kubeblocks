@@ -12,6 +12,13 @@ data:
     if [ "$country" == "CN" ]; then
       CLONE_MODEL_SCRIPT="git lfs install; git clone https://www.modelscope.cn/${MODEL_NAME}.git"
       export MODEL_NAME="../${MODEL_NAME##*/}"
+    else
+      curl --max-time 10 https://huggingface.co/${MODEL_NAME} > /dev/null 2>&1
+      code=$?
+      if [ "$code" -ne 0 ]; then 
+        CLONE_MODEL_SCRIPT="git lfs install; git clone https://www.modelscope.cn/${MODEL_NAME}.git"
+        export MODEL_NAME="../${MODEL_NAME##*/}"
+      fi
     fi 
     echo "model=${MODEL_NAME}"
     if [ -n "$CLONE_MODEL_SCRIPT" ]; then

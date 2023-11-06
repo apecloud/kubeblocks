@@ -154,27 +154,31 @@ func (w *oteldWrapper) buildProcessor(pipeline *types.Pipeline) {
 }
 
 func (w *oteldWrapper) buildMetricsExporter(pipeline *types.Pipeline) {
-	for _, exporter := range w.metricsExporters.Items {
-		for _, exporterName := range w.source.MetricsExporterRef {
-			if exporter.Name == exporterName {
-				pipeline.ExporterMap[fmt.Sprintf(ExporterNamePattern, exporter.Spec.Type, exporter.Name)] = true
-				return
-			}
+	for _, exporterName := range w.source.MetricsExporterRef {
+		if exporter := w.foundMetricsExporter(exporterName); exporter != "" {
+			pipeline.ExporterMap[exporter] = true
+			continue
 		}
+		w.errs = append(w.errs, cfgcore.MakeError(
+			"the metrics exporter[%s] relied on by %s was not found.",
+			w.source.MetricsExporterRef,
+			pipeline.Name),
+		)
 	}
-	w.errs = append(w.errs, cfgcore.MakeError("the metrics exporter[%s] relied on by %s was not found.", w.source.MetricsExporterRef, pipeline.Name))
 }
 
 func (w *oteldWrapper) buildLogsExporter(pipeline *types.Pipeline) {
-	for _, exporter := range w.logsExporters.Items {
-		for _, exporterName := range w.source.LogsExporterRef {
-			if exporter.Name == exporterName {
-				pipeline.ExporterMap[fmt.Sprintf(ExporterNamePattern, exporter.Spec.Type, exporter.Name)] = true
-				return
-			}
+	for _, exporterName := range w.source.LogsExporterRef {
+		if exporter := w.foundLogExporter(exporterName); exporter != "" {
+			pipeline.ExporterMap[exporter] = true
+			continue
 		}
+		w.errs = append(w.errs, cfgcore.MakeError(
+			"the logs exporter[%s] relied on by %s was not found.",
+			w.source.LogsExporterRef,
+			pipeline.Name),
+		)
 	}
-	w.errs = append(w.errs, cfgcore.MakeError("the logs exporter[%s] relied on by %s was not found.", w.source.LogsExporterRef, pipeline.Name))
 }
 
 func (w *oteldWrapper) appendAllMetricsExporter(pipeline *types.Pipeline) {
@@ -206,7 +210,7 @@ func (w *oteldWrapper) buildFixedPipeline() *oteldWrapper {
 	for _, instance := range w.instanceMap {
 		logsPipeline := types.NewPipeline(LogsCreatorName)
 		w.buildProcessor(&logsPipeline)
-		w.buildSysytemLogsExporter(&logsPipeline)
+		w.buildSystemLogsExporter(&logsPipeline)
 		instance.AppLogsPipeline = &logsPipeline
 
 		metricsPipeline := types.NewPipeline(AppMetricsCreatorName)
@@ -221,7 +225,7 @@ func (w *oteldWrapper) complete() error {
 	return errors.Join(w.errs...)
 }
 
-func (w *oteldWrapper) buildSysytemLogsExporter(pipeline *types.Pipeline) {
+func (w *oteldWrapper) buildSystemLogsExporter(pipeline *types.Pipeline) {
 	for _, exporterName := range w.OTeld.Spec.SystemDataSource.LogsExporterRef {
 		found := false
 		for _, exporter := range w.logsExporters.Items {
@@ -251,6 +255,24 @@ func (w *oteldWrapper) buildSysytemMetricsExporter(pipeline *types.Pipeline) {
 			w.errs = append(w.errs, cfgcore.MakeError("the metrics exporter[%s] relied on by %s was not found.", w.source.MetricsExporterRef, pipeline.Name))
 		}
 	}
+}
+
+func (w *oteldWrapper) foundLogExporter(exporterName string) (ret string) {
+	for _, exporter := range w.logsExporters.Items {
+		if exporter.Name == exporterName {
+			return fmt.Sprintf(ExporterNamePattern, exporter.Spec.Type, exporter.Name)
+		}
+	}
+	return
+}
+
+func (w *oteldWrapper) foundMetricsExporter(exporterName string) (ret string) {
+	for _, exporter := range w.metricsExporters.Items {
+		if exporter.Name == exporterName {
+			return fmt.Sprintf(ExporterNamePattern, exporter.Spec.Type, exporter.Name)
+		}
+	}
+	return
 }
 
 func foundOrCreatePipeline(instance *types.OteldInstance, name string, collectType collectType) *types.Pipeline {

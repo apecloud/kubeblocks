@@ -366,11 +366,11 @@ func (r *ComponentDefinitionReconciler) validateLifecycleActionBuiltInHandlers(l
 		return nil
 	}
 
-	builtInHandlerMap := make(map[string]bool)
-	supportedBuiltInHandlers := constant.GetSupportBuiltInHandlers()
+	builtInHandlerMap := make(map[appsv1alpha1.BuiltinActionHandlerType]bool)
+	supportedBuiltInHandlers := getBuiltinActionHandlers()
 
 	if lifecycleActions.RoleProbe != nil && lifecycleActions.RoleProbe.BuiltinHandler != nil {
-		if !slices.Contains(supportedBuiltInHandlers, constant.BuiltInHandlerType(*lifecycleActions.RoleProbe.BuiltinHandler)) {
+		if !slices.Contains(supportedBuiltInHandlers, *lifecycleActions.RoleProbe.BuiltinHandler) {
 			return fmt.Errorf("the builtin handler %s is not supported", *lifecycleActions.RoleProbe.BuiltinHandler)
 		}
 		builtInHandlerMap[*lifecycleActions.RoleProbe.BuiltinHandler] = true
@@ -393,7 +393,7 @@ func (r *ComponentDefinitionReconciler) validateLifecycleActionBuiltInHandlers(l
 
 	for _, action := range actions {
 		if action.LifeCycleActionHandlers != nil && action.LifeCycleActionHandlers.BuiltinHandler != nil {
-			if !slices.Contains(supportedBuiltInHandlers, constant.BuiltInHandlerType(*lifecycleActions.RoleProbe.BuiltinHandler)) {
+			if !slices.Contains(supportedBuiltInHandlers, *lifecycleActions.RoleProbe.BuiltinHandler) {
 				return fmt.Errorf("the builtin handler %s is not supported", *lifecycleActions.RoleProbe.BuiltinHandler)
 			}
 			builtInHandlerMap[*lifecycleActions.RoleProbe.BuiltinHandler] = true
@@ -442,4 +442,18 @@ func checkUniqueItem(slice any, fieldName string) bool {
 		lookupTable[fieldValue] = true
 	}
 	return true
+}
+
+func getBuiltinActionHandlers() []appsv1alpha1.BuiltinActionHandlerType {
+	return []appsv1alpha1.BuiltinActionHandlerType{
+		appsv1alpha1.MySQLBuiltinActionHandler,
+		appsv1alpha1.WeSQLBuiltinActionHandler,
+		appsv1alpha1.RedisBuiltinActionHandler,
+		appsv1alpha1.MongoDBBuiltinActionHandler,
+		appsv1alpha1.ETCDBuiltinActionHandler,
+		appsv1alpha1.PostgresqlBuiltinActionHandler,
+		appsv1alpha1.OfficialPostgresqlBuiltinActionHandler,
+		appsv1alpha1.ApeCloudPostgresqlBuiltinActionHandler,
+		appsv1alpha1.PolarDBXBuiltinActionHandler,
+	}
 }

@@ -248,11 +248,11 @@ func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container 
 		})
 
 	// inject the default built-in handler env to lorry container.
-	builtInHandlerName := getBuiltInHandlerName(synthesizeComp)
-	if builtInHandlerName != string(constant.UnKnownBuiltInHandlerName) {
+	builtinHandler := getBuiltinActionHandler(synthesizeComp)
+	if builtinHandler != appsv1alpha1.UnknownBuiltinActionHandler {
 		container.Env = append(container.Env, corev1.EnvVar{
 			Name:      constant.KBEnvBuiltinHandler,
-			Value:     builtInHandlerName,
+			Value:     string(builtinHandler),
 			ValueFrom: nil,
 		})
 	}
@@ -356,10 +356,11 @@ func env4VolumeProtection(spec appsv1alpha1.VolumeProtectionSpec) corev1.EnvVar 
 	}
 }
 
-// getBuiltInHandlerName gets the built-in handler name. the BuiltInHandlerName within the same synthesizeComp LifecycleActions should be consistent. we can take any one of them.
-func getBuiltInHandlerName(synthesizeComp *SynthesizedComponent) string {
+// getBuiltinActionHandler gets the built-in handler.
+// The BuiltinActionHandler within the same synthesizeComp LifecycleActions should be consistent, we can take any one of them.
+func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.BuiltinActionHandlerType {
 	if synthesizeComp.LifecycleActions == nil {
-		return string(constant.UnKnownBuiltInHandlerName)
+		return appsv1alpha1.UnknownBuiltinActionHandler
 	}
 
 	if synthesizeComp.LifecycleActions.RoleProbe != nil && synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != nil {
@@ -387,5 +388,5 @@ func getBuiltInHandlerName(synthesizeComp *SynthesizedComponent) string {
 		}
 	}
 
-	return string(constant.UnKnownBuiltInHandlerName)
+	return appsv1alpha1.UnknownBuiltinActionHandler
 }

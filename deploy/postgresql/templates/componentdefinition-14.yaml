@@ -121,7 +121,7 @@ spec:
       passwordGenerationPolicy: *defaultPasswdGenerationPolicy
   lifecycleActions:
     roleProbe:
-      builtinHandlerName: postgresql
+      builtinHandler: postgresql
       roleUpdateMechanism: DirectAPIServerEventUpdate
       failureThreshold: 2
       periodSeconds: 1

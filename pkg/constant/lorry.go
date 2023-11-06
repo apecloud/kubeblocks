@@ -19,22 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package constant
 
-// BuiltInHandlerType defines build-in handler type of lorry
-type BuiltInHandlerType string
-
-const (
-	MySQLBuiltInHandlerName              BuiltInHandlerType = "mysql"
-	WeSQLBuiltInHandlerName              BuiltInHandlerType = "wesql"
-	RedisBuiltInHandlerName              BuiltInHandlerType = "redis"
-	MongoDBBuiltInHandlerName            BuiltInHandlerType = "mongodb"
-	ETCDBuiltInHandlerName               BuiltInHandlerType = "etcd"
-	PostgresqlBuiltInHandlerName         BuiltInHandlerType = "postgresql"
-	OfficialPostgresqlBuiltInHandlerName BuiltInHandlerType = "official-postgresql"
-	ApeCloudPostgresqlBuiltInHandlerName BuiltInHandlerType = "apecloud-postgresql"
-	PolarDBXBuiltInHandlerName           BuiltInHandlerType = "polardbx"
-	UnKnownBuiltInHandlerName            BuiltInHandlerType = "unknown"
-)
-
 const (
 	PostgreSQLCharacterType = "postgresql"
 	MySQLCharacterType      = "mysql"
@@ -43,18 +27,3 @@ const (
 	ETCDCharacterType       = "etcd"
 	PolarDBXCharacterType   = "polardbx"
 )
-
-// GetSupportBuiltInHandlers get support all built-in handlers by lorry
-func GetSupportBuiltInHandlers() []BuiltInHandlerType {
-	return []BuiltInHandlerType{
-		MySQLBuiltInHandlerName,
-		WeSQLBuiltInHandlerName,
-		RedisBuiltInHandlerName,
-		MongoDBBuiltInHandlerName,
-		ETCDBuiltInHandlerName,
-		PostgresqlBuiltInHandlerName,
-		OfficialPostgresqlBuiltInHandlerName,
-		ApeCloudPostgresqlBuiltInHandlerName,
-		PolarDBXBuiltInHandlerName,
-	}
-}

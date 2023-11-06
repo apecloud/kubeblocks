@@ -468,33 +468,33 @@ func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
 	return lifecycleActions, nil // TODO
 }
 
-func (c *compDefLifecycleActionsConvertor) convertBuildInHandlerName(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) constant.BuiltInHandlerType {
+func (c *compDefLifecycleActionsConvertor) convertBuiltinActionHandler(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) appsv1alpha1.BuiltinActionHandlerType {
 	if clusterCompDef == nil || clusterCompDef.CharacterType == "" {
-		return constant.UnKnownBuiltInHandlerName
+		return appsv1alpha1.UnknownBuiltinActionHandler
 	}
 	switch clusterCompDef.CharacterType {
 	case constant.MySQLCharacterType:
 		if clusterCompDef.WorkloadType == appsv1alpha1.Consensus {
-			return constant.WeSQLBuiltInHandlerName
+			return appsv1alpha1.WeSQLBuiltinActionHandler
 		} else {
-			return constant.MySQLBuiltInHandlerName
+			return appsv1alpha1.MySQLBuiltinActionHandler
 		}
 	case constant.PostgreSQLCharacterType:
 		if clusterCompDef.WorkloadType == appsv1alpha1.Consensus {
-			return constant.ApeCloudPostgresqlBuiltInHandlerName
+			return appsv1alpha1.ApeCloudPostgresqlBuiltinActionHandler
 		} else {
-			return constant.PostgresqlBuiltInHandlerName
+			return appsv1alpha1.PostgresqlBuiltinActionHandler
 		}
 	case constant.RedisCharacterType:
-		return constant.RedisBuiltInHandlerName
+		return appsv1alpha1.RedisBuiltinActionHandler
 	case constant.MongoDBCharacterType:
-		return constant.MongoDBBuiltInHandlerName
+		return appsv1alpha1.MongoDBBuiltinActionHandler
 	case constant.ETCDCharacterType:
-		return constant.ETCDBuiltInHandlerName
+		return appsv1alpha1.ETCDBuiltinActionHandler
 	case constant.PolarDBXCharacterType:
-		return constant.PolarDBXBuiltInHandlerName
+		return appsv1alpha1.PolarDBXBuiltinActionHandler
 	default:
-		return constant.UnKnownBuiltInHandlerName
+		return appsv1alpha1.UnknownBuiltinActionHandler
 	}
 }
 
@@ -511,8 +511,8 @@ func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *apps
 	}
 
 	if clusterCompDefRoleProbe.Commands == nil || len(clusterCompDefRoleProbe.Commands.Writes) == 0 || len(clusterCompDefRoleProbe.Commands.Queries) == 0 {
-		buildInHandlerName := c.convertBuildInHandlerName(clusterCompDef)
-		roleProbeSpec.BuiltinHandler = (*string)(&buildInHandlerName)
+		builtinHandler := c.convertBuiltinActionHandler(clusterCompDef)
+		roleProbeSpec.BuiltinHandler = &builtinHandler
 		roleProbeSpec.CustomHandler = nil
 		return roleProbeSpec
 	}

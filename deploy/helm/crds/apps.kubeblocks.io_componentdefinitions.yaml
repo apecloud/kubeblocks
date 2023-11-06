@@ -220,11 +220,11 @@ spec:
                     description: AccountProvision defines how to provision accounts.
                       Cannot be updated.
                     properties:
-                      builtinHandlerName:
-                        description: builtinHandler specifies the builtin handler
+                      builtinHandler:
+                        description: builtinHandler specifies the builtin action handler
                           name to do the action. Different lifecycleActions support
-                          different BuiltinHandlers. Details can be queried through
-                          official documentation in the future. use CustomHandler
+                          different BuiltinActionHandlers. Details can be queried
+                          through official documentation in the future. use CustomActionHandler
                           to define your own actions if none of them satisfies the
                           requirement.
                         type: string
@@ -235,7 +235,8 @@ spec:
                             description: Container defines the name of the container
                               within the target Pod where the action will be executed.
                               If specified, it must be one of container declared in
-                              @Runtime. Cannot be updated.
+                              @Runtime. If not specified, the first container declared
+                              in @Runtime will be used. Cannot be updated.
                             type: string
                           env:
                             description: List of environment variables to set in the
@@ -467,7 +468,6 @@ spec:
                             enum:
                             - Any
                             - All
-                            - Pod
                             - Role
                             - Ordinal
                             type: string
@@ -488,11 +488,11 @@ spec:
                       the action must be able to guarantee idempotence to allow for
                       retries from the beginning. Cannot be updated.'
                     properties:
-                      builtinHandlerName:
-                        description: builtinHandler specifies the builtin handler
+                      builtinHandler:
+                        description: builtinHandler specifies the builtin action handler
                           name to do the action. Different lifecycleActions support
-                          different BuiltinHandlers. Details can be queried through
-                          official documentation in the future. use CustomHandler
+                          different BuiltinActionHandlers. Details can be queried
+                          through official documentation in the future. use CustomActionHandler
                           to define your own actions if none of them satisfies the
                           requirement.
                         type: string
@@ -503,7 +503,8 @@ spec:
                             description: Container defines the name of the container
                               within the target Pod where the action will be executed.
                               If specified, it must be one of container declared in
-                              @Runtime. Cannot be updated.
+                              @Runtime. If not specified, the first container declared
+                              in @Runtime will be used. Cannot be updated.
                             type: string
                           env:
                             description: List of environment variables to set in the
@@ -735,7 +736,6 @@ spec:
                             enum:
                             - Any
                             - All
-                            - Pod
                             - Role
                             - Ordinal
                             type: string
@@ -754,11 +754,11 @@ spec:
                       - clone It should write the valid data to stdout without including
                       any extraneous information. Cannot be updated.'
                     properties:
-                      builtinHandlerName:
-                        description: builtinHandler specifies the builtin handler
+                      builtinHandler:
+                        description: builtinHandler specifies the builtin action handler
                           name to do the action. Different lifecycleActions support
-                          different BuiltinHandlers. Details can be queried through
-                          official documentation in the future. use CustomHandler
+                          different BuiltinActionHandlers. Details can be queried
+                          through official documentation in the future. use CustomActionHandler
                           to define your own actions if none of them satisfies the
                           requirement.
                         type: string
@@ -769,7 +769,8 @@ spec:
                             description: Container defines the name of the container
                               within the target Pod where the action will be executed.
                               If specified, it must be one of container declared in
-                              @Runtime. Cannot be updated.
+                              @Runtime. If not specified, the first container declared
+                              in @Runtime will be used. Cannot be updated.
                             type: string
                           env:
                             description: List of environment variables to set in the
@@ -1001,7 +1002,6 @@ spec:
                             enum:
                             - Any
                             - All
-                            - Pod
                             - Role
                             - Ordinal
                             type: string
@@ -1020,11 +1020,11 @@ spec:
                       involve updating configuration, notifying other members, and
                       ensuring data consistency. Cannot be updated.
                     properties:
-                      builtinHandlerName:
-                        description: builtinHandler specifies the builtin handler
+                      builtinHandler:
+                        description: builtinHandler specifies the builtin action handler
                           name to do the action. Different lifecycleActions support
-                          different BuiltinHandlers. Details can be queried through
-                          official documentation in the future. use CustomHandler
+                          different BuiltinActionHandlers. Details can be queried
+                          through official documentation in the future. use CustomActionHandler
                           to define your own actions if none of them satisfies the
                           requirement.
                         type: string
@@ -1035,7 +1035,8 @@ spec:
                             description: Container defines the name of the container
                               within the target Pod where the action will be executed.
                               If specified, it must be one of container declared in
-                              @Runtime. Cannot be updated.
+                              @Runtime. If not specified, the first container declared
+                              in @Runtime will be used. Cannot be updated.
                             type: string
                           env:
                             description: List of environment variables to set in the
@@ -1267,7 +1268,6 @@ spec:
                             enum:
                             - Any
                             - All
-                            - Pod
                             - Role
                             - Ordinal
                             type: string
@@ -1287,11 +1287,11 @@ spec:
                       the departure, but it is advisable to avoid performing data
                       migration within this action. Cannot be updated.
                     properties:
-                      builtinHandlerName:
-                        description: builtinHandler specifies the builtin handler
+                      builtinHandler:
+                        description: builtinHandler specifies the builtin action handler
                           name to do the action. Different lifecycleActions support
-                          different BuiltinHandlers. Details can be queried through
-                          official documentation in the future. use CustomHandler
+                          different BuiltinActionHandlers. Details can be queried
+                          through official documentation in the future. use CustomActionHandler
                           to define your own actions if none of them satisfies the
                           requirement.
                         type: string
@@ -1302,7 +1302,8 @@ spec:
                             description: Container defines the name of the container
                               within the target Pod where the action will be executed.
                               If specified, it must be one of container declared in
-                              @Runtime. Cannot be updated.
+                              @Runtime. If not specified, the first container declared
+                              in @Runtime will be used. Cannot be updated.
                             type: string
                           env:
                             description: List of environment variables to set in the
@@ -1534,7 +1535,6 @@ spec:
                             enum:
                             - Any
                             - All
-                            - Pod
                             - Role
                             - Ordinal
                             type: string
@@ -1550,11 +1550,11 @@ spec:
                     description: PostStart is called immediately after a component
                       is created. Cannot be updated.
                     properties:
-                      builtinHandlerName:
-                        description: builtinHandler specifies the builtin handler
+                      builtinHandler:
+                        description: builtinHandler specifies the builtin action handler
                           name to do the action. Different lifecycleActions support
-                          different BuiltinHandlers. Details can be queried through
-                          official documentation in the future. use CustomHandler
+                          different BuiltinActionHandlers. Details can be queried
+                          through official documentation in the future. use CustomActionHandler
                           to define your own actions if none of them satisfies the
                           requirement.
                         type: string
@@ -1565,7 +1565,8 @@ spec:
                             description: Container defines the name of the container
                               within the target Pod where the action will be executed.
                               If specified, it must be one of container declared in
-                              @Runtime. Cannot be updated.
+                              @Runtime. If not specified, the first container declared
+                              in @Runtime will be used. Cannot be updated.
                             type: string
                           env:
                             description: List of environment variables to set in the
@@ -1797,7 +1798,6 @@ spec:
                             enum:
                             - Any
                             - All
-                            - Pod
                             - Role
                             - Ordinal
                             type: string
@@ -1813,11 +1813,11 @@ spec:
                     description: PreStop is called immediately before a component
                       is terminated due to an API request. Cannot be updated.
                     properties:
-                      builtinHandlerName:
-                        description: builtinHandler specifies the builtin handler
+                      builtinHandler:
+                        description: builtinHandler specifies the builtin action handler
                           name to do the action. Different lifecycleActions support
-                          different BuiltinHandlers. Details can be queried through
-                          official documentation in the future. use CustomHandler
+                          different BuiltinActionHandlers. Details can be queried
+                          through official documentation in the future. use CustomActionHandler
                           to define your own actions if none of them satisfies the
                           requirement.
                         type: string
@@ -1828,7 +1828,8 @@ spec:
                             description: Container defines the name of the container
                               within the target Pod where the action will be executed.
                               If specified, it must be one of container declared in
-                              @Runtime. Cannot be updated.
+                              @Runtime. If not specified, the first container declared
+                              in @Runtime will be used. Cannot be updated.
                             type: string
                           env:
                             description: List of environment variables to set in the
@@ -2060,7 +2061,6 @@ spec:
                             enum:
                             - Any
                             - All
-                            - Pod
                             - Role
                             - Ordinal
                             type: string
@@ -2077,11 +2077,11 @@ spec:
                       read-only. This action is used to protect a replica in case
                       of volume space exhaustion or excessive traffic. Cannot be updated.
                     properties:
-                      builtinHandlerName:
-                        description: builtinHandler specifies the builtin handler
+                      builtinHandler:
+                        description: builtinHandler specifies the builtin action handler
                           name to do the action. Different lifecycleActions support
-                          different BuiltinHandlers. Details can be queried through
-                          official documentation in the future. use CustomHandler
+                          different BuiltinActionHandlers. Details can be queried
+                          through official documentation in the future. use CustomActionHandler
                           to define your own actions if none of them satisfies the
                           requirement.
                         type: string
@@ -2092,7 +2092,8 @@ spec:
                             description: Container defines the name of the container
                               within the target Pod where the action will be executed.
                               If specified, it must be one of container declared in
-                              @Runtime. Cannot be updated.
+                              @Runtime. If not specified, the first container declared
+                              in @Runtime will be used. Cannot be updated.
                             type: string
                           env:
                             description: List of environment variables to set in the
@@ -2324,7 +2325,6 @@ spec:
                             enum:
                             - Any
                             - All
-                            - Pod
                             - Role
                             - Ordinal
                             type: string
@@ -2340,11 +2340,11 @@ spec:
                     description: Readwrite defines how to set a replica service as
                       read-write. Cannot be updated.
                     properties:
-                      builtinHandlerName:
-                        description: builtinHandler specifies the builtin handler
+                      builtinHandler:
+                        description: builtinHandler specifies the builtin action handler
                           name to do the action. Different lifecycleActions support
-                          different BuiltinHandlers. Details can be queried through
-                          official documentation in the future. use CustomHandler
+                          different BuiltinActionHandlers. Details can be queried
+                          through official documentation in the future. use CustomActionHandler
                           to define your own actions if none of them satisfies the
                           requirement.
                         type: string
@@ -2355,7 +2355,8 @@ spec:
                             description: Container defines the name of the container
                               within the target Pod where the action will be executed.
                               If specified, it must be one of container declared in
-                              @Runtime. Cannot be updated.
+                              @Runtime. If not specified, the first container declared
+                              in @Runtime will be used. Cannot be updated.
                             type: string
                           env:
                             description: List of environment variables to set in the
@@ -2587,7 +2588,6 @@ spec:
                             enum:
                             - Any
                             - All
-                            - Pod
                             - Role
                             - Ordinal
                             type: string
@@ -2603,11 +2603,11 @@ spec:
                     description: Reconfigure defines how to notify the replica service
                       that there is a configuration update. Cannot be updated.
                     properties:
-                      builtinHandlerName:
-                        description: builtinHandler specifies the builtin handler
+                      builtinHandler:
+                        description: builtinHandler specifies the builtin action handler
                           name to do the action. Different lifecycleActions support
-                          different BuiltinHandlers. Details can be queried through
-                          official documentation in the future. use CustomHandler
+                          different BuiltinActionHandlers. Details can be queried
+                          through official documentation in the future. use CustomActionHandler
                           to define your own actions if none of them satisfies the
                           requirement.
                         type: string
@@ -2618,7 +2618,8 @@ spec:
                             description: Container defines the name of the container
                               within the target Pod where the action will be executed.
                               If specified, it must be one of container declared in
-                              @Runtime. Cannot be updated.
+                              @Runtime. If not specified, the first container declared
+                              in @Runtime will be used. Cannot be updated.
                             type: string
                           env:
                             description: List of environment variables to set in the
@@ -2850,7 +2851,6 @@ spec:
                             enum:
                             - Any
                             - All
-                            - Pod
                             - Role
                             - Ordinal
                             type: string
@@ -2866,11 +2866,11 @@ spec:
                     description: RoleProbe defines how to probe the role of replicas.
                       Cannot be updated.
                     properties:
-                      builtinHandlerName:
-                        description: builtinHandler specifies the builtin handler
+                      builtinHandler:
+                        description: builtinHandler specifies the builtin action handler
                           name to do the action. Different lifecycleActions support
-                          different BuiltinHandlers. Details can be queried through
-                          official documentation in the future. use CustomHandler
+                          different BuiltinActionHandlers. Details can be queried
+                          through official documentation in the future. use CustomActionHandler
                           to define your own actions if none of them satisfies the
                           requirement.
                         type: string
@@ -2881,7 +2881,8 @@ spec:
                             description: Container defines the name of the container
                               within the target Pod where the action will be executed.
                               If specified, it must be one of container declared in
-                              @Runtime. Cannot be updated.
+                              @Runtime. If not specified, the first container declared
+                              in @Runtime will be used. Cannot be updated.
                             type: string
                           env:
                             description: List of environment variables to set in the
@@ -3113,7 +3114,6 @@ spec:
                             enum:
                             - Any
                             - All
-                            - Pod
                             - Role
                             - Ordinal
                             type: string
@@ -3206,7 +3206,8 @@ spec:
                             description: Container defines the name of the container
                               within the target Pod where the action will be executed.
                               If specified, it must be one of container declared in
-                              @Runtime. Cannot be updated.
+                              @Runtime. If not specified, the first container declared
+                              in @Runtime will be used. Cannot be updated.
                             type: string
                           env:
                             description: List of environment variables to set in the
@@ -3438,7 +3439,6 @@ spec:
                             enum:
                             - Any
                             - All
-                            - Pod
                             - Role
                             - Ordinal
                             type: string
@@ -3457,7 +3457,8 @@ spec:
                             description: Container defines the name of the container
                               within the target Pod where the action will be executed.
                               If specified, it must be one of container declared in
-                              @Runtime. Cannot be updated.
+                              @Runtime. If not specified, the first container declared
+                              in @Runtime will be used. Cannot be updated.
                             type: string
                           env:
                             description: List of environment variables to set in the
@@ -3689,7 +3690,6 @@ spec:
                             enum:
                             - Any
                             - All
-                            - Pod
                             - Role
                             - Ordinal
                             type: string

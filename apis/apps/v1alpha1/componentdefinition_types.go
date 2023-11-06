@@ -312,13 +312,12 @@ type ReplicaRole struct {
 
 // TargetPodSelector defines how to select pod(s) to execute a action.
 // +enum
-// +kubebuilder:validation:Enum={Any,All,Pod,Role,Ordinal}
+// +kubebuilder:validation:Enum={Any,All,Role,Ordinal}
 type TargetPodSelector string
 
 const (
 	AnyReplica      TargetPodSelector = "Any"
 	AllReplicas     TargetPodSelector = "All"
-	PodSelector     TargetPodSelector = "Pod"
 	RoleSelector    TargetPodSelector = "Role"
 	OrdinalSelector TargetPodSelector = "Ordinal"
 )
@@ -427,6 +426,7 @@ type Action struct {
 
 	// Container defines the name of the container within the target Pod where the action will be executed.
 	// If specified, it must be one of container declared in @Runtime.
+	// If not specified, the first container declared in @Runtime will be used.
 	// Cannot be updated.
 	// +optional
 	Container string `json:"container,omitempty"`
@@ -443,12 +443,28 @@ type Action struct {
 	RetryPolicy *RetryPolicy `json:"retryPolicy,omitempty"`
 }
 
+// BuiltinActionHandlerType defines build-in action handlers provided by Lorry.
+type BuiltinActionHandlerType string
+
+const (
+	MySQLBuiltinActionHandler              BuiltinActionHandlerType = "mysql"
+	WeSQLBuiltinActionHandler              BuiltinActionHandlerType = "wesql"
+	RedisBuiltinActionHandler              BuiltinActionHandlerType = "redis"
+	MongoDBBuiltinActionHandler            BuiltinActionHandlerType = "mongodb"
+	ETCDBuiltinActionHandler               BuiltinActionHandlerType = "etcd"
+	PostgresqlBuiltinActionHandler         BuiltinActionHandlerType = "postgresql"
+	OfficialPostgresqlBuiltinActionHandler BuiltinActionHandlerType = "official-postgresql"
+	ApeCloudPostgresqlBuiltinActionHandler BuiltinActionHandlerType = "apecloud-postgresql"
+	PolarDBXBuiltinActionHandler           BuiltinActionHandlerType = "polardbx"
+	UnknownBuiltinActionHandler            BuiltinActionHandlerType = "unknown"
+)
+
 type LifecycleActionHandler struct {
-	// builtinHandler specifies the builtin handler name to do the action.
-	// Different lifecycleActions support different BuiltinHandlers. Details can be queried through official documentation in the future.
-	// use CustomHandler to define your own actions if none of them satisfies the requirement.
+	// builtinHandler specifies the builtin action handler name to do the action.
+	// Different lifecycleActions support different BuiltinActionHandlers. Details can be queried through official documentation in the future.
+	// use CustomActionHandler to define your own actions if none of them satisfies the requirement.
 	// +optional
-	BuiltinHandler *string `json:"builtinHandlerName,omitempty"`
+	BuiltinHandler *BuiltinActionHandlerType `json:"builtinHandler,omitempty"`
 
 	// customHandler defines the custom way to do action.
 	// +optional

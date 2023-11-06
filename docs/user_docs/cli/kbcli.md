@@ -72,6 +72,7 @@ kbcli [flags]
 * [kbcli logout](kbcli_logout.md)	 - Log out of the KubeBlocks Cloud
 * [kbcli migration](kbcli_migration.md)	 - Data migration between two data sources.
 * [kbcli options](kbcli_options.md)	 - Print the list of flags inherited by all commands.
+* [kbcli org](kbcli_org.md)	 - kbcli org is used to manage cloud organizations and is only suitable for interacting with cloud.
 * [kbcli playground](kbcli_playground.md)	 - Bootstrap or destroy a playground KubeBlocks in local host or cloud.
 * [kbcli plugin](kbcli_plugin.md)	 - Provides utilities for interacting with plugins.
 * [kbcli report](kbcli_report.md)	 - report kubeblocks or cluster info.

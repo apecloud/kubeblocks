@@ -223,6 +223,16 @@ Print the list of flags inherited by all commands.
 
 
 
+## [org](kbcli_org.md)
+
+kbcli org is used to manage cloud organizations and is only suitable for interacting with cloud.
+
+* [kbcli org current](kbcli_org_current.md)	 - Get current organization.
+* [kbcli org describe](kbcli_org_describe.md)	 - Get the description information of an organization.
+* [kbcli org list](kbcli_org_list.md)	 - List all organizations you have joined.
+* [kbcli org switch](kbcli_org_switch.md)	 - Switch to another organization you are already a member of.
+
+
 ## [playground](kbcli_playground.md)
 
 Bootstrap or destroy a playground KubeBlocks in local host or cloud.

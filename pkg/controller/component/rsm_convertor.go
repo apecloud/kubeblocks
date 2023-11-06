@@ -139,7 +139,7 @@ func (c *rsmRolesConvertor) convert(args ...any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	accessMode := func(role appsv1alpha1.ComponentReplicaRole) workloads.AccessMode {
+	accessMode := func(role appsv1alpha1.ReplicaRole) workloads.AccessMode {
 		switch {
 		case role.Serviceable && role.Writable:
 			return workloads.ReadWriteMode
@@ -208,7 +208,7 @@ func (c *rsmRoleProbeConvertor) convert(args ...any) (any, error) {
 func (c *rsmCredentialConvertor) convert(args ...any) (any, error) {
 	var (
 		secretName     string
-		sysInitAccount *appsv1alpha1.ComponentSystemAccount
+		sysInitAccount *appsv1alpha1.SystemAccount
 	)
 
 	cluster, synthesizeComp, err := parseRSMConvertorArgs(args...)
@@ -218,7 +218,7 @@ func (c *rsmCredentialConvertor) convert(args ...any) (any, error) {
 
 	// use the system init account as the default credential
 	for index, sysAccount := range synthesizeComp.SystemAccounts {
-		if sysAccount.IsSystemInitAccount {
+		if sysAccount.InitAccount {
 			sysInitAccount = &synthesizeComp.SystemAccounts[index]
 			break
 		}

@@ -187,13 +187,13 @@ func (builder *ComponentDefinitionBuilder) SetLabels(labels map[string]appsv1alp
 }
 
 func (builder *ComponentDefinitionBuilder) AddSystemAccount(accountName string, isSystemInitAccount bool, statement string) *ComponentDefinitionBuilder {
-	account := appsv1alpha1.ComponentSystemAccount{
-		Name:                accountName,
-		IsSystemInitAccount: isSystemInitAccount,
-		Statement:           statement,
+	account := appsv1alpha1.SystemAccount{
+		Name:        accountName,
+		InitAccount: isSystemInitAccount,
+		Statement:   statement,
 	}
 	if builder.get().Spec.SystemAccounts == nil {
-		builder.get().Spec.SystemAccounts = make([]appsv1alpha1.ComponentSystemAccount, 0)
+		builder.get().Spec.SystemAccounts = make([]appsv1alpha1.SystemAccount, 0)
 	}
 	builder.get().Spec.SystemAccounts = append(builder.get().Spec.SystemAccounts, account)
 	return builder
@@ -219,19 +219,19 @@ func (builder *ComponentDefinitionBuilder) SetUpdateStrategy(strategy *appsv1alp
 }
 
 func (builder *ComponentDefinitionBuilder) AddRole(name string, serviceable, writable bool) *ComponentDefinitionBuilder {
-	role := appsv1alpha1.ComponentReplicaRole{
+	role := appsv1alpha1.ReplicaRole{
 		Name:        name,
 		Serviceable: serviceable,
 		Writable:    writable,
 	}
 	if builder.get().Spec.Roles == nil {
-		builder.get().Spec.Roles = make([]appsv1alpha1.ComponentReplicaRole, 0)
+		builder.get().Spec.Roles = make([]appsv1alpha1.ReplicaRole, 0)
 	}
 	builder.get().Spec.Roles = append(builder.get().Spec.Roles, role)
 	return builder
 }
 
-func (builder *ComponentDefinitionBuilder) SetRoleArbitrator(arbitrator *appsv1alpha1.ComponentRoleArbitrator) *ComponentDefinitionBuilder {
+func (builder *ComponentDefinitionBuilder) SetRoleArbitrator(arbitrator *appsv1alpha1.RoleArbitrator) *ComponentDefinitionBuilder {
 	builder.get().Spec.RoleArbitrator = arbitrator
 	return builder
 }

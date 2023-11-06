@@ -3919,8 +3919,8 @@ spec:
                 description: Roles defines all the roles that the component can assume.
                   Cannot be updated.
                 items:
-                  description: ComponentReplicaRole represents a role that can be
-                    assumed by a component instance.
+                  description: ReplicaRole represents a role that can be assumed by
+                    a component instance.
                   properties:
                     name:
                       description: Name of the role. It will apply to "apps.kubeblocks.io/role"
@@ -11684,15 +11684,15 @@ spec:
                 type: array
               systemAccounts:
                 description: 'SystemAccounts defines the pre-defined system accounts
-                  required to manage the component. TODO: accounts KB required Cannot
-                  be updated.'
+                  required to manage the component. TODO(component): accounts KB required
+                  Cannot be updated.'
                 items:
                   properties:
-                    isSystemInitAccount:
+                    initAccount:
                       default: false
-                      description: IsSystemInitAccount indicates whether this is the
-                        unique system initialization account (e.g., MySQL root). Only
-                        one system init account is allowed. Cannot be updated.
+                      description: InitAccount indicates whether this is the unique
+                        system initialization account (e.g., MySQL root). Only one
+                        system init account is allowed. Cannot be updated.
                       type: boolean
                     name:
                       description: The name of the account. Others can refer to this

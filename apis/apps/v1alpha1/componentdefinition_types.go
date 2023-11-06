@@ -161,10 +161,10 @@ type ComponentDefinitionSpec struct {
 	Labels map[string]BuiltInString `json:"labels,omitempty"`
 
 	// SystemAccounts defines the pre-defined system accounts required to manage the component.
-	// TODO: accounts KB required
+	// TODO(component): accounts KB required
 	// Cannot be updated.
 	// +optional
-	SystemAccounts []ComponentSystemAccount `json:"systemAccounts,omitempty"`
+	SystemAccounts []SystemAccount `json:"systemAccounts,omitempty"`
 
 	// ConnectionCredentials defines the default connection credentials that can be used to access the component service.
 	// Cannot be updated.
@@ -180,21 +180,19 @@ type ComponentDefinitionSpec struct {
 	// Roles defines all the roles that the component can assume.
 	// Cannot be updated.
 	// +optional
-	Roles []ComponentReplicaRole `json:"roles,omitempty"`
+	Roles []ReplicaRole `json:"roles,omitempty"`
 
 	// RoleArbitrator defines the strategy for electing the component's active role.
 	// Cannot be updated.
 	// +kubebuilder:default=External
 	// +optional
-	RoleArbitrator *ComponentRoleArbitrator `json:"roleArbitrator,omitempty"`
+	RoleArbitrator *RoleArbitrator `json:"roleArbitrator,omitempty"`
 
 	// LifecycleActions defines the operational actions that needed to interoperate with the component
 	// service and processes for lifecycle management.
 	// Cannot be updated.
 	// +optional
 	LifecycleActions *ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
-
-	// TODO: introduce the event-based interoperability mechanism.
 
 	// serviceRefDeclarations is used to declare the service reference of the current component.
 	// Cannot be updated.
@@ -245,19 +243,19 @@ type ComponentVolume struct {
 	HighWatermark int `json:"highWatermark,omitempty"`
 }
 
-type ComponentSystemAccount struct {
+type SystemAccount struct {
 	// The name of the account.
 	// Others can refer to this account by the name.
 	// Cannot be updated.
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// IsSystemInitAccount indicates whether this is the unique system initialization account (e.g., MySQL root).
+	// InitAccount indicates whether this is the unique system initialization account (e.g., MySQL root).
 	// Only one system init account is allowed.
 	// Cannot be updated.
 	// +kubebuilder:default=false
 	// +optional
-	IsSystemInitAccount bool `json:"isSystemInitAccount,omitempty"`
+	InitAccount bool `json:"initAccount,omitempty"`
 
 	// Statement specifies the statement used to create the account with required privileges.
 	// Cannot be updated.
@@ -312,19 +310,19 @@ type ConnectionCredential struct {
 	SecretNamespace string `json:"secretNamespace,omitempty"`
 }
 
-// ComponentRoleArbitrator defines how to arbitrate the role of replicas.
+// RoleArbitrator defines how to arbitrate the role of replicas.
 // +enum
 // +kubebuilder:validation:Enum={External,Lorry}
-type ComponentRoleArbitrator string
+type RoleArbitrator string
 
 const (
-	ExternalRoleArbitrator   ComponentRoleArbitrator = "External"
-	KubeBlocksRoleArbitrator ComponentRoleArbitrator = "KubeBlocks"
-	LorryRoleArbitrator      ComponentRoleArbitrator = "Lorry"
+	ExternalRoleArbitrator   RoleArbitrator = "External"
+	KubeBlocksRoleArbitrator RoleArbitrator = "KubeBlocks"
+	LorryRoleArbitrator      RoleArbitrator = "Lorry"
 )
 
-// ComponentReplicaRole represents a role that can be assumed by a component instance.
-type ComponentReplicaRole struct {
+// ReplicaRole represents a role that can be assumed by a component instance.
+type ReplicaRole struct {
 	// Name of the role. It will apply to "apps.kubeblocks.io/role" object label value.
 	// Cannot be updated.
 	// +kubebuilder:validation:Required

@@ -68,7 +68,7 @@ func (t *componentAccountTransformer) Transform(ctx graph.TransformContext, dag 
 }
 
 func (t *componentAccountTransformer) checkAccountSecretExist(ctx graph.TransformContext,
-	synthesizeComp *component.SynthesizedComponent, account appsv1alpha1.ComponentSystemAccount) (bool, error) {
+	synthesizeComp *component.SynthesizedComponent, account appsv1alpha1.SystemAccount) (bool, error) {
 	secretKey := types.NamespacedName{
 		Namespace: synthesizeComp.Namespace,
 		Name:      constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, account.Name),
@@ -85,7 +85,7 @@ func (t *componentAccountTransformer) checkAccountSecretExist(ctx graph.Transfor
 }
 
 func (t *componentAccountTransformer) buildAccountSecret(ctx graph.TransformContext,
-	synthesizeComp *component.SynthesizedComponent, account appsv1alpha1.ComponentSystemAccount) (*corev1.Secret, error) {
+	synthesizeComp *component.SynthesizedComponent, account appsv1alpha1.SystemAccount) (*corev1.Secret, error) {
 	var password []byte
 	if account.SecretRef != nil {
 		var err error
@@ -98,7 +98,7 @@ func (t *componentAccountTransformer) buildAccountSecret(ctx graph.TransformCont
 	return t.buildAccountSecretWithPassword(synthesizeComp, account, password), nil
 }
 
-func (t *componentAccountTransformer) getPasswordFromSecret(ctx graph.TransformContext, account appsv1alpha1.ComponentSystemAccount) ([]byte, error) {
+func (t *componentAccountTransformer) getPasswordFromSecret(ctx graph.TransformContext, account appsv1alpha1.SystemAccount) ([]byte, error) {
 	secretKey := types.NamespacedName{
 		Namespace: account.SecretRef.Namespace,
 		Name:      account.SecretRef.Name,
@@ -113,7 +113,7 @@ func (t *componentAccountTransformer) getPasswordFromSecret(ctx graph.TransformC
 	return secret.Data[constant.AccountPasswdForSecret], nil
 }
 
-func (t *componentAccountTransformer) generatePassword(account appsv1alpha1.ComponentSystemAccount) []byte {
+func (t *componentAccountTransformer) generatePassword(account appsv1alpha1.SystemAccount) []byte {
 	config := account.PasswordGenerationPolicy
 	passwd, _ := password.Generate((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), false, false)
 	switch config.LetterCase {
@@ -126,7 +126,7 @@ func (t *componentAccountTransformer) generatePassword(account appsv1alpha1.Comp
 }
 
 func (t *componentAccountTransformer) buildAccountSecretWithPassword(synthesizeComp *component.SynthesizedComponent,
-	account appsv1alpha1.ComponentSystemAccount, password []byte) *corev1.Secret {
+	account appsv1alpha1.SystemAccount, password []byte) *corev1.Secret {
 	secretName := constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, account.Name)
 	labels := constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
 	return builder.NewSecretBuilder(synthesizeComp.Namespace, secretName).

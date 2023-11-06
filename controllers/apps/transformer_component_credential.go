@@ -110,7 +110,7 @@ func (t *componentCredentialTransformer) buildFromServiceAndAccount(transCtx *co
 		}
 	}
 	if len(credential.AccountName) > 0 {
-		var systemAccount *appsv1alpha1.ComponentSystemAccount
+		var systemAccount *appsv1alpha1.SystemAccount
 		for i, account := range synthesizeComp.SystemAccounts {
 			if account.Name == credential.AccountName {
 				systemAccount = &synthesizeComp.SystemAccounts[i]
@@ -177,7 +177,7 @@ func (t *componentCredentialTransformer) buildEndpointFromService(synthesizeComp
 }
 
 func (t *componentCredentialTransformer) buildCredential(transCtx *componentTransformContext,
-	dag *graph.DAG, synthesizedComp *component.SynthesizedComponent, account *appsv1alpha1.ComponentSystemAccount, data *map[string][]byte) error {
+	dag *graph.DAG, synthesizedComp *component.SynthesizedComponent, account *appsv1alpha1.SystemAccount, data *map[string][]byte) error {
 	secretKey := types.NamespacedName{
 		Namespace: synthesizedComp.Namespace,
 		Name:      constant.GenerateAccountSecretName(synthesizedComp.ClusterName, synthesizedComp.Name, account.Name),
@@ -196,7 +196,7 @@ func (t *componentCredentialTransformer) buildCredential(transCtx *componentTran
 }
 
 func (t *componentCredentialTransformer) getAccountSecretFromLocalCache(transCtx *componentTransformContext,
-	dag *graph.DAG, synthesizedComp *component.SynthesizedComponent, account *appsv1alpha1.ComponentSystemAccount) (*corev1.Secret, error) {
+	dag *graph.DAG, synthesizedComp *component.SynthesizedComponent, account *appsv1alpha1.SystemAccount) (*corev1.Secret, error) {
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	secretKey := types.NamespacedName{
 		Namespace: synthesizedComp.Namespace,

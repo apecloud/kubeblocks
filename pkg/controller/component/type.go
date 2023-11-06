@@ -55,14 +55,14 @@ type SynthesizedComponent struct {
 	ServiceReferences    map[string]*v1alpha1.ServiceDescriptor `json:"serviceReferences,omitempty"`
 
 	// The following fields were introduced with the ComponentDefinition and Component API in KubeBlocks version 0.8.0
-	Roles                 []v1alpha1.ComponentReplicaRole     `json:"roles,omitempty"`
+	Roles                 []v1alpha1.ReplicaRole              `json:"roles,omitempty"`
 	Labels                map[string]v1alpha1.BuiltInString   `json:"labels,omitempty"`
 	ConnectionCredentials []v1alpha1.ConnectionCredential     `json:"connectionCredentials,omitempty"`
 	UpdateStrategy        *v1alpha1.UpdateStrategy            `json:"updateStrategy,omitempty"`
 	PolicyRules           []rbacv1.PolicyRule                 `json:"policyRules,omitempty"`
 	LifecycleActions      *v1alpha1.ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
-	SystemAccounts        []v1alpha1.ComponentSystemAccount   `json:"systemAccounts,omitempty"`
-	RoleArbitrator        *v1alpha1.ComponentRoleArbitrator   `json:"roleArbitrator,omitempty"`
+	SystemAccounts        []v1alpha1.SystemAccount            `json:"systemAccounts,omitempty"`
+	RoleArbitrator        *v1alpha1.RoleArbitrator            `json:"roleArbitrator,omitempty"`
 	Volumes               []v1alpha1.ComponentVolume          `json:"volumes,omitempty"`
 	ComponentServices     []v1alpha1.Service                  `json:"componentServices,omitempty"`
 

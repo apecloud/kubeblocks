@@ -201,13 +201,13 @@ func (f *MockComponentDefinitionFactory) SetLabels(labels map[string]appsv1alpha
 }
 
 func (f *MockComponentDefinitionFactory) AddSystemAccount(accountName string, isSystemInitAccount bool, statement string) *MockComponentDefinitionFactory {
-	account := appsv1alpha1.ComponentSystemAccount{
-		Name:                accountName,
-		IsSystemInitAccount: isSystemInitAccount,
-		Statement:           statement,
+	account := appsv1alpha1.SystemAccount{
+		Name:        accountName,
+		InitAccount: isSystemInitAccount,
+		Statement:   statement,
 	}
 	if f.Get().Spec.SystemAccounts == nil {
-		f.Get().Spec.SystemAccounts = make([]appsv1alpha1.ComponentSystemAccount, 0)
+		f.Get().Spec.SystemAccounts = make([]appsv1alpha1.SystemAccount, 0)
 	}
 	f.Get().Spec.SystemAccounts = append(f.Get().Spec.SystemAccounts, account)
 	return f
@@ -233,19 +233,19 @@ func (f *MockComponentDefinitionFactory) SetUpdateStrategy(strategy *appsv1alpha
 }
 
 func (f *MockComponentDefinitionFactory) AddRole(name string, serviceable, writable bool) *MockComponentDefinitionFactory {
-	role := appsv1alpha1.ComponentReplicaRole{
+	role := appsv1alpha1.ReplicaRole{
 		Name:        name,
 		Serviceable: serviceable,
 		Writable:    writable,
 	}
 	if f.Get().Spec.Roles == nil {
-		f.Get().Spec.Roles = make([]appsv1alpha1.ComponentReplicaRole, 0)
+		f.Get().Spec.Roles = make([]appsv1alpha1.ReplicaRole, 0)
 	}
 	f.Get().Spec.Roles = append(f.Get().Spec.Roles, role)
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) SetRoleArbitrator(arbitrator *appsv1alpha1.ComponentRoleArbitrator) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) SetRoleArbitrator(arbitrator *appsv1alpha1.RoleArbitrator) *MockComponentDefinitionFactory {
 	f.Get().Spec.RoleArbitrator = arbitrator
 	return f
 }

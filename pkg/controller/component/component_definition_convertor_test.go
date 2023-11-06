@@ -540,7 +540,7 @@ var _ = Describe("Component Definition Convertor", func() {
 				res, err := convertor.convert(clusterCompDef)
 				Expect(err).Should(Succeed())
 
-				expectedAccounts := []appsv1alpha1.ComponentSystemAccount{
+				expectedAccounts := []appsv1alpha1.SystemAccount{
 					{
 						Name:                     string(clusterCompDef.SystemAccounts.Accounts[0].Name),
 						PasswordGenerationPolicy: clusterCompDef.SystemAccounts.PasswordConfig,
@@ -607,7 +607,7 @@ var _ = Describe("Component Definition Convertor", func() {
 				res, err := convertor.convert(clusterCompDef)
 				Expect(err).Should(Succeed())
 
-				expectedRoles := []appsv1alpha1.ComponentReplicaRole{
+				expectedRoles := []appsv1alpha1.ReplicaRole{
 					{
 						Name:        "leader",
 						Serviceable: true,

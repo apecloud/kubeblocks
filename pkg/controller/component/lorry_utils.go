@@ -108,12 +108,12 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 func buildBasicContainer(synthesizeComp *SynthesizedComponent) *corev1.Container {
 	var (
 		secretName     string
-		sysInitAccount *appsv1alpha1.ComponentSystemAccount
+		sysInitAccount *appsv1alpha1.SystemAccount
 	)
 
 	// TODO(lorry): use the buildIn kbprobe system account as the default credential
 	for index, sysAccount := range synthesizeComp.SystemAccounts {
-		if sysAccount.IsSystemInitAccount {
+		if sysAccount.InitAccount {
 			sysInitAccount = &synthesizeComp.SystemAccounts[index]
 			break
 		}
@@ -197,12 +197,12 @@ func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container 
 
 	var (
 		secretName     string
-		sysInitAccount *appsv1alpha1.ComponentSystemAccount
+		sysInitAccount *appsv1alpha1.SystemAccount
 	)
 
 	// TODO(lorry): use the buildIn kbprobe system account as the default credential
 	for index, sysAccount := range synthesizeComp.SystemAccounts {
-		if sysAccount.IsSystemInitAccount {
+		if sysAccount.InitAccount {
 			sysInitAccount = &synthesizeComp.SystemAccounts[index]
 			break
 		}

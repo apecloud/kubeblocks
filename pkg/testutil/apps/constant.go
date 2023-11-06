@@ -293,10 +293,10 @@ var (
 				RoleSelector: "follower",
 			},
 		},
-		SystemAccounts: []appsv1alpha1.ComponentSystemAccount{
+		SystemAccounts: []appsv1alpha1.SystemAccount{
 			{
-				Name:                "root",
-				IsSystemInitAccount: true,
+				Name:        "root",
+				InitAccount: true,
 				PasswordGenerationPolicy: appsv1alpha1.PasswordConfig{
 					Length:     16,
 					NumDigits:  8,
@@ -327,7 +327,7 @@ var (
 				AccountName: "admin",
 			},
 		},
-		Roles: []appsv1alpha1.ComponentReplicaRole{
+		Roles: []appsv1alpha1.ReplicaRole{
 			{
 				Name:        "leader",
 				Serviceable: true,

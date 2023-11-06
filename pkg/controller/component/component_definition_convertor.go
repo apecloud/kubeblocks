@@ -293,9 +293,9 @@ func (c *compDefSystemAccountsConvertor) convert(args ...any) (any, error) {
 		return nil, nil
 	}
 
-	accounts := make([]appsv1alpha1.ComponentSystemAccount, 0)
+	accounts := make([]appsv1alpha1.SystemAccount, 0)
 	for _, account := range clusterCompDef.SystemAccounts.Accounts {
-		accounts = append(accounts, appsv1alpha1.ComponentSystemAccount{
+		accounts = append(accounts, appsv1alpha1.SystemAccount{
 			Name:                     string(account.Name),
 			PasswordGenerationPolicy: clusterCompDef.SystemAccounts.PasswordConfig,
 			SecretRef:                account.ProvisionPolicy.SecretRef,
@@ -364,7 +364,7 @@ func (c *compDefRolesConvertor) convert(args ...any) (any, error) {
 	case appsv1alpha1.Consensus:
 		return c.convertConsensusRole(clusterCompDef)
 	case appsv1alpha1.Replication:
-		defaultRoles := []appsv1alpha1.ComponentReplicaRole{
+		defaultRoles := []appsv1alpha1.ReplicaRole{
 			{
 				Name:        constant.Primary,
 				Serviceable: true,
@@ -393,9 +393,9 @@ func (c *compDefRolesConvertor) convertConsensusRole(clusterCompDef *appsv1alpha
 		return nil, nil
 	}
 
-	roles := make([]appsv1alpha1.ComponentReplicaRole, 0)
+	roles := make([]appsv1alpha1.ReplicaRole, 0)
 	addRole := func(member appsv1alpha1.ConsensusMember, votable bool) {
-		roles = append(roles, appsv1alpha1.ComponentReplicaRole{
+		roles = append(roles, appsv1alpha1.ReplicaRole{
 			Name:        member.Name,
 			Serviceable: member.AccessMode != appsv1alpha1.None,
 			Writable:    member.AccessMode == appsv1alpha1.ReadWrite,

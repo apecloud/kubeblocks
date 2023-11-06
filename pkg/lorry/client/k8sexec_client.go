@@ -34,13 +34,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
-	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	cmdexec "k8s.io/kubectl/pkg/cmd/exec"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/pkg/cli/scheme"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -90,7 +89,7 @@ func NewK8sExecClientWithPod(pod *corev1.Pod) (*K8sExecClient, error) {
 
 	restConfig.GroupVersion = &schema.GroupVersion{Group: "", Version: "v1"}
 	restConfig.APIPath = "/api"
-	restConfig.NegotiatedSerializer = clientsetscheme.Codecs.WithoutConversion()
+	restConfig.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 	restClient, err := rest.RESTClientFor(restConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "create k8s client failed")

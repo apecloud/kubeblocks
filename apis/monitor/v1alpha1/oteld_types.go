@@ -87,19 +87,30 @@ type Batch struct {
 }
 
 type NodeExporter struct {
+	// enabled indicates whether to enable node exporter
+	// +kubebuilder:default=true
 	Enabled bool `json:"enabled,omitempty"`
 }
 
 type K8sClusterExporter struct {
+	// enabled indicates whether to enable k8s cluster exporter
+	// +kubebuilder:default=false
 	Enabled bool `json:"enabled,omitempty"`
 }
 
 type K8sKubeletExporter struct {
-	Enabled       bool     `json:"enabled,omitempty"`
-	MetricsFilter []string `json:"metricsFilter,omitempty"`
+	// enabled indicates whether to enable kubelet exporter
+	// +kubebuilder:default=true
+	Enabled bool `json:"enabled,omitempty"`
+
+	// metricsFilter is the metrics filter of the kubelet exporter
+	// +optional
+	MetricsFilter map[string]bool `json:"metricsFilter,omitempty"`
 }
 
 type PodLogs struct {
+	// enabled indicates whether to enable pod logs
+	// +kubebuilder:default=true
 	Enabled bool `json:"enabled,omitempty"`
 }
 

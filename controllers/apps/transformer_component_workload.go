@@ -74,9 +74,11 @@ var _ graph.Transformer = &componentWorkloadTransformer{}
 
 func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
+	if model.IsObjectDeleting(transCtx.ComponentOrig) {
+		return nil
+	}
+
 	cluster := transCtx.Cluster
-	comp := transCtx.Component
-	compOrig := transCtx.ComponentOrig
 	synthesizeComp := transCtx.SynthesizeComponent
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      transCtx.Context,
@@ -84,11 +86,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 		Recorder: transCtx.EventRecorder,
 	}
 
-	if model.IsObjectDeleting(compOrig) {
-		return nil
-	}
-
-	runningRSM, err := t.RSMObject(ctx, cluster, comp)
+	runningRSM, err := t.runningRSMObject(ctx, synthesizeComp)
 	if err != nil {
 		return err
 	}
@@ -122,18 +120,20 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	return err
 }
 
-func (t *componentWorkloadTransformer) RSMObject(ctx graph.TransformContext,
-	cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) (*workloads.ReplicatedStateMachine, error) {
-	rsms := &workloads.ReplicatedStateMachineList{}
-	inNS := client.InNamespace(cluster.GetNamespace())
-	ml := client.MatchingLabels(constant.GetComponentWellKnownLabels(cluster.Name, comp.Name))
-	if err := ctx.GetClient().List(ctx.GetContext(), rsms, inNS, ml); err != nil {
+func (t *componentWorkloadTransformer) runningRSMObject(ctx graph.TransformContext,
+	synthesizeComp *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
+	rsmKey := types.NamespacedName{
+		Namespace: synthesizeComp.Namespace,
+		Name:      constant.GenerateRSMNamePattern(synthesizeComp.ClusterName, synthesizeComp.Name),
+	}
+	rsm := &workloads.ReplicatedStateMachine{}
+	if err := ctx.GetClient().Get(ctx.GetContext(), rsmKey, rsm); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
-	if len(rsms.Items) == 0 {
-		return nil, nil
-	}
-	return &rsms.Items[0], nil
+	return rsm, nil
 }
 
 func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG,

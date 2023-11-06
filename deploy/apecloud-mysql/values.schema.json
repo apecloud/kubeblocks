@@ -8,7 +8,7 @@
       "type": "object",
       "default": {
         "image": {
-          "registry": "infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com",
+          "registry": "",
           "repository": "apecloud/apecloud-mysql-server",
           "pullPolicy": "IfNotPresent",
           "tag": "8.0.30-5.beta2.20230830.g4ca1eb8.13"
@@ -19,7 +19,7 @@
           "title": "Registry",
           "description": "Registry to download the image.",
           "type": "string",
-          "default": "infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com"
+          "default": ""
         },
         "repository": {
           "title": "Repository.",
@@ -368,7 +368,7 @@
       "type": "object",
       "default": {
         "image": {
-          "registry": "infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com",
+          "registry": "",
           "repository": "apecloud/agamotto",
           "tag": "0.1.2-beta.1",
           "pullPolicy": "IfNotPresent"
@@ -383,7 +383,7 @@
           "description": "Image.",
           "type": "object",
           "default": {
-            "registry": "infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com",
+            "registry": "",
             "repository": "apecloud/agamotto",
             "tag": "0.1.2-beta.1",
             "pullPolicy": "IfNotPresent"
@@ -393,7 +393,7 @@
               "title": "Registry",
               "description": "Registry to download the image.",
               "type": "string",
-              "default": "infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com"
+              "default": ""
             },
             "repository": {
               "title": "Repository.",
@@ -444,7 +444,7 @@
       "type": "object",
       "default": {
         "image": {
-          "registry": "infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com",
+          "registry": "",
           "repository": "apecloud/apecloud-xtrabackup",
           "tag": "latest",
           "pullPolicy": "IfNotPresent"
@@ -456,7 +456,7 @@
           "description": "Image.",
           "type": "object",
           "default": {
-            "registry": "infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com",
+            "registry": "",
             "repository": "apecloud/agamotto",
             "tag": "0.1.2-beta.1",
             "pullPolicy": "IfNotPresent"
@@ -466,7 +466,7 @@
               "title": "Registry",
               "description": "Registry to download the image.",
               "type": "string",
-              "default": "infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com"
+              "default": ""
             },
             "repository": {
               "title": "Repository.",
@@ -502,7 +502,7 @@
       "default": {
         "cell": "zone1",
         "image": {
-          "registry": "infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com",
+          "registry": "",
           "repository": "apecloud/apecloud-mysql-scale",
           "tag": "0.1.1",
           "pullPolicy": "IfNotPresent"
@@ -520,7 +520,7 @@
           "description": "Image.",
           "type": "object",
           "default": {
-            "registry": "infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com",
+            "registry": "",
             "repository": "apecloud/agamotto",
             "tag": "0.1.2-beta.1",
             "pullPolicy": "IfNotPresent"
@@ -530,7 +530,7 @@
               "title": "Registry",
               "description": "Registry to download the image.",
               "type": "string",
-              "default": "infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com"
+              "default": ""
             },
             "repository": {
               "title": "Repository.",

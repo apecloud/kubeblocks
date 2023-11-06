@@ -545,7 +545,7 @@ func (u *upgradeHandlerTo7) transformDeployment(dynamic dynamic.Interface, obj u
 			return err
 		}
 	}
-	// update cluster status observedGeneration to 0 to trigger component owned objects regeneration.
+	// increase cluster status.observedGeneration by 1 to trigger component owned objects regeneration.
 	if clusterName, ok := labels[constant.AppInstanceLabelKey]; ok {
 		clusterObj, err := dynamic.Resource(types.ClusterGVR()).Namespace(obj.GetNamespace()).Get(context.TODO(), clusterName, metav1.GetOptions{})
 		if err != nil {

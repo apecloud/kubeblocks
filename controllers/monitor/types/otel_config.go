@@ -276,7 +276,7 @@ func (cg *OteldConfigGenerater) appendExporter(cfg yaml.MapSlice, metricsExporte
 func (cg *OteldConfigGenerater) appendProcessor(cfg yaml.MapSlice, instance *OteldInstance) (yaml.MapSlice, error) {
 	processorSlice := yaml.MapSlice{}
 	oteld := instance.OTeld
-	if oteld.Spec.Batch.Enabled == true {
+	if oteld.Spec.Batch.Enabled {
 		batchConfig := fromBatchConfig(oteld.Spec.Batch.Config)
 		batchProcessor, err := buildSliceFromCUE("processor/batch.cue", batchConfig)
 		if err != nil {
@@ -284,7 +284,7 @@ func (cg *OteldConfigGenerater) appendProcessor(cfg yaml.MapSlice, instance *Ote
 		}
 		processorSlice = append(processorSlice, batchProcessor...)
 	}
-	if oteld.Spec.MemoryLimiter.Enabled == true {
+	if oteld.Spec.MemoryLimiter.Enabled {
 		memoryLimiterConfig := fromMemoryLimiterConfig(oteld.Spec.MemoryLimiter.Config)
 		memoryProcessor, err := buildSliceFromCUE("processor/memory_limiter.cue", memoryLimiterConfig)
 		if err != nil {

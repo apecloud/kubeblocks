@@ -15,6 +15,9 @@ on:
         description: 'backup type'
         required: true
         default: 's3'
+        type: choice
+          - s3
+          - oss
       CLOUD_PROVIDER:
         description: 'cloud provider'
         required: true

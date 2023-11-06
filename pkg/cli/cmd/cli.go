@@ -52,6 +52,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/migration"
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/options"
+	"github.com/apecloud/kubeblocks/pkg/cli/cmd/organization"
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/playground"
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/plugin"
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/report"
@@ -190,8 +191,8 @@ A Command Line Interface for KubeBlocks`,
 	cmd.AddCommand(
 		auth.NewLogin(ioStreams),
 		auth.NewLogout(ioStreams),
-		// organization.NewOrganizationCmd(ioStreams),
-		// context.NewContextCmd(ioStreams),
+		organization.NewOrganizationCmd(ioStreams),
+		//context.NewContextCmd(ioStreams),
 		playground.NewPlaygroundCmd(ioStreams),
 		kubeblocks.NewKubeBlocksCmd(f, ioStreams),
 		bench.NewBenchCmd(f, ioStreams),

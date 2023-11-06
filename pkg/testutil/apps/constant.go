@@ -66,7 +66,7 @@ const (
 )
 
 var (
-	defaultBuiltinHandler         = "default"
+	defaultBuiltinHandler         = string(constant.MySQLBuiltInHandlerName)
 	defaultLifecycleActionHandler = &appsv1alpha1.LifecycleActionHandler{
 		BuiltinHandler: &defaultBuiltinHandler,
 	}

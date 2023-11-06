@@ -3,7 +3,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: pg-cluster-snapshot
+  name: pg-cluster-restore
   annotations:
     kubeblocks.io/restore-from-backup: '{"postgresql":{"name":"backup-postgresql-cluster","namespace":"default","volumeRestorePolicy":"Parallel"}}'
 spec:

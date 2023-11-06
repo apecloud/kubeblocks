@@ -44,9 +44,9 @@ func Config() {
 
 	Context("Configure running e2e information", func() {
 		It("create a secret to save the access key and ", func() {
-			secret := "k get secret " + ConfigType + "-credential-for-backuprepo -n kb-system | grep " +
+			secret := "kubectl get secret " + ConfigType + "-credential-for-backuprepo -n kb-system | grep " +
 				ConfigType + "-credential-for-backuprepo | awk '{print $1}'"
-			if len(e2eutil.ExecCommand(secret)) > 0 {
+			if checkResourceExists(secret) {
 				log.Println("secret " + ConfigType + "-credential-for-backuprepo already exists")
 			} else {
 				var accessKey, secretKey string
@@ -67,7 +67,7 @@ func Config() {
 		})
 		It(" configure backup-repo", func() {
 			repo := "kubectl get BackupRepo | grep my-repo | awk '{print $1}'"
-			if len(e2eutil.ExecCommand(repo)) > 0 {
+			if checkResourceExists(repo) {
 				log.Println("BackupRepo already exists")
 			} else {
 				var yaml string
@@ -79,7 +79,33 @@ func Config() {
 				b := e2eutil.OpsYaml(yaml, "create")
 				Expect(b).Should(BeTrue())
 			}
-
+		})
+		It(" configure componentresourceconstraint custom", func() {
+			componentResourceConstraint := "kubectl get ComponentResourceConstraint | grep kb-resource-constraint-e2e | awk '{print $1}'"
+			if checkResourceExists(componentResourceConstraint) {
+				log.Println("ComponentResourceConstraint already exists")
+			} else {
+				b := e2eutil.OpsYaml(dir+"/testdata/config/componentresourceconstraint_custom.yaml", "create")
+				Expect(b).Should(BeTrue())
+			}
+		})
+		It(" configure custom class", func() {
+			componentClassDefinition := "kubectl get ComponentClassDefinition | grep custom-class | awk '{print $1}'"
+			if checkResourceExists(componentClassDefinition) {
+				log.Println("ComponentClassDefinition already exists")
+			} else {
+				b := e2eutil.OpsYaml(dir+"/testdata/config/custom_class.yaml", "create")
+				Expect(b).Should(BeTrue())
+			}
+		})
+		It(" configure pg cluster version", func() {
+			clusterVersion := "kubectl get ClusterVersion | grep postgresql-14.7.2-latest | awk '{print $1}'"
+			if checkResourceExists(clusterVersion) {
+				log.Println("postgresql-14.7.2-latest clusterVersion already exists")
+			} else {
+				b := e2eutil.OpsYaml(dir+"/testdata/config/postgresql_cv.yaml", "create")
+				Expect(b).Should(BeTrue())
+			}
 		})
 	})
 }
@@ -91,20 +117,41 @@ func DeleteConfig() {
 	AfterEach(func() {
 	})
 
-	Context("delete e2e config resources", func() {
+	Context("delete e2e test resources", func() {
 		It("Check backup exists ", func() {
 			backupArr := e2eutil.ExecCommandReadline("kubectl get backup | awk '{print $1}'")
 			if len(backupArr) > 0 {
-				deleteBackups := e2eutil.ExecuteCommand("kubectl delete backup --all")
-				Expect(deleteBackups).Should(BeTrue())
+				deleteResource("kubectl delete backup --all")
 			}
 		})
 		It("delete secret and backuprepo", func() {
-			deleteSecret := e2eutil.ExecuteCommand("kubectl delete secret " + ConfigType + "-credential-for-backuprepo -n kb-system")
-			Expect(deleteSecret).Should(BeTrue())
-			deleteBr := e2eutil.ExecuteCommand("kubectl delete backuprepo my-repo")
-			Expect(deleteBr).Should(BeTrue())
+			deleteResource("kubectl delete secret " + ConfigType + "-credential-for-backuprepo -n kb-system")
+			deleteResource("kubectl delete backuprepo my-repo")
 		})
 
+		It("delete resources", func() {
+			deleteResource("kubectl delete ComponentResourceConstraint kb-resource-constraint-e2e")
+			deleteResource("kubectl delete ComponentClassDefinition custom-class")
+		})
+
+		It("delete cv", func() {
+			deleteResource("kubectl delete ClusterVersion  postgresql-14.7.2-latest")
+		})
+
+		It("delete clusters", func() {
+			deleteResource("kubectl delete cluster --all")
+		})
 	})
+}
+
+func checkResourceExists(command string) bool {
+	if len(e2eutil.ExecCommand(command)) > 0 {
+		return true
+	}
+	return false
+}
+
+func deleteResource(cmd string) {
+	deleteCv := e2eutil.ExecuteCommand(cmd)
+	Expect(deleteCv).Should(BeTrue())
 }

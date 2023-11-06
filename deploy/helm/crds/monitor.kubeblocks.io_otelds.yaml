@@ -193,9 +193,9 @@ spec:
                       enabled:
                         type: boolean
                       metricsFilter:
-                        additionalProperties:
-                          type: boolean
-                        type: object
+                        items:
+                          type: string
+                        type: array
                     type: object
                   logsExporterRef:
                     description: logsExporterRef is the exporter to export system
@@ -227,6 +227,9 @@ spec:
                 description: useConfigMap indicates whether to use configmap to store
                   oteld config
                 type: boolean
+            required:
+            - image
+            - metricsPort
             type: object
           status:
             description: OTeldStatus defines the observed state of CollectorDataSource

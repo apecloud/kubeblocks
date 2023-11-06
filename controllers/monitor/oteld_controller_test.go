@@ -97,7 +97,7 @@ func mockOTeldInstance() *v1alpha1.OTeld {
 	oteld := &v1alpha1.OTeld{
 		Spec: v1alpha1.OTeldSpec{
 			Image: "docker.io/apecloud/oteld:0.1.0-beta.1",
-			Batch: v1alpha1.Batch{
+			Batch: &v1alpha1.Batch{
 				Enabled: true,
 				Config: &v1alpha1.BatchConfig{
 					Timeout:       "15s",
@@ -105,9 +105,7 @@ func mockOTeldInstance() *v1alpha1.OTeld {
 				},
 			},
 			CollectionInterval: "15s",
-			LogsLevel:          "debug",
 			MetricsPort:        8888,
-			UseConfigMap:       true,
 			SystemDataSource: &v1alpha1.SystemDataSource{
 				PodLogs: &v1alpha1.PodLogs{
 					Enabled: true,

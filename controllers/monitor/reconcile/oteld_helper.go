@@ -142,10 +142,10 @@ func (w *oteldWrapper) createPipeline(mode v1alpha1.Mode, name string, collectTy
 }
 
 func (w *oteldWrapper) buildProcessor(pipeline *types.Pipeline) {
-	if w.Spec.Batch.Enabled {
+	if w.Spec.Batch != nil && w.Spec.Batch.Enabled {
 		pipeline.ProcessorMap[types.BatchProcessorName] = true
 	}
-	if w.Spec.MemoryLimiter.Enabled {
+	if w.Spec.MemoryLimiter != nil && w.Spec.MemoryLimiter.Enabled {
 		pipeline.ProcessorMap[types.MemoryProcessorName] = true
 	}
 	if len(w.Spec.GlobalLabels) > 0 {

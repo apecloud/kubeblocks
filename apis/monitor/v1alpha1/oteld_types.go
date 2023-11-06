@@ -95,8 +95,8 @@ type K8sClusterExporter struct {
 }
 
 type K8sKubeletExporter struct {
-	Enabled       bool            `json:"enabled,omitempty"`
-	MetricsFilter map[string]bool `json:"metricsFilter,omitempty"`
+	Enabled       bool     `json:"enabled,omitempty"`
+	MetricsFilter []string `json:"metricsFilter,omitempty"`
 }
 
 type PodLogs struct {
@@ -141,7 +141,7 @@ type OTeldSpec struct {
 
 	// image is the image of the oteld
 	// +kubebuilder:validation:Required
-	Image string `json:"image,omitempty"`
+	Image string `json:"image"`
 
 	// logsLevel is the level of the oteld collector logs
 	// +kubebuilder:default="info"
@@ -153,7 +153,7 @@ type OTeldSpec struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=8888
 	// +kubebuilder:validation:Minimum=1024
-	MetricsPort int `json:"metricsPort,omitempty"`
+	MetricsPort int `json:"metricsPort"`
 
 	// collectionInterval is the default collect interval of the oteld collection
 	// +kubebuilder:default="15s"
@@ -162,11 +162,11 @@ type OTeldSpec struct {
 
 	// memoryLimiter is the memory limiter config that used to limit the memory usage of oteld
 	// +optional
-	MemoryLimiter MemoryLimiter `json:"memoryLimiter,omitempty"`
+	MemoryLimiter *MemoryLimiter `json:"memoryLimiter,omitempty"`
 
 	// batch is the batch config that used to batch data before sending
 	// +optional
-	Batch Batch `json:"batch,omitempty"`
+	Batch *Batch `json:"batch,omitempty"`
 
 	// resources is the resource requirements for the oteld
 	// +optional

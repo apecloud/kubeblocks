@@ -552,7 +552,8 @@ func (u *upgradeHandlerTo7) transformDeployment(dynamic dynamic.Interface, obj u
 			return err
 		}
 		status := clusterObj.Object["status"].(map[string]interface{})
-		status["observedGeneration"] = 0
+		generation := status["observedGeneration"].(int64)
+		status["observedGeneration"] = generation + 1
 		if _, err = dynamic.Resource(types.ClusterGVR()).Namespace(obj.GetNamespace()).UpdateStatus(context.TODO(), clusterObj, metav1.UpdateOptions{}); err != nil {
 			return err
 		}

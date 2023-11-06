@@ -13,11 +13,8 @@ on:
         default: ''
       CONFIG_TYPE:
         description: 'backup type'
-        required: true
+        required: false
         default: 's3'
-        type: choice
-          - s3
-          - oss
       CLOUD_PROVIDER:
         description: 'cloud provider'
         required: true

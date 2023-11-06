@@ -109,16 +109,16 @@ func mockOTeldInstance() *v1alpha1.OTeld {
 			MetricsPort:        8888,
 			UseConfigMap:       true,
 			SystemDataSource: &v1alpha1.SystemDataSource{
-				PodLogs: v1alpha1.PodLogs{
+				PodLogs: &v1alpha1.PodLogs{
 					Enabled: true,
 				},
-				NodeExporter: v1alpha1.NodeExporter{
+				NodeExporter: &v1alpha1.NodeExporter{
 					Enabled: true,
 				},
-				K8sKubeletExporter: v1alpha1.K8sKubeletExporter{
+				K8sKubeletExporter: &v1alpha1.K8sKubeletExporter{
 					Enabled: true,
 				},
-				K8sClusterExporter: v1alpha1.K8sClusterExporter{
+				K8sClusterExporter: &v1alpha1.K8sClusterExporter{
 					Enabled: true,
 				},
 				MetricsExporterRef: []string{"prometheus"},

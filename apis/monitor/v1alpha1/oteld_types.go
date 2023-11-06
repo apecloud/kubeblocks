@@ -114,19 +114,19 @@ type SystemDataSource struct {
 
 	// nodeExporter indicates how to collect node metrics
 	// +optional
-	NodeExporter NodeExporter `json:"nodeExporter,omitempty"`
+	NodeExporter *NodeExporter `json:"nodeExporter,omitempty"`
 
 	// k8sClusterMetrics indicates how to collect k8s cluster metrics
 	// +optional
-	K8sClusterExporter K8sClusterExporter `json:"k8sClusterExporter,omitempty"`
+	K8sClusterExporter *K8sClusterExporter `json:"k8sClusterExporter,omitempty"`
 
 	// k8sKubeletExporter indicates how to collect kubelet states metrics
 	// +optional
-	K8sKubeletExporter K8sKubeletExporter `json:"k8sKubeletExporter,omitempty"`
+	K8sKubeletExporter *K8sKubeletExporter `json:"k8sKubeletExporter,omitempty"`
 
 	// podLogs indicates how to collect pod logs
 	// +optional
-	PodLogs PodLogs `json:"podLogs,omitempty"`
+	PodLogs *PodLogs `json:"podLogs,omitempty"`
 
 	// collectionInterval is the interval of the data source
 	// +kubebuilder:default="15s"

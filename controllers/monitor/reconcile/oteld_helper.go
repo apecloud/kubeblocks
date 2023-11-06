@@ -24,11 +24,12 @@ import (
 	"errors"
 	"fmt"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/monitor/types"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type oteldWrapper struct {
@@ -63,7 +64,7 @@ const (
 )
 
 func (w *oteldWrapper) buildAPIServicePipeline() *oteldWrapper {
-	if !w.source.K8sClusterExporter.Enabled {
+	if w.source.K8sClusterExporter != nil && !w.source.K8sClusterExporter.Enabled {
 		return w
 	}
 
@@ -77,7 +78,7 @@ func (w *oteldWrapper) buildAPIServicePipeline() *oteldWrapper {
 }
 
 func (w *oteldWrapper) buildK8sNodeStatesPipeline() *oteldWrapper {
-	if !w.source.K8sKubeletExporter.Enabled {
+	if w.source.K8sKubeletExporter != nil && !w.source.K8sKubeletExporter.Enabled {
 		return w
 	}
 
@@ -91,7 +92,7 @@ func (w *oteldWrapper) buildK8sNodeStatesPipeline() *oteldWrapper {
 }
 
 func (w *oteldWrapper) buildNodePipeline() *oteldWrapper {
-	if !w.source.NodeExporter.Enabled {
+	if w.source.NodeExporter != nil && !w.source.NodeExporter.Enabled {
 		return w
 	}
 
@@ -116,7 +117,7 @@ func (w *oteldWrapper) buildSelfPipeline() *oteldWrapper {
 }
 
 func (w *oteldWrapper) buildPodLogsPipeline() *oteldWrapper {
-	if !w.source.PodLogs.Enabled {
+	if w.source.PodLogs != nil && !w.source.PodLogs.Enabled {
 		return w
 	}
 

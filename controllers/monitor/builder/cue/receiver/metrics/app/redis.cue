@@ -16,10 +16,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 parameters: {
-	job:      *"oteld-app-metrics" | string
-	endpoint: *"`endpoint`:6379" | string
-	username: *"envs[\"REDIS_REPL_USER\"]" | string
-	password: *"envs[\"REDIS_REPL_PASSWORD\"]" | string
+	job: *"oteld-app-metrics" | string
+	endpoint: *"`endpoint`:`envs[\"SERVICE_PORT\"]`" | string
+	username: *"default" | string
+	password: *"`envs[\"REDIS_REPL_PASSWORD\"]`" | string
 }
 
 output:

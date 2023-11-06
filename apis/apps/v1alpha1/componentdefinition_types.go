@@ -273,43 +273,6 @@ type SystemAccount struct {
 	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
 }
 
-type ConnectionCredential struct {
-	// The name of the ConnectionCredential.
-	// Cannot be updated.
-	// +required
-	Name string `json:"name"`
-
-	// ServiceName specifies the name of component service to use for accessing the component service.
-	// Cannot be updated.
-	// +optional
-	ServiceName string `json:"serviceName,omitempty"`
-
-	// PortName specifies the name of the port to access the component service.
-	// If the service has multiple ports, a specific port must be specified to use here.
-	// Otherwise, the unique port of the service will be used.
-	// Cannot be updated.
-	// +optional
-	PortName string `json:"portName,omitempty"`
-
-	// AccountName specifies the account used to access the component service.
-	// If specified, the account must be defined in @SystemAccounts.
-	// Cannot be updated.
-	// +optional
-	AccountName string `json:"accountName,omitempty"`
-
-	// TODO: how to use the secret?
-	// SecretName specifies the name of existed secret used to access the component service.
-	// Cannot be updated.
-	// +optional
-	SecretName string `json:"secretName,omitempty"`
-
-	// SecretNamespace specifies the namespace existed secret used to access the component service.
-	// If not specified, the namespace component existed will be used.
-	// Cannot be updated.
-	// +optional
-	SecretNamespace string `json:"secretNamespace,omitempty"`
-}
-
 // RoleArbitrator defines how to arbitrate the role of replicas.
 // +enum
 // +kubebuilder:validation:Enum={External,Lorry}

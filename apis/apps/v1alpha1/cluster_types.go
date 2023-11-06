@@ -76,10 +76,10 @@ type ClusterSpec struct {
 	// +optional
 	Services []Service `json:"services,omitempty"`
 
-	// credentials defines the credentials used to access a cluster.
+	// connectionCredentials defines the credentials used to access a cluster.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
-	Credentials []ClusterCredential `json:"credentials,omitempty"`
+	ConnectionCredentials []ConnectionCredential `json:"connectionCredentials,omitempty"`
 
 	// tenancy describes how pods are distributed across node.
 	// SharedNode means multiple pods may share the same node.
@@ -689,35 +689,6 @@ type ClusterComponentService struct {
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
-}
-
-type ClusterCredential struct {
-	// The name of the ConnectionCredential.
-	// Cannot be updated.
-	// +required
-	Name string `json:"name"`
-
-	// ServiceName specifies the name of service to use for accessing the cluster.
-	// Cannot be updated.
-	// +optional
-	ServiceName string `json:"serviceName,omitempty"`
-
-	// PortName specifies the name of the port to access the service.
-	// If the service has multiple ports, a specific port must be specified to use here.
-	// Otherwise, the unique port of the service will be used.
-	// Cannot be updated.
-	// +optional
-	PortName string `json:"portName,omitempty"`
-
-	// Cannot be updated.
-	// +optional
-	ComponentName string `json:"componentName,omitempty"`
-
-	// AccountName specifies the account used to access the component service.
-	// If specified, the account must be defined in @SystemAccounts.
-	// Cannot be updated.
-	// +optional
-	AccountName string `json:"accountName,omitempty"`
 }
 
 type ClassDefRef struct {

@@ -64,41 +64,30 @@ func (t *componentCredentialTransformer) Transform(ctx graph.TransformContext, d
 
 func (t *componentCredentialTransformer) buildConnCredential(transCtx *componentTransformContext, dag *graph.DAG,
 	synthesizeComp *component.SynthesizedComponent, credential appsv1alpha1.ConnectionCredential) (*corev1.Secret, error) {
-	secret := factory.BuildConnCredential4Component(synthesizeComp, credential.Name)
-	if len(credential.SecretName) != 0 {
-		if err := t.buildFromExistedSecret(transCtx, credential, secret); err != nil {
-			return nil, err
-		}
-	} else {
-		if err := t.buildFromServiceAndAccount(transCtx, dag, synthesizeComp, credential, secret); err != nil {
+	data := make(map[string][]byte)
+	if len(credential.ServiceName) > 0 {
+		if err := t.buildEndpoint(synthesizeComp, credential, &data); err != nil {
 			return nil, err
 		}
 	}
-	return secret, nil
-}
+	if len(credential.AccountName) > 0 {
+		var systemAccount *appsv1alpha1.SystemAccount
+		for i, account := range synthesizeComp.SystemAccounts {
+			if account.Name == credential.AccountName {
+				systemAccount = &synthesizeComp.SystemAccounts[i]
+				break
+			}
+		}
+		if systemAccount == nil {
+			return nil, fmt.Errorf("connection credential references a system account not defined")
+		}
+		if err := t.buildCredential(transCtx, dag, synthesizeComp, systemAccount, &data); err != nil {
+			return nil, err
+		}
+	}
 
-func (t *componentCredentialTransformer) buildFromExistedSecret(transCtx *componentTransformContext,
-	credential appsv1alpha1.ConnectionCredential, secret *corev1.Secret) error {
-	namespace := func() string {
-		namespace := credential.SecretNamespace
-		if len(namespace) == 0 {
-			namespace = secret.Namespace
-		}
-		return namespace
-	}
-	secretKey := types.NamespacedName{
-		Namespace: namespace(),
-		Name:      credential.SecretName,
-	}
-	obj := &corev1.Secret{}
-	if err := transCtx.GetClient().Get(transCtx.GetContext(), secretKey, obj); err != nil {
-		return err
-	}
-	secret.Immutable = obj.Immutable
-	secret.Data = obj.Data
-	secret.StringData = obj.StringData
-	secret.Type = obj.Type
-	return nil
+	secret := factory.BuildConnCredential4Component(synthesizeComp, credential.Name, data)
+	return secret, nil
 }
 
 func (t *componentCredentialTransformer) buildFromServiceAndAccount(transCtx *componentTransformContext,

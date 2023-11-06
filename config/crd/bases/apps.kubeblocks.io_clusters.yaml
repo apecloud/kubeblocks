@@ -903,18 +903,20 @@ spec:
                   rule: self.all(x, oldSelf.exists(y, y.name == x.name))
                 - message: component can not be removed dynamically
                   rule: oldSelf.all(x, self.exists(y, y.name == x.name))
-              credentials:
-                description: credentials defines the credentials used to access a
-                  cluster.
+              connectionCredentials:
+                description: connectionCredentials defines the credentials used to
+                  access a cluster.
                 items:
                   properties:
                     accountName:
-                      description: AccountName specifies the account used to access
-                        the component service. If specified, the account must be defined
+                      description: AccountName specifies the name of account used
+                        to access the service. If specified, the account must be defined
                         in @SystemAccounts. Cannot be updated.
                       type: string
                     componentName:
-                      description: Cannot be updated.
+                      description: ComponentName specifies the name of component where
+                        the account defined. For cluster-level connection credential,
+                        this field is required. Cannot be updated.
                       type: string
                     name:
                       description: The name of the ConnectionCredential. Cannot be
@@ -928,7 +930,7 @@ spec:
                       type: string
                     serviceName:
                       description: ServiceName specifies the name of service to use
-                        for accessing the cluster. Cannot be updated.
+                        for accessing. Cannot be updated.
                       type: string
                   required:
                   - name

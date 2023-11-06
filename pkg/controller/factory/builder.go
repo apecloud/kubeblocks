@@ -543,16 +543,24 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 	return connCredential
 }
 
-func BuildConnCredential4Cluster(cluster *appsv1alpha1.Cluster, name string) *corev1.Secret {
+func BuildConnCredential4Cluster(cluster *appsv1alpha1.Cluster, name string, data map[string][]byte) *corev1.Secret {
 	secretName := constant.GenerateClusterConnCredential(cluster.Name, name)
 	labels := constant.GetClusterWellKnownLabels(cluster.Name)
-	return builder.NewSecretBuilder(cluster.Namespace, secretName).AddLabelsInMap(labels).GetObject()
+	return builder.NewSecretBuilder(cluster.Namespace, secretName).
+		AddLabelsInMap(labels).
+		SetData(data).
+		SetImmutable(true).
+		GetObject()
 }
 
-func BuildConnCredential4Component(comp *component.SynthesizedComponent, name string) *corev1.Secret {
+func BuildConnCredential4Component(comp *component.SynthesizedComponent, name string, data map[string][]byte) *corev1.Secret {
 	secretName := constant.GenerateComponentConnCredential(comp.ClusterName, comp.Name, name)
 	labels := constant.GetComponentWellKnownLabels(comp.ClusterName, comp.Name)
-	return builder.NewSecretBuilder(comp.Namespace, secretName).AddLabelsInMap(labels).GetObject()
+	return builder.NewSecretBuilder(comp.Namespace, secretName).
+		AddLabelsInMap(labels).
+		SetData(data).
+		SetImmutable(true).
+		GetObject()
 }
 
 func BuildPDB(synthesizedComp *component.SynthesizedComponent) *policyv1.PodDisruptionBudget {

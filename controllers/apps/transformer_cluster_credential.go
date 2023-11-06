@@ -96,7 +96,7 @@ func (t *ClusterCredentialTransformer) buildSynthesizedComponentLegacy(transCtx 
 
 func (t *ClusterCredentialTransformer) transformClusterCredential(transCtx *clusterTransformContext, dag *graph.DAG) error {
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	for _, credential := range transCtx.Cluster.Spec.Credentials {
+	for _, credential := range transCtx.Cluster.Spec.ConnectionCredentials {
 		secret, err := t.buildClusterCredential(transCtx, credential)
 		if err != nil {
 			return err
@@ -108,16 +108,15 @@ func (t *ClusterCredentialTransformer) transformClusterCredential(transCtx *clus
 	return nil
 }
 
-func (t *ClusterCredentialTransformer) buildClusterCredential(transCtx *clusterTransformContext, credential appsv1alpha1.ClusterCredential) (*corev1.Secret, error) {
+func (t *ClusterCredentialTransformer) buildClusterCredential(transCtx *clusterTransformContext, credential appsv1alpha1.ConnectionCredential) (*corev1.Secret, error) {
 	cluster := transCtx.Cluster
-	secret := factory.BuildConnCredential4Cluster(cluster, credential.Name)
 
 	var compDef *appsv1alpha1.ComponentDefinition
-	// if len(credential.ComponentName) > 0 {
+	// if len(credential.Component) > 0 {
 	//	// TODO(component): lookup comp def
 	// }
 
-	data := make(map[string]string)
+	data := make(map[string][]byte)
 	if len(credential.ServiceName) > 0 {
 		if err := t.buildServiceEndpoint(cluster, compDef, credential, &data); err != nil {
 			return nil, err
@@ -128,14 +127,14 @@ func (t *ClusterCredentialTransformer) buildClusterCredential(transCtx *clusterT
 			return nil, err
 		}
 	}
-	// TODO(component): define the format of conn-credential secret
-	secret.StringData = data
 
+	// TODO(component): define the format of conn-credential secret
+	secret := factory.BuildConnCredential4Cluster(cluster, credential.Name, data)
 	return secret, nil
 }
 
 func (t *ClusterCredentialTransformer) buildServiceEndpoint(cluster *appsv1alpha1.Cluster, compDef *appsv1alpha1.ComponentDefinition,
-	credential appsv1alpha1.ClusterCredential, data *map[string]string) error {
+	credential appsv1alpha1.ConnectionCredential, data *map[string][]byte) error {
 	serviceName, ports := t.lookupMatchedService(cluster, compDef, credential)
 	if len(serviceName) == 0 {
 		return fmt.Errorf("cluster credential references a service which is not definied: %s-%s", cluster.Name, credential.Name)
@@ -152,7 +151,7 @@ func (t *ClusterCredentialTransformer) buildServiceEndpoint(cluster *appsv1alpha
 }
 
 func (t *ClusterCredentialTransformer) lookupMatchedService(cluster *appsv1alpha1.Cluster,
-	compDef *appsv1alpha1.ComponentDefinition, credential appsv1alpha1.ClusterCredential) (string, []corev1.ServicePort) {
+	compDef *appsv1alpha1.ComponentDefinition, credential appsv1alpha1.ConnectionCredential) (string, []corev1.ServicePort) {
 	for i, svc := range cluster.Spec.Services {
 		if svc.Name == credential.ServiceName {
 			// TODO(component): service name
@@ -171,8 +170,8 @@ func (t *ClusterCredentialTransformer) lookupMatchedService(cluster *appsv1alpha
 	return "", nil
 }
 
-func (t *ClusterCredentialTransformer) buildEndpointFromService(credential appsv1alpha1.ClusterCredential,
-	serviceName string, ports []corev1.ServicePort, data *map[string]string) {
+func (t *ClusterCredentialTransformer) buildEndpointFromService(credential appsv1alpha1.ConnectionCredential,
+	serviceName string, ports []corev1.ServicePort, data *map[string][]byte) {
 	port := int32(0)
 	if len(credential.PortName) == 0 {
 		port = ports[0].Port
@@ -185,12 +184,12 @@ func (t *ClusterCredentialTransformer) buildEndpointFromService(credential appsv
 		}
 	}
 	// TODO(component): define the service and port pattern
-	(*data)["service"] = serviceName
-	(*data)["port"] = fmt.Sprintf("%d", port)
+	(*data)["service"] = []byte(serviceName)
+	(*data)["port"] = []byte(fmt.Sprintf("%d", port))
 }
 
 func (t *ClusterCredentialTransformer) buildCredential(ctx graph.TransformContext, namespace string,
-	credential appsv1alpha1.ClusterCredential, data *map[string]string) error {
+	credential appsv1alpha1.ConnectionCredential, data *map[string][]byte) error {
 	key := types.NamespacedName{
 		Namespace: namespace,
 		Name:      credential.AccountName, // TODO(component): secret name
@@ -200,7 +199,7 @@ func (t *ClusterCredentialTransformer) buildCredential(ctx graph.TransformContex
 		return err
 	}
 	// TODO: which field should to use from accounts?
-	maps.Copy(*data, secret.StringData)
+	maps.Copy(*data, secret.Data)
 	return nil
 }
 

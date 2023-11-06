@@ -21,7 +21,6 @@ package accounts
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -34,8 +33,6 @@ import (
 	clusterutil "github.com/apecloud/kubeblocks/pkg/cli/cluster"
 	"github.com/apecloud/kubeblocks/pkg/cli/exec"
 	"github.com/apecloud/kubeblocks/pkg/cli/printer"
-	"github.com/apecloud/kubeblocks/pkg/cli/util"
-	"github.com/apecloud/kubeblocks/pkg/lorry/client"
 	lorryutil "github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
@@ -56,15 +53,13 @@ var (
 	errMissingUserName       = fmt.Errorf("please specify username")
 	errMissingRoleName       = fmt.Errorf("please specify at least ONE role name")
 	errInvalidRoleName       = fmt.Errorf("invalid role name, should be one of [SUPERUSER, READWRITE, READONLY] ")
-	errInvalidOp             = fmt.Errorf("invalid operation")
 	errCompNameOrInstName    = fmt.Errorf("please specify either --component or --instance, they are exclusive")
 	errClusterNameorInstName = fmt.Errorf("specify either cluster name or --instance")
 )
 
-func NewAccountBaseOptions(f cmdutil.Factory, streams genericiooptions.IOStreams, op lorryutil.OperationKind) *AccountBaseOptions {
+func NewAccountBaseOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *AccountBaseOptions {
 	return &AccountBaseOptions{
 		ExecOptions: exec.NewExecOptions(f, streams),
-		AccountOp:   op,
 	}
 }
 
@@ -147,60 +142,6 @@ func (o *AccountBaseOptions) Complete(f cmdutil.Factory) error {
 	return nil
 }
 
-func (o *AccountBaseOptions) Run(cmd *cobra.Command, f cmdutil.Factory, streams genericiooptions.IOStreams) error {
-	var err error
-	response, err := o.Do()
-	if err != nil {
-		if lorryutil.IsUnSupportedError(err) {
-			return fmt.Errorf("command `%s` on characterType `%s` (defined in cluster: %s, component: %s) is not supported yet", cmd.Use, o.CharType, o.ClusterName, o.ComponentName)
-		}
-		return err
-	}
-
-	switch o.AccountOp {
-	case
-		lorryutil.DeleteUserOp,
-		lorryutil.RevokeUserRoleOp,
-		lorryutil.GrantUserRoleOp:
-		o.printGeneralInfo(response)
-		err = nil
-	case lorryutil.CreateUserOp:
-		o.printGeneralInfo(response)
-		if response.Event == lorryutil.RespEveSucc {
-			printer.Alert(o.Out, "Please do REMEMBER the password for the new user! Once forgotten, it cannot be retrieved!\n")
-		}
-		err = nil
-	case lorryutil.DescribeUserOp:
-		err = o.printRoleInfo(response)
-	case lorryutil.ListUsersOp:
-		err = o.printUserInfo(response)
-	default:
-		err = errInvalidOp
-	}
-	if err != nil {
-		return err
-	}
-
-	if o.Verbose {
-		fmt.Fprintln(o.Out, "")
-		o.printMeta(response)
-	}
-	return err
-}
-
-func (o *AccountBaseOptions) Do() (lorryutil.SQLChannelResponse, error) {
-	klog.V(1).Info(fmt.Sprintf("connect to cluster %s, component %s, instance %s\n", o.ClusterName, o.ComponentName, o.PodName))
-	response := lorryutil.SQLChannelResponse{}
-	sqlClient, err := client.NewHTTPClientWithChannelPod(o.Pod, o.CharType)
-	if err != nil {
-		return response, err
-	}
-
-	request := lorryutil.SQLChannelRequest{Operation: (string)(o.AccountOp), Metadata: o.RequestMeta}
-	response, err = sqlClient.SendRequest(o.ExecOptions, request)
-	return response, err
-}
-
 func (o *AccountBaseOptions) newTblPrinterWithStyle(title string, header []interface{}) *printer.TablePrinter {
 	tblPrinter := printer.NewTablePrinter(o.Out)
 	tblPrinter.SetStyle(printer.TerminalStyle)
@@ -209,59 +150,26 @@ func (o *AccountBaseOptions) newTblPrinterWithStyle(title string, header []inter
 	return tblPrinter
 }
 
-func (o *AccountBaseOptions) printGeneralInfo(response lorryutil.SQLChannelResponse) {
+func (o *AccountBaseOptions) printGeneralInfo(event, message string) {
 	tblPrinter := o.newTblPrinterWithStyle("QUERY RESULT", []interface{}{"RESULT", "MESSAGE"})
-	tblPrinter.AddRow(response.Event, response.Message)
+	tblPrinter.AddRow(event, message)
 	tblPrinter.Print()
 }
 
-func (o *AccountBaseOptions) printMeta(response lorryutil.SQLChannelResponse) {
-	meta := response.Metadata
-	tblPrinter := o.newTblPrinterWithStyle("QUERY META", []interface{}{"START TIME", "END TIME", "OPERATION", "DATA"})
-	tblPrinter.SetStyle(printer.KubeCtlStyle)
-	tblPrinter.AddRow(util.TimeTimeFormat(meta.StartTime), util.TimeTimeFormat(meta.EndTime), meta.Operation, meta.Extra)
-	tblPrinter.Print()
-}
-
-func (o *AccountBaseOptions) printUserInfo(response lorryutil.SQLChannelResponse) error {
-	if response.Event == lorryutil.RespEveFail {
-		o.printGeneralInfo(response)
-		return nil
-	}
-	// decode user info from metadata
-	users := []lorryutil.UserInfo{}
-	err := json.Unmarshal([]byte(response.Message), &users)
-	if err != nil {
-		return err
-	}
-
+func (o *AccountBaseOptions) printUserInfo(users []map[string]any) {
 	// render user info with username and password expired boolean
 	tblPrinter := o.newTblPrinterWithStyle("USER INFO", []interface{}{"USERNAME", "EXPIRED"})
 	for _, user := range users {
-		tblPrinter.AddRow(user.UserName, user.Expired)
+		tblPrinter.AddRow(user["userName"], user["expired"])
 	}
 
 	tblPrinter.Print()
-	return nil
 }
 
-func (o *AccountBaseOptions) printRoleInfo(response lorryutil.SQLChannelResponse) error {
-	if response.Event == lorryutil.RespEveFail {
-		o.printGeneralInfo(response)
-		return nil
-	}
-
-	// decode role info from metadata
-	users := []lorryutil.UserInfo{}
-	err := json.Unmarshal([]byte(response.Message), &users)
-	if err != nil {
-		return err
-	}
-
+func (o *AccountBaseOptions) printRoleInfo(users []map[string]any) {
 	tblPrinter := o.newTblPrinterWithStyle("USER INFO", []interface{}{"USERNAME", "ROLE"})
 	for _, user := range users {
-		tblPrinter.AddRow(user.UserName, user.RoleName)
+		tblPrinter.AddRow(user["userName"], user["roleName"])
 	}
 	tblPrinter.Print()
-	return nil
 }

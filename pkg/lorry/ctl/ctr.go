@@ -37,14 +37,13 @@ var RootCmd = &cobra.Command{
 	Use:   "lorryctl",
 	Short: "LORRY CLI",
 	Long: `
-   _____ ____    __       ________                           __
-  / ___// __ \  / /      / ____/ /_  ____ _____  ____  ___  / /
-  \__ \/ / / / / /      / /   / __ \/ __ \/ __ \/ __ \/ _ \/ /
- ___/ / /_/ / / /___   / /___/ / / / /_/ / / / / / / /  __/ /
-/____/\___\_\/_____/   \____/_/ /_/\__,_/_/ /_/_/ /_/\___/_/
-									   
+   / /   ____  ____________  __   / ____/ /______/ /
+  / /   / __ \/ ___/ ___/ / / /  / /   / __/ ___/ / 
+ / /___/ /_/ / /  / /  / /_/ /  / /___/ /_/ /  / /  
+/_____/\____/_/  /_/   \__, /   \____/\__/_/  /_/   
+                      /____/                        
 ===============================
-SQL Channel client`,
+Lorry service client`,
 	Run: func(cmd *cobra.Command, _ []string) {
 		if versionFlag {
 			printVersion()
@@ -54,21 +53,21 @@ SQL Channel client`,
 	},
 }
 
-type sqlChannelVersion struct {
+type lorryVersion struct {
 	CliVersion     string `json:"Cli version"`
 	RuntimeVersion string `json:"Runtime version"`
 }
 
 var (
-	cliVersion            string
-	versionFlag           bool
-	sqlChannelVer         sqlChannelVersion
-	sqlChannelRuntimePath string
+	cliVersion       string
+	versionFlag      bool
+	lorryVer         lorryVersion
+	lorryRuntimePath string
 )
 
 // Execute adds all child commands to the root command.
 func Execute(cliVersion, apiVersion string) {
-	sqlChannelVer = sqlChannelVersion{
+	lorryVer = lorryVersion{
 		CliVersion:     cliVersion,
 		RuntimeVersion: apiVersion,
 	}
@@ -84,38 +83,38 @@ func Execute(cliVersion, apiVersion string) {
 }
 
 func setVersion() {
-	template := fmt.Sprintf(cliVersionTemplateString, sqlChannelVer.CliVersion, sqlChannelVer.RuntimeVersion)
+	template := fmt.Sprintf(cliVersionTemplateString, lorryVer.CliVersion, lorryVer.RuntimeVersion)
 	RootCmd.SetVersionTemplate(template)
 }
 
 func printVersion() {
-	fmt.Printf(cliVersionTemplateString, sqlChannelVer.CliVersion, sqlChannelVer.RuntimeVersion)
+	fmt.Printf(cliVersionTemplateString, lorryVer.CliVersion, lorryVer.RuntimeVersion)
 }
 
 func initConfig() {
-	// err intentionally ignored since sqlChanneld may not yet be installed.
+	// err intentionally ignored since lorry may not yet be installed.
 	runtimeVer := GetRuntimeVersion()
 
-	sqlChannelVer = sqlChannelVersion{
+	lorryVer = lorryVersion{
 		// Set in Execute() method in this file before initConfig() is called by cmd.Execute().
 		CliVersion:     cliVersion,
 		RuntimeVersion: strings.ReplaceAll(runtimeVer, "\n", ""),
 	}
 
-	viper.SetEnvPrefix("sqlChannel")
+	viper.SetEnvPrefix("lorry")
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv()
 }
 
 func init() {
-	RootCmd.PersistentFlags().StringVarP(&sqlChannelRuntimePath, "kb-runtime-dir", "", "/kubeblocks/", "The directory of kubeblocks binaries")
+	RootCmd.PersistentFlags().StringVarP(&lorryRuntimePath, "kb-runtime-dir", "", "/kubeblocks/", "The directory of kubeblocks binaries")
 }
 
-// GetRuntimeVersion returns the version for the local sqlChannel runtime.
+// GetRuntimeVersion returns the version for the local lorry runtime.
 func GetRuntimeVersion() string {
-	sqlchannelCMD := filepath.Join(sqlChannelRuntimePath, "probe")
+	lorryCMD := filepath.Join(lorryRuntimePath, "lorry")
 
-	out, err := exec.Command(sqlchannelCMD, "--version").Output()
+	out, err := exec.Command(lorryCMD, "--version").Output()
 	if err != nil {
 		return "n/a\n"
 	}

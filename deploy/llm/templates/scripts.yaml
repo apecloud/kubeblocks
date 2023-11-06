@@ -6,36 +6,51 @@ metadata:
     {{- include "llm.labels" . | nindent 4 }}
 data:
   start.sh: |
-    #!/bin/sh
+    #!/bin/bash
     if [ -n "$CLONE_MODEL_SCRIPT" ]; then
       bash -c "$CLONE_MODEL_SCRIPT"
     fi
     ordinal=${KB_POD_NAME##*-}
     echo "current pod ordinal: $ordinal"
-    /scripts/vllm-start.sh &
     if [ $ordinal -eq 0 ]; then
-      ray start --head --block
+      /scripts/vllm-start.sh &
+      /scripts/ray-health-checker.sh &
+      ray start --head --block --redis-password=44s5jntp
     else 
       ray start --address="${KB_VLLM_0_HOSTNAME}:6379" --block
     fi
   vllm-start.sh: |
-    #!/bin/sh
+    #!/bin/bash
     echo "model=${MODEL_NAME}"
-    ordinal=${KB_POD_NAME##*-}
-    echo "current pod ordinal: $ordinal"
     echo "EXTRA_ARGS=${EXTRA_ARGS}"
     cd vllm
     while true; do
-      if [ $ordinal -eq 0 ]; then
-        python -m vllm.entrypoints.api_server --host 0.0.0.0 --port 8000 --model ${MODEL_NAME} --gpu-memory-utilization 0.95 --max-num-seqs 512 --max-num-batched-tokens 8192 --tensor-parallel-size ${KB_VLLM_N} ${EXTRA_ARGS} > log
-        code=$?
-        if [ $code -eq 0 ]; then
-          break
-        fi
-        echo "exit with code $code, wait for 1 second and try again..."
+      node_num=`ray status | grep "1 node" | wc -l`
+      # continue waiting if ray status not ok
+      if [[ "$node_num" -ne "$KB_VLLM_N" ]]; then 
         sleep 1
-      else 
-        # keep container running
-        sleep 1
+        continue
       fi
+      python -m vllm.entrypoints.api_server --host 0.0.0.0 --port 8000 --model ${MODEL_NAME} --gpu-memory-utilization 0.95 --max-num-seqs 512 --max-num-batched-tokens 8192 --tensor-parallel-size ${KB_VLLM_N} ${EXTRA_ARGS} 2>&1 > log 
+      code=$?
+      if [ $code -eq 0 ]; then
+        break
+      fi
+      echo "exit with code $code, wait for 1 second and try again..." 2>&1 > log
+      sleep 1
+    done
+  ray-health-checker.sh: |
+    #!/bin/bash
+    # wait ray to start when first run
+    sleep 10 
+    while true; do
+      node_num=`ray status | grep "1 node" | wc -l`
+      if [[ "$node_num" -ne "$KB_VLLM_N" ]]; then 
+        # if ray nodes not healthy, restart vllm
+        vllm_pid=`ps aux | grep "python -m vllm.entrypoints.api_server" | grep -v grep | awk '{print $2}'`
+        if [[ "$vllm_pid" ]]; then 
+          kill -9 "$vllm_pid"
+        fi
+      fi
+      sleep 3
     done

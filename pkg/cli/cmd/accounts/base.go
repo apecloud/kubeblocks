@@ -156,7 +156,7 @@ func (o *AccountBaseOptions) printGeneralInfo(event, message string) {
 	tblPrinter.Print()
 }
 
-func (o *AccountBaseOptions) printUserInfo(users []map[string]any) error {
+func (o *AccountBaseOptions) printUserInfo(users []map[string]any) {
 	// render user info with username and password expired boolean
 	tblPrinter := o.newTblPrinterWithStyle("USER INFO", []interface{}{"USERNAME", "EXPIRED"})
 	for _, user := range users {
@@ -164,14 +164,12 @@ func (o *AccountBaseOptions) printUserInfo(users []map[string]any) error {
 	}
 
 	tblPrinter.Print()
-	return nil
 }
 
-func (o *AccountBaseOptions) printRoleInfo(users []map[string]any) error {
+func (o *AccountBaseOptions) printRoleInfo(users []map[string]any) {
 	tblPrinter := o.newTblPrinterWithStyle("USER INFO", []interface{}{"USERNAME", "ROLE"})
 	for _, user := range users {
 		tblPrinter.AddRow(user["userName"], user["roleName"])
 	}
 	tblPrinter.Print()
-	return nil
 }

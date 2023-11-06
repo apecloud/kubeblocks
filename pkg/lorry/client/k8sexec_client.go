@@ -125,7 +125,7 @@ func (cli *K8sExecClient) Request(ctx context.Context, operation, method string,
 		}
 		// escape single quote
 		body := strings.ReplaceAll(string(jsonData), "'", "\\'")
-		curlCmd = curlCmd + fmt.Sprintf(" -d '%s'", body)
+		curlCmd += fmt.Sprintf(" -d '%s'", body)
 	}
 	cmd := []string{"sh", "-c", curlCmd}
 

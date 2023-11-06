@@ -47,13 +47,10 @@ func (t *ClusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	// has no components defined
-	if len(transCtx.ComponentSpecs) == 0 {
+	if len(transCtx.ComponentSpecs) == 0 || !transCtx.OrigCluster.IsUpdating() {
 		return nil
 	}
-	if transCtx.OrigCluster.IsUpdating() {
-		return t.reconcileComponents(transCtx, dag)
-	}
-	return t.reconcileComponentsStatus(transCtx, dag)
+	return t.reconcileComponents(transCtx, dag)
 }
 
 func (t *ClusterComponentTransformer) reconcileComponents(transCtx *clusterTransformContext, dag *graph.DAG) error {
@@ -134,39 +131,6 @@ func (t *ClusterComponentTransformer) handleCompsUpdate(transCtx *clusterTransfo
 		}
 	}
 	return nil
-}
-
-func (t *ClusterComponentTransformer) reconcileComponentsStatus(transCtx *clusterTransformContext, dag *graph.DAG) error {
-	cluster := transCtx.Cluster
-	if cluster.Status.Components == nil {
-		cluster.Status.Components = make(map[string]appsv1alpha1.ClusterComponentStatus)
-	}
-	// We cannot use cluster.status.components because of simplified API generated component is not in it.
-	for _, compSpec := range transCtx.ComponentSpecs {
-		compKey := types.NamespacedName{
-			Namespace: cluster.Namespace,
-			Name:      component.FullName(cluster.Name, compSpec.Name),
-		}
-		comp := &appsv1alpha1.Component{}
-		if err := transCtx.Client.Get(transCtx.Context, compKey, comp); err != nil {
-			return err
-		}
-		status := t.buildClusterCompStatus(comp)
-		if len(status.Phase) == 0 {
-			continue
-		}
-		cluster.Status.Components[compSpec.Name] = status
-	}
-	return nil
-}
-
-// buildClusterCompStatus builds cluster component status from specified component object.
-func (t *ClusterComponentTransformer) buildClusterCompStatus(comp *appsv1alpha1.Component) appsv1alpha1.ClusterComponentStatus {
-	// TODO(component): conditions & roles(?)
-	return appsv1alpha1.ClusterComponentStatus{
-		Phase:   comp.Status.Phase,
-		Message: comp.Status.Message,
-	}
 }
 
 // getRunningCompObject gets the component object from cache snapshot

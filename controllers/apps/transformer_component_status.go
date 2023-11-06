@@ -82,6 +82,10 @@ var _ graph.Transformer = &componentStatusTransformer{}
 
 func (t *componentStatusTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
+	if model.IsObjectDeleting(transCtx.ComponentOrig) {
+		return nil
+	}
+
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      transCtx.Context,
 		Log:      transCtx.Logger,
@@ -89,35 +93,21 @@ func (t *componentStatusTransformer) Transform(ctx graph.TransformContext, dag *
 	}
 	comp := transCtx.Component
 	compOrig := transCtx.ComponentOrig
-
-	// fast return
-	if model.IsObjectDeleting(compOrig) {
-		return nil
-	}
-
 	cluster := transCtx.Cluster
-	clusterObj := cluster.DeepCopy()
 	synthesizeComp := transCtx.SynthesizeComponent
 
-	// get underlying running rsm
-	var runningRSM *workloads.ReplicatedStateMachine
-	runningRSMList, err := component.ListRSMOwnedByComponent(reqCtx.Ctx, t.Client, cluster.Namespace, constant.GetComponentWellKnownLabels(cluster.Name, synthesizeComp.Name))
+	// get underlying running RSM object
+	runningRSM, err := t.runningRSMObject(ctx, synthesizeComp)
 	if err != nil {
 		return err
 	}
-	cnt := len(runningRSMList)
-	switch {
-	case cnt == 0:
-		transCtx.Logger.Info(fmt.Sprintf("skip reconcile component status because rsm not found, generation: %d", comp.Generation))
+	if runningRSM == nil {
+		transCtx.Logger.Info(fmt.Sprintf("skip reconcile component status because underlying workload object not found, generation: %d", comp.Generation))
 		return nil
-	case cnt == 1:
-		runningRSM = runningRSMList[0]
-	default:
-		return fmt.Errorf("more than one workloads found for the component, cluster: %s, component: %s, cnt: %d", cluster.Name, synthesizeComp.Name, cnt)
 	}
 
-	// build protoRSM workload
-	protoRSM, err := factory.BuildRSMWrapper(clusterObj, synthesizeComp)
+	// build proto RSM workload
+	protoRSM, err := factory.BuildRSMWrapper(cluster, synthesizeComp)
 	if err != nil {
 		return err
 	}
@@ -128,40 +118,37 @@ func (t *componentStatusTransformer) Transform(ctx graph.TransformContext, dag *
 		comp.Status.ObservedGeneration = comp.Generation
 	case model.IsObjectStatusUpdating(compOrig):
 		// reconcile the component status and sync the component status to cluster status
-		csh := newComponentStatusHandler(reqCtx, t.Client, clusterObj, comp, synthesizeComp, runningRSM, protoRSM, dag)
+		csh := newComponentStatusHandler(reqCtx, t.Client, cluster, comp, synthesizeComp, runningRSM, protoRSM, dag)
 		if err := csh.reconcileComponentStatus(); err != nil {
 			return err
 		}
-
 		comp = csh.comp
-		clusterObj = csh.cluster
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	graphCli.Status(dag, compOrig, comp)
-	graphCli.Status(dag, cluster, clusterObj)
 
 	return nil
 }
 
-// reconcileComponentStatus reconciles phase and syncs the component status to cluster status.
+func (t *componentStatusTransformer) runningRSMObject(ctx graph.TransformContext,
+	synthesizeComp *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
+	rsmKey := types.NamespacedName{
+		Namespace: synthesizeComp.Namespace,
+		Name:      constant.GenerateRSMNamePattern(synthesizeComp.ClusterName, synthesizeComp.Name),
+	}
+	rsm := &workloads.ReplicatedStateMachine{}
+	if err := ctx.GetClient().Get(ctx.GetContext(), rsmKey, rsm); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return rsm, nil
+}
+
+// reconcileComponentStatus reconciles component status.
 func (r *componentStatusHandler) reconcileComponentStatus() error {
-
-	// reconcile the component phase.
-	if err := r.reconcileComponentPhase(); err != nil {
-		return err
-	}
-
-	// sync the component status to cluster status.
-	if err := r.syncComponentStatusToCluster(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// reconcileComponentPhase reconciles the component phase.
-func (r *componentStatusHandler) reconcileComponentPhase() error {
 	if r.runningRSM == nil {
 		return nil
 	}
@@ -275,49 +262,6 @@ func (r *componentStatusHandler) reconcileComponentPhase() error {
 	if err := r.updatePrimaryIndex(); err != nil {
 		return err
 	}
-
-	return nil
-}
-
-// syncComponentStatusToCluster syncs the component status to cluster status.
-func (r *componentStatusHandler) syncComponentStatusToCluster() error {
-	updatePodsReady := func(ready bool) {
-		_ = r.updateClusterComponentStatus("", func(status *appsv1alpha1.ClusterComponentStatus) error {
-			// if ready flag not changed, don't update the ready time
-			if status.PodsReady != nil && *status.PodsReady == ready {
-				return nil
-			}
-			status.PodsReady = &ready
-			if ready {
-				now := metav1.Now()
-				status.PodsReadyTime = &now
-			}
-			return nil
-		})
-	}
-
-	switch r.comp.Status.Phase {
-	case appsv1alpha1.DeletingClusterCompPhase:
-		r.setClusterStatusPhase(appsv1alpha1.DeletingClusterCompPhase, r.comp.Status.Message, "component is Deleting")
-	case appsv1alpha1.StoppingClusterCompPhase:
-		r.setClusterStatusPhase(appsv1alpha1.StoppingClusterCompPhase, r.comp.Status.Message, "component is Stopping")
-	case appsv1alpha1.StoppedClusterCompPhase:
-		r.setClusterStatusPhase(appsv1alpha1.StoppedClusterCompPhase, r.comp.Status.Message, "component is Stopped")
-	case appsv1alpha1.RunningClusterCompPhase:
-		r.setClusterStatusPhase(appsv1alpha1.RunningClusterCompPhase, r.comp.Status.Message, "component is Running")
-	case appsv1alpha1.CreatingClusterCompPhase:
-		r.setClusterStatusPhase(appsv1alpha1.CreatingClusterCompPhase, r.comp.Status.Message, "Create a new component")
-	case appsv1alpha1.UpdatingClusterCompPhase:
-		r.setClusterStatusPhase(appsv1alpha1.UpdatingClusterCompPhase, r.comp.Status.Message, "component is Updating")
-	case appsv1alpha1.FailedClusterCompPhase:
-		r.setClusterStatusPhase(appsv1alpha1.FailedClusterCompPhase, r.comp.Status.Message, "component is Failed")
-	default:
-		r.setClusterStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, r.comp.Status.Message, "unknown")
-	}
-
-	updatePodsReady(r.podsReady)
-
-	r.updateClusterMembersStatus()
 
 	return nil
 }
@@ -578,127 +522,6 @@ func (r *componentStatusHandler) updateComponentStatus(phaseTransitionMsg string
 		}
 	}
 	return nil
-}
-
-// setStatusPhase sets the cluster component phase and messages conditionally.
-func (r *componentStatusHandler) setClusterStatusPhase(phase appsv1alpha1.ClusterComponentPhase, statusMessage appsv1alpha1.ComponentMessageMap, phaseTransitionMsg string) {
-	updateFn := func(status *appsv1alpha1.ClusterComponentStatus) error {
-		if status.Phase == phase {
-			return nil
-		}
-		status.Phase = phase
-		if status.Message == nil {
-			status.Message = statusMessage
-		} else {
-			for k, v := range statusMessage {
-				status.Message[k] = v
-			}
-		}
-		return nil
-	}
-	if err := r.updateClusterComponentStatus(phaseTransitionMsg, updateFn); err != nil {
-		panic(fmt.Sprintf("unexpected error occurred while updating component status: %s", err.Error()))
-	}
-}
-
-// updateClusterComponentStatus updates the cluster component status by @updateFn, with additional message to explain the transition occurred.
-func (r *componentStatusHandler) updateClusterComponentStatus(phaseTransitionMsg string, updateFn func(status *appsv1alpha1.ClusterComponentStatus) error) error {
-	if updateFn == nil {
-		return nil
-	}
-
-	status := r.getClusterComponentStatus()
-	phase := status.Phase
-	err := updateFn(&status)
-	if err != nil {
-		return err
-	}
-	r.cluster.Status.Components[r.synthesizeComp.Name] = status
-
-	if phase != status.Phase {
-		// TODO: logging the event
-		if r.reqCtx.Recorder != nil && phaseTransitionMsg != "" {
-			r.reqCtx.Recorder.Eventf(r.cluster, corev1.EventTypeNormal, componentPhaseTransition, phaseTransitionMsg)
-		}
-	}
-
-	return nil
-}
-
-// getComponentStatus gets the cluster component status.
-func (r *componentStatusHandler) getClusterComponentStatus() appsv1alpha1.ClusterComponentStatus {
-	if r.cluster.Status.Components == nil {
-		r.cluster.Status.Components = make(map[string]appsv1alpha1.ClusterComponentStatus)
-	}
-	if _, ok := r.cluster.Status.Components[r.synthesizeComp.Name]; !ok {
-		r.cluster.Status.Components[r.synthesizeComp.Name] = appsv1alpha1.ClusterComponentStatus{}
-	}
-	return r.cluster.Status.Components[r.synthesizeComp.Name]
-}
-
-// updateClusterMembersStatus updates the cluster members status.
-// TODO(xingran): remove the dependency of the component's workload type.
-func (r *componentStatusHandler) updateClusterMembersStatus() {
-	// get component status
-	componentStatus := r.getClusterComponentStatus()
-
-	// for compatibilities prior KB 0.7.0
-	buildConsensusSetStatus := func(membersStatus []workloads.MemberStatus) *appsv1alpha1.ConsensusSetStatus {
-		consensusSetStatus := &appsv1alpha1.ConsensusSetStatus{
-			Leader: appsv1alpha1.ConsensusMemberStatus{
-				Name:       "",
-				Pod:        constant.ComponentStatusDefaultPodName,
-				AccessMode: appsv1alpha1.None,
-			},
-		}
-		for _, memberStatus := range membersStatus {
-			status := appsv1alpha1.ConsensusMemberStatus{
-				Name:       memberStatus.Name,
-				Pod:        memberStatus.PodName,
-				AccessMode: appsv1alpha1.AccessMode(memberStatus.AccessMode),
-			}
-			switch {
-			case memberStatus.IsLeader:
-				consensusSetStatus.Leader = status
-			case memberStatus.CanVote:
-				consensusSetStatus.Followers = append(consensusSetStatus.Followers, status)
-			default:
-				consensusSetStatus.Learner = &status
-			}
-		}
-		return consensusSetStatus
-	}
-	buildReplicationSetStatus := func(membersStatus []workloads.MemberStatus) *appsv1alpha1.ReplicationSetStatus {
-		replicationSetStatus := &appsv1alpha1.ReplicationSetStatus{
-			Primary: appsv1alpha1.ReplicationMemberStatus{
-				Pod: "Unknown",
-			},
-		}
-		for _, memberStatus := range membersStatus {
-			status := appsv1alpha1.ReplicationMemberStatus{
-				Pod: memberStatus.PodName,
-			}
-			switch {
-			case memberStatus.IsLeader:
-				replicationSetStatus.Primary = status
-			default:
-				replicationSetStatus.Secondaries = append(replicationSetStatus.Secondaries, status)
-			}
-		}
-		return replicationSetStatus
-	}
-
-	// update members status
-	switch r.synthesizeComp.WorkloadType {
-	case appsv1alpha1.Consensus:
-		componentStatus.ConsensusSetStatus = buildConsensusSetStatus(r.runningRSM.Status.MembersStatus)
-	case appsv1alpha1.Replication:
-		componentStatus.ReplicationSetStatus = buildReplicationSetStatus(r.runningRSM.Status.MembersStatus)
-	}
-	componentStatus.MembersStatus = slices.Clone(r.runningRSM.Status.MembersStatus)
-
-	// set component status back
-	r.cluster.Status.Components[r.synthesizeComp.Name] = componentStatus
 }
 
 // updatePrimaryIndex updates the primary pod index to the pod annotations.

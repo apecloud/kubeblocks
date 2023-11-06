@@ -185,12 +185,11 @@ func (c *rsmRoleProbeConvertor) convert(args ...any) (any, error) {
 		PeriodSeconds:       synthesizeComp.LifecycleActions.RoleProbe.PeriodSeconds,
 		SuccessThreshold:    synthesizeComp.LifecycleActions.RoleProbe.SuccessThreshold,
 		FailureThreshold:    synthesizeComp.LifecycleActions.RoleProbe.FailureThreshold,
+		RoleUpdateMechanism: workloads.DirectAPIServerEventUpdate,
 	}
 
-	rsmRoleProbe.RoleUpdateMechanism = synthesizeComp.LifecycleActions.RoleProbe.RoleUpdateMechanism
 	if synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != nil {
 		rsmRoleProbe.BuiltinHandler = synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler
-		rsmRoleProbe.RoleUpdateMechanism = workloads.DirectAPIServerEventUpdate
 	}
 
 	// TODO(xingran): RSM Action does not support args[] yet

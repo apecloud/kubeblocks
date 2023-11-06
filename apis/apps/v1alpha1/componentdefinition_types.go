@@ -23,8 +23,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
 // +genclient
@@ -370,10 +368,6 @@ type ExecAction struct {
 	Args []string `json:"args,omitempty"`
 }
 
-// Preconditions must be fulfilled before an action is executed.
-type Preconditions struct {
-}
-
 type RetryPolicy struct {
 	// MaxRetries specifies the maximum number of times the action should be retried.
 	// +kubebuilder:default=0
@@ -436,12 +430,6 @@ type Action struct {
 	// Cannot be updated.
 	// +optional
 	Container string `json:"container,omitempty"`
-
-	// Preconditions represent conditions that must be met before executing the action.
-	// If any precondition is not met, the action will not be executed.
-	// Cannot be updated.
-	// +optional
-	Preconditions *Preconditions `json:"preconditions:omitempty"`
 
 	// TimeoutSeconds defines the timeout duration for the action in seconds.
 	// Cannot be updated.
@@ -572,12 +560,6 @@ type ComponentSwitchoverSpec struct {
 
 type RoleProbeSpec struct {
 	LifecycleActionHandler `json:",inline"`
-
-	// RoleUpdateMechanism specifies the way how pod role label being updated.
-	// +kubebuilder:default=ReadinessProbeEventUpdate
-	// +kubebuilder:validation:Enum={ReadinessProbeEventUpdate, DirectAPIServerEventUpdate}
-	// +optional
-	RoleUpdateMechanism workloads.RoleUpdateMechanism `json:"roleUpdateMechanism,omitempty"`
 
 	// Number of seconds after the container has started before liveness probes are initiated.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes

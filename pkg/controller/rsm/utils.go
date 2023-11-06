@@ -22,11 +22,12 @@ package rsm
 import (
 	"context"
 	"fmt"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"

@@ -70,6 +70,8 @@ var (
 	mongodbChart embed.FS
 	//go:embed charts/llm-cluster.tgz
 	llmChart embed.FS
+	//go:embed charts/xinference-cluster.tgz
+	xinferenceChart embed.FS
 )
 
 func IsbuiltinCharts(chart string) bool {
@@ -134,4 +136,12 @@ func init() {
 		fmt.Println(err.Error())
 	}
 
+	xinference := &embedConfig{
+		chartFS: xinferenceChart,
+		name:    "xinference-cluster.tgz",
+		alias:   "",
+	}
+	if err := xinference.register("xinference"); err != nil {
+		fmt.Println(err.Error())
+	}
 }

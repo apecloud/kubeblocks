@@ -1,0 +1,7 @@
+image:
+  repository: apecloud/xinference
+  pullPolicy: IfNotPresent
+  # registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+  registry: docker.io
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: latest-amd64

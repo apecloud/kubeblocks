@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: xinference-scripts
+  labels:
+    {{- include "xinference.labels" . | nindent 4 }}
+data:
+  start.sh: |
+    #!/bin/bash
+    xinference --host 0.0.0.0

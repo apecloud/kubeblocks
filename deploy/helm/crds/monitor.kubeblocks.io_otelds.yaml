@@ -36,6 +36,8 @@ spec:
             description: OTeldSpec defines the desired state of CollectorDataSource
             properties:
               batch:
+                description: batch is the batch config that used to batch data before
+                  sending
                 properties:
                   enabled:
                     default: true
@@ -86,6 +88,8 @@ spec:
                 - fatal
                 type: string
               memoryLimiter:
+                description: memoryLimiter is the memory limiter config that used
+                  to limit the memory usage of oteld
                 properties:
                   checkInterval:
                     description: CheckInterval is the time between measurements of
@@ -93,6 +97,7 @@ spec:
                       if set to zero, no checks will be performed.
                     type: string
                   enabled:
+                    default: true
                     description: enabled indicates whether to enable memory limiter
                     type: boolean
                   memoryLimitMib:

@@ -47,10 +47,10 @@ type oteldWrapper struct {
 }
 
 const (
-	k8sclusterPipeline = "api-service"
-	k8snodePipeline    = "datasource-metrics"
+	k8sClusterPipeline = "api-service"
+	k8sNodePipeline    = "datasource-metrics"
 	oteldSelfPipeline  = "self-metrics"
-	k8spodLogsPipeline = "podlogs"
+	k8sPodLogsPipeline = "podlogs"
 
 	AppMetricsCreatorName = "receiver_creator/app"
 	LogsCreatorName       = "receiver_creator/logs"
@@ -68,7 +68,7 @@ func (w *oteldWrapper) buildAPIServicePipeline() *oteldWrapper {
 		return w
 	}
 
-	pipeline := w.createPipeline(v1alpha1.ModeDeployment, k8sclusterPipeline, collectTypeMetrics)
+	pipeline := w.createPipeline(v1alpha1.ModeDeployment, k8sClusterPipeline, collectTypeMetrics)
 	pipeline.ReceiverMap[constant.APIServiceReceiverTPLName] = types.Receiver{
 		CollectionInterval: w.source.CollectionInterval,
 	}
@@ -82,7 +82,7 @@ func (w *oteldWrapper) buildK8sNodeStatesPipeline() *oteldWrapper {
 		return w
 	}
 
-	pipeline := w.createPipeline(v1alpha1.ModeDaemonSet, k8snodePipeline, collectTypeMetrics)
+	pipeline := w.createPipeline(v1alpha1.ModeDaemonSet, k8sNodePipeline, collectTypeMetrics)
 	pipeline.ReceiverMap[constant.K8SNodeStatesReceiverTPLName] = types.Receiver{
 		CollectionInterval: w.source.CollectionInterval,
 	}
@@ -96,7 +96,7 @@ func (w *oteldWrapper) buildNodePipeline() *oteldWrapper {
 		return w
 	}
 
-	pipeline := w.createPipeline(v1alpha1.ModeDaemonSet, k8snodePipeline, collectTypeMetrics)
+	pipeline := w.createPipeline(v1alpha1.ModeDaemonSet, k8sNodePipeline, collectTypeMetrics)
 	pipeline.ReceiverMap[constant.NodeExporterReceiverTPLName] = types.Receiver{
 		CollectionInterval: w.source.CollectionInterval,
 	}
@@ -121,7 +121,7 @@ func (w *oteldWrapper) buildPodLogsPipeline() *oteldWrapper {
 		return w
 	}
 
-	pipeline := w.createPipeline(v1alpha1.ModeDaemonSet, k8spodLogsPipeline, collectTypeLogs)
+	pipeline := w.createPipeline(v1alpha1.ModeDaemonSet, k8sPodLogsPipeline, collectTypeLogs)
 	pipeline.ReceiverMap[constant.PodLogsReceiverTPLName] = types.Receiver{}
 	w.buildProcessor(pipeline)
 	w.buildLogsExporter(pipeline)
@@ -215,7 +215,7 @@ func (w *oteldWrapper) buildFixedPipeline() *oteldWrapper {
 
 		metricsPipeline := types.NewPipeline(AppMetricsCreatorName)
 		w.buildProcessor(&metricsPipeline)
-		w.buildSysytemMetricsExporter(&metricsPipeline)
+		w.buildSystemMetricsExporter(&metricsPipeline)
 		instance.AppMetricsPipelien = &metricsPipeline
 	}
 	return w
@@ -241,7 +241,7 @@ func (w *oteldWrapper) buildSystemLogsExporter(pipeline *types.Pipeline) {
 	}
 }
 
-func (w *oteldWrapper) buildSysytemMetricsExporter(pipeline *types.Pipeline) {
+func (w *oteldWrapper) buildSystemMetricsExporter(pipeline *types.Pipeline) {
 	for _, exporterName := range w.OTeld.Spec.SystemDataSource.MetricsExporterRef {
 		found := false
 		for _, exporter := range w.metricsExporters.Items {

@@ -51,7 +51,7 @@ func (t *ClusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
-	services, err := t.listClusterServices(transCtx, cluster)
+	services, err := t.listOwnedClusterServices(transCtx, cluster)
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func (t *ClusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 		if err != nil {
 			return err
 		}
-		if err = t.createOrUpdate(ctx, dag, graphCli, service); err != nil {
+		if err = createOrUpdateService(ctx, dag, graphCli, service); err != nil {
 			return err
 		}
 		delete(services, service.Name)
@@ -81,7 +81,8 @@ func (t *ClusterServiceTransformer) buildService(transCtx *clusterTransformConte
 		clusterName = cluster.Name
 	)
 
-	builder := builder.NewServiceBuilder(namespace, service.ServiceName).
+	serviceName := constant.GenerateClusterServiceName(clusterName, service.ServiceName)
+	builder := builder.NewServiceBuilder(namespace, serviceName).
 		AddLabelsInMap(constant.GetClusterWellKnownLabels(clusterName)).
 		SetSpec(&service.Spec).
 		AddSelectorsInMap(t.builtinSelector(cluster)).
@@ -92,10 +93,8 @@ func (t *ClusterServiceTransformer) buildService(transCtx *clusterTransformConte
 		if err != nil {
 			return nil, err
 		}
-
 		builder.AddSelector(constant.KBAppComponentLabelKey, service.ComponentSelector)
 
-		// TODO(component): role selector
 		if len(service.RoleSelector) > 0 {
 			if err := t.checkComponentRoles(compDef, service); err != nil {
 				return nil, err
@@ -144,8 +143,24 @@ func (t *ClusterServiceTransformer) checkComponentRoles(compDef *appsv1alpha1.Co
 	return nil
 }
 
-func (t *ClusterServiceTransformer) createOrUpdate(ctx graph.TransformContext,
-	dag *graph.DAG, graphCli model.GraphClient, service *corev1.Service) error {
+func (t *ClusterServiceTransformer) listOwnedClusterServices(transCtx *clusterTransformContext,
+	cluster *appsv1alpha1.Cluster) (map[string]*corev1.Service, error) {
+	svcList := &corev1.ServiceList{}
+	labels := client.MatchingLabels(constant.GetClusterWellKnownLabels(cluster.Name))
+	if err := transCtx.Client.List(transCtx.Context, svcList, labels, client.InNamespace(cluster.Namespace)); err != nil {
+		return nil, err
+	}
+
+	services := make(map[string]*corev1.Service)
+	for i, svc := range svcList.Items {
+		if model.IsOwnerOf(cluster, &svc) {
+			services[svc.Name] = &svcList.Items[i]
+		}
+	}
+	return services, nil
+}
+
+func createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG, graphCli model.GraphClient, service *corev1.Service) error {
 	key := types.NamespacedName{
 		Namespace: service.Namespace,
 		Name:      service.Name,
@@ -160,24 +175,8 @@ func (t *ClusterServiceTransformer) createOrUpdate(ctx graph.TransformContext,
 	}
 	objCopy := obj.DeepCopy()
 	objCopy.Spec = service.Spec
-	if !reflect.DeepEqual(obj, objCopy) || !reflect.DeepEqual(obj.Annotations, objCopy.Annotations) {
+	if !reflect.DeepEqual(obj, objCopy) {
 		graphCli.Update(dag, obj, objCopy)
 	}
 	return nil
-}
-
-func (t *ClusterServiceTransformer) listClusterServices(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) (map[string]*corev1.Service, error) {
-	svcList := &corev1.ServiceList{}
-	labels := client.MatchingLabels(constant.GetClusterWellKnownLabels(cluster.Name))
-	if err := transCtx.Client.List(transCtx.Context, svcList, labels, client.InNamespace(cluster.Namespace)); err != nil {
-		return nil, err
-	}
-
-	services := make(map[string]*corev1.Service)
-	for i, svc := range svcList.Items {
-		if model.IsOwnerOf(cluster, &svc) {
-			services[svc.Name] = &svcList.Items[i]
-		}
-	}
-	return services, nil
 }

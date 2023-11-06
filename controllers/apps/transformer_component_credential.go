@@ -21,13 +21,8 @@ package apps
 
 import (
 	"fmt"
-	"reflect"
 
-	"github.com/pkg/errors"
-	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -51,22 +46,22 @@ func (t *componentCredentialTransformer) Transform(ctx graph.TransformContext, d
 	synthesizeComp := transCtx.SynthesizeComponent
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for _, credential := range synthesizeComp.ConnectionCredentials {
-		secret, err := t.buildConnCredential(transCtx, dag, synthesizeComp, credential)
+		secret, err := t.buildComponentCredential(transCtx, dag, synthesizeComp, credential)
 		if err != nil {
 			return err
 		}
-		if err = t.createOrUpdate(ctx, dag, graphCli, secret); err != nil {
+		if err = createOrUpdateCredentialSecret(ctx, dag, graphCli, secret); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (t *componentCredentialTransformer) buildConnCredential(transCtx *componentTransformContext, dag *graph.DAG,
+func (t *componentCredentialTransformer) buildComponentCredential(transCtx *componentTransformContext, dag *graph.DAG,
 	synthesizeComp *component.SynthesizedComponent, credential appsv1alpha1.ConnectionCredential) (*corev1.Secret, error) {
 	data := make(map[string][]byte)
 	if len(credential.ServiceName) > 0 {
-		if err := t.buildEndpoint(synthesizeComp, credential, &data); err != nil {
+		if err := t.buildCredentialEndpoint(synthesizeComp, credential, &data); err != nil {
 			return nil, err
 		}
 	}
@@ -81,7 +76,8 @@ func (t *componentCredentialTransformer) buildConnCredential(transCtx *component
 		if systemAccount == nil {
 			return nil, fmt.Errorf("connection credential references a system account not defined")
 		}
-		if err := t.buildCredential(transCtx, dag, synthesizeComp, systemAccount, &data); err != nil {
+		if err := buildCredentialAccountFromSecret(transCtx, dag, synthesizeComp.Namespace, synthesizeComp.ClusterName,
+			synthesizeComp.Name, systemAccount.Name, &data); err != nil {
 			return nil, err
 		}
 	}
@@ -90,34 +86,7 @@ func (t *componentCredentialTransformer) buildConnCredential(transCtx *component
 	return secret, nil
 }
 
-func (t *componentCredentialTransformer) buildFromServiceAndAccount(transCtx *componentTransformContext,
-	dag *graph.DAG, synthesizeComp *component.SynthesizedComponent, credential appsv1alpha1.ConnectionCredential, secret *corev1.Secret) error {
-	data := make(map[string][]byte)
-	if len(credential.ServiceName) > 0 {
-		if err := t.buildEndpoint(synthesizeComp, credential, &data); err != nil {
-			return err
-		}
-	}
-	if len(credential.AccountName) > 0 {
-		var systemAccount *appsv1alpha1.SystemAccount
-		for i, account := range synthesizeComp.SystemAccounts {
-			if account.Name == credential.AccountName {
-				systemAccount = &synthesizeComp.SystemAccounts[i]
-				break
-			}
-		}
-		if systemAccount == nil {
-			return errors.New("connection credential references a system account not defined")
-		}
-		if err := t.buildCredential(transCtx, dag, synthesizeComp, systemAccount, &data); err != nil {
-			return err
-		}
-	}
-	secret.Data = data
-	return nil
-}
-
-func (t *componentCredentialTransformer) buildEndpoint(synthesizeComp *component.SynthesizedComponent,
+func (t *componentCredentialTransformer) buildCredentialEndpoint(synthesizeComp *component.SynthesizedComponent,
 	credential appsv1alpha1.ConnectionCredential, data *map[string][]byte) error {
 	var service *appsv1alpha1.Service
 	for i, svc := range synthesizeComp.ComponentServices {
@@ -139,88 +108,7 @@ func (t *componentCredentialTransformer) buildEndpoint(synthesizeComp *component
 			credential.Name, credential.ServiceName)
 	}
 
-	t.buildEndpointFromService(synthesizeComp, credential, service, data)
-	return nil
-}
-
-func (t *componentCredentialTransformer) buildEndpointFromService(synthesizeComp *component.SynthesizedComponent,
-	credential appsv1alpha1.ConnectionCredential, service *appsv1alpha1.Service, data *map[string][]byte) {
 	serviceName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, service.ServiceName)
-
-	port := int32(0)
-	if len(credential.PortName) == 0 {
-		port = service.Spec.Ports[0].Port
-	} else {
-		for _, servicePort := range service.Spec.Ports {
-			if servicePort.Name == credential.PortName {
-				port = servicePort.Port
-				break
-			}
-		}
-	}
-
-	// TODO(component): define the service and port pattern
-	(*data)["endpoint"] = []byte(fmt.Sprintf("%s:%d", serviceName, port))
-	(*data)["host"] = []byte(serviceName)
-	(*data)["port"] = []byte(fmt.Sprintf("%d", port))
-}
-
-func (t *componentCredentialTransformer) buildCredential(transCtx *componentTransformContext,
-	dag *graph.DAG, synthesizedComp *component.SynthesizedComponent, account *appsv1alpha1.SystemAccount, data *map[string][]byte) error {
-	secretKey := types.NamespacedName{
-		Namespace: synthesizedComp.Namespace,
-		Name:      constant.GenerateAccountSecretName(synthesizedComp.ClusterName, synthesizedComp.Name, account.Name),
-	}
-	secret := &corev1.Secret{}
-	if err := transCtx.GetClient().Get(transCtx.GetContext(), secretKey, secret); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return err
-		}
-		if secret, err = t.getAccountSecretFromLocalCache(transCtx, dag, synthesizedComp, account); err != nil {
-			return err
-		}
-	}
-	maps.Copy(*data, secret.Data)
-	return nil
-}
-
-func (t *componentCredentialTransformer) getAccountSecretFromLocalCache(transCtx *componentTransformContext,
-	dag *graph.DAG, synthesizedComp *component.SynthesizedComponent, account *appsv1alpha1.SystemAccount) (*corev1.Secret, error) {
-	graphCli, _ := transCtx.Client.(model.GraphClient)
-	secretKey := types.NamespacedName{
-		Namespace: synthesizedComp.Namespace,
-		Name:      constant.GenerateAccountSecretName(synthesizedComp.ClusterName, synthesizedComp.Name, account.Name),
-	}
-	secrets := graphCli.FindAll(dag, &corev1.Secret{})
-	for i, obj := range secrets {
-		if obj.GetNamespace() == secretKey.Namespace && obj.GetName() == secretKey.Name {
-			return secrets[i].(*corev1.Secret), nil
-		}
-	}
-	return nil, fmt.Errorf("referenced account secret not found: %s", secretKey.String())
-}
-
-func (t *componentCredentialTransformer) createOrUpdate(ctx graph.TransformContext,
-	dag *graph.DAG, graphCli model.GraphClient, secret *corev1.Secret) error {
-	key := types.NamespacedName{
-		Namespace: secret.Namespace,
-		Name:      secret.Name,
-	}
-	obj := &corev1.Secret{}
-	if err := ctx.GetClient().Get(ctx.GetContext(), key, obj); err != nil {
-		if apierrors.IsNotFound(err) {
-			graphCli.Create(dag, secret)
-			return nil
-		}
-		return err
-	}
-	objCopy := obj.DeepCopy()
-	objCopy.Immutable = secret.Immutable
-	objCopy.Data = secret.Data
-	objCopy.StringData = secret.StringData
-	objCopy.Type = secret.Type
-	if !reflect.DeepEqual(obj, objCopy) {
-		graphCli.Update(dag, obj, objCopy)
-	}
+	buildCredentialEndpointFromService(credential, serviceName, service.Spec.Ports, data)
 	return nil
 }

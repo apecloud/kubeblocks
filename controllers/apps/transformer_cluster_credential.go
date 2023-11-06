@@ -97,44 +97,52 @@ func (t *ClusterCredentialTransformer) buildSynthesizedComponentLegacy(transCtx 
 func (t *ClusterCredentialTransformer) transformClusterCredential(transCtx *clusterTransformContext, dag *graph.DAG) error {
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for _, credential := range transCtx.Cluster.Spec.ConnectionCredentials {
-		secret, err := t.buildClusterCredential(transCtx, credential)
+		secret, err := t.buildClusterCredential(transCtx, dag, credential)
 		if err != nil {
 			return err
 		}
-		if err = t.createOrUpdate(transCtx, dag, graphCli, secret); err != nil {
+		if err = createOrUpdateCredentialSecret(transCtx, dag, graphCli, secret); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (t *ClusterCredentialTransformer) buildClusterCredential(transCtx *clusterTransformContext, credential appsv1alpha1.ConnectionCredential) (*corev1.Secret, error) {
-	cluster := transCtx.Cluster
+func (t *ClusterCredentialTransformer) buildClusterCredential(transCtx *clusterTransformContext, dag *graph.DAG,
+	credential appsv1alpha1.ConnectionCredential) (*corev1.Secret, error) {
+	var (
+		cluster = transCtx.Cluster
+		compDef *appsv1alpha1.ComponentDefinition
+	)
 
-	var compDef *appsv1alpha1.ComponentDefinition
-	// if len(credential.Component) > 0 {
-	//	// TODO(component): lookup comp def
-	// }
+	if len(credential.ComponentName) > 0 {
+		for _, compSpec := range transCtx.ComponentSpecs {
+			if compSpec.Name != credential.ComponentName {
+				compDef, _ = transCtx.ComponentDefs[compSpec.ComponentDef]
+				break
+			}
+		}
+	}
 
 	data := make(map[string][]byte)
 	if len(credential.ServiceName) > 0 {
-		if err := t.buildServiceEndpoint(cluster, compDef, credential, &data); err != nil {
+		if err := t.buildCredentialEndpoint(cluster, compDef, credential, &data); err != nil {
 			return nil, err
 		}
 	}
 	if len(credential.ComponentName) > 0 && len(credential.AccountName) > 0 {
-		if err := t.buildCredential(transCtx, cluster.Namespace, credential, &data); err != nil {
+		if err := buildCredentialAccountFromSecret(transCtx, dag, cluster.Namespace, cluster.Name,
+			credential.ComponentName, credential.AccountName, &data); err != nil {
 			return nil, err
 		}
 	}
 
-	// TODO(component): define the format of conn-credential secret
 	secret := factory.BuildConnCredential4Cluster(cluster, credential.Name, data)
 	return secret, nil
 }
 
-func (t *ClusterCredentialTransformer) buildServiceEndpoint(cluster *appsv1alpha1.Cluster, compDef *appsv1alpha1.ComponentDefinition,
-	credential appsv1alpha1.ConnectionCredential, data *map[string][]byte) error {
+func (t *ClusterCredentialTransformer) buildCredentialEndpoint(cluster *appsv1alpha1.Cluster,
+	compDef *appsv1alpha1.ComponentDefinition, credential appsv1alpha1.ConnectionCredential, data *map[string][]byte) error {
 	serviceName, ports := t.lookupMatchedService(cluster, compDef, credential)
 	if len(serviceName) == 0 {
 		return fmt.Errorf("cluster credential references a service which is not definied: %s-%s", cluster.Name, credential.Name)
@@ -146,7 +154,7 @@ func (t *ClusterCredentialTransformer) buildServiceEndpoint(cluster *appsv1alpha
 		return fmt.Errorf("cluster credential should specify which port to use for the referenced service: %s-%s", cluster.Name, credential.Name)
 	}
 
-	t.buildEndpointFromService(credential, serviceName, ports, data)
+	buildCredentialEndpointFromService(credential, serviceName, ports, data)
 	return nil
 }
 
@@ -154,14 +162,13 @@ func (t *ClusterCredentialTransformer) lookupMatchedService(cluster *appsv1alpha
 	compDef *appsv1alpha1.ComponentDefinition, credential appsv1alpha1.ConnectionCredential) (string, []corev1.ServicePort) {
 	for i, svc := range cluster.Spec.Services {
 		if svc.Name == credential.ServiceName {
-			// TODO(component): service name
-			return svc.ServiceName, cluster.Spec.Services[i].Spec.Ports
+			serviceName := constant.GenerateClusterServiceName(cluster.Name, svc.ServiceName)
+			return serviceName, cluster.Spec.Services[i].Spec.Ports
 		}
 	}
 	if len(credential.ComponentName) > 0 && compDef != nil {
 		for i, svc := range compDef.Spec.Services {
 			if svc.Name == credential.ServiceName {
-				// TODO(component): service.ServiceName
 				serviceName := constant.GenerateComponentServiceName(cluster.Name, credential.ComponentName, svc.ServiceName)
 				return serviceName, compDef.Spec.Services[i].Spec.Ports
 			}
@@ -170,7 +177,7 @@ func (t *ClusterCredentialTransformer) lookupMatchedService(cluster *appsv1alpha
 	return "", nil
 }
 
-func (t *ClusterCredentialTransformer) buildEndpointFromService(credential appsv1alpha1.ConnectionCredential,
+func buildCredentialEndpointFromService(credential appsv1alpha1.ConnectionCredential,
 	serviceName string, ports []corev1.ServicePort, data *map[string][]byte) {
 	port := int32(0)
 	if len(credential.PortName) == 0 {
@@ -184,27 +191,42 @@ func (t *ClusterCredentialTransformer) buildEndpointFromService(credential appsv
 		}
 	}
 	// TODO(component): define the service and port pattern
-	(*data)["service"] = []byte(serviceName)
+	(*data)["endpoint"] = []byte(fmt.Sprintf("%s:%d", serviceName, port))
+	(*data)["host"] = []byte(serviceName)
 	(*data)["port"] = []byte(fmt.Sprintf("%d", port))
 }
 
-func (t *ClusterCredentialTransformer) buildCredential(ctx graph.TransformContext, namespace string,
-	credential appsv1alpha1.ConnectionCredential, data *map[string][]byte) error {
-	key := types.NamespacedName{
+func buildCredentialAccountFromSecret(ctx graph.TransformContext, dag *graph.DAG,
+	namespace, clusterName, compName, accountName string, data *map[string][]byte) error {
+	secretKey := types.NamespacedName{
 		Namespace: namespace,
-		Name:      credential.AccountName, // TODO(component): secret name
+		Name:      constant.GenerateAccountSecretName(clusterName, compName, accountName),
 	}
 	secret := &corev1.Secret{}
-	if err := ctx.GetClient().Get(ctx.GetContext(), key, secret); err != nil {
-		return err
+	if err := ctx.GetClient().Get(ctx.GetContext(), secretKey, secret); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+		if secret, err = getAccountSecretFromLocalCache(ctx, dag, secretKey); err != nil {
+			return err
+		}
 	}
-	// TODO: which field should to use from accounts?
 	maps.Copy(*data, secret.Data)
 	return nil
 }
 
-func (t *ClusterCredentialTransformer) createOrUpdate(ctx graph.TransformContext,
-	dag *graph.DAG, graphCli model.GraphClient, secret *corev1.Secret) error {
+func getAccountSecretFromLocalCache(ctx graph.TransformContext, dag *graph.DAG, secretKey types.NamespacedName) (*corev1.Secret, error) {
+	graphCli, _ := ctx.GetClient().(model.GraphClient)
+	secrets := graphCli.FindAll(dag, &corev1.Secret{})
+	for i, obj := range secrets {
+		if obj.GetNamespace() == secretKey.Namespace && obj.GetName() == secretKey.Name {
+			return secrets[i].(*corev1.Secret), nil
+		}
+	}
+	return nil, fmt.Errorf("the account secret referenced is not found: %s", secretKey.String())
+}
+
+func createOrUpdateCredentialSecret(ctx graph.TransformContext, dag *graph.DAG, graphCli model.GraphClient, secret *corev1.Secret) error {
 	key := types.NamespacedName{
 		Namespace: secret.Namespace,
 		Name:      secret.Name,

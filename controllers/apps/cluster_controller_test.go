@@ -292,7 +292,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("check cluster service created")
 		clusterSvcKey := types.NamespacedName{
 			Namespace: clusterKey.Namespace,
-			Name:      service.Name,
+			Name:      constant.GenerateClusterServiceName(clusterObj.Name, service.Name),
 		}
 		Eventually(testapps.CheckObj(&testCtx, clusterSvcKey, func(g Gomega, svc *corev1.Service) {
 			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.AppManagedByLabelKey, constant.AppName))
@@ -466,7 +466,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		for svcName, svcSpec := range expectServices {
 			idx := slices.IndexFunc(services, func(e *corev1.Service) bool {
-				return e.Name == svcName
+				return e.Name == constant.GenerateClusterServiceName(clusterObj.Name, svcName)
 			})
 			g.Expect(idx >= 0).To(BeTrue())
 			svc := services[idx]
@@ -522,7 +522,8 @@ var _ = Describe("Cluster Controller", func() {
 		lastService := services[3]
 
 		By("create last cluster service manually which will not owned by cluster")
-		svcObj := builder.NewServiceBuilder(clusterObj.Namespace, lastService.ServiceName).
+		lastServiceName := constant.GenerateClusterServiceName(clusterObj.Name, lastService.ServiceName)
+		svcObj := builder.NewServiceBuilder(clusterObj.Namespace, lastServiceName).
 			AddLabelsInMap(constant.GetClusterWellKnownLabels(clusterObj.Name)).
 			SetSpec(&lastService.Spec).
 			AddSelector(constant.KBAppComponentLabelKey, lastService.ComponentSelector).

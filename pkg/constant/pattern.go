@@ -33,6 +33,22 @@ func GenerateAccountSecretName(clusterName, compName, name string) string {
 	return fmt.Sprintf("%s-%s-account-%s", clusterName, compName, name)
 }
 
+// GenerateClusterServiceName generates the service name for cluster.
+func GenerateClusterServiceName(clusterName, svcName string) string {
+	if len(svcName) > 0 {
+		return fmt.Sprintf("%s-%s", clusterName, svcName)
+	}
+	return fmt.Sprintf("%s", clusterName)
+}
+
+// GenerateClusterHeadlessServiceName generates the headless service name for cluster.
+func GenerateClusterHeadlessServiceName(clusterName, svcName string) string {
+	if len(svcName) > 0 {
+		return fmt.Sprintf("%s-%s-headless", clusterName, svcName)
+	}
+	return fmt.Sprintf("%s-headless", clusterName)
+}
+
 // GenerateComponentServiceName generates the service name for component.
 func GenerateComponentServiceName(clusterName, compName, svcName string) string {
 	if len(svcName) > 0 {
@@ -46,8 +62,8 @@ func GenerateDefaultComponentServiceName(clusterName, compName string) string {
 	return GenerateComponentServiceName(clusterName, compName, "")
 }
 
-// GenerateComponentHeadlessService generates the headless service name for component.
-func GenerateComponentHeadlessService(clusterName, compName, svcName string) string {
+// GenerateComponentHeadlessServiceName generates the headless service name for component.
+func GenerateComponentHeadlessServiceName(clusterName, compName, svcName string) string {
 	if len(svcName) > 0 {
 		return fmt.Sprintf("%s-%s-%s-headless", clusterName, compName, svcName)
 	}
@@ -56,7 +72,7 @@ func GenerateComponentHeadlessService(clusterName, compName, svcName string) str
 
 // GenerateDefaultComponentHeadlessServiceName generates the default headless service name for component.
 func GenerateDefaultComponentHeadlessServiceName(clusterName, compName string) string {
-	return GenerateComponentHeadlessService(clusterName, compName, "")
+	return GenerateComponentHeadlessServiceName(clusterName, compName, "")
 }
 
 // GenerateDefaultConnCredential generates the default connection credential name for cluster.

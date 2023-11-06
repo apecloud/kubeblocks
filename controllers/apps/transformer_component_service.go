@@ -21,13 +21,7 @@ package apps
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
-
-	"golang.org/x/exp/maps"
-	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -35,6 +29,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"golang.org/x/exp/maps"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // componentServiceTransformer handles component services.
@@ -55,7 +51,7 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 		if err != nil {
 			return err
 		}
-		if err = t.createOrUpdate(ctx, dag, graphCli, svc); err != nil {
+		if err = createOrUpdateService(ctx, dag, graphCli, svc); err != nil {
 			return err
 		}
 	}
@@ -109,28 +105,6 @@ func (t *componentServiceTransformer) checkRoleSelector(synthesizeComp *componen
 	}
 	if !definedRoles[strings.ToLower(roleSelector)] {
 		return fmt.Errorf("role selector for service is not defined, service: %s, role: %s", name, roleSelector)
-	}
-	return nil
-}
-
-func (t *componentServiceTransformer) createOrUpdate(ctx graph.TransformContext,
-	dag *graph.DAG, graphCli model.GraphClient, service *corev1.Service) error {
-	key := types.NamespacedName{
-		Namespace: service.Namespace,
-		Name:      service.Name,
-	}
-	obj := &corev1.Service{}
-	if err := ctx.GetClient().Get(ctx.GetContext(), key, obj); err != nil {
-		if apierrors.IsNotFound(err) {
-			graphCli.Create(dag, service)
-			return nil
-		}
-		return err
-	}
-	objCopy := obj.DeepCopy()
-	objCopy.Spec = service.Spec
-	if !reflect.DeepEqual(obj, objCopy) {
-		graphCli.Update(dag, obj, objCopy)
 	}
 	return nil
 }

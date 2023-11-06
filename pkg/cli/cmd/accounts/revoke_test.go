@@ -24,7 +24,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
@@ -37,7 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
 )
 
-var _ = Describe("Create Account Options", func() {
+var _ = Describe("Revoke Account Options", func() {
 	const (
 		namespace   = "test"
 		clusterName = "apple"
@@ -81,45 +80,46 @@ var _ = Describe("Create Account Options", func() {
 
 	Context("new options", func() {
 		It("new option", func() {
-			o := NewCreateUserOptions(tf, streams)
+			o := NewRevokeOptions(tf, streams)
 			Expect(o).ShouldNot(BeNil())
-			Expect(o.AccountBaseOptions).ShouldNot(BeNil())
 		})
 
-		It("validate user name and password", func() {
-			o := NewCreateUserOptions(tf, streams)
+		It("validate options", func() {
+			o := NewRevokeOptions(tf, streams)
 			Expect(o).ShouldNot(BeNil())
 			args := []string{}
 			Expect(o.Validate(args)).Should(MatchError(errClusterNameorInstName))
 
-			// add two elements
-			By("add two args")
-			args = []string{"foo", "bar"}
-			Expect(o.Validate(args)).Should(MatchError(errClusterNameNum))
-
 			// add one element
 			By("add one more args, should fail")
-			args = []string{clusterName}
+			args = []string{"foo"}
 			Expect(o.Validate(args)).Should(MatchError(errMissingUserName))
 
-			// set user name
-			o.userName = "fooUser"
-			Expect(o.Validate(args)).Should(Succeed())
-			// set password
-			o.password = "fooPwd"
-			Expect(o.Validate(args)).Should(Succeed())
+			o.userName = "foo"
+			Expect(o.Validate(args)).Should(MatchError(errMissingRoleName))
+
+			o.roleName = "bar"
+			Expect(o.Validate(args)).Should(MatchError(errInvalidRoleName))
+			for _, r := range []string{"readonly", "readwrite", "superuser"} {
+				o.roleName = r
+				Expect(o.Validate(args)).Should(Succeed())
+			}
 		})
 
-		It("complete options", func() {
-			o := NewCreateUserOptions(tf, streams)
+		It("complete option", func() {
+			o := NewRevokeOptions(tf, streams)
 			Expect(o).ShouldNot(BeNil())
 			o.PodName = pods.Items[0].Name
 			o.ClusterName = clusterName
-			o.userName = "foo-user"
-
-			Expect(o.password).Should(HaveLen(0))
+			o.userName = "alice"
+			o.roleName = "readonly"
 			Expect(o.Complete(tf)).Should(Succeed())
-			Expect(o.password).ShouldNot(BeEmpty())
+
+			Expect(o.Client).ShouldNot(BeNil())
+			Expect(o.Dynamic).ShouldNot(BeNil())
+			Expect(o.Namespace).Should(Equal(namespace))
+			Expect(o.Pod).ShouldNot(BeNil())
+			Expect(o.Pod.Name).Should(Equal(o.PodName))
 		})
 	})
 })

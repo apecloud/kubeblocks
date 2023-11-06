@@ -34,7 +34,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/cli/testing"
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
-	lorryutil "github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 var _ = Describe("Base Account Options", func() {
@@ -81,16 +80,12 @@ var _ = Describe("Base Account Options", func() {
 
 	Context("new options", func() {
 		It("new option", func() {
-			for _, op := range []lorryutil.OperationKind{lorryutil.CreateUserOp, lorryutil.DeleteUserOp,
-				lorryutil.ListUsersOp, lorryutil.DescribeUserOp,
-				lorryutil.GrantUserRoleOp, lorryutil.RevokeUserRoleOp} {
-				o := NewAccountBaseOptions(tf, streams, op)
-				Expect(o).ShouldNot(BeNil())
-			}
+			o := NewAccountBaseOptions(tf, streams)
+			Expect(o).ShouldNot(BeNil())
 		})
 
 		It("validate options", func() {
-			o := NewAccountBaseOptions(tf, streams, lorryutil.CreateUserOp)
+			o := NewAccountBaseOptions(tf, streams)
 			Expect(o).ShouldNot(BeNil())
 			args := []string{}
 			Expect(o.Validate(args)).Should(MatchError(errClusterNameorInstName))
@@ -117,7 +112,7 @@ var _ = Describe("Base Account Options", func() {
 		})
 
 		It("complete option", func() {
-			o := NewAccountBaseOptions(tf, streams, lorryutil.CreateUserOp)
+			o := NewAccountBaseOptions(tf, streams)
 			Expect(o).ShouldNot(BeNil())
 			o.PodName = pods.Items[0].Name
 			o.ClusterName = clusterName

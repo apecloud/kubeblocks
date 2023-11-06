@@ -31,11 +31,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	. "github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 const (
@@ -43,12 +44,14 @@ const (
 )
 
 type HTTPClient struct {
+	lorryClient
 	Client           *http.Client
 	URL              string
 	cache            map[string]*OperationResult
 	CacheTTL         time.Duration
 	ReconcileTimeout time.Duration
 	RequestTimeout   time.Duration
+	logger           logr.Logger
 }
 
 var _ Client = &HTTPClient{}
@@ -60,6 +63,7 @@ type OperationResult struct {
 }
 
 func NewHTTPClientWithPod(pod *corev1.Pod) (*HTTPClient, error) {
+	logger := ctrl.Log.WithName("Lorry HTTP client")
 	ip := pod.Status.PodIP
 	if ip == "" {
 		return nil, fmt.Errorf("pod %v has no ip", pod.Name)
@@ -67,7 +71,7 @@ func NewHTTPClientWithPod(pod *corev1.Pod) (*HTTPClient, error) {
 
 	port, err := intctrlutil.GetLorryHTTPPort(pod)
 	if err != nil {
-		// not lorry in the pod, just return nil without error
+		logger.Info("not lorry in the pod, just return nil without error")
 		return nil, nil
 	}
 
@@ -91,7 +95,9 @@ func NewHTTPClientWithPod(pod *corev1.Pod) (*HTTPClient, error) {
 		RequestTimeout:   30 * time.Second,
 		ReconcileTimeout: 500 * time.Millisecond,
 		cache:            make(map[string]*OperationResult),
+		logger:           ctrl.Log.WithName("Lorry HTTP client"),
 	}
+	operationClient.lorryClient = lorryClient{requester: operationClient}
 	return operationClient, nil
 }
 
@@ -121,115 +127,8 @@ func NewHTTPClientWithURL(url string) (*HTTPClient, error) {
 		ReconcileTimeout: 500 * time.Millisecond,
 		cache:            make(map[string]*OperationResult),
 	}
+	operationClient.lorryClient = lorryClient{requester: operationClient}
 	return operationClient, nil
-}
-
-func (cli *HTTPClient) GetRole(ctx context.Context) (string, error) {
-	resp, err := cli.Request(ctx, string(GetRoleOperation), http.MethodGet, nil)
-	if err != nil {
-		return "", err
-	}
-
-	role, ok := resp["role"]
-	if !ok {
-		return "", nil
-	}
-
-	return role.(string), nil
-}
-
-func (cli *HTTPClient) CreateUser(ctx context.Context, userName, password string) error {
-	parameters := map[string]any{
-		"userName": userName,
-		"password": password,
-	}
-	req := map[string]any{"parameters": parameters}
-	_, err := cli.Request(ctx, string(CreateUserOp), http.MethodPost, req)
-	return err
-}
-
-func (cli *HTTPClient) DeleteUser(ctx context.Context, userName string) error {
-	parameters := map[string]any{
-		"userName": userName,
-	}
-	req := map[string]any{"parameters": parameters}
-	_, err := cli.Request(ctx, string(DeleteUserOp), http.MethodPost, req)
-	return err
-}
-
-func (cli *HTTPClient) DescribeUser(ctx context.Context, userName string) (map[string]any, error) {
-	parameters := map[string]any{
-		"userName": userName,
-	}
-	req := map[string]any{"parameters": parameters}
-	resp, err := cli.Request(ctx, string(DescribeUserOp), http.MethodGet, req)
-	if err != nil {
-		return nil, err
-	}
-	user, ok := resp["user"]
-	if !ok {
-		return nil, nil
-	}
-
-	return user.(map[string]any), nil
-}
-
-func (cli *HTTPClient) GrantUserRole(ctx context.Context, userName, roleName string) error {
-	parameters := map[string]any{
-		"userName": userName,
-		"roleName": roleName,
-	}
-	req := map[string]any{"parameters": parameters}
-	_, err := cli.Request(ctx, string(GrantUserRoleOp), http.MethodPost, req)
-	return err
-}
-
-func (cli *HTTPClient) RevokeUserRole(ctx context.Context, userName, roleName string) error {
-	parameters := map[string]any{
-		"userName": userName,
-		"roleName": roleName,
-	}
-	req := map[string]any{"parameters": parameters}
-	_, err := cli.Request(ctx, string(RevokeUserRoleOp), http.MethodPost, req)
-	return err
-}
-
-// ListUsers lists all normal users created
-func (cli *HTTPClient) ListUsers(ctx context.Context) ([]map[string]any, error) {
-	resp, err := cli.Request(ctx, string(ListUsersOp), http.MethodGet, nil)
-	if err != nil {
-		return nil, err
-	}
-	users, ok := resp["users"]
-	if !ok {
-		return nil, nil
-	}
-	return convertToArrayOfMap(users)
-}
-
-// ListSystemAccounts lists all system accounts created
-func (cli *HTTPClient) ListSystemAccounts(ctx context.Context) ([]map[string]any, error) {
-	resp, err := cli.Request(ctx, string(ListSystemAccountsOp), http.MethodGet, nil)
-	if err != nil {
-		return nil, err
-	}
-	systemAccounts, ok := resp["systemAccounts"]
-	if !ok {
-		return nil, nil
-	}
-	return convertToArrayOfMap(systemAccounts)
-}
-
-// JoinMember sends a join member operation request to Lorry, located on the target pod that is about to join.
-func (cli *HTTPClient) JoinMember(ctx context.Context) error {
-	_, err := cli.Request(ctx, string(JoinMemberOperation), http.MethodPost, nil)
-	return err
-}
-
-// LeaveMember sends a Leave member operation request to Lorry, located on the target pod that is about to leave.
-func (cli *HTTPClient) LeaveMember(ctx context.Context) error {
-	_, err := cli.Request(ctx, string(LeaveMemberOperation), http.MethodPost, nil)
-	return err
 }
 
 func (cli *HTTPClient) Request(ctx context.Context, operation, method string, req map[string]any) (map[string]any, error) {

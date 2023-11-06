@@ -103,26 +103,26 @@ func (options *Options) getEnv() []string {
 
 // Commands represents the managed subprocesses.
 type Commands struct {
-	ctx                context.Context
-	WaitGroup          sync.WaitGroup
-	SQLChannelCMD      *exec.Cmd
-	SQLChannelErr      error
-	SQLChannelHTTPPort int
-	SQLChannelGRPCPort int
-	SQLChannelStarted  chan bool
-	AppCMD             *exec.Cmd
-	AppErr             error
-	AppStarted         chan bool
-	Options            *Options
-	SigCh              chan os.Signal
+	ctx           context.Context
+	WaitGroup     sync.WaitGroup
+	LorryCMD      *exec.Cmd
+	LorryErr      error
+	LorryHTTPPort int
+	LorryGRPCPort int
+	LorryStarted  chan bool
+	AppCMD        *exec.Cmd
+	AppErr        error
+	AppStarted    chan bool
+	Options       *Options
+	SigCh         chan os.Signal
 	// if it's false, lorryctl will not restart db service
 	restartDB bool
 }
 
-func getSQLChannelCommand(options *Options) (*exec.Cmd, error) {
-	sqlChannelCMD := filepath.Join(sqlChannelRuntimePath, "probe")
+func getLorryCommand(options *Options) (*exec.Cmd, error) {
+	lorryCMD := filepath.Join(lorryRuntimePath, "lorry")
 	args := options.getArgs()
-	cmd := exec.Command(sqlChannelCMD, args...)
+	cmd := exec.Command(lorryCMD, args...)
 	return cmd, nil
 }
 
@@ -153,7 +153,7 @@ func newCommands(ctx context.Context, options *Options) (*Commands, error) {
 		return nil, err
 	}
 
-	sqlChannelCMD, err := getSQLChannelCommand(options)
+	lorryCMD, err := getLorryCommand(options)
 	if err != nil {
 		return nil, err
 	}
@@ -161,39 +161,39 @@ func newCommands(ctx context.Context, options *Options) (*Commands, error) {
 	//nolint
 	var appCMD *exec.Cmd = getAppCommand(options)
 	cmd := &Commands{
-		ctx:                ctx,
-		SQLChannelCMD:      sqlChannelCMD,
-		SQLChannelErr:      nil,
-		SQLChannelHTTPPort: options.HTTPPort,
-		SQLChannelGRPCPort: options.GRPCPort,
-		SQLChannelStarted:  make(chan bool, 1),
-		AppCMD:             appCMD,
-		AppErr:             nil,
-		AppStarted:         make(chan bool, 1),
-		Options:            options,
-		SigCh:              make(chan os.Signal, 1),
-		restartDB:          true,
+		ctx:           ctx,
+		LorryCMD:      lorryCMD,
+		LorryErr:      nil,
+		LorryHTTPPort: options.HTTPPort,
+		LorryGRPCPort: options.GRPCPort,
+		LorryStarted:  make(chan bool, 1),
+		AppCMD:        appCMD,
+		AppErr:        nil,
+		AppStarted:    make(chan bool, 1),
+		Options:       options,
+		SigCh:         make(chan os.Signal, 1),
+		restartDB:     true,
 	}
 	return cmd, nil
 }
 
-func (commands *Commands) StartSQLChannel() {
+func (commands *Commands) StartLorry() {
 	var startInfo string
-	fmt.Fprintf(os.Stdout, "Starting SQLChannel HTTP Port: %v. gRPC Port: %v\n",
-		commands.SQLChannelHTTPPort,
-		commands.SQLChannelGRPCPort)
+	fmt.Fprintf(os.Stdout, "Starting Lorry HTTP Port: %v. gRPC Port: %v\n",
+		commands.LorryHTTPPort,
+		commands.LorryGRPCPort)
 	fmt.Fprintln(os.Stdout, startInfo)
 
-	commands.SQLChannelCMD.Stdout = os.Stdout
-	commands.SQLChannelCMD.Stderr = os.Stderr
+	commands.LorryCMD.Stdout = os.Stdout
+	commands.LorryCMD.Stderr = os.Stderr
 
-	err := commands.SQLChannelCMD.Start()
+	err := commands.LorryCMD.Start()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
 
-	commands.SQLChannelStarted <- true
+	commands.LorryStarted <- true
 }
 
 func (commands *Commands) RestartDBServiceIfExited() {
@@ -283,23 +283,23 @@ func (commands *Commands) StartDBService() {
 	go commands.WaitDBService()
 }
 
-func (commands *Commands) StopSQLChannel() bool {
+func (commands *Commands) StopLorry() bool {
 	exitWithError := false
-	if commands.SQLChannelErr != nil {
+	if commands.LorryErr != nil {
 		exitWithError = true
-		fmt.Fprintf(os.Stderr, "Error exiting SQLChannel: %s\n", commands.SQLChannelErr)
-	} else if commands.SQLChannelCMD.ProcessState == nil || !commands.SQLChannelCMD.ProcessState.Exited() {
-		err := commands.SQLChannelCMD.Process.Signal(syscall.SIGTERM)
+		fmt.Fprintf(os.Stderr, "Error exiting Lorry: %s\n", commands.LorryErr)
+	} else if commands.LorryCMD.ProcessState == nil || !commands.LorryCMD.ProcessState.Exited() {
+		err := commands.LorryCMD.Process.Signal(syscall.SIGTERM)
 		if err != nil {
 			exitWithError = true
-			fmt.Fprintf(os.Stderr, "Error exiting SQLChannel: %s\n", err)
+			fmt.Fprintf(os.Stderr, "Error exiting Lorry: %s\n", err)
 		} else {
-			fmt.Fprintln(os.Stdout, "Send SIGTERM to SQLChannel")
+			fmt.Fprintln(os.Stdout, "Send SIGTERM to Lorry")
 		}
 	}
-	// state, err = commands.SQLChannelCMD.Process.Wait()
+	// state, err = commands.LorryCMD.Process.Wait()
 	// fmt.Printf("state: %v, err: %v\n", state, err)
-	commands.WaitSQLChannel()
+	commands.WaitLorry()
 	return exitWithError
 }
 
@@ -325,8 +325,8 @@ func (commands *Commands) WaitDBService() {
 	commands.AppErr = waitCmd(commands.AppCMD)
 }
 
-func (commands *Commands) WaitSQLChannel() {
-	commands.SQLChannelErr = waitCmd(commands.SQLChannelCMD)
+func (commands *Commands) WaitLorry() {
+	commands.LorryErr = waitCmd(commands.LorryCMD)
 }
 
 func waitCmd(cmd *exec.Cmd) error {

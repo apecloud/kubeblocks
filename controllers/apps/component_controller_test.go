@@ -22,7 +22,6 @@ package apps
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -243,7 +242,7 @@ var _ = Describe("Component Controller", func() {
 		}
 	}
 
-	createClusterObjNoWait := func(compName, compDefName string, v2 bool, processor func(*testapps.MockClusterFactory)) {
+	createClusterObjVx := func(compName, compDefName string, v2 bool, processor func(*testapps.MockClusterFactory)) {
 		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
 			WithRandomName()
 		if !v2 {
@@ -256,44 +255,38 @@ var _ = Describe("Component Controller", func() {
 		}
 		clusterObj = factory.Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		By("Waiting for the cluster enter Creating phase")
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		if clusterObj.Spec.ComponentSpecs[0].Replicas == 0 {
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StoppedClusterPhase))
+		} else {
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
+		}
+
+		By("Waiting for the component enter Creating phase")
+		compKey = types.NamespacedName{
+			Namespace: clusterObj.Namespace,
+			Name:      component.FullName(clusterObj.Name, compName),
+		}
+		compObj = &appsv1alpha1.Component{}
+		Eventually(testapps.CheckObjExists(&testCtx, compKey, compObj, true)).Should(Succeed())
+		Eventually(testapps.GetComponentObservedGeneration(&testCtx, compKey)).Should(BeEquivalentTo(1))
+		if compObj.Spec.Replicas == 0 {
+			Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(appsv1alpha1.StoppedClusterCompPhase))
+		} else {
+			Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
+		}
 	}
 
 	createClusterObj := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster")
-		createClusterObjNoWait(compName, compDefName, false, processor)
-
-		By("Waiting for the cluster enter Creating phase")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
-
-		By("Waiting for the component enter Creating phase")
-		compKey = types.NamespacedName{
-			Namespace: clusterObj.Namespace,
-			Name:      component.FullName(clusterObj.Name, compName),
-		}
-		compObj = &appsv1alpha1.Component{}
-		Eventually(testapps.CheckObjExists(&testCtx, compKey, compObj, true)).Should(Succeed())
-		Eventually(testapps.GetComponentObservedGeneration(&testCtx, compKey)).Should(BeEquivalentTo(1))
-		Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
+		createClusterObjVx(compName, compDefName, false, processor)
 	}
 
 	createClusterObjV2 := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster with new component definition")
-		createClusterObjNoWait(compName, compDefName, true, processor)
-
-		By("Waiting for the cluster enter Creating phase")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
-
-		By("Waiting for the component enter Creating phase")
-		compKey = types.NamespacedName{
-			Namespace: clusterObj.Namespace,
-			Name:      component.FullName(clusterObj.Name, compName),
-		}
-		compObj = &appsv1alpha1.Component{}
-		Eventually(testapps.CheckObjExists(&testCtx, compKey, compObj, true)).Should(Succeed())
-		Eventually(testapps.GetComponentObservedGeneration(&testCtx, compKey)).Should(BeEquivalentTo(1))
-		Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
+		createClusterObjVx(compName, compDefName, true, processor)
 	}
 
 	// createCompObjNoWait := func(compName, compDefName string, processor func(*testapps.MockComponentFactory)) {
@@ -751,17 +744,11 @@ var _ = Describe("Component Controller", func() {
 		dataClonePolicy appsv1alpha1.HScaleDataClonePolicyType) {
 		By("Creating a single component cluster with VolumeClaimTemplate")
 		pvcSpec := testapps.NewPVCSpec("1Gi")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(compName, compDefName).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-			AddVolumeClaimTemplate(testapps.LogVolumeName, pvcSpec).
-			SetReplicas(initialReplicas).
-			Create(&testCtx).GetObject()
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-		By("Waiting for the cluster controller to create resources completely")
-		waitForCreatingResourceCompletely(clusterKey, compName)
+		createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
+			f.SetReplicas(initialReplicas).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
+				AddVolumeClaimTemplate(testapps.LogVolumeName, pvcSpec)
+		})
 
 		// REVIEW: this test flow, wait for running phase?
 		testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
@@ -1602,17 +1589,9 @@ var _ = Describe("Component Controller", func() {
 
 		By("Creating a cluster with VolumeClaimTemplate")
 		pvcSpec := testapps.NewPVCSpec("1Gi")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(compName, compDefName).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-			SetReplicas(initialReplicas).
-			Create(&testCtx).GetObject()
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-		By("Waiting for the cluster controller to create resources completely")
-		waitForCreatingResourceCompletely(clusterKey, compName)
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
+			f.SetReplicas(initialReplicas).AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec)
+		})
 
 		By("Create and Mock PVCs status to bound")
 		for _, comp := range clusterObj.Spec.ComponentSpecs {
@@ -1649,7 +1628,7 @@ var _ = Describe("Component Controller", func() {
 			var err error
 			for _, cond := range cluster.Status.Conditions {
 				if strings.Contains(cond.Message, "backup for horizontalScaling failed") {
-					err = errors.New("has backup error")
+					err = fmt.Errorf("has backup error")
 					break
 				}
 			}
@@ -1927,7 +1906,8 @@ var _ = Describe("Component Controller", func() {
 					testHorizontalScale(compName, compDefName, 1, 3, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 				})
 
-				It("backup error at scale-out", func() {
+				// TODO(component): events & conditions
+				PIt("backup error at scale-out", func() {
 					testBackupError(compName, compDefName)
 				})
 

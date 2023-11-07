@@ -41,7 +41,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/lorry/highavailability"
 	"github.com/apecloud/kubeblocks/pkg/lorry/httpserver"
 	opsregister "github.com/apecloud/kubeblocks/pkg/lorry/operations/register"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -93,7 +92,7 @@ func main() {
 		characterType = viper.GetString(constant.KBEnvBuiltinHandler)
 	}
 	workloadType := viper.GetString(constant.KBEnvWorkloadType)
-	if util.IsHAAvailable(characterType, workloadType) {
+	if highavailability.IsHAAvailable(characterType, workloadType) {
 		ha := highavailability.NewHa()
 		if ha != nil {
 			defer ha.ShutdownWithWait()

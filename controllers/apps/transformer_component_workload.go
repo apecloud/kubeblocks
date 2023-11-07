@@ -144,7 +144,9 @@ func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 	}
 
 	objCopy := copyAndMerge(runningRSM, protoRSM, cluster)
-	cli.Update(dag, runningRSM, objCopy)
+	if !cli.IsAction(dag, objCopy, model.ActionNoopPtr()) {
+		cli.Update(dag, nil, objCopy, model.ReplaceIfExistingOption)
+	}
 
 	// to work around that the scaled PVC will be deleted at object action.
 	newRsmObj, _ := objCopy.(*workloads.ReplicatedStateMachine)

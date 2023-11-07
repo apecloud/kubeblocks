@@ -1,1 +1,0 @@
-JAVA_OPTS: -Xmx{{ getContainerMemory ( index $.podSpec.containers 0 ) }} -Xms{{ getContainerMemory ( index $.podSpec.containers 0 ) }}

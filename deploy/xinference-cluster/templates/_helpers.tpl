@@ -1,3 +1,0 @@
-{{/*
-Define xinference cluster component.
-*/}}

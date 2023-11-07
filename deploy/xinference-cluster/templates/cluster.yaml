@@ -1,0 +1,20 @@
+{{- include "kblib.clusterCommon" . }}
+  clusterDefinitionRef: xinference  # ref clusterDefinition.name
+  {{ if .Values.cpuMode }}
+  clusterVersionRef: {{ .Values.cpuVersion }}
+  {{ end }}
+  componentSpecs:
+    - name: xinference
+      componentDefRef: xinference # ref clusterDefinition componentDefs.name
+      {{- include "kblib.componentMonitor" . | indent 6 }}
+      replicas: {{ .Values.replicas }}
+      serviceAccountName: {{ include "kblib.serviceAccountName" . }}
+      {{ if .Values.cpuMode }}
+      {{- include "kblib.componentResources" . | indent 6 }}
+      {{ else }}
+      resources:
+        limits:
+          nvidia.com/gpu: {{ .Values.gpu }}
+        requests:
+          nvidia.com/gpu: {{ .Values.gpu }}
+      {{ end }}

@@ -68,6 +68,10 @@ var (
 	redisChart embed.FS
 	//go:embed charts/mongodb-cluster.tgz
 	mongodbChart embed.FS
+	//go:embed charts/llm-cluster.tgz
+	llmChart embed.FS
+	//go:embed charts/xinference-cluster.tgz
+	xinferenceChart embed.FS
 )
 
 func IsbuiltinCharts(chart string) bool {
@@ -123,4 +127,21 @@ func init() {
 		fmt.Println(err.Error())
 	}
 
+	llm := &embedConfig{
+		chartFS: llmChart,
+		name:    "llm-cluster.tgz",
+		alias:   "",
+	}
+	if err := llm.register("llm"); err != nil {
+		fmt.Println(err.Error())
+	}
+
+	xinference := &embedConfig{
+		chartFS: xinferenceChart,
+		name:    "xinference-cluster.tgz",
+		alias:   "",
+	}
+	if err := xinference.register("xinference"); err != nil {
+		fmt.Println(err.Error())
+	}
 }

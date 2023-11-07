@@ -135,6 +135,16 @@ ClusterVersion command.
 * [kbcli clusterversion unset-default](kbcli_clusterversion_unset-default.md)	 - Unset the clusterversion if it's default.
 
 
+## [context](kbcli_context.md)
+
+kbcli context allows you to manage cloud context. This command is currently only applicable to cloud, and currently does not support switching the context of the local k8s cluster.
+
+* [kbcli context current](kbcli_context_current.md)	 - Get the currently used context.
+* [kbcli context describe](kbcli_context_describe.md)	 - Get the description information of a context.
+* [kbcli context list](kbcli_context_list.md)	 - List all created contexts.
+* [kbcli context use](kbcli_context_use.md)	 - Use another context that you have already created.
+
+
 ## [dashboard](kbcli_dashboard.md)
 
 List and open the KubeBlocks dashboards.

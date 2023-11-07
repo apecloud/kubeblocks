@@ -226,7 +226,7 @@ var _ = Describe("Component Utils", func() {
 				Expect(podList).Should(HaveLen(3))
 				for _, pod := range podList {
 					Expect(pod.GetLabels()).ShouldNot(BeNil())
-					Expect(pod.GetLabels()[string(customLabels[mockLabelKey])]).Should(Equal(fmt.Sprintf("%s-%s", clusterName, comp.Name)))
+					Expect(pod.GetLabels()[mockLabelKey]).Should(Equal(fmt.Sprintf("%s-%s", clusterName, comp.Name)))
 				}
 			})
 		})

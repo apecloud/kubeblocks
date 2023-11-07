@@ -16,7 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 output:
-	apecloudmongo: {
+	apecloudmongodb: {
 		rule: "type == \"container\" && monitor_type == \"mongodb\" && config != nil && config.EnabledMetrics"
 		config: {
 			endpoint:            "`endpoint`:`envs[\"SERVICE_PORT\"]`"

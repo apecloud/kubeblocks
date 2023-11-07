@@ -35,7 +35,7 @@ spec:
                 mountPath: /models-target
         containers:
           - name: xinference
-            image: apecloud/xinference:latest-arm
+            image: docker.io/apecloud/xinference:latest-arm
             volumeMounts:
               - name: models
                 mountPath: /models

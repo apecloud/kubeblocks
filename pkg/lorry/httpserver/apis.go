@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/valyala/fasthttp"
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
@@ -119,16 +120,16 @@ func OperationWrapper(op operations.Operation) fasthttp.RequestHandler {
 
 		statusCode := fasthttp.StatusOK
 		if err != nil {
-			if _, ok := err.(util.ProbeError); ok {
+			if ok := errors.As(err, &util.ProbeError{}); ok {
 				statusCode = fasthttp.StatusUnavailableForLegalReasons
 			} else {
-				if err == models.ErrNoImplemented {
+				if errors.Is(err, models.ErrNoImplemented) {
 					statusCode = fasthttp.StatusNotImplemented
 				} else {
 					statusCode = fasthttp.StatusInternalServerError
 					logger.Error(err, "operation exec failed")
 				}
-				msg := NewErrorResponse("ERR_OPERATION_FAILED", err.Error())
+				msg := NewErrorResponse("ERR_OPERATION_FAILED", fmt.Sprintf("operation exec failed: %v", err))
 				respond(reqCtx, withError(statusCode, msg))
 				return
 			}
@@ -137,7 +138,7 @@ func OperationWrapper(op operations.Operation) fasthttp.RequestHandler {
 		if resp == nil {
 			respond(reqCtx, withEmpty())
 		} else {
-			body, _ := json.Marshal(resp.Data)
+			body, _ = json.Marshal(resp.Data)
 			respond(reqCtx, withMetadata(resp.Metadata), withJSON(statusCode, body))
 		}
 	}
@@ -152,7 +153,7 @@ func withJSON(code int, obj []byte) option {
 	}
 }
 
-// withError sets error code and jsonized error message.
+// withError sets error code and jsonify error message.
 func withError(code int, resp ErrorResponse) option {
 	b, _ := json.Marshal(&resp)
 	return withJSON(code, b)

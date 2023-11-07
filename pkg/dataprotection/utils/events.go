@@ -17,20 +17,21 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package accounts
+package utils
 
 import (
-	"encoding/json"
+	"bytes"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/kubectl/pkg/describe"
 )
 
-func struct2Map(obj interface{}) (map[string]interface{}, error) {
-	b, err := json.Marshal(obj)
-	if err != nil {
-		return nil, err
-	}
-	var m map[string]interface{}
-	if err = json.Unmarshal(b, &m); err != nil {
-		return nil, err
-	}
-	return m, nil
+func EventsToString(events *corev1.EventList) string {
+	buf := bytes.NewBuffer(nil)
+	pw := describe.NewPrefixWriter(buf)
+	describe.DescribeEvents(events, pw)
+	pw.Flush()
+	// discard the first line
+	_, _ = buf.ReadString('\n')
+	return buf.String()
 }

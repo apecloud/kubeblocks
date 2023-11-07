@@ -20,12 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -34,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 func NewFakeActionSet(testCtx *testutil.TestContext) *dpv1alpha1.ActionSet {
@@ -111,6 +116,15 @@ func NewFakeBackupRepo(testCtx *testutil.TestContext,
 				change(obj)
 			}
 		})
+	jobName := fmt.Sprintf("pre-check-%s-%s", repo.UID[:8], repo.Name)
+	namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+	Eventually(testapps.GetAndChangeObjStatus(testCtx, types.NamespacedName{Name: jobName, Namespace: namespace},
+		func(job *batchv1.Job) {
+			job.Status.Conditions = append(job.Status.Conditions, batchv1.JobCondition{
+				Type:   batchv1.JobComplete,
+				Status: corev1.ConditionTrue,
+			})
+		})).Should(Succeed())
 	var name string
 	Eventually(testapps.CheckObj(testCtx, client.ObjectKeyFromObject(repo),
 		func(g Gomega, repo *dpv1alpha1.BackupRepo) {

@@ -1,3 +1,3 @@
 {{/*
-Define llm cluster component.
+Define xinference cluster component.
 */}}

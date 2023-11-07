@@ -7,6 +7,20 @@ metadata:
 data:
   start.sh: |
     #!/bin/bash
+    echo "model=${MODEL_NAME}"
+    country=`curl https://ifconfig.io/country_code`
+    if [ "$country" == "CN" ]; then
+      CLONE_MODEL_SCRIPT="git lfs install; git clone https://www.modelscope.cn/${MODEL_NAME}.git"
+      export MODEL_NAME="../${MODEL_NAME##*/}"
+    else
+      curl --max-time 10 https://huggingface.co/${MODEL_NAME} > /dev/null 2>&1
+      code=$?
+      if [ "$code" -ne 0 ]; then 
+        CLONE_MODEL_SCRIPT="git lfs install; git clone https://www.modelscope.cn/${MODEL_NAME}.git"
+        export MODEL_NAME="../${MODEL_NAME##*/}"
+      fi
+    fi 
+    echo "model=${MODEL_NAME}"
     if [ -n "$CLONE_MODEL_SCRIPT" ]; then
       bash -c "$CLONE_MODEL_SCRIPT"
     fi
@@ -24,6 +38,7 @@ data:
     echo "model=${MODEL_NAME}"
     echo "EXTRA_ARGS=${EXTRA_ARGS}"
     cd vllm
+    echo "model=${MODEL_NAME}" > log
     while true; do
       node_num=`ray status | grep "1 node" | wc -l`
       # continue waiting if ray status not ok

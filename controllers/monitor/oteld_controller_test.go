@@ -20,16 +20,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package monitor
 
 import (
+	"fmt"
+	"reflect"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/apis/monitor/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/monitor/reconcile"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var OTeldSignature = func(_ v1alpha1.OTeld, _ *v1alpha1.OTeld, _ v1alpha1.OTeldList, _ *v1alpha1.OTeldList) {}
@@ -40,19 +46,37 @@ const (
 
 	mysqlCompDefName = "replicasets"
 	mysqlCompName    = "mysql"
+
+	clusterDefName     = "test-clusterdef"
+	clusterVersionName = "test-clusterversion"
+	clusterName        = "test-cluster"
 )
 
 var _ = Describe("OTeld Monitor Controller", func() {
 
-	const (
-		clusterDefName     = "test-clusterdef"
-		clusterVersionName = "test-clusterversion"
-		clusterName        = "test-cluster"
-	)
-
 	Context("OTeld Controller", func() {
 
 		var cluster *appsv1alpha1.Cluster
+
+		loadExpectConfig := func(file string) map[string]any {
+			var m map[string]any
+			b, err := testdata.GetTestDataFileContent(file)
+			Expect(err).Should(Succeed())
+			Expect(yaml.Unmarshal(b, &m)).Should(Succeed())
+			return m
+		}
+
+		validateEngineConfig := func(content string) {
+			var m map[string]any
+			Expect(yaml.Unmarshal([]byte(content), &m)).Should(Succeed())
+			Expect(reflect.DeepEqual(m, loadExpectConfig("monitor/otel.engine.yaml"))).Should(BeTrue())
+		}
+
+		validateOteldConfig := func(content string) {
+			var m map[string]any
+			Expect(yaml.Unmarshal([]byte(content), &m)).Should(Succeed())
+			Expect(reflect.DeepEqual(m, loadExpectConfig("monitor/otel.config.yaml"))).Should(BeTrue())
+		}
 
 		BeforeEach(func() {
 			clusterDef := testapps.NewClusterDefFactory(clusterDefName).
@@ -88,6 +112,26 @@ var _ = Describe("OTeld Monitor Controller", func() {
 				func(g Gomega, oteld *v1alpha1.OTeld) {
 					g.Expect(oteld.Status.ObservedGeneration).Should(BeEquivalentTo(1))
 				}), time.Second*30, time.Second*1).Should(Succeed())
+
+			By("check oteld config.yaml")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      fmt.Sprintf(reconcile.OteldConfigMapNamePattern, v1alpha1.ModeDaemonSet),
+			}, func(g Gomega, cm *corev1.ConfigMap) {
+				Expect(len(cm.Data)).Should(Equal(1))
+				Expect(cm.Data).Should(HaveKey("config.yaml"))
+				validateOteldConfig(cm.Data["config.yaml"])
+			}), time.Second*30, time.Second*1).Should(Succeed())
+
+			By("check oteld kb_engine.yaml")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      fmt.Sprintf(reconcile.OteldEngineConfigMapNamePattern, v1alpha1.ModeDaemonSet),
+			}, func(g Gomega, cm *corev1.ConfigMap) {
+				Expect(len(cm.Data)).Should(Equal(1))
+				Expect(cm.Data).Should(HaveKey("kb_engine.yaml"))
+				validateEngineConfig(cm.Data["kb_engine.yaml"])
+			}), time.Second*30, time.Second*1).Should(Succeed())
 		})
 	})
 })
@@ -129,9 +173,37 @@ func mockOTeldInstance() *v1alpha1.OTeld {
 	oteld.SetNamespace(testCtx.DefaultNamespace)
 	oteld = testapps.CreateK8sResource(&testCtx, oteld).(*v1alpha1.OTeld)
 
-	testapps.CreateCustomizedObj(&testCtx, "monitor/collectordatasource.yaml", &v1alpha1.CollectorDataSource{},
-		testCtx.UseDefaultNamespace(),
-		testapps.WithName(metricsSinkName))
+	datasource := v1alpha1.CollectorDataSource{
+		Spec: v1alpha1.CollectorDataSourceSpec{
+			ClusterDefRef: clusterDefName,
+			CollectorSpecs: []v1alpha1.CollectorSpec{{
+				ComponentName: mysqlCompDefName,
+				ScrapeConfigs: []v1alpha1.ScrapeConfig{{
+					ContainerName: "mysql",
+					ExternalLabels: map[string]string{
+						"label1": "label1",
+						"label2": "label2",
+					},
+					Metrics: &v1alpha1.MetricsCollector{
+						CollectionInterval: "15s",
+						MetricsSelector:    []string{"mysql_global_status_threads_running"},
+						ExporterRef: v1alpha1.ExporterRef{
+							ExporterNames: []string{metricsSinkName},
+						},
+					},
+					Logs: &v1alpha1.LogsCollector{
+						ExporterRef: v1alpha1.ExporterRef{
+							ExporterNames: []string{logsSinkName},
+						},
+						LogTypes: []string{"error", "slow", "general"},
+					},
+				}},
+			}},
+		},
+	}
+	datasource.SetName("mysql-metric")
+	datasource.SetNamespace(testCtx.DefaultNamespace)
+	testapps.CreateK8sResource(&testCtx, &datasource)
 
 	prometheus := v1alpha1.MetricsExporterSink{
 		Spec: v1alpha1.MetricsExporterSinkSpec{
@@ -140,15 +212,13 @@ func mockOTeldInstance() *v1alpha1.OTeld {
 				PrometheusConfig: &v1alpha1.PrometheusConfig{
 					Namespace: testCtx.DefaultNamespace,
 					ServiceRef: v1alpha1.ServiceRef{
-						Endpoint:                    "${env:HOST_IP}:1234",
-						Namespace:                   "default",
-						ServiceConnectionCredential: "prometheus-service",
+						Endpoint: "${env:HOST_IP}:1234",
 					},
 				},
 			},
 		},
 	}
-	prometheus.SetName("prometheus")
+	prometheus.SetName(metricsSinkName)
 	prometheus.SetNamespace(testCtx.DefaultNamespace)
 	testapps.CreateK8sResource(&testCtx, &prometheus)
 
@@ -158,9 +228,7 @@ func mockOTeldInstance() *v1alpha1.OTeld {
 			SinkSource: v1alpha1.SinkSource{
 				LokiConfig: &v1alpha1.LokiConfig{
 					ServiceRef: v1alpha1.ServiceRef{
-						Endpoint:                    "http://loki-gateway.kb-system/loki/api/v1/push",
-						Namespace:                   "default",
-						ServiceConnectionCredential: "loki-service",
+						Endpoint: "http://loki-gateway.kb-system/loki/api/v1/push",
 					},
 				},
 			},

@@ -1,0 +1,320 @@
+extensions:
+  apecloud_engine_observer:
+    container_observer: runtime_container
+    observe_nodes: true
+    observe_pods: true
+    pod_observer: apecloud_k8s_observer
+    scraper_config_file: /opt/apecloud/apps/kb_engine.yaml
+  apecloud_k8s_observer:
+    auth_type: kubeConfig
+    node: ${env:NODE_NAME}
+    observe_nodes: true
+    observe_pods: true
+  file_storage/oteld:
+    compaction:
+      directory: /var/log/oteld
+      max_transaction_size: 65536
+      on_start: true
+    directory: /var/log/oteld
+    timeout: 1s
+  memory_ballast:
+    size_mib: 32
+  runtime_container:
+    auth_type: kubeConfig
+    enable: true
+    kubernetes_node: ${env:NODE_NAME}
+receivers:
+  receiver_creator/datasource-metrics:
+    receivers:
+      apecloudkubeletstats:
+        config:
+          auth_type: serviceAccount
+          collection_interval: 15s
+          endpoint: '`endpoint`:`kubelet_endpoint_port`'
+          extra_metadata_labels:
+          - k8s.volume.type
+          - kubeblocks
+          metric_groups:
+          - container
+          - pod
+          - volume
+        resource_attributes:
+          job: oteld-kubeletstats-metrics
+          receiver: apecloudkubeletstats
+        rule: type == "k8s.node"
+      apecloudnode:
+        config:
+          collection_interval: 15s
+        resource_attributes:
+          job: oteld-node-metrics
+          receiver: apecloudnode
+        rule: type == "k8s.node"
+    resource_attributes:
+      container:
+        app_kubernetes_io_component: '`labels["app.kubernetes.io/component"]`'
+        app_kubernetes_io_instance: '`labels["app.kubernetes.io/instance"]`'
+        app_kubernetes_io_managed_by: '`labels["app.kubernetes.io/managed-by"]`'
+        app_kubernetes_io_name: '`labels["app.kubernetes.io/name"]`'
+        app_kubernetes_io_version: '`labels["app.kubernetes.io/version"]`'
+        apps_kubeblocks_io_component_name: '`labels["apps.kubeblocks.io/component-name"]`'
+        namespace: '`namespace`'
+        node: ${env:NODE_NAME}
+        pod: '`name`'
+      k8s.node:
+        hostname: '`hostname`'
+        kubernetes_io_arch: '`labels["kubernetes.io/arch"]`'
+        kubernetes_io_hostname: '`labels["kubernetes.io/hostname"]`'
+        kubernetes_io_os: '`labels["kubernetes.io/os"]`'
+        node: '`name`'
+      pod:
+        app_kubernetes_io_component: '`labels["app.kubernetes.io/component"]`'
+        app_kubernetes_io_instance: '`labels["app.kubernetes.io/instance"]`'
+        app_kubernetes_io_managed_by: '`labels["app.kubernetes.io/managed-by"]`'
+        app_kubernetes_io_name: '`labels["app.kubernetes.io/name"]`'
+        app_kubernetes_io_version: '`labels["app.kubernetes.io/version"]`'
+        apps_kubeblocks_io_component_name: '`labels["apps.kubeblocks.io/component-name"]`'
+        namespace: '`namespace`'
+        node: ${env:NODE_NAME}
+        pod: '`name`'
+    watch_observers:
+    - apecloud_engine_observer
+  prometheus/self-metrics:
+    config:
+      scrape_configs:
+      - job_name: oteld-self-metrics
+        scrape_interval: 15s
+        static_configs:
+        - targets:
+          - ${env:HOST_IP}:8888
+  receiver_creator/app:
+    resource_attributes:
+      container:
+        app_kubernetes_io_component: '`labels["app.kubernetes.io/component"]`'
+        app_kubernetes_io_instance: '`labels["app.kubernetes.io/instance"]`'
+        app_kubernetes_io_managed_by: '`labels["app.kubernetes.io/managed-by"]`'
+        app_kubernetes_io_name: '`labels["app.kubernetes.io/name"]`'
+        app_kubernetes_io_version: '`labels["app.kubernetes.io/version"]`'
+        apps_kubeblocks_io_component_name: '`labels["apps.kubeblocks.io/component-name"]`'
+        namespace: '`namespace`'
+        node: ${env:NODE_NAME}
+        pod: '`name`'
+      k8s.node:
+        hostname: '`hostname`'
+        kubernetes_io_arch: '`labels["kubernetes.io/arch"]`'
+        kubernetes_io_hostname: '`labels["kubernetes.io/hostname"]`'
+        kubernetes_io_os: '`labels["kubernetes.io/os"]`'
+        node: '`name`'
+      pod:
+        app_kubernetes_io_component: '`labels["app.kubernetes.io/component"]`'
+        app_kubernetes_io_instance: '`labels["app.kubernetes.io/instance"]`'
+        app_kubernetes_io_managed_by: '`labels["app.kubernetes.io/managed-by"]`'
+        app_kubernetes_io_name: '`labels["app.kubernetes.io/name"]`'
+        app_kubernetes_io_version: '`labels["app.kubernetes.io/version"]`'
+        apps_kubeblocks_io_component_name: '`labels["apps.kubeblocks.io/component-name"]`'
+        namespace: '`namespace`'
+        node: ${env:NODE_NAME}
+        pod: '`name`'
+    watch_observers:
+    - apecloud_engine_observer
+    receivers:
+      apecloudmongo:
+        config:
+          collect_all: true
+          collection_interval: '`settings.CollectionInterval`'
+          compatible_mode: true
+          connect_params: admin?ssl=false&authSource=admin
+          direct_connect: true
+          endpoint: '`endpoint`:27017'
+          global_conn_pool: false
+          password: '`envs["MONGODB_ROOT_PASSWORD"]`'
+          username: '`envs["MONGODB_ROOT_USER"]`'
+        resource_attributes:
+          job: oteld-app-metrics
+          receiver: apecloudmongodb
+        rule: type == "container" && monitor_type == "mongodb" && config != nil &&
+          config.EnabledMetrics
+      apecloudmysql:
+        config:
+          allow_native_passwords: true
+          collection_interval: '`settings.CollectionInterval`'
+          endpoint: '`endpoint`:3306'
+          password: '`envs["MYSQL_ROOT_PASSWORD"]`'
+          transport: tcp
+          username: '`envs["MYSQL_ROOT_USER"]`'
+        resource_attributes:
+          job: oteld-app-metrics
+          receiver: apecloudmysql
+        rule: type == "container" && monitor_type == "mysql" && config != nil && config.EnabledMetrics
+      apecloudpostgresql:
+        config:
+          collection_interval: '`settings.CollectionInterval`'
+          databases:
+          - postgres
+          endpoint: '`endpoint`:5432'
+          exclude_databases:
+          - template0
+          - template1
+          password: '`envs["PGPASSWORD_SUPERUSER"]`'
+          tls:
+            insecure: true
+            insecure_skip_verify: true
+          transport: tcp
+          username: '`envs["PGUSER_SUPERUSER"]`'
+        resource_attributes:
+          job: oteld-app-metrics
+          receiver: apecloudpostgresql
+        rule: type == "container" && monitor_type == "postgresql" && config != nil
+          && config.EnabledMetrics
+      prometheus_simple:
+        config:
+          collection_interval: '`settings.CollectionInterval`'
+          disable_keep_alives: '`config.Prometheus == nil ? false : config.Prometheus.DisableKeepAlives`'
+          endpoint: '`endpoint`:`envs["SERVICE_PORT"]`'
+          metrics_path: '`config.Prometheus == nil ? "/metrics" : config.Prometheus.MetricsPath`'
+          use_service_account: '`config.Prometheus == nil ? false : config.Prometheus.UseServiceAccount`'
+        rule: type == "container" && monitor_type == "prometheus" && config != nil
+          && config.EnabledMetrics
+      apecloudredis:
+        config:
+          collection_interval: '`settings.CollectionInterval`'
+          endpoint: '`endpoint`:`envs["SERVICE_PORT"]`'
+          lua_script: ""
+          password: '`envs["REDIS_REPL_PASSWORD"]`'
+          password_file: ""
+          tls:
+            insecure: true
+            insecure_skip_verify: true
+          username: default
+        resource_attributes:
+          job: oteld-app-metrics
+          receiver: apecloudredis
+        rule: type == "container" && monitor_type == "redis" && config != nil && config.EnabledMetrics
+  receiver_creator/logs:
+    receivers:
+      container_filelog:
+        config:
+          character_type: '`config.CharacterType`'
+          cluster_name: '`config.ClusterName`'
+          component_name: '`config.ComponentName`'
+          container_id: '`container_id`'
+          input_configs: '`config.LogsCollector`'
+          pod_ip: '`endpoint`'
+          storage: file_storage/oteld
+        rule: type == "container" && config != nil && config.EnabledLogs
+    resource_attributes:
+      container:
+        app_kubernetes_io_component: '`labels["app.kubernetes.io/component"]`'
+        app_kubernetes_io_instance: '`labels["app.kubernetes.io/instance"]`'
+        app_kubernetes_io_managed_by: '`labels["app.kubernetes.io/managed-by"]`'
+        app_kubernetes_io_name: '`labels["app.kubernetes.io/name"]`'
+        app_kubernetes_io_version: '`labels["app.kubernetes.io/version"]`'
+        apps_kubeblocks_io_component_name: '`labels["apps.kubeblocks.io/component-name"]`'
+        job: oteld-app-metrics
+        namespace: '`namespace`'
+        node: ${env:NODE_NAME}
+        pod: '`name`'
+    watch_observers:
+    - apecloud_engine_observer
+  filelog/pod:
+    attributes:
+      loki.attribute.labels: namespace, pod, pod_id, container, restart_num, log.file.path,
+        log.file.name
+    include:
+    - /host/root/var/log/pods/**/**/*.log
+    include_file_name: true
+    include_file_path: true
+    operators:
+    - field: resource.host_name
+      type: add
+      value: EXPR(env("PWD"))
+    - field: resource.host_ip
+      type: add
+      value: EXPR(env("PWD"))
+    - id: parser_pods_logs_dir
+      on_error: send
+      parse_from: attributes['log.file.path']
+      regex: ^/host/root/var/log/pods/(?P<namespace>[^_]+)_(?P<pod>[^_]+)_(?P<pod_id>[^_]+)/(?P<container>[^/]+)/(?P<restart_num>\d+).log$
+      type: regex_parser
+    resource:
+      loki.format: raw
+      loki.resource.labels: host_name, host_ip
+      type: pods
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+    start_at: beginning
+    storage: file_storage/oteld
+processors:
+  batch:
+    send_batch_max_size: 200
+    send_batch_size: 200
+    timeout: 5s
+exporters:
+  prometheus/prometheus:
+    enable_open_metrics: false
+    endpoint: ${env:HOST_IP}:1234
+    metric_expiration: 20s
+    resource_to_telemetry_conversion:
+      enabled: true
+    send_timestamps: false
+  loki/loki:
+    endpoint: http://loki-gateway.kb-system/loki/api/v1/push
+    retry_on_failure:
+      enabled: true
+      initial_interval: 10s
+      max_elapsed_time: 300s
+      max_interval: 60s
+    sending_queue:
+      enabled: true
+      num_consumers: 3
+      queue_size: 128
+service:
+  pipelines:
+    metrics/datasource-metrics:
+      receivers:
+      - receiver_creator/datasource-metrics
+      processors:
+      - batch
+      exporters:
+      - prometheus/prometheus
+    metrics/self-metrics:
+      receivers:
+      - prometheus/self-metrics
+      processors: []
+      exporters:
+      - prometheus/prometheus
+    logs/podlogs:
+      receivers:
+      - filelog/pod
+      processors:
+      - batch
+      exporters:
+      - loki/loki
+    metrics/app:
+      receivers:
+      - receiver_creator/app
+      processors:
+      - batch
+      exporters:
+      - prometheus/prometheus
+    logs:
+      receivers:
+      - receiver_creator/logs
+      processors:
+      - batch
+      exporters:
+      - loki/loki
+  extensions:
+  - memory_ballast
+  - apecloud_k8s_observer
+  - runtime_container
+  - apecloud_engine_observer
+  - file_storage/oteld
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      address: ${env:HOST_IP}:8888
+    resource:
+      node: ${env:NODE_NAME}
+

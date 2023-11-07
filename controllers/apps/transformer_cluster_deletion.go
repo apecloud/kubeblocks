@@ -24,8 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
-
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -40,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
 // ClusterDeletionTransformer handles cluster deletion

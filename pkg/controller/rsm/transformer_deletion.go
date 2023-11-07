@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm
 
 import (
-	"fmt"
-
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -51,7 +49,6 @@ func (t *ObjectDeletionTransformer) Transform(ctx graph.TransformContext, dag *g
 	for _, object := range snapshot {
 		// don't delete cm that not created by rsm
 		if IsOwnedByRsm(object) {
-			fmt.Printf("delete: %s\n", object.GetName())
 			graphCli.Delete(dag, object)
 		}
 	}

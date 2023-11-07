@@ -24,9 +24,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	v1alpha12 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -37,6 +34,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
@@ -81,21 +80,21 @@ var _ = Describe("object deletion transformer test.", func() {
 			controller := true
 			sts.OwnerReferences = []metav1.OwnerReference{
 				{
-					Kind:       reflect.TypeOf(v1alpha12.ReplicatedStateMachine{}).Name(),
+					Kind:       reflect.TypeOf(workloads.ReplicatedStateMachine{}).Name(),
 					Controller: &controller,
 				},
 			}
 			headLessSvc := buildHeadlessSvc(*rsm)
 			headLessSvc.SetOwnerReferences([]metav1.OwnerReference{
 				{
-					Kind:       reflect.TypeOf(v1alpha12.ReplicatedStateMachine{}).Name(),
+					Kind:       reflect.TypeOf(workloads.ReplicatedStateMachine{}).Name(),
 					Controller: &controller,
 				},
 			})
 			envConfig := buildEnvConfigMap(*rsm)
 			envConfig.SetOwnerReferences([]metav1.OwnerReference{
 				{
-					Kind:       reflect.TypeOf(v1alpha12.ReplicatedStateMachine{}).Name(),
+					Kind:       reflect.TypeOf(workloads.ReplicatedStateMachine{}).Name(),
 					Controller: &controller,
 				},
 			})
@@ -111,7 +110,7 @@ var _ = Describe("object deletion transformer test.", func() {
 			action := buildAction(rsm, actionName, jobTypeSwitchover, jobScenarioMembership, "", "")
 			action.SetOwnerReferences([]metav1.OwnerReference{
 				{
-					Kind:       reflect.TypeOf(v1alpha12.ReplicatedStateMachine{}).Name(),
+					Kind:       reflect.TypeOf(workloads.ReplicatedStateMachine{}).Name(),
 					Controller: &controller,
 				},
 			})

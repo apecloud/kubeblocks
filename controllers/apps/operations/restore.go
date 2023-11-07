@@ -68,11 +68,13 @@ func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	if cluster, err := restoreClusterFromBackup(reqCtx, cli, opsRequest, clusterDef); err != nil {
 		return err
 	} else {
+		// create cluster
 		if err := cli.Create(reqCtx.Ctx, cluster); err != nil {
 			return err
 		}
 
-		// add labels of clusterRef
+		// add labels of clusterRef and type to OpsRequest
+		// and set owner reference to cluster
 		patch := client.MergeFrom(opsRequest.DeepCopy())
 		if opsRequest.Labels == nil {
 			opsRequest.Labels = make(map[string]string)

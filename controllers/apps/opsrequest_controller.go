@@ -227,7 +227,8 @@ func (r *OpsRequestReconciler) reconcileStatusDuringRunningOrCanceling(reqCtx in
 // addClusterLabelAndSetOwnerReference adds the cluster label and set the owner reference of the OpsRequest.
 func (r *OpsRequestReconciler) addClusterLabelAndSetOwnerReference(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
 	// restore ops will create cluster, the cluster don't exist now
-	// so don't need to add label and set owner reference n
+	// so don't add label and set owner reference in here
+	// it will be done in restore action
 	if opsRes.OpsRequest.Spec.Type == appsv1alpha1.RestoreType {
 		return nil, nil
 	}

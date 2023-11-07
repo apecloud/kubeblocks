@@ -10,7 +10,7 @@ sidebar_label: Multi-component configuration
 
 So far, you've learned the definition, backup, and configuration of single-component clusters (e.g., Oracle-MySQL).
 
-This tutorial takes NebulaGraph as an example to demonstrate how to integrate a multi-component cluster and address several common issues in multi-component configurations. You can find more details in [this repository](https://github.com/apecloud/kubeblocks/tree/main/deploy/nebula).
+This tutorial takes NebulaGraph as an example to demonstrate how to integrate a multi-component cluster and address several common issues in multi-component configurations. You can find more details in [this repository](https://github.com/apecloud/kubeblocks-addons/tree/main/addons/nebula).
 
 ## Before you start
 

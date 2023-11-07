@@ -67,6 +67,11 @@ func (u *upgradeHandlerTo7) snapshot(dynamic dynamic.Interface) (map[string][]un
 		return nil, err
 	}
 
+	// get deployment objs
+	if err := fillResourcesMap(dynamic, resourcesMap, types.DeployGVR(), metav1.ListOptions{}); err != nil {
+		return nil, err
+	}
+
 	// get configmap objs for pulsar
 	if err := fillResourcesMap(dynamic, resourcesMap, types.ConfigmapGVR(), metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", constant.CMTemplateNameLabelKey, brokerEnvTPL),
@@ -98,6 +103,10 @@ func (u *upgradeHandlerTo7) transform(dynamic dynamic.Interface, resourcesMap ma
 				}
 			case types.KindStatefulSet:
 				if err := u.transformStatefulSet(dynamic, obj); err != nil {
+					return err
+				}
+			case types.KindDeployment:
+				if err := u.transformDeployment(dynamic, obj); err != nil {
 					return err
 				}
 			case types.KindConfigMap:
@@ -132,7 +141,7 @@ func (u *upgradeHandlerTo7) transformBackupPolicy(dynamic dynamic.Interface, obj
 		}
 	}
 
-	_, found, _ := unstructured.NestedMap(specMap, "backupMethods")
+	_, found, _ := unstructured.NestedSlice(specMap, "backupMethods")
 	if found {
 		// if exist backupMethods, nothing to do.
 		return nil
@@ -499,6 +508,55 @@ func (u *upgradeHandlerTo7) transformStatefulSet(dynamic dynamic.Interface, obj 
 		&unstructured.Unstructured{Object: unstructuredMap}, metav1.CreateOptions{})
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return fmt.Errorf("create rsm %s failed: %s", rsm.Name, err.Error())
+	}
+	return nil
+}
+
+func (u *upgradeHandlerTo7) transformDeployment(dynamic dynamic.Interface, obj unstructured.Unstructured) error {
+	labels := obj.GetLabels()
+	if labels == nil || labels[constant.AppManagedByLabelKey] != constant.AppName {
+		return nil
+	}
+
+	// delete deployment
+	patchData, _ := json.Marshal(map[string]map[string]interface{}{"metadata": {"finalizers": nil}})
+	if _, err := dynamic.Resource(types.DeployGVR()).Namespace(obj.GetNamespace()).Patch(context.TODO(), obj.GetName(), apitypes.MergePatchType, patchData, metav1.PatchOptions{}); err != nil {
+		return err
+	}
+	if err := dynamic.Resource(types.DeployGVR()).Namespace(obj.GetNamespace()).Delete(context.TODO(), obj.GetName(), metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	// delete env cm
+	envCMName := fmt.Sprintf("%s-%s", obj.GetName(), "env")
+	if _, err := dynamic.Resource(types.ConfigmapGVR()).Namespace(obj.GetNamespace()).Patch(context.TODO(), envCMName, apitypes.MergePatchType, patchData, metav1.PatchOptions{}); err != nil {
+		return err
+	}
+	if err := dynamic.Resource(types.ConfigmapGVR()).Namespace(obj.GetNamespace()).Delete(context.TODO(), envCMName, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	// delete config cm
+	if compName, ok := labels[constant.KBAppComponentLabelKey]; ok {
+		configCMName := fmt.Sprintf("%s-%s-%s", obj.GetName(), compName, "config")
+		if _, err := dynamic.Resource(types.ConfigmapGVR()).Namespace(obj.GetNamespace()).Patch(context.TODO(), configCMName, apitypes.MergePatchType, patchData, metav1.PatchOptions{}); err != nil {
+			return err
+		}
+		err := dynamic.Resource(types.ConfigmapGVR()).Namespace(obj.GetNamespace()).Delete(context.TODO(), configCMName, metav1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+	// increase cluster status.observedGeneration by 1 to trigger component owned objects regeneration.
+	if clusterName, ok := labels[constant.AppInstanceLabelKey]; ok {
+		clusterObj, err := dynamic.Resource(types.ClusterGVR()).Namespace(obj.GetNamespace()).Get(context.TODO(), clusterName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		status := clusterObj.Object["status"].(map[string]interface{})
+		generation := status["observedGeneration"].(int64)
+		status["observedGeneration"] = generation + 1
+		if _, err = dynamic.Resource(types.ClusterGVR()).Namespace(obj.GetNamespace()).UpdateStatus(context.TODO(), clusterObj, metav1.UpdateOptions{}); err != nil {
+			return err
+		}
 	}
 	return nil
 }

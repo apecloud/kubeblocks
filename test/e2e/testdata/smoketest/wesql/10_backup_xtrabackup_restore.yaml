@@ -1,0 +1,26 @@
+---
+# Source: apecloud-mysql-cluster/templates/cluster.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: mysql-cluster-restore
+  annotations:
+    kubeblocks.io/restore-from-backup: '{"mysql":{"name":"backup-mysql-cluster","namespace":"default","volumeRestorePolicy":"Parallel"}}'
+spec:
+  clusterDefinitionRef:  apecloud-mysql
+  clusterVersionRef: ac-mysql-8.0.30
+  terminationPolicy: WipeOut
+  componentSpecs:
+    - name: mysql
+      componentDefRef: mysql
+      monitor: false
+      replicas: 1
+      serviceAccountName: kb-mysql-cluster
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 21Gi

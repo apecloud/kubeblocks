@@ -35,7 +35,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/cli/testing"
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
-	lorryutil "github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 var _ = Describe("List Account Options", func() {
@@ -85,7 +84,6 @@ var _ = Describe("List Account Options", func() {
 			o := NewListUserOptions(tf, streams)
 			Expect(o).ShouldNot(BeNil())
 			Expect(o.AccountBaseOptions).ShouldNot(BeNil())
-			Expect(o.AccountBaseOptions.AccountOp).Should(Equal(lorryutil.ListUsersOp))
 		})
 
 		It("validate options", func() {

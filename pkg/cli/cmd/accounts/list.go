@@ -20,10 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package accounts
 
 import (
+	"context"
+	"fmt"
+
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	lorryutil "github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/spf13/cobra"
+
+	"github.com/apecloud/kubeblocks/pkg/lorry/client"
 )
 
 type ListUserOptions struct {
@@ -32,7 +38,7 @@ type ListUserOptions struct {
 
 func NewListUserOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *ListUserOptions {
 	return &ListUserOptions{
-		AccountBaseOptions: NewAccountBaseOptions(f, streams, lorryutil.ListUsersOp),
+		AccountBaseOptions: NewAccountBaseOptions(f, streams),
 	}
 }
 func (o ListUserOptions) Validate(args []string) error {
@@ -41,4 +47,20 @@ func (o ListUserOptions) Validate(args []string) error {
 
 func (o *ListUserOptions) Complete(f cmdutil.Factory) error {
 	return o.AccountBaseOptions.Complete(f)
+}
+
+func (o *ListUserOptions) Run(cmd *cobra.Command, f cmdutil.Factory, streams genericiooptions.IOStreams) error {
+	klog.V(1).Info(fmt.Sprintf("connect to cluster %s, component %s, instance %s\n", o.ClusterName, o.ComponentName, o.PodName))
+	lorryClient, err := client.NewK8sExecClientWithPod(o.Pod)
+	if err != nil {
+		return err
+	}
+
+	users, err := lorryClient.ListUsers(context.Background())
+	if err != nil {
+		o.printGeneralInfo("fail", err.Error())
+		return err
+	}
+	o.printUserInfo(users)
+	return nil
 }

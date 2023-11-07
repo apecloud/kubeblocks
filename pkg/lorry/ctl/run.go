@@ -42,7 +42,7 @@ var (
 
 var RunCmd = &cobra.Command{
 	Use:   "run",
-	Short: "Run sqlchannel and db service.",
+	Short: "Run Lorry and db service.",
 	Example: `
 lorryctl run  -- mysqld
   `,
@@ -71,8 +71,8 @@ lorryctl run  -- mysqld
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
 
-		go commands.StartSQLChannel()
-		<-commands.SQLChannelStarted
+		go commands.StartLorry()
+		<-commands.LorryStarted
 
 		go commands.StartDBService()
 		<-commands.AppStarted
@@ -81,9 +81,9 @@ lorryctl run  -- mysqld
 		if commands.AppCMD != nil {
 			appCommand := strings.Join(args, " ")
 			fmt.Fprintf(os.Stdout, "Start DB Service with %s.\n", appCommand)
-			fmt.Fprintf(os.Stdout, "SQLChannel logs and DB logs will appear here.\n")
+			fmt.Fprintf(os.Stdout, "Lorry logs and DB logs will appear here.\n")
 		} else {
-			fmt.Fprintf(os.Stdout, "SQLChannel logs will appear here.\n")
+			fmt.Fprintf(os.Stdout, "Lorry logs will appear here.\n")
 		}
 
 		sig := <-sigCh
@@ -91,7 +91,7 @@ lorryctl run  -- mysqld
 		cancel()
 		commands.WaitGroup.Wait()
 
-		exitWithError := commands.StopSQLChannel() || commands.StopDBService()
+		exitWithError := commands.StopLorry() || commands.StopDBService()
 		if exitWithError {
 			os.Exit(1)
 		}

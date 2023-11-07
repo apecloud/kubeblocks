@@ -21,7 +21,11 @@ package rsm
 
 import (
 	"context"
+	"reflect"
 	"time"
+
+	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	v1alpha12 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -48,7 +52,13 @@ var _ = Describe("object deletion transformer test.", func() {
 			SetMembershipReconfiguration(&reconfiguration).
 			SetService(service).
 			GetObject()
-
+		controller := true
+		rsm.OwnerReferences = []metav1.OwnerReference{
+			{
+				Kind:       reflect.TypeOf(v1alpha1.Cluster{}).Name(),
+				Controller: &controller,
+			},
+		}
 		transCtx = &rsmTransformContext{
 			Context:       ctx,
 			Client:        graphCli,
@@ -68,12 +78,43 @@ var _ = Describe("object deletion transformer test.", func() {
 			transCtx.rsmOrig.DeletionTimestamp = &ts
 			transCtx.rsm.DeletionTimestamp = &ts
 			sts := mockUnderlyingSts(*rsm, rsm.Generation)
+			controller := true
+			sts.OwnerReferences = []metav1.OwnerReference{
+				{
+					Kind:       reflect.TypeOf(v1alpha12.ReplicatedStateMachine{}).Name(),
+					Controller: &controller,
+				},
+			}
 			headLessSvc := buildHeadlessSvc(*rsm)
+			headLessSvc.SetOwnerReferences([]metav1.OwnerReference{
+				{
+					Kind:       reflect.TypeOf(v1alpha12.ReplicatedStateMachine{}).Name(),
+					Controller: &controller,
+				},
+			})
 			envConfig := buildEnvConfigMap(*rsm)
+			envConfig.SetOwnerReferences([]metav1.OwnerReference{
+				{
+					Kind:       reflect.TypeOf(v1alpha12.ReplicatedStateMachine{}).Name(),
+					Controller: &controller,
+				},
+			})
 			envConfigShouldNotBeDeleted := buildEnvConfigMap(*rsm)
+			envConfigShouldNotBeDeleted.SetOwnerReferences([]metav1.OwnerReference{
+				{
+					Kind:       reflect.TypeOf(v1alpha1.Cluster{}).Name(),
+					Controller: &controller,
+				},
+			})
 			envConfigShouldNotBeDeleted.Name = "env-cm-should-not-be-deleted"
 			actionName := getActionName(rsm.Name, int(rsm.Generation), 1, jobTypeSwitchover)
 			action := buildAction(rsm, actionName, jobTypeSwitchover, jobScenarioMembership, "", "")
+			action.SetOwnerReferences([]metav1.OwnerReference{
+				{
+					Kind:       reflect.TypeOf(v1alpha12.ReplicatedStateMachine{}).Name(),
+					Controller: &controller,
+				},
+			})
 			k8sMock.EXPECT().
 				List(gomock.Any(), &apps.StatefulSetList{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, list *apps.StatefulSetList, _ ...client.ListOption) error {

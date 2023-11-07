@@ -161,7 +161,7 @@ func (param *reconfigureParams) maxRollingReplicas() int32 {
 		replicas       = param.getTargetReplicas()
 	)
 
-	if param.SynthesizedComponent.MinAvailable == nil {
+	if param.SynthesizedComponent == nil || param.SynthesizedComponent.MinAvailable == nil {
 		return defaultRolling
 	}
 

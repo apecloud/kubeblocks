@@ -162,6 +162,7 @@ kbcli cluster create [NAME] [flags]
 * [kbcli cluster create mysql](kbcli_cluster_create_mysql.md)	 - Create a mysql cluster.
 * [kbcli cluster create postgresql](kbcli_cluster_create_postgresql.md)	 - Create a postgresql cluster.
 * [kbcli cluster create redis](kbcli_cluster_create_redis.md)	 - Create a redis cluster.
+* [kbcli cluster create xinference](kbcli_cluster_create_xinference.md)	 - Create a xinference cluster.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

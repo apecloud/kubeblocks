@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
-	kbcollector "github.com/apecloud/kubeblocks/pkg/preflight/collector"
+	kbcollector "github.com/apecloud/kubeblocks/pkg/cli/preflight/collector"
 )
 
 var _ = Describe("analyzer_test", func() {

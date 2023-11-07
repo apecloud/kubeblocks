@@ -27,8 +27,9 @@ import (
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"github.com/apecloud/kubeblocks/pkg/lorry/client"
 	"github.com/spf13/cobra"
+
+	"github.com/apecloud/kubeblocks/pkg/lorry/client"
 )
 
 type ListUserOptions struct {

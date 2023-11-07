@@ -27,7 +27,7 @@ import (
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/cluster"
-	"github.com/apecloud/kubeblocks/pkg/preflight/util"
+	"github.com/apecloud/kubeblocks/pkg/cli/preflight/util"
 )
 
 // LoadPreflightSpec loads content of preflightSpec and hostPreflightSpec against yamlFiles from args

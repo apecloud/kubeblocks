@@ -41,6 +41,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
@@ -345,6 +346,15 @@ var _ = Describe("OpsRequest Controller", func() {
 		}
 
 		mockCompRunning := func(replicas int32) {
+			// to wait the component object becomes stable
+			compKey := types.NamespacedName{
+				Namespace: clusterKey.Namespace,
+				Name:      component.FullName(clusterKey.Name, mysqlCompName),
+			}
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
+				g.Expect(comp.Generation).Should(Equal(comp.Status.ObservedGeneration))
+			})).Should(Succeed())
+
 			wl := componentWorkload()
 			rsm, _ := wl.(*workloads.ReplicatedStateMachine)
 			sts := testapps.NewStatefulSetFactory(rsm.Namespace, rsm.Name, clusterKey.Name, mysqlCompName).
@@ -352,7 +362,6 @@ var _ = Describe("OpsRequest Controller", func() {
 			testapps.CheckedCreateK8sResource(&testCtx, sts)
 
 			mockPods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, mysqlCompName)
-			rsm, _ = wl.(*workloads.ReplicatedStateMachine)
 			Expect(testapps.ChangeObjStatus(&testCtx, rsm, func() {
 				testk8s.MockRSMReady(rsm, mockPods...)
 			})).ShouldNot(HaveOccurred())

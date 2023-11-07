@@ -176,6 +176,11 @@ func (c *componentPlanBuilder) componentWalkFunc(v graph.Vertex) error {
 			c.transCtx.Logger.Error(err, fmt.Sprintf("update %T error: %s", vertex.Obj, vertex.Obj.GetName()))
 			return err
 		}
+	case model.PATCH:
+		patch := client.MergeFrom(vertex.OriObj)
+		if err := c.cli.Patch(c.transCtx.Context, vertex.Obj, patch); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
 	case model.DELETE:
 		// if controllerutil.RemoveFinalizer(vertex.Obj, constant.DBComponentFinalizerName) {
 		if controllerutil.RemoveFinalizer(vertex.Obj, constant.DBClusterFinalizerName) {

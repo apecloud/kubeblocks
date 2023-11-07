@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -45,8 +46,11 @@ func (f *componentOwnershipTransformer) Transform(ctx graph.TransformContext, da
 	controllerutil.AddFinalizer(comp, constant.DBClusterFinalizerName)
 
 	for _, object := range objects {
-		// TODO: skip to set ownership for ClusterRoleBinding which is a cluster-scoped object.
+		// TODO: skip to set ownership for ClusterRoleBinding/PersistentVolume which is a cluster-scoped object.
 		if _, ok := object.(*rbacv1.ClusterRoleBinding); ok {
+			continue
+		}
+		if _, ok := object.(*corev1.PersistentVolume); ok {
 			continue
 		}
 		// if err := intctrlutil.SetOwnership(comp, object, rscheme, constant.DBComponentFinalizerName); err != nil {

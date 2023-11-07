@@ -64,7 +64,8 @@ func fakeInstance() *OteldInstance {
 	return &OteldInstance{
 		MetricsPipeline: []Pipeline{
 			{
-				Name: "metrics",
+				Name:         "metrics",
+				ReceiverType: ReceiverCreatorType,
 				ReceiverMap: map[string]Receiver{
 					"kubeletstats": {},
 					"node":         {},

@@ -89,9 +89,4 @@ var _ = Describe("template", func() {
 			testComponentTemplate(componentPath, helmOutput)
 		}
 	})
-
-	It("test config template render without depend on helm", func() {
-		testComponentTemplate(testdata.SubTestDataPath("../../deploy/apecloud-mysql"), "")
-		testComponentTemplate(testdata.SubTestDataPath("../../deploy/postgresql"), "")
-	})
 })

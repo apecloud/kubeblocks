@@ -1,0 +1,27 @@
+annotations:
+  category: Database
+apiVersion: v2
+name: xinference-cluster
+type: application
+version: 0.7.0-alpha.0
+description: A vxinference Cluster Helm chart for KubeBlocks.
+dependencies:
+  - name: kblib
+    version: 0.1.0
+    repository: file://../kblib
+    alias: extra
+
+appVersion: "7.0.6"
+
+keywords:
+  - xinference
+
+home: https://github.com/apecloud/kubeblocks/tree/main/deploy/xinference-cluster
+icon: https://kubeblocks.io/img/logo.png
+
+maintainers:
+  - name: ApeCloud
+    url: https://kubeblocks.io/
+
+sources:
+  - https://github.com/apecloud/kubeblocks/

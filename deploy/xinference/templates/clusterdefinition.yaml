@@ -1,0 +1,43 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: xinference
+  labels:
+    {{- include "xinference.labels" . | nindent 4}}
+spec:
+  componentDefs:
+    - name: xinference
+      workloadType: Stateful
+      characterType: xinference
+      scriptSpecs:
+        - name: xinference-scripts
+          templateRef: xinference-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
+      service:
+        ports:
+          - name: xinference
+            port: 9997
+            targetPort: xinference
+      podSpec:
+        containers:
+          - name: xinference
+            imagePullPolicy: {{default .Values.image.pullPolicy "IfNotPresent"}}
+            securityContext:
+              runAsUser: 0
+              privileged: true
+              allowPrivilegeEscalation: true
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts
+            command:
+              - /scripts/start.sh
+            ports:
+              - name: xinference
+                containerPort: 9997
+  connectionCredential:
+    username: root
+    password: ""

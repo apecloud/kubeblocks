@@ -7,6 +7,6 @@ spec:
   type: VerticalScaling
   verticalScaling:
     - componentName: milvus
-        requests:
-          cpu: "500m"
-          memory: 500Mi
+      requests:
+        cpu: "500m"
+        memory: 500Mi

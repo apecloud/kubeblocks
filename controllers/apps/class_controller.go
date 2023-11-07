@@ -32,7 +32,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/class"
-	"github.com/apecloud/kubeblocks/pkg/cli/types"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -69,7 +68,7 @@ func (r *ComponentClassReconciler) Reconcile(ctx context.Context, req reconcile.
 	}
 
 	ml := []client.ListOption{
-		client.HasLabels{types.ResourceConstraintProviderLabelKey},
+		client.HasLabels{constant.ResourceConstraintProviderLabelKey},
 	}
 	constraintsList := &appsv1alpha1.ComponentResourceConstraintList{}
 	if err := r.Client.List(reqCtx.Ctx, constraintsList, ml...); err != nil {
@@ -78,7 +77,7 @@ func (r *ComponentClassReconciler) Reconcile(ctx context.Context, req reconcile.
 	constraintsMap := make(map[string]appsv1alpha1.ComponentResourceConstraint)
 	for idx := range constraintsList.Items {
 		cf := constraintsList.Items[idx]
-		if _, ok := cf.GetLabels()[types.ResourceConstraintProviderLabelKey]; !ok {
+		if _, ok := cf.GetLabels()[constant.ResourceConstraintProviderLabelKey]; !ok {
 			continue
 		}
 		constraintsMap[cf.GetName()] = cf

@@ -1,22 +1,22 @@
 ---
-# Source: mariadb/templates/rbac.yaml
+# Source: mariadb-cluster/templates/rbac.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: kb-mariadb-cluster
   namespace: default
   labels:
-    helm.sh/chart: mariadb-0.7.0-alpha.0
+    helm.sh/chart: mariadb-cluster-0.7.0-alpha.0
     app.kubernetes.io/version: "10.6.15"
     app.kubernetes.io/instance: mariadb-cluster
 ---
-# Source: mariadb/templates/rbac.yaml
+# Source: mariadb-cluster/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: kb-mariadb-cluster
   labels:
-    helm.sh/chart: mariadb-0.7.0-alpha.0
+    helm.sh/chart: mariadb-cluster-0.7.0-alpha.0
     app.kubernetes.io/version: "10.6.15"
     app.kubernetes.io/instance: mariadb-cluster
 roleRef:
@@ -28,13 +28,13 @@ subjects:
     name: kb-mariadb-cluster
     namespace: default
 ---
-# Source: mariadb/templates/rbac.yaml
+# Source: mariadb-cluster/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: kb-mariadb-cluster
   labels:
-    helm.sh/chart: mariadb-0.7.0-alpha.0
+    helm.sh/chart: mariadb-cluster-0.7.0-alpha.0
     app.kubernetes.io/version: "10.6.15"
     app.kubernetes.io/instance: mariadb-cluster
 roleRef:
@@ -46,13 +46,13 @@ subjects:
     name: kb-mariadb-cluster
     namespace: default
 ---
-# Source: mariadb/templates/cluster.yaml
+# Source: mariadb-cluster/templates/cluster.yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: mariadb-cluster
   labels: 
-    helm.sh/chart: mariadb-0.7.0-alpha.0
+    helm.sh/chart: mariadb-cluster-0.7.0-alpha.0
     app.kubernetes.io/version: "10.6.15"
     app.kubernetes.io/instance: mariadb-cluster
 spec:

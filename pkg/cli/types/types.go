@@ -110,6 +110,7 @@ const (
 	KindBackupSchedule                  = "BackupSchedule"
 	KindBackupPolicyTemplate            = "BackupPolicyTemplate"
 	KindStatefulSet                     = "StatefulSet"
+	KindDeployment                      = "Deployment"
 	KindRSM                             = "ReplicatedStateMachine"
 	KindConfigMap                       = "ConfigMap"
 )
@@ -131,9 +132,8 @@ const (
 	ServiceHAVIPTypeAnnotationValue = "private-ip"
 	ServiceFloatingIPAnnotationKey  = "service.kubernetes.io/kubeblocks-havip-floating-ip"
 
-	ClassProviderLabelKey              = "class.kubeblocks.io/provider"
-	ResourceConstraintProviderLabelKey = "resourceconstraint.kubeblocks.io/provider"
-	ReloadConfigMapAnnotationKey       = "kubeblocks.io/reload-configmap" // mark an annotation to load configmap
+	ClassProviderLabelKey        = "class.kubeblocks.io/provider"
+	ReloadConfigMapAnnotationKey = "kubeblocks.io/reload-configmap" // mark an annotation to load configmap
 )
 
 // DataProtection API group

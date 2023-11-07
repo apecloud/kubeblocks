@@ -70,7 +70,9 @@ jobs:
       - name: make test ${{ matrix.ops }}
         if: ${{ contains(matrix.ops, '/') }}
         run: |
-          make test TEST_PACKAGES=./${{ matrix.ops }}/...
+          if [[ -d "./${{ matrix.ops }}" ]]; then
+              make test TEST_PACKAGES=./${{ matrix.ops }}/...
+          fi
 
   release-version:
     needs: release-test

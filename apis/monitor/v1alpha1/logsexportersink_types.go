@@ -37,16 +37,16 @@ type ServiceRef struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
 	// +kubebuilder:default="default"
 	// +optional
-	Namespace string `json:"namespace"`
+	Namespace string `json:"namespace,omitempty"`
 
 	// Specify the name of the referenced the serviceConnectionCredential object.
-	// +kubebuilder:validation:Required
-	ServiceConnectionCredential string `json:"serviceConnectionCredential"`
-
-	// TODO the field for test
-	// Specify the endpoint of the referenced service.
 	// +optional
-	Endpoint string `json:"endpoint,omitempty"`
+	ServiceConnectionCredential string `json:"serviceConnectionCredential,omitempty"`
+
+	// TODO using serviceRef to reference the service
+	// Specify the endpoint of the referenced service.
+	// +kubebuilder:validation:Required
+	Endpoint string `json:"endpoint"`
 }
 
 type LokiConfig struct {
@@ -55,11 +55,11 @@ type LokiConfig struct {
 	// Define retry strategy when loki service is unavailable.
 	// If not set, not retry sending batches in case of export failure.
 	// +optional
-	RetryPolicyOnFailure *RetryPolicyOnFailure `json:"retryPolicyOnFailure"`
+	RetryPolicyOnFailure *RetryPolicyOnFailure `json:"retryPolicyOnFailure,omitempty"`
 
 	// Define whether to not enqueue batches before sending to the consumerSender.
 	// +optional
-	SinkQueueConfig *SinkQueueConfig `json:"sinkQueueConfig"`
+	SinkQueueConfig *SinkQueueConfig `json:"sinkQueueConfig,omitempty"`
 }
 
 type SecretKeySelector struct {

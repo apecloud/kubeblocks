@@ -43,8 +43,8 @@ spec:
                     description: Specify the cluster of the referenced service.
                     type: string
                   endpoint:
-                    description: TODO the field for test Specify the endpoint of the
-                      referenced service.
+                    description: TODO using serviceRef to reference the service Specify
+                      the endpoint of the referenced service.
                     type: string
                   namespace:
                     default: default
@@ -58,19 +58,18 @@ spec:
                       object.
                     type: string
                 required:
-                - namespace
-                - serviceConnectionCredential
+                - endpoint
                 type: object
               prometheusRemoteWriteConfig:
-                description: PrometheusRemotewriteConfig defines the config of the
+                description: prometheusRemoteWriteConfig defines the config of the
                   prometheus remote write
                 properties:
                   clusterName:
                     description: Specify the cluster of the referenced service.
                     type: string
                   endpoint:
-                    description: TODO the field for test Specify the endpoint of the
-                      referenced service.
+                    description: TODO using serviceRef to reference the service Specify
+                      the endpoint of the referenced service.
                     type: string
                   namespace:
                     default: default
@@ -84,7 +83,7 @@ spec:
                       object.
                     type: string
                 required:
-                - serviceConnectionCredential
+                - endpoint
                 type: object
               type:
                 description: type defines the type of the exporterSink

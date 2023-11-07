@@ -27,8 +27,8 @@ type PrometheusConfig struct {
 	ServiceRef `json:",inline"`
 
 	// namespace defines the namespace of the prometheus
-	// +kube:validation:Required
-	Namespace string `json:"namespace"`
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
 }
 
 type PrometheusRemoteWriteConfig struct {
@@ -40,7 +40,7 @@ type MetricsSinkSource struct {
 	// +optional
 	PrometheusConfig *PrometheusConfig `json:"prometheusConfig,omitempty"`
 
-	// PrometheusRemotewriteConfig defines the config of the prometheus remote write
+	// prometheusRemoteWriteConfig defines the config of the prometheus remote write
 	// +optional
 	PrometheusRemoteWriteConfig *PrometheusRemoteWriteConfig `json:"prometheusRemoteWriteConfig,omitempty"`
 }

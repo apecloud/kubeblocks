@@ -42,8 +42,8 @@ spec:
                     description: Specify the cluster of the referenced service.
                     type: string
                   endpoint:
-                    description: TODO the field for test Specify the endpoint of the
-                      referenced service.
+                    description: TODO using serviceRef to reference the service Specify
+                      the endpoint of the referenced service.
                     type: string
                   namespace:
                     default: default
@@ -103,7 +103,7 @@ spec:
                         type: integer
                     type: object
                 required:
-                - serviceConnectionCredential
+                - endpoint
                 type: object
               s3Config:
                 description: s3Config defines the config of the s3

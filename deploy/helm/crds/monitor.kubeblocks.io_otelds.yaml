@@ -184,6 +184,9 @@ spec:
                       metrics
                     properties:
                       enabled:
+                        default: false
+                        description: enabled indicates whether to enable k8s cluster
+                          exporter
                         type: boolean
                     type: object
                   k8sKubeletExporter:
@@ -191,11 +194,15 @@ spec:
                       states metrics
                     properties:
                       enabled:
+                        default: true
+                        description: enabled indicates whether to enable kubelet exporter
                         type: boolean
                       metricsFilter:
-                        items:
-                          type: string
-                        type: array
+                        additionalProperties:
+                          type: boolean
+                        description: metricsFilter is the metrics filter of the kubelet
+                          exporter
+                        type: object
                     type: object
                   logsExporterRef:
                     description: logsExporterRef is the exporter to export system
@@ -213,12 +220,16 @@ spec:
                     description: nodeExporter indicates how to collect node metrics
                     properties:
                       enabled:
+                        default: true
+                        description: enabled indicates whether to enable node exporter
                         type: boolean
                     type: object
                   podLogs:
                     description: podLogs indicates how to collect pod logs
                     properties:
                       enabled:
+                        default: true
+                        description: enabled indicates whether to enable pod logs
                         type: boolean
                     type: object
                 type: object

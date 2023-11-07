@@ -222,8 +222,10 @@ func (in *K8sKubeletExporter) DeepCopyInto(out *K8sKubeletExporter) {
 	*out = *in
 	if in.MetricsFilter != nil {
 		in, out := &in.MetricsFilter, &out.MetricsFilter
-		*out = make([]string, len(*in))
-		copy(*out, *in)
+		*out = make(map[string]bool, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
 	}
 }
 

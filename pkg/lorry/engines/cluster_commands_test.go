@@ -20,9 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package engines
 
 import (
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 )
 
 var _ = Describe("Cluster commands", func() {

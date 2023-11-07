@@ -24,8 +24,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 )
 
 const (

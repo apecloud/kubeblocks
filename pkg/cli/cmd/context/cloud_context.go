@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
@@ -35,6 +36,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/organization"
 	"github.com/apecloud/kubeblocks/pkg/cli/printer"
 )
+
+const contextAPIName = "contexts"
 
 type CloudContext struct {
 	ContextName  string
@@ -122,11 +125,14 @@ type Status struct {
 }
 
 type CloudContextResponse struct {
-	APIVersion string      `json:"apiVersion"`
-	Kind       string      `json:"kind"`
-	Metadata   Metadata    `json:"metadata"`
-	Spec       ClusterSpec `json:"spec"`
-	Status     Status      `json:"status"`
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	OrgName     string    `json:"orgName"`
+	Description string    `json:"description,omitempty"`
+	DisplayName string    `json:"displayName,omitempty"`
+	State       string    `json:"state"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 func (c *CloudContext) showContext() error {
@@ -180,24 +186,22 @@ func (c *CloudContext) printTable(ctxRes *CloudContextResponse) error {
 		"Partner",
 		"ID",
 		"CreatedAt",
-		"ModifiedAt",
+		"UpdatedAt",
 	)
 
 	createAt := convertTimestampToHumanReadable(
-		ctxRes.Metadata.CreatedAt.Seconds,
-		ctxRes.Metadata.CreatedAt.Nanos,
+		ctxRes.CreatedAt,
 	)
 	modifiedAt := convertTimestampToHumanReadable(
-		ctxRes.Metadata.ModifiedAt.Seconds,
-		ctxRes.Metadata.ModifiedAt.Nanos,
+		ctxRes.UpdatedAt,
 	)
 	tbl.AddRow(
-		ctxRes.Metadata.Name,
-		ctxRes.Metadata.Description,
-		ctxRes.Metadata.Project,
-		ctxRes.Metadata.Organization,
-		ctxRes.Metadata.Partner,
-		ctxRes.Metadata.ID,
+		ctxRes.Name,
+		ctxRes.Description,
+		"",
+		ctxRes.OrgName,
+		"",
+		ctxRes.ID,
 		createAt,
 		modifiedAt,
 	)
@@ -227,22 +231,20 @@ func (c *CloudContext) showContexts() error {
 		"ModifiedAt",
 	)
 
-	for _, orgItem := range cloudContexts.Items {
+	for _, orgItem := range cloudContexts {
 		createAt := convertTimestampToHumanReadable(
-			orgItem.Metadata.CreatedAt.Seconds,
-			orgItem.Metadata.CreatedAt.Nanos,
+			orgItem.CreatedAt,
 		)
 		modifiedAt := convertTimestampToHumanReadable(
-			orgItem.Metadata.ModifiedAt.Seconds,
-			orgItem.Metadata.ModifiedAt.Nanos,
+			orgItem.UpdatedAt,
 		)
 		tbl.AddRow(
-			orgItem.Metadata.Name,
-			orgItem.Metadata.Description,
-			orgItem.Metadata.Project,
-			orgItem.Metadata.Organization,
-			orgItem.Metadata.Partner,
-			orgItem.Metadata.ID,
+			orgItem.Name,
+			orgItem.Description,
+			"",
+			orgItem.OrgName,
+			"",
+			orgItem.ID,
 			createAt,
 			modifiedAt,
 		)
@@ -285,7 +287,7 @@ func (c *CloudContext) showRemoveContext() error {
 }
 
 func (c *CloudContext) GetContext() (*CloudContextResponse, error) {
-	path := strings.Join([]string{c.APIURL, c.APIPath, "organizations", c.OrgName, "contexts", c.ContextName}, "/")
+	path := strings.Join([]string{c.APIURL, c.APIPath, organization.OrgAPIName, c.OrgName, contextAPIName, c.ContextName}, "/")
 	response, err := organization.NewRequest(http.MethodGet, path, c.Token, nil)
 	if err != nil {
 		return nil, err
@@ -300,20 +302,20 @@ func (c *CloudContext) GetContext() (*CloudContextResponse, error) {
 	return &context, nil
 }
 
-func (c *CloudContext) GetContexts() (*CloudContextsResponse, error) {
-	path := strings.Join([]string{c.APIURL, c.APIPath, "organizations", c.OrgName, "contexts"}, "/")
+func (c *CloudContext) GetContexts() ([]CloudContextResponse, error) {
+	path := strings.Join([]string{c.APIURL, c.APIPath, organization.OrgAPIName, c.OrgName, contextAPIName}, "/")
 	response, err := organization.NewRequest(http.MethodGet, path, c.Token, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var contexts CloudContextsResponse
+	var contexts []CloudContextResponse
 	err = json.Unmarshal(response, &contexts)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to unmarshal contexts.")
 	}
 
-	return &contexts, nil
+	return contexts, nil
 }
 
 func (c *CloudContext) getCurrentContext() (string, error) {
@@ -350,7 +352,7 @@ func (c *CloudContext) useContext(contextName string) (string, error) {
 
 // RemoveContext TODO: By the way, delete the context stored locally.
 func (c *CloudContext) removeContext() error {
-	path := strings.Join([]string{c.APIURL, c.APIPath, "organizations", c.OrgName, "contexts", c.ContextName}, "/")
+	path := strings.Join([]string{c.APIURL, c.APIPath, organization.OrgAPIName, c.OrgName, contextAPIName, c.ContextName}, "/")
 	_, err := organization.NewRequest(http.MethodDelete, path, c.Token, nil)
 	if err != nil {
 		return err
@@ -365,12 +367,12 @@ func (c *CloudContext) isValidContext(contextName string) (bool, error) {
 		return false, errors.Wrap(err, "Failed to get contexts.")
 	}
 
-	if cloudContexts == nil || len(cloudContexts.Items) == 0 {
+	if cloudContexts == nil || len(cloudContexts) == 0 {
 		return false, errors.Wrap(err, "No context found, please create a context on cloud.")
 	}
 
-	for _, item := range cloudContexts.Items {
-		if item.Metadata.Name == contextName {
+	for _, item := range cloudContexts {
+		if item.Name == contextName {
 			return true, nil
 		}
 	}
@@ -378,7 +380,7 @@ func (c *CloudContext) isValidContext(contextName string) (bool, error) {
 	return false, errors.Errorf("Context %s does not exist.", contextName)
 }
 
-func writeContexts(contexts *CloudContextsResponse) error {
+func writeContexts(contexts []CloudContextResponse) error {
 	jsonData, err := json.MarshalIndent(contexts, "", "    ")
 	if err != nil {
 		return err
@@ -401,12 +403,7 @@ func writeContexts(contexts *CloudContextsResponse) error {
 	return nil
 }
 
-func convertTimestampToHumanReadable(seconds int, nanos int) string {
-	// Convert seconds and nanoseconds to a time.Time object
-	secondsDuration := time.Duration(seconds) * time.Second
-	nanosDuration := time.Duration(nanos) * time.Nanosecond
-	timestamp := time.Unix(0, int64(secondsDuration+nanosDuration))
-
+func convertTimestampToHumanReadable(t time.Time) string {
 	// Format the time to a human-readable layout
-	return timestamp.Format("2006-01-02 15:04:05")
+	return t.Format("2006-01-02 15:04:05")
 }

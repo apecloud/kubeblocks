@@ -12,13 +12,14 @@ spec:
   services:
     - name: postgresql
       serviceName: postgresql
-      ports:
-        - name: tcp-postgresql
-          port: 5432
-          targetPort: tcp-postgresql
-        - name: tcp-pgbouncer
-          port: 6432
-          targetPort: tcp-pgbouncer
+      spec:
+        ports:
+          - name: tcp-postgresql
+            port: 5432
+            targetPort: tcp-postgresql
+          - name: tcp-pgbouncer
+            port: 6432
+            targetPort: tcp-pgbouncer
       roleSelector: primary
   connectionCredentials:
     - name: postgres
@@ -86,43 +87,34 @@ spec:
       defaultMode: 0555
   systemAccounts:
     - name: postgres
-      isSystemInitAccount: true
+      initAccount: true
       passwordGenerationPolicy:
         length: 10
         numDigits: 5
         numSymbols: 0
         letterCase: MixedCases
     - name: kbadmin
-      isSystemInitAccount: false
       statement: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
       passwordGenerationPolicy: &defaultPasswdGenerationPolicy
         length: 10
         numDigits: 5
         numSymbols: 0
         letterCase: MixedCases
-      ## secretRef:
-      ##   name: kbadmin
-      ##   namespace: $(NAMESPACE)
     - name: kbdataprotection
-      isSystemInitAccount: false
       statement: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
       passwordGenerationPolicy: *defaultPasswdGenerationPolicy
     - name: kbprobe
-      isSystemInitAccount: false
       statement: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
       passwordGenerationPolicy: *defaultPasswdGenerationPolicy
     - name: kbmonitoring
-      isSystemInitAccount: false
       statement: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
       passwordGenerationPolicy: *defaultPasswdGenerationPolicy
     - name: kbreplicator
-      isSystemInitAccount: false
       statement: CREATE USER $(USERNAME) WITH REPLICATION PASSWORD '$(PASSWD)';
       passwordGenerationPolicy: *defaultPasswdGenerationPolicy
   lifecycleActions:
     roleProbe:
       builtinHandler: postgresql
-      roleUpdateMechanism: DirectAPIServerEventUpdate
       failureThreshold: 2
       periodSeconds: 1
       timeoutSeconds: 1

@@ -130,16 +130,20 @@ spec:
   volumes:
   services:
     - name: default
-      ports:
-        - name: mysql
-          port: 3306
-          targetPort: mysql
+      serviceName: mysql
+      spec:
+        ports:
+          - name: mysql
+            port: 3306
+            targetPort: mysql
       roleSelector: leader
     - name: readonly
-      ports:
-        - name: mysql
-          port: 3306
-          targetPort: mysql
+      serviceName: mysql-ro
+      spec:
+        ports:
+          - name: mysql
+            port: 3306
+            targetPort: mysql
       roleSelector: follower
   configs:
     - name: mysql-consensusset-config
@@ -175,7 +179,7 @@ spec:
       defaultMode: 0555  # for read and execute, mysql container switched user account.
   systemAccounts:
     - name: root
-      isSystemInitAccount: true
+      initAccount: true
       passwordGenerationPolicy:
         length: 16
         numDigits: 8

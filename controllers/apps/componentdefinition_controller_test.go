@@ -43,7 +43,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 	)
 
 	var (
-		defaultAction = &appsv1alpha1.Action{}
+		defaultActionHandler = &appsv1alpha1.LifecycleActionHandler{}
 	)
 
 	cleanEnv := func() {
@@ -170,8 +170,8 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
 				AddVolume("default", true, 85).
-				SetLifecycleAction("Readonly", defaultAction).
-				SetLifecycleAction("Readwrite", defaultAction).
+				SetLifecycleAction("Readonly", defaultActionHandler).
+				SetLifecycleAction("Readwrite", defaultActionHandler).
 				Create(&testCtx).GetObject()
 
 			checkObjectStatus(componentDefObj, appsv1alpha1.AvailablePhase)
@@ -287,7 +287,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
 				AddSystemAccount(string(appsv1alpha1.AdminAccount), true, "create user").
-				SetLifecycleAction("AccountProvision", defaultAction).
+				SetLifecycleAction("AccountProvision", defaultActionHandler).
 				Create(&testCtx).GetObject()
 
 			checkObjectStatus(componentDefObj, appsv1alpha1.AvailablePhase)
@@ -299,7 +299,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 				SetRuntime(nil).
 				AddSystemAccount(string(appsv1alpha1.AdminAccount), true, "create user").
 				AddSystemAccount(string(appsv1alpha1.AdminAccount), false, "create user").
-				SetLifecycleAction("AccountProvision", defaultAction).
+				SetLifecycleAction("AccountProvision", defaultActionHandler).
 				Create(&testCtx).GetObject()
 
 			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
@@ -311,7 +311,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 				SetRuntime(nil).
 				AddSystemAccount(string(appsv1alpha1.AdminAccount), true, "create user").
 				AddSystemAccount(string(appsv1alpha1.ProbeAccount), true, "create user").
-				SetLifecycleAction("AccountProvision", defaultAction).
+				SetLifecycleAction("AccountProvision", defaultActionHandler).
 				Create(&testCtx).GetObject()
 
 			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
@@ -326,7 +326,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 				AddService("default", "", 3306, "").
 				AddSystemAccount(string(appsv1alpha1.AdminAccount), false, "create user").
 				AddConnectionCredential("default", "default", "", string(appsv1alpha1.AdminAccount)).
-				SetLifecycleAction("AccountProvision", defaultAction).
+				SetLifecycleAction("AccountProvision", defaultActionHandler).
 				Create(&testCtx).GetObject()
 
 			checkObjectStatus(componentDefObj, appsv1alpha1.AvailablePhase)

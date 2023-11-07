@@ -221,7 +221,7 @@ func (r *ComponentDefinitionReconciler) validateServices(cli client.Client, rctx
 		roleNames[strings.ToLower(role.Name)] = true
 	}
 	for _, svc := range cmpd.Spec.Services {
-		if !roleNames[strings.ToLower(svc.RoleSelector)] {
+		if len(svc.RoleSelector) > 0 && !roleNames[strings.ToLower(svc.RoleSelector)] {
 			return fmt.Errorf("the role that service selector used is not defined: %s", svc.RoleSelector)
 		}
 	}
@@ -261,9 +261,9 @@ func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client
 	if !checkUniqueItem(cmpd.Spec.SystemAccounts, "Name") {
 		return fmt.Errorf("duplicate system accounts are not allowed")
 	}
-	/*	if !checkUniqueItem(cmpd.Spec.SystemAccounts, "InitAccount") {
+	if !checkUniqueItem(cmpd.Spec.SystemAccounts, "InitAccount") {
 		return fmt.Errorf("multiple system init accounts are not allowed")
-	}*/
+	}
 
 	for _, account := range cmpd.Spec.SystemAccounts {
 		if !account.InitAccount && len(account.Statement) == 0 && account.SecretRef == nil {

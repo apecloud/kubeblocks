@@ -200,10 +200,10 @@ func (f *MockComponentDefinitionFactory) SetLabels(labels map[string]appsv1alpha
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) AddSystemAccount(accountName string, isSystemInitAccount bool, statement string) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) AddSystemAccount(accountName string, initAccount bool, statement string) *MockComponentDefinitionFactory {
 	account := appsv1alpha1.SystemAccount{
 		Name:        accountName,
-		InitAccount: isSystemInitAccount,
+		InitAccount: initAccount,
 		Statement:   statement,
 	}
 	if f.Get().Spec.SystemAccounts == nil {
@@ -251,15 +251,21 @@ func (f *MockComponentDefinitionFactory) SetRoleArbitrator(arbitrator *appsv1alp
 }
 
 func (f *MockComponentDefinitionFactory) SetLifecycleAction(name string, val interface{}) *MockComponentDefinitionFactory {
-	obj := &f.Get().Spec.LifecycleActions
-	t := reflect.TypeOf(reflect.ValueOf(obj).Elem())
+	if f.Get().Spec.LifecycleActions == nil {
+		f.Get().Spec.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{}
+	}
+	obj := f.Get().Spec.LifecycleActions
+	t := reflect.TypeOf(obj).Elem()
 	for i := 0; i < t.NumField(); i++ {
 		fieldName := t.Field(i).Name
 		if strings.EqualFold(fieldName, name) {
 			fieldValue := reflect.ValueOf(obj).Elem().FieldByName(fieldName)
-			if fieldValue.IsValid() && fieldValue.Type().AssignableTo(reflect.TypeOf(val)) {
+			switch {
+			case reflect.TypeOf(val) == nil || reflect.ValueOf(val).IsZero():
+				fieldValue.Set(reflect.Zero(fieldValue.Type()))
+			case fieldValue.IsValid() && fieldValue.Type().AssignableTo(reflect.TypeOf(val)):
 				fieldValue.Set(reflect.ValueOf(val))
-			} else {
+			default:
 				panic("not assignable")
 			}
 			break

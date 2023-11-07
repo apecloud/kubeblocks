@@ -588,7 +588,7 @@ KUBECTL=$(shell which kubectl)
 ##@ End-to-end (E2E) tests
 .PHONY: render-smoke-testdata-manifests
 render-smoke-testdata-manifests: addonsPath=addons/addons
-render-smoke-testdata-manifests: ## Update E2E test dataset
+render-smoke-testdata-manifests: fetch-addons ## Update E2E test dataset
 ifeq ($(TEST_TYPE), wesql)
 	$(HELM) dependency build $(addonsPath)/apecloud-mysql-cluster --skip-refresh
 	$(HELM) template mysql-cluster $(addonsPath)/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
@@ -710,7 +710,7 @@ test-e2e: helm-package install-s3-csi-driver render-smoke-testdata-manifests ## 
 
 .PHONY: render-smoke-testdata-manifests-local
 render-smoke-testdata-manifests-local: addonsPath=addons/addons## Helm Install CD And CV
-render-smoke-testdata-manifests-local:
+render-smoke-testdata-manifests-local: fetch-addons
 ifeq ($(TEST_TYPE), wesql)
 	$(HELM) upgrade --install wesql $(addonsPath)/apecloud-mysql
 else ifeq ($(TEST_TYPE), postgresql)
@@ -771,7 +771,7 @@ else
 endif
 
 .PHONY: test-e2e-local
-test-e2e-local: fetch-addons generate-cluster-role install-s3-csi-driver render-smoke-testdata-manifests-local render-smoke-testdata-manifests ## Run E2E tests on local.
+test-e2e-local: generate-cluster-role install-s3-csi-driver render-smoke-testdata-manifests-local render-smoke-testdata-manifests ## Run E2E tests on local.
 	$(MAKE) -e TEST_TYPE=$(TEST_TYPE) -C test/e2e run
 
 .PHONY: generate-cluster-role

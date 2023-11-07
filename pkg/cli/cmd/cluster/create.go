@@ -54,8 +54,10 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+
 	"github.com/apecloud/kubeblocks/pkg/class"
 	"github.com/apecloud/kubeblocks/pkg/cli/cluster"
+	classutil "github.com/apecloud/kubeblocks/pkg/cli/cmd/class"
 	"github.com/apecloud/kubeblocks/pkg/cli/create"
 	"github.com/apecloud/kubeblocks/pkg/cli/printer"
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
@@ -584,7 +586,7 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 	if err != nil {
 		return nil, err
 	}
-	clsMgr, err := class.GetManager(o.Dynamic, o.ClusterDefRef)
+	clsMgr, err := classutil.GetManager(o.Dynamic, o.ClusterDefRef)
 	if err != nil {
 		return nil, err
 	}

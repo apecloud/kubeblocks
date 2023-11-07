@@ -128,12 +128,12 @@ func (o *CreateOptions) complete(f cmdutil.Factory) error {
 }
 
 func (o *CreateOptions) run() error {
-	clsMgr, err := class.GetManager(o.dynamic, o.ClusterDefRef)
+	clsMgr, err := GetManager(o.dynamic, o.ClusterDefRef)
 	if err != nil {
 		return err
 	}
 
-	constraints, err := class.GetResourceConstraints(o.dynamic)
+	constraints, err := GetResourceConstraints(o.dynamic)
 	if err != nil {
 		return err
 	}

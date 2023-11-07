@@ -72,7 +72,7 @@ func (o *ListOptions) complete(f cmdutil.Factory) error {
 }
 
 func (o *ListOptions) run() error {
-	clsMgr, err := class.GetManager(o.dynamic, o.ClusterDefRef)
+	clsMgr, err := GetManager(o.dynamic, o.ClusterDefRef)
 	if err != nil {
 		return err
 	}

@@ -45,6 +45,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/clusterdefinition"
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/clusterversion"
+	"github.com/apecloud/kubeblocks/pkg/cli/cmd/context"
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/dashboard"
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/dataprotection"
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/fault"
@@ -192,7 +193,7 @@ A Command Line Interface for KubeBlocks`,
 		auth.NewLogin(ioStreams),
 		auth.NewLogout(ioStreams),
 		organization.NewOrganizationCmd(ioStreams),
-		//context.NewContextCmd(ioStreams),
+		context.NewContextCmd(ioStreams),
 		playground.NewPlaygroundCmd(ioStreams),
 		kubeblocks.NewKubeBlocksCmd(f, ioStreams),
 		bench.NewBenchCmd(f, ioStreams),

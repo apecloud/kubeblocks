@@ -29,7 +29,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-const apiName = "organization"
+const apiName = "organizations"
 
 type CloudOrganization struct {
 	Token   string

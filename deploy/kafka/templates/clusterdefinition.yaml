@@ -518,6 +518,9 @@ spec:
           fsGroup: 1001
         containers:
           - name: kafka-exporter
+            env:
+              - name: SERVICE_PORT
+                value: 9308
             command:
               - /scripts/setup.sh
             ports:

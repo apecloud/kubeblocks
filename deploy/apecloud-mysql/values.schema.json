@@ -457,8 +457,8 @@
           "type": "object",
           "default": {
             "registry": "",
-            "repository": "apecloud/agamotto",
-            "tag": "0.1.2-beta.1",
+            "repository": "apecloud/apecloud-xtrabackup",
+            "tag": "latest",
             "pullPolicy": "IfNotPresent"
           },
           "properties": {
@@ -521,8 +521,8 @@
           "type": "object",
           "default": {
             "registry": "",
-            "repository": "apecloud/agamotto",
-            "tag": "0.1.2-beta.1",
+            "repository": "apecloud/apecloud-mysql-scale",
+            "tag": "0.1.1",
             "pullPolicy": "IfNotPresent"
           },
           "properties": {

@@ -99,14 +99,12 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		ClusterDef().
 		ClusterVer().
 		ClusterComponent().
-		ClusterDefComponent().
-		ClusterVerComponent().
 		Complete()
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to get related object.")
 	}
 
-	if fetcherTask.ClusterComObj == nil || fetcherTask.ClusterDefComObj == nil {
+	if fetcherTask.ClusterComObj == nil {
 		return r.failWithInvalidComponent(configuration, reqCtx)
 	}
 

@@ -139,33 +139,7 @@ func (c *rsmRolesConvertor) convert(args ...any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	accessMode := func(role appsv1alpha1.ReplicaRole) workloads.AccessMode {
-		switch {
-		case role.Serviceable && role.Writable:
-			return workloads.ReadWriteMode
-		case role.Serviceable:
-			return workloads.ReadonlyMode
-		default:
-			return workloads.NoneMode
-		}
-	}
-	rsmReplicaRoles := make([]workloads.ReplicaRole, 0)
-	for _, role := range synthesizeComp.Roles {
-		rsmReplicaRole := workloads.ReplicaRole{
-			Name:       role.Name,
-			AccessMode: accessMode(role),
-			CanVote:    role.Votable,
-			// HACK: Since the RSM relies on IsLeader field to determine whether a workload is available, we are using
-			// such a workaround to combine these two fields to provide the information.
-			// However, the condition will be broken if a service with multiple different roles that can be writable
-			// at the same time, such as Zookeeper.
-			// TODO: We need to discuss further whether we should rely on the concept of "Leader" in the case
-			//  where the KB controller does not provide HA functionality.
-			IsLeader: role.Serviceable && role.Writable,
-		}
-		rsmReplicaRoles = append(rsmReplicaRoles, rsmReplicaRole)
-	}
-	return rsmReplicaRoles, nil
+	return ConvertSynthesizeCompRoleToRSMRole(synthesizeComp), nil
 }
 
 // rsmRoleProbeConvertor converts the ComponentDefinition.Spec.LifecycleActions.RoleProbe into ReplicatedStateMachine.Spec.RoleProbe.
@@ -290,4 +264,39 @@ func (c *rsmPodManagementPolicyConvertor) convert(args ...any) (any, error) {
 func (c *rsmUpdateStrategyConvertor) convert(args ...any) (any, error) {
 	// cluster, synthesizeComp, err := parseRSMConvertorArgs(args...)
 	return "", nil // TODO
+}
+
+// ConvertSynthesizeCompRoleToRSMRole converts the component.SynthesizedComponent.Roles to workloads.ReplicaRole.
+func ConvertSynthesizeCompRoleToRSMRole(synthesizedComp *SynthesizedComponent) []workloads.ReplicaRole {
+	if synthesizedComp.Roles == nil {
+		return nil
+	}
+
+	accessMode := func(role appsv1alpha1.ReplicaRole) workloads.AccessMode {
+		switch {
+		case role.Serviceable && role.Writable:
+			return workloads.ReadWriteMode
+		case role.Serviceable:
+			return workloads.ReadonlyMode
+		default:
+			return workloads.NoneMode
+		}
+	}
+	rsmReplicaRoles := make([]workloads.ReplicaRole, 0)
+	for _, role := range synthesizedComp.Roles {
+		rsmReplicaRole := workloads.ReplicaRole{
+			Name:       role.Name,
+			AccessMode: accessMode(role),
+			CanVote:    role.Votable,
+			// HACK: Since the RSM relies on IsLeader field to determine whether a workload is available, we are using
+			// such a workaround to combine these two fields to provide the information.
+			// However, the condition will be broken if a service with multiple different roles that can be writable
+			// at the same time, such as Zookeeper.
+			// TODO: We need to discuss further whether we should rely on the concept of "Leader" in the case
+			//  where the KB controller does not provide HA functionality.
+			IsLeader: role.Serviceable && role.Writable,
+		}
+		rsmReplicaRoles = append(rsmReplicaRoles, rsmReplicaRole)
+	}
+	return rsmReplicaRoles
 }

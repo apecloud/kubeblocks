@@ -79,39 +79,12 @@ func (c *configReconcileContext) GetRelatedObjects() error {
 		ClusterDef().
 		ClusterVer().
 		ClusterComponent().
-		ClusterDefComponent().
 		RSM().
-		StatefulSet().
-		Deployment().
 		Complete()
-}
-
-func (c *configReconcileContext) StatefulSet() *configReconcileContext {
-	stsFn := func() (err error) {
-		dComp := c.ClusterDefComObj
-		if dComp == nil || dComp.WorkloadType == appsv1alpha1.Stateless || len(c.RSMList) != 0 {
-			return
-		}
-
-		c.StatefulSets, c.Containers, err = retrieveRelatedComponentsByConfigmap(
-			c.Client,
-			c.Context,
-			c.Name,
-			generics.StatefulSetSignature,
-			client.ObjectKeyFromObject(c.ConfigMap),
-			client.InNamespace(c.Namespace),
-			c.MatchingLabels)
-		return
-	}
-	return c.Wrap(stsFn)
 }
 
 func (c *configReconcileContext) RSM() *configReconcileContext {
 	stsFn := func() (err error) {
-		dComp := c.ClusterDefComObj
-		if dComp == nil {
-			return
-		}
 		c.RSMList, c.Containers, err = retrieveRelatedComponentsByConfigmap(
 			c.Client,
 			c.Context,
@@ -136,26 +109,6 @@ func (c *configReconcileContext) RSM() *configReconcileContext {
 		return
 	}
 	return c.Wrap(stsFn)
-}
-
-func (c *configReconcileContext) Deployment() *configReconcileContext {
-	deployFn := func() (err error) {
-		dComp := c.ClusterDefComObj
-		if dComp == nil || dComp.WorkloadType != appsv1alpha1.Stateless || len(c.RSMList) != 0 {
-			return
-		}
-
-		c.Deployments, c.Containers, err = retrieveRelatedComponentsByConfigmap(
-			c.Client,
-			c.Context,
-			c.Name,
-			generics.DeploymentSignature,
-			client.ObjectKeyFromObject(c.ConfigMap),
-			client.InNamespace(c.Namespace),
-			c.MatchingLabels)
-		return
-	}
-	return c.Wrap(deployFn)
 }
 
 func (c *configReconcileContext) Complete() (err error) {

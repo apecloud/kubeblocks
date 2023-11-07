@@ -30,8 +30,8 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
+	"github.com/apecloud/kubeblocks/pkg/cli/preflight/util"
 	cliutil "github.com/apecloud/kubeblocks/pkg/cli/util"
-	"github.com/apecloud/kubeblocks/pkg/preflight/util"
 )
 
 const (

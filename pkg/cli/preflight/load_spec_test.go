@@ -26,7 +26,7 @@ import (
 
 var _ = Describe("load_spec_test", func() {
 	It("LoadPreflightSpec test, and expect success", func() {
-		yamlCheckFiles := []string{"../cli/testing/testdata/preflight.yaml", "../cli/testing/testdata/hostpreflight.yaml"}
+		yamlCheckFiles := []string{"../testing/testdata/preflight.yaml", "..//testing/testdata/hostpreflight.yaml"}
 		Eventually(func(g Gomega) {
 			preflightSpec, hostPreflightSpec, preflightName, err := LoadPreflightSpec(yamlCheckFiles, nil)
 			g.Expect(err).NotTo(HaveOccurred())

@@ -40,7 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
-	kbcollector "github.com/apecloud/kubeblocks/pkg/preflight/collector"
+	kbcollector "github.com/apecloud/kubeblocks/pkg/cli/preflight/collector"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 

@@ -28,8 +28,8 @@ import (
 	analyzer "github.com/replicatedhq/troubleshoot/pkg/analyze"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
-	kbcollector "github.com/apecloud/kubeblocks/pkg/preflight/collector"
-	"github.com/apecloud/kubeblocks/pkg/preflight/util"
+	kbcollector "github.com/apecloud/kubeblocks/pkg/cli/preflight/collector"
+	"github.com/apecloud/kubeblocks/pkg/cli/preflight/util"
 )
 
 type AnalyzeClusterRegion struct {

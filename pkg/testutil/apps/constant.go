@@ -60,9 +60,17 @@ const (
 	Class2c4gName                 = "general-2c4g"
 	DefaultResourceConstraintName = "kb-resource-constraint"
 
-	StogrageClassName = "test-sc"
-	EnvKeyImageTag    = "IMAGE_TAG"
-	DefaultImageTag   = "test"
+	StorageClassName = "test-sc"
+	EnvKeyImageTag   = "IMAGE_TAG"
+	DefaultImageTag  = "test"
+
+	DefaultConfigSpecName          = "config-cm"
+	DefaultConfigSpecTplRef        = "env-from-config-tpl"
+	DefaultConfigSpecVolumeName    = "volume"
+	DefaultConfigSpecConstraintRef = "env-from-config-test"
+	DefaultScriptSpecName          = "script-cm"
+	DefaultScriptSpecTplRef        = "env-from-config-tpl"
+	DefaultScriptSpecVolumeName    = "script-volume"
 )
 
 var (
@@ -365,6 +373,25 @@ var (
 			DataAssemble:     defaultLifecycleActionHandler,
 			Reconfigure:      defaultLifecycleActionHandler,
 			AccountProvision: defaultLifecycleActionHandler,
+		},
+	}
+
+	DefaultCompDefConfigs = []appsv1alpha1.ComponentConfigSpec{
+		{
+			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+				Name:        DefaultConfigSpecName,
+				TemplateRef: DefaultConfigSpecTplRef,
+				VolumeName:  DefaultConfigSpecVolumeName,
+			},
+			ConfigConstraintRef: DefaultConfigSpecConstraintRef,
+		},
+	}
+
+	DefaultCompDefScripts = []appsv1alpha1.ComponentTemplateSpec{
+		{
+			Name:        DefaultScriptSpecName,
+			TemplateRef: DefaultScriptSpecTplRef,
+			VolumeName:  DefaultScriptSpecVolumeName,
 		},
 	}
 

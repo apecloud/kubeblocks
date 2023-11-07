@@ -151,6 +151,22 @@ func (f *MockComponentDefinitionFactory) AddConfigTemplate(name, configTemplateR
 	return f
 }
 
+func (f *MockComponentDefinitionFactory) AddConfigs(configs []appsv1alpha1.ComponentConfigSpec) *MockComponentDefinitionFactory {
+	if f.Get().Spec.Configs == nil {
+		f.Get().Spec.Configs = make([]appsv1alpha1.ComponentConfigSpec, 0)
+	}
+	f.Get().Spec.Configs = append(f.Get().Spec.Configs, configs...)
+	return f
+}
+
+func (f *MockComponentDefinitionFactory) AddScripts(scripts []appsv1alpha1.ComponentTemplateSpec) *MockComponentDefinitionFactory {
+	if f.Get().Spec.Scripts == nil {
+		f.Get().Spec.Scripts = make([]appsv1alpha1.ComponentTemplateSpec, 0)
+	}
+	f.Get().Spec.Scripts = append(f.Get().Spec.Scripts, scripts...)
+	return f
+}
+
 func (f *MockComponentDefinitionFactory) AddLogConfig(name, filePathPattern string) *MockComponentDefinitionFactory {
 	logConfig := appsv1alpha1.LogConfig{
 		FilePathPattern: filePathPattern,
@@ -271,5 +287,10 @@ func (f *MockComponentDefinitionFactory) SetLifecycleAction(name string, val int
 			break
 		}
 	}
+	return f
+}
+
+func (f *MockComponentDefinitionFactory) AddContainerVolumeMounts(containerName string, volumeMounts []corev1.VolumeMount) *MockComponentDefinitionFactory {
+	f.Get().Spec.Runtime.Containers = appendContainerVolumeMounts(f.Get().Spec.Runtime.Containers, containerName, volumeMounts)
 	return f
 }

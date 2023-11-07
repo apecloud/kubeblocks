@@ -287,7 +287,7 @@ fetch-addons: ## fetch addons helm charts, if addons dir not exist, clone it, el
 .PHONY: kbcli-fast
 kbcli-fast: OS=$(shell $(GO) env GOOS)
 kbcli-fast: ARCH=$(shell $(GO) env GOARCH)
-kbcli-fast: fetch-addons build-kbcli-embed-chart
+kbcli-fast: build-kbcli-embed-chart
 	$(MAKE) bin/kbcli.$(OS).$(ARCH)
 	@mv bin/kbcli.$(OS).$(ARCH) bin/kbcli
 
@@ -304,7 +304,7 @@ endif
 	mv $(chart)-*.tgz pkg/cli/cluster/charts/$(chart).tgz
 
 .PHONY: build-kbcli-embed-chart
-build-kbcli-embed-chart: helmtool create-kbcli-embed-charts-dir \
+build-kbcli-embed-chart: helmtool fetch-addons create-kbcli-embed-charts-dir \
 	build-single-kbcli-embed-chart.apecloud-mysql-cluster \
 	build-single-kbcli-embed-chart.redis-cluster \
 	build-single-kbcli-embed-chart.postgresql-cluster \

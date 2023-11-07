@@ -231,6 +231,7 @@ const (
 	ExposeType            OpsType = "Expose"
 	DataScriptType        OpsType = "DataScript" // DataScriptType the data script operation will execute the data script against the cluster.
 	BackupType            OpsType = "Backup"
+	RestoreType           OpsType = "Restore"
 )
 
 // ComponentResourceKey defines the resource key of component, such as pod/pvc.

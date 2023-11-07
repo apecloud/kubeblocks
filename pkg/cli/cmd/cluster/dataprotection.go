@@ -61,6 +61,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
 	"github.com/apecloud/kubeblocks/pkg/cli/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
@@ -550,7 +551,7 @@ func (o *CreateRestoreOptions) runRestoreFromBackup() error {
 		return errors.Errorf(`missing source cluster in backup "%s", "app.kubernetes.io/instance" is empty in labels.`, o.Backup)
 	}
 
-	restoreTimeStr, err := formatRestoreTimeAndValidate(o.RestoreTimeStr, backup)
+	restoreTimeStr, err := restore.FormatRestoreTimeAndValidate(o.RestoreTimeStr, backup)
 	if err != nil {
 		return err
 	}
@@ -559,7 +560,7 @@ func (o *CreateRestoreOptions) runRestoreFromBackup() error {
 	if err != nil {
 		return err
 	}
-	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, o.VolumeRestorePolicy, len(clusterObj.Spec.ComponentSpecs), clusterObj.Spec.ComponentSpecs[0].Name, restoreTimeStr)
+	restoreAnnotation, err := restore.GetRestoreFromBackupAnnotation(backup, o.VolumeRestorePolicy, len(clusterObj.Spec.ComponentSpecs), clusterObj.Spec.ComponentSpecs[0].Name, restoreTimeStr)
 	if err != nil {
 		return err
 	}
@@ -576,7 +577,7 @@ func (o *CreateRestoreOptions) createCluster(cluster *appsv1alpha1.Cluster) erro
 	cluster.Status = appsv1alpha1.ClusterStatus{}
 	cluster.TypeMeta = metav1.TypeMeta{
 		Kind:       types.KindCluster,
-		APIVersion: clusterGVR.Group + "/" + clusterGVR.Version,
+		APIVersion: clusterGVR.GroupVersion().String(),
 	}
 	// convert the cluster object and create it.
 	unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&cluster)

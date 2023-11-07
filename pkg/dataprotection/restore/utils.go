@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/cli/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
@@ -249,4 +250,57 @@ func cutJobName(jobName string) string {
 		return fmt.Sprintf("%s-%s", jobName[:57], jobName[l-5:l])
 	}
 	return jobName
+}
+
+func FormatRestoreTimeAndValidate(restoreTimeStr string, continuousBackup *dpv1alpha1.Backup) (string, error) {
+	if restoreTimeStr == "" {
+		return restoreTimeStr, nil
+	}
+	restoreTime, err := util.TimeParse(restoreTimeStr, time.Second)
+	if err != nil {
+		// retry to parse time with RFC3339 format.
+		var errRFC error
+		restoreTime, errRFC = time.Parse(time.RFC3339, restoreTimeStr)
+		if errRFC != nil {
+			// if retry failure, report the error
+			return restoreTimeStr, err
+		}
+	}
+	restoreTimeStr = restoreTime.Format(time.RFC3339)
+	// TODO: check with Recoverable time
+	if !isTimeInRange(restoreTime, continuousBackup.Status.TimeRange.Start.Time, continuousBackup.Status.TimeRange.End.Time) {
+		return restoreTimeStr, fmt.Errorf("restore-to-time is out of time range, you can view the recoverable time: \n"+
+			"\tkbcli cluster describe %s -n %s", continuousBackup.Labels[constant.AppInstanceLabelKey], continuousBackup.Namespace)
+	}
+	return restoreTimeStr, nil
+}
+
+func isTimeInRange(t time.Time, start time.Time, end time.Time) bool {
+	return !t.Before(start) && !t.After(end)
+}
+
+func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, volumeRestorePolicy string, compSpecsCount int, firstCompName string, restoreTime string) (string, error) {
+	componentName := backup.Labels[constant.KBAppComponentLabelKey]
+	if len(componentName) == 0 {
+		if compSpecsCount != 1 {
+			return "", fmt.Errorf("unable to obtain the name of the component to be recovered, please ensure that Backup.status.componentName exists")
+		}
+		componentName = firstCompName
+	}
+	backupNameString := fmt.Sprintf(`"%s":"%s"`, constant.BackupNameKeyForRestore, backup.Name)
+	backupNamespaceString := fmt.Sprintf(`"%s":"%s"`, constant.BackupNamespaceKeyForRestore, backup.Namespace)
+	volumeRestorePolicyString := fmt.Sprintf(`"%s":"%s"`, constant.VolumeRestorePolicyKeyForRestore, volumeRestorePolicy)
+	var restoreTimeString string
+	if restoreTime != "" {
+		restoreTimeString = fmt.Sprintf(`,"%s":"%s"`, constant.RestoreTimeKeyForRestore, restoreTime)
+	}
+
+	var passwordString string
+	connectionPassword := backup.Annotations[dptypes.ConnectionPasswordKey]
+	if connectionPassword != "" {
+		passwordString = fmt.Sprintf(`,"%s":"%s"`, constant.ConnectionPassword, connectionPassword)
+	}
+
+	restoreFromBackupAnnotation := fmt.Sprintf(`{"%s":{%s,%s,%s%s%s}}`, componentName, backupNameString, backupNamespaceString, volumeRestorePolicyString, restoreTimeString, passwordString)
+	return restoreFromBackupAnnotation, nil
 }

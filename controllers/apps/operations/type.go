@@ -104,5 +104,6 @@ const (
 	// ProcessingReasonSwitchovering is the reason of the "OpsRequestProcessed" condition for the switchover opsRequest processing in cluster.
 	ProcessingReasonSwitchovering = "Switchovering"
 	// ProcessingReasonBackup is the reason of the "OpsRequestProcessed" condition for the backup opsRequest processing in cluster.
-	ProcessingReasonBackup = "Backup"
+	ProcessingReasonBackup  = "Backup"
+	ProcessingReasonRestore = "Restore"
 )

@@ -134,6 +134,20 @@ output: {
 				collection_interval: "30s"
 		}
 
+		"kafka/kafka-server/jmx-exporter/prometheus": {
+			enabled_metrics: true
+			enabled_logs:    false
+			metrics_collector:
+				collection_interval: "30s"
+		}
+
+		"kafka/kafka-exporter/kafka-exporter/prometheus": {
+			enabled_metrics: true
+			enabled_logs:    false
+			metrics_collector:
+				collection_interval: "30s"
+		}
+
 		"qdrant/qdrant/qdrant/prometheus": {
 			enabled_metrics: true
 			enabled_logs:    false

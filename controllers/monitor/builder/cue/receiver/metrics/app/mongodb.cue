@@ -19,7 +19,7 @@ output:
 	apecloudmongo: {
 		rule: "type == \"container\" && monitor_type == \"mongodb\" && config != nil && config.EnabledMetrics"
 		config: {
-			endpoint:            "`endpoint`:27017"
+			endpoint:            "`endpoint`:`envs[\"SERVICE_PORT\"]`"
 			username:            "`envs[\"MONGODB_ROOT_USER\"]`"
 			password:            "`envs[\"MONGODB_ROOT_PASSWORD\"]`"
 			connect_params:      "admin?ssl=false&authSource=admin"

@@ -1,0 +1,27 @@
+# Default values for xinference-cluster.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+## @param version xinference cluster version
+##
+version: xinference-latest
+
+cpuVersion: xinference-cpu-latest
+
+## @param replicas specify cluster replicas
+##
+replicas: 1
+
+## @param cpu
+##
+cpu: 3
+
+## @param memory, the unit is Gi
+##
+memory: 7
+
+## @param gpu
+##
+gpu: 1
+
+cpuMode: false

@@ -1,0 +1,43 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: xinference-latest
+  labels:
+    {{- include "xinference.labels" . | nindent 4 }}
+  annotations:
+    kubeblocks.io/is-default-cluster-version: "true"
+spec:
+  clusterDefinitionRef: xinference
+  componentVersions:
+    - componentDefRef: xinference
+      versionsContext:
+        containers:
+          - name: xinference
+            image:  {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository}}:{{ default .Chart.AppVersion .Values.image.tag }}
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: xinference-cpu-latest
+  labels:
+    {{- include "xinference.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: xinference
+  componentVersions:
+    - componentDefRef: xinference
+      versionsContext:
+        initContainers:
+          - name: download
+            image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/baichuan2-7b-gguf:ggml-model-q4
+            command: ["sh", "-c", "cp /models/ggml-model-q4.gguf /models-target/"]
+            volumeMounts:
+              - name: models
+                mountPath: /models-target
+        containers:
+          - name: xinference
+            image: docker.io/apecloud/xinference:latest-arm
+            volumeMounts:
+              - name: models
+                mountPath: /models
+              - name: scripts
+                mountPath: /scripts

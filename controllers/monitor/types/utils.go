@@ -75,14 +75,14 @@ func buildEngineValMap(templateName string, componentName string, config v1alpha
 
 	valMap := map[string]any{
 		"template_name":   templateName,
-		"component_name":  componentName,
+		"component_name":  "",
 		"container_name":  config.ContainerName,
 		"collector_name":  monitorType,
 		"metrics.enabled": config.Metrics != nil,
 		"logs.enabled":    config.Logs != nil,
 		// for clusterDefinition
 		"cluster_def_name":   clusterDefName,
-		"component_def_name": obj.Name,
+		"component_def_name": componentName,
 	}
 
 	if config.Metrics != nil {

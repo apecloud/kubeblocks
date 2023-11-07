@@ -295,7 +295,10 @@ func buildEngineConfigForOteld(instance *types.OteldInstance, namespace string, 
 		constant.AppInstanceLabelKey:  name,
 	}
 
-	configData, _ := gc.GenerateEngineConfiguration(instance, mode)
+	configData, err := gc.GenerateEngineConfiguration(instance, mode)
+	if err != nil {
+		return nil, err
+	}
 	marshal, err := yaml.Marshal(configData)
 	if err != nil {
 		return nil, err

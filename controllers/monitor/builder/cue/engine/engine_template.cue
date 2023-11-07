@@ -22,10 +22,12 @@ logsInclude: {
 }
 
 parameters: {
-	cluster_name:   string
-	component_name: string
-	container_name: string
-	collector_name: string
+	cluster_name?:      string
+	component_name?:    string
+	container_name:     string
+	collector_name:     string
+	cluster_def_name:   string
+	component_def_name: string
 	metrics: {
 		enabled:             *true | bool
 		collection_interval: *"30s" | string
@@ -38,7 +40,7 @@ parameters: {
 }
 
 output: {
-	"\(parameters.cluster_name)/\(parameters.component_name)/\(parameters.container_name)/\(parameters.collector_name)": {
+	"\(parameters.cluster_def_name)/\(parameters.component_def_name)/\(parameters.container_name)/\(parameters.collector_name)": {
 		enabled_metrics: parameters.metrics.enabled
 		enabled_logs:    parameters.logs.enabled
 		metrics_collector: {

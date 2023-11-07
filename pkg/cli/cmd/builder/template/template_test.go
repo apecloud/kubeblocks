@@ -66,6 +66,7 @@ var _ = Describe("template", func() {
 	}
 
 	It("should succeed", func() {
+		Skip("helm charts in ../../deploy are moved to other repos")
 		componentRootPath := testdata.SubTestDataPath("../../deploy")
 		testComponents := []string{
 			"apecloud-mysql",

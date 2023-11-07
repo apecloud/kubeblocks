@@ -1,2 +1,0 @@
-chunkingEnabled=false
-compressionType=NONE

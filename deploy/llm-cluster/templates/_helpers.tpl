@@ -1,3 +1,0 @@
-{{/*
-Define llm cluster component.
-*/}}

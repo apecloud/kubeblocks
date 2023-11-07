@@ -22,13 +22,14 @@ package grpcserver
 import (
 	"testing"
 
-	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 )
 
 func init() {

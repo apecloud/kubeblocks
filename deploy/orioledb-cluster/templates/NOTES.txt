@@ -1,1 +1,0 @@
-OrioleDB with patroni in Kubeblocks

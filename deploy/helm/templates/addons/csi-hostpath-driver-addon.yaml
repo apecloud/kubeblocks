@@ -19,7 +19,7 @@ spec:
 
     installOptions:
       {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-      version: {{ default .Chart.Version .Values.versionOverride }}
+      version: 0.7.0
       {{- end }}
 
     installValues:

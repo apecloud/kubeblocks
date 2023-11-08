@@ -33,7 +33,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/operations/util"
-	"github.com/apecloud/kubeblocks/pkg/cli/types"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
@@ -61,33 +60,37 @@ func (r RestoreOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx,
 
 // Action implements the restore action.
 func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
+	var cluster *appsv1alpha1.Cluster
+	var err error
+
 	opsRequest := opsRes.OpsRequest
 	clusterDef := opsRes.OpsRequest.Spec.ClusterRef
 
 	// restore the cluster from the backup
-	if cluster, err := restoreClusterFromBackup(reqCtx, cli, opsRequest, clusterDef); err != nil {
+	if cluster, err = restoreClusterFromBackup(reqCtx, cli, opsRequest, clusterDef); err != nil {
 		return err
-	} else {
-		// create cluster
-		if err := cli.Create(reqCtx.Ctx, cluster); err != nil {
-			return err
-		}
+	}
 
-		// add labels of clusterRef and type to OpsRequest
-		// and set owner reference to cluster
-		patch := client.MergeFrom(opsRequest.DeepCopy())
-		if opsRequest.Labels == nil {
-			opsRequest.Labels = make(map[string]string)
-		}
-		opsRequest.Labels[constant.AppInstanceLabelKey] = opsRequest.Spec.ClusterRef
-		opsRequest.Labels[constant.OpsRequestTypeLabelKey] = string(opsRequest.Spec.Type)
-		scheme, _ := appsv1alpha1.SchemeBuilder.Build()
-		if err := controllerutil.SetOwnerReference(cluster, opsRequest, scheme); err != nil {
-			return err
-		}
-		if err := cli.Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
-			return err
-		}
+	// create cluster
+	if err = cli.Create(reqCtx.Ctx, cluster); err != nil {
+		return err
+	}
+	opsRes.Cluster = cluster
+
+	// add labels of clusterRef and type to OpsRequest
+	// and set owner reference to cluster
+	patch := client.MergeFrom(opsRequest.DeepCopy())
+	if opsRequest.Labels == nil {
+		opsRequest.Labels = make(map[string]string)
+	}
+	opsRequest.Labels[constant.AppInstanceLabelKey] = opsRequest.Spec.ClusterRef
+	opsRequest.Labels[constant.OpsRequestTypeLabelKey] = string(opsRequest.Spec.Type)
+	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
+	if err = controllerutil.SetOwnerReference(cluster, opsRequest, scheme); err != nil {
+		return err
+	}
+	if err = cli.Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
+		return err
 	}
 	return nil
 }
@@ -130,7 +133,6 @@ func (r RestoreOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 func restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest, clusterDef string) (*appsv1alpha1.Cluster, error) {
 	backupName := opsRequest.Spec.RestoreSpec.BackupName
 	restoreTimeStr := opsRequest.Spec.RestoreSpec.RestoreTimeStr
-	volumeRestorePolicy := opsRequest.Spec.RestoreSpec.VolumeRestorePolicy
 
 	// check if the backup exists
 	backup := &dpv1alpha1.Backup{}
@@ -149,28 +151,17 @@ func restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 		return nil, fmt.Errorf(`missing source cluster in backup "%s", "app.kubernetes.io/instance" is empty in labels`, backupName)
 	}
 
-	restoreTimeStr, err := restore.FormatRestoreTimeAndValidate(opsRequest.Spec.RestoreSpec.RestoreTimeStr, backup)
+	// format and validate the restore time
+	restoreTimeStr, err := restore.FormatRestoreTimeAndValidate(restoreTimeStr, backup)
 	if err != nil {
 		return nil, err
 	}
+	opsRequest.Spec.RestoreSpec.RestoreTimeStr = restoreTimeStr
 
 	// get the cluster object from backup
-	clusterObj, err := getClusterObjFromBackup(cli, backup)
+	clusterObj, err := getClusterObjFromBackup(cli, backup, opsRequest)
 	if err != nil {
 		return nil, err
-	}
-	restoreAnnotation, err := restore.GetRestoreFromBackupAnnotation(backup, volumeRestorePolicy, len(clusterObj.Spec.ComponentSpecs), clusterObj.Spec.ComponentSpecs[0].Name, restoreTimeStr)
-	if err != nil {
-		return nil, err
-	}
-	clusterObj.ObjectMeta = metav1.ObjectMeta{
-		Name:        clusterDef,
-		Namespace:   clusterObj.Namespace,
-		Annotations: map[string]string{constant.RestoreFromBackupAnnotationKey: restoreAnnotation},
-	}
-	clusterObj.TypeMeta = metav1.TypeMeta{
-		Kind:       types.KindCluster,
-		APIVersion: types.ClusterGVR().GroupVersion().String(),
 	}
 	opsRequestSlice := []appsv1alpha1.OpsRecorder{
 		{
@@ -182,23 +173,36 @@ func restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 	return clusterObj, nil
 }
 
-func getClusterObjFromBackup(cli client.Client, backup *dpv1alpha1.Backup) (*appsv1alpha1.Cluster, error) {
+func getClusterObjFromBackup(cli client.Client, backup *dpv1alpha1.Backup, opsRequest *appsv1alpha1.OpsRequest) (*appsv1alpha1.Cluster, error) {
+	cluster := &appsv1alpha1.Cluster{}
+	volumeRestorePolicy := opsRequest.Spec.RestoreSpec.VolumeRestorePolicy
+	restoreTimeStr := opsRequest.Spec.RestoreSpec.RestoreTimeStr
+
 	// use the cluster snapshot to restore firstly
 	clusterString, ok := backup.Annotations[constant.ClusterSnapshotAnnotationKey]
 	if ok {
-		clusterObj := &appsv1alpha1.Cluster{}
-		if err := json.Unmarshal([]byte(clusterString), &clusterObj); err != nil {
+		if err := json.Unmarshal([]byte(clusterString), &cluster); err != nil {
 			return nil, err
 		}
-		return clusterObj, nil
+	} else {
+		clusterName := backup.Labels[constant.AppInstanceLabelKey]
+		if err := cli.Get(context.Background(), client.ObjectKey{
+			Namespace: backup.Namespace,
+			Name:      clusterName,
+		}, cluster); err != nil {
+			return nil, err
+		}
 	}
-	clusterName := backup.Labels[constant.AppInstanceLabelKey]
-	cluster := &appsv1alpha1.Cluster{}
-	if err := cli.Get(context.Background(), client.ObjectKey{
-		Namespace: backup.Namespace,
-		Name:      clusterName,
-	}, cluster); err != nil {
+
+	// set the restore annotation to cluster
+	restoreAnnotation, err := restore.GetRestoreFromBackupAnnotation(backup, volumeRestorePolicy, len(cluster.Spec.ComponentSpecs), cluster.Spec.ComponentSpecs[0].Name, restoreTimeStr)
+	if err != nil {
 		return nil, err
+	}
+	cluster.ObjectMeta = metav1.ObjectMeta{
+		Name:        opsRequest.Spec.ClusterRef,
+		Namespace:   cluster.Namespace,
+		Annotations: map[string]string{constant.RestoreFromBackupAnnotationKey: restoreAnnotation},
 	}
 	return cluster, nil
 }

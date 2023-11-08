@@ -104,6 +104,10 @@ func (r *OpsRequestReconciler) fetchOpsRequest(reqCtx intctrlutil.RequestCtx, op
 		}
 		return intctrlutil.ResultToP(intctrlutil.Reconciled())
 	}
+	// if opsRequest type is restore, the cluster will be created by restore action
+	if opsRequest.Spec.Type == appsv1alpha1.RestoreType {
+		opsRequest.Spec.IsCreateCluster = true
+	}
 	opsRes.OpsRequest = opsRequest
 	return nil, nil
 }
@@ -123,9 +127,8 @@ func (r *OpsRequestReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, ops
 // fetchCluster fetches the Cluster from the OpsRequest.
 func (r *OpsRequestReconciler) fetchCluster(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
 	cluster := &appsv1alpha1.Cluster{}
-	// restore ops will create cluster
-	// so don't need to fetch cluster
-	if opsRes.OpsRequest.Spec.Type == "Restore" {
+	if opsRes.OpsRequest.Spec.IsCreateCluster {
+		// check if the cluster already exists
 		cluster.Name = opsRes.OpsRequest.Spec.ClusterRef
 		cluster.Namespace = opsRes.OpsRequest.GetNamespace()
 		opsRes.Cluster = cluster
@@ -226,10 +229,10 @@ func (r *OpsRequestReconciler) reconcileStatusDuringRunningOrCanceling(reqCtx in
 
 // addClusterLabelAndSetOwnerReference adds the cluster label and set the owner reference of the OpsRequest.
 func (r *OpsRequestReconciler) addClusterLabelAndSetOwnerReference(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
-	// restore ops will create cluster, the cluster don't exist now
+	// if the opsRequest will create cluster, the cluster don't exist now
 	// so don't add label and set owner reference in here
-	// it will be done in restore action
-	if opsRes.OpsRequest.Spec.Type == appsv1alpha1.RestoreType {
+	// it should be done in this opsRequest action
+	if opsRes.OpsRequest.Spec.IsCreateCluster {
 		return nil, nil
 	}
 

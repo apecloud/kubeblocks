@@ -197,6 +197,11 @@ spec:
                 x-kubernetes-validations:
                 - message: forbidden to update spec.horizontalScaling
                   rule: self == oldSelf
+              isCreateCluster:
+                default: false
+                description: isCreateCluster indicates whether the OpsRequest is used
+                  to create a cluster.
+                type: boolean
               reconfigure:
                 description: reconfigure defines the variables that need to input
                   when updating configuration.
@@ -577,6 +582,7 @@ spec:
                 - Switchover
                 - DataScript
                 - Backup
+                - Restore
                 type: string
                 x-kubernetes-validations:
                 - message: forbidden to update spec.type

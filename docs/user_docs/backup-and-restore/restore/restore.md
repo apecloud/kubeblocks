@@ -13,15 +13,15 @@ KubeBlocks supports restoring clusters from backups with the following instructi
 1. View backups.
 For existing clusters, execute:
 
-```shell
-kbcli cluster list-backups mysql-cluster
-```
+    ```shell
+    kbcli cluster list-backups mysql-cluster
+    ```
 
-If the cluster has been deleted, execute:
+    If the cluster has been deleted, execute:
 
-```bash
-kbcli dataprotection list-backups
-```
+    ```bash
+    kbcli dataprotection list-backups
+    ```
 
 2. Restore clusters from a specific backup.
    
@@ -82,8 +82,8 @@ EOF
 
 3. Connect to the restored cluster for verification.
 
-Once the cluster status is Running, run the following command to connect to the cluster for verification:
+    Once the cluster status is Running, run the following command to connect to the cluster for verification:
 
-```bash
-kbcli cluster connect myrestore
-```
+    ```bash
+    kbcli cluster connect myrestore
+    ```

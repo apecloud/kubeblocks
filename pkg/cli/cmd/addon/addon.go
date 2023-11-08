@@ -816,11 +816,8 @@ func addonListRun(o *list.ListOptions) error {
 			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, addon); err != nil {
 				return err
 			}
-			extraNames := addon.GetExtraNames()
-			var selectors []string
 			var autoInstall bool
 			if addon.Spec.Installable != nil {
-				selectors = addon.Spec.Installable.GetSelectorsStrings()
 				autoInstall = addon.Spec.Installable.AutoInstall
 			}
 			label := obj.GetLabels()
@@ -830,15 +827,13 @@ func addonListRun(o *list.ListOptions) error {
 				provider,
 				addon.Status.Phase,
 				autoInstall,
-				strings.Join(selectors, ";"),
-				strings.Join(extraNames, ","),
 			)
 		}
 		return nil
 	}
 
 	if err = printer.PrintTable(o.Out, nil, printRows,
-		"NAME", "TYPE", "PROVIDER", "STATUS", "AUTO-INSTALL", "AUTO-INSTALLABLE-SELECTOR", "EXTRAS"); err != nil {
+		"NAME", "TYPE", "PROVIDER", "STATUS", "AUTO-INSTALL"); err != nil {
 		return err
 	}
 	return nil

@@ -390,7 +390,6 @@ func (r *OpsRequestReconciler) parseBackupOpsRequest(ctx context.Context, object
 type opsRequestStep func(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error)
 
 type opsControllerHandler struct {
-	opsBehaviour operations.OpsBehaviour
 }
 
 func (h *opsControllerHandler) Handle(reqCtx intctrlutil.RequestCtx,

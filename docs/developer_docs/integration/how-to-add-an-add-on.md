@@ -338,7 +338,7 @@ And then configure your Helm chart remote repository address with `chartsImage`.
 
 ## Step 4. (Optional) Publish to Kubeblocks community
 
-You can contribute the Helm chart to the [KubeBlocks add-ons](https://github.com/apecloud/kubeblocks-addons) and `addon.yaml` to the [KubeBlocks community](https://github.com/apecloud/kubeblocks). The `addon.yaml` can be found in the `kubeblocks/deploy/helm/templates/addons` directory.
+You can contribute the Helm chart to the [KubeBlocks add-ons](https://github.com/apecloud/kubeblocks-addons) and `addon.yaml` to the [KubeBlocks](https://github.com/apecloud/kubeblocks). The `addon.yaml` can be found in the `kubeblocks/deploy/helm/templates/addons` directory.
 
 ## Appendix
 

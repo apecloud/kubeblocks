@@ -367,7 +367,7 @@ func (c *CloudContext) isValidContext(contextName string) (bool, error) {
 		return false, errors.Wrap(err, "Failed to get contexts.")
 	}
 
-	if cloudContexts == nil || len(cloudContexts) == 0 {
+	if len(cloudContexts) == 0 {
 		return false, errors.Wrap(err, "No context found, please create a context on cloud.")
 	}
 

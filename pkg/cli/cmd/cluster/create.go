@@ -30,7 +30,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/ghodss/yaml"
 	"github.com/robfig/cron/v3"
@@ -63,6 +62,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
 	"github.com/apecloud/kubeblocks/pkg/cli/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -325,32 +325,6 @@ func setMonitor(monitoringInterval uint8, components []map[string]interface{}) {
 	}
 }
 
-func getRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, volumeRestorePolicy string, compSpecsCount int, firstCompName string, restoreTime string) (string, error) {
-	componentName := backup.Labels[constant.KBAppComponentLabelKey]
-	if len(componentName) == 0 {
-		if compSpecsCount != 1 {
-			return "", fmt.Errorf("unable to obtain the name of the component to be recovered, please ensure that Backup.status.componentName exists")
-		}
-		componentName = firstCompName
-	}
-	backupNameString := fmt.Sprintf(`"%s":"%s"`, constant.BackupNameKeyForRestore, backup.Name)
-	backupNamespaceString := fmt.Sprintf(`"%s":"%s"`, constant.BackupNamespaceKeyForRestore, backup.Namespace)
-	volumeRestorePolicyString := fmt.Sprintf(`"%s":"%s"`, constant.VolumeRestorePolicyKeyForRestore, volumeRestorePolicy)
-	var restoreTimeString string
-	if restoreTime != "" {
-		restoreTimeString = fmt.Sprintf(`,"%s":"%s"`, constant.RestoreTimeKeyForRestore, restoreTime)
-	}
-
-	var passwordString string
-	connectionPassword := backup.Annotations[dptypes.ConnectionPasswordKey]
-	if connectionPassword != "" {
-		passwordString = fmt.Sprintf(`,"%s":"%s"`, constant.ConnectionPassword, connectionPassword)
-	}
-
-	restoreFromBackupAnnotation := fmt.Sprintf(`{"%s":{%s,%s,%s%s%s}}`, componentName, backupNameString, backupNamespaceString, volumeRestorePolicyString, restoreTimeString, passwordString)
-	return restoreFromBackupAnnotation, nil
-}
-
 func getSourceClusterFromBackup(backup *dpv1alpha1.Backup) (*appsv1alpha1.Cluster, error) {
 	sourceCluster := &appsv1alpha1.Cluster{}
 	sourceClusterJSON := backup.Annotations[constant.ClusterSnapshotAnnotationKey]
@@ -405,29 +379,6 @@ func fillClusterInfoFromBackup(o *CreateOptions, cls **appsv1alpha1.Cluster) err
 	return nil
 }
 
-func formatRestoreTimeAndValidate(restoreTimeStr string, continuousBackup *dpv1alpha1.Backup) (string, error) {
-	if restoreTimeStr == "" {
-		return restoreTimeStr, nil
-	}
-	restoreTime, err := util.TimeParse(restoreTimeStr, time.Second)
-	if err != nil {
-		// retry to parse time with RFC3339 format.
-		var errRFC error
-		restoreTime, errRFC = time.Parse(time.RFC3339, restoreTimeStr)
-		if errRFC != nil {
-			// if retry failure, report the error
-			return restoreTimeStr, err
-		}
-	}
-	restoreTimeStr = restoreTime.Format(time.RFC3339)
-	// TODO: check with Recoverable time
-	if !isTimeInRange(restoreTime, continuousBackup.Status.TimeRange.Start.Time, continuousBackup.Status.TimeRange.End.Time) {
-		return restoreTimeStr, fmt.Errorf("restore-to-time is out of time range, you can view the recoverable time: \n"+
-			"\tkbcli cluster describe %s -n %s", continuousBackup.Labels[constant.AppInstanceLabelKey], continuousBackup.Namespace)
-	}
-	return restoreTimeStr, nil
-}
-
 func setBackup(o *CreateOptions, components []map[string]interface{}) error {
 	backupName := o.Backup
 	if len(backupName) == 0 || len(components) == 0 {
@@ -440,11 +391,11 @@ func setBackup(o *CreateOptions, components []map[string]interface{}) error {
 	if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
 		return fmt.Errorf(`backup "%s" is not completed`, backup.Name)
 	}
-	restoreTimeStr, err := formatRestoreTimeAndValidate(o.RestoreTime, backup)
+	restoreTimeStr, err := restore.FormatRestoreTimeAndValidate(o.RestoreTime, backup)
 	if err != nil {
 		return err
 	}
-	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, o.VolumeRestorePolicy, len(components), components[0]["name"].(string), restoreTimeStr)
+	restoreAnnotation, err := restore.GetRestoreFromBackupAnnotation(backup, o.VolumeRestorePolicy, len(components), components[0]["name"].(string), restoreTimeStr)
 	if err != nil {
 		return err
 	}

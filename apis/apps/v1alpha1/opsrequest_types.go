@@ -135,6 +135,10 @@ type OpsRequestSpec struct {
 	// backupSpec defines how to backup the cluster.
 	// +optional
 	BackupSpec *BackupSpec `json:"backupSpec,omitempty"`
+
+	// restoreSpec defines how to restore the cluster.
+	// +optional
+	RestoreSpec *RestoreSpec `json:"restoreSpec,omitempty"`
 }
 
 // ComponentOps defines the common variables of component scope operations.
@@ -404,6 +408,20 @@ type BackupSpec struct {
 	// if backupType is incremental, parentBackupName is required.
 	// +optional
 	ParentBackupName string `json:"parentBackupName,omitempty"`
+}
+
+type RestoreSpec struct {
+	// backupName is the name of the backup.
+	// +kubebuilder:validation:Required
+	BackupName string `json:"backupName"`
+
+	// restoreTime point in time to restore
+	RestoreTimeStr string `json:"restoreTimeStr,omitempty"`
+
+	// the volume claim restore policy, support values: [Serial, Parallel]
+	// +kubebuilder:validation:Enum=Serial;Parallel
+	// +kubebuilder:default=Serial
+	VolumeRestorePolicy string `json:"volumeRestorePolicy,omitempty"`
 }
 
 // ScriptSecret defines the secret to be used to execute the script.

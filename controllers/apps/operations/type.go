@@ -63,6 +63,9 @@ type OpsBehaviour struct {
 	// only update the opsRequest object, then opsRequest controller will update uniformly.
 	CancelFunc func(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) error
 
+	// IsClusterCreationEnabled indicates whether the opsRequest will create a new cluster.
+	IsClusterCreationEnabled bool
+
 	OpsHandler OpsHandler
 }
 
@@ -104,5 +107,6 @@ const (
 	// ProcessingReasonSwitchovering is the reason of the "OpsRequestProcessed" condition for the switchover opsRequest processing in cluster.
 	ProcessingReasonSwitchovering = "Switchovering"
 	// ProcessingReasonBackup is the reason of the "OpsRequestProcessed" condition for the backup opsRequest processing in cluster.
-	ProcessingReasonBackup = "Backup"
+	ProcessingReasonBackup  = "Backup"
+	ProcessingReasonRestore = "Restore"
 )

@@ -816,25 +816,46 @@ func addonListRun(o *list.ListOptions) error {
 			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, addon); err != nil {
 				return err
 			}
+			extraNames := addon.GetExtraNames()
+			var selectors []string
 			var autoInstall bool
 			if addon.Spec.Installable != nil {
+				selectors = addon.Spec.Installable.GetSelectorsStrings()
 				autoInstall = addon.Spec.Installable.AutoInstall
 			}
 			label := obj.GetLabels()
 			provider := label[constant.AddonProviderLabelKey]
-			tbl.AddRow(addon.Name,
-				addon.Spec.Type,
-				provider,
-				addon.Status.Phase,
-				autoInstall,
-			)
+			if o.Format == printer.Wide {
+				tbl.AddRow(addon.Name,
+					addon.Spec.Type,
+					provider,
+					addon.Status.Phase,
+					autoInstall,
+					strings.Join(selectors, ";"),
+					strings.Join(extraNames, ","),
+				)
+			} else {
+				tbl.AddRow(addon.Name,
+					addon.Spec.Type,
+					provider,
+					addon.Status.Phase,
+					autoInstall,
+				)
+			}
 		}
 		return nil
 	}
 
-	if err = printer.PrintTable(o.Out, nil, printRows,
-		"NAME", "TYPE", "PROVIDER", "STATUS", "AUTO-INSTALL"); err != nil {
-		return err
+	if o.Format == printer.Wide {
+		if err = printer.PrintTable(o.Out, nil, printRows,
+			"NAME", "TYPE", "PROVIDER", "STATUS", "AUTO-INSTALL", "AUTO-INSTALLABLE-SELECTOR", "EXTRAS"); err != nil {
+			return err
+		}
+	} else {
+		if err = printer.PrintTable(o.Out, nil, printRows,
+			"NAME", "TYPE", "PROVIDER", "STATUS", "AUTO-INSTALL"); err != nil {
+			return err
+		}
 	}
 	return nil
 }

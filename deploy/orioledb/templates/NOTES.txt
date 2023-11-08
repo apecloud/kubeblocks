@@ -1,6 +1,0 @@
-KubeBlocks Orioledb 14.7.2-beta1
-
-orioledb cluster in KubeBlocks relies on an etcd component named 'etcd'.
-
-So you need to create an etcd cluster in KubeBlocks by `kbcli cluster create etcd --cluster-definition etcd` first
-

@@ -67,5 +67,9 @@ deploy/**/charts
 # cli embed chart directory
 pkg/cli/cluster/charts/
 
-# generated code by controller-gen
-**/zz_generated.deepcopy.go
+# ignore the addons that clone from apecloud/kubeblocks-addons
+addons/
+
+# ignore test result
+test/e2e/report.json
+test/e2e/*.txt

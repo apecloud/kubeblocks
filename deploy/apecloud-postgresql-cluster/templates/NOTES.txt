@@ -1,1 +1,0 @@
-1. By default, the helm chart will create a ApeCloud-PostgreSQL cluster with the same version as the Chart appVersion.

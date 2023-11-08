@@ -1,5 +1,0 @@
-cert-manager github:
-https://github.com/cert-manager/cert-manager
-
-How to install:
-`kbcli addon enable cert-manager` or `helm install cert ./deploy/cert-manager`

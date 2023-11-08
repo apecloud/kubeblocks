@@ -40,8 +40,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/class"
 	"github.com/apecloud/kubeblocks/pkg/cli/cluster"
+	classutil "github.com/apecloud/kubeblocks/pkg/cli/cmd/class"
 	"github.com/apecloud/kubeblocks/pkg/cli/create"
 	"github.com/apecloud/kubeblocks/pkg/cli/printer"
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
@@ -241,7 +241,7 @@ func (o *OperationsOptions) validateVScale(cluster *appsv1alpha1.Cluster) error 
 		return fmt.Errorf("class or cpu/memory must be specified")
 	}
 
-	clsMgr, err := class.GetManager(o.Dynamic, cluster.Spec.ClusterDefRef)
+	clsMgr, err := classutil.GetManager(o.Dynamic, cluster.Spec.ClusterDefRef)
 	if err != nil {
 		return err
 	}

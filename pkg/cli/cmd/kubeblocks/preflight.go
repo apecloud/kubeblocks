@@ -39,10 +39,10 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
+	kbpreflight "github.com/apecloud/kubeblocks/pkg/cli/preflight"
 	"github.com/apecloud/kubeblocks/pkg/cli/spinner"
 	"github.com/apecloud/kubeblocks/pkg/cli/util"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	kbpreflight "github.com/apecloud/kubeblocks/pkg/preflight"
 )
 
 const (

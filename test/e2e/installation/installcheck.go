@@ -28,16 +28,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/pkg/cli/types"
-	"github.com/apecloud/kubeblocks/pkg/cli/util"
-	"github.com/apecloud/kubeblocks/pkg/cli/util/helm"
 	. "github.com/apecloud/kubeblocks/test/e2e"
+	"github.com/apecloud/kubeblocks/test/testutils"
 )
 
 const releaseName = "kubeblocks"
 const releaseNS = "kubeblocks-e2e-test"
 
-var chart = helm.InstallOpts{
+var chart = testutils.InstallOpts{
 	Name:      releaseName,
 	Chart:     "kubeblocks/kubeblocks",
 	Wait:      true,
@@ -66,7 +64,7 @@ func InstallationTest() {
 		})
 
 		It("add repo", func() {
-			err := helm.AddRepo(&repo.Entry{Name: types.KubeBlocksRepoName, URL: util.GetHelmChartRepoURL()})
+			err := testutils.AddRepo(&repo.Entry{Name: testutils.KubeBlocksRepoName, URL: testutils.GetHelmChartRepoURL()})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -112,12 +110,12 @@ func CheckedUninstallHelmRelease() {
 	uninstallHelmRelease()
 }
 
-func getHelmConfig() *helm.Config {
-	return helm.NewConfig(releaseNS, "", "", false)
+func getHelmConfig() *testutils.Config {
+	return testutils.NewConfig(releaseNS, "", "", false)
 }
 
-func getHelmActionCfg(cfg *helm.Config) *action.Configuration {
-	actionCfg, err := helm.NewActionConfig(cfg)
+func getHelmActionCfg(cfg *testutils.Config) *action.Configuration {
+	actionCfg, err := testutils.NewActionConfig(cfg)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(actionCfg).NotTo(BeNil())
 	return actionCfg

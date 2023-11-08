@@ -66,6 +66,7 @@ var _ = Describe("template", func() {
 	}
 
 	It("should succeed", func() {
+		Skip("helm charts in ../../deploy are moved to other repos")
 		componentRootPath := testdata.SubTestDataPath("../../deploy")
 		testComponents := []string{
 			"apecloud-mysql",
@@ -88,10 +89,5 @@ var _ = Describe("template", func() {
 			Expect(HelmTemplate(componentPath, helmOutput)).Should(Succeed())
 			testComponentTemplate(componentPath, helmOutput)
 		}
-	})
-
-	It("test config template render without depend on helm", func() {
-		testComponentTemplate(testdata.SubTestDataPath("../../deploy/apecloud-mysql"), "")
-		testComponentTemplate(testdata.SubTestDataPath("../../deploy/postgresql"), "")
 	})
 })

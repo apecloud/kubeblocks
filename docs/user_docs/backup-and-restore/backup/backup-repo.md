@@ -26,7 +26,7 @@ Users can create multiple BackupRepos to suit different scenarios. For example, 
 
 2. Configure MinIO.
    
-   If you don't have an object storage service from a cloud provider, you can deploy the open-source service MinIO in Kubernetes and use it to configure BackupRepo. If you are using an object storage service provided by a cloud provider, directly skip to [Configure BackupRepo](./backup/backup-repo.md#configure-backuprepo).
+   If you don't have an object storage service from a cloud provider, you can deploy the open-source service MinIO in Kubernetes and use it to configure BackupRepo. If you are using an object storage service provided by a cloud provider, directly skip to [Configure BackupRepo](#configure-backuprepo).
 
   ***Steps:***
 

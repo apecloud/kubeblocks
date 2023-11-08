@@ -54,18 +54,21 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 		opsRequest   = opsRes.OpsRequest
 	)
 	if opsBehaviour, ok = opsMgr.OpsMap[opsRequest.Spec.Type]; !ok || opsBehaviour.OpsHandler == nil {
-		return nil, patchOpsHandlerNotSupported(reqCtx.Ctx, cli, opsRes)
+		return nil, PatchOpsHandlerNotSupported(reqCtx.Ctx, cli, opsRes)
 	}
+
 	// validate OpsRequest.spec
 	// if the operation will create a new cluster, don't validate the cluster
-	if err = opsRequest.Validate(reqCtx.Ctx, cli, opsRes.Cluster, !opsRes.OpsRequest.Spec.IsCreateCluster); err != nil {
+	if err = opsRequest.Validate(reqCtx.Ctx, cli, opsRes.Cluster, !opsBehaviour.IsClusterCreationEnabled); err != nil {
 		if patchErr := patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error()); patchErr != nil {
 			return nil, patchErr
 		}
 		return nil, err
 	}
-	// validate entry condition for OpsRequest
-	if opsRequest.Status.Phase == appsv1alpha1.OpsPendingPhase {
+
+	// validate entry condition for OpsRequest, check if the cluster is in the right phase
+	// if the operation will create the cluster, don't need to validate it
+	if opsRequest.Status.Phase == appsv1alpha1.OpsPendingPhase && !opsBehaviour.IsClusterCreationEnabled {
 		if err = validateOpsWaitingPhase(opsRes.Cluster, opsRequest, opsBehaviour); err != nil {
 			// check if the error is caused by WaitForClusterPhaseErr  error
 			if _, ok := err.(*WaitForClusterPhaseErr); ok {
@@ -120,7 +123,7 @@ func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	)
 
 	if opsBehaviour, ok = opsMgr.OpsMap[opsRes.OpsRequest.Spec.Type]; !ok || opsBehaviour.OpsHandler == nil {
-		return 0, patchOpsHandlerNotSupported(reqCtx.Ctx, cli, opsRes)
+		return 0, PatchOpsHandlerNotSupported(reqCtx.Ctx, cli, opsRes)
 	}
 	opsRes.ToClusterPhase = opsBehaviour.ToClusterPhase
 	if opsRequestPhase, requeueAfter, err = opsBehaviour.OpsHandler.ReconcileAction(reqCtx, cli, opsRes); err != nil &&

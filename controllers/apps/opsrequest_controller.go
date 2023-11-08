@@ -104,10 +104,6 @@ func (r *OpsRequestReconciler) fetchOpsRequest(reqCtx intctrlutil.RequestCtx, op
 		}
 		return intctrlutil.ResultToP(intctrlutil.Reconciled())
 	}
-	// if opsRequest type is restore, the cluster will be created by restore action
-	if opsRequest.Spec.Type == appsv1alpha1.RestoreType {
-		opsRequest.Spec.IsCreateCluster = true
-	}
 	opsRes.OpsRequest = opsRequest
 	return nil, nil
 }
@@ -127,7 +123,11 @@ func (r *OpsRequestReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, ops
 // fetchCluster fetches the Cluster from the OpsRequest.
 func (r *OpsRequestReconciler) fetchCluster(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
 	cluster := &appsv1alpha1.Cluster{}
-	if opsRes.OpsRequest.Spec.IsCreateCluster {
+	opsBehaviour, ok := operations.GetOpsManager().OpsMap[opsRes.OpsRequest.Spec.Type]
+	if !ok || opsBehaviour.OpsHandler == nil {
+		return nil, operations.PatchOpsHandlerNotSupported(reqCtx.Ctx, r.Client, opsRes)
+	}
+	if opsBehaviour.IsClusterCreationEnabled {
 		// check if the cluster already exists
 		cluster.Name = opsRes.OpsRequest.Spec.ClusterRef
 		cluster.Namespace = opsRes.OpsRequest.GetNamespace()
@@ -229,10 +229,11 @@ func (r *OpsRequestReconciler) reconcileStatusDuringRunningOrCanceling(reqCtx in
 
 // addClusterLabelAndSetOwnerReference adds the cluster label and set the owner reference of the OpsRequest.
 func (r *OpsRequestReconciler) addClusterLabelAndSetOwnerReference(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
-	// if the opsRequest will create cluster, the cluster don't exist now
+	// if the opsBehaviour will create cluster, the cluster don't exist now
 	// so don't add label and set owner reference in here
 	// it should be done in this opsRequest action
-	if opsRes.OpsRequest.Spec.IsCreateCluster {
+	opsBehaviour, _ := operations.GetOpsManager().OpsMap[opsRes.OpsRequest.Spec.Type]
+	if opsBehaviour.IsClusterCreationEnabled {
 		return nil, nil
 	}
 
@@ -389,6 +390,7 @@ func (r *OpsRequestReconciler) parseBackupOpsRequest(ctx context.Context, object
 type opsRequestStep func(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error)
 
 type opsControllerHandler struct {
+	opsBehaviour operations.OpsBehaviour
 }
 
 func (h *opsControllerHandler) Handle(reqCtx intctrlutil.RequestCtx,

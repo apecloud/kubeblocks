@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -43,10 +42,13 @@ type RestoreOpsHandler struct{}
 var _ OpsHandler = RestoreOpsHandler{}
 
 func init() {
+	// register restore operation, it will create a new cluster
+	// so set IsClusterCreationEnabled to true
 	restoreBehaviour := OpsBehaviour{
 		FromClusterPhases:                  appsv1alpha1.GetClusterUpRunningPhases(),
 		OpsHandler:                         RestoreOpsHandler{},
 		ProcessingReasonInClusterCondition: ProcessingReasonRestore,
+		IsClusterCreationEnabled:           true,
 	}
 
 	opsMgr := GetOpsManager()
@@ -142,12 +144,9 @@ func restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 		return nil, err
 	}
 
-	// check if the backup whether is completed
+	// check if the backup is completed
 	if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
-		return nil, fmt.Errorf("backup %s is not completed", backupName)
-	}
-	if len(backup.Labels[constant.AppInstanceLabelKey]) == 0 {
-		return nil, fmt.Errorf(`missing source cluster in backup "%s", "app.kubernetes.io/instance" is empty in labels`, backupName)
+		return nil, fmt.Errorf("backup %s status is %s, only completed backup can be used to restore", backupName, backup.Status.Phase)
 	}
 
 	// format and validate the restore time
@@ -158,7 +157,7 @@ func restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 	opsRequest.Spec.RestoreSpec.RestoreTimeStr = restoreTimeStr
 
 	// get the cluster object from backup
-	clusterObj, err := getClusterObjFromBackup(cli, backup, opsRequest)
+	clusterObj, err := getClusterObjFromBackup(backup, opsRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -172,25 +171,18 @@ func restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 	return clusterObj, nil
 }
 
-func getClusterObjFromBackup(cli client.Client, backup *dpv1alpha1.Backup, opsRequest *appsv1alpha1.OpsRequest) (*appsv1alpha1.Cluster, error) {
+func getClusterObjFromBackup(backup *dpv1alpha1.Backup, opsRequest *appsv1alpha1.OpsRequest) (*appsv1alpha1.Cluster, error) {
 	cluster := &appsv1alpha1.Cluster{}
 	volumeRestorePolicy := opsRequest.Spec.RestoreSpec.VolumeRestorePolicy
 	restoreTimeStr := opsRequest.Spec.RestoreSpec.RestoreTimeStr
 
 	// use the cluster snapshot to restore firstly
 	clusterString, ok := backup.Annotations[constant.ClusterSnapshotAnnotationKey]
-	if ok {
-		if err := json.Unmarshal([]byte(clusterString), &cluster); err != nil {
-			return nil, err
-		}
-	} else {
-		clusterName := backup.Labels[constant.AppInstanceLabelKey]
-		if err := cli.Get(context.Background(), client.ObjectKey{
-			Namespace: backup.Namespace,
-			Name:      clusterName,
-		}, cluster); err != nil {
-			return nil, err
-		}
+	if !ok {
+		return nil, fmt.Errorf("missing snapshot annotation in backup %s, %s is empty in Annotations", backup.Name, constant.ClusterSnapshotAnnotationKey)
+	}
+	if err := json.Unmarshal([]byte(clusterString), &cluster); err != nil {
+		return nil, err
 	}
 
 	// set the restore annotation to cluster

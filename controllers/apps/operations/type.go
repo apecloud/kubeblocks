@@ -63,6 +63,9 @@ type OpsBehaviour struct {
 	// only update the opsRequest object, then opsRequest controller will update uniformly.
 	CancelFunc func(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) error
 
+	// IsClusterCreationEnabled indicates whether the opsRequest will create a new cluster.
+	IsClusterCreationEnabled bool
+
 	OpsHandler OpsHandler
 }
 

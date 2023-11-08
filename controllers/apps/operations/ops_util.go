@@ -251,8 +251,8 @@ func PatchClusterNotFound(ctx context.Context, cli client.Client, opsRes *OpsRes
 	return PatchOpsStatus(ctx, cli, opsRes, appsv1alpha1.OpsFailedPhase, condition)
 }
 
-// patchOpsHandlerNotSupported patches OpsNotSupported condition to the OpsRequest.status.conditions.
-func patchOpsHandlerNotSupported(ctx context.Context, cli client.Client, opsRes *OpsResource) error {
+// PatchOpsHandlerNotSupported patches OpsNotSupported condition to the OpsRequest.status.conditions.
+func PatchOpsHandlerNotSupported(ctx context.Context, cli client.Client, opsRes *OpsResource) error {
 	message := fmt.Sprintf("spec.type %s is not supported by operator", opsRes.OpsRequest.Spec.Type)
 	condition := appsv1alpha1.NewValidateFailedCondition(appsv1alpha1.ReasonOpsTypeNotSupported, message)
 	return PatchOpsStatus(ctx, cli, opsRes, appsv1alpha1.OpsFailedPhase, condition)
@@ -443,7 +443,7 @@ func validateOpsWaitingPhase(cluster *appsv1alpha1.Cluster, ops *appsv1alpha1.Op
 	// or opsRequest status.phase is not Pending,
 	// or opsRequest will create cluster,
 	// we don't validate the cluster phase.
-	if len(opsBehaviour.FromClusterPhases) == 0 || ops.Status.Phase != appsv1alpha1.OpsPendingPhase || ops.Spec.IsCreateCluster {
+	if len(opsBehaviour.FromClusterPhases) == 0 || ops.Status.Phase != appsv1alpha1.OpsPendingPhase {
 		return nil
 	}
 	// check if the opsRequest can be executed in the current cluster phase unless this opsRequest is reentrant.

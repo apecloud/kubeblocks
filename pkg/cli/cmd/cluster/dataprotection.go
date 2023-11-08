@@ -520,15 +520,14 @@ type CreateRestoreOptions struct {
 func (o *CreateRestoreOptions) getClusterObject(backup *dpv1alpha1.Backup) (*appsv1alpha1.Cluster, error) {
 	// use the cluster snapshot to restore firstly
 	clusterString, ok := backup.Annotations[constant.ClusterSnapshotAnnotationKey]
-	if ok {
-		clusterObj := &appsv1alpha1.Cluster{}
-		if err := json.Unmarshal([]byte(clusterString), &clusterObj); err != nil {
-			return nil, err
-		}
-		return clusterObj, nil
+	if !ok {
+		return nil, fmt.Errorf("missing snapshot annotation in backup %s, %s is empty in Annotations", backup.Name, constant.ClusterSnapshotAnnotationKey)
 	}
-	clusterName := backup.Labels[constant.AppInstanceLabelKey]
-	return cluster.GetClusterByName(o.Dynamic, clusterName, o.Namespace)
+	clusterObj := &appsv1alpha1.Cluster{}
+	if err := json.Unmarshal([]byte(clusterString), &clusterObj); err != nil {
+		return nil, err
+	}
+	return clusterObj, nil
 }
 
 func (o *CreateRestoreOptions) Run() error {

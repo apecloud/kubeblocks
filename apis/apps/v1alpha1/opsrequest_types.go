@@ -32,11 +32,6 @@ type OpsRequestSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
 	ClusterRef string `json:"clusterRef"`
 
-	// isCreateCluster indicates whether the OpsRequest is used to create a cluster.
-	// +kubebuilder:default=false
-	// +optional
-	IsCreateCluster bool `json:"isCreateCluster,omitempty"`
-
 	// cancel defines the action to cancel the Pending/Creating/Running opsRequest, supported types: [VerticalScaling, HorizontalScaling].
 	// once cancel is set to true, this opsRequest will be canceled and modifying this property again will not take effect.
 	// +optional

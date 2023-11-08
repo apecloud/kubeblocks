@@ -11,20 +11,85 @@ import TabItem from '@theme/TabItem';
 
 # Introduction
 
-BackupRepo is the storage repository for backup data, which uses CSI driver to upload backup data to various storage systems, such as object storage systems like S3 and GCS, or storage servers like FTP and NFS. Currently, BackupRepo of Kubeblocks only supports S3 and other S3-compatible storage systems, and more types of storage will be supported in the future.
+BackupRepo is the storage repository for backup data. Currently, KubeBlocks supports configuring various object storage services as backup repositories, including OSS (Alibaba Cloud Object Storage Service), S3 (Amazon Simple Storage Service), COS (Tencent Cloud Object Storage), GCS (Google Cloud Storage), OBS (Huawei Cloud Object Storage), MinIO, and other S3-compatible services. Additionally, it also supports using Kubernetes native PVCs as backup repositories.
 
-Users can create multiple BackupRepos to suit different scenarios. For example, based on different businesses, the data of business A is stored in repository A, and the data of business B is stored in repository B. Or you can configure multiple repositories by region to realize geo-disaster recovery. But it is required to specify backup repositories when creating a backup. You can also create a default backup repository and KubeBlocks uses this default repository to store backup data if no specific repository is specified when creating a backup.
+Users can create multiple BackupRepos to suit different scenarios. For example, based on different businesses, the data of business A is stored in repository A, and the data of business B is stored in repository B. Or you can configure multiple repositories by region to realize geo-disaster recovery. But it is required to specify backup repositories when you create a backup. You can also create a default backup repository and KubeBlocks uses this default repository to store backup data if no specific repository is specified.
 
-The following instructions take AWS S3 as an example to demonstrate how to configure BackupRepo. There are two options for configuring BackupRepo.
+## Before you start
 
-* Automatic BackupRepo configuration: you can provide the necessary configuration information (for example, the AccessKey of object storage, etc.) when installing KubeBlocks, and the installer automatically creates a default BackupRepo and the CSI driver add-on required for automatic installation.
-* Manual BackupRepo configuration: you can install S3 CSI driver and then create BackupRepo manually.
+1. Make sure you have all the following prepared.
 
-## Automatic BackupRepo configuration
+* [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md)
+* [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
+* [Install Helm](https://helm.sh/docs/intro/install/)
+* [Install KubeBlocks](./..installation/install-with-helm/install-kubeblocks-with-helm.md)
 
-You can specify the BackupRepo information in a YAML configuration file when installing KubeBlocks, and KubeBlocks creates a BackupRepo automatically.
+2. Configure MinIO.
+   
+   If you don't have an object storage service from a cloud provider, you can deploy the open-source service MinIO in Kubernetes and use it to configure BackupRepo. If you are using an object storage service provided by a cloud provider, directly skip to [Configure BackupRepo](./backup/backup-repo.md#configure-backuprepo).
 
-1. Write the following configuration to the `backuprepo.yaml` file.
+  ***Steps:***
+
+1. Install MinIO.
+
+   Use the following Helm command to install MinIO in the `kb-system` namespace:
+
+   ```bash
+   helm repo add kubeblocks-apps https://jihulab.com/api/v4/projects/152630/packages/helm/stable
+   helm install minio kubeblocks-apps/minio --namespace kb-system --create-namespace --set "extraEnvVars[0].name=MINIO_BROWSER_LOGIN_ANIMATION" --set "extraEnvVars[0].value=off"
+   ```
+
+   Get initial username and password:
+
+   ```bash
+   # Initial username
+   echo $(kubectl get secret --namespace kb-system minio -o jsonpath="{.data.root-user}" | base64 -d)
+
+   # Initial password
+   echo $(kubectl get secret --namespace kb-system minio -o jsonpath="{.data.root-password}" | base64 -d)
+   ```
+
+2. Generate credentials.
+   Access the login page by running `kubectl port-forward --namespace default svc/minio 9001:9001` and then accessing `127.0.0.1:9001`.
+
+   Once you are logged in to the dashboard, you can generate `an access key` and `secret key`.
+   ![backup-and-restore-backup-repo-1](./../../../img/backup-and-restore-backup-repo-1.png)
+
+3. Create a bucket.
+   Create a bucket named `test-minio`.
+
+   ![backup-and-restore-backup-repo-2](./../../../img/backup-and-restore-backup-repo-2.png)
+   ![backup-and-restore-backup-repo3](./../../../img/backup-and-restore-backup-repo-3.png)
+
+  :::note
+
+  The access address (endpoint) for the installed MinIO is `http://minio.kb-system.svc.cluster.local:9000`, which will be used to configure BackupRepo. In this case, `kb-system` is the name of the namespace where MinIO is installed.
+
+  :::
+
+## Configure BackupRepo
+With object storage services prepared, it's time to configure BackupRepo. KubeBlocks provides two ways for the configuration:
+
+- Automatic BackupRepo configuration during KubeBlocks installation;
+- Manual BackupRepo configuration for on-demand scenarios.
+  
+### Access BackupRepo
+There are two methods to access remote object storage:
+
+- Using command-line tools to directly access remote storage;
+  
+- Mounting the remote storage to the local system with a CSI driver, allowing the work processes to access the remote storage as if it were local files.
+  
+The two access methods are referred to as "Tool" and "Mount". When creating BackupRepo, users can specify the access method through the `accessMethod` field, which can not be changed after creation.
+
+Generally, it is recommended to use the "Tool" method as it does not require installing an additional CSI driver, thus reducing dependencies. However, as backup and restore tasks require running in the namespace of the database cluster, using the "Tool" approach automatically synchronizes the necessary credentials for accessing the remote storage as secret resources in those namespaces. These credentials are used by the data transfer tool. If you have concerns about security risks associated with synchronizing secrets in a multi-tenant environment, you can choose to use the "Mount" method.
+
+### Automatic BackupRepo configuration
+
+You can specify the BackupRepo information in a YAML configuration file when installing KubeBlocks, and KubeBlocks will create the BackupRepo and automatically install the necessary CSI Driver based on the provided configuration.
+
+1. Prepare the configuration file.
+Taking AWS S3 as an example, the configuration file `backuprepo.yaml` is:
 
     ```yaml
     backupRepo:
@@ -42,102 +107,36 @@ You can specify the BackupRepo information in a YAML configuration file when ins
     * `bucket`: specifies the bucket name of S3.
     * `accessKeyId`: specifies the Access Key of AWS.
     * `secretAccessKey`: specifies the Secret Key of AWS.
+    * `storageProvider`：specifies the object storage provider, which is S3 in this case.
 
     :::note
 
-    1. For KubeBlocks v0.6.0, the available `storageProvider` are `s3`, `oss`, and `minio`.
-    2. For different storage providers, the configuration may differ. `config` and `secrets` in the above example are applied to S3.
-    3. You can run the command below to view the supported storage provider.
-
-       ```bash
-       kubectl get storageproviders.storage.kubeblocks.io
-       ```
+    1. For KubeBlocks v0.7.0, the available `storageProvider` options are `s3`, `cos`, `gcs-s3comp`, `obs`, `oss`, `minio`, and `pvc`.
+    2. For different `storageProvider`, the configuration may differ. `config` and `secrets` in the above example are applied to S3.
+    3. Execute the command `kubectl get storageproviders.storage.kubeblocks.io` to view the supported `storageProvider` options.
 
     :::
 
-2. Install KubeBlocks.
+2. Specify the configuration file when installing KubeBlocks. 
 
-   ```bash
+   ```shell
    kbcli kubeblocks install -f backuprepo.yaml
    ```
+   Use the command below to check the BackupRepo after successful installation. 
+   ```bash
+   # kbcli command
+   kbcli backuprepo list
 
-## Manual BackupRepo configuration
+   # kubectl command
+   kubectl get backuprepo
+   ```
+
+
+### Manual BackupRepo configuration
 
 If you do not configure the BackupRepo information when installing KubeBlocks, you can manually configure it by the following instructions.
 
-### Before you start
-
-There are various ways to create a BackupRepo. Make sure you have done all the necessary preparations before creating it. If you want to use MinIO, you need to make the following configurations in advance.
-
-1. Install MinIO.
-
-   <Tabs>
-
-   <TabItem value="kbcli" label="kbcli" default>
-
-   ```bash
-   # Install via add-on
-   kbcli addon enable minio
-
-   # Access MinIO dashboard
-   kbcli dashboard open minio
-   ```
-
-   </TabItem>
-
-   <TabItem value="Helm" label="Helm">
-
-   ```bash
-   helm install minio oci://registry-1.docker.io/   bitnamicharts/minio
-   ```
-
-   </TabItem>
-
-   </Tabs>
-
-   To get initial username and password, try the following.
-
-   <Tabs>
-
-   <TabItem value="kbcli" label="kbcli" default>
-
-   ``` bash
-   Initial username: kubeblocks
-   Initial password: kubeblocks
-   ```
-
-   </TabItem>
-
-   <TabItem value="Helm" label="Helm">
-
-   ```bash
-   # Initial username
-   echo $(kubectl get secret --namespace default minio -o jsonpath="{.data.root-user}" | base64 -d)
-
-   # Initial password
-   echo $(kubectl get secret --namespace default minio -o jsonpath="{.data.root-password}" | base64 -d)       
-   ```
-
-   </TabItem>
-
-   </Tabs>
-
-
-2. Generate credentials.
-
-   Access the login page by running `kubectl port-forward --namespace default svc/minio 9001:9001` and then accessing `127.0.0.1:9001`.
-
-   Once you are logged in to the dashboard, you can generate an `access key` and `secret key`.
-
-   ![MinIO dashboard](./../../../img/backup-and-restore-configure-backuprepo-minio.png)
-
-:::note
-
-If you fail to log in on Chrome, try switching to Safari and give it another try. 
-
-:::
-
-### Install S3 CSI driver
+1. Install S3 CSI driver (only used in the Mount method).
 
 <Tabs>
 
@@ -148,7 +147,7 @@ If you fail to log in on Chrome, try switching to Safari and give it another try
 kbcli addon enable csi-s3
 
 # You can add flags to customize the installation of this add-on
-# CSI-S3 install a daemonSet Pod on all nodes by default and you can set tolerations to install it on the specified node
+# CSI-S3 installs a daemonSet Pod on all nodes by default and you can set tolerations to install it on the specified node
 kbcli addon enable csi-s3 \
   --tolerations '[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]' \
   --tolerations 'daemonset:[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]'
@@ -163,10 +162,10 @@ kbcli addon list csi-s3
 
 ```bash
 helm repo add kubeblocks https://jihulab.com/api/v4/projects/85949/packages/helm/stable
-helm install csi-s3 kubeblocks/csi-s3 --version=0.6.0 -n kb-system
+helm install csi-s3 kubeblocks/csi-s3 --version=0.7.0 -n kb-system
 
 # You can add flags to customize the installation of this add-on
-# CSI-S3 install a daemonSet Pod on all nodes by default and you can set tolerations to install it on the specified node
+# CSI-S3 installs a daemonSet Pod on all nodes by default and you can set tolerations to install it on the specified node
 --set-json tolerations='[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"taintValue"}]'
 --set-json daemonsetTolerations='[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"taintValue"}]'
 ```
@@ -175,7 +174,7 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.6.0 -n kb-system
 
 </Tabs>
 
-### Create BackupRepo
+2. Create BackupRepo
 
 <Tabs>
 
@@ -192,6 +191,7 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.6.0 -n kb-system
      --bucket test-kb-backup \
      --access-key-id <ACCESS KEY> \
      --secret-access-key <SECRET KEY> \
+     --access-method Tool \ # Mount is also acceptable
      --default
    ```
 
@@ -204,9 +204,57 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.6.0 -n kb-system
      --provider oss \
      --region cn-zhangjiakou \
      --bucket  test-kb-backup \
-     # --endpoint https://oss-cn-zhangjiakou-internal.aliyuncs.com \ To display the specified oss endpoint
+     # --endpoint https://oss-cn-zhangjiakou-internal.aliyuncs.com \ can show the specified oss endpoint
      --access-key-id <ACCESS KEY> \
      --secret-access-key <SECRET KEY> \
+     --default
+   ```
+
+   </TabItem>
+
+   <TabItem value="OBS" label="OBS">
+
+   ```bash
+   kbcli backuprepo create my-repo \
+     --provider obs \
+     --region cn-north-4 \
+     --bucket  test-kb-backup \
+     --access-key-id <ACCESS KEY> \
+     --secret-access-key <SECRET KEY> \
+     --access-method Tool \
+     --default
+   ```
+
+   </TabItem>
+
+   <TabItem value="COS" label="COS">
+
+   ```bash
+   kbcli backuprepo create my-repo \
+     --provider cos \
+     --region ap-guangzhou \
+     # In COS, the naming format of a bucket is <BucketName-APPID>，where APPID is automatically generated by Tencent Cloud
+     # When setting up, first create the bucket through Tencent Cloud's console and obtain the bucket name
+     --bucket  test-kb-backup \ 
+     --access-key-id <ACCESS KEY> \
+     --secret-access-key <SECRET KEY> \
+     --access-method Tool \
+     --default
+   ```
+
+   </TabItem>
+
+   <TabItem value="GCS" label="GCS">
+
+   ```bash
+   # The current GCS is the S3-compatible version provided by Google Cloud
+   kbcli backuprepo create my-repo \
+     --provider gcs \
+     --region auto \
+     --bucket  test-kb-backup \
+     --access-key-id <ACCESS KEY> \
+     --secret-access-key <SECRET KEY> \
+     --access-method Tool \
      --default
    ```
 
@@ -217,27 +265,39 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.6.0 -n kb-system
    ```bash
    kbcli backuprepo create my-repo \
      --provider minio \
-     --endpoint <ip:port> \
+     --endpoint <ip:port> \    # The access address for the deployed MinIO is: http://minio.kb-system.svc.cluster.local:9000
      --bucket test-minio \
      --access-key-id <ACCESS KEY> \
      --secret-access-key <SECRET KEY> \
+     --access-method Tool \
      --default
    ```
 
    </TabItem>
 
+   <TabItem value="PVC" label="PVC">
+
+   ```bash
+   kbcli backuprepo create --provider nfs \
+     --storage-class-name "nfs-storage" \
+     --access-mode "ReadWriteMany" \
+     --volume-capacity "100Gi" \
+     --default
+   ```
+
+   </TabItem>
    </Tabs>
 
    The above command creates a default backup repository `my-repo`.
 
    * `my-repo` is the name of the created backup repository. If you do not specify a name, the system creates a random name, following the format `backuprepo-xxxxx`.
-   * `--default` means that this repository is set as the default repository. Note that there can only be one default global repository. If there exist multiple default repositories, KubeBlocks cannot decide which one to use (similar to the default StorageClass of Kubernetes), which further results in backup failure. Using `kbcli` to create BackupRepo can avoid such problems because `kbcli` checks whether there is another default repository before creating a new one.
-   * `--provider` specifies the storage type, i.e. `storageProvider`, and is required for creating a BakcupRepo. The available values are `s3`, `oss`, and `minio`. Parameters for different storage providers vary and you can run `kbcli backuprepo create --provider STORAGE-PROVIDER-NAME -h` to view the flags for different storage providers.
+   * `--default` means that this repository is set as the default repository. Note that there can only be one default global repository. If there exist multiple default repositories, KubeBlocks cannot decide which one to use (similar to the default StorageClass of Kubernetes), which further results in backup failure. Using kbcli to create BackupRepo can avoid such problems because kbcli checks whether there is another default repository before creating a new one.
+   * `--provider` specifies the storage type, i.e. `storageProvider`, and is required for creating a BakcupRepo. The available values are `s3`, `cos`, `gcs-s3comp`, `obs`, `oss`, and `minio`. Parameters for different storage providers vary and you can run `kbcli backuprepo create --provider STORAGE-PROVIDER-NAME -h` to view the flags for different storage providers. Please note that `--provider` is mandatory in configuration.
 
    After `kbcli backuprepo create` is executed successfully, the system creates the K8s resource whose type is `BackupRepo`. You can modify the annotation of this resource to adjust the default repository.
 
    ```bash
-   # Canel the default repository
+   # Cancel the default repository
    kubectl annotate backuprepo old-default-repo \
      --overwrite=true \
      dataprotection.kubeblocks.io/is-default-repo=false
@@ -254,7 +314,7 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.6.0 -n kb-system
 
 <TabItem value="kubectl" label="kubectl">
 
-   `kubectl` is another option to create a BackupRepo, but the commands do not include parameter and default repository verification compared with kbcli, which is not convenient.
+   `kubectl` is another option to create BackupRepo, but the commands do not include parameter and default repository verification compared with kbcli, which is not convenient. It is recommended to use kbcli.
 
    <Tabs>
 
@@ -277,6 +337,7 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.6.0 -n kb-system
        dataprotection.kubeblocks.io/is-default-repo: "true"
    spec:
      storageProviderRef: s3
+     accessMethod: Tool
      pvReclaimPolicy: Retain
      volumeCapacity: 100Gi
      config:
@@ -310,7 +371,8 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.6.0 -n kb-system
      annotations:
        dataprotection.kubeblocks.io/is-default-repo: "true"
    spec:
-     storageProviderRef: s3
+     storageProviderRef: oss
+     accessMethod: Tool
      pvReclaimPolicy: Retain
      volumeCapacity: 100Gi
      config:
@@ -320,6 +382,111 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.6.0 -n kb-system
        region: cn-zhangjiakou
      credential:
        name: oss-credential-for-backuprepo
+       namespace: kb-system
+   EOF
+   ```
+
+   </TabItem>
+
+   <TabItem value="OBS" label="OBS">
+
+   ```bash
+   # Create a secret to save the access key for OBS
+   kubectl create secret generic obs-credential-for-backuprepo \
+   -n kb-system \
+   --from-literal=accessKeyId=<ACCESS KEY> \
+   --from-literal=secretAccessKey=<SECRET KEY>
+
+   # Create the BackupRepo resource
+   kubectl apply -f - <<-'EOF'
+   apiVersion: dataprotection.kubeblocks.io/v1alpha1
+   kind: BackupRepo
+   metadata:
+     name: my-repo
+     annotations:
+       dataprotection.kubeblocks.io/is-default-repo: "true"
+   spec:
+     storageProviderRef: obs
+     accessMethod: Tool
+     pvReclaimPolicy: Retain
+     volumeCapacity: 100Gi
+     config:
+       bucket: test-kb-backup
+       mountOptions: ""
+       endpoint: ""
+       region: cn-north-4
+     credential:
+       name: obs-credential-for-backuprepo
+       namespace: kb-system
+   EOF
+   ```
+
+   </TabItem>
+
+   <TabItem value="COS" label="COS">
+
+   ```bash
+   # Create a secret to save the access key for COS
+   kubectl create secret generic cos-credential-for-backuprepo \
+     -n kb-system \
+     --from-literal=accessKeyId=<ACCESS KEY> \
+     --from-literal=secretAccessKey=<SECRET KEY>
+
+   # Create the BackupRepo resource
+   kubectl apply -f - <<-'EOF'
+   apiVersion: dataprotection.kubeblocks.io/v1alpha1
+   kind: BackupRepo
+   metadata:
+     name: my-repo
+     annotations:
+       dataprotection.kubeblocks.io/is-default-repo: "true"
+   spec:
+     storageProviderRef: cos
+     accessMethod: Tool
+     pvReclaimPolicy: Retain
+     volumeCapacity: 100Gi
+     config:
+       bucket: test-kb-backup
+       mountOptions: ""
+       endpoint: ""
+       region: ap-guangzhou
+     credential:
+       name: cos-credential-for-backuprepo
+       namespace: kb-system
+   EOF
+   ```
+
+   </TabItem>
+
+   <TabItem value="GCS" label="GCS">
+
+   ```bash
+   # Create a secret to save the access key for GCS
+   kubectl create secret generic gcs-credential-for-backuprepo \
+     -n kb-system \
+     --from-literal=accessKeyId=<ACCESS KEY> \
+     --from-literal=secretAccessKey=<SECRET KEY>
+
+   # Create the BackupRepo resource
+   kubectl apply -f - <<-'EOF'
+   apiVersion: dataprotection.kubeblocks.io/v1alpha1
+   kind: BackupRepo
+   metadata:
+     name: my-repo
+     annotations:
+       dataprotection.kubeblocks.io/is-default-repo: "true"
+   spec:
+     storageProviderRef: gcs
+     accessMethod: Tool
+     pvReclaimPolicy: Retain
+     volumeCapacity: 100Gi
+     config:
+       bucket: test-kb-backup
+       mountOptions: ""
+       endpoint: ""
+       region: auto
+     credential:
+       name: gcs-credential-for-backuprepo
        namespace: kb-system
    EOF
    ```
@@ -345,6 +512,7 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.6.0 -n kb-system
        dataprotection.kubeblocks.io/is-default-repo: "true"
    spec:
      storageProviderRef: minio
+     accessMethod: Tool
      pvReclaimPolicy: Retain
      volumeCapacity: 100Gi
      config:
@@ -365,32 +533,12 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.6.0 -n kb-system
 
 </Tabs>
 
-## (Optional) Change the backup repository for a cluster
-
-By default, all backups are stored in the global default repository when creating a cluster. You can specify another backup repository for this cluster by editing `BackupPolicy`.
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
+After creating, execute the following command to view the BackupRepo and its status. If the status is Ready, the BackupRepo is ready.
 
 ```bash
-kbcli cluster edit-backup-policy mysql-cluster --set="datafile.backupRepoName=my-repo"
+# kbcli command
+kbcli backuprepo list
+
+# kubectl command
+kubectl get backuprepo
 ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
-
-```bash
-kubectl edit backuppolicy mysql-cluster-mysql-backup-policy
-...
-spec:
-  datafile:
-    ... 
-    # Edit the backup repository name
-    backupRepoName: my-repo
-```
-
-</TabItem>
-
-</Tabs>

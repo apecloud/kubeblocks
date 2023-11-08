@@ -22,7 +22,6 @@ require (
 	github.com/clbanning/mxj/v2 v2.5.7
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3
 	github.com/containers/common v0.55.4
-	github.com/dapr/kit v0.11.3
 	github.com/deckarep/golang-set/v2 v2.3.1
 	github.com/dlclark/regexp2 v1.10.0
 	github.com/docker/docker v24.0.6+incompatible

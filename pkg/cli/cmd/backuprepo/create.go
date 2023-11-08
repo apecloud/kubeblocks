@@ -40,7 +40,6 @@ import (
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/stoewer/go-strcase"
@@ -160,18 +159,6 @@ func (o *createOptions) init(f cmdutil.Factory) error {
 	return nil
 }
 
-func flagsToValues(fs *pflag.FlagSet) map[string]string {
-	values := make(map[string]string)
-	fs.VisitAll(func(f *pflag.Flag) {
-		if f.Name == "help" {
-			return
-		}
-		val, _ := fs.GetString(f.Name)
-		values[f.Name] = val
-	})
-	return values
-}
-
 func (o *createOptions) parseProviderFlags(cmd *cobra.Command, args []string, f cmdutil.Factory) error {
 	// Since we disabled the flag parsing of the cmd, we need to parse it from args
 	help := false
@@ -255,7 +242,7 @@ func (o *createOptions) complete(cmd *cobra.Command) error {
 		for _, x := range schema.CredentialFields {
 			credMap[x] = true
 		}
-		fromFlags := flagsToValues(cmd.LocalNonPersistentFlags())
+		fromFlags := flagsToValues(cmd.LocalNonPersistentFlags(), false)
 		for name := range schema.OpenAPIV3Schema.Properties {
 			flagName := strcase.KebabCase(name)
 			if val, ok := fromFlags[flagName]; ok {
@@ -442,15 +429,7 @@ func (o *createOptions) setSecretOwnership(secret *corev1.Secret, owner *unstruc
 		UID:        owner.GetUID(),
 	})
 	secret.SetOwnerReferences(refs)
-	oldData, err := json.Marshal(old)
-	if err != nil {
-		return err
-	}
-	newData, err := json.Marshal(secret)
-	if err != nil {
-		return err
-	}
-	patchData, err := jsonpatch.CreateMergePatch(oldData, newData)
+	patchData, err := createPatchData(old, secret)
 	if err != nil {
 		return err
 	}

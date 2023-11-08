@@ -232,7 +232,7 @@ func (r *OpsRequestReconciler) addClusterLabelAndSetOwnerReference(reqCtx intctr
 	// if the opsBehaviour will create cluster, the cluster don't exist now
 	// so don't add label and set owner reference in here
 	// it should be done in this opsRequest action
-	opsBehaviour, _ := operations.GetOpsManager().OpsMap[opsRes.OpsRequest.Spec.Type]
+	opsBehaviour := operations.GetOpsManager().OpsMap[opsRes.OpsRequest.Spec.Type]
 	if opsBehaviour.IsClusterCreationEnabled {
 		return nil, nil
 	}

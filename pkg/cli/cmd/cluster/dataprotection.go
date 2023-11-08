@@ -593,10 +593,6 @@ func (o *CreateRestoreOptions) createCluster(cluster *appsv1alpha1.Cluster) erro
 	return nil
 }
 
-func isTimeInRange(t time.Time, start time.Time, end time.Time) bool {
-	return !t.Before(start) && !t.After(end)
-}
-
 func (o *CreateRestoreOptions) Validate() error {
 	if o.Backup == "" {
 		return fmt.Errorf("must be specified one of the --backup ")

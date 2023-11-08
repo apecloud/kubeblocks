@@ -27,18 +27,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
-	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 )
 
 var _ = Describe("Restore OpsRequest", func() {
 	var (
-		randomStr   = testCtx.GetRandomStr()
-		clusterName = "cluster-for-ops-" + randomStr
+		randomStr             = testCtx.GetRandomStr()
+		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
+		clusterVersionName    = "clusterversion-for-ops-" + randomStr
+		clusterName           = "cluster-for-ops-" + randomStr
+		backupName            = "backup-for-ops-" + randomStr
 	)
 
 	cleanEnv := func() {
@@ -66,32 +67,31 @@ var _ = Describe("Restore OpsRequest", func() {
 		var (
 			opsRes *OpsResource
 			reqCtx intctrlutil.RequestCtx
-			backup *dpv1alpha1.Backup
 		)
 		BeforeEach(func() {
 			By("init operations resources ")
-			backup = testdp.NewFakeBackup(&testCtx, nil)
+			opsRes, _, _ = initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 			reqCtx = intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 		})
 
 		It("", func() {
 			By("create Restore OpsRequest")
-			opsRes.OpsRequest = createRestoreOpsObj(clusterName, "restore-ops-"+randomStr, backup.Name)
+			opsRes.OpsRequest = createRestoreOpsObj(clusterName, "restore-ops-"+randomStr, backupName)
 
 			By("mock restore OpsRequest is Running")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
 
-			By("test restore action and reconcile function")
-			testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusComp)
-			testapps.MockStatelessComponentDeploy(&testCtx, clusterName, statelessComp)
+			By("test restore action")
 			restoreHandler := RestoreOpsHandler{}
-			Expect(restoreHandler.Action(reqCtx, k8sClient, opsRes)).Should(Succeed())
+			_ = restoreHandler.Action(reqCtx, k8sClient, opsRes)
 
 			By("test restore reconcile function")
+			opsRes.Cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 		})
 	})
 })

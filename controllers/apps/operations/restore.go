@@ -64,10 +64,9 @@ func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	var err error
 
 	opsRequest := opsRes.OpsRequest
-	clusterDef := opsRes.OpsRequest.Spec.ClusterRef
 
 	// restore the cluster from the backup
-	if cluster, err = restoreClusterFromBackup(reqCtx, cli, opsRequest, clusterDef); err != nil {
+	if cluster, err = restoreClusterFromBackup(reqCtx, cli, opsRequest); err != nil {
 		return err
 	}
 
@@ -130,7 +129,7 @@ func (r RestoreOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 	return nil
 }
 
-func restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest, clusterDef string) (*appsv1alpha1.Cluster, error) {
+func restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest) (*appsv1alpha1.Cluster, error) {
 	backupName := opsRequest.Spec.RestoreSpec.BackupName
 	restoreTimeStr := opsRequest.Spec.RestoreSpec.RestoreTimeStr
 

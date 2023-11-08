@@ -89,7 +89,7 @@ func replaceEnvsValues(clusterName string, sysAccounts *appsv1alpha1.SystemAccou
 		for k, v := range map2 {
 			mergedMap[k] = v
 		}
-		return nil
+		return mergedMap
 	}
 
 	// replace systemAccounts.cmdExecutorConfig.env[].valueFrom.secretKeyRef.name variables
@@ -335,13 +335,11 @@ func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, co
 
 	// add toleration
 	clusterComp := cluster.Spec.GetComponentByName(compKey.componentName)
-	if clusterComp != nil {
-		tolerations, err := componetutil.BuildTolerations(cluster, clusterComp)
-		if err != nil {
-			return err
-		}
-		job.Spec.Template.Spec.Tolerations = tolerations
+	tolerations, err := componetutil.BuildTolerations(cluster, clusterComp)
+	if err != nil {
+		return err
 	}
+	job.Spec.Template.Spec.Tolerations = tolerations
 
 	return nil
 }

@@ -163,7 +163,7 @@ func TestRenderJob(t *testing.T) {
 	assert.NotNil(t, clusterDef.Spec.ComponentDefs[0].SystemAccounts)
 
 	cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDef.Name, clusterVersionName).
-		AddComponent(mysqlCompDefName, mysqlCompName).GetObject()
+		AddComponent(mysqlCompName, mysqlCompDefName).GetObject()
 	assert.NotNil(t, cluster)
 	if cluster.Annotations == nil {
 		cluster.Annotations = make(map[string]string, 0)

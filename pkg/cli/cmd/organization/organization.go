@@ -47,7 +47,7 @@ var organizationExample = templates.Examples(`
 `)
 
 const (
-	APIURL  = "http://a8ff89cbeec444c82b90c5f83a117b39-16361bbd933bde33.elb.cn-northwest-1.amazonaws.com.cn:8086"
+	APIURL  = "https://cloudapi.apecloud.cn"
 	APIPath = "api/v1"
 )
 

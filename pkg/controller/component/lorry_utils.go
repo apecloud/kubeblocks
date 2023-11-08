@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -89,13 +90,17 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 		lorryContainers = append(lorryContainers, *c)
 	}
 
-	// inject WeSyncer(currently part of Lorry) in cluster controller.
+	// inject WeSyncer(currently part of lorry) in cluster controller.
 	// as all the above features share the lorry service, only one lorry need to be injected.
 	// if none of the above feature enabled, WeSyncer still need to be injected for the HA feature functions well.
-	if len(lorryContainers) == 0 {
+	if len(lorryContainers) == 0 && isSupportWeSyncer(synthesizeComp) {
 		weSyncerContainer := container.DeepCopy()
 		buildWeSyncerContainer(weSyncerContainer, int(lorrySvcHTTPPort))
 		lorryContainers = append(lorryContainers, *weSyncerContainer)
+	}
+
+	if len(lorryContainers) == 0 {
+		return nil
 	}
 
 	buildLorryServiceContainer(synthesizeComp, &lorryContainers[0], int(lorrySvcHTTPPort), lorrySvcGRPCPort)
@@ -389,4 +394,18 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 	}
 
 	return appsv1alpha1.UnknownBuiltinActionHandler
+}
+
+// isSupportWeSyncer checks if we need to inject a kb-we-syncer container
+// TODO(xingran&xuanchi): which needs to be refactored
+func isSupportWeSyncer(synthesizeComp *SynthesizedComponent) bool {
+	if synthesizeComp.CharacterType == "" {
+		return false
+	}
+
+	if !slices.Contains(constant.GetSupportWeSyncerType(), synthesizeComp.CharacterType) {
+		return false
+	}
+
+	return true
 }

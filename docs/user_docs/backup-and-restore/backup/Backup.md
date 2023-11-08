@@ -9,6 +9,8 @@ sidebar_label: Backup
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
+# Backup 
+
 ## Configure encryption key
 
 To ensure that the restored cluster can access the data properly, KubeBlocks encrypts the cluster's credentials during the backup process and securely stores it in the Annotation of the Backup object. Therefore, to protect your data security, it is strongly recommended to carefully assign Get/List permissions for backup objects and specify an encryption key during the installation or upgrade of KubeBlocks. These measures will help ensure the proper protection of your data.

@@ -143,14 +143,13 @@ func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 		return err
 	}
 
-	objCopy := copyAndMerge(runningRSM, protoRSM, cluster)
-	if !cli.IsAction(dag, objCopy, model.ActionNoopPtr()) {
+	objCopy := copyAndMergeRSM(runningRSM, protoRSM, cluster)
+	if objCopy != nil && !cli.IsAction(dag, objCopy, model.ActionNoopPtr()) {
 		cli.Update(dag, nil, objCopy, model.ReplaceIfExistingOption)
 	}
 
 	// to work around that the scaled PVC will be deleted at object action.
-	newRsmObj, _ := objCopy.(*workloads.ReplicatedStateMachine)
-	if err := updateVolumes(reqCtx, t.Client, synthesizeComp, newRsmObj, dag); err != nil {
+	if err := updateVolumes(reqCtx, t.Client, synthesizeComp, runningRSM, dag); err != nil {
 		return err
 	}
 	return nil
@@ -211,14 +210,10 @@ func buildPodSpecVolumeMounts(synthesizeComp *component.SynthesizedComponent) {
 	synthesizeComp.PodSpec = podSpec
 }
 
-// copyAndMerge merges two objects for updating:
-// 1. new an object targetObj by copying from oldObj
-// 2. merge all fields can be updated from newObj into targetObj
-func copyAndMerge(oldObj, newObj client.Object, cluster *appsv1alpha1.Cluster) client.Object {
-	if reflect.TypeOf(oldObj) != reflect.TypeOf(newObj) {
-		return nil
-	}
-
+// copyAndMergeRSM merges two RSM objects for updating:
+//  1. new an object targetObj by copying from oldObj
+//  2. merge all fields can be updated from newObj into targetObj
+func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, cluster *appsv1alpha1.Cluster) *workloads.ReplicatedStateMachine {
 	// mergeAnnotations keeps the original annotations.
 	mergeMetadataMap := func(originalMap map[string]string, targetMap *map[string]string) {
 		if targetMap == nil || originalMap == nil {
@@ -262,51 +257,47 @@ func copyAndMerge(oldObj, newObj client.Object, cluster *appsv1alpha1.Cluster) c
 		}
 	}
 
-	copyAndMergeRsm := func(oldRsm, newRsm *workloads.ReplicatedStateMachine) client.Object {
-		rsmObjCopy := oldRsm.DeepCopy()
-		rsmProto := newRsm
+	rsmObjCopy := oldRsm.DeepCopy()
+	rsmProto := newRsm
 
-		// remove original monitor annotations
-		if len(rsmObjCopy.Annotations) > 0 {
-			maps.DeleteFunc(rsmObjCopy.Annotations, func(k, v string) bool {
-				return strings.HasPrefix(k, "monitor.kubeblocks.io")
-			})
-		}
-		mergeMetadataMap(rsmObjCopy.Annotations, &rsmProto.Annotations)
-		rsmObjCopy.Annotations = rsmProto.Annotations
-		buildWorkLoadAnnotations(rsmObjCopy, cluster)
+	// remove original monitor annotations
+	if len(rsmObjCopy.Annotations) > 0 {
+		maps.DeleteFunc(rsmObjCopy.Annotations, func(k, v string) bool {
+			return strings.HasPrefix(k, "monitor.kubeblocks.io")
+		})
+	}
+	mergeMetadataMap(rsmObjCopy.Annotations, &rsmProto.Annotations)
+	rsmObjCopy.Annotations = rsmProto.Annotations
+	buildWorkLoadAnnotations(rsmObjCopy, cluster)
 
-		// keep the original template annotations.
-		// if annotations exist and are replaced, the rsm will be updated.
-		mergeMetadataMap(rsmObjCopy.Spec.Template.Annotations, &rsmProto.Spec.Template.Annotations)
-		rsmObjCopy.Spec.Template = rsmProto.Spec.Template
-		rsmObjCopy.Spec.Replicas = rsmProto.Spec.Replicas
-		updateUpdateStrategy(rsmObjCopy, rsmProto)
-		rsmObjCopy.Spec.Service = rsmProto.Spec.Service
-		rsmObjCopy.Spec.AlternativeServices = rsmProto.Spec.AlternativeServices
-		rsmObjCopy.Spec.Roles = rsmProto.Spec.Roles
-		rsmObjCopy.Spec.RoleProbe = rsmProto.Spec.RoleProbe
-		rsmObjCopy.Spec.MembershipReconfiguration = rsmProto.Spec.MembershipReconfiguration
-		rsmObjCopy.Spec.MemberUpdateStrategy = rsmProto.Spec.MemberUpdateStrategy
-		rsmObjCopy.Spec.Credential = rsmProto.Spec.Credential
+	// keep the original template annotations.
+	// if annotations exist and are replaced, the rsm will be updated.
+	mergeMetadataMap(rsmObjCopy.Spec.Template.Annotations, &rsmProto.Spec.Template.Annotations)
+	rsmObjCopy.Spec.Template = rsmProto.Spec.Template
+	rsmObjCopy.Spec.Replicas = rsmProto.Spec.Replicas
+	updateUpdateStrategy(rsmObjCopy, rsmProto)
+	rsmObjCopy.Spec.Service = rsmProto.Spec.Service
+	rsmObjCopy.Spec.AlternativeServices = rsmProto.Spec.AlternativeServices
+	rsmObjCopy.Spec.Roles = rsmProto.Spec.Roles
+	rsmObjCopy.Spec.RoleProbe = rsmProto.Spec.RoleProbe
+	rsmObjCopy.Spec.MembershipReconfiguration = rsmProto.Spec.MembershipReconfiguration
+	rsmObjCopy.Spec.MemberUpdateStrategy = rsmProto.Spec.MemberUpdateStrategy
+	rsmObjCopy.Spec.Credential = rsmProto.Spec.Credential
 
-		ResolvePodSpecDefaultFields(oldRsm.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
-		DelayUpdatePodSpecSystemFields(oldRsm.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
+	ResolvePodSpecDefaultFields(oldRsm.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
+	DelayUpdatePodSpecSystemFields(oldRsm.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
 
-		isTemplateUpdated := !reflect.DeepEqual(&oldRsm.Spec, &rsmObjCopy.Spec)
-		if isTemplateUpdated {
-			UpdatePodSpecSystemFields(&rsmObjCopy.Spec.Template.Spec)
-		}
-
-		return rsmObjCopy
+	isSpecUpdated := !reflect.DeepEqual(&oldRsm.Spec, &rsmObjCopy.Spec)
+	if isSpecUpdated {
+		UpdatePodSpecSystemFields(&rsmObjCopy.Spec.Template.Spec)
 	}
 
-	switch o := newObj.(type) {
-	case *workloads.ReplicatedStateMachine:
-		return copyAndMergeRsm(oldObj.(*workloads.ReplicatedStateMachine), o)
-	default:
-		return newObj
+	isLabelsUpdated := !reflect.DeepEqual(oldRsm.Labels, rsmObjCopy.Labels)
+	isAnnotationsUpdated := !reflect.DeepEqual(oldRsm.Annotations, rsmObjCopy.Annotations)
+	if !isSpecUpdated && !isLabelsUpdated && !isAnnotationsUpdated {
+		return nil
 	}
+	return rsmObjCopy
 }
 
 // expandVolume handles rsm workload expand volume

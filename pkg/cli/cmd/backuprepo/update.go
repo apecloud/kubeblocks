@@ -364,6 +364,6 @@ func (o *updateOptions) run() error {
 		return err
 	}
 
-	printer.PrintLine(fmt.Sprintf("Updated."))
+	printer.PrintLine("Updated.")
 	return nil
 }

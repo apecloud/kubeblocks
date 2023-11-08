@@ -25,7 +25,7 @@ require (
 	github.com/dapr/kit v0.11.3
 	github.com/deckarep/golang-set/v2 v2.3.1
 	github.com/dlclark/regexp2 v1.10.0
-	github.com/docker/docker v24.0.6+incompatible
+	github.com/docker/docker v24.0.7+incompatible
 	github.com/docker/go-connections v0.4.1-0.20190612165340-fd1b1942c4d5
 	github.com/dustin/go-humanize v1.0.1
 	github.com/evanphx/json-patch v5.6.0+incompatible
@@ -174,7 +174,7 @@ require (
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/distribution/distribution/v3 v3.0.0-20221208165359-362910506bc2 // indirect
-	github.com/docker/cli v24.0.6+incompatible // indirect
+	github.com/docker/cli v24.0.7+incompatible // indirect
 	github.com/docker/distribution v2.8.2+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.8.0 // indirect
 	github.com/docker/go v1.5.1-1.0.20160303222718-d30aec9fd63c // indirect
@@ -421,8 +421,8 @@ require (
 )
 
 replace (
-	github.com/docker/cli => github.com/docker/cli v24.0.6+incompatible
+	github.com/docker/cli => github.com/docker/cli v24.0.7+incompatible
 	github.com/docker/distribution => github.com/docker/distribution v2.8.2+incompatible
-	github.com/docker/docker => github.com/moby/moby v24.0.6+incompatible
+	github.com/docker/docker => github.com/moby/moby v24.0.7+incompatible
 	github.com/spf13/afero => github.com/spf13/afero v1.2.2
 )

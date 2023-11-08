@@ -34,7 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/cli/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
@@ -256,7 +255,8 @@ func FormatRestoreTimeAndValidate(restoreTimeStr string, continuousBackup *dpv1a
 	if restoreTimeStr == "" {
 		return restoreTimeStr, nil
 	}
-	restoreTime, err := util.TimeParse(restoreTimeStr, time.Second)
+	layout := "Jan 02,2006 15:04:05 UTC-0700"
+	restoreTime, err := time.Parse(layout, restoreTimeStr)
 	if err != nil {
 		// retry to parse time with RFC3339 format.
 		var errRFC error

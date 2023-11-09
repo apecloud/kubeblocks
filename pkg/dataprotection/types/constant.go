@@ -54,6 +54,8 @@ const (
 	ClusterUIDLabelKey = "dataprotection.kubeblocks.io/cluster-uid"
 	// BackupNameLabelKey specifies the backup name label key.
 	BackupNameLabelKey = "dataprotection.kubeblocks.io/backup-name"
+	// BackupNamespaceLabelKey specifies the backup namespace label key.
+	BackupNamespaceLabelKey = "dataprotection.kubeblocks.io/backup-namespace"
 	// BackupScheduleLabelKey specifies the backup schedule label key.
 	BackupScheduleLabelKey = "dataprotection.kubeblocks.io/backup-schedule"
 	// BackupPolicyLabelKey specifies the backup policy label key.

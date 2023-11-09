@@ -52,6 +52,7 @@ type restoreJobBuilder struct {
 	specificVolumeMounts []corev1.VolumeMount
 	image                string
 	command              []string
+	args                 []string
 	tolerations          []corev1.Toleration
 	nodeSelector         map[string]string
 	jobName              string
@@ -132,6 +133,11 @@ func (r *restoreJobBuilder) setImage(image string) *restoreJobBuilder {
 
 func (r *restoreJobBuilder) setCommand(command []string) *restoreJobBuilder {
 	r.command = command
+	return r
+}
+
+func (r *restoreJobBuilder) setArgs(args []string) *restoreJobBuilder {
+	r.args = args
 	return r
 }
 
@@ -290,6 +296,7 @@ func (r *restoreJobBuilder) build() *batchv1.Job {
 		Env:          r.env,
 		VolumeMounts: r.specificVolumeMounts,
 		Command:      r.command,
+		Args:         r.args,
 		// expand the image value with the env variables.
 		Image:           common.Expand(r.image, common.MappingFuncFor(utils.CovertEnvToMap(r.env))),
 		ImagePullPolicy: corev1.PullIfNotPresent,

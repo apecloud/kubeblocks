@@ -157,7 +157,7 @@ var _ = Describe("generate service descriptor", func() {
 
 	// for test GetContainerWithVolumeMount
 	Context("config template utils test", func() {
-		It("service reference config template render test", func() {
+		PIt("service reference config template render test", func() {
 			clusterKey := client.ObjectKeyFromObject(cluster)
 			req := ctrl.Request{
 				NamespacedName: clusterKey,

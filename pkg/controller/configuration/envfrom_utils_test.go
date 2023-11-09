@@ -92,8 +92,7 @@ var _ = Describe("ConfigEnvFrom test", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			// TODO(xingran): check it BuildComponent can be replaced by BuildSynthesizedComponentWrapper
-			synthesizeComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, &cluster.Spec.ComponentSpecs[0])
+			synthesizeComp, err := component.BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 
 			podSpec := &corev1.PodSpec{

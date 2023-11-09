@@ -94,7 +94,7 @@ var _ = Describe("ConfigurationPipelineTest", func() {
 		// Add any setup steps that needs to be executed before each test
 		k8sMockClient = testutil.NewK8sMockClient()
 		clusterObj, clusterDefObj, clusterVersionObj, _ = newAllFieldsClusterObj(nil, nil, false)
-		clusterComponent = newAllFieldsComponent(clusterDefObj, clusterVersionObj)
+		clusterComponent = newAllFieldsComponent(clusterDefObj, clusterVersionObj, clusterObj)
 		configMapObj = testapps.NewConfigMap("default", mysqlConfigName,
 			testapps.SetConfigMapData(testConfigFile, `
 bgwriter_delay = '200ms'

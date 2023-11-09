@@ -141,18 +141,19 @@ var _ = Describe("builder", func() {
 		}
 		return reqCtx
 	}
-	newAllFieldsComponent := func(cluster *appsv1alpha1.Cluster, clusterDef *appsv1alpha1.ClusterDefinition, clusterVersion *appsv1alpha1.ClusterVersion) *component.SynthesizedComponent {
+	newAllFieldsComponent := func(clusterDef *appsv1alpha1.ClusterDefinition,
+		clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster) *component.SynthesizedComponent {
 		reqCtx := newReqCtx()
 		By("assign every available fields")
 		synthesizeComp, err := component.BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli,
-			clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[0])
+			clusterDef, clusterVer, cluster, &cluster.Spec.ComponentSpecs[0])
 		Expect(err).Should(Succeed())
 		Expect(synthesizeComp).ShouldNot(BeNil())
 		return synthesizeComp
 	}
 	newClusterObjs := func(clusterDefObj *appsv1alpha1.ClusterDefinition) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.Cluster, *component.SynthesizedComponent) {
 		cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(clusterDefObj, nil, false)
-		synthesizedComponent := newAllFieldsComponent(cluster, clusterDef, clusterVersion)
+		synthesizedComponent := newAllFieldsComponent(clusterDef, clusterVersion, cluster)
 		return clusterDef, cluster, synthesizedComponent
 	}
 

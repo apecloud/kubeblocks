@@ -40,6 +40,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/operations"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -84,6 +85,7 @@ func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.OpsRequest{}).
 		Watches(&appsv1alpha1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.parseAllOpsRequest)).
+		Watches(&workloadsv1alpha1.ReplicatedStateMachine{}, handler.EnqueueRequestsFromMapFunc(r.parseAllOpsRequestForRSM)).
 		Watches(&dpv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.parseBackupOpsRequest)).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.parseVolumeExpansionOpsRequest)).
 		Complete(r)
@@ -121,6 +123,17 @@ func (r *OpsRequestReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, ops
 // fetchCluster fetches the Cluster from the OpsRequest.
 func (r *OpsRequestReconciler) fetchCluster(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
 	cluster := &appsv1alpha1.Cluster{}
+	opsBehaviour, ok := operations.GetOpsManager().OpsMap[opsRes.OpsRequest.Spec.Type]
+	if !ok || opsBehaviour.OpsHandler == nil {
+		return nil, operations.PatchOpsHandlerNotSupported(reqCtx.Ctx, r.Client, opsRes)
+	}
+	if opsBehaviour.IsClusterCreationEnabled {
+		// check if the cluster already exists
+		cluster.Name = opsRes.OpsRequest.Spec.ClusterRef
+		cluster.Namespace = opsRes.OpsRequest.GetNamespace()
+		opsRes.Cluster = cluster
+		return nil, nil
+	}
 	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{
 		Namespace: opsRes.OpsRequest.GetNamespace(),
 		Name:      opsRes.OpsRequest.Spec.ClusterRef,
@@ -216,6 +229,14 @@ func (r *OpsRequestReconciler) reconcileStatusDuringRunningOrCanceling(reqCtx in
 
 // addClusterLabelAndSetOwnerReference adds the cluster label and set the owner reference of the OpsRequest.
 func (r *OpsRequestReconciler) addClusterLabelAndSetOwnerReference(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
+	// if the opsBehaviour will create cluster, the cluster don't exist now
+	// so don't add label and set owner reference in here
+	// it should be done in this opsRequest action
+	opsBehaviour := operations.GetOpsManager().OpsMap[opsRes.OpsRequest.Spec.Type]
+	if opsBehaviour.IsClusterCreationEnabled {
+		return nil, nil
+	}
+
 	// add label of clusterRef
 	opsRequest := opsRes.OpsRequest
 	clusterName := opsRequest.Labels[constant.AppInstanceLabelKey]
@@ -285,8 +306,7 @@ func (r *OpsRequestReconciler) handleOpsReqDeletedDuringRunning(reqCtx intctrlut
 	return nil
 }
 
-func (r *OpsRequestReconciler) parseAllOpsRequest(ctx context.Context, object client.Object) []reconcile.Request {
-	cluster := object.(*appsv1alpha1.Cluster)
+func (r *OpsRequestReconciler) getRequestsFromCluster(cluster *appsv1alpha1.Cluster) []reconcile.Request {
 	var (
 		opsRequestSlice []appsv1alpha1.OpsRecorder
 		err             error
@@ -304,6 +324,24 @@ func (r *OpsRequestReconciler) parseAllOpsRequest(ctx context.Context, object cl
 		})
 	}
 	return requests
+}
+
+func (r *OpsRequestReconciler) parseAllOpsRequest(ctx context.Context, object client.Object) []reconcile.Request {
+	cluster := object.(*appsv1alpha1.Cluster)
+	return r.getRequestsFromCluster(cluster)
+}
+
+func (r *OpsRequestReconciler) parseAllOpsRequestForRSM(ctx context.Context, object client.Object) []reconcile.Request {
+	rsm := object.(*workloadsv1alpha1.ReplicatedStateMachine)
+	clusterName := rsm.Labels[constant.AppInstanceLabelKey]
+	if clusterName == "" {
+		return nil
+	}
+	cluster := &appsv1alpha1.Cluster{}
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: rsm.Namespace}, cluster); err != nil {
+		return nil
+	}
+	return r.getRequestsFromCluster(cluster)
 }
 
 func (r *OpsRequestReconciler) parseVolumeExpansionOpsRequest(ctx context.Context, object client.Object) []reconcile.Request {

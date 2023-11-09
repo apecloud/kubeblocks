@@ -1,51 +1,4 @@
 ---
-# Source: etcd-cluster/templates/rbac.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: kb-etcd-cluster
-  namespace: default
-  labels:
-    helm.sh/chart: etcd-cluster-0.1.0
-    app.kubernetes.io/version: "v3.5.6"
-    app.kubernetes.io/instance: etcd-cluster
----
-# Source: etcd-cluster/templates/rbac.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: kb-etcd-cluster
-  labels:
-    helm.sh/chart: etcd-cluster-0.1.0
-    app.kubernetes.io/version: "v3.5.6"
-    app.kubernetes.io/instance: etcd-cluster
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: kubeblocks-volume-protection-pod-role
-subjects:
-  - kind: ServiceAccount
-    name: kb-etcd-cluster
-    namespace: default
----
-# Source: etcd-cluster/templates/rbac.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: kb-etcd-cluster
-  labels:
-    helm.sh/chart: etcd-cluster-0.1.0
-    app.kubernetes.io/version: "v3.5.6"
-    app.kubernetes.io/instance: etcd-cluster
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: kubeblocks-cluster-pod-role
-subjects:
-  - kind: ServiceAccount
-    name: kb-etcd-cluster
-    namespace: default
----
 # Source: etcd-cluster/templates/cluster.yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
@@ -70,24 +23,12 @@ spec:
       monitor: false
       replicas: 3
       serviceAccountName: kb-etcd-cluster
----
-# Source: etcd-cluster/templates/tests/test-connection.yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: "etcd-cluster-test-connection"
-  labels:
-    helm.sh/chart: etcd-cluster-0.1.0
-    app.kubernetes.io/name: etcd-cluster
-    app.kubernetes.io/instance: etcd-cluster
-    app.kubernetes.io/version: "v3.5.6"
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    "helm.sh/hook": test
-spec:
-  containers:
-    - name: wget
-      image: busybox
-      command: ['wget']
-      args: ['etcd-cluster:']
-  restartPolicy: Never
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: 
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi

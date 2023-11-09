@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -37,7 +36,8 @@ import (
 
 const (
 	// http://localhost:<port>/v1.0/bindings/<binding_type>
-	checkRoleURIFormat        = "/v1.0/bindings/%s?operation=checkRole&workloadType=%s"
+	// checkRoleURIFormat        = "/v1.0/bindings/%s?operation=checkRole&workloadType=%s"
+	checkRoleURIFormat        = "/v1.0/checkrole"
 	checkRunningURIFormat     = "/v1.0/bindings/%s?operation=checkRunning"
 	checkStatusURIFormat      = "/v1.0/bindings/%s?operation=checkStatus"
 	volumeProtectionURIFormat = "/v1.0/bindings/%s?operation=volumeProtection"
@@ -73,6 +73,7 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		reqCtx.Log.Info("get lorry container port failed", "error", err)
 		return err
 	}
+	lorrySvcGRPCPort := viper.GetInt("PROBE_SERVICE_GRPC_PORT")
 
 	if componentProbes.RoleProbe != nil && (component.RSMSpec == nil || component.RSMSpec.RoleProbe == nil) {
 		roleChangedContainer := container.DeepCopy()
@@ -107,7 +108,7 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		lorryContainers = append(lorryContainers, *weSyncerContainer)
 	}
 
-	buildLorryServiceContainer(component, &lorryContainers[0], int(lorrySvcHTTPPort))
+	buildLorryServiceContainer(component, &lorryContainers[0], int(lorrySvcHTTPPort), lorrySvcGRPCPort)
 
 	reqCtx.Log.V(1).Info("lorry", "containers", lorryContainers)
 	component.PodSpec.Containers = append(component.PodSpec.Containers, lorryContainers...)
@@ -143,11 +144,13 @@ func buildBasicContainer() *corev1.Container {
 		GetObject()
 }
 
-func buildLorryServiceContainer(component *SynthesizedComponent, container *corev1.Container, lorrySvcHTTPPort int) {
+func buildLorryServiceContainer(component *SynthesizedComponent, container *corev1.Container, lorrySvcHTTPPort, lorrySvcGRPCPort int) {
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	container.Command = []string{"lorry",
 		"--port", strconv.Itoa(lorrySvcHTTPPort),
+		"--config-path", "/config/lorry/components/",
+		"--grpcport", strconv.Itoa(lorrySvcGRPCPort),
 	}
 
 	if len(component.PodSpec.Containers) > 0 {
@@ -222,7 +225,13 @@ func buildLorryServiceContainer(component *SynthesizedComponent, container *core
 			ContainerPort: int32(lorrySvcHTTPPort),
 			Name:          constant.LorryHTTPPortName,
 			Protocol:      "TCP",
-		}}
+		},
+		{
+			ContainerPort: int32(lorrySvcGRPCPort),
+			Name:          constant.LorryGRPCPortName,
+			Protocol:      "TCP",
+		},
+	}
 
 	// pass the volume protection spec to lorry container through env.
 	if volumeProtectionEnabled(component) {
@@ -238,10 +247,8 @@ func buildWeSyncerContainer(weSyncerContainer *corev1.Container, probeSvcHTTPPor
 func buildRoleProbeContainer(component *SynthesizedComponent, roleChangedContainer *corev1.Container,
 	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	roleChangedContainer.Name = constant.RoleProbeContainerName
-	bindingType := strings.ToLower(component.CharacterType)
-	workloadType := component.WorkloadType
 	httpGet := &corev1.HTTPGetAction{}
-	httpGet.Path = fmt.Sprintf(checkRoleURIFormat, bindingType, workloadType)
+	httpGet.Path = checkRoleURIFormat
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
 	probe := &corev1.Probe{}
 	probe.Exec = nil

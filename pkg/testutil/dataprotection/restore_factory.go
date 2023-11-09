@@ -69,7 +69,7 @@ func (f *MockRestoreFactory) initPrepareDataConfig() {
 	prepareDataConfig := f.Get().Spec.PrepareDataConfig
 	if prepareDataConfig == nil {
 		f.Get().Spec.PrepareDataConfig = &dpv1alpha1.PrepareDataConfig{
-			VolumeClaimManagementPolicy: dpv1alpha1.ParallelManagementPolicy,
+			VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicyParallel,
 		}
 	}
 }
@@ -105,13 +105,13 @@ func (f *MockRestoreFactory) buildRestoreVolumeClaim(name, volumeSource, mountPa
 	}
 }
 
-func (f *MockRestoreFactory) SetVolumeRestoreManagementPolicy(policy dpv1alpha1.VolumeClaimManagementPolicy) *MockRestoreFactory {
+func (f *MockRestoreFactory) SetVolumeClaimRestorePolicy(policy dpv1alpha1.VolumeClaimRestorePolicy) *MockRestoreFactory {
 	f.initPrepareDataConfig()
-	f.Get().Spec.PrepareDataConfig.VolumeClaimManagementPolicy = policy
+	f.Get().Spec.PrepareDataConfig.VolumeClaimRestorePolicy = policy
 	return f
 }
 
-func (f *MockRestoreFactory) SetShedulingSpec(schedulingSpec dpv1alpha1.SchedulingSpec) *MockRestoreFactory {
+func (f *MockRestoreFactory) SetSchedulingSpec(schedulingSpec dpv1alpha1.SchedulingSpec) *MockRestoreFactory {
 	f.initPrepareDataConfig()
 	f.Get().Spec.PrepareDataConfig.SchedulingSpec = schedulingSpec
 	return f

@@ -20,11 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package backuprepo
 
 import (
+	"context"
 	"fmt"
 	"sort"
 
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
@@ -86,28 +87,23 @@ func printBackupRepoList(o *listBackupRepoOptions) error {
 		return err
 	}
 
-	// get and output the result
-	o.Print = false
-	r, err := o.Run()
+	backupRepoList, err := o.dynamic.Resource(types.BackupRepoGVR()).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: o.LabelSelector,
+		FieldSelector: o.FieldSelector,
+	})
 	if err != nil {
 		return err
 	}
 
-	infos, err := r.Infos()
-	if err != nil {
-		return err
-	}
-
-	if len(infos) == 0 {
+	if len(backupRepoList.Items) == 0 {
 		fmt.Fprintln(o.IOStreams.Out, "No backup repository found")
 		return nil
 	}
 
 	backupRepos := make([]*dpv1alpha1.BackupRepo, 0)
-	for _, info := range infos {
+	for _, item := range backupRepoList.Items {
 		backupRepo := &dpv1alpha1.BackupRepo{}
-		obj := info.Object.(*unstructured.Unstructured)
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, backupRepo); err != nil {
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, backupRepo); err != nil {
 			return err
 		}
 		backupRepos = append(backupRepos, backupRepo)

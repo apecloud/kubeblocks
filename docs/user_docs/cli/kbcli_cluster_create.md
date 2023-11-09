@@ -92,7 +92,7 @@ kbcli cluster create [NAME] [flags]
   kbcli cluster create --cluster-definition pulsar --pvc type=bookies,name=ledgers,size=20Gi --pvc type=bookies,name=journal,size=20Gi
   
   # Create a cluster with using a service reference to another KubeBlocks cluster
-  cluster create --cluster-definition pulsar --service-reference name=pulsarZookeeper,cluster=zookeeper,namespace=default
+  kbcli cluster create --cluster-definition pulsar --service-reference name=pulsarZookeeper,cluster=zookeeper,namespace=default
 ```
 
 ### Options
@@ -157,10 +157,12 @@ kbcli cluster create [NAME] [flags]
 
 * [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
 * [kbcli cluster create kafka](kbcli_cluster_create_kafka.md)	 - Create a kafka cluster.
+* [kbcli cluster create llm](kbcli_cluster_create_llm.md)	 - Create a llm cluster.
 * [kbcli cluster create mongodb](kbcli_cluster_create_mongodb.md)	 - Create a mongodb cluster.
 * [kbcli cluster create mysql](kbcli_cluster_create_mysql.md)	 - Create a mysql cluster.
 * [kbcli cluster create postgresql](kbcli_cluster_create_postgresql.md)	 - Create a postgresql cluster.
 * [kbcli cluster create redis](kbcli_cluster_create_redis.md)	 - Create a redis cluster.
+* [kbcli cluster create xinference](kbcli_cluster_create_xinference.md)	 - Create a xinference cluster.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

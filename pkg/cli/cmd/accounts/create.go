@@ -20,29 +20,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package accounts
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/sethvargo/go-password/password"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/lorry/client"
 )
 
 type CreateUserOptions struct {
 	*AccountBaseOptions
-	info lorryutil.UserInfo
+	userName string
+	password string
 }
 
 func NewCreateUserOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *CreateUserOptions {
 	return &CreateUserOptions{
-		AccountBaseOptions: NewAccountBaseOptions(f, streams, lorryutil.CreateUserOp),
+		AccountBaseOptions: NewAccountBaseOptions(f, streams),
 	}
 }
 
 func (o *CreateUserOptions) AddFlags(cmd *cobra.Command) {
 	o.AccountBaseOptions.AddFlags(cmd)
-	cmd.Flags().StringVar(&o.info.UserName, "name", "", "Required. Specify the name of user, which must be unique.")
-	cmd.Flags().StringVarP(&o.info.Password, "password", "p", "", "Optional. Specify the password of user. The default value is empty, which means a random password will be generated.")
+	cmd.Flags().StringVar(&o.userName, "name", "", "Required. Specify the name of user, which must be unique.")
+	cmd.Flags().StringVarP(&o.password, "password", "p", "", "Optional. Specify the password of user. The default value is empty, which means a random password will be generated.")
 	_ = cmd.MarkFlagRequired("name")
 	// TODO:@shanshan add expire flag if needed
 	// cmd.Flags().DurationVar(&o.info.ExpireAt, "expire", 0, "Optional. Specify the expired time of password. The default value is 0, which means the user will never expire.")
@@ -52,7 +57,7 @@ func (o CreateUserOptions) Validate(args []string) error {
 	if err := o.AccountBaseOptions.Validate(args); err != nil {
 		return err
 	}
-	if len(o.info.UserName) == 0 {
+	if len(o.userName) == 0 {
 		return errMissingUserName
 	}
 	return nil
@@ -64,10 +69,24 @@ func (o *CreateUserOptions) Complete(f cmdutil.Factory) error {
 		return err
 	}
 	// complete other options
-	if len(o.info.Password) == 0 {
-		o.info.Password, _ = password.Generate(10, 2, 0, false, false)
+	if len(o.password) == 0 {
+		o.password, _ = password.Generate(10, 2, 0, false, false)
 	}
-	// encode user info to metadata
-	o.RequestMeta, err = struct2Map(o.info)
 	return err
+}
+
+func (o *CreateUserOptions) Run(cmd *cobra.Command, f cmdutil.Factory, streams genericiooptions.IOStreams) error {
+	klog.V(1).Info(fmt.Sprintf("connect to cluster %s, component %s, instance %s\n", o.ClusterName, o.ComponentName, o.PodName))
+	lorryClient, err := client.NewK8sExecClientWithPod(o.Pod)
+	if err != nil {
+		return err
+	}
+
+	err = lorryClient.CreateUser(context.Background(), o.userName, o.password)
+	if err != nil {
+		o.printGeneralInfo("fail", err.Error())
+		return err
+	}
+	o.printGeneralInfo("success", "")
+	return nil
 }

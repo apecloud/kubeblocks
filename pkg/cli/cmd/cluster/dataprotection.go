@@ -31,6 +31,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/maps"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,6 +61,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
 	"github.com/apecloud/kubeblocks/pkg/cli/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
@@ -82,11 +84,17 @@ var (
         kbcli cluster edit-bp <backup-policy-name>
 	`)
 	createBackupExample = templates.Examples(`
+		# Create a backup for the cluster, use the default backup policy and volume snapshot backup method
+		kbcli cluster backup mycluster
+
 		# create a backup with a specified method, run "kbcli cluster desc-backup-policy mycluster" to show supported backup methods
 		kbcli cluster backup mycluster --method volume-snapshot
 
 		# create a backup with specified backup policy, run "kbcli cluster list-backup-policy mycluster" to show the cluster supported backup policies
 		kbcli cluster backup mycluster --method volume-snapshot --policy <backup-policy-name>
+
+		# create a backup from a parent backup
+		kbcli cluster backup mycluster --parent-backup parent-backup-name
 	`)
 	listBackupExample = templates.Examples(`
 		# list all backups
@@ -116,10 +124,12 @@ var (
 const annotationTrueValue = "true"
 
 type CreateBackupOptions struct {
-	BackupMethod string `json:"backupMethod"`
-	BackupName   string `json:"backupName"`
-	Role         string `json:"role,omitempty"`
-	BackupPolicy string `json:"backupPolicy"`
+	BackupMethod     string `json:"backupMethod"`
+	BackupName       string `json:"backupName"`
+	BackupPolicy     string `json:"backupPolicy"`
+	DeletionPolicy   string `json:"deletionPolicy"`
+	RetentionPeriod  string `json:"retentionPeriod"`
+	ParentBackupName string `json:"parentBackupName"`
 
 	create.CreateOptions `json:"-"`
 }
@@ -158,22 +168,54 @@ func (o *CreateBackupOptions) Validate() error {
 	if o.Name == "" {
 		return fmt.Errorf("missing cluster name")
 	}
+
+	// if backup policy is not specified, use the default backup policy
 	if o.BackupPolicy == "" {
 		if err := o.completeDefaultBackupPolicy(); err != nil {
 			return err
 		}
-	} else {
-		// check if backup policy exists
-		if _, err := o.Dynamic.Resource(types.BackupPolicyGVR()).Namespace(o.Namespace).Get(context.TODO(), o.BackupPolicy, metav1.GetOptions{}); err != nil {
-			return err
-		}
 	}
+
+	// check if backup policy exists
+	backupPolicyObj, err := o.Dynamic.Resource(types.BackupPolicyGVR()).Namespace(o.Namespace).Get(context.TODO(), o.BackupPolicy, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	backupPolicy := &dpv1alpha1.BackupPolicy{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(backupPolicyObj.Object, backupPolicy); err != nil {
+		return err
+	}
+
 	if o.BackupMethod == "" {
-		// TODO(ldm): if backup policy only has one backup method, use it as default
-		//  backup method.
-		return fmt.Errorf("missing backup method")
+		return fmt.Errorf("backup method can not be empty, you can specify it by --method")
 	}
 	// TODO: check if pvc exists
+
+	// valid retention period
+	if o.RetentionPeriod != "" {
+		_, err := dpv1alpha1.RetentionPeriod(o.RetentionPeriod).ToDuration()
+		if err != nil {
+			return fmt.Errorf("invalid retention period, please refer to examples [1y, 1m, 1d, 1h, 1m] or combine them [1y1m1d1h1m]")
+		}
+	}
+
+	// check if parent backup exists
+	if o.ParentBackupName != "" {
+		parentBackupObj, err := o.Dynamic.Resource(types.BackupGVR()).Namespace(o.Namespace).Get(context.TODO(), o.ParentBackupName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		parentBackup := &dpv1alpha1.Backup{}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(parentBackupObj.Object, parentBackup); err != nil {
+			return err
+		}
+		if parentBackup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
+			return fmt.Errorf("parent backup %s is not completed", o.ParentBackupName)
+		}
+		if parentBackup.Labels[constant.AppInstanceLabelKey] != o.Name {
+			return fmt.Errorf("parent backup %s is not belong to cluster %s", o.ParentBackupName, o.Name)
+		}
+	}
 	return nil
 }
 
@@ -255,11 +297,68 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *
 		},
 	}
 
-	cmd.Flags().StringVar(&o.BackupMethod, "method", "", "Backup method that defined in backup policy (required)")
+	cmd.Flags().StringVar(&o.BackupMethod, "method", "", "Backup methods are defined in backup policy (required), if only one backup method in backup policy, use it as default backup method, if multiple backup methods in backup policy, use method which volume snapshot is true as default backup method")
 	cmd.Flags().StringVar(&o.BackupName, "name", "", "Backup name")
-	cmd.Flags().StringVar(&o.BackupPolicy, "policy", "", "Backup policy name, this flag will be ignored when backup-type is snapshot")
-
+	cmd.Flags().StringVar(&o.BackupPolicy, "policy", "", "Backup policy name, if not specified, use the cluster default backup policy")
+	cmd.Flags().StringVar(&o.DeletionPolicy, "deletion-policy", "Delete", "Deletion policy for backup, determine whether the backup content in backup repo will be deleted after the backup is deleted, supported values: [Delete, Retain]")
+	cmd.Flags().StringVar(&o.RetentionPeriod, "retention-period", "", "Retention period for backup, supported values: [1y, 1mo, 1d, 1h, 1m] or combine them [1y1mo1d1h1m], if not specified, the backup will not be automatically deleted, you need to manually delete it.")
+	cmd.Flags().StringVar(&o.ParentBackupName, "parent-backup", "", "Parent backup name, used for incremental backup")
+	// register backup flag completion func
+	o.RegisterBackupFlagCompletionFunc(cmd, f)
 	return cmd
+}
+func (o *CreateBackupOptions) RegisterBackupFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
+	getClusterName := func(cmd *cobra.Command, args []string) string {
+		clusterName, _ := cmd.Flags().GetString("cluster")
+		if clusterName != "" {
+			return clusterName
+		}
+		if len(args) > 0 {
+			return args[0]
+		}
+		return ""
+	}
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"deletion-policy",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return []string{string(dpv1alpha1.BackupDeletionPolicyRetain), string(dpv1alpha1.BackupDeletionPolicyDelete)}, cobra.ShellCompDirectiveNoFileComp
+		}))
+
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"policy",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			label := fmt.Sprintf("%s=%s", constant.AppInstanceLabelKey, getClusterName(cmd, args))
+			return util.CompGetResourceWithLabels(f, cmd, util.GVRToString(types.BackupPolicyGVR()), []string{label}, toComplete), cobra.ShellCompDirectiveNoFileComp
+		}))
+
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"method",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			namespace, _ := cmd.Flags().GetString("namespace")
+			if namespace == "" {
+				namespace, _, _ = f.ToRawKubeConfigLoader().Namespace()
+			}
+			var (
+				labelSelector string
+				clusterName   = getClusterName(cmd, args)
+			)
+			if clusterName != "" {
+				labelSelector = fmt.Sprintf("%s=%s", constant.AppInstanceLabelKey, clusterName)
+			}
+			dynamicClient, _ := f.DynamicClient()
+			objs, _ := dynamicClient.Resource(types.BackupPolicyGVR()).Namespace(namespace).List(context.TODO(), metav1.ListOptions{
+				LabelSelector: labelSelector,
+			})
+			methodMap := map[string]struct{}{}
+			for _, v := range objs.Items {
+				backupPolicy := &dpv1alpha1.BackupPolicy{}
+				_ = runtime.DefaultUnstructuredConverter.FromUnstructured(v.Object, backupPolicy)
+				for _, m := range backupPolicy.Spec.BackupMethods {
+					methodMap[m.Name] = struct{}{}
+				}
+			}
+			return maps.Keys(methodMap), cobra.ShellCompDirectiveNoFileComp
+		}))
 }
 
 func PrintBackupList(o ListBackupOptions) error {
@@ -411,9 +510,9 @@ type CreateRestoreOptions struct {
 	Backup string `json:"backup,omitempty"`
 
 	// point in time recovery args
-	RestoreTime             *time.Time `json:"restoreTime,omitempty"`
-	RestoreTimeStr          string     `json:"restoreTimeStr,omitempty"`
-	RestoreManagementPolicy string     `json:"volumeRestorePolicy,omitempty"`
+	RestoreTime         *time.Time `json:"restoreTime,omitempty"`
+	RestoreTimeStr      string     `json:"restoreTimeStr,omitempty"`
+	VolumeRestorePolicy string     `json:"volumeRestorePolicy,omitempty"`
 
 	create.CreateOptions `json:"-"`
 }
@@ -421,15 +520,14 @@ type CreateRestoreOptions struct {
 func (o *CreateRestoreOptions) getClusterObject(backup *dpv1alpha1.Backup) (*appsv1alpha1.Cluster, error) {
 	// use the cluster snapshot to restore firstly
 	clusterString, ok := backup.Annotations[constant.ClusterSnapshotAnnotationKey]
-	if ok {
-		clusterObj := &appsv1alpha1.Cluster{}
-		if err := json.Unmarshal([]byte(clusterString), &clusterObj); err != nil {
-			return nil, err
-		}
-		return clusterObj, nil
+	if !ok {
+		return nil, fmt.Errorf("missing snapshot annotation in backup %s, %s is empty in Annotations", backup.Name, constant.ClusterSnapshotAnnotationKey)
 	}
-	clusterName := backup.Labels[constant.AppInstanceLabelKey]
-	return cluster.GetClusterByName(o.Dynamic, clusterName, o.Namespace)
+	clusterObj := &appsv1alpha1.Cluster{}
+	if err := json.Unmarshal([]byte(clusterString), &clusterObj); err != nil {
+		return nil, err
+	}
+	return clusterObj, nil
 }
 
 func (o *CreateRestoreOptions) Run() error {
@@ -452,7 +550,7 @@ func (o *CreateRestoreOptions) runRestoreFromBackup() error {
 		return errors.Errorf(`missing source cluster in backup "%s", "app.kubernetes.io/instance" is empty in labels.`, o.Backup)
 	}
 
-	restoreTimeStr, err := formatRestoreTimeAndValidate(o.RestoreTimeStr, backup)
+	restoreTimeStr, err := restore.FormatRestoreTimeAndValidate(o.RestoreTimeStr, backup)
 	if err != nil {
 		return err
 	}
@@ -461,7 +559,7 @@ func (o *CreateRestoreOptions) runRestoreFromBackup() error {
 	if err != nil {
 		return err
 	}
-	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, o.RestoreManagementPolicy, len(clusterObj.Spec.ComponentSpecs), clusterObj.Spec.ComponentSpecs[0].Name, restoreTimeStr)
+	restoreAnnotation, err := restore.GetRestoreFromBackupAnnotation(backup, o.VolumeRestorePolicy, len(clusterObj.Spec.ComponentSpecs), clusterObj.Spec.ComponentSpecs[0].Name, restoreTimeStr)
 	if err != nil {
 		return err
 	}
@@ -478,7 +576,7 @@ func (o *CreateRestoreOptions) createCluster(cluster *appsv1alpha1.Cluster) erro
 	cluster.Status = appsv1alpha1.ClusterStatus{}
 	cluster.TypeMeta = metav1.TypeMeta{
 		Kind:       types.KindCluster,
-		APIVersion: clusterGVR.Group + "/" + clusterGVR.Version,
+		APIVersion: clusterGVR.GroupVersion().String(),
 	}
 	// convert the cluster object and create it.
 	unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&cluster)
@@ -493,10 +591,6 @@ func (o *CreateRestoreOptions) createCluster(cluster *appsv1alpha1.Cluster) erro
 		fmt.Fprintf(o.Out, "%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
 	}
 	return nil
-}
-
-func isTimeInRange(t time.Time, start time.Time, end time.Time) bool {
-	return !t.Before(start) && !t.After(end)
 }
 
 func (o *CreateRestoreOptions) Validate() error {
@@ -539,7 +633,7 @@ func NewCreateRestoreCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) 
 	}
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Backup name")
 	cmd.Flags().StringVar(&o.RestoreTimeStr, "restore-to-time", "", "point in time recovery(PITR)")
-	cmd.Flags().StringVar(&o.RestoreManagementPolicy, "volume-restore-policy", "Parallel", "the volume claim restore policy, supported values: [Serial, Parallel]")
+	cmd.Flags().StringVar(&o.VolumeRestorePolicy, "volume-restore-policy", "Parallel", "the volume claim restore policy, supported values: [Serial, Parallel]")
 	return cmd
 }
 
@@ -556,15 +650,20 @@ func NewListBackupPolicyCmd(f cmdutil.Factory, streams genericiooptions.IOStream
 			o.Names = nil
 			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			util.CheckErr(o.Complete())
-			util.CheckErr(printBackupPolicyList(*o))
+			util.CheckErr(PrintBackupPolicyList(*o))
 		},
 	}
 	o.AddFlags(cmd)
 	return cmd
 }
 
-// printBackupPolicyList prints the backup policy list.
-func printBackupPolicyList(o list.ListOptions) error {
+// PrintBackupPolicyList prints the backup policy list.
+func PrintBackupPolicyList(o list.ListOptions) error {
+	var backupPolicyNameMap = make(map[string]bool)
+	for _, name := range o.Names {
+		backupPolicyNameMap[name] = true
+	}
+
 	// if format is JSON or YAML, use default printer to output the result.
 	if o.Format == printer.JSON || o.Format == printer.YAML {
 		_, err := o.Run()
@@ -600,6 +699,9 @@ func printBackupPolicyList(o list.ListOptions) error {
 		}
 		if !ok {
 			defaultPolicy = "false"
+		}
+		if len(o.Names) > 0 && !backupPolicyNameMap[backupPolicy.Name] {
+			continue
 		}
 		createTime := obj.GetCreationTimestamp()
 		tbl.AddRow(obj.GetName(), obj.GetNamespace(), defaultPolicy, obj.GetLabels()[constant.AppInstanceLabelKey],
@@ -849,7 +951,7 @@ func (o *editBackupPolicyOptions) applyChanges(backupPolicy *dpv1alpha1.BackupPo
 	return nil
 }
 
-type describeBackupPolicyOptions struct {
+type DescribeBackupPolicyOptions struct {
 	namespace string
 	dynamic   dynamic.Interface
 	Factory   cmdutil.Factory
@@ -862,7 +964,7 @@ type describeBackupPolicyOptions struct {
 	genericiooptions.IOStreams
 }
 
-func (o *describeBackupPolicyOptions) Complete() error {
+func (o *DescribeBackupPolicyOptions) Complete() error {
 	var err error
 
 	if o.client, err = o.Factory.KubernetesClientSet(); err != nil {
@@ -879,7 +981,7 @@ func (o *describeBackupPolicyOptions) Complete() error {
 	return nil
 }
 
-func (o *describeBackupPolicyOptions) Validate() error {
+func (o *DescribeBackupPolicyOptions) Validate() error {
 	// must specify one of the cluster name or backup policy name
 	if len(o.ClusterNames) == 0 && len(o.Names) == 0 {
 		return fmt.Errorf("missing cluster name or backup policy name")
@@ -888,7 +990,7 @@ func (o *describeBackupPolicyOptions) Validate() error {
 	return nil
 }
 
-func (o *describeBackupPolicyOptions) Run() error {
+func (o *DescribeBackupPolicyOptions) Run() error {
 	var backupPolicyNameMap = make(map[string]bool)
 	for _, name := range o.Names {
 		backupPolicyNameMap[name] = true
@@ -902,7 +1004,7 @@ func (o *describeBackupPolicyOptions) Run() error {
 	}
 
 	if len(backupPolicyList.Items) == 0 {
-		fmt.Fprintf(o.Out, "No backup policy found")
+		fmt.Fprintf(o.Out, "No backup policy found\n")
 		return nil
 	}
 
@@ -928,7 +1030,7 @@ func (o *describeBackupPolicyOptions) Run() error {
 	return nil
 }
 
-func (o *describeBackupPolicyOptions) printBackupPolicyObj(obj *dpv1alpha1.BackupPolicy) error {
+func (o *DescribeBackupPolicyOptions) printBackupPolicyObj(obj *dpv1alpha1.BackupPolicy) error {
 	printer.PrintLine("Summary:")
 	realPrintPairStringToLine("Name", obj.Name)
 	realPrintPairStringToLine("Cluster", obj.Labels[constant.AppInstanceLabelKey])
@@ -950,17 +1052,16 @@ func (o *describeBackupPolicyOptions) printBackupPolicyObj(obj *dpv1alpha1.Backu
 }
 
 func NewDescribeBackupPolicyCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
-	o := &describeBackupPolicyOptions{
+	o := &DescribeBackupPolicyOptions{
 		Factory:   f,
 		IOStreams: streams,
 	}
 	cmd := &cobra.Command{
-		Use:                   "describe-backup-policy",
-		DisableFlagsInUseLine: true,
-		Aliases:               []string{"desc-backup-policy"},
-		Short:                 "Describe backup policy",
-		Example:               describeBackupPolicyExample,
-		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Use:               "describe-backup-policy",
+		Aliases:           []string{"desc-backup-policy"},
+		Short:             "Describe backup policy",
+		Example:           describeBackupPolicyExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.ClusterNames = args
 			o.LabelSelector = util.BuildLabelSelectorByNames(o.LabelSelector, args)
@@ -1086,7 +1187,7 @@ func (o *DescribeBackupOptions) enhancePrintFailureReason(backupName, failureRea
 	ctx := context.Background()
 	// get the latest job log details.
 	labels := fmt.Sprintf("%s=%s",
-		dptypes.DataProtectionLabelBackupNameKey, backupName,
+		dptypes.BackupNameLabelKey, backupName,
 	)
 	jobList, err := o.client.BatchV1().Jobs("").List(ctx, metav1.ListOptions{LabelSelector: labels})
 	if err != nil {

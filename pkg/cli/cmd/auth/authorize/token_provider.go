@@ -57,31 +57,17 @@ func newTokenProvider(cached CachedTokenProvider, issued IssuedTokenProvider) Pr
 }
 
 func (p *TokenProvider) Login(ctx context.Context) (*authenticator.UserInfoResponse, string, error) {
-	isAccessTokenValid := func(tokenResponse authenticator.TokenResponse) bool { return IsValidToken(tokenResponse.AccessToken) }
-	tokenResult, err := p.getTokenFromCache(isAccessTokenValid)
+	tokenResult, err := p.issued.authenticate(ctx)
 	if err != nil {
-		return nil, "", errors.Wrap(err, "could not refresh from cache")
+		return nil, "", errors.Wrap(err, "could not authenticate with cloud")
 	}
-
-	var userInfo *authenticator.UserInfoResponse
-	if tokenResult != nil {
-		userInfo, err = p.cached.getUserInfo()
-		if err != nil {
-			return nil, "", errors.Wrap(err, "could not get user info from cache")
-		}
-	} else {
-		tokenResult, err = p.issued.authenticate(ctx)
-		if err != nil {
-			return nil, "", errors.Wrap(err, "could not authenticate with cloud")
-		}
-		userInfo, err = p.issued.getUserInfo(tokenResult.AccessToken)
-		if err != nil {
-			return nil, "", errors.Wrap(err, "could not get user info from cloud")
-		}
-		err = p.cached.cacheUserInfo(userInfo)
-		if err != nil {
-			return nil, "", errors.Wrap(err, "could not store user info")
-		}
+	userInfo, err := p.issued.getUserInfo(tokenResult.IDToken)
+	if err != nil {
+		return nil, "", errors.Wrap(err, "could not get user info from cloud")
+	}
+	err = p.cached.cacheUserInfo(userInfo)
+	if err != nil {
+		return nil, "", errors.Wrap(err, "could not store user info")
 	}
 
 	err = p.cached.cacheTokens(tokenResult)

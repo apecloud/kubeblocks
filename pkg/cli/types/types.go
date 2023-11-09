@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
 const (
@@ -108,6 +109,10 @@ const (
 	KindOps                             = "OpsRequest"
 	KindBackupSchedule                  = "BackupSchedule"
 	KindBackupPolicyTemplate            = "BackupPolicyTemplate"
+	KindStatefulSet                     = "StatefulSet"
+	KindDeployment                      = "Deployment"
+	KindRSM                             = "ReplicatedStateMachine"
+	KindConfigMap                       = "ConfigMap"
 )
 
 // K8S rbac API group
@@ -127,9 +132,8 @@ const (
 	ServiceHAVIPTypeAnnotationValue = "private-ip"
 	ServiceFloatingIPAnnotationKey  = "service.kubernetes.io/kubeblocks-havip-floating-ip"
 
-	ClassProviderLabelKey              = "class.kubeblocks.io/provider"
-	ResourceConstraintProviderLabelKey = "resourceconstraint.kubeblocks.io/provider"
-	ReloadConfigMapAnnotationKey       = "kubeblocks.io/reload-configmap" // mark an annotation to load configmap
+	ClassProviderLabelKey        = "class.kubeblocks.io/provider"
+	ReloadConfigMapAnnotationKey = "kubeblocks.io/reload-configmap" // mark an annotation to load configmap
 )
 
 // DataProtection API group
@@ -183,6 +187,11 @@ const (
 	ResourceYcsb        = "ycsbs"
 	ResourceTpcc        = "tpccs"
 	ResourceTpch        = "tpches"
+)
+
+// Workload API group
+const (
+	ResourceRSM = "replicatedstatemachines"
 )
 
 const (
@@ -309,6 +318,10 @@ func SecretGVR() schema.GroupVersionResource {
 
 func StatefulSetGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: appsv1.GroupName, Version: K8sCoreAPIVersion, Resource: ResourceStatefulSets}
+}
+
+func RSMGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: workloads.GroupVersion.Group, Version: workloads.GroupVersion.Version, Resource: ResourceRSM}
 }
 
 func DaemonSetGVR() schema.GroupVersionResource {

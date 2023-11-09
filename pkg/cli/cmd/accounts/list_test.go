@@ -33,7 +33,6 @@ import (
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
 	"github.com/apecloud/kubeblocks/pkg/cli/testing"
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
 )
@@ -85,7 +84,6 @@ var _ = Describe("List Account Options", func() {
 			o := NewListUserOptions(tf, streams)
 			Expect(o).ShouldNot(BeNil())
 			Expect(o.AccountBaseOptions).ShouldNot(BeNil())
-			Expect(o.AccountBaseOptions.AccountOp).Should(Equal(lorryutil.ListUsersOp))
 		})
 
 		It("validate options", func() {

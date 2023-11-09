@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("Backup Deleter Test", func() {
@@ -66,6 +67,7 @@ var _ = Describe("Backup Deleter Test", func() {
 		// non-namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ActionSetSignature, true, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.StorageClassSignature, true, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeSignature, true, ml)
 	}
 
 	BeforeEach(func() {
@@ -119,7 +121,7 @@ var _ = Describe("Backup Deleter Test", func() {
 			By("create restore")
 			restoreFactory := testdp.NewRestoreactory(testCtx.DefaultNamespace, testdp.RestoreName).
 				SetBackup(backup.Name, testCtx.DefaultNamespace).
-				SetShedulingSpec(schedulingSpec)
+				SetSchedulingSpec(schedulingSpec)
 
 			change(restoreFactory)
 
@@ -189,7 +191,7 @@ var _ = Describe("Backup Deleter Test", func() {
 			checkPVC(startingIndex, useVolumeSnapshot)
 		})
 
-		It("test with BuildPrepareDataJobs function and Parallel volumeManagementPolicy", func() {
+		It("test with BuildPrepareDataJobs function and Parallel volumeRestorePolicy", func() {
 			reqCtx := getReqCtx()
 			startingIndex := 1
 			restoreMGR, backupSet := initResources(reqCtx, startingIndex, false, func(f *testdp.MockRestoreFactory) {
@@ -208,13 +210,13 @@ var _ = Describe("Backup Deleter Test", func() {
 			checkPVC(startingIndex, false)
 		})
 
-		It("test with BuildPrepareDataJobs function and Serial volumeManagementPolicy", func() {
+		It("test with BuildPrepareDataJobs function and Serial volumeRestorePolicy", func() {
 			reqCtx := getReqCtx()
 			startingIndex := 1
 			restoreMGR, backupSet := initResources(reqCtx, startingIndex, false, func(f *testdp.MockRestoreFactory) {
 				f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
 					testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex)).
-					SetVolumeRestoreManagementPolicy(dpv1alpha1.SerialManagementPolicy)
+					SetVolumeClaimRestorePolicy(dpv1alpha1.VolumeClaimRestorePolicySerial)
 			})
 
 			actionSetName := "preparedata-0"
@@ -281,6 +283,10 @@ var _ = Describe("Backup Deleter Test", func() {
 		})
 
 		testPostReady := func(existVolume bool) {
+			kbNamespace := "kb-system"
+			kbServiceAccountName := "kubeblocks"
+			viper.Set(constant.CfgKeyCtrlrMgrNS, kbNamespace)
+			viper.Set(constant.KBServiceAcccountName, kbServiceAccountName)
 			reqCtx := getReqCtx()
 			matchLabels := map[string]string{
 				constant.AppInstanceLabelKey: testdp.ClusterName,
@@ -298,6 +304,8 @@ var _ = Describe("Backup Deleter Test", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			// the count of exec jobs should equal to the pods count of cluster
 			Expect(len(jobs)).Should(Equal(2))
+			Expect(jobs[0].Namespace).Should(Equal(kbNamespace))
+			Expect(jobs[0].Spec.Template.Spec.ServiceAccountName).Should(Equal(kbServiceAccountName))
 
 			By("test with jobAction and expect for creating 1 job")
 			// step 0 is the execAction in actionSet

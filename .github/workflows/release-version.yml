@@ -31,8 +31,10 @@ jobs:
 
           TEST_PACKAGES=`bash .github/utils/utils.sh --type 16 \
               --trigger-type "[test]" \
-              --test-pkgs "internal|apis|controllers|cmd" \
-              --test-check "mod-vendor|lint"`
+              --test-pkgs "${{ vars.TEST_PKGS }}" \
+              --test-check "${{ vars.TEST_CHECK }}" \
+              --test-pkgs-first "${{ vars.TEST_PKGS_FIRST }}" \
+              --ignore-pkgs "${{ vars.SKIP_CHECK_PKG }}"`
           echo "matrix={\"include\":[$TEST_PACKAGES]}" >> $GITHUB_OUTPUT
 
   release-test:
@@ -60,14 +62,17 @@ jobs:
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
 
-      - name: make test ${{ matrix.ops }}
+      - name: make ${{ matrix.ops }}
+        if: ${{ ! contains(matrix.ops, '/') }}
         run: |
           make ${{ matrix.ops }}
 
-      - name: make ${{ matrix.ops }}
+      - name: make test ${{ matrix.ops }}
         if: ${{ contains(matrix.ops, '/') }}
         run: |
-          make test TEST_PACKAGES=./${{ matrix.ops }}/...
+          if [[ -d "./${{ matrix.ops }}" ]]; then
+              make test TEST_PACKAGES=./${{ matrix.ops }}/...
+          fi
 
   release-version:
     needs: release-test

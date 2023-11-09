@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package utils
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"reflect"
@@ -37,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -59,7 +61,12 @@ func AddTolerations(podSpec *corev1.PodSpec) (err error) {
 	return nil
 }
 
+// IsJobFinished if the job is completed or failed, return true.
+// if the job is failed, return the failed message.
 func IsJobFinished(job *batchv1.Job) (bool, batchv1.JobConditionType, string) {
+	if job == nil {
+		return false, "", ""
+	}
 	for _, c := range job.Status.Conditions {
 		if c.Status != corev1.ConditionTrue {
 			continue
@@ -68,10 +75,19 @@ func IsJobFinished(job *batchv1.Job) (bool, batchv1.JobConditionType, string) {
 			return true, c.Type, ""
 		}
 		if c.Type == batchv1.JobFailed {
-			return true, c.Type, c.Reason + "/" + c.Message
+			return true, c.Type, c.Reason + ":" + c.Message
 		}
 	}
 	return false, "", ""
+}
+
+func GetAssociatedPodsOfJob(ctx context.Context, cli client.Client, namespace, jobName string) (*corev1.PodList, error) {
+	podList := &corev1.PodList{}
+	// from https://github.com/kubernetes/kubernetes/issues/24709
+	err := cli.List(ctx, podList, client.InNamespace(namespace), client.MatchingLabels{
+		"job-name": jobName,
+	})
+	return podList, err
 }
 
 func RemoveDataProtectionFinalizer(ctx context.Context, cli client.Client, obj client.Object) error {
@@ -158,24 +174,17 @@ func VolumeSnapshotEnabled(ctx context.Context, cli client.Client, pod *corev1.P
 		return false, fmt.Errorf(`can not find any volume by targetVolumes %v on pod "%s"`, volumes, pod.Name)
 	}
 	// get the storageClass by pvc
-	storageClassMap := map[string]string{}
 	for i := range pvcNames {
 		pvc := &corev1.PersistentVolumeClaim{}
 		if err := cli.Get(ctx, types.NamespacedName{Name: pvcNames[i], Namespace: pod.Namespace}, pvc); err != nil {
 			return false, nil
 		}
-		if pvc.Spec.StorageClassName == nil {
-			return false, nil
-		}
-		storageClassMap[*pvc.Spec.StorageClassName] = pvcNames[i]
-	}
-	for k := range storageClassMap {
-		enabled, err := intctrlutil.IsVolumeSnapshotEnabled(ctx, cli, k)
+		enabled, err := intctrlutil.IsVolumeSnapshotEnabled(ctx, cli, pvc.Spec.VolumeName)
 		if err != nil {
 			return false, err
 		}
 		if !enabled {
-			return false, fmt.Errorf(`cannot find any VolumeSnapshotClass of persistentVolumeClaim "%s" to do volume snapshot on pod "%s"`, storageClassMap[k], pod.Name)
+			return false, fmt.Errorf(`cannot find any VolumeSnapshotClass of persistentVolumeClaim "%s" to do volume snapshot on pod "%s"`, pvc.Name, pod.Name)
 		}
 	}
 	return true, nil
@@ -198,4 +207,35 @@ func CovertEnvToMap(env []corev1.EnvVar) map[string]string {
 		envMap[v.Name] = v.Value
 	}
 	return envMap
+}
+
+func GetBackupType(actionSet *dpv1alpha1.ActionSet, useSnapshot *bool) dpv1alpha1.BackupType {
+	if actionSet != nil {
+		return actionSet.Spec.BackupType
+	} else if boolptr.IsSetToTrue(useSnapshot) {
+		return dpv1alpha1.BackupTypeFull
+	}
+	return ""
+}
+
+// PrependSpaces prepends spaces to each line of the content.
+func PrependSpaces(content string, spaces int) string {
+	prefix := ""
+	for i := 0; i < spaces; i++ {
+		prefix += " "
+	}
+	r := bytes.NewBufferString(content)
+	w := bytes.NewBuffer(nil)
+	w.Grow(r.Len())
+	for {
+		line, err := r.ReadString('\n')
+		if len(line) > 0 {
+			w.WriteString(prefix)
+			w.WriteString(line)
+		}
+		if err != nil {
+			break
+		}
+	}
+	return w.String()
 }

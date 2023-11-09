@@ -37,7 +37,7 @@ type BackupSpec struct {
 	// deletionPolicy determines whether the backup contents stored in backup repository
 	// should be deleted when the backup custom resource is deleted.
 	// Supported values are "Retain" and "Delete".
-	// "Retain" means that the backup content and its physical snapshot on backup repository are kept.
+	// "Retain" means that the backup can not be deleted and remains in 'Deleting' phase.
 	// "Delete" means that the backup content and its physical snapshot on backup repository are deleted.
 	// +kubebuilder:validation:Enum=Delete;Retain
 	// +kubebuilder:validation:Required
@@ -98,6 +98,7 @@ type BackupStatus struct {
 
 	// totalSize is the total size of backed up data size.
 	// A string with capacity units in the format of "1Gi", "1Mi", "1Ki".
+	// If no capacity unit is specified, it is assumed to be in bytes.
 	// +optional
 	TotalSize string `json:"totalSize,omitempty"`
 

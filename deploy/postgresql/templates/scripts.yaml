@@ -1,8 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: postgresql-scripts
-  labels:
-    {{- include "postgresql.labels" . | nindent 4 }}
-data:
-  {{- include "postgresql.extend.scripts" . | nindent 2 }}

@@ -20,27 +20,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package accounts
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/lorry/client"
 )
 
 type DescribeUserOptions struct {
 	*AccountBaseOptions
-	info lorryutil.UserInfo
+	userName string
 }
 
 func NewDescribeUserOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *DescribeUserOptions {
 	return &DescribeUserOptions{
-		AccountBaseOptions: NewAccountBaseOptions(f, streams, lorryutil.DescribeUserOp),
+		AccountBaseOptions: NewAccountBaseOptions(f, streams),
 	}
 }
 
 func (o *DescribeUserOptions) AddFlags(cmd *cobra.Command) {
 	o.AccountBaseOptions.AddFlags(cmd)
-	cmd.Flags().StringVar(&o.info.UserName, "name", "", "Required user name, please specify it.")
+	cmd.Flags().StringVar(&o.userName, "name", "", "Required user name, please specify it.")
 	_ = cmd.MarkFlagRequired("name")
 }
 
@@ -48,7 +52,7 @@ func (o DescribeUserOptions) Validate(args []string) error {
 	if err := o.AccountBaseOptions.Validate(args); err != nil {
 		return err
 	}
-	if len(o.info.UserName) == 0 {
+	if len(o.userName) == 0 {
 		return errMissingUserName
 	}
 	return nil
@@ -59,6 +63,21 @@ func (o *DescribeUserOptions) Complete(f cmdutil.Factory) error {
 	if err = o.AccountBaseOptions.Complete(f); err != nil {
 		return err
 	}
-	o.RequestMeta, err = struct2Map(o.info)
 	return err
+}
+
+func (o *DescribeUserOptions) Run(cmd *cobra.Command, f cmdutil.Factory, streams genericiooptions.IOStreams) error {
+	klog.V(1).Info(fmt.Sprintf("connect to cluster %s, component %s, instance %s\n", o.ClusterName, o.ComponentName, o.PodName))
+	lorryClient, err := client.NewK8sExecClientWithPod(o.Pod)
+	if err != nil {
+		return err
+	}
+
+	user, err := lorryClient.DescribeUser(context.Background(), o.userName)
+	if err != nil {
+		o.printGeneralInfo("fail", err.Error())
+		return err
+	}
+	o.printRoleInfo([]map[string]any{user})
+	return nil
 }

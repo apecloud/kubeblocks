@@ -57,6 +57,7 @@ import (
 	storagecontrollers "github.com/apecloud/kubeblocks/controllers/storage"
 	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -107,6 +108,7 @@ func init() {
 	viper.SetDefault(constant.FeatureGateReplicatedStateMachine, true)
 	viper.SetDefault(constant.KBDataScriptClientsImage, "apecloud/kubeblocks-datascript:latest")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
+	viper.SetDefault(rsm.FeatureGateRSMCompatibilityMode, true)
 }
 
 type flagName string
@@ -374,6 +376,14 @@ func main() {
 			Scheme: mgr.GetScheme(),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ServiceDescriptor")
+			os.Exit(1)
+		}
+
+		if err = (&appscontrollers.BackupPolicyTemplateReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "BackupPolicyTemplate")
 			os.Exit(1)
 		}
 	}

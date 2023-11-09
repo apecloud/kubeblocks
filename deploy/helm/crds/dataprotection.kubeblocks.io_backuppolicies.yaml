@@ -335,7 +335,10 @@ spec:
                       passwordKey:
                         default: password
                         description: passwordKey specifies the map key of the password
-                          in the connection credential secret.
+                          in the connection credential secret. This password will
+                          be saved in the backup annotation for full backup. You can
+                          use the environment variable DP_ENCRYPTION_KEY to specify
+                          encryption key.
                         type: string
                       portKey:
                         description: portKey specifies the map key of the port in
@@ -402,10 +405,8 @@ spec:
                         default: Any
                         description: 'strategy specifies the strategy to select the
                           target pod when multiple pods are selected. Valid values
-                          are: - All: select all pods that match the labelsSelector.
-                          - Any: select any one pod that match the labelsSelector.'
+                          are: - Any: select any one pod that match the labelsSelector.'
                         enum:
-                        - All
                         - Any
                         type: string
                     type: object

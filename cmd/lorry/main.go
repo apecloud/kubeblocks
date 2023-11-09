@@ -22,112 +22,100 @@ package main
 import (
 	"flag"
 	"fmt"
-	"net"
-	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 	"go.uber.org/automaxprocs/maxprocs"
-	"google.golang.org/grpc"
-	health "google.golang.org/grpc/health/grpc_health_v1"
+	"go.uber.org/zap"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	kzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/apecloud/kubeblocks/lorry/component"
-	"github.com/apecloud/kubeblocks/lorry/highavailability"
-	customgrpc "github.com/apecloud/kubeblocks/lorry/middleware/grpc"
-	probe2 "github.com/apecloud/kubeblocks/lorry/middleware/probe"
-	"github.com/apecloud/kubeblocks/lorry/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
+	"github.com/apecloud/kubeblocks/pkg/lorry/grpcserver"
+	"github.com/apecloud/kubeblocks/pkg/lorry/highavailability"
+	"github.com/apecloud/kubeblocks/pkg/lorry/httpserver"
+	opsregister "github.com/apecloud/kubeblocks/pkg/lorry/operations/register"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-var (
-	port      int
-	grpcPort  int
-	configDir string
-)
-
-const (
-	DefaultPort       = 3501
-	DefaultGRPCPort   = 50001
-	DefaultConfigPath = "/config/lorry/components"
-)
+var configDir string
 
 func init() {
 	viper.AutomaticEnv()
-	viper.SetDefault(constant.KBEnvCharacterType, "custom")
-	flag.IntVar(&port, "port", DefaultPort, "lorry http default port")
-	flag.IntVar(&grpcPort, "grpcport", DefaultGRPCPort, "lorry grpc default port")
-	flag.StringVar(&configDir, "config-path", DefaultConfigPath, "lorry default config directory for builtin type")
+	pflag.StringVar(&configDir, "config-path", "/config/lorry/components/", "Lorry default config directory for builtin type")
 }
 
 func main() {
-	// set GOMAXPROCS
+	// Set GOMAXPROCS
 	_, _ = maxprocs.Set()
 
-	// setup log
-	opts := zap.Options{
+	// Initialize flags
+	opts := kzap.Options{
 		Development: true,
 	}
 	opts.BindFlags(flag.CommandLine)
-
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 	err := viper.BindPFlags(pflag.CommandLine)
 	if err != nil {
-		panic(fmt.Errorf("fatal error viper bindPFlags: %v", err))
+		panic(errors.Wrap(err, "fatal error viper bindPFlags"))
 	}
 
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	// Initialize logger
+	kopts := []kzap.Opts{kzap.UseFlagOptions(&opts)}
+	if strings.EqualFold("debug", viper.GetString("zap-log-level")) {
+		kopts = append(kopts, kzap.RawZapOpts(zap.AddCaller()))
+	}
+	ctrl.SetLogger(kzap.New(kopts...))
 
+	// Initialize DB Manager
+	err = register.InitDBManager(configDir)
+	if err != nil {
+		panic(errors.Wrap(err, "DB manager initialize failed"))
+	}
+
+	// Initialize DCS (Distributed Control System)
+	err = dcs.InitStore()
+	if err != nil {
+		panic(errors.Wrap(err, "DCS initialize failed"))
+	}
+
+	// Start HA
 	characterType := viper.GetString(constant.KBEnvCharacterType)
+	if viper.IsSet(constant.KBEnvBuiltinHandler) {
+		characterType = viper.GetString(constant.KBEnvBuiltinHandler)
+	}
 	workloadType := viper.GetString(constant.KBEnvWorkloadType)
-	err = component.GetAllComponent(configDir) // find all builtin config file and read
-	if err != nil {                            // Handle errors reading the config file
-		panic(fmt.Errorf("fatal error config file: %v", err))
-	}
-
-	err = probe2.RegisterBuiltin(characterType) // register builtin component
-	if err != nil {
-		panic(fmt.Errorf("fatal error register builtin: %v", err))
-	}
-
-	// start http server for lorry client
-	http.HandleFunc("/", probe2.SetMiddleware(probe2.GetRouter()))
-	go func() {
-		addr := fmt.Sprintf(":%d", port)
-		err := http.ListenAndServe(addr, nil)
-		if err != nil {
-			panic(fmt.Errorf("fatal error listen on port %d", port))
-		}
-	}()
-
-	// start grpc server for role probe
-	listen, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
-	if err != nil {
-		panic(fmt.Errorf("fatal error listen on port %d: %v", grpcPort, err))
-	}
-	healthServer := customgrpc.NewGRPCServer()
-	server := grpc.NewServer()
-	health.RegisterHealthServer(server, healthServer)
-	go func() {
-		err = server.Serve(listen)
-		if err != nil {
-			panic(fmt.Errorf("fatal error grpcserver serve failed: %v", err))
-		}
-	}()
-
-	// ha dependent on dbmanager which is initialized by rt.Run
-	logHa := ctrl.Log.WithName("HA")
-	ha := highavailability.NewHa(logHa)
-	if util.IsHAAvailable(characterType, workloadType) {
+	if highavailability.IsHAAvailable(characterType, workloadType) {
+		ha := highavailability.NewHa()
 		if ha != nil {
 			defer ha.ShutdownWithWait()
 			go ha.Start()
 		}
+	}
+
+	// start grpc server for role probe
+	grpcServer, err := grpcserver.NewGRPCServer()
+	if err != nil {
+		panic(fmt.Errorf("fatal error grpcserver create failed: %v", err))
+	}
+	err = grpcServer.StartNonBlocking()
+	if err != nil {
+		panic(fmt.Errorf("fatal error grpcserver serve failed: %v", err))
+	}
+
+	// Start HTTP Server
+	ops := opsregister.Operations()
+	httpServer := httpserver.NewServer(ops)
+	err = httpServer.StartNonBlocking()
+	if err != nil {
+		panic(errors.Wrap(err, "HTTP server initialize failed"))
 	}
 
 	stop := make(chan os.Signal, 1)

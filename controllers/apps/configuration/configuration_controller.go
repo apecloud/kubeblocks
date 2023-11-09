@@ -73,6 +73,11 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "cannot find configuration")
 	}
 
+	if !configuration.GetDeletionTimestamp().IsZero() {
+		reqCtx.Log.Info("configuration is deleting, skip reconcile")
+		return intctrlutil.Reconciled()
+	}
+
 	tasks := make([]Task, 0, len(configuration.Spec.ConfigItemDetails))
 	for _, item := range configuration.Spec.ConfigItemDetails {
 		if status := fromItemStatus(reqCtx, &configuration.Status, item); status != nil {
@@ -160,7 +165,6 @@ func (r *ConfigurationReconciler) runTasks(taskCtx TaskContext, tasks []Task) (e
 	patch := client.MergeFrom(configuration.DeepCopy())
 	revision := strconv.FormatInt(configuration.GetGeneration(), 10)
 	for _, task := range tasks {
-		task.Status.UpdateRevision = revision
 		if err := task.Do(taskCtx.fetcher, synthesizedComp, revision); err != nil {
 			errs = append(errs, err)
 			continue

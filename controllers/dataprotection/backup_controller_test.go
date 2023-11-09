@@ -23,6 +23,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"time"
+
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -64,7 +66,7 @@ var _ = Describe("Backup Controller test", func() {
 		// job to delete the backup between the ClearResources function delete
 		// the job and get the job list, resulting the ClearResources panic.
 		Eventually(testapps.List(&testCtx, generics.BackupSignature, inNS)).Should(HaveLen(0))
-
+		testapps.ClearResources(&testCtx, generics.SecretSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
@@ -72,6 +74,7 @@ var _ = Describe("Backup Controller test", func() {
 		// non-namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ActionSetSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeSignature, true, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupRepoSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageProviderSignature, ml)
 		testapps.ClearResources(&testCtx, generics.VolumeSnapshotClassSignature, ml)
@@ -140,6 +143,7 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Status.PersistentVolumeClaimName).Should(Equal(repoPVCName))
 					g.Expect(fetched.Status.Path).Should(Equal(dpbackup.BuildBackupPath(fetched, backupPolicy.Spec.PathPrefix)))
 					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
+					g.Expect(fetched.Annotations[dptypes.ConnectionPasswordKey]).ShouldNot(BeEmpty())
 				})).Should(Succeed())
 
 				By("check backup job's nodeName equals pod's nodeName")
@@ -160,7 +164,7 @@ var _ = Describe("Backup Controller test", func() {
 				By("backup should have completed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
-					g.Expect(fetched.Labels[dptypes.DataProtectionLabelClusterUIDKey]).Should(Equal(string(cluster.UID)))
+					g.Expect(fetched.Labels[dptypes.ClusterUIDLabelKey]).Should(Equal(string(cluster.UID)))
 					g.Expect(fetched.Labels[constant.AppInstanceLabelKey]).Should(Equal(testdp.ClusterName))
 					g.Expect(fetched.Labels[constant.KBAppComponentLabelKey]).Should(Equal(testdp.ComponentName))
 					g.Expect(fetched.Annotations[constant.ClusterSnapshotAnnotationKey]).ShouldNot(BeEmpty())
@@ -182,6 +186,69 @@ var _ = Describe("Backup Controller test", func() {
 				By("check backup failed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
+				})).Should(Succeed())
+			})
+		})
+
+		Context("create an invalid backup", func() {
+			It("should fail if backupPolicy is not found", func() {
+				By("creating a backup using a not found backupPolicy")
+				backup := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
+					backup.Spec.BackupPolicyName = "not-found"
+				})
+				backupKey := client.ObjectKeyFromObject(backup)
+
+				By("check backup failed and its expiration when retentionPeriod is not set")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
+					g.Expect(fetched.Status.Expiration).Should(BeNil())
+				})).Should(Succeed())
+			})
+		})
+
+		Context("creates a backup with retentionPeriod", func() {
+			It("create a valid backup", func() {
+				By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
+				backup := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
+					backup.Spec.RetentionPeriod = "1h"
+				})
+				backupKey := client.ObjectKeyFromObject(backup)
+
+				getJobKey := func() client.ObjectKey {
+					return client.ObjectKey{
+						Name:      dpbackup.GenerateBackupJobName(backup, dpbackup.BackupDataJobNamePrefix),
+						Namespace: backup.Namespace,
+					}
+				}
+
+				By("check backup expiration is set by start time when backup is running")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
+					g.Expect(fetched.Status.Expiration.Second()).Should(Equal(fetched.Status.StartTimestamp.Add(time.Hour).Second()))
+				})).Should(Succeed())
+
+				testdp.PatchK8sJobStatus(&testCtx, getJobKey(), batchv1.JobComplete)
+
+				By("check backup expiration is updated by completion time when backup is completed")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
+					g.Expect(fetched.Status.CompletionTimestamp).ShouldNot(BeNil())
+					g.Expect(fetched.Status.Expiration.Second()).Should(Equal(fetched.Status.CompletionTimestamp.Add(time.Hour).Second()))
+				})).Should(Succeed())
+			})
+
+			It("create an invalid backup", func() {
+				By("creating a backup using a not found backupPolicy")
+				backup := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
+					backup.Spec.BackupPolicyName = "not-found"
+					backup.Spec.RetentionPeriod = "1h"
+				})
+				backupKey := client.ObjectKeyFromObject(backup)
+
+				By("check backup failed and its expiration is set")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
+					g.Expect(fetched.Status.Expiration).ShouldNot(BeNil())
 				})).Should(Succeed())
 			})
 		})
@@ -263,7 +330,7 @@ var _ = Describe("Backup Controller test", func() {
 
 			BeforeEach(func() {
 				// mock VolumeSnapshotClass for volume snapshot
-				testk8s.CreateVolumeSnapshotClass(&testCtx, testutil.DefaultStorageProvisoner)
+				testk8s.CreateVolumeSnapshotClass(&testCtx, testutil.DefaultCSIDriver)
 
 				By("create a backup from backupPolicy " + testdp.BackupPolicyName)
 				backup = testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
@@ -345,6 +412,10 @@ var _ = Describe("Backup Controller test", func() {
 	})
 
 	When("with exceptional settings", func() {
+		var (
+			backupPolicy *dpv1alpha1.BackupPolicy
+		)
+
 		Context("creates a backup with non-existent backup policy", func() {
 			var backupKey types.NamespacedName
 			BeforeEach(func() {
@@ -353,6 +424,76 @@ var _ = Describe("Backup Controller test", func() {
 				backupKey = client.ObjectKeyFromObject(backup)
 			})
 			It("should fail", func() {
+				By("check backup status failed")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
+				})).Should(Succeed())
+			})
+		})
+
+		Context("creates a backup using non-existent backup method", func() {
+			BeforeEach(func() {
+				By("creating a backupPolicy without backup method")
+				backupPolicy = testdp.NewFakeBackupPolicy(&testCtx, nil)
+			})
+
+			It("should fail because of no-existent backup method", func() {
+				backup := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
+					backup.Spec.BackupPolicyName = backupPolicy.Name
+					backup.Spec.BackupMethod = "non-existent"
+				})
+				backupKey := client.ObjectKeyFromObject(backup)
+
+				By("check backup status failed")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
+				})).Should(Succeed())
+			})
+		})
+
+		Context("creates a backup with invalid backup method", func() {
+			BeforeEach(func() {
+				backupPolicy = testdp.NewFakeBackupPolicy(&testCtx, func(backupPolicy *dpv1alpha1.BackupPolicy) {
+					backupPolicy.Spec.BackupMethods = append(backupPolicy.Spec.BackupMethods, dpv1alpha1.BackupMethod{
+						Name:          "invalid",
+						ActionSetName: "",
+					})
+				})
+			})
+
+			It("should fail because backup method doesn't specify snapshotVolumes with empty actionSet", func() {
+				backup := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
+					backup.Spec.BackupPolicyName = backupPolicy.Name
+					backup.Spec.BackupMethod = "invalid"
+				})
+				backupKey := client.ObjectKeyFromObject(backup)
+
+				By("check backup status failed")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
+				})).Should(Succeed())
+			})
+
+			It("should fail because of no-existing actionSet", func() {
+				backup := testdp.NewFakeBackup(&testCtx, nil)
+				backupKey := client.ObjectKeyFromObject(backup)
+
+				By("check backup status failed")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
+				})).Should(Succeed())
+			})
+
+			It("should fail because actionSet's backup type isn't Full", func() {
+				actionSet := testdp.NewFakeActionSet(&testCtx)
+				actionSetKey := client.ObjectKeyFromObject(actionSet)
+				Eventually(testapps.GetAndChangeObj(&testCtx, actionSetKey, func(fetched *dpv1alpha1.ActionSet) {
+					fetched.Spec.BackupType = dpv1alpha1.BackupTypeIncremental
+				}))
+
+				backup := testdp.NewFakeBackup(&testCtx, nil)
+				backupKey := client.ObjectKeyFromObject(backup)
+
 				By("check backup status failed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))

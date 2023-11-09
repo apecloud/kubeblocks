@@ -112,6 +112,11 @@ spec:
             - name: RECOVER_VOLUME_EXPANSION_FAILURE
               value: "true"
             {{- end }}
+            - name: DP_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kubeblocks.fullname" . }}-secret
+                  key: dataProtectionEncryptionKey
             - name: KUBE_PROVIDER
               value: {{ .Values.provider | quote }}
           {{- with .Values.securityContext }}

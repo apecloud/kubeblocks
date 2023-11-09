@@ -1,5 +1,0 @@
-1. Show Kafka server:
-
-  kbcli cluster describe {{ .Release.Name }} -n {{ .Release.Namespace }}
-
-  

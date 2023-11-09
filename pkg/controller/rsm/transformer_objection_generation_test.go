@@ -47,7 +47,7 @@ var _ = Describe("object generation transformer test.", func() {
 			SetService(service).
 			SetCredential(credential).
 			SetTemplate(template).
-			SetProbeActions(observeActions).
+			SetCustomHandler(observeActions).
 			GetObject()
 
 		transCtx = &rsmTransformContext{
@@ -178,4 +178,77 @@ var _ = Describe("object generation transformer test.", func() {
 			}
 		})
 	})
+
+	Context("injectRoleProbeBaseContainer function", func() {
+		It("should reuse container 'kb-checkrole' if exists", func() {
+			templateCopy := template.DeepCopy()
+			templateCopy.Spec.Containers = append(templateCopy.Spec.Containers, corev1.Container{
+				Name:  constant.RoleProbeContainerName,
+				Image: "bar",
+			})
+			injectRoleProbeBaseContainer(*rsm, templateCopy, "", nil)
+			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
+			probeContainer := templateCopy.Spec.Containers[1]
+			Expect(probeContainer.ReadinessProbe).ShouldNot(BeNil())
+			Expect(len(probeContainer.Ports)).Should(Equal(1))
+			Expect(probeContainer.Ports[0].ContainerPort).Should(BeElementOf([]int32{int32(defaultRoleProbeGRPCPort), int32(defaultRoleProbeDaemonPort)}))
+		})
+
+		It("should not use default grpcPort in case of 'lorry-grpc-port' existence", func() {
+			rsm.Spec.RoleProbe.RoleUpdateMechanism = workloads.ReadinessProbeEventUpdate
+			templateCopy := template.DeepCopy()
+			templateCopy.Spec.Containers = append(templateCopy.Spec.Containers, corev1.Container{
+				Name:  constant.RoleProbeContainerName,
+				Image: "bar",
+				Ports: []corev1.ContainerPort{
+					{
+						Name:          constant.LorryGRPCPortName,
+						ContainerPort: 9555,
+					},
+				},
+			})
+			injectRoleProbeBaseContainer(*rsm, templateCopy, "", nil)
+			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
+			probeContainer := templateCopy.Spec.Containers[1]
+			Expect(len(probeContainer.Ports)).Should(Equal(1))
+			Expect(probeContainer.Ports[0].ContainerPort).Should(Equal(int32(9555)))
+		})
+
+		It("container.ports nil", func() {
+			rsm.Spec.RoleProbe.RoleUpdateMechanism = workloads.ReadinessProbeEventUpdate
+			templateCopy := template.DeepCopy()
+			templateCopy.Spec.Containers = append(templateCopy.Spec.Containers, corev1.Container{
+				Name:  constant.RoleProbeContainerName,
+				Image: "bar",
+				Ports: nil,
+			})
+			injectRoleProbeBaseContainer(*rsm, templateCopy, "", nil)
+			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
+			probeContainer := templateCopy.Spec.Containers[1]
+			Expect(len(probeContainer.Ports)).Should(Equal(1))
+			Expect(probeContainer.Ports[0].ContainerPort).Should(Equal(int32(defaultRoleProbeGRPCPort)))
+		})
+
+		It("container.ports.containerPort negative", func() {
+			rsm.Spec.RoleProbe.RoleUpdateMechanism = workloads.ReadinessProbeEventUpdate
+			templateCopy := template.DeepCopy()
+			templateCopy.Spec.Containers = append(templateCopy.Spec.Containers, corev1.Container{
+				Name:  constant.RoleProbeContainerName,
+				Image: "bar",
+				Ports: []corev1.ContainerPort{
+					{
+						Name:          constant.LorryGRPCPortName,
+						ContainerPort: -9999,
+					},
+				},
+			})
+			injectRoleProbeBaseContainer(*rsm, templateCopy, "", nil)
+			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
+			probeContainer := templateCopy.Spec.Containers[1]
+			Expect(len(probeContainer.Ports)).Should(Equal(1))
+			Expect(probeContainer.Ports[0].ContainerPort).Should(Equal(int32(defaultRoleProbeGRPCPort)))
+		})
+
+	})
+
 })

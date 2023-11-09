@@ -37,24 +37,13 @@ const (
 	maxConcurDataProtectionReconKey = "MAXCONCURRENTRECONCILES_DATAPROTECTION"
 
 	// label keys
-	dataProtectionLabelBackupScheduleKey = "dataprotection.kubeblocks.io/backup-schedule"
-	dataProtectionLabelBackupPolicyKey   = "dataprotection.kubeblocks.io/backup-policy"
-	dataProtectionLabelBackupMethodKey   = "dataprotection.kubeblocks.io/backup-method"
-	dataProtectionLabelBackupTypeKey     = "dataprotection.kubeblocks.io/backup-type"
-	dataProtectionLabelAutoBackupKey     = "dataprotection.kubeblocks.io/autobackup"
-
-	dataProtectionBackupTargetPodKey          = "dataprotection.kubeblocks.io/target-pod-name"
-	dataProtectionAnnotationCreateByPolicyKey = "dataprotection.kubeblocks.io/created-by-policy"
-
 	dataProtectionBackupRepoKey          = "dataprotection.kubeblocks.io/backup-repo-name"
 	dataProtectionWaitRepoPreparationKey = "dataprotection.kubeblocks.io/wait-repo-preparation"
 	dataProtectionIsToolConfigKey        = "dataprotection.kubeblocks.io/is-tool-config"
 
 	// annotation keys
-	dataProtectionSecretTemplateMD5AnnotationKey        = "dataprotection.kubeblocks.io/secret-template-md5"
-	dataProtectionTemplateValuesMD5AnnotationKey        = "dataprotection.kubeblocks.io/template-values-md5"
-	dataProtectionPVCTemplateMD5MD5AnnotationKey        = "dataprotection.kubeblocks.io/pvc-template-md5"
-	dataProtectionToolConfigTemplateMD5MD5AnnotationKey = "dataprotection.kubeblocks.io/tool-config-template-md5"
+	dataProtectionBackupRepoDigestAnnotationKey     = "dataprotection.kubeblocks.io/backup-repo-digest"
+	dataProtectionNeedUpdateToolConfigAnnotationKey = "dataprotection.kubeblocks.io/need-update-tool-config"
 )
 
 // condition constants
@@ -64,8 +53,8 @@ const (
 	ConditionTypeParametersChecked     = "ParametersChecked"
 	ConditionTypeStorageClassCreated   = "StorageClassCreated"
 	ConditionTypePVCTemplateChecked    = "PVCTemplateChecked"
-	ConditionTypeToolConfigChecked     = "ToolConfigSecretChecked"
 	ConditionTypeDerivedObjectsDeleted = "DerivedObjectsDeleted"
+	ConditionTypePreCheckPassed        = "PreCheckPassed"
 
 	// condition reasons
 	ReasonStorageProviderReady      = "StorageProviderReady"
@@ -77,14 +66,16 @@ const (
 	ReasonPrepareCSISecretFailed    = "PrepareCSISecretFailed"
 	ReasonPrepareStorageClassFailed = "PrepareStorageClassFailed"
 	ReasonBadPVCTemplate            = "BadPVCTemplate"
-	ReasonBadToolConfigTemplate     = "BadToolConfigTemplate"
 	ReasonStorageClassCreated       = "StorageClassCreated"
 	ReasonPVCTemplateChecked        = "PVCTemplateChecked"
-	ReasonToolConfigChecked         = "ToolConfigChecked"
 	ReasonHaveAssociatedBackups     = "HaveAssociatedBackups"
 	ReasonHaveResidualPVCs          = "HaveResidualPVCs"
 	ReasonDerivedObjectsDeleted     = "DerivedObjectsDeleted"
+	ReasonPreCheckPassed            = "PreCheckPassed"
+	ReasonPreCheckFailed            = "PreCheckFailed"
+	ReasonDigestChanged             = "DigestChanged"
 	ReasonUnknownError              = "UnknownError"
+	ReasonSkipped                   = "Skipped"
 )
 
 // constant  for volume populator
@@ -93,7 +84,7 @@ const (
 
 	// annotation keys
 	annSelectedNode = "volume.kubernetes.io/selected-node"
-	annPopulateFrom = "dataprotections.kubeblocks.io/populate-from"
+	annPopulateFrom = "dataprotection.kubeblocks.io/populate-from"
 
 	// event reason
 	reasonStartToVolumePopulate = "StartToVolumePopulate"

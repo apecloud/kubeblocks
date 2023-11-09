@@ -56,8 +56,6 @@ const (
 	clusterWeight
 )
 
-// TODO: cluster plan builder can be abstracted as a common flow
-
 // clusterTransformContext a graph.TransformContext implementation for Cluster reconciliation
 type clusterTransformContext struct {
 	context.Context
@@ -233,21 +231,21 @@ func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ct
 func (c *clusterPlanBuilder) defaultWalkFuncWithLogging(vertex graph.Vertex) error {
 	node, ok := vertex.(*model.ObjectVertex)
 	err := c.defaultWalkFunc(vertex)
-	if err != nil {
-		if !ok {
-			c.transCtx.Logger.Error(err, "")
-		} else {
-			if node.Action == nil {
-				c.transCtx.Logger.Error(err, fmt.Sprintf("%T", node))
-			} else {
-				c.transCtx.Logger.Error(err, fmt.Sprintf("%s %T error", *node.Action, node.Obj))
-			}
-		}
+	switch {
+	case err == nil:
+		return err
+	case !ok:
+		c.transCtx.Logger.Error(err, "")
+	case node.Action == nil:
+		c.transCtx.Logger.Error(err, fmt.Sprintf("%T", node))
+	case apierrors.IsConflict(err):
+		return err
+	default:
+		c.transCtx.Logger.Error(err, fmt.Sprintf("%s %T error", *node.Action, node.Obj))
 	}
 	return err
 }
 
-// TODO: retry strategy on error
 func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 	node, ok := vertex.(*model.ObjectVertex)
 	if !ok {
@@ -281,7 +279,6 @@ func (c *clusterPlanBuilder) reconcileObject(node *model.ObjectVertex) error {
 	case model.PATCH:
 		patch := client.MergeFrom(node.OriObj)
 		if err := c.cli.Patch(c.transCtx.Context, node.Obj, patch); err != nil && !apierrors.IsNotFound(err) {
-			c.transCtx.Logger.Error(err, fmt.Sprintf("patch %T error", node.OriObj))
 			return err
 		}
 	case model.DELETE:
@@ -294,7 +291,6 @@ func (c *clusterPlanBuilder) reconcileObject(node *model.ObjectVertex) error {
 		// delete secondary objects
 		if _, ok := node.Obj.(*appsv1alpha1.Cluster); !ok {
 			err := intctrlutil.BackgroundDeleteObject(c.cli, c.transCtx.Context, node.Obj)
-			// err := c.cli.Delete(c.transCtx.Context, node.obj)
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
@@ -323,20 +319,8 @@ func (c *clusterPlanBuilder) reconcileCluster(node *model.ObjectVertex) error {
 	// cluster.meta and cluster.spec might change
 	case model.STATUS:
 		if !reflect.DeepEqual(cluster.ObjectMeta, origCluster.ObjectMeta) || !reflect.DeepEqual(cluster.Spec, origCluster.Spec) {
-			// TODO: we should Update instead of Patch cluster object,
-			// TODO: but Update failure happens too frequently as other controllers are updating cluster object too.
-			// TODO: use Patch here, revert to Update after refactoring done
-			// if err := c.cli.Update(c.ctx.Ctx, cluster); err != nil {
-			//	tmpCluster := &appsv1alpha1.Cluster{}
-			//	err = c.cli.Get(c.ctx.Ctx,client.ObjectKeyFromObject(origCluster), tmpCluster)
-			//	c.ctx.Log.Error(err, fmt.Sprintf("update %T error, orig: %v, curr: %v, api-server: %v", origCluster, origCluster, cluster, tmpCluster))
-			//	return err
-			// }
 			patch := client.MergeFrom(origCluster.DeepCopy())
 			if err := c.cli.Patch(c.transCtx.Context, cluster, patch); err != nil {
-				// log for debug
-				// TODO:(free6om) make error message smaller when refactor done.
-				c.transCtx.Logger.Error(err, fmt.Sprintf("patch %T error, orig: %v, curr: %v", origCluster, origCluster, cluster))
 				return err
 			}
 		}

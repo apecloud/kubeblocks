@@ -45,6 +45,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/clusterdefinition"
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/clusterversion"
+	"github.com/apecloud/kubeblocks/pkg/cli/cmd/context"
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/dashboard"
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/dataprotection"
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/fault"
@@ -52,6 +53,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/migration"
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/options"
+	"github.com/apecloud/kubeblocks/pkg/cli/cmd/organization"
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/playground"
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/plugin"
 	"github.com/apecloud/kubeblocks/pkg/cli/cmd/report"
@@ -188,10 +190,10 @@ A Command Line Interface for KubeBlocks`,
 
 	// Add subcommands
 	cmd.AddCommand(
-		// auth.NewLogin(ioStreams),
-		// auth.NewLogout(ioStreams),
-		// organization.NewOrganizationCmd(ioStreams),
-		// context.NewContextCmd(ioStreams),
+		auth.NewLogin(ioStreams),
+		auth.NewLogout(ioStreams),
+		organization.NewOrganizationCmd(ioStreams),
+		context.NewContextCmd(ioStreams),
 		playground.NewPlaygroundCmd(ioStreams),
 		kubeblocks.NewKubeBlocksCmd(f, ioStreams),
 		bench.NewBenchCmd(f, ioStreams),

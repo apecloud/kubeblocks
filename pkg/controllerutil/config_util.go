@@ -25,9 +25,7 @@ import (
 	"reflect"
 
 	"github.com/StudioSol/set"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -37,29 +35,19 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
-type ConfigEventContext struct {
-	Client  client.Client
-	ReqCtx  RequestCtx
-	Cluster *v1alpha1.Cluster
+type Result struct {
+	Phase      v1alpha1.ConfigurationPhase `json:"phase"`
+	Revision   string                      `json:"revision"`
+	Policy     string                      `json:"policy"`
+	ExecResult string                      `json:"execResult"`
 
-	ClusterComponent *v1alpha1.ClusterComponentSpec
-	Component        *v1alpha1.ClusterComponentDefinition
-	ComponentUnits   []appsv1.StatefulSet
-	DeploymentUnits  []appsv1.Deployment
+	SucceedCount  int32 `json:"succeedCount"`
+	ExpectedCount int32 `json:"expectedCount"`
 
-	ConfigSpecName   string
-	ConfigPatch      *core.ConfigPatchInfo
-	ConfigMap        *corev1.ConfigMap
-	ConfigConstraint *v1alpha1.ConfigConstraintSpec
-
-	PolicyStatus core.PolicyExecStatus
+	Retry   bool   `json:"retry"`
+	Failed  bool   `json:"failed"`
+	Message string `json:"message"`
 }
-
-type ConfigEventHandler interface {
-	Handle(eventContext ConfigEventContext, lastOpsRequest string, phase v1alpha1.OpsPhase, err error) error
-}
-
-var ConfigEventHandlerMap = make(map[string]ConfigEventHandler)
 
 // MergeAndValidateConfigs merges and validates configuration files
 func MergeAndValidateConfigs(configConstraint v1alpha1.ConfigConstraintSpec, baseConfigs map[string]string, cmKey []string, updatedParams []core.ParamPairs) (map[string]string, error) {

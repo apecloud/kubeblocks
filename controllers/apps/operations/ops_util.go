@@ -35,6 +35,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
+	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -250,8 +251,8 @@ func PatchClusterNotFound(ctx context.Context, cli client.Client, opsRes *OpsRes
 	return PatchOpsStatus(ctx, cli, opsRes, appsv1alpha1.OpsFailedPhase, condition)
 }
 
-// patchOpsHandlerNotSupported patches OpsNotSupported condition to the OpsRequest.status.conditions.
-func patchOpsHandlerNotSupported(ctx context.Context, cli client.Client, opsRes *OpsResource) error {
+// PatchOpsHandlerNotSupported patches OpsNotSupported condition to the OpsRequest.status.conditions.
+func PatchOpsHandlerNotSupported(ctx context.Context, cli client.Client, opsRes *OpsResource) error {
 	message := fmt.Sprintf("spec.type %s is not supported by operator", opsRes.OpsRequest.Spec.Type)
 	condition := appsv1alpha1.NewValidateFailedCondition(appsv1alpha1.ReasonOpsTypeNotSupported, message)
 	return PatchOpsStatus(ctx, cli, opsRes, appsv1alpha1.OpsFailedPhase, condition)
@@ -360,8 +361,10 @@ func updateReconfigureStatusByCM(reconfiguringStatus *appsv1alpha1.Reconfiguring
 	}
 	cmCount := len(reconfiguringStatus.ConfigurationStatus)
 	reconfiguringStatus.ConfigurationStatus = append(reconfiguringStatus.ConfigurationStatus, appsv1alpha1.ConfigurationItemStatus{
-		Name:   tplName,
-		Status: appsv1alpha1.ReasonReconfigureMerging,
+		Name:          tplName,
+		Status:        appsv1alpha1.ReasonReconfigurePersisting,
+		SucceedCount:  core.NotStarted,
+		ExpectedCount: core.Unconfirmed,
 	})
 	cmStatus := &reconfiguringStatus.ConfigurationStatus[cmCount]
 	return handleReconfigureStatus(cmStatus)
@@ -436,6 +439,10 @@ func cancelComponentOps(ctx context.Context,
 // validateOpsWaitingPhase validates whether the current cluster phase is expected, and whether the waiting time exceeds the limit.
 // only requests with `Pending` phase will be validated.
 func validateOpsWaitingPhase(cluster *appsv1alpha1.Cluster, ops *appsv1alpha1.OpsRequest, opsBehaviour OpsBehaviour) error {
+	// if opsRequest don't need to wait for the cluster phase
+	// or opsRequest status.phase is not Pending,
+	// or opsRequest will create cluster,
+	// we don't validate the cluster phase.
 	if len(opsBehaviour.FromClusterPhases) == 0 || ops.Status.Phase != appsv1alpha1.OpsPendingPhase {
 		return nil
 	}

@@ -1,12 +1,10 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  generateName: milvus-cluster-hscale-in-
+  generateName: clickhouse-cluster-hscale-in-
 spec:
-  clusterRef: milvus-cluster
+  clusterRef: test-clickhouse-cluster
   type: HorizontalScaling
   horizontalScaling:
-    - componentName: milvus
-      replicas: 1
-    - componentName: minio
+    - componentName: shard-0
       replicas: 1

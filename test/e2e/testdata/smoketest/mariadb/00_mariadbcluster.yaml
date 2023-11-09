@@ -1,0 +1,79 @@
+---
+# Source: mariadb-cluster/templates/rbac.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kb-mariadb-cluster
+  namespace: default
+  labels:
+    helm.sh/chart: mariadb-cluster-0.7.0-alpha.0
+    app.kubernetes.io/version: "10.6.15"
+    app.kubernetes.io/instance: mariadb-cluster
+---
+# Source: mariadb-cluster/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kb-mariadb-cluster
+  labels:
+    helm.sh/chart: mariadb-cluster-0.7.0-alpha.0
+    app.kubernetes.io/version: "10.6.15"
+    app.kubernetes.io/instance: mariadb-cluster
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubeblocks-volume-protection-pod-role
+subjects:
+  - kind: ServiceAccount
+    name: kb-mariadb-cluster
+    namespace: default
+---
+# Source: mariadb-cluster/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kb-mariadb-cluster
+  labels:
+    helm.sh/chart: mariadb-cluster-0.7.0-alpha.0
+    app.kubernetes.io/version: "10.6.15"
+    app.kubernetes.io/instance: mariadb-cluster
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubeblocks-cluster-pod-role
+subjects:
+  - kind: ServiceAccount
+    name: kb-mariadb-cluster
+    namespace: default
+---
+# Source: mariadb-cluster/templates/cluster.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: mariadb-cluster
+  labels: 
+    helm.sh/chart: mariadb-cluster-0.7.0-alpha.0
+    app.kubernetes.io/version: "10.6.15"
+    app.kubernetes.io/instance: mariadb-cluster
+spec:
+  clusterVersionRef: mariadb
+  terminationPolicy: Delete  
+  affinity:
+    podAntiAffinity: Required
+    topologyKeys:
+      - kubernetes.io/hostname
+    tenancy: SharedNode
+  clusterDefinitionRef: mariadb # ref clusterdefinition.name
+  componentSpecs:
+    - name: mariadb
+      componentDefRef: mariadb-compdef # ref clusterdefinition componentDefs.name
+      replicas: 1
+      serviceAccountName: kb-mariadb-cluster      
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"      
+      services:

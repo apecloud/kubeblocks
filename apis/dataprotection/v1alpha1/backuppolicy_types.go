@@ -77,7 +77,6 @@ type PodSelector struct {
 	// strategy specifies the strategy to select the target pod when multiple pods
 	// are selected.
 	// Valid values are:
-	// - All: select all pods that match the labelsSelector.
 	// - Any: select any one pod that match the labelsSelector.
 	// +kubebuilder:default=Any
 	Strategy PodSelectionStrategy `json:"strategy,omitempty"`
@@ -85,11 +84,12 @@ type PodSelector struct {
 
 // PodSelectionStrategy specifies the strategy to select when multiple pods are
 // selected for backup target
-// +kubebuilder:validation:Enum=All;Any
+// +kubebuilder:validation:Enum=Any
 type PodSelectionStrategy string
 
 const (
 	// PodSelectionStrategyAll selects all pods that match the labelsSelector.
+	// TODO: support PodSelectionStrategyAll
 	PodSelectionStrategyAll PodSelectionStrategy = "All"
 
 	// PodSelectionStrategyAny selects any one pod that match the labelsSelector.
@@ -109,6 +109,8 @@ type ConnectionCredential struct {
 	UsernameKey string `json:"usernameKey,omitempty"`
 
 	// passwordKey specifies the map key of the password in the connection credential secret.
+	// This password will be saved in the backup annotation for full backup.
+	// You can use the environment variable DP_ENCRYPTION_KEY to specify encryption key.
 	// +kubebuilder:default=password
 	PasswordKey string `json:"passwordKey,omitempty"`
 

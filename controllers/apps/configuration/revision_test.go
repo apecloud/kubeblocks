@@ -29,39 +29,40 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 func TestGcConfigRevision(t *testing.T) {
 	cm := builder.NewConfigMapBuilder("default", "test").
-		AddAnnotations(core.GenerateRevisionPhaseKey("1"), "finished").
-		AddAnnotations(core.GenerateRevisionPhaseKey("2"), "init").
-		AddAnnotations(core.GenerateRevisionPhaseKey("3"), "finished").
-		AddAnnotations(core.GenerateRevisionPhaseKey("4"), "finished").
+		AddAnnotations(core.GenerateRevisionPhaseKey("1"), "Finished").
+		AddAnnotations(core.GenerateRevisionPhaseKey("2"), "Init").
+		AddAnnotations(core.GenerateRevisionPhaseKey("3"), "Finished").
+		AddAnnotations(core.GenerateRevisionPhaseKey("4"), "Finished").
 		GetObject()
 	revisions := GcRevision(cm.GetAnnotations())
 	assert.Equal(t, 0, len(revisions))
 
 	cm = builder.NewConfigMapBuilder("default", "test").
-		AddAnnotations(core.GenerateRevisionPhaseKey("1"), "finished").
-		AddAnnotations(core.GenerateRevisionPhaseKey("2"), "init").
-		AddAnnotations(core.GenerateRevisionPhaseKey("3"), "finished").
-		AddAnnotations(core.GenerateRevisionPhaseKey("4"), "finished").
-		AddAnnotations(core.GenerateRevisionPhaseKey("5"), "finished").
-		AddAnnotations(core.GenerateRevisionPhaseKey("6"), "finished").
-		AddAnnotations(core.GenerateRevisionPhaseKey("7"), "finished").
-		AddAnnotations(core.GenerateRevisionPhaseKey("8"), "finished").
-		AddAnnotations(core.GenerateRevisionPhaseKey("9"), "finished").
-		AddAnnotations(core.GenerateRevisionPhaseKey("10"), "finished").
-		AddAnnotations(core.GenerateRevisionPhaseKey("11"), "finished").
-		AddAnnotations(core.GenerateRevisionPhaseKey("12"), "finished").
+		AddAnnotations(core.GenerateRevisionPhaseKey("1"), "Finished").
+		AddAnnotations(core.GenerateRevisionPhaseKey("2"), "Init").
+		AddAnnotations(core.GenerateRevisionPhaseKey("3"), "Finished").
+		AddAnnotations(core.GenerateRevisionPhaseKey("4"), "Finished").
+		AddAnnotations(core.GenerateRevisionPhaseKey("5"), "Finished").
+		AddAnnotations(core.GenerateRevisionPhaseKey("6"), "Finished").
+		AddAnnotations(core.GenerateRevisionPhaseKey("7"), "Finished").
+		AddAnnotations(core.GenerateRevisionPhaseKey("8"), "Finished").
+		AddAnnotations(core.GenerateRevisionPhaseKey("9"), "Finished").
+		AddAnnotations(core.GenerateRevisionPhaseKey("10"), "Finished").
+		AddAnnotations(core.GenerateRevisionPhaseKey("11"), "Finished").
+		AddAnnotations(core.GenerateRevisionPhaseKey("12"), `{"Phase":"Finished","Revision":"12","Policy":"","ExecResult":"","SucceedCount":0,"ExpectedCount":0,"Retry":false,"Failed":false,"Message":"the configuration file has not been modified, skip reconfigure"}`).
 		GetObject()
 
 	assert.Equal(t, 12, len(RetrieveRevision(cm.GetAnnotations())))
 
 	revisions = GcRevision(cm.GetAnnotations())
 	assert.Equal(t, 2, len(revisions))
-	assert.Equal(t, "init", string(revisions[1].Phase))
-	assert.Equal(t, "finished", string(revisions[0].Phase))
+	assert.Equal(t, string(appsv1alpha1.CInitPhase), string(revisions[1].Phase))
+	assert.Equal(t, string(appsv1alpha1.CFinishedPhase), string(revisions[0].Phase))
 
 	GcConfigRevision(cm)
 	assert.Equal(t, 10, len(RetrieveRevision(cm.GetAnnotations())))
@@ -95,6 +96,10 @@ func TestParseRevision(t *testing.T) {
 			StrRevision: "120000",
 			Revision:    120000,
 			Phase:       appsv1alpha1.CPendingPhase,
+			Result: intctrlutil.Result{
+				Phase:    appsv1alpha1.CPendingPhase,
+				Revision: "120000",
+			},
 		},
 		wantErr: false,
 	}, {
@@ -148,6 +153,55 @@ func TestGetCurrentRevision(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equalf(t, tt.want, GetCurrentRevision(tt.args.annotations), "GetCurrentRevision(%v)", tt.args.annotations)
+		})
+	}
+}
+
+func TestGetLastRevision(t *testing.T) {
+	type args struct {
+		annotations map[string]string
+		revision    int64
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  ConfigurationRevision
+		want1 bool
+	}{{
+		name: "test",
+		args: args{
+			annotations: map[string]string{
+				core.GenerateRevisionPhaseKey("1"): "Finished",
+				core.GenerateRevisionPhaseKey("2"): "Running",
+			},
+			revision: 2,
+		},
+		want: ConfigurationRevision{
+			Revision:    2,
+			StrRevision: "2",
+			Phase:       appsv1alpha1.CRunningPhase,
+			Result: intctrlutil.Result{
+				Phase:    appsv1alpha1.CRunningPhase,
+				Revision: "2",
+			},
+		},
+		want1: true,
+	}, {
+		name: "test",
+		args: args{
+			annotations: map[string]string{
+				core.GenerateRevisionPhaseKey("1"): "Finished",
+				core.GenerateRevisionPhaseKey("2"): "Running",
+			},
+			revision: 3,
+		},
+		want1: false,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := GetLastRevision(tt.args.annotations, tt.args.revision)
+			assert.Equalf(t, tt.want, got, "GetLastRevision(%v, %v)", tt.args.annotations, tt.args.revision)
+			assert.Equalf(t, tt.want1, got1, "GetLastRevision(%v, %v)", tt.args.annotations, tt.args.revision)
 		})
 	}
 }

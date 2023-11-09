@@ -26,6 +26,7 @@ import (
 	"strings"
 	"sync"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 )
 
 var (
@@ -196,6 +198,27 @@ func getDefaultBackupRepo(ctx context.Context, cli client.Client) (*dpv1alpha1.B
 		return nil, errNoDefaultBackupRepo
 	}
 	return defaultRepo, nil
+}
+
+func deleteRelatedJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, namespace string, labels map[string]string) error {
+	if labels == nil || namespace == "" {
+		return nil
+	}
+	jobs := &batchv1.JobList{}
+	if err := cli.List(reqCtx.Ctx, jobs,
+		client.MatchingLabels(labels)); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+	for i := range jobs.Items {
+		job := &jobs.Items[i]
+		if err := dputils.RemoveDataProtectionFinalizer(reqCtx.Ctx, cli, job); err != nil {
+			return err
+		}
+		if err := intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, job); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ============================================================================

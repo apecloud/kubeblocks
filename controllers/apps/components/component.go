@@ -47,7 +47,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	lorry "github.com/apecloud/kubeblocks/lorry/client"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -56,6 +55,7 @@ import (
 	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -141,7 +141,7 @@ func (c *rsmComponent) Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) 
 }
 
 func (c *rsmComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.status(reqCtx, cli, c.newBuilder(reqCtx, cli, model.ActionNoopPtr()))
+	return c.status(reqCtx, cli, c.newBuilder(reqCtx, cli, nil))
 }
 
 func (c *rsmComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli client.Client,
@@ -187,6 +187,7 @@ func (c *rsmComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Client, bu
 		if err = builder.BuildEnv().
 			BuildWorkload().
 			BuildPDB().
+			BuildCustomVolumes().
 			BuildConfig().
 			BuildTLSVolume().
 			BuildVolumeMount().
@@ -276,6 +277,7 @@ func (c *rsmComponent) status(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 	if c.runningWorkload == nil {
 		return nil
 	}
+	c.noopAllNoneWorkloadObjects()
 
 	isDeleting := func() bool {
 		return !c.runningWorkload.DeletionTimestamp.IsZero()
@@ -381,6 +383,73 @@ func (c *rsmComponent) status(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 		return err
 	}
 
+	// set primary-pod annotation
+	// TODO(free6om): primary-pod is only used in redis to bootstrap the redis cluster correctly.
+	// it is too hacky to be replaced by a better design.
+	if err := c.updatePrimaryIndex(reqCtx.Ctx, cli); err != nil {
+		return err
+	}
+
+	graphCli := model.NewGraphClient(c.Client)
+	if graphCli.IsAction(c.dag, c.workload, nil) {
+		graphCli.Noop(c.dag, c.workload)
+	}
+
+	return nil
+}
+
+func (c *rsmComponent) updatePrimaryIndex(ctx context.Context, cli client.Client) error {
+	if c.component.WorkloadType != appsv1alpha1.Replication {
+		return nil
+	}
+	podList, err := listPodOwnedByComponent(ctx, cli, c.GetNamespace(), c.getMatchingLabels())
+	if err != nil {
+		return err
+	}
+	if len(podList) == 0 {
+		return nil
+	}
+	slices.SortFunc(podList, func(a, b *corev1.Pod) bool {
+		return a.GetName() < b.GetName()
+	})
+	primaryPods := make([]string, 0)
+	emptyRolePods := make([]string, 0)
+	for _, pod := range podList {
+		role, ok := pod.Labels[constant.RoleLabelKey]
+		if !ok || role == "" {
+			emptyRolePods = append(emptyRolePods, pod.Name)
+			continue
+		}
+		if role == constant.Primary {
+			primaryPods = append(primaryPods, pod.Name)
+		}
+	}
+	primaryPodName, err := func() (string, error) {
+		switch {
+		// if the workload is newly created, and the role label is not set, we set the pod with index=0 as the primary by default.
+		case len(emptyRolePods) == len(podList):
+			return podList[0].Name, nil
+		case len(primaryPods) != 1:
+			return "", fmt.Errorf("the number of primary pod is not equal to 1, primary pods: %v, emptyRole pods: %v", primaryPods, emptyRolePods)
+		default:
+			return primaryPods[0], nil
+		}
+	}()
+	if err != nil {
+		return err
+	}
+	graphCli := model.NewGraphClient(c.Client)
+	for _, pod := range podList {
+		if pod.Annotations == nil {
+			pod.Annotations = map[string]string{}
+		}
+		pi, ok := pod.Annotations[constant.PrimaryAnnotationKey]
+		if !ok || pi != primaryPodName {
+			origPod := pod.DeepCopy()
+			pod.Annotations[constant.PrimaryAnnotationKey] = primaryPodName
+			graphCli.Patch(c.dag, origPod, pod)
+		}
+	}
 	return nil
 }
 
@@ -416,8 +485,8 @@ func (c *rsmComponent) resolveObjectsAction(reqCtx intctrlutil.RequestCtx, cli c
 		switch action, err := resolveObjectAction(snapshot, object, cli.Scheme()); {
 		case err != nil:
 			return err
-		case *action == model.UPDATE:
-			graphCli.Update(c.dag, nil, object)
+		case *action == model.CREATE:
+			graphCli.Create(c.dag, object)
 		default:
 			graphCli.Noop(c.dag, object)
 
@@ -425,12 +494,17 @@ func (c *rsmComponent) resolveObjectsAction(reqCtx intctrlutil.RequestCtx, cli c
 	}
 	if c.GetCluster().IsStatusUpdating() {
 		// TODO(refactor): fix me, this is a workaround for h-scaling to update stateful set.
-		objects = graphCli.FindAll(c.dag, &workloads.ReplicatedStateMachine{}, model.HaveDifferentTypeWithOption)
-		for _, object := range objects {
-			graphCli.Noop(c.dag, object)
-		}
+		c.noopAllNoneWorkloadObjects()
 	}
 	return c.validateObjectsAction()
+}
+
+func (c *rsmComponent) noopAllNoneWorkloadObjects() {
+	graphCli := model.NewGraphClient(c.Client)
+	objects := graphCli.FindAll(c.dag, &workloads.ReplicatedStateMachine{}, model.HaveDifferentTypeWithOption)
+	for _, object := range objects {
+		graphCli.Noop(c.dag, object)
+	}
 }
 
 // setStatusPhase sets the cluster component phase and messages conditionally.
@@ -528,10 +602,7 @@ func (c *rsmComponent) isAvailable(reqCtx intctrlutil.RequestCtx, cli client.Cli
 			continue
 		}
 		if !shouldCheckLeader {
-			continue
-		}
-		if _, ok := pod.Labels[constant.RoleLabelKey]; ok {
-			continue
+			return true, nil
 		}
 		if hasLeaderRoleLabel(pod) {
 			return true, nil
@@ -1235,6 +1306,7 @@ func (c *rsmComponent) updateWorkload(rsmObj *workloads.ReplicatedStateMachine) 
 	rsmObjCopy.Spec.RoleProbe = rsmProto.Spec.RoleProbe
 	rsmObjCopy.Spec.MembershipReconfiguration = rsmProto.Spec.MembershipReconfiguration
 	rsmObjCopy.Spec.MemberUpdateStrategy = rsmProto.Spec.MemberUpdateStrategy
+	rsmObjCopy.Spec.Paused = rsmProto.Spec.Paused
 	rsmObjCopy.Spec.Credential = rsmProto.Spec.Credential
 
 	resolvePodSpecDefaultFields(rsmObj.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
@@ -1272,7 +1344,7 @@ func (c *rsmComponent) updatePDB(reqCtx intctrlutil.RequestCtx, cli client.Clien
 			pdbObj := pdbObjList[pos]
 			if !reflect.DeepEqual(pdbObj.Spec, pdbProto.Spec) {
 				pdbObj.Spec = pdbProto.Spec
-				graphCli.Update(c.dag, pdbProto, pdbObj)
+				graphCli.Update(c.dag, nil, pdbObj, model.ReplaceIfExistingOption)
 			}
 		}
 	}

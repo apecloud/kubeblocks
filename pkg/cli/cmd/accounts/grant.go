@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package accounts
 
 import (
+	"context"
+	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -28,28 +30,26 @@ import (
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/lorry/client"
+	lorryutil "github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type GrantOptions struct {
 	*AccountBaseOptions
-	info lorryutil.UserInfo
+	userName string
+	roleName string
 }
 
-func NewGrantOptions(f cmdutil.Factory, streams genericiooptions.IOStreams, op lorryutil.OperationKind) *GrantOptions {
-	if (op != lorryutil.GrantUserRoleOp) && (op != lorryutil.RevokeUserRoleOp) {
-		klog.V(1).Infof("invalid operation kind: %s", op)
-		return nil
-	}
+func NewGrantOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *GrantOptions {
 	return &GrantOptions{
-		AccountBaseOptions: NewAccountBaseOptions(f, streams, op),
+		AccountBaseOptions: NewAccountBaseOptions(f, streams),
 	}
 }
 
 func (o *GrantOptions) AddFlags(cmd *cobra.Command) {
 	o.AccountBaseOptions.AddFlags(cmd)
-	cmd.Flags().StringVar(&o.info.UserName, "name", "", "Required user name, please specify it.")
-	cmd.Flags().StringVarP(&o.info.RoleName, "role", "r", "", "Role name should be one of [SUPERUSER, READWRITE, READONLY].")
+	cmd.Flags().StringVar(&o.userName, "name", "", "Required user name, please specify it.")
+	cmd.Flags().StringVarP(&o.roleName, "role", "r", "", "Role name should be one of [SUPERUSER, READWRITE, READONLY].")
 	_ = cmd.MarkFlagRequired("name")
 	_ = cmd.MarkFlagRequired("role")
 }
@@ -58,10 +58,10 @@ func (o *GrantOptions) Validate(args []string) error {
 	if err := o.AccountBaseOptions.Validate(args); err != nil {
 		return err
 	}
-	if len(o.info.UserName) == 0 {
+	if len(o.userName) == 0 {
 		return errMissingUserName
 	}
-	if len(o.info.RoleName) == 0 {
+	if len(o.roleName) == 0 {
 		return errMissingRoleName
 	}
 	if err := o.validRoleName(); err != nil {
@@ -72,7 +72,7 @@ func (o *GrantOptions) Validate(args []string) error {
 
 func (o *GrantOptions) validRoleName() error {
 	candidates := []string{string(lorryutil.SuperUserRole), string(lorryutil.ReadWriteRole), string(lorryutil.ReadOnlyRole)}
-	if slices.Contains(candidates, strings.ToLower(o.info.RoleName)) {
+	if slices.Contains(candidates, strings.ToLower(o.roleName)) {
 		return nil
 	}
 	return errInvalidRoleName
@@ -83,6 +83,21 @@ func (o *GrantOptions) Complete(f cmdutil.Factory) error {
 	if err = o.AccountBaseOptions.Complete(f); err != nil {
 		return err
 	}
-	o.RequestMeta, err = struct2Map(o.info)
 	return err
+}
+
+func (o *GrantOptions) Run(cmd *cobra.Command, f cmdutil.Factory, streams genericiooptions.IOStreams) error {
+	klog.V(1).Info(fmt.Sprintf("connect to cluster %s, component %s, instance %s\n", o.ClusterName, o.ComponentName, o.PodName))
+	lorryClient, err := client.NewK8sExecClientWithPod(o.Pod)
+	if err != nil {
+		return err
+	}
+
+	err = lorryClient.GrantUserRole(context.Background(), o.userName, o.roleName)
+	if err != nil {
+		o.printGeneralInfo("fail", err.Error())
+		return err
+	}
+	o.printGeneralInfo("success", "")
+	return nil
 }

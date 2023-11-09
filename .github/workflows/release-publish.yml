@@ -244,13 +244,18 @@ jobs:
 
   e2e-kbcli:
     needs: [ send-message, release-result ]
-    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.4
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.35
+    strategy:
+      fail-fast: false
+      matrix:
+        test-type: [ apecloud-mysql|postgresql|redis|mongodb|kafka|pulsar|weaviate|qdrant|smartengine|mysqlscale , greptimedb|nebula|risingwave|starrocks|etcd|oceanbase|foxlake|oracle-mysql|asmysql|openldap|milvus|clickhouse , polardbx|pika|opensearch|elasticsearch|tdengine|vllm|orioledb|official-pg|ggml|zookeeper|mariadb ]
     with:
       GITHUB_REPO: "apecloud/kubeblocks"
       BRANCH_NAME: "main"
       WORKFLOW_ID: "e2e-kbcli.yml"
-      APECD_REF: "v0.1.4"
+      APECD_REF: "v0.1.35"
       VERSION: "${{ needs.send-message.outputs.tag-name }}"
+      EXTRA_ARGS: "TEST_TYPE=${{ matrix.test-type }}"
     secrets: inherit
 
   delete-cache:

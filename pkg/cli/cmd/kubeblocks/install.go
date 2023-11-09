@@ -49,6 +49,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/cli/spinner"
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
 	"github.com/apecloud/kubeblocks/pkg/cli/util"
+	"github.com/apecloud/kubeblocks/pkg/cli/util/breakingchange"
 	"github.com/apecloud/kubeblocks/pkg/cli/util/helm"
 	"github.com/apecloud/kubeblocks/version"
 )
@@ -75,6 +76,7 @@ type Options struct {
 
 type InstallOptions struct {
 	Options
+	OldVersion      string
 	Version         string
 	Quiet           bool
 	CreateNamespace bool
@@ -514,6 +516,11 @@ func (o *InstallOptions) buildChart() *helm.InstallOpts {
 		CreateNamespace: o.CreateNamespace,
 		Timeout:         o.Timeout,
 		Atomic:          false,
+		Upgrader: breakingchange.Upgrader{
+			FromVersion: o.OldVersion,
+			ToVersion:   o.Version,
+			Dynamic:     o.Dynamic,
+		},
 	}
 }
 

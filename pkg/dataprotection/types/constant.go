@@ -44,30 +44,32 @@ const (
 	DefaultBackupPolicyTemplateAnnotationKey = "dataprotection.kubeblocks.io/is-default-policy-template"
 	// DefaultBackupRepoAnnotationKey specifies the default backup repo.
 	DefaultBackupRepoAnnotationKey = "dataprotection.kubeblocks.io/is-default-repo"
-	// BackupDataPathPrefixAnnotationKey specifies the backup data path prefix.
-	BackupDataPathPrefixAnnotationKey = "dataprotection.kubeblocks.io/path-prefix"
 	// ReconfigureRefAnnotationKey specifies the reconfigure ref.
 	ReconfigureRefAnnotationKey = "dataprotection.kubeblocks.io/reconfigure-ref"
 )
 
 // label keys
 const (
-	// DataProtectionLabelClusterUIDKey specifies the cluster UID label key.
-	DataProtectionLabelClusterUIDKey = "dataprotection.kubeblocks.io/cluster-uid"
-	// BackupTypeLabelKeyKey specifies the backup type label key.
-	BackupTypeLabelKeyKey = "dataprotection.kubeblocks.io/backup-type"
-	// DataProtectionLabelBackupNameKey specifies the backup name label key.
-	DataProtectionLabelBackupNameKey = "dataprotection.kubeblocks.io/backup-name"
-	// DataProtectionLabelBackupScheduleKey specifies the backup schedule label key.
-	DataProtectionLabelBackupScheduleKey = "dataprotection.kubeblocks.io/backup-schedule"
-	// DataProtectionLabelBackupPolicyKey specifies the backup policy label key.
-	DataProtectionLabelBackupPolicyKey = "dataprotection.kubeblocks.io/backup-policy"
-	// DataProtectionLabelBackupMethodKey specifies the backup method label key.
-	DataProtectionLabelBackupMethodKey = "dataprotection.kubeblocks.io/backup-method"
-	// DataProtectionLabelBackupTypeKey specifies the backup type label key.
-	DataProtectionLabelBackupTypeKey = "dataprotection.kubeblocks.io/backup-type"
-	// DataProtectionLabelAutoBackupKey specifies the auto backup label key.
-	DataProtectionLabelAutoBackupKey = "dataprotection.kubeblocks.io/autobackup"
+	// ClusterUIDLabelKey specifies the cluster UID label key.
+	ClusterUIDLabelKey = "dataprotection.kubeblocks.io/cluster-uid"
+	// BackupNameLabelKey specifies the backup name label key.
+	BackupNameLabelKey = "dataprotection.kubeblocks.io/backup-name"
+	// BackupNamespaceLabelKey specifies the backup namespace label key.
+	BackupNamespaceLabelKey = "dataprotection.kubeblocks.io/backup-namespace"
+	// BackupScheduleLabelKey specifies the backup schedule label key.
+	BackupScheduleLabelKey = "dataprotection.kubeblocks.io/backup-schedule"
+	// BackupPolicyLabelKey specifies the backup policy label key.
+	BackupPolicyLabelKey = "dataprotection.kubeblocks.io/backup-policy"
+	// BackupMethodLabelKey specifies the backup method label key.
+	BackupMethodLabelKey = "dataprotection.kubeblocks.io/backup-method"
+	// BackupTypeLabelKey specifies the backup type label key.
+	BackupTypeLabelKey = "dataprotection.kubeblocks.io/backup-type"
+	// AutoBackupLabelKey specifies the auto backup label key.
+	AutoBackupLabelKey = "dataprotection.kubeblocks.io/autobackup"
+	// BackupTargetPodLabelKey specifies the backup target pod label key.
+	BackupTargetPodLabelKey = "dataprotection.kubeblocks.io/target-pod-name"
+	// ConnectionPasswordKey specifies the password of the connection credential.
+	ConnectionPasswordKey = "dataprotection.kubeblocks.io/connection-password"
 )
 
 // env names
@@ -88,30 +90,21 @@ const (
 	DPBackupBasePath = "DP_BACKUP_BASE_PATH"
 	// DPBackupName backup CR name
 	DPBackupName = "DP_BACKUP_NAME"
-	// DPTTL backup time to live, reference the backupPolicy.spec.retention.ttl
+	// DPTTL backup time to live, reference the backup.spec.retentionPeriod
 	DPTTL = "DP_TTL"
-	// DPCheckInterval check interval for continue backup
+	// DPCheckInterval check interval for sync backup progress
 	DPCheckInterval = "DP_CHECK_INTERVAL"
 	// DPBackupInfoFile the file name which retains the backup.status info
 	DPBackupInfoFile = "DP_BACKUP_INFO_FILE"
 	// DPTimeFormat golang time format string
-	DPTimeFormat = "TIME_FORMAT"
-	// DPVolumeDataDIR the volume data dir
-	DPVolumeDataDIR = "VOLUME_DATA_DIR" //
-	// DPKBRecoveryTime recovery time
-	DPKBRecoveryTime = "KB_RECOVERY_TIME" // recovery time
-	// DPKBRecoveryTimestamp recovery timestamp
-	DPKBRecoveryTimestamp = "KB_RECOVERY_TIMESTAMP" // recovery timestamp
-	// DPBaseBackupStartTime base backup start time for pitr
-	DPBaseBackupStartTime = "BASE_BACKUP_START_TIME" // base backup start time for pitr
-	// DPBaseBackupStartTimestamp base backup start timestamp for pitr
-	DPBaseBackupStartTimestamp = "BASE_BACKUP_START_TIMESTAMP" // base backup start timestamp for pitr
+	DPTimeFormat = "DP_TIME_FORMAT"
 	// DPBackupStopTime backup stop time
-	DPBackupStopTime = "BACKUP_STOP_TIME" // backup stop time
-	// DPDatasafedLocalBackendPath force datasafed to use local backend with the path
-	DPDatasafedLocalBackendPath = "DATASAFED_LOCAL_BACKEND_PATH"
+	DPBackupStopTime = "DP_BACKUP_STOP_TIME" // backup stop time
 	// DPDatasafedBinPath the path containing the datasafed binary
 	DPDatasafedBinPath = "DP_DATASAFED_BIN_PATH"
+	// DPDatasafedLocalBackendPath force datasafed to use local backend with the path
+	// NOTE: do not add 'DP_' for this constant, it is the datasafed built-in environment.
+	DPDatasafedLocalBackendPath = "DATASAFED_LOCAL_BACKEND_PATH"
 )
 
 const (

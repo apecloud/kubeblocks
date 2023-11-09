@@ -48,6 +48,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
 	"github.com/apecloud/kubeblocks/pkg/cli/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 var _ = Describe("DataProtection", func() {
@@ -155,6 +156,11 @@ var _ = Describe("DataProtection", func() {
 			o.Dynamic = tf.FakeDynamicClient
 			Expect(o.Validate()).Should(MatchError(fmt.Errorf(`cluster "%s" has multiple default backup policies`, o.Name)))
 
+			By("test without method")
+			initClient(defaultBackupPolicy)
+			o.Dynamic = tf.FakeDynamicClient
+			Expect(o.Validate().Error()).Should(ContainSubstring("backup method can not be empty, you can specify it by --method"))
+
 			By("test with one default backupPolicy")
 			initClient(defaultBackupPolicy)
 			o.Dynamic = tf.FakeDynamicClient
@@ -164,16 +170,16 @@ var _ = Describe("DataProtection", func() {
 
 		It("run backup command", func() {
 			defaultBackupPolicy := testing.FakeBackupPolicy(policyName, testing.ClusterName)
-			initClient(defaultBackupPolicy)
-			By("test with specified backupPolicy")
+			otherBackupPolicy := testing.FakeBackupPolicy("otherPolicy", testing.ClusterName)
+			otherBackupPolicy.Annotations = map[string]string{}
+			initClient(defaultBackupPolicy, otherBackupPolicy)
+			By("test backup with default backupPolicy")
 			cmd := NewCreateBackupCmd(tf, streams)
 			Expect(cmd).ShouldNot(BeNil())
-			// must succeed otherwise exit 1 and make test fails
-			_ = cmd.Flags().Set("policy", defaultBackupPolicy.Name)
 			_ = cmd.Flags().Set("method", testing.BackupMethodName)
 			cmd.Run(cmd, []string{testing.ClusterName})
 
-			By("test with logfile type")
+			By("test with specified backupMethod and backupPolicy")
 			o := &CreateBackupOptions{
 				CreateOptions: create.CreateOptions{
 					IOStreams:       streams,
@@ -182,7 +188,7 @@ var _ = Describe("DataProtection", func() {
 					CueTemplateName: "backup_template.cue",
 					Name:            testing.ClusterName,
 				},
-				BackupPolicy: defaultBackupPolicy.Name,
+				BackupPolicy: otherBackupPolicy.Name,
 				BackupMethod: testing.BackupMethodName,
 			}
 			Expect(o.CompleteBackup()).Should(Succeed())
@@ -280,6 +286,9 @@ var _ = Describe("DataProtection", func() {
 		newClusterObj := &appsv1alpha1.Cluster{}
 		Expect(cluster.GetK8SClientObject(tf.FakeDynamicClient, newClusterObj, types.ClusterGVR(), testing.Namespace, newClusterName)).Should(Succeed())
 		Expect(clusterObj.Spec.ComponentSpecs[0].Replicas).Should(Equal(int32(1)))
+		// check if cluster contains the annotation for restoring
+		Expect(newClusterObj.Annotations[constant.RestoreFromBackupAnnotationKey]).Should(ContainSubstring(constant.ConnectionPassword))
+		Expect(newClusterObj.Annotations[constant.RestoreFromBackupAnnotationKey]).Should(ContainSubstring(constant.BackupNamespaceKeyForRestore))
 		By("restore new cluster from source cluster which is deleted")
 		// mock cluster is not lived in kubernetes
 		mockBackupInfo(tf.FakeDynamicClient, backupName, "deleted-cluster", nil, "")
@@ -398,7 +407,7 @@ var _ = Describe("DataProtection", func() {
 		Expect(cmd).ShouldNot(BeNil())
 		By("test describe-backup-policy cmd with cluster and backupPolicy")
 		tf.FakeDynamicClient = testing.FakeDynamicClient()
-		o := describeBackupPolicyOptions{
+		o := DescribeBackupPolicyOptions{
 			Factory:   tf,
 			IOStreams: streams,
 		}
@@ -416,7 +425,7 @@ var _ = Describe("DataProtection", func() {
 		Expect(o.Run()).Should(Succeed())
 
 		By("test describe-backup-policy with backupPolicy")
-		o = describeBackupPolicyOptions{
+		o = DescribeBackupPolicyOptions{
 			Factory:   tf,
 			IOStreams: streams,
 		}
@@ -441,6 +450,7 @@ func mockBackupInfo(dynamic dynamic.Interface, backupName, clusterName string, t
 				"name": backupName,
 				"annotations": map[string]any{
 					constant.ClusterSnapshotAnnotationKey: clusterString,
+					dptypes.ConnectionPasswordKey:         "test-password",
 				},
 				"labels": map[string]any{
 					constant.AppInstanceLabelKey:    clusterName,

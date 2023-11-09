@@ -8,11 +8,11 @@ metadata:
     helm.sh/chart: elasticsearch-cluster-0.1.0
     app.kubernetes.io/name: elasticsearch-cluster
     app.kubernetes.io/instance: elasticsearch-cluster
-    app.kubernetes.io/version: "8.8.0"
+    app.kubernetes.io/version: "8.8.2"
     app.kubernetes.io/managed-by: Helm
 spec:
   clusterDefinitionRef: elasticsearch  # ref clusterdefinition.name
-  clusterVersionRef: elasticsearch-8.8.0 # ref clusterversion.name
+  clusterVersionRef: elasticsearch-8.8.2 # ref clusterversion.name
   terminationPolicy: Delete
   affinity:
     topologyKeys: 

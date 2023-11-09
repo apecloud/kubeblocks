@@ -45,8 +45,8 @@ const (
 
 	// condition and event reasons
 
-	ReasonReconfigureMerging       = "ReconfigureMerging"
-	ReasonReconfigureMerged        = "ReconfigureMerged"
+	ReasonReconfigurePersisting    = "ReconfigurePersisting"
+	ReasonReconfigurePersisted     = "ReconfigurePersisted"
 	ReasonReconfigureFailed        = "ReconfigureFailed"
 	ReasonReconfigureRestartFailed = "ReconfigureRestartFailed"
 	ReasonReconfigureRestart       = "ReconfigureRestarted"
@@ -339,5 +339,16 @@ func NewBackupCondition(ops *OpsRequest) *metav1.Condition {
 		Reason:             "BackupStarted",
 		LastTransitionTime: metav1.Now(),
 		Message:            fmt.Sprintf("Start to backup the Cluster: %s", ops.Spec.ClusterRef),
+	}
+}
+
+// NewRestoreCondition creates a condition that the OpsRequest restore the cluster.
+func NewRestoreCondition(ops *OpsRequest) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               ConditionTypeBackup,
+		Status:             metav1.ConditionTrue,
+		Reason:             "RestoreStarted",
+		LastTransitionTime: metav1.Now(),
+		Message:            fmt.Sprintf("Start to restore the Cluster: %s", ops.Spec.ClusterRef),
 	}
 }

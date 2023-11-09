@@ -188,12 +188,12 @@ func (r *VolumePopulatorReconciler) populate(reqCtx intctrlutil.RequestCtx, pvc 
 		}
 
 		// 3. check if jobs are finished.
-		isCompleted, err := dprestore.CheckJobDone(jobs[0])
+		isCompleted, _, errMsg := utils.IsJobFinished(jobs[0])
 		if !isCompleted {
 			return nil
 		}
-		if err != nil {
-			return intctrlutil.NewFatalError(err.Error())
+		if errMsg != "" {
+			return intctrlutil.NewFatalError(errMsg)
 		}
 	}
 	// 4. if jobs are succeed, rebind the pvc and pv

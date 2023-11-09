@@ -33,7 +33,6 @@ import (
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
 	"github.com/apecloud/kubeblocks/pkg/cli/testing"
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
 )
@@ -86,7 +85,6 @@ var _ = Describe("Delete Account Options", func() {
 			o := NewDeleteUserOptions(tf, streams)
 			Expect(o).ShouldNot(BeNil())
 			Expect(o.AccountBaseOptions).ShouldNot(BeNil())
-			Expect(o.AccountBaseOptions.AccountOp).Should(Equal(lorryutil.DeleteUserOp))
 		})
 
 		It("validate user name and password", func() {
@@ -101,11 +99,11 @@ var _ = Describe("Delete Account Options", func() {
 			Expect(o.Validate(args)).Should(MatchError(errMissingUserName))
 
 			// set user name
-			o.info.UserName = "lilei"
+			o.userName = "lilei"
 			_, _ = in.Write([]byte("hanmeimei\n"))
 			Expect(o.Validate(args)).Should(HaveOccurred())
 			in.Reset()
-			_, _ = in.Write([]byte(o.info.UserName + "\n"))
+			_, _ = in.Write([]byte(o.userName + "\n"))
 			Expect(o.Validate(args)).Should(Succeed())
 		})
 
@@ -115,11 +113,9 @@ var _ = Describe("Delete Account Options", func() {
 
 			o.PodName = pods.Items[0].Name
 			o.ClusterName = clusterName
-			o.info.UserName = "lily"
+			o.userName = "lily"
 
 			Expect(o.Complete(tf)).Should(Succeed())
-			Expect(o.RequestMeta).ShouldNot(BeNil())
-			Expect(o.RequestMeta).Should(HaveLen(1))
 		})
 	})
 })

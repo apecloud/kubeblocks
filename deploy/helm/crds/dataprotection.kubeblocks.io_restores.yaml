@@ -1430,9 +1430,9 @@ spec:
                     x-kubernetes-validations:
                     - message: forbidden to update spec.prepareDataConfig.schedulingSpec
                       rule: self == oldSelf
-                  volumeClaimManagementPolicy:
+                  volumeClaimRestorePolicy:
                     default: Parallel
-                    description: 'VolumeClaimManagementPolicy defines recovery strategy
+                    description: 'VolumeClaimRestorePolicy defines restore policy
                       for persistent volume claim. Supported policies are as follows:
                       1. Parallel: parallel recovery of persistent volume claim. 2.
                       Serial: restore the persistent volume claim in sequence, and
@@ -2011,7 +2011,7 @@ spec:
                     - message: forbidden to update spec.prepareDataConfig.volumeClaimsTemplate
                       rule: self == oldSelf
                 required:
-                - volumeClaimManagementPolicy
+                - volumeClaimRestorePolicy
                 type: object
               readyConfig:
                 description: configuration for the action of "postReady" phase.
@@ -2027,7 +2027,10 @@ spec:
                       passwordKey:
                         default: password
                         description: passwordKey specifies the map key of the password
-                          in the connection credential secret.
+                          in the connection credential secret. This password will
+                          be saved in the backup annotation for full backup. You can
+                          use the environment variable DP_ENCRYPTION_KEY to specify
+                          encryption key.
                         type: string
                       portKey:
                         description: portKey specifies the map key of the port in

@@ -163,7 +163,11 @@ func (r *Request) buildBackupDataAction() (action.Action, error) {
 	}
 
 	backupDataAct := r.ActionSet.Spec.Backup.BackupData
-	podSpec := r.buildJobActionPodSpec(backupDataContainerName, &backupDataAct.JobActionSpec)
+	podSpec, err := r.buildJobActionPodSpec(backupDataContainerName, &backupDataAct.JobActionSpec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build job action pod spec: %w", err)
+	}
+
 	if backupDataAct.SyncProgress != nil {
 		r.injectSyncProgressContainer(podSpec, backupDataAct.SyncProgress)
 	}
@@ -241,33 +245,48 @@ func (r *Request) buildAction(name string, act *dpv1alpha1.ActionSpec) (action.A
 
 func (r *Request) buildExecAction(name string, exec *dpv1alpha1.ExecActionSpec) action.Action {
 	targetPod := r.TargetPods[0]
+	objectMeta := *buildBackupJobObjMeta(r.Backup, name)
+	objectMeta.Labels[dptypes.BackupNamespaceLabelKey] = r.Namespace
+	// create exec job in kubeblocks namespace for security
+	objectMeta.Namespace = viper.GetString(constant.CfgKeyCtrlrMgrNS)
+	containerName := exec.Container
+	if exec.Container == "" {
+		containerName = targetPod.Spec.Containers[0].Name
+	}
 	return &action.ExecAction{
 		JobAction: action.JobAction{
 			Name:       name,
-			ObjectMeta: *buildBackupJobObjMeta(r.Backup, name),
+			ObjectMeta: objectMeta,
 			Owner:      r.Backup,
 		},
-		Command:            exec.Command,
-		Container:          exec.Container,
-		Namespace:          targetPod.Namespace,
-		PodName:            targetPod.Name,
-		Timeout:            exec.Timeout,
-		ServiceAccountName: r.targetServiceAccountName(),
+		Command:   exec.Command,
+		Container: containerName,
+		Namespace: targetPod.Namespace,
+		PodName:   targetPod.Name,
+		Timeout:   exec.Timeout,
+		// use the kubeblocks's serviceAccount
+		ServiceAccountName: viper.GetString(constant.KBServiceAcccountName),
 	}
 }
 
 func (r *Request) buildJobAction(name string, job *dpv1alpha1.JobActionSpec) (action.Action, error) {
+	podSpec, err := r.buildJobActionPodSpec(name, job)
+	if err != nil {
+		return nil, err
+	}
 	return &action.JobAction{
 		Name:         name,
 		ObjectMeta:   *buildBackupJobObjMeta(r.Backup, name),
 		Owner:        r.Backup,
-		PodSpec:      r.buildJobActionPodSpec(name, job),
+		PodSpec:      podSpec,
 		BackOffLimit: r.BackupPolicy.Spec.BackoffLimit,
 	}, nil
 }
 
-func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSpec) *corev1.PodSpec {
+func (r *Request) buildJobActionPodSpec(name string,
+	job *dpv1alpha1.JobActionSpec) (*corev1.PodSpec, error) {
 	targetPod := r.TargetPods[0]
+
 	// build environment variables, include built-in envs, envs from backupMethod
 	// and envs from actionSet. Latter will override former for the same name.
 	// env from backupMethod has the highest priority.
@@ -301,6 +320,10 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 		return utils.MergeEnv(envVars, r.BackupMethod.Env)
 	}
 
+	runOnTargetPodNode := func() bool {
+		return boolptr.IsSetToTrue(job.RunOnTargetPodNode)
+	}
+
 	buildVolumes := func() []corev1.Volume {
 		volumes := []corev1.Volume{
 			{
@@ -311,7 +334,7 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 			},
 		}
 		// only mount the volumes when the backup pod is running on the target pod node.
-		if boolptr.IsSetToTrue(job.RunOnTargetPodNode) {
+		if runOnTargetPodNode() {
 			volumes = append(volumes, getVolumesByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)...)
 		}
 		return volumes
@@ -325,7 +348,7 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 			},
 		}
 		// only mount the volumes when the backup pod is running on the target pod node.
-		if boolptr.IsSetToTrue(job.RunOnTargetPodNode) {
+		if runOnTargetPodNode() {
 			volumesMount = append(volumesMount, getVolumeMountsByVolumeInfo(targetPod, r.BackupMethod.TargetVolumes)...)
 		}
 		return volumesMount
@@ -362,23 +385,25 @@ func (r *Request) buildJobActionPodSpec(name string, job *dpv1alpha1.JobActionSp
 		Volumes:            buildVolumes(),
 		ServiceAccountName: r.targetServiceAccountName(),
 		RestartPolicy:      corev1.RestartPolicyNever,
-
-		// tolerate all taints
-		Tolerations: []corev1.Toleration{
-			{
-				Operator: corev1.TolerationOpExists,
-			},
-		},
 	}
 
-	if boolptr.IsSetToTrue(job.RunOnTargetPodNode) {
+	// if run on target pod node, set backup pod tolerations same as the target pod,
+	// that will make sure the backup pod can be scheduled to the target pod node.
+	// If not, just use the tolerations built by the environment variables.
+	if runOnTargetPodNode() {
+		podSpec.Tolerations = targetPod.Spec.Tolerations
 		podSpec.NodeSelector = map[string]string{
 			corev1.LabelHostname: targetPod.Spec.NodeName,
 		}
+	} else {
+		if err := utils.AddTolerations(podSpec); err != nil {
+			return nil, err
+		}
 	}
+
 	utils.InjectDatasafed(podSpec, r.BackupRepo, RepoVolumeMountPath,
 		BuildBackupPath(r.Backup, r.BackupPolicy.Spec.PathPrefix))
-	return podSpec
+	return podSpec, nil
 }
 
 // injectSyncProgressContainer injects a container to sync the backup progress.
@@ -408,15 +433,37 @@ func (r *Request) injectSyncProgressContainer(podSpec *corev1.PodSpec,
 			Value: fmt.Sprintf("%d", checkIntervalSeconds)},
 	)
 
+	// sync progress script will wait for the backup info file to be created,
+	// if the file is created, it will update the backup status and exit.
+	// If an exit file named with the backup info file with .exit suffix exists,
+	// it indicates that the container for backing up data exited abnormally,
+	// this script will exit.
 	args := fmt.Sprintf(`
-set -o errexit;
-set -o nounset;
-while [ ! -f ${%[1]s} ]; do
-  sleep ${%[2]s}
-done
-backupInfo=$(cat ${%[1]s});
-echo backupInfo:${backupInfo};
-eval kubectl -n %[3]s patch backup %[4]s --subresource=status --type=merge --patch '{\"status\":${backupInfo}}';
+set -o errexit
+set -o nounset
+
+function update_backup_stauts() {
+  local backup_info_file="$1"
+  local exit_file="$1.exit"
+  local sleep_seconds="$2"
+  while true; do 
+    if [ -f "$exit_file" ]; then
+      echo "exit file $exit_file exists, exit"
+      exit 1
+    fi
+    if [ -f "$backup_info_file" ]; then
+      break
+    fi
+    echo "backup info file not exists, wait for ${sleep_seconds}s"
+    sleep $sleep_seconds
+  done
+  local backup_info=$(cat $backup_info_file)
+  echo backupInfo:${backup_info}
+  local namespace="$3"
+  local backup_name="$4"
+  eval kubectl -n "$namespace" patch backup "$backup_name" --subresource=status --type=merge --patch '{\"status\":${backup_info}}'
+}
+update_backup_stauts ${%s} ${%s} %s %s
 `, dptypes.DPBackupInfoFile, dptypes.DPCheckInterval, r.Backup.Namespace, r.Backup.Name)
 
 	container.Args = []string{args}

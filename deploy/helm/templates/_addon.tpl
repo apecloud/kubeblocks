@@ -7,7 +7,7 @@ chartsPathInImage: {{ .Values.addonChartsImage.chartsPath }}
 {{- end }}
 
 {{/*
-Define addon helm localtion URL
+Define addon helm location URL
 Usage:
 {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "CHART-NAME" "version" "VERSION" "values" .Values) }}
 Example:

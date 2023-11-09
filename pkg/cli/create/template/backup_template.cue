@@ -17,10 +17,13 @@
 
 // required, command line input options for parameters and flags
 options: {
-	backupName:   string
-	namespace:    string
-	backupMethod: string
-	backupPolicy: string
+	backupName:       string
+	namespace:        string
+	backupMethod:     string
+	backupPolicy:     string
+	deletionPolicy:   string
+	retentionPeriod:  string
+	parentBackupName: string
 }
 
 // required, k8s api resource content
@@ -37,5 +40,14 @@ content: {
 	spec: {
 		backupMethod:     options.backupMethod
 		backupPolicyName: options.backupPolicy
+		if options.deletionPolicy != "" {
+			deletionPolicy: options.deletionPolicy
+		}
+		if options.retentionPeriod != "" {
+			retentionPeriod: options.retentionPeriod
+		}
+		if options.parentBackupName != "" {
+			parentBackupName: options.parentBackupName
+		}
 	}
 }

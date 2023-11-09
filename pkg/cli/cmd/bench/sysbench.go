@@ -22,6 +22,7 @@ package bench
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,6 +43,7 @@ var (
 		"mysql":      "mysql",
 		"postgresql": "pgsql",
 	}
+	sysbenchSupportedDrivers = []string{"mysql", "pgsql"}
 )
 
 var sysbenchExample = templates.Examples(`
@@ -125,20 +127,20 @@ func (o *SysBenchOptions) Complete(args []string) error {
 
 	o.Step, o.name = parseStepAndName(args, "sysbench")
 
+	o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return err
+	}
+
+	if o.dynamic, err = o.factory.DynamicClient(); err != nil {
+		return err
+	}
+
+	if o.client, err = o.factory.KubernetesClientSet(); err != nil {
+		return err
+	}
+
 	if o.ClusterName != "" {
-		o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
-		if err != nil {
-			return err
-		}
-
-		if o.dynamic, err = o.factory.DynamicClient(); err != nil {
-			return err
-		}
-
-		if o.client, err = o.factory.KubernetesClientSet(); err != nil {
-			return err
-		}
-
 		clusterGetter := cluster.ObjectsGetter{
 			Client:    o.client,
 			Dynamic:   o.dynamic,
@@ -195,7 +197,8 @@ func (o *SysBenchOptions) Validate() error {
 		}
 	}
 	if !supported {
-		return fmt.Errorf("driver %s is not supported", o.Driver)
+		return fmt.Errorf("sysbench now only supports drivers in [%s], current cluster driver is %s",
+			strings.Join(sysbenchSupportedDrivers, ","), o.Driver)
 	}
 
 	if o.User == "" {

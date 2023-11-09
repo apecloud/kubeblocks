@@ -22,6 +22,7 @@ package bench
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,6 +43,7 @@ var (
 		"mysql":      "mysql",
 		"postgresql": "postgres",
 	}
+	tpccSupportedDrivers = []string{"mysql", "postgres"}
 )
 
 var tpccExample = templates.Examples(`
@@ -130,20 +132,20 @@ func (o *TpccOptions) Complete(args []string) error {
 
 	o.Step, o.name = parseStepAndName(args, "tpcc")
 
+	o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return err
+	}
+
+	if o.dynamic, err = o.factory.DynamicClient(); err != nil {
+		return err
+	}
+
+	if o.client, err = o.factory.KubernetesClientSet(); err != nil {
+		return err
+	}
+
 	if o.ClusterName != "" {
-		o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
-		if err != nil {
-			return err
-		}
-
-		if o.dynamic, err = o.factory.DynamicClient(); err != nil {
-			return err
-		}
-
-		if o.client, err = o.factory.KubernetesClientSet(); err != nil {
-			return err
-		}
-
 		clusterGetter := cluster.ObjectsGetter{
 			Client:    o.client,
 			Dynamic:   o.dynamic,
@@ -194,7 +196,8 @@ func (o *TpccOptions) Validate() error {
 		}
 	}
 	if !supported {
-		return fmt.Errorf("driver %s is not supported", o.Driver)
+		return fmt.Errorf("tpcc now only supports drivers in [%s], current cluster driver is %s",
+			strings.Join(tpccSupportedDrivers, ","), o.Driver)
 	}
 
 	if o.User == "" {

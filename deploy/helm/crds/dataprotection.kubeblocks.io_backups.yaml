@@ -91,9 +91,9 @@ spec:
                 description: deletionPolicy determines whether the backup contents
                   stored in backup repository should be deleted when the backup custom
                   resource is deleted. Supported values are "Retain" and "Delete".
-                  "Retain" means that the backup content and its physical snapshot
-                  on backup repository are kept. "Delete" means that the backup content
-                  and its physical snapshot on backup repository are deleted.
+                  "Retain" means that the backup can not be deleted and remains in
+                  'Deleting' phase. "Delete" means that the backup content and its
+                  physical snapshot on backup repository are deleted.
                 type: string
               parentBackupName:
                 description: parentBackupName determines the parent backup name for
@@ -538,7 +538,10 @@ spec:
                       passwordKey:
                         default: password
                         description: passwordKey specifies the map key of the password
-                          in the connection credential secret.
+                          in the connection credential secret. This password will
+                          be saved in the backup annotation for full backup. You can
+                          use the environment variable DP_ENCRYPTION_KEY to specify
+                          encryption key.
                         type: string
                       portKey:
                         description: portKey specifies the map key of the port in
@@ -605,10 +608,8 @@ spec:
                         default: Any
                         description: 'strategy specifies the strategy to select the
                           target pod when multiple pods are selected. Valid values
-                          are: - All: select all pods that match the labelsSelector.
-                          - Any: select any one pod that match the labelsSelector.'
+                          are: - Any: select any one pod that match the labelsSelector.'
                         enum:
-                        - All
                         - Any
                         type: string
                     type: object
@@ -703,6 +704,7 @@ spec:
               totalSize:
                 description: totalSize is the total size of backed up data size. A
                   string with capacity units in the format of "1Gi", "1Mi", "1Ki".
+                  If no capacity unit is specified, it is assumed to be in bytes.
                 type: string
               volumeSnapshots:
                 description: volumeSnapshots records the volume snapshot status for

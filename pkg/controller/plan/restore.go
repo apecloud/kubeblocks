@@ -28,7 +28,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -51,12 +50,12 @@ type RestoreManager struct {
 	Scheme  *k8sruntime.Scheme
 
 	// private
-	namespace              string
-	restoreTime            string
-	volumeManagementPolicy dpv1alpha1.VolumeClaimManagementPolicy
-	startingIndex          int32
-	replicas               int32
-	restoreLabels          map[string]string
+	namespace           string
+	restoreTime         string
+	volumeRestorePolicy dpv1alpha1.VolumeClaimRestorePolicy
+	startingIndex       int32
+	replicas            int32
+	restoreLabels       map[string]string
 }
 
 func NewRestoreManager(ctx context.Context,
@@ -67,15 +66,15 @@ func NewRestoreManager(ctx context.Context,
 	replicas, startingIndex int32,
 ) *RestoreManager {
 	return &RestoreManager{
-		Cluster:                cluster,
-		Client:                 cli,
-		Ctx:                    ctx,
-		Scheme:                 scheme,
-		replicas:               replicas,
-		startingIndex:          startingIndex,
-		namespace:              cluster.Namespace,
-		volumeManagementPolicy: dpv1alpha1.ParallelManagementPolicy,
-		restoreLabels:          restoreLabels,
+		Cluster:             cluster,
+		Client:              cli,
+		Ctx:                 ctx,
+		Scheme:              scheme,
+		replicas:            replicas,
+		startingIndex:       startingIndex,
+		namespace:           cluster.Namespace,
+		volumeRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicyParallel,
+		restoreLabels:       restoreLabels,
 	}
 }
 
@@ -174,8 +173,8 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 			},
 			RestoreTime: r.restoreTime,
 			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
-				SchedulingSpec:              schedulingSpec,
-				VolumeClaimManagementPolicy: r.volumeManagementPolicy,
+				SchedulingSpec:           schedulingSpec,
+				VolumeClaimRestorePolicy: r.volumeRestorePolicy,
 				RestoreVolumeClaimsTemplate: &dpv1alpha1.RestoreVolumeClaimsTemplate{
 					Replicas:      r.replicas,
 					StartingIndex: r.startingIndex,
@@ -289,13 +288,24 @@ func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.Synt
 	}
 	if namespace := backupSource[constant.BackupNamespaceKeyForRestore]; namespace != "" {
 		r.namespace = namespace
+		// TODO: support restore backup to different namespace
+		if namespace != r.Cluster.Namespace {
+			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed,
+				"unsupported restore backup to different namespace, backup namespace: %s, cluster namespace: %s", namespace, r.Cluster.Namespace)
+		}
 	}
-	if managementPolicy := backupSource[constant.VolumeManagementPolicyKeyForRestore]; managementPolicy != "" {
-		r.volumeManagementPolicy = dpv1alpha1.VolumeClaimManagementPolicy(managementPolicy)
+	if volumeRestorePolicy := backupSource[constant.VolumeRestorePolicyKeyForRestore]; volumeRestorePolicy != "" {
+		r.volumeRestorePolicy = dpv1alpha1.VolumeClaimRestorePolicy(volumeRestorePolicy)
 	}
 	r.restoreTime = backupSource[constant.RestoreTimeKeyForRestore]
+
+	name := backupSource[constant.BackupNameKeyForRestore]
+	if name == "" {
+		return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed,
+			"failed to restore component %s, backup name is empty", synthesizedComponent.Name)
+	}
 	backup := &dpv1alpha1.Backup{}
-	if err = r.Client.Get(r.Ctx, types.NamespacedName{Name: backupSource[constant.BackupNameKeyForRestore], Namespace: r.Cluster.Namespace}, backup); err != nil {
+	if err = r.Client.Get(r.Ctx, client.ObjectKey{Namespace: r.namespace, Name: name}, backup); err != nil {
 		return nil, err
 	}
 	return backup, nil
@@ -317,13 +327,15 @@ func (r *RestoreManager) createRestoreAndWait(restore *dpv1alpha1.Restore) error
 			return err
 		}
 	}
-	if restore.Status.Phase == dpv1alpha1.RestorePhaseCompleted {
+
+	switch restore.Status.Phase {
+	case dpv1alpha1.RestorePhaseCompleted:
 		return nil
+	case dpv1alpha1.RestorePhaseFailed:
+		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed, `restore "%s" status is Failed, you can describe it and re-restore the cluster.`, restore.GetName())
+	default:
+		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting, `waiting for restore "%s" successfully`, restore.GetName())
 	}
-	if restore.Status.Phase == dpv1alpha1.RestorePhaseFailed {
-		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed, `restore "%s" is Failed, you can describe it and re-restore the cluster.`, restore.GetName())
-	}
-	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting, `waiting for restore "%s" successfully`, restore.GetName())
 }
 
 func (r *RestoreManager) cleanupClusterAnnotations() error {

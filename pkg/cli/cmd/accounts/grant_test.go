@@ -32,7 +32,6 @@ import (
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	lorryutil "github.com/apecloud/kubeblocks/lorry/util"
 	"github.com/apecloud/kubeblocks/pkg/cli/testing"
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
 )
@@ -81,47 +80,39 @@ var _ = Describe("Grant Account Options", func() {
 
 	Context("new options", func() {
 		It("new option", func() {
-			for _, op := range []lorryutil.OperationKind{lorryutil.GrantUserRoleOp, lorryutil.RevokeUserRoleOp} {
-				o := NewGrantOptions(tf, streams, op)
-				Expect(o).ShouldNot(BeNil())
-			}
-			for _, op := range []lorryutil.OperationKind{lorryutil.CreateUserOp, lorryutil.DeleteUserOp, lorryutil.DescribeUserOp, lorryutil.ListUsersOp} {
-				o := NewGrantOptions(tf, streams, op)
-				Expect(o).Should(BeNil())
-			}
+			o := NewGrantOptions(tf, streams)
+			Expect(o).ShouldNot(BeNil())
 		})
 
 		It("validate options", func() {
-			for _, op := range []lorryutil.OperationKind{lorryutil.GrantUserRoleOp, lorryutil.RevokeUserRoleOp} {
-				o := NewGrantOptions(tf, streams, op)
-				Expect(o).ShouldNot(BeNil())
-				args := []string{}
-				Expect(o.Validate(args)).Should(MatchError(errClusterNameorInstName))
+			o := NewGrantOptions(tf, streams)
+			Expect(o).ShouldNot(BeNil())
+			args := []string{}
+			Expect(o.Validate(args)).Should(MatchError(errClusterNameorInstName))
 
-				// add one element
-				By("add one more args, should fail")
-				args = []string{"foo"}
-				Expect(o.Validate(args)).Should(MatchError(errMissingUserName))
+			// add one element
+			By("add one more args, should fail")
+			args = []string{"foo"}
+			Expect(o.Validate(args)).Should(MatchError(errMissingUserName))
 
-				o.info.UserName = "foo"
-				Expect(o.Validate(args)).Should(MatchError(errMissingRoleName))
+			o.userName = "foo"
+			Expect(o.Validate(args)).Should(MatchError(errMissingRoleName))
 
-				o.info.RoleName = "bar"
-				Expect(o.Validate(args)).Should(MatchError(errInvalidRoleName))
-				for _, r := range []string{"readonly", "readwrite", "superuser"} {
-					o.info.RoleName = r
-					Expect(o.Validate(args)).Should(Succeed())
-				}
+			o.roleName = "bar"
+			Expect(o.Validate(args)).Should(MatchError(errInvalidRoleName))
+			for _, r := range []string{"readonly", "readwrite", "superuser"} {
+				o.roleName = r
+				Expect(o.Validate(args)).Should(Succeed())
 			}
 		})
 
 		It("complete option", func() {
-			o := NewGrantOptions(tf, streams, lorryutil.GrantUserRoleOp)
+			o := NewGrantOptions(tf, streams)
 			Expect(o).ShouldNot(BeNil())
 			o.PodName = pods.Items[0].Name
 			o.ClusterName = clusterName
-			o.info.UserName = "alice"
-			o.info.RoleName = "readonly"
+			o.userName = "alice"
+			o.roleName = "readonly"
 			Expect(o.Complete(tf)).Should(Succeed())
 
 			Expect(o.Client).ShouldNot(BeNil())
@@ -129,8 +120,6 @@ var _ = Describe("Grant Account Options", func() {
 			Expect(o.Namespace).Should(Equal(namespace))
 			Expect(o.Pod).ShouldNot(BeNil())
 			Expect(o.Pod.Name).Should(Equal(o.PodName))
-			Expect(o.RequestMeta).ShouldNot(BeNil())
-			Expect(o.RequestMeta).Should(HaveLen(2))
 		})
 	})
 })

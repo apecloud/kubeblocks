@@ -32,21 +32,19 @@ import (
 	"k8s.io/client-go/dynamic"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/cli/types"
 	. "github.com/apecloud/kubeblocks/test/e2e"
 	e2eutil "github.com/apecloud/kubeblocks/test/e2e/util"
+	"github.com/apecloud/kubeblocks/test/testutils"
 )
 
 const (
-	timeout  time.Duration = time.Second * 1000
+	timeout  time.Duration = time.Second * 1500
 	interval time.Duration = time.Second * 10
 )
 
 type Options struct {
 	Dynamic dynamic.Interface
 }
-
-var arr = []string{"00", "componentresourceconstraint", "restore", "class", "cv", "snapshot"}
 
 func SmokeTest() {
 	BeforeEach(func() {
@@ -65,7 +63,7 @@ func SmokeTest() {
 			if err != nil {
 				logrus.WithError(err).Fatal("could not generate dynamic client for config")
 			}
-			objects, err := dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
+			objects, err := dynamic.Resource(testutils.AddonGVR()).List(context.TODO(), metav1.ListOptions{
 				LabelSelector: e2eutil.BuildAddonLabelSelector(),
 			})
 			if err != nil && !apierrors.IsNotFound(err) {
@@ -159,6 +157,20 @@ func runTestCases(files []string) {
 				}
 			}
 		}
+		if strings.Contains(file, "restore") {
+			backups := "kubectl get backup | awk '{print $1}' | tail -n +2"
+			log.Println(backups)
+			backupList := e2eutil.ExecCommandReadline(backups)
+			log.Println(backupList)
+			Eventually(func(g Gomega) {
+				for _, backup := range backupList {
+					cmd := "kubectl get backup " + backup + " -o=jsonpath='{.status.phase}'"
+					log.Println(cmd)
+					log.Println(e2eutil.ExecCommand(cmd))
+					g.Expect(e2eutil.ExecCommand(cmd)).Should(Equal("Completed"))
+				}
+			}, timeout, interval).Should(Succeed())
+		}
 		b := e2eutil.OpsYaml(file, "create")
 		if strings.Contains(file, "00") || strings.Contains(file, "restore") {
 			clusterName, nameSpace = e2eutil.GetName(file)
@@ -187,6 +199,7 @@ func runTestCases(files []string) {
 			}, timeout, interval).Should(Succeed())
 			testResult = true
 		}
+		log.Println(testResult)
 		if testResult {
 			e2eResult := NewResult(fileName, testResult, "")
 			TestResults = append(TestResults, e2eResult)
@@ -194,11 +207,6 @@ func runTestCases(files []string) {
 			out := troubleShooting(clusterName)
 			e2eResult := NewResult(fileName, testResult, out)
 			TestResults = append(TestResults, e2eResult)
-		}
-	}
-	if len(files) > 0 {
-		for _, file := range files {
-			deleteResource(file)
 		}
 	}
 }
@@ -209,12 +217,4 @@ func troubleShooting(clusterName string) string {
 	commond := "kubectl describe cluster " + clusterName
 	clusterEvents := e2eutil.ExecCommand(commond)
 	return allResourceStatus + clusterEvents
-}
-
-func deleteResource(file string) {
-	for _, s := range arr {
-		if strings.Contains(file, s) {
-			e2eutil.OpsYaml(file, "delete")
-		}
-	}
 }

@@ -99,19 +99,6 @@ var (
 		},
 	}
 
-	defaultConnectionCredential = map[string]string{
-		"username":          "root",
-		"SVC_FQDN":          "$(SVC_FQDN)",
-		"HEADLESS_SVC_FQDN": "$(HEADLESS_SVC_FQDN)",
-		"RANDOM_PASSWD":     "$(RANDOM_PASSWD)",
-		"tcpEndpoint":       "tcp:$(SVC_FQDN):$(SVC_PORT_mysql)",
-		"paxosEndpoint":     "paxos:$(SVC_FQDN):$(SVC_PORT_paxos)",
-		"UUID":              "$(UUID)",
-		"UUID_B64":          "$(UUID_B64)",
-		"UUID_STR_B64":      "$(UUID_STR_B64)",
-		"UUID_HEX":          "$(UUID_HEX)",
-	}
-
 	// defaultSvc value are corresponding to defaultMySQLContainer.Ports name mapping and
 	// corresponding to defaultConnectionCredential variable placeholder
 	defaultSvcSpec = appsv1alpha1.ServiceSpec{

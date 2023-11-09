@@ -26,11 +26,12 @@ import (
 )
 
 const (
-	APIVersion            = "apps.kubeblocks.io/v1alpha1"
-	ClusterVersionKind    = "ClusterVersion"
-	ClusterDefinitionKind = "ClusterDefinition"
-	ClusterKind           = "Cluster"
-	OpsRequestKind        = "OpsRequestKind"
+	APIVersion                 = "apps.kubeblocks.io/v1alpha1"
+	ClusterVersionKind         = "ClusterVersion"
+	ClusterDefinitionKind      = "ClusterDefinition"
+	ClusterKind                = "Cluster"
+	OpsRequestKind             = "OpsRequestKind"
+	ReplicatedStateMachineKind = "ReplicatedStateMachine"
 )
 
 type ComponentTemplateSpec struct {
@@ -215,7 +216,7 @@ const (
 
 // OpsType defines operation types.
 // +enum
-// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose,Switchover,DataScript,Backup}
+// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose,Switchover,DataScript,Backup,Restore}
 type OpsType string
 
 const (
@@ -231,6 +232,7 @@ const (
 	ExposeType            OpsType = "Expose"
 	DataScriptType        OpsType = "DataScript" // DataScriptType the data script operation will execute the data script against the cluster.
 	BackupType            OpsType = "Backup"
+	RestoreType           OpsType = "Restore"
 )
 
 // ComponentResourceKey defines the resource key of component, such as pod/pvc.

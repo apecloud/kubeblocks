@@ -40,10 +40,10 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
-	lorry "github.com/apecloud/kubeblocks/lorry/client"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
+	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -512,7 +512,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			vs.Name = backupKey.Name
 			vs.Namespace = backupKey.Namespace
 			vs.Labels = map[string]string{
-				dptypes.DataProtectionLabelBackupNameKey: backupKey.Name,
+				dptypes.BackupNameLabelKey: backupKey.Name,
 			}
 			pvcName := ""
 			vs.Spec = snapshotv1.VolumeSnapshotSpec{
@@ -597,7 +597,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		})
 
 		It("HorizontalScaling when the number of pods is inconsistent with the number of replicas", func() {
-			lorry.SetMockClient(&mockLorryClient{replicas: 2, clusterKey: clusterKey, compName: mysqlCompName}, nil)
+			newMockLorryClient(clusterKey, mysqlCompName, 2)
 			defer lorry.UnsetMockClient()
 
 			By("create a cluster with 3 pods")

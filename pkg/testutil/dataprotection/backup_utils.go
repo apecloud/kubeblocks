@@ -20,12 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -34,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 func NewFakeActionSet(testCtx *testutil.TestContext) *dpv1alpha1.ActionSet {
@@ -62,6 +67,17 @@ func NewFakeBackupPolicy(testCtx *testutil.TestContext,
 		SetBackupMethodVolumes([]string{DataVolumeName}).
 		Apply(change).
 		Create(testCtx).GetObject()
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ClusterName,
+			Namespace: testCtx.DefaultNamespace,
+		},
+		StringData: map[string]string{
+			"password": "test-passw0rd",
+		},
+	}
+	Expect(testCtx.CreateObj(testCtx.Ctx, secret)).Should(Succeed())
 	Eventually(testapps.CheckObj(testCtx, client.ObjectKeyFromObject(bp),
 		func(g Gomega, bp *dpv1alpha1.BackupPolicy) {
 			g.Expect(bp.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.AvailablePhase))
@@ -100,6 +116,15 @@ func NewFakeBackupRepo(testCtx *testutil.TestContext,
 				change(obj)
 			}
 		})
+	jobName := fmt.Sprintf("pre-check-%s-%s", repo.UID[:8], repo.Name)
+	namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+	Eventually(testapps.GetAndChangeObjStatus(testCtx, types.NamespacedName{Name: jobName, Namespace: namespace},
+		func(job *batchv1.Job) {
+			job.Status.Conditions = append(job.Status.Conditions, batchv1.JobCondition{
+				Type:   batchv1.JobComplete,
+				Status: corev1.ConditionTrue,
+			})
+		})).Should(Succeed())
 	var name string
 	Eventually(testapps.CheckObj(testCtx, client.ObjectKeyFromObject(repo),
 		func(g Gomega, repo *dpv1alpha1.BackupRepo) {
@@ -124,12 +149,19 @@ func NewFakeBackup(testCtx *testutil.TestContext,
 }
 
 func NewFakeCluster(testCtx *testutil.TestContext) *BackupClusterInfo {
-	createPVC := func(name string) *corev1.PersistentVolumeClaim {
-		return testapps.NewPersistentVolumeClaimFactory(
+	createPVCAndPV := func(name string) *corev1.PersistentVolumeClaim {
+		pvName := "pv-" + name
+		pvc := testapps.NewPersistentVolumeClaimFactory(
 			testCtx.DefaultNamespace, name, ClusterName, ComponentName, "data").
+			SetVolumeName(pvName).
 			SetStorage("1Gi").
 			SetStorageClass(StorageClassName).
 			Create(testCtx).GetObject()
+
+		testapps.NewPersistentVolumeFactory(testCtx.DefaultNamespace, pvName, name).
+			SetStorage("1Gi").
+			SetClaimRef(pvc).SetCSIDriver(testutil.DefaultCSIDriver).Create(testCtx)
+		return pvc
 	}
 
 	podFactory := func(name string) *testapps.MockPodFactory {
@@ -148,10 +180,10 @@ func NewFakeCluster(testCtx *testutil.TestContext) *BackupClusterInfo {
 	_ = testapps.CreateStorageClass(testCtx, StorageClassName, true)
 
 	By("mocking a pvc belonging to the pod 0")
-	pvc := createPVC("data-" + podName + "-0")
+	pvc := createPVCAndPV("data-" + podName + "-0")
 
 	By("mocking a pvc belonging to the pod 1")
-	pvc1 := createPVC("data-" + podName + "-1")
+	pvc1 := createPVCAndPV("data-" + podName + "-1")
 
 	By("mocking pod 0 belonging to the statefulset")
 	volume := corev1.Volume{Name: DataVolumeName, VolumeSource: corev1.VolumeSource{

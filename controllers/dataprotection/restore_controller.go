@@ -30,18 +30,21 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // RestoreReconciler reconciles a Restore object
@@ -88,6 +91,10 @@ func (r *RestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.newAction(reqCtx, restore)
 	case dpv1alpha1.RestorePhaseRunning:
 		return r.inProgressAction(reqCtx, restore)
+	case dpv1alpha1.RestorePhaseCompleted:
+		if err = r.deleteExternalResources(reqCtx, restore); err != nil {
+			return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+		}
 	}
 	return intctrlutil.Reconciled()
 }
@@ -97,27 +104,32 @@ func (r *RestoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dpv1alpha1.Restore{}).
 		Owns(&batchv1.Job{}).
+		Watches(&batchv1.Job{}, handler.EnqueueRequestsFromMapFunc(r.parseRestoreJob)).
 		Complete(r)
 }
 
+func (r *RestoreReconciler) parseRestoreJob(ctx context.Context, object client.Object) []reconcile.Request {
+	job := object.(*batchv1.Job)
+	var requests []reconcile.Request
+	restoreName := job.Labels[dprestore.DataProtectionLabelRestoreKey]
+	restoreNamespace := job.Labels[dprestore.DataProtectionLabelRestoreNamespaceKey]
+	if restoreName != "" && restoreNamespace != "" {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: restoreNamespace,
+				Name:      restoreName,
+			},
+		})
+	}
+	return requests
+}
+
 func (r *RestoreReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, restore *dpv1alpha1.Restore) error {
-	jobs := &batchv1.JobList{}
-	if err := r.Client.List(reqCtx.Ctx, jobs,
-		client.InNamespace(restore.Namespace),
-		client.MatchingLabels(dprestore.BuildRestoreLabels(restore.Name))); err != nil {
-		return client.IgnoreNotFound(err)
+	labels := dprestore.BuildRestoreLabels(restore.Name)
+	if err := deleteRelatedJobs(reqCtx, r.Client, restore.Namespace, labels); err != nil {
+		return err
 	}
-	for i := range jobs.Items {
-		job := &jobs.Items[i]
-		if controllerutil.ContainsFinalizer(job, dptypes.DataProtectionFinalizerName) {
-			patch := client.MergeFrom(job.DeepCopy())
-			controllerutil.RemoveFinalizer(job, dptypes.DataProtectionFinalizerName)
-			if err := r.Patch(reqCtx.Ctx, job, patch); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
+	return deleteRelatedJobs(reqCtx, r.Client, viper.GetString(constant.CfgKeyCtrlrMgrNS), labels)
 }
 
 func (r *RestoreReconciler) newAction(reqCtx intctrlutil.RequestCtx, restore *dpv1alpha1.Restore) (ctrl.Result, error) {

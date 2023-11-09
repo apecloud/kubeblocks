@@ -245,18 +245,27 @@ func (r *Request) buildAction(name string, act *dpv1alpha1.ActionSpec) (action.A
 
 func (r *Request) buildExecAction(name string, exec *dpv1alpha1.ExecActionSpec) action.Action {
 	targetPod := r.TargetPods[0]
+	objectMeta := *buildBackupJobObjMeta(r.Backup, name)
+	objectMeta.Labels[dptypes.BackupNamespaceLabelKey] = r.Namespace
+	// create exec job in kubeblocks namespace for security
+	objectMeta.Namespace = viper.GetString(constant.CfgKeyCtrlrMgrNS)
+	containerName := exec.Container
+	if exec.Container == "" {
+		containerName = targetPod.Spec.Containers[0].Name
+	}
 	return &action.ExecAction{
 		JobAction: action.JobAction{
 			Name:       name,
-			ObjectMeta: *buildBackupJobObjMeta(r.Backup, name),
+			ObjectMeta: objectMeta,
 			Owner:      r.Backup,
 		},
-		Command:            exec.Command,
-		Container:          exec.Container,
-		Namespace:          targetPod.Namespace,
-		PodName:            targetPod.Name,
-		Timeout:            exec.Timeout,
-		ServiceAccountName: r.targetServiceAccountName(),
+		Command:   exec.Command,
+		Container: containerName,
+		Namespace: targetPod.Namespace,
+		PodName:   targetPod.Name,
+		Timeout:   exec.Timeout,
+		// use the kubeblocks's serviceAccount
+		ServiceAccountName: viper.GetString(constant.KBServiceAcccountName),
 	}
 }
 

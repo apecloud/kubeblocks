@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("Backup Deleter Test", func() {
@@ -282,6 +283,10 @@ var _ = Describe("Backup Deleter Test", func() {
 		})
 
 		testPostReady := func(existVolume bool) {
+			kbNamespace := "kb-system"
+			kbServiceAccountName := "kubeblocks"
+			viper.Set(constant.CfgKeyCtrlrMgrNS, kbNamespace)
+			viper.Set(constant.KBServiceAcccountName, kbServiceAccountName)
 			reqCtx := getReqCtx()
 			matchLabels := map[string]string{
 				constant.AppInstanceLabelKey: testdp.ClusterName,
@@ -299,6 +304,8 @@ var _ = Describe("Backup Deleter Test", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			// the count of exec jobs should equal to the pods count of cluster
 			Expect(len(jobs)).Should(Equal(2))
+			Expect(jobs[0].Namespace).Should(Equal(kbNamespace))
+			Expect(jobs[0].Spec.Template.Spec.ServiceAccountName).Should(Equal(kbServiceAccountName))
 
 			By("test with jobAction and expect for creating 1 job")
 			// step 0 is the execAction in actionSet

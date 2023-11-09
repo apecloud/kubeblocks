@@ -134,19 +134,15 @@ You can specify the BackupRepo information in a YAML configuration file when ins
    <Tabs>
 
    <TabItem value="kbcli" label="kbcli" default>
-
    ```bash
    kbcli backuprepo list
    ```
-
    </TabItem>
 
    <TabItem value="kubectl" label="kubectl">
-
    ```bash
    kubectl get backuprepo
    ```
-
    </TabItem>
 
    </Tabs>

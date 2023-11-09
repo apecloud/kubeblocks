@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
 // ClusterDeletionTransformer handles cluster deletion
@@ -163,7 +164,9 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	delObjs = append(delObjs, toDeleteObjs(nonNamespacedObjs)...)
 
 	for _, o := range delObjs {
-		graphCli.Delete(dag, o)
+		if !rsm.IsOwnedByRsm(o) {
+			graphCli.Delete(dag, o)
+		}
 	}
 	// set cluster action to noop until all the sub-resources deleted
 	if len(delObjs) == 0 {

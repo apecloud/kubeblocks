@@ -130,19 +130,23 @@ You can specify the BackupRepo information in a YAML configuration file when ins
    ```
 
    Use the command below to check the BackupRepo after installation.
-
+   
    <Tabs>
 
    <TabItem value="kbcli" label="kbcli" default>
+
    ```bash
    kbcli backuprepo list
    ```
+
    </TabItem>
 
    <TabItem value="kubectl" label="kubectl">
+
    ```bash
    kubectl get backuprepo
    ```
+
    </TabItem>
 
    </Tabs>

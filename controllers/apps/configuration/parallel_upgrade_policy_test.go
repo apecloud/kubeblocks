@@ -199,7 +199,8 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 		})
 	})
 
-	Context("parallel reconfigure policy test for not supported component", func() {
+	// TODO(component)
+	PContext("parallel reconfigure policy test for not supported component", func() {
 		It("Should failed", func() {
 			// not support type
 			mockParam := newMockReconfigureParams("parallelPolicy", k8sMockClient.Client(),

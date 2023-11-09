@@ -24,11 +24,11 @@ As its definition indicates, referencing the external component can be divided i
 
 * Referencing an external component
 
-This external component can be Kubernetes-based or non-Kubernetes. When referencing this component, first create a ServiceDescriptor CR which defines both the service and resources for referencing.
+This external component can be Kubernetes-based or non-Kubernetes. When referencing this component, first create a ServiceDescriptor CR (custom resources) which defines both the service and resources for referencing.
 
 * Reference a KubeBlocks-based component
 
-This type of component is based on KubeBlocks clusters. When referencing this component, just fill in the referenced Cluster and no ServiceDescriptor is required. 
+This type of component is based on KubeBlocks clusters. When referencing this component, just fill in the referenced Cluster and no ServiceDescriptor is required.
 
 ## Examples of referencing external component
 
@@ -196,7 +196,7 @@ Based on the above example, when creating a Pulsar cluster, the zookeeper mappin
        # Here omit other definitions
    ```
 
-   When creating the Pulsar Cluster object, `serviceRefs` maps `pulsarZookeeper` in the declaration to the specific `serviceDescriptor`. `name` in `serviceRefs` corresponds to the component referencing name defined in the ClusterDefinition and the value of `serviveDescriptor` is the name of `ServiceDescritor` in step 1.
+   When creating the Pulsar Cluster object, `serviceRefs` maps `pulsarZookeeper` in the declaration to the specific `serviceDescriptor`. `name` in `serviceRefs` corresponds to the component referencing name defined in the ClusterDefinition and the value of `serviceDescriptor` is the name of `ServiceDescritor` in step 1.
 
 #### Mapping the Zookeeper component deployed by an individual cluster provided by KubeBlocks
 
@@ -270,5 +270,5 @@ KubeBlocks v0.7.0 only provides an alpha version of the external component refer
 * If both serviceDescriptor-based and cluster-based mapping are specified when creating a cluster, the cluster-based one enjoys higher priority and the serviceDescriptor-based one will be ignored.
 * If the cluster-based mapping is used when creating a cluster, the `ServiceKind` and `ServiceVersion` defined in the ClusterDefinition will not be verified.
 
-  If the serviceDescriptor-based mapping is adopted, KubeBlocks will verify the `ServieKind` and `ServiceVersion` in the `serviceDescriptor` by comparing the `ServiceKind` and `ServiceVersion` defined in the ClusterDefinition. Mapping then is performed only when the values match.
+  If the serviceDescriptor-based mapping is adopted, KubeBlocks will verify the `ServiceKind` and `ServiceVersion` in the `serviceDescriptor` by comparing the `ServiceKind` and `ServiceVersion` defined in the ClusterDefinition. Mapping then is performed only when the values match.
 * For v0.7.0, the usage of component referencing in the ClusterDefinition is supported only by rendering the configuration templates. Other usage options will be supported in the future.

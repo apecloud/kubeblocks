@@ -42,6 +42,11 @@ type mapStruct struct {
 	M   map[string]string
 }
 
+type privateStruct struct {
+	Key   string
+	value string
+}
+
 func Print(a any) {
 	v := reflect.ValueOf(a)
 	fmt.Print(v.Kind())
@@ -121,5 +126,25 @@ func TestDeepCopy(t *testing.T) {
 		fmt.Printf("s: %v\n", s)
 		fmt.Printf("d: %v\n", d)
 		assert.NotEqual(t, s, *d)
+	})
+
+	t.Run("test struct with unexported field", func(t *testing.T) {
+		s := privateStruct{
+			Key:   "private1",
+			value: "values1",
+		}
+		fmt.Printf("s: %v\n", s)
+		d := &privateStruct{}
+		DeepCopy(&s, d)
+		fmt.Printf("d: %v\n", d)
+		assert.Equal(t, d.Key, s.Key)
+		assert.NotEqual(t, d.value, s.value)
+
+		d.Key = "private2"
+		d.value = "values2"
+		fmt.Printf("s: %v\n", s)
+		fmt.Printf("d: %v\n", d)
+		assert.NotEqual(t, d.Key, s.Key)
+		assert.NotEqual(t, d.value, s.value)
 	})
 }

@@ -64,6 +64,8 @@ func deepCopy(s, d reflect.Value) error {
 		err = deepCopyMap(s, d)
 	case reflect.String:
 		err = deepCopyString(s, d)
+	case reflect.Func:
+		break
 	default:
 		d.Set(s)
 	}
@@ -89,6 +91,11 @@ func deepCopyStruct(s, d reflect.Value) error {
 	dType := dValue.Type()
 
 	for i := 0; i < dType.NumField(); i++ {
+		dfieldType := dType.Field(i)
+		if !dfieldType.IsExported() {
+			continue
+		}
+
 		dfieldValue := dValue.Field(i)
 		sfieldValue := sValue.Field(i)
 		deepCopy(sfieldValue, dfieldValue)

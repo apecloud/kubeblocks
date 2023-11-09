@@ -75,9 +75,12 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 	lorrySvcGRPCPort := viper.GetInt("PROBE_SERVICE_GRPC_PORT")
 
 	// inject role probe container
-	compRoleProbe := synthesizeComp.LifecycleActions.RoleProbe
-	reqCtx.Log.V(3).Info("lorry", "settings", compRoleProbe)
+	var compRoleProbe *appsv1alpha1.RoleProbeSpec
+	if synthesizeComp.LifecycleActions != nil {
+		compRoleProbe = synthesizeComp.LifecycleActions.RoleProbe
+	}
 	if compRoleProbe != nil {
+		reqCtx.Log.V(3).Info("lorry", "settings", compRoleProbe)
 		roleChangedContainer := container.DeepCopy()
 		buildRoleProbeContainer(roleChangedContainer, compRoleProbe, int(lorrySvcHTTPPort))
 		lorryContainers = append(lorryContainers, *roleChangedContainer)

@@ -342,6 +342,26 @@ spec:
                 x-kubernetes-validations:
                 - message: forbidden to update spec.restoreFrom
                   rule: self == oldSelf
+              restoreSpec:
+                description: restoreSpec defines how to restore the cluster.
+                properties:
+                  backupName:
+                    description: backupName is the name of the backup.
+                    type: string
+                  restoreTimeStr:
+                    description: restoreTime point in time to restore
+                    type: string
+                  volumeRestorePolicy:
+                    default: Serial
+                    description: 'the volume claim restore policy, support values:
+                      [Serial, Parallel]'
+                    enum:
+                    - Serial
+                    - Parallel
+                    type: string
+                required:
+                - backupName
+                type: object
               scriptSpec:
                 description: scriptSpec defines the script to be executed.
                 properties:
@@ -557,6 +577,7 @@ spec:
                 - Switchover
                 - DataScript
                 - Backup
+                - Restore
                 type: string
                 x-kubernetes-validations:
                 - message: forbidden to update spec.type

@@ -114,8 +114,10 @@ func (j *JobAction) Execute(ctx Context) (*dpv1alpha1.ActionStatus, error) {
 	}
 
 	controllerutil.AddFinalizer(job, types.DataProtectionFinalizerName)
-	if err = utils.SetControllerReference(j.Owner, job, ctx.Scheme); err != nil {
-		return handleErr(err)
+	if job.Namespace == j.Owner.GetNamespace() {
+		if err = utils.SetControllerReference(j.Owner, job, ctx.Scheme); err != nil {
+			return handleErr(err)
+		}
 	}
 	msg := fmt.Sprintf("creating job %s/%s", job.Namespace, job.Name)
 	ctx.Recorder.Event(j.Owner, corev1.EventTypeNormal, "CreatingJob", msg)

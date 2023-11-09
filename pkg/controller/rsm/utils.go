@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -727,4 +728,14 @@ func ParseAnnotationsOfScope(scope AnnotationScope, scopedAnnotations map[string
 
 func getEnvConfigMapName(rsmName string) string {
 	return fmt.Sprintf("%s-rsm-env", rsmName)
+}
+
+// IsOwnedByRsm is used to judge if the obj is owned by rsm
+func IsOwnedByRsm(obj client.Object) bool {
+	for _, ref := range obj.GetOwnerReferences() {
+		if ref.Kind == appsv1alpha1.ReplicatedStateMachineKind && ref.Controller != nil && *ref.Controller {
+			return true
+		}
+	}
+	return false
 }

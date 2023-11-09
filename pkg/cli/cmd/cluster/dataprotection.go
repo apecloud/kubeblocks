@@ -61,6 +61,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
 	"github.com/apecloud/kubeblocks/pkg/cli/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
@@ -519,15 +520,14 @@ type CreateRestoreOptions struct {
 func (o *CreateRestoreOptions) getClusterObject(backup *dpv1alpha1.Backup) (*appsv1alpha1.Cluster, error) {
 	// use the cluster snapshot to restore firstly
 	clusterString, ok := backup.Annotations[constant.ClusterSnapshotAnnotationKey]
-	if ok {
-		clusterObj := &appsv1alpha1.Cluster{}
-		if err := json.Unmarshal([]byte(clusterString), &clusterObj); err != nil {
-			return nil, err
-		}
-		return clusterObj, nil
+	if !ok {
+		return nil, fmt.Errorf("missing snapshot annotation in backup %s, %s is empty in Annotations", backup.Name, constant.ClusterSnapshotAnnotationKey)
 	}
-	clusterName := backup.Labels[constant.AppInstanceLabelKey]
-	return cluster.GetClusterByName(o.Dynamic, clusterName, o.Namespace)
+	clusterObj := &appsv1alpha1.Cluster{}
+	if err := json.Unmarshal([]byte(clusterString), &clusterObj); err != nil {
+		return nil, err
+	}
+	return clusterObj, nil
 }
 
 func (o *CreateRestoreOptions) Run() error {
@@ -550,7 +550,7 @@ func (o *CreateRestoreOptions) runRestoreFromBackup() error {
 		return errors.Errorf(`missing source cluster in backup "%s", "app.kubernetes.io/instance" is empty in labels.`, o.Backup)
 	}
 
-	restoreTimeStr, err := formatRestoreTimeAndValidate(o.RestoreTimeStr, backup)
+	restoreTimeStr, err := restore.FormatRestoreTimeAndValidate(o.RestoreTimeStr, backup)
 	if err != nil {
 		return err
 	}
@@ -559,7 +559,7 @@ func (o *CreateRestoreOptions) runRestoreFromBackup() error {
 	if err != nil {
 		return err
 	}
-	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, o.VolumeRestorePolicy, len(clusterObj.Spec.ComponentSpecs), clusterObj.Spec.ComponentSpecs[0].Name, restoreTimeStr)
+	restoreAnnotation, err := restore.GetRestoreFromBackupAnnotation(backup, o.VolumeRestorePolicy, len(clusterObj.Spec.ComponentSpecs), clusterObj.Spec.ComponentSpecs[0].Name, restoreTimeStr)
 	if err != nil {
 		return err
 	}
@@ -576,7 +576,7 @@ func (o *CreateRestoreOptions) createCluster(cluster *appsv1alpha1.Cluster) erro
 	cluster.Status = appsv1alpha1.ClusterStatus{}
 	cluster.TypeMeta = metav1.TypeMeta{
 		Kind:       types.KindCluster,
-		APIVersion: clusterGVR.Group + "/" + clusterGVR.Version,
+		APIVersion: clusterGVR.GroupVersion().String(),
 	}
 	// convert the cluster object and create it.
 	unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&cluster)
@@ -591,10 +591,6 @@ func (o *CreateRestoreOptions) createCluster(cluster *appsv1alpha1.Cluster) erro
 		fmt.Fprintf(o.Out, "%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
 	}
 	return nil
-}
-
-func isTimeInRange(t time.Time, start time.Time, end time.Time) bool {
-	return !t.Before(start) && !t.After(end)
 }
 
 func (o *CreateRestoreOptions) Validate() error {

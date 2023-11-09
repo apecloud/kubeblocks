@@ -310,14 +310,16 @@ func (r *clusterBackupPolicyTransformer) syncBackupPolicy(backupPolicy *dpv1alph
 		return
 	}
 
-	podSelector := backupPolicy.Spec.Target.PodSelector
-	if podSelector.LabelSelector == nil || podSelector.LabelSelector.MatchLabels == nil {
-		podSelector.LabelSelector = &metav1.LabelSelector{MatchLabels: map[string]string{}}
-	}
-	if r.getCompReplicas() == 1 {
-		delete(podSelector.LabelSelector.MatchLabels, constant.RoleLabelKey)
-	} else {
-		podSelector.LabelSelector.MatchLabels[constant.RoleLabelKey] = role
+	if backupPolicy.Spec.Target != nil {
+		podSelector := backupPolicy.Spec.Target.PodSelector
+		if podSelector.LabelSelector == nil || podSelector.LabelSelector.MatchLabels == nil {
+			podSelector.LabelSelector = &metav1.LabelSelector{MatchLabels: map[string]string{}}
+		}
+		if r.getCompReplicas() == 1 {
+			delete(podSelector.LabelSelector.MatchLabels, constant.RoleLabelKey)
+		} else {
+			podSelector.LabelSelector.MatchLabels[constant.RoleLabelKey] = role
+		}
 	}
 }
 

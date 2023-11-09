@@ -1,13 +1,21 @@
 ---
-title: kbcli backuprepo
+title: kbcli login
 ---
 
-BackupRepo command.
+Authenticate with the KubeBlocks Cloud
+
+```
+kbcli login [flags]
+```
 
 ### Options
 
 ```
-  -h, --help   help for backuprepo
+  -c, --context string   Context name.
+  -h, --help             help for login
+      --no-browser       Do not open the browser for authentication.
+  -o, --org string       Organization name.
+  -r, --region string    Specify the region [jp] to log in. (default "jp")
 ```
 
 ### Options inherited from parent commands
@@ -21,7 +29,6 @@ BackupRepo command.
       --client-certificate string      Path to a client certificate file for TLS
       --client-key string              Path to a client key file for TLS
       --cluster string                 The name of the kubeconfig cluster to use
-      --context string                 The name of the kubeconfig context to use
       --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
@@ -37,10 +44,6 @@ BackupRepo command.
 ### SEE ALSO
 
 
-* [kbcli backuprepo create](kbcli_backuprepo_create.md)	 - Create a backup repo
-* [kbcli backuprepo describe](kbcli_backuprepo_describe.md)	 - Describe a backup repository.
-* [kbcli backuprepo list](kbcli_backuprepo_list.md)	 - List Backup Repositories.
-* [kbcli backuprepo update](kbcli_backuprepo_update.md)	 - Update a backup repository.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

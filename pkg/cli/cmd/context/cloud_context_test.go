@@ -37,11 +37,7 @@ func mockServer() *httptest.Server {
 			switch r.Method {
 			case http.MethodGet:
 				cloudContextResponse := CloudContextResponse{
-					APIVersion: "test_api_version",
-					Kind:       "test_kind",
-					Metadata: Metadata{
-						Name: "test_context",
-					},
+					Name: "test_context",
 				}
 				jsonData, err := json.Marshal(cloudContextResponse)
 				if err != nil {
@@ -60,15 +56,9 @@ func mockServer() *httptest.Server {
 			}
 
 		case "/api/v1/organizations/test_org/contexts":
-			cloudContextsResponse := CloudContextsResponse{
-				APIVersion: "test_api_version",
-				Kind:       "test_kind",
-				Items: []ClusterItem{
-					{
-						Metadata: Metadata{
-							Name: "test_context",
-						},
-					},
+			cloudContextsResponse := []CloudContextResponse{
+				{
+					Name: "test_context",
 				},
 			}
 			jsonData, err := json.Marshal(cloudContextsResponse)

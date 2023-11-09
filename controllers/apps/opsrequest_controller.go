@@ -123,6 +123,17 @@ func (r *OpsRequestReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, ops
 // fetchCluster fetches the Cluster from the OpsRequest.
 func (r *OpsRequestReconciler) fetchCluster(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
 	cluster := &appsv1alpha1.Cluster{}
+	opsBehaviour, ok := operations.GetOpsManager().OpsMap[opsRes.OpsRequest.Spec.Type]
+	if !ok || opsBehaviour.OpsHandler == nil {
+		return nil, operations.PatchOpsHandlerNotSupported(reqCtx.Ctx, r.Client, opsRes)
+	}
+	if opsBehaviour.IsClusterCreationEnabled {
+		// check if the cluster already exists
+		cluster.Name = opsRes.OpsRequest.Spec.ClusterRef
+		cluster.Namespace = opsRes.OpsRequest.GetNamespace()
+		opsRes.Cluster = cluster
+		return nil, nil
+	}
 	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{
 		Namespace: opsRes.OpsRequest.GetNamespace(),
 		Name:      opsRes.OpsRequest.Spec.ClusterRef,
@@ -218,6 +229,14 @@ func (r *OpsRequestReconciler) reconcileStatusDuringRunningOrCanceling(reqCtx in
 
 // addClusterLabelAndSetOwnerReference adds the cluster label and set the owner reference of the OpsRequest.
 func (r *OpsRequestReconciler) addClusterLabelAndSetOwnerReference(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
+	// if the opsBehaviour will create cluster, the cluster don't exist now
+	// so don't add label and set owner reference in here
+	// it should be done in this opsRequest action
+	opsBehaviour := operations.GetOpsManager().OpsMap[opsRes.OpsRequest.Spec.Type]
+	if opsBehaviour.IsClusterCreationEnabled {
+		return nil, nil
+	}
+
 	// add label of clusterRef
 	opsRequest := opsRes.OpsRequest
 	clusterName := opsRequest.Labels[constant.AppInstanceLabelKey]

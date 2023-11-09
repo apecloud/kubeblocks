@@ -1,13 +1,31 @@
 ---
-title: kbcli backuprepo
+title: kbcli backuprepo update
 ---
 
-BackupRepo command.
+Update a backup repository.
+
+```
+kbcli backuprepo update BACKUP_REPO_NAME [flags]
+```
+
+### Examples
+
+```
+  # Update the credential of a S3-based backuprepo
+  kbcli backuprepo update my-backuprepo --access-key-id=<NEW ACCESS KEY> --secret-access-key=<NEW SECRET KEY>
+  
+  # Set the backuprepo as default
+  kbcli backuprepo update my-backuprepo --default
+  
+  # Unset the default backuprepo
+  kbcli backuprepo update my-backuprepo --default=false
+```
 
 ### Options
 
 ```
-  -h, --help   help for backuprepo
+      --default   Specify whether to set the created backup repo as default
+  -h, --help      help for update
 ```
 
 ### Options inherited from parent commands
@@ -36,11 +54,7 @@ BackupRepo command.
 
 ### SEE ALSO
 
-
-* [kbcli backuprepo create](kbcli_backuprepo_create.md)	 - Create a backup repo
-* [kbcli backuprepo describe](kbcli_backuprepo_describe.md)	 - Describe a backup repository.
-* [kbcli backuprepo list](kbcli_backuprepo_list.md)	 - List Backup Repositories.
-* [kbcli backuprepo update](kbcli_backuprepo_update.md)	 - Update a backup repository.
+* [kbcli backuprepo](kbcli_backuprepo.md)	 - BackupRepo command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

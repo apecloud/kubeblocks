@@ -31,7 +31,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/constant"
 )
 
-func setOpsRequestToCluster(cluster *appsv1alpha1.Cluster, opsRequestSlice []appsv1alpha1.OpsRecorder) {
+func SetOpsRequestToCluster(cluster *appsv1alpha1.Cluster, opsRequestSlice []appsv1alpha1.OpsRecorder) {
 	if cluster.Annotations == nil {
 		cluster.Annotations = map[string]string{}
 	}
@@ -49,7 +49,7 @@ func PatchClusterOpsAnnotations(ctx context.Context,
 	cluster *appsv1alpha1.Cluster,
 	opsRequestSlice []appsv1alpha1.OpsRecorder) error {
 	patch := client.MergeFrom(cluster.DeepCopy())
-	setOpsRequestToCluster(cluster, opsRequestSlice)
+	SetOpsRequestToCluster(cluster, opsRequestSlice)
 	return cli.Patch(ctx, cluster, patch)
 }
 
@@ -58,7 +58,7 @@ func UpdateClusterOpsAnnotations(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	opsRequestSlice []appsv1alpha1.OpsRecorder) error {
-	setOpsRequestToCluster(cluster, opsRequestSlice)
+	SetOpsRequestToCluster(cluster, opsRequestSlice)
 	return cli.Update(ctx, cluster)
 }
 

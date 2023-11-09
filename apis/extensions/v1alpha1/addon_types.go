@@ -95,7 +95,7 @@ type SelectorRequirement struct {
 	// The selector key. Valid values are KubeVersion, KubeGitVersion and KubeProvider.
 	// "KubeVersion" the semver expression of Kubernetes versions, i.e., v1.24.
 	// "KubeGitVersion" may contain distro. info., i.e., v1.24.4+eks.
-	// "KubeProvider" the Kubernetes provider, i.e., aws,gcp,azure,huaweiCloud,tencentCloud etc.
+	// "KubeProvider" the Kubernetes provider, i.e., aws, gcp, azure, huaweiCloud, tencentCloud etc.
 	// +kubebuilder:validation:Required
 	Key AddonSelectorKey `json:"key"`
 

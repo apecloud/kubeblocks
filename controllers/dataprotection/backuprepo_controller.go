@@ -848,27 +848,6 @@ func (r *BackupRepoReconciler) collectPreCheckFailureMessage(reconCtx *reconcile
 		return -1
 	})
 
-	prependSpaces := func(content string, spaces int) string {
-		prefix := ""
-		for i := 0; i < spaces; i++ {
-			prefix += " "
-		}
-		r := bytes.NewBufferString(content)
-		w := bytes.NewBuffer(nil)
-		w.Grow(r.Len())
-		for {
-			line, err := r.ReadString('\n')
-			if len(line) > 0 {
-				w.WriteString(prefix)
-				w.WriteString(line)
-			}
-			if err != nil {
-				break
-			}
-		}
-		return w.String()
-	}
-
 	var message string
 
 	// collect failure logs from the pod
@@ -880,7 +859,7 @@ func (r *BackupRepoReconciler) collectPreCheckFailureMessage(reconCtx *reconcile
 	if failureLogs == "" {
 		message += "No logs are available.\n\n"
 	} else {
-		message += fmt.Sprintf("Logs from the pre-check job:\n%s\n", prependSpaces(failureLogs, 2))
+		message += fmt.Sprintf("Logs from the pre-check job:\n%s\n", utils.PrependSpaces(failureLogs, 2))
 	}
 
 	collectEvents := func(object client.Object) error {

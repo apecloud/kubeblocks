@@ -69,6 +69,7 @@ type SynthesizedComponent struct {
 	StatefulSetWorkload   v1alpha1.StatefulSetWorkload           `json:"statefulSetWorkload,omitempty"`
 	ComponentRefEnvs      []*corev1.EnvVar                       `json:"componentRefEnvs,omitempty"`
 	ServiceReferences     map[string]*v1alpha1.ServiceDescriptor `json:"serviceReferences,omitempty"`
+	PostStartSpec         *v1alpha1.PostStartAction              `json:"postStartSpec,omitempty"`
 }
 
 type CloudProvider string

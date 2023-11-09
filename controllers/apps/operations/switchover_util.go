@@ -37,7 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlcomputil "github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -100,14 +100,14 @@ func createSwitchoverJob(reqCtx intctrlutil.RequestCtx,
 	if !exists {
 		// check the previous generation switchoverJob whether exist
 		ml := getSwitchoverCmdJobLabel(cluster.Name, componentSpec.Name)
-		previousJobs, err := getJobWithLabels(reqCtx.Ctx, cli, cluster, ml)
+		previousJobs, err := component.GetJobWithLabels(reqCtx.Ctx, cli, cluster, ml)
 		if err != nil {
 			return err
 		}
 		if len(previousJobs) > 0 {
 			// delete the previous generation switchoverJob
 			reqCtx.Log.V(1).Info("delete previous generation switchoverJob", "job", previousJobs[0].Name)
-			if err := cleanJobWithLabels(reqCtx.Ctx, cli, cluster, ml); err != nil {
+			if err := component.CleanJobWithLabels(reqCtx.Ctx, cli, cluster, ml); err != nil {
 				return err
 			}
 		}
@@ -377,10 +377,10 @@ func replaceSwitchoverConnCredentialEnv(clusterName string, switchoverSpec *apps
 	if switchoverSpec == nil {
 		return
 	}
-	namedValuesMap := intctrlcomputil.GetEnvReplacementMapForConnCredential(clusterName)
+	namedValuesMap := component.GetEnvReplacementMapForConnCredential(clusterName)
 	replaceEnvVars := func(cmdExecutorConfig *appsv1alpha1.CmdExecutorConfig) {
 		if cmdExecutorConfig != nil {
-			cmdExecutorConfig.Env = intctrlcomputil.ReplaceSecretEnvVars(namedValuesMap, cmdExecutorConfig.Env)
+			cmdExecutorConfig.Env = component.ReplaceSecretEnvVars(namedValuesMap, cmdExecutorConfig.Env)
 		}
 	}
 	replaceEnvVars(switchoverSpec.WithCandidate.CmdExecutorConfig)
@@ -439,89 +439,6 @@ func buildSwitchoverWorkloadEnvs(ctx context.Context,
 	// add tht first container's environment variables of the primary pod
 	workloadEnvs = append(workloadEnvs, pod.Spec.Containers[0].Env...)
 	return workloadEnvs, nil
-}
-
-// getJobWithLabels gets the job list with the specified labels.
-func getJobWithLabels(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	matchLabels client.MatchingLabels) ([]batchv1.Job, error) {
-	jobList := &batchv1.JobList{}
-	if err := cli.List(ctx, jobList, client.InNamespace(cluster.Namespace), matchLabels); err != nil {
-		return nil, err
-	}
-	return jobList.Items, nil
-}
-
-// cleanJobWithLabels cleans up the job tasks with label that execute the switchover commands.
-func cleanJobWithLabels(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	matchLabels client.MatchingLabels) error {
-	jobList, err := getJobWithLabels(ctx, cli, cluster, matchLabels)
-	if err != nil {
-		return err
-	}
-	for _, job := range jobList {
-		var ttl = int32(constant.KBJobTTLSecondsAfterFinished)
-		patch := client.MergeFrom(job.DeepCopy())
-		job.Spec.TTLSecondsAfterFinished = &ttl
-		if err := cli.Patch(ctx, &job, patch); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// cleanJobByName cleans up the job task by name that execute the switchover commands.
-func cleanJobByName(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	jobName string) error {
-	job := &batchv1.Job{}
-	key := types.NamespacedName{Namespace: cluster.Namespace, Name: jobName}
-	if err := cli.Get(ctx, key, job); err != nil {
-		return err
-	}
-	var ttl = int32(constant.KBJobTTLSecondsAfterFinished)
-	patch := client.MergeFrom(job.DeepCopy())
-	job.Spec.TTLSecondsAfterFinished = &ttl
-	if err := cli.Patch(ctx, job, patch); err != nil {
-		return err
-	}
-	return nil
-}
-
-// checkJobSucceed checks the result of job execution.
-// Returns:
-// - bool: whether job exist, true exist
-// - error: any error that occurred during the handling
-func checkJobSucceed(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	jobName string) error {
-	key := types.NamespacedName{Namespace: cluster.Namespace, Name: jobName}
-	currentJob := batchv1.Job{}
-	exists, err := intctrlutil.CheckResourceExists(ctx, cli, key, &currentJob)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return errors.New("job not exist, pls check.")
-	}
-	jobStatusConditions := currentJob.Status.Conditions
-	if len(jobStatusConditions) > 0 {
-		switch jobStatusConditions[0].Type {
-		case batchv1.JobComplete:
-			return nil
-		case batchv1.JobFailed:
-			return errors.New("job failed, pls check.")
-		default:
-			return intctrlutil.NewErrorf(intctrlutil.ErrorWaitCacheRefresh, "requeue to waiting for job %s finished.", key.Name)
-		}
-	} else {
-		return errors.New("job check conditions status failed")
-	}
 }
 
 // getPrimaryOrLeaderPod returns the leader or primary pod of the component.

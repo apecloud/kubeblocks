@@ -23,8 +23,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 )
 
-var _ = Describe("Component PostStart Test", func() {
-	Context("Component PostStart", func() {
+var _ = Describe("Job Utils Test", func() {
+	Context("Job Utils For Get, Clean, Check Test", func() {
 		BeforeEach()
 	})
 })

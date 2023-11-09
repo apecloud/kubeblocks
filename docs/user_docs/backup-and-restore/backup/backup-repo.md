@@ -130,7 +130,7 @@ You can specify the BackupRepo information in a YAML configuration file when ins
    ```
 
    Use the command below to check the BackupRepo after installation.
-
+   
    <Tabs>
 
    <TabItem value="kbcli" label="kbcli" default>
@@ -146,7 +146,11 @@ You can specify the BackupRepo information in a YAML configuration file when ins
    ```bash
    kubectl get backuprepo
    ```
-     
+
+   </TabItem>
+
+   </Tabs>
+
 ### Manual BackupRepo configuration
 
 If you do not configure the BackupRepo information when installing KubeBlocks, you can manually configure it by the following instructions.

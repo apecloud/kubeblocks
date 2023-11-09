@@ -47,6 +47,11 @@ type privateStruct struct {
 	value string
 }
 
+type pointerStruct struct {
+	Key string
+	P   *stringStruct
+}
+
 func Print(a any) {
 	v := reflect.ValueOf(a)
 	fmt.Print(v.Kind())
@@ -58,6 +63,20 @@ func Print(a any) {
 		fmt.Printf("Key: %v\n", c)
 	}
 
+}
+
+func TestClone(t *testing.T) {
+	s := &stringStruct{
+		Key:   "key1",
+		Value: "values",
+	}
+	dd, _ := Clone(s)
+	d := dd.(*stringStruct)
+	fmt.Printf("s: %v\n", s)
+	fmt.Printf("d: %v\n", d)
+	assert.Equal(t, s, d)
+	d.Value = "values1"
+	assert.NotEqual(t, s, d)
 }
 
 func TestDeepCopy(t *testing.T) {
@@ -146,5 +165,30 @@ func TestDeepCopy(t *testing.T) {
 		fmt.Printf("d: %v\n", d)
 		assert.NotEqual(t, d.Key, s.Key)
 		assert.NotEqual(t, d.value, s.value)
+	})
+
+	t.Run("test struct with pointer", func(t *testing.T) {
+		s := &stringStruct{
+			Key:   "private1",
+			Value: "values1",
+		}
+		p := pointerStruct{
+			Key: "pointer1",
+			P:   s,
+		}
+
+		fmt.Printf("p: %v\n", p)
+		d := &pointerStruct{}
+		DeepCopy(&p, d)
+		fmt.Printf("d: %v\n", d)
+		assert.Equal(t, d.Key, p.Key)
+		assert.Equal(t, *d.P, *p.P)
+
+		d.P.Key = "pointer2"
+		d.P.Value = "values2"
+		fmt.Printf("p: %v\n", p.P)
+		fmt.Printf("d: %v\n", d.P)
+		assert.NotEqual(t, d.P.Key, p.P.Key)
+		assert.NotEqual(t, d.P.Value, p.P.Value)
 	})
 }

@@ -24,17 +24,24 @@ import (
 	"reflect"
 )
 
+func Clone(s any) (any, error) {
+	sValue := reflect.Indirect(reflect.ValueOf(s))
+	sType := sValue.Type()
+	d := reflect.New(sType).Interface()
+	err := DeepCopy(s, d)
+	if err != nil {
+		return nil, err
+	}
+	return d, nil
+}
+
 // DeepCopy make a compele copy for a struct value
 func DeepCopy(s, d any) error {
-	sType := reflect.TypeOf(s)
-	sValue := reflect.ValueOf(s)
-	if sType.Kind() != reflect.Pointer {
-		return errors.New("source object must be an Pointer")
-	}
-	sType = sType.Elem()
+	sValue := reflect.Indirect(reflect.ValueOf(s))
+	sType := sValue.Type()
 
 	dType := reflect.TypeOf(d)
-	dValue := reflect.ValueOf(d)
+	dValue := reflect.Indirect(reflect.ValueOf(d))
 	if dType.Kind() != reflect.Pointer {
 		return errors.New("dest object must be an Pointer")
 	}
@@ -52,8 +59,7 @@ func DeepCopy(s, d any) error {
 }
 
 func deepCopy(s, d reflect.Value) error {
-	sValue := reflect.Indirect(s)
-	kind := sValue.Kind()
+	kind := d.Kind()
 	var err error
 	switch kind {
 	case reflect.Struct:
@@ -64,8 +70,10 @@ func deepCopy(s, d reflect.Value) error {
 		err = deepCopyMap(s, d)
 	case reflect.String:
 		err = deepCopyString(s, d)
-	case reflect.Func:
-		break
+	case reflect.Pointer:
+		err = deepCopyPointer(s, d)
+	// case reflect.Func:
+	//	break
 	default:
 		d.Set(s)
 	}
@@ -106,6 +114,23 @@ func deepCopyStruct(s, d reflect.Value) error {
 
 func deepCopyString(s, d reflect.Value) error {
 	d.SetString(s.String())
+	return nil
+}
+
+func deepCopyPointer(s, d reflect.Value) error {
+	if s.IsNil() {
+		return nil
+	}
+	sValue := reflect.Indirect(s)
+	dType := sValue.Type()
+	newValue := reflect.New(dType)
+
+	err := deepCopy(sValue, reflect.Indirect(newValue))
+	if err != nil {
+		return err
+	}
+	d.Set(newValue)
+
 	return nil
 }
 

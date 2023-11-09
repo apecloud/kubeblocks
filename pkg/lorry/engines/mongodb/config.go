@@ -26,6 +26,8 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
+
+	utilconfig "github.com/apecloud/kubeblocks/pkg/lorry/util/config"
 )
 
 const (
@@ -129,10 +131,8 @@ func (config *Config) GetDBPort() int {
 }
 
 func (config *Config) DeepCopy() *Config {
-	newConf := *config
-	newConf.hosts = make([]string, len(config.hosts))
-	copy(newConf.hosts, config.hosts)
-	return &newConf
+	newConf, _ := utilconfig.Clone(config)
+	return newConf.(*Config)
 }
 
 func GetConfig() *Config {

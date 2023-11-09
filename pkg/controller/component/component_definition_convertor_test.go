@@ -153,7 +153,7 @@ var _ = Describe("Component Definition Convertor", func() {
 				Service: &appsv1alpha1.ServiceSpec{
 					Ports: []appsv1alpha1.ServicePort{
 						{
-							Name: "data",
+							Name: "mysql",
 							Port: 3306,
 							TargetPort: intstr.IntOrString{
 								Type:   intstr.String,
@@ -435,11 +435,15 @@ var _ = Describe("Component Definition Convertor", func() {
 
 				// headless service
 				Expect(services[1].ServiceName).Should(BeEquivalentTo("headless"))
-				Expect(len(services[1].Spec.Ports)).Should(Equal(len(clusterCompDef.Service.Ports) + len(clusterCompDef.PodSpec.Containers[0].Ports)))
+				// service ports and containers ports are order and value
+				Expect(len(services[1].Spec.Ports)).Should(Equal(len(clusterCompDef.Service.Ports)))
 				for i := range clusterCompDef.Service.Ports {
 					Expect(services[1].Spec.Ports[i].Name).Should(Equal(clusterCompDef.Service.Ports[i].Name))
 					Expect(services[1].Spec.Ports[i].Port).Should(Equal(clusterCompDef.Service.Ports[i].Port))
 					Expect(services[1].Spec.Ports[i].TargetPort).Should(Equal(clusterCompDef.Service.Ports[i].TargetPort))
+				}
+				for i, port := range clusterCompDef.PodSpec.Containers[0].Ports {
+					Expect(services[1].Spec.Ports[i].Port).Should(Equal(port.ContainerPort))
 				}
 				Expect(services[1].Spec.Type).Should(Equal(corev1.ServiceTypeClusterIP))
 				Expect(services[1].Spec.ClusterIP).Should(Equal(corev1.ClusterIPNone))
@@ -522,6 +526,9 @@ var _ = Describe("Component Definition Convertor", func() {
 
 			labels := res.(map[string]appsv1alpha1.BuiltInString)
 			expectedLabels := map[string]appsv1alpha1.BuiltInString{}
+			for _, item := range clusterCompDef.CustomLabelSpecs {
+				expectedLabels[item.Key] = appsv1alpha1.BuiltInString(item.Value)
+			}
 			Expect(labels).Should(BeEquivalentTo(expectedLabels))
 		})
 
@@ -570,7 +577,10 @@ var _ = Describe("Component Definition Convertor", func() {
 				convertor := &compDefUpdateStrategyConvertor{}
 				res, err := convertor.convert(clusterCompDef)
 				Expect(err).Should(Succeed())
-				Expect(res).Should(BeNil())
+
+				strategy := res.(*appsv1alpha1.UpdateStrategy)
+				// default update strategy
+				Expect(*strategy).Should(BeEquivalentTo(appsv1alpha1.BestEffortParallelStrategy))
 			})
 
 			It("ok", func() {
@@ -641,6 +651,8 @@ var _ = Describe("Component Definition Convertor", func() {
 		// TODO(component)
 		Context("lifecycle actions", func() {
 			It("w/o comp version", func() {
+				clusterCompDef.Probes.RoleProbe = nil
+
 				convertor := &compDefLifecycleActionsConvertor{}
 				res, err := convertor.convert(clusterCompDef)
 				Expect(err).Should(Succeed())
@@ -651,7 +663,7 @@ var _ = Describe("Component Definition Convertor", func() {
 			})
 
 			It("w/ comp version", func() {
-				// TODO(component)
+				clusterCompDef.Probes.RoleProbe = nil
 				clusterCompVer := &appsv1alpha1.ClusterComponentVersion{}
 
 				convertor := &compDefLifecycleActionsConvertor{}
@@ -661,6 +673,29 @@ var _ = Describe("Component Definition Convertor", func() {
 				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
 				expectedActions := &appsv1alpha1.ComponentLifecycleActions{}
 				Expect(*actions).Should(BeEquivalentTo(*expectedActions))
+			})
+
+			It("role probe", func() {
+				convertor := &compDefLifecycleActionsConvertor{}
+				res, err := convertor.convert(clusterCompDef)
+				Expect(err).Should(Succeed())
+
+				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
+				// mysql + consensus -> wesql
+				wesqlBuiltinHandler := func() *appsv1alpha1.BuiltinActionHandlerType {
+					handler := appsv1alpha1.WeSQLBuiltinActionHandler
+					return &handler
+				}
+				expectedRoleProbe := &appsv1alpha1.RoleProbeSpec{
+					LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
+						BuiltinHandler: wesqlBuiltinHandler(),
+					},
+					TimeoutSeconds:   clusterCompDef.Probes.RoleProbe.TimeoutSeconds,
+					PeriodSeconds:    clusterCompDef.Probes.RoleProbe.PeriodSeconds,
+					FailureThreshold: clusterCompDef.Probes.RoleProbe.FailureThreshold,
+				}
+				Expect(actions.RoleProbe).ShouldNot(BeNil())
+				Expect(*actions.RoleProbe).Should(BeEquivalentTo(*expectedRoleProbe))
 			})
 		})
 

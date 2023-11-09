@@ -318,40 +318,28 @@ type compDefUpdateStrategyConvertor struct{}
 
 func (c *compDefUpdateStrategyConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	var compDefUpdateStrategy *appsv1alpha1.UpdateStrategy
+	defaultUpdateStrategy := appsv1alpha1.BestEffortParallelStrategy
+	strategy := &defaultUpdateStrategy
+
 	switch clusterCompDef.WorkloadType {
 	case appsv1alpha1.Consensus:
 		if clusterCompDef.ConsensusSpec != nil {
-			updateStrategy := &clusterCompDef.ConsensusSpec.UpdateStrategy
-			compDefUpdateStrategy = updateStrategy
-		} else {
-			updateStrategy := appsv1alpha1.BestEffortParallelStrategy
-			compDefUpdateStrategy = &updateStrategy
+			strategy = &clusterCompDef.ConsensusSpec.UpdateStrategy
 		}
 	case appsv1alpha1.Replication:
 		if clusterCompDef.ReplicationSpec != nil {
-			updateStrategy := &clusterCompDef.ReplicationSpec.UpdateStrategy
-			compDefUpdateStrategy = updateStrategy
-		} else {
-			updateStrategy := appsv1alpha1.BestEffortParallelStrategy
-			compDefUpdateStrategy = &updateStrategy
+			strategy = &clusterCompDef.ReplicationSpec.UpdateStrategy
 		}
 	case appsv1alpha1.Stateful:
 		if clusterCompDef.StatefulSpec != nil {
-			updateStrategy := &clusterCompDef.StatefulSpec.UpdateStrategy
-			compDefUpdateStrategy = updateStrategy
-		} else {
-			updateStrategy := appsv1alpha1.BestEffortParallelStrategy
-			compDefUpdateStrategy = &updateStrategy
+			strategy = &clusterCompDef.StatefulSpec.UpdateStrategy
 		}
 	case appsv1alpha1.Stateless:
-		// TODO: check the UpdateStrategy of stateless
-		updateStrategy := appsv1alpha1.BestEffortParallelStrategy
-		compDefUpdateStrategy = &updateStrategy
+		// do nothing
 	default:
 		panic(fmt.Sprintf("unknown workload type: %s", clusterCompDef.WorkloadType))
 	}
-	return compDefUpdateStrategy, nil
+	return strategy, nil
 }
 
 // compDefRolesConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Roles.

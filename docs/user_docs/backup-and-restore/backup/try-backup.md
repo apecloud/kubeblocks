@@ -9,7 +9,7 @@ sidebar_label: Try backup
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Backup 
+# Try backup 
 
 ## Configure encryption key
 

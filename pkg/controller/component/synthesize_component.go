@@ -59,7 +59,7 @@ func BuildSynthesizedComponent4Generated(reqCtx intctrlutil.RequestCtx,
 	if clusterCompSpec == nil {
 		return nil, nil, fmt.Errorf("cluster component spec is not found: %s", comp.Name)
 	}
-	compDef, err := BuildComponentDefinition(clusterDef, clusterVer, clusterCompSpec)
+	compDef, err := getOrBuildComponentDefinition(reqCtx.Ctx, cli, clusterDef, clusterVer, cluster, clusterCompSpec)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -71,6 +71,7 @@ func BuildSynthesizedComponent4Generated(reqCtx intctrlutil.RequestCtx,
 }
 
 // BuildSynthesizedComponentWrapper builds a new SynthesizedComponent object with a given ClusterComponentSpec.
+// TODO: remove this
 func BuildSynthesizedComponentWrapper(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
 	cluster *appsv1alpha1.Cluster,
@@ -79,11 +80,11 @@ func BuildSynthesizedComponentWrapper(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	return BuildSynthesizedComponentWrapperWithDefinition(reqCtx, cli, clusterDef, clusterVer, cluster, clusterCompSpec)
+	return BuildSynthesizedComponentWrapper4Test(reqCtx, cli, clusterDef, clusterVer, cluster, clusterCompSpec)
 }
 
-// BuildSynthesizedComponentWrapperWithDefinition builds a new SynthesizedComponent object with a given ClusterComponentSpec.
-func BuildSynthesizedComponentWrapperWithDefinition(reqCtx intctrlutil.RequestCtx,
+// BuildSynthesizedComponentWrapper4Test builds a new SynthesizedComponent object with a given ClusterComponentSpec.
+func BuildSynthesizedComponentWrapper4Test(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
 	clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterVer *appsv1alpha1.ClusterVersion,
@@ -95,7 +96,7 @@ func BuildSynthesizedComponentWrapperWithDefinition(reqCtx intctrlutil.RequestCt
 	if clusterCompSpec == nil {
 		return nil, nil
 	}
-	compDef, err := BuildComponentDefinition(clusterDef, clusterVer, clusterCompSpec)
+	compDef, err := getOrBuildComponentDefinition(reqCtx.Ctx, cli, clusterDef, clusterVer, cluster, clusterCompSpec)
 	if err != nil {
 		return nil, err
 	}

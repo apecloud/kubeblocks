@@ -87,7 +87,7 @@ var _ = Describe("affinity utils", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			component, _ = BuildSynthesizedComponentWrapperWithDefinition(reqCtx, testCtx.Cli,
+			component, _ = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli,
 				clusterDefObj, clusterVersionObj, clusterObj, &clusterObj.Spec.ComponentSpecs[0])
 		}
 	)

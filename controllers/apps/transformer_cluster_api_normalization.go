@@ -63,6 +63,7 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 			transCtx.ComponentDefs[compDef.Name] = compDef
 			transCtx.ComponentSpecs[i].ComponentDef = compDef.Name
 		} else {
+			// should be loaded at load resources transformer
 			if _, ok := transCtx.ComponentDefs[compSpec.ComponentDef]; !ok {
 				panic(fmt.Sprintf("runtime error - expected component definition object not found: %s", compSpec.ComponentDef))
 			}

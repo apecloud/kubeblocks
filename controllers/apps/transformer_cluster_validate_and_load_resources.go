@@ -99,7 +99,7 @@ func (t *ClusterValidateAndLoadRefResourcesTransformer) Transform(ctx graph.Tran
 		transCtx.ClusterVer = &appsv1alpha1.ClusterVersion{}
 	}
 
-	if err = t.checkComponentDefinitions(transCtx, cluster); err != nil {
+	if err = t.loadAndCheckComponentDefinitions(transCtx, cluster); err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
@@ -117,7 +117,8 @@ func (t *ClusterValidateAndLoadRefResourcesTransformer) allCompDefRefs(cluster *
 	return refs
 }
 
-func (t *ClusterValidateAndLoadRefResourcesTransformer) checkComponentDefinitions(ctx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
+func (t *ClusterValidateAndLoadRefResourcesTransformer) loadAndCheckComponentDefinitions(
+	ctx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
 	for _, comp := range cluster.Spec.ComponentSpecs {
 		if len(comp.ComponentDef) == 0 {
 			continue

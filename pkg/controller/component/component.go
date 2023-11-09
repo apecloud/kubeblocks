@@ -93,6 +93,24 @@ func BuildComponentDefinition(clusterDef *appsv1alpha1.ClusterDefinition,
 	return compDef, nil
 }
 
+func getOrBuildComponentDefinition(ctx context.Context, cli client.Reader,
+	clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterVer *appsv1alpha1.ClusterVersion,
+	cluster *appsv1alpha1.Cluster,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ComponentDefinition, error) {
+	if len(cluster.Spec.ClusterDefRef) > 0 && len(clusterCompSpec.ComponentDefRef) > 0 {
+		return BuildComponentDefinition(clusterDef, clusterVer, clusterCompSpec)
+	}
+	if len(clusterCompSpec.ComponentDef) > 0 {
+		compDef := &appsv1alpha1.ComponentDefinition{}
+		if err := cli.Get(ctx, types.NamespacedName{Name: clusterCompSpec.ComponentDef}, compDef); err != nil {
+			return nil, err
+		}
+		return compDef, nil
+	}
+	return nil, fmt.Errorf("the component definition is not provided")
+}
+
 func getClusterReferencedResources(ctx context.Context, cli client.Reader,
 	cluster *appsv1alpha1.Cluster) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, error) {
 	var (

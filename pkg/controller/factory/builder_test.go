@@ -144,7 +144,7 @@ var _ = Describe("builder", func() {
 	newAllFieldsComponent := func(cluster *appsv1alpha1.Cluster, clusterDef *appsv1alpha1.ClusterDefinition, clusterVersion *appsv1alpha1.ClusterVersion) *component.SynthesizedComponent {
 		reqCtx := newReqCtx()
 		By("assign every available fields")
-		synthesizeComp, err := component.BuildSynthesizedComponentWrapperWithDefinition(reqCtx, testCtx.Cli,
+		synthesizeComp, err := component.BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli,
 			clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[0])
 		Expect(err).Should(Succeed())
 		Expect(synthesizeComp).ShouldNot(BeNil())

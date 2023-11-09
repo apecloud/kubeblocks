@@ -86,24 +86,24 @@ var _ = Describe("Component", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			component, err := BuildSynthesizedComponentWrapperWithDefinition(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[0])
+			component, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 
 			By("leave clusterVersion.versionCtx empty initContains and containers")
 			clusterVersion.Spec.ComponentVersions[0].VersionsCtx.Containers = nil
 			clusterVersion.Spec.ComponentVersions[0].VersionsCtx.InitContainers = nil
-			component, err = BuildSynthesizedComponentWrapperWithDefinition(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[0])
+			component, err = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 
 			By("new container in clusterVersion not in clusterDefinition")
-			component, err = BuildSynthesizedComponentWrapperWithDefinition(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[0])
+			component, err = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 			Expect(len(component.PodSpec.Containers) >= 3).Should(BeTrue())
 
 			By("new init container in clusterVersion not in clusterDefinition")
-			component, err = BuildSynthesizedComponentWrapperWithDefinition(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[1])
+			component, err = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[1])
 			Expect(err).Should(Succeed())
 			Expect(len(component.PodSpec.InitContainers)).Should(Equal(1))
 		})
@@ -125,14 +125,14 @@ var _ = Describe("Component", func() {
 			cluster.Spec.ComponentSpecs = nil
 
 			By("build first component from simplified fields")
-			synthesizeComp, err := BuildSynthesizedComponentWrapperWithDefinition(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
+			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).ShouldNot(BeNil())
 			Expect(synthesizeComp.Replicas).Should(Equal(*cluster.Spec.Replicas))
 			Expect(synthesizeComp.VolumeClaimTemplates[0].Spec.Resources.Requests["storage"]).Should(Equal(cluster.Spec.Storage.Size))
 
 			// By("build second component will be nil")
-			// synthesizeComp, err = BuildSynthesizedComponentWrapperWithDefinition(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
+			// synthesizeComp, err = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
 			// Expect(err).Should(Succeed())
 			// Expect(synthesizeComp).Should(BeNil())
 		})
@@ -148,7 +148,7 @@ var _ = Describe("Component", func() {
 			By("clear cluster's component spec")
 			cluster.Spec.ComponentSpecs = nil
 			By("call build")
-			synthesizeComp, err := BuildSynthesizedComponentWrapperWithDefinition(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
+			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).ShouldNot(BeNil())
 			Expect(synthesizeComp.PodSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].PodAffinityTerm.TopologyKey).Should(Equal("topology.kubernetes.io/zone"))
@@ -170,7 +170,7 @@ var _ = Describe("Component", func() {
 			By("clear cluster's component spec")
 			cluster.Spec.ComponentSpecs = nil
 			By("call build")
-			synthesizeComp, err := BuildSynthesizedComponentWrapperWithDefinition(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
+			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).ShouldNot(BeNil())
 			Expect(synthesizeComp.Monitor.Enable).Should(Equal(false))
@@ -178,7 +178,7 @@ var _ = Describe("Component", func() {
 			interval2 := intstr.Parse("10s")
 			cluster.Spec.Monitor.MonitoringInterval = &interval2
 			By("call build")
-			synthesizeComp, err = BuildSynthesizedComponentWrapperWithDefinition(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
+			synthesizeComp, err = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).ShouldNot(BeNil())
 			Expect(synthesizeComp.Monitor.Enable).Should(Equal(true))
@@ -199,7 +199,7 @@ var _ = Describe("Component", func() {
 			By("clear cluster's component spec")
 			cluster.Spec.ComponentSpecs = nil
 			By("call build")
-			synthesizeComp, err := BuildSynthesizedComponentWrapperWithDefinition(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
+			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).ShouldNot(BeNil())
 			Expect(synthesizeComp.Services[1].Name).Should(Equal("vpc"))
@@ -251,7 +251,7 @@ var _ = Describe("Component", func() {
 			By("clear cluster's component spec")
 			cluster.Spec.ComponentSpecs = nil
 			By("call build")
-			synthesizeComp, err := BuildSynthesizedComponentWrapperWithDefinition(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
+			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, nil)
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).Should(BeNil())
 		})
@@ -282,7 +282,7 @@ var _ = Describe("Component", func() {
 				testapps.NginxImage: serviceDescriptor,
 			}
 			By("call build")
-			synthesizeComp, err := BuildSynthesizedComponentWrapperWithDefinition(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[0])
+			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).ShouldNot(BeNil())
 			Expect(synthesizeComp.ServiceReferences).ShouldNot(BeNil())

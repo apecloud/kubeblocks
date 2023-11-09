@@ -5,8 +5,8 @@ on:
     - cron: '0 0 * * 1-5' # Runs at 00:00 UTC on Mon to Friday
   workflow_dispatch:
     inputs:
-      image_tag:
-        description: 'image tag'
+      release_version:
+        description: 'The release version of image'
         required: false
         default: 'latest'
   release:
@@ -16,108 +16,115 @@ on:
 env:
   GH_TOKEN: ${{ github.token }}
   RELEASE_VERSION: ${{ github.ref_name }}
-  RELEASE_BOT_WEBHOOK: ${{ secrets.RELEASE_BOT_WEBHOOK }}
-
 
 jobs:
-  image-tag:
+  release-version:
     runs-on: ubuntu-latest
     outputs:
-      tag-name: ${{ steps.get_tag_name.outputs.tag_name }}
+      release-version: ${{ steps.get_release_version.outputs.release_version }}
     steps:
-      - name: Get Tag Name
-        id: get_tag_name
+      - name: Get Release Version
+        id: get_release_version
         run: |
-          TAG_NAME="latest"
-          if [[ ! -z "${{ inputs.image_tag }}" ]]; then
-            TAG_NAME="${{ inputs.image_tag }}"
+          RELEASE_VERSION="latest"
+          if [[ ! -z "${{ inputs.release_version }}" ]]; then
+            RELEASE_VERSION="${{ inputs.release_version }}"
           elif [[ "${{ env.RELEASE_VERSION }}" == "main" ]]; then
-            TAG_NAME="latest"
+            RELEASE_VERSION="latest"
           elif [[ ! -z "${{ env.RELEASE_VERSION }}" ]]; then
-            TAG_NAME=${{ env.RELEASE_VERSION }}
+            RELEASE_VERSION=${{ env.RELEASE_VERSION }}
           fi
-          echo tag_name=$TAG_NAME >> $GITHUB_OUTPUT
+          echo release_version=$RELEASE_VERSION >> $GITHUB_OUTPUT
 
   release-image:
-    needs: image-tag
+    needs: release-version
     uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.24
     with:
       MAKE_OPS_PRE: "generate"
       IMG: "apecloud/kubeblocks"
-      VERSION: "${{ needs.image-tag.outputs.tag-name }}"
+      VERSION: "${{ needs.release-version.outputs.release-version }}"
       GO_VERSION: "1.21"
       APECD_REF: "v0.1.24"
       DOCKERFILE_PATH: "./docker/Dockerfile"
     secrets: inherit
 
   release-tools-image:
-    needs: image-tag
+    needs: release-version
     uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.24
     with:
       MAKE_OPS_PRE: "module generate test-go-generate"
       IMG: "apecloud/kubeblocks-tools"
-      VERSION: "${{ needs.image-tag.outputs.tag-name }}"
+      VERSION: "${{ needs.release-version.outputs.release-version }}"
       GO_VERSION: "1.21"
       APECD_REF: "v0.1.24"
       DOCKERFILE_PATH: "./docker/Dockerfile-tools"
     secrets: inherit
 
   release-datascript-image:
-    needs: image-tag
+    needs: release-version
     uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.24
     with:
       IMG: "apecloud/kubeblocks-datascript"
-      VERSION: "${{ needs.image-tag.outputs.tag-name }}"
+      VERSION: "${{ needs.release-version.outputs.release-version }}"
       APECD_REF: "v0.1.24"
       DOCKERFILE_PATH: "./docker/Dockerfile-datascript"
     secrets: inherit
 
   release-dataprotection-image:
-    needs: image-tag
+    needs: release-version
     uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.24
     with:
       IMG: "apecloud/kubeblocks-dataprotection"
-      VERSION: "${{ needs.image-tag.outputs.tag-name }}"
+      VERSION: "${{ needs.release-version.outputs.release-version }}"
       APECD_REF: "v0.1.24"
       DOCKERFILE_PATH: "./docker/Dockerfile-dataprotection"
     secrets: inherit
 
-  send-message:
+  release-message:
     runs-on: ubuntu-latest
-    needs: [ release-image, release-tools-image, release-datascript-image]
+    needs: [ release-image, release-tools-image, release-datascript-image, release-dataprotection-image ]
+    outputs:
+      content-result: ${{ steps.release_message.outputs.content_result }}
+      release-version: ${{ steps.release_message.outputs.release_version }}
     if: ${{ always() && github.event.action == 'published' }}
     steps:
       - uses: actions/checkout@v4
-      - name: send message
-        id: send_message
+      - name: release message
+        id: release_message
         run: |
-          release_result="${{ env.RELEASE_VERSION }}-image"
-          touch ${release_result}
-          echo 'release-result='${release_result} >> $GITHUB_OUTPUT
+          ARTIFACT_KEY="${{ env.RELEASE_VERSION }}-image"
+          touch ${ARTIFACT_KEY}
+          echo 'artifact_key='${ARTIFACT_KEY} >> $GITHUB_OUTPUT
 
-          CONTENT="release\u00a0${{ env.RELEASE_VERSION }}\u00a0image\u00a0error"
-          if [[ "${{ needs.release-image.result }}" == "success" && "${{ needs.release-tools-image.result }}" == "success"  && "${{ needs.release-datascript-image.result }}" == "success" ]]; then
-              CONTENT="release\u00a0${{ env.RELEASE_VERSION }}\u00a0image\u00a0success"
-              echo "success" > ${release_result}
+          CONTENT="error"
+          if [[ "${{ needs.release-image.result }}" == "success" && "${{ needs.release-tools-image.result }}" == "success"  && "${{ needs.release-datascript-image.result }}" == "success" && "${{ needs.release-dataprotection-image.result }}" == "success" ]]; then
+              CONTENT="success"
+              echo "success" > ${ARTIFACT_KEY}
           else
-              echo "error" > ${release_result}
+              echo "error" > ${ARTIFACT_KEY}
           fi
-
-          bash .github/utils/utils.sh --type 12 \
-            --tag-name ${{ env.RELEASE_VERSION }} \
-            --content "${CONTENT}"\
-            --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
-            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          echo 'content_result='$CONTENT >> $GITHUB_OUTPUT
+          echo release_version=${{ env.RELEASE_VERSION }} >> $GITHUB_OUTPUT
 
       - name: delete cache
         continue-on-error: true
         run: |
-          bash .github/utils/utils.sh --type 17 --tag-name "${{ steps.send_message.outputs.release-result }}"
+          bash .github/utils/utils.sh --type 17 --tag-name "${{ steps.release_message.outputs.artifact_key }}"
 
       - name: Save Artifact
         id: cache-artifact-save
         uses: actions/cache/save@v3
         with:
           path: |
-            ${{ steps.send_message.outputs.release-result }}
-          key: ${{ steps.send_message.outputs.release-result }}
+            ${{ steps.release_message.outputs.artifact_key }}
+          key: ${{ steps.release_message.outputs.artifact_key }}
+
+  send-message:
+    needs: [ release-message ]
+    if: ${{ always() && github.event.action == 'published' }}
+    uses: apecloud/apecloud-cd/.github/workflows/feishui-message.yml@v0.1.38
+    with:
+      TYPE: "2"
+      CONTENT: "release image ${{ needs.release-message.outputs.release-version }} ${{ needs.release-message.outputs.content-result }}"
+      APECD_REF: "v0.1.38"
+    secrets: inherit

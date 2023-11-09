@@ -2,7 +2,6 @@
 {{- if and $scName .Values.storageClass.create }}
 {{- $cloudProvider := (include "kubeblocks.cloudProvider" .) }}
 {{- if eq $cloudProvider "aws" }}
----
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -19,7 +18,6 @@ reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
 ---
 {{- else if eq $cloudProvider "gcp" }}
----
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -36,7 +34,6 @@ reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
 ---
 {{- else if eq $cloudProvider "aliyun" }}
----
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -53,7 +50,6 @@ reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
 ---
 {{- else if eq $cloudProvider "tencentCloud" }}
----
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -68,7 +64,6 @@ provisioner: com.tencent.cloud.csi.cbs
 volumeBindingMode: WaitForFirstConsumer
 ---
 {{- else if eq $cloudProvider "azure" }}
----
 ## it doesn't work here because aks does not support .Capabilities.KubeVersion.GitVersion to judge the provider.
 ## refer: https://github.com/Azure/AKS/issues/3375
 apiVersion: storage.k8s.io/v1
@@ -87,7 +82,6 @@ reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
 ---
 {{- else if eq $cloudProvider "huaweiCloud" }} # huawei cloud
----
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:

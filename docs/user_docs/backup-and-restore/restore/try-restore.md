@@ -1,12 +1,12 @@
 ---
-title: Restore
+title: Try restore
 description: How to restore clusters from backups
 keywords: [backup and restore, restore]
-sidebar_position: 8
-sidebar_label: Restore
+sidebar_position: 1
+sidebar_label: Try restore
 ---
 
-# Restore
+# Try restore
 
 KubeBlocks supports restoring clusters from backups with the following instructions.
 
@@ -17,7 +17,7 @@ For existing clusters, execute:
     kbcli cluster list-backups mysql-cluster
     ```
 
-    If the cluster has been deleted, execute:
+   If the cluster has been deleted, execute:
 
     ```bash
     kbcli dataprotection list-backups
@@ -28,8 +28,6 @@ For existing clusters, execute:
 <Tabs>
 
 <TabItem value="kbcli" label="kbcli" default>
-
-Restore with the kbcli command:
 
 ```powershell
 # Restore new cluster
@@ -46,8 +44,6 @@ myrestore   default     apecloud-mysql       ac-mysql-8.0.30   Delete           
 </TabItem>
 
 <TabItem value="kubectl" label="kubectl">
-
-Restore with the kubectl command:
 
 ```bash
 $ kubectl apply -f - <<-'EOF'
@@ -82,7 +78,7 @@ EOF
 
 3. Connect to the restored cluster for verification.
 
-    Once the cluster status is Running, run the following command to connect to the cluster for verification:
+    Once the cluster status is `Running`, run the following command to connect to the cluster for verification:
 
     ```bash
     kbcli cluster connect myrestore

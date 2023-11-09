@@ -2,7 +2,7 @@
 title: Configure BackupRepo
 description: How to configure BackupRepo
 keywords: [introduction, backup, restore]
-sidebar_position: 2
+sidebar_position: 1
 sidebar_label: Configure BackupRepo
 ---
 
@@ -28,38 +28,38 @@ Users can create multiple BackupRepos to suit different scenarios. For example, 
    
    If you don't have an object storage service from a cloud provider, you can deploy the open-source service MinIO in Kubernetes and use it to configure BackupRepo. If you are using an object storage service provided by a cloud provider, directly skip to [Configure BackupRepo](#configure-backuprepo).
 
-  ***Steps:***
+  ***Steps***
 
-1. Install MinIO.
+   1. Install MinIO.
 
-   Use the following Helm command to install MinIO in the `kb-system` namespace:
+      Use the following Helm command to install MinIO in the `kb-system` namespace:
 
-   ```bash
-   helm repo add kubeblocks-apps https://jihulab.com/api/v4/projects/152630/packages/helm/stable
-   helm install minio kubeblocks-apps/minio --namespace kb-system --create-namespace --set "extraEnvVars[0].name=MINIO_BROWSER_LOGIN_ANIMATION" --set "extraEnvVars[0].value=off"
-   ```
+      ```bash
+      helm repo add kubeblocks-apps https://jihulab.com/api/v4/projects/152630/packages/helm/stable
+      helm install minio kubeblocks-apps/minio --namespace kb-system --create-namespace --set "extraEnvVars[0].name=MINIO_BROWSER_LOGIN_ANIMATION" --set "extraEnvVars[0].value=off"
+      ```
 
-   Get initial username and password:
+      Get initial username and password:
 
-   ```bash
-   # Initial username
-   echo $(kubectl get secret --namespace kb-system minio -o jsonpath="{.data.root-user}" | base64 -d)
+      ```bash
+      # Initial username
+      echo $(kubectl get secret --namespace kb-system minio -o jsonpath="{.data.root-user}" | base64 -d)
 
-   # Initial password
-   echo $(kubectl get secret --namespace kb-system minio -o jsonpath="{.data.root-password}" | base64 -d)
-   ```
+      # Initial password
+      echo $(kubectl get secret --namespace kb-system minio -o jsonpath="{.data.root-password}" | base64 -d)
+      ```
 
-2. Generate credentials.
-   Access the login page by running `kubectl port-forward --namespace default svc/minio 9001:9001` and then accessing `127.0.0.1:9001`.
+   2. Generate credentials.
+      Access the login page by running `kubectl port-forward --namespace default svc/minio 9001:9001` and then accessing `127.0.0.1:9001`.
 
-   Once you are logged in to the dashboard, you can generate `an access key` and `secret key`.
-   ![backup-and-restore-backup-repo-1](./../../../img/backup-and-restore-backup-repo-1.png)
+      Once you are logged in to the dashboard, you can generate `an access key` and `secret key`.
+      ![backup-and-restore-backup-repo-1](./../../../img/backup-and-restore-backup-repo-1.png)
 
-3. Create a bucket.
-   Create a bucket named `test-minio`.
+   3. Create a bucket.
+      Create a bucket named `test-minio`.
 
-   ![backup-and-restore-backup-repo-2](./../../../img/backup-and-restore-backup-repo-2.png)
-   ![backup-and-restore-backup-repo3](./../../../img/backup-and-restore-backup-repo-3.png)
+      ![backup-and-restore-backup-repo-2](./../../../img/backup-and-restore-backup-repo-2.png)
+      ![backup-and-restore-backup-repo3](./../../../img/backup-and-restore-backup-repo-3.png)
 
   :::note
 
@@ -82,14 +82,17 @@ There are two methods to access remote object storage:
   
 The two access methods are referred to as "Tool" and "Mount". When creating BackupRepo, users can specify the access method through the `accessMethod` field, which can not be changed after creation.
 
-Generally, it is recommended to use the "Tool" method as it does not require installing an additional CSI driver, thus reducing dependencies. However, as backup and restore tasks require running in the namespace of the database cluster, using the "Tool" approach automatically synchronizes the necessary credentials for accessing the remote storage as secret resources in those namespaces. These credentials are used by the data transfer tool. If you have concerns about security risks associated with synchronizing secrets in a multi-tenant environment, you can choose to use the "Mount" method.
+Generally, it is recommended to use the "Tool" method as it does not require installing an additional CSI driver, thus reducing dependencies. 
+
+However, as backup and restore tasks require running in the namespace of the database cluster, using the "Tool" approach automatically synchronizes the necessary credentials for accessing the remote storage as secret resources in those namespaces. These credentials are used by the data transfer tool. If you have concerns about security risks associated with synchronizing secrets in a multi-tenant environment, you can choose to use the "Mount" method.
 
 ### Automatic BackupRepo configuration
 
 You can specify the BackupRepo information in a YAML configuration file when installing KubeBlocks, and KubeBlocks will create the BackupRepo and automatically install the necessary CSI Driver based on the provided configuration.
 
 1. Prepare the configuration file.
-Taking AWS S3 as an example, the configuration file `backuprepo.yaml` is:
+   
+   Taking AWS S3 as an example, the configuration file `backuprepo.yaml` is:
 
     ```yaml
     backupRepo:
@@ -117,7 +120,7 @@ Taking AWS S3 as an example, the configuration file `backuprepo.yaml` is:
 
     :::
 
-2. Specify the configuration file when installing KubeBlocks. 
+1. Specify the configuration file when installing KubeBlocks. 
 
    ```shell
    kbcli kubeblocks install -f backuprepo.yaml

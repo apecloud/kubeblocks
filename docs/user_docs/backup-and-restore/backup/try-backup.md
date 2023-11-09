@@ -1,9 +1,9 @@
 ---
-title: Backup
+title: Try backup
 description: How to back up a cluster
 keywords: [backup, backup policy, manual backup, automatic backup]
-sidebar_position: 4
-sidebar_label: Backup
+sidebar_position: 2
+sidebar_label: Try backup
 ---
 
 import Tabs from '@theme/Tabs';
@@ -109,7 +109,7 @@ volume-snapshot   volumesnapshot-for-apecloud-mysql   true
 
 </Tabs>
 
-For a MySQL cluster, it supports two default backup methods: `xtrabackup` and `volume-snapshot`. The former uses the backup tool `xtrabackup` to backup MySQL data to an object storage, while the latter utilizes the volume snapshot capability of cloud storage to backup data through snapshots. When creating a backup, you can specify which backup method to use.
+For a MySQL cluster, two default backup methods are supported: `xtrabackup` and `volume-snapshot`. The former uses the backup tool `xtrabackup` to backup MySQL data to an object storage, while the latter utilizes the volume snapshot capability of cloud storage to backup data through snapshots. When creating a backup, you can specify which backup method to use.
 
 ## Manual backup
 
@@ -158,13 +158,13 @@ mybackup   mysql-cluster-mysql-backup-policy   xtrabackup   my-repo   Completed 
 
 </Tabs>
 
-To create a backup using the snapshot, the backupMethod in the YAML configuration file or the --method field in the kbcli command should be set to volume-snapshot.
+To create a backup using the snapshot, the backupMethod in the YAML configuration file or the `--method` field in the kbcli command should be set to `volume-snapshot`.
 
 :::caution
 
-When creating backups using snapshots, ensure that the storage used supports the snapshot feature; otherwise, the backup may fail.
+1. When creating backups using snapshots, ensure that the storage used supports the snapshot feature; otherwise, the backup may fail.
 
-Backups created manually using kubectl or kbcli will not be automatically deleted. You need to manually delete them.
+2. Backups created manually using kubectl or kbcli will not be automatically deleted. You need to manually delete them.
 
 :::
 

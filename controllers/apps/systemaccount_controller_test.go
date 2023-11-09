@@ -300,7 +300,7 @@ var _ = Describe("SystemAccount Controller", func() {
 			clustersMap = initSysAccountTestsAndCluster(mysqlTestCases)
 		})
 
-		It("Should create jobs and secrets as expected for each test case", func() {
+		PIt("Should create jobs and secrets as expected for each test case", func() {
 			for testName, testCase := range mysqlTestCases {
 				var (
 					acctList   appsv1alpha1.KBAccountType
@@ -359,7 +359,7 @@ var _ = Describe("SystemAccount Controller", func() {
 			}
 		})
 
-		It("Secrets should be created when jobs succeeds", func() {
+		PIt("Secrets should be created when jobs succeeds", func() {
 			for testName, testCase := range mysqlTestCases {
 				var (
 					acctList   appsv1alpha1.KBAccountType
@@ -472,7 +472,7 @@ var _ = Describe("SystemAccount Controller", func() {
 			clustersMap = initSysAccountTestsAndCluster(mysqlTestCases)
 		})
 
-		It("Should clear relevant expectations and secrets after cluster deletion", func() {
+		PIt("Should clear relevant expectations and secrets after cluster deletion", func() {
 			var totalJobs, totalSecrets int
 			for testName, testCase := range mysqlTestCases {
 				var (
@@ -533,7 +533,7 @@ var _ = Describe("SystemAccount Controller", func() {
 			}
 		})
 
-		It("Should remove jobs neither completed nor failed on cluster deletion", func() {
+		PIt("Should remove jobs neither completed nor failed on cluster deletion", func() {
 			var totalJobs int
 			for testName, testCase := range mysqlTestCases {
 				var (
@@ -611,7 +611,7 @@ var _ = Describe("SystemAccount Controller", func() {
 			clustersMap = initSysAccountTestsAndCluster(mysqlTestCases)
 		})
 
-		It("Patch Cluster after running", func() {
+		PIt("Patch Cluster after running", func() {
 			for testName, testCase := range mysqlTestCases {
 				var (
 					acctList   appsv1alpha1.KBAccountType

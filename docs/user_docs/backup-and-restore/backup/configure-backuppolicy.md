@@ -37,7 +37,7 @@ mysql-cluster-mysql-backup-policy          true      mysql-cluster   May 23,2023
 mysql-cluster-mysql-backup-policy-hscale   false     mysql-cluster   May 23,2023 19:53 UTC+0800   Available
 ```
 
-By default, all the backups are stored in the default global repository. You can execute the following command to view all BackupRepos. When the DEFAULT field is true, the BackupRepo is the default BackupRepo.
+By default, all the backups are stored in the default global repository. You can execute the following command to view all BackupRepos. When the `DEFAULT` field is `true`, the BackupRepo is the default BackupRepo.
 
 ```bash
 # View BackupRepo
@@ -46,14 +46,14 @@ kbcli backuprepo list
 
 ## View BackupPolicy
 
-After creating a database cluster, an automatic backup policy (BackupPolicy) is created for databases that support backup. Execute the following command to view the BackupPolicy of the cluster.
+After creating a database cluster, a BackupPolicy is created automatically for databases that support backup. Execute the following command to view the BackupPolicy of the cluster.
 
 <Tabs>
 
 <TabItem value="kbcli" label="kbcli" default>
 
 ```bash
-$ kbcli cluster list-backup-policy mysql-cluster
+kbcli cluster list-backup-policy mysql-cluster
 >
 NAME                                       NAMESPACE   DEFAULT   CLUSTER         CREATE-TIME                  STATUS
 mysql-cluster-mysql-backup-policy          default     true      mysql-cluster   Oct 30,2023 14:34 UTC+0800   Available
@@ -82,7 +82,7 @@ The backup policy includes the backup methods supported by the cluster. Execute 
 <TabItem value="kbcli" label="kbcli" default>
 
 ```bash
-$ kbcli cluster describe-backup-policy mysql-cluster
+kbcli cluster describe-backup-policy mysql-cluster
 > 
 kbcli cluster describe-backup-policy mysql-cluster
 Summary:
@@ -102,7 +102,7 @@ volume-snapshot   volumesnapshot-for-apecloud-mysql   true
 <TabItem value="kubectl" label="kubectl">
 
 ```bash
- $ kubectl get backuppolicy mysql-cluster-mysql-backup-policy -o yaml
+kubectl get backuppolicy mysql-cluster-mysql-backup-policy -o yaml
 ```
 
 </TabItem>

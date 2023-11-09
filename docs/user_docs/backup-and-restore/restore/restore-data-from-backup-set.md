@@ -14,7 +14,7 @@ import TabItem from '@theme/TabItem';
 KubeBlocks supports restoring clusters from backups with the following instructions.
 
 1. View backups.
-   
+
    For existing clusters, execute:
 
    ```shell

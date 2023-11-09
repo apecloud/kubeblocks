@@ -32,10 +32,10 @@ As its definition indicates, referencing the external component can be divided i
 
 ## Examples of referencing external component
 
-The following examples show how a Pulsar cluster created by the KubeBlocks add-on references Zookeeper by the external component. The instructions below include two parts:
+The following examples show how a Pulsar cluster created by the KubeBlocks add-on references Zookeeper as an external component. The instructions below include two parts:
 
 1. [Create an external component reference declaration](#create-an-external-component-reference-declaration) when installing KubeBlocks or enabling an add-on.
-2. [Define the mapping relation](#define-the-external-component-referencing-mapping-relation) when creating a cluster.
+2. [Define the external component referencing mapping relation](#define-the-external-component-referencing-mapping-relation) when creating a cluster.
 
 A KubeBlocks Pulsar cluster is composed of components including proxy, broker, bookies, and zookeeper and broker and bookies rely on zookeeper to provide metadata storage and interaction.
 
@@ -47,9 +47,9 @@ For more information about the KubeBlocks Pulsar cluster, refer to [KubeBlocks f
 
 ### Create an external component reference declaration
 
-1. Declare the referenced component in `ComponentDefs` in the ClusterDefinition.
+1. Declare the referenced component in `componentDefs` in the ClusterDefinition.
 
-    In this example, the broker and bookies components of the Pulsar cluster rely on the zookeeper component, so you need to add the declaration of zookeeper in the `ComponentDefs` of broker and bookies.
+    In this example, the broker and bookies components of the Pulsar cluster rely on the zookeeper component, so you need to add the declaration of zookeeper in the `componentDefs` of broker and bookies.
 
     ```yaml
     apiVersion: apps.kubeblocks.io/v1alpha1
@@ -84,7 +84,7 @@ For more information about the KubeBlocks Pulsar cluster, refer to [KubeBlocks f
         # Here omit other component definitions
     ```
 
-    `serviceRefDeclarations` above describe the external component referencing declarations, in which both pulsar-broker and bookies declare a component named `pulsarZookeeper`. It means `pulsar-broker` and `bookies` require a component whose name is `pulsarZookeeper`, `serviceKind` is `zookeeper`, and `serviceVersion` matches the `^3.8.\d{1,2}$` regular expression.
+    `serviceRefDeclarations` above describe the external component referencing declarations, in which both `pulsar-broker` and `bookies` declare a component named `pulsarZookeeper`. It means `pulsar-broker` and `bookies` require a component whose name is `pulsarZookeeper`, `serviceKind` is `zookeeper`, and `serviceVersion` matches the `^3.8.\d{1,2}$` regular expression.
 
     This `pulsarZookeeper` reference declaration will be mapped to your specified zookeeper cluster when you create a Pulsar cluster.
 
@@ -141,7 +141,7 @@ For more information about the KubeBlocks Pulsar cluster, refer to [KubeBlocks f
 
     :::
 
-### Define the External component referencing mapping relation
+### Define the external component referencing mapping relation
 
 Based on the above example, when creating a Pulsar cluster, the zookeeper mapping can be divided into two types:
 
@@ -173,7 +173,7 @@ Based on the above example, when creating a Pulsar cluster, the zookeeper mappin
 
 2. Reference the external zookeeper component when creating a Pulsar cluster.
 
-   The following example shows creating a Pulsar cluster referencing the external zookeeper component mentioned above.
+   The following example shows how to create a Pulsar cluster referencing the external zookeeper component mentioned above.
 
    ```yaml
    apiVersion: apps.kubeblocks.io/v1alpha1
@@ -199,7 +199,7 @@ Based on the above example, when creating a Pulsar cluster, the zookeeper mappin
        # Here omit other definitions
    ```
 
-   When creating the Pulsar Cluster object, `serviceRefs` maps `pulsarZookeeper` in the declaration to the specific `serviceDescriptor`. `name` in `serviceRefs` corresponds to the component referencing name defined in the ClusterDefinition and the value of `serviceDescriptor` is the name of `ServiceDescritor` in step 1.
+   When creating the Pulsar Cluster object, `serviceRefs` maps `pulsarZookeeper` in the declaration to the specific `serviceDescriptor`. `name` in `serviceRefs` corresponds to the component referencing name defined in the ClusterDefinition and the value of `serviceDescriptor` is the name of `ServiceDescriptor` in step 1.
 
 #### Mapping the Zookeeper component deployed by an individual cluster provided by KubeBlocks
 
@@ -239,7 +239,9 @@ This mapping relation refers to mapping an external component to an individual K
    terminationPolicy: WipeOut
    ```
 
-2. Reference the above Zookeeper cluster when creating a Pulsar cluster. Fill in the value of `cluster` in `serviceRefs` with the name of the KubeBlocks Zookeeper cluster in step 1.
+2. Reference the above Zookeeper cluster when creating a Pulsar cluster. 
+
+   Fill in the value of `cluster` in `serviceRefs` with the name of the KubeBlocks Zookeeper cluster in step 1.
 
    ```yaml
    apiVersion: apps.kubeblocks.io/v1alpha1
@@ -271,7 +273,7 @@ KubeBlocks v0.7.0 only provides an alpha version of the external component refer
 
 * The `name` in the ClusterDefinition of component referencing declaration maintains the semantic consistency on the cluster level, which means the same names are identified as the same component referencing and they cannot be mapped to different clusters.
 * If both serviceDescriptor-based and cluster-based mapping are specified when creating a cluster, the cluster-based one enjoys higher priority and the serviceDescriptor-based one will be ignored.
-* If the cluster-based mapping is used when creating a cluster, the `ServiceKind` and `ServiceVersion` defined in the ClusterDefinition will not be verified.
+* If the cluster-based mapping is used when creating a cluster, the `serviceKind` and `serviceVersion` defined in the ClusterDefinition will not be verified.
 
-  If the serviceDescriptor-based mapping is adopted, KubeBlocks will verify the `ServiceKind` and `ServiceVersion` in the `serviceDescriptor` by comparing the `ServiceKind` and `ServiceVersion` defined in the ClusterDefinition. Mapping then is performed only when the values match.
+  If the serviceDescriptor-based mapping is adopted, KubeBlocks will verify the `serviceKind` and `serviceVersion` in the `serviceDescriptor` by comparing the `serviceKind` and `serviceVersion` defined in the ClusterDefinition. Mapping then is performed only when the values match.
 * For v0.7.0, the usage of component referencing in the ClusterDefinition is supported only by rendering the configuration templates. Other usage options will be supported in the future.

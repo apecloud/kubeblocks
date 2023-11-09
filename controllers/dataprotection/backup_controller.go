@@ -34,6 +34,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
@@ -42,7 +43,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -128,7 +131,8 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(maxConcurDataProtectionReconKey),
 		}).
-		Owns(&batchv1.Job{})
+		Owns(&batchv1.Job{}).
+		Watches(&batchv1.Job{}, handler.EnqueueRequestsFromMapFunc(r.parseBackupJob))
 
 	if intctrlutil.InVolumeSnapshotV1Beta1() {
 		b.Owns(&vsv1beta1.VolumeSnapshot{}, builder.Predicates{})
@@ -136,6 +140,22 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		b.Owns(&vsv1.VolumeSnapshot{}, builder.Predicates{})
 	}
 	return b.Complete(r)
+}
+
+func (r *BackupReconciler) parseBackupJob(ctx context.Context, object client.Object) []reconcile.Request {
+	job := object.(*batchv1.Job)
+	var requests []reconcile.Request
+	backupName := job.Labels[dptypes.BackupNameLabelKey]
+	backupNamespace := job.Labels[dptypes.BackupNamespaceLabelKey]
+	if backupName != "" && backupNamespace != "" {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: backupNamespace,
+				Name:      backupName,
+			},
+		})
+	}
+	return requests
 }
 
 // deleteBackupFiles deletes the backup files stored in backup repository.
@@ -408,6 +428,7 @@ func (r *BackupReconciler) patchBackupObjectMeta(
 
 	request.Labels[constant.AppManagedByLabelKey] = constant.AppName
 	request.Labels[dptypes.BackupTypeLabelKey] = request.GetBackupType()
+	request.Labels[dptypes.BackupPolicyLabelKey] = request.Spec.BackupPolicyName
 	// wait for the backup repo controller to prepare the essential resource.
 	wait := false
 	if request.BackupRepo != nil {
@@ -585,33 +606,11 @@ func (r *BackupReconciler) updateStatusIfFailed(
 
 // deleteExternalJobs deletes the external jobs.
 func (r *BackupReconciler) deleteExternalJobs(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
-	jobs := &batchv1.JobList{}
-	if err := r.Client.List(reqCtx.Ctx, jobs,
-		client.InNamespace(backup.Namespace),
-		client.MatchingLabels(dpbackup.BuildBackupWorkloadLabels(backup))); err != nil {
-		return client.IgnoreNotFound(err)
+	labels := dpbackup.BuildBackupWorkloadLabels(backup)
+	if err := deleteRelatedJobs(reqCtx, r.Client, backup.Namespace, labels); err != nil {
+		return err
 	}
-
-	deleteJob := func(job *batchv1.Job) error {
-		if err := dputils.RemoveDataProtectionFinalizer(reqCtx.Ctx, r.Client, job); err != nil {
-			return err
-		}
-		if !job.DeletionTimestamp.IsZero() {
-			return nil
-		}
-		reqCtx.Log.V(1).Info("delete job", "job", job)
-		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, job); err != nil {
-			return err
-		}
-		return nil
-	}
-
-	for i := range jobs.Items {
-		if err := deleteJob(&jobs.Items[i]); err != nil {
-			return err
-		}
-	}
-	return nil
+	return deleteRelatedJobs(reqCtx, r.Client, viper.GetString(constant.CfgKeyCtrlrMgrNS), labels)
 }
 
 func (r *BackupReconciler) deleteVolumeSnapshots(reqCtx intctrlutil.RequestCtx,

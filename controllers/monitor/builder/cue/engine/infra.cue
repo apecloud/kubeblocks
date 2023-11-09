@@ -35,9 +35,9 @@ output: {
 			}
 			logs_collector: {
 				errorlog:
-					include: ["/data/mysql/log/mysqld-error.log"]
+					include: ["/data/mysql/log/mysqld-error.log*"]
 				slow:
-					include: ["/data/mysql/log/mysqld-slowquery.log"]
+					include: ["/data/mysql/log/mysqld-slowquery.log*"]
 			}
 		}
 

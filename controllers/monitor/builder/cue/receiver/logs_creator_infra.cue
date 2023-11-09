@@ -25,12 +25,11 @@ output: {
 				container_id:   "`container_id`"
 				pod_ip:         "`endpoint`"
 				storage:        "file_storage/oteld"
-				cluster_name:   "`config.ClusterName`"
-				component_name: "`config.ComponentName`"
-				character_type: "`config.CharacterType`"
+				cluster_name:   "`labels[\"app.kubernetes.io/instance\"]`"
+				component_name: "`labels[\"apps.kubeblocks.io/component-name\"]`"
+				character_type: "`labels[\"app.kubernetes.io/name\"]`"
 			}
 		}
-
 	}
 	resource_attributes: {
 		container: {
@@ -43,7 +42,7 @@ output: {
 			node:                              "${env:NODE_NAME}"
 			namespace:                         "`namespace`"
 			pod:                               "`name`"
-			job:                               "oteld-app-metrics"
+			job:                               "oteld-app-logs"
 		}
 	}
 }

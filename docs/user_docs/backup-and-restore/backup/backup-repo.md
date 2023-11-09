@@ -146,6 +146,7 @@ You can specify the BackupRepo information in a YAML configuration file when ins
    ```bash
    kubectl get backuprepo
    ```
+   </TabItem>
      
 ### Manual BackupRepo configuration
 

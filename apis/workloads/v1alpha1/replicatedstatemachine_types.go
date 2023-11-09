@@ -23,6 +23,22 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+)
+
+const (
+	ReplicatedStateMachineKind = "ReplicatedStateMachine"
+)
+
+// RsmToStsPolicy defines RsmToStsPolicy type
+// OneToMul and OneToOne is supported
+// +enum
+// +kubebuilder:validation:Enum={OneToMul,OneToOne}
+type RsmToStsPolicy string
+
+const (
+	OneToMul RsmToStsPolicy = "OneToMul"
+	OneToOne RsmToStsPolicy = "OneToOne"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -120,6 +136,33 @@ type ReplicatedStateMachineSpec struct {
 	// Credential used to connect to DB engine
 	// +optional
 	Credential *Credential `json:"credential,omitempty"`
+
+	// RsmToStsPolicy defines the policy generate sts using rsm. Passed from cluster.
+	// OneToOne: one rsm corresponds to one sts
+	// OneToMul: one rsm corresponds to multiple sts
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=OneToOne
+	// +optional
+	RsmToStsPolicy RsmToStsPolicy `json:"rsmToStsPolicy,omitempty"`
+
+	// NodeAssignment defines the expected assignment of nodes.
+	// +optional
+	NodeAssignment []NodeAssignment `json:"nodeAssignment,omitempty"`
+}
+
+type NodeAssignment struct {
+	// Name defines the name of statefulSet that needs to allocate node.
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// NodeSpec defines the detailed node info that will assign to the statefulSet.
+	// +optional
+	NodeSpec NodeSpec `json:"nodeSpec,omitempty"`
+}
+
+type NodeSpec struct {
+	// +optional
+	NodeName types.NodeName `json:"nodeName,omitempty"`
 }
 
 // ReplicatedStateMachineStatus defines the observed state of ReplicatedStateMachine

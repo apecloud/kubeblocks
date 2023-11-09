@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -390,6 +391,21 @@ type ClusterComponentSpec struct {
 	// userResourceRefs defines the user-defined volumes.
 	// +optional
 	UserResourceRefs *UserResourceRefs `json:"userResourceRefs,omitempty"`
+
+	// RsmToStsPolicy defines the policy generate sts using rsm.
+	// OneToOne: one rsm corresponds to one sts
+	// OneToMul: one rsm corresponds to multiple sts
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=OneToOne
+	// +optional
+	RsmToStsPolicy workloads.RsmToStsPolicy `json:"rsmToStsPolicy,omitempty"`
+
+	// Nodes defines the list of nodes that pods can schedule
+	// If the RsmToStsPolicy is specified as OneToMul,the list of nodes will be used. If the list of nodes is empty,
+	// no specific node will be assigned. However, if the list of node is filled, all pods will be evenly scheduled
+	// across the nodes in the list.
+	// +optional
+	Nodes []types.NodeName `json:"nodes,omitempty"`
 }
 
 // GetMinAvailable wraps the 'prefer' value return. As for component replicaCount <= 1, it will return 0,

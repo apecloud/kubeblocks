@@ -47,21 +47,21 @@ func GenServiceReferencesLegacy(reqCtx intctrlutil.RequestCtx,
 		comp    *appsv1alpha1.Component
 		err     error
 	)
-	if compDef, err = BuildComponentDefinitionLow(clusterDef, clusterVer, cluster, clusterCompSpec); err != nil {
+	if compDef, err = BuildComponentDefinition(clusterDef, clusterVer, cluster, clusterCompSpec.Name); err != nil {
 		return nil, err
 	}
-	if comp, err = BuildProtoComponent(cluster, clusterCompSpec); err != nil {
+	if comp, err = BuildComponent(cluster, clusterCompSpec); err != nil {
 		return nil, err
 	}
-	return GenServiceReferences(reqCtx, cli, cluster, compDef, comp)
+	return GenServiceReferences(reqCtx, cli, cluster.Namespace, cluster.Name, compDef, comp)
 }
 
 func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 	cli roclient.ReadonlyClient,
-	cluster *appsv1alpha1.Cluster,
+	namespace, clusterName string,
 	compDef *appsv1alpha1.ComponentDefinition,
 	comp *appsv1alpha1.Component) (map[string]*appsv1alpha1.ServiceDescriptor, error) {
-	if cluster == nil || compDef == nil || comp == nil {
+	if compDef == nil || comp == nil {
 		return nil, nil
 	}
 
@@ -75,13 +75,13 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 			if serviceRef.Name != serviceRefDecl.Name {
 				continue
 			}
-			targetNamespace := cluster.Namespace
+			targetNamespace := namespace
 			if serviceRef.Namespace != "" {
 				targetNamespace = serviceRef.Namespace
 			}
 			// if service reference is another KubeBlocks Cluster, then it is necessary to generate a service connection credential from the cluster connection credential secret
 			if serviceRef.Cluster != "" {
-				if err := handleClusterTypeServiceRef(reqCtx, cli, targetNamespace, cluster, serviceRef, serviceRefDecl, serviceReferences); err != nil {
+				if err := handleClusterTypeServiceRef(reqCtx, cli, targetNamespace, clusterName, serviceRef, serviceRefDecl, serviceReferences); err != nil {
 					return nil, err
 				}
 				// serviceRef.Cluster takes precedence, and if serviceRef.Cluster is set, serviceRef.ServiceDescriptor will be ignored
@@ -108,13 +108,12 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 // handleClusterTypeServiceRef handles the service reference is another KubeBlocks Cluster.
 func handleClusterTypeServiceRef(reqCtx intctrlutil.RequestCtx,
 	cli roclient.ReadonlyClient,
-	namespace string,
-	cluster *appsv1alpha1.Cluster,
+	namespace, clusterName string,
 	serviceRef appsv1alpha1.ServiceRef,
 	serviceRefDecl appsv1alpha1.ServiceRefDeclaration,
 	serviceReferences map[string]*appsv1alpha1.ServiceDescriptor) error {
-	if serviceRef.Cluster == cluster.Name {
-		return fmt.Errorf("cluster %s cannot reference itself", cluster.Name)
+	if serviceRef.Cluster == clusterName {
+		return fmt.Errorf("cluster %s cannot reference itself", clusterName)
 	}
 	referencedCluster := &appsv1alpha1.Cluster{}
 	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: namespace, Name: serviceRef.Cluster}, referencedCluster); err != nil {
@@ -142,7 +141,7 @@ func handleClusterTypeServiceRef(reqCtx intctrlutil.RequestCtx,
 	}
 
 	// TODO: Second-stage optimization: Cluster-type references no longer perform conversion on the connection credential field. Instead, the configMap or secret is directly passed through to the serviceDescriptor.
-	sdBuilder := builder.NewServiceDescriptorBuilder(namespace, generateDefaultServiceDescriptorName(cluster.Name))
+	sdBuilder := builder.NewServiceDescriptorBuilder(namespace, generateDefaultServiceDescriptorName(clusterName))
 	sdBuilder.SetServiceKind("")
 	sdBuilder.SetServiceVersion("")
 	handleSecretKey(secretRef, sdBuilder, constant.ServiceDescriptorEndpointKey, sdBuilder.SetEndpoint)

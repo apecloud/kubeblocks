@@ -65,9 +65,9 @@ func NewClusterDefFactory(name string) *MockClusterDefFactory {
 	return f
 }
 
-func NewClusterDefFactoryWithConnCredential(name string) *MockClusterDefFactory {
+func NewClusterDefFactoryWithConnCredential(name, compDefName string) *MockClusterDefFactory {
 	f := NewClusterDefFactory(name)
-	f.AddComponentDef(StatefulMySQLComponent, "conn-cred")
+	f.AddComponentDef(StatefulMySQLComponent, compDefName)
 	f.SetConnectionCredential(getDefaultConnectionCredential(), &defaultSvcSpec)
 	return f
 }

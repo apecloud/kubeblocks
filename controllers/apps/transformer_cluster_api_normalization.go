@@ -56,7 +56,7 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	}
 	for i, compSpec := range transCtx.ComponentSpecs {
 		if len(compSpec.ComponentDef) == 0 {
-			compDef, err := component.BuildComponentDefinitionLow(transCtx.ClusterDef, transCtx.ClusterVer, cluster, compSpec)
+			compDef, err := component.BuildComponentDefinition(transCtx.ClusterDef, transCtx.ClusterVer, cluster, compSpec.Name)
 			if err != nil {
 				return err
 			}

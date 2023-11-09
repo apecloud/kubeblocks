@@ -141,19 +141,18 @@ var _ = Describe("builder", func() {
 		}
 		return reqCtx
 	}
-	newAllFieldsComponent := func(clusterDef *appsv1alpha1.ClusterDefinition, clusterVersion *appsv1alpha1.ClusterVersion) *component.SynthesizedComponent {
-		cluster, _, _, _ := newAllFieldsClusterObj(clusterDef, clusterVersion, false)
+	newAllFieldsComponent := func(cluster *appsv1alpha1.Cluster, clusterDef *appsv1alpha1.ClusterDefinition, clusterVersion *appsv1alpha1.ClusterVersion) *component.SynthesizedComponent {
 		reqCtx := newReqCtx()
 		By("assign every available fields")
-		// TODO(xingran): check it BuildComponent can be replaced by BuildSynthesizedComponentWrapper
-		synthesizeComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, &cluster.Spec.ComponentSpecs[0])
+		synthesizeComp, err := component.BuildSynthesizedComponentWrapperWithDefinition(reqCtx, testCtx.Cli,
+			clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[0])
 		Expect(err).Should(Succeed())
 		Expect(synthesizeComp).ShouldNot(BeNil())
 		return synthesizeComp
 	}
 	newClusterObjs := func(clusterDefObj *appsv1alpha1.ClusterDefinition) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.Cluster, *component.SynthesizedComponent) {
 		cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(clusterDefObj, nil, false)
-		synthesizedComponent := newAllFieldsComponent(clusterDef, clusterVersion)
+		synthesizedComponent := newAllFieldsComponent(cluster, clusterDef, clusterVersion)
 		return clusterDef, cluster, synthesizedComponent
 	}
 
@@ -176,7 +175,7 @@ var _ = Describe("builder", func() {
 
 		It("builds Conn. Credential correctly", func() {
 			var (
-				clusterDefObj                             = testapps.NewClusterDefFactoryWithConnCredential("conn-cred").GetObject()
+				clusterDefObj                             = testapps.NewClusterDefFactoryWithConnCredential("conn-cred", mysqlCompDefName).GetObject()
 				clusterDef, cluster, synthesizedComponent = newClusterObjs(clusterDefObj)
 			)
 			credential := BuildConnCredential(clusterDef, cluster, synthesizedComponent)
@@ -212,8 +211,8 @@ var _ = Describe("builder", func() {
 				Expect(credential.StringData[v]).ShouldNot(BeEquivalentTo(fmt.Sprintf("$(%s)", v)))
 			}
 			Expect(credential.StringData["RANDOM_PASSWD"]).Should(HaveLen(8))
-			svcFQDN := fmt.Sprintf("%s-%s.%s.svc", cluster.Name, synthesizedComponent.Name, cluster.Namespace)
-			headlessSvcFQDN := fmt.Sprintf("%s-%s-headless.%s.svc", cluster.Name, synthesizedComponent.Name, cluster.Namespace)
+			svcFQDN := fmt.Sprintf("%s-%s", cluster.Name, synthesizedComponent.Name)
+			headlessSvcFQDN := fmt.Sprintf("%s-%s-headless", cluster.Name, synthesizedComponent.Name)
 			var mysqlPort corev1.ServicePort
 			var paxosPort corev1.ServicePort
 			for _, s := range synthesizedComponent.Services[0].Spec.Ports {
@@ -236,7 +235,7 @@ var _ = Describe("builder", func() {
 			encryptionKey := "encryptionKey"
 			viper.Set(constant.CfgKeyDPEncryptionKey, encryptionKey)
 			var (
-				clusterDefObj                             = testapps.NewClusterDefFactoryWithConnCredential("conn-cred").GetObject()
+				clusterDefObj                             = testapps.NewClusterDefFactoryWithConnCredential("conn-cred", mysqlCompDefName).GetObject()
 				clusterDef, cluster, synthesizedComponent = newClusterObjs(clusterDefObj)
 			)
 			e := intctrlutil.NewEncryptor(encryptionKey)

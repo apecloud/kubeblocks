@@ -91,7 +91,7 @@ func (t *ClusterComponentTransformer) handleCompsCreate(transCtx *clusterTransfo
 	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for compName := range createCompSet {
-		comp, err := component.BuildProtoComponent(cluster, protoCompSpecMap[compName])
+		comp, err := component.BuildComponent(cluster, protoCompSpecMap[compName])
 		if err != nil {
 			return err
 		}
@@ -117,7 +117,7 @@ func (t *ClusterComponentTransformer) handleCompsUpdate(transCtx *clusterTransfo
 		if getErr != nil && !apierrors.IsNotFound(getErr) {
 			return getErr
 		}
-		comp, buildErr := component.BuildProtoComponent(cluster, protoCompSpecMap[compName])
+		comp, buildErr := component.BuildComponent(cluster, protoCompSpecMap[compName])
 		if buildErr != nil {
 			return buildErr
 		}

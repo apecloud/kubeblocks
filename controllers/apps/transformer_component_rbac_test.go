@@ -75,6 +75,8 @@ var _ = Describe("object rbac transformer test.", func() {
 		By("Creating a component")
 		fullCompName := constant.GenerateClusterComponentName(cluster.Name, compName)
 		compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, compDefName).
+			AddLabels(constant.AppInstanceLabelKey, cluster.Name).
+			AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 			SetReplicas(1).
 			SetServiceAccountName(serviceAccountName).
 			GetObject()
@@ -90,7 +92,7 @@ var _ = Describe("object rbac transformer test.", func() {
 			Ctx: ctx,
 			Log: logger,
 		}
-		synthesizedComponent, err := component.BuildSynthesizedComponent(reqCtx, k8sClient, compDefObj, cluster, compObj)
+		synthesizedComponent, err := component.BuildSynthesizedComponent(reqCtx, k8sClient, compDefObj, compObj)
 		Expect(err).Should(Succeed())
 
 		transCtx = &componentTransformContext{

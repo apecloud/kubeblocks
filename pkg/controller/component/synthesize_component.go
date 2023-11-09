@@ -23,10 +23,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -36,45 +34,104 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
+// BuildSynthesizedComponent builds a new SynthesizedComponent object, which is a mixture of component-related configs from ComponentDefinition and Component.
+func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
+	cli client.Reader,
+	compDef *appsv1alpha1.ComponentDefinition,
+	comp *appsv1alpha1.Component) (*SynthesizedComponent, error) {
+	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
+}
+
+// BuildSynthesizedComponent4Generated builds SynthesizedComponent for generated Component which w/o ComponentDefinition.
+func BuildSynthesizedComponent4Generated(reqCtx intctrlutil.RequestCtx,
+	cli client.Reader,
+	cluster *appsv1alpha1.Cluster,
+	comp *appsv1alpha1.Component) (*appsv1alpha1.ComponentDefinition, *SynthesizedComponent, error) {
+	clusterDef, clusterVer, err := getClusterReferencedResources(reqCtx.Ctx, cli, cluster)
+	if err != nil {
+		return nil, nil, err
+	}
+	compName, err := ShortName(cluster.Name, comp.Name)
+	if err != nil {
+		return nil, nil, err
+	}
+	compDef, err := BuildComponentDefinition(clusterDef, clusterVer, cluster, compName)
+	if err != nil {
+		return nil, nil, err
+	}
+	synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, clusterDef, clusterVer, cluster)
+	if err != nil {
+		return nil, nil, err
+	}
+	return compDef, synthesizedComp, nil
+}
+
 // BuildSynthesizedComponentWrapper builds a new SynthesizedComponent object with a given ClusterComponentSpec.
 // TODO(component): check all the usages to handle the simplified cluster API at caller.
 func BuildSynthesizedComponentWrapper(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
+	cli client.Reader,
+	cluster *appsv1alpha1.Cluster,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*SynthesizedComponent, error) {
+	clusterDef, clusterVer, err := getClusterReferencedResources(reqCtx.Ctx, cli, cluster)
+	if err != nil {
+		return nil, err
+	}
+	return BuildSynthesizedComponentWrapperWithDefinition(reqCtx, cli, clusterDef, clusterVer, cluster, clusterCompSpec)
+}
+
+// BuildSynthesizedComponentWrapperWithDefinition builds a new SynthesizedComponent object with a given ClusterComponentSpec.
+// TODO(component): check all the usages to handle the simplified cluster API at caller.
+func BuildSynthesizedComponentWrapperWithDefinition(reqCtx intctrlutil.RequestCtx,
+	cli client.Reader,
+	clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterVer *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*SynthesizedComponent, error) {
 	if clusterCompSpec == nil {
 		return nil, nil
 	}
-	compDef, err := BuildComponentDefinition(reqCtx, cli, cluster, clusterCompSpec)
+	compDef, err := BuildComponentDefinition(clusterDef, clusterVer, cluster, clusterCompSpec.Name)
 	if err != nil {
 		return nil, err
 	}
-	comp, err := BuildProtoComponent(cluster, clusterCompSpec)
+	comp, err := BuildComponent(cluster, clusterCompSpec)
 	if err != nil {
 		return nil, err
 	}
-	return BuildSynthesizedComponent(reqCtx, cli, compDef, cluster, comp)
+	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, clusterDef, clusterVer, cluster)
 }
 
-// BuildSynthesizedComponent builds a new SynthesizedComponent object, which is a mixture of component-related configs from input Cluster, ComponentDefinition and Component.
-func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
-	cli roclient.ReadonlyClient,
+// buildSynthesizedComponent builds a new SynthesizedComponent object, which is a mixture of component-related configs from ComponentDefinition and Component.
+// !!! Do not use @clusterDef, @clusterVer and @cluster since they are used for the backward compatibility only.
+// TODO: remove @reqCtx & @cli
+func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
+	cli client.Reader,
 	compDef *appsv1alpha1.ComponentDefinition,
-	cluster *appsv1alpha1.Cluster,
-	comp *appsv1alpha1.Component) (*SynthesizedComponent, error) {
-	if cluster == nil || compDef == nil || comp == nil {
+	comp *appsv1alpha1.Component,
+	clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterVer *appsv1alpha1.ClusterVersion,
+	cluster *appsv1alpha1.Cluster) (*SynthesizedComponent, error) {
+	if compDef == nil || comp == nil {
 		return nil, nil
 	}
 
-	compName, err := ShortName(cluster.Name, comp.Name)
+	clusterName, err := GetClusterName(comp)
+	if err != nil {
+		return nil, err
+	}
+	clusterUID, err := GetClusterUID(comp)
+	if err != nil {
+		return nil, err
+	}
+	compName, err := ShortName(clusterName, comp.Name)
 	if err != nil {
 		return nil, err
 	}
 	compDefObj := compDef.DeepCopy()
 	synthesizeComp := &SynthesizedComponent{
-		Namespace:             cluster.Namespace,
-		ClusterName:           cluster.Name,
-		ClusterUID:            string(cluster.UID),
+		Namespace:             comp.Namespace,
+		ClusterName:           clusterName,
+		ClusterUID:            clusterUID,
 		Name:                  compName,
 		FullCompName:          comp.Name,
 		CompDefName:           compDef.Name,
@@ -99,8 +156,10 @@ func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	// build backward compatible fields, including workload, services, componentRefEnvs, clusterDefName, clusterCompDefName, and clusterCompVer, etc.
 	// if cluster referenced a clusterDefinition and clusterVersion, for backward compatibility, we need to merge the clusterDefinition and clusterVersion into the component
 	// TODO(xingran): it will be removed in the future
-	if err = buildBackwardCompatibleFields(reqCtx, cli, cluster, synthesizeComp); err != nil {
-		return nil, err
+	if cluster != nil && clusterDef != nil {
+		if err = buildBackwardCompatibleFields(reqCtx, clusterDef, clusterVer, cluster, synthesizeComp); err != nil {
+			return nil, err
+		}
 	}
 
 	// build affinity and tolerations
@@ -136,17 +195,17 @@ func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	}
 
 	// build serviceReferences
-	if err = buildServiceReferences(reqCtx, cli, cluster, synthesizeComp, compDef, comp); err != nil {
+	if err = buildServiceReferences(reqCtx, cli, synthesizeComp, compDef, comp); err != nil {
 		reqCtx.Log.Error(err, "build service references failed.")
 		return nil, err
 	}
 
 	// replace podSpec containers env default credential placeholder
-	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForConnCredential(cluster.GetName()))
+	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForConnCredential(synthesizeComp.ClusterName))
 
 	// replace podSpec containers env component connection credential placeholder
 	// TODO(xingran): This is a temporary solution used to reference component connection credentials defined in ComponentDefinition. it will be refactored in the future.
-	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForCompConnCredential(cluster.GetName(), synthesizeComp.Name))
+	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForCompConnCredential(synthesizeComp.ClusterName, synthesizeComp.Name))
 
 	return synthesizeComp, nil
 }
@@ -199,8 +258,9 @@ func buildAndUpdateResources(synthesizeComp *SynthesizedComponent, comp *appsv1a
 }
 
 // buildServiceReferences builds serviceReferences for component.
-func buildServiceReferences(reqCtx intctrlutil.RequestCtx, cli roclient.ReadonlyClient, cluster *appsv1alpha1.Cluster, synthesizeComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) error {
-	serviceReferences, err := GenServiceReferences(reqCtx, cli, cluster, compDef, comp)
+func buildServiceReferences(reqCtx intctrlutil.RequestCtx, cli roclient.ReadonlyClient,
+	synthesizeComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) error {
+	serviceReferences, err := GenServiceReferences(reqCtx, cli, synthesizeComp.Namespace, synthesizeComp.ClusterName, compDef, comp)
 	if err != nil {
 		return err
 	}
@@ -233,39 +293,27 @@ func buildServiceAccountName(synthesizeComp *SynthesizedComponent) {
 
 // buildBackwardCompatibleFields builds backward compatible fields for component which referenced a clusterComponentDefinition and clusterComponentVersion before KubeBlocks Version 0.7.0
 // TODO(xingran): it will be removed in the future
-func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx, cli roclient.ReadonlyClient, cluster *appsv1alpha1.Cluster, synthesizeComp *SynthesizedComponent) error {
-	if cluster.Spec.ClusterDefRef == "" || cluster.Spec.ClusterVersionRef == "" {
-		return nil // no need to build backward compatible fields
-	}
-
-	cd := &appsv1alpha1.ClusterDefinition{}
-	if err := intctrlutil.ValidateExistence(reqCtx.Ctx, cli, types.NamespacedName{Name: cluster.Spec.ClusterDefRef}, cd, false); err != nil {
-		return err
-	}
-	cv := &appsv1alpha1.ClusterVersion{}
-	if err := intctrlutil.ValidateExistence(reqCtx.Ctx, cli, types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}, cv, false); err != nil {
-		return err
-	}
-
-	var clusterCompDef *appsv1alpha1.ClusterComponentDefinition
-	var clusterCompVer *appsv1alpha1.ClusterComponentVersion
+func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
+	clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterVer *appsv1alpha1.ClusterVersion,
+	cluster *appsv1alpha1.Cluster,
+	synthesizeComp *SynthesizedComponent) error {
 	clusterCompSpec := cluster.Spec.GetComponentByName(synthesizeComp.Name)
 	if clusterCompSpec == nil {
-		return errors.New(fmt.Sprintf("component spec %s not found", synthesizeComp.Name))
+		return fmt.Errorf("component spec %s not found", synthesizeComp.Name)
 	}
 	if clusterCompSpec.ComponentDefRef == "" {
 		return nil // no need to build backward compatible fields
 	}
 
-	clusterCompDef = cd.GetComponentDefByName(clusterCompSpec.ComponentDefRef)
+	clusterCompDef := clusterDef.GetComponentDefByName(clusterCompSpec.ComponentDefRef)
 	if clusterCompDef == nil {
-		return fmt.Errorf("referenced component definition does not exist, cluster: %s, component: %s, component definition ref:%s",
+		return fmt.Errorf("referenced cluster component definition does not exist, cluster: %s, component: %s, component definition ref:%s",
 			cluster.Name, clusterCompSpec.Name, clusterCompSpec.ComponentDefRef)
 	}
-	clusterCompVer = cv.Spec.GetDefNameMappingComponents()[clusterCompSpec.ComponentDefRef]
 
 	buildWorkload := func() {
-		synthesizeComp.ClusterDefName = cd.Name
+		synthesizeComp.ClusterDefName = clusterDef.Name
 		synthesizeComp.ClusterCompDefName = clusterCompDef.Name
 		synthesizeComp.WorkloadType = clusterCompDef.WorkloadType
 		synthesizeComp.CharacterType = clusterCompDef.CharacterType
@@ -304,6 +352,10 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx, cli roclient.R
 	}
 
 	mergeClusterCompVersion := func() {
+		var clusterCompVer *appsv1alpha1.ClusterComponentVersion
+		if clusterVer != nil {
+			clusterCompVer = clusterVer.Spec.GetDefNameMappingComponents()[clusterCompSpec.ComponentDefRef]
+		}
 		if clusterCompVer != nil {
 			// only accept 1st ClusterVersion override context
 			synthesizeComp.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterCompVer.ConfigSpecs, synthesizeComp.ConfigTemplates)
@@ -329,7 +381,7 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx, cli roclient.R
 	buildServices()
 
 	// build componentRefEnvs
-	if err := buildComponentRef(cd, cluster, clusterCompDef, synthesizeComp); err != nil {
+	if err := buildComponentRef(clusterDef, cluster, clusterCompDef, synthesizeComp); err != nil {
 		reqCtx.Log.Error(err, "failed to merge componentRef")
 		return err
 	}

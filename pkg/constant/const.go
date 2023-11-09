@@ -96,6 +96,7 @@ const (
 	RoleLabelKey                             = "kubeblocks.io/role"     // RoleLabelKey consensusSet and replicationSet role label key
 	VolumeTypeLabelKey                       = "kubeblocks.io/volume-type"
 	ClusterAccountLabelKey                   = "account.kubeblocks.io/name"
+	KBAppClusterUIDLabelKey                  = "apps.kubeblocks.io/cluster-uid"
 	KBAppComponentLabelKey                   = "apps.kubeblocks.io/component-name"
 	KBAppComponentDefRefLabelKey             = "apps.kubeblocks.io/component-def-ref"
 	KBAppClusterDefTypeLabelKey              = "apps.kubeblocks.io/cluster-type" // refer clusterDefinition.Spec.Type (deprecated)

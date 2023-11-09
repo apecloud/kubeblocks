@@ -741,13 +741,11 @@ func BuildRestoreJob(cluster *appsv1alpha1.Cluster, synthesizedComponent *compon
 		intctrlutil.InjectZeroResourcesLimitsIfEmpty(&containers[0])
 	}
 	compSpec := cluster.Spec.GetComponentByName(synthesizedComponent.Name)
-	if compSpec != nil {
-		tolerations, err := component.BuildTolerations(cluster, compSpec)
-		if err != nil {
-			return nil, err
-		}
-		job.Spec.Template.Spec.Tolerations = tolerations
+	tolerations, err := component.BuildTolerations(cluster, compSpec)
+	if err != nil {
+		return nil, err
 	}
+	job.Spec.Template.Spec.Tolerations = tolerations
 	return job, nil
 }
 

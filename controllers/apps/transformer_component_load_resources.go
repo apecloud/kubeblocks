@@ -22,7 +22,6 @@ package apps
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -41,11 +40,6 @@ var _ graph.Transformer = &componentLoadResourcesTransformer{}
 
 func (t *componentLoadResourcesTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
-	reqCtx := ictrlutil.RequestCtx{
-		Ctx:      transCtx.Context,
-		Log:      transCtx.Logger,
-		Recorder: transCtx.EventRecorder,
-	}
 	comp := transCtx.Component
 
 	var err error
@@ -53,80 +47,103 @@ func (t *componentLoadResourcesTransformer) Transform(ctx graph.TransformContext
 		setProvisioningStartedCondition(&comp.Status.Conditions, comp.Name, comp.Generation, err)
 	}()
 
-	clusterName, err := getClusterName(comp)
+	clusterName, err := component.GetClusterName(comp)
 	if err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
-	// TODO(xingran): In order to backward compatibility in KubeBlocks version 0.8.0, the cluster field is still required. However, if in the future the Component objects can be used independently, the Cluster field should be removed from the component.Spec
 	cluster := &appsv1alpha1.Cluster{}
 	err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: clusterName, Namespace: comp.Namespace}, cluster)
 	if err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
+	transCtx.Cluster = cluster
 
-	compDef, err := t.getOrBuildCompDef(reqCtx, transCtx, cluster)
+	isGenerated := false
+	isGenerated, err = t.isGeneratedComponent(cluster, comp)
 	if err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
-	transCtx.CompDef = compDef
-	transCtx.Cluster = cluster
+	if isGenerated {
+		return t.transformForGeneratedComponent(transCtx)
+	}
+	return t.transformForNativeComponent(transCtx)
+}
 
-	synthesizeComp, err := component.BuildSynthesizedComponent(reqCtx, transCtx.Client, compDef, cluster, comp)
+func (t *componentLoadResourcesTransformer) isGeneratedComponent(cluster *appsv1alpha1.Cluster,
+	comp *appsv1alpha1.Component) (bool, error) {
+	compName, err := component.ShortName(cluster.Name, comp.Name)
+	if err != nil {
+		return false, err
+	}
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		if compSpec.Name == compName {
+			if len(compSpec.ComponentDef) > 0 {
+				if compSpec.ComponentDef != comp.Spec.CompDef {
+					err = fmt.Errorf("component definitions referred in cluster and component are different: %s vs %s",
+						compSpec.ComponentDef, comp.Spec.CompDef)
+				}
+				return false, err
+			}
+			return true, nil
+		}
+	}
+	return true, fmt.Errorf("component %s is not found in cluster %s", compName, cluster.Name)
+}
+
+func (t *componentLoadResourcesTransformer) transformForGeneratedComponent(transCtx *componentTransformContext) error {
+	reqCtx := ictrlutil.RequestCtx{
+		Ctx:      transCtx.Context,
+		Log:      transCtx.Logger,
+		Recorder: transCtx.EventRecorder,
+	}
+	comp := transCtx.Component
+
+	compDef, synthesizedComp, err := component.BuildSynthesizedComponent4Generated(reqCtx, transCtx.Client, transCtx.Cluster, comp)
 	if err != nil {
 		message := fmt.Sprintf("build synthesized component for %s failed: %s", comp.Name, err.Error())
 		return newRequeueError(requeueDuration, message)
 	}
-	transCtx.SynthesizeComponent = synthesizeComp
+	transCtx.CompDef = compDef
+	transCtx.SynthesizeComponent = synthesizedComp
 	return nil
 }
 
-func (t *componentLoadResourcesTransformer) getOrBuildCompDef(reqCtx ictrlutil.RequestCtx,
-	transCtx *componentTransformContext, cluster *appsv1alpha1.Cluster) (*appsv1alpha1.ComponentDefinition, error) {
-	clusterCompSpec, err := t.isLegacyComponent(cluster, transCtx.Component)
+func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx *componentTransformContext) error {
+	compDef, err := t.getNCheckCompDef(transCtx)
 	if err != nil {
-		return nil, err
+		return newRequeueError(requeueDuration, err.Error())
 	}
-	var compDef *appsv1alpha1.ComponentDefinition
-	if clusterCompSpec != nil {
-		compDef, err = component.BuildComponentDefinition(reqCtx, t.Client, cluster, clusterCompSpec)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		compDef = &appsv1alpha1.ComponentDefinition{}
-		err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: transCtx.Component.Spec.CompDef}, compDef)
-		if err != nil {
-			return nil, err
-		}
-		if compDef.Status.Phase != appsv1alpha1.AvailablePhase {
-			message := fmt.Sprintf("ComponentDefinition referenced is unavailable: %s", compDef.Name)
-			return nil, errors.New(message)
-		}
+	transCtx.CompDef = compDef
+
+	reqCtx := ictrlutil.RequestCtx{
+		Ctx:      transCtx.Context,
+		Log:      transCtx.Logger,
+		Recorder: transCtx.EventRecorder,
 	}
-	return compDef, nil
+	comp := transCtx.Component
+	synthesizedComp, err := component.BuildSynthesizedComponent(reqCtx, transCtx.Client, compDef, comp)
+	if err != nil {
+		message := fmt.Sprintf("build synthesized component for %s failed: %s", comp.Name, err.Error())
+		return newRequeueError(requeueDuration, message)
+	}
+	transCtx.SynthesizeComponent = synthesizedComp
+
+	return nil
 }
 
-func (t *componentLoadResourcesTransformer) isLegacyComponent(cluster *appsv1alpha1.Cluster,
-	comp *appsv1alpha1.Component) (*appsv1alpha1.ClusterComponentSpec, error) {
-	compName, err := component.ShortName(cluster.Name, comp.Name)
-	if err != nil {
+func (t *componentLoadResourcesTransformer) getNCheckCompDef(transCtx *componentTransformContext) (*appsv1alpha1.ComponentDefinition, error) {
+	compKey := types.NamespacedName{
+		Namespace: transCtx.Component.Namespace,
+		Name:      transCtx.Component.Spec.CompDef,
+	}
+	compDef := &appsv1alpha1.ComponentDefinition{}
+	if err := transCtx.Client.Get(transCtx.Context, compKey, compDef); err != nil {
 		return nil, err
 	}
-	var targetCompSpec *appsv1alpha1.ClusterComponentSpec
-	for i, compSpec := range cluster.Spec.ComponentSpecs {
-		if compSpec.Name == compName {
-			if len(compSpec.ComponentDef) > 0 {
-				if compSpec.ComponentDef == comp.Spec.CompDef {
-					return nil, nil
-				}
-				return nil, fmt.Errorf("runtime error - comp definitions referred in cluster and component are different: %s vs %s",
-					compSpec.ComponentDef, comp.Spec.CompDef)
-			}
-			targetCompSpec = &cluster.Spec.ComponentSpecs[i]
-			break
-		}
+	if compDef.Status.Phase != appsv1alpha1.AvailablePhase {
+		return nil, fmt.Errorf("ComponentDefinition referenced is unavailable: %s", compDef.Name)
 	}
-	return targetCompSpec, nil
+	return compDef, nil
 }

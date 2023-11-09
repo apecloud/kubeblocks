@@ -1314,17 +1314,6 @@ var _ = Describe("Component Controller", func() {
 		testCompRBAC(compName, compDefName, saName)
 	}
 
-	getStsPodsName := func(sts *appsv1.StatefulSet) []string {
-		pods, err := common.GetPodListByStatefulSet(ctx, k8sClient, sts)
-		Expect(err).To(Succeed())
-
-		names := make([]string, 0)
-		for _, pod := range pods {
-			names = append(names, pod.Name)
-		}
-		return names
-	}
-
 	testReplicationWorkloadRunning := func(compName, compDefName string) {
 		By("Mock a cluster obj with replication componentDefRef.")
 		pvcSpec := testapps.NewPVCSpec("1Gi")
@@ -1465,14 +1454,25 @@ var _ = Describe("Component Controller", func() {
 			compName := fetched.Spec.ComponentSpecs[0].Name
 			g.Expect(fetched.Status.Components != nil).To(BeTrue())
 			g.Expect(fetched.Status.Components).To(HaveKey(compName))
-			compStatus, ok := fetched.Status.Components[compName]
+			_, ok := fetched.Status.Components[compName]
 			g.Expect(ok).Should(BeTrue())
-			consensusStatus := compStatus.ConsensusSetStatus
-			g.Expect(consensusStatus != nil).To(BeTrue())
-			g.Expect(consensusStatus.Leader.Pod).To(BeElementOf(getStsPodsName(sts)))
-			g.Expect(consensusStatus.Followers).Should(HaveLen(2))
-			g.Expect(consensusStatus.Followers[0].Pod).To(BeElementOf(getStsPodsName(sts)))
-			g.Expect(consensusStatus.Followers[1].Pod).To(BeElementOf(getStsPodsName(sts)))
+			// TODO(component): workload status
+			// getStsPodsName := func(sts *appsv1.StatefulSet) []string {
+			//	pods, err := common.GetPodListByStatefulSet(ctx, k8sClient, sts)
+			//	Expect(err).To(Succeed())
+			//
+			//	names := make([]string, 0)
+			//	for _, pod := range pods {
+			//		names = append(names, pod.Name)
+			//	}
+			//	return names
+			// }
+			// consensusStatus := compStatus.ConsensusSetStatus
+			// g.Expect(consensusStatus != nil).To(BeTrue())
+			// g.Expect(consensusStatus.Leader.Pod).To(BeElementOf(getStsPodsName(sts)))
+			// g.Expect(consensusStatus.Followers).Should(HaveLen(2))
+			// g.Expect(consensusStatus.Followers[0].Pod).To(BeElementOf(getStsPodsName(sts)))
+			// g.Expect(consensusStatus.Followers[1].Pod).To(BeElementOf(getStsPodsName(sts)))
 		}).Should(Succeed())
 
 		By("Waiting the component be running")

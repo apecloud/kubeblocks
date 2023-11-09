@@ -50,12 +50,14 @@ Users can create multiple BackupRepos to suit different scenarios. For example, 
       ```
 
    2. Generate credentials.
+   
       Access the login page by running `kubectl port-forward --namespace default svc/minio 9001:9001` and then accessing `127.0.0.1:9001`.
 
       Once you are logged in to the dashboard, you can generate `an access key` and `secret key`.
       ![backup-and-restore-backup-repo-1](./../../../img/backup-and-restore-backup-repo-1.png)
 
    3. Create a bucket.
+   
       Create a bucket named `test-minio`.
 
       ![backup-and-restore-backup-repo-2](./../../../img/backup-and-restore-backup-repo-2.png)
@@ -115,7 +117,9 @@ You can specify the BackupRepo information in a YAML configuration file when ins
   :::note
 
   For KubeBlocks v0.7.0, the available `storageProvider` options are `s3`, `cos`, `gcs-s3comp`, `obs`, `oss`, `minio`, and `pvc`.
+
   For different `storageProvider`, the configuration may differ. `config` and `secrets` in the above example are applied to S3.
+
   Execute the command `kubectl get storageproviders.storage.kubeblocks.io` to view the supported `storageProvider` options.
 
   :::
@@ -538,10 +542,22 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.7.0 -n kb-system
 
 After creating, execute the following command to view the BackupRepo and its status. If the status is Ready, the BackupRepo is ready.
 
-```bash
-# kbcli command
-kbcli backuprepo list
+<Tabs>
 
-# kubectl command
+<TabItem value="kbcli" label="kbcli" default>
+
+```bash
+kbcli backuprepo list
+```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+```bash
 kubectl get backuprepo
 ```
+
+</TabItem>
+
+</Tabs>

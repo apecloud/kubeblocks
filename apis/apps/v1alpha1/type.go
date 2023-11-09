@@ -26,11 +26,12 @@ import (
 )
 
 const (
-	APIVersion            = "apps.kubeblocks.io/v1alpha1"
-	ClusterVersionKind    = "ClusterVersion"
-	ClusterDefinitionKind = "ClusterDefinition"
-	ClusterKind           = "Cluster"
-	OpsRequestKind        = "OpsRequestKind"
+	APIVersion                 = "apps.kubeblocks.io/v1alpha1"
+	ClusterVersionKind         = "ClusterVersion"
+	ClusterDefinitionKind      = "ClusterDefinition"
+	ClusterKind                = "Cluster"
+	OpsRequestKind             = "OpsRequestKind"
+	ReplicatedStateMachineKind = "ReplicatedStateMachine"
 )
 
 type ComponentTemplateSpec struct {

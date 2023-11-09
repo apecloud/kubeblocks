@@ -185,6 +185,7 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.ConfigMap{}).
 		Owns(&dpv1alpha1.BackupPolicy{}).
 		Owns(&dpv1alpha1.BackupSchedule{}).
+		Owns(&dpv1alpha1.Restore{}).
 		Owns(&batchv1.Job{}).
 		Owns(&appsv1alpha1.Configuration{}).
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources))

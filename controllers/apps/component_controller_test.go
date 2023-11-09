@@ -980,7 +980,6 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		By("Updating the PVC storage size")
-		fmt.Printf("test - update PVC storage size to 2Gi\n")
 		newStorageValue := resource.MustParse("2Gi")
 		changePVC(newStorageValue)
 
@@ -991,7 +990,6 @@ var _ = Describe("Component Controller", func() {
 		checkPVC(newStorageValue)
 
 		By("Updating the PVC storage size back")
-		fmt.Printf("test - update PVC storage size to 1Gi\n")
 		originStorageValue := resource.MustParse("1Gi")
 		changePVC(originStorageValue)
 
@@ -1486,8 +1484,7 @@ var _ = Describe("Component Controller", func() {
 		By("mock backuptool object")
 		backupPolicyName := "test-backup-policy"
 		backupName := "test-backup"
-		_ = testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml",
-			&dpv1alpha1.ActionSet{}, testapps.RandomizedObjName())
+		_ = testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml", &dpv1alpha1.ActionSet{}, testapps.RandomizedObjName())
 
 		By("creating backup")
 		backup := testdp.NewBackupFactory(testCtx.DefaultNamespace, backupName).
@@ -1506,16 +1503,19 @@ var _ = Describe("Component Controller", func() {
 		restoreFromBackup := fmt.Sprintf(`{"%s":{"name":"%s"}}`, compName, backupName)
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		replicas := 3
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
+			WithRandomName().
 			AddComponent(compName, compDefName).
 			SetReplicas(int32(replicas)).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-			AddAnnotations(constant.RestoreFromBackupAnnotationKey, restoreFromBackup).Create(&testCtx).GetObject()
+			AddAnnotations(constant.RestoreFromBackupAnnotationKey, restoreFromBackup).
+			Create(&testCtx).
+			GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		// mock pvcs have restored
 		mockComponentPVCsAndBound(clusterObj.Spec.GetComponentByName(compName), replicas, true, testk8s.DefaultStorageClassName)
+
 		By("wait for restore created")
 		ml := client.MatchingLabels{
 			constant.AppInstanceLabelKey:    clusterKey.Name,

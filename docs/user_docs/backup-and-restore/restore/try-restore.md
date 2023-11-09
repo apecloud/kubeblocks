@@ -14,19 +14,20 @@ import TabItem from '@theme/TabItem';
 KubeBlocks supports restoring clusters from backups with the following instructions.
 
 1. View backups.
-For existing clusters, execute:
+   
+   For existing clusters, execute:
 
-    ```shell
-    kbcli cluster list-backups mysql-cluster
-    ```
+   ```shell
+   kbcli cluster list-backups mysql-cluster
+   ```
 
    If the cluster has been deleted, execute:
 
-    ```bash
-    kbcli dataprotection list-backups
-    ```
+   ```bash
+   kbcli dataprotection list-backups
+   ```
 
-2. Restore clusters from a specific backup.
+1. Restore clusters from a specific backup.
 
 <Tabs>
 

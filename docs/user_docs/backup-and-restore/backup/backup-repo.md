@@ -62,11 +62,11 @@ If you don't have an object storage service from a cloud provider, you can deplo
    ![backup-and-restore-backup-repo-2](./../../../img/backup-and-restore-backup-repo-2.png)
    ![backup-and-restore-backup-repo3](./../../../img/backup-and-restore-backup-repo-3.png)
 
-  :::note
+:::note
 
-  The access address (endpoint) for the installed MinIO is `http://minio.kb-system.svc.cluster.local:9000`, which will be used to configure BackupRepo. In this case, `kb-system` is the name of the namespace where MinIO is installed.
+The access address (endpoint) for the installed MinIO is `http://minio.kb-system.svc.cluster.local:9000`, which will be used to configure BackupRepo. In this case, `kb-system` is the name of the namespace where MinIO is installed.
 
-  :::
+:::
 
 ## Configure BackupRepo
 
@@ -114,13 +114,13 @@ You can specify the BackupRepo information in a YAML configuration file when ins
     * `secretAccessKey`: specifies the Secret Key of AWS.
     * `storageProvider`：specifies the object storage provider, which is S3 in this case.
 
-  :::note
+:::note
 
-  * For KubeBlocks v0.7.0, the available `storageProvider` options are `s3`, `cos`, `gcs-s3comp`, `obs`, `oss`, `minio`, and `pvc`.
-  * For different `storageProvider`, the configuration may differ. `config` and `secrets` in the above example are applied to S3.
-  * Execute the command `kubectl get storageproviders.storage.kubeblocks.io` to view the supported `storageProvider` options.
+* For KubeBlocks v0.7.0, the available `storageProvider` options are `s3`, `cos`, `gcs-s3comp`, `obs`, `oss`, `minio`, and `pvc`.
+* For different `storageProvider`, the configuration may differ. `config` and `secrets` in the above example are applied to S3.
+* Execute the command `kubectl get storageproviders.storage.kubeblocks.io` to view the supported `storageProvider` options.
 
-  :::
+:::
 
 2. Specify the configuration file when installing KubeBlocks.
 

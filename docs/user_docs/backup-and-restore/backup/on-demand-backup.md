@@ -1,9 +1,9 @@
 ---
-title: Manual backup
+title: On-demand backup
 description: How to back up databases on-demand by snapshot and backup tool
-keywords: [backup, manual backup, snapshot backup, backup tool]
+keywords: [backup, on-demand backup, snapshot backup, backup tool]
 sidebar_position: 4
-sidebar_label: Manual backup
+sidebar_label: On-demand backup
 ---
 
 import Tabs from '@theme/Tabs';

@@ -16,7 +16,7 @@ The external component function is an alpha version and there might be major rev
 
 ## What is referencing an external component?
 
-Some database clusters rely on metadata storage for distributed coordination and dynamic configuration. However, as the number of database clusters increases, the metadata storage itself can consume a significant amount of resources. Examples of such components include Zookeeper in Pulsar. To reduce overhead, you can reference the same external component in multiple database clusters now.
+Some database clusters rely on metadata storage for distributed coordination and dynamic configuration. However, as the number of database clusters increases, the metadata storage itself can consume a significant amount of resources. Examples of such components include ZooKeeper in Pulsar. To reduce overhead, you can reference the same external component in multiple database clusters now.
 
 Referencing an external component in KubeBlocks means referencing an external or KubeBlocks-based component in a declarative manner in a KubeBlocks cluster.
 
@@ -32,12 +32,12 @@ As its definition indicates, referencing the external component can be divided i
 
 ## Examples of referencing external component
 
-The following examples show how a Pulsar cluster created by the KubeBlocks add-on references Zookeeper as an external component. The instructions below include two parts:
+The following examples show how a Pulsar cluster created by the KubeBlocks add-on references ZooKeeper as an external component. The instructions below include two parts:
 
 1. [Create an external component reference declaration](#create-an-external-component-reference-declaration) when installing KubeBlocks or enabling an add-on.
-2. [Define the external component referencing mapping relation](#define-the-external-component-referencing-mapping-relation) when creating a cluster.
+2. [Define the mapping relation of the external component](#define-the-mapping-relation-of-the-external-component) when creating a cluster.
 
-A KubeBlocks Pulsar cluster is composed of components including proxy, broker, bookies, and zookeeper and broker and bookies rely on zookeeper to provide metadata storage and interaction.
+A KubeBlocks Pulsar cluster is composed of components including proxy, broker, bookies, and ZooKeeper and broker and bookies rely on ZooKeeper to provide metadata storage and interaction.
 
 :::note
 
@@ -49,7 +49,7 @@ For more information about the KubeBlocks Pulsar cluster, refer to [KubeBlocks f
 
 1. Declare the referenced component in `componentDefs` in the ClusterDefinition.
 
-    In this example, the broker and bookies components of the Pulsar cluster rely on the zookeeper component, so you need to add the declaration of zookeeper in the `componentDefs` of broker and bookies.
+    In this example, the broker and bookies components of the Pulsar cluster rely on the ZooKeeper component, so you need to add the declaration of ZooKeeper in the `componentDefs` of broker and bookies.
 
     ```yaml
     apiVersion: apps.kubeblocks.io/v1alpha1
@@ -86,17 +86,17 @@ For more information about the KubeBlocks Pulsar cluster, refer to [KubeBlocks f
 
     `serviceRefDeclarations` above describe the external component referencing declarations, in which both `pulsar-broker` and `bookies` declare a component named `pulsarZookeeper`. It means `pulsar-broker` and `bookies` require a component whose name is `pulsarZookeeper`, `serviceKind` is `zookeeper`, and `serviceVersion` matches the `^3.8.\d{1,2}$` regular expression.
 
-    This `pulsarZookeeper` reference declaration will be mapped to your specified zookeeper cluster when you create a Pulsar cluster.
+    This `pulsarZookeeper` reference declaration will be mapped to your specified ZooKeeper cluster when you create a Pulsar cluster.
 
-2. Define the usage of this zookeeper in the component provider.
+2. Define the usage of this ZooKeeper component in the component provider.
 
-    After the external component is declared in the ClusterDefinition, you can use the pre-defined pulsarZookeeper in any definition in the ClusterDefinition.
+    After the external component is declared in the ClusterDefinition, you can use the pre-defined `pulsarZookeeper` in any definition in the ClusterDefinition.
 
-    For example, when starting the pulsar-broker and bookies components, upload the address of the zookeeper component to the configuration of pulsar-broker and bookies. Then you can reference this zookeeper component when rendering the pulsar-broker and bookies configuration templates. Below is an example of generating zookeeperServers in the `broker-env.tpl`.
+    For example, when starting the pulsar-broker and bookies components, upload the address of the ZooKeeper component to the configuration of pulsar-broker and bookies. Then you can reference this ZooKeeper component when rendering the pulsar-broker and bookies configuration templates. Below is an example of generating zookeeperServers in the `broker-env.tpl`.
 
     :::note
 
-    From the above declaration, ClusterDefinition only knows this is a zookeeper component but has no idea of which zookeeper is provided by whom. Therefore, you need to map this zookeeper component when creating a cluster. Follow the instructions in the next section.
+    From the above declaration, ClusterDefinition only knows this is a ZooKeeper component but has no idea of which ZooKeeper is provided by whom. Therefore, you need to map this ZooKeeper component when creating a cluster. Follow the instructions in the next section.
 
     :::
 
@@ -141,14 +141,14 @@ For more information about the KubeBlocks Pulsar cluster, refer to [KubeBlocks f
 
     :::
 
-### Define the external component referencing mapping relation
+### Define the mapping relation of the external component
 
-Based on the above example, when creating a Pulsar cluster, the zookeeper mapping can be divided into two types:
+Based on the above example, when creating a Pulsar cluster, the ZooKeeper component mapping can be divided into two types:
 
-* Mapping the external Zookeeper component.
-* Mapping the Zookeeper component deployed by an individual cluster provided by KubeBlocks.
+* Mapping the external ZooKeeper component.
+* Mapping the ZooKeeper component deployed by an individual cluster provided by KubeBlocks.
 
-#### Mapping the external Zookeeper component
+#### Mapping the external ZooKeeper component
 
 1. Create a ServiceDescriptor CR object in a Kubernetes cluster.
 
@@ -171,9 +171,9 @@ Based on the above example, when creating a Pulsar cluster, the zookeeper mappin
      port: 2181
    ```
 
-2. Reference the external zookeeper component when creating a Pulsar cluster.
+2. Reference the external ZooKeeper component when creating a Pulsar cluster.
 
-   The following example shows how to create a Pulsar cluster referencing the external zookeeper component mentioned above.
+   The following example shows how to create a Pulsar cluster referencing the external ZooKeeper component mentioned above.
 
    ```yaml
    apiVersion: apps.kubeblocks.io/v1alpha1
@@ -199,13 +199,13 @@ Based on the above example, when creating a Pulsar cluster, the zookeeper mappin
        # Here omit other definitions
    ```
 
-   When creating the Pulsar Cluster object, `serviceRefs` maps `pulsarZookeeper` in the declaration to the specific `serviceDescriptor`. `name` in `serviceRefs` corresponds to the component referencing name defined in the ClusterDefinition and the value of `serviceDescriptor` is the name of `ServiceDescriptor` in step 1.
+   When creating the Pulsar Cluster object, `serviceRefs` maps `pulsarZookeeper` in the declaration to the specific `serviceDescriptor`. `name` in `serviceRefs` corresponds to the component referencing name defined in the ClusterDefinition and the value of `serviceDescriptor` is the name of `ServiceDescriptor` in Step 1.
 
-#### Mapping the Zookeeper component deployed by an individual cluster provided by KubeBlocks
+#### Mapping the ZooKeeper component deployed by an individual cluster provided by KubeBlocks
 
-This mapping relation refers to mapping an external component to an individual KubeBlocks Zookeeper cluster.
+This mapping relation refers to mapping an external component to an individual KubeBlocks ZooKeeper cluster.
 
-1. Create a KubeBlocks Zookeeper cluster named `kb-zookeeper-for-pulsar`.
+1. Create a KubeBlocks ZooKeeper cluster named `kb-zookeeper-for-pulsar`.
 
    ```yaml
    apiVersion: apps.kubeblocks.io/v1alpha1
@@ -239,9 +239,9 @@ This mapping relation refers to mapping an external component to an individual K
    terminationPolicy: WipeOut
    ```
 
-2. Reference the above Zookeeper cluster when creating a Pulsar cluster. 
+2. Reference the above ZooKeeper cluster when creating a Pulsar cluster.
 
-   Fill in the value of `cluster` in `serviceRefs` with the name of the KubeBlocks Zookeeper cluster in step 1.
+   Fill in the value of `cluster` in `serviceRefs` with the name of the KubeBlocks ZooKeeper cluster in Step 1.
 
    ```yaml
    apiVersion: apps.kubeblocks.io/v1alpha1

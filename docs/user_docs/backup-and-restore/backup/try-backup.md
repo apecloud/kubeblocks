@@ -46,7 +46,7 @@ kbcli backuprepo list
 
 ## View BackupPolicy
 
-After creating a database cluster, an automatic backup policy (BackupPolicy) is created for databases that support backup. Execute the following command to view the backup policy of the cluster.
+After creating a database cluster, an automatic backup policy (BackupPolicy) is created for databases that support backup. Execute the following command to view the BackupPolicy of the cluster.
 
 <Tabs>
 

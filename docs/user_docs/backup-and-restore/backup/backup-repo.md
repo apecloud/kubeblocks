@@ -50,14 +50,15 @@ Users can create multiple BackupRepos to suit different scenarios. For example, 
       ```
 
    2. Generate credentials.
-   
+
       Access the login page by running `kubectl port-forward --namespace default svc/minio 9001:9001` and then accessing `127.0.0.1:9001`.
 
       Once you are logged in to the dashboard, you can generate `an access key` and `secret key`.
+
       ![backup-and-restore-backup-repo-1](./../../../img/backup-and-restore-backup-repo-1.png)
 
    3. Create a bucket.
-   
+
       Create a bucket named `test-minio`.
 
       ![backup-and-restore-backup-repo-2](./../../../img/backup-and-restore-backup-repo-2.png)
@@ -124,20 +125,33 @@ You can specify the BackupRepo information in a YAML configuration file when ins
 
   :::
 
-2. Specify the configuration file when installing KubeBlocks. 
+2. Specify the configuration file when installing KubeBlocks.
 
    ```shell
    kbcli kubeblocks install -f backuprepo.yaml
    ```
-   Use the command below to check the BackupRepo after successful installation. 
-   ```bash
-   # kbcli command
-   kbcli backuprepo list
 
-   # kubectl command
-   kubectl get backuprepo
-   ```
+   Use the command below to check the BackupRepo after successful installation.
 
+   <Tabs>
+
+    <TabItem value="kbcli" label="kbcli" default>
+
+    ```bash
+    kbcli backuprepo list
+    ```
+
+    </TabItem>
+
+    <TabItem value="kubectl" label="kubectl">
+
+    ```bash
+    kubectl get backuprepo
+    ```
+
+    </TabItem>
+
+    </Tabs>
 
 ### Manual BackupRepo configuration
 
@@ -540,7 +554,7 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.7.0 -n kb-system
 
 </Tabs>
 
-After creating, execute the following command to view the BackupRepo and its status. If the status is Ready, the BackupRepo is ready.
+After creating, execute the following command to view the BackupRepo and its status. If the status is `Ready`, the BackupRepo is ready.
 
 <Tabs>
 

@@ -24,15 +24,18 @@ As its definition indicates, referencing the external component can be divided i
 
 * Referencing an external component
 
-This external component can be Kubernetes-based or non-Kubernetes. When referencing this component, first create a ServiceDescriptor CR (custom resources) which defines both the service and resources for referencing.
+  This external component can be Kubernetes-based or non-Kubernetes. When referencing this component, first create a ServiceDescriptor CR (custom resources) which defines both the service and resources for referencing.
 
 * Reference a KubeBlocks-based component
 
-This type of component is based on KubeBlocks clusters. When referencing this component, just fill in the referenced Cluster and no ServiceDescriptor is required.
+  This type of component is based on KubeBlocks clusters. When referencing this component, just fill in the referenced Cluster and no ServiceDescriptor is required.
 
 ## Examples of referencing external component
 
-The following examples show how a Pulsar cluster created by the KubeBlocks add-on references Zookeeper by the external component. The instructions below include two parts, external component referencing declaration and relation mapping.
+The following examples show how a Pulsar cluster created by the KubeBlocks add-on references Zookeeper by the external component. The instructions below include two parts:
+
+1. [Create an external component reference declaration](#create-an-external-component-reference-declaration) when installing KubeBlocks or enabling an add-on.
+2. [Define the mapping relation](#define-the-external-component-referencing-mapping-relation) when creating a cluster.
 
 A KubeBlocks Pulsar cluster is composed of components including proxy, broker, bookies, and zookeeper and broker and bookies rely on zookeeper to provide metadata storage and interaction.
 
@@ -42,7 +45,7 @@ For more information about the KubeBlocks Pulsar cluster, refer to [KubeBlocks f
 
 :::
 
-### External component referencing declaration
+### Create an external component reference declaration
 
 1. Declare the referenced component in `ComponentDefs` in the ClusterDefinition.
 
@@ -138,7 +141,7 @@ For more information about the KubeBlocks Pulsar cluster, refer to [KubeBlocks f
 
     :::
 
-### External component referencing mapping
+### Define the External component referencing mapping relation
 
 Based on the above example, when creating a Pulsar cluster, the zookeeper mapping can be divided into two types:
 

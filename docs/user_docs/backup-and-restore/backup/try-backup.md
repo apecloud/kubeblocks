@@ -44,7 +44,7 @@ By default, all the backups are stored in the default global repository. You can
 kbcli backuprepo list
 ```
 
-## BackupPolicy
+## View BackupPolicy
 
 After creating a database cluster, an automatic backup policy (BackupPolicy) is created for databases that support backup. Execute the following command to view the backup policy of the cluster.
 
@@ -110,63 +110,6 @@ volume-snapshot   volumesnapshot-for-apecloud-mysql   true
 </Tabs>
 
 For a MySQL cluster, two default backup methods are supported: `xtrabackup` and `volume-snapshot`. The former uses the backup tool `xtrabackup` to backup MySQL data to an object storage, while the latter utilizes the volume snapshot capability of cloud storage to backup data through snapshots. When creating a backup, you can specify which backup method to use.
-
-## Manual backup
-
-KubeBlocks supports manual backups. The following command uses the `xtrabackup` backup method to create a backup named `mybackup`:
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-# Create a backup
-$ kbcli cluster backup mysql-cluster --name mybackup --method xtrabackup
-Backup mybackup created successfully, you can view the progress:
-        kbcli cluster list-backups --name=mybackup -n default
-        
-# View the backup
-$ kbcli cluster list-backups --name=mybackup -n default
-NAME       NAMESPACE   SOURCE-CLUSTER   METHOD       STATUS      TOTAL-SIZE   DURATION   CREATE-TIME                  COMPLETION-TIME              EXPIRATION
-mybackup   default     mysql-cluster    xtrabackup   Completed   4426858      2m8s       Oct 30,2023 15:19 UTC+0800   Oct 30,2023 15:21 UTC+0800
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
-
-```bash
-# Create a backup
-$ kubectl apply -f - <<-'EOF'
-apiVersion: dataprotection.kubeblocks.io/v1alpha1
-kind: Backup
-metadata:
-  name: mybackup
-  namespace: default
-spec:
-  backupMethod: xtrabackup
-  backupPolicyName: mysql-cluster-mysql-backup-policy
-EOF
-
-# View the backup
-$ kubectl get backup mybackup
-NAME       POLICY                              METHOD       REPO      STATUS      TOTAL-SIZE   DURATION   CREATION-TIME          COMPLETION-TIME        EXPIRATION-TIME
-mybackup   mysql-cluster-mysql-backup-policy   xtrabackup   my-repo   Completed   4426858      2m8s       2023-10-30T07:19:21Z   2023-10-30T07:21:28Z
-```
-
-</TabItem>
-
-</Tabs>
-
-To create a backup using the snapshot, the backupMethod in the YAML configuration file or the `--method` field in the kbcli command should be set to `volume-snapshot`.
-
-:::caution
-
-1. When creating backups using snapshots, ensure that the storage used supports the snapshot feature; otherwise, the backup may fail.
-
-2. Backups created manually using kubectl or kbcli will not be automatically deleted. You need to manually delete them.
-
-:::
 
 ## Automatic backup
 
@@ -235,3 +178,60 @@ Data Protection:
 BACKUP-REPO   AUTO-BACKUP   BACKUP-SCHEDULE   BACKUP-METHOD   BACKUP-RETENTION
 my-repo       Enabled       0 18 * * *        xtrabackup      7d
 ```
+
+## Manual backup
+
+KubeBlocks supports manual backups. The following command uses the `xtrabackup` backup method to create a backup named `mybackup`:
+
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
+```bash
+# Create a backup
+$ kbcli cluster backup mysql-cluster --name mybackup --method xtrabackup
+Backup mybackup created successfully, you can view the progress:
+        kbcli cluster list-backups --name=mybackup -n default
+        
+# View the backup
+$ kbcli cluster list-backups --name=mybackup -n default
+NAME       NAMESPACE   SOURCE-CLUSTER   METHOD       STATUS      TOTAL-SIZE   DURATION   CREATE-TIME                  COMPLETION-TIME              EXPIRATION
+mybackup   default     mysql-cluster    xtrabackup   Completed   4426858      2m8s       Oct 30,2023 15:19 UTC+0800   Oct 30,2023 15:21 UTC+0800
+```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+```bash
+# Create a backup
+$ kubectl apply -f - <<-'EOF'
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: Backup
+metadata:
+  name: mybackup
+  namespace: default
+spec:
+  backupMethod: xtrabackup
+  backupPolicyName: mysql-cluster-mysql-backup-policy
+EOF
+
+# View the backup
+$ kubectl get backup mybackup
+NAME       POLICY                              METHOD       REPO      STATUS      TOTAL-SIZE   DURATION   CREATION-TIME          COMPLETION-TIME        EXPIRATION-TIME
+mybackup   mysql-cluster-mysql-backup-policy   xtrabackup   my-repo   Completed   4426858      2m8s       2023-10-30T07:19:21Z   2023-10-30T07:21:28Z
+```
+
+</TabItem>
+
+</Tabs>
+
+To create a backup using the snapshot, the backupMethod in the YAML configuration file or the `--method` field in the kbcli command should be set to `volume-snapshot`.
+
+:::caution
+
+1. When creating backups using snapshots, ensure that the storage used supports the snapshot feature; otherwise, the backup may fail.
+
+2. Backups created manually using kubectl or kbcli will not be automatically deleted. You need to manually delete them.
+
+:::

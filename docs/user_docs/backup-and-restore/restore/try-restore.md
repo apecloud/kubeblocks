@@ -6,6 +6,9 @@ sidebar_position: 1
 sidebar_label: Try restore
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Try restore
 
 KubeBlocks supports restoring clusters from backups with the following instructions.
@@ -24,7 +27,7 @@ For existing clusters, execute:
     ```
 
 2. Restore clusters from a specific backup.
-   
+
 <Tabs>
 
 <TabItem value="kbcli" label="kbcli" default>

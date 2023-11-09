@@ -30,6 +30,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -39,7 +40,7 @@ func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
 	compDef *appsv1alpha1.ComponentDefinition,
 	comp *appsv1alpha1.Component) (*SynthesizedComponent, error) {
-	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
+	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil, nil)
 }
 
 // BuildSynthesizedComponent4Generated builds SynthesizedComponent for generated Component which w/o ComponentDefinition.
@@ -51,15 +52,18 @@ func BuildSynthesizedComponent4Generated(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, nil, err
 	}
-	compName, err := ShortName(cluster.Name, comp.Name)
+	clusterCompSpec, err := getClusterCompSpec4Component(clusterDef, cluster, comp)
 	if err != nil {
 		return nil, nil, err
 	}
-	compDef, err := BuildComponentDefinition(clusterDef, clusterVer, cluster, compName)
+	if clusterCompSpec == nil {
+		return nil, nil, fmt.Errorf("cluster component spec is not found: %s", comp.Name)
+	}
+	compDef, err := BuildComponentDefinition(clusterDef, clusterVer, clusterCompSpec)
 	if err != nil {
 		return nil, nil, err
 	}
-	synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, clusterDef, clusterVer, cluster)
+	synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -67,7 +71,6 @@ func BuildSynthesizedComponent4Generated(reqCtx intctrlutil.RequestCtx,
 }
 
 // BuildSynthesizedComponentWrapper builds a new SynthesizedComponent object with a given ClusterComponentSpec.
-// TODO(component): check all the usages to handle the simplified cluster API at caller.
 func BuildSynthesizedComponentWrapper(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
 	cluster *appsv1alpha1.Cluster,
@@ -80,7 +83,6 @@ func BuildSynthesizedComponentWrapper(reqCtx intctrlutil.RequestCtx,
 }
 
 // BuildSynthesizedComponentWrapperWithDefinition builds a new SynthesizedComponent object with a given ClusterComponentSpec.
-// TODO(component): check all the usages to handle the simplified cluster API at caller.
 func BuildSynthesizedComponentWrapperWithDefinition(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
 	clusterDef *appsv1alpha1.ClusterDefinition,
@@ -88,9 +90,12 @@ func BuildSynthesizedComponentWrapperWithDefinition(reqCtx intctrlutil.RequestCt
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*SynthesizedComponent, error) {
 	if clusterCompSpec == nil {
+		clusterCompSpec = apiconversion.HandleSimplifiedClusterAPI(clusterDef, cluster)
+	}
+	if clusterCompSpec == nil {
 		return nil, nil
 	}
-	compDef, err := BuildComponentDefinition(clusterDef, clusterVer, cluster, clusterCompSpec.Name)
+	compDef, err := BuildComponentDefinition(clusterDef, clusterVer, clusterCompSpec)
 	if err != nil {
 		return nil, err
 	}
@@ -98,11 +103,11 @@ func BuildSynthesizedComponentWrapperWithDefinition(reqCtx intctrlutil.RequestCt
 	if err != nil {
 		return nil, err
 	}
-	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, clusterDef, clusterVer, cluster)
+	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, clusterDef, clusterVer, cluster, clusterCompSpec)
 }
 
 // buildSynthesizedComponent builds a new SynthesizedComponent object, which is a mixture of component-related configs from ComponentDefinition and Component.
-// !!! Do not use @clusterDef, @clusterVer and @cluster since they are used for the backward compatibility only.
+// !!! Do not use @clusterDef, @clusterVer, @cluster and @clusterCompSpec since they are used for the backward compatibility only.
 // TODO: remove @reqCtx & @cli
 func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
@@ -110,7 +115,8 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	comp *appsv1alpha1.Component,
 	clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterVer *appsv1alpha1.ClusterVersion,
-	cluster *appsv1alpha1.Cluster) (*SynthesizedComponent, error) {
+	cluster *appsv1alpha1.Cluster,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*SynthesizedComponent, error) {
 	if compDef == nil || comp == nil {
 		return nil, nil
 	}
@@ -156,8 +162,8 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	// build backward compatible fields, including workload, services, componentRefEnvs, clusterDefName, clusterCompDefName, and clusterCompVer, etc.
 	// if cluster referenced a clusterDefinition and clusterVersion, for backward compatibility, we need to merge the clusterDefinition and clusterVersion into the component
 	// TODO(xingran): it will be removed in the future
-	if cluster != nil && clusterDef != nil {
-		if err = buildBackwardCompatibleFields(reqCtx, clusterDef, clusterVer, cluster, synthesizeComp); err != nil {
+	if clusterDef != nil && cluster != nil && clusterCompSpec != nil {
+		if err = buildBackwardCompatibleFields(reqCtx, clusterDef, clusterVer, cluster, clusterCompSpec, synthesizeComp); err != nil {
 			return nil, err
 		}
 	}
@@ -297,11 +303,8 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 	clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterVer *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
 	synthesizeComp *SynthesizedComponent) error {
-	clusterCompSpec := cluster.Spec.GetComponentByName(synthesizeComp.Name)
-	if clusterCompSpec == nil {
-		return fmt.Errorf("component spec %s not found", synthesizeComp.Name)
-	}
 	if clusterCompSpec.ComponentDefRef == "" {
 		return nil // no need to build backward compatible fields
 	}

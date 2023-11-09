@@ -32,7 +32,7 @@ import (
 // TODO(xingran): HandleSimplifiedClusterAPI should also support the new component definition API.
 
 // HandleSimplifiedClusterAPI handles simplified api for cluster.
-func HandleSimplifiedClusterAPI(cluster *appsv1alpha1.Cluster, clusterDef *appsv1alpha1.ClusterDefinition) *appsv1alpha1.ClusterComponentSpec {
+func HandleSimplifiedClusterAPI(clusterDef *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster) *appsv1alpha1.ClusterComponentSpec {
 	if hasClusterCompDefined(cluster) {
 		return nil
 	}

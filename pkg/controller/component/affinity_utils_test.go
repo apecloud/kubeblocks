@@ -85,7 +85,7 @@ var _ = Describe("affinity utils", func() {
 
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
-				Log: tlog,
+				Log: logger,
 			}
 			component, _ = BuildSynthesizedComponentWrapperWithDefinition(reqCtx, testCtx.Cli,
 				clusterDefObj, clusterVersionObj, clusterObj, &clusterObj.Spec.ComponentSpecs[0])

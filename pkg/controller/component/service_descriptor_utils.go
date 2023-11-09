@@ -47,7 +47,7 @@ func GenServiceReferencesLegacy(reqCtx intctrlutil.RequestCtx,
 		comp    *appsv1alpha1.Component
 		err     error
 	)
-	if compDef, err = BuildComponentDefinition(clusterDef, clusterVer, cluster, clusterCompSpec.Name); err != nil {
+	if compDef, err = BuildComponentDefinition(clusterDef, clusterVer, clusterCompSpec); err != nil {
 		return nil, err
 	}
 	if comp, err = BuildComponent(cluster, clusterCompSpec); err != nil {

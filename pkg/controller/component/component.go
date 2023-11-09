@@ -29,6 +29,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )
 
@@ -80,13 +81,12 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1
 
 func BuildComponentDefinition(clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterVer *appsv1alpha1.ClusterVersion,
-	cluster *appsv1alpha1.Cluster,
-	compName string) (*appsv1alpha1.ComponentDefinition, error) {
-	clusterCompDef, clusterCompVer, err := getClusterCompDefAndVersion(clusterDef, clusterVer, cluster, compName)
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ComponentDefinition, error) {
+	clusterCompDef, clusterCompVer, err := getClusterCompDefAndVersion(clusterDef, clusterVer, clusterCompSpec)
 	if err != nil {
 		return nil, err
 	}
-	compDef, err := buildComponentDefinitionFrom(clusterCompDef, clusterCompVer)
+	compDef, err := buildComponentDefinitionByConversion(clusterCompDef, clusterCompVer)
 	if err != nil {
 		return nil, err
 	}
@@ -123,41 +123,33 @@ func getClusterReferencedResources(ctx context.Context, cli client.Reader,
 
 func getClusterCompDefAndVersion(clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterVer *appsv1alpha1.ClusterVersion,
-	cluster *appsv1alpha1.Cluster,
-	compName string) (*appsv1alpha1.ClusterComponentDefinition, *appsv1alpha1.ClusterComponentVersion, error) {
-	if len(cluster.Spec.ComponentSpecs) == 0 {
-		clusterCompDef := &clusterDef.Spec.ComponentDefs[0]
-		var clusterCompVer *appsv1alpha1.ClusterComponentVersion
-		if clusterVer != nil {
-			clusterCompVer = clusterVer.Spec.GetDefNameMappingComponents()[clusterCompDef.Name]
-		}
-		return clusterCompDef, clusterCompVer, nil
-	}
-
-	var clusterCompSpec *appsv1alpha1.ClusterComponentSpec
-	for i, compSpec := range cluster.Spec.ComponentSpecs {
-		if compSpec.Name == compName {
-			clusterCompSpec = &cluster.Spec.ComponentSpecs[i]
-			break
-		}
-	}
-	if clusterCompSpec == nil {
-		return nil, nil, fmt.Errorf("cluster component spec is not found: %s", compName)
-	}
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ClusterComponentDefinition, *appsv1alpha1.ClusterComponentVersion, error) {
 	if len(clusterCompSpec.ComponentDefRef) == 0 {
-		return nil, nil, fmt.Errorf("cluster component definition ref is empty: %s", compName)
+		return nil, nil, fmt.Errorf("cluster component definition ref is empty: %s", clusterCompSpec.Name)
 	}
-
 	clusterCompDef := clusterDef.GetComponentDefByName(clusterCompSpec.ComponentDefRef)
 	if clusterCompDef == nil {
 		return nil, nil, fmt.Errorf("referenced cluster component definition is not defined: %s", clusterCompSpec.ComponentDefRef)
 	}
-
 	var clusterCompVer *appsv1alpha1.ClusterComponentVersion
 	if clusterVer != nil {
 		clusterCompVer = clusterVer.Spec.GetDefNameMappingComponents()[clusterCompSpec.ComponentDefRef]
 	}
 	return clusterCompDef, clusterCompVer, nil
+}
+
+func getClusterCompSpec4Component(clusterDef *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster,
+	comp *appsv1alpha1.Component) (*appsv1alpha1.ClusterComponentSpec, error) {
+	compName, err := ShortName(cluster.Name, comp.Name)
+	if err != nil {
+		return nil, err
+	}
+	for i, spec := range cluster.Spec.ComponentSpecs {
+		if spec.Name == compName {
+			return &cluster.Spec.ComponentSpecs[i], nil
+		}
+	}
+	return apiconversion.HandleSimplifiedClusterAPI(clusterDef, cluster), nil
 }
 
 func getCompLabelValue(comp *appsv1alpha1.Component, label string) (string, error) {

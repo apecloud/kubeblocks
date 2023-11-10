@@ -10,7 +10,7 @@ env:
   RELEASE_BOT_WEBHOOK: ${{ secrets.RELEASE_BOT_WEBHOOK }}
 
 jobs:
-  publish:
+  release-create:
     name: create a release
     runs-on: ubuntu-latest
     outputs:
@@ -48,15 +48,11 @@ jobs:
         run: ./.github/utils/sanitize_release_body.sh
 
   send-message:
-    runs-on: ubuntu-latest
-    needs: publish
+    needs: [ release-create ]
     if: ${{ failure() || cancelled() }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: send message
-        run: |
-          bash .github/utils/utils.sh --type 12 \
-            --tag-name ${{ needs.publish.outputs.rel-version }} \
-            --content "release\u00a0${{ needs.publish.outputs.rel-version }}\u00a0create\u00a0error"\
-            --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
-            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+    uses: apecloud/apecloud-cd/.github/workflows/feishui-message.yml@v0.1.38
+    with:
+      TYPE: "2"
+      CONTENT: "create release ${{ needs.release-create.outputs.rel-version }} error"
+      APECD_REF: "v0.1.38"
+    secrets: inherit

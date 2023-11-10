@@ -173,7 +173,7 @@ You can use cloud Kubernetes service, such as [`EKS`](https://aws.amazon.com/eks
 
 `kbcli` is a [cobra-based](https://github.com/spf13/cobra) command line interface for `KubeBlocks` which support to the basic interaction commands such as `install/uninstall/upgrade` KubeBlocks and all kinds of actions for KubeBlocks
 
-Now the code of `kbcli` has been moved to https://github.com/apecloud/kbcli
+The kbcli repository: https://github.com/apecloud/kbcli
 
 ### Code style
 First, read the Go (Golang) coding guidelines again, looking for any style violations. It's easier to remember a style rule once you've violated it.

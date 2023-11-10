@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       release_version:
-        description: 'The tag name of release'
+        description: 'The version of release'
         required: true
         default: ''
 
@@ -12,11 +12,18 @@ run-name: ref_name:${{ github.ref_name }} release_version:${{ inputs.release_ver
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-  RELEASE_BOT_WEBHOOK: ${{ secrets.RELEASE_BOT_WEBHOOK }}
   GO_VERSION: "1.21"
 
 jobs:
   release-message:
+    uses: apecloud/apecloud-cd/.github/workflows/feishui-message.yml@v0.1.38
+    with:
+      TYPE: "1"
+      VERSION: "${{ inputs.release_version }}"
+      APECD_REF: "v0.1.38"
+    secrets: inherit
+
+  trigger-mode:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.get_trigger_mode.outputs.matrix }}
@@ -25,10 +32,6 @@ jobs:
       - name: release message
         id: get_trigger_mode
         run: |
-          bash .github/utils/utils.sh --type 11 \
-            --tag-name "${{ inputs.release_version }}" \
-            --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }}
-
           TEST_PACKAGES=`bash .github/utils/utils.sh --type 16 \
               --trigger-type "[test]" \
               --test-pkgs "${{ vars.TEST_PKGS }}" \
@@ -38,11 +41,11 @@ jobs:
           echo "matrix={\"include\":[$TEST_PACKAGES]}" >> $GITHUB_OUTPUT
 
   release-test:
-    needs: release-message
+    needs: [ trigger-mode ]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
-      matrix: ${{ fromJSON(needs.release-message.outputs.matrix) }}
+      matrix: ${{ fromJSON(needs.trigger-mode.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
       - name: install lib
@@ -74,8 +77,39 @@ jobs:
               make test TEST_PACKAGES=./${{ matrix.ops }}/...
           fi
 
-  release-version:
+  release-branch:
     needs: release-test
+    uses: apecloud/apecloud-cd/.github/workflows/release-branch.yml@v0.1.38
+    with:
+      RELEASE_VERSION: "${{ inputs.release_version }}"
+      RELEASE_BRANCH: "${{ github.ref_name }}"
+      APECD_REF: "v0.1.38"
+    secrets: inherit
+
+  release-addons-version:
+    needs: release-branch
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.38
+    with:
+      GITHUB_REPO: "apecloud/kubeblocks-addons"
+      VERSION: "${{ inputs.release_version }}"
+      BRANCH_NAME: "${{ needs.release-branch.outputs.release-branch }}"
+      WORKFLOW_ID: "release-version.yml"
+      APECD_REF: "v0.1.38"
+    secrets: inherit
+
+  release-kbcli-version:
+    needs: release-branch
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.38
+    with:
+      GITHUB_REPO: "apecloud/kbcli"
+      VERSION: "${{ inputs.release_version }}"
+      BRANCH_NAME: "${{ needs.release-branch.outputs.release-branch }}"
+      WORKFLOW_ID: "release-version.yml"
+      APECD_REF: "v0.1.38"
+    secrets: inherit
+
+  release-version:
+    needs: [ release-addons-version, release-kbcli-version ]
     runs-on: ubuntu-latest
     steps:
       - name: checkout branch ${{ github.ref_name }}
@@ -88,15 +122,11 @@ jobs:
           tag_prefix: ""
 
   send-message:
-    runs-on: ubuntu-latest
-    needs: release-version
+    needs: [ release-version, release-addons-version, release-kbcli-version ]
     if: ${{ failure() || cancelled() }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: send message
-        run: |
-          bash .github/utils/utils.sh --type 12 \
-            --tag-name ${{ inputs.release_version }} \
-            --content "release\u00a0${{ inputs.release_version }}\u00a0error"\
-            --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
-            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+    uses: apecloud/apecloud-cd/.github/workflows/feishui-message.yml@v0.1.38
+    with:
+      TYPE: "2"
+      CONTENT: "release ${{ inputs.release_version }} error"
+      APECD_REF: "v0.1.38"
+    secrets: inherit

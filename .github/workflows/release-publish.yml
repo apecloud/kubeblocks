@@ -7,221 +7,67 @@ on:
 
 env:
   GH_TOKEN: ${{ github.token }}
-  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-  TAG_NAME: ${{ github.ref_name }}
-  GO_VERSION: "1.21"
-  CLI_NAME: 'kbcli'
-  CLI_REPO: 'apecloud/kbcli'
-  GITLAB_KBCLI_PROJECT_ID: 85948
-  GITLAB_ACCESS_TOKEN: ${{ secrets.GITLAB_ACCESS_TOKEN }}
-  RELEASE_BOT_WEBHOOK: ${{ secrets.RELEASE_BOT_WEBHOOK }}
-  FURY_TOKEN: ${{ secrets.FURY_UPLOAD_TOKEN }}
-  FURY_ACCOUNT: ${{ secrets.FURY_ACCOUNT }}
-  GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-  PASSPHRASE: ${{ secrets.PASSPHRASE }}
+  RELEASE_VERSION: ${{ github.ref_name }}
 
 jobs:
-  create-release-kbcli:
-    name: Create Release kbcli
+  release-kbcli:
+    uses: apecloud/kbcli/.github/workflows/release-kbcli.yml@main
+    with:
+      KBCLI_REF: ${{ github.ref }}
+    secrets: inherit
+
+  release-message:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: create release ${{ env.CLI_NAME }}
-        id: create_release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ env.TAG_NAME }}
-          name: KubeBlocks ${{ env.TAG_NAME }}
-          repository: ${{ env.CLI_REPO }}
-          token: ${{ env.GITHUB_TOKEN }}
-          prerelease: true
-      - name: create gitlab release ${{ env.CLI_NAME }}
-        run: |
-          bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
-            --type 1 \
-            --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
-            --tag-name ${{ env.TAG_NAME }} \
-            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
-
-  gorelease-assert:
-    needs: create-release-kbcli
-    name: Upload and release kbcli
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: install lib
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libbtrfs-dev \
-            libdevmapper-dev \
-            libgpgme-dev
-
-      - name: Setup Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Import GPG key
-        id: import_gpg
-        uses: crazy-max/ghaction-import-gpg@v5
-        with:
-          gpg_private_key: ${{ env.GPG_PRIVATE_KEY }}
-          passphrase: ${{ env.PASSPHRASE }}
-
-      - uses: goreleaser/goreleaser-action@v4
-        with:
-          distribution: goreleaser
-          version: latest
-          args: release --config ${{ github.workspace }}/.goreleaser.yaml --clean
-        env:
-          GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
-          GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
-
-      - name: upload .rpm and .deb to fury.io
-        run: |
-          for file in $(find "${{ github.workspace }}/dist" -type f | grep -E '\.(deb|rpm)$'); do
-            echo "Processing file: $file"
-            curl -F package=@$file https://${{ env.FURY_TOKEN }}@push.fury.io/${{ env.FURY_ACCOUNT }}/
-          done
-
-      - name: get kbcli's release upload url
-        run: |
-          echo 'UPLOAD_URL='`bash ${{ github.workspace }}/.github/utils/utils.sh \
-            --tag-name ${{ env.TAG_NAME }} \
-            --type 3 \
-            --github-repo ${{ env.CLI_REPO }} \
-            --github-token ${{ env.GITHUB_TOKEN }}` >> $GITHUB_ENV
-
-      - name: upload kbcli.exe to kbcli's release page for winget
-        uses: actions/upload-release-asset@main
-        with:
-          upload_url: ${{ env.UPLOAD_URL }}
-          asset_path: ${{ github.workspace }}/dist/kbcli_windows_amd64_v1/${{ env.CLI_NAME }}.exe
-          asset_name: ${{ env.CLI_NAME }}.exe
-          asset_content_type: application/octet-stream
-
-      - name: Upload kbcli Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ env.TAG_NAME }}-kbcli
-          path: |
-            ./dist/*.tar.gz
-            ./dist/*.zip
-          if-no-files-found: error
-          retention-days: 1
-
-  upload-release-assert:
-    needs: gorelease-assert
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64, windows-amd64, windows-arm64]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Download kbcli Artifact
-        uses: actions/download-artifact@v3.0.2
-        with:
-          name: ${{ env.TAG_NAME }}-kbcli
-          path: ${{ github.workspace }}/dist
-
-      - name: upload assets to gitlab
-        run: |
-          for file in $(find "${{ github.workspace }}/dist" -type f | grep -E '\.(gz|zip)$'); do
-              if [[ "$file" == *"${{ matrix.os }}"* ]]; then
-                  echo "Processing file: $file"
-                  filename=$(basename "$file")
-                  bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
-                  --type 2 \
-                  --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
-                  --tag-name ${{ env.TAG_NAME }} \
-                  --asset-path $file \
-                  --asset-name $filename \
-                  --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
-              fi
-          done
-      # to github.com/apelcould/kubeblocks/release
-      - name: Get release
-        id: get_release
-        uses: bruceadams/get-release@v1.3.2
-
-      - name: upload release asset ${{ matrix.os }}
-        if: ${{ matrix.os != 'windows-amd64' && matrix.os != 'windows-arm64' }}
-        continue-on-error: true
-        uses: actions/upload-release-asset@main
-        with:
-          upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ${{ github.workspace }}/dist/${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
-          asset_name: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
-          asset_content_type: application/gzip
-
-      - name: upload release asset ${{ matrix.os }}
-        if: ${{ matrix.os == 'windows-amd64' || matrix.os == 'windows-arm64' }}
-        continue-on-error: true
-        uses: actions/upload-release-asset@main
-        with:
-          upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ${{ github.workspace }}/dist/${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.zip
-          asset_name: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.zip
-          asset_content_type: application/zip
-
-  remove-artifact:
-    needs: upload-release-assert
-    runs-on: ubuntu-latest
-    steps:
-      - name: Remove kbcli Artifact
-        uses: geekyeggo/delete-artifact@v2
-        with:
-          name: ${{ env.TAG_NAME }}-kbcli
-
-  send-message:
-    runs-on: ubuntu-latest
-    needs: upload-release-assert
+    needs: release-kbcli
     outputs:
-      tag-name: ${{ steps.send_message.outputs.tag_name }}
+      content-result: ${{ steps.release_message.outputs.content_result }}
+      release-version: ${{ steps.release_message.outputs.release_version }}
     if: ${{ always() && github.event.action == 'published' }}
     steps:
       - uses: actions/checkout@v4
-      - name: send message
-        id: send_message
+      - name: release message
+        id: release_message
         run: |
-          release_result="${{ env.TAG_NAME }}-kbcli"
-          touch ${release_result}
-          echo 'release-result='${release_result} >> $GITHUB_OUTPUT
+          ARTIFACT_KEY="${{ env.RELEASE_VERSION }}-kbcli"
+          touch ${ARTIFACT_KEY}
+          echo 'artifact_key='${ARTIFACT_KEY} >> $GITHUB_OUTPUT
           
-          CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0error"
-          if [[ "${{ needs.upload-release-assert.result }}" == "success" ]]; then
-              CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0success"
-              echo "success" > ${release_result}
+          CONTENT="error"
+          if [[ "${{ needs.release-kbcli.result }}" == "success" ]]; then
+              CONTENT="success"
+              echo "success" > ${ARTIFACT_KEY}
           else
-              echo "error" > ${release_result}
+              echo "error" > ${ARTIFACT_KEY}
           fi
-          
-          bash .github/utils/utils.sh --type 12 \
-            --tag-name ${{ env.TAG_NAME }} \
-            --content "${CONTENT}"\
-            --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
-            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-          
-          echo tag_name=${{ env.TAG_NAME }} >> $GITHUB_OUTPUT
+          echo 'content_result='$CONTENT >> $GITHUB_OUTPUT
+          echo release_version=${{ env.RELEASE_VERSION }} >> $GITHUB_OUTPUT
 
       - name: delete cache
         continue-on-error: true
         run: |
-          bash .github/utils/utils.sh --type 17 --tag-name "${{ steps.send_message.outputs.release-result }}"
+          bash .github/utils/utils.sh --type 17 --tag-name "${{ steps.release_message.outputs.artifact_key }}"
 
       - name: Save Artifact
         id: cache-artifact-save
         uses: actions/cache/save@v3
         with:
           path: |
-            ${{ steps.send_message.outputs.release-result }}
-          key: ${{ steps.send_message.outputs.release-result }}
+            ${{ steps.release_message.outputs.artifact_key }}
+          key: ${{ steps.release_message.outputs.artifact_key }}
+
+  send-message:
+    needs: [ release-message ]
+    if: ${{ always() && github.event.action == 'published' }}
+    uses: apecloud/apecloud-cd/.github/workflows/feishui-message.yml@v0.1.38
+    with:
+      TYPE: "2"
+      CONTENT: "release kbcli ${{ needs.release-message.outputs.release-version }} ${{ needs.release-message.outputs.content-result }}"
+      APECD_REF: "v0.1.38"
+    secrets: inherit
 
   release-result:
     if: github.event.action == 'published'
-    needs: [ send-message ]
+    needs: [ release-message ]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -232,18 +78,18 @@ jobs:
         uses: actions/cache/restore@v3
         with:
           path: |
-            ${{ env.TAG_NAME }}-${{ matrix.type }}
-          key: ${{ env.TAG_NAME }}-${{ matrix.type }}
+            ${{ env.RELEASE_VERSION }}-${{ matrix.type }}
+          key: ${{ env.RELEASE_VERSION }}-${{ matrix.type }}
 
       - name: check release result
         run: |
-          release_result=$( cat ${{ env.TAG_NAME }}-${{ matrix.type }} )
+          release_result=$( cat ${{ env.RELEASE_VERSION }}-${{ matrix.type }} )
           if [[ "$release_result" != "success" ]]; then
               exit 1
           fi
 
   e2e-kbcli:
-    needs: [ send-message, release-result ]
+    needs: [ release-message, release-result ]
     uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.35
     strategy:
       fail-fast: false
@@ -254,7 +100,7 @@ jobs:
       BRANCH_NAME: "main"
       WORKFLOW_ID: "e2e-kbcli.yml"
       APECD_REF: "v0.1.35"
-      VERSION: "${{ needs.send-message.outputs.tag-name }}"
+      VERSION: "${{ needs.release-message.outputs.release-version }}"
       EXTRA_ARGS: "TEST_TYPE=${{ matrix.test-type }}"
     secrets: inherit
 
@@ -269,4 +115,4 @@ jobs:
       - name: delete ${{ matrix.type }} cache
         continue-on-error: true
         run: |
-          bash .github/utils/utils.sh --type 17 --tag-name "${{ env.TAG_NAME }}-${{ matrix.type }}"
+          bash .github/utils/utils.sh --type 17 --tag-name "${{ env.RELEASE_VERSION }}-${{ matrix.type }}"

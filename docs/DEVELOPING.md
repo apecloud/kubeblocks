@@ -18,7 +18,7 @@ This document covers basic needs to work with KubeBlocks codebase.
   - [Basics](#basics)
     - [Kubebuilder](#kubebuilder)
     - [Makefile](#makefile)
-    - [\[TODO\] kbcli](#todo-kbcli)
+    - [kbcli](#kbcli)
     - [Code style](#code-style)
   - [Test](#test)
     - [Envtest](#envtest)
@@ -173,19 +173,7 @@ You can use cloud Kubernetes service, such as [`EKS`](https://aws.amazon.com/eks
 
 `kbcli` is a [cobra-based](https://github.com/spf13/cobra) command line interface for `KubeBlocks` which support to the basic interaction commands such as `install/uninstall/upgrade` KubeBlocks and all kinds of actions for KubeBlocks
 
-The source directory for `kbcli` is `/pkg/cli/` and the `main.go` is `/cmd/cli/main.go`
-
-Build the local kbcli binary executables by:
-```shell
-make kbcli 
-```
-or
-```shell
-make kbcli-fast 
-``` 
-The file will be generated in `/bin/`
-
-Run `kbcli --help` to list all commands of `kbcli`.
+The kbcli repository: https://github.com/apecloud/kbcli
 
 ### Code style
 First, read the Go (Golang) coding guidelines again, looking for any style violations. It's easier to remember a style rule once you've violated it.

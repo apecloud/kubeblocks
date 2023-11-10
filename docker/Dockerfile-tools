@@ -74,10 +74,6 @@ RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/lorryctl cmd/lorry/ctl/main.go
 
-RUN --mount=type=bind,target=. \
-    --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=cache,target=/go/pkg/mod \
-    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -tags="containers_image_openpgp" -a -o /out/kbcli cmd/cli/main.go
 
 RUN GRPC_HEALTH_PROBE_VERSION=v0.4.13  GOOS=${TARGETOS} GOARCH=${TARGETARCH} &&  \
     wget -qO/bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-${GOOS}-${GOARCH}
@@ -100,7 +96,6 @@ COPY --from=builder /out/reloader /bin
 COPY --from=builder /out/config_render /bin
 COPY --from=builder /out/lorry /bin
 COPY --from=builder /out/lorryctl /bin
-COPY --from=builder /out/kbcli /bin
 COPY --from=builder /bin/grpc_health_probe /bin
 
 # make breaking change compatible
@@ -111,7 +106,6 @@ RUN ln -s /config/lorry /config/probe
 RUN chmod +x /bin/grpc_health_probe
 
 # mkdir kbcli config dir and helm cache dir.
-RUN mkdir /.kbcli && chown -R 65532:65532 /.kbcli \
-    && mkdir /.cache && chown -R 65532:65532 /.cache
+RUN mkdir /.cache && chown -R 65532:65532 /.cache
 USER 65532:65532
 

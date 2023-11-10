@@ -62,12 +62,12 @@ If you don't have an object storage service from a cloud provider, you can deplo
    ![backup-and-restore-backup-repo-2](./../../../img/backup-and-restore-backup-repo-2.png)
    ![backup-and-restore-backup-repo3](./../../../img/backup-and-restore-backup-repo-3.png)
 
-3. Create a bucket.
+  :::note
 
-   Create a bucket named `test-minio` in the MinIO dashboard.
+  The access address (endpoint) for the installed MinIO is `http://minio.kb-system.svc.cluster.local:9000`, which will be used to configure BackupRepo. In this case, `kb-system` is the name of the namespace where MinIO is installed.
 
-   ![Create a bucket](./../../../img/backup-and-restore-configure-backuprepo-minio-bucket-0.png)
-   ![Create a bucket](./../../../img/backup-and-restore-configure-backuprepo-minio-bucket-1.png)
+  :::
+
 
 ## Configure BackupRepo
 
@@ -193,7 +193,7 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
 
     </Tabs>
 
-2. Create BackupRepo
+2. Create BackupRepo.
 
     <Tabs>
 

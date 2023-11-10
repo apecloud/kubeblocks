@@ -30,7 +30,7 @@ As its definition indicates, referencing the external component can be divided i
 
   This type of component is based on KubeBlocks clusters. When referencing this component, just fill in the referenced Cluster and no ServiceDescriptor is required.
 
-## Examples of referencing external component
+## Examples of an referencing external component
 
 The following examples show how a Pulsar cluster created by the KubeBlocks add-on references ZooKeeper as an external component. The instructions below include two parts:
 

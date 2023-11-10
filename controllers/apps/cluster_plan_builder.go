@@ -27,7 +27,6 @@ import (
 	"github.com/go-logr/logr"
 	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -254,7 +253,7 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 		return fmt.Errorf("wrong vertex type %v", vertex)
 	}
 	if node.Action == nil {
-		return errors.New("node action can't be nil")
+		return fmt.Errorf("node action can't be nil")
 	}
 
 	// cluster object has more business to do, handle them here

@@ -24,7 +24,6 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -89,8 +88,6 @@ var _ graph.TransformContext = &componentTransformContext{}
 var _ graph.PlanBuilder = &componentPlanBuilder{}
 var _ graph.Plan = &componentPlan{}
 
-// PlanBuilder implementation
-
 func (c *componentPlanBuilder) Init() error {
 	comp := &appsv1alpha1.Component{}
 	if err := c.cli.Get(c.transCtx.Context, c.req.NamespacedName, comp); err != nil {
@@ -118,29 +115,29 @@ func (c *componentPlanBuilder) AddParallelTransformer(transformer ...graph.Trans
 
 // Build runs all transformers to generate a plan
 func (c *componentPlanBuilder) Build() (graph.Plan, error) {
-	var err error
-	// new a DAG and apply chain on it
 	dag := graph.NewDAG()
-	err = c.transformers.ApplyTo(c.transCtx, dag)
+	err := c.transformers.ApplyTo(c.transCtx, dag)
+	if err != nil {
+		c.transCtx.Logger.V(1).Info(fmt.Sprintf("build error: %s", err.Error()))
+	}
 	c.transCtx.Logger.V(1).Info(fmt.Sprintf("DAG: %s", dag))
 
-	// construct execution plan
 	plan := &componentPlan{
 		dag:      dag,
-		walkFunc: c.componentWalkFunc,
+		walkFunc: c.defaultWalkFuncWithLogging,
 		cli:      c.cli,
 		transCtx: c.transCtx,
 	}
 	return plan, err
 }
 
-// Plan implementation
-
 func (p *componentPlan) Execute() error {
-	return p.dag.WalkReverseTopoOrder(p.walkFunc, nil)
+	err := p.dag.WalkReverseTopoOrder(p.walkFunc, nil)
+	if err != nil {
+		p.transCtx.Logger.V(1).Info(fmt.Sprintf("execute error: %s", err.Error()))
+	}
+	return err
 }
-
-// Do the real works
 
 // NewComponentPlanBuilder returns a componentPlanBuilder powered PlanBuilder
 func NewComponentPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.Request) graph.PlanBuilder {
@@ -156,13 +153,33 @@ func NewComponentPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req 
 	}
 }
 
-func (c *componentPlanBuilder) componentWalkFunc(v graph.Vertex) error {
+func (c *componentPlanBuilder) defaultWalkFuncWithLogging(vertex graph.Vertex) error {
+	node, ok := vertex.(*model.ObjectVertex)
+	err := c.defaultWalkFunc(vertex)
+	switch {
+	case err == nil:
+		c.transCtx.Logger.V(1).Info("reconcile object %T with action %s OK", node.Obj, *node.Action)
+		return err
+	case !ok:
+		c.transCtx.Logger.Error(err, "")
+	case node.Action == nil:
+		c.transCtx.Logger.Error(err, fmt.Sprintf("%T", node))
+	case apierrors.IsConflict(err):
+		c.transCtx.Logger.V(1).Info("reconcile object %T with action %s error: %s", node.Obj, *node.Action, err.Error())
+		return err
+	default:
+		c.transCtx.Logger.Error(err, fmt.Sprintf("%s %T error", *node.Action, node.Obj))
+	}
+	return err
+}
+
+func (c *componentPlanBuilder) defaultWalkFunc(v graph.Vertex) error {
 	vertex, ok := v.(*model.ObjectVertex)
 	if !ok {
 		return fmt.Errorf("wrong vertex type %v", v)
 	}
 	if vertex.Action == nil {
-		return errors.New("vertex action can't be nil")
+		return fmt.Errorf("vertex action can't be nil")
 	}
 	switch *vertex.Action {
 	case model.CREATE:
@@ -173,7 +190,6 @@ func (c *componentPlanBuilder) componentWalkFunc(v graph.Vertex) error {
 	case model.UPDATE:
 		err := c.cli.Update(c.transCtx.Context, vertex.Obj)
 		if err != nil && !apierrors.IsNotFound(err) {
-			c.transCtx.Logger.Error(err, fmt.Sprintf("update %T error: %s", vertex.Obj, vertex.Obj.GetName()))
 			return err
 		}
 	case model.PATCH:
@@ -186,7 +202,6 @@ func (c *componentPlanBuilder) componentWalkFunc(v graph.Vertex) error {
 		if controllerutil.RemoveFinalizer(vertex.Obj, constant.DBClusterFinalizerName) {
 			err := c.cli.Update(c.transCtx.Context, vertex.Obj)
 			if err != nil && !apierrors.IsNotFound(err) {
-				c.transCtx.Logger.Error(err, fmt.Sprintf("delete %T error: %s", vertex.Obj, vertex.Obj.GetName()))
 				return err
 			}
 		}

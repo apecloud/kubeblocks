@@ -220,6 +220,10 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 		return phase == "" || phase == appsv1alpha1.CreatingClusterCompPhase
 	}()
 
+	r.reqCtx.Log.V(1).Info(
+		fmt.Sprintf("component status conditions, isRSMRunning: %v, isAllConfigSynced: %v, hasRunningVolumeExpansion: %v, hasFailure: %v,  isInCreatingPhase: %v, hasFailure: %v, isComponentAvailable: %v",
+			isRSMRunning, isAllConfigSynced, hasRunningVolumeExpansion, hasFailure, isInCreatingPhase, hasFailure, isComponentAvailable))
+
 	r.podsReady = false
 	switch {
 	case isDeleting:
@@ -234,13 +238,13 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 		r.setComponentStatusPhase(appsv1alpha1.RunningClusterCompPhase, nil, "component is Running")
 		r.podsReady = true
 	case !hasFailure && isInCreatingPhase:
-		r.setComponentStatusPhase(appsv1alpha1.CreatingClusterCompPhase, nil, "Create a new component")
+		r.setComponentStatusPhase(appsv1alpha1.CreatingClusterCompPhase, nil, "component is Creating")
 	case !hasFailure:
 		r.setComponentStatusPhase(appsv1alpha1.UpdatingClusterCompPhase, nil, "component is Updating")
 	case !isComponentAvailable:
 		r.setComponentStatusPhase(appsv1alpha1.FailedClusterCompPhase, messages, "component is Failed")
 	default:
-		r.setComponentStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, nil, "unknown")
+		r.setComponentStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, nil, "component is Abnormal")
 	}
 
 	// update component info to pods' annotations

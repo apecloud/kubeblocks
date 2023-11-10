@@ -117,7 +117,7 @@ help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 .PHONY: all
-all: manager dataprotection kbcli lorry reloader ## Make all cmd binaries.
+all: manager dataprotection  lorry reloader ## Make all cmd binaries.
 
 ##@ Development
 
@@ -258,77 +258,6 @@ endif
 goimports: goimportstool ## Run goimports against code.
 	$(GOIMPORTS) -local github.com/apecloud/kubeblocks -w $$(git ls-files|grep "\.go$$" | grep -v $(GENERATED_CLIENT_PKG))
 
-
-##@ CLI
-K3S_VERSION ?= v1.23.8+k3s1
-K3D_VERSION ?= 5.4.4
-K3S_IMG_TAG ?= $(subst +,-,$(K3S_VERSION))
-
-CLI_LD_FLAGS ="-s -w \
-	-X github.com/apecloud/kubeblocks/version.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` \
-	-X github.com/apecloud/kubeblocks/version.GitCommit=$(GIT_COMMIT) \
-	-X github.com/apecloud/kubeblocks/version.GitVersion=$(GIT_VERSION) \
-	-X github.com/apecloud/kubeblocks/version.Version=$(VERSION) \
-	-X github.com/apecloud/kubeblocks/version.K3sImageTag=$(K3S_IMG_TAG) \
-	-X github.com/apecloud/kubeblocks/version.K3dVersion=$(K3D_VERSION) \
-	-X github.com/apecloud/kubeblocks/version.DefaultKubeBlocksVersion=$(VERSION)"
-
-bin/kbcli.%: test-go-generate ## Cross build bin/kbcli.$(OS).$(ARCH).
-	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -tags $(BUILD_TAGS) -ldflags=${CLI_LD_FLAGS} -o $@ cmd/cli/main.go
-
-.PHONY: fetch-addons
-fetch-addons: ## fetch addons helm charts, if addons dir not exist, clone it, else pull it.
-	@if [ ! -d "addons" ]; then \
-		git clone https://github.com/apecloud/kubeblocks-addons.git -b main addons;\
-	else \
-		cd addons && git pull ;\
-	fi
-
-.PHONY: kbcli-fast
-kbcli-fast: OS=$(shell $(GO) env GOOS)
-kbcli-fast: ARCH=$(shell $(GO) env GOARCH)
-kbcli-fast: build-kbcli-embed-chart
-	$(MAKE) bin/kbcli.$(OS).$(ARCH)
-	@mv bin/kbcli.$(OS).$(ARCH) bin/kbcli
-
-create-kbcli-embed-charts-dir:
-	mkdir -p pkg/cli/cluster/charts/
-build-single-kbcli-embed-chart.%: chart=$(word 2,$(subst ., ,$@))
-build-single-kbcli-embed-chart.%:
-	$(HELM) dependency update addons/addons/$(chart) --skip-refresh
-ifeq ($(VERSION), latest)
-	$(HELM) package addons/addons/$(chart)
-else
-	$(HELM) package addons/addons/$(chart) --version $(VERSION)
-endif
-	mv $(chart)-*.tgz pkg/cli/cluster/charts/$(chart).tgz
-
-.PHONY: build-kbcli-embed-chart
-build-kbcli-embed-chart: helmtool fetch-addons create-kbcli-embed-charts-dir \
-	build-single-kbcli-embed-chart.apecloud-mysql-cluster \
-	build-single-kbcli-embed-chart.redis-cluster \
-	build-single-kbcli-embed-chart.postgresql-cluster \
-	build-single-kbcli-embed-chart.kafka-cluster \
-	build-single-kbcli-embed-chart.mongodb-cluster \
-	build-single-kbcli-embed-chart.llm-cluster \
-	build-single-kbcli-embed-chart.xinference-cluster \
-#	build-single-kbcli-embed-chart.neon-cluster
-#	build-single-kbcli-embed-chart.postgresql-cluster \
-#	build-single-kbcli-embed-chart.clickhouse-cluster \
-#	build-single-kbcli-embed-chart.milvus-cluster \
-#	build-single-kbcli-embed-chart.qdrant-cluster \
-#	build-single-kbcli-embed-chart.weaviate-cluster
-
-.PHONY: kbcli
-kbcli: test-go-generate build-checks kbcli-fast ## Build bin/kbcli.
-
-.PHONY: clean-kbcli
-clean-kbcli: ## Clean bin/kbcli*.
-	rm -f bin/kbcli*
-
-.PHONY: kbcli-doc
-kbcli-doc: generate test-go-generate build-kbcli-embed-chart ## generate CLI command reference manual.
-	$(GO) run -tags $(BUILD_TAGS) ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
 .PHONY: lorryctl-doc
 lorryctl-doc: generate test-go-generate ## generate CLI command reference manual.

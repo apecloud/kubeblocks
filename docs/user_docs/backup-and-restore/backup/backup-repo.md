@@ -226,6 +226,7 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
         # --endpoint https://oss-cn-zhangjiakou-internal.aliyuncs.com \ can show the specified oss endpoint
         --access-key-id <ACCESS KEY> \
         --secret-access-key <SECRET KEY> \
+        --access-method Tool \ 
         --default
       ```
 
@@ -297,7 +298,7 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
       <TabItem value="PVC" label="PVC">
 
       ```bash
-      kbcli backuprepo create --provider nfs \
+      kbcli backuprepo create --provider pvc \
         --storage-class-name "nfs-storage" \
         --access-mode "ReadWriteMany" \
         --volume-capacity "100Gi" \

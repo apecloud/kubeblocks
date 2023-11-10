@@ -53,7 +53,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
-	serviceAccount, needCRB, err := buildServiceAccounts(transCtx)
+	serviceAccount, needCRB, err := buildServiceAccount(transCtx)
 	if err != nil {
 		return err
 	}
@@ -62,13 +62,15 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return nil
 	}
 
+	if isServiceAccountExist(transCtx, serviceAccount.Name) {
+		return nil
+	}
+
 	if !viper.GetBool(constant.EnableRBACManager) {
 		transCtx.Logger.V(1).Info("rbac manager is disabled")
-		if !isServiceAccountExist(transCtx, serviceAccount.Name) {
-			transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning,
-				string(ictrlutil.ErrorTypeNotFound), fmt.Sprintf("ServiceAccount %s is not exist", serviceAccount.Name))
-			return ictrlutil.NewRequeueError(time.Second, "RBAC manager is disabled, but service account is not exist")
-		}
+		transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning,
+			string(ictrlutil.ErrorTypeNotFound), fmt.Sprintf("ServiceAccount %s is not exist", serviceAccount.Name))
+		return ictrlutil.NewRequeueError(time.Second, "RBAC manager is disabled, but service account is not exist")
 	}
 
 	var parent client.Object
@@ -230,7 +232,7 @@ func getDefaultBackupPolicyTemplate(transCtx *componentTransformContext, cluster
 	return &backupPolicyTPLs.Items[0], nil
 }
 
-func buildServiceAccounts(transCtx *componentTransformContext) (*corev1.ServiceAccount, bool, error) {
+func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAccount, bool, error) {
 	var (
 		cluster = transCtx.Cluster
 		comp    = transCtx.Component

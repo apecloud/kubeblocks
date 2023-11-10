@@ -175,8 +175,42 @@ func createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG, graphCli 
 	}
 	objCopy := obj.DeepCopy()
 	objCopy.Spec = service.Spec
+
+	resolveServiceDefaultFields(&obj.Spec, &objCopy.Spec)
+
 	if !reflect.DeepEqual(obj, objCopy) {
 		graphCli.Update(dag, obj, objCopy)
 	}
 	return nil
+}
+
+func resolveServiceDefaultFields(obj, objCopy *corev1.ServiceSpec) {
+	// TODO: how about the order changed?
+	for i, port := range objCopy.Ports {
+		if port.TargetPort.IntVal != 0 {
+			continue
+		}
+		port.TargetPort = obj.Ports[i].TargetPort
+		if reflect.DeepEqual(port, obj.Ports[i]) {
+			objCopy.Ports[i].TargetPort = obj.Ports[i].TargetPort
+		}
+	}
+	if len(objCopy.ClusterIP) == 0 {
+		objCopy.ClusterIP = obj.ClusterIP
+	}
+	if len(objCopy.ClusterIPs) == 0 {
+		objCopy.ClusterIPs = obj.ClusterIPs
+	}
+	if len(objCopy.SessionAffinity) == 0 {
+		objCopy.SessionAffinity = obj.SessionAffinity
+	}
+	if len(objCopy.IPFamilies) == 0 {
+		objCopy.IPFamilies = obj.IPFamilies
+	}
+	if objCopy.IPFamilyPolicy == nil {
+		objCopy.IPFamilyPolicy = obj.IPFamilyPolicy
+	}
+	if objCopy.InternalTrafficPolicy == nil {
+		objCopy.InternalTrafficPolicy = obj.InternalTrafficPolicy
+	}
 }

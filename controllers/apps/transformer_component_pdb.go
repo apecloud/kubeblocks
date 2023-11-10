@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"reflect"
+
 	policyv1 "k8s.io/api/policy/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -42,7 +44,7 @@ func (t *componentPDBTransformer) Transform(ctx graph.TransformContext, dag *gra
 	}
 
 	synthesizedComp := transCtx.SynthesizeComponent
-	obj, err := t.PDBObject(ctx, synthesizedComp)
+	obj, err := t.runningPDBObject(ctx, synthesizedComp)
 	if err != nil {
 		return err
 	}
@@ -74,7 +76,7 @@ func (t *componentPDBTransformer) Transform(ctx graph.TransformContext, dag *gra
 	return nil
 }
 
-func (t *componentPDBTransformer) PDBObject(ctx graph.TransformContext, synthesizedComp *component.SynthesizedComponent) (*policyv1.PodDisruptionBudget, error) {
+func (t *componentPDBTransformer) runningPDBObject(ctx graph.TransformContext, synthesizedComp *component.SynthesizedComponent) (*policyv1.PodDisruptionBudget, error) {
 	pdbs := &policyv1.PodDisruptionBudgetList{}
 	inNS := client.InNamespace(synthesizedComp.Namespace)
 	ml := client.MatchingLabels(constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name))
@@ -98,5 +100,7 @@ func (t *componentPDBTransformer) handleUpdate(cli model.GraphClient, dag *graph
 		objCopy.Annotations = pdb.Annotations
 	}
 	objCopy.Spec = pdb.Spec
-	cli.Update(dag, obj, objCopy)
+	if !reflect.DeepEqual(obj, objCopy) {
+		cli.Update(dag, obj, objCopy)
+	}
 }

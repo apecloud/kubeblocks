@@ -495,6 +495,7 @@ func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *apps
 	roleProbeSpec := &appsv1alpha1.RoleProbeSpec{
 		TimeoutSeconds:   clusterCompDefRoleProbe.TimeoutSeconds,
 		PeriodSeconds:    clusterCompDefRoleProbe.PeriodSeconds,
+		SuccessThreshold: 1, // default non-zero value
 		FailureThreshold: clusterCompDefRoleProbe.FailureThreshold,
 	}
 

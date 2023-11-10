@@ -1650,16 +1650,17 @@ var _ = Describe("Component Controller", func() {
 			viper.Set(constant.KBToolsImage, oldToolsImage)
 		}()
 
-		underlyingWorkload := func() *appsv1.StatefulSet {
+		underlyingWorkload := func() *workloads.ReplicatedStateMachine {
 			rsmList := testk8s.ListAndCheckRSM(&testCtx, clusterKey)
-			return rsm.ConvertRSMToSTS(&rsmList.Items[0])
+			return &rsmList.Items[0]
 		}
 
 		initWorkloadGeneration := underlyingWorkload().GetGeneration()
 		Expect(initWorkloadGeneration).ShouldNot(Equal(0))
 
-		checkWorkloadGenerationAndToolsImage := func(workloadGenerationExpected int64, oldImageCntExpected, newImageCntExpected int) {
-			Consistently(func(g Gomega) {
+		checkWorkloadGenerationAndToolsImage := func(assertion func(any, ...any) AsyncAssertion,
+			workloadGenerationExpected int64, oldImageCntExpected, newImageCntExpected int) {
+			assertion(func(g Gomega) {
 				sts := underlyingWorkload()
 				g.Expect(sts.Generation).Should(Equal(workloadGenerationExpected))
 				oldImageCnt := 0
@@ -1678,7 +1679,7 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		By("check the workload generation as init")
-		checkWorkloadGenerationAndToolsImage(initWorkloadGeneration, 1, 0)
+		checkWorkloadGenerationAndToolsImage(Consistently, initWorkloadGeneration, 1, 0)
 
 		By("update kubeblocks tools image")
 		viper.Set(constant.KBToolsImage, newToolsImage)
@@ -1687,7 +1688,7 @@ var _ = Describe("Component Controller", func() {
 		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *appsv1alpha1.Component) {
 			comp.Annotations = map[string]string{"time": time.Now().Format(time.RFC3339)}
 		})()).Should(Succeed())
-		checkWorkloadGenerationAndToolsImage(initWorkloadGeneration, 1, 0)
+		checkWorkloadGenerationAndToolsImage(Consistently, initWorkloadGeneration, 1, 0)
 
 		By("update spec to trigger component spec reconcile, but workload not changed")
 		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *appsv1alpha1.Component) {
@@ -1695,13 +1696,13 @@ var _ = Describe("Component Controller", func() {
 				{Name: randomStr()}, // set a non-existed reference.
 			}
 		})()).Should(Succeed())
-		checkWorkloadGenerationAndToolsImage(initWorkloadGeneration, 1, 0)
+		checkWorkloadGenerationAndToolsImage(Consistently, initWorkloadGeneration, 1, 0)
 
 		By("update replicas to trigger component spec and workload reconcile")
 		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *appsv1alpha1.Component) {
 			comp.Spec.Replicas += 1
 		})()).Should(Succeed())
-		checkWorkloadGenerationAndToolsImage(initWorkloadGeneration+1, 0, 1)
+		checkWorkloadGenerationAndToolsImage(Eventually, initWorkloadGeneration+1, 0, 1)
 	}
 
 	Context("component resources provisioning", func() {
@@ -1847,7 +1848,7 @@ var _ = Describe("Component Controller", func() {
 				testChangeReplicas(compName, compDefName)
 			})
 
-			PIt(fmt.Sprintf("[comp: %s] update kubeblocks-tools image", compName), func() {
+			It(fmt.Sprintf("[comp: %s] update kubeblocks-tools image", compName), func() {
 				testUpdateKubeBlocksToolsImage(compName, compDefName)
 			})
 		}

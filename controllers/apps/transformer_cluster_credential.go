@@ -117,7 +117,7 @@ func (t *ClusterCredentialTransformer) buildClusterCredential(transCtx *clusterT
 	if len(credential.ComponentName) > 0 {
 		for _, compSpec := range transCtx.ComponentSpecs {
 			if compSpec.Name != credential.ComponentName {
-				compDef, _ = transCtx.ComponentDefs[compSpec.ComponentDef]
+				compDef = transCtx.ComponentDefs[compSpec.ComponentDef]
 				break
 			}
 		}

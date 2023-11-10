@@ -327,7 +327,7 @@ clean-kbcli: ## Clean bin/kbcli*.
 	rm -f bin/kbcli*
 
 .PHONY: kbcli-doc
-kbcli-doc: generate test-go-generate ## generate CLI command reference manual.
+kbcli-doc: generate test-go-generate build-kbcli-embed-chart ## generate CLI command reference manual.
 	$(GO) run -tags $(BUILD_TAGS) ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
 .PHONY: lorryctl-doc

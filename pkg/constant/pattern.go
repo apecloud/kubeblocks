@@ -38,7 +38,7 @@ func GenerateClusterServiceName(clusterName, svcName string) string {
 	if len(svcName) > 0 {
 		return fmt.Sprintf("%s-%s", clusterName, svcName)
 	}
-	return fmt.Sprintf("%s", clusterName)
+	return clusterName
 }
 
 // GenerateClusterHeadlessServiceName generates the headless service name for cluster.

@@ -60,11 +60,8 @@ func (r *rollingUpgradePolicy) GetPolicyName() string {
 
 func canPerformUpgrade(pods []corev1.Pod, params reconfigureParams) bool {
 	target := params.getTargetReplicas()
-	if len(pods) == target {
-		return true
-	}
 	// TODO(xingran&zhangtao): review this logic
-	return false
+	return len(pods) == target
 
 	/*	if params.WorkloadType() == appsv1alpha1.Consensus {
 			params.Ctx.Log.Info(fmt.Sprintf("wait for consensus component is ready, %d pods are ready, and the expected replicas is %d.", len(pods), target))

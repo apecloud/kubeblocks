@@ -23,14 +23,15 @@ import (
 	"fmt"
 	"strings"
 
+	"golang.org/x/exp/maps"
+	corev1 "k8s.io/api/core/v1"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"golang.org/x/exp/maps"
-	corev1 "k8s.io/api/core/v1"
 )
 
 // componentServiceTransformer handles component services.

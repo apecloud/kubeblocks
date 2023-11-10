@@ -111,6 +111,11 @@ func createPostStartJobIfNotExist(ctx context.Context,
 		return nil
 	}
 
+	// set the controller reference
+	if err := intctrlutil.SetControllerReference(cluster, postStartJob); err != nil {
+		return err
+	}
+
 	// create the postStartJob if not exist
 	if err := cli.Create(ctx, postStartJob); err != nil {
 		return err

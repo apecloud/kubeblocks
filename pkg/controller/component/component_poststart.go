@@ -83,6 +83,9 @@ func needDoPostStart(ctx context.Context, cli client.Client, cluster *appsv1alph
 	if err != nil {
 		return false, err
 	}
+	if rsm == nil {
+		return false, errors.New("ReplicatedStateMachine object not found")
+	}
 	if rsm.Annotations == nil {
 		return false, nil
 	}

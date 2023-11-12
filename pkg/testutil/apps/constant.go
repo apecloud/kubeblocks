@@ -60,9 +60,8 @@ const (
 	Class2c4gName                 = "general-2c4g"
 	DefaultResourceConstraintName = "kb-resource-constraint"
 
-	StogrageClassName = "test-sc"
-	EnvKeyImageTag    = "IMAGE_TAG"
-	DefaultImageTag   = "test"
+	EnvKeyImageTag  = "IMAGE_TAG"
+	DefaultImageTag = "test"
 )
 
 var (

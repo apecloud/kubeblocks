@@ -58,7 +58,7 @@ port=3306
 	assert.EqualValues(t, subConfigObj.Get("log_error"), "/data/mysql/log/mysqld.err")
 }
 
-func TestPropertiesFormat(t *testing.T) {
+func TestPropertiesFormat1(t *testing.T) {
 	const propertiesContext = `
 listen_addresses = '*'
 port = '5432'

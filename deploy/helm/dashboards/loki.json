@@ -1713,7 +1713,7 @@
           },
           "expr": "rate(loki_distributor_ingester_appends_total[5m])",
           "interval": "",
-          "legendFormat": "successed",
+          "legendFormat": "succeeded",
           "refId": "A"
         },
         {
@@ -2831,7 +2831,7 @@
       ],
       "thresholds": [],
       "timeRegions": [],
-      "title": "Strams Stats",
+      "title": "Streams Stats",
       "tooltip": {
         "shared": true,
         "sort": 0,

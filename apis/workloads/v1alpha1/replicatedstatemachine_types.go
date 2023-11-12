@@ -333,22 +333,22 @@ type MembershipReconfiguration struct {
 	SwitchoverAction *Action `json:"switchoverAction,omitempty"`
 
 	// MemberJoinAction specifies how to add member
-	// previous none-nil action's Image wil be used if not configured
+	// previous none-nil action's Image will be used if not configured
 	// +optional
 	MemberJoinAction *Action `json:"memberJoinAction,omitempty"`
 
 	// MemberLeaveAction specifies how to remove member
-	// previous none-nil action's Image wil be used if not configured
+	// previous none-nil action's Image will be used if not configured
 	// +optional
 	MemberLeaveAction *Action `json:"memberLeaveAction,omitempty"`
 
 	// LogSyncAction specifies how to trigger the new member to start log syncing
-	// previous none-nil action's Image wil be used if not configured
+	// previous none-nil action's Image will be used if not configured
 	// +optional
 	LogSyncAction *Action `json:"logSyncAction,omitempty"`
 
 	// PromoteAction specifies how to tell the cluster that the new member can join voting now
-	// previous none-nil action's Image wil be used if not configured
+	// previous none-nil action's Image will be used if not configured
 	// +optional
 	PromoteAction *Action `json:"promoteAction,omitempty"`
 }

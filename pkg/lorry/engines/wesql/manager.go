@@ -197,7 +197,7 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 	return false
 }
 
-// IsClusterInitialized is a method to check if cluster is initailized or not
+// IsClusterInitialized is a method to check if cluster is initialized or not
 func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	clusterInfo := mgr.GetClusterInfo(ctx, nil)
 	if clusterInfo != "" {

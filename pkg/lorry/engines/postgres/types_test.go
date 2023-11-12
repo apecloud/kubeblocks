@@ -150,7 +150,7 @@ func TestParsePGSyncStandby(t *testing.T) {
 
 		assert.NotNil(t, err)
 		assert.Nil(t, resp)
-		assert.Contains(t, err.Error(), "Unparseable synchronous_standby_names value")
+		assert.Contains(t, err.Error(), "Unpassable synchronous_standby_names value")
 	})
 }
 

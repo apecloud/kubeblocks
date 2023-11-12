@@ -475,7 +475,7 @@ func (r *SystemAccountReconciler) jobCompletionHandler() *handler.Funcs {
 
 	// check against a job to make sure it
 	// 1. works for sysaccount (by checking labels)
-	// 2. has completed (either successed or failed)
+	// 2. has completed (either succeed or failed)
 	// 3. is under deletion (either by user or by TTL, where deletionTimestamp is set)
 	return &handler.Funcs{
 		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {

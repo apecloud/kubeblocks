@@ -176,7 +176,7 @@ func RowToArray(rows *sql.Rows, columns []string) []CellData {
 }
 
 // ScanRowsToArrays is a convenience function, typically not called directly, which maps rows
-// already read from the databse into arrays of NullString
+// already read from the database into arrays of NullString
 func ScanRowsToArrays(rows *sql.Rows, onRow func([]CellData) error) error {
 	columns, _ := rows.Columns()
 	for rows.Next() {
@@ -198,7 +198,7 @@ func rowToMap(row []CellData, columns []string) map[string]CellData {
 }
 
 // ScanRowsToMaps is a convenience function, typically not called directly, which maps rows
-// already read from the databse into RowMap entries.
+// already read from the database into RowMap entries.
 func ScanRowsToMaps(rows *sql.Rows, onRow func(RowMap) error) error {
 	columns, _ := rows.Columns()
 	err := ScanRowsToArrays(rows, func(arr []CellData) error {

@@ -42,7 +42,7 @@ var _ = Describe("Redis DBManager", func() {
 	viper.Set("KB_SERVICE_USER", "testuser")
 	viper.Set("KB_SERVICE_PASSWORD", "testpassword")
 	Context("new db manager", func() {
-		It("with rigth configurations", func() {
+		It("with right configurations", func() {
 			properties := engines.Properties{
 				"url": "127.0.0.1",
 			}

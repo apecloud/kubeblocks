@@ -38,7 +38,7 @@ type DCS interface {
 	GetHaConfig() (*HaConfig, error)
 	UpdateHaConfig() error
 
-	// member manager funtions
+	// member manager functions
 	GetMembers() ([]Member, error)
 	AddCurrentMember() error
 

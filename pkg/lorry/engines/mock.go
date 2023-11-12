@@ -104,7 +104,7 @@ func (*MockManager) JoinCurrentMemberToCluster(context.Context, *dcs.Cluster) er
 }
 
 func (*MockManager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string) error {
-	return fmt.Errorf("NotSuppported")
+	return fmt.Errorf("NotSupported")
 }
 
 func (*MockManager) Promote(context.Context, *dcs.Cluster) error {
@@ -116,7 +116,7 @@ func (*MockManager) IsPromoted(context.Context) bool {
 }
 
 func (*MockManager) Demote(context.Context) error {
-	return fmt.Errorf("NotSuppported")
+	return fmt.Errorf("NotSupported")
 }
 
 func (*MockManager) Follow(context.Context, *dcs.Cluster) error {
@@ -145,9 +145,9 @@ func (*MockManager) CreateRoot(context.Context) error {
 }
 
 func (*MockManager) Lock(context.Context, string) error {
-	return fmt.Errorf("NotSuppported")
+	return fmt.Errorf("NotSupported")
 }
 
 func (*MockManager) Unlock(context.Context) error {
-	return fmt.Errorf("NotSuppported")
+	return fmt.Errorf("NotSupported")
 }

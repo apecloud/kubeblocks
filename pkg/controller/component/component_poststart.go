@@ -34,11 +34,17 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // ReconcileCompPostStart reconciles the component-level postStart command.
-func ReconcileCompPostStart(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, synthesizeComp *SynthesizedComponent) error {
+func ReconcileCompPostStart(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	synthesizeComp *SynthesizedComponent,
+	dag *graph.DAG) error {
 	needPostStart, err := needDoPostStart(ctx, cli, cluster, synthesizeComp)
 	if err != nil {
 		return err
@@ -47,23 +53,29 @@ func ReconcileCompPostStart(ctx context.Context, cli client.Client, cluster *app
 		return nil
 	}
 
-	if err := createPostStartJobIfNotExist(ctx, cli, cluster, synthesizeComp); err != nil {
+	job, err := createPostStartJobIfNotExist(ctx, cli, cluster, synthesizeComp)
+	if err != nil {
 		return err
 	}
+	if job == nil {
+		return nil
+	}
 
-	jobName := genPostStartJobName(cluster.Name, synthesizeComp.Name)
-	err = CheckJobSucceed(ctx, cli, cluster, jobName)
+	err = CheckJobSucceed(ctx, cli, cluster, job.Name)
 	if err != nil {
+		if intctrlutil.IsTargetError(err, intctrlutil.ErrorWaitCacheRefresh) {
+			return nil
+		}
 		return err
 	}
 
 	// job executed successfully, add the label to the rsm object to indicate that the postStart has been executed and delete the job
-	if err := setPostStartDoneLabel(ctx, cli, cluster, synthesizeComp); err != nil {
+	if err := setPostStartDoneLabel(cli, cluster, synthesizeComp, dag); err != nil {
 		return err
 	}
 
 	// clean up the job
-	if err := CleanJobByName(ctx, cli, cluster, jobName); err != nil {
+	if err := CleanJobByName(ctx, cli, cluster, job.Name); err != nil {
 		return err
 	}
 
@@ -79,7 +91,7 @@ func needDoPostStart(ctx context.Context, cli client.Client, cluster *appsv1alph
 	// determine whether the component has undergone postStart by examining the annotation of the cluster object
 	compPostStarLabelKey := fmt.Sprintf(constant.KBCompPostStartDoneLabelKeyPattern, fmt.Sprintf("%s-%s", cluster.Name, synthesizeComp.Name))
 	if cluster.Annotations == nil {
-		return false, nil
+		return true, nil
 	}
 	_, ok := cluster.Annotations[compPostStarLabelKey]
 	if ok {
@@ -90,32 +102,33 @@ func needDoPostStart(ctx context.Context, cli client.Client, cluster *appsv1alph
 
 // createPostStartJobIfNotExist creates a job to execute component-level post start command, each component only has a corresponding job.
 func createPostStartJobIfNotExist(ctx context.Context,
-	cli client.Client, cluster *appsv1alpha1.Cluster, synthesizeComp *SynthesizedComponent) error {
+	cli client.Client, cluster *appsv1alpha1.Cluster, synthesizeComp *SynthesizedComponent) (*batchv1.Job, error) {
 	if synthesizeComp.PostStartSpec == nil {
-		return nil
+		return nil, nil
 	}
 
 	postStartJob, err := renderPostStartCmdJob(ctx, cli, cluster, synthesizeComp)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// check the postStartJob whether exist
 	key := types.NamespacedName{Namespace: cluster.Namespace, Name: postStartJob.Name}
-	exist, _ := intctrlutil.CheckResourceExists(ctx, cli, key, &batchv1.Job{})
+	existJob := &batchv1.Job{}
+	exist, _ := intctrlutil.CheckResourceExists(ctx, cli, key, existJob)
 	if exist {
-		return nil
+		return existJob, nil
 	}
 
 	// set the controller reference
 	if err := intctrlutil.SetControllerReference(cluster, postStartJob); err != nil {
-		return err
+		return postStartJob, err
 	}
 
 	// create the postStartJob if not exist
 	if err := cli.Create(ctx, postStartJob); err != nil {
-		return err
+		return postStartJob, err
 	}
-	return nil
+	return postStartJob, nil
 }
 
 // renderPostStartCmdJob renders and creates the postStart command job.
@@ -303,19 +316,18 @@ func getComponentPodList(ctx context.Context, cli client.Client, cluster appsv1a
 }
 
 // setPostStartDoneLabel sets the postStart done annotation to the cluster object.
-func setPostStartDoneLabel(ctx context.Context,
-	cli client.Client,
+func setPostStartDoneLabel(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	synthesizeComp *SynthesizedComponent) error {
-	ClusterObj := cluster.DeepCopy()
+	synthesizeComp *SynthesizedComponent,
+	dag *graph.DAG) error {
+	graphCli := model.NewGraphClient(cli)
 	if cluster.Annotations == nil {
 		cluster.Annotations = make(map[string]string)
 	}
+	clusterObj := cluster.DeepCopy()
 	timeStr := time.Now().Format(time.RFC3339Nano)
 	compPostStarLabelKey := fmt.Sprintf(constant.KBCompPostStartDoneLabelKeyPattern, fmt.Sprintf("%s-%s", cluster.Name, synthesizeComp.Name))
 	cluster.Annotations[compPostStarLabelKey] = timeStr
-	if err := cli.Patch(ctx, cluster, client.MergeFrom(ClusterObj)); err != nil {
-		return err
-	}
+	graphCli.Do(dag, clusterObj, cluster, model.ActionUpdatePtr(), nil)
 	return nil
 }

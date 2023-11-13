@@ -392,10 +392,7 @@ func (c *rsmComponent) status(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 	// when the component is ready, try to execute a custom postStart hook.
 	status := c.getComponentStatus()
 	if status.Phase == appsv1alpha1.RunningClusterCompPhase {
-		if err := component.ReconcileCompPostStart(reqCtx.Ctx, cli, c.Cluster, c.component); err != nil {
-			if intctrlutil.IsTargetError(err, intctrlutil.ErrorWaitCacheRefresh) {
-				return nil
-			}
+		if err := component.ReconcileCompPostStart(reqCtx.Ctx, cli, c.Cluster, c.component, c.dag); err != nil {
 			return err
 		}
 	}

@@ -55,7 +55,7 @@ var _ = Describe("Handler Util Test", func() {
 			_, err = NewCommandChannel(ctx, patroni, "localhost")
 			Expect(err).Should(Succeed())
 
-			By("testUnsupport")
+			By("testUnsupported")
 			_, err = NewCommandChannel(ctx, "", "localhost")
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("not supported type"))

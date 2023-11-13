@@ -146,7 +146,7 @@ func resolveCredentialVar(cli ictrlclient.ReadonlyClient, ctx context.Context, n
 	}
 
 	for _, credentialVar := range credentialVars {
-		// TODO: replace thw build-in placeholder with the real value
+		// TODO: replace the build-in placeholder with the real value
 		if credentialVar.Value != "" {
 			return nil
 		}

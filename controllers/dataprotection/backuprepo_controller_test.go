@@ -272,13 +272,13 @@ parameters:
 			g.Expect(err).ShouldNot(HaveOccurred())
 		}
 
-		preCheckResouceName := func(repo *dpv1alpha1.BackupRepo) string {
+		preCheckResourceName := func(repo *dpv1alpha1.BackupRepo) string {
 			reconCtx := reconcileContext{repo: repo}
 			return reconCtx.preCheckResourceName()
 		}
 
 		completePreCheckJob := func(repo *dpv1alpha1.BackupRepo) {
-			jobName := preCheckResouceName(repo)
+			jobName := preCheckResourceName(repo)
 			namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 			Eventually(testapps.GetAndChangeObjStatus(&testCtx, types.NamespacedName{Name: jobName, Namespace: namespace}, func(job *batchv1.Job) {
 				job.Status.Conditions = append(job.Status.Conditions, batchv1.JobCondition{
@@ -289,7 +289,7 @@ parameters:
 		}
 
 		completePreCheckJobWithError := func(repo *dpv1alpha1.BackupRepo, message string) {
-			jobName := preCheckResouceName(repo)
+			jobName := preCheckResourceName(repo)
 			namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 			Eventually(testapps.GetAndChangeObjStatus(&testCtx, types.NamespacedName{Name: jobName, Namespace: namespace}, func(job *batchv1.Job) {
 				job.Status.Conditions = append(job.Status.Conditions, batchv1.JobCondition{
@@ -584,8 +584,8 @@ parameters:
 			createBackupRepoSpec(nil)
 
 			By("checking the pre-check job resources")
-			pvcName := preCheckResouceName(repo)
-			jobName := preCheckResouceName(repo)
+			pvcName := preCheckResourceName(repo)
+			jobName := preCheckResourceName(repo)
 			namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 			checkResources := func(exists bool) {
 				Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{Name: jobName, Namespace: namespace},
@@ -625,7 +625,7 @@ parameters:
 		})
 
 		It("should remove the stale pre-check job if the repo spec has changed too quickly", func() {
-			resourceName := preCheckResouceName(repo)
+			resourceName := preCheckResourceName(repo)
 			namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 			updateRepoAndCheckResources := func(content string, lastJobUID types.UID) (string, types.UID) {
 				Eventually(testapps.GetAndChangeObj(&testCtx, credentialSecretKey, func(cred *corev1.Secret) {
@@ -994,8 +994,8 @@ new-item=new-value
 				})
 
 				By("checking the pre-check job resources")
-				secretName := preCheckResouceName(repo)
-				jobName := preCheckResouceName(repo)
+				secretName := preCheckResourceName(repo)
+				jobName := preCheckResourceName(repo)
 				namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 				checkResources := func(exists bool) {
 					Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{Name: jobName, Namespace: namespace},
@@ -1034,7 +1034,7 @@ new-item=new-value
 			})
 
 			It("should remove the stale pre-check job if the repo spec has changed too quickly", func() {
-				resourceName := preCheckResouceName(repo)
+				resourceName := preCheckResourceName(repo)
 				namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 				updateRepoAndCheckResources := func(content string, lastJobUID types.UID) (string, types.UID) {
 					Eventually(testapps.GetAndChangeObj(&testCtx, credentialSecretKey, func(cred *corev1.Secret) {
@@ -1079,7 +1079,7 @@ new-item=new-value
 				createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
 					repo.Spec.AccessMethod = dpv1alpha1.AccessMethodTool
 				})
-				resourceName := preCheckResouceName(repo)
+				resourceName := preCheckResourceName(repo)
 				namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 				Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{Name: resourceName, Namespace: namespace},
 					&batchv1.Job{}, true)).Should(Succeed())
@@ -1192,7 +1192,7 @@ new-item=new-value
 		It("should delete resources for pre-checking when deleting the repo", func() {
 			By("preparing")
 			createBackupRepoSpec(nil)
-			resourceName := preCheckResouceName(repo)
+			resourceName := preCheckResourceName(repo)
 			namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 			Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{Name: resourceName, Namespace: namespace},
 				&batchv1.Job{}, true)).Should(Succeed())

@@ -186,7 +186,7 @@ func generateUniqueNameWithBackupSchedule(backupSchedule *dpv1alpha1.BackupSched
 	return uniqueName
 }
 
-// BuildBackupPath builds the path to storage backup datas in backup repository.
+// BuildBackupPath builds the path to storage backup data in backup repository.
 func BuildBackupPath(backup *dpv1alpha1.Backup, pathPrefix string) string {
 	pathPrefix = strings.TrimRight(pathPrefix, "/")
 	if strings.TrimSpace(pathPrefix) == "" || strings.HasPrefix(pathPrefix, "/") {

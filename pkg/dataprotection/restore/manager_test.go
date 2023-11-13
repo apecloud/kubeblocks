@@ -286,7 +286,7 @@ var _ = Describe("Backup Deleter Test", func() {
 			kbNamespace := "kb-system"
 			kbServiceAccountName := "kubeblocks"
 			viper.Set(constant.CfgKeyCtrlrMgrNS, kbNamespace)
-			viper.Set(constant.KBServiceAcccountName, kbServiceAccountName)
+			viper.Set(constant.KBServiceAccountName, kbServiceAccountName)
 			reqCtx := getReqCtx()
 			matchLabels := map[string]string{
 				constant.AppInstanceLabelKey: testdp.ClusterName,

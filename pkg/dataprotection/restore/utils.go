@@ -94,7 +94,7 @@ func SetRestoreStatusAction(actions *[]dpv1alpha1.RestoreStatusAction,
 		case dpv1alpha1.RestoreActionCompleted:
 			statusAction.Message = fmt.Sprintf(`successfully processed the "%s"`, statusAction.ObjectKey)
 		case dpv1alpha1.RestoreActionFailed:
-			statusAction.Message = fmt.Sprintf(`"%s" is failed, you can describe it or logs the ownered pod to get more informations`, statusAction.ObjectKey)
+			statusAction.Message = fmt.Sprintf(`"%s" is failed, you can describe it or logs the ownered pod to get more information`, statusAction.ObjectKey)
 		}
 	}
 	if statusAction.Status != dpv1alpha1.RestoreActionProcessing {

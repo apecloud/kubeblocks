@@ -39,7 +39,7 @@ import (
 var _ = Describe("ETCD DBManager", func() {
 	// Set up relevant viper config variables
 	Context("new db manager", func() {
-		It("with rigth configurations", func() {
+		It("with right configurations", func() {
 			viper.Set("KB_RSM_ACTION_SVC_LIST", "[3502]")
 			properties := engines.Properties{}
 			dbManger, err := NewManager(properties)

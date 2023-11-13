@@ -60,7 +60,7 @@ const (
 )
 
 const (
-	KBServiceAcccountName    = "KUBEBLOCKS_SERVICEACCOUNT_NAME"
+	KBServiceAccountName     = "KUBEBLOCKS_SERVICEACCOUNT_NAME"
 	KBToolsImage             = "KUBEBLOCKS_TOOLS_IMAGE"
 	KBImagePullPolicy        = "KUBEBLOCKS_IMAGE_PULL_POLICY"
 	KBDataScriptClientsImage = "KUBEBLOCKS_DATASCRIPT_CLIENTS_IMAGE"

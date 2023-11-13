@@ -479,7 +479,7 @@ var _ = Describe("builder", func() {
 					Tolerations: []corev1.Toleration{
 						{
 							Key:      "testKey",
-							Value:    "testVaule",
+							Value:    "testValue",
 							Operator: corev1.TolerationOpExists,
 						},
 					},

@@ -90,7 +90,7 @@ var newMockLorryClient = func(clusterKey types.NamespacedName, compName string, 
 		}
 		for _, pod := range podList.Items {
 			if pod.Annotations == nil {
-				panic(fmt.Sprintf("pod annotaions is nil: %s", pod.Name))
+				panic(fmt.Sprintf("pod annotations is nil: %s", pod.Name))
 			}
 			if pod.Annotations[podAnnotationKey4Test] == fmt.Sprintf("%d", replicas) {
 				continue
@@ -1603,7 +1603,7 @@ var _ = Describe("Cluster Controller", func() {
 						g.Expect(*policy.Spec.BackupRepoName).Should(BeEquivalentTo(backup.RepoName))
 					}
 					g.Expect(policy.Spec.BackupMethods).ShouldNot(BeEmpty())
-					// expect for image tage env in backupMethod
+					// expect for image tag env in backupMethod
 					var existImageTagEnv bool
 					for _, v := range policy.Spec.BackupMethods {
 						for _, e := range v.Env {

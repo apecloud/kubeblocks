@@ -73,7 +73,7 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 			}
 		}
 		if saNotExist {
-			return ictrlutil.NewRequeueError(time.Second, "RBAC manager is disabed, but service account is not exist")
+			return ictrlutil.NewRequeueError(time.Second, "RBAC manager is disabled, but service account is not exist")
 		}
 		return nil
 	}

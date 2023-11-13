@@ -28,17 +28,17 @@ import (
 func TestIsDelayedRequeueError(t *testing.T) {
 	err := NewDelayedRequeueError(time.Second, "requeue for test")
 	if !IsDelayedRequeueError(err) {
-		t.Error("should return ture when error is a delayed requeue error")
+		t.Error("should return true when error is a delayed requeue error")
 	}
 	if !IsRequeueError(err) {
-		t.Error("should return ture when error is a requeue error")
+		t.Error("should return true when error is a requeue error")
 	}
 }
 
 func TestIsRequeueError(t *testing.T) {
 	err := NewRequeueError(time.Second, "requeue for test")
 	if !IsRequeueError(err) {
-		t.Error("should return ture when error is a requeue error")
+		t.Error("should return true when error is a requeue error")
 	}
 }
 

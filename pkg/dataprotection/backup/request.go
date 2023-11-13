@@ -265,7 +265,7 @@ func (r *Request) buildExecAction(name string, exec *dpv1alpha1.ExecActionSpec) 
 		PodName:   targetPod.Name,
 		Timeout:   exec.Timeout,
 		// use the kubeblocks's serviceAccount
-		ServiceAccountName: viper.GetString(constant.KBServiceAcccountName),
+		ServiceAccountName: viper.GetString(constant.KBServiceAccountName),
 	}
 }
 

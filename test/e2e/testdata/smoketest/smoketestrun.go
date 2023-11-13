@@ -214,7 +214,7 @@ func runTestCases(files []string) {
 func troubleShooting(clusterName string) string {
 	cmd := "kubectl get all -l app.kubernetes.io/instance=" + clusterName
 	allResourceStatus := e2eutil.ExecCommand(cmd)
-	commond := "kubectl describe cluster " + clusterName
-	clusterEvents := e2eutil.ExecCommand(commond)
+	command := "kubectl describe cluster " + clusterName
+	clusterEvents := e2eutil.ExecCommand(command)
 	return allResourceStatus + clusterEvents
 }

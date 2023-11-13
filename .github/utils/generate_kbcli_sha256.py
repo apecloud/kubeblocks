@@ -3,7 +3,7 @@
 
 # generate kbcli sha256 notes
 # 1. open each *.sha256.txt in target direct
-# 2. get the contain of the file
+# 2. get the contains of the file
 # 3. render the template
 
 import os

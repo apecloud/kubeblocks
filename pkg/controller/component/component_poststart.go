@@ -69,13 +69,13 @@ func ReconcileCompPostStart(ctx context.Context,
 		return err
 	}
 
-	// job executed successfully, add the label to the rsm object to indicate that the postStart has been executed and delete the job
-	if err := setPostStartDoneLabel(cli, cluster, synthesizeComp, dag); err != nil {
+	// job executed successfully, add the annotation to indicate that the postStart has been executed and delete the job
+	if err := setPostStartDoneAnnotation(cli, cluster, synthesizeComp, dag); err != nil {
 		return err
 	}
 
-	// clean up the job
-	if err := CleanJobByName(ctx, cli, cluster, job.Name); err != nil {
+	// clean up the post-start job
+	if err := cleanPostStartJob(ctx, cli, cluster, synthesizeComp, job.Name); err != nil {
 		return err
 	}
 
@@ -87,14 +87,16 @@ func needDoPostStart(ctx context.Context, cli client.Client, cluster *appsv1alph
 	if synthesizeComp.PostStartSpec == nil {
 		return false, nil
 	}
-
-	// determine whether the component has undergone postStart by examining the annotation of the cluster object
-	compPostStarLabelKey := fmt.Sprintf(constant.KBCompPostStartDoneLabelKeyPattern, fmt.Sprintf("%s-%s", cluster.Name, synthesizeComp.Name))
 	if cluster.Annotations == nil {
 		return true, nil
 	}
-	_, ok := cluster.Annotations[compPostStarLabelKey]
-	if ok {
+
+	// determine whether the component has undergone post-start by examining the annotation of the cluster object
+	jobExist := checkPostStartJobExist(ctx, cli, cluster, genPostStartJobName(cluster.Name, synthesizeComp.Name))
+	compPostStartDoneKey := fmt.Sprintf(constant.KBCompPostStartDoneKeyPattern, fmt.Sprintf("%s-%s", cluster.Name, synthesizeComp.Name))
+	_, ok := cluster.Annotations[compPostStartDoneKey]
+	if ok && !jobExist {
+		// if the annotation has been set and the job does not exist, it means that the post-start has finished, so skip it
 		return false, nil
 	}
 	return true, nil
@@ -129,6 +131,13 @@ func createPostStartJobIfNotExist(ctx context.Context,
 		return postStartJob, err
 	}
 	return postStartJob, nil
+}
+
+func checkPostStartJobExist(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, jobName string) bool {
+	key := types.NamespacedName{Namespace: cluster.Namespace, Name: jobName}
+	existJob := &batchv1.Job{}
+	exist, _ := intctrlutil.CheckResourceExists(ctx, cli, key, existJob)
+	return exist
 }
 
 // renderPostStartCmdJob renders and creates the postStart command job.
@@ -315,8 +324,8 @@ func getComponentPodList(ctx context.Context, cli client.Client, cluster appsv1a
 	return podList, err
 }
 
-// setPostStartDoneLabel sets the postStart done annotation to the cluster object.
-func setPostStartDoneLabel(cli client.Client,
+// setPostStartDoneAnnotation sets the postStart done annotation to the cluster object.
+func setPostStartDoneAnnotation(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	synthesizeComp *SynthesizedComponent,
 	dag *graph.DAG) error {
@@ -324,10 +333,31 @@ func setPostStartDoneLabel(cli client.Client,
 	if cluster.Annotations == nil {
 		cluster.Annotations = make(map[string]string)
 	}
+	compPostStartDoneKey := fmt.Sprintf(constant.KBCompPostStartDoneKeyPattern, fmt.Sprintf("%s-%s", cluster.Name, synthesizeComp.Name))
+	_, ok := cluster.Annotations[compPostStartDoneKey]
+	if ok {
+		return nil
+	}
 	clusterObj := cluster.DeepCopy()
 	timeStr := time.Now().Format(time.RFC3339Nano)
-	compPostStarLabelKey := fmt.Sprintf(constant.KBCompPostStartDoneLabelKeyPattern, fmt.Sprintf("%s-%s", cluster.Name, synthesizeComp.Name))
-	cluster.Annotations[compPostStarLabelKey] = timeStr
+	cluster.Annotations[compPostStartDoneKey] = timeStr
 	graphCli.Do(dag, clusterObj, cluster, model.ActionUpdatePtr(), nil)
 	return nil
+}
+
+func cleanPostStartJob(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	synthesizeComp *SynthesizedComponent,
+	jobName string) error {
+	if cluster.Annotations == nil {
+		return errors.New("cluster annotations not found")
+	}
+	// check cluster post-start done annotation has been set
+	compPostStartDoneKey := fmt.Sprintf(constant.KBCompPostStartDoneKeyPattern, fmt.Sprintf("%s-%s", cluster.Name, synthesizeComp.Name))
+	_, ok := cluster.Annotations[compPostStartDoneKey]
+	if !ok {
+		return errors.New("cluster post-start done annotation has not been set")
+	}
+	return CleanJobByName(ctx, cli, cluster, jobName)
 }

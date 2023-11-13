@@ -279,11 +279,11 @@ const (
 
 // postStart constants
 const (
-	KBPostStartJobLabelKey             = "kubeblocks.io/poststart-job"
-	KBPostStartJobLabelValue           = "kb-poststart-job"
-	KBPostStartJobNamePrefix           = "kb-poststart-job"
-	KBPostStartJobContainerName        = "kb-poststart-job-container"
-	KBCompPostStartDoneLabelKeyPattern = "kubeblocks.io/%s-poststart-done"
+	KBPostStartJobLabelKey        = "kubeblocks.io/poststart-job"
+	KBPostStartJobLabelValue      = "kb-poststart-job"
+	KBPostStartJobNamePrefix      = "kb-poststart-job"
+	KBPostStartJobContainerName   = "kb-poststart-job-container"
+	KBCompPostStartDoneKeyPattern = "kubeblocks.io/%s-poststart-done"
 
 	KBPostStartClusterCompList = "KB_CLUSTER_COMPONENT_LIST"
 )

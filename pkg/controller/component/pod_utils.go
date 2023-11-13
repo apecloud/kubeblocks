@@ -34,12 +34,12 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
-func ListPodOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*corev1.Pod, error) {
+func ListPodOwnedByComponent(ctx context.Context, cli client.Reader, namespace string, labels client.MatchingLabels) ([]*corev1.Pod, error) {
 	return ListObjWithLabelsInNamespace(ctx, cli, generics.PodSignature, namespace, labels)
 }
 
 // GetComponentPodList gets the pod list by cluster and componentName
-func GetComponentPodList(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, componentName string) (*corev1.PodList, error) {
+func GetComponentPodList(ctx context.Context, cli client.Reader, cluster appsv1alpha1.Cluster, componentName string) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
 	labels := constant.GetComponentWellKnownLabels(cluster.Name, componentName)
 	if err := cli.List(ctx, podList, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
@@ -49,7 +49,7 @@ func GetComponentPodList(ctx context.Context, cli client.Client, cluster appsv1a
 }
 
 // GetComponentPodListWithRole gets the pod list with target role by cluster and componentName
-func GetComponentPodListWithRole(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, compSpecName, role string) (*corev1.PodList, error) {
+func GetComponentPodListWithRole(ctx context.Context, cli client.Reader, cluster appsv1alpha1.Cluster, compSpecName, role string) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
 	labels := constant.GetComponentWellKnownLabels(cluster.Name, compSpecName)
 	labels[constant.RoleLabelKey] = role
@@ -60,7 +60,7 @@ func GetComponentPodListWithRole(ctx context.Context, cli client.Client, cluster
 }
 
 // IsComponentPodsWithLatestRevision checks whether the underlying pod spec matches the one declared in the Cluster/Component.
-func IsComponentPodsWithLatestRevision(ctx context.Context, cli client.Client,
+func IsComponentPodsWithLatestRevision(ctx context.Context, cli client.Reader,
 	cluster *appsv1alpha1.Cluster, rsm *workloads.ReplicatedStateMachine) (bool, error) {
 	if cluster == nil || rsm == nil {
 		return false, nil

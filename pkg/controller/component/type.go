@@ -91,14 +91,3 @@ type SynthesizedComponent struct {
 	// The old MinAvailable field, which is determined based on the deprecated "workloadType" field, is also no longer applicable in the new API.
 	MinAvailable *intstr.IntOrString `json:"minAvailable,omitempty"`
 }
-
-type CloudProvider string
-
-const (
-	CloudProviderAWS     CloudProvider = "aws"
-	CloudProviderGCP     CloudProvider = "gcp"
-	CloudProviderAliyun  CloudProvider = "aliyun"
-	CloudProviderAzure   CloudProvider = "azure"
-	CloudProviderTencent CloudProvider = "tencent"
-	CloudProviderUnknown CloudProvider = "unknown"
-)

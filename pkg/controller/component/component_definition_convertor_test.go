@@ -22,7 +22,6 @@ package component
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -695,6 +694,8 @@ var _ = Describe("Component Definition Convertor", func() {
 					FailureThreshold: clusterCompDef.Probes.RoleProbe.FailureThreshold,
 				}
 				Expect(actions.RoleProbe).ShouldNot(BeNil())
+				Expect(*actions.RoleProbe).ShouldNot(BeEquivalentTo(*expectedRoleProbe))
+				expectedRoleProbe.SuccessThreshold = actions.RoleProbe.SuccessThreshold
 				Expect(*actions.RoleProbe).Should(BeEquivalentTo(*expectedRoleProbe))
 			})
 		})

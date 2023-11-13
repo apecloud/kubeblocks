@@ -467,7 +467,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 			job.Namespace = viper.GetString(constant.CfgKeyCtrlrMgrNS)
 			job.Labels[DataProtectionLabelRestoreNamespaceKey] = r.Restore.Namespace
 			// use the kubeblocks's serviceAccount
-			job.Spec.Template.Spec.ServiceAccountName = viper.GetString(constant.KBServiceAcccountName)
+			job.Spec.Template.Spec.ServiceAccountName = viper.GetString(constant.KBServiceAccountName)
 			restoreJobs = append(restoreJobs, job)
 		}
 		return restoreJobs, nil

@@ -27,7 +27,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
-func TestProperitesFormat(t *testing.T) {
+func TestPropertiesFormat(t *testing.T) {
 	const propsContext = `
 # Time of inactivity after which the broker will discard the deduplication information
 # relative to a disconnected producer. Default is 6 hours.
@@ -83,7 +83,7 @@ brokerMaxConnectionsPerIp=0
 	assert.EqualValues(t, propsConfigObj.Get("defaultNumberOfNamespaceBundles"), "600")
 }
 
-func TestProperitesEmpty(t *testing.T) {
+func TestPropertiesEmpty(t *testing.T) {
 	propsConfigObj, err := LoadConfig("props_test", "", appsv1alpha1.PropertiesPlus)
 	assert.Nil(t, err)
 

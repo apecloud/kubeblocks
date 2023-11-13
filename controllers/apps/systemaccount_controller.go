@@ -101,7 +101,7 @@ func init() {
 	systemAccountLog = log.Log.WithName("systemAccountRuntime")
 }
 
-// SystemAccountController does not have a custom resource, but wathes the create/delete/update of resource like cluster,
+// SystemAccountController does not have a custom resource, but watches the create/delete/update of resource like cluster,
 // clusterdefinition, backuppolicy, jobs, secrets
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch;
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters/status,verbs=get
@@ -475,7 +475,7 @@ func (r *SystemAccountReconciler) jobCompletionHandler() *handler.Funcs {
 
 	// check against a job to make sure it
 	// 1. works for sysaccount (by checking labels)
-	// 2. has completed (either successed or failed)
+	// 2. has completed (either succeeded or failed)
 	// 3. is under deletion (either by user or by TTL, where deletionTimestamp is set)
 	return &handler.Funcs{
 		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
@@ -545,7 +545,7 @@ func (r *SystemAccountReconciler) jobCompletionHandler() *handler.Funcs {
 			passwd := job.Annotations[systemAccountPasswdAnnotation]
 			secret := renderSecretWithPwd(compKey, accountName, passwd)
 			if err := controllerutil.SetControllerReference(cluster, secret, r.Scheme); err != nil {
-				logger.Error(err, "failed to set ownere reference for secret", "secret", secret.Name)
+				logger.Error(err, "failed to set owner reference for secret", "secret", secret.Name)
 				return
 			}
 

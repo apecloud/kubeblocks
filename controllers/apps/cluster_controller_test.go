@@ -917,7 +917,6 @@ var _ = Describe("Cluster Controller", func() {
 			backupRepoName   = "test-backup-repo"
 			backupMethodName = "test-backup-method"
 		)
-
 		BeforeEach(func() {
 			cleanEnv()
 			createAllWorkloadTypesClusterDef()
@@ -1027,7 +1026,7 @@ var _ = Describe("Cluster Controller", func() {
 						g.Expect(*policy.Spec.BackupRepoName).Should(BeEquivalentTo(backup.RepoName))
 					}
 					g.Expect(policy.Spec.BackupMethods).ShouldNot(BeEmpty())
-					// expect for image tage env in backupMethod
+					// expect for image tag env in backupMethod
 					var existImageTagEnv bool
 					for _, v := range policy.Spec.BackupMethods {
 						for _, e := range v.Env {

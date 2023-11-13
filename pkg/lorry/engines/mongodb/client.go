@@ -31,7 +31,7 @@ import (
 
 func NewMongodbClient(ctx context.Context, config *Config) (*mongo.Client, error) {
 	if len(config.hosts) == 0 {
-		return nil, errors.New("Get replset client whitout hosts")
+		return nil, errors.New("Get replset client without hosts")
 	}
 
 	opts := options.Client().

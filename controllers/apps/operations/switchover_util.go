@@ -437,7 +437,7 @@ func buildSwitchoverWorkloadEnvs(ctx context.Context,
 		}
 		workloadEnvs = append(workloadEnvs, csEnvs...)
 	}
-	// add tht first container's environment variables of the primary pod
+	// add the first container's environment variables of the primary pod
 	workloadEnvs = append(workloadEnvs, pod.Spec.Containers[0].Env...)
 	return workloadEnvs, nil
 }

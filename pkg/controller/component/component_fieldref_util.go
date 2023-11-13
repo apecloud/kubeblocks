@@ -49,7 +49,7 @@ func buildComponentRef(clusterDef *appsv1alpha1.ClusterDefinition,
 		referredComponents := cluster.Spec.GetDefNameMappingComponents()[compRef.ComponentDefName]
 
 		if referredComponentDef == nil || len(referredComponents) == 0 {
-			err := fmt.Errorf("failes to match %s in cluster %s", compRef.ComponentDefName, cluster.Name)
+			err := fmt.Errorf("failed to match %s in cluster %s", compRef.ComponentDefName, cluster.Name)
 			if compRef.FailurePolicy == appsv1alpha1.FailurePolicyFail {
 				return err
 			} else {

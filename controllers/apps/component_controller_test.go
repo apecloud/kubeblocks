@@ -95,7 +95,7 @@ var newMockLorryClient = func(clusterKey types.NamespacedName, compName string, 
 		}
 		for _, pod := range podList.Items {
 			if pod.Annotations == nil {
-				panic(fmt.Sprintf("pod annotaions is nil: %s", pod.Name))
+				panic(fmt.Sprintf("pod annotations is nil: %s", pod.Name))
 			}
 			if pod.Annotations[podAnnotationKey4Test] == fmt.Sprintf("%d", replicas) {
 				continue

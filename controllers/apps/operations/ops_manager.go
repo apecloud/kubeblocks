@@ -98,8 +98,8 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 	}
 
 	if err = opsBehaviour.OpsHandler.Action(reqCtx, cli, opsRes); err != nil {
-		// patch the status.phase to Failed when the error is FastFaileError, which means the operation is failed and there is no need to retry
-		if _, ok := err.(*FastFaileError); ok {
+		// patch the status.phase to Failed when the error is FastFailError, which means the operation is failed and there is no need to retry
+		if _, ok := err.(*FastFailError); ok {
 			if patchErr := patchFastFailErrorCondition(reqCtx.Ctx, cli, opsRes, err); patchErr != nil {
 				return nil, patchErr
 			}

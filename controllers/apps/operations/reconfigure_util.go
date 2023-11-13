@@ -290,7 +290,7 @@ func processMergedFailed(resource *OpsResource, isInvalid bool, err error) error
 	// if failed to validate configure, set opsRequest to failed and return
 	failedCondition := appsv1alpha1.NewReconfigureFailedCondition(resource.OpsRequest, err)
 	resource.OpsRequest.SetStatusCondition(*failedCondition)
-	return &FastFaileError{message: err.Error()}
+	return &FastFailError{message: err.Error()}
 }
 
 func formatConfigPatchToMessage(configPatch *core.ConfigPatchInfo, execStatus *core.PolicyExecStatus) string {

@@ -829,7 +829,7 @@ spec:
                 properties:
                   logSyncAction:
                     description: LogSyncAction specifies how to trigger the new member
-                      to start log syncing previous none-nil action's Image wil be
+                      to start log syncing previous none-nil action's Image will be
                       used if not configured
                     properties:
                       command:
@@ -847,7 +847,7 @@ spec:
                     type: object
                   memberJoinAction:
                     description: MemberJoinAction specifies how to add member previous
-                      none-nil action's Image wil be used if not configured
+                      none-nil action's Image will be used if not configured
                     properties:
                       command:
                         description: Command will be executed in Container to retrieve
@@ -864,7 +864,7 @@ spec:
                     type: object
                   memberLeaveAction:
                     description: MemberLeaveAction specifies how to remove member
-                      previous none-nil action's Image wil be used if not configured
+                      previous none-nil action's Image will be used if not configured
                     properties:
                       command:
                         description: Command will be executed in Container to retrieve
@@ -882,7 +882,7 @@ spec:
                   promoteAction:
                     description: PromoteAction specifies how to tell the cluster that
                       the new member can join voting now previous none-nil action's
-                      Image wil be used if not configured
+                      Image will be used if not configured
                     properties:
                       command:
                         description: Command will be executed in Container to retrieve

@@ -97,7 +97,7 @@ var _ = Describe("Component PostStart Test", func() {
 				Args:    []string{},
 			}
 			postStartSpec := &appsv1alpha1.PostStartAction{
-				CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{
+				CmdExecutorConfig: appsv1alpha1.CmdExecutorConfig{
 					CommandExecutorEnvItem: *commandExecutorEnvItem,
 					CommandExecutorItem:    *commandExecutorItem,
 				},

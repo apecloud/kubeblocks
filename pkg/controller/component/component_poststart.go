@@ -187,9 +187,6 @@ func renderPostStartCmdJob(ctx context.Context,
 			cmdExecutorConfig   = postStartSpec.CmdExecutorConfig
 			scriptSpecSelectors = postStartSpec.ScriptSpecSelectors
 		)
-		if cmdExecutorConfig == nil {
-			return nil, errors.New("postStart action not found")
-		}
 		volumes, volumeMounts := renderJobPodVolumes(scriptSpecSelectors)
 		jobName := genPostStartJobName(cluster.Name, synthesizeComp.Name)
 		job := &batchv1.Job{
@@ -247,7 +244,7 @@ func buildPostStartEnvs(cluster *appsv1alpha1.Cluster,
 	tplPod *corev1.Pod) ([]corev1.EnvVar, error) {
 	var workloadEnvs []corev1.EnvVar
 
-	if synthesizeComp != nil && synthesizeComp.PostStartSpec != nil && synthesizeComp.PostStartSpec.CmdExecutorConfig != nil {
+	if synthesizeComp != nil && synthesizeComp.PostStartSpec != nil {
 		workloadEnvs = append(workloadEnvs, synthesizeComp.PostStartSpec.CmdExecutorConfig.Env...)
 	}
 

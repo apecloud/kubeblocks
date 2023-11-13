@@ -444,7 +444,7 @@ type ClusterComponentDefinition struct {
 	// +optional
 	SwitchoverSpec *SwitchoverSpec `json:"switchoverSpec,omitempty"`
 
-	// postStart defines the command to be executed after the component is started.
+	// postStartSpec defines the command to be executed when the component is ready, and the command will only be executed once after the component becomes ready.
 	// +optional
 	PostStartSpec *PostStartAction `json:"postStartSpec,omitempty"`
 
@@ -952,12 +952,12 @@ func (r *ReplicationSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolic
 }
 
 type PostStartAction struct {
-	// cmdExecutorConfig is the executor configuration of the switchover command.
+	// cmdExecutorConfig is the executor configuration of the post-start command.
 	// +kubebuilder:validation:Required
-	CmdExecutorConfig *CmdExecutorConfig `json:"cmdExecutorConfig"`
+	CmdExecutorConfig CmdExecutorConfig `json:"cmdExecutorConfig"`
 
 	// scriptSpecSelectors defines the selector of the scriptSpecs that need to be referenced.
-	// Once ScriptSpecSelectors is defined, the scripts defined in scriptSpecs can be referenced in the SwitchoverAction.CmdExecutorConfig.
+	// Once ScriptSpecSelectors is defined, the scripts defined in scriptSpecs can be referenced in the PostStartAction.CmdExecutorConfig.
 	// +optional
 	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
 }

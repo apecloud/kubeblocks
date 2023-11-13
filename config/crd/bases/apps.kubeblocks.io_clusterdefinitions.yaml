@@ -8307,12 +8307,13 @@ spec:
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
                     postStartSpec:
-                      description: postStart defines the command to be executed after
-                        the component is started.
+                      description: postStartSpec defines the command to be executed
+                        when the component is ready, and the command will only be
+                        executed once after the component becomes ready.
                       properties:
                         cmdExecutorConfig:
                           description: cmdExecutorConfig is the executor configuration
-                            of the switchover command.
+                            of the post-start command.
                           properties:
                             args:
                               description: args is used to perform statements.
@@ -8460,7 +8461,7 @@ spec:
                           description: scriptSpecSelectors defines the selector of
                             the scriptSpecs that need to be referenced. Once ScriptSpecSelectors
                             is defined, the scripts defined in scriptSpecs can be
-                            referenced in the SwitchoverAction.CmdExecutorConfig.
+                            referenced in the PostStartAction.CmdExecutorConfig.
                           items:
                             properties:
                               name:

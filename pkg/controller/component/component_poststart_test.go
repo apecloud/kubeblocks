@@ -31,6 +31,8 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -118,7 +120,9 @@ var _ = Describe("Component PostStart Test", func() {
 			Expect(component).ShouldNot(BeNil())
 			Expect(component.PostStartSpec).Should(BeNil())
 
-			err = ReconcileCompPostStart(testCtx.Ctx, testCtx.Cli, cluster, component)
+			dag := graph.NewDAG()
+			dag.AddVertex(&model.ObjectVertex{Obj: cluster, Action: model.ActionUpdatePtr()})
+			err = ReconcileCompPostStart(testCtx.Ctx, testCtx.Cli, cluster, component, dag)
 			Expect(err).Should(Succeed())
 
 			By("build component with poststartSpec without PodList, do not need to do postStartAction")
@@ -136,7 +140,7 @@ var _ = Describe("Component PostStart Test", func() {
 				},
 			}
 			component.PostStartSpec = postStartSpec
-			err = ReconcileCompPostStart(testCtx.Ctx, testCtx.Cli, cluster, component)
+			err = ReconcileCompPostStart(testCtx.Ctx, testCtx.Cli, cluster, component, dag)
 			Expect(err).ShouldNot(Succeed())
 
 			By("build component with poststartSpec with PodList, do postStartAction and requeue waiting job")
@@ -150,9 +154,17 @@ var _ = Describe("Component PostStart Test", func() {
 				}}
 				Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
 			}
-			err = ReconcileCompPostStart(testCtx.Ctx, testCtx.Cli, cluster, component)
+			err = ReconcileCompPostStart(testCtx.Ctx, testCtx.Cli, cluster, component, dag)
+			Expect(err).Should(Succeed())
+
+			jobName := genPostStartJobName(cluster.Name, component.Name)
+			err = CheckJobSucceed(testCtx.Ctx, testCtx.Cli, cluster, jobName)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("requeue to waiting for job"))
+
+			By("test set postStartDoneLabel without error")
+			err = setPostStartDoneLabel(testCtx.Cli, cluster, component, dag)
+			Expect(err).Should(Succeed())
 		})
 	})
 })

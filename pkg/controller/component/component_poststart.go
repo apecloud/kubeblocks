@@ -33,10 +33,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 // ReconcileCompPostStart reconciles the component-level postStart command.
@@ -78,18 +76,12 @@ func needDoPostStart(ctx context.Context, cli client.Client, cluster *appsv1alph
 		return false, nil
 	}
 
-	// determine whether the component has undergone postStart by examining the annotation of the rsm object
-	rsm, err := getUnderlyingRSMObj(ctx, cli, cluster, synthesizeComp)
-	if err != nil {
-		return false, err
-	}
-	if rsm == nil {
-		return false, errors.New("ReplicatedStateMachine object not found")
-	}
-	if rsm.Annotations == nil {
+	// determine whether the component has undergone postStart by examining the annotation of the cluster object
+	compPostStarLabelKey := fmt.Sprintf(constant.KBCompPostStartDoneLabelKeyPattern, fmt.Sprintf("%s-%s", cluster.Name, synthesizeComp.Name))
+	if cluster.Annotations == nil {
 		return false, nil
 	}
-	_, ok := rsm.Annotations[constant.KBPostStartDoneLabelKey]
+	_, ok := cluster.Annotations[compPostStarLabelKey]
 	if ok {
 		return false, nil
 	}
@@ -310,41 +302,19 @@ func getComponentPodList(ctx context.Context, cli client.Client, cluster appsv1a
 	return podList, err
 }
 
-// getUnderlyingRSMObj gets the underlying ReplicatedStateMachine object of component.
-func getUnderlyingRSMObj(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	synthesizeComp *SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
-	rsmKey := types.NamespacedName{
-		Namespace: cluster.Namespace,
-		Name:      fmt.Sprintf("%s-%s", cluster.Name, synthesizeComp.Name),
-	}
-	rsm := &workloads.ReplicatedStateMachine{}
-	if err := cli.Get(ctx, rsmKey, rsm); err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return rsm, nil
-}
-
-// setPostStartDoneLabel sets the postStart done annotation to the underlying ReplicatedStateMachine object of component.
+// setPostStartDoneLabel sets the postStart done annotation to the cluster object.
 func setPostStartDoneLabel(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	synthesizeComp *SynthesizedComponent) error {
-	rsm, err := getUnderlyingRSMObj(ctx, cli, cluster, synthesizeComp)
-	if err != nil {
-		return err
-	}
-	rmsObj := rsm.DeepCopy()
-	if rsm.Annotations == nil {
-		rsm.Annotations = make(map[string]string)
+	ClusterObj := cluster.DeepCopy()
+	if cluster.Annotations == nil {
+		cluster.Annotations = make(map[string]string)
 	}
 	timeStr := time.Now().Format(time.RFC3339Nano)
-	rsm.Annotations[constant.KBPostStartDoneLabelKey] = timeStr
-	if err := cli.Patch(ctx, rsm, client.MergeFrom(rmsObj)); err != nil {
+	compPostStarLabelKey := fmt.Sprintf(constant.KBCompPostStartDoneLabelKeyPattern, fmt.Sprintf("%s-%s", cluster.Name, synthesizeComp.Name))
+	cluster.Annotations[compPostStarLabelKey] = timeStr
+	if err := cli.Patch(ctx, cluster, client.MergeFrom(ClusterObj)); err != nil {
 		return err
 	}
 	return nil

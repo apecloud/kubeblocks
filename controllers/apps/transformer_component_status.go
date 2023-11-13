@@ -221,8 +221,8 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 	}()
 
 	r.reqCtx.Log.V(1).Info(
-		fmt.Sprintf("component status conditions, isRSMRunning: %v, isAllConfigSynced: %v, hasRunningVolumeExpansion: %v, hasFailure: %v,  isInCreatingPhase: %v, hasFailure: %v, isComponentAvailable: %v",
-			isRSMRunning, isAllConfigSynced, hasRunningVolumeExpansion, hasFailure, isInCreatingPhase, hasFailure, isComponentAvailable))
+		fmt.Sprintf("component status conditions, isRSMRunning: %v, isAllConfigSynced: %v, hasRunningVolumeExpansion: %v, hasFailure: %v,  isInCreatingPhase: %v, isComponentAvailable: %v",
+			isRSMRunning, isAllConfigSynced, hasRunningVolumeExpansion, hasFailure, isInCreatingPhase, isComponentAvailable))
 
 	r.podsReady = false
 	switch {

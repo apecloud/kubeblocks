@@ -50,7 +50,7 @@ func BuildRSMFromConvertor(cluster *appsv1alpha1.Cluster, synthesizeComp *compon
 
 	template := corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
-		Spec:       *synthesizeComp.PodSpec,
+		Spec:       *synthesizeComp.PodSpec.DeepCopy(),
 	}
 
 	monitorAnnotations := getMonitorAnnotations(synthesizeComp)

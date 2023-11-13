@@ -50,6 +50,8 @@ type componentTransformContext struct {
 	Component           *appsv1alpha1.Component
 	ComponentOrig       *appsv1alpha1.Component
 	SynthesizeComponent *component.SynthesizedComponent
+	RunningWorkload     client.Object
+	ProtoWorkload       client.Object
 }
 
 func (c *componentTransformContext) GetContext() context.Context {

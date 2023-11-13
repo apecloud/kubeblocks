@@ -90,6 +90,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	if err != nil {
 		return err
 	}
+	transCtx.RunningWorkload = runningRSM
 
 	// build synthesizeComp podSpec volumeMounts
 	buildPodSpecVolumeMounts(synthesizeComp)
@@ -100,6 +101,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	if err != nil {
 		return err
 	}
+	transCtx.ProtoWorkload = protoRSM
 
 	// build configuration template annotations to rsm workload
 	buildRSMConfigTplAnnotations(protoRSM, synthesizeComp)

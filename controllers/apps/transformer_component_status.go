@@ -37,7 +37,6 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
@@ -82,7 +81,12 @@ var _ graph.Transformer = &componentStatusTransformer{}
 
 func (t *componentStatusTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
+	comp := transCtx.Component
 	if model.IsObjectDeleting(transCtx.ComponentOrig) {
+		return nil
+	}
+	if transCtx.RunningWorkload == nil {
+		transCtx.Logger.Info(fmt.Sprintf("skip reconcile component status because underlying workload object not found, generation: %d", comp.Generation))
 		return nil
 	}
 
@@ -91,32 +95,15 @@ func (t *componentStatusTransformer) Transform(ctx graph.TransformContext, dag *
 		Log:      transCtx.Logger,
 		Recorder: transCtx.EventRecorder,
 	}
-	comp := transCtx.Component
-	compOrig := transCtx.ComponentOrig
 	cluster := transCtx.Cluster
 	synthesizeComp := transCtx.SynthesizeComponent
-
-	// get underlying running RSM object
-	runningRSM, err := t.runningRSMObject(ctx, synthesizeComp)
-	if err != nil {
-		return err
-	}
-	if runningRSM == nil {
-		transCtx.Logger.Info(fmt.Sprintf("skip reconcile component status because underlying workload object not found, generation: %d", comp.Generation))
-		return nil
-	}
-
-	// build proto RSM workload
-	protoRSM, err := factory.BuildRSMWrapper(cluster, synthesizeComp)
-	if err != nil {
-		return err
-	}
-
+	runningRSM, _ := transCtx.RunningWorkload.(*workloads.ReplicatedStateMachine)
+	protoRSM, _ := transCtx.ProtoWorkload.(*workloads.ReplicatedStateMachine)
 	switch {
-	case model.IsObjectUpdating(compOrig):
+	case model.IsObjectUpdating(transCtx.ComponentOrig):
 		transCtx.Logger.Info(fmt.Sprintf("update component status after applying resources, generation: %d", comp.Generation))
 		comp.Status.ObservedGeneration = comp.Generation
-	case model.IsObjectStatusUpdating(compOrig):
+	case model.IsObjectStatusUpdating(transCtx.ComponentOrig):
 		// reconcile the component status and sync the component status to cluster status
 		csh := newComponentStatusHandler(reqCtx, t.Client, cluster, comp, synthesizeComp, runningRSM, protoRSM, dag)
 		if err := csh.reconcileComponentStatus(); err != nil {
@@ -126,25 +113,9 @@ func (t *componentStatusTransformer) Transform(ctx graph.TransformContext, dag *
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	graphCli.Status(dag, compOrig, comp)
+	graphCli.Status(dag, transCtx.ComponentOrig, comp)
 
 	return nil
-}
-
-func (t *componentStatusTransformer) runningRSMObject(ctx graph.TransformContext,
-	synthesizeComp *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
-	rsmKey := types.NamespacedName{
-		Namespace: synthesizeComp.Namespace,
-		Name:      constant.GenerateRSMNamePattern(synthesizeComp.ClusterName, synthesizeComp.Name),
-	}
-	rsm := &workloads.ReplicatedStateMachine{}
-	if err := ctx.GetClient().Get(ctx.GetContext(), rsmKey, rsm); err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return rsm, nil
 }
 
 // reconcileComponentStatus reconciles component status.

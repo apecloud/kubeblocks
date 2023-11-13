@@ -277,6 +277,17 @@ const (
 	KBSwitchoverConsensusLeaderPodFqdn    = "KB_CONSENSUS_LEADER_POD_FQDN"
 )
 
+// postStart constants
+const (
+	KBPostStartJobLabelKey        = "kubeblocks.io/poststart-job"
+	KBPostStartJobLabelValue      = "kb-poststart-job"
+	KBPostStartJobNamePrefix      = "kb-poststart-job"
+	KBPostStartJobContainerName   = "kb-poststart-job-container"
+	KBCompPostStartDoneKeyPattern = "kubeblocks.io/%s-poststart-done"
+
+	KBPostStartClusterCompList = "KB_CLUSTER_COMPONENT_LIST"
+)
+
 // username and password are keys in created secrets for others to refer to.
 const (
 	AccountNameForSecret   = "username"

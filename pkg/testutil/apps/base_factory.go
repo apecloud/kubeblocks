@@ -23,6 +23,8 @@ import (
 	"context"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/types"
+
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,6 +57,11 @@ func (factory *BaseFactory[T, PT, F]) Init(namespace, name string, obj PT, f *F)
 
 func (factory *BaseFactory[T, PT, F]) Get() PT {
 	return factory.object
+}
+
+func (factory *BaseFactory[T, PT, F]) SetUID(uid types.UID) *F {
+	factory.object.SetUID(uid)
+	return factory.concreteFactory
 }
 
 func (factory *BaseFactory[T, PT, F]) WithRandomName() *F {

@@ -389,6 +389,14 @@ func (c *rsmComponent) status(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 		return err
 	}
 
+	// when the component is ready, try to execute a custom postStart hook.
+	status := c.getComponentStatus()
+	if status.Phase == appsv1alpha1.RunningClusterCompPhase {
+		if err := component.ReconcileCompPostStart(reqCtx.Ctx, cli, c.Cluster, c.component, c.dag); err != nil {
+			return err
+		}
+	}
+
 	graphCli := model.NewGraphClient(c.Client)
 	if graphCli.IsAction(c.dag, c.workload, nil) {
 		graphCli.Noop(c.dag, c.workload)

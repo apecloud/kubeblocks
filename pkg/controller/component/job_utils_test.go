@@ -42,6 +42,7 @@ var _ = Describe("Job Utils Test", func() {
 			clusterName        = "test-cluster"
 			mysqlCompDefName   = "replicasets"
 			mysqlCompName      = "mysql"
+			labelKey           = "test-label"
 		)
 
 		var (
@@ -92,11 +93,11 @@ var _ = Describe("Job Utils Test", func() {
 		})
 
 		It("should work as expected with various inputs", func() {
-			By("create watch obj with label=" + constant.AppManagedByLabelKey)
-			job := createJob("test-job1", constant.AppManagedByLabelKey)
+			By("create watch obj with label=" + labelKey)
+			job := createJob("test-job1", labelKey)
 			Expect(k8sClient.Create(ctx, job)).ToNot(HaveOccurred())
 
-			jobList, err := GetJobWithLabels(ctx, k8sClient, cluster, map[string]string{constant.AppManagedByLabelKey: constant.AppName})
+			jobList, err := GetJobWithLabels(ctx, k8sClient, cluster, map[string]string{labelKey: constant.AppName})
 			Expect(err).Should(Succeed())
 			Expect(len(jobList)).To(Equal(1))
 
@@ -116,12 +117,12 @@ var _ = Describe("Job Utils Test", func() {
 			By("delete job by name")
 			Expect(CleanJobByName(ctx, k8sClient, cluster, job.Name)).ShouldNot(HaveOccurred())
 
-			By("create watch obj with label=" + constant.AppManagedByLabelKey)
-			job2 := createJob("test-job2", constant.AppManagedByLabelKey)
+			By("create watch obj with label=" + labelKey)
+			job2 := createJob("test-job2", labelKey)
 			Expect(k8sClient.Create(ctx, job2)).ToNot(HaveOccurred())
 
 			By("delete job with label")
-			Expect(CleanJobWithLabels(ctx, k8sClient, cluster, map[string]string{constant.AppManagedByLabelKey: constant.AppName})).ShouldNot(HaveOccurred())
+			Expect(CleanJobWithLabels(ctx, k8sClient, cluster, map[string]string{labelKey: constant.AppName})).ShouldNot(HaveOccurred())
 		})
 	})
 })

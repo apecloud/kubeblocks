@@ -21,8 +21,9 @@ package apps
 
 import (
 	"context"
-	"k8s.io/apimachinery/pkg/types"
 	"reflect"
+
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"

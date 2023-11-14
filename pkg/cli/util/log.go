@@ -64,7 +64,7 @@ func EnableLogToFile(fs *pflag.FlagSet) error {
 }
 
 func getCliLogFile() (string, error) {
-	homeDir, err := GetCliHomeDir()
+	homeDir, err := GetCliLogDir()
 	if err != nil {
 		return "", err
 	}

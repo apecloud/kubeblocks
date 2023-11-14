@@ -105,6 +105,21 @@ func GetCliHomeDir() (string, error) {
 	return cliHome, nil
 }
 
+// GetCliLogDir returns kbcli log dir
+func GetCliLogDir() (string, error) {
+	cliHome, err := GetCliHomeDir()
+	if err != nil {
+		return "", err
+	}
+	logDir := filepath.Join(cliHome, types.CliLogDir)
+	if _, err := os.Stat(logDir); err != nil && os.IsNotExist(err) {
+		if err = os.MkdirAll(logDir, 0750); err != nil {
+			return "", errors.Wrap(err, "error when create kbcli log directory")
+		}
+	}
+	return logDir, nil
+}
+
 // GetKubeconfigDir returns the kubeconfig directory.
 func GetKubeconfigDir() string {
 	var kubeconfigDir string

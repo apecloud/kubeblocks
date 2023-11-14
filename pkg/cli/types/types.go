@@ -42,6 +42,9 @@ const (
 	//	CliChartsCache defines kbcli charts cache dir name
 	CliChartsCache = "charts"
 
+	// CliLogDir defines kbcli log dir name
+	CliLogDir = "logs"
+
 	// CliHomeEnv defines kbcli home system env
 	CliHomeEnv = "KBCLI_HOME"
 

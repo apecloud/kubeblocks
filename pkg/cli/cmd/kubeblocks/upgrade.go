@@ -160,27 +160,27 @@ func (o *InstallOptions) Upgrade() error {
 	}
 	s.Success()
 
-	// stop the old version KubeBlocks, otherwise the old version KubeBlocks will reconcile the
-	// new version resources, which may not be compatible. helm will start the new version
-	// KubeBlocks after upgrade.
-	s = spinner.New(o.Out, spinnerMsg("Stop KubeBlocks "+kbVersion))
-	defer s.Fail()
-	if err = o.stopDeployment(util.GetKubeBlocksDeploy); err != nil {
-		return err
-	}
-	s.Success()
-
-	// stop the data protection deployment
-	s = spinner.New(o.Out, spinnerMsg("Stop DataProtection"))
-	defer s.Fail()
-	if err = o.stopDeployment(util.GetDataProtectionDeploy); err != nil {
-		return err
-	}
-	s.Success()
-
 	// it's time to upgrade
 	msg := ""
 	if o.Version != "" {
+		// stop the old version KubeBlocks, otherwise the old version KubeBlocks will reconcile the
+		// new version resources, which may not be compatible. helm will start the new version
+		// KubeBlocks after upgrade.
+		s = spinner.New(o.Out, spinnerMsg("Stop KubeBlocks "+kbVersion))
+		defer s.Fail()
+		if err = o.stopDeployment(util.GetKubeBlocksDeploy); err != nil {
+			return err
+		}
+		s.Success()
+
+		// stop the data protection deployment
+		s = spinner.New(o.Out, spinnerMsg("Stop DataProtection"))
+		defer s.Fail()
+		if err = o.stopDeployment(util.GetDataProtectionDeploy); err != nil {
+			return err
+		}
+		s.Success()
+
 		msg = "to " + o.Version
 	}
 	s = spinner.New(o.Out, spinnerMsg("Upgrading KubeBlocks "+msg))

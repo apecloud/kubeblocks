@@ -127,33 +127,33 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	plan, errBuild := planBuilder.
 		AddTransformer(
 			// handle cluster deletion first
-			&ClusterDeletionTransformer{},
+			&clusterDeletionTransformer{},
 			// check is recovering from halted cluster
-			&ClusterHaltRecoveryTransformer{},
+			&clusterHaltRecoveryTransformer{},
 			// update finalizer and cd&cv labels
-			&ClusterAssureMetaTransformer{},
+			&clusterAssureMetaTransformer{},
 			// validate cd & cv's existence and availability
-			&ClusterValidateAndLoadRefResourcesTransformer{},
+			&clusterLoadRefResourcesTransformer{},
 			// normalize the cluster and component API
 			&ClusterAPINormalizationTransformer{},
 			// handle cluster services
-			&ClusterServiceTransformer{},
-			// handle restore before ClusterComponentTransformer
-			&ClusterRestoreTransformer{Client: r.Client},
+			&clusterServiceTransformer{},
+			// handle restore before clusterComponentTransformer
+			&clusterRestoreTransformer{Client: r.Client},
 			// create all cluster components objects
-			&ClusterComponentTransformer{},
+			&clusterComponentTransformer{},
 			// update cluster components' status
 			&clusterComponentStatusTransformer{},
 			// create default cluster connection credential secret object
-			&ClusterCredentialTransformer{},
+			&clusterCredentialTransformer{},
 			// build backuppolicy and backupschedule from backupPolicyTemplate
 			&clusterBackupPolicyTransformer{},
 			// add our finalizer to all objects
-			&ClusterOwnershipTransformer{},
+			&clusterOwnershipTransformer{},
 			// make all workload objects depending on credential secret
-			&SecretTransformer{},
+			&secretTransformer{},
 			// update cluster status
-			&ClusterStatusTransformer{},
+			&clusterStatusTransformer{},
 			// always safe to put your transformer below
 		).
 		Build()

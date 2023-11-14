@@ -41,12 +41,12 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
-// ClusterDeletionTransformer handles cluster deletion
-type ClusterDeletionTransformer struct{}
+// clusterDeletionTransformer handles cluster deletion
+type clusterDeletionTransformer struct{}
 
-var _ graph.Transformer = &ClusterDeletionTransformer{}
+var _ graph.Transformer = &clusterDeletionTransformer{}
 
-func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.OrigCluster
 	if !cluster.IsDeleting() {

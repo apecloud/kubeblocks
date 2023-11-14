@@ -36,12 +36,12 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-// ClusterCredentialTransformer creates the connection credential secret
-type ClusterCredentialTransformer struct{}
+// clusterCredentialTransformer creates the connection credential secret
+type clusterCredentialTransformer struct{}
 
-var _ graph.Transformer = &ClusterCredentialTransformer{}
+var _ graph.Transformer = &clusterCredentialTransformer{}
 
-func (t *ClusterCredentialTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *clusterCredentialTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	if model.IsObjectDeleting(transCtx.OrigCluster) {
 		return nil
@@ -53,7 +53,7 @@ func (t *ClusterCredentialTransformer) Transform(ctx graph.TransformContext, dag
 	return t.transformClusterCredential(transCtx, dag)
 }
 
-func (t *ClusterCredentialTransformer) isLegacyCluster(transCtx *clusterTransformContext) bool {
+func (t *clusterCredentialTransformer) isLegacyCluster(transCtx *clusterTransformContext) bool {
 	for _, comp := range transCtx.ComponentSpecs {
 		compDef, ok := transCtx.ComponentDefs[comp.ComponentDef]
 		if ok && (len(compDef.UID) > 0 || !compDef.CreationTimestamp.IsZero()) {
@@ -63,7 +63,7 @@ func (t *ClusterCredentialTransformer) isLegacyCluster(transCtx *clusterTransfor
 	return true
 }
 
-func (t *ClusterCredentialTransformer) transformClusterCredentialLegacy(transCtx *clusterTransformContext, dag *graph.DAG) error {
+func (t *clusterCredentialTransformer) transformClusterCredentialLegacy(transCtx *clusterTransformContext, dag *graph.DAG) error {
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	synthesizedComponent := t.buildSynthesizedComponentLegacy(transCtx)
 	if synthesizedComponent != nil {
@@ -75,7 +75,7 @@ func (t *ClusterCredentialTransformer) transformClusterCredentialLegacy(transCtx
 	return nil
 }
 
-func (t *ClusterCredentialTransformer) buildSynthesizedComponentLegacy(transCtx *clusterTransformContext) *component.SynthesizedComponent {
+func (t *clusterCredentialTransformer) buildSynthesizedComponentLegacy(transCtx *clusterTransformContext) *component.SynthesizedComponent {
 	for _, compDef := range transCtx.ClusterDef.Spec.ComponentDefs {
 		if compDef.Service == nil {
 			continue
@@ -93,7 +93,7 @@ func (t *ClusterCredentialTransformer) buildSynthesizedComponentLegacy(transCtx 
 	return nil
 }
 
-func (t *ClusterCredentialTransformer) transformClusterCredential(transCtx *clusterTransformContext, dag *graph.DAG) error {
+func (t *clusterCredentialTransformer) transformClusterCredential(transCtx *clusterTransformContext, dag *graph.DAG) error {
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for _, credential := range transCtx.Cluster.Spec.ConnectionCredentials {
 		secret, err := t.buildClusterCredential(transCtx, dag, credential)
@@ -107,7 +107,7 @@ func (t *ClusterCredentialTransformer) transformClusterCredential(transCtx *clus
 	return nil
 }
 
-func (t *ClusterCredentialTransformer) buildClusterCredential(transCtx *clusterTransformContext, dag *graph.DAG,
+func (t *clusterCredentialTransformer) buildClusterCredential(transCtx *clusterTransformContext, dag *graph.DAG,
 	credential appsv1alpha1.ConnectionCredential) (*corev1.Secret, error) {
 	var (
 		cluster = transCtx.Cluster
@@ -140,7 +140,7 @@ func (t *ClusterCredentialTransformer) buildClusterCredential(transCtx *clusterT
 	return secret, nil
 }
 
-func (t *ClusterCredentialTransformer) buildCredentialEndpoint(cluster *appsv1alpha1.Cluster,
+func (t *clusterCredentialTransformer) buildCredentialEndpoint(cluster *appsv1alpha1.Cluster,
 	compDef *appsv1alpha1.ComponentDefinition, credential appsv1alpha1.ConnectionCredential, data *map[string][]byte) error {
 	serviceName, ports := t.lookupMatchedService(cluster, compDef, credential)
 	if len(serviceName) == 0 {
@@ -157,7 +157,7 @@ func (t *ClusterCredentialTransformer) buildCredentialEndpoint(cluster *appsv1al
 	return nil
 }
 
-func (t *ClusterCredentialTransformer) lookupMatchedService(cluster *appsv1alpha1.Cluster,
+func (t *clusterCredentialTransformer) lookupMatchedService(cluster *appsv1alpha1.Cluster,
 	compDef *appsv1alpha1.ComponentDefinition, credential appsv1alpha1.ConnectionCredential) (string, []corev1.ServicePort) {
 	for i, svc := range cluster.Spec.Services {
 		if svc.Name == credential.ServiceName {

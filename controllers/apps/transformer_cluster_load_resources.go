@@ -30,12 +30,12 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
-// ClusterValidateAndLoadRefResourcesTransformer handles referenced resources'(cd & cv) validation and load them into context
-type ClusterValidateAndLoadRefResourcesTransformer struct{}
+// clusterLoadRefResourcesTransformer loads and validates referenced resources (cd & cv).
+type clusterLoadRefResourcesTransformer struct{}
 
-var _ graph.Transformer = &ClusterValidateAndLoadRefResourcesTransformer{}
+var _ graph.Transformer = &clusterLoadRefResourcesTransformer{}
 
-func (t *ClusterValidateAndLoadRefResourcesTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *clusterLoadRefResourcesTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster
 
@@ -106,7 +106,7 @@ func (t *ClusterValidateAndLoadRefResourcesTransformer) Transform(ctx graph.Tran
 	return nil
 }
 
-func (t *ClusterValidateAndLoadRefResourcesTransformer) allCompDefRefs(cluster *appsv1alpha1.Cluster) []string {
+func (t *clusterLoadRefResourcesTransformer) allCompDefRefs(cluster *appsv1alpha1.Cluster) []string {
 	refs := make([]string, 0)
 	for _, comp := range cluster.Spec.ComponentSpecs {
 		if len(comp.ComponentDef) == 0 {
@@ -117,7 +117,7 @@ func (t *ClusterValidateAndLoadRefResourcesTransformer) allCompDefRefs(cluster *
 	return refs
 }
 
-func (t *ClusterValidateAndLoadRefResourcesTransformer) loadAndCheckComponentDefinitions(
+func (t *clusterLoadRefResourcesTransformer) loadAndCheckComponentDefinitions(
 	ctx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
 	for _, comp := range cluster.Spec.ComponentSpecs {
 		if len(comp.ComponentDef) == 0 {

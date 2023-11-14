@@ -30,13 +30,13 @@ import (
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-type ClusterRestoreTransformer struct {
+type clusterRestoreTransformer struct {
 	client.Client
 }
 
-var _ graph.Transformer = &ClusterRestoreTransformer{}
+var _ graph.Transformer = &clusterRestoreTransformer{}
 
-func (t *ClusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster
 	reqCtx := ictrlutil.RequestCtx{

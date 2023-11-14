@@ -30,12 +30,12 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// ClusterOwnershipTransformer adds finalizer to all none cluster objects
-type ClusterOwnershipTransformer struct{}
+// clusterOwnershipTransformer adds finalizer to all none cluster objects
+type clusterOwnershipTransformer struct{}
 
-var _ graph.Transformer = &ClusterOwnershipTransformer{}
+var _ graph.Transformer = &clusterOwnershipTransformer{}
 
-func (f *ClusterOwnershipTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (f *clusterOwnershipTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	cluster := transCtx.Cluster

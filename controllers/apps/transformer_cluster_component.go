@@ -35,12 +35,12 @@ import (
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// ClusterComponentTransformer transforms all cluster.Spec.ComponentSpecs to mapping Component objects
-type ClusterComponentTransformer struct{}
+// clusterComponentTransformer transforms all cluster.Spec.ComponentSpecs to mapping Component objects
+type clusterComponentTransformer struct{}
 
-var _ graph.Transformer = &ClusterComponentTransformer{}
+var _ graph.Transformer = &clusterComponentTransformer{}
 
-func (t *ClusterComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *clusterComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	if model.IsObjectDeleting(transCtx.OrigCluster) {
 		return nil
@@ -53,7 +53,7 @@ func (t *ClusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 	return t.reconcileComponents(transCtx, dag)
 }
 
-func (t *ClusterComponentTransformer) reconcileComponents(transCtx *clusterTransformContext, dag *graph.DAG) error {
+func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTransformContext, dag *graph.DAG) error {
 	cluster := transCtx.Cluster
 
 	protoCompSpecMap := make(map[string]*appsv1alpha1.ClusterComponentSpec)
@@ -86,7 +86,7 @@ func (t *ClusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 	return nil
 }
 
-func (t *ClusterComponentTransformer) handleCompsCreate(transCtx *clusterTransformContext, dag *graph.DAG,
+func (t *clusterComponentTransformer) handleCompsCreate(transCtx *clusterTransformContext, dag *graph.DAG,
 	protoCompSpecMap map[string]*appsv1alpha1.ClusterComponentSpec, createCompSet sets.Set[string]) error {
 	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
@@ -101,14 +101,14 @@ func (t *ClusterComponentTransformer) handleCompsCreate(transCtx *clusterTransfo
 	return nil
 }
 
-func (t *ClusterComponentTransformer) initClusterCompStatus(cluster *appsv1alpha1.Cluster, compName string) {
+func (t *clusterComponentTransformer) initClusterCompStatus(cluster *appsv1alpha1.Cluster, compName string) {
 	if cluster.Status.Components == nil {
 		cluster.Status.Components = make(map[string]appsv1alpha1.ClusterComponentStatus)
 	}
 	cluster.Status.Components[compName] = appsv1alpha1.ClusterComponentStatus{}
 }
 
-func (t *ClusterComponentTransformer) handleCompsUpdate(transCtx *clusterTransformContext, dag *graph.DAG,
+func (t *clusterComponentTransformer) handleCompsUpdate(transCtx *clusterTransformContext, dag *graph.DAG,
 	protoCompSpecMap map[string]*appsv1alpha1.ClusterComponentSpec, updateCompSet sets.Set[string]) error {
 	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)

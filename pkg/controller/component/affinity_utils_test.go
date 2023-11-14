@@ -85,18 +85,10 @@ var _ = Describe("affinity utils", func() {
 
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
-				Log: tlog,
+				Log: logger,
 			}
-			component, _ = BuildComponent(
-				reqCtx,
-				nil,
-				clusterObj,
-				clusterDefObj,
-				&clusterDefObj.Spec.ComponentDefs[0],
-				&clusterObj.Spec.ComponentSpecs[0],
-				nil,
-				&clusterVersionObj.Spec.ComponentVersions[0],
-			)
+			component, _ = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli,
+				clusterDefObj, clusterVersionObj, clusterObj, &clusterObj.Spec.ComponentSpecs[0])
 		}
 	)
 
@@ -107,14 +99,14 @@ var _ = Describe("affinity utils", func() {
 		})
 
 		It("should have correct Affinity and TopologySpreadConstraints", func() {
-			affinity, err := BuildPodAffinity(clusterObj, clusterObj.Spec.Affinity, component)
+			affinity, err := BuildPodAffinity(clusterObj.Name, component.Name, clusterObj.Spec.Affinity)
 			Expect(err).Should(Succeed())
 			Expect(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(labelKey))
 			Expect(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).Should(Equal(topologyKey))
 			Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).Should(BeEmpty())
 			Expect(affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution).Should(BeEmpty())
 
-			topologySpreadConstraints := BuildPodTopologySpreadConstraints(clusterObj, clusterObj.Spec.Affinity, component)
+			topologySpreadConstraints := BuildPodTopologySpreadConstraints(clusterObj.Name, component.Name, clusterObj.Spec.Affinity)
 			Expect(topologySpreadConstraints[0].WhenUnsatisfiable).Should(Equal(corev1.DoNotSchedule))
 			Expect(topologySpreadConstraints[0].TopologyKey).Should(Equal(topologyKey))
 		})
@@ -124,15 +116,35 @@ var _ = Describe("affinity utils", func() {
 				fmt.Sprintf("{\"nodeAffinity\":{\"preferredDuringSchedulingIgnoredDuringExecution\":[{\"preference\":{\"matchExpressions\":[{\"key\":\"%s\",\"operator\":\"In\",\"values\":[\"true\"]}]},\"weight\":100}]}}", nodeKey))
 			defer viper.Set(constant.CfgKeyDataPlaneAffinity, "")
 
-			affinity, err := BuildPodAffinity(clusterObj, clusterObj.Spec.Affinity, component)
+			affinity, err := BuildPodAffinity(clusterObj.Name, component.Name, clusterObj.Spec.Affinity)
 			Expect(err).Should(Succeed())
 			Expect(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(labelKey))
 			Expect(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).Should(Equal(topologyKey))
 			Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).Should(BeEmpty())
 			Expect(affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Preference.MatchExpressions[0].Key).Should(Equal(nodeKey))
 
-			topologySpreadConstraints := BuildPodTopologySpreadConstraints(clusterObj, clusterObj.Spec.Affinity, component)
+			topologySpreadConstraints := BuildPodTopologySpreadConstraints(clusterObj.Name, component.Name, clusterObj.Spec.Affinity)
 			Expect(topologySpreadConstraints[0].WhenUnsatisfiable).Should(Equal(corev1.DoNotSchedule))
+			Expect(topologySpreadConstraints[0].TopologyKey).Should(Equal(topologyKey))
+		})
+	})
+
+	Context("with PodAntiAffinity set to Preferred", func() {
+		BeforeEach(func() {
+			buildObjs(appsv1alpha1.Preferred)
+			Expect(component).ShouldNot(BeNil())
+		})
+
+		It("should have correct Affinity and TopologySpreadConstraints", func() {
+			affinity, err := BuildPodAffinity(clusterObj.Name, component.Name, clusterObj.Spec.Affinity)
+			Expect(err).Should(Succeed())
+			Expect(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(labelKey))
+			Expect(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).Should(BeEmpty())
+			Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight).ShouldNot(BeNil())
+			Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].PodAffinityTerm.TopologyKey).Should(Equal(topologyKey))
+
+			topologySpreadConstraints := BuildPodTopologySpreadConstraints(clusterObj.Name, component.Name, clusterObj.Spec.Affinity)
+			Expect(topologySpreadConstraints[0].WhenUnsatisfiable).Should(Equal(corev1.ScheduleAnyway))
 			Expect(topologySpreadConstraints[0].TopologyKey).Should(Equal(topologyKey))
 		})
 	})
@@ -158,26 +170,6 @@ var _ = Describe("affinity utils", func() {
 			Expect(tolerations).Should(HaveLen(2))
 			Expect(tolerations[0].Key).Should(Equal(clusterTolerationKey))
 			Expect(tolerations[1].Key).Should(Equal(dpTolerationKey))
-		})
-	})
-
-	Context("with PodAntiAffinity set to Preferred", func() {
-		BeforeEach(func() {
-			buildObjs(appsv1alpha1.Preferred)
-			Expect(component).ShouldNot(BeNil())
-		})
-
-		It("should have correct Affinity and TopologySpreadConstraints", func() {
-			affinity, err := BuildPodAffinity(clusterObj, clusterObj.Spec.Affinity, component)
-			Expect(err).Should(Succeed())
-			Expect(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(labelKey))
-			Expect(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).Should(BeEmpty())
-			Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight).ShouldNot(BeNil())
-			Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].PodAffinityTerm.TopologyKey).Should(Equal(topologyKey))
-
-			topologySpreadConstraints := BuildPodTopologySpreadConstraints(clusterObj, clusterObj.Spec.Affinity, component)
-			Expect(topologySpreadConstraints[0].WhenUnsatisfiable).Should(Equal(corev1.ScheduleAnyway))
-			Expect(topologySpreadConstraints[0].TopologyKey).Should(Equal(topologyKey))
 		})
 	})
 })

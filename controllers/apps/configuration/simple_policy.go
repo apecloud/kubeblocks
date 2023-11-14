@@ -37,20 +37,7 @@ func init() {
 func (s *simplePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
 	params.Ctx.Log.V(1).Info("simple policy begin....")
 
-	var funcs RollingUpgradeFuncs
-	switch params.WorkloadType() {
-	default:
-		return makeReturnedStatus(ESNotSupport), core.MakeError("not supported component workload type:[%s]", params.WorkloadType())
-	case appsv1alpha1.Consensus:
-		funcs = GetConsensusRollingUpgradeFuncs()
-	case appsv1alpha1.Stateful:
-		funcs = GetStatefulSetRollingUpgradeFuncs()
-	case appsv1alpha1.Replication:
-		funcs = GetReplicationRollingUpgradeFuncs()
-	case appsv1alpha1.Stateless:
-		funcs = GetDeploymentRollingUpgradeFuncs()
-	}
-	return restartAndCheckComponent(params, funcs, fromWorkloadObjects(params))
+	return restartAndCheckComponent(params, GetRSMRollingUpgradeFuncs(), fromWorkloadObjects(params))
 }
 
 func (s *simplePolicy) GetPolicyName() string {

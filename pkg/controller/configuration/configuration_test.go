@@ -84,8 +84,8 @@ func newAllFieldsClusterObj(
 		clusterDefObj.Name, clusterVersionObj.Name).
 		AddComponent(mysqlCompName, mysqlCompDefName).SetReplicas(1).
 		AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-		AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
-		AddService(testapps.ServiceInternetName, corev1.ServiceTypeLoadBalancer).
+		AddComponentService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
+		AddComponentService(testapps.ServiceInternetName, corev1.ServiceTypeLoadBalancer).
 		GetObject()
 	key := client.ObjectKeyFromObject(clusterObj)
 	if needCreate {
@@ -94,24 +94,17 @@ func newAllFieldsClusterObj(
 	return clusterObj, clusterDefObj, clusterVersionObj, key
 }
 
-func newAllFieldsComponent(clusterDef *appsv1alpha1.ClusterDefinition, clusterVersion *appsv1alpha1.ClusterVersion) *component.SynthesizedComponent {
-	cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(clusterDef, clusterVersion, false)
-	component, err := component.BuildComponent(
-		intctrlutil.RequestCtx{
-			Ctx: testCtx.Ctx,
-			Log: logger,
-		},
-		nil,
-		cluster,
-		clusterDef,
-		&clusterDef.Spec.ComponentDefs[0],
-		&cluster.Spec.ComponentSpecs[0],
-		nil,
-		&clusterVersion.Spec.ComponentVersions[0])
+func newAllFieldsComponent(clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster) *component.SynthesizedComponent {
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx: testCtx.Ctx,
+		Log: logger,
+	}
+	synthesizeComp, err := component.BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVer, cluster, &cluster.Spec.ComponentSpecs[0])
 	Expect(err).Should(Succeed())
-	Expect(component).ShouldNot(BeNil())
-	addTestVolumeMount(component.PodSpec, mysqlCompName)
-	return component
+	Expect(synthesizeComp).ShouldNot(BeNil())
+	addTestVolumeMount(synthesizeComp.PodSpec, mysqlCompName)
+	return synthesizeComp
 }
 
 func addTestVolumeMount(spec *corev1.PodSpec, containerName string) {

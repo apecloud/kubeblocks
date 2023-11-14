@@ -34,6 +34,7 @@ import (
 	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -100,7 +101,12 @@ type reconfigureParams struct {
 
 	// Associated component for cluster.
 	ClusterComponent *appsv1alpha1.ClusterComponentSpec
+
+	// Associated component for component and component definition.
+	SynthesizedComponent *component.SynthesizedComponent
+
 	// Associated component for clusterdefinition.
+	// TODO(xingran): remove this field when test case is refactored.
 	Component *appsv1alpha1.ClusterComponentDefinition
 
 	// List of StatefulSets using this config template.
@@ -129,10 +135,6 @@ func init() {
 	RegisterPolicy(appsv1alpha1.AutoReload, &AutoReloadPolicy{})
 }
 
-func (param *reconfigureParams) WorkloadType() appsv1alpha1.WorkloadType {
-	return param.Component.WorkloadType
-}
-
 // GetClientFactory support ut mock
 func GetClientFactory() createReconfigureClient {
 	return newGRPCClient
@@ -159,11 +161,12 @@ func (param *reconfigureParams) maxRollingReplicas() int32 {
 		replicas       = param.getTargetReplicas()
 	)
 
-	if param.Component.GetMaxUnavailable() == nil {
+	if param.SynthesizedComponent == nil || param.SynthesizedComponent.MinAvailable == nil {
 		return defaultRolling
 	}
 
-	v, isPercentage, err := intctrlutil.GetIntOrPercentValue(param.Component.GetMaxUnavailable())
+	// TODO(xingran&zhangtao): review this logic, set to nil in new API version
+	v, isPercentage, err := intctrlutil.GetIntOrPercentValue(nil)
 	if err != nil {
 		param.Ctx.Log.Error(err, "failed to get maxUnavailable!")
 		return defaultRolling

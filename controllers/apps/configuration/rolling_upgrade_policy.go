@@ -21,14 +21,12 @@ package configuration
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	podutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -53,19 +51,7 @@ func init() {
 }
 
 func (r *rollingUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
-	var funcs RollingUpgradeFuncs
-
-	switch params.WorkloadType() {
-	case appsv1alpha1.Consensus:
-		funcs = GetConsensusRollingUpgradeFuncs()
-	case appsv1alpha1.Replication:
-		funcs = GetReplicationRollingUpgradeFuncs()
-	case appsv1alpha1.Stateful:
-		funcs = GetStatefulSetRollingUpgradeFuncs()
-	default:
-		return makeReturnedStatus(ESNotSupport), cfgcore.MakeError("not supported component workload type[%s]", params.WorkloadType())
-	}
-	return performRollingUpgrade(params, funcs)
+	return performRollingUpgrade(params, GetRSMRollingUpgradeFuncs())
 }
 
 func (r *rollingUpgradePolicy) GetPolicyName() string {
@@ -74,18 +60,19 @@ func (r *rollingUpgradePolicy) GetPolicyName() string {
 
 func canPerformUpgrade(pods []corev1.Pod, params reconfigureParams) bool {
 	target := params.getTargetReplicas()
-	if len(pods) == target {
+	// TODO(xingran&zhangtao): review this logic
+	return len(pods) == target
+
+	/*	if params.WorkloadType() == appsv1alpha1.Consensus {
+			params.Ctx.Log.Info(fmt.Sprintf("wait for consensus component is ready, %d pods are ready, and the expected replicas is %d.", len(pods), target))
+			return false
+		}
+		if len(pods) < target {
+			params.Ctx.Log.Info(fmt.Sprintf("component pods are not all ready, %d pods are ready, which is less than the expected replicas(%d).", len(pods), target))
+			return false
+		}
 		return true
-	}
-	if params.WorkloadType() == appsv1alpha1.Consensus {
-		params.Ctx.Log.Info(fmt.Sprintf("wait for consensus component is ready, %d pods are ready, and the expected replicas is %d.", len(pods), target))
-		return false
-	}
-	if len(pods) < target {
-		params.Ctx.Log.Info(fmt.Sprintf("component pods are not all ready, %d pods are ready, which is less than the expected replicas(%d).", len(pods), target))
-		return false
-	}
-	return true
+	*/
 }
 
 func performRollingUpgrade(params reconfigureParams, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {

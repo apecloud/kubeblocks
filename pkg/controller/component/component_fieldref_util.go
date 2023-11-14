@@ -35,7 +35,6 @@ import (
 func buildComponentRef(clusterDef *appsv1alpha1.ClusterDefinition,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
-	clusterComp *appsv1alpha1.ClusterComponentSpec,
 	component *SynthesizedComponent) error {
 
 	compRefs := clusterCompDef.ComponentDefRef

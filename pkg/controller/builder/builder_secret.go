@@ -42,6 +42,7 @@ func (builder *SecretBuilder) PutStringData(key, value string) *SecretBuilder {
 		data = make(map[string]string, 1)
 	}
 	data[key] = value
+	builder.get().StringData = data
 	return builder
 }
 
@@ -56,6 +57,7 @@ func (builder *SecretBuilder) PutData(key string, value []byte) *SecretBuilder {
 		data = make(map[string][]byte, 1)
 	}
 	data[key] = value
+	builder.get().Data = data
 	return builder
 }
 

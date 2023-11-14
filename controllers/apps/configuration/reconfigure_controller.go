@@ -39,6 +39,7 @@ import (
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -216,6 +217,14 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 		return updateConfigPhase(r.Client, reqCtx, configMap, appsv1alpha1.CFinishedPhase, configurationNotUsingMessage)
 	}
 
+	synthesizedComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, r.Client, reconcileContext.ClusterObj, reconcileContext.ClusterComObj)
+	if err != nil {
+		reqCtx.Recorder.Eventf(configMap,
+			corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
+			"build synthesized component failed, skip reconfigure")
+		return updateConfigPhase(r.Client, reqCtx, configMap, appsv1alpha1.CFinishedPhase, configurationNotUsingMessage)
+	}
+
 	return r.performUpgrade(reconfigureParams{
 		ConfigSpecName:           configSpecName,
 		ConfigPatch:              configPatch,
@@ -228,8 +237,8 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 		ComponentUnits:           reconcileContext.StatefulSets,
 		DeploymentUnits:          reconcileContext.Deployments,
 		RSMList:                  reconcileContext.RSMList,
-		Component:                reconcileContext.ClusterDefComObj,
 		ClusterComponent:         reconcileContext.ClusterComObj,
+		SynthesizedComponent:     synthesizedComp,
 		Restart:                  forceRestart || !cfgcm.IsSupportReload(configConstraint.Spec.ReloadOptions),
 		ReconfigureClientFactory: GetClientFactory(),
 	})

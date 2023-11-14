@@ -21,7 +21,6 @@ package storage
 
 import (
 	"context"
-	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -76,7 +75,6 @@ var _ = BeforeSuite(func() {
 
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
-	fmt.Printf("config settings: %v\n", viper.AllSettings())
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{

@@ -96,7 +96,6 @@ var _ = Describe("resource Fetcher", func() {
 				ClusterDef().
 				ClusterVer().
 				ClusterComponent().
-				ClusterDefComponent().
 				ConfigMap(mysqlConfigName).
 				ConfigConstraints(mysqlConfigName).
 				Configuration().

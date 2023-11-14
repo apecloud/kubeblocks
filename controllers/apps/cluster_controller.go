@@ -23,11 +23,8 @@ import (
 	"context"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,7 +37,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -50,10 +46,12 @@ import (
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters/finalizers,verbs=update
 
-// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=backuppolicytemplates,verbs=get;list
-
 // owned K8s core API resources controller-gen RBAC marker
 // full access on core API resources
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components,verbs=get;list;watch;create;update;patch;delete;deletecollection
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components/status,verbs=get
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components/finalizers,verbs=update
+
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=core,resources=secrets/finalizers,verbs=update
 
@@ -64,55 +62,15 @@ import (
 // +kubebuilder:rbac:groups=core,resources=services/status,verbs=get
 // +kubebuilder:rbac:groups=core,resources=services/finalizers,verbs=update
 
-// +kubebuilder:rbac:groups=core,resources=resourcequotas,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=resourcequotas/status,verbs=get
-// +kubebuilder:rbac:groups=core,resources=resourcequotas/finalizers,verbs=update
-
-// +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/status,verbs=get
-// +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/finalizers,verbs=update
-
-// +kubebuilder:rbac:groups=core,resources=persistentvolumes,verbs=get;list;watch;update;patch
-
-// +kubebuilder:rbac:groups=apps,resources=replicasets,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps,resources=replicasets/status,verbs=get
-// +kubebuilder:rbac:groups=apps,resources=replicasets/finalizers,verbs=update
-
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete;deletecollection
-// +kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get
-// +kubebuilder:rbac:groups=apps,resources=deployments/finalizers,verbs=update
-
-// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete;deletecollection
-// +kubebuilder:rbac:groups=apps,resources=statefulsets/status,verbs=get
-// +kubebuilder:rbac:groups=apps,resources=statefulsets/finalizers,verbs=update
-
-// +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete;deletecollection
-// +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets/finalizers,verbs=update
-
 // read + update access
-// +kubebuilder:rbac:groups=core,resources=endpoints,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=core,resources=pods/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,resources=pods/exec,verbs=create
 
-// read only + watch access
-// +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
-
 // dataprotection get list and delete
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=backuppolicytemplates,verbs=get;list
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;delete;deletecollection
-
-// componentresourceconstraint get list
-// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentresourceconstraints,verbs=get;list;watch
-
-// +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch
-// +kubebuilder:rbac:groups=core,resources=serviceaccounts/status,verbs=get
-
-// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch
-// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings/status,verbs=get
-
-// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=get;list;watch
-// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings/status,verbs=get
 
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
@@ -168,36 +126,34 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// TODO: transformers are vertices, theirs' dependencies are edges, make plan Build stage a DAG.
 	plan, errBuild := planBuilder.
 		AddTransformer(
-			// handle deletion
 			// handle cluster deletion first
-			&ClusterDeletionTransformer{},
+			&clusterDeletionTransformer{},
 			// check is recovering from halted cluster
-			&HaltRecoveryTransformer{},
-			// assure meta-data info
+			&clusterHaltRecoveryTransformer{},
 			// update finalizer and cd&cv labels
-			&AssureMetaTransformer{},
-			// validate ref objects
+			&clusterAssureMetaTransformer{},
 			// validate cd & cv's existence and availability
-			&ValidateAndLoadRefResourcesTransformer{},
-			// validate config
-			&ValidateEnableLogsTransformer{},
-			// create cluster connection credential secret object
-			&ClusterCredentialTransformer{},
-			// handle restore before ComponentTransformer
-			&RestoreTransformer{Client: r.Client},
-			// create all components objects
-			&ComponentTransformer{Client: r.Client},
-			// transform backupPolicyTemplate to backuppolicy.dataprotection.kubeblocks.io
-			// and backupschedule.dataprotection.kubeblocks.io
-			&BackupPolicyTplTransformer{},
-			// handle rbac for pod
-			&RBACTransformer{},
+			&clusterLoadRefResourcesTransformer{},
+			// normalize the cluster and component API
+			&ClusterAPINormalizationTransformer{},
+			// handle cluster services
+			&clusterServiceTransformer{},
+			// handle restore before clusterComponentTransformer
+			&clusterRestoreTransformer{Client: r.Client},
+			// create all cluster components objects
+			&clusterComponentTransformer{},
+			// update cluster components' status
+			&clusterComponentStatusTransformer{},
+			// create default cluster connection credential secret object
+			&clusterCredentialTransformer{},
+			// build backuppolicy and backupschedule from backupPolicyTemplate
+			&clusterBackupPolicyTransformer{},
 			// add our finalizer to all objects
-			&OwnershipTransformer{},
+			&clusterOwnershipTransformer{},
 			// make all workload objects depending on credential secret
-			&SecretTransformer{},
+			&secretTransformer{},
 			// update cluster status
-			&ClusterStatusTransformer{},
+			&clusterStatusTransformer{},
 			// always safe to put your transformer below
 		).
 		Build()
@@ -223,31 +179,16 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// TODO: add filter predicate for core API objects
 	b := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.Cluster{}).
-		Owns(&appsv1.StatefulSet{}).
-		Owns(&appsv1.Deployment{}).
-		Owns(&workloads.ReplicatedStateMachine{}).
+		Owns(&appsv1alpha1.Component{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
-		Owns(&corev1.PersistentVolumeClaim{}).
-		Owns(&policyv1.PodDisruptionBudget{}).
 		Owns(&dpv1alpha1.BackupPolicy{}).
 		Owns(&dpv1alpha1.BackupSchedule{}).
-		Owns(&dpv1alpha1.Backup{}).
 		Owns(&dpv1alpha1.Restore{}).
 		Owns(&batchv1.Job{}).
 		Owns(&appsv1alpha1.Configuration{}).
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources))
-
-	if viper.GetBool(constant.EnableRBACManager) {
-		b.Owns(&rbacv1.ClusterRoleBinding{}).
-			Owns(&rbacv1.RoleBinding{}).
-			Owns(&corev1.ServiceAccount{})
-	} else {
-		b.Watches(&rbacv1.ClusterRoleBinding{}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources)).
-			Watches(&rbacv1.RoleBinding{}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources)).
-			Watches(&corev1.ServiceAccount{}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources))
-	}
 
 	return b.Complete(r)
 }

@@ -38,9 +38,21 @@ type ClusterDefinitionListerExpansion interface{}
 // ClusterVersionLister.
 type ClusterVersionListerExpansion interface{}
 
+// ComponentListerExpansion allows custom methods to be added to
+// ComponentLister.
+type ComponentListerExpansion interface{}
+
+// ComponentNamespaceListerExpansion allows custom methods to be added to
+// ComponentNamespaceLister.
+type ComponentNamespaceListerExpansion interface{}
+
 // ComponentClassDefinitionListerExpansion allows custom methods to be added to
 // ComponentClassDefinitionLister.
 type ComponentClassDefinitionListerExpansion interface{}
+
+// ComponentDefinitionListerExpansion allows custom methods to be added to
+// ComponentDefinitionLister.
+type ComponentDefinitionListerExpansion interface{}
 
 // ComponentResourceConstraintListerExpansion allows custom methods to be added to
 // ComponentResourceConstraintLister.

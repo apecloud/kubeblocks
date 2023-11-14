@@ -29,11 +29,11 @@ import (
 )
 
 // SecretTransformer puts all the secrets at the beginning of the DAG
-type SecretTransformer struct{}
+type secretTransformer struct{}
 
-var _ graph.Transformer = &SecretTransformer{}
+var _ graph.Transformer = &secretTransformer{}
 
-func (c *SecretTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (c *secretTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 

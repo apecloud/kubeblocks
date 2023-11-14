@@ -160,14 +160,14 @@ func (c *componentPlanBuilder) defaultWalkFuncWithLogging(vertex graph.Vertex) e
 	err := c.defaultWalkFunc(vertex)
 	switch {
 	case err == nil:
-		c.transCtx.Logger.V(1).Info("reconcile object %T with action %s OK", node.Obj, *node.Action)
+		c.transCtx.Logger.V(1).Info(fmt.Sprintf("reconcile object %T with action %s OK", node.Obj, *node.Action))
 		return err
 	case !ok:
 		c.transCtx.Logger.Error(err, "")
 	case node.Action == nil:
 		c.transCtx.Logger.Error(err, fmt.Sprintf("%T", node))
 	case apierrors.IsConflict(err):
-		c.transCtx.Logger.V(1).Info("reconcile object %T with action %s error: %s", node.Obj, *node.Action, err.Error())
+		c.transCtx.Logger.V(1).Info(fmt.Sprintf("reconcile object %T with action %s error: %s", node.Obj, *node.Action, err.Error()))
 		return err
 	default:
 		c.transCtx.Logger.Error(err, fmt.Sprintf("%s %T error", *node.Action, node.Obj))

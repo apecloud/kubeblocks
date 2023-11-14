@@ -38,7 +38,9 @@ import (
 )
 
 const (
-	accountProvisionConditionType = "SystemAccountProvision"
+	accountProvisionConditionType             = "SystemAccountProvision"
+	accountProvisionConditionReasonInProgress = "InProgress"
+	accountProvisionConditionReasonDone       = "AllProvisioned"
 )
 
 // componentAccountProvisionTransformer provisions component system accounts.
@@ -52,6 +54,9 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 		return nil
 	}
 
+	if len(transCtx.SynthesizeComponent.SystemAccounts) == 0 {
+		return nil
+	}
 	if transCtx.Component.Status.Phase != appsv1alpha1.RunningClusterCompPhase {
 		return nil
 	}
@@ -69,9 +74,10 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 			continue
 		}
 		if err = t.provisionAccount(transCtx, cond, lorryCli, account); err != nil {
+			t.markProvisionAsFailed(transCtx, &cond, err)
 			return err
 		}
-		t.markAccountProvisioned(cond, account)
+		t.markAccountProvisioned(&cond, account)
 	}
 	t.markProvisioned(transCtx, cond)
 
@@ -92,29 +98,37 @@ func (t *componentAccountProvisionTransformer) isProvisioned(transCtx *component
 		Status:             metav1.ConditionFalse,
 		ObservedGeneration: transCtx.Component.Generation,
 		LastTransitionTime: metav1.Now(),
-		Reason:             "",
+		Reason:             accountProvisionConditionReasonInProgress,
 		Message:            "",
 	}, false
 }
 
-func (t *componentAccountProvisionTransformer) markProvisioned(transCtx *componentTransformContext, condition metav1.Condition) {
-	condition.Status = metav1.ConditionTrue
-	condition.ObservedGeneration = transCtx.Component.Generation
-	condition.LastTransitionTime = metav1.Now()
+func (t *componentAccountProvisionTransformer) markProvisionAsFailed(transCtx *componentTransformContext, cond *metav1.Condition, err error) {
+	cond.Status = metav1.ConditionFalse
+	cond.ObservedGeneration = transCtx.Component.Generation
+	cond.LastTransitionTime = metav1.Now()
+	// cond.Reason = err.Error() // TODO: error
+}
+
+func (t *componentAccountProvisionTransformer) markProvisioned(transCtx *componentTransformContext, cond metav1.Condition) {
+	cond.Status = metav1.ConditionTrue
+	cond.ObservedGeneration = transCtx.Component.Generation
+	cond.LastTransitionTime = metav1.Now()
+	cond.Reason = accountProvisionConditionReasonDone
 
 	conditions := transCtx.Component.Status.Conditions
 	if conditions == nil {
 		conditions = make([]metav1.Condition, 0)
 	}
 	existed := false
-	for i, cond := range conditions {
-		if cond.Type == condition.Type {
+	for i, c := range conditions {
+		if c.Type == cond.Type {
 			existed = true
-			conditions[i] = condition
+			conditions[i] = cond
 		}
 	}
 	if !existed {
-		conditions = append(conditions, condition)
+		conditions = append(conditions, cond)
 	}
 	transCtx.Component.Status.Conditions = conditions
 }
@@ -127,7 +141,7 @@ func (t *componentAccountProvisionTransformer) isAccountProvisioned(cond metav1.
 	return slices.Contains(accounts, account.Name)
 }
 
-func (t *componentAccountProvisionTransformer) markAccountProvisioned(cond metav1.Condition, account appsv1alpha1.SystemAccount) {
+func (t *componentAccountProvisionTransformer) markAccountProvisioned(cond *metav1.Condition, account appsv1alpha1.SystemAccount) {
 	if len(cond.Message) == 0 {
 		cond.Message = account.Name
 		return

@@ -79,34 +79,53 @@ var (
 	podAnnotationKey4Test = fmt.Sprintf("%s-test", constant.ComponentReplicasAnnotationKey)
 )
 
-var newMockLorryClient = func(clusterKey types.NamespacedName, compName string, replicas int) {
-	ctrl := gomock.NewController(GinkgoT())
-	mockLorryClient := lorry.NewMockClient(ctrl)
-	lorry.SetMockClient(mockLorryClient, nil)
-	mockLorryClient.EXPECT().JoinMember(gomock.Any()).Return(nil).AnyTimes()
-	mockLorryClient.EXPECT().LeaveMember(gomock.Any()).DoAndReturn(func(ctx context.Context) error {
-		var podList corev1.PodList
-		labels := client.MatchingLabels{
-			constant.AppInstanceLabelKey:    clusterKey.Name,
-			constant.KBAppComponentLabelKey: compName,
-		}
-		if err := testCtx.Cli.List(ctx, &podList, labels, client.InNamespace(clusterKey.Namespace)); err != nil {
-			return err
-		}
-		for _, pod := range podList.Items {
-			if pod.Annotations == nil {
-				panic(fmt.Sprintf("pod annotations is nil: %s", pod.Name))
+var mockLorryClient = func(mock func(*lorry.MockClientMockRecorder)) {
+	mockLorryCli := lorry.GetMockClient()
+	if mockLorryCli == nil {
+		ctrl := gomock.NewController(GinkgoT())
+		mockLorryCli = lorry.NewMockClient(ctrl)
+	}
+	if mock != nil {
+		mockCli := mockLorryCli.(*lorry.MockClient)
+		mock(mockCli.EXPECT())
+	}
+	lorry.SetMockClient(mockLorryCli, nil)
+}
+
+var mockLorryClientDefault = func() {
+	mockLorryClient(func(recorder *lorry.MockClientMockRecorder) {
+		recorder.CreateUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		recorder.GrantUserRole(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	})
+}
+
+var mockLorryClient4HScale = func(clusterKey types.NamespacedName, compName string, replicas int) {
+	mockLorryClient(func(recorder *lorry.MockClientMockRecorder) {
+		recorder.JoinMember(gomock.Any()).Return(nil).AnyTimes()
+		recorder.LeaveMember(gomock.Any()).DoAndReturn(func(ctx context.Context) error {
+			var podList corev1.PodList
+			labels := client.MatchingLabels{
+				constant.AppInstanceLabelKey:    clusterKey.Name,
+				constant.KBAppComponentLabelKey: compName,
 			}
-			if pod.Annotations[podAnnotationKey4Test] == fmt.Sprintf("%d", replicas) {
-				continue
-			}
-			pod.Annotations[podAnnotationKey4Test] = fmt.Sprintf("%d", replicas)
-			if err := testCtx.Cli.Update(ctx, &pod); err != nil {
+			if err := testCtx.Cli.List(ctx, &podList, labels, client.InNamespace(clusterKey.Namespace)); err != nil {
 				return err
 			}
-		}
-		return nil
-	}).AnyTimes()
+			for _, pod := range podList.Items {
+				if pod.Annotations == nil {
+					panic(fmt.Sprintf("pod annotations is nil: %s", pod.Name))
+				}
+				if pod.Annotations[podAnnotationKey4Test] == fmt.Sprintf("%d", replicas) {
+					continue
+				}
+				pod.Annotations[podAnnotationKey4Test] = fmt.Sprintf("%d", replicas)
+				if err := testCtx.Cli.Update(ctx, &pod); err != nil {
+					return err
+				}
+			}
+			return nil
+		}).AnyTimes()
+	})
 }
 
 var _ = Describe("Component Controller", func() {
@@ -225,6 +244,9 @@ var _ = Describe("Component Controller", func() {
 			SetDefaultSpec().
 			Create(&testCtx).
 			GetObject()
+
+		By("Mock lorry client for the default transformer of system accounts provision")
+		mockLorryClientDefault()
 	}
 
 	waitForCreatingResourceCompletely := func(clusterKey client.ObjectKey, compNames ...string) {
@@ -287,6 +309,27 @@ var _ = Describe("Component Controller", func() {
 	createClusterObjV2 := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster with new component definition")
 		createClusterObjVx(compName, compDefName, true, processor)
+	}
+
+	mockCompRunning := func(compName string) {
+		rsmList := testk8s.ListAndCheckRSMWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), compName)
+		Expect(rsmList.Items).Should(HaveLen(1))
+		rsm := rsmList.Items[0]
+		sts := testapps.NewStatefulSetFactory(rsm.Namespace, rsm.Name, clusterObj.Name, compName).
+			SetReplicas(*rsm.Spec.Replicas).
+			Create(&testCtx).
+			GetObject()
+		pods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterObj.Name, compName)
+		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+			testk8s.MockStatefulSetReady(sts)
+		})).ShouldNot(HaveOccurred())
+		Expect(testapps.ChangeObjStatus(&testCtx, &rsm, func() {
+			testk8s.MockRSMReady(&rsm, pods...)
+		})).ShouldNot(HaveOccurred())
+		Eventually(testapps.GetComponentPhase(&testCtx, types.NamespacedName{
+			Namespace: clusterObj.Namespace,
+			Name:      component.FullName(clusterObj.Name, compName),
+		})).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 	}
 
 	// createCompObjNoWait := func(compName, compDefName string, processor func(*testapps.MockComponentFactory)) {
@@ -721,7 +764,7 @@ var _ = Describe("Component Controller", func() {
 		By("Get the latest cluster def")
 		Expect(k8sClient.Get(testCtx.Ctx, client.ObjectKeyFromObject(clusterDefObj), clusterDefObj)).Should(Succeed())
 		for i, comp := range cluster.Spec.ComponentSpecs {
-			newMockLorryClient(clusterKey, comp.Name, updatedReplicas)
+			mockLorryClient4HScale(clusterKey, comp.Name, updatedReplicas)
 
 			By(fmt.Sprintf("H-scale component %s with policy %s", comp.Name, hscalePolicy(comp)))
 			horizontalScaleComp(updatedReplicas, &cluster.Spec.ComponentSpecs[i], storageClassName, hscalePolicy(comp))
@@ -1076,6 +1119,25 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
 			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
 			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
+		})).Should(Succeed())
+
+		By("mock component as Running")
+		mockCompRunning(compName)
+
+		By("wait accounts to be provisioned")
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
+			g.Expect(len(comp.Status.Conditions) > 0).Should(BeTrue())
+			var cond *metav1.Condition
+			for i, c := range comp.Status.Conditions {
+				if c.Type == accountProvisionConditionType {
+					cond = &comp.Status.Conditions[i]
+					break
+				}
+			}
+			g.Expect(cond).ShouldNot(BeNil())
+			g.Expect(cond.Status).Should(BeEquivalentTo(metav1.ConditionTrue))
+			g.Expect(cond.Message).Should(ContainSubstring("root"))
+			g.Expect(cond.Message).Should(ContainSubstring("admin"))
 		})).Should(Succeed())
 	}
 

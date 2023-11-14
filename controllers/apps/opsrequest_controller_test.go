@@ -44,7 +44,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
-	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -338,6 +337,9 @@ var _ = Describe("OpsRequest Controller", func() {
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponentVersion(mysqlCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
+
+			By("Mock lorry client for the default transformer of system accounts provision")
+			mockLorryClientDefault()
 		})
 
 		componentWorkload := func() client.Object {
@@ -608,8 +610,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		})
 
 		It("HorizontalScaling when the number of pods is inconsistent with the number of replicas", func() {
-			newMockLorryClient(clusterKey, mysqlCompName, 2)
-			defer lorry.UnsetMockClient()
+			mockLorryClient4HScale(clusterKey, mysqlCompName, 2)
 
 			By("create a cluster with 3 pods")
 			createMysqlCluster(3)

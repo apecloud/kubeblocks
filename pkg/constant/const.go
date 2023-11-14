@@ -53,10 +53,15 @@ const (
 	KBClusterCompNamePlaceHolder    = "$(KB_CLUSTER_COMP_NAME)"
 	KBClusterUIDPostfix8PlaceHolder = "$(KB_CLUSTER_UID_POSTFIX_8)"
 	KBToolsImagePlaceHolder         = "$(KUBEBLOCKS_TOOLS_IMAGE)"
+
+	// KBComponentConnCredentialPlaceHolder is the prefix of the placeholder for componentDefinition connection credential secret name
+	// TODO(xingran): This is a temporary solution used to reference component connection credentials defined in ComponentDefinition. The suffix is ComponentDefinition.Spec.ConnectionCredentials[x].Name, There will be a unified referencing scheme designed in the future.
+	KBComponentConnCredentialPlaceHolder = "$(COMPONENT_CONN_CREDENTIAL_SECRET_NAME)"
 )
 
 const (
-	KBPrefix = "KB"
+	KBPrefix      = "KB"
+	KBLowerPrefix = "kb"
 )
 
 const (
@@ -71,10 +76,15 @@ const (
 
 	AppName = "kubeblocks"
 
-	// K8s recommonded well-known labels and annotation keys
-	AppInstanceLabelKey  = "app.kubernetes.io/instance"
-	AppNameLabelKey      = "app.kubernetes.io/name"
+	// K8S recommended well-known labels and annotation keys
+
+	// AppInstanceLabelKey refer cluster.Name
+	AppInstanceLabelKey = "app.kubernetes.io/instance"
+	// AppNameLabelKey refer clusterDefinition.Name before KubeBlocks Version 0.8.0 or refer ComponentDefinition.Name after KubeBlocks Version 0.8.0 (TODO：Pending)
+	AppNameLabelKey = "app.kubernetes.io/name"
+	// AppComponentLabelKey refer clusterDefinition.Spec.ComponentDefs[*].Name before KubeBlocks Version 0.8.0 or refer ComponentDefinition.Name after KubeBlocks Version 0.8.0
 	AppComponentLabelKey = "app.kubernetes.io/component"
+	// AppVersionLabelKey refer clusterVersion.Name before KubeBlocks Version 0.8.0 or refer ComponentDefinition.Name after KubeBlocks Version 0.8.0
 	AppVersionLabelKey   = "app.kubernetes.io/version"
 	AppManagedByLabelKey = "app.kubernetes.io/managed-by"
 	RegionLabelKey       = "topology.kubernetes.io/region"
@@ -85,11 +95,12 @@ const (
 	BackupToolTypeLabelKey                   = "kubeblocks.io/backup-tool-type"
 	AddonProviderLabelKey                    = "kubeblocks.io/provider" // AddonProviderLabelKey marks the addon provider
 	RoleLabelKey                             = "kubeblocks.io/role"     // RoleLabelKey consensusSet and replicationSet role label key
-	ModeKey                                  = "kubeblocks.io/mode"     // ModeKey is in enum of standalone/replication/raftGroup
 	VolumeTypeLabelKey                       = "kubeblocks.io/volume-type"
 	ClusterAccountLabelKey                   = "account.kubeblocks.io/name"
+	KBAppClusterUIDLabelKey                  = "apps.kubeblocks.io/cluster-uid"
 	KBAppComponentLabelKey                   = "apps.kubeblocks.io/component-name"
 	KBAppComponentDefRefLabelKey             = "apps.kubeblocks.io/component-def-ref"
+	KBAppClusterDefTypeLabelKey              = "apps.kubeblocks.io/cluster-type" // refer clusterDefinition.Spec.Type (deprecated)
 	AppConfigTypeLabelKey                    = "apps.kubeblocks.io/config-type"
 	KBManagedByKey                           = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created
 	PVCNameLabelKey                          = "apps.kubeblocks.io/pvc-name"
@@ -99,6 +110,7 @@ const (
 	ClassProviderLabelKey                    = "class.kubeblocks.io/provider"
 	ClusterDefLabelKey                       = "clusterdefinition.kubeblocks.io/name"
 	ClusterVerLabelKey                       = "clusterversion.kubeblocks.io/name"
+	ComponentDefinitionLabelKey              = "componentdefinition.kubeblocks.io/name"
 	CMConfigurationSpecProviderLabelKey      = "config.kubeblocks.io/config-spec"    // CMConfigurationSpecProviderLabelKey is ComponentConfigSpec name
 	CMConfigurationCMKeysLabelKey            = "config.kubeblocks.io/configmap-keys" // CMConfigurationCMKeysLabelKey Specify configmap keys
 	CMConfigurationTemplateNameLabelKey      = "config.kubeblocks.io/config-template-name"
@@ -144,6 +156,8 @@ const (
 
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName             = "cluster.kubeblocks.io/finalizer"
+	DBComponentFinalizerName           = "component.kubeblocks.io/finalizer"
+	DBComponentDefinitionFinalizerName = "componentdefinition.kubeblocks.io/finalizer"
 	ConfigurationTemplateFinalizerName = "config.kubeblocks.io/finalizer"
 	ServiceDescriptorFinalizerName     = "servicedescriptor.kubeblocks.io/finalizer"
 

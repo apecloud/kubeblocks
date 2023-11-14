@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/sethvargo/go-password/password"
-
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -256,7 +255,7 @@ func buildDataScriptJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, clust
 		secretFrom := ops.Spec.ScriptSpec.Secret
 		if secretFrom == nil {
 			secretFrom = &appsv1alpha1.ScriptSecret{
-				Name:        fmt.Sprintf("%s-conn-credential", cluster.Name),
+				Name:        constant.GenerateDefaultConnCredential(cluster.Name),
 				PasswordKey: "password",
 				UsernameKey: "username",
 			}

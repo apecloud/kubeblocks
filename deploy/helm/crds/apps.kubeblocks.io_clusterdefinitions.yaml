@@ -9653,7 +9653,7 @@ spec:
                             password.
                           properties:
                             length:
-                              default: 10
+                              default: 16
                               description: length defines the length of password.
                               format: int32
                               maximum: 32
@@ -9665,17 +9665,17 @@ spec:
                                 upper-cases or mixed-cases of letters.
                               type: string
                             numDigits:
-                              default: 2
+                              default: 4
                               description: numDigits defines number of digits.
                               format: int32
-                              maximum: 20
+                              maximum: 8
                               minimum: 0
                               type: integer
                             numSymbols:
-                              default: 0
+                              default: 4
                               description: numSymbols defines number of symbols.
                               format: int32
-                              maximum: 20
+                              maximum: 8
                               minimum: 0
                               type: integer
                           type: object

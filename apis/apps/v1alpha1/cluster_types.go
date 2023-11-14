@@ -37,11 +37,12 @@ import (
 // ClusterSpec defines the desired state of Cluster.
 type ClusterSpec struct {
 	// Cluster referencing ClusterDefinition name. This is an immutable attribute.
-	// +kubebuilder:validation:Required
+	// If ClusterDefRef is not specified, ComponentDef must be specified for each Component in ComponentSpecs.
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="clusterDefinitionRef is immutable"
-	ClusterDefRef string `json:"clusterDefinitionRef"`
+	// +optional
+	ClusterDefRef string `json:"clusterDefinitionRef,omitempty"`
 
 	// Cluster referencing ClusterVersion name.
 	// +kubebuilder:validation:MaxLength=63
@@ -67,6 +68,16 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:MaxItems=128
 	// +kubebuilder:validation:XValidation:rule="self.all(x, size(self.filter(c, c.name == x.name)) == 1)",message="duplicated component"
 	ComponentSpecs []ClusterComponentSpec `json:"componentSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+
+	// services defines the services to access a cluster.
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +optional
+	Services []Service `json:"services,omitempty"`
+
+	// connectionCredentials defines the credentials used to access a cluster.
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +optional
+	ConnectionCredentials []ConnectionCredential `json:"connectionCredentials,omitempty"`
 
 	// tenancy describes how pods are distributed across node.
 	// SharedNode means multiple pods may share the same node.
@@ -271,6 +282,9 @@ type ClusterStatus struct {
 }
 
 // ClusterComponentSpec defines the cluster component spec.
+// +kubebuilder:validation:XValidation:rule="has(self.componentDefRef) || has(self.componentDef)",message="either componentDefRef or componentDef should be provided"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDefRef) || has(self.componentDefRef)", message="componentDefRef is required once set"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDef) || has(self.componentDef)", message="componentDef is required once set"
 type ClusterComponentSpec struct {
 	// name defines cluster's component name, this name is also part of Service DNS name, so this name will
 	// comply with IANA Service Naming rule.
@@ -282,11 +296,19 @@ type ClusterComponentSpec struct {
 
 	// componentDefRef references componentDef defined in ClusterDefinition spec. Need to
 	// comply with IANA Service Naming rule.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDefRef is immutable"
-	ComponentDefRef string `json:"componentDefRef"`
+	// +optional
+	ComponentDefRef string `json:"componentDefRef,omitempty"`
+
+	// componentDef references the name of the ComponentDefinition.
+	// If both componentDefRef and componentDef are provided, the componentDef will take precedence over componentDefRef.
+	// +kubebuilder:validation:MaxLength=22
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDef is immutable"
+	// +optional
+	ComponentDef string `json:"componentDef,omitempty"`
 
 	// classDefRef references the class defined in ComponentClassDefinition.
 	// +optional
@@ -367,6 +389,10 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:default=false
 	// +optional
 	NoCreatePDB bool `json:"noCreatePDB,omitempty"`
+
+	// updateStrategy defines the update strategy for the component.
+	// +optional
+	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
 
 	// userResourceRefs defines the user-defined volumes.
 	// +optional
@@ -584,6 +610,15 @@ type Affinity struct {
 	// +kubebuilder:default=SharedNode
 	// +optional
 	Tenancy TenancyType `json:"tenancy,omitempty"`
+}
+
+type TLSConfig struct {
+	// +kubebuilder:default=false
+	// +optional
+	Enable bool `json:"enable,omitempty"`
+
+	// +optional
+	Issuer *Issuer `json:"issuer,omitempty"`
 }
 
 // Issuer defines Tls certs issuer

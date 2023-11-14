@@ -29,7 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -53,7 +52,7 @@ func notifyClusterStatusChange(ctx context.Context, cli client.Client, recorder 
 	cluster, ok := obj.(*appsv1alpha1.Cluster)
 	if !ok {
 		var err error
-		if cluster, err = components.GetClusterByObject(ctx, cli, obj); err != nil {
+		if cluster, err = GetClusterByObject(ctx, cli, obj); err != nil {
 			return err
 		}
 	}

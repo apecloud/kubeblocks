@@ -33,10 +33,10 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -62,6 +62,12 @@ type handleStatusProgressWithComponent func(reqCtx intctrlutil.RequestCtx,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, succeedCount int32, err error)
 
 type handleReconfigureOpsStatus func(cmStatus *appsv1alpha1.ConfigurationItemStatus) error
+
+func isFailedOrAbnormal(phase appsv1alpha1.ClusterComponentPhase) bool {
+	return slices.Index([]appsv1alpha1.ClusterComponentPhase{
+		appsv1alpha1.FailedClusterCompPhase,
+		appsv1alpha1.AbnormalClusterCompPhase}, phase) != -1
+}
 
 // reconcileActionWithComponentOps will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the common function to reconcile opsRequest status when the opsRequest will affect the lifecycle of the components.
@@ -109,7 +115,7 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 			compStatus = appsv1alpha1.OpsRequestComponentStatus{}
 		}
 		lastFailedTime := compStatus.LastFailedTime
-		if components.IsFailedOrAbnormal(v.Phase) {
+		if isFailedOrAbnormal(v.Phase) {
 			isFailed = true
 			if lastFailedTime.IsZero() {
 				lastFailedTime = metav1.Now()
@@ -179,7 +185,7 @@ func opsRequestHasProcessed(reqCtx intctrlutil.RequestCtx, cli client.Client, op
 		return false
 	}
 	for _, rsm := range rsmList.Items {
-		isLatestRevision, err := components.IsComponentPodsWithLatestRevision(reqCtx.Ctx, cli, opsRes.Cluster, &rsm)
+		isLatestRevision, err := intctrlcomp.IsComponentPodsWithLatestRevision(reqCtx.Ctx, cli, opsRes.Cluster, &rsm)
 		if err != nil {
 			return false
 		}

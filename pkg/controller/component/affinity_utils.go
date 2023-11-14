@@ -31,40 +31,8 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-func BuildPodTopologySpreadConstraints(
-	cluster *appsv1alpha1.Cluster,
-	clusterOrCompAffinity *appsv1alpha1.Affinity,
-	component *SynthesizedComponent,
-) []corev1.TopologySpreadConstraint {
-	if clusterOrCompAffinity == nil {
-		return nil
-	}
-
-	var topologySpreadConstraints []corev1.TopologySpreadConstraint
-
-	var whenUnsatisfiable corev1.UnsatisfiableConstraintAction
-	if clusterOrCompAffinity.PodAntiAffinity == appsv1alpha1.Required {
-		whenUnsatisfiable = corev1.DoNotSchedule
-	} else {
-		whenUnsatisfiable = corev1.ScheduleAnyway
-	}
-	for _, topologyKey := range clusterOrCompAffinity.TopologyKeys {
-		topologySpreadConstraints = append(topologySpreadConstraints, corev1.TopologySpreadConstraint{
-			MaxSkew:           1,
-			WhenUnsatisfiable: whenUnsatisfiable,
-			TopologyKey:       topologyKey,
-			LabelSelector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					constant.AppInstanceLabelKey:    cluster.Name,
-					constant.KBAppComponentLabelKey: component.Name,
-				},
-			},
-		})
-	}
-	return topologySpreadConstraints
-}
-
-func BuildAffinity(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) *appsv1alpha1.Affinity {
+// BuildAffinity builds affinities for components from cluster and comp spec.
+func BuildAffinity(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec) *appsv1alpha1.Affinity {
 	affinityTopoKey := func(policyType appsv1alpha1.AvailabilityPolicyType) string {
 		switch policyType {
 		case appsv1alpha1.AvailabilityPolicyZone:
@@ -85,18 +53,59 @@ func BuildAffinity(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.
 	if cluster.Spec.Affinity != nil {
 		affinity = cluster.Spec.Affinity
 	}
-	if clusterCompSpec.Affinity != nil {
-		affinity = clusterCompSpec.Affinity
+	if compSpec != nil && compSpec.Affinity != nil {
+		affinity = compSpec.Affinity
 	}
 	return affinity
 }
 
-func BuildPodAffinity(
-	cluster *appsv1alpha1.Cluster,
-	clusterOrCompAffinity *appsv1alpha1.Affinity,
-	component *SynthesizedComponent,
-) (*corev1.Affinity, error) {
-	affinity := buildNewAffinity(cluster, clusterOrCompAffinity, component)
+// BuildTolerations builds tolerations for components from cluster and comp spec.
+func BuildTolerations(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec) ([]corev1.Toleration, error) {
+	tolerations := cluster.Spec.Tolerations
+	if compSpec != nil && len(compSpec.Tolerations) != 0 {
+		tolerations = compSpec.Tolerations
+	}
+	// build data plane tolerations from config
+	var dpTolerations []corev1.Toleration
+	if val := viper.GetString(constant.CfgKeyDataPlaneTolerations); val != "" {
+		if err := json.Unmarshal([]byte(val), &dpTolerations); err != nil {
+			return nil, err
+		}
+	}
+	return append(tolerations, dpTolerations...), nil
+}
+
+func BuildPodTopologySpreadConstraints(clusterName, compName string, compAffinity *appsv1alpha1.Affinity) []corev1.TopologySpreadConstraint {
+	if compAffinity == nil {
+		return nil
+	}
+
+	var topologySpreadConstraints []corev1.TopologySpreadConstraint
+
+	var whenUnsatisfiable corev1.UnsatisfiableConstraintAction
+	if compAffinity.PodAntiAffinity == appsv1alpha1.Required {
+		whenUnsatisfiable = corev1.DoNotSchedule
+	} else {
+		whenUnsatisfiable = corev1.ScheduleAnyway
+	}
+	for _, topologyKey := range compAffinity.TopologyKeys {
+		topologySpreadConstraints = append(topologySpreadConstraints, corev1.TopologySpreadConstraint{
+			MaxSkew:           1,
+			WhenUnsatisfiable: whenUnsatisfiable,
+			TopologyKey:       topologyKey,
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					constant.AppInstanceLabelKey:    clusterName,
+					constant.KBAppComponentLabelKey: FullName(clusterName, compName),
+				},
+			},
+		})
+	}
+	return topologySpreadConstraints
+}
+
+func BuildPodAffinity(clusterName string, compName string, compAffinity *appsv1alpha1.Affinity) (*corev1.Affinity, error) {
+	affinity := buildNewAffinity(clusterName, compName, compAffinity)
 
 	// read data plane affinity from config and merge it
 	dpAffinity := new(corev1.Affinity)
@@ -108,18 +117,14 @@ func BuildPodAffinity(
 	return mergeAffinity(affinity, dpAffinity)
 }
 
-func buildNewAffinity(
-	cluster *appsv1alpha1.Cluster,
-	clusterOrCompAffinity *appsv1alpha1.Affinity,
-	component *SynthesizedComponent,
-) *corev1.Affinity {
-	if clusterOrCompAffinity == nil {
+func buildNewAffinity(clusterName, compName string, compAffinity *appsv1alpha1.Affinity) *corev1.Affinity {
+	if compAffinity == nil {
 		return nil
 	}
 	affinity := new(corev1.Affinity)
 	// Build NodeAffinity
 	var matchExpressions []corev1.NodeSelectorRequirement
-	for key, value := range clusterOrCompAffinity.NodeLabels {
+	for key, value := range compAffinity.NodeLabels {
 		values := strings.Split(value, ",")
 		matchExpressions = append(matchExpressions, corev1.NodeSelectorRequirement{
 			Key:      key,
@@ -140,18 +145,18 @@ func buildNewAffinity(
 	// Build PodAntiAffinity
 	var podAntiAffinity *corev1.PodAntiAffinity
 	var podAffinityTerms []corev1.PodAffinityTerm
-	for _, topologyKey := range clusterOrCompAffinity.TopologyKeys {
+	for _, topologyKey := range compAffinity.TopologyKeys {
 		podAffinityTerms = append(podAffinityTerms, corev1.PodAffinityTerm{
 			TopologyKey: topologyKey,
 			LabelSelector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					constant.AppInstanceLabelKey:    cluster.Name,
-					constant.KBAppComponentLabelKey: component.Name,
+					constant.AppInstanceLabelKey:    clusterName,
+					constant.KBAppComponentLabelKey: FullName(clusterName, compName),
 				},
 			},
 		})
 	}
-	if clusterOrCompAffinity.PodAntiAffinity == appsv1alpha1.Required {
+	if compAffinity.PodAntiAffinity == appsv1alpha1.Required {
 		podAntiAffinity = &corev1.PodAntiAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: podAffinityTerms,
 		}
@@ -168,7 +173,7 @@ func buildNewAffinity(
 		}
 	}
 	// Add pod PodAffinityTerm for dedicated node
-	if clusterOrCompAffinity.Tenancy == appsv1alpha1.DedicatedNode {
+	if compAffinity.Tenancy == appsv1alpha1.DedicatedNode {
 		var labelSelectorReqs []metav1.LabelSelectorRequirement
 		labelSelectorReqs = append(labelSelectorReqs, metav1.LabelSelectorRequirement{
 			Key:      constant.WorkloadTypeLabelKey,
@@ -251,22 +256,4 @@ func mergeAffinity(dest, src *corev1.Affinity) (*corev1.Affinity, error) {
 		}
 	}
 	return rst, nil
-}
-
-// BuildTolerations builds tolerations from config
-func BuildTolerations(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) ([]corev1.Toleration, error) {
-	tolerations := cluster.Spec.Tolerations
-	if clusterCompSpec != nil && len(clusterCompSpec.Tolerations) != 0 {
-		tolerations = clusterCompSpec.Tolerations
-	}
-
-	// build data plane tolerations from config
-	var dpTolerations []corev1.Toleration
-	if val := viper.GetString(constant.CfgKeyDataPlaneTolerations); val != "" {
-		if err := json.Unmarshal([]byte(val), &dpTolerations); err != nil {
-			return nil, err
-		}
-	}
-
-	return append(tolerations, dpTolerations...), nil
 }

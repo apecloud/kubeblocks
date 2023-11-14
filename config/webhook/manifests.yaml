@@ -50,6 +50,46 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /mutate-apps-kubeblocks-io-v1alpha1-component
+  failurePolicy: Fail
+  name: mcomponent.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - components
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-apps-kubeblocks-io-v1alpha1-componentdefinition
+  failurePolicy: Fail
+  name: mcomponentdefinition.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - componentdefinitions
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /mutate-apps-kubeblocks-io-v1alpha1-servicedescriptor
   failurePolicy: Fail
   name: mservicedescriptor.kb.io
@@ -149,6 +189,46 @@ webhooks:
     - UPDATE
     resources:
     - clusterversions
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-apps-kubeblocks-io-v1alpha1-component
+  failurePolicy: Fail
+  name: vcomponent.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - components
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-apps-kubeblocks-io-v1alpha1-componentdefinition
+  failurePolicy: Fail
+  name: vcomponentdefinition.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - componentdefinitions
   sideEffects: None
 - admissionReviewVersions:
   - v1

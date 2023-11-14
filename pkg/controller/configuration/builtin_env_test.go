@@ -31,6 +31,7 @@ import (
 	coreclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	ctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
@@ -151,7 +152,7 @@ bootstrap:
 							ValueFrom: &corev1.EnvVarSource{
 								SecretKeyRef: &corev1.SecretKeySelector{
 									LocalObjectReference: corev1.LocalObjectReference{
-										Name: "$(CONN_CREDENTIAL_SECRET_NAME)",
+										Name: constant.KBConnCredentialPlaceHolder,
 									},
 									Key: "password",
 								},

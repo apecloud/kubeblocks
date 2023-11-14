@@ -1,0 +1,641 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.12.1
+  labels:
+    app.kubernetes.io/name: kubeblocks
+  name: components.apps.kubeblocks.io
+spec:
+  group: apps.kubeblocks.io
+  names:
+    categories:
+    - kubeblocks
+    - all
+    kind: Component
+    listKind: ComponentList
+    plural: components
+    shortNames:
+    - cmp
+    singular: component
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: component definition
+      jsonPath: .spec.compDef
+      name: COMPONENT-DEFINITION
+      type: string
+    - description: status phase
+      jsonPath: .status.phase
+      name: STATUS
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Component is the Schema for the components API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ComponentSpec defines the desired state of Component
+            properties:
+              affinity:
+                properties:
+                  nodeLabels:
+                    additionalProperties:
+                      type: string
+                    description: nodeLabels describes that pods must be scheduled
+                      to the nodes with the specified node labels.
+                    type: object
+                  podAntiAffinity:
+                    default: Preferred
+                    description: podAntiAffinity describes the anti-affinity level
+                      of pods within a component. Preferred means try spread pods
+                      by `TopologyKeys`. Required means must spread pods by `TopologyKeys`.
+                    enum:
+                    - Preferred
+                    - Required
+                    type: string
+                  tenancy:
+                    default: SharedNode
+                    description: tenancy describes how pods are distributed across
+                      node. SharedNode means multiple pods may share the same node.
+                      DedicatedNode means each pod runs on their own dedicated node.
+                    enum:
+                    - SharedNode
+                    - DedicatedNode
+                    type: string
+                  topologyKeys:
+                    description: topologyKey is the key of node labels. Nodes that
+                      have a label with this key and identical values are considered
+                      to be in the same topology. It's used as the topology domain
+                      for pod anti-affinity and pod spread constraint. Some well-known
+                      label keys, such as "kubernetes.io/hostname" and "topology.kubernetes.io/zone"
+                      are often used as TopologyKey, as well as any other custom label
+                      key.
+                    items:
+                      type: string
+                    type: array
+                    x-kubernetes-list-type: set
+                type: object
+              classDefRef:
+                description: classDefRef references the class defined in ComponentClassDefinition.
+                properties:
+                  class:
+                    description: Class refers to the name of the class that is defined
+                      in the ComponentClassDefinition.
+                    type: string
+                  name:
+                    description: Name refers to the name of the ComponentClassDefinition.
+                    maxLength: 63
+                    pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                    type: string
+                required:
+                - class
+                type: object
+              compDef:
+                description: compDef is the name of the referenced componentDefinition.
+                type: string
+              configs:
+                items:
+                  properties:
+                    asEnvFrom:
+                      description: 'asEnvFrom is optional: the list of containers
+                        will be injected into EnvFrom.'
+                      items:
+                        type: string
+                      type: array
+                      x-kubernetes-list-type: set
+                    constraintRef:
+                      description: Specify the name of the referenced the configuration
+                        constraints object.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
+                    defaultMode:
+                      description: 'defaultMode is optional: mode bits used to set
+                        permissions on created files by default. Must be an octal
+                        value between 0000 and 0777 or a decimal value between 0 and
+                        511. YAML accepts both octal and decimal values, JSON requires
+                        decimal values for mode bits. Defaults to 0644. Directories
+                        within the path are not affected by this setting. This might
+                        be in conflict with other options that affect the file mode,
+                        like fsGroup, and the result can be other mode bits set.'
+                      format: int32
+                      type: integer
+                    keys:
+                      description: Specify a list of keys. If empty, ConfigConstraint
+                        takes effect for all keys in configmap.
+                      items:
+                        type: string
+                      type: array
+                      x-kubernetes-list-type: set
+                    legacyRenderedConfigSpec:
+                      description: 'lazyRenderedConfigSpec is optional: specify the
+                        secondary rendered config spec.'
+                      properties:
+                        namespace:
+                          default: default
+                          description: Specify the namespace of the referenced the
+                            configuration template ConfigMap object. An empty namespace
+                            is equivalent to the "default" namespace.
+                          maxLength: 63
+                          pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                          type: string
+                        policy:
+                          default: none
+                          description: policy defines how to merge external imported
+                            templates into component templates.
+                          enum:
+                          - patch
+                          - replace
+                          - none
+                          type: string
+                        templateRef:
+                          description: Specify the name of the referenced the configuration
+                            template ConfigMap object.
+                          maxLength: 63
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          type: string
+                      required:
+                      - templateRef
+                      type: object
+                    name:
+                      description: Specify the name of configuration template.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
+                    namespace:
+                      default: default
+                      description: Specify the namespace of the referenced the configuration
+                        template ConfigMap object. An empty namespace is equivalent
+                        to the "default" namespace.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                      type: string
+                    templateRef:
+                      description: Specify the name of the referenced the configuration
+                        template ConfigMap object.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
+                    volumeName:
+                      description: volumeName is the volume name of PodTemplate, which
+                        the configuration file produced through the configuration
+                        template will be mounted to the corresponding volume. Must
+                        be a DNS_LABEL name. The volume name must be defined in podSpec.containers[*].volumeMounts.
+                      maxLength: 63
+                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
+                      type: string
+                  required:
+                  - name
+                  - templateRef
+                  - volumeName
+                  type: object
+                type: array
+              enabledLogs:
+                description: enabledLogs indicates which log file takes effect in
+                  the database cluster. element is the log type which is defined in
+                  ComponentDefinition logConfig.name, and will set relative variables
+                  about this log type in database kernel.
+                items:
+                  type: string
+                type: array
+                x-kubernetes-list-type: set
+              monitor:
+                default: false
+                description: monitor is a switch to enable monitoring and is set as
+                  false by default. KubeBlocks provides an extension mechanism to
+                  support component level monitoring, which will scrape metrics auto
+                  or manually from servers in component and export metrics to Time
+                  Series Database.
+                type: boolean
+              replicas:
+                default: 1
+                description: Component replicas. The default value is used in ClusterDefinition
+                  spec if not specified.
+                format: int32
+                minimum: 0
+                type: integer
+              resources:
+                description: Resources requests and limits of workload.
+                properties:
+                  claims:
+                    description: "Claims lists the names of resources, defined in
+                      spec.resourceClaims, that are used by this container. \n This
+                      is an alpha field and requires enabling the DynamicResourceAllocation
+                      feature gate. \n This field is immutable. It can only be set
+                      for containers."
+                    items:
+                      description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                      properties:
+                        name:
+                          description: Name must match the name of one entry in pod.spec.resourceClaims
+                            of the Pod where this field is used. It makes that resource
+                            available inside a container.
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
+                  limits:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: 'Limits describes the maximum amount of compute resources
+                      allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                    type: object
+                  requests:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: 'Requests describes the minimum amount of compute
+                      resources required. If Requests is omitted for a container,
+                      it defaults to Limits if that is explicitly specified, otherwise
+                      to an implementation-defined value. Requests cannot exceed Limits.
+                      More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                    type: object
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+              serviceAccountName:
+                description: serviceAccountName is the name of the ServiceAccount
+                  that running component depends on.
+                type: string
+              serviceRefs:
+                description: 'serviceRefs define service references for the current
+                  component. Based on the referenced services, they can be categorized
+                  into two types: Service provided by external sources: These services
+                  are provided by external sources and are not managed by KubeBlocks.
+                  They can be Kubernetes-based or non-Kubernetes services. For external
+                  services, you need to provide an additional ServiceDescriptor object
+                  to establish the service binding. Service provided by other KubeBlocks
+                  clusters: These services are provided by other KubeBlocks clusters.
+                  You can bind to these services by specifying the name of the hosting
+                  cluster. Each type of service reference requires specific configurations
+                  and bindings to establish the connection and interaction with the
+                  respective services. It should be noted that the ServiceRef has
+                  cluster-level semantic consistency, meaning that within the same
+                  Cluster, service references with the same ServiceRef.Name are considered
+                  to be the same service. It is only allowed to bind to the same Cluster
+                  or ServiceDescriptor.'
+                items:
+                  properties:
+                    cluster:
+                      description: 'When referencing a service provided by other KubeBlocks
+                        cluster, you need to provide the name of the Cluster being
+                        referenced. By default, when other KubeBlocks Cluster are
+                        referenced, the ClusterDefinition.spec.connectionCredential
+                        secret corresponding to the referenced Cluster will be used
+                        to bind to the current component. Currently, if a KubeBlocks
+                        cluster is to be referenced, the connection credential secret
+                        should include and correspond to the following fields: endpoint,
+                        port, username, and password. Under this referencing approach,
+                        the ServiceKind and ServiceVersion of service reference declaration
+                        defined in the ClusterDefinition will not be validated. If
+                        both Cluster and ServiceDescriptor are specified, the Cluster
+                        takes precedence.'
+                      type: string
+                    name:
+                      description: name of the service reference declaration. references
+                        the serviceRefDeclaration name defined in clusterDefinition.componentDefs[*].serviceRefDeclarations[*].name
+                      type: string
+                    namespace:
+                      description: namespace defines the namespace of the referenced
+                        Cluster or the namespace of the referenced ServiceDescriptor
+                        object. If not set, the referenced Cluster and ServiceDescriptor
+                        will be searched in the namespace of the current cluster by
+                        default.
+                      type: string
+                    serviceDescriptor:
+                      description: serviceDescriptor defines the service descriptor
+                        of the service provided by external sources. When referencing
+                        a service provided by external sources, you need to provide
+                        the ServiceDescriptor object name to establish the service
+                        binding. And serviceDescriptor is the name of the ServiceDescriptor
+                        object, furthermore, the ServiceDescriptor.spec.serviceKind
+                        and ServiceDescriptor.spec.serviceVersion should match clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceKind
+                        and the regular expression defines in clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceVersion.
+                        If both Cluster and ServiceDescriptor are specified, the Cluster
+                        takes precedence.
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
+              tlsConfig:
+                properties:
+                  enable:
+                    default: false
+                    type: boolean
+                  issuer:
+                    description: Issuer defines Tls certs issuer
+                    properties:
+                      name:
+                        default: KubeBlocks
+                        description: 'Name of issuer. Options supported: - KubeBlocks
+                          - Certificates signed by KubeBlocks Operator. - UserProvided
+                          - User provided own CA-signed certificates.'
+                        enum:
+                        - KubeBlocks
+                        - UserProvided
+                        type: string
+                      secretRef:
+                        description: secretRef. TLS certs Secret reference required
+                          when from is UserProvided
+                        properties:
+                          ca:
+                            description: CA cert key in Secret
+                            type: string
+                          cert:
+                            description: Cert key in Secret
+                            type: string
+                          key:
+                            description: Key of TLS private key in Secret
+                            type: string
+                          name:
+                            description: Name of the Secret
+                            type: string
+                        required:
+                        - ca
+                        - cert
+                        - key
+                        - name
+                        type: object
+                    required:
+                    - name
+                    type: object
+                type: object
+              tolerations:
+                items:
+                  description: The pod this Toleration is attached to tolerates any
+                    taint that matches the triple <key,value,effect> using the matching
+                    operator <operator>.
+                  properties:
+                    effect:
+                      description: Effect indicates the taint effect to match. Empty
+                        means match all taint effects. When specified, allowed values
+                        are NoSchedule, PreferNoSchedule and NoExecute.
+                      type: string
+                    key:
+                      description: Key is the taint key that the toleration applies
+                        to. Empty means match all taint keys. If the key is empty,
+                        operator must be Exists; this combination means to match all
+                        values and all keys.
+                      type: string
+                    operator:
+                      description: Operator represents a key's relationship to the
+                        value. Valid operators are Exists and Equal. Defaults to Equal.
+                        Exists is equivalent to wildcard for value, so that a pod
+                        can tolerate all taints of a particular category.
+                      type: string
+                    tolerationSeconds:
+                      description: TolerationSeconds represents the period of time
+                        the toleration (which must be of effect NoExecute, otherwise
+                        this field is ignored) tolerates the taint. By default, it
+                        is not set, which means tolerate the taint forever (do not
+                        evict). Zero and negative values will be treated as 0 (evict
+                        immediately) by the system.
+                      format: int64
+                      type: integer
+                    value:
+                      description: Value is the taint value the toleration matches
+                        to. If the operator is Exists, the value should be empty,
+                        otherwise just a regular string.
+                      type: string
+                  type: object
+                type: array
+              updateStrategy:
+                description: UpdateStrategy defines Cluster Component update strategy.
+                enum:
+                - Serial
+                - BestEffortParallel
+                - Parallel
+                type: string
+              volumeClaimTemplates:
+                description: VolumeClaimTemplates information for statefulset.spec.volumeClaimTemplates.
+                items:
+                  properties:
+                    name:
+                      description: Reference `ClusterDefinition.spec.componentDefs.containers.volumeMounts.name`.
+                      type: string
+                    spec:
+                      description: spec defines the desired characteristics of a volume
+                        requested by a pod author.
+                      properties:
+                        accessModes:
+                          description: 'accessModes contains the desired access modes
+                            the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1.'
+                          items:
+                            type: string
+                          type: array
+                          x-kubernetes-preserve-unknown-fields: true
+                        resources:
+                          description: 'resources represents the minimum resources
+                            the volume should have. If RecoverVolumeExpansionFailure
+                            feature is enabled users are allowed to specify resource
+                            requirements that are lower than previous value but must
+                            still be higher than capacity recorded in the status field
+                            of the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources.'
+                          properties:
+                            claims:
+                              description: "Claims lists the names of resources, defined
+                                in spec.resourceClaims, that are used by this container.
+                                \n This is an alpha field and requires enabling the
+                                DynamicResourceAllocation feature gate. \n This field
+                                is immutable. It can only be set for containers."
+                              items:
+                                description: ResourceClaim references one entry in
+                                  PodSpec.ResourceClaims.
+                                properties:
+                                  name:
+                                    description: Name must match the name of one entry
+                                      in pod.spec.resourceClaims of the Pod where
+                                      this field is used. It makes that resource available
+                                      inside a container.
+                                    type: string
+                                required:
+                                - name
+                                type: object
+                              type: array
+                              x-kubernetes-list-map-keys:
+                              - name
+                              x-kubernetes-list-type: map
+                            limits:
+                              additionalProperties:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
+                              description: 'Limits describes the maximum amount of
+                                compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                              type: object
+                            requests:
+                              additionalProperties:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
+                              description: 'Requests describes the minimum amount
+                                of compute resources required. If Requests is omitted
+                                for a container, it defaults to Limits if that is
+                                explicitly specified, otherwise to an implementation-defined
+                                value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                              type: object
+                          type: object
+                          x-kubernetes-preserve-unknown-fields: true
+                        storageClassName:
+                          description: 'storageClassName is the name of the StorageClass
+                            required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.'
+                          type: string
+                        volumeMode:
+                          description: volumeMode defines what type of volume is required
+                            by the claim.
+                          type: string
+                      type: object
+                  required:
+                  - name
+                  type: object
+                type: array
+            required:
+            - compDef
+            - replicas
+            type: object
+          status:
+            description: ComponentStatus defines the observed state of Component
+            properties:
+              conditions:
+                description: Describe current state of component API Resource, like
+                  warning.
+                items:
+                  description: "Condition contains details for one aspect of the current
+                    state of this API Resource. --- This struct is intended for direct
+                    use as an array at the field path .status.conditions.  For example,
+                    \n type FooStatus struct{ // Represents the observations of a
+                    foo's current state. // Known .status.conditions.type are: \"Available\",
+                    \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge
+                    // +listType=map // +listMapKey=type Conditions []metav1.Condition
+                    `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\"
+                    protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
+                  properties:
+                    lastTransitionTime:
+                      description: lastTransitionTime is the last time the condition
+                        transitioned from one status to another. This should be when
+                        the underlying condition changed.  If that is not known, then
+                        using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: message is a human readable message indicating
+                        details about the transition. This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: observedGeneration represents the .metadata.generation
+                        that the condition was set based upon. For instance, if .metadata.generation
+                        is currently 12, but the .status.conditions[x].observedGeneration
+                        is 9, the condition is out of date with respect to the current
+                        state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: reason contains a programmatic identifier indicating
+                        the reason for the condition's last transition. Producers
+                        of specific condition types may define expected values and
+                        meanings for this field, and whether the values are considered
+                        a guaranteed API. The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                        --- Many .condition.type values are consistent across resources
+                        like Available, but because arbitrary conditions can be useful
+                        (see .node.status.conditions), the ability to deconflict is
+                        important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              message:
+                additionalProperties:
+                  type: string
+                description: message records the component details message in current
+                  phase. Keys are podName or deployName or statefulSetName. The format
+                  is `ObjectKind/Name`.
+                type: object
+              observedGeneration:
+                description: observedGeneration is the most recent generation observed
+                  for this Component. It corresponds to the Cluster's generation,
+                  which is updated on mutation by the API Server.
+                format: int64
+                type: integer
+              phase:
+                description: 'phase describes the phase of the component and the detail
+                  information of the phases are as following: Creating: `Creating`
+                  is a special `Updating` with previous phase `empty`(means "") or
+                  `Creating`. Running: component replicas > 0 and all pod specs are
+                  latest with a Running state. Updating: component replicas > 0 and
+                  has no failed pods. the component is being updated. Abnormal: component
+                  replicas > 0 but having some failed pods. the component basically
+                  works but in a fragile state. Failed: component replicas > 0 but
+                  having some failed pods. the component doesn''t work anymore. Stopping:
+                  component replicas = 0 and has terminating pods. Stopped: component
+                  replicas = 0 and all pods have been deleted. Deleting: the component
+                  is being deleted.'
+                enum:
+                - Creating
+                - Running
+                - Updating
+                - Stopping
+                - Stopped
+                - Deleting
+                - Failed
+                - Abnormal
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

@@ -21,6 +21,7 @@ import (
 	"errors"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -260,8 +261,8 @@ type UpdateStrategy string
 
 const (
 	SerialStrategy             UpdateStrategy = "Serial"
-	BestEffortParallelStrategy UpdateStrategy = "BestEffortParallel"
 	ParallelStrategy           UpdateStrategy = "Parallel"
+	BestEffortParallelStrategy UpdateStrategy = "BestEffortParallel"
 )
 
 var DefaultLeader = ConsensusMember{
@@ -549,17 +550,6 @@ const (
 	Noop                  SwitchPolicyType = "Noop"
 )
 
-// SwitchStepRole defines the role to execute the switch command.
-// +enum
-// +kubebuilder:validation:Enum={NewPrimary, OldPrimary, Secondaries}
-type SwitchStepRole string
-
-const (
-	NewPrimary  SwitchStepRole = "NewPrimary"
-	OldPrimary  SwitchStepRole = "OldPrimary"
-	Secondaries SwitchStepRole = "Secondaries"
-)
-
 // VolumeType defines volume type for backup data or log.
 // +enum
 // +kubebuilder:validation:Enum={data,log}
@@ -597,4 +587,66 @@ var (
 type StatefulSetWorkload interface {
 	FinalStsUpdateStrategy() (appsv1.PodManagementPolicyType, appsv1.StatefulSetUpdateStrategy)
 	GetUpdateStrategy() UpdateStrategy
+}
+
+type Service struct {
+	// The name of the service.
+	// Others can refer to this service by its name. (e.g., connection credential)
+	// Cannot be updated.
+	// +required
+	Name string `json:"name"`
+
+	// ServiceName defines the name of the underlying service object.
+	// If not specified, the default service name with different patterns will be used:
+	//  - <CLUSTER_NAME>: for cluster-level services
+	//  - <CLUSTER_NAME>-<COMPONENT_NAME>: for component-level services
+	// Only one default service name is allowed.
+	// Cannot be updated.
+	// +optional
+	ServiceName string `json:"serviceName,omitempty"`
+
+	// Spec defines the behavior of a service.
+	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +optional
+	Spec corev1.ServiceSpec `json:"spec,omitempty"`
+
+	// ComponentSelector extends the ServiceSpec.Selector by allowing you to specify a component as selectors for the service.
+	// For component-level services, a default component selector with the component name will be added automatically.
+	// +optional
+	ComponentSelector string `json:"componentSelector,omitempty"`
+
+	// RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined role as selector for the service.
+	// +optional
+	RoleSelector string `json:"roleSelector,omitempty"`
+}
+
+type ConnectionCredential struct {
+	// The name of the ConnectionCredential.
+	// Cannot be updated.
+	// +required
+	Name string `json:"name"`
+
+	// ServiceName specifies the name of service to use for accessing.
+	// Cannot be updated.
+	// +optional
+	ServiceName string `json:"serviceName,omitempty"`
+
+	// PortName specifies the name of the port to access the service.
+	// If the service has multiple ports, a specific port must be specified to use here.
+	// Otherwise, the unique port of the service will be used.
+	// Cannot be updated.
+	// +optional
+	PortName string `json:"portName,omitempty"`
+
+	// ComponentName specifies the name of component where the account defined.
+	// For cluster-level connection credential, this field is required.
+	// Cannot be updated.
+	// +optional
+	ComponentName string `json:"componentName,omitempty"`
+
+	// AccountName specifies the name of account used to access the service.
+	// If specified, the account must be defined in @SystemAccounts.
+	// Cannot be updated.
+	// +optional
+	AccountName string `json:"accountName,omitempty"`
 }

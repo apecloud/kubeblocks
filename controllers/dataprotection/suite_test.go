@@ -21,7 +21,6 @@ package dataprotection
 
 import (
 	"context"
-	"fmt"
 	"go/build"
 	"path/filepath"
 	"testing"
@@ -84,7 +83,6 @@ var _ = BeforeSuite(func() {
 
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks:latest")
-	fmt.Printf("config settings: %v\n", viper.AllSettings())
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{

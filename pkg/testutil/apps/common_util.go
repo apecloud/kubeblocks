@@ -360,4 +360,5 @@ func ClearClusterResourcesWithRemoveFinalizerOption(testCtx *testutil.TestContex
 	// finalizer of ConfigMap are deleted in ClusterDef & ClusterVersion controller
 	ClearResourcesWithRemoveFinalizerOption(testCtx, intctrlutil.ClusterVersionSignature, true, hasLabels)
 	ClearResourcesWithRemoveFinalizerOption(testCtx, intctrlutil.ClusterDefinitionSignature, true, hasLabels)
+	ClearResourcesWithRemoveFinalizerOption(testCtx, intctrlutil.ComponentDefinitionSignature, true, hasLabels)
 }

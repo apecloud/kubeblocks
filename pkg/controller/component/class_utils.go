@@ -19,13 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package component
 
-import (
-	"strings"
-
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
-)
-
-func ignoreResourceConstraint(cluster *appsv1alpha1.Cluster) bool {
-	return strings.ToLower(cluster.GetAnnotations()[constant.IgnoreResourceConstraint]) == "true"
-}
+// TODO(component)
+// func ignoreResourceConstraint(cluster *appsv1alpha1.Cluster) bool {
+//	return strings.ToLower(cluster.GetAnnotations()[constant.IgnoreResourceConstraint]) == "true"
+// }

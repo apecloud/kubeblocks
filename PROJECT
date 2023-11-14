@@ -198,4 +198,30 @@ resources:
   kind: Restore
   path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kubeblocks.io
+  group: apps
+  kind: ComponentDefinition
+  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kubeblocks.io
+  group: apps
+  kind: Component
+  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
 version: "3"

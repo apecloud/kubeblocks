@@ -27,7 +27,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
@@ -126,7 +125,7 @@ var _ = Describe("MySQL data protection function", func() {
 		backupPolicyObj := testdp.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 			WithRandomName().
 			SetTarget(constant.AppInstanceLabelKey, clusterKey.Name).
-			SetTargetConnectionCredential(component.GenerateConnCredential(clusterKey.Name)).
+			SetTargetConnectionCredential(constant.GenerateDefaultConnCredential(clusterKey.Name)).
 			AddBackupMethod(testdp.BackupMethodName, false, actionSet.Name).
 			SetBackupMethodVolumeMounts(testapps.DataVolumeName, "/data").
 			Create(&testCtx).GetObject()

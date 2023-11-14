@@ -43,6 +43,11 @@ func NewClusterFactory(namespace, name, cdRef, cvRef string) *MockClusterFactory
 	return f
 }
 
+func (factory *MockClusterFactory) SetTerminationPolicy(policyType appsv1alpha1.TerminationPolicyType) *MockClusterFactory {
+	factory.Get().Spec.TerminationPolicy = policyType
+	return factory
+}
+
 func (factory *MockClusterFactory) SetClusterAffinity(affinity *appsv1alpha1.Affinity) *MockClusterFactory {
 	factory.Get().Spec.Affinity = affinity
 	return factory
@@ -67,6 +72,25 @@ func (factory *MockClusterFactory) AddComponent(compName string, compDefName str
 	return factory
 }
 
+func (factory *MockClusterFactory) AddComponentV2(compName string, compDefName string) *MockClusterFactory {
+	comp := appsv1alpha1.ClusterComponentSpec{
+		Name:         compName,
+		ComponentDef: compDefName,
+	}
+	factory.Get().Spec.ComponentSpecs = append(factory.Get().Spec.ComponentSpecs, comp)
+	return factory
+}
+
+func (factory *MockClusterFactory) AddService(service appsv1alpha1.Service) *MockClusterFactory {
+	services := factory.Get().Spec.Services
+	if len(services) == 0 {
+		services = []appsv1alpha1.Service{}
+	}
+	services = append(services, service)
+	factory.Get().Spec.Services = services
+	return factory
+}
+
 type updateFn func(comp *appsv1alpha1.ClusterComponentSpec)
 
 func (factory *MockClusterFactory) lastComponentRef(update updateFn) *MockClusterFactory {
@@ -76,6 +100,12 @@ func (factory *MockClusterFactory) lastComponentRef(update updateFn) *MockCluste
 	}
 	factory.Get().Spec.ComponentSpecs = comps
 	return factory
+}
+
+func (factory *MockClusterFactory) SetCompDef(compDef string) *MockClusterFactory {
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+		comp.ComponentDef = compDef
+	})
 }
 
 func (factory *MockClusterFactory) SetReplicas(replicas int32) *MockClusterFactory {
@@ -160,7 +190,7 @@ func (factory *MockClusterFactory) SetIssuer(issuer *appsv1alpha1.Issuer) *MockC
 	})
 }
 
-func (factory *MockClusterFactory) AddService(serviceName string, serviceType corev1.ServiceType) *MockClusterFactory {
+func (factory *MockClusterFactory) AddComponentService(serviceName string, serviceType corev1.ServiceType) *MockClusterFactory {
 	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
 		comp.Services = append(comp.Services,
 			appsv1alpha1.ClusterComponentService{

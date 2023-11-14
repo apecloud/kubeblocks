@@ -65,9 +65,9 @@ func NewClusterDefFactory(name string) *MockClusterDefFactory {
 	return f
 }
 
-func NewClusterDefFactoryWithConnCredential(name string) *MockClusterDefFactory {
+func NewClusterDefFactoryWithConnCredential(name, compDefName string) *MockClusterDefFactory {
 	f := NewClusterDefFactory(name)
-	f.AddComponentDef(StatefulMySQLComponent, "conn-cred")
+	f.AddComponentDef(StatefulMySQLComponent, compDefName)
 	f.SetConnectionCredential(getDefaultConnectionCredential(), &defaultSvcSpec)
 	return f
 }
@@ -307,20 +307,25 @@ func appendContainerVolumeMounts(containers []corev1.Container, targetContainerN
 		c := &containers[index]
 		// remove the duplicated volumeMounts and overwrite the default mount path
 		if c.Name == targetContainerName {
-			mergedVolumeMounts := make([]corev1.VolumeMount, 0)
-			volumeMountsMap := make(map[string]corev1.VolumeMount)
-			for _, v := range c.VolumeMounts {
-				volumeMountsMap[v.Name] = v
-			}
-			for _, v := range volumeMounts {
-				volumeMountsMap[v.Name] = v
-			}
-			for _, v := range volumeMountsMap {
-				mergedVolumeMounts = append(mergedVolumeMounts, v)
-			}
-			c.VolumeMounts = mergedVolumeMounts
+			mergedAddVolumeMounts(c, volumeMounts)
 			break
 		}
 	}
 	return containers
+}
+
+func mergedAddVolumeMounts(c *corev1.Container, volumeMounts []corev1.VolumeMount) {
+	table := make(map[string]corev1.VolumeMount)
+	for _, v := range c.VolumeMounts {
+		table[v.Name] = v
+	}
+	for _, v := range volumeMounts {
+		table[v.Name] = v
+	}
+
+	mounts := make([]corev1.VolumeMount, 0)
+	for _, v := range table {
+		mounts = append(mounts, v)
+	}
+	c.VolumeMounts = mounts
 }

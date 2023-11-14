@@ -53,7 +53,7 @@ var _ = Describe("TemplateWrapperTest", func() {
 		mockK8sCli = testutil.NewK8sMockClient()
 
 		clusterObj, clusterDefObj, clusterVersionObj, _ = newAllFieldsClusterObj(nil, nil, false)
-		clusterComponent = newAllFieldsComponent(clusterDefObj, clusterVersionObj)
+		clusterComponent = newAllFieldsComponent(clusterDefObj, clusterVersionObj, clusterObj)
 	})
 
 	AfterEach(func() {

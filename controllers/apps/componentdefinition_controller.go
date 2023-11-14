@@ -176,7 +176,7 @@ func (r *ComponentDefinitionReconciler) validateRuntime(cli client.Client, rctx 
 
 func (r *ComponentDefinitionReconciler) validateVolumes(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
-	if !checkUniqueItem(cmpd.Spec.Volumes, "Name") {
+	if !checkUniqueItemWithValue(cmpd.Spec.Volumes, "Name", nil) {
 		return fmt.Errorf("duplicate volume names are not allowed")
 	}
 
@@ -197,7 +197,7 @@ func (r *ComponentDefinitionReconciler) validateVolumes(cli client.Client, rctx 
 
 func (r *ComponentDefinitionReconciler) validateServices(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
-	if !checkUniqueItem(cmpd.Spec.Services, "Name") {
+	if !checkUniqueItemWithValue(cmpd.Spec.Services, "Name", nil) {
 		return fmt.Errorf("duplicate names of component service are not allowed")
 	}
 
@@ -206,7 +206,7 @@ func (r *ComponentDefinitionReconciler) validateServices(cli client.Client, rctx
 			cmpd.Spec.Services[i].ServiceName = defaultServiceName
 		}
 	}
-	if !checkUniqueItem(cmpd.Spec.Services, "ServiceName") {
+	if !checkUniqueItemWithValue(cmpd.Spec.Services, "ServiceName", nil) {
 		return fmt.Errorf("duplicate service names are not allowed")
 	}
 
@@ -258,10 +258,10 @@ func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client
 		return fmt.Errorf("the AccountProvision action is needed to provision system accounts")
 	}
 
-	if !checkUniqueItem(cmpd.Spec.SystemAccounts, "Name") {
+	if !checkUniqueItemWithValue(cmpd.Spec.SystemAccounts, "Name", nil) {
 		return fmt.Errorf("duplicate system accounts are not allowed")
 	}
-	if !checkUniqueItem(cmpd.Spec.SystemAccounts, "InitAccount") {
+	if !checkUniqueItemWithValue(cmpd.Spec.SystemAccounts, "InitAccount", true) {
 		return fmt.Errorf("multiple system init accounts are not allowed")
 	}
 
@@ -275,7 +275,7 @@ func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client
 
 func (r *ComponentDefinitionReconciler) validateConnectionCredentials(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
-	if !checkUniqueItem(cmpd.Spec.ConnectionCredentials, "Name") {
+	if !checkUniqueItemWithValue(cmpd.Spec.ConnectionCredentials, "Name", nil) {
 		return fmt.Errorf("duplicate connection credential names are not allowed")
 	}
 	for _, cc := range cmpd.Spec.ConnectionCredentials {
@@ -348,7 +348,7 @@ func (r *ComponentDefinitionReconciler) validateConnectionCredentialAccount(cmpd
 
 func (r *ComponentDefinitionReconciler) validateReplicaRoles(cli client.Client, reqCtx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
-	if !checkUniqueItem(cmpd.Spec.Roles, "Name") {
+	if !checkUniqueItemWithValue(cmpd.Spec.Roles, "Name", nil) {
 		return fmt.Errorf("duplicate replica roles are not allowed")
 	}
 	return nil
@@ -412,7 +412,7 @@ func (r *ComponentDefinitionReconciler) validateComponentDefRef(cli client.Clien
 	return nil
 }
 
-func checkUniqueItem(slice any, fieldName string) bool {
+func checkUniqueItemWithValue(slice any, fieldName string, val any) bool {
 	sliceValue := reflect.ValueOf(slice)
 	if sliceValue.Kind() != reflect.Slice {
 		panic("Not a slice")
@@ -437,7 +437,9 @@ func checkUniqueItem(slice any, fieldName string) bool {
 		fieldValue := field.Interface()
 
 		if lookupTable[fieldValue] {
-			return false
+			if val == nil || val == fieldValue {
+				return false
+			}
 		}
 		lookupTable[fieldValue] = true
 	}

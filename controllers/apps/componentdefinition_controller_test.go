@@ -305,16 +305,30 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
 		})
 
-		It("multiple system init accounts", func() {
+		It("multiple init accounts", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
 				AddSystemAccount(string(appsv1alpha1.AdminAccount), true, "create user").
 				AddSystemAccount(string(appsv1alpha1.ProbeAccount), true, "create user").
+				AddSystemAccount(string(appsv1alpha1.MonitorAccount), false, "create user").
 				SetLifecycleAction("AccountProvision", defaultActionHandler).
 				Create(&testCtx).GetObject()
 
 			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
+		})
+
+		It("multiple accounts should be ok", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddSystemAccount(string(appsv1alpha1.AdminAccount), true, "create user").
+				AddSystemAccount(string(appsv1alpha1.ProbeAccount), false, "create user").
+				AddSystemAccount(string(appsv1alpha1.MonitorAccount), false, "create user").
+				SetLifecycleAction("AccountProvision", defaultActionHandler).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, appsv1alpha1.AvailablePhase)
 		})
 	})
 

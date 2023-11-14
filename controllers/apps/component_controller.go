@@ -142,6 +142,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentCredentialTransformer{},
 			// handle tls volume and cert
 			&componentTLSTransformer{},
+			// handle component custom volumes
+			&componentCustomVolumesTransformer{},
 			// render component configurations
 			&componentConfigurationTransformer{Client: r.Client},
 			// handle the component workload

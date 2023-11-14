@@ -450,12 +450,13 @@ var _ = Describe("Component Controller", func() {
 				pods[0].ObjectMeta.Labels[constant.RoleLabelKey] = "primary"
 			}
 			Expect(testCtx.CheckedCreateObj(testCtx.Ctx, &pod)).Should(Succeed())
-			// mock the status to pass the isReady(pod) check in consensus_set
-			pod.Status.Conditions = []corev1.PodCondition{{
-				Type:   corev1.PodReady,
-				Status: corev1.ConditionTrue,
-			}}
-			Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
+			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(&pod), func(p *corev1.Pod) {
+				// mock the status to pass the isReady(pod) check in consensus_set
+				p.Status.Conditions = []corev1.PodCondition{{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionTrue,
+				}}
+			})).Should(Succeed())
 		}
 
 		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))

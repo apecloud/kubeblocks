@@ -86,7 +86,7 @@ func TestDeepCopy(t *testing.T) {
 			Value: "values",
 		}
 		d := &stringStruct{}
-		DeepCopy(s, d)
+		_ = DeepCopy(s, d)
 		t.Logf("s: %v\n", s)
 		t.Logf("d: %v\n", d)
 		assert.Equal(t, s, d)
@@ -121,7 +121,7 @@ func TestDeepCopy(t *testing.T) {
 		fmt.Printf("sliceStruct s: %v \n", s)
 
 		d := &sliceStruct{}
-		DeepCopy(&s, d)
+		_ = DeepCopy(&s, d)
 		fmt.Printf("sliceStruct d: %v \n", d)
 		assert.Equal(t, *d, s)
 		d.A[0] = 2
@@ -137,7 +137,7 @@ func TestDeepCopy(t *testing.T) {
 		}
 		fmt.Printf("s: %v\n", s)
 		d := &mapStruct{}
-		DeepCopy(&s, d)
+		_ = DeepCopy(&s, d)
 		fmt.Printf("d: %v\n", d)
 		assert.Equal(t, s, *d)
 
@@ -154,7 +154,7 @@ func TestDeepCopy(t *testing.T) {
 		}
 		fmt.Printf("s: %v\n", s)
 		d := &privateStruct{}
-		DeepCopy(&s, d)
+		_ = DeepCopy(&s, d)
 		fmt.Printf("d: %v\n", d)
 		assert.Equal(t, d.Key, s.Key)
 		assert.NotEqual(t, d.value, s.value)
@@ -179,7 +179,7 @@ func TestDeepCopy(t *testing.T) {
 
 		fmt.Printf("p: %v\n", p)
 		d := &pointerStruct{}
-		DeepCopy(&p, d)
+		_ = DeepCopy(&p, d)
 		fmt.Printf("d: %v\n", d)
 		assert.Equal(t, d.Key, p.Key)
 		assert.Equal(t, *d.P, *p.P)

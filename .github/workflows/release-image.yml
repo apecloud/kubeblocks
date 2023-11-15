@@ -40,35 +40,35 @@ jobs:
 
   release-image:
     needs: image-tag
-    uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.12
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.38
     with:
       MAKE_OPS_PRE: "generate"
       IMG: "apecloud/kubeblocks"
       VERSION: "${{ needs.image-tag.outputs.tag-name }}"
       GO_VERSION: "1.20.5"
-      APECD_REF: "v0.1.12"
+      APECD_REF: "v0.1.38"
       DOCKERFILE_PATH: "./docker/Dockerfile"
     secrets: inherit
 
   release-tools-image:
     needs: image-tag
-    uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.12
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.38
     with:
       MAKE_OPS_PRE: "generate test-go-generate"
       IMG: "apecloud/kubeblocks-tools"
       VERSION: "${{ needs.image-tag.outputs.tag-name }}"
       GO_VERSION: "1.20.5"
-      APECD_REF: "v0.1.12"
+      APECD_REF: "v0.1.38"
       DOCKERFILE_PATH: "./docker/Dockerfile-tools"
     secrets: inherit
 
   release-datascript-image:
     needs: image-tag
-    uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.12
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.38
     with:
       IMG: "apecloud/kubeblocks-datascript"
       VERSION: "${{ needs.image-tag.outputs.tag-name }}"
-      APECD_REF: "v0.1.12"
+      APECD_REF: "v0.1.38"
       DOCKERFILE_PATH: "./docker/Dockerfile-datascript"
     secrets: inherit
 

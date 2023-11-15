@@ -67,10 +67,12 @@ func MergeUpdatedConfig(baseMap, updatedMap map[string]string) map[string]string
 func FromStringMap(m map[string]*string) map[string]interface{} {
 	r := make(map[string]interface{}, len(m))
 	for key, v := range m {
-		if v != nil {
+		switch {
+		case hasArrayField(key):
+			r[GetValidFieldName(key)] = fromJSONString(v)
+		case v != nil:
 			r[key] = *v
-		} else {
-			// delete config parameter if value is nil
+		default:
 			r[key] = nil
 		}
 	}

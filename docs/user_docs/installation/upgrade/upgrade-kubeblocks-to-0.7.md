@@ -15,5 +15,5 @@ sidebar_label: Upgrade to KubeBlocks v0.7
 2. Upgrade KubeBlocks from v0.6 to v0.7.
 
    ```bash
-   kbcli upgrade --version=0.7.0
+   kbcli kubeblocks upgrade --version=0.7.0
    ```

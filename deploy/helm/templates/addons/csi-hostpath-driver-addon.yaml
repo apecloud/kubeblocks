@@ -44,7 +44,7 @@ spec:
         operator: DoesNotContain
         values:
           - eks
-          - aliyun
+          - aliyun.
           - gke
           - tke
           - aks

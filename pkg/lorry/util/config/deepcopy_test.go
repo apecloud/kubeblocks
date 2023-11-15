@@ -103,8 +103,8 @@ func TestDeepCopy(t *testing.T) {
 		}
 		func(s any) {
 			sv := reflect.ValueOf(s)
-			//p1 := unsafe.Pointer(sv.UnsafeAddr())
-			//s1 := (*sliceStruct)(p1)
+			// p1 := unsafe.Pointer(sv.UnsafeAddr())
+			// s1 := (*sliceStruct)(p1)
 			fmt.Printf("sliceStruct s: %v \n", s)
 			s1 := s.(sliceStruct)
 			s1.Key = "slice1"

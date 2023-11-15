@@ -81,13 +81,15 @@ func (f *MockRestoreFactory) initReadyConfig() {
 	}
 }
 
-func (f *MockRestoreFactory) buildRestoreVolumeClaim(name, volumeSource, mountPath, storageClass string) dpv1alpha1.RestoreVolumeClaim {
+func (f *MockRestoreFactory) buildRestoreVolumeClaim(name, volumeSource, mountPath, storageClass string, labels map[string]string) dpv1alpha1.RestoreVolumeClaim {
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	labels[constant.AppManagedByLabelKey] = "restore"
 	return dpv1alpha1.RestoreVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-			Labels: map[string]string{
-				constant.AppManagedByLabelKey: "restore",
-			},
+			Name:   name,
+			Labels: labels,
 		},
 		VolumeConfig: dpv1alpha1.VolumeConfig{
 			VolumeSource: volumeSource,
@@ -126,13 +128,13 @@ func (f *MockRestoreFactory) SetDataSourceRef(volumeSource, mountPath string) *M
 	return f
 }
 
-func (f *MockRestoreFactory) SetVolumeClaimsTemplate(templateName, volumeSource, mountPath, storageClass string, replicas, startingIndex int32) *MockRestoreFactory {
+func (f *MockRestoreFactory) SetVolumeClaimsTemplate(templateName, volumeSource, mountPath, storageClass string, replicas, startingIndex int32, labels map[string]string) *MockRestoreFactory {
 	f.initPrepareDataConfig()
 	f.Get().Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate = &dpv1alpha1.RestoreVolumeClaimsTemplate{
 		Replicas:      replicas,
 		StartingIndex: startingIndex,
 		Templates: []dpv1alpha1.RestoreVolumeClaim{
-			f.buildRestoreVolumeClaim(templateName, volumeSource, mountPath, storageClass),
+			f.buildRestoreVolumeClaim(templateName, volumeSource, mountPath, storageClass, labels),
 		},
 	}
 	return f
@@ -141,7 +143,7 @@ func (f *MockRestoreFactory) SetVolumeClaimsTemplate(templateName, volumeSource,
 func (f *MockRestoreFactory) AddVolumeClaim(claimName, volumeSource, mountPath, storageClass string) *MockRestoreFactory {
 	f.initPrepareDataConfig()
 	f.Get().Spec.PrepareDataConfig.RestoreVolumeClaims = append(f.Get().Spec.PrepareDataConfig.RestoreVolumeClaims,
-		f.buildRestoreVolumeClaim(claimName, volumeSource, mountPath, storageClass))
+		f.buildRestoreVolumeClaim(claimName, volumeSource, mountPath, storageClass, nil))
 	return f
 }
 

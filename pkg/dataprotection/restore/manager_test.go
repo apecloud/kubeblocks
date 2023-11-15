@@ -80,9 +80,10 @@ var _ = Describe("Backup Deleter Test", func() {
 
 	Context("with restore manager functions", func() {
 		var (
-			actionSet *dpv1alpha1.ActionSet
-			nodeName  = "minikube"
-			replicas  = 2
+			actionSet    *dpv1alpha1.ActionSet
+			nodeName     = "minikube"
+			replicas     = 2
+			instanceName = "test"
 		)
 
 		BeforeEach(func() {
@@ -182,7 +183,7 @@ var _ = Describe("Backup Deleter Test", func() {
 			useVolumeSnapshot := true
 			restoreMGR, backupSet := initResources(reqCtx, startingIndex, useVolumeSnapshot, func(f *testdp.MockRestoreFactory) {
 				f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
-					testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex))
+					testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex), nil)
 			})
 
 			By("test RestorePVCFromSnapshot function")
@@ -196,13 +197,17 @@ var _ = Describe("Backup Deleter Test", func() {
 			startingIndex := 1
 			restoreMGR, backupSet := initResources(reqCtx, startingIndex, false, func(f *testdp.MockRestoreFactory) {
 				f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
-					testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex))
+					testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex), map[string]string{
+						constant.AppInstanceLabelKey: instanceName,
+					})
 			})
 
 			By(fmt.Sprintf("test BuildPrepareDataJobs function, expect for %d jobs", replicas))
 			actionSetName := "preparedata-0"
 			jobs, err := restoreMGR.BuildPrepareDataJobs(reqCtx, k8sClient, *backupSet, actionSetName)
 			Expect(err).ShouldNot(HaveOccurred())
+			// job contains the pvc's label
+			Expect(jobs[0].Spec.Template.Labels[constant.AppInstanceLabelKey]).Should(Equal(instanceName))
 			Expect(len(jobs)).Should(Equal(replicas))
 			// image should be expanded by env
 			Expect(jobs[0].Spec.Template.Spec.Containers[0].Image).Should(ContainSubstring(testdp.ImageTag))
@@ -215,7 +220,7 @@ var _ = Describe("Backup Deleter Test", func() {
 			startingIndex := 1
 			restoreMGR, backupSet := initResources(reqCtx, startingIndex, false, func(f *testdp.MockRestoreFactory) {
 				f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
-					testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex)).
+					testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex), nil).
 					SetVolumeClaimRestorePolicy(dpv1alpha1.VolumeClaimRestorePolicySerial)
 			})
 

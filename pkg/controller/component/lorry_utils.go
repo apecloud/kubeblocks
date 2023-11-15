@@ -57,8 +57,13 @@ var (
 
 // buildLorryContainers builds lorry containers for component.
 // In the new ComponentDefinition API, StatusProbe and RunningProbe have been removed.
-// TODO(xingran): workloadType and characterType dependency should be removed from lorry container.
 func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *SynthesizedComponent) error {
+	// If it's not a built-in handler supported by Lorry, LorryContainers are not injected by default.
+	builtinHandler := getBuiltinActionHandler(synthesizeComp)
+	if builtinHandler == appsv1alpha1.UnknownBuiltinActionHandler {
+		return nil
+	}
+
 	container := buildBasicContainer(synthesizeComp)
 	var lorryContainers []corev1.Container
 	lorrySvcHTTPPort := viper.GetInt32("PROBE_SERVICE_HTTP_PORT")
@@ -221,15 +226,10 @@ func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container 
 		secretName = constant.GenerateDefaultConnCredential(synthesizeComp.ClusterName)
 	}
 	container.Env = append(container.Env,
-		// TODO(xingran): remove KBEnvCharacterType and KBEnvWorkloadType in the future.
+		// inject the default built-in handler env to lorry container.
 		corev1.EnvVar{
-			Name:      constant.KBEnvCharacterType,
-			Value:     synthesizeComp.CharacterType,
-			ValueFrom: nil,
-		},
-		corev1.EnvVar{
-			Name:      constant.KBEnvWorkloadType,
-			Value:     string(synthesizeComp.WorkloadType),
+			Name:      constant.KBEnvBuiltinHandler,
+			Value:     string(getBuiltinActionHandler(synthesizeComp)),
 			ValueFrom: nil,
 		},
 		corev1.EnvVar{
@@ -254,16 +254,6 @@ func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container 
 				},
 			},
 		})
-
-	// inject the default built-in handler env to lorry container.
-	builtinHandler := getBuiltinActionHandler(synthesizeComp)
-	if builtinHandler != appsv1alpha1.UnknownBuiltinActionHandler {
-		container.Env = append(container.Env, corev1.EnvVar{
-			Name:      constant.KBEnvBuiltinHandler,
-			Value:     string(builtinHandler),
-			ValueFrom: nil,
-		})
-	}
 
 	container.Ports = []corev1.ContainerPort{
 		{
@@ -303,36 +293,6 @@ func buildRoleProbeContainer(roleChangedContainer *corev1.Container, roleProbe *
 	probe.FailureThreshold = roleProbe.FailureThreshold
 	roleChangedContainer.ReadinessProbe = probe
 	roleChangedContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
-}
-
-func buildStatusProbeContainer(characterType string, statusProbeContainer *corev1.Container,
-	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
-	statusProbeContainer.Name = constant.StatusProbeContainerName
-	probe := &corev1.Probe{}
-	httpGet := &corev1.HTTPGetAction{}
-	httpGet.Path = fmt.Sprintf(checkStatusURIFormat, characterType)
-	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
-	probe.HTTPGet = httpGet
-	probe.PeriodSeconds = probeSetting.PeriodSeconds
-	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
-	probe.FailureThreshold = probeSetting.FailureThreshold
-	statusProbeContainer.ReadinessProbe = probe
-	statusProbeContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
-}
-
-func buildRunningProbeContainer(characterType string, runningProbeContainer *corev1.Container,
-	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
-	runningProbeContainer.Name = constant.RunningProbeContainerName
-	probe := &corev1.Probe{}
-	httpGet := &corev1.HTTPGetAction{}
-	httpGet.Path = fmt.Sprintf(checkRunningURIFormat, characterType)
-	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
-	probe.HTTPGet = httpGet
-	probe.PeriodSeconds = probeSetting.PeriodSeconds
-	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
-	probe.FailureThreshold = probeSetting.FailureThreshold
-	runningProbeContainer.ReadinessProbe = probe
-	runningProbeContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
 func volumeProtectionEnabled(component *SynthesizedComponent) bool {

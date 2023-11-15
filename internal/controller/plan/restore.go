@@ -615,6 +615,9 @@ func (p *RestoreManager) BuildDatafileRestoreJobByPVCS(synthesizedComponent *com
 		if job.Spec.Template.Spec.Affinity, err = component.BuildPodAffinity(p.Cluster, affinity, synthesizedComponent); err != nil {
 			return nil, err
 		}
+		job.Spec.Template.ObjectMeta = metav1.ObjectMeta{
+			Labels: labels,
+		}
 		if p.Scheme != nil {
 			if err = controllerutil.SetControllerReference(p.Cluster, job, p.Scheme); err != nil {
 				return nil, err

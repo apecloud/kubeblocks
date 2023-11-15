@@ -106,7 +106,10 @@ func deepCopyStruct(s, d reflect.Value) error {
 
 		dfieldValue := dValue.Field(i)
 		sfieldValue := sValue.Field(i)
-		deepCopy(sfieldValue, dfieldValue)
+		err := deepCopy(sfieldValue, dfieldValue)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -140,7 +143,10 @@ func deepCopySlice(s, d reflect.Value) error {
 	sliceType := reflect.SliceOf(valElemType)
 	sliceVar := reflect.MakeSlice(sliceType, s.Len(), s.Len())
 	for i := 0; i < s.Len(); i++ {
-		deepCopy(s.Index(i), sliceVar.Index(i))
+		err := deepCopy(s.Index(i), sliceVar.Index(i))
+		if err != nil {
+			return err
+		}
 	}
 	d.Set(sliceVar)
 	return nil
@@ -154,9 +160,15 @@ func deepCopyMap(s, d reflect.Value) error {
 	valMap := reflect.MakeMap(mapType)
 	for _, k := range s.MapKeys() {
 		currentKey := reflect.Indirect(reflect.New(valKeyType))
-		deepCopy(k, currentKey)
+		err := deepCopy(k, currentKey)
+		if err != nil {
+			return err
+		}
 		currentElem := reflect.Indirect(reflect.New(valElemType))
-		deepCopy(s.MapIndex(k), currentElem)
+		err = deepCopy(s.MapIndex(k), currentElem)
+		if err != nil {
+			return err
+		}
 		valMap.SetMapIndex(currentKey, currentElem)
 	}
 	d.Set(valMap)

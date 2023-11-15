@@ -34,10 +34,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlcomputil "github.com/apecloud/kubeblocks/pkg/controller/component"
+	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -66,7 +65,7 @@ func needDoSwitchover(ctx context.Context,
 	case constant.KBSwitchoverCandidateInstanceForAnyPod:
 		return true, nil
 	default:
-		podList, err := components.GetComponentPodList(ctx, cli, *cluster, componentSpec.Name)
+		podList, err := intctrlcomp.GetComponentPodList(ctx, cli, *cluster, componentSpec.Name)
 		if err != nil {
 			return false, err
 		}
@@ -346,7 +345,7 @@ func buildSwitchoverEnvs(ctx context.Context,
 		return nil, errors.New("switchover spec not found")
 	}
 	// replace secret env and merge envs defined in SwitchoverSpec
-	replaceSwitchoverConnCredentialEnv(cluster.Name, componentDef.SwitchoverSpec)
+	replaceSwitchoverConnCredentialEnv(cluster.Name, componentDef.SwitchoverSpec, componentSpec)
 	var switchoverEnvs []corev1.EnvVar
 	switch switchover.InstanceName {
 	case constant.KBSwitchoverCandidateInstanceForAnyPod:
@@ -373,14 +372,16 @@ func buildSwitchoverEnvs(ctx context.Context,
 }
 
 // replaceSwitchoverConnCredentialEnv replaces the connection credential environment variables for the switchover job.
-func replaceSwitchoverConnCredentialEnv(clusterName string, switchoverSpec *appsv1alpha1.SwitchoverSpec) {
+func replaceSwitchoverConnCredentialEnv(clusterName string, switchoverSpec *appsv1alpha1.SwitchoverSpec, componentSpec *appsv1alpha1.ClusterComponentSpec) {
 	if switchoverSpec == nil {
 		return
 	}
-	namedValuesMap := intctrlcomputil.GetEnvReplacementMapForConnCredential(clusterName)
+	connCredentialMap := intctrlcomp.GetEnvReplacementMapForConnCredential(clusterName)
+	compConnCredentialMap := intctrlcomp.GetEnvReplacementMapForCompConnCredential(clusterName, componentSpec.Name)
 	replaceEnvVars := func(cmdExecutorConfig *appsv1alpha1.CmdExecutorConfig) {
 		if cmdExecutorConfig != nil {
-			cmdExecutorConfig.Env = intctrlcomputil.ReplaceSecretEnvVars(namedValuesMap, cmdExecutorConfig.Env)
+			cmdExecutorConfig.Env = intctrlcomp.ReplaceSecretEnvVars(connCredentialMap, cmdExecutorConfig.Env)
+			cmdExecutorConfig.Env = intctrlcomp.ReplaceSecretEnvVars(compConnCredentialMap, cmdExecutorConfig.Env)
 		}
 	}
 	replaceEnvVars(switchoverSpec.WithCandidate.CmdExecutorConfig)
@@ -436,7 +437,7 @@ func buildSwitchoverWorkloadEnvs(ctx context.Context,
 		}
 		workloadEnvs = append(workloadEnvs, csEnvs...)
 	}
-	// add tht first container's environment variables of the primary pod
+	// add the first container's environment variables of the primary pod
 	workloadEnvs = append(workloadEnvs, pod.Spec.Containers[0].Env...)
 	return workloadEnvs, nil
 }
@@ -539,9 +540,9 @@ func getPrimaryOrLeaderPod(ctx context.Context, cli client.Client, cluster appsv
 	}
 	switch compDef.WorkloadType {
 	case appsv1alpha1.Replication:
-		podList, err = components.GetComponentPodListWithRole(ctx, cli, cluster, compSpecName, constant.Primary)
+		podList, err = intctrlcomp.GetComponentPodListWithRole(ctx, cli, cluster, compSpecName, constant.Primary)
 	case appsv1alpha1.Consensus:
-		podList, err = components.GetComponentPodListWithRole(ctx, cli, cluster, compSpecName, compDef.ConsensusSpec.Leader.Name)
+		podList, err = intctrlcomp.GetComponentPodListWithRole(ctx, cli, cluster, compSpecName, compDef.ConsensusSpec.Leader.Name)
 	}
 	if err != nil {
 		return nil, err

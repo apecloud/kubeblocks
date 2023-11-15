@@ -5,80 +5,6 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - apps
-  resources:
-  - deployments
-  verbs:
-  - create
-  - delete
-  - deletecollection
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps
-  resources:
-  - deployments/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps
-  resources:
-  - deployments/status
-  verbs:
-  - get
-- apiGroups:
-  - apps
-  resources:
-  - replicasets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps
-  resources:
-  - replicasets/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps
-  resources:
-  - replicasets/status
-  verbs:
-  - get
-- apiGroups:
-  - apps
-  resources:
-  - statefulsets
-  verbs:
-  - create
-  - delete
-  - deletecollection
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps
-  resources:
-  - statefulsets/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps
-  resources:
-  - statefulsets/status
-  verbs:
-  - get
-- apiGroups:
   - apps.kubeblocks.io
   resources:
   - backuppolicytemplates
@@ -211,11 +137,64 @@ rules:
 - apiGroups:
   - apps.kubeblocks.io
   resources:
+  - componentdefinitions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - componentdefinitions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - componentdefinitions/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
   - componentresourceconstraints
   verbs:
   - get
   - list
   - watch
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - components
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - components/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - components/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - apps.kubeblocks.io
   resources:
@@ -421,16 +400,6 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - endpoints
-  verbs:
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - events
   verbs:
   - create
@@ -505,30 +474,6 @@ rules:
   verbs:
   - get
   - list
-- apiGroups:
-  - ""
-  resources:
-  - resourcequotas
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - resourcequotas/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - resourcequotas/status
-  verbs:
-  - get
 - apiGroups:
   - ""
   resources:

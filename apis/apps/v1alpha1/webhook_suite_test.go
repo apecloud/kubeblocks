@@ -161,6 +161,12 @@ var _ = BeforeSuite(func() {
 
 	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)
 
+	err = (&ComponentDefinition{}).SetupWebhookWithManager(mgr)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = (&Component{}).SetupWebhookWithManager(mgr)
+	Expect(err).NotTo(HaveOccurred())
+
 	// +kubebuilder:scaffold:webhook
 
 	go func() {

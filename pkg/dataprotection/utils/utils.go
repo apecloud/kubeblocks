@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package utils
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"reflect"
@@ -215,4 +216,26 @@ func GetBackupType(actionSet *dpv1alpha1.ActionSet, useSnapshot *bool) dpv1alpha
 		return dpv1alpha1.BackupTypeFull
 	}
 	return ""
+}
+
+// PrependSpaces prepends spaces to each line of the content.
+func PrependSpaces(content string, spaces int) string {
+	prefix := ""
+	for i := 0; i < spaces; i++ {
+		prefix += " "
+	}
+	r := bytes.NewBufferString(content)
+	w := bytes.NewBuffer(nil)
+	w.Grow(r.Len())
+	for {
+		line, err := r.ReadString('\n')
+		if len(line) > 0 {
+			w.WriteString(prefix)
+			w.WriteString(line)
+		}
+		if err != nil {
+			break
+		}
+	}
+	return w.String()
 }

@@ -34,7 +34,7 @@ const (
 	ConfVolumeName      = "conf"
 	DataVolumeName      = "data"
 	ScriptsVolumeName   = "scripts"
-	ServiceDefaultName  = ""
+	ServiceDefaultName  = "default"
 	ServiceHeadlessName = "headless"
 	ServiceVPCName      = "vpc-lb"
 	ServiceInternetName = "internet-lb"
@@ -60,12 +60,25 @@ const (
 	Class2c4gName                 = "general-2c4g"
 	DefaultResourceConstraintName = "kb-resource-constraint"
 
-	StogrageClassName = "test-sc"
-	EnvKeyImageTag    = "IMAGE_TAG"
-	DefaultImageTag   = "test"
+	StorageClassName = "test-sc"
+	EnvKeyImageTag   = "IMAGE_TAG"
+	DefaultImageTag  = "test"
+
+	DefaultConfigSpecName          = "config-cm"
+	DefaultConfigSpecTplRef        = "env-from-config-tpl"
+	DefaultConfigSpecVolumeName    = "volume"
+	DefaultConfigSpecConstraintRef = "env-from-config-test"
+	DefaultScriptSpecName          = "script-cm"
+	DefaultScriptSpecTplRef        = "env-from-config-tpl"
+	DefaultScriptSpecVolumeName    = "script-volume"
 )
 
 var (
+	defaultBuiltinHandler         = appsv1alpha1.MySQLBuiltinActionHandler
+	defaultLifecycleActionHandler = &appsv1alpha1.LifecycleActionHandler{
+		BuiltinHandler: &defaultBuiltinHandler,
+	}
+
 	zeroResRequirements = corev1.ResourceRequirements{
 		Limits: map[corev1.ResourceName]resource.Quantity{
 			corev1.ResourceCPU:    resource.MustParse("0"),
@@ -204,6 +217,7 @@ var (
 
 	defaultMySQLService = appsv1alpha1.ServiceSpec{
 		Ports: []appsv1alpha1.ServicePort{{
+			Name:     "mysql",
 			Protocol: corev1.ProtocolTCP,
 			Port:     3306,
 		}},
@@ -229,6 +243,156 @@ var (
 			Name: DataVolumeName,
 			Type: appsv1alpha1.VolumeTypeData,
 		}},
+	}
+
+	defaultComponentDefSpec = appsv1alpha1.ComponentDefinitionSpec{
+		Provider:       "kubeblocks.io",
+		Description:    "ApeCloud MySQL is a database that is compatible with MySQL syntax and achieves high availability\n  through the utilization of the RAFT consensus protocol.",
+		ServiceKind:    "mysql",
+		ServiceVersion: "8.0.30",
+		Runtime: corev1.PodSpec{
+			Containers: []corev1.Container{
+				defaultMySQLContainer,
+			},
+		},
+		Volumes: []appsv1alpha1.ComponentVolume{
+			{
+				Name:         DataVolumeName,
+				NeedSnapshot: true,
+			},
+			{
+				Name:         LogVolumeName,
+				NeedSnapshot: true,
+			},
+		},
+		Services: []appsv1alpha1.Service{
+			{
+				Name:        "rw",
+				ServiceName: "rw",
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Protocol: corev1.ProtocolTCP,
+							Port:     3306,
+							TargetPort: intstr.IntOrString{
+								Type:   intstr.String,
+								StrVal: "mysql",
+							},
+						},
+					},
+				},
+				RoleSelector: "leader",
+			},
+			{
+				Name:        "ro",
+				ServiceName: "ro",
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Protocol: corev1.ProtocolTCP,
+							Port:     3306,
+							TargetPort: intstr.IntOrString{
+								Type:   intstr.String,
+								StrVal: "mysql",
+							},
+						},
+					},
+				},
+				RoleSelector: "follower",
+			},
+		},
+		SystemAccounts: []appsv1alpha1.SystemAccount{
+			{
+				Name:        "root",
+				InitAccount: true,
+				PasswordGenerationPolicy: appsv1alpha1.PasswordConfig{
+					Length:     16,
+					NumDigits:  8,
+					NumSymbols: 8,
+					LetterCase: appsv1alpha1.MixedCases,
+				},
+			},
+			{
+				Name:      "admin",
+				Statement: "CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWORD)'; GRANT ALL PRIVILEGES ON *.* TO $(USERNAME);",
+				PasswordGenerationPolicy: appsv1alpha1.PasswordConfig{
+					Length:     10,
+					NumDigits:  5,
+					NumSymbols: 0,
+					LetterCase: appsv1alpha1.MixedCases,
+				},
+			},
+		},
+		ConnectionCredentials: []appsv1alpha1.ConnectionCredential{
+			{
+				Name:        "root",
+				ServiceName: "rw",
+				AccountName: "root",
+			},
+			{
+				Name:        "admin",
+				ServiceName: "rw",
+				AccountName: "admin",
+			},
+		},
+		Roles: []appsv1alpha1.ReplicaRole{
+			{
+				Name:        "leader",
+				Serviceable: true,
+				Writable:    true,
+				Votable:     true,
+			},
+			{
+				Name:        "follower",
+				Serviceable: true,
+				Writable:    false,
+				Votable:     true,
+			},
+			{
+				Name:        "learner",
+				Serviceable: false,
+				Writable:    false,
+				Votable:     false,
+			},
+		},
+		LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{
+			PostStart: defaultLifecycleActionHandler,
+			PreStop:   defaultLifecycleActionHandler,
+			RoleProbe: &appsv1alpha1.RoleProbeSpec{
+				LifecycleActionHandler: *defaultLifecycleActionHandler,
+				FailureThreshold:       3,
+				PeriodSeconds:          1,
+				TimeoutSeconds:         5,
+			},
+			Switchover:       nil,
+			MemberJoin:       defaultLifecycleActionHandler,
+			MemberLeave:      defaultLifecycleActionHandler,
+			Readonly:         defaultLifecycleActionHandler,
+			Readwrite:        defaultLifecycleActionHandler,
+			DataPopulate:     defaultLifecycleActionHandler,
+			DataAssemble:     defaultLifecycleActionHandler,
+			Reconfigure:      defaultLifecycleActionHandler,
+			AccountProvision: defaultLifecycleActionHandler,
+		},
+	}
+
+	DefaultCompDefConfigs = []appsv1alpha1.ComponentConfigSpec{
+		{
+			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+				Name:        DefaultConfigSpecName,
+				TemplateRef: DefaultConfigSpecTplRef,
+				VolumeName:  DefaultConfigSpecVolumeName,
+			},
+			ConfigConstraintRef: DefaultConfigSpecConstraintRef,
+		},
+	}
+
+	DefaultCompDefScripts = []appsv1alpha1.ComponentTemplateSpec{
+		{
+			Name:        DefaultScriptSpecName,
+			TemplateRef: DefaultScriptSpecTplRef,
+			VolumeName:  DefaultScriptSpecVolumeName,
+		},
 	}
 
 	defaultRedisService = appsv1alpha1.ServiceSpec{

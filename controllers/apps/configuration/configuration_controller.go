@@ -99,14 +99,12 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		ClusterDef().
 		ClusterVer().
 		ClusterComponent().
-		ClusterDefComponent().
-		ClusterVerComponent().
 		Complete()
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to get related object.")
 	}
 
-	if fetcherTask.ClusterComObj == nil || fetcherTask.ClusterDefComObj == nil {
+	if fetcherTask.ClusterComObj == nil {
 		return r.failWithInvalidComponent(configuration, reqCtx)
 	}
 
@@ -149,14 +147,7 @@ func (r *ConfigurationReconciler) runTasks(taskCtx TaskContext, tasks []Task) (e
 		configuration = taskCtx.configuration
 	)
 
-	synthesizedComp, err = component.BuildComponent(taskCtx.reqCtx,
-		nil,
-		taskCtx.fetcher.ClusterObj,
-		taskCtx.fetcher.ClusterDefObj,
-		taskCtx.fetcher.ClusterDefComObj,
-		taskCtx.fetcher.ClusterComObj,
-		nil,
-		taskCtx.fetcher.ClusterVerComObj)
+	synthesizedComp, err = component.BuildSynthesizedComponentWrapper(taskCtx.reqCtx, r.Client, taskCtx.fetcher.ClusterObj, taskCtx.fetcher.ClusterComObj)
 	if err != nil {
 		return err
 	}

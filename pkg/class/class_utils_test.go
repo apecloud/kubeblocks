@@ -107,7 +107,7 @@ var _ = Describe("utils", func() {
 				Expect(clsMgr.ValidateResources(clusterDefinitionName, comp)).ShouldNot(HaveOccurred())
 			})
 
-			It("should match minial class with partial classDefRef", func() {
+			It("should match minimal class with partial classDefRef", func() {
 				comp := &v1alpha1.ClusterComponentSpec{
 					ComponentDefRef: compType1,
 					ClassDefRef: &v1alpha1.ClassDefRef{
@@ -168,7 +168,7 @@ var _ = Describe("utils", func() {
 				Expect(err).Should(HaveOccurred())
 			})
 
-			It("should match minial class with empty resource", func() {
+			It("should match minimal class with empty resource", func() {
 				comp := &v1alpha1.ClusterComponentSpec{
 					ComponentDefRef: compType1,
 				}
@@ -180,7 +180,7 @@ var _ = Describe("utils", func() {
 				Expect(clsMgr.ValidateResources(clusterDefinitionName, comp)).ShouldNot(HaveOccurred())
 			})
 
-			It("should match minial memory if with only cpu", func() {
+			It("should match minimal memory if with only cpu", func() {
 				comp := &v1alpha1.ClusterComponentSpec{
 					ComponentDefRef: compType1,
 					Resources: corev1.ResourceRequirements{
@@ -195,7 +195,7 @@ var _ = Describe("utils", func() {
 				Expect(clsMgr.ValidateResources(clusterDefinitionName, comp)).ShouldNot(HaveOccurred())
 			})
 
-			It("should match minial cpu if with only memory", func() {
+			It("should match minimal cpu if with only memory", func() {
 				comp := &v1alpha1.ClusterComponentSpec{
 					ComponentDefRef: compType1,
 					Resources: corev1.ResourceRequirements{

@@ -49,7 +49,7 @@ var _ = Describe("monitor_utils", func() {
 
 		It("should disable monitor if ClusterComponentSpec.Monitor is false", func() {
 			clusterCompSpec.Monitor = false
-			buildMonitorConfig(clusterCompDef, clusterCompSpec, component)
+			buildMonitorConfigLegacy(clusterCompDef, clusterCompSpec, component)
 			monitorConfig := component.Monitor
 			Expect(monitorConfig.Enable).Should(BeFalse())
 			Expect(monitorConfig.BuiltIn).Should(BeFalse())
@@ -60,7 +60,7 @@ var _ = Describe("monitor_utils", func() {
 		It("should disable builtin monitor if ClusterComponentDefinition.Monitor.BuiltIn is false and has valid ExporterConfig", func() {
 			clusterCompSpec.Monitor = true
 			clusterCompDef.Monitor.BuiltIn = false
-			buildMonitorConfig(clusterCompDef, clusterCompSpec, component)
+			buildMonitorConfigLegacy(clusterCompDef, clusterCompSpec, component)
 			monitorConfig := component.Monitor
 			Expect(monitorConfig.Enable).Should(BeTrue())
 			Expect(monitorConfig.BuiltIn).Should(BeFalse())
@@ -72,7 +72,7 @@ var _ = Describe("monitor_utils", func() {
 			clusterCompSpec.Monitor = true
 			clusterCompDef.Monitor.BuiltIn = false
 			clusterCompDef.Monitor.Exporter = nil
-			buildMonitorConfig(clusterCompDef, clusterCompSpec, component)
+			buildMonitorConfigLegacy(clusterCompDef, clusterCompSpec, component)
 			monitorConfig := component.Monitor
 			Expect(monitorConfig.Enable).Should(BeFalse())
 			Expect(monitorConfig.BuiltIn).Should(BeFalse())
@@ -84,7 +84,7 @@ var _ = Describe("monitor_utils", func() {
 			clusterCompSpec.Monitor = true
 			clusterCompDef.Monitor.BuiltIn = true
 			clusterCompDef.Monitor.Exporter = nil
-			buildMonitorConfig(clusterCompDef, clusterCompSpec, component)
+			buildMonitorConfigLegacy(clusterCompDef, clusterCompSpec, component)
 			monitorConfig := component.Monitor
 			Expect(monitorConfig.Enable).Should(BeTrue())
 			Expect(monitorConfig.BuiltIn).Should(BeTrue())

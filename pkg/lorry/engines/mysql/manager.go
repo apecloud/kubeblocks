@@ -471,7 +471,7 @@ func (mgr *Manager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string
 // 	return mgr.IsMemberHealthy(ctx, cluster, leaderMember)
 // }
 
-// IsClusterInitialized is a method to check if cluster is initailized or not
+// IsClusterInitialized is a method to check if cluster is initialized or not
 func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	return mgr.EnsureServerID(ctx)
 }

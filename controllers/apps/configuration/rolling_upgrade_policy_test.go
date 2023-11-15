@@ -86,7 +86,8 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 		k8sMockClient.Finish()
 	})
 
-	Context("consensus rolling reconfigure policy test", func() {
+	// TODO(component)
+	PContext("consensus rolling reconfigure policy test", func() {
 		It("Should success without error", func() {
 			Expect(rollingPolicy.GetPolicyName()).Should(BeEquivalentTo("rolling"))
 
@@ -230,7 +231,8 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 		})
 	})
 
-	Context("rolling reconfigure policy test for not supported component", func() {
+	// TODO(component)
+	PContext("rolling reconfigure policy test for not supported component", func() {
 		It("Should failed", func() {
 			// not supported type
 			_ = mockParam

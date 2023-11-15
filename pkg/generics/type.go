@@ -101,6 +101,10 @@ var ClusterVersionSignature = func(_ appsv1alpha1.ClusterVersion, _ *appsv1alpha
 }
 var ClusterDefinitionSignature = func(_ appsv1alpha1.ClusterDefinition, _ *appsv1alpha1.ClusterDefinition, _ appsv1alpha1.ClusterDefinitionList, _ *appsv1alpha1.ClusterDefinitionList) {
 }
+var ComponentSignature = func(appsv1alpha1.Component, *appsv1alpha1.Component, appsv1alpha1.ComponentList, *appsv1alpha1.ComponentList) {
+}
+var ComponentDefinitionSignature = func(appsv1alpha1.ComponentDefinition, *appsv1alpha1.ComponentDefinition, appsv1alpha1.ComponentDefinitionList, *appsv1alpha1.ComponentDefinitionList) {
+}
 var OpsRequestSignature = func(_ appsv1alpha1.OpsRequest, _ *appsv1alpha1.OpsRequest, _ appsv1alpha1.OpsRequestList, _ *appsv1alpha1.OpsRequestList) {
 }
 var ConfigConstraintSignature = func(_ appsv1alpha1.ConfigConstraint, _ *appsv1alpha1.ConfigConstraint, _ appsv1alpha1.ConfigConstraintList, _ *appsv1alpha1.ConfigConstraintList) {

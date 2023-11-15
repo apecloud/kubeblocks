@@ -20,12 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"context"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -36,19 +35,18 @@ import (
 )
 
 var _ = Describe("test cluster Failed/Abnormal phase", func() {
-
 	var (
-		ctx                = context.Background()
-		clusterName        = ""
-		clusterDefName     = ""
-		clusterVersionName = ""
+		clusterDefName = ""
+		clusterVerName = ""
+		clusterName    = ""
+		clusterKey     types.NamespacedName
 	)
 
 	setupResourceNames := func() {
 		suffix := testCtx.GetRandomStr()
-		clusterName = "cluster-for-status-" + suffix
-		clusterDefName = "clusterdef-for-status-" + suffix
-		clusterVersionName = "cluster-version-for-status-" + suffix
+		clusterDefName = "test-clusterdef-" + suffix
+		clusterVerName = "test-clusterver-" + suffix
+		clusterName = "test-cluster-" + suffix
 	}
 
 	cleanEnv := func() {
@@ -92,8 +90,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			Create(&testCtx)
 	}
 
-	createClusterVersion := func() {
-		_ = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
+	createClusterVer := func() {
+		_ = testapps.NewClusterVersionFactory(clusterVerName, clusterDefName).
 			AddComponentVersion(statefulMySQLCompType).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
 			AddComponentVersion(consensusMySQLCompType).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
 			AddComponentVersion(statelessCompType).AddContainerShort(testapps.DefaultNginxContainerName, testapps.NginxImage).
@@ -101,28 +99,29 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 	}
 
 	createCluster := func() *appsv1alpha1.Cluster {
-		return testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
+		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVerName).
 			AddComponent(statefulMySQLCompName, statefulMySQLCompType).SetReplicas(3).
 			AddComponent(consensusMySQLCompName, consensusMySQLCompType).SetReplicas(3).
 			AddComponent(statelessCompName, statelessCompType).SetReplicas(3).
 			Create(&testCtx).GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+		return clusterObj
 	}
 
 	Context("test cluster Failed/Abnormal phase", func() {
 		It("test cluster Failed/Abnormal phase", func() {
 			By("create cluster related resources")
 			createClusterDef()
-			createClusterVersion()
+			createClusterVer()
 			// cluster := createCluster()
 			createCluster()
 
 			// wait for cluster's status to become stable so that it won't interfere with later tests
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace},
-				func(g Gomega, fetched *appsv1alpha1.Cluster) {
-					g.Expect(fetched.Generation).To(BeEquivalentTo(1))
-					g.Expect(fetched.Status.ObservedGeneration).To(BeEquivalentTo(1))
-					g.Expect(fetched.Status.Phase).To(Equal(appsv1alpha1.CreatingClusterPhase))
-				})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+				g.Expect(cluster.Generation).To(BeEquivalentTo(1))
+				g.Expect(cluster.Status.ObservedGeneration).To(BeEquivalentTo(1))
+				g.Expect(cluster.Status.Phase).To(Equal(appsv1alpha1.CreatingClusterPhase))
+			})).Should(Succeed())
 
 			By("watch normal event")
 			event := &corev1.Event{
@@ -132,21 +131,19 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			}
 			Expect(handleEventForClusterStatus(ctx, k8sClient, clusterRecorder, event)).Should(Succeed())
 
-			By("watch warning event from StatefulSet, but mismatch condition ")
-			// wait for StatefulSet created by cluster controller
-			workloadName := clusterName + "-" + statefulMySQLCompName
-			kd := constant.RSMKind
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: workloadName, Namespace: testCtx.DefaultNamespace},
-				func(g Gomega, fetched *workloads.ReplicatedStateMachine) {
-					g.Expect(fetched.Generation).To(BeEquivalentTo(1))
-				})).Should(Succeed())
+			By("watch warning event from workload, but mismatch condition ")
+			rsmKey := types.NamespacedName{
+				Namespace: clusterKey.Namespace,
+				Name:      clusterKey.Name + "-" + statefulMySQLCompName,
+			}
+			Eventually(testapps.CheckObjExists(&testCtx, rsmKey, &workloads.ReplicatedStateMachine{}, true)).Should(Succeed())
 
-			stsInvolvedObject := corev1.ObjectReference{
-				Name:      workloadName,
-				Kind:      kd,
+			involvedObject := corev1.ObjectReference{
+				Name:      rsmKey.Name,
+				Kind:      constant.RSMKind,
 				Namespace: testCtx.DefaultNamespace,
 			}
-			event.InvolvedObject = stsInvolvedObject
+			event.InvolvedObject = involvedObject
 			event.Type = corev1.EventTypeWarning
 			Expect(handleEventForClusterStatus(ctx, k8sClient, clusterRecorder, event)).Should(Succeed())
 		})

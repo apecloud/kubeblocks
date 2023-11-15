@@ -129,7 +129,7 @@ func TestIsClusterInitialized(t *testing.T) {
 
 		isInitialized, err := manager.IsClusterInitialized(ctx, cluster)
 		if err != nil {
-			t.Errorf("exepect check is cluster initialized success but failed")
+			t.Errorf("expect check is cluster initialized success but failed")
 		}
 
 		assert.True(t, isInitialized)
@@ -140,7 +140,7 @@ func TestIsClusterInitialized(t *testing.T) {
 		mock.ExpectPing()
 		isInitialized, err := manager.IsClusterInitialized(ctx, cluster)
 		if err != nil {
-			t.Errorf("exepect check is cluster initialized success but failed")
+			t.Errorf("expect check is cluster initialized success but failed")
 		}
 
 		if err = mock.ExpectationsWereMet(); err != nil {
@@ -154,7 +154,7 @@ func TestIsClusterInitialized(t *testing.T) {
 	t.Run("DBStartup is not set ready but ping failed", func(t *testing.T) {
 		isInitialized, err := manager.IsClusterInitialized(ctx, cluster)
 		if err != nil {
-			t.Errorf("exepect check is cluster initialized success but failed")
+			t.Errorf("expect check is cluster initialized success but failed")
 		}
 
 		assert.False(t, isInitialized)

@@ -15,15 +15,15 @@ run-name: Delete Release:${{ inputs.release-version }}
 jobs:
   delete-release:
     if: github.event_name != 'schedule'
-    uses: apecloud/apecloud-cd/.github/workflows/release-delete.yml@v0.1.37
+    uses: apecloud/apecloud-cd/.github/workflows/release-delete.yml@v0.1.38
     with:
       VERSION: "${{ inputs.release-version }}"
-      APECD_REF: "v0.1.37"
+      APECD_REF: "v0.1.38"
     secrets: inherit
 
   delete-release-schedule:
     if: github.event_name == 'schedule'
-    uses: apecloud/apecloud-cd/.github/workflows/release-delete-schedule.yml@v0.1.37
+    uses: apecloud/apecloud-cd/.github/workflows/release-delete-schedule.yml@v0.1.38
     with:
-      APECD_REF: "v0.1.37"
+      APECD_REF: "v0.1.38"
     secrets: inherit

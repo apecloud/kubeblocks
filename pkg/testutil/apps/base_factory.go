@@ -57,6 +57,11 @@ func (factory *BaseFactory[T, PT, F]) Get() PT {
 	return factory.object
 }
 
+func (factory *BaseFactory[T, PT, F]) SetName(name string) *F {
+	factory.object.SetName(name)
+	return factory.concreteFactory
+}
+
 func (factory *BaseFactory[T, PT, F]) WithRandomName() *F {
 	key := GetRandomizedKey("", factory.object.GetName())
 	factory.object.SetName(key.Name)

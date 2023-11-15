@@ -131,7 +131,7 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 	}
 
 	var templates []dpv1alpha1.RestoreVolumeClaim
-	pvcLabels := factory.BuildCommonLabels(r.Cluster, comp)
+	pvcLabels := constant.GetKBWellKnownLabels(comp.ClusterDefName, r.Cluster.Name, comp.Name)
 	for _, v := range comp.VolumeClaimTemplates {
 		if !r.existVolumeSource(targetVolumes, v.Name) {
 			continue
@@ -191,7 +191,7 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent, backu
 	if compStatus.Phase != appsv1alpha1.RunningClusterCompPhase {
 		return nil
 	}
-	jobActionLabels := factory.BuildCommonLabels(r.Cluster, comp)
+	jobActionLabels := constant.GetKBWellKnownLabels(comp.ClusterDefName, r.Cluster.Name, comp.Name)
 	if comp.WorkloadType == appsv1alpha1.Consensus || comp.WorkloadType == appsv1alpha1.Replication {
 		// TODO: use rsm constant
 		rsmAccessModeLabelKey := "rsm.workloads.kubeblocks.io/access-mode"
@@ -210,7 +210,7 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent, backu
 				ExecAction: &dpv1alpha1.ExecAction{
 					Target: dpv1alpha1.ExecActionTarget{
 						PodSelector: metav1.LabelSelector{
-							MatchLabels: factory.BuildCommonLabels(r.Cluster, comp),
+							MatchLabels: constant.GetKBWellKnownLabels(comp.ClusterDefName, r.Cluster.Name, comp.Name),
 						},
 					},
 				},
@@ -232,10 +232,10 @@ func (r *RestoreManager) buildSchedulingSpec(comp *component.SynthesizedComponen
 	schedulingSpec := dpv1alpha1.SchedulingSpec{}
 	compSpec := r.Cluster.Spec.GetComponentByName(comp.Name)
 	affinity := component.BuildAffinity(r.Cluster, compSpec)
-	if schedulingSpec.Affinity, err = component.BuildPodAffinity(r.Cluster, affinity, comp); err != nil {
+	if schedulingSpec.Affinity, err = component.BuildPodAffinity(r.Cluster.Name, comp.Name, affinity); err != nil {
 		return schedulingSpec, err
 	}
-	schedulingSpec.TopologySpreadConstraints = component.BuildPodTopologySpreadConstraints(r.Cluster, affinity, comp)
+	schedulingSpec.TopologySpreadConstraints = component.BuildPodTopologySpreadConstraints(r.Cluster.Name, comp.Name, affinity)
 	if schedulingSpec.Tolerations, err = component.BuildTolerations(r.Cluster, compSpec); err != nil {
 		return schedulingSpec, err
 	}
@@ -248,7 +248,7 @@ func (r *RestoreManager) GetRestoreObjectMeta(comp *component.SynthesizedCompone
 		name = fmt.Sprintf("%s-%d", name, r.startingIndex)
 	}
 	if len(r.restoreLabels) == 0 {
-		r.restoreLabels = factory.BuildCommonLabels(r.Cluster, comp)
+		r.restoreLabels = constant.GetKBWellKnownLabels(comp.ClusterDefName, r.Cluster.Name, comp.Name)
 	}
 	return metav1.ObjectMeta{
 		Name:      name,
@@ -353,7 +353,7 @@ func (r *RestoreManager) cleanupRestores(comp *component.SynthesizedComponent) e
 		return nil
 	}
 	restoreList := &dpv1alpha1.RestoreList{}
-	if err := r.Client.List(r.Ctx, restoreList, client.MatchingLabels(factory.BuildCommonLabels(r.Cluster, comp))); err != nil {
+	if err := r.Client.List(r.Ctx, restoreList, client.MatchingLabels(constant.GetKBWellKnownLabels(comp.ClusterDefName, r.Cluster.Name, comp.Name))); err != nil {
 		return err
 	}
 	for i := range restoreList.Items {

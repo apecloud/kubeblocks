@@ -26,8 +26,8 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	jsonpath "k8s.io/client-go/util/jsonpath"
-	klog "k8s.io/klog/v2"
+	"k8s.io/client-go/util/jsonpath"
+	"k8s.io/klog/v2"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
@@ -35,7 +35,6 @@ import (
 func buildComponentRef(clusterDef *appsv1alpha1.ClusterDefinition,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
-	clusterComp *appsv1alpha1.ClusterComponentSpec,
 	component *SynthesizedComponent) error {
 
 	compRefs := clusterCompDef.ComponentDefRef
@@ -50,7 +49,7 @@ func buildComponentRef(clusterDef *appsv1alpha1.ClusterDefinition,
 		referredComponents := cluster.Spec.GetDefNameMappingComponents()[compRef.ComponentDefName]
 
 		if referredComponentDef == nil || len(referredComponents) == 0 {
-			err := fmt.Errorf("failes to match %s in cluster %s", compRef.ComponentDefName, cluster.Name)
+			err := fmt.Errorf("failed to match %s in cluster %s", compRef.ComponentDefName, cluster.Name)
 			if compRef.FailurePolicy == appsv1alpha1.FailurePolicyFail {
 				return err
 			} else {

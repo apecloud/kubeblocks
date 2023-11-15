@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"sort"
 	"strconv"
 
 	appv1 "k8s.io/api/apps/v1"
@@ -31,31 +30,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
-
-func getDeploymentRollingPods(params reconfigureParams) ([]corev1.Pod, error) {
-	// util.GetComponentPodList supports deployment
-	return getReplicationSetPods(params)
-}
-
-func getReplicationSetPods(params reconfigureParams) ([]corev1.Pod, error) {
-	var ctx = params.Ctx
-	var cluster = params.Cluster
-	podList, err := components.GetComponentPodList(ctx.Ctx, params.Client, *cluster, params.ClusterComponent.Name)
-	if err != nil {
-		return nil, err
-	}
-	return podList.Items, nil
-}
 
 // GetComponentPods gets all pods of the component.
 func GetComponentPods(params reconfigureParams) ([]corev1.Pod, error) {
@@ -86,27 +70,9 @@ func CheckReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string
 	return readyPods
 }
 
-func getStatefulSetPods(params reconfigureParams) ([]corev1.Pod, error) {
-	if len(params.ComponentUnits) != 1 {
-		return nil, core.MakeError("statefulSet component require only one statefulset, actual %d components", len(params.ComponentUnits))
-	}
-
-	pods, err := GetComponentPods(params)
-	if err != nil {
-		return nil, err
-	}
-
-	sort.SliceStable(pods, func(i, j int) bool {
-		_, ordinal1 := intctrlutil.GetParentNameAndOrdinal(&pods[i])
-		_, ordinal2 := intctrlutil.GetParentNameAndOrdinal(&pods[j])
-		return ordinal1 < ordinal2
-	})
-	return pods, nil
-}
-
-func getConsensusPods(params reconfigureParams) ([]corev1.Pod, error) {
+func getPodsForOnlineUpdate(params reconfigureParams) ([]corev1.Pod, error) {
 	if len(params.ComponentUnits) > 1 {
-		return nil, core.MakeError("consensus component require only one statefulset, actual %d components", len(params.ComponentUnits))
+		return nil, core.MakeError("component require only one statefulSet, actual %d components", len(params.ComponentUnits))
 	}
 
 	if len(params.ComponentUnits) == 0 {
@@ -123,9 +89,8 @@ func getConsensusPods(params reconfigureParams) ([]corev1.Pod, error) {
 		return nil, err
 	}
 
-	// TODO: should resolve the dependency on consensus module
-	if params.Component.RSMSpec != nil {
-		rsm.SortPods(pods, rsm.ComposeRolePriorityMap(params.Component.RSMSpec.Roles), true)
+	if params.SynthesizedComponent != nil {
+		rsmcore.SortPods(pods, rsmcore.ComposeRolePriorityMap(component.ConvertSynthesizeCompRoleToRSMRole(params.SynthesizedComponent)), true)
 	}
 	return pods, nil
 }

@@ -174,8 +174,8 @@ spec:
                               KubeGitVersion and KubeProvider. "KubeVersion" the semver
                               expression of Kubernetes versions, i.e., v1.24. "KubeGitVersion"
                               may contain distro. info., i.e., v1.24.4+eks. "KubeProvider"
-                              the Kubernetes provider, i.e., aws,gcp,azure,huaweiCloud,tencentCloud
-                              etc.
+                              the Kubernetes provider, i.e., aws, gcp, azure, huaweiCloud,
+                              tencentCloud etc.
                             enum:
                             - KubeGitVersion
                             - KubeVersion
@@ -567,8 +567,8 @@ spec:
                             KubeGitVersion and KubeProvider. "KubeVersion" the semver
                             expression of Kubernetes versions, i.e., v1.24. "KubeGitVersion"
                             may contain distro. info., i.e., v1.24.4+eks. "KubeProvider"
-                            the Kubernetes provider, i.e., aws,gcp,azure,huaweiCloud,tencentCloud
-                            etc.
+                            the Kubernetes provider, i.e., aws, gcp, azure, huaweiCloud,
+                            tencentCloud etc.
                           enum:
                           - KubeGitVersion
                           - KubeVersion

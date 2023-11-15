@@ -20,32 +20,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
-func buildMonitorConfig(
-	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
-	component *SynthesizedComponent) {
-	monitorEnable := false
-	if clusterCompSpec != nil {
-		monitorEnable = clusterCompSpec.Monitor
-	}
+func buildMonitorConfigLegacy(
+	compDef *appsv1alpha1.ClusterComponentDefinition,
+	compSpec *appsv1alpha1.ClusterComponentSpec,
+	synthesizeComp *SynthesizedComponent) {
+	buildMonitorConfig(compDef.Monitor, compSpec.Monitor, compDef.PodSpec, synthesizeComp)
+}
 
-	monitorConfig := clusterCompDef.Monitor
+func buildMonitorConfig(
+	monitorConfig *appsv1alpha1.MonitorConfig,
+	monitorEnable bool,
+	podSpec *corev1.PodSpec,
+	synthesizeComp *SynthesizedComponent) {
 	if !monitorEnable || monitorConfig == nil {
-		disableMonitor(component)
+		disableMonitor(synthesizeComp)
 		return
 	}
 
 	if !monitorConfig.BuiltIn {
 		if monitorConfig.Exporter == nil {
-			disableMonitor(component)
+			disableMonitor(synthesizeComp)
 			return
 		}
-		component.Monitor = &MonitorConfig{
+		synthesizeComp.Monitor = &MonitorConfig{
 			Enable:     true,
 			BuiltIn:    false,
 			ScrapePath: monitorConfig.Exporter.ScrapePath,
@@ -54,10 +57,10 @@ func buildMonitorConfig(
 
 		if monitorConfig.Exporter.ScrapePort.Type == intstr.String {
 			portName := monitorConfig.Exporter.ScrapePort.StrVal
-			for _, c := range clusterCompDef.PodSpec.Containers {
+			for _, c := range podSpec.Containers {
 				for _, p := range c.Ports {
 					if p.Name == portName {
-						component.Monitor.ScrapePort = p.ContainerPort
+						synthesizeComp.Monitor.ScrapePort = p.ContainerPort
 						break
 					}
 				}
@@ -66,7 +69,7 @@ func buildMonitorConfig(
 		return
 	}
 
-	component.Monitor = &MonitorConfig{
+	synthesizeComp.Monitor = &MonitorConfig{
 		Enable:  true,
 		BuiltIn: true,
 	}

@@ -52,9 +52,7 @@ type ResourceFetcher[T any] struct {
 	ConfigurationObj    *appsv1alpha1.Configuration
 	ConfigConstraintObj *appsv1alpha1.ConfigConstraint
 
-	ClusterComObj    *appsv1alpha1.ClusterComponentSpec
-	ClusterDefComObj *appsv1alpha1.ClusterComponentDefinition
-	ClusterVerComObj *appsv1alpha1.ClusterComponentVersion
+	ClusterComObj *appsv1alpha1.ClusterComponentSpec
 }
 
 func (r *ResourceFetcher[T]) Init(ctx *ResourceCtx, object *T) *T {
@@ -106,28 +104,6 @@ func (r *ResourceFetcher[T]) ClusterVer() *T {
 		r.ClusterVerObj = &appsv1alpha1.ClusterVersion{}
 		return r.Client.Get(r.Context, clusterVerKey, r.ClusterVerObj)
 	})
-}
-func (r *ResourceFetcher[T]) ClusterDefComponent() *T {
-	foundFn := func() (err error) {
-		if r.ClusterComObj == nil {
-			return
-		}
-		r.ClusterDefComObj = r.ClusterDefObj.GetComponentDefByName(r.ClusterComObj.ComponentDefRef)
-		return
-	}
-	return r.Wrap(foundFn)
-}
-
-func (r *ResourceFetcher[T]) ClusterVerComponent() *T {
-	foundFn := func() (err error) {
-		if r.ClusterComObj == nil || r.ClusterVerObj == nil {
-			return
-		}
-		components := r.ClusterVerObj.Spec.GetDefNameMappingComponents()
-		r.ClusterVerComObj = components[r.ClusterComObj.ComponentDefRef]
-		return
-	}
-	return r.Wrap(foundFn)
 }
 
 func (r *ResourceFetcher[T]) ClusterComponent() *T {

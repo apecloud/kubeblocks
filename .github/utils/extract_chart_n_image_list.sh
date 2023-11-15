@@ -146,7 +146,7 @@ spec:
         - name: pull-kb-tools
           image: ${KB_TOOLS_IMAGE}
           imagePullPolicy: IfNotPresent
-          command: ["cp", "-r", "/bin/kbcli", "/kb-tools/kbcli"]
+          command: ["cp", "-r", "/usr/bin/kubectl", "/kb-tools/kubectl"]
           volumeMounts:
             - name: shared-volume
               mountPath: /kb-tools
@@ -170,7 +170,7 @@ for image in "${image_set[@]}"; do
         - name: pull-${count}
           image: ${image}
           imagePullPolicy: IfNotPresent
-          command: ["/kb-tools/kbcli"]
+          command: ["/kb-tools/kubectl"]
           volumeMounts:
             - name: shared-volume
               mountPath: /kb-tools

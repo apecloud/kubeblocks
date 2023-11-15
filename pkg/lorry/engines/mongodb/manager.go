@@ -140,7 +140,7 @@ func (mgr *Manager) InitiateReplSet(ctx context.Context, cluster *dcs.Cluster) e
 	return nil
 }
 
-// IsClusterInitialized is a method to check if cluster is initailized or not
+// IsClusterInitialized is a method to check if cluster is initialized or not
 func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	client, err := mgr.GetReplSetClient(ctx, cluster)
 	if err != nil {
@@ -384,8 +384,8 @@ func (mgr *Manager) GetLeaderClient(ctx context.Context, cluster *dcs.Cluster) (
 
 func (mgr *Manager) GetReplSetClientWithHosts(ctx context.Context, hosts []string) (*mongo.Client, error) {
 	if len(hosts) == 0 {
-		err := errors.New("Get replset client whitout hosts")
-		mgr.Logger.Error(err, "Get replset client whitout hosts")
+		err := errors.New("Get replset client without hosts")
+		mgr.Logger.Error(err, "Get replset client without hosts")
 		return nil, err
 	}
 

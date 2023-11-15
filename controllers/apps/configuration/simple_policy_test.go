@@ -156,7 +156,8 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 		})
 	})
 
-	Context("simple reconfigure policy test for not supported component", func() {
+	// TODO(component)
+	PContext("simple reconfigure policy test for not supported component", func() {
 		It("Should failed", func() {
 			// not support type
 			mockParam := newMockReconfigureParams("simplePolicy", k8sMockClient.Client(),

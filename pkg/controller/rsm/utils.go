@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -725,6 +726,40 @@ func ParseAnnotationsOfScope(scope AnnotationScope, scopedAnnotations map[string
 	return annotations
 }
 
+// ConvertRSMToSTS converts a rsm to sts
+// TODO(free6om): refactor this func out
+func ConvertRSMToSTS(rsm *workloads.ReplicatedStateMachine) *appsv1.StatefulSet {
+	if rsm == nil {
+		return nil
+	}
+	sts := builder.NewStatefulSetBuilder(rsm.Namespace, rsm.Name).
+		SetUID(rsm.UID).
+		AddLabelsInMap(rsm.Labels).
+		AddAnnotationsInMap(rsm.Annotations).
+		SetReplicas(*rsm.Spec.Replicas).
+		SetSelector(rsm.Spec.Selector).
+		SetServiceName(rsm.Spec.ServiceName).
+		SetTemplate(rsm.Spec.Template).
+		SetVolumeClaimTemplates(rsm.Spec.VolumeClaimTemplates...).
+		SetPodManagementPolicy(rsm.Spec.PodManagementPolicy).
+		SetUpdateStrategy(rsm.Spec.UpdateStrategy).
+		GetObject()
+	sts.Generation = rsm.Generation
+	sts.Status = rsm.Status.StatefulSetStatus
+	sts.Status.ObservedGeneration = rsm.Status.ObservedGeneration
+	return sts
+}
+
 func getEnvConfigMapName(rsmName string) string {
 	return fmt.Sprintf("%s-rsm-env", rsmName)
+}
+
+// IsOwnedByRsm is used to judge if the obj is owned by rsm
+func IsOwnedByRsm(obj client.Object) bool {
+	for _, ref := range obj.GetOwnerReferences() {
+		if ref.Kind == appsv1alpha1.ReplicatedStateMachineKind && ref.Controller != nil && *ref.Controller {
+			return true
+		}
+	}
+	return false
 }

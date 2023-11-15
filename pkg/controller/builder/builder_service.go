@@ -118,8 +118,3 @@ func (builder *ServiceBuilder) Optimize4ExternalTraffic() *ServiceBuilder {
 	}
 	return builder
 }
-
-func (builder *ServiceBuilder) SetAnnotations(annotations map[string]string) *ServiceBuilder {
-	builder.get().SetAnnotations(annotations)
-	return builder
-}

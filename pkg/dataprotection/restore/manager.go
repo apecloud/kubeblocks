@@ -332,6 +332,9 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 				if err != nil {
 					return nil, err
 				}
+				for k, v := range claim.Labels {
+					jobBuilder.addLabel(k, v)
+				}
 				jobBuilder.addToSpecificVolumesAndMounts(volume, volumeMount)
 			}
 		}

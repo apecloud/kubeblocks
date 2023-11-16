@@ -1065,14 +1065,15 @@ func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition, mappin
 	bpt := testapps.NewBackupPolicyTemplateFactory(backupPolicyTPLName).
 		AddLabels(constant.ClusterDefLabelKey, clusterDefObj.Name).
 		SetClusterDefRef(clusterDefObj.Name)
+	ttl := "7d"
 	for _, v := range clusterDefObj.Spec.ComponentDefs {
 		bpt = bpt.AddBackupPolicy(v.Name).
 			AddBackupMethod(backupMethodName, false, actionSetName, mappingClusterVersions...).
 			SetBackupMethodVolumeMounts("data", "/data").
 			AddBackupMethod(vsBackupMethodName, true, vsActionSetName).
 			SetBackupMethodVolumes([]string{"data"}).
-			AddSchedule(backupMethodName, "0 0 * * *", true).
-			AddSchedule(vsBackupMethodName, "0 0 * * *", true)
+			AddSchedule(backupMethodName, "0 0 * * *", ttl, true).
+			AddSchedule(vsBackupMethodName, "0 0 * * *", ttl, true)
 		switch v.WorkloadType {
 		case appsv1alpha1.Consensus:
 			bpt.SetTargetRole("leader")

@@ -26,6 +26,6 @@ const (
 	// RepoVolumeMountPath is the backup repo volume mount path.
 	RepoVolumeMountPath = "/backupdata"
 
-	// backupInfoFileName is the backup info file name in the backup path.
-	backupInfoFileName = "backup.info"
+	// BackupInfoFileName is the backup info file name in the backup path.
+	BackupInfoFileName = "backup.info"
 )

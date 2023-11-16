@@ -37,6 +37,7 @@ var _ = Describe("", func() {
 		ActionSetName            = "test-as"
 		VsBackupMethodName       = "test-vs-bm"
 		VsActionSetName          = "test-vs-as"
+		ttl                      = "7d"
 	)
 
 	cleanEnv := func() {
@@ -67,8 +68,8 @@ var _ = Describe("", func() {
 				SetBackupMethodVolumeMounts("data", "/data").
 				AddBackupMethod(VsBackupMethodName, true, VsActionSetName).
 				SetBackupMethodVolumeMounts("data", "/data").
-				AddSchedule(BackupMethod, "0 0 * * *", true).
-				AddSchedule(VsBackupMethodName, "0 0 * * *", true).
+				AddSchedule(BackupMethod, "0 0 * * *", ttl, true).
+				AddSchedule(VsBackupMethodName, "0 0 * * *", ttl, true).
 				Create(&testCtx).GetObject()
 			key := client.ObjectKeyFromObject(bpt)
 			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pobj *v1alpha1.BackupPolicyTemplate) {

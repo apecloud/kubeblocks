@@ -46,7 +46,6 @@ type JobAction struct {
 	// ObjectMeta is the metadata of the job.
 	ObjectMeta metav1.ObjectMeta
 
-	// PodSpec is the
 	PodSpec *corev1.PodSpec
 
 	// BackOffLimit is the number of retries before considering a JobAction as failed.

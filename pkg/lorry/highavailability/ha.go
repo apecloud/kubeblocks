@@ -127,7 +127,7 @@ func (ha *Ha) RunCycle() {
 		ha.logger.Info("Cluster has no leader, attempt to take the leader")
 		if ha.IsHealthiestMember(ha.ctx, cluster) {
 			cluster.Leader.DBState = DBState
-			if ha.dcs.AttempAcquireLease() == nil {
+			if ha.dcs.AttemptAcquireLease() == nil {
 				err := ha.dbManager.Promote(ha.ctx, cluster)
 				if err != nil {
 					ha.logger.Error(err, "Take the leader failed")
@@ -161,7 +161,7 @@ func (ha *Ha) RunCycle() {
 		if ha.dbManager.HasOtherHealthyLeader(ha.ctx, cluster) != nil {
 			// this case is applicable only to consensus cluster, where the db's internal
 			// role services as the source of truth.
-			// for replicationset cluster,  HasOtherHealthyLeader will always be false.
+			// for replicationSet cluster,  HasOtherHealthyLeader will always be false.
 			ha.logger.Info("Release leader")
 			_ = ha.dcs.ReleaseLease()
 			break
@@ -216,7 +216,7 @@ func (ha *Ha) Start() {
 	isInitialized, err := ha.dbManager.IsClusterInitialized(context.TODO(), cluster)
 	for err != nil || !isInitialized {
 		ha.logger.Info("Waiting for the database cluster to be initialized.")
-		// TODO: implement dbmanager initialize to replace pod's entrypoint scripts
+		// TODO: implement DBManager initialize to replace pod's entrypoint scripts
 		// if I am the node of index 0, then do initialization
 		if err == nil && !isInitialized && ha.dbManager.IsFirstMember() {
 			ha.logger.Info("Initialize cluster.")
@@ -246,7 +246,7 @@ func (ha *Ha) Start() {
 	isExist, _ := ha.dcs.IsLeaseExist()
 	for !isExist {
 		if ok, _ := ha.dbManager.IsLeader(context.Background(), cluster); ok {
-			err := ha.dcs.Initialize(cluster)
+			err := ha.dcs.Initialize()
 			if err != nil {
 				ha.logger.Error(err, "DCS initialize failed")
 				time.Sleep(5 * time.Second)

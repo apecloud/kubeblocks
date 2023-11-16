@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/spf13/viper"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 )
 
@@ -35,8 +36,8 @@ const (
 // Test case for Init() function
 var _ = Describe("MySQL DBManager", func() {
 	// Set up relevant viper config variables
-	viper.Set("KB_SERVICE_USER", "testuser")
-	viper.Set("KB_SERVICE_PASSWORD", "testpassword")
+	viper.Set(constant.KBEnvServiceUser, "testuser")
+	viper.Set(constant.KBEnvServicePassword, "testpassword")
 	Context("new db manager", func() {
 		It("with right configurations", func() {
 			properties := engines.Properties{

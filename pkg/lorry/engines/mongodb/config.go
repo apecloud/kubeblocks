@@ -26,6 +26,8 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
+
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 const (
@@ -66,8 +68,8 @@ func NewConfig(properties map[string]string) (*Config, error) {
 		config.hosts = []string{val}
 	}
 
-	if viper.IsSet("KB_SERVICE_PORT") {
-		config.hosts = []string{"localhost:" + viper.GetString("KB_SERVICE_PORT")}
+	if viper.IsSet(constant.KBEnvServicePort) {
+		config.hosts = []string{"localhost:" + viper.GetString(constant.KBEnvServicePort)}
 	}
 
 	if len(config.hosts) == 0 {
@@ -82,16 +84,16 @@ func NewConfig(properties map[string]string) (*Config, error) {
 		config.password = val
 	}
 
-	if viper.IsSet("KB_SERVICE_USER") {
-		config.username = viper.GetString("KB_SERVICE_USER")
+	if viper.IsSet(constant.KBEnvServiceUser) {
+		config.username = viper.GetString(constant.KBEnvServiceUser)
 	}
 
-	if viper.IsSet("KB_SERVICE_PASSWORD") {
-		config.password = viper.GetString("KB_SERVICE_PASSWORD")
+	if viper.IsSet(constant.KBEnvServicePassword) {
+		config.password = viper.GetString(constant.KBEnvServicePassword)
 	}
 
-	if viper.IsSet("KB_CLUSTER_COMP_NAME") {
-		config.replSetName = viper.GetString("KB_CLUSTER_COMP_NAME")
+	if viper.IsSet(constant.KBEnvClusterCompName) {
+		config.replSetName = viper.GetString(constant.KBEnvClusterCompName)
 	}
 
 	config.databaseName = adminDatabase

@@ -26,17 +26,6 @@ chartLocationURL: {{ $base }}/{{ $fullChart }}.tgz
 {{- end }}
 
 {{/*
-Define addon Helm charts image information.
-Parameters:
-  values: values of the KubeBlocks helm chart
-  appVersion: appVersion of the KubeBlocks helm chart
-*/}}
-{{- define "kubeblocks.addonChartsImageByParam" }}
-chartsImage: {{ .values.addonChartsImage.registry | default "docker.io" }}/{{ .values.addonChartsImage.repository }}:{{ .values.addonChartsImage.tag | default .appVersion }}
-chartsPathInImage: {{ .values.addonChartsImage.chartsPath }}
-{{- end }}
-
-{{/*
 Build add-on CRs
 Parameters:
 - name: name of the addon

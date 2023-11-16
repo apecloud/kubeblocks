@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package wesql
 
 import (
-	"context"
 	"database/sql"
 	"strings"
 
@@ -30,26 +29,25 @@ import (
 )
 
 // GetDBConnWithMember retrieves a database connection for a specific member of a cluster.
-func (mgr *Manager) GetDBConnWithMember(cluster *dcs.Cluster, member *dcs.Member) (*sql.DB, error) {
-	var db *sql.DB
-	var err error
-	if member != nil {
+func (mgr *Manager) GetDBConnWithMember(cluster *dcs.Cluster, member *dcs.Member) (db *sql.DB, err error) {
+	if member != nil && member.Name != mgr.CurrentMemberName {
 		addr := cluster.GetMemberAddrWithPort(*member)
 		db, err = config.GetDBConnWithAddr(addr)
 		if err != nil {
 			return nil, errors.Wrap(err, "new db connection failed")
 		}
+	} else {
+		db = mgr.DB
 	}
 	return db, nil
 }
 
 // GetLeaderConn retrieves a database connection to the leader member of a cluster.
-func (mgr *Manager) GetLeaderConn(ctx context.Context, cluster *dcs.Cluster) (*sql.DB, error) {
-	mgr.Logger.Info("Get leaader from dcs cluster")
+func (mgr *Manager) GetLeaderConn(cluster *dcs.Cluster) (*sql.DB, error) {
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
-		mgr.Logger.Info("Get leaader from db cluster local")
-		leaderMember = mgr.GetLeaderMember(ctx, cluster)
+		mgr.Logger.Info("Get leader from db cluster local")
+		leaderMember = mgr.GetLeaderMember(cluster)
 	}
 	if leaderMember == nil {
 		return nil, errors.New("the cluster has no leader")
@@ -58,8 +56,8 @@ func (mgr *Manager) GetLeaderConn(ctx context.Context, cluster *dcs.Cluster) (*s
 }
 
 // GetLeaderMember retrieves the leader member of a cluster
-func (mgr *Manager) GetLeaderMember(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
-	clusterLocalInfo, err := mgr.GetClusterLocalInfo(ctx)
+func (mgr *Manager) GetLeaderMember(cluster *dcs.Cluster) *dcs.Member {
+	clusterLocalInfo, err := mgr.GetClusterLocalInfo()
 	if err != nil || clusterLocalInfo == nil {
 		mgr.Logger.Error(err, "Get cluster local info failed")
 		return nil

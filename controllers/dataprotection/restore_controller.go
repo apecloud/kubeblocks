@@ -42,6 +42,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -149,10 +150,20 @@ func (r *RestoreReconciler) newAction(reqCtx intctrlutil.RequestCtx, restore *dp
 	if restore.Spec.PrepareDataConfig != nil && restore.Spec.PrepareDataConfig.DataSourceRef != nil {
 		restore.Status.Phase = dpv1alpha1.RestorePhaseAsDataSource
 	} else {
-		// patch status
-		restore.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
-		restore.Status.Phase = dpv1alpha1.RestorePhaseRunning
-		r.Recorder.Event(restore, corev1.EventTypeNormal, dprestore.ReasonRestoreStarting, "start to restore")
+		// check if restore CR is legal
+		err := dprestore.ValidateAndInitRestoreMGR(reqCtx, r.Client, dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme))
+		switch {
+		case intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal):
+			restore.Status.Phase = dpv1alpha1.RestorePhaseFailed
+			restore.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
+			r.Recorder.Event(restore, corev1.EventTypeWarning, dprestore.ReasonRestoreFailed, err.Error())
+		case err != nil:
+			return RecorderEventAndRequeue(reqCtx, r.Recorder, restore, err)
+		default:
+			restore.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
+			restore.Status.Phase = dpv1alpha1.RestorePhaseRunning
+			r.Recorder.Event(restore, corev1.EventTypeNormal, dprestore.ReasonRestoreStarting, "start to restore")
+		}
 	}
 	if err := r.Client.Status().Patch(reqCtx.Ctx, restore, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -162,8 +173,16 @@ func (r *RestoreReconciler) newAction(reqCtx intctrlutil.RequestCtx, restore *dp
 
 func (r *RestoreReconciler) inProgressAction(reqCtx intctrlutil.RequestCtx, restore *dpv1alpha1.Restore) (ctrl.Result, error) {
 	restoreMgr := dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme)
-	// handle restore actions
-	err := r.handleRestoreActions(reqCtx, restoreMgr)
+	// validate if the restore.spec is valid and build restore manager.
+	err := r.validateAndBuildMGR(reqCtx, restoreMgr)
+	// skip processing for ErrorTypeWaitForExternalHandler when Restore is Running
+	if intctrlutil.IsTargetError(err, dperrors.ErrorTypeWaitForExternalHandler) {
+		return intctrlutil.Reconciled()
+	}
+	if err == nil {
+		// handle restore actions
+		err = r.HandleRestoreActions(reqCtx, restoreMgr)
+	}
 	if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
 		// set restore phase to failed if the error is fatal.
 		restoreMgr.Restore.Status.Phase = dpv1alpha1.RestorePhaseFailed
@@ -183,13 +202,8 @@ func (r *RestoreReconciler) inProgressAction(reqCtx intctrlutil.RequestCtx, rest
 	return intctrlutil.Reconciled()
 }
 
-func (r *RestoreReconciler) handleRestoreActions(reqCtx intctrlutil.RequestCtx, restoreMgr *dprestore.RestoreManager) error {
-	// 1. validate if the restore.spec is valid and build restore manager.
-	if err := r.validateAndBuildMGR(reqCtx, restoreMgr); err != nil {
-		return err
-	}
-
-	// 2. handle the prepareData stage.
+func (r *RestoreReconciler) HandleRestoreActions(reqCtx intctrlutil.RequestCtx, restoreMgr *dprestore.RestoreManager) error {
+	// 1. handle the prepareData stage.
 	isCompleted, err := r.prepareData(reqCtx, restoreMgr)
 	if err != nil {
 		return err
@@ -198,7 +212,7 @@ func (r *RestoreReconciler) handleRestoreActions(reqCtx intctrlutil.RequestCtx, 
 	if !isCompleted {
 		return nil
 	}
-	// 3. handle the postReady stage.
+	// 2. handle the postReady stage.
 	isCompleted, err = r.postReady(reqCtx, restoreMgr)
 	if err != nil {
 		return err
@@ -222,8 +236,7 @@ func (r *RestoreReconciler) validateAndBuildMGR(reqCtx intctrlutil.RequestCtx, r
 			r.Recorder.Event(restoreMgr.Restore, corev1.EventTypeWarning, dprestore.ReasonValidateFailed, err.Error())
 		}
 	}()
-
-	err = dprestore.ValidateAndInitRestoreMGR(reqCtx, r.Client, r.Recorder, restoreMgr)
+	err = dprestore.ValidateAndInitRestoreMGR(reqCtx, r.Client, restoreMgr)
 	return err
 }
 

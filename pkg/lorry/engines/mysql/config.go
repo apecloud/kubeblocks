@@ -25,12 +25,12 @@ import (
 	"database/sql"
 	"fmt"
 	"net"
-	"os"
 	"strconv"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
+	"github.com/spf13/afero"
 	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -57,7 +57,6 @@ const (
 )
 
 const (
-	databaseName  = "databaseName"
 	adminDatabase = "mysql"
 	defaultDBPort = 3306
 )
@@ -72,6 +71,8 @@ type Config struct {
 	connMaxLifetime time.Duration
 	connMaxIdletime time.Duration
 }
+
+var fs = afero.NewOsFs()
 
 var config *Config
 
@@ -122,7 +123,7 @@ func NewConfig(properties map[string]string) (*Config, error) {
 
 	if config.pemPath != "" {
 		rootCertPool := x509.NewCertPool()
-		pem, err := os.ReadFile(config.pemPath)
+		pem, err := afero.ReadFile(fs, config.pemPath)
 		if err != nil {
 			return nil, errors.Wrapf(err, "Error reading PEM file from %s", config.pemPath)
 		}
@@ -147,9 +148,9 @@ func (config *Config) GetLocalDBConn() (*sql.DB, error) {
 	}
 	mysqlConfig.User = config.username
 	mysqlConfig.Passwd = config.password
-	db, err := sql.Open("mysql", mysqlConfig.FormatDSN())
+	db, err := GetDBConnection(mysqlConfig.FormatDSN())
 	if err != nil {
-		return nil, errors.Wrap(err, "error opening DB connection")
+		return nil, errors.Wrap(err, "get DB connection failed")
 	}
 
 	return db, nil
@@ -163,9 +164,9 @@ func (config *Config) GetDBConnWithAddr(addr string) (*sql.DB, error) {
 	mysqlConfig.User = config.username
 	mysqlConfig.Passwd = config.password
 	mysqlConfig.Addr = addr
-	db, err := sql.Open("mysql", mysqlConfig.FormatDSN())
+	db, err := GetDBConnection(mysqlConfig.FormatDSN())
 	if err != nil {
-		return nil, errors.Wrap(err, "error opening DB connection")
+		return nil, errors.Wrap(err, "get DB connection failed")
 	}
 
 	return db, nil

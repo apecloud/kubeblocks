@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -147,7 +146,7 @@ func getTimeFormat(envs []corev1.EnvVar) string {
 	return time.RFC3339
 }
 
-func compareWithBackupStopTime(backupI, backupJ dpv1alpha1.Backup) bool {
+func CompareWithBackupStopTime(backupI, backupJ dpv1alpha1.Backup) bool {
 	endTimeI := backupI.GetEndTime()
 	endTimeJ := backupJ.GetEndTime()
 	if endTimeI.IsZero() {
@@ -207,7 +206,6 @@ func deleteRestoreJob(reqCtx intctrlutil.RequestCtx, cli client.Client, jobKey s
 // ValidateAndInitRestoreMGR validate if the restore CR is valid and init the restore manager.
 func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	recorder record.EventRecorder,
 	restoreMgr *RestoreManager) error {
 
 	// get backupActionSet based on the specified backup name.
@@ -235,8 +233,7 @@ func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 	case dpv1alpha1.BackupTypeDifferential:
 		err = restoreMgr.BuildDifferentialBackupActionSets(reqCtx, cli, *backupSet)
 	case dpv1alpha1.BackupTypeContinuous:
-		err = intctrlutil.NewErrorf(dperrors.ErrorTypeWaitForExternalHandler, "wait for external handler to do handle the Point-In-Time recovery.")
-		recorder.Event(restoreMgr.Restore, corev1.EventTypeWarning, string(dperrors.ErrorTypeWaitForExternalHandler), err.Error())
+		err = intctrlutil.NewErrorf(dperrors.ErrorTypeWaitForExternalHandler, "wait for external handler to handle the Point-In-Time recovery.")
 	default:
 		err = intctrlutil.NewFatalError(fmt.Sprintf("backup type of %s is empty", backupName))
 	}

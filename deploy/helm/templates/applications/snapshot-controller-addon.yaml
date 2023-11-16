@@ -88,7 +88,7 @@ spec:
         operator: DoesNotContain
         values:
           - tke
-          - aliyun
+          - aliyun.
       - key: KubeProvider
         operator: DoesNotContain
         values:

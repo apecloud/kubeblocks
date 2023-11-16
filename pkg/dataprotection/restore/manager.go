@@ -43,7 +43,9 @@ import (
 )
 
 type BackupActionSet struct {
-	Backup            *dpv1alpha1.Backup
+	Backup *dpv1alpha1.Backup
+	// set it when the backup relies on a base backup, such as Continuous backup
+	BaseBackup        *dpv1alpha1.Backup
 	ActionSet         *dpv1alpha1.ActionSet
 	UseVolumeSnapshot bool
 }
@@ -127,7 +129,7 @@ func (r *RestoreManager) BuildIncrementalBackupActionSets(reqCtx intctrlutil.Req
 			if backupJ == nil {
 				return true
 			}
-			return compareWithBackupStopTime(*backupI, *backupJ)
+			return CompareWithBackupStopTime(*backupI, *backupJ)
 		})
 		return backupSets
 	}
@@ -331,6 +333,9 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 				volume, volumeMount, err := createPVCIfNotExistsAndBuildVolume(claim, "dp-claim-tpl")
 				if err != nil {
 					return nil, err
+				}
+				for k, v := range claim.Labels {
+					jobBuilder.addLabel(k, v)
 				}
 				jobBuilder.addToSpecificVolumesAndMounts(volume, volumeMount)
 			}

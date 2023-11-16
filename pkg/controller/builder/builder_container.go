@@ -96,6 +96,11 @@ func (builder *ContainerBuilder) SetReadinessProbe(probe corev1.Probe) *Containe
 	return builder
 }
 
+func (builder *ContainerBuilder) SetLivenessProbe(probe corev1.Probe) *ContainerBuilder {
+	builder.get().LivenessProbe = &probe
+	return builder
+}
+
 func (builder *ContainerBuilder) SetStartupProbe(probe corev1.Probe) *ContainerBuilder {
 	builder.get().StartupProbe = &probe
 	return builder

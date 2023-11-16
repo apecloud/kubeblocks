@@ -47,7 +47,7 @@ func init() {
 	}
 }
 
-func (s *Query) Init(ctx context.Context) error {
+func (s *Query) Init(context.Context) error {
 	dbManager, err := register.GetDBManager()
 	if err != nil {
 		return errors.Wrap(err, "get manager failed")
@@ -57,12 +57,12 @@ func (s *Query) Init(ctx context.Context) error {
 	return nil
 }
 
-func (s *Query) IsReadonly(ctx context.Context) bool {
+func (s *Query) IsReadonly(context.Context) bool {
 	return true
 }
 
 func (s *Query) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	sql := req.Parameters["sql"].(string)
+	sql := req.GetString("sql")
 	if sql == "" {
 		return nil, errors.New("no sql provided")
 	}

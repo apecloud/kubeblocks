@@ -28,8 +28,8 @@ const (
 	KBEnvVolumeProtectionSpec = "KB_VOLUME_PROTECTION_SPEC"
 )
 
+// Lorry env names
 const (
-	// Lorry env names
 	KBEnvClusterName     = "KB_CLUSTER_NAME"
 	KBEnvComponentName   = "KB_COMP_NAME"
 	KBEnvClusterCompName = "KB_CLUSTER_COMP_NAME"

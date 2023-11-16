@@ -100,6 +100,14 @@ var _ = Describe("Lorry Utils", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
+			defaultBuiltInHandler := appsv1alpha1.MySQLBuiltinActionHandler
+			component.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{
+				RoleProbe: &appsv1alpha1.RoleProbeSpec{
+					LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
+						BuiltinHandler: &defaultBuiltInHandler,
+					},
+				},
+			}
 			Expect(buildLorryContainers(reqCtx, component)).Should(Succeed())
 			Expect(component.PodSpec.Containers).Should(HaveLen(1))
 			Expect(component.PodSpec.Containers[0].Name).Should(Equal(constant.RoleProbeContainerName))
@@ -110,23 +118,18 @@ var _ = Describe("Lorry Utils", func() {
 			Expect(container.Command).ShouldNot(BeEmpty())
 		})
 
-		It("should build status probe container", func() {
-			buildStatusProbeContainer("wesql", container, clusterDefProbe, probeServiceHTTPPort)
-			Expect(container.ReadinessProbe.HTTPGet).ShouldNot(BeNil())
-		})
-
-		It("should build running probe container", func() {
-			buildRunningProbeContainer("wesql", container, clusterDefProbe, probeServiceHTTPPort)
-			Expect(container.ReadinessProbe.HTTPGet).ShouldNot(BeNil())
-		})
-
 		It("build we-syncer container", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
 				Log: logger,
 			}
 			// all other services are disabled
-			component.LifecycleActions = nil
+			defaultBuiltInHandler := appsv1alpha1.MySQLBuiltinActionHandler
+			component.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{
+				MemberJoin: &appsv1alpha1.LifecycleActionHandler{
+					BuiltinHandler: &defaultBuiltInHandler,
+				},
+			}
 			Expect(buildLorryContainers(reqCtx, component)).Should(Succeed())
 			Expect(component.PodSpec.Containers).Should(HaveLen(1))
 			Expect(component.PodSpec.Containers[0].Name).Should(Equal(constant.WeSyncerContainerName))
@@ -147,6 +150,14 @@ var _ = Describe("Lorry Utils", func() {
 					{
 						Name:          "volume-002",
 						HighWatermark: &zeroWatermark,
+					},
+				},
+			}
+			defaultBuiltInHandler := appsv1alpha1.MySQLBuiltinActionHandler
+			component.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{
+				RoleProbe: &appsv1alpha1.RoleProbeSpec{
+					LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
+						BuiltinHandler: &defaultBuiltInHandler,
 					},
 				},
 			}
@@ -171,6 +182,14 @@ var _ = Describe("Lorry Utils", func() {
 					{
 						Name:          "volume-002",
 						HighWatermark: &zeroWatermark,
+					},
+				},
+			}
+			defaultBuiltInHandler := appsv1alpha1.MySQLBuiltinActionHandler
+			component.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{
+				RoleProbe: &appsv1alpha1.RoleProbeSpec{
+					LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
+						BuiltinHandler: &defaultBuiltInHandler,
 					},
 				},
 			}

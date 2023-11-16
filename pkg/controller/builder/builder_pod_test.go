@@ -66,12 +66,18 @@ var _ = Describe("pod builder", func() {
 				Value:    "node-0",
 			},
 		}
+		nodeSelector := map[string]string{
+			"label1": "value1",
+			"label2": "value2",
+		}
 		pod := NewPodBuilder(ns, name).
 			SetContainers(containers).
 			AddContainer(container).
 			AddVolumes(volumes...).
 			SetRestartPolicy(restartPolicy).
 			SetSecurityContext(ctx).
+			AddServiceAccount("my_test").
+			SetNodeSelector(nodeSelector).
 			AddTolerations(tolerations...).
 			GetObject()
 
@@ -87,5 +93,7 @@ var _ = Describe("pod builder", func() {
 		Expect(*pod.Spec.SecurityContext).Should(Equal(ctx))
 		Expect(pod.Spec.Tolerations).Should(HaveLen(1))
 		Expect(pod.Spec.Tolerations[0]).Should(Equal(tolerations[0]))
+		Expect(pod.Spec.ServiceAccountName).Should(BeEquivalentTo("my_test"))
+		Expect(pod.Spec.NodeSelector).Should(BeEquivalentTo(nodeSelector))
 	})
 })

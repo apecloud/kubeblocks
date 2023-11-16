@@ -43,7 +43,7 @@ func init() {
 	}
 }
 
-func (s *Switchover) Init(ctx context.Context) error {
+func (s *Switchover) Init(_ context.Context) error {
 	s.dcsStore = dcs.GetStore()
 	if s.dcsStore == nil {
 		return errors.New("dcs store init failed")
@@ -53,8 +53,8 @@ func (s *Switchover) Init(ctx context.Context) error {
 }
 
 func (s *Switchover) PreCheck(ctx context.Context, req *OpsRequest) error {
-	primary := req.Parameters["primary"].(string)
-	candidate := req.Parameters["candidate"].(string)
+	primary := req.GetString("primary")
+	candidate := req.GetString("candidate")
 	if primary == "" && candidate == "" {
 		return errors.New("primary or candidate must be set")
 	}
@@ -100,9 +100,9 @@ func (s *Switchover) PreCheck(ctx context.Context, req *OpsRequest) error {
 	return nil
 }
 
-func (s *Switchover) Do(ctx context.Context, req *OpsRequest) (*OpsResponse, error) {
-	primary := req.Parameters["primary"].(string)
-	candidate := req.Parameters["candidate"].(string)
+func (s *Switchover) Do(_ context.Context, req *OpsRequest) (*OpsResponse, error) {
+	primary := req.GetString("primary")
+	candidate := req.GetString("candidate")
 	err := s.dcsStore.CreateSwitchover(primary, candidate)
 	if err != nil {
 		message := fmt.Sprintf("Create switchover failed: %v", err)

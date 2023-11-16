@@ -32,7 +32,7 @@ var (
 )
 
 // GTIDItem represents an item in a set of GTID ranges,
-// for example, the item: "bfaff6e9-3040-11ee-9393-eab5dfc9b22a:1-5:8-10"
+// for example, the item: "ee194423-3040-11ee-9393-eab5dfc9b22a:1-5:8-10"
 type GTIDItem struct {
 	ServerUUID string
 	Ranges     string
@@ -58,7 +58,7 @@ func (gtid *GTIDItem) String() string {
 	return fmt.Sprintf("%s:%s", gtid.ServerUUID, gtid.Ranges)
 }
 
-func (gtid *GTIDItem) Explode() (result [](*GTIDItem)) {
+func (gtid *GTIDItem) Explode() (result []*GTIDItem) {
 	intervals := strings.Split(gtid.Ranges, ":")
 	for _, interval := range intervals {
 		if submatch := multiValueInterval.FindStringSubmatch(interval); submatch != nil {
@@ -101,7 +101,7 @@ func NewOracleGtidSet(gtidSet string) (res *GTIDSet, err error) {
 }
 
 func (gtidSet *GTIDSet) RemoveUUID(uuid string) (removed bool) {
-	filteredEntries := [](*GTIDItem){}
+	var filteredEntries []*GTIDItem
 	for _, item := range gtidSet.Items {
 		if item.ServerUUID == uuid {
 			removed = true
@@ -124,7 +124,7 @@ func (gtidSet *GTIDSet) RetainUUIDs(uuids []string) (anythingRemoved bool) {
 	for _, uuid := range uuids {
 		retainUUIDs[uuid] = true
 	}
-	filteredEntries := [](*GTIDItem){}
+	var filteredEntries []*GTIDItem
 	for _, item := range gtidSet.Items {
 		if retainUUIDs[item.ServerUUID] {
 			filteredEntries = append(filteredEntries, item)
@@ -151,7 +151,7 @@ func (gtidSet *GTIDSet) SharedUUIDs(other *GTIDSet) (shared []string) {
 	return shared
 }
 
-func (gtidSet *GTIDSet) Explode() (result [](*GTIDItem)) {
+func (gtidSet *GTIDSet) Explode() (result []*GTIDItem) {
 	for _, entries := range gtidSet.Items {
 		result = append(result, entries.Explode()...)
 	}
@@ -159,7 +159,7 @@ func (gtidSet *GTIDSet) Explode() (result [](*GTIDItem)) {
 }
 
 func (gtidSet *GTIDSet) String() string {
-	tokens := []string{}
+	var tokens []string
 	for _, item := range gtidSet.Items {
 		tokens = append(tokens, item.String())
 	}

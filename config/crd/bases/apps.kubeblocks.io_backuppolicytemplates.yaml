@@ -362,16 +362,6 @@ spec:
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
-                    retentionPeriod:
-                      default: 7d
-                      description: "retentionPeriod determines a duration up to which
-                        the backup should be kept. controller will remove all backups
-                        that are older than the RetentionPeriod. For example, RetentionPeriod
-                        of `30d` will keep only the backups of last 30 days. Sample
-                        duration format: - years: \t2y - months: \t6mo - days: \t\t30d
-                        - hours: \t12h - minutes: \t30m You can also combine the above
-                        durations. For example: 30d12h30m"
-                      type: string
                     schedules:
                       description: schedule policy for backup.
                       items:
@@ -388,6 +378,17 @@ spec:
                             description: enabled specifies whether the backup schedule
                               is enabled or not.
                             type: boolean
+                          retentionPeriod:
+                            default: 7d
+                            description: "retentionPeriod determines a duration up
+                              to which the backup should be kept. controller will
+                              remove all backups that are older than the RetentionPeriod.
+                              For example, RetentionPeriod of `30d` will keep only
+                              the backups of last 30 days. Sample duration format:
+                              - years: \t2y - months: \t6mo - days: \t\t30d - hours:
+                              \t12h - minutes: \t30m You can also combine the above
+                              durations. For example: 30d12h30m"
+                            type: string
                         required:
                         - backupMethod
                         - cronExpression

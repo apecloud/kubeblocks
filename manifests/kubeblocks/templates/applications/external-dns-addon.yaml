@@ -1,0 +1,51 @@
+---
+# Source: kubeblocks/templates/applications/external-dns-addon.yaml
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: external-dns
+  labels:
+    helm.sh/chart: kubeblocks-0.8.0-alpha.0
+    app.kubernetes.io/name: kubeblocks
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: "0.8.0-alpha.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  description: >-
+    ExternalDNS synchronizes exposed Kubernetes Services and Ingresses with DNS providers.
+
+  type: Helm
+
+  helm:    
+    chartLocationURL: file:///external-dns-6.20.4.tgz    
+    chartsImage: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/kubeblocks-charts:0.8.0-alpha.0
+    chartsPathInImage: /charts
+
+    installOptions:
+
+    installValues:
+      configMapRefs:
+      - name: external-dns-chart-kubeblocks-values
+        key: values-kubeblocks-override.yaml
+
+    valuesMapping:
+      valueMap:
+        replicaCount: replicaCount
+
+      jsonMap:
+        tolerations: tolerations
+
+      resources:
+        cpu:
+          requests: resources.requests.cpu
+          limits: resources.limits.cpu
+        memory:
+          requests: resources.requests.memory
+          limits: resources.limits.memory
+
+  defaultInstallValues:
+  - replicas: 1
+    tolerations: "[{\"effect\":\"NoSchedule\",\"key\":\"kb-controller\",\"operator\":\"Equal\",\"value\":\"true\"}]"
+
+  installable:
+    autoInstall: false

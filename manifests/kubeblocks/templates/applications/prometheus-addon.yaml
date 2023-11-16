@@ -1,0 +1,131 @@
+---
+# Source: kubeblocks/templates/applications/prometheus-addon.yaml
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: prometheus
+  labels:
+    helm.sh/chart: kubeblocks-0.8.0-alpha.0
+    app.kubernetes.io/name: kubeblocks
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: "0.8.0-alpha.0"
+    app.kubernetes.io/managed-by: Helm
+    "kubeblocks.io/provider": community
+spec:
+  description: Prometheus is a monitoring system and time series database.
+  type: Helm
+
+  helm:    
+    chartLocationURL: file:///prometheus-15.16.1.tgz    
+    chartsImage: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/kubeblocks-charts:0.8.0-alpha.0
+    chartsPathInImage: /charts
+
+    installOptions:
+
+    installValues:
+      configMapRefs:
+        - name: prometheus-chart-kubeblocks-values
+          key: values-kubeblocks-override.yaml
+
+    valuesMapping:
+      valueMap:
+        replicaCount: server.replicaCount
+        storageClass: server.persistentVolume.storageClass
+        persistentVolumeEnabled: server.persistentVolume.enabled
+
+      jsonMap:
+        tolerations: server.tolerations
+
+      resources:
+        storage: server.persistentVolume.size
+        cpu:
+          requests: server.resources.requests.cpu
+          limits: server.resources.limits.cpu
+        memory:
+          requests: server.resources.requests.memory
+          limits: server.resources.limits.memory
+      extras:
+        - name: alertmanager
+          valueMap:
+            replicaCount: alertmanager.replicaCount
+            storageClass: alertmanager.persistentVolume.storageClass
+            persistentVolumeEnabled: alertmanager.persistentVolume.enabled
+
+          jsonMap:
+            tolerations: alertmanager.tolerations
+
+          resources:
+            storage: alertmanager.persistentVolume.size
+            cpu:
+              requests: alertmanager.resources.requests.cpu
+              limits: alertmanager.resources.limits.cpu
+            memory:
+              requests: alertmanager.resources.requests.memory
+              limits: alertmanager.resources.limits.memory
+
+  defaultInstallValues:
+    - replicas: 1
+      resources:
+        requests:
+          storage: 20Gi
+          memory: 512Mi
+        limits:
+          memory: 4Gi
+      tolerations: "[{\"effect\":\"NoSchedule\",\"key\":\"kb-controller\",\"operator\":\"Equal\",\"value\":\"true\"}]"
+
+      extras:
+        - name: alertmanager
+          replicas: 1
+          resources:
+            requests:
+              storage: 4Gi
+          tolerations: "[{\"effect\":\"NoSchedule\",\"key\":\"kb-controller\",\"operator\":\"Equal\",\"value\":\"true\"}]"
+
+    # for ACK, the smallest storage size is 20Gi, the format of GitVersion is v1.24.6-aliyun.1
+    - selectors:
+        - key: KubeGitVersion
+          operator: Contains
+          values:
+            - aliyun
+      replicas: 1
+      resources:
+        requests:
+          storage: 20Gi
+          memory: 512Mi
+        limits:
+          memory: 4Gi
+      tolerations: "[{\"effect\":\"NoSchedule\",\"key\":\"kb-controller\",\"operator\":\"Equal\",\"value\":\"true\"}]"
+
+      extras:
+        - name: alertmanager
+          replicas: 1
+          resources:
+            requests:
+              storage: 20Gi
+          tolerations: "[{\"effect\":\"NoSchedule\",\"key\":\"kb-controller\",\"operator\":\"Equal\",\"value\":\"true\"}]"
+
+    # for TKE, the smallest storage size is 10Gi, the format of GitVersion is v1.24.4-tke.5
+    - selectors:
+        - key: KubeGitVersion
+          operator: Contains
+          values:
+            - tke
+      replicas: 1
+      resources:
+        requests:
+          storage: 20Gi
+          memory: 512Mi
+        limits:
+          memory: 4Gi
+      tolerations: "[{\"effect\":\"NoSchedule\",\"key\":\"kb-controller\",\"operator\":\"Equal\",\"value\":\"true\"}]"
+
+      extras:
+        - name: alertmanager
+          replicas: 1
+          resources:
+            requests:
+              storage: 10Gi
+          tolerations: "[{\"effect\":\"NoSchedule\",\"key\":\"kb-controller\",\"operator\":\"Equal\",\"value\":\"true\"}]"
+
+  installable:
+    autoInstall: false

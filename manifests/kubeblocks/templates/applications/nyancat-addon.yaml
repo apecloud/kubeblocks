@@ -1,0 +1,46 @@
+---
+# Source: kubeblocks/templates/applications/nyancat-addon.yaml
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: nyancat
+  labels:
+    helm.sh/chart: kubeblocks-0.8.0-alpha.0
+    app.kubernetes.io/name: kubeblocks
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: "0.8.0-alpha.0"
+    app.kubernetes.io/managed-by: Helm
+    "kubeblocks.io/provider": apecloud
+spec:
+  description: 'Deploys a nyancat application in a cluster.
+  Nyancat is a demo application for showing database cluster availability.'
+  type: Helm
+
+  helm:    
+    chartLocationURL: file:///nyancat-0.7.0.tgz    
+    chartsImage: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/kubeblocks-charts:0.8.0-alpha.0
+    chartsPathInImage: /charts
+
+    installOptions:
+
+    valuesMapping:
+      valueMap:
+        replicaCount: replicaCount
+
+      jsonMap:
+        tolerations: tolerations
+
+      resources:
+        cpu:
+          requests: resources.requests.cpu
+          limits: resources.limits.cpu
+        memory:
+          requests: resources.requests.memory
+          limits: resources.limits.memory
+
+  defaultInstallValues:
+    - replicas: 1
+      tolerations: "[{\"effect\":\"NoSchedule\",\"key\":\"kb-controller\",\"operator\":\"Equal\",\"value\":\"true\"}]"
+
+  installable:
+    autoInstall: false

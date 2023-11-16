@@ -1,0 +1,25 @@
+---
+# Source: kubeblocks/templates/addons/polardbx-addon.yaml
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: polardbx
+  labels:
+    app.kubernetes.io/name: polardbx
+    app.kubernetes.io/version: 0.7.0
+    addon.kubeblocks.io/provider: community
+    addon.kubeblocks.io/model: RDBMS
+  annotations:
+    addon.kubeblocks.io/kubeblocks-version: '>=0.7.0'
+spec:
+  description: 'PolarDB-X is a cloud native distributed SQL Database designed for high concurrency, massive storage, complex querying scenarios.'
+  type: Helm
+  helm:    
+    chartLocationURL: file:///polardbx-0.7.0.tgz
+    chartsImage: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/kubeblocks-charts:0.8.0-alpha.0
+    chartsPathInImage: /charts
+    installOptions:
+  defaultInstallValues:
+  - enabled: true
+  installable:
+    autoInstall: false

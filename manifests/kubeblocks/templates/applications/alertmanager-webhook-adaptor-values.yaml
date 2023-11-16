@@ -1,0 +1,29 @@
+---
+# Source: kubeblocks/templates/applications/alertmanager-webhook-adaptor-values.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-webhook-adaptor-chart-kubeblocks-values
+  labels:
+    helm.sh/chart: kubeblocks-0.8.0-alpha.0
+    app.kubernetes.io/name: kubeblocks
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: "0.8.0-alpha.0"
+    app.kubernetes.io/managed-by: Helm
+data:
+  values-kubeblocks-override.yaml: |-
+    affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - preference:
+            matchExpressions:
+            - key: kb-controller
+              operator: In
+              values:
+              - "true"
+          weight: 100
+    configFiles:
+      config.yaml: {}
+    configMapOverrideName: config
+    image:
+      registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com

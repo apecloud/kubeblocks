@@ -1,0 +1,25 @@
+---
+# Source: kubeblocks/templates/addons/xinference-addon.yaml
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: xinference
+  labels:
+    app.kubernetes.io/name: xinference
+    app.kubernetes.io/version: 0.1.0
+    addon.kubeblocks.io/provider: community
+    addon.kubeblocks.io/model: LLM
+  annotations:
+    addon.kubeblocks.io/kubeblocks-version: '>=0.7.0'
+spec:
+  description: 'Xorbits Inference(Xinference) is a powerful and versatile library designed to serve language, speech recognition, and multimodal models.'
+  type: Helm
+  helm:    
+    chartLocationURL: file:///xinference-0.1.0.tgz
+    chartsImage: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/kubeblocks-charts:0.8.0-alpha.0
+    chartsPathInImage: /charts
+    installOptions:
+  defaultInstallValues:
+  - enabled: true
+  installable:
+    autoInstall: false

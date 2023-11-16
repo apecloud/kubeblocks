@@ -1,0 +1,15 @@
+---
+# Source: kubeblocks/templates/prometheus/webhook-adaptor.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    helm.sh/chart: kubeblocks-0.8.0-alpha.0
+    app.kubernetes.io/name: kubeblocks
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: "0.8.0-alpha.0"
+    app.kubernetes.io/managed-by: Helm
+  name: kb-addon-alertmanager-webhook-adaptor-config
+data:
+  config.yml: |
+    receivers: [ ]

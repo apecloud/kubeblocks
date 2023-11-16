@@ -1,0 +1,73 @@
+---
+# Source: kubeblocks/templates/applications/loki-addon.yaml
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: loki
+  labels:
+    helm.sh/chart: kubeblocks-0.8.0-alpha.0
+    app.kubernetes.io/name: kubeblocks
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: "0.8.0-alpha.0"
+    app.kubernetes.io/managed-by: Helm
+    "kubeblocks.io/provider": community
+spec:
+  description: Grafana Loki is a horizontally scalable, highly available, and multi-tenant log aggregation system, which inspired by Prometheus.
+  type: Helm
+
+  helm:    
+    chartLocationURL: file:///loki-5.8.9.tgz    
+    chartsImage: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/kubeblocks-charts:0.8.0-alpha.0
+    chartsPathInImage: /charts
+
+    installOptions:
+
+    installValues:
+      configMapRefs:
+        - name: loki-chart-kubeblocks-values
+          key: values-kubeblocks-override.yaml
+
+    valuesMapping:
+      valueMap:
+        replicaCount: singleBinary.replicas
+        storageClass: singleBinary.persistence.storageClass
+        persistentVolumeEnabled: singleBinary.persistence.enabled
+
+      jsonMap:
+        tolerations: global.tolerations
+
+      resources:
+        storage: singleBinary.persistence.size
+
+  defaultInstallValues:
+    - replicas: 1
+      storageClass:
+      resources:
+        requests:
+          storage: 8Gi
+      tolerations: "[{\"effect\":\"NoSchedule\",\"key\":\"kb-controller\",\"operator\":\"Equal\",\"value\":\"true\"}]"
+    # for ACK, the smallest storage size is 20Gi, the format of GitVersion is v1.24.6-aliyun.1
+    - selectors:
+        - key: KubeGitVersion
+          operator: Contains
+          values:
+            - aliyun
+      replicas: 1
+      resources:
+        requests:
+          storage: 20Gi
+      tolerations: "[{\"effect\":\"NoSchedule\",\"key\":\"kb-controller\",\"operator\":\"Equal\",\"value\":\"true\"}]"
+    # for TKE, the smallest storage size is 10Gi, the format of GitVersion is v1.24.4-tke.5
+    - selectors:
+        - key: KubeGitVersion
+          operator: Contains
+          values:
+            - tke
+      replicas: 1
+      resources:
+        requests:
+          storage: 10Gi
+      tolerations: "[{\"effect\":\"NoSchedule\",\"key\":\"kb-controller\",\"operator\":\"Equal\",\"value\":\"true\"}]"
+
+  installable:
+    autoInstall: false

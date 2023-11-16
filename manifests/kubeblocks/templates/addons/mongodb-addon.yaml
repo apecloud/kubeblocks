@@ -1,0 +1,25 @@
+---
+# Source: kubeblocks/templates/addons/mongodb-addon.yaml
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: mongodb
+  labels:
+    app.kubernetes.io/name: mongodb
+    app.kubernetes.io/version: 0.7.0
+    addon.kubeblocks.io/provider: apecloud
+    addon.kubeblocks.io/model: document
+  annotations:
+    addon.kubeblocks.io/kubeblocks-version: '>=0.7.0'
+spec:
+  description: 'MongoDB is a document database designed for ease of application development and scaling.'
+  type: Helm
+  helm:    
+    chartLocationURL: file:///mongodb-0.7.0.tgz
+    chartsImage: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/kubeblocks-charts:0.8.0-alpha.0
+    chartsPathInImage: /charts
+    installOptions:
+  defaultInstallValues:
+  - enabled: true
+  installable:
+    autoInstall: true

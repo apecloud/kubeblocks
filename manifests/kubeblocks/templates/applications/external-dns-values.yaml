@@ -1,0 +1,21 @@
+---
+# Source: kubeblocks/templates/applications/external-dns-values.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: external-dns-chart-kubeblocks-values
+  labels:
+    helm.sh/chart: kubeblocks-0.8.0-alpha.0
+    app.kubernetes.io/name: kubeblocks
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: "0.8.0-alpha.0"
+    app.kubernetes.io/managed-by: Helm
+data:
+  values-kubeblocks-override.yaml: |-
+    domain: kubeblocks.io
+    enabled: false
+    tolerations:
+    - effect: NoSchedule
+      key: kb-controller
+      operator: Equal
+      value: "true"

@@ -1,0 +1,28 @@
+---
+# Source: kubeblocks/templates/rbac/apps_clusterdefinition_viewer_role.yaml
+# permissions for end users to view clusterdefinitions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: release-name-kubeblocks-clusterdefinition-viewer-role
+  labels:
+    helm.sh/chart: kubeblocks-0.8.0-alpha.0
+    app.kubernetes.io/name: kubeblocks
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: "0.8.0-alpha.0"
+    app.kubernetes.io/managed-by: Helm
+rules:
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - clusterdefinitions
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - clusterdefinitions/status
+  verbs:
+  - get

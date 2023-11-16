@@ -1,0 +1,28 @@
+---
+# Source: kubeblocks/charts/monitor/templates/prometheus/alertmanager.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    helm.sh/chart: monitor-0.1.0
+    app.kubernetes.io/name: monitor
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: "2.44.0"
+    app.kubernetes.io/managed-by: Helm
+  name: kb-addon-prometheus-alertmanager-config
+data:
+  alertmanager.yml: |
+    global: { }
+    receivers:
+      - name: default-receiver
+    route:
+      group_by: [ 'alertname', 'namespace', 'app_kubernetes_io_instance' ]
+      group_interval: 30s
+      group_wait: 5s
+      receiver: default-receiver
+      repeat_interval: 10m
+      routes:
+        - receiver: default-receiver
+          group_by: ['alertname', 'instance', 'pod']
+          matchers:
+            - alertname=~"Container.*"

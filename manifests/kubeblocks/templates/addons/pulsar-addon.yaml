@@ -1,0 +1,30 @@
+---
+# Source: kubeblocks/templates/addons/pulsar-addon.yaml
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: pulsar
+  labels:
+    app.kubernetes.io/name: pulsar
+    app.kubernetes.io/version: 0.7.0
+    addon.kubeblocks.io/provider: community
+    addon.kubeblocks.io/model: streaming
+  annotations:
+    addon.kubeblocks.io/kubeblocks-version: '>=0.7.0'
+spec:
+  description: "Apache® Pulsar™ is an open-source, distributed messaging and streaming platform built for the cloud."
+  type: Helm
+  helm:    
+    chartLocationURL: file:///pulsar-0.7.0.tgz    
+    chartsImage: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/kubeblocks-charts:0.8.0-alpha.0
+    chartsPathInImage: /charts
+
+    installOptions:
+
+    installValues:
+
+  installable:
+    autoInstall: true
+
+  defaultInstallValues:
+    - enabled: true

@@ -1,0 +1,52 @@
+---
+# Source: kubeblocks/templates/applications/loki-values.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki-chart-kubeblocks-values
+  labels:
+    helm.sh/chart: kubeblocks-0.8.0-alpha.0
+    app.kubernetes.io/name: kubeblocks
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: "0.8.0-alpha.0"
+    app.kubernetes.io/managed-by: Helm
+data:
+  values-kubeblocks-override.yaml: |-
+    enabled: false
+    loki:
+      auth_enabled: false
+      commonConfig:
+        replication_factor: 1
+      compactor:
+        compaction_interval: 10m
+        delete_request_cancel_period: 2h
+        retention_delete_delay: 2h
+        retention_delete_worker_count: 150
+        retention_enabled: true
+        shared_store: filesystem
+        working_directory: /var/loki/retention
+      limits_config:
+        max_query_lookback: 72h
+        retention_period: 72h
+      podSecurityContext:
+        runAsNonRoot: false
+        runAsUser: 0
+      storage:
+        type: filesystem
+    monitoring:
+      dashboards:
+        enabled: false
+      lokiCanary:
+        enabled: false
+      rules:
+        enabled: false
+      selfMonitoring:
+        enabled: false
+        grafanaAgent:
+          installOperator: false
+      serviceMonitor:
+        enabled: false
+    singleBinary:
+      replicas: 1
+    test:
+      enabled: false

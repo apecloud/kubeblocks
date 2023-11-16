@@ -1,0 +1,29 @@
+---
+# Source: kubeblocks/templates/applications/nvidia-gpu-exporter-addon.yaml
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: nvidia-gpu-exporter
+  labels:
+    helm.sh/chart: kubeblocks-0.8.0-alpha.0
+    app.kubernetes.io/name: kubeblocks
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: "0.8.0-alpha.0"
+    app.kubernetes.io/managed-by: Helm
+    "kubeblocks.io/provider": community
+spec:
+  description: 'Nvidia GPU exporter for prometheus using nvidia-smi binary'
+  type: Helm
+
+  helm:    
+    chartLocationURL: file:///nvidia-gpu-exporter-0.3.1.tgz    
+    chartsImage: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/kubeblocks-charts:0.8.0-alpha.0
+    chartsPathInImage: /charts
+
+    installOptions:
+
+  installable:
+    autoInstall: false
+
+  defaultInstallValues:
+  - enabled: true

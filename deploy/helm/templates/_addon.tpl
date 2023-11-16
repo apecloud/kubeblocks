@@ -26,7 +26,7 @@ chartLocationURL: {{ $base }}/{{ $fullChart }}.tgz
 {{- end }}
 
 {{/*
-Build add-on CRs
+Build add-on CR
 Parameters:
 - name: name of the addon
 - version: version of the addon

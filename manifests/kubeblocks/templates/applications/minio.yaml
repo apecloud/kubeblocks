@@ -1,0 +1,35 @@
+---
+# Source: kubeblocks/templates/applications/minio.yaml
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: minio
+  labels:
+    helm.sh/chart: kubeblocks-0.8.0-alpha.0
+    app.kubernetes.io/name: kubeblocks
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: "0.8.0-alpha.0"
+    app.kubernetes.io/managed-by: Helm
+    "kubeblocks.io/provider": community
+spec:
+  description: 'MinIO(R) is an object storage server, compatible with Amazon S3 cloud storage service, mainly used for storing unstructured data (such as photos, videos, log files, etc.).'
+  type: Helm
+
+  helm:    
+    chartLocationURL: file:///minio-12.8.12.tgz    
+    chartsImage: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/kubeblocks-charts:0.8.0-alpha.0
+    chartsPathInImage: /charts
+
+    installOptions:
+
+    installValues:
+      setValues:
+        - auth.rootUser=kubeblocks
+        - auth.rootPassword=kubeblocks
+        - extraEnvVars[0].name=MINIO_BROWSER_LOGIN_ANIMATION
+        - extraEnvVars[0].value=off
+  installable:
+    autoInstall: false
+
+  defaultInstallValues:
+    - enabled: true

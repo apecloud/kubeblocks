@@ -1,0 +1,56 @@
+---
+# Source: kubeblocks/templates/addons/pre-delete-job.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: release-name-addon-removal
+  labels:
+    helm.sh/chart: kubeblocks-0.8.0-alpha.0
+    app.kubernetes.io/name: kubeblocks
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: "0.8.0-alpha.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  ttlSecondsAfterFinished: 0
+  template:
+    metadata:
+      name: release-name-addon-removal
+      labels:
+        helm.sh/chart: kubeblocks-0.8.0-alpha.0
+        app.kubernetes.io/name: kubeblocks
+        app.kubernetes.io/instance: release-name
+        app.kubernetes.io/version: "0.8.0-alpha.0"
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      serviceAccountName: release-name-kubeblocks
+      securityContext:
+        runAsNonRoot: true
+      restartPolicy: OnFailure
+      containers:
+        - name: post-install-job
+          image: "infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/kubeblocks-tools:0.8.0-alpha.0"
+          imagePullPolicy: IfNotPresent
+          command:
+            - kubectl
+          args:
+            - delete
+            - addons.extensions.kubeblocks.io
+            - --selector=app.kubernetes.io/managed-by=Helm,app.kubernetes.io/instance=release-name
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - preference:
+              matchExpressions:
+              - key: kb-controller
+                operator: In
+                values:
+                - "true"
+            weight: 100
+      tolerations:
+        - effect: NoSchedule
+          key: kb-controller
+          operator: Equal
+          value: "true"

@@ -1,0 +1,32 @@
+---
+# Source: kubeblocks/templates/rbac/extensions_addon_editor_role.yaml
+# permissions for end users to edit addons.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: release-name-kubeblocks-editor-role
+  labels:
+    helm.sh/chart: kubeblocks-0.8.0-alpha.0
+    app.kubernetes.io/name: kubeblocks
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: "0.8.0-alpha.0"
+    app.kubernetes.io/managed-by: Helm
+rules:
+- apiGroups:
+  - extensions.kubeblocks.io
+  resources:
+  - addons
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - extensions.kubeblocks.io
+  resources:
+  - addons/status
+  verbs:
+  - get

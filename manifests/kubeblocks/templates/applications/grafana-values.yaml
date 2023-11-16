@@ -1,0 +1,87 @@
+---
+# Source: kubeblocks/templates/applications/grafana-values.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-chart-kubeblocks-values
+  labels:
+    helm.sh/chart: kubeblocks-0.8.0-alpha.0
+    app.kubernetes.io/name: kubeblocks
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: "0.8.0-alpha.0"
+    app.kubernetes.io/managed-by: Helm
+data:
+  values-kubeblocks-override.yaml: |-
+    adminPassword: kubeblocks
+    adminUser: admin
+    affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - preference:
+            matchExpressions:
+            - key: kb-controller
+              operator: In
+              values:
+              - "true"
+          weight: 100
+    defaultDashboardsTimezone: null
+    enabled: false
+    grafana.ini:
+      auth.anonymous:
+        enabled: true
+        hide_version: true
+      auth.basic:
+        enabled: false
+    image:
+      repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/grafana
+      tag: 9.2.4
+    ingress:
+      annotations: {}
+      enabled: false
+      extraPaths: []
+      hosts:
+      - chart-example.local
+      labels: {}
+      path: /
+      pathType: Prefix
+      tls: []
+    rbac:
+      pspEnabled: false
+    replicas: 1
+    resources: {}
+    service:
+      annotations: {}
+      appProtocol: ""
+      enabled: true
+      labels: {}
+      port: 80
+      portName: service
+      targetPort: 3000
+      type: ClusterIP
+    sidecar:
+      dashboards:
+        enabled: true
+        label: grafana_dashboard
+        labelValue: "1"
+        resource: configmap
+        searchNamespace: ALL
+      datasources:
+        defaultDatasourceEnabled: true
+        enabled: true
+        initDatasources: true
+        label: grafana_datasource
+        labelValue: "1"
+        resource: configmap
+        searchNamespace: ALL
+        skipReload: false
+        uid: prometheus
+      image:
+        repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/k8s-sidecar
+        tag: 1.19.2
+    testFramework:
+      enabled: false
+    tolerations:
+    - effect: NoSchedule
+      key: kb-controller
+      operator: Equal
+      value: "true"

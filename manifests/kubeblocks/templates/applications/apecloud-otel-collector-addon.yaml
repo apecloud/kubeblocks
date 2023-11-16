@@ -1,0 +1,49 @@
+---
+# Source: kubeblocks/templates/applications/apecloud-otel-collector-addon.yaml
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: apecloud-otel-collector
+  labels:
+    helm.sh/chart: kubeblocks-0.8.0-alpha.0
+    app.kubernetes.io/name: kubeblocks
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: "0.8.0-alpha.0"
+    app.kubernetes.io/managed-by: Helm
+    "kubeblocks.io/provider": apecloud
+spec:
+  description: apecloud-otel-collector is a high-performance data collection agent with luxuriant function, which inspired by OpenTelemetry.
+  type: Helm
+
+  helm:    
+    chartLocationURL: file:///apecloud-otel-collector-0.1.2-beta.3.tgz    
+    chartsImage: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/kubeblocks-charts:0.8.0-alpha.0
+    chartsPathInImage: /charts
+
+    installOptions:
+
+    installValues:
+      configMapRefs:
+        - name: apecloud-otel-collector-chart-kubeblocks-values
+          key: values-kubeblocks-override.yaml
+
+    valuesMapping:
+      valueMap:
+
+      jsonMap:
+        tolerations: tolerations
+
+      resources:
+        cpu:
+          requests: resources.requests.cpu
+          limits: resources.limits.cpu
+        memory:
+          requests: resources.requests.memory
+          limits: resources.limits.memory
+
+  defaultInstallValues:
+    - enabled: true
+      tolerations: "[{\"effect\":\"NoSchedule\",\"key\":\"kb-controller\",\"operator\":\"Equal\",\"value\":\"true\"},{\"effect\":\"NoSchedule\",\"key\":\"kb-data\",\"operator\":\"Equal\",\"value\":\"true\"}]"
+
+  installable:
+    autoInstall: false

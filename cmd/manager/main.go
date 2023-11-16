@@ -390,16 +390,18 @@ func main() {
 		}
 
 		if err = (&appscontrollers.ServiceDescriptorReconciler{
-			Client: mgr.GetClient(),
-			Scheme: mgr.GetScheme(),
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("service-descriptor-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ServiceDescriptor")
 			os.Exit(1)
 		}
 
 		if err = (&appscontrollers.BackupPolicyTemplateReconciler{
-			Client: mgr.GetClient(),
-			Scheme: mgr.GetScheme(),
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("backup-policy-template-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "BackupPolicyTemplate")
 			os.Exit(1)

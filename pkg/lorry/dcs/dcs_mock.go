@@ -68,18 +68,18 @@ func (mr *MockDCSMockRecorder) AddCurrentMember() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddCurrentMember", reflect.TypeOf((*MockDCS)(nil).AddCurrentMember))
 }
 
-// AttempAcquireLease mocks base method.
-func (m *MockDCS) AttempAcquireLease() error {
+// AttemptAcquireLease mocks base method.
+func (m *MockDCS) AttemptAcquireLease() error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AttempAcquireLease")
+	ret := m.ctrl.Call(m, "AttemptAcquireLease")
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// AttempAcquireLease indicates an expected call of AttempAcquireLease.
-func (mr *MockDCSMockRecorder) AttempAcquireLease() *gomock.Call {
+// AttemptAcquireLease indicates an expected call of AttemptAcquireLease.
+func (mr *MockDCSMockRecorder) AttemptAcquireLease() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AttempAcquireLease", reflect.TypeOf((*MockDCS)(nil).AttempAcquireLease))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AttemptAcquireLease", reflect.TypeOf((*MockDCS)(nil).AttemptAcquireLease))
 }
 
 // CreateLease mocks base method.
@@ -254,17 +254,17 @@ func (mr *MockDCSMockRecorder) HasLease() *gomock.Call {
 }
 
 // Initialize mocks base method.
-func (m *MockDCS) Initialize(arg0 *Cluster) error {
+func (m *MockDCS) Initialize() error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Initialize", arg0)
+	ret := m.ctrl.Call(m, "Initialize")
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Initialize indicates an expected call of Initialize.
-func (mr *MockDCSMockRecorder) Initialize(arg0 interface{}) *gomock.Call {
+func (mr *MockDCSMockRecorder) Initialize() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*MockDCS)(nil).Initialize), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*MockDCS)(nil).Initialize))
 }
 
 // IsLeaseExist mocks base method.

@@ -47,12 +47,11 @@ jobs:
 
   release-addons-chart:
     needs: release-version
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.38
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.40
     with:
       GITHUB_REPO: "apecloud/kubeblocks-addons"
-      VERSION: "${{ needs.release-version.outputs.release-version }}"
       CHART_DIR: "addons"
-      APECD_REF: "v0.1.38"
+      APECD_REF: "v0.1.40"
       GITHUB_REF: ${{ github.ref }}
     secrets: inherit
 

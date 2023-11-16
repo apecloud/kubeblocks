@@ -91,7 +91,7 @@ func (ha *Ha) RunCycle() {
 	}
 
 	if !ha.dbManager.IsRunning() {
-		ha.logger.Info("DB Service is not running,  wait for lorryctl to start it")
+		ha.logger.Info("DB Service is not running,  wait for lorryCtl to start it")
 		if ha.dcs.HasLease() {
 			_ = ha.dcs.ReleaseLease()
 		}
@@ -190,7 +190,7 @@ func (ha *Ha) RunCycle() {
 		// lockOwnerIsLeader, _ := ha.dbManager.IsLeaderMember(ha.ctx, cluster, leaderMember)
 		// currentMemberIsLeader, _ := ha.dbManager.IsLeader(context.TODO(), cluster)
 		// if lockOwnerIsLeader && currentMemberIsLeader {
-		// ha.logger.Infof("Lock owner is real Leader, demote myself and follow the real leader")
+		// ha.logger.Info("Lock owner is real Leader, demote myself and follow the real leader")
 		_ = ha.dbManager.Demote(ha.ctx)
 		_ = ha.dbManager.Follow(ha.ctx, cluster)
 	}

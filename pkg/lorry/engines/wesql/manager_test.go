@@ -40,7 +40,6 @@ const (
 	fakePodName         = "test-wesql-0"
 	fakeClusterCompName = "test-wesql"
 	fakeNamespace       = "fake-namespace"
-	fakeDBPort          = "fake-port"
 )
 
 func mockDatabase(t *testing.T) (*Manager, sqlmock.Sqlmock, error) {
@@ -183,6 +182,11 @@ func TestGetClusterInfo(t *testing.T) {
 	ctx := context.TODO()
 	manager, mock, _ := mockDatabase(t)
 
+	t.Run("Get leader conn failed", func(t *testing.T) {
+		clusterInfo := manager.GetClusterInfo(ctx, &dcs.Cluster{})
+		assert.Empty(t, clusterInfo)
+	})
+
 	t.Run("get cluster info failed", func(t *testing.T) {
 		mock.ExpectQuery("select cluster_id, cluster_info from mysql.consensus_info").
 			WillReturnError(fmt.Errorf("some error"))
@@ -252,6 +256,94 @@ func TestIsCurrentMemberInCluster(t *testing.T) {
 			AddRow("1", "test-wesql-0.test-wesql-headless:13306;test-wesql-1.test-wesql-headless:13306@1"))
 
 	assert.True(t, manager.IsCurrentMemberInCluster(ctx, nil))
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %v", err)
+	}
+}
+
+func TestManager_LeaveMemberFromCluster(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := mockDatabase(t)
+	cluster := &dcs.Cluster{
+		ClusterCompName: fakeClusterCompName,
+		Namespace:       fakeNamespace,
+	}
+	memberName := fakePodName
+
+	t.Run("Get leader conn failed", func(t *testing.T) {
+		err := manager.LeaveMemberFromCluster(ctx, cluster, memberName)
+		assert.NotNil(t, err)
+		assert.ErrorContains(t, err, "the cluster has no leader")
+	})
+
+	cluster.Leader = &dcs.Leader{Name: fakePodName}
+	cluster.Members = []dcs.Member{{Name: fakePodName}}
+	t.Run("member already deleted", func(t *testing.T) {
+		err := manager.LeaveMemberFromCluster(ctx, cluster, memberName)
+		assert.Nil(t, err)
+	})
+
+	t.Run("delete member from db cluster failed", func(t *testing.T) {
+		mock.ExpectQuery("select cluster_id, cluster_info from mysql.consensus_info").
+			WillReturnRows(sqlmock.NewRows([]string{"cluster_id", "cluster_info"}).
+				AddRow("1", "test-wesql-0.test-wesql-headless:13306;test-wesql-1.test-wesql-headless:13306@1"))
+		mock.ExpectExec("call dbms_consensus").
+			WillReturnError(fmt.Errorf("some error"))
+
+		err := manager.LeaveMemberFromCluster(ctx, cluster, memberName)
+		assert.NotNil(t, err)
+		assert.ErrorContains(t, err, "some error")
+	})
+
+	t.Run("delete member successfully", func(t *testing.T) {
+		mock.ExpectQuery("select cluster_id, cluster_info from mysql.consensus_info").
+			WillReturnRows(sqlmock.NewRows([]string{"cluster_id", "cluster_info"}).
+				AddRow("1", "test-wesql-0.test-wesql-headless:13306;test-wesql-1.test-wesql-headless:13306@1"))
+		mock.ExpectExec("call dbms_consensus").
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		err := manager.LeaveMemberFromCluster(ctx, cluster, memberName)
+		assert.Nil(t, err)
+	})
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %v", err)
+	}
+}
+
+func TestManager_IsClusterHealthy(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := mockDatabase(t)
+	cluster := &dcs.Cluster{}
+
+	t.Run("Get leader conn failed", func(t *testing.T) {
+		isHealthy := manager.IsClusterHealthy(ctx, cluster)
+		assert.False(t, isHealthy)
+	})
+
+	cluster.Leader = &dcs.Leader{Name: fakePodName}
+	cluster.Members = []dcs.Member{{Name: fakePodName}}
+	t.Run("get wesql cluster information failed", func(t *testing.T) {
+		mock.ExpectQuery("select *").
+			WillReturnError(fmt.Errorf("some error"))
+
+		isHealthy := manager.IsClusterHealthy(ctx, cluster)
+		assert.False(t, isHealthy)
+	})
+
+	t.Run("check cluster healthy status successfully", func(t *testing.T) {
+		roles := []string{Leader, "Follow"}
+		expectedRes := []bool{true, false}
+
+		for i, role := range roles {
+			mock.ExpectQuery("select *").
+				WillReturnRows(sqlmock.NewRows([]string{Role}).AddRow(role))
+
+			isHealthy := manager.IsClusterHealthy(ctx, cluster)
+			assert.Equal(t, expectedRes[i], isHealthy)
+		}
+	})
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled expectations: %v", err)
@@ -380,6 +472,56 @@ func TestHasOtherHealthyMembers(t *testing.T) {
 	members := manager.HasOtherHealthyMembers(ctx, cluster, "fake-pod-0")
 	assert.Len(t, members, 1)
 	assert.Equal(t, fakePodName, members[0].Name)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %v", err)
+	}
+}
+
+func TestManager_Promote(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := mockDatabase(t)
+	cluster := &dcs.Cluster{}
+
+	t.Run("current member is leader", func(t *testing.T) {
+		mock.ExpectQuery("select CURRENT_LEADER, ROLE, SERVER_ID from information_schema.wesql_cluster_local").
+			WillReturnRows(sqlmock.NewRows([]string{"CURRENT_LEADER", "ROLE", "SERVER_ID"}).AddRow("test-wesql-0", "leader", "1"))
+
+		err := manager.Promote(ctx, cluster)
+		assert.Nil(t, err)
+	})
+
+	t.Run("Get leader conn failed", func(t *testing.T) {
+		mock.ExpectQuery("select CURRENT_LEADER, ROLE, SERVER_ID from information_schema.wesql_cluster_local").
+			WillReturnRows(sqlmock.NewRows([]string{"CURRENT_LEADER", "ROLE", "SERVER_ID"}).AddRow("test-wesql-0", "follower", "1"))
+
+		err := manager.Promote(ctx, cluster)
+		assert.NotNil(t, err)
+		assert.ErrorContains(t, err, "Get leader conn failed")
+	})
+
+	cluster.Leader = &dcs.Leader{Name: fakePodName}
+	cluster.Members = []dcs.Member{{Name: fakePodName}}
+	t.Run("promote failed", func(t *testing.T) {
+		mock.ExpectQuery("select CURRENT_LEADER, ROLE, SERVER_ID from information_schema.wesql_cluster_local").
+			WillReturnRows(sqlmock.NewRows([]string{"CURRENT_LEADER", "ROLE", "SERVER_ID"}).AddRow("test-wesql-0", "follower", "1"))
+		mock.ExpectExec("call dbms_consensus").
+			WillReturnError(fmt.Errorf("some error"))
+
+		err := manager.Promote(ctx, cluster)
+		assert.NotNil(t, err)
+		assert.ErrorContains(t, err, "some error")
+	})
+
+	t.Run("promote successfully", func(t *testing.T) {
+		mock.ExpectQuery("select CURRENT_LEADER, ROLE, SERVER_ID from information_schema.wesql_cluster_local").
+			WillReturnRows(sqlmock.NewRows([]string{"CURRENT_LEADER", "ROLE", "SERVER_ID"}).AddRow("test-wesql-0", "follower", "1"))
+		mock.ExpectExec("call dbms_consensus").
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		err := manager.Promote(ctx, cluster)
+		assert.Nil(t, err)
+	})
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled expectations: %v", err)

@@ -52,13 +52,6 @@ func TestNewManager(t *testing.T) {
 		assert.NotNil(t, err)
 	})
 
-	t.Run("get local connection failed", func(t *testing.T) {
-		manager, err := NewManager(fakePropertiesWithWrongURL)
-
-		assert.Nil(t, manager)
-		assert.NotNil(t, err)
-	})
-
 	t.Run("new db manager base failed", func(t *testing.T) {
 		manager, err := NewManager(fakeProperties)
 
@@ -79,6 +72,13 @@ func TestNewManager(t *testing.T) {
 	})
 
 	viper.Set(constant.KBEnvPodName, fakePodName)
+	t.Run("get local connection failed", func(t *testing.T) {
+		manager, err := NewManager(fakePropertiesWithWrongURL)
+
+		assert.Nil(t, manager)
+		assert.NotNil(t, err)
+	})
+
 	t.Run("new manager successfully", func(t *testing.T) {
 		managerIFace, err := NewManager(fakeProperties)
 		assert.Nil(t, err)
@@ -162,6 +162,21 @@ func TestManager_IsDBStartupReady(t *testing.T) {
 	}
 }
 
+func TestManager_IsReadonly(t *testing.T) {
+	ctx := context.TODO()
+	manager, _, _ := mockDatabase(t)
+	cluster := &dcs.Cluster{}
+
+	t.Run("Get Member conn failed", func(t *testing.T) {
+		_, _ = NewConfig(fakePropertiesWithWrongURL)
+
+		readonly, err := manager.IsReadonly(ctx, cluster, &dcs.Member{})
+		assert.False(t, readonly)
+		assert.NotNil(t, err)
+		assert.ErrorContains(t, err, "illegal Data Source Name (DNS) specified by")
+	})
+}
+
 func TestManager_IsLeader(t *testing.T) {
 	ctx := context.TODO()
 	manager, mock, _ := mockDatabase(t)
@@ -240,6 +255,91 @@ func TestManager_GetMemberAddrs(t *testing.T) {
 	addrs := manager.GetMemberAddrs(ctx, cluster)
 	assert.Len(t, addrs, 1)
 	assert.Equal(t, "fake-mysql-0.-headless.fake-namespace.svc.cluster.local:fake-port", addrs[0])
+}
+
+func TestManager_IsMemberLagging(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := mockDatabase(t)
+	cluster := &dcs.Cluster{Leader: &dcs.Leader{}, HaConfig: &dcs.HaConfig{}}
+
+	t.Run("No leader DBState info", func(t *testing.T) {
+		isMemberLagging, lags := manager.IsMemberLagging(ctx, cluster, nil)
+		assert.False(t, isMemberLagging)
+		assert.Zero(t, lags)
+	})
+
+	cluster.Leader.DBState = &dcs.DBState{}
+	t.Run("Get Member conn failed", func(t *testing.T) {
+		_, _ = NewConfig(fakePropertiesWithWrongURL)
+
+		isMemberLagging, lags := manager.IsMemberLagging(ctx, cluster, &dcs.Member{})
+		assert.False(t, isMemberLagging)
+		assert.Zero(t, lags)
+	})
+
+	_, _ = NewConfig(fakeProperties)
+	t.Run("get op timestamp failed", func(t *testing.T) {
+		mock.ExpectQuery("select check_ts").
+			WillReturnError(fmt.Errorf("some error"))
+
+		isMemberLagging, lags := manager.IsMemberLagging(ctx, cluster, &dcs.Member{Name: fakePodName})
+		assert.False(t, isMemberLagging)
+		assert.Zero(t, lags)
+	})
+
+	cluster.Leader.DBState.OpTimestamp = 100
+	t.Run("no lags", func(t *testing.T) {
+
+		mock.ExpectQuery("select check_ts").
+			WillReturnRows(sqlmock.NewRows([]string{"check_ts"}).AddRow(100))
+
+		isMemberLagging, lags := manager.IsMemberLagging(ctx, cluster, &dcs.Member{Name: fakePodName})
+		assert.False(t, isMemberLagging)
+		assert.Zero(t, lags)
+	})
+
+	t.Run("member is lagging", func(t *testing.T) {
+		mock.ExpectQuery("select check_ts").
+			WillReturnRows(sqlmock.NewRows([]string{"check_ts"}).AddRow(0))
+
+		isMemberLagging, lags := manager.IsMemberLagging(ctx, cluster, &dcs.Member{Name: fakePodName})
+		assert.True(t, isMemberLagging)
+		assert.Equal(t, int64(100), lags)
+	})
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %v", err)
+	}
+}
+
+func TestManager_IsMemberHealthy(t *testing.T) {
+	ctx := context.TODO()
+	manager, mock, _ := mockDatabase(t)
+	member := dcs.Member{Name: fakePodName}
+	cluster := &dcs.Cluster{
+		Leader:  &dcs.Leader{Name: fakePodName},
+		Members: []dcs.Member{member},
+	}
+
+	t.Run("Get Member conn failed", func(t *testing.T) {
+		_, _ = NewConfig(fakePropertiesWithWrongURL)
+
+		isHealthy := manager.IsMemberHealthy(ctx, cluster, &dcs.Member{})
+		assert.False(t, isHealthy)
+	})
+
+	_, _ = NewConfig(fakeProperties)
+	t.Run("write check failed", func(t *testing.T) {
+		mock.ExpectExec("CREATE DATABASE IF NOT EXISTS kubeblocks").
+			WillReturnError(fmt.Errorf("some error"))
+
+		isHealthy := manager.IsCurrentMemberHealthy(ctx, cluster)
+		assert.False(t, isHealthy)
+	})
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %v", err)
+	}
 }
 
 func TestManager_WriteCheck(t *testing.T) {

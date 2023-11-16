@@ -24,10 +24,8 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 )
 
@@ -38,26 +36,21 @@ func TestGetDBConnWithMember(t *testing.T) {
 		Namespace:       fakeNamespace,
 	}
 
-	t.Run("get db nil", func(t *testing.T) {
-		db, err := manager.GetDBConnWithMember(cluster, nil)
-
-		assert.Nil(t, db)
-		assert.Nil(t, err)
-	})
-
-	member := &dcs.Member{
-		Name:   fakePodName,
-		DBPort: fakeDBPort,
-	}
-	viper.Set(constant.KubernetesClusterDomainEnv, "cluster.local")
-	defer viper.Reset()
 	t.Run("new db connection failed", func(t *testing.T) {
 		_, _ = NewConfig(fakePropertiesWithWrongUrl)
-		db, err := manager.GetDBConnWithMember(cluster, member)
+		db, err := manager.GetDBConnWithMember(cluster, &dcs.Member{})
 
 		assert.Nil(t, db)
 		assert.NotNil(t, err)
 		assert.ErrorContains(t, err, "new db connection failed")
+	})
+
+	t.Run("return current member connection", func(t *testing.T) {
+		db, err := manager.GetDBConnWithMember(cluster, nil)
+
+		assert.NotNil(t, db)
+		assert.Nil(t, err)
+		assert.Equal(t, db, manager.DB)
 	})
 }
 

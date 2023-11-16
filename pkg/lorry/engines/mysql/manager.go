@@ -58,20 +58,6 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 		return nil, err
 	}
 
-	db, err := config.GetLocalDBConn()
-	if err != nil {
-		return nil, errors.Wrap(err, "connect to MySQL")
-	}
-
-	defer func() {
-		if err != nil {
-			derr := db.Close()
-			if derr != nil {
-				logger.Error(err, "failed to close")
-			}
-		}
-	}()
-
 	managerBase, err := engines.NewDBManagerBase(logger)
 	if err != nil {
 		return nil, err
@@ -80,6 +66,11 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 	serverID, err := engines.GetIndex(managerBase.CurrentMemberName)
 	if err != nil {
 		return nil, err
+	}
+
+	db, err := config.GetLocalDBConn()
+	if err != nil {
+		return nil, errors.Wrap(err, "connect to MySQL")
 	}
 
 	mgr := &Manager{
@@ -137,20 +128,10 @@ func (mgr *Manager) IsDBStartupReady() bool {
 }
 
 func (mgr *Manager) IsReadonly(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
-	var db *sql.DB
-	var err error
-	if member != nil {
-		addr := cluster.GetMemberAddrWithPort(*member)
-		db, err = config.GetDBConnWithAddr(addr)
-		if err != nil {
-			mgr.Logger.Error(err, "Get Member conn failed")
-			return false, err
-		}
-		if db != nil {
-			defer db.Close()
-		}
-	} else {
-		db = mgr.DB
+	db, err := mgr.GetMemberConnection(cluster, member)
+	if err != nil {
+		mgr.Logger.Error(err, "Get Member conn failed")
+		return false, err
 	}
 
 	var readonly bool
@@ -210,16 +191,6 @@ func (mgr *Manager) GetMemberAddrs(_ context.Context, cluster *dcs.Cluster) []st
 	return cluster.GetMemberAddrs()
 }
 
-func (mgr *Manager) GetLeaderClient(_ context.Context, cluster *dcs.Cluster) (*sql.DB, error) {
-	leaderMember := cluster.GetLeaderMember()
-	if leaderMember == nil {
-		return nil, fmt.Errorf("cluster has no leader")
-	}
-
-	addr := cluster.GetMemberAddrWithPort(*leaderMember)
-	return config.GetDBConnWithAddr(addr)
-}
-
 func (mgr *Manager) IsCurrentMemberInCluster(context.Context, *dcs.Cluster) bool {
 	return true
 }
@@ -232,8 +203,6 @@ func (mgr *Manager) IsCurrentMemberHealthy(ctx context.Context, cluster *dcs.Clu
 }
 
 func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, int64) {
-	var db *sql.DB
-	var err error
 	var leaderDBState *dcs.DBState
 	if cluster.Leader == nil || cluster.Leader.DBState == nil {
 		mgr.Logger.Info("No leader DBState info")
@@ -241,19 +210,12 @@ func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, m
 	}
 	leaderDBState = cluster.Leader.DBState
 
-	if member != nil && member.Name != mgr.CurrentMemberName {
-		addr := cluster.GetMemberAddrWithPort(*member)
-		db, err = config.GetDBConnWithAddr(addr)
-		if err != nil {
-			mgr.Logger.Error(err, "Get Member conn failed")
-			return false, 0
-		}
-		if db != nil {
-			defer db.Close()
-		}
-	} else {
-		db = mgr.DB
+	db, err := mgr.GetMemberConnection(cluster, member)
+	if err != nil {
+		mgr.Logger.Error(err, "Get Member conn failed")
+		return false, 0
 	}
+
 	opTimestamp, err := mgr.GetOpTimestamp(ctx, db)
 	if err != nil {
 		mgr.Logger.Error(err, "get op timestamp failed")
@@ -268,20 +230,10 @@ func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, m
 }
 
 func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
-	var db *sql.DB
-	var err error
-	if member != nil && member.Name != mgr.CurrentMemberName {
-		addr := cluster.GetMemberAddrWithPort(*member)
-		db, err = config.GetDBConnWithAddr(addr)
-		if err != nil {
-			mgr.Logger.Error(err, "Get Member conn failed")
-			return false
-		}
-		if db != nil {
-			defer db.Close()
-		}
-	} else {
-		db = mgr.DB
+	db, err := mgr.GetMemberConnection(cluster, member)
+	if err != nil {
+		mgr.Logger.Error(err, "Get Member conn failed")
+		return false
 	}
 
 	if cluster.Leader != nil && cluster.Leader.Name == member.Name {
@@ -644,4 +596,11 @@ func (mgr *Manager) Unlock(context.Context) error {
 	}
 	mgr.IsLocked = false
 	return nil
+}
+
+func (mgr *Manager) ShutDownWithWait() {
+	for _, db := range connectionPoolCache {
+		_ = db.Close()
+	}
+	connectionPoolCache = make(map[string]*sql.DB)
 }

@@ -173,11 +173,7 @@ func (mgr *Manager) IsClusterHealthy(_ context.Context, cluster *dcs.Cluster) bo
 		mgr.Logger.Error(err, "Get leader conn failed")
 		return false
 	}
-	if db == nil {
-		return false
-	}
 
-	defer db.Close()
 	var leaderRecord mysql.RowMap
 	sql := "select * from information_schema.wesql_cluster_global;"
 	err = mysql.QueryRowsMap(db, sql, func(rMap mysql.RowMap) error {
@@ -216,9 +212,6 @@ func (mgr *Manager) GetClusterInfo(ctx context.Context, cluster *dcs.Cluster) st
 			mgr.Logger.Error(err, "Get leader conn failed")
 			return ""
 		}
-		if db != nil {
-			defer db.Close()
-		}
 	} else {
 		db = mgr.DB
 
@@ -241,9 +234,6 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 	db, err := mgr.GetLeaderConn(cluster)
 	if err != nil {
 		return errors.Wrap(err, "Get leader conn failed")
-	}
-	if db != nil {
-		defer db.Close()
 	}
 
 	currentMember := cluster.GetMemberWithName(mgr.GetCurrentMemberName())

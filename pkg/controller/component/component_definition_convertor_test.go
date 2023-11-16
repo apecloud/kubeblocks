@@ -22,6 +22,7 @@ package component
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -456,9 +457,9 @@ var _ = Describe("Component Definition Convertor", func() {
 						AccessMode: appsv1alpha1.ReadWrite,
 					},
 				}
-				res2, err := convertor.convert(clusterCompDef, clusterName)
-				services2, ok := res2.([]appsv1alpha1.Service)
-				Expect(ok).Should(BeTrue())
+				res2, _ := convertor.convert(clusterCompDef, clusterName)
+				services2, ok2 := res2.([]appsv1alpha1.Service)
+				Expect(ok2).Should(BeTrue())
 				Expect(services2).Should(HaveLen(2))
 				Expect(services2[0].RoleSelector).Should(BeEquivalentTo(constant.Primary))
 			})

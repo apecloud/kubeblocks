@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package wesql
 
 import (
-	"context"
 	"database/sql"
 	"strings"
 
@@ -44,12 +43,12 @@ func (mgr *Manager) GetDBConnWithMember(cluster *dcs.Cluster, member *dcs.Member
 }
 
 // GetLeaderConn retrieves a database connection to the leader member of a cluster.
-func (mgr *Manager) GetLeaderConn(ctx context.Context, cluster *dcs.Cluster) (*sql.DB, error) {
-	mgr.Logger.Info("Get leaader from dcs cluster")
+func (mgr *Manager) GetLeaderConn(cluster *dcs.Cluster) (*sql.DB, error) {
+	mgr.Logger.Info("Get leader from dcs cluster")
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
-		mgr.Logger.Info("Get leaader from db cluster local")
-		leaderMember = mgr.GetLeaderMember(ctx, cluster)
+		mgr.Logger.Info("Get leader from db cluster local")
+		leaderMember = mgr.GetLeaderMember(cluster)
 	}
 	if leaderMember == nil {
 		return nil, errors.New("the cluster has no leader")
@@ -58,8 +57,8 @@ func (mgr *Manager) GetLeaderConn(ctx context.Context, cluster *dcs.Cluster) (*s
 }
 
 // GetLeaderMember retrieves the leader member of a cluster
-func (mgr *Manager) GetLeaderMember(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
-	clusterLocalInfo, err := mgr.GetClusterLocalInfo(ctx)
+func (mgr *Manager) GetLeaderMember(cluster *dcs.Cluster) *dcs.Member {
+	clusterLocalInfo, err := mgr.GetClusterLocalInfo()
 	if err != nil || clusterLocalInfo == nil {
 		mgr.Logger.Error(err, "Get cluster local info failed")
 		return nil

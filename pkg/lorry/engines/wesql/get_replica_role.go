@@ -29,7 +29,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/mysql"
 )
 
-func (mgr *Manager) GetReplicaRole(ctx context.Context, cluter *dcs.Cluster) (string, error) {
+func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string, error) {
 	sql := "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
 
 	rows, err := mgr.DB.QueryContext(ctx, sql)
@@ -60,7 +60,7 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, cluter *dcs.Cluster) (st
 	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
 }
 
-func (mgr *Manager) GetClusterLocalInfo(ctx context.Context) (mysql.RowMap, error) {
+func (mgr *Manager) GetClusterLocalInfo() (mysql.RowMap, error) {
 	var result mysql.RowMap
 	sql := "select * from information_schema.wesql_cluster_local;"
 	err := mysql.QueryRowsMap(mgr.DB, sql, func(rMap mysql.RowMap) error {

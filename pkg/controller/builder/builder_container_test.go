@@ -111,6 +111,13 @@ var _ = Describe("container builder", func() {
 				},
 			},
 		}
+		livenessProbe := corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{},
+				},
+			},
+		}
 		container := NewContainerBuilder(name).
 			AddCommands(commands...).
 			AddArgs(args...).
@@ -123,6 +130,7 @@ var _ = Describe("container builder", func() {
 			AddPorts(ports...).
 			SetReadinessProbe(readinessProbe).
 			SetStartupProbe(startupProbe).
+			SetLivenessProbe(livenessProbe).
 			GetObject()
 
 		Expect(container.Name).Should(Equal(name))
@@ -140,5 +148,7 @@ var _ = Describe("container builder", func() {
 		Expect(*container.ReadinessProbe).Should(Equal(readinessProbe))
 		Expect(container.StartupProbe).ShouldNot(BeNil())
 		Expect(*container.StartupProbe).Should(Equal(startupProbe))
+		Expect(container.LivenessProbe).ShouldNot(BeNil())
+		Expect(*container.LivenessProbe).Should(Equal(livenessProbe))
 	})
 })

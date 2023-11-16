@@ -32,7 +32,7 @@ var (
 		"url":          "root:@tcp(127.0.0.1:3306)/mysql?multiStatements=true",
 		"maxOpenConns": "5",
 	}
-	fakePropertiesWithWrongUrl = engines.Properties{
+	fakePropertiesWithWrongURL = engines.Properties{
 		"url": "root:@tcp(127.0.0.1:3306)mysql",
 	}
 	fakePropertiesWithWrongPem = engines.Properties{

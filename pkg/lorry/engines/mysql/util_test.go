@@ -56,7 +56,7 @@ func TestCellData_MarshalJSON(t *testing.T) {
 
 func TestCellData_UnmarshalJSON(t *testing.T) {
 	testCases := []struct {
-		fakeJson             string
+		fakeJSON             string
 		expectErrorMsg       string
 		expectCellDataString string
 	}{
@@ -67,7 +67,7 @@ func TestCellData_UnmarshalJSON(t *testing.T) {
 	for _, testCase := range testCases {
 		fakeCellData := &CellData{}
 
-		err := fakeCellData.UnmarshalJSON([]byte(testCase.fakeJson))
+		err := fakeCellData.UnmarshalJSON([]byte(testCase.fakeJSON))
 		assert.Equal(t, testCase.expectErrorMsg == "", err == nil)
 		if err != nil {
 			assert.ErrorContains(t, err, testCase.expectErrorMsg)

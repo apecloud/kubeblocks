@@ -37,7 +37,7 @@ func TestGetDBConnWithMember(t *testing.T) {
 	}
 
 	t.Run("new db connection failed", func(t *testing.T) {
-		_, _ = NewConfig(fakePropertiesWithWrongUrl)
+		_, _ = NewConfig(fakePropertiesWithWrongURL)
 		db, err := manager.GetDBConnWithMember(cluster, &dcs.Member{})
 
 		assert.Nil(t, db)

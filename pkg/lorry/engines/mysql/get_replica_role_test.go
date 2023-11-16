@@ -28,16 +28,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	fakeSlaveHosts = `*  1. row *  
-  Server_id:  2  
-  Host:    
-  Port:  3306  
-  Master_id:  1  
-Slave_UUID: ad397a06-7c56-11e4-b2fb-000c29dcb3b5  
-`
-)
-
 func TestManager_GetRole(t *testing.T) {
 	ctx := context.TODO()
 	manager, _, _ := mockDatabase(t)

@@ -447,6 +447,20 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(services[1].Spec.Type).Should(Equal(corev1.ServiceTypeClusterIP))
 				Expect(services[1].Spec.ClusterIP).Should(Equal(corev1.ClusterIPNone))
 				Expect(services[1].RoleSelector).Should(BeEquivalentTo(constant.Leader))
+
+				// consensus role selector
+				clusterCompDef.WorkloadType = appsv1alpha1.Consensus
+				clusterCompDef.ConsensusSpec = &appsv1alpha1.ConsensusSetSpec{
+					Leader: appsv1alpha1.ConsensusMember{
+						Name:       constant.Primary,
+						AccessMode: appsv1alpha1.ReadWrite,
+					},
+				}
+				res2, err := convertor.convert(clusterCompDef, clusterName)
+				services2, ok := res2.([]appsv1alpha1.Service)
+				Expect(ok).Should(BeTrue())
+				Expect(services2).Should(HaveLen(2))
+				Expect(services2[0].RoleSelector).Should(BeEquivalentTo(constant.Primary))
 			})
 		})
 

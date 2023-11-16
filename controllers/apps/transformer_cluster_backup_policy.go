@@ -27,6 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -397,7 +399,7 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(
 		if comp.ServiceAccountName != "" {
 			return comp.ServiceAccountName
 		}
-		return "kb-" + r.Cluster.Name
+		return constant.GenerateDefaultCompServiceAccountPattern(component.FullName(r.Cluster.Name, comp.Name))
 	}
 
 	// build the target connection credential

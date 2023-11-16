@@ -71,7 +71,7 @@ func BuildRSMFromConvertor(cluster *appsv1alpha1.Cluster, synthesizeComp *compon
 	}
 	rsmBuilder.SetVolumeClaimTemplates(vcts...)
 
-	// TODO(xingran): call convertors to convert componentDef attributes to rsm attributes. including service, credential, roles, roleProbe, membershipReconfiguration, memberUpdateStrategy, etc.
+	// convert componentDef attributes to rsm attributes. including service, credential, roles, roleProbe, membershipReconfiguration, memberUpdateStrategy, etc.
 	convertedRSM, err := component.BuildRSMFrom(cluster, synthesizeComp, rsmBuilder.GetObject())
 	if err != nil {
 		return nil, err

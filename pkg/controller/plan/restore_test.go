@@ -43,7 +43,6 @@ import (
 )
 
 var _ = Describe("Restore", func() {
-	const defaultTTL = "7d"
 	const backupName = "test-backup-job"
 	const sourceCluster = "source-cluster"
 

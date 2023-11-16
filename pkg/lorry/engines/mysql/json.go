@@ -34,7 +34,7 @@ func jsonify(rows *sql.Rows) ([]byte, error) {
 	var ret []interface{}
 	for rows.Next() {
 		values := prepareValues(columnTypes)
-		err := rows.Scan(values...)
+		err = rows.Scan(values...)
 		if err != nil {
 			return nil, err
 		}

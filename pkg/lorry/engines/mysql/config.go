@@ -25,12 +25,12 @@ import (
 	"database/sql"
 	"fmt"
 	"net"
-	"os"
 	"strconv"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
+	"github.com/spf13/afero"
 	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -72,6 +72,8 @@ type Config struct {
 	connMaxLifetime time.Duration
 	connMaxIdletime time.Duration
 }
+
+var fs = afero.NewOsFs()
 
 var config *Config
 
@@ -122,7 +124,7 @@ func NewConfig(properties map[string]string) (*Config, error) {
 
 	if config.pemPath != "" {
 		rootCertPool := x509.NewCertPool()
-		pem, err := os.ReadFile(config.pemPath)
+		pem, err := afero.ReadFile(fs, config.pemPath)
 		if err != nil {
 			return nil, errors.Wrapf(err, "Error reading PEM file from %s", config.pemPath)
 		}

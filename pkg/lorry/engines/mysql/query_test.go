@@ -22,6 +22,7 @@ package mysql
 import (
 	"context"
 	"encoding/json"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"testing"
 	"time"
 
@@ -96,13 +97,18 @@ func TestExec(t *testing.T) {
 
 func mockDatabase(t *testing.T) (*Manager, sqlmock.Sqlmock, error) {
 	viper.SetDefault(constant.KBEnvServiceRoles, "{\"follower\":\"Readonly\",\"leader\":\"ReadWrite\"}")
-	viper.Set(constant.KBEnvPodName, "test-pod-0")
 	db, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 
-	manager := &Manager{}
+	manager := &Manager{
+		DBManagerBase: engines.DBManagerBase{
+			CurrentMemberName: fakePodName,
+			ClusterCompName:   fakeClusterCompName,
+			Namespace:         fakeNamespace,
+		},
+	}
 	development, _ := zap.NewDevelopment()
 	manager.Logger = zapr.NewLogger(development)
 	manager.DB = db

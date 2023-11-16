@@ -50,6 +50,7 @@ func TestGetDBConnWithMember(t *testing.T) {
 		DBPort: fakeDBPort,
 	}
 	viper.Set(constant.KubernetesClusterDomainEnv, "cluster.local")
+	defer viper.Reset()
 	t.Run("new db connection failed", func(t *testing.T) {
 		_, _ = NewConfig(fakePropertiesWithWrongUrl)
 		db, err := manager.GetDBConnWithMember(cluster, member)

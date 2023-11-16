@@ -22,9 +22,10 @@ package mysql
 import (
 	"database/sql"
 	"encoding/json"
-	"github.com/pkg/errors"
 	"strconv"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 const DateTimeFormat = "2006-01-02 15:04:05.999999"

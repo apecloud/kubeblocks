@@ -21,21 +21,17 @@ package backup
 
 import (
 	"fmt"
-	"sort"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
@@ -87,122 +83,22 @@ func (s *Scheduler) validate() error {
 
 func (s *Scheduler) handleSchedulePolicy(index int) error {
 	schedulePolicy := &s.BackupSchedule.Spec.Schedules[index]
-	// TODO(ldm): better to remove this dependency in the future
-	if err := s.reconfigure(schedulePolicy); err != nil {
-		return err
+
+	for _, method := range s.BackupPolicy.Spec.BackupMethods {
+		if method.Name == schedulePolicy.BackupMethod && !boolptr.IsSetToTrue(method.SnapshotVolumes) {
+			actionSet, err := dputils.GetActionSetByName(s.RequestCtx, s.Client, method.ActionSetName)
+			if err != nil {
+				return err
+			}
+			if actionSet.Spec.BackupType == dpv1alpha1.BackupTypeContinuous {
+				// ignore continuous backup
+				return nil
+			}
+		}
 	}
 
 	// create/delete/patch cronjob workload
 	return s.reconcileCronJob(schedulePolicy)
-}
-
-type backupReconfigureRef struct {
-	Name    string         `json:"name"`
-	Key     string         `json:"key"`
-	Enable  parameterPairs `json:"enable,omitempty"`
-	Disable parameterPairs `json:"disable,omitempty"`
-}
-
-type parameterPairs map[string][]appsv1alpha1.ParameterPair
-
-func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error {
-	reCfgRef := s.BackupSchedule.Annotations[dptypes.ReconfigureRefAnnotationKey]
-	if reCfgRef == "" {
-		return nil
-	}
-	configRef := backupReconfigureRef{}
-	if err := json.Unmarshal([]byte(reCfgRef), &configRef); err != nil {
-		return err
-	}
-
-	enable := boolptr.IsSetToTrue(schedulePolicy.Enabled)
-	if s.BackupSchedule.Annotations[constant.LastAppliedConfigAnnotationKey] == "" && !enable {
-		// disable in the first policy created, no need reconfigure because default configs had been set.
-		return nil
-	}
-	configParameters := configRef.Disable
-	if enable {
-		configParameters = configRef.Enable
-	}
-	if configParameters == nil {
-		return nil
-	}
-	parameters := configParameters[schedulePolicy.BackupMethod]
-	if len(parameters) == 0 {
-		// skip reconfigure if not found parameters.
-		return nil
-	}
-	updateParameterPairsBytes, _ := json.Marshal(parameters)
-	updateParameterPairs := string(updateParameterPairsBytes)
-	if updateParameterPairs == s.BackupSchedule.Annotations[constant.LastAppliedConfigAnnotationKey] {
-		// reconcile the config job if finished
-		return s.reconcileReconfigure()
-	}
-
-	targetPodSelector := s.BackupPolicy.Spec.Target.PodSelector
-	ops := appsv1alpha1.OpsRequest{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: s.BackupSchedule.Name + "-",
-			Namespace:    s.BackupSchedule.Namespace,
-			Labels: map[string]string{
-				dptypes.BackupScheduleLabelKey: s.BackupSchedule.Name,
-			},
-		},
-		Spec: appsv1alpha1.OpsRequestSpec{
-			Type:       appsv1alpha1.ReconfiguringType,
-			ClusterRef: targetPodSelector.MatchLabels[constant.AppInstanceLabelKey],
-			Reconfigure: &appsv1alpha1.Reconfigure{
-				ComponentOps: appsv1alpha1.ComponentOps{
-					ComponentName: targetPodSelector.MatchLabels[constant.KBAppComponentLabelKey],
-				},
-				Configurations: []appsv1alpha1.ConfigurationItem{
-					{
-						Name: configRef.Name,
-						Keys: []appsv1alpha1.ParameterConfig{
-							{
-								Key:        configRef.Key,
-								Parameters: parameters,
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-	if err := s.Client.Create(s.Ctx, &ops); err != nil {
-		return err
-	}
-	s.Recorder.Eventf(s.BackupSchedule, corev1.EventTypeNormal, "Reconfiguring", "update config %s", updateParameterPairs)
-	patch := client.MergeFrom(s.BackupSchedule.DeepCopy())
-	if s.BackupSchedule.Annotations == nil {
-		s.BackupSchedule.Annotations = map[string]string{}
-	}
-	s.BackupSchedule.Annotations[constant.LastAppliedConfigAnnotationKey] = updateParameterPairs
-	if err := s.Client.Patch(s.Ctx, s.BackupSchedule, patch); err != nil {
-		return err
-	}
-	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for ops %s finished.", ops.Name)
-}
-
-func (s *Scheduler) reconcileReconfigure() error {
-	opsList := appsv1alpha1.OpsRequestList{}
-	if err := s.Client.List(s.Ctx, &opsList,
-		client.InNamespace(s.BackupSchedule.Namespace),
-		client.MatchingLabels{dptypes.BackupScheduleLabelKey: s.BackupPolicy.Name}); err != nil {
-		return err
-	}
-	if len(opsList.Items) > 0 {
-		sort.Slice(opsList.Items, func(i, j int) bool {
-			return opsList.Items[j].CreationTimestamp.Before(&opsList.Items[i].CreationTimestamp)
-		})
-		latestOps := opsList.Items[0]
-		if latestOps.Status.Phase == appsv1alpha1.OpsFailedPhase {
-			return intctrlutil.NewErrorf(dperrors.ErrorTypeReconfigureFailed, "ops failed %s", latestOps.Name)
-		} else if latestOps.Status.Phase != appsv1alpha1.OpsSucceedPhase {
-			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "waiting for ops %s finished.", latestOps.Name)
-		}
-	}
-	return nil
 }
 
 // buildCronJob builds cronjob from backup schedule.

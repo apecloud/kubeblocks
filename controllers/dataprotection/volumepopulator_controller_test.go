@@ -175,7 +175,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 				if claim.Annotations == nil {
 					claim.Annotations = map[string]string{}
 				}
-				claim.Annotations[annSelectedNode] = "test-node"
+				claim.Annotations[AnnSelectedNode] = "test-node"
 			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, tmpPVC *corev1.PersistentVolumeClaim) {
 				g.Expect(len(tmpPVC.Status.Conditions)).Should(Equal(1))
@@ -205,7 +205,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 
 			By("expect for pvc has been populated")
 			Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, tmpPVC *corev1.PersistentVolumeClaim) {
-				g.Expect(tmpPVC.Status.Conditions[0].Reason).Should(Equal(reasonPopulatingSucceed))
+				g.Expect(tmpPVC.Status.Conditions[0].Reason).Should(Equal(ReasonPopulatingSucceed))
 			})).Should(Succeed())
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pv), func(g Gomega, tmpPV *corev1.PersistentVolume) {
@@ -243,7 +243,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 				pvc := initResources(storagev1.VolumeBindingImmediate, false, false)
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pvc), func(g Gomega, tmpPVC *corev1.PersistentVolumeClaim) {
 					g.Expect(len(tmpPVC.Status.Conditions)).Should(Equal(1))
-					g.Expect(tmpPVC.Status.Conditions[0].Reason).Should(Equal(reasonPopulatingFailed))
+					g.Expect(tmpPVC.Status.Conditions[0].Reason).Should(Equal(ReasonPopulatingFailed))
 				})).Should(Succeed())
 
 			})

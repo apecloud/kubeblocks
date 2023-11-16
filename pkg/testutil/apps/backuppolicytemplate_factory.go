@@ -69,11 +69,6 @@ func (f *MockBackupPolicyTemplateFactory) AddBackupPolicy(componentDef string) *
 	return f
 }
 
-func (f *MockBackupPolicyTemplateFactory) SetRetentionPeriod(duration string) *MockBackupPolicyTemplateFactory {
-	f.getLastBackupPolicy().RetentionPeriod = dpv1alpha1.RetentionPeriod(duration)
-	return f
-}
-
 func (f *MockBackupPolicyTemplateFactory) setBackupPolicyField(setField func(backupPolicy *appsv1alpha1.BackupPolicy)) {
 	backupPolicy := f.getLastBackupPolicy()
 	if backupPolicy == nil {
@@ -83,11 +78,12 @@ func (f *MockBackupPolicyTemplateFactory) setBackupPolicyField(setField func(bac
 	setField(backupPolicy)
 }
 
-func (f *MockBackupPolicyTemplateFactory) AddSchedule(method, schedule string, enable bool) *MockBackupPolicyTemplateFactory {
+func (f *MockBackupPolicyTemplateFactory) AddSchedule(method, schedule, retentionPeriod string, enable bool) *MockBackupPolicyTemplateFactory {
 	schedulePolicy := appsv1alpha1.SchedulePolicy{
-		Enabled:        &enable,
-		CronExpression: schedule,
-		BackupMethod:   method,
+		Enabled:         &enable,
+		CronExpression:  schedule,
+		BackupMethod:    method,
+		RetentionPeriod: dpv1alpha1.RetentionPeriod(retentionPeriod),
 	}
 	backupPolicy := f.getLastBackupPolicy()
 	backupPolicy.Schedules = append(backupPolicy.Schedules, schedulePolicy)

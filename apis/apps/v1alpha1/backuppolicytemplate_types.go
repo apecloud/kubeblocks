@@ -56,20 +56,6 @@ type BackupPolicy struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	ComponentDefRef string `json:"componentDefRef"`
 
-	// retentionPeriod determines a duration up to which the backup should be kept.
-	// controller will remove all backups that are older than the RetentionPeriod.
-	// For example, RetentionPeriod of `30d` will keep only the backups of last 30 days.
-	// Sample duration format:
-	// - years: 	2y
-	// - months: 	6mo
-	// - days: 		30d
-	// - hours: 	12h
-	// - minutes: 	30m
-	// You can also combine the above durations. For example: 30d12h30m
-	// +optional
-	// +kubebuilder:default="7d"
-	RetentionPeriod dpv1alpha1.RetentionPeriod `json:"retentionPeriod,omitempty"`
-
 	// target instance for backup.
 	// +optional
 	Target TargetInstance `json:"target"`
@@ -130,6 +116,20 @@ type SchedulePolicy struct {
 	// see https://en.wikipedia.org/wiki/Cron.
 	// +kubebuilder:validation:Required
 	CronExpression string `json:"cronExpression"`
+
+	// retentionPeriod determines a duration up to which the backup should be kept.
+	// controller will remove all backups that are older than the RetentionPeriod.
+	// For example, RetentionPeriod of `30d` will keep only the backups of last 30 days.
+	// Sample duration format:
+	// - years: 	2y
+	// - months: 	6mo
+	// - days: 		30d
+	// - hours: 	12h
+	// - minutes: 	30m
+	// You can also combine the above durations. For example: 30d12h30m
+	// +optional
+	// +kubebuilder:default="7d"
+	RetentionPeriod dpv1alpha1.RetentionPeriod `json:"retentionPeriod,omitempty"`
 }
 
 type TargetInstance struct {

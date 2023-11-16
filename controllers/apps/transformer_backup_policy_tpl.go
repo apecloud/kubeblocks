@@ -242,7 +242,7 @@ func (r *BackupPolicyTplTransformer) buildBackupSchedule(
 			BackupMethod:    s.BackupMethod,
 			CronExpression:  s.CronExpression,
 			Enabled:         s.Enabled,
-			RetentionPeriod: r.backupPolicy.RetentionPeriod,
+			RetentionPeriod: s.RetentionPeriod,
 		})
 	}
 	backupSchedule.Spec.Schedules = schedules
@@ -263,7 +263,7 @@ func (r *BackupPolicyTplTransformer) syncBackupSchedule(backupSchedule *dpv1alph
 			BackupMethod:    s.BackupMethod,
 			CronExpression:  s.CronExpression,
 			Enabled:         s.Enabled,
-			RetentionPeriod: r.backupPolicy.RetentionPeriod,
+			RetentionPeriod: s.RetentionPeriod,
 		})
 	}
 }
@@ -315,7 +315,7 @@ func (r *BackupPolicyTplTransformer) syncBackupPolicy(backupPolicy *dpv1alpha1.B
 		}
 		if r.getCompReplicas() == 1 {
 			delete(podSelector.LabelSelector.MatchLabels, constant.RoleLabelKey)
-		} else {
+		} else if podSelector.LabelSelector.MatchLabels[constant.RoleLabelKey] == "" {
 			podSelector.LabelSelector.MatchLabels[constant.RoleLabelKey] = role
 		}
 	}

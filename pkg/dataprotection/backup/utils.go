@@ -34,23 +34,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
-// GetBackupPolicy returns the BackupPolicy with the given namespace and name.
-func GetBackupPolicy(ctx context.Context, cli client.Client, namespace, name string) (*dpv1alpha1.BackupPolicy, error) {
-	backupPolicy := &dpv1alpha1.BackupPolicy{}
-	if err := cli.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, backupPolicy); err != nil {
-		return nil, err
-	}
-	return backupPolicy, nil
-}
-
-func GetActionSet(ctx context.Context, cli client.Client, namespace, name string) (*dpv1alpha1.ActionSet, error) {
-	actionSet := &dpv1alpha1.ActionSet{}
-	if err := cli.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, actionSet); err != nil {
-		return nil, err
-	}
-	return actionSet, nil
-}
-
 func getVolumesByNames(pod *corev1.Pod, volumeNames []string) []corev1.Volume {
 	var volumes []corev1.Volume
 	for _, v := range pod.Spec.Volumes {
@@ -201,5 +184,36 @@ func GetSchedulePolicyByMethod(backupSchedule *dpv1alpha1.BackupSchedule, method
 			return &s
 		}
 	}
+	return nil
+}
+
+func SetExpirationByCreationTime(backup *dpv1alpha1.Backup) error {
+	// if expiration is already set, do not update it.
+	if backup.Status.Expiration != nil {
+		return nil
+	}
+
+	duration, err := backup.Spec.RetentionPeriod.ToDuration()
+	if err != nil {
+		return fmt.Errorf("failed to parse retention period %s, %v", backup.Spec.RetentionPeriod, err)
+	}
+
+	// if duration is zero, the backup will be kept forever.
+	// Do not set expiration time for it.
+	if duration.Seconds() == 0 {
+		return nil
+	}
+
+	var expiration *metav1.Time
+	if backup.Status.StartTimestamp != nil {
+		expiration = &metav1.Time{
+			Time: backup.Status.StartTimestamp.Add(duration),
+		}
+	} else {
+		expiration = &metav1.Time{
+			Time: backup.CreationTimestamp.Add(duration),
+		}
+	}
+	backup.Status.Expiration = expiration
 	return nil
 }

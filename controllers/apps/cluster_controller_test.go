@@ -990,3 +990,27 @@ func outOfOrderEqualFunc[E1, E2 any](s1 []E1, s2 []E2, eq func(E1, E2) bool) boo
 	}
 	return true
 }
+
+func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition, mappingClusterVersions ...string) {
+	By("Creating a BackupPolicyTemplate")
+	bpt := testapps.NewBackupPolicyTemplateFactory(backupPolicyTPLName).
+		AddLabels(constant.ClusterDefLabelKey, clusterDefObj.Name).
+		SetClusterDefRef(clusterDefObj.Name)
+	ttl := "7d"
+	for _, v := range clusterDefObj.Spec.ComponentDefs {
+		bpt = bpt.AddBackupPolicy(v.Name).
+			AddBackupMethod(backupMethodName, false, actionSetName, mappingClusterVersions...).
+			SetBackupMethodVolumeMounts("data", "/data").
+			AddBackupMethod(vsBackupMethodName, true, vsActionSetName).
+			SetBackupMethodVolumes([]string{"data"}).
+			AddSchedule(backupMethodName, "0 0 * * *", ttl, true).
+			AddSchedule(vsBackupMethodName, "0 0 * * *", ttl, true)
+		switch v.WorkloadType {
+		case appsv1alpha1.Consensus:
+			bpt.SetTargetRole("leader")
+		case appsv1alpha1.Replication:
+			bpt.SetTargetRole("primary")
+		}
+	}
+	bpt.Create(&testCtx)
+}

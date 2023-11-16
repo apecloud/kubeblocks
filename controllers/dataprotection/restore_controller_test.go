@@ -187,14 +187,11 @@ var _ = Describe("Restore Controller test", func() {
 		Context("with restore fails", func() {
 			It("test restore is Failed when backup is not completed", func() {
 				By("expect for restore is Failed ")
-				restore := initResourcesAndWaitRestore(false, false, true, dpv1alpha1.RestorePhaseRunning,
+				initResourcesAndWaitRestore(false, false, true, dpv1alpha1.RestorePhaseFailed,
 					func(f *testdp.MockRestoreFactory) {
 						f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
 							testdp.DataVolumeMountPath, "", int32(3), int32(0), nil)
 					})
-				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(restore), func(g Gomega, r *dpv1alpha1.Restore) {
-					g.Expect(r.Status.Phase).Should(Equal(dpv1alpha1.RestorePhaseFailed))
-				})).Should(Succeed())
 			})
 
 			It("test restore is Failed when restore job is not Failed", func() {

@@ -54,9 +54,10 @@ var _ = Describe("Scheduler Test", func() {
 
 		// delete rest mocked objects
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
-
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupScheduleSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ActionSetSignature, true, ml)
 	}
 
 	BeforeEach(func() {
@@ -76,13 +77,17 @@ var _ = Describe("Scheduler Test", func() {
 		)
 
 		BeforeEach(func() {
+			By("creating an actionSet")
+			actionSet := testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml",
+				&dpv1alpha1.ActionSet{}, testapps.WithName(testdp.ActionSetName))
+
 			backupPolicy = testdp.NewBackupPolicyFactory(testCtx.DefaultNamespace, testdp.BackupPolicyName).
 				SetBackupRepoName(testdp.BackupRepoName).
 				SetPathPrefix(testdp.BackupPathPrefix).
 				SetTarget(constant.AppInstanceLabelKey, testdp.ClusterName,
 					constant.KBAppComponentLabelKey, testdp.ComponentName,
 					constant.RoleLabelKey, constant.Leader).
-				AddBackupMethod(testdp.BackupMethodName, false, testdp.ActionSetName).
+				AddBackupMethod(testdp.BackupMethodName, false, actionSet.Name).
 				AddBackupMethod(testdp.VSBackupMethodName, true, "").
 				Create(&testCtx).GetObject()
 			backupSchedule = testdp.NewFakeBackupSchedule(&testCtx, nil)

@@ -42,6 +42,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -80,13 +81,16 @@ func (r *VolumePopulatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	if err := r.syncPVC(reqCtx, pvc); err != nil {
 		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
-			r.Recorder.Event(pvc, corev1.EventTypeWarning, reasonVolumePopulateFailed, err.Error())
-			if patchErr := r.updatePVCConditions(reqCtx, pvc, reasonPopulatingFailed, err.Error()); patchErr != nil {
+			r.Recorder.Event(pvc, corev1.EventTypeWarning, ReasonVolumePopulateFailed, err.Error())
+			if patchErr := r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingFailed, err.Error()); patchErr != nil {
 				return intctrlutil.RequeueWithError(patchErr, reqCtx.Log, "")
 			}
 			return intctrlutil.Reconciled()
+		} else if intctrlutil.IsTargetError(err, dperrors.ErrorTypeWaitForExternalHandler) && r.ContainPopulatingCondition(pvc) {
+			// ignore the error if external controller handles it.
+			return intctrlutil.Reconciled()
 		}
-		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+		return RecorderEventAndRequeue(reqCtx, r.Recorder, pvc, err)
 	}
 	return intctrlutil.Reconciled()
 }
@@ -99,7 +103,7 @@ func (r *VolumePopulatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *VolumePopulatorReconciler) matchToPopulate(pvc *corev1.PersistentVolumeClaim) (bool, error) {
+func (r *VolumePopulatorReconciler) MatchToPopulate(pvc *corev1.PersistentVolumeClaim) (bool, error) {
 	dataSourceRef := pvc.Spec.DataSourceRef
 	if dataSourceRef == nil {
 		// Ignore PVCs without a datasource
@@ -121,21 +125,41 @@ func (r *VolumePopulatorReconciler) matchToPopulate(pvc *corev1.PersistentVolume
 }
 
 func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
-	matched, err := r.matchToPopulate(pvc)
+	matched, err := r.MatchToPopulate(pvc)
 	if err != nil {
 		return err
 	}
 	if !matched {
 		return nil
 	}
+	restoreMgr, err := r.validateRestoreAndBuildMGR(reqCtx, pvc)
+	if err != nil {
+		return err
+	}
 	// if pvc has not bound pv, populate it.
 	if pvc.Spec.VolumeName == "" {
-		return r.populate(reqCtx, pvc)
+		return r.Populate(reqCtx, pvc, restoreMgr)
 	}
-	return r.cleanup(reqCtx, pvc)
+	return r.Cleanup(reqCtx, pvc)
 }
 
-func (r *VolumePopulatorReconciler) populate(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
+func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) (*dprestore.RestoreManager, error) {
+	restore := &dpv1alpha1.Restore{}
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: pvc.Spec.DataSourceRef.Name,
+		Namespace: pvc.Namespace}, restore); err != nil {
+		return nil, err
+	}
+	if restore.Spec.PrepareDataConfig == nil || restore.Spec.PrepareDataConfig.DataSourceRef == nil {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`spec.prepareDataConfig.datasourceRef of restore "%s" can not be empty`, restore.Name))
+	}
+	restoreMgr := dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme)
+	if err := dprestore.ValidateAndInitRestoreMGR(reqCtx, r.Client, restoreMgr); err != nil {
+		return nil, err
+	}
+	return restoreMgr, nil
+}
+
+func (r *VolumePopulatorReconciler) Populate(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, restoreMgr *dprestore.RestoreManager) error {
 	wait, nodeName, err := r.waitForPVCSelectedNode(reqCtx, pvc)
 	if err != nil || wait {
 		return err
@@ -148,25 +172,25 @@ func (r *VolumePopulatorReconciler) populate(reqCtx intctrlutil.RequestCtx, pvc 
 			return err
 		}
 	}
-	if err = r.updatePVCConditions(reqCtx, pvc, reasonPopulatingProcessing, "Populator started"); err != nil {
+	if err = r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing, "Populator started"); err != nil {
 		return err
 	}
-
-	restore, err := r.getRestoreCR(reqCtx, pvc, nodeName)
-	if err != nil {
-		return err
+	// set scheduling for restore
+	restoreMgr.Restore.Spec.PrepareDataConfig.SchedulingSpec = dpv1alpha1.SchedulingSpec{
+		Tolerations: []corev1.Toleration{
+			{Operator: corev1.TolerationOpExists},
+		},
 	}
-
-	restoreMgr := dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme)
-	if err = dprestore.ValidateAndInitRestoreMGR(reqCtx, r.Client, r.Recorder, restoreMgr); err != nil {
-		return err
+	if nodeName != "" {
+		restoreMgr.Restore.Spec.PrepareDataConfig.SchedulingSpec.NodeSelector = map[string]string{
+			corev1.LabelHostname: nodeName,
+		}
 	}
-
 	var populatePVC *corev1.PersistentVolumeClaim
 	for i, v := range restoreMgr.PrepareDataBackupSets {
 		if populatePVC == nil {
 			populatePVC, err = r.getPopulatePVC(reqCtx, pvc, v,
-				restore.Spec.PrepareDataConfig.DataSourceRef.VolumeSource, nodeName)
+				restoreMgr.Restore.Spec.PrepareDataConfig.DataSourceRef.VolumeSource, nodeName)
 			if err != nil {
 				return err
 			}
@@ -200,13 +224,13 @@ func (r *VolumePopulatorReconciler) populate(reqCtx intctrlutil.RequestCtx, pvc 
 	if err = r.rebindPVCAndPV(reqCtx, populatePVC, pvc); err != nil {
 		return err
 	}
-	if err = r.updatePVCConditions(reqCtx, pvc, reasonPopulatingSucceed, "Populator finished"); err != nil {
+	if err = r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingSucceed, "Populator finished"); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (r *VolumePopulatorReconciler) cleanup(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
+func (r *VolumePopulatorReconciler) Cleanup(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
 	if slices.Contains(pvc.Finalizers, dptypes.DataProtectionFinalizerName) {
 		pvcPatch := client.MergeFrom(pvc.DeepCopy())
 		controllerutil.RemoveFinalizer(pvc, dptypes.DataProtectionFinalizerName)
@@ -277,7 +301,7 @@ func (r *VolumePopulatorReconciler) waitForPVCSelectedNode(reqCtx intctrlutil.Re
 			return false, nodeName, err
 		}
 		if storageClass.VolumeBindingMode != nil && storagev1.VolumeBindingWaitForFirstConsumer == *storageClass.VolumeBindingMode {
-			nodeName = pvc.Annotations[annSelectedNode]
+			nodeName = pvc.Annotations[AnnSelectedNode]
 			if nodeName == "" {
 				// Wait for the PVC to get a node name before continuing
 				return true, nodeName, nil
@@ -314,7 +338,7 @@ func (r *VolumePopulatorReconciler) getPopulatePVC(reqCtx intctrlutil.RequestCtx
 		}
 		if nodeName != "" {
 			populatePVC.Annotations = map[string]string{
-				annSelectedNode: pvc.Annotations[annSelectedNode],
+				AnnSelectedNode: pvc.Annotations[AnnSelectedNode],
 			}
 		}
 		if backupSet.UseVolumeSnapshot {
@@ -330,28 +354,6 @@ func (r *VolumePopulatorReconciler) getPopulatePVC(reqCtx intctrlutil.RequestCtx
 		}
 	}
 	return populatePVC, nil
-}
-
-func (r *VolumePopulatorReconciler) getRestoreCR(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, nodeName string) (*dpv1alpha1.Restore, error) {
-	restore := &dpv1alpha1.Restore{}
-	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: pvc.Spec.DataSourceRef.Name,
-		Namespace: pvc.Namespace}, restore); err != nil {
-		return nil, err
-	}
-	if restore.Spec.PrepareDataConfig == nil || restore.Spec.PrepareDataConfig.DataSourceRef == nil {
-		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`spec.prepareDataConfig.datasourceRef of restore "%s" can not be empty`, restore.Name))
-	}
-	restore.Spec.PrepareDataConfig.SchedulingSpec = dpv1alpha1.SchedulingSpec{
-		Tolerations: []corev1.Toleration{
-			{Operator: corev1.TolerationOpExists},
-		},
-	}
-	if nodeName != "" {
-		restore.Spec.PrepareDataConfig.SchedulingSpec.NodeSelector = map[string]string{
-			corev1.LabelHostname: nodeName,
-		}
-	}
-	return restore, nil
 }
 
 func (r *VolumePopulatorReconciler) rebindPVCAndPV(reqCtx intctrlutil.RequestCtx, populatePVC, pvc *corev1.PersistentVolumeClaim) error {
@@ -379,11 +381,11 @@ func (r *VolumePopulatorReconciler) rebindPVCAndPV(reqCtx intctrlutil.RequestCtx
 	if pv.Annotations == nil {
 		pv.Annotations = map[string]string{}
 	}
-	pv.Annotations[annPopulateFrom] = pvc.Spec.DataSourceRef.Name
+	pv.Annotations[AnnPopulateFrom] = pvc.Spec.DataSourceRef.Name
 	return r.Client.Patch(reqCtx.Ctx, pv, patchPV)
 }
 
-func (r *VolumePopulatorReconciler) updatePVCConditions(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, reason, message string) error {
+func (r *VolumePopulatorReconciler) UpdatePVCConditions(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, reason, message string) error {
 	progressCondition := corev1.PersistentVolumeClaimCondition{
 		Type:               PersistentVolumeClaimPopulating,
 		Status:             corev1.ConditionTrue,
@@ -400,6 +402,10 @@ func (r *VolumePopulatorReconciler) updatePVCConditions(reqCtx intctrlutil.Reque
 		if reason == v.Reason {
 			return nil
 		}
+		if v.Reason == ReasonPopulatingSucceed {
+			// ignore succeed condition
+			return nil
+		}
 		existPopulating = true
 		pvc.Status.Conditions[i] = progressCondition
 	}
@@ -407,10 +413,22 @@ func (r *VolumePopulatorReconciler) updatePVCConditions(reqCtx intctrlutil.Reque
 		pvc.Status.Conditions = append(pvc.Status.Conditions, progressCondition)
 	}
 	switch reason {
-	case reasonPopulatingProcessing:
-		r.Recorder.Event(pvc, corev1.EventTypeNormal, reasonStartToVolumePopulate, message)
-	case reasonPopulatingSucceed:
-		r.Recorder.Event(pvc, corev1.EventTypeNormal, reasonVolumePopulateSucceed, message)
+	case ReasonPopulatingProcessing:
+		r.Recorder.Event(pvc, corev1.EventTypeNormal, ReasonStartToVolumePopulate, message)
+	case ReasonPopulatingSucceed:
+		r.Recorder.Event(pvc, corev1.EventTypeNormal, ReasonVolumePopulateSucceed, message)
 	}
 	return r.Client.Status().Patch(reqCtx.Ctx, pvc, pvcPatch)
+}
+
+func (r *VolumePopulatorReconciler) ContainPopulatingCondition(pvc *corev1.PersistentVolumeClaim) bool {
+	if pvc == nil {
+		return false
+	}
+	for _, v := range pvc.Status.Conditions {
+		if v.Type == PersistentVolumeClaimPopulating {
+			return true
+		}
+	}
+	return false
 }

@@ -42,10 +42,10 @@ const (
 	BackupDataJobNamePrefix      = "dp-backup"
 	prebackupJobNamePrefix       = "dp-prebackup"
 	postbackupJobNamePrefix      = "dp-postbackup"
-	backupDataContainerName      = "backupdata"
-	syncProgressContainerName    = "sync-progress"
-	syncProgressSharedVolumeName = "sync-progress-shared-volume"
-	syncProgressSharedMountPath  = "/dp-sync-progress"
+	BackupDataContainerName      = "backupdata"
+	SyncProgressContainerName    = "sync-progress"
+	SyncProgressSharedVolumeName = "sync-progress-shared-volume"
+	SyncProgressSharedMountPath  = "/dp-sync-progress"
 )
 
 // Request is a request for a backup, with all references to other objects.
@@ -163,13 +163,13 @@ func (r *Request) buildBackupDataAction() (action.Action, error) {
 	}
 
 	backupDataAct := r.ActionSet.Spec.Backup.BackupData
-	podSpec, err := r.buildJobActionPodSpec(backupDataContainerName, &backupDataAct.JobActionSpec)
+	podSpec, err := r.BuildJobActionPodSpec(BackupDataContainerName, &backupDataAct.JobActionSpec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build job action pod spec: %w", err)
 	}
 
 	if backupDataAct.SyncProgress != nil {
-		r.injectSyncProgressContainer(podSpec, backupDataAct.SyncProgress)
+		r.InjectSyncProgressContainer(podSpec, backupDataAct.SyncProgress, r.buildSyncProgressCommand())
 	}
 
 	if r.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeFull {
@@ -270,7 +270,7 @@ func (r *Request) buildExecAction(name string, exec *dpv1alpha1.ExecActionSpec) 
 }
 
 func (r *Request) buildJobAction(name string, job *dpv1alpha1.JobActionSpec) (action.Action, error) {
-	podSpec, err := r.buildJobActionPodSpec(name, job)
+	podSpec, err := r.BuildJobActionPodSpec(name, job)
 	if err != nil {
 		return nil, err
 	}
@@ -283,7 +283,7 @@ func (r *Request) buildJobAction(name string, job *dpv1alpha1.JobActionSpec) (ac
 	}, nil
 }
 
-func (r *Request) buildJobActionPodSpec(name string,
+func (r *Request) BuildJobActionPodSpec(name string,
 	job *dpv1alpha1.JobActionSpec) (*corev1.PodSpec, error) {
 	targetPod := r.TargetPods[0]
 
@@ -306,7 +306,7 @@ func (r *Request) buildJobActionPodSpec(name string,
 			},
 			{
 				Name:  dptypes.DPBackupInfoFile,
-				Value: syncProgressSharedMountPath + "/" + backupInfoFileName,
+				Value: SyncProgressSharedMountPath + "/" + BackupInfoFileName,
 			},
 			{
 				Name:  dptypes.DPTTL,
@@ -327,7 +327,7 @@ func (r *Request) buildJobActionPodSpec(name string,
 	buildVolumes := func() []corev1.Volume {
 		volumes := []corev1.Volume{
 			{
-				Name: syncProgressSharedVolumeName,
+				Name: SyncProgressSharedVolumeName,
 				VolumeSource: corev1.VolumeSource{
 					EmptyDir: &corev1.EmptyDirVolumeSource{},
 				},
@@ -343,8 +343,8 @@ func (r *Request) buildJobActionPodSpec(name string,
 	buildVolumeMounts := func() []corev1.VolumeMount {
 		volumesMount := []corev1.VolumeMount{
 			{
-				Name:      syncProgressSharedVolumeName,
-				MountPath: syncProgressSharedMountPath,
+				Name:      SyncProgressSharedVolumeName,
+				MountPath: SyncProgressSharedMountPath,
 			},
 		}
 		// only mount the volumes when the backup pod is running on the target pod node.
@@ -406,39 +406,13 @@ func (r *Request) buildJobActionPodSpec(name string,
 	return podSpec, nil
 }
 
-// injectSyncProgressContainer injects a container to sync the backup progress.
-func (r *Request) injectSyncProgressContainer(podSpec *corev1.PodSpec,
-	sync *dpv1alpha1.SyncProgress) {
-	if !boolptr.IsSetToTrue(sync.Enabled) {
-		return
-	}
-
-	// build container to sync backup progress that will update the backup status
-	container := podSpec.Containers[0].DeepCopy()
-	container.Name = syncProgressContainerName
-	container.Image = viper.GetString(constant.KBToolsImage)
-	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
-	container.Resources = corev1.ResourceRequirements{Limits: nil, Requests: nil}
-	intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
-	container.Command = []string{"sh", "-c"}
-
-	// append some envs
-	checkIntervalSeconds := int32(5)
-	if sync.IntervalSeconds != nil && *sync.IntervalSeconds > 0 {
-		checkIntervalSeconds = *sync.IntervalSeconds
-	}
-	container.Env = append(container.Env,
-		corev1.EnvVar{
-			Name:  dptypes.DPCheckInterval,
-			Value: fmt.Sprintf("%d", checkIntervalSeconds)},
-	)
-
+func (r *Request) buildSyncProgressCommand() string {
 	// sync progress script will wait for the backup info file to be created,
 	// if the file is created, it will update the backup status and exit.
 	// If an exit file named with the backup info file with .exit suffix exists,
 	// it indicates that the container for backing up data exited abnormally,
 	// this script will exit.
-	args := fmt.Sprintf(`
+	return fmt.Sprintf(`
 set -o errexit
 set -o nounset
 
@@ -465,8 +439,35 @@ function update_backup_stauts() {
 }
 update_backup_stauts ${%s} ${%s} %s %s
 `, dptypes.DPBackupInfoFile, dptypes.DPCheckInterval, r.Backup.Namespace, r.Backup.Name)
+}
 
-	container.Args = []string{args}
+// InjectSyncProgressContainer injects a container to sync the backup progress.
+func (r *Request) InjectSyncProgressContainer(podSpec *corev1.PodSpec,
+	sync *dpv1alpha1.SyncProgress, command string) {
+	if !boolptr.IsSetToTrue(sync.Enabled) {
+		return
+	}
+
+	// build container to sync backup progress that will update the backup status
+	container := podSpec.Containers[0].DeepCopy()
+	container.Name = SyncProgressContainerName
+	container.Image = viper.GetString(constant.KBToolsImage)
+	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
+	container.Resources = corev1.ResourceRequirements{Limits: nil, Requests: nil}
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
+	container.Command = []string{"sh", "-c"}
+
+	// append some envs
+	checkIntervalSeconds := int32(5)
+	if sync.IntervalSeconds != nil && *sync.IntervalSeconds > 0 {
+		checkIntervalSeconds = *sync.IntervalSeconds
+	}
+	container.Env = append(container.Env,
+		corev1.EnvVar{
+			Name:  dptypes.DPCheckInterval,
+			Value: fmt.Sprintf("%d", checkIntervalSeconds)},
+	)
+	container.Args = []string{command}
 	podSpec.Containers = append(podSpec.Containers, *container)
 }
 

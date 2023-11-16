@@ -156,7 +156,7 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 	return mgr.DBState
 }
 
-func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
+func (mgr *Manager) IsLeader(ctx context.Context, _ *dcs.Cluster) (bool, error) {
 	isSet, isLeader := mgr.GetIsLeader()
 	if isSet {
 		return isLeader, nil
@@ -213,7 +213,7 @@ func (mgr *Manager) GetMemberRoleWithHost(ctx context.Context, host string) (str
 	}
 }
 
-func (mgr *Manager) GetMemberAddrs(ctx context.Context, cluster *dcs.Cluster) []string {
+func (mgr *Manager) GetMemberAddrs(_ context.Context, cluster *dcs.Cluster) []string {
 	return cluster.GetMemberAddrs()
 }
 
@@ -800,7 +800,7 @@ func (mgr *Manager) getHistory(host string, timeline int64) *postgres.HistoryFil
 	return postgres.ParseHistory(resp)
 }
 
-func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
+func (mgr *Manager) Promote(ctx context.Context, _ *dcs.Cluster) error {
 	if isLeader, err := mgr.IsLeader(ctx, nil); isLeader && err == nil {
 		mgr.Logger.Info("i am already the leader, don't need to promote")
 		return nil

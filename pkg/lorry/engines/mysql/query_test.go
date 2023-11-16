@@ -25,12 +25,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/go-logr/zapr"
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 
-	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/stretchr/testify/assert"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 )
 
 func TestQuery(t *testing.T) {
@@ -94,14 +96,19 @@ func TestExec(t *testing.T) {
 }
 
 func mockDatabase(t *testing.T) (*Manager, sqlmock.Sqlmock, error) {
-	viper.SetDefault("KB_SERVICE_ROLES", "{\"follower\":\"Readonly\",\"leader\":\"ReadWrite\"}")
-	viper.Set("KB_POD_NAME", "test-pod-0")
+	viper.SetDefault(constant.KBEnvServiceRoles, "{\"follower\":\"Readonly\",\"leader\":\"ReadWrite\"}")
 	db, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 
-	manager := &Manager{}
+	manager := &Manager{
+		DBManagerBase: engines.DBManagerBase{
+			CurrentMemberName: fakePodName,
+			ClusterCompName:   fakeClusterCompName,
+			Namespace:         fakeNamespace,
+		},
+	}
 	development, _ := zap.NewDevelopment()
 	manager.Logger = zapr.NewLogger(development)
 	manager.DB = db

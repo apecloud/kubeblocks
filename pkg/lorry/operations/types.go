@@ -31,6 +31,18 @@ type OpsRequest struct {
 	Parameters map[string]any `json:"parameters,omitempty"`
 }
 
+func (r *OpsRequest) GetString(key string) string {
+	if r.Parameters[key] == nil {
+		return ""
+	}
+
+	if value, ok := r.Parameters[key].(string); ok {
+		return value
+	} else {
+		return ""
+	}
+}
+
 // OpsResponse is the response for Operation
 type OpsResponse struct {
 	Data     map[string]any    `json:"data,omitempty"`

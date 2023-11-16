@@ -68,7 +68,7 @@ func (s *CheckRole) Init(ctx context.Context) error {
 		return errors.New("dcs store init failed")
 	}
 
-	val := viper.GetString("KB_SERVICE_ROLES")
+	val := viper.GetString(constant.KBEnvServiceRoles)
 	if val != "" {
 		if err := json.Unmarshal([]byte(val), &s.DBRoles); err != nil {
 			fmt.Println(errors.Wrap(err, "KB_DB_ROLES env format error").Error())

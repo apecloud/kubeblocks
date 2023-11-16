@@ -70,7 +70,7 @@ func NewKubernetesStore() (*KubernetesStore, error) {
 	}
 	client, err := k8s.GetRESTClientForKB()
 	if err != nil {
-		err = errors.Wrap(err, "restclient init failed")
+		err = errors.Wrap(err, "restClient init failed")
 		return nil, err
 	}
 
@@ -81,7 +81,7 @@ func NewKubernetesStore() (*KubernetesStore, error) {
 
 	componentName := os.Getenv(constant.KBEnvComponentName)
 	if componentName == "" {
-		return nil, errors.New("KB_CCMP_NAME must be set")
+		return nil, errors.New("KB_COMP_NAME must be set")
 	}
 
 	clusterCompName := os.Getenv(constant.KBEnvClusterCompName)
@@ -113,14 +113,14 @@ func NewKubernetesStore() (*KubernetesStore, error) {
 	return store, err
 }
 
-func (store *KubernetesStore) Initialize(cluster *Cluster) error {
+func (store *KubernetesStore) Initialize() error {
 	store.logger.Info("k8s store initializing")
 	_, err := store.GetCluster()
 	if err != nil {
 		return err
 	}
 
-	err = store.CreateHaConfig(cluster)
+	err = store.CreateHaConfig()
 	if err != nil {
 		store.logger.Error(err, "Create Ha ConfigMap failed")
 	}
@@ -153,7 +153,6 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 		VersionedParams(&metav1.GetOptions{}, scheme.ParameterCodec).
 		Do(store.ctx).
 		Into(clusterResource)
-	// store.logger.Debugf("cluster resource: %v", clusterResource)
 	if err != nil {
 		store.logger.Error(err, "k8s get cluster error")
 		return nil, err
@@ -314,7 +313,7 @@ func (store *KubernetesStore) GetLeader() (*Leader, error) {
 	}
 	ttl, err := strconv.Atoi(annotations["ttl"])
 	if err != nil {
-		ttl = viper.GetInt("KB_TTL")
+		ttl = viper.GetInt(constant.KBEnvTTL)
 	}
 	leader := annotations["leader"]
 	stateStr, ok := annotations["dbstate"]
@@ -352,7 +351,7 @@ func (store *KubernetesStore) DeleteLeader() error {
 	return err
 }
 
-func (store *KubernetesStore) AttempAcquireLease() error {
+func (store *KubernetesStore) AttemptAcquireLease() error {
 	now := strconv.FormatInt(time.Now().Unix(), 10)
 	ttl := store.cluster.HaConfig.ttl
 	leaderName := store.currentMemberName
@@ -421,7 +420,7 @@ func (store *KubernetesStore) ReleaseLease() error {
 	return err
 }
 
-func (store *KubernetesStore) CreateHaConfig(cluster *Cluster) error {
+func (store *KubernetesStore) CreateHaConfig() error {
 	haName := store.getHAConfigName()
 	haConfig, _ := store.GetHaConfig()
 	if haConfig.resource != nil {
@@ -466,7 +465,7 @@ func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 		}
 		return &HaConfig{
 			index:              "",
-			ttl:                viper.GetInt("KB_TTL"),
+			ttl:                viper.GetInt(constant.KBEnvTTL),
 			maxLagOnSwitchover: 1048576,
 			DeleteMembers:      deleteMembers,
 		}, err
@@ -475,7 +474,7 @@ func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 	annotations := configmap.Annotations
 	ttl, err := strconv.Atoi(annotations["ttl"])
 	if err != nil {
-		ttl = viper.GetInt("KB_TTL")
+		ttl = viper.GetInt(constant.KBEnvTTL)
 	}
 	maxLagOnSwitchover, err := strconv.Atoi(annotations["MaxLagOnSwitchover"])
 	if err != nil {
@@ -599,9 +598,9 @@ func (store *KubernetesStore) getSwitchoverName() string {
 
 func (store *KubernetesStore) createConfigMap(configMap *corev1.ConfigMap) error {
 	labelsMap := map[string]string{
-		"app.kubernetes.io/instance":        store.clusterName,
-		"app.kubernetes.io/managed-by":      "kubeblocks",
-		"apps.kubeblocks.io/component-name": store.componentName,
+		constant.AppInstanceLabelKey:    store.clusterName,
+		constant.AppManagedByLabelKey:   "kubeblocks",
+		constant.KBAppComponentLabelKey: store.componentName,
 	}
 
 	configMap.Labels = labelsMap

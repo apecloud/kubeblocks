@@ -28,7 +28,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 )
 
-func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (string, error) {
+func (mgr *Manager) GetReplicaRole(_ context.Context, cluster *dcs.Cluster) (string, error) {
 	if cluster == nil {
 		return "", errors.New("cluster not found")
 	}
@@ -63,7 +63,7 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (s
 	// 	return "", err
 	// }
 	// if isReadonly {
-	// 	// TODO: in case of diskfull lock, dababase will be set readonly,
+	// 	// TODO: in case of diskFull lock, database will be set readonly,
 	// 	// how to deal with this situation
 	// 	return SECONDARY, nil
 	// }

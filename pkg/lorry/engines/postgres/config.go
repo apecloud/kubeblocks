@@ -25,6 +25,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -69,11 +70,11 @@ func NewConfig(properties map[string]string) (*Config, error) {
 	config.MaxConnections = poolConfig.MaxConns
 	config.MinConnections = poolConfig.MinConns
 
-	if viper.IsSet("KB_SERVICE_USER") {
-		config.Username = viper.GetString("KB_SERVICE_USER")
+	if viper.IsSet(constant.KBEnvServiceUser) {
+		config.Username = viper.GetString(constant.KBEnvServiceUser)
 	}
-	if viper.IsSet("KB_SERVICE_PASSWORD") {
-		config.Password = viper.GetString("KB_SERVICE_PASSWORD")
+	if viper.IsSet(constant.KBEnvServicePassword) {
+		config.Password = viper.GetString(constant.KBEnvServicePassword)
 	}
 
 	config.URL = config.GetConnectURLWithHost(config.Host)

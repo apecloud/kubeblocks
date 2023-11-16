@@ -25,7 +25,7 @@ import (
 )
 
 type DCS interface {
-	Initialize(*Cluster) error
+	Initialize() error
 
 	// cluster manage functions
 	GetClusterName() string
@@ -48,7 +48,7 @@ type DCS interface {
 	DeleteSwitchover() error
 
 	// cluster scope leader lock
-	AttempAcquireLease() error
+	AttemptAcquireLease() error
 	CreateLease() error
 	IsLeaseExist() (bool, error)
 	HasLease() bool
@@ -61,8 +61,8 @@ type DCS interface {
 var dcs DCS
 
 func init() {
-	viper.SetDefault("KB_TTL", 15)
-	viper.SetDefault("KB_MAX_LAG", 10)
+	viper.SetDefault(constant.KBEnvTTL, 15)
+	viper.SetDefault(constant.KBEnvMaxLag, 10)
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 }
 

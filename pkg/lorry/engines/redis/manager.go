@@ -27,6 +27,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -51,12 +52,12 @@ var _ engines.DBManager = &Manager{}
 func NewManager(properties engines.Properties) (engines.DBManager, error) {
 	logger := ctrl.Log.WithName("Redis")
 
-	if viper.IsSet("KB_SERVICE_USER") {
-		redisUser = viper.GetString("KB_SERVICE_USER")
+	if viper.IsSet(constant.KBEnvServiceUser) {
+		redisUser = viper.GetString(constant.KBEnvServiceUser)
 	}
 
-	if viper.IsSet("KB_SERVICE_PASSWORD") {
-		redisPasswd = viper.GetString("KB_SERVICE_PASSWORD")
+	if viper.IsSet(constant.KBEnvServicePassword) {
+		redisPasswd = viper.GetString(constant.KBEnvServicePassword)
 	}
 
 	managerBase, err := engines.NewDBManagerBase(logger)

@@ -393,14 +393,14 @@ func TestIsCurrentMemberInCluster(t *testing.T) {
 	}
 
 	t.Run("currentMember is in cluster", func(t *testing.T) {
-		manager.memberAddrs = []string{cluster.GetMemberAddrWithName(manager.CurrentMemberName)}
+		manager.memberAddrs = []string{"test-pod-0.test-headless"}
 
 		inCluster := manager.IsCurrentMemberInCluster(ctx, cluster)
 		assert.True(t, inCluster)
 	})
 
-	t.Run("currentMember is in cluster", func(t *testing.T) {
-		manager.memberAddrs[0] = cluster.GetMemberAddrWithName("test-pod-1")
+	t.Run("currentMember is not in cluster", func(t *testing.T) {
+		manager.memberAddrs[0] = "test-pod-1.test-headless"
 
 		inCluster := manager.IsCurrentMemberInCluster(ctx, cluster)
 		assert.False(t, inCluster)
@@ -653,22 +653,26 @@ func TestPromote(t *testing.T) {
 		ClusterCompName: manager.ClusterCompName,
 	}
 
-	t.Run("query leader ip port failed", func(t *testing.T) {
+	t.Run("get leader addr failed", func(t *testing.T) {
 		mock.ExpectQuery("select ip_port from consensus_cluster_status").
 			WillReturnError(fmt.Errorf("some error"))
 
 		err := manager.Promote(ctx, cluster)
 		assert.NotNil(t, err)
+		assert.ErrorContains(t, err, "some error")
 	})
 
-	t.Run("parse query failed", func(t *testing.T) {
+	t.Run("get current member addr failed", func(t *testing.T) {
 		mock.ExpectQuery("select ip_port from consensus_cluster_status").
-			WillReturnRows(pgxmock.NewRows([]string{"ip_port"}))
+			WillReturnRows(pgxmock.NewRows([]string{"ip_port"}).AddRow(":"))
 
 		err := manager.Promote(ctx, cluster)
 		assert.NotNil(t, err)
+		assert.ErrorContains(t, err, "get current member addr failed")
 	})
 
+	manager.DBState = &dcs.DBState{}
+	manager.memberAddrs = []string{"test-pod-0.test-headless"}
 	t.Run("exec promote failed", func(t *testing.T) {
 		mock.ExpectQuery("select ip_port from consensus_cluster_status").
 			WillReturnRows(pgxmock.NewRows([]string{"ip_port"}).AddRow(":"))
@@ -677,6 +681,7 @@ func TestPromote(t *testing.T) {
 
 		err := manager.Promote(ctx, cluster)
 		assert.NotNil(t, err)
+		assert.ErrorContains(t, err, "some error")
 	})
 
 	t.Run("exec promote success", func(t *testing.T) {
@@ -720,17 +725,9 @@ func TestHasOtherHealthyLeader(t *testing.T) {
 	defer mock.Close()
 	cluster := &dcs.Cluster{}
 
-	t.Run("query failed", func(t *testing.T) {
+	t.Run("get leader addr failed", func(t *testing.T) {
 		mock.ExpectQuery("select ip_port from consensus_cluster_status").
 			WillReturnError(fmt.Errorf("some error"))
-
-		member := manager.HasOtherHealthyLeader(ctx, cluster)
-		assert.Nil(t, member)
-	})
-
-	t.Run("parse query failed", func(t *testing.T) {
-		mock.ExpectQuery("select ip_port from consensus_cluster_status").
-			WillReturnRows(pgxmock.NewRows([]string{"ip_port"}))
 
 		member := manager.HasOtherHealthyLeader(ctx, cluster)
 		assert.Nil(t, member)

@@ -34,9 +34,9 @@ import (
 )
 
 const (
-	Role        = "ROLE"
-	CurrentRole = "CURRENT_ROLE"
-	Leader      = "Leader"
+	Role          = "ROLE"
+	CurrentLeader = "CURRENT_LEADER"
+	Leader        = "Leader"
 )
 
 type Manager struct {
@@ -65,7 +65,7 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 	return mgr, nil
 }
 
-func (mgr *Manager) InitializeCluster(ctx context.Context, cluster *dcs.Cluster) error {
+func (mgr *Manager) InitializeCluster(context.Context, *dcs.Cluster) error {
 	return nil
 }
 
@@ -83,12 +83,12 @@ func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, e
 	return false, nil
 }
 
-func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
+func (mgr *Manager) IsLeaderMember(_ context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
 	if member == nil {
 		return false, nil
 	}
 
-	leaderMember := mgr.GetLeaderMember(ctx, cluster)
+	leaderMember := mgr.GetLeaderMember(cluster)
 	if leaderMember == nil {
 		return false, nil
 	}
@@ -100,7 +100,7 @@ func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, me
 	return true, nil
 }
 
-func (mgr *Manager) InitiateCluster(cluster *dcs.Cluster) error {
+func (mgr *Manager) InitiateCluster(_ *dcs.Cluster) error {
 	return nil
 }
 
@@ -146,7 +146,7 @@ func (mgr *Manager) JoinCurrentMemberToCluster(context.Context, *dcs.Cluster) er
 }
 
 func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
-	db, err := mgr.GetLeaderConn(ctx, cluster)
+	db, err := mgr.GetLeaderConn(cluster)
 	if err != nil {
 		mgr.Logger.Error(err, "Get leader conn failed")
 		return err
@@ -167,17 +167,13 @@ func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Clu
 	return nil
 }
 
-func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
-	db, err := mgr.GetLeaderConn(ctx, cluster)
+func (mgr *Manager) IsClusterHealthy(_ context.Context, cluster *dcs.Cluster) bool {
+	db, err := mgr.GetLeaderConn(cluster)
 	if err != nil {
 		mgr.Logger.Error(err, "Get leader conn failed")
 		return false
 	}
-	if db == nil {
-		return false
-	}
 
-	defer db.Close()
 	var leaderRecord mysql.RowMap
 	sql := "select * from information_schema.wesql_cluster_global;"
 	err = mysql.QueryRowsMap(db, sql, func(rMap mysql.RowMap) error {
@@ -198,7 +194,7 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 }
 
 // IsClusterInitialized is a method to check if cluster is initialized or not
-func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
+func (mgr *Manager) IsClusterInitialized(ctx context.Context, _ *dcs.Cluster) (bool, error) {
 	clusterInfo := mgr.GetClusterInfo(ctx, nil)
 	if clusterInfo != "" {
 		return true, nil
@@ -211,13 +207,10 @@ func (mgr *Manager) GetClusterInfo(ctx context.Context, cluster *dcs.Cluster) st
 	var db *sql.DB
 	var err error
 	if cluster != nil {
-		db, err = mgr.GetLeaderConn(ctx, cluster)
+		db, err = mgr.GetLeaderConn(cluster)
 		if err != nil {
 			mgr.Logger.Error(err, "Get leader conn failed")
 			return ""
-		}
-		if db != nil {
-			defer db.Close()
 		}
 	} else {
 		db = mgr.DB
@@ -238,19 +231,17 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 		return nil
 	}
 
-	db, err := mgr.GetLeaderConn(ctx, cluster)
+	db, err := mgr.GetLeaderConn(cluster)
 	if err != nil {
 		return errors.Wrap(err, "Get leader conn failed")
 	}
-	if db != nil {
-		defer db.Close()
-	}
 
-	currentMember := cluster.GetMemberWithName(mgr.GetCurrentMemberName())
-	addr := cluster.GetMemberAddr(*currentMember)
-	resp, err := db.Exec(fmt.Sprintf("call dbms_consensus.change_leader('%s:13306');", addr))
+	addr := mgr.GetAddrWithMemberName(ctx, cluster, mgr.CurrentMemberName)
+	if addr == "" {
+		return errors.New("get current member's addr failed")
+	}
+	resp, err := db.Exec(fmt.Sprintf("call dbms_consensus.change_leader('%s');", addr))
 	if err != nil {
-		mgr.Logger.Error(err, "promote err")
 		return err
 	}
 
@@ -267,16 +258,17 @@ func (mgr *Manager) Demote(context.Context) error {
 	return nil
 }
 
-func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
+func (mgr *Manager) Follow(_ context.Context, cluster *dcs.Cluster) error {
+	mgr.Logger.Info("current member still follow the leader", "leader name", cluster.Leader.Name)
 	return nil
 }
 
-func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) *dcs.Member {
+func (mgr *Manager) GetHealthiestMember(*dcs.Cluster, string) *dcs.Member {
 	return nil
 }
 
-func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
-	clusterLocalInfo, err := mgr.GetClusterLocalInfo(ctx)
+func (mgr *Manager) HasOtherHealthyLeader(_ context.Context, cluster *dcs.Cluster) *dcs.Member {
+	clusterLocalInfo, err := mgr.GetClusterLocalInfo()
 	if err != nil || clusterLocalInfo == nil {
 		mgr.Logger.Error(err, "Get cluster local info failed")
 		return nil
@@ -287,7 +279,7 @@ func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Clus
 		return nil
 	}
 
-	leaderAddr := clusterLocalInfo.GetString(CurrentRole)
+	leaderAddr := clusterLocalInfo.GetString(CurrentLeader)
 	if leaderAddr == "" {
 		return nil
 	}

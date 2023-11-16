@@ -115,7 +115,7 @@ func TestConfig_GetLocalDBConn(t *testing.T) {
 		assert.ErrorContains(t, err, "illegal Data Source Name (DNS) specified by url")
 	})
 
-	t.Run("get local DB connection successfully", func(t *testing.T) {
+	t.Run("get DB connection with addr successfully", func(t *testing.T) {
 		fakeConfig, err := NewConfig(fakeProperties)
 		assert.Nil(t, err)
 

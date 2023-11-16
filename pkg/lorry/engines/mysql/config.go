@@ -57,7 +57,6 @@ const (
 )
 
 const (
-	databaseName  = "databaseName"
 	adminDatabase = "mysql"
 	defaultDBPort = 3306
 )
@@ -149,9 +148,9 @@ func (config *Config) GetLocalDBConn() (*sql.DB, error) {
 	}
 	mysqlConfig.User = config.username
 	mysqlConfig.Passwd = config.password
-	db, err := sql.Open("mysql", mysqlConfig.FormatDSN())
+	db, err := GetDBConnection(mysqlConfig.FormatDSN())
 	if err != nil {
-		return nil, errors.Wrap(err, "error opening DB connection")
+		return nil, errors.Wrap(err, "get DB connection failed")
 	}
 
 	return db, nil
@@ -165,9 +164,9 @@ func (config *Config) GetDBConnWithAddr(addr string) (*sql.DB, error) {
 	mysqlConfig.User = config.username
 	mysqlConfig.Passwd = config.password
 	mysqlConfig.Addr = addr
-	db, err := sql.Open("mysql", mysqlConfig.FormatDSN())
+	db, err := GetDBConnection(mysqlConfig.FormatDSN())
 	if err != nil {
-		return nil, errors.Wrap(err, "error opening DB connection")
+		return nil, errors.Wrap(err, "get DB connection failed")
 	}
 
 	return db, nil

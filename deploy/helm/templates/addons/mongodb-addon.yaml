@@ -1,0 +1,8 @@
+{{- include "kubeblocks.buildAddonCR" (merge (dict
+  "kbVersion" ">=0.7.0"
+  "name" "mongodb"
+  "version" "0.7.0"
+  "model" "document"
+  "provider" "apecloud"
+  "description" "MongoDB is a document database designed for ease of application development and scaling."
+  "autoInstall" true) . ) -}}

@@ -1,0 +1,8 @@
+{{- include "kubeblocks.buildAddonCR" (merge (dict
+  "kbVersion" ">=0.7.0"
+  "name" "orioledb"
+  "version" "0.7.0"
+  "model" "RDBMS"
+  "provider" "apecloud"
+  "description" "OrioleDB – a modern cloud-native storage engine solving some PostgreSQL wicked problems."
+  "autoInstall" false) . ) -}}

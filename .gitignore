@@ -68,7 +68,7 @@ deploy/**/charts
 pkg/cli/cluster/charts/
 
 # ignore the addons that clone from apecloud/kubeblocks-addons
-addons/
+/addons/
 
 # ignore test result
 test/e2e/report.json

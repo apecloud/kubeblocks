@@ -1,0 +1,8 @@
+{{- include "kubeblocks.buildAddonCR" (merge (dict
+  "kbVersion" ">=0.7.0"
+  "name" "llm"
+  "version" "0.7.0"
+  "model" "LLM"
+  "provider" "community"
+  "description" "Large Language Models."
+  "autoInstall" false) . ) -}}

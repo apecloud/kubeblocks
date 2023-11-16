@@ -1,0 +1,8 @@
+{{- include "kubeblocks.buildAddonCR" (merge (dict
+  "kbVersion" ">=0.7.0"
+  "name" "foxlake"
+  "version" "0.7.0"
+  "model" "RDBMS"
+  "provider" "apecloud"
+  "description" "ApeCloud FoxLake is an open-source cloud-native data warehouse."
+  "autoInstall" false) . ) -}}

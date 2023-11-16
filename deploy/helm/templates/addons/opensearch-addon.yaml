@@ -1,0 +1,8 @@
+{{- include "kubeblocks.buildAddonCR" (merge (dict
+  "kbVersion" ">=0.7.0"
+  "name" "opensearch"
+  "version" "0.7.0"
+  "model" "search-engine"
+  "provider" "community"
+  "description" "OpenSearch is a scalable, flexible, and extensible open-source software suite for search, analytics, and observability applications licensed under Apache 2.0."
+  "autoInstall" false) . ) -}}

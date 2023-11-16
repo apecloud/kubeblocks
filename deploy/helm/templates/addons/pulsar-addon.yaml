@@ -1,0 +1,40 @@
+{{- $name:="pulsar" -}}
+{{- $version:="0.7.0" -}}
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: {{ $name }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    app.kubernetes.io/version: {{ $version }}
+    addon.kubeblocks.io/provider: community
+    addon.kubeblocks.io/model: streaming
+  annotations:
+    addon.kubeblocks.io/kubeblocks-version: '>=0.7.0'
+  {{- if .Values.keepAddons }}
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: "Apache® Pulsar™ is an open-source, distributed messaging and streaming platform built for the cloud."
+  type: Helm
+  helm:
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" $name "version" $version "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: {{ default .Chart.Version .Values.versionOverride }}
+      {{- end }}
+
+    installValues:
+      {{- $cloudProvider := (include "kubeblocks.cloudProvider" .) }}
+      {{- if eq $cloudProvider "huaweiCloud" }}
+      setValues:
+        - cloudProvider=huaweiCloud
+      {{- end }}
+
+  installable:
+    autoInstall: true
+
+  defaultInstallValues:
+    - enabled: true

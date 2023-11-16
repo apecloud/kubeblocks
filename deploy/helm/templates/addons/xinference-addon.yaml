@@ -1,0 +1,8 @@
+{{- include "kubeblocks.buildAddonCR" (merge (dict
+  "kbVersion" ">=0.7.0"
+  "name" "xinference"
+  "version" "0.1.0"
+  "model" "LLM"
+  "provider" "community"
+  "description" "Xorbits Inference(Xinference) is a powerful and versatile library designed to serve language, speech recognition, and multimodal models."
+  "autoInstall" false) . ) -}}

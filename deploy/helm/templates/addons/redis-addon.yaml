@@ -1,0 +1,8 @@
+{{- include "kubeblocks.buildAddonCR" (merge (dict
+  "kbVersion" ">=0.7.0"
+  "name" "redis"
+  "version" "0.7.0"
+  "model" "key-value"
+  "provider" "community"
+  "description" "Redis is an open source (BSD licensed), in-memory data structure store, used as a database, cache and message broker."
+  "autoInstall" true) . ) -}}

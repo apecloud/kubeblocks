@@ -1,0 +1,8 @@
+{{- include "kubeblocks.buildAddonCR" (merge (dict
+  "kbVersion" ">=0.7.0"
+  "name" "polardbx"
+  "version" "0.7.0"
+  "model" "RDBMS"
+  "provider" "community"
+  "description" "PolarDB-X is a cloud native distributed SQL Database designed for high concurrency, massive storage, complex querying scenarios."
+  "autoInstall" false) . ) -}}

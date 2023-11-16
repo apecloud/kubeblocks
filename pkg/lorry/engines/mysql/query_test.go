@@ -22,7 +22,6 @@ package mysql
 import (
 	"context"
 	"encoding/json"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"testing"
 	"time"
 
@@ -33,6 +32,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 )
 
 func TestQuery(t *testing.T) {

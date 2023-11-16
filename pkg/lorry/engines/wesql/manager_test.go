@@ -502,9 +502,22 @@ func TestManager_Promote(t *testing.T) {
 
 	cluster.Leader = &dcs.Leader{Name: fakePodName}
 	cluster.Members = []dcs.Member{{Name: fakePodName}}
+	t.Run("get addr failed", func(t *testing.T) {
+		mock.ExpectQuery("select CURRENT_LEADER, ROLE, SERVER_ID from information_schema.wesql_cluster_local").
+			WillReturnRows(sqlmock.NewRows([]string{"CURRENT_LEADER", "ROLE", "SERVER_ID"}).AddRow("test-wesql-0", "follower", "1"))
+		mock.ExpectQuery("select cluster_id, cluster_info from mysql.consensus_info").
+			WillReturnRows(sqlmock.NewRows([]string{"cluster_id", "cluster_info"}).AddRow("1", "test-wesql-1.test-wesql-headless:13306;"))
+
+		err := manager.Promote(ctx, cluster)
+		assert.NotNil(t, err)
+		assert.ErrorContains(t, err, "get current member's addr failed")
+	})
+
 	t.Run("promote failed", func(t *testing.T) {
 		mock.ExpectQuery("select CURRENT_LEADER, ROLE, SERVER_ID from information_schema.wesql_cluster_local").
 			WillReturnRows(sqlmock.NewRows([]string{"CURRENT_LEADER", "ROLE", "SERVER_ID"}).AddRow("test-wesql-0", "follower", "1"))
+		mock.ExpectQuery("select cluster_id, cluster_info from mysql.consensus_info").
+			WillReturnRows(sqlmock.NewRows([]string{"cluster_id", "cluster_info"}).AddRow("1", "test-wesql-0.test-wesql-headless:13306;"))
 		mock.ExpectExec("call dbms_consensus").
 			WillReturnError(fmt.Errorf("some error"))
 
@@ -516,6 +529,8 @@ func TestManager_Promote(t *testing.T) {
 	t.Run("promote successfully", func(t *testing.T) {
 		mock.ExpectQuery("select CURRENT_LEADER, ROLE, SERVER_ID from information_schema.wesql_cluster_local").
 			WillReturnRows(sqlmock.NewRows([]string{"CURRENT_LEADER", "ROLE", "SERVER_ID"}).AddRow("test-wesql-0", "follower", "1"))
+		mock.ExpectQuery("select cluster_id, cluster_info from mysql.consensus_info").
+			WillReturnRows(sqlmock.NewRows([]string{"cluster_id", "cluster_info"}).AddRow("1", "test-wesql-0.test-wesql-headless:13306;"))
 		mock.ExpectExec("call dbms_consensus").
 			WillReturnResult(sqlmock.NewResult(1, 1))
 

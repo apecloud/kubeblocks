@@ -128,7 +128,7 @@ func (ha *Ha) RunCycle() {
 		if ha.IsHealthiestMember(ha.ctx, cluster) {
 			cluster.Leader.DBState = DBState
 			if ha.dcs.AttemptAcquireLease() == nil {
-				err := ha.dbManager.Promote(ha.ctx, cluster)
+				err = ha.dbManager.Promote(ha.ctx, cluster)
 				if err != nil {
 					ha.logger.Error(err, "Take the leader failed")
 					_ = ha.dcs.ReleaseLease()
@@ -166,7 +166,7 @@ func (ha *Ha) RunCycle() {
 			_ = ha.dcs.ReleaseLease()
 			break
 		}
-		err := ha.dbManager.Promote(ha.ctx, cluster)
+		err = ha.dbManager.Promote(ha.ctx, cluster)
 		if err != nil {
 			ha.logger.Error(err, "promote failed")
 			break

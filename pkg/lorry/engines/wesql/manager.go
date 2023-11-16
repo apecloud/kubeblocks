@@ -236,11 +236,12 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 		return errors.Wrap(err, "Get leader conn failed")
 	}
 
-	currentMember := cluster.GetMemberWithName(mgr.GetCurrentMemberName())
-	addr := cluster.GetMemberAddr(*currentMember)
-	resp, err := db.Exec(fmt.Sprintf("call dbms_consensus.change_leader('%s:13306');", addr))
+	addr := mgr.GetAddrWithMemberName(ctx, cluster, mgr.CurrentMemberName)
+	if addr == "" {
+		return errors.New("get current member's addr failed")
+	}
+	resp, err := db.Exec(fmt.Sprintf("call dbms_consensus.change_leader('%s');", addr))
 	if err != nil {
-		mgr.Logger.Error(err, "promote err")
 		return err
 	}
 
@@ -257,7 +258,8 @@ func (mgr *Manager) Demote(context.Context) error {
 	return nil
 }
 
-func (mgr *Manager) Follow(context.Context, *dcs.Cluster) error {
+func (mgr *Manager) Follow(_ context.Context, cluster *dcs.Cluster) error {
+	mgr.Logger.Info("current member still follow the leader", "leader name", cluster.Leader.Name)
 	return nil
 }
 

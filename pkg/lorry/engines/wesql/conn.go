@@ -44,7 +44,6 @@ func (mgr *Manager) GetDBConnWithMember(cluster *dcs.Cluster, member *dcs.Member
 
 // GetLeaderConn retrieves a database connection to the leader member of a cluster.
 func (mgr *Manager) GetLeaderConn(cluster *dcs.Cluster) (*sql.DB, error) {
-	mgr.Logger.Info("Get leader from dcs cluster")
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
 		mgr.Logger.Info("Get leader from db cluster local")

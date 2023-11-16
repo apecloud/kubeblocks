@@ -74,4 +74,10 @@ func TestXMLFormat(t *testing.T) {
 	assert.Nil(t, xmlConfigObj.RemoveKey("profiles.web.timeout_before_checking_execution_speed.sksds"))
 	assert.Nil(t, xmlConfigObj.RemoveKey("profiles.web.timeout_before_checking_execution_speed"))
 	assert.EqualValues(t, xmlConfigObj.Get("profiles.web.timeout_before_checking_execution_speed"), nil)
+
+	assert.Nil(t, xmlConfigObj.Update("profiles.web2.timeout_before_checking_execution_speed", 600))
+	assert.EqualValues(t, xmlConfigObj.Get("profiles.web2.timeout_before_checking_execution_speed"), 600)
+
+	assert.Nil(t, xmlConfigObj.Update("profiles_test", "not_exist"))
+	assert.EqualValues(t, xmlConfigObj.Get("profiles_test"), "not_exist")
 }

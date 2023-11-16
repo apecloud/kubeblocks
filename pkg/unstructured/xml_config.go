@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package unstructured
 
 import (
+	"errors"
 	"strings"
 
 	mxjv2 "github.com/clbanning/mxj/v2"
@@ -47,7 +48,27 @@ func init() {
 }
 
 func (x *xmlConfig) Update(key string, value any) error {
-	return x.data.SetValueForPath(value, key)
+	err := x.data.SetValueForPath(value, key)
+	if err != nil && errors.Is(err, mxjv2.PathNotExistError) {
+		_, err = createValueMapForPath(x.data, value, strings.Split(key, "."))
+	}
+	return err
+}
+
+func createValueMapForPath(data mxjv2.Map, value any, fields []string) (interface{}, error) {
+	parentPaths := fields[0 : len(fields)-1]
+	val, err := data.ValueForPath(strings.Join(parentPaths, "."))
+	if err != nil && errors.Is(err, mxjv2.PathNotExistError) {
+		val, err = createValueMapForPath(data, map[string]interface{}{}, parentPaths)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	key := fields[len(fields)-1]
+	cVal := val.(map[string]interface{})
+	cVal[key] = value
+	return value, nil
 }
 
 func (x *xmlConfig) RemoveKey(key string) error {

@@ -69,10 +69,6 @@ LD_FLAGS="-s -w -X main.version=v${VERSION} -X main.buildDate=`date -u +'%Y-%m-%
 local : ARCH ?= $(shell go env GOOS)-$(shell go env GOARCH)
 ARCH ?= linux-amd64
 
-# build tags
-BUILD_TAGS="containers_image_openpgp"
-
-
 TAG_LATEST ?= false
 BUILDX_ENABLED ?= ""
 ifeq ($(BUILDX_ENABLED), "")
@@ -167,7 +163,7 @@ fmt: ## Run go fmt against code.
 
 .PHONY: vet
 vet: ## Run go vet against code.
-	GOOS=$(GOOS) $(GO) vet -tags $(BUILD_TAGS) -mod=mod ./...
+	GOOS=$(GOOS) $(GO) vet -mod=mod ./...
 
 .PHONY: cue-fmt
 cue-fmt: cuetool ## Run cue fmt against code.
@@ -187,7 +183,7 @@ golangci-lint: golangci generate ## Run golangci-lint against code.
 
 .PHONY: staticcheck
 staticcheck: staticchecktool test-go-generate generate ## Run staticcheck against code.
-	$(STATICCHECK) -tags $(BUILD_TAGS) ./...
+	$(STATICCHECK) ./...
 
 .PHONY: build-checks
 build-checks: generate fmt vet goimports lint-fast ## Run build checks.
@@ -220,22 +216,22 @@ endif
 OUTPUT_COVERAGE=-coverprofile cover.out.tmp && grep -v "zz_generated.deepcopy.go" cover.out.tmp > cover.out && rm cover.out.tmp
 .PHONY: test-current-ctx
 test-current-ctx: manifests generate add-k8s-host ## Run operator controller tests with current $KUBECONFIG context. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
-	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -tags $(BUILD_TAGS) -p 1 $(TEST_PACKAGES) $(OUTPUT_COVERAGE)
+	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -p 1 $(TEST_PACKAGES) $(OUTPUT_COVERAGE)
 
 .PHONY: test-fast
 test-fast: envtest
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -tags $(BUILD_TAGS) -short $(TEST_PACKAGES)  $(OUTPUT_COVERAGE)
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -short $(TEST_PACKAGES)  $(OUTPUT_COVERAGE)
 
 .PHONY: test
 test: manifests generate test-go-generate add-k8s-host test-fast ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 
 .PHONY: race
 race:
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -tags $(BUILD_TAGS) -race $(TEST_PACKAGES)
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -race $(TEST_PACKAGES)
 
 .PHONY: test-integration
 test-integration: manifests generate envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -tags $(BUILD_TAGS) ./test/integration
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./test/integration
 
 .PHONY: test-delve
 test-delve: manifests generate envtest ## Run tests.
@@ -261,7 +257,7 @@ goimports: goimportstool ## Run goimports against code.
 
 .PHONY: lorryctl-doc
 lorryctl-doc: generate test-go-generate ## generate CLI command reference manual.
-	$(GO) run -tags $(BUILD_TAGS) ./hack/docgen/lorryctl/main.go ./docs/user_docs/lorryctl
+	$(GO) run ./hack/docgen/lorryctl/main.go ./docs/user_docs/lorryctl
 
 .PHONY: api-doc
 api-doc:  ## generate API reference manual.
@@ -272,11 +268,11 @@ api-doc:  ## generate API reference manual.
 
 .PHONY: manager
 manager: cue-fmt generate manager-go-generate test-go-generate build-checks ## Build manager binary.
-	$(GO) build -tags $(BUILD_TAGS) -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
+	$(GO) build -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
 
 .PHONY: dataprotection
 dataprotection: generate test-go-generate build-checks ## Build dataprotection binary.
-	$(GO) build -tags $(BUILD_TAGS) -ldflags=${LD_FLAGS} -o bin/dataprotection ./cmd/dataprotection/main.go
+	$(GO) build -ldflags=${LD_FLAGS} -o bin/dataprotection ./cmd/dataprotection/main.go
 
 CERT_ROOT_CA ?= $(WEBHOOK_CERT_DIR)/rootCA.key
 .PHONY: webhook-cert

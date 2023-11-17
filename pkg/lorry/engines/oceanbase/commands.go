@@ -64,7 +64,7 @@ func (r *Commands) ConnectCommand(connectInfo *engines.AuthInfo) []string {
 	var obCmd []string
 
 	if userPass != "" {
-		obCmd = []string{fmt.Sprintf("%s -h127.0.0.1 -P2881 -u%s -A -p%s", r.info.Client, userName, userPass)}
+		obCmd = []string{fmt.Sprintf("%s -h127.0.0.1 -P2881 -u%s -A -p%s", r.info.Client, userName, engines.AddSingleQuote(userPass))}
 	} else {
 		obCmd = []string{fmt.Sprintf("%s -h127.0.0.1 -P2881 -u%s -A", r.info.Client, userName)}
 	}

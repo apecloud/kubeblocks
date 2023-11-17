@@ -58,8 +58,8 @@ func (r Commands) ConnectCommand(connectInfo *engines.AuthInfo) []string {
 	}
 
 	if connectInfo != nil {
-		redisCmd = append(redisCmd, "--user", connectInfo.UserName)
-		redisCmd = append(redisCmd, "--pass", connectInfo.UserPasswd)
+		redisCmd = append(redisCmd, "--user", engines.AddSingleQuote(connectInfo.UserName))
+		redisCmd = append(redisCmd, "--pass", engines.AddSingleQuote(connectInfo.UserPasswd))
 	}
 	return []string{"sh", "-c", strings.Join(redisCmd, " ")}
 }

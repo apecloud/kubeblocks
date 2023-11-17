@@ -248,7 +248,7 @@ func (m *Commands) ConnectCommand(connectInfo *engines.AuthInfo) []string {
 
 	// please refer to PostgreSQL documentation for more details
 	// https://www.postgresql.org/docs/current/libpq-envars.html
-	cmd := []string{fmt.Sprintf("PGUSER=%s PGPASSWORD=%s PGDATABASE=%s %s", userName, userPass, m.info.Database, m.info.Client)}
+	cmd := []string{fmt.Sprintf("PGUSER=\"%s\" PGPASSWORD=\"%s\" PGDATABASE=%s %s", userName, userPass, m.info.Database, m.info.Client)}
 	return []string{"sh", "-c", strings.Join(cmd, " ")}
 }
 

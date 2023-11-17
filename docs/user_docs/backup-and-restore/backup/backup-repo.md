@@ -19,10 +19,10 @@ You can create multiple BackupRepos to suit different scenarios. For example, ba
 
 Make sure you have all the following prepared.
 
-* [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md)
+* [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md)
 * [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
 * [Install Helm](https://helm.sh/docs/intro/install/)
-* [Install KubeBlocks](./..installation/install-with-helm/install-kubeblocks-with-helm.md)
+* Install KubeBlocks by [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md)
 
 ## Install MinIO
 

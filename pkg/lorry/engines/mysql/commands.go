@@ -268,7 +268,7 @@ func (m *Commands) ConnectCommand(connectInfo *engines.AuthInfo) []string {
 	// MYSQL_PWD is deprecated as of MySQL 8.0; expect it to be removed in a future version of MySQL.
 	// ref to mysql manual for more details.
 	// https://dev.mysql.com/doc/refman/8.0/en/environment-variables.html
-	mysqlCmd := []string{fmt.Sprintf("%s -u%s -p%s", m.info.Client, userName, userPass)}
+	mysqlCmd := []string{fmt.Sprintf("%s -u%s -p%s", m.info.Client, engines.AddSingleQuote(userName), engines.AddSingleQuote(userPass))}
 
 	return []string{"sh", "-c", strings.Join(mysqlCmd, " ")}
 }

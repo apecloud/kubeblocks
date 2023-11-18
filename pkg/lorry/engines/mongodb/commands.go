@@ -64,7 +64,7 @@ func (r Commands) ConnectCommand(connectInfo *engines.AuthInfo) []string {
 		userPass = connectInfo.UserPasswd
 	}
 
-	mongodbCmd := []string{fmt.Sprintf("export CLIENT=`which mongosh>/dev/null&&echo %s||echo mongo`; $CLIENT mongodb://%s:%s@$KB_POD_FQDN:27017/admin?replicaSet=$KB_CLUSTER_COMP_NAME", r.info.Client, userName, userPass)}
+	mongodbCmd := []string{fmt.Sprintf("export CLIENT=`which mongosh>/dev/null&&echo %s||echo mongo`; $CLIENT %s", r.info.Client, engines.AddSingleQuote(fmt.Sprintf("mongodb://%s:%s@$KB_POD_FQDN:27017/admin?replicaSet=$KB_CLUSTER_COMP_NAME", userName, userPass)))}
 
 	return []string{"sh", "-c", strings.Join(mongodbCmd, " ")}
 }

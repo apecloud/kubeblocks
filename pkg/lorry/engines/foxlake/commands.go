@@ -63,7 +63,7 @@ func (r *Commands) ConnectCommand(connectInfo *engines.AuthInfo) []string {
 		userPass = connectInfo.UserPasswd
 	}
 
-	foxlakeCmd := []string{fmt.Sprintf("%s mysql://%s:%s@:${serverPort}", r.info.Client, userName, userPass)}
+	foxlakeCmd := []string{fmt.Sprintf("%s %s", r.info.Client, engines.AddSingleQuote(fmt.Sprintf("mysql://%s:%s@:${serverPort}", userName, userPass)))}
 
 	return []string{"sh", "-c", strings.Join(foxlakeCmd, " ")}
 }

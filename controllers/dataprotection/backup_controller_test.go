@@ -158,6 +158,7 @@ var _ = Describe("Backup Controller test", func() {
 				By("backup job should have completed")
 				Eventually(testapps.CheckObj(&testCtx, getJobKey(), func(g Gomega, fetched *batchv1.Job) {
 					_, finishedType, _ := dputils.IsJobFinished(fetched)
+					g.Expect(fetched.Labels[constant.KBManagedByKey]).Should(Equal(dptypes.AppName))
 					g.Expect(finishedType).To(Equal(batchv1.JobComplete))
 				})).Should(Succeed())
 
@@ -167,6 +168,7 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Labels[dptypes.ClusterUIDLabelKey]).Should(Equal(string(cluster.UID)))
 					g.Expect(fetched.Labels[constant.AppInstanceLabelKey]).Should(Equal(testdp.ClusterName))
 					g.Expect(fetched.Labels[constant.KBAppComponentLabelKey]).Should(Equal(testdp.ComponentName))
+					g.Expect(fetched.Labels[constant.KBManagedByKey]).Should(Equal(dptypes.AppName))
 					g.Expect(fetched.Annotations[constant.ClusterSnapshotAnnotationKey]).ShouldNot(BeEmpty())
 				})).Should(Succeed())
 

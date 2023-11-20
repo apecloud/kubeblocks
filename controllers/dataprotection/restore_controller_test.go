@@ -26,15 +26,16 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/types"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -264,6 +265,7 @@ var _ = Describe("Restore Controller test", func() {
 					client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
 
 				for _, v := range jobList.Items {
+					Expect(v.Labels[constant.KBManagedByKey]).Should(Equal(dptypes.AppName))
 					finished, _, _ := dputils.IsJobFinished(&v)
 					Expect(finished).Should(BeFalse())
 				}

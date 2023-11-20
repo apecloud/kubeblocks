@@ -33,6 +33,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	componetutil "github.com/apecloud/kubeblocks/pkg/controller/component"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -125,6 +126,17 @@ func renderJob(jobName string, engine *customizedEngine, key componentUniqueKey,
 		envs = append(envs, engine.getEnvs()...)
 	}
 
+	jobContainer := corev1.Container{
+		Name:            jobName,
+		Image:           engine.getImage(),
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Command:         engine.getCommand(),
+		Args:            engine.getArgs(),
+		Env:             envs,
+	}
+
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&jobContainer)
+
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: key.namespace,
@@ -137,16 +149,7 @@ func renderJob(jobName string, engine *customizedEngine, key componentUniqueKey,
 					Name:      jobName},
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,
-					Containers: []corev1.Container{
-						{
-							Name:            jobName,
-							Image:           engine.getImage(),
-							ImagePullPolicy: corev1.PullIfNotPresent,
-							Command:         engine.getCommand(),
-							Args:            engine.getArgs(),
-							Env:             envs,
-						},
-					},
+					Containers:    []corev1.Container{jobContainer},
 				},
 			},
 		},

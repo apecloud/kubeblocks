@@ -317,22 +317,6 @@ var _ = Describe("Cluster Controller", func() {
 				g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.RoleLabelKey, constant.Leader))
 			}
 		})).Should(Succeed())
-
-		By("check component headless service created")
-		compHeadlessSvcKey := types.NamespacedName{
-			Namespace: clusterKey.Namespace,
-			Name:      constant.GenerateComponentServiceName(clusterObj.Name, compName, "headless"),
-		}
-		Eventually(testapps.CheckObj(&testCtx, compHeadlessSvcKey, func(g Gomega, svc *corev1.Service) {
-			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.AppManagedByLabelKey, constant.AppName))
-			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.AppInstanceLabelKey, clusterObj.Name))
-			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.KBAppComponentLabelKey, compName))
-			g.Expect(svc.Spec.Selector).Should(HaveKey(constant.RoleLabelKey))
-			if compDefName == consensusCompDefName {
-				// default role selector for Consensus workload
-				g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.RoleLabelKey, constant.Leader))
-			}
-		})).Should(Succeed())
 	}
 
 	testClusterCredential := func(compName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory))) {

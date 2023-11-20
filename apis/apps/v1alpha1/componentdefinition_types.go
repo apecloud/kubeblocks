@@ -108,6 +108,7 @@ type ComponentDefinitionSpec struct {
 	Volumes []ComponentVolume `json:"volumes"`
 
 	// Services defines endpoints that can be used to access the component service to manage the component.
+	// In addition, a reserved headless service will be created by default, with the name pattern {clusterName}-{componentName}-headless.
 	// Cannot be updated.
 	// +optional
 	Services []Service `json:"services,omitempty"`
@@ -461,8 +462,8 @@ const (
 
 type LifecycleActionHandler struct {
 	// builtinHandler specifies the builtin action handler name to do the action.
-	// Different lifecycleActions support different BuiltinActionHandlers. Details can be queried through official documentation in the future.
-	// use CustomActionHandler to define your own actions if none of them satisfies the requirement.
+	// the BuiltinHandler within the same ComponentLifecycleActions should be consistent. Details can be queried through official documentation in the future.
+	// use CustomHandler to define your own actions if none of them satisfies the requirement.
 	// +optional
 	BuiltinHandler *BuiltinActionHandlerType `json:"builtinHandler,omitempty"`
 

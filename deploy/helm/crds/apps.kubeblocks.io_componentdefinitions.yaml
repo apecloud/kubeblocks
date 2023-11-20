@@ -222,11 +222,11 @@ spec:
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler
-                          name to do the action. Different lifecycleActions support
-                          different BuiltinActionHandlers. Details can be queried
-                          through official documentation in the future. use CustomActionHandler
-                          to define your own actions if none of them satisfies the
-                          requirement.
+                          name to do the action. the BuiltinHandler within the same
+                          ComponentLifecycleActions should be consistent. Details
+                          can be queried through official documentation in the future.
+                          use CustomHandler to define your own actions if none of
+                          them satisfies the requirement.
                         type: string
                       customHandler:
                         description: customHandler defines the custom way to do action.
@@ -490,11 +490,11 @@ spec:
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler
-                          name to do the action. Different lifecycleActions support
-                          different BuiltinActionHandlers. Details can be queried
-                          through official documentation in the future. use CustomActionHandler
-                          to define your own actions if none of them satisfies the
-                          requirement.
+                          name to do the action. the BuiltinHandler within the same
+                          ComponentLifecycleActions should be consistent. Details
+                          can be queried through official documentation in the future.
+                          use CustomHandler to define your own actions if none of
+                          them satisfies the requirement.
                         type: string
                       customHandler:
                         description: customHandler defines the custom way to do action.
@@ -756,11 +756,11 @@ spec:
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler
-                          name to do the action. Different lifecycleActions support
-                          different BuiltinActionHandlers. Details can be queried
-                          through official documentation in the future. use CustomActionHandler
-                          to define your own actions if none of them satisfies the
-                          requirement.
+                          name to do the action. the BuiltinHandler within the same
+                          ComponentLifecycleActions should be consistent. Details
+                          can be queried through official documentation in the future.
+                          use CustomHandler to define your own actions if none of
+                          them satisfies the requirement.
                         type: string
                       customHandler:
                         description: customHandler defines the custom way to do action.
@@ -1022,11 +1022,11 @@ spec:
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler
-                          name to do the action. Different lifecycleActions support
-                          different BuiltinActionHandlers. Details can be queried
-                          through official documentation in the future. use CustomActionHandler
-                          to define your own actions if none of them satisfies the
-                          requirement.
+                          name to do the action. the BuiltinHandler within the same
+                          ComponentLifecycleActions should be consistent. Details
+                          can be queried through official documentation in the future.
+                          use CustomHandler to define your own actions if none of
+                          them satisfies the requirement.
                         type: string
                       customHandler:
                         description: customHandler defines the custom way to do action.
@@ -1289,11 +1289,11 @@ spec:
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler
-                          name to do the action. Different lifecycleActions support
-                          different BuiltinActionHandlers. Details can be queried
-                          through official documentation in the future. use CustomActionHandler
-                          to define your own actions if none of them satisfies the
-                          requirement.
+                          name to do the action. the BuiltinHandler within the same
+                          ComponentLifecycleActions should be consistent. Details
+                          can be queried through official documentation in the future.
+                          use CustomHandler to define your own actions if none of
+                          them satisfies the requirement.
                         type: string
                       customHandler:
                         description: customHandler defines the custom way to do action.
@@ -1552,11 +1552,11 @@ spec:
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler
-                          name to do the action. Different lifecycleActions support
-                          different BuiltinActionHandlers. Details can be queried
-                          through official documentation in the future. use CustomActionHandler
-                          to define your own actions if none of them satisfies the
-                          requirement.
+                          name to do the action. the BuiltinHandler within the same
+                          ComponentLifecycleActions should be consistent. Details
+                          can be queried through official documentation in the future.
+                          use CustomHandler to define your own actions if none of
+                          them satisfies the requirement.
                         type: string
                       customHandler:
                         description: customHandler defines the custom way to do action.
@@ -1815,11 +1815,11 @@ spec:
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler
-                          name to do the action. Different lifecycleActions support
-                          different BuiltinActionHandlers. Details can be queried
-                          through official documentation in the future. use CustomActionHandler
-                          to define your own actions if none of them satisfies the
-                          requirement.
+                          name to do the action. the BuiltinHandler within the same
+                          ComponentLifecycleActions should be consistent. Details
+                          can be queried through official documentation in the future.
+                          use CustomHandler to define your own actions if none of
+                          them satisfies the requirement.
                         type: string
                       customHandler:
                         description: customHandler defines the custom way to do action.
@@ -2079,11 +2079,11 @@ spec:
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler
-                          name to do the action. Different lifecycleActions support
-                          different BuiltinActionHandlers. Details can be queried
-                          through official documentation in the future. use CustomActionHandler
-                          to define your own actions if none of them satisfies the
-                          requirement.
+                          name to do the action. the BuiltinHandler within the same
+                          ComponentLifecycleActions should be consistent. Details
+                          can be queried through official documentation in the future.
+                          use CustomHandler to define your own actions if none of
+                          them satisfies the requirement.
                         type: string
                       customHandler:
                         description: customHandler defines the custom way to do action.
@@ -2342,11 +2342,11 @@ spec:
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler
-                          name to do the action. Different lifecycleActions support
-                          different BuiltinActionHandlers. Details can be queried
-                          through official documentation in the future. use CustomActionHandler
-                          to define your own actions if none of them satisfies the
-                          requirement.
+                          name to do the action. the BuiltinHandler within the same
+                          ComponentLifecycleActions should be consistent. Details
+                          can be queried through official documentation in the future.
+                          use CustomHandler to define your own actions if none of
+                          them satisfies the requirement.
                         type: string
                       customHandler:
                         description: customHandler defines the custom way to do action.
@@ -2605,11 +2605,11 @@ spec:
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler
-                          name to do the action. Different lifecycleActions support
-                          different BuiltinActionHandlers. Details can be queried
-                          through official documentation in the future. use CustomActionHandler
-                          to define your own actions if none of them satisfies the
-                          requirement.
+                          name to do the action. the BuiltinHandler within the same
+                          ComponentLifecycleActions should be consistent. Details
+                          can be queried through official documentation in the future.
+                          use CustomHandler to define your own actions if none of
+                          them satisfies the requirement.
                         type: string
                       customHandler:
                         description: customHandler defines the custom way to do action.
@@ -2868,11 +2868,11 @@ spec:
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler
-                          name to do the action. Different lifecycleActions support
-                          different BuiltinActionHandlers. Details can be queried
-                          through official documentation in the future. use CustomActionHandler
-                          to define your own actions if none of them satisfies the
-                          requirement.
+                          name to do the action. the BuiltinHandler within the same
+                          ComponentLifecycleActions should be consistent. Details
+                          can be queried through official documentation in the future.
+                          use CustomHandler to define your own actions if none of
+                          them satisfies the requirement.
                         type: string
                       customHandler:
                         description: customHandler defines the custom way to do action.
@@ -11212,7 +11212,9 @@ spec:
                 type: string
               services:
                 description: Services defines endpoints that can be used to access
-                  the component service to manage the component. Cannot be updated.
+                  the component service to manage the component. In addition, a reserved
+                  headless service will be created by default, with the name pattern
+                  {clusterName}-{componentName}-headless. Cannot be updated.
                 items:
                   properties:
                     componentSelector:

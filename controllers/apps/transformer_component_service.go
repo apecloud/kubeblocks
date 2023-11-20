@@ -48,6 +48,10 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 	synthesizeComp := transCtx.SynthesizeComponent
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for _, service := range synthesizeComp.ComponentServices {
+		// component controller does not handle the default headless service; the default headless service is managed by the RSM.
+		if t.isDefaultHeadlessSvc(synthesizeComp, &service) {
+			continue
+		}
 		svc, err := t.buildService(transCtx.Component, synthesizeComp, &service)
 		if err != nil {
 			return err
@@ -108,4 +112,10 @@ func (t *componentServiceTransformer) checkRoleSelector(synthesizeComp *componen
 		return fmt.Errorf("role selector for service is not defined, service: %s, role: %s", name, roleSelector)
 	}
 	return nil
+}
+
+func (t *componentServiceTransformer) isDefaultHeadlessSvc(synthesizeComp *component.SynthesizedComponent, service *appsv1alpha1.Service) bool {
+	svcName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, service.ServiceName)
+	defaultHeadlessSvcName := constant.GenerateDefaultComponentHeadlessServiceName(synthesizeComp.ClusterName, synthesizeComp.Name)
+	return svcName == defaultHeadlessSvcName
 }

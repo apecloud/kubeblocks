@@ -116,3 +116,8 @@ func GenerateRSMNamePattern(clusterName, compName string) string {
 func GenerateRSMServiceNamePattern(rsmName string) string {
 	return fmt.Sprintf("%s-headless", rsmName)
 }
+
+// GenerateDefaultHeadlessServicePattern generates rsm name pattern
+func GenerateDefaultHeadlessServicePattern(clusterName, compName string) string {
+	return fmt.Sprintf("%s-%s-headless", clusterName, compName)
+}

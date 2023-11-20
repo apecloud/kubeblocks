@@ -1,33 +1,8 @@
-apiVersion: extensions.kubeblocks.io/v1alpha1
-kind: Addon
-metadata:
-  name: opensearch
-  labels:
-    {{- include "kubeblocks.labels" . | nindent 4 }}
-    "kubeblocks.io/provider": community
-  {{- if .Values.keepAddons }}
-  annotations:
-    helm.sh/resource-policy: keep
-  {{- end }}
-spec:
-  description: 'OpenSearch is a scalable, flexible, and extensible open-source software suite for search, analytics, and observability applications licensed under Apache 2.0.'
-
-  type: Helm
-
-  helm:
-    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "opensearch" "version" (default .Chart.Version .Values.versionOverride) "values" .Values) | indent 4 }}
-    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
-
-    installOptions:
-      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-      version: {{ default .Chart.Version .Values.versionOverride }}
-      {{- end }}
-
-  installable:
-    autoInstall: false
-
-  defaultInstallValues:
-    - enabled: false
-      {{- with .Values.tolerations }}
-      tolerations: {{ toJson . | quote }}
-      {{- end }}
+{{- include "kubeblocks.buildAddonCR" (merge (dict
+  "kbVersion" ">=0.7.0"
+  "name" "opensearch"
+  "version" "0.7.0"
+  "model" "search-engine"
+  "provider" "community"
+  "description" "OpenSearch is a scalable, flexible, and extensible open-source software suite for search, analytics, and observability applications licensed under Apache 2.0."
+  "autoInstall" false) . ) -}}

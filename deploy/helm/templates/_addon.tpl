@@ -24,3 +24,46 @@ chartLocationURL: {{ $base }}/{{ $fullChart }}/{{ $fullChart }}.tgz
 chartLocationURL: {{ $base }}/{{ $fullChart }}.tgz
 {{- end }}
 {{- end }}
+
+{{/*
+Build add-on CR
+Parameters:
+- name: name of the addon
+- version: version of the addon
+- model: model of the addon
+- provider: provider of the addon
+- descripton: description of the addon
+- autoInstall: autoInstall of the addon
+- kbVersion: KubeBlocks version that this addon is compatible with
+*/}}
+{{- define "kubeblocks.buildAddonCR" }}
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: {{ .name }}
+  labels:
+    app.kubernetes.io/name: {{ .name }}
+    app.kubernetes.io/version: {{ .version }}
+    addon.kubeblocks.io/provider: {{ .provider }}
+    addon.kubeblocks.io/model: {{ .model }}
+  annotations:
+    addon.kubeblocks.io/kubeblocks-version: {{ .kbVersion | squote }}
+  {{- if .Values.keepAddons }}
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: {{ .description | squote }}
+  type: Helm
+  helm:
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" .name "version" .version "values" .Values) | indent 4 }}
+    chartsImage: {{ .Values.addonChartsImage.registry | default "docker.io" }}/{{ .Values.addonChartsImage.repository }}:{{ .Values.addonChartsImage.tag | default .Chart.AppVersion }}
+    chartsPathInImage: {{ .Values.addonChartsImage.chartsPath }}
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: {{ .version }}
+      {{- end }}
+  defaultInstallValues:
+  - enabled: true
+  installable:
+    autoInstall: {{ .autoInstall }}
+{{- end -}}

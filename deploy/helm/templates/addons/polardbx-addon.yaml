@@ -1,28 +1,8 @@
-apiVersion: extensions.kubeblocks.io/v1alpha1
-kind: Addon
-metadata:
-  name: polardbx
-  labels:
-    {{- include "kubeblocks.labels" . | nindent 4 }}
-    "kubeblocks.io/provider": community
-  {{- if .Values.keepAddons }}
-  annotations:
-    helm.sh/resource-policy: keep
-  {{- end }}
-spec:
-  description: 'PolarDB-X is a cloud native distributed SQL Database designed for high concurrency, massive storage, complex querying scenarios.'
-  type: Helm
-  helm:
-    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "polardbx" "version" (default .Chart.Version .Values.versionOverride) "values" .Values) | indent 4 }}
-    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
-
-    installOptions:
-     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-      version: {{ default .Chart.Version .Values.versionOverride }}
-     {{- end }}
-
-  installable:
-    autoInstall: false
-
-  defaultInstallValues:
-    - enabled: true
+{{- include "kubeblocks.buildAddonCR" (merge (dict
+  "kbVersion" ">=0.7.0"
+  "name" "polardbx"
+  "version" "0.7.0"
+  "model" "RDBMS"
+  "provider" "community"
+  "description" "PolarDB-X is a cloud native distributed SQL Database designed for high concurrency, massive storage, complex querying scenarios."
+  "autoInstall" false) . ) -}}

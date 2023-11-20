@@ -124,7 +124,7 @@ func (s *Scheduler) buildCronJob(
 			Name:      cronJobName,
 			Namespace: s.BackupSchedule.Namespace,
 			Labels: map[string]string{
-				constant.AppManagedByLabelKey: constant.AppName,
+				constant.AppManagedByLabelKey: dptypes.AppName,
 			},
 		},
 		Spec: batchv1.CronJobSpec{
@@ -207,7 +207,6 @@ func (s *Scheduler) reconcileCronJob(schedulePolicy *dpv1alpha1.SchedulePolicy) 
 		client.MatchingLabels{
 			dptypes.BackupScheduleLabelKey: s.BackupSchedule.Name,
 			dptypes.BackupMethodLabelKey:   schedulePolicy.BackupMethod,
-			constant.AppManagedByLabelKey:  constant.AppName,
 		},
 	); err != nil {
 		return err

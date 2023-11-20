@@ -18,7 +18,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/dapr/kit/config"
+	"github.com/apecloud/kubeblocks/pkg/lorry/util/config"
 )
 
 type Settings struct {

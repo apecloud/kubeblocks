@@ -111,6 +111,7 @@ func TestParseRedisMetadata(t *testing.T) {
 		err := m.Decode(fakeProperties)
 
 		// assert
+		// m.Decode dose not return error when host is ""
 		assert.Error(t, errors.New("redis streams error: missing host address"), err)
 		assert.Empty(t, m.Host)
 	})

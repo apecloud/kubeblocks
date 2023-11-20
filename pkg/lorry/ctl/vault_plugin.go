@@ -23,14 +23,20 @@ import (
 	"os"
 
 	hclog "github.com/hashicorp/go-hclog"
-	redis "github.com/hashicorp/vault-plugin-database-redis"
 	dbplugin "github.com/hashicorp/vault/sdk/database/dbplugin/v5"
 	"github.com/spf13/cobra"
+
+	"github.com/apecloud/kubeblocks/pkg/lorry/vault"
 )
 
 // Run instantiates a lorry vault plugin object, and runs the RPC server for the plugin
 func Run() error {
-	db, err := redis.New()
+	logger := hclog.New(&hclog.LoggerOptions{
+		Level:      hclog.Trace,
+		Output:     os.Stderr,
+		JSONFormat: true,
+	})
+	db, err := vault.New(logger)
 	if err != nil {
 		return err
 	}

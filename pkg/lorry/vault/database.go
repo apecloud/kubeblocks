@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/go-hclog"
 	dbplugin "github.com/hashicorp/vault/sdk/database/dbplugin/v5"
 	"github.com/hashicorp/vault/sdk/database/helper/credsutil"
 )
@@ -41,12 +42,14 @@ var _ dbplugin.Database = &LorryDB{}
 
 type LorryDB struct {
 	credsutil.CredentialsProducer
+	logger hclog.Logger
 	sync.Mutex
 }
 
 // New implements builtinplugins.BuiltinFactory
-func New() (interface{}, error) {
+func New(logger hclog.Logger) (interface{}, error) {
 	db := new()
+	db.logger = logger
 	// Wrap the plugin with middleware to sanitize errors
 	dbType := dbplugin.NewDatabaseErrorSanitizerMiddleware(db, nil)
 	return dbType, nil
@@ -63,6 +66,9 @@ func (c *LorryDB) Initialize(ctx context.Context, req dbplugin.InitializeRequest
 	resp := dbplugin.InitializeResponse{
 		Config: req.Config,
 	}
+	// internal logger to os.Stderr
+	logger := hclog.New(&hclog.LoggerOptions{})
+	logger.Debug("lorry plugin", "config", req.Config)
 	return resp, nil
 }
 
@@ -89,6 +95,9 @@ func (c *LorryDB) NewUser(ctx context.Context, req dbplugin.NewUserRequest) (dbp
 	// 	return dbplugin.NewUserResponse{}, err
 	// }
 
+	// internal logger to os.Stderr
+	logger := hclog.New(&hclog.LoggerOptions{})
+	logger.Debug("lorry plugin", "username", username)
 	resp := dbplugin.NewUserResponse{
 		Username: username,
 	}

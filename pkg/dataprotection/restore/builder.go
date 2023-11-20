@@ -194,6 +194,10 @@ func (r *restoreJobBuilder) addCommonEnv() *restoreJobBuilder {
 		}
 	}
 	appendTimeEnv(dptypes.DPBackupStopTime, "", r.backupSet.Backup.GetEndTime())
+	if r.backupSet.BaseBackup != nil {
+		appendTimeEnv(DPBaseBackupStartTime, DPBaseBackupStartTimestamp, r.backupSet.BaseBackup.GetStartTime())
+		appendTimeEnv(DPBaseBackupStopTime, DPBaseBackupStopTimestamp, r.backupSet.BaseBackup.GetEndTime())
+	}
 	if r.restore.Spec.RestoreTime != "" {
 		restoreTime, _ := time.Parse(time.RFC3339, r.restore.Spec.RestoreTime)
 		appendTimeEnv(DPRestoreTime, DPRestoreTimestamp, &metav1.Time{Time: restoreTime})
@@ -286,6 +290,9 @@ func (r *restoreJobBuilder) build() *batchv1.Job {
 	r.specificVolumes = append(r.specificVolumes, r.commonVolumes...)
 	podSpec.Volumes = r.specificVolumes
 	job.Spec.Template.Spec = podSpec
+	job.Spec.Template.ObjectMeta = metav1.ObjectMeta{
+		Labels: r.labels,
+	}
 	job.Spec.BackoffLimit = &defaultBackoffLimit
 
 	// 2. set restore container

@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -76,10 +77,31 @@ func (mgr *Manager) QueryOthers(ctx context.Context, sql string, host string) (r
 	return conn.Query(ctx, sql)
 }
 
+// GetLeaderAddr query leader addr from db kernel
+func (mgr *Manager) GetLeaderAddr(ctx context.Context) (string, error) {
+	queryLeaderAddrSQL := `select ip_port from consensus_cluster_status where server_id = (select current_leader from consensus_member_status);`
+	resp, err := mgr.Query(ctx, queryLeaderAddrSQL)
+	if err != nil {
+		return "", err
+	}
+
+	resMap, err := ParseQuery(string(resp))
+	if err != nil {
+		return "", err
+	}
+
+	return strings.Split(cast.ToString(resMap[0]["ip_port"]), ":")[0], nil
+}
+
 func (mgr *Manager) QueryLeader(ctx context.Context, sql string, cluster *dcs.Cluster) (result []byte, err error) {
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
-		return nil, ClusterHasNoLeader
+		leaderAddr, err := mgr.GetLeaderAddr(ctx)
+		if err != nil {
+			return nil, ClusterHasNoLeader
+		}
+
+		return mgr.QueryWithHost(ctx, sql, leaderAddr)
 	}
 
 	var host string
@@ -126,7 +148,12 @@ func (mgr *Manager) ExecOthers(ctx context.Context, sql string, host string) (re
 func (mgr *Manager) ExecLeader(ctx context.Context, sql string, cluster *dcs.Cluster) (result int64, err error) {
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
-		return 0, ClusterHasNoLeader
+		leaderAddr, err := mgr.GetLeaderAddr(ctx)
+		if err != nil {
+			return 0, ClusterHasNoLeader
+		}
+
+		return mgr.ExecWithHost(ctx, sql, leaderAddr)
 	}
 
 	var host string

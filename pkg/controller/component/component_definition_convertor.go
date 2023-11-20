@@ -213,7 +213,10 @@ func (c *compDefServicesConvertor) removeDuplicatePorts(svc *corev1.Service) *co
 func (c *compDefServicesConvertor) roleSelector(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) string {
 	switch clusterCompDef.WorkloadType {
 	case appsv1alpha1.Consensus:
-		return constant.Leader
+		if clusterCompDef.ConsensusSpec == nil {
+			return constant.Leader
+		}
+		return clusterCompDef.ConsensusSpec.Leader.Name
 	case appsv1alpha1.Replication:
 		return constant.Primary
 	default:

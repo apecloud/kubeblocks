@@ -1,30 +1,8 @@
-apiVersion: extensions.kubeblocks.io/v1alpha1
-kind: Addon
-metadata:
-  name: tidb
-  labels:
-    {{- include "kubeblocks.labels" . | nindent 4 }}
-    "kubeblocks.io/provider": community
-  {{- if .Values.keepAddons }}
-  annotations:
-    helm.sh/resource-policy: keep
-  {{- end }}
-spec:
-  description: 'TiDB is an open-source, cloud-native, distributed, MySQL-Compatible database for elastic scale and real-time analytics.'
-
-  type: Helm
-
-  helm:
-    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "tidb" "version" (default .Chart.Version .Values.versionOverride) "values" .Values) | indent 4 }}
-    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
-
-    installOptions:
-     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-      version: {{ default .Chart.Version .Values.versionOverride }}
-     {{- end }}
-
-  installable:
-    autoInstall: false
-
-  defaultInstallValues:
-    - enabled: true
+{{- include "kubeblocks.buildAddonCR" (merge (dict
+  "kbVersion" ">=0.7.0"
+  "name" "tidb"
+  "version" "0.1.0-alpha.1"
+  "model" "RDBMS"
+  "provider" "community"
+  "description" "TiDB is an open-source, cloud-native, distributed, MySQL-Compatible database for elastic scale and real-time analytics."
+  "autoInstall" false) . ) -}}

@@ -1,35 +1,8 @@
-apiVersion: extensions.kubeblocks.io/v1alpha1
-kind: Addon
-metadata:
-  name: orioledb
-  labels:
-    {{- include "kubeblocks.labels" . | nindent 4 }}
-    "kubeblocks.io/provider": apecloud
-  {{- if .Values.keepAddons }}
-  annotations:
-    helm.sh/resource-policy: keep
-  {{- end }}
-spec:
-  description: 'OrioleDB – a modern cloud-native storage engine solving some PostgreSQL wicked problems.'
-
-  type: Helm
-
-  helm:
-    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "orioledb" "version" (default .Chart.Version .Values.versionOverride) "values" .Values) | indent 4 }}
-    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
-
-    installOptions:
-      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-      version: {{ default .Chart.Version .Values.versionOverride }}
-      {{- end }}
-
-  installable:
-    autoInstall: false
-
-  defaultInstallValues:
-    - enabled: false
-      {{- with .Values.tolerations }}
-      tolerations: {{ toJson . | quote }}
-      {{- end }}
-
-
+{{- include "kubeblocks.buildAddonCR" (merge (dict
+  "kbVersion" ">=0.7.0"
+  "name" "orioledb"
+  "version" "0.8.0-alpha.5"
+  "model" "RDBMS"
+  "provider" "apecloud"
+  "description" "OrioleDB – a modern cloud-native storage engine solving some PostgreSQL wicked problems."
+  "autoInstall" false) . ) -}}

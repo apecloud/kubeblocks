@@ -24,6 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -62,8 +63,8 @@ func TestGetPostgresqlMetadata(t *testing.T) {
 	})
 
 	t.Run("set env", func(t *testing.T) {
-		viper.Set("KB_SERVICE_USER", "test")
-		viper.Set("KB_SERVICE_PASSWORD", "test_pwd")
+		viper.Set(constant.KBEnvServiceUser, "test")
+		viper.Set(constant.KBEnvServicePassword, "test_pwd")
 		properties := map[string]string{
 			ConnectionURLKey: "user=postgres password=docker host=localhost port=5432 dbname=postgres pool_min_conns=1 pool_max_conns=10",
 		}

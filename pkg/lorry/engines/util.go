@@ -47,4 +47,8 @@ func GetIndex(memberName string) (int, error) {
 	return strconv.Atoi(memberName[i+1:])
 }
 
+func AddSingleQuote(str string) string {
+	return "'" + str + "'"
+}
+
 type Properties map[string]string

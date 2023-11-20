@@ -24,6 +24,8 @@ import (
 	"encoding/json"
 	"strconv"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 const DateTimeFormat = "2006-01-02 15:04:05.999999"
@@ -64,7 +66,7 @@ type RowData []CellData
 
 // MarshalJSON will marshal this map as JSON
 func (rd *RowData) MarshalJSON() ([]byte, error) {
-	cells := make([](*CellData), len(*rd))
+	cells := make([]*CellData, len(*rd))
 	for i, val := range *rd {
 		d := val
 		cells[i] = &d
@@ -75,7 +77,7 @@ func (rd *RowData) MarshalJSON() ([]byte, error) {
 func (rd *RowData) Args() []interface{} {
 	result := make([]interface{}, len(*rd))
 	for i := range *rd {
-		result[i] = (*(*rd)[i].NullString())
+		result[i] = *(*rd)[i].NullString()
 	}
 	return result
 }
@@ -212,7 +214,7 @@ func ScanRowsToMaps(rows *sql.Rows, onRow func(RowMap) error) error {
 	return err
 }
 
-// QueryRowsMap is a convenience function allowing querying a result set while poviding a callback
+// QueryRowsMap is a convenience function allowing querying a result set while providing a callback
 // function activated per read row.
 func QueryRowsMap(db *sql.DB, query string, onRow func(RowMap) error, args ...interface{}) (err error) {
 	var rows *sql.Rows
@@ -220,7 +222,7 @@ func QueryRowsMap(db *sql.DB, query string, onRow func(RowMap) error, args ...in
 	if rows != nil {
 		defer rows.Close()
 	}
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
 	err = ScanRowsToMaps(rows, onRow)

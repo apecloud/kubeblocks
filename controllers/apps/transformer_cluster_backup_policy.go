@@ -31,6 +31,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -244,7 +245,7 @@ func (r *clusterBackupPolicyTransformer) buildBackupSchedule(
 			BackupMethod:    s.BackupMethod,
 			CronExpression:  s.CronExpression,
 			Enabled:         s.Enabled,
-			RetentionPeriod: r.backupPolicy.RetentionPeriod,
+			RetentionPeriod: s.RetentionPeriod,
 		})
 	}
 	backupSchedule.Spec.Schedules = schedules
@@ -265,7 +266,7 @@ func (r *clusterBackupPolicyTransformer) syncBackupSchedule(backupSchedule *dpv1
 			BackupMethod:    s.BackupMethod,
 			CronExpression:  s.CronExpression,
 			Enabled:         s.Enabled,
-			RetentionPeriod: r.backupPolicy.RetentionPeriod,
+			RetentionPeriod: s.RetentionPeriod,
 		})
 	}
 }
@@ -317,7 +318,7 @@ func (r *clusterBackupPolicyTransformer) syncBackupPolicy(backupPolicy *dpv1alph
 		}
 		if r.getCompReplicas() == 1 {
 			delete(podSelector.LabelSelector.MatchLabels, constant.RoleLabelKey)
-		} else {
+		} else if podSelector.LabelSelector.MatchLabels[constant.RoleLabelKey] == "" {
 			podSelector.LabelSelector.MatchLabels[constant.RoleLabelKey] = role
 		}
 	}
@@ -397,7 +398,7 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(
 		if comp.ServiceAccountName != "" {
 			return comp.ServiceAccountName
 		}
-		return "kb-" + r.Cluster.Name
+		return constant.GenerateDefaultCompServiceAccountPattern(component.FullName(r.Cluster.Name, comp.Name))
 	}
 
 	// build the target connection credential

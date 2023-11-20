@@ -899,10 +899,6 @@ spec:
                 x-kubernetes-validations:
                 - message: duplicated component
                   rule: self.all(x, size(self.filter(c, c.name == x.name)) == 1)
-                - message: component can not be added dynamically
-                  rule: self.all(x, oldSelf.exists(y, y.name == x.name))
-                - message: component can not be removed dynamically
-                  rule: oldSelf.all(x, self.exists(y, y.name == x.name))
               connectionCredentials:
                 description: connectionCredentials defines the credentials used to
                   access a cluster.

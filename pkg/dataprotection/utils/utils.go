@@ -113,6 +113,30 @@ func GetActionSetByName(reqCtx intctrlutil.RequestCtx,
 	return as, nil
 }
 
+func GetBackupPolicyByName(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	name string) (*dpv1alpha1.BackupPolicy, error) {
+	backupPolicy := &dpv1alpha1.BackupPolicy{}
+	key := client.ObjectKey{
+		Namespace: reqCtx.Req.Namespace,
+		Name:      name,
+	}
+	if err := cli.Get(reqCtx.Ctx, key, backupPolicy); err != nil {
+		return nil, err
+	}
+	return backupPolicy, nil
+}
+
+func GetBackupMethodByName(name string, backupPolicy *dpv1alpha1.BackupPolicy) *dpv1alpha1.BackupMethod {
+	for _, m := range backupPolicy.Spec.BackupMethods {
+		if m.Name == name {
+			return &m
+		}
+	}
+	return nil
+}
+
 func GetPodListByLabelSelector(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	labelSelector metav1.LabelSelector) (*corev1.PodList, error) {

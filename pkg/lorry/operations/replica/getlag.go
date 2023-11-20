@@ -49,7 +49,7 @@ func init() {
 	}
 }
 
-func (s *GetLag) Init(ctx context.Context) error {
+func (s *GetLag) Init(context.Context) error {
 	s.dcsStore = dcs.GetStore()
 	if s.dcsStore == nil {
 		return errors.New("dcs store init failed")
@@ -64,12 +64,12 @@ func (s *GetLag) Init(ctx context.Context) error {
 	return nil
 }
 
-func (s *GetLag) IsReadonly(ctx context.Context) bool {
+func (s *GetLag) IsReadonly(context.Context) bool {
 	return false
 }
 
 func (s *GetLag) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	sql := req.Parameters["sql"].(string)
+	sql := req.GetString("sql")
 	if sql == "" {
 		return nil, errors.New("no sql provided")
 	}

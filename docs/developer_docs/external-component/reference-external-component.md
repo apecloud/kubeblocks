@@ -41,7 +41,7 @@ A KubeBlocks Pulsar cluster is composed of components including proxy, broker, b
 
 :::note
 
-For more information about the KubeBlocks Pulsar cluster, refer to [KubeBlocks for Pulsar](./../kubeblocks-for-pulsar/cluster-management/create-pulsar-cluster-on-kubeblocks.md).
+For more information about the KubeBlocks Pulsar cluster, refer to [KubeBlocks for Pulsar](./../../user_docs/kubeblocks-for-pulsar/cluster-management/create-pulsar-cluster-on-kubeblocks.md).
 
 :::
 

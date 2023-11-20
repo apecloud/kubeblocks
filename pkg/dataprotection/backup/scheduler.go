@@ -148,7 +148,7 @@ func (s *Scheduler) buildCronJob(
 	}
 	cronjob.Labels[dptypes.BackupScheduleLabelKey] = s.BackupSchedule.Name
 	cronjob.Labels[dptypes.BackupMethodLabelKey] = schedulePolicy.BackupMethod
-	cronjob.Labels[constant.KBManagedByKey] = dptypes.AppName
+	cronjob.Labels[constant.AppManagedByLabelKey] = dptypes.AppName
 	return cronjob, nil
 }
 

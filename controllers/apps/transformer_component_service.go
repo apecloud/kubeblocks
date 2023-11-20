@@ -116,6 +116,6 @@ func (t *componentServiceTransformer) checkRoleSelector(synthesizeComp *componen
 
 func (t *componentServiceTransformer) isDefaultHeadlessSvc(synthesizeComp *component.SynthesizedComponent, service *appsv1alpha1.Service) bool {
 	svcName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, service.ServiceName)
-	defaultHeadlessSvcName := constant.GenerateDefaultHeadlessServicePattern(synthesizeComp.ClusterName, synthesizeComp.Name)
+	defaultHeadlessSvcName := constant.GenerateDefaultComponentHeadlessServiceName(synthesizeComp.ClusterName, synthesizeComp.Name)
 	return svcName == defaultHeadlessSvcName
 }

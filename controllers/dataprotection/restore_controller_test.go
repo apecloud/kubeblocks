@@ -265,7 +265,7 @@ var _ = Describe("Restore Controller test", func() {
 					client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
 
 				for _, v := range jobList.Items {
-					Expect(v.Labels[constant.KBManagedByKey]).Should(Equal(dptypes.AppName))
+					Expect(v.Labels[constant.AppManagedByLabelKey]).Should(Equal(dptypes.AppName))
 					finished, _, _ := dputils.IsJobFinished(&v)
 					Expect(finished).Should(BeFalse())
 				}

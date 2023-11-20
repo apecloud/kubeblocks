@@ -208,7 +208,7 @@ done
 			Namespace: jobKey.Namespace,
 			Name:      jobKey.Name,
 			Labels: map[string]string{
-				constant.KBManagedByKey: dptypes.AppName,
+				constant.AppManagedByLabelKey: dptypes.AppName,
 			},
 		},
 		Spec: batchv1.JobSpec{

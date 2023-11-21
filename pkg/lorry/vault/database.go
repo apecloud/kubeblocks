@@ -38,7 +38,7 @@ const (
 	lorryTypeName        = "lorry"
 	defaultLorryUserRule = "readonly"
 	defaultTimeout       = 20000 * time.Millisecond
-	maxKeyLength         = 64
+	maxKeyLength         = 32
 )
 
 var _ dbplugin.Database = &LorryDB{}
@@ -98,7 +98,8 @@ func (db *LorryDB) NewUser(ctx context.Context, req dbplugin.NewUserRequest) (db
 
 	username, err := credsutil.GenerateUsername(
 		credsutil.DisplayName(req.UsernameConfig.DisplayName, maxKeyLength),
-		credsutil.RoleName(req.UsernameConfig.RoleName, maxKeyLength))
+		credsutil.RoleName(req.UsernameConfig.RoleName, maxKeyLength),
+		credsutil.MaxLength(maxKeyLength))
 	if err != nil {
 		return dbplugin.NewUserResponse{}, fmt.Errorf("failed to generate username: %w", err)
 	}

@@ -175,7 +175,7 @@ var _ = Describe("Component PostStart Test", func() {
 			Expect(err.Error()).Should(ContainSubstring("requeue to waiting for job"))
 
 			By("test setPostStartDoneAnnotation without error")
-			err = setPostStartDoneAnnotation(testCtx.Cli, comp, dag)
+			err = setPostStartDoneAnnotation(testCtx.Cli, *comp, dag)
 			Expect(err).Should(Succeed())
 		})
 	})

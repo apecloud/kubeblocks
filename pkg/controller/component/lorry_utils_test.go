@@ -126,8 +126,10 @@ var _ = Describe("Lorry Utils", func() {
 			// all other services are disabled
 			defaultBuiltInHandler := appsv1alpha1.MySQLBuiltinActionHandler
 			component.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{
-				MemberJoin: &appsv1alpha1.LifecycleActionHandler{
-					BuiltinHandler: &defaultBuiltInHandler,
+				MemberJoin: &appsv1alpha1.LifecycleActionSpec{
+					LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
+						BuiltinHandler: &defaultBuiltInHandler,
+					},
 				},
 			}
 			Expect(buildLorryContainers(reqCtx, component)).Should(Succeed())

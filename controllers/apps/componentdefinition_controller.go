@@ -316,7 +316,10 @@ func (r *ComponentDefinitionReconciler) validateConnectionCredentialServiceEndpo
 	}
 	for _, svc := range cmpd.Spec.Services {
 		if svc.Name == svcName {
-			return r.validateConnectionCredentialPort(cc.Name, cc.Endpoint.ServiceEndpoint.PortName, svc.Spec.Ports)
+			portName := cc.Endpoint.ServiceEndpoint.PortName
+			return validateConnectionCredentialPort(cc.Name, portName, svc.Spec.Ports, func(port corev1.ServicePort) string {
+				return port.Name
+			})
 		}
 	}
 	return fmt.Errorf("there is no matched service for connection credential: %s", cc.Name)
@@ -324,10 +327,33 @@ func (r *ComponentDefinitionReconciler) validateConnectionCredentialServiceEndpo
 
 func (r *ComponentDefinitionReconciler) validateConnectionCredentialPodEndpoint(cmpd *appsv1alpha1.ComponentDefinition,
 	cc appsv1alpha1.ConnectionCredential) error {
-	return nil
+	if len(cmpd.Spec.Runtime.Containers) == 0 {
+		return nil
+	}
+	ep := cc.Endpoint.PodEndpoint
+	if len(ep.Container) == 0 && len(cmpd.Spec.Runtime.Containers) > 1 {
+		return fmt.Errorf("there are multiple container defined, it must be specified a container for connection credential: %s", cc.Name)
+	}
+	var container *corev1.Container
+	if len(ep.Container) == 0 {
+		container = &cmpd.Spec.Runtime.Containers[0]
+	} else {
+		for i, c := range cmpd.Spec.Runtime.Containers {
+			if c.Name == ep.Container {
+				container = &cmpd.Spec.Runtime.Containers[i]
+				break
+			}
+		}
+	}
+	if container == nil {
+		return fmt.Errorf("there is no matched container for connection credential: %s", cc.Name)
+	}
+	return validateConnectionCredentialPort(cc.Name, ep.PortName, container.Ports, func(port corev1.ContainerPort) string {
+		return port.Name
+	})
 }
 
-func (r *ComponentDefinitionReconciler) validateConnectionCredentialPort(credentialName, portName string, ports []corev1.ServicePort) error {
+func validateConnectionCredentialPort[T any](credentialName, portName string, ports []T, getName func(T) string) error {
 	if len(portName) == 0 {
 		switch len(ports) {
 		case 0:
@@ -339,7 +365,7 @@ func (r *ComponentDefinitionReconciler) validateConnectionCredentialPort(credent
 		}
 	}
 	for _, port := range ports {
-		if port.Name == portName {
+		if getName(port) == portName {
 			return nil
 		}
 	}

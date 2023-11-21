@@ -242,6 +242,26 @@ func (f *MockComponentDefinitionFactory) AddConnectionCredential(name, serviceNa
 			AccountName: accountName,
 		},
 	}
+	return f.AddConnectionCredentialObj(credential)
+}
+
+func (f *MockComponentDefinitionFactory) AddConnectionCredential4Pod(name, container, portName, accountName string) *MockComponentDefinitionFactory {
+	credential := appsv1alpha1.ConnectionCredential{
+		Name: name,
+		Endpoint: appsv1alpha1.ConnectionEndpoint{
+			PodEndpoint: &appsv1alpha1.ConnectionPodEndpoint{
+				Container: container,
+				PortName:  portName,
+			},
+		},
+		Account: appsv1alpha1.ConnectionCredentialAccount{
+			AccountName: accountName,
+		},
+	}
+	return f.AddConnectionCredentialObj(credential)
+}
+
+func (f *MockComponentDefinitionFactory) AddConnectionCredentialObj(credential appsv1alpha1.ConnectionCredential) *MockComponentDefinitionFactory {
 	if f.Get().Spec.ConnectionCredentials == nil {
 		f.Get().Spec.ConnectionCredentials = make([]appsv1alpha1.ConnectionCredential, 0)
 	}

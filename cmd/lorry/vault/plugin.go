@@ -38,7 +38,7 @@ func main() {
 	}
 }
 
-// Run instantiates a RedisDB object, and runs the RPC server for the plugin
+// Run instantiates a LorryDB object, and runs the RPC server for the plugin
 func Run() error {
 	db, err := vault.New()
 	if err != nil {

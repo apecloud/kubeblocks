@@ -190,7 +190,6 @@ var _ = Describe("Component Definition Convertor", func() {
 					},
 				},
 				ReplicationSpec:       nil,
-				RSMSpec:               &appsv1alpha1.RSMSpec{},
 				HorizontalScalePolicy: &appsv1alpha1.HorizontalScalePolicy{},
 				SystemAccounts: &appsv1alpha1.SystemAccountSpec{
 					CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{

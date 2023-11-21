@@ -171,8 +171,8 @@ spec:
                     a k8s Secret object will be created with the scheme: \n ObjectMeta:
                     Name: <CLUSTER_NAME>-<NAME> or <CLUSTER_NAME>-<COMPONENT_NAME>-<NAME>
                     Spec: Data: endpoint: <endpoint>[,<endpoint>....] host: <host>
-                    port: <port> username: <account.name> password: <account.password>
-                    # TODO: ak/sk"
+                    port: <port> username: <account.name>  # TODO: ak/sk password:
+                    <account.password>"
                   properties:
                     account:
                       description: Account specifies the defined system account to
@@ -191,7 +191,7 @@ spec:
                       type: object
                     endpoint:
                       description: Endpoint specifies the connection endpoint information.
-                        It can be either a defined service or pods' FQDN of specified
+                        It can be either a defined service or pods' FQDN of a specified
                         component. Cannot be updated.
                       properties:
                         podEndpoint:

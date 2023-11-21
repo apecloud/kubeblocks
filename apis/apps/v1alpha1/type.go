@@ -623,16 +623,15 @@ type Service struct {
 // ConnectionCredential defines the information needed to access a cluster or component service.
 // For each ConnectionCredential, a k8s Secret object will be created with the scheme:
 //
-//	 ObjectMeta:
-//	   Name: <CLUSTER_NAME>-<NAME> or <CLUSTER_NAME>-<COMPONENT_NAME>-<NAME>
-//	 Spec:
-//		  Data:
-//		    endpoint: <endpoint>[,<endpoint>....]
-//		    host: <host>
-//		    port: <port>
-//		    username: <account.name>
-//		    password: <account.password>
-//		    # TODO: ak/sk
+//	ObjectMeta:
+//	    Name: <CLUSTER_NAME>-<NAME> or <CLUSTER_NAME>-<COMPONENT_NAME>-<NAME>
+//	Spec:
+//	    Data:
+//	        endpoint: <endpoint>[,<endpoint>....]
+//	        host: <host>
+//	        port: <port>
+//	        username: <account.name>  # TODO: ak/sk
+//	        password: <account.password>
 type ConnectionCredential struct {
 	// The name of the ConnectionCredential.
 	// Cannot be updated.

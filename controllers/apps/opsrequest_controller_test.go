@@ -749,5 +749,61 @@ var _ = Describe("OpsRequest Controller", func() {
 				g.Expect(tmlCluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
 			})).Should(Succeed())
 		})
+
+		It("test opsRequest queue", func() {
+			By("create cluster and mock it to running")
+			replicas := int32(3)
+			createMysqlCluster(replicas)
+			mockCompRunning(replicas)
+
+			createRestartOps := func(clusterName string, index int) *appsv1alpha1.OpsRequest {
+				opsName := fmt.Sprintf("restart-ops-%d", index)
+				ops := testapps.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
+					clusterName, appsv1alpha1.RestartType)
+				ops.Spec.RestartList = []appsv1alpha1.ComponentOps{
+					{ComponentName: mysqlCompName},
+				}
+				return testapps.CreateOpsRequest(ctx, testCtx, ops)
+			}
+
+			By("create first restart ops")
+			ops1 := createRestartOps(clusterObj.Name, 1)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(appsv1alpha1.OpsRunningPhase))
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.UpdatingClusterPhase))
+
+			By("create second horizontalScaling ops")
+			ops2 := createRestartOps(clusterObj.Name, 2)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(appsv1alpha1.OpsPendingPhase))
+
+			By("create third horizontalScaling ops")
+			ops3 := createRestartOps(clusterObj.Name, 3)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops3))).Should(Equal(appsv1alpha1.OpsPendingPhase))
+
+			By("expect for all opsRequests in queue")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterObj), func(g Gomega, cluster *appsv1alpha1.Cluster) {
+				opsSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
+				g.Expect(len(opsSlice)).Should(Equal(3))
+				// ops1 is running
+				g.Expect(opsSlice[0].InQueue).Should(BeFalse())
+				g.Expect(opsSlice[1].InQueue).Should(BeTrue())
+				g.Expect(opsSlice[2].InQueue).Should(BeTrue())
+			})).Should(Succeed())
+
+			By("mock ops1 phase to Succeed")
+			mockCompRunning(replicas)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
+
+			By("expect for next ops is Running")
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(appsv1alpha1.OpsRunningPhase))
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterObj), func(g Gomega, cluster *appsv1alpha1.Cluster) {
+				// ops1 should be dequeue
+				opsSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
+				g.Expect(len(opsSlice)).Should(Equal(2))
+				g.Expect(opsSlice[0].InQueue).Should(BeFalse())
+				g.Expect(opsSlice[1].InQueue).Should(BeTrue())
+			})).Should(Succeed())
+
+			// TODO: test head opsRequest phase is Failed by mocking pod is Failed
+		})
 	})
 })

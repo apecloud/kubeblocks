@@ -76,13 +76,13 @@ var _ = Describe("OpsRequest webhook", func() {
 		cleanupObjects()
 	})
 
-	addClusterRequestAnnotation := func(cluster *Cluster, opsName string, toClusterPhase ClusterPhase) {
+	/*	addClusterRequestAnnotation := func(cluster *Cluster, opsName string, toClusterPhase ClusterPhase) {
 		clusterPatch := client.MergeFrom(cluster.DeepCopy())
 		cluster.Annotations = map[string]string{
 			opsRequestAnnotationKey: fmt.Sprintf(`[{"name":"%s","clusterPhase":"%s"}]`, opsName, toClusterPhase),
 		}
 		Expect(k8sClient.Patch(ctx, cluster, clusterPatch)).Should(Succeed())
-	}
+	}*/
 
 	createStorageClass := func(ctx context.Context, storageClassName string, isDefault string, allowVolumeExpansion bool) *storagev1.StorageClass {
 		storageClass := &storagev1.StorageClass{
@@ -166,12 +166,12 @@ var _ = Describe("OpsRequest webhook", func() {
 		cluster.Status.Phase = RunningClusterPhase
 		Expect(k8sClient.Status().Patch(ctx, cluster, clusterPatch)).Should(Succeed())
 
-		By("Test existing other operations in cluster")
+		/*By("Test existing other operations in cluster")
 		// update cluster existing operations
 		addClusterRequestAnnotation(cluster, "testOpsName", UpdatingClusterPhase)
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("existing OpsRequest: testOpsName"))
 		// test opsRequest reentry
-		addClusterRequestAnnotation(cluster, opsRequest.Name, UpdatingClusterPhase)
+		addClusterRequestAnnotation(cluster, opsRequest.Name, UpdatingClusterPhase)*/
 
 		By("By creating a upgrade opsRequest, it should be succeed")
 		opsRequest.Spec.Upgrade.ClusterVersionRef = newClusterVersion.Name

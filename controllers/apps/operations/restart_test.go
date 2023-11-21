@@ -22,6 +22,7 @@ package operations
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -100,11 +101,12 @@ var _ = Describe("Restart OpsRequest", func() {
 			By("create Restart opsRequest")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-ops-"+randomStr)
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
-			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("OpsRequest.spec.type=Restart is forbidden when Cluster.status.phase=Stopped"))
+			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest),
 				func(g Gomega, fetched *appsv1alpha1.OpsRequest) {
 					g.Expect(fetched.Status.Phase).To(Equal(appsv1alpha1.OpsFailedPhase))
+					condition := meta.FindStatusCondition(fetched.Status.Conditions, appsv1alpha1.ConditionTypeValidated)
+					g.Expect(condition.Message).Should(Equal("OpsRequest.spec.type=Restart is forbidden when Cluster.status.phase=Stopped"))
 				})).Should(Succeed())
 		})
 	})
@@ -117,5 +119,7 @@ func createRestartOpsObj(clusterName, restartOpsName string) *appsv1alpha1.OpsRe
 		{ComponentName: consensusComp},
 		{ComponentName: statelessComp},
 	}
-	return testapps.CreateOpsRequest(ctx, testCtx, ops)
+	opsRequest := testapps.CreateOpsRequest(ctx, testCtx, ops)
+	opsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
+	return opsRequest
 }

@@ -351,16 +351,17 @@ const (
 )
 
 type OpsRequestBehaviour struct {
-	FromClusterPhases                  []ClusterPhase
-	ToClusterPhase                     ClusterPhase
-	ProcessingReasonInClusterCondition string
+	FromClusterPhases []ClusterPhase
+	ToClusterPhase    ClusterPhase
 }
 
 type OpsRecorder struct {
 	// name OpsRequest name
 	Name string `json:"name"`
-	// clusterPhase the cluster phase when the OpsRequest is running
+	// opsRequest type
 	Type OpsType `json:"type"`
+	// indicates whether the current opsRequest is in the queue
+	InQueue bool `json:"inQueue,omitempty"`
 }
 
 // ProvisionPolicyType defines the policy for creating accounts.

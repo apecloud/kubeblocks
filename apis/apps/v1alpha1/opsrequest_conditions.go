@@ -25,23 +25,23 @@ import (
 
 const (
 	// condition types
-	ConditionTypeCancelled         = "Cancelled"
-	ConditionTypeProgressing       = "Progressing"
-	ConditionTypeValidated         = "Validated"
-	ConditionTypeSucceed           = "Succeed"
-	ConditionTypeFailed            = "Failed"
-	ConditionTypeRestarting        = "Restarting"
-	ConditionTypeVerticalScaling   = "VerticalScaling"
-	ConditionTypeHorizontalScaling = "HorizontalScaling"
-	ConditionTypeVolumeExpanding   = "VolumeExpanding"
-	ConditionTypeReconfigure       = "Reconfigure"
-	ConditionTypeSwitchover        = "Switchover"
-	ConditionTypeStop              = "Stopping"
-	ConditionTypeStart             = "Starting"
-	ConditionTypeVersionUpgrading  = "VersionUpgrading"
-	ConditionTypeExpose            = "Exposing"
-	ConditionTypeDataScript        = "ExecuteDataScript"
-	ConditionTypeBackup            = "Backup"
+	ConditionTypeCancelled          = "Cancelled"
+	ConditionTypeWaitForProgressing = "WaitForProgressing"
+	ConditionTypeValidated          = "Validated"
+	ConditionTypeSucceed            = "Succeed"
+	ConditionTypeFailed             = "Failed"
+	ConditionTypeRestarting         = "Restarting"
+	ConditionTypeVerticalScaling    = "VerticalScaling"
+	ConditionTypeHorizontalScaling  = "HorizontalScaling"
+	ConditionTypeVolumeExpanding    = "VolumeExpanding"
+	ConditionTypeReconfigure        = "Reconfigure"
+	ConditionTypeSwitchover         = "Switchover"
+	ConditionTypeStop               = "Stopping"
+	ConditionTypeStart              = "Starting"
+	ConditionTypeVersionUpgrading   = "VersionUpgrading"
+	ConditionTypeExpose             = "Exposing"
+	ConditionTypeDataScript         = "ExecuteDataScript"
+	ConditionTypeBackup             = "Backup"
 
 	// condition and event reasons
 
@@ -61,20 +61,21 @@ const (
 	ReasonOpsCanceling             = "Canceling"
 	ReasonOpsCancelFailed          = "CancelFailed"
 	ReasonOpsCancelSucceed         = "CancelSucceed"
+	ReasonOpsCancelByController    = "CancelByController"
 )
 
 func (r *OpsRequest) SetStatusCondition(condition metav1.Condition) {
 	meta.SetStatusCondition(&r.Status.Conditions, condition)
 }
 
-// NewProgressingCondition the controller is progressing the OpsRequest
-func NewProgressingCondition(ops *OpsRequest) *metav1.Condition {
+// NewWaitForProcessingCondition waits the controller to process the opsRequest.
+func NewWaitForProcessingCondition(ops *OpsRequest) *metav1.Condition {
 	return &metav1.Condition{
-		Type:               ConditionTypeProgressing,
+		Type:               ConditionTypeWaitForProgressing,
 		Status:             metav1.ConditionTrue,
-		Reason:             "OpsRequestProgressingStarted",
+		Reason:             ConditionTypeWaitForProgressing,
 		LastTransitionTime: metav1.Now(),
-		Message: fmt.Sprintf("Start to process the OpsRequest: %s in Cluster: %s",
+		Message: fmt.Sprintf("wait for the controller to process the OpsRequest: %s in Cluster: %s",
 			ops.Name, ops.Spec.ClusterRef),
 	}
 }

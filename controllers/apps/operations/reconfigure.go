@@ -41,9 +41,8 @@ func init() {
 		// REVIEW: can do opsrequest if not running?
 		FromClusterPhases: appsv1alpha1.GetReconfiguringRunningPhases(),
 		// TODO: add cluster reconcile Reconfiguring phase.
-		ToClusterPhase:                     appsv1alpha1.UpdatingClusterPhase,
-		OpsHandler:                         &reAction,
-		ProcessingReasonInClusterCondition: ProcessingReasonReconfiguring,
+		ToClusterPhase: appsv1alpha1.UpdatingClusterPhase,
+		OpsHandler:     &reAction,
 	}
 	opsManager.RegisterOps(appsv1alpha1.ReconfiguringType, reconfigureBehaviour)
 }

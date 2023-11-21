@@ -89,6 +89,7 @@ var _ = Describe("DataScriptOps", func() {
 		}
 		ops.Spec.TTLSecondsBeforeAbort = int32Ptr(ttlBeforeAbort)
 		Expect(testCtx.CreateObj(testCtx.Ctx, ops)).Should(Succeed())
+		ops.Status.Phase = appsv1alpha1.OpsPendingPhase
 		return ops
 	}
 
@@ -178,7 +179,7 @@ var _ = Describe("DataScriptOps", func() {
 			reqCtx.Req = reconcile.Request{NamespacedName: opsKey}
 			By("check the opsRequest phase, should fail")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsResource)
-			Expect(err).Should(HaveOccurred())
+			Expect(err).ShouldNot(HaveOccurred())
 			Expect(ops.Status.Phase).Should(Equal(appsv1alpha1.OpsFailedPhase))
 		})
 
@@ -217,7 +218,7 @@ var _ = Describe("DataScriptOps", func() {
 			reqCtx.Req = reconcile.Request{NamespacedName: opsKey}
 			By("check the opsRequest phase, should fail, cause pod is missing")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsResource)
-			Expect(err).Should(HaveOccurred())
+			Expect(err).ShouldNot(HaveOccurred())
 			Expect(ops.Status.Phase).Should(Equal(appsv1alpha1.OpsFailedPhase))
 		})
 

@@ -213,11 +213,12 @@ func (r *ComponentReconciler) filterComponentResources(ctx context.Context, obj 
 	if _, ok := labels[constant.KBAppComponentLabelKey]; !ok {
 		return []reconcile.Request{}
 	}
+	fullCompName := constant.GenerateClusterComponentName(labels[constant.AppInstanceLabelKey], labels[constant.KBAppComponentLabelKey])
 	return []reconcile.Request{
 		{
 			NamespacedName: types.NamespacedName{
 				Namespace: obj.GetNamespace(),
-				Name:      obj.GetName(),
+				Name:      fullCompName,
 			},
 		},
 	}

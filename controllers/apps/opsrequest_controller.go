@@ -84,8 +84,8 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.OpsRequest{}).
-		Watches(&appsv1alpha1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.parseAllOpsRequest)).
-		Watches(&workloadsv1alpha1.ReplicatedStateMachine{}, handler.EnqueueRequestsFromMapFunc(r.parseAllOpsRequestForRSM)).
+		Watches(&appsv1alpha1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.parseFirstOpsRequest)).
+		Watches(&workloadsv1alpha1.ReplicatedStateMachine{}, handler.EnqueueRequestsFromMapFunc(r.parseFirstOpsRequestForRSM)).
 		Watches(&dpv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.parseBackupOpsRequest)).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.parseVolumeExpansionOpsRequest)).
 		Complete(r)
@@ -114,9 +114,7 @@ func (r *OpsRequestReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, ops
 		return nil, nil
 	}
 	return intctrlutil.HandleCRDeletion(reqCtx, r, opsRes.OpsRequest, opsRequestFinalizerName, func() (*ctrl.Result, error) {
-		// if the OpsRequest is deleted, we should clear the OpsRequest annotation in reference cluster.
-		// this is mainly to prevent OpsRequest from being deleted by mistake, resulting in inconsistency.
-		return nil, operations.DeleteOpsRequestAnnotationInCluster(reqCtx.Ctx, r.Client, opsRes)
+		return nil, operations.DequeueOpsRequestInClusterAnnotation(reqCtx.Ctx, r.Client, opsRes)
 	})
 }
 
@@ -127,7 +125,7 @@ func (r *OpsRequestReconciler) fetchCluster(reqCtx intctrlutil.RequestCtx, opsRe
 	if !ok || opsBehaviour.OpsHandler == nil {
 		return nil, operations.PatchOpsHandlerNotSupported(reqCtx.Ctx, r.Client, opsRes)
 	}
-	if opsBehaviour.IsClusterCreationEnabled {
+	if opsBehaviour.IsClusterCreation {
 		// check if the cluster already exists
 		cluster.Name = opsRes.OpsRequest.Spec.ClusterRef
 		cluster.Namespace = opsRes.OpsRequest.GetNamespace()
@@ -153,7 +151,8 @@ func (r *OpsRequestReconciler) handleOpsRequestByPhase(reqCtx intctrlutil.Reques
 	switch opsRes.OpsRequest.Status.Phase {
 	case "":
 		// update status.phase to pending
-		if err := operations.PatchOpsStatus(reqCtx.Ctx, r.Client, opsRes, appsv1alpha1.OpsPendingPhase, appsv1alpha1.NewProgressingCondition(opsRes.OpsRequest)); err != nil {
+		if err := operations.PatchOpsStatus(reqCtx.Ctx, r.Client, opsRes, appsv1alpha1.OpsPendingPhase,
+			appsv1alpha1.NewWaitForProcessingCondition(opsRes.OpsRequest)); err != nil {
 			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 		}
 		return intctrlutil.ResultToP(intctrlutil.Reconciled())
@@ -233,7 +232,7 @@ func (r *OpsRequestReconciler) addClusterLabelAndSetOwnerReference(reqCtx intctr
 	// so don't add label and set owner reference in here
 	// it should be done in this opsRequest action
 	opsBehaviour := operations.GetOpsManager().OpsMap[opsRes.OpsRequest.Spec.Type]
-	if opsBehaviour.IsClusterCreationEnabled {
+	if opsBehaviour.IsClusterCreation {
 		return nil, nil
 	}
 
@@ -301,12 +300,12 @@ func (r *OpsRequestReconciler) handleOpsReqDeletedDuringRunning(reqCtx intctrlut
 		}
 		// if the OpsRequest is abnormal, we should clear the OpsRequest annotation in referencing cluster.
 		opsRequestSlice = slices.Delete(opsRequestSlice, index, index+1)
-		return opsutil.PatchClusterOpsAnnotations(reqCtx.Ctx, r.Client, &cluster, opsRequestSlice)
+		return opsutil.UpdateClusterOpsAnnotations(reqCtx.Ctx, r.Client, &cluster, opsRequestSlice)
 	}
 	return nil
 }
 
-func (r *OpsRequestReconciler) getRequestsFromCluster(cluster *appsv1alpha1.Cluster) []reconcile.Request {
+func (r *OpsRequestReconciler) getFirstRequestsFromCluster(cluster *appsv1alpha1.Cluster) []reconcile.Request {
 	var (
 		opsRequestSlice []appsv1alpha1.OpsRecorder
 		err             error
@@ -315,23 +314,23 @@ func (r *OpsRequestReconciler) getRequestsFromCluster(cluster *appsv1alpha1.Clus
 	if opsRequestSlice, err = opsutil.GetOpsRequestSliceFromCluster(cluster); err != nil {
 		return nil
 	}
-	for _, v := range opsRequestSlice {
+	if len(opsRequestSlice) > 0 {
 		requests = append(requests, reconcile.Request{
 			NamespacedName: types.NamespacedName{
 				Namespace: cluster.Namespace,
-				Name:      v.Name,
+				Name:      opsRequestSlice[0].Name,
 			},
 		})
 	}
 	return requests
 }
 
-func (r *OpsRequestReconciler) parseAllOpsRequest(ctx context.Context, object client.Object) []reconcile.Request {
+func (r *OpsRequestReconciler) parseFirstOpsRequest(ctx context.Context, object client.Object) []reconcile.Request {
 	cluster := object.(*appsv1alpha1.Cluster)
-	return r.getRequestsFromCluster(cluster)
+	return r.getFirstRequestsFromCluster(cluster)
 }
 
-func (r *OpsRequestReconciler) parseAllOpsRequestForRSM(ctx context.Context, object client.Object) []reconcile.Request {
+func (r *OpsRequestReconciler) parseFirstOpsRequestForRSM(ctx context.Context, object client.Object) []reconcile.Request {
 	rsm := object.(*workloadsv1alpha1.ReplicatedStateMachine)
 	clusterName := rsm.Labels[constant.AppInstanceLabelKey]
 	if clusterName == "" {
@@ -341,7 +340,7 @@ func (r *OpsRequestReconciler) parseAllOpsRequestForRSM(ctx context.Context, obj
 	if err := r.Client.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: rsm.Namespace}, cluster); err != nil {
 		return nil
 	}
-	return r.getRequestsFromCluster(cluster)
+	return r.getFirstRequestsFromCluster(cluster)
 }
 
 func (r *OpsRequestReconciler) parseVolumeExpansionOpsRequest(ctx context.Context, object client.Object) []reconcile.Request {

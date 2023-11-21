@@ -207,6 +207,9 @@ done
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: jobKey.Namespace,
 			Name:      jobKey.Name,
+			Labels: map[string]string{
+				constant.AppManagedByLabelKey: dptypes.AppName,
+			},
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{

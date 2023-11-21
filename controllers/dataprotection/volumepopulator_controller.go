@@ -218,7 +218,7 @@ func (r *VolumePopulatorReconciler) cleanup(reqCtx intctrlutil.RequestCtx, pvc *
 	jobs := &batchv1.JobList{}
 	if err := r.Client.List(reqCtx.Ctx, jobs,
 		client.InNamespace(pvc.Namespace), client.MatchingLabels(map[string]string{
-			dprestore.DataProtectionLabelPopulatePVCKey: getPopulatePVCName(pvc.UID),
+			dprestore.DataProtectionPopulatePVCLabelKey: getPopulatePVCName(pvc.UID),
 		})); err != nil {
 		return err
 	}

@@ -29,7 +29,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -139,6 +141,7 @@ var _ = Describe("Backup Schedule Controller", func() {
 				By("checking cronjob, should exist one cronjob to create backup")
 				Eventually(testapps.CheckObj(&testCtx, getCronjobKey(backupSchedule, testdp.BackupMethodName), func(g Gomega, fetched *batchv1.CronJob) {
 					schedulePolicy := dpbackup.GetSchedulePolicyByMethod(backupSchedule, testdp.BackupMethodName)
+					g.Expect(fetched.Labels[constant.AppManagedByLabelKey]).Should(Equal(dptypes.AppName))
 					g.Expect(boolptr.IsSetToTrue(schedulePolicy.Enabled)).To(BeTrue())
 					g.Expect(fetched.Spec.Schedule).To(Equal(schedulePolicy.CronExpression))
 					g.Expect(fetched.Spec.StartingDeadlineSeconds).ShouldNot(BeNil())

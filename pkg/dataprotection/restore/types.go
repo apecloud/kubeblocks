@@ -44,9 +44,9 @@ const (
 
 // labels key
 const (
-	DataProtectionLabelRestoreKey          = "dataprotection.kubeblocks.io/restore"
-	DataProtectionLabelRestoreNamespaceKey = "dataprotection.kubeblocks.io/restore-namespace"
-	DataProtectionLabelPopulatePVCKey      = "dataprotection.kubeblocks.io/populate-pvc"
+	DataProtectionRestoreLabelKey          = "dataprotection.kubeblocks.io/restore"
+	DataProtectionRestoreNamespaceLabelKey = "dataprotection.kubeblocks.io/restore-namespace"
+	DataProtectionPopulatePVCLabelKey      = "dataprotection.kubeblocks.io/populate-pvc"
 )
 
 // env name for restore

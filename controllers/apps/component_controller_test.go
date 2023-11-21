@@ -1898,29 +1898,6 @@ var _ = Describe("Cluster Controller", func() {
 	})
 })
 
-func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition, mappingClusterVersions ...string) {
-	By("Creating a BackupPolicyTemplate")
-	bpt := testapps.NewBackupPolicyTemplateFactory(backupPolicyTPLName).
-		AddLabels(constant.ClusterDefLabelKey, clusterDefObj.Name).
-		SetClusterDefRef(clusterDefObj.Name)
-	for _, v := range clusterDefObj.Spec.ComponentDefs {
-		bpt = bpt.AddBackupPolicy(v.Name).
-			AddBackupMethod(backupMethodName, false, actionSetName, mappingClusterVersions...).
-			SetBackupMethodVolumeMounts("data", "/data").
-			AddBackupMethod(vsBackupMethodName, true, vsActionSetName).
-			SetBackupMethodVolumes([]string{"data"}).
-			AddSchedule(backupMethodName, "0 0 * * *", true).
-			AddSchedule(vsBackupMethodName, "0 0 * * *", true)
-		switch v.WorkloadType {
-		case appsv1alpha1.Consensus:
-			bpt.SetTargetRole("leader")
-		case appsv1alpha1.Replication:
-			bpt.SetTargetRole("primary")
-		}
-	}
-	bpt.Create(&testCtx)
-}
-
 func mockRestoreCompleted(ml client.MatchingLabels) {
 	restoreList := dpv1alpha1.RestoreList{}
 	Expect(testCtx.Cli.List(testCtx.Ctx, &restoreList, ml)).Should(Succeed())

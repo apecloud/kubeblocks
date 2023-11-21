@@ -50,7 +50,7 @@ lorryctl  createuser --username xxx --password xxx
 			return
 		}
 
-		err = lorryClient.CreateUser(context.TODO(), createUserOptions.userName, createUserOptions.password)
+		err = lorryClient.CreateUser(context.TODO(), createUserOptions.userName, createUserOptions.password, "")
 		if err != nil {
 			fmt.Printf("create user failed: %v\n", err)
 			return

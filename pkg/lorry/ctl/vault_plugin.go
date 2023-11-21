@@ -31,12 +31,7 @@ import (
 
 // Run instantiates a lorry vault plugin object, and runs the RPC server for the plugin
 func Run() error {
-	logger := hclog.New(&hclog.LoggerOptions{
-		Level:      hclog.Trace,
-		Output:     os.Stderr,
-		JSONFormat: true,
-	})
-	db, err := vault.New(logger)
+	db, err := vault.New()
 	if err != nil {
 		return err
 	}

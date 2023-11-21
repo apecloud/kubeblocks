@@ -123,9 +123,7 @@ func (s *Scheduler) buildCronJob(
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cronJobName,
 			Namespace: s.BackupSchedule.Namespace,
-			Labels: map[string]string{
-				constant.AppManagedByLabelKey: constant.AppName,
-			},
+			Labels:    map[string]string{},
 		},
 		Spec: batchv1.CronJobSpec{
 			Schedule:                   schedulePolicy.CronExpression,
@@ -146,13 +144,11 @@ func (s *Scheduler) buildCronJob(
 	controllerutil.AddFinalizer(cronjob, dptypes.DataProtectionFinalizerName)
 	// set labels
 	for k, v := range s.BackupSchedule.Labels {
-		if cronjob.Labels == nil {
-			cronjob.SetLabels(map[string]string{})
-		}
 		cronjob.Labels[k] = v
 	}
 	cronjob.Labels[dptypes.BackupScheduleLabelKey] = s.BackupSchedule.Name
 	cronjob.Labels[dptypes.BackupMethodLabelKey] = schedulePolicy.BackupMethod
+	cronjob.Labels[constant.AppManagedByLabelKey] = dptypes.AppName
 	return cronjob, nil
 }
 
@@ -207,7 +203,6 @@ func (s *Scheduler) reconcileCronJob(schedulePolicy *dpv1alpha1.SchedulePolicy) 
 		client.MatchingLabels{
 			dptypes.BackupScheduleLabelKey: s.BackupSchedule.Name,
 			dptypes.BackupMethodLabelKey:   schedulePolicy.BackupMethod,
-			constant.AppManagedByLabelKey:  constant.AppName,
 		},
 	); err != nil {
 		return err

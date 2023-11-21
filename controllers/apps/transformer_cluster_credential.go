@@ -119,9 +119,9 @@ func (t *clusterCredentialTransformer) buildClusterCredential(transCtx *clusterT
 		return nil, err
 	}
 
-	if len(credential.Account.Component) > 0 && len(credential.Account.Account) > 0 {
+	if len(credential.Account.Component) > 0 && len(credential.Account.AccountName) > 0 {
 		if err := buildConnCredentialAccount(transCtx, dag, cluster.Namespace, cluster.Name,
-			credential.Account.Component, credential.Account.Account, &data); err != nil {
+			credential.Account.Component, credential.Account.AccountName, &data); err != nil {
 			return nil, err
 		}
 	}
@@ -205,15 +205,15 @@ func buildServiceEndpoint(clusterName, compName string, clusterService, compServ
 	if len(svcPorts) == 0 {
 		return nil, "", fmt.Errorf("connection credential references a service which doesn't define any ports: %s-%s", clusterName, credential.Name)
 	}
-	if len(endpoint.Port) == 0 && len(svcPorts) > 1 {
+	if len(endpoint.PortName) == 0 && len(svcPorts) > 1 {
 		return nil, "", fmt.Errorf("connection credential should specify which port to use for the referenced service: %s-%s", clusterName, credential.Name)
 	}
 	port := ""
-	if len(endpoint.Port) == 0 {
+	if len(endpoint.PortName) == 0 {
 		port = fmt.Sprintf("%d", svcPorts[0].Port)
 	} else {
 		for _, svcPort := range svcPorts {
-			if svcPort.Name == endpoint.Port {
+			if svcPort.Name == endpoint.PortName {
 				port = fmt.Sprintf("%d", svcPort.Port)
 				break
 			}
@@ -239,7 +239,7 @@ func lookupMatchedCompService(clusterName, compName string,
 func lookupMatchedService(services []appsv1alpha1.Service, svcEndpoint *appsv1alpha1.ConnectionServiceEndpoint,
 	svcNameBuilder func(svcName string) string) (string, []corev1.ServicePort) {
 	for i, svc := range services {
-		if svc.Name == svcEndpoint.Service {
+		if svc.Name == svcEndpoint.ServiceName {
 			return svcNameBuilder(svc.ServiceName), services[i].Spec.Ports
 		}
 	}
@@ -273,13 +273,13 @@ func buildPodEndpoint(namespace, clusterName, compName string, replicas int, com
 	if len(container.Ports) == 0 {
 		return nil, "", fmt.Errorf("")
 	}
-	if len(svcEndpoint.Port) == 0 && len(container.Ports) > 1 {
+	if len(svcEndpoint.PortName) == 0 && len(container.Ports) > 1 {
 		return nil, "", fmt.Errorf("")
 	}
 	containerPort := container.Ports[0]
-	if len(svcEndpoint.Port) > 0 {
-		for i, port := range container.Ports {
-			if port.Name == svcEndpoint.Port {
+	if len(svcEndpoint.PortName) > 0 {
+		for i, p := range container.Ports {
+			if p.Name == svcEndpoint.PortName {
 				containerPort = container.Ports[i]
 				break
 			}

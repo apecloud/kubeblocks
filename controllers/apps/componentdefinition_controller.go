@@ -310,13 +310,13 @@ func (r *ComponentDefinitionReconciler) validateConnectionCredentialEndpoint(cmp
 
 func (r *ComponentDefinitionReconciler) validateConnectionCredentialServiceEndpoint(cmpd *appsv1alpha1.ComponentDefinition,
 	cc appsv1alpha1.ConnectionCredential) error {
-	svcName := cc.Endpoint.ServiceEndpoint.Service
+	svcName := cc.Endpoint.ServiceEndpoint.ServiceName
 	if len(svcName) == 0 {
 		return fmt.Errorf("there is no component service name defined for connection credential: %s", cc.Name)
 	}
 	for _, svc := range cmpd.Spec.Services {
 		if svc.Name == svcName {
-			return r.validateConnectionCredentialPort(cc.Name, cc.Endpoint.ServiceEndpoint.Port, svc.Spec.Ports)
+			return r.validateConnectionCredentialPort(cc.Name, cc.Endpoint.ServiceEndpoint.PortName, svc.Spec.Ports)
 		}
 	}
 	return fmt.Errorf("there is no matched service for connection credential: %s", cc.Name)
@@ -348,14 +348,14 @@ func (r *ComponentDefinitionReconciler) validateConnectionCredentialPort(credent
 
 func (r *ComponentDefinitionReconciler) validateConnectionCredentialAccount(cmpd *appsv1alpha1.ComponentDefinition,
 	cc appsv1alpha1.ConnectionCredential) error {
-	if len(cc.Account.Account) == 0 {
+	if len(cc.Account.AccountName) == 0 {
 		return nil
 	}
 	if cmpd.Spec.SystemAccounts == nil {
 		return fmt.Errorf("there is no account defined for connection credential: %s", cc.Name)
 	}
 	for _, account := range cmpd.Spec.SystemAccounts {
-		if account.Name == cc.Account.Account {
+		if account.Name == cc.Account.AccountName {
 			return nil
 		}
 	}

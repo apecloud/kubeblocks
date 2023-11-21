@@ -30,6 +30,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/custom"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/etcd"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/foxlake"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
@@ -81,6 +82,7 @@ func init() {
 	RegisterEngine(models.PostgreSQL, "", officalpostgres.NewManager, postgres.NewCommands)
 	RegisterEngine(models.OfficialPostgreSQL, "", officalpostgres.NewManager, postgres.NewCommands)
 	RegisterEngine(models.ApecloudPostgreSQL, "", apecloudpostgres.NewManager, postgres.NewCommands)
+	RegisterEngine(models.Custom, "", custom.NewManager, nil)
 }
 
 func RegisterEngine(characterType models.EngineType, workloadType string, newFunc managerNewFunc, newCommand engines.NewCommandFunc) {
@@ -121,17 +123,19 @@ func InitDBManager(configDir string) error {
 	}
 
 	ctrl.Log.Info("Initialize DB manager")
-	characterType := viper.GetString(constant.KBEnvCharacterType)
-	if viper.IsSet(constant.KBEnvBuiltinHandler) {
-		characterType = viper.GetString(constant.KBEnvBuiltinHandler)
-	}
-	if characterType == "" {
-		return fmt.Errorf("%s not set", constant.KBEnvCharacterType)
-	}
-
 	workloadType := viper.GetString(constant.KBEnvWorkloadType)
 	if workloadType == "" {
 		ctrl.Log.Info(constant.KBEnvWorkloadType + " ENV not set")
+	}
+
+	characterType := viper.GetString(constant.KBEnvCharacterType)
+	if viper.IsSet(constant.KBEnvBuiltinHandler) {
+		workloadType = ""
+		characterType = viper.GetString(constant.KBEnvBuiltinHandler)
+	}
+	if characterType == "" {
+		ctrl.Log.Info("BuiltinHandler not set, use the custom manager")
+		characterType = string(models.Custom)
 	}
 
 	err := GetAllComponent(configDir) // find all builtin config file and read

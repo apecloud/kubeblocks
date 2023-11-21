@@ -328,22 +328,22 @@ var (
 				Name: "root",
 				Endpoint: appsv1alpha1.ConnectionEndpoint{
 					ServiceEndpoint: &appsv1alpha1.ConnectionServiceEndpoint{
-						Service: "rw",
+						ServiceName: "rw",
 					},
 				},
 				Account: appsv1alpha1.ConnectionCredentialAccount{
-					Account: "root",
+					AccountName: "root",
 				},
 			},
 			{
 				Name: "admin",
 				Endpoint: appsv1alpha1.ConnectionEndpoint{
 					ServiceEndpoint: &appsv1alpha1.ConnectionServiceEndpoint{
-						Service: "rw",
+						ServiceName: "rw",
 					},
 				},
 				Account: appsv1alpha1.ConnectionCredentialAccount{
-					Account: "admin",
+					AccountName: "admin",
 				},
 			},
 		},

@@ -71,10 +71,10 @@ func (t *componentCredentialTransformer) buildComponentCredential(transCtx *comp
 		return nil, err
 	}
 
-	if len(credential.Account.Account) > 0 {
+	if len(credential.Account.AccountName) > 0 {
 		var systemAccount *appsv1alpha1.SystemAccount
 		for i, account := range synthesizeComp.SystemAccounts {
-			if account.Name == credential.Account.Account {
+			if account.Name == credential.Account.AccountName {
 				systemAccount = &synthesizeComp.SystemAccounts[i]
 				break
 			}

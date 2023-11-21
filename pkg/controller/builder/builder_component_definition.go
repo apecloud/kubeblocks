@@ -204,12 +204,12 @@ func (builder *ComponentDefinitionBuilder) AddConnectionCredential(name, service
 		Name: name,
 		Endpoint: appsv1alpha1.ConnectionEndpoint{
 			ServiceEndpoint: &appsv1alpha1.ConnectionServiceEndpoint{
-				Service: serviceName,
-				Port:    portName,
+				ServiceName: serviceName,
+				PortName:    portName,
 			},
 		},
 		Account: appsv1alpha1.ConnectionCredentialAccount{
-			Account: accountName,
+			AccountName: accountName,
 		},
 	}
 	if builder.get().Spec.ConnectionCredentials == nil {

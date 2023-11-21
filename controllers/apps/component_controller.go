@@ -154,6 +154,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentRBACTransformer{},
 			// add our finalizer to all objects
 			&componentOwnershipTransformer{},
+			// handle component lifecycle actions
+			&componentLifeCycleActionsTransformer{Client: r.Client},
 			// update component status
 			&componentStatusTransformer{Client: r.Client},
 		).Build()

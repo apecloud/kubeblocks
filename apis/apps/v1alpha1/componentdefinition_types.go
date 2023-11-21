@@ -473,15 +473,16 @@ type LifecycleActionHandler struct {
 
 // ComponentLifecycleActions defines a set of operational actions for interacting with component services and processes.
 type ComponentLifecycleActions struct {
-	// PostStart is called immediately after a component is created.
+	// PostStart defines the action to be executed when the component is ready, and the action will only be executed once after the component becomes ready.
+	// Currently, if PostStart defined by a CustomHandler, only ExecAction is supported.
 	// Cannot be updated.
 	// +optional
-	PostStart *LifecycleActionHandler `json:"postStart,omitempty"`
+	PostStart *LifecycleActionSpec `json:"postStart,omitempty"`
 
 	// PreStop is called immediately before a component is terminated due to an API request.
 	// Cannot be updated.
 	// +optional
-	PreStop *LifecycleActionHandler `json:"preStop,omitempty"`
+	PreStop *LifecycleActionSpec `json:"preStop,omitempty"`
 
 	// RoleProbe defines how to probe the role of replicas.
 	// Cannot be updated.
@@ -506,7 +507,7 @@ type ComponentLifecycleActions struct {
 	// It may involve updating configuration, notifying other members, and ensuring data consistency.
 	// Cannot be updated.
 	// +optional
-	MemberJoin *LifecycleActionHandler `json:"memberJoin,omitempty"`
+	MemberJoin *LifecycleActionSpec `json:"memberJoin,omitempty"`
 
 	// MemberLeave defines how to remove a replica from the replication group.
 	// This action is typically invoked when a replica needs to be removed, such as during scale-in.
@@ -514,18 +515,18 @@ type ComponentLifecycleActions struct {
 	// but it is advisable to avoid performing data migration within this action.
 	// Cannot be updated.
 	// +optional
-	MemberLeave *LifecycleActionHandler `json:"memberLeave,omitempty"`
+	MemberLeave *LifecycleActionSpec `json:"memberLeave,omitempty"`
 
 	// Readonly defines how to set a replica service as read-only.
 	// This action is used to protect a replica in case of volume space exhaustion or excessive traffic.
 	// Cannot be updated.
 	// +optional
-	Readonly *LifecycleActionHandler `json:"readonly,omitempty"`
+	Readonly *LifecycleActionSpec `json:"readonly,omitempty"`
 
 	// Readwrite defines how to set a replica service as read-write.
 	// Cannot be updated.
 	// +optional
-	Readwrite *LifecycleActionHandler `json:"readwrite,omitempty"`
+	Readwrite *LifecycleActionSpec `json:"readwrite,omitempty"`
 
 	// DataPopulate defines how to populate the data to create new replicas.
 	// This action is typically used when a new replica needs to be constructed, such as:
@@ -535,7 +536,7 @@ type ComponentLifecycleActions struct {
 	// It should write the valid data to stdout without including any extraneous information.
 	// Cannot be updated.
 	// +optional
-	DataPopulate *LifecycleActionHandler `json:"dataPopulate,omitempty"`
+	DataPopulate *LifecycleActionSpec `json:"dataPopulate,omitempty"`
 
 	// DataAssemble defines how to assemble data synchronized from external before starting the service for a new replica.
 	// This action is typically used when creating a new replica, such as:
@@ -546,17 +547,26 @@ type ComponentLifecycleActions struct {
 	// the action must be able to guarantee idempotence to allow for retries from the beginning.
 	// Cannot be updated.
 	// +optional
-	DataAssemble *LifecycleActionHandler `json:"dataAssemble,omitempty"`
+	DataAssemble *LifecycleActionSpec `json:"dataAssemble,omitempty"`
 
 	// Reconfigure defines how to notify the replica service that there is a configuration update.
 	// Cannot be updated.
 	// +optional
-	Reconfigure *LifecycleActionHandler `json:"reconfigure,omitempty"`
+	Reconfigure *LifecycleActionSpec `json:"reconfigure,omitempty"`
 
 	// AccountProvision defines how to provision accounts.
 	// Cannot be updated.
 	// +optional
-	AccountProvision *LifecycleActionHandler `json:"accountProvision,omitempty"`
+	AccountProvision *LifecycleActionSpec `json:"accountProvision,omitempty"`
+}
+
+type LifecycleActionSpec struct {
+	LifecycleActionHandler `json:",inline"`
+
+	// scriptSpecSelectors defines the selector of the scriptSpecs that need to be referenced.
+	// Once ScriptSpecSelectors is defined, the scripts defined in scripts can be referenced in the CustomHandler Action.
+	// +optional
+	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
 }
 
 type ComponentSwitchoverSpec struct {

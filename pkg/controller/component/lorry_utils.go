@@ -336,7 +336,7 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 	}
 
 	actions := []struct {
-		LifeCycleActionHandlers *appsv1alpha1.LifecycleActionHandler
+		LifeCycleActionSpecs *appsv1alpha1.LifecycleActionSpec
 	}{
 		{synthesizeComp.LifecycleActions.PostStart},
 		{synthesizeComp.LifecycleActions.PreStop},
@@ -351,8 +351,8 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 	}
 
 	for _, action := range actions {
-		if action.LifeCycleActionHandlers != nil && action.LifeCycleActionHandlers.BuiltinHandler != nil {
-			return *action.LifeCycleActionHandlers.BuiltinHandler
+		if action.LifeCycleActionSpecs != nil && action.LifeCycleActionSpecs.BuiltinHandler != nil {
+			return *action.LifeCycleActionSpecs.BuiltinHandler
 		}
 	}
 

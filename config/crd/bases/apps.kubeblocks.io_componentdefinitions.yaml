@@ -478,6 +478,23 @@ spec:
                             format: int32
                             type: integer
                         type: object
+                      scriptSpecSelectors:
+                        description: scriptSpecSelectors defines the selector of the
+                          scriptSpecs that need to be referenced. Once ScriptSpecSelectors
+                          is defined, the scripts defined in scripts can be referenced
+                          in the CustomHandler Action.
+                        items:
+                          properties:
+                            name:
+                              description: ScriptSpec name of the referent, refer
+                                to componentDefs[x].scriptSpecs[y].Name.
+                              maxLength: 63
+                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
                     type: object
                   dataAssemble:
                     description: 'DataAssemble defines how to assemble data synchronized
@@ -746,6 +763,23 @@ spec:
                             format: int32
                             type: integer
                         type: object
+                      scriptSpecSelectors:
+                        description: scriptSpecSelectors defines the selector of the
+                          scriptSpecs that need to be referenced. Once ScriptSpecSelectors
+                          is defined, the scripts defined in scripts can be referenced
+                          in the CustomHandler Action.
+                        items:
+                          properties:
+                            name:
+                              description: ScriptSpec name of the referent, refer
+                                to componentDefs[x].scriptSpecs[y].Name.
+                              maxLength: 63
+                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
                     type: object
                   dataPopulate:
                     description: 'DataPopulate defines how to populate the data to
@@ -1012,6 +1046,23 @@ spec:
                             format: int32
                             type: integer
                         type: object
+                      scriptSpecSelectors:
+                        description: scriptSpecSelectors defines the selector of the
+                          scriptSpecs that need to be referenced. Once ScriptSpecSelectors
+                          is defined, the scripts defined in scripts can be referenced
+                          in the CustomHandler Action.
+                        items:
+                          properties:
+                            name:
+                              description: ScriptSpec name of the referent, refer
+                                to componentDefs[x].scriptSpecs[y].Name.
+                              maxLength: 63
+                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
                     type: object
                   memberJoin:
                     description: MemberJoin defines how to add a new replica to the
@@ -1278,6 +1329,23 @@ spec:
                             format: int32
                             type: integer
                         type: object
+                      scriptSpecSelectors:
+                        description: scriptSpecSelectors defines the selector of the
+                          scriptSpecs that need to be referenced. Once ScriptSpecSelectors
+                          is defined, the scripts defined in scripts can be referenced
+                          in the CustomHandler Action.
+                        items:
+                          properties:
+                            name:
+                              description: ScriptSpec name of the referent, refer
+                                to componentDefs[x].scriptSpecs[y].Name.
+                              maxLength: 63
+                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
                     type: object
                   memberLeave:
                     description: MemberLeave defines how to remove a replica from
@@ -1545,10 +1613,30 @@ spec:
                             format: int32
                             type: integer
                         type: object
+                      scriptSpecSelectors:
+                        description: scriptSpecSelectors defines the selector of the
+                          scriptSpecs that need to be referenced. Once ScriptSpecSelectors
+                          is defined, the scripts defined in scripts can be referenced
+                          in the CustomHandler Action.
+                        items:
+                          properties:
+                            name:
+                              description: ScriptSpec name of the referent, refer
+                                to componentDefs[x].scriptSpecs[y].Name.
+                              maxLength: 63
+                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
                     type: object
                   postStart:
-                    description: PostStart is called immediately after a component
-                      is created. Cannot be updated.
+                    description: PostStart defines the action to be executed when
+                      the component is ready, and the action will only be executed
+                      once after the component becomes ready. Currently, if PostStart
+                      defined by a CustomHandler, only ExecAction is supported. Cannot
+                      be updated.
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler
@@ -1808,6 +1896,23 @@ spec:
                             format: int32
                             type: integer
                         type: object
+                      scriptSpecSelectors:
+                        description: scriptSpecSelectors defines the selector of the
+                          scriptSpecs that need to be referenced. Once ScriptSpecSelectors
+                          is defined, the scripts defined in scripts can be referenced
+                          in the CustomHandler Action.
+                        items:
+                          properties:
+                            name:
+                              description: ScriptSpec name of the referent, refer
+                                to componentDefs[x].scriptSpecs[y].Name.
+                              maxLength: 63
+                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
                     type: object
                   preStop:
                     description: PreStop is called immediately before a component
@@ -2071,6 +2176,23 @@ spec:
                             format: int32
                             type: integer
                         type: object
+                      scriptSpecSelectors:
+                        description: scriptSpecSelectors defines the selector of the
+                          scriptSpecs that need to be referenced. Once ScriptSpecSelectors
+                          is defined, the scripts defined in scripts can be referenced
+                          in the CustomHandler Action.
+                        items:
+                          properties:
+                            name:
+                              description: ScriptSpec name of the referent, refer
+                                to componentDefs[x].scriptSpecs[y].Name.
+                              maxLength: 63
+                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
                     type: object
                   readonly:
                     description: Readonly defines how to set a replica service as
@@ -2335,6 +2457,23 @@ spec:
                             format: int32
                             type: integer
                         type: object
+                      scriptSpecSelectors:
+                        description: scriptSpecSelectors defines the selector of the
+                          scriptSpecs that need to be referenced. Once ScriptSpecSelectors
+                          is defined, the scripts defined in scripts can be referenced
+                          in the CustomHandler Action.
+                        items:
+                          properties:
+                            name:
+                              description: ScriptSpec name of the referent, refer
+                                to componentDefs[x].scriptSpecs[y].Name.
+                              maxLength: 63
+                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
                     type: object
                   readwrite:
                     description: Readwrite defines how to set a replica service as
@@ -2598,6 +2737,23 @@ spec:
                             format: int32
                             type: integer
                         type: object
+                      scriptSpecSelectors:
+                        description: scriptSpecSelectors defines the selector of the
+                          scriptSpecs that need to be referenced. Once ScriptSpecSelectors
+                          is defined, the scripts defined in scripts can be referenced
+                          in the CustomHandler Action.
+                        items:
+                          properties:
+                            name:
+                              description: ScriptSpec name of the referent, refer
+                                to componentDefs[x].scriptSpecs[y].Name.
+                              maxLength: 63
+                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
                     type: object
                   reconfigure:
                     description: Reconfigure defines how to notify the replica service
@@ -2861,6 +3017,23 @@ spec:
                             format: int32
                             type: integer
                         type: object
+                      scriptSpecSelectors:
+                        description: scriptSpecSelectors defines the selector of the
+                          scriptSpecs that need to be referenced. Once ScriptSpecSelectors
+                          is defined, the scripts defined in scripts can be referenced
+                          in the CustomHandler Action.
+                        items:
+                          properties:
+                            name:
+                              description: ScriptSpec name of the referent, refer
+                                to componentDefs[x].scriptSpecs[y].Name.
+                              maxLength: 63
+                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
                     type: object
                   roleProbe:
                     description: RoleProbe defines how to probe the role of replicas.

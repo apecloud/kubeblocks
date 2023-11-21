@@ -447,6 +447,11 @@ func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
 		lifecycleActions.Switchover = c.convertSwitchover(clusterCompDef.SwitchoverSpec, clusterCompVer)
 	}
 
+	if clusterCompDef.PostStartSpec != nil {
+		lifecycleActions.PostStart = c.convertPostStart(clusterCompDef.PostStartSpec)
+	}
+
+	lifecycleActions.PreStop = nil
 	lifecycleActions.MemberJoin = nil
 	lifecycleActions.MemberLeave = nil
 	lifecycleActions.Readonly = nil
@@ -578,5 +583,25 @@ func (c *compDefLifecycleActionsConvertor) convertSwitchover(switchover *appsv1a
 		WithCandidate:       withCandidateAction,
 		WithoutCandidate:    withoutCandidateAction,
 		ScriptSpecSelectors: mergeScriptSpec(),
+	}
+}
+
+func (c *compDefLifecycleActionsConvertor) convertPostStart(postStart *appsv1alpha1.PostStartAction) *appsv1alpha1.LifecycleActionSpec {
+	if postStart == nil {
+		return nil
+	}
+
+	return &appsv1alpha1.LifecycleActionSpec{
+		LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
+			CustomHandler: &appsv1alpha1.Action{
+				Image: postStart.CmdExecutorConfig.Image,
+				Exec: &appsv1alpha1.ExecAction{
+					Command: postStart.CmdExecutorConfig.Command,
+					Args:    postStart.CmdExecutorConfig.Args,
+				},
+				Env: postStart.CmdExecutorConfig.Env,
+			},
+		},
+		ScriptSpecSelectors: postStart.ScriptSpecSelectors,
 	}
 }

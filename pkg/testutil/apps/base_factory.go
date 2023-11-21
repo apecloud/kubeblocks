@@ -26,6 +26,7 @@ import (
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -59,6 +60,11 @@ func (factory *BaseFactory[T, PT, F]) Get() PT {
 
 func (factory *BaseFactory[T, PT, F]) SetName(name string) *F {
 	factory.object.SetName(name)
+	return factory.concreteFactory
+}
+
+func (factory *BaseFactory[T, PT, F]) SetUID(uid types.UID) *F {
+	factory.object.SetUID(uid)
 	return factory.concreteFactory
 }
 

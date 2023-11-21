@@ -377,7 +377,7 @@ func (r *ComponentDefinitionReconciler) validateLifecycleActionBuiltInHandlers(l
 	}
 
 	actions := []struct {
-		LifeCycleActionHandlers *appsv1alpha1.LifecycleActionHandler
+		LifeCycleActionSpecs *appsv1alpha1.LifecycleActionSpec
 	}{
 		{lifecycleActions.PostStart},
 		{lifecycleActions.PreStop},
@@ -392,7 +392,7 @@ func (r *ComponentDefinitionReconciler) validateLifecycleActionBuiltInHandlers(l
 	}
 
 	for _, action := range actions {
-		if action.LifeCycleActionHandlers != nil && action.LifeCycleActionHandlers.BuiltinHandler != nil {
+		if action.LifeCycleActionSpecs != nil && action.LifeCycleActionSpecs.BuiltinHandler != nil {
 			if !slices.Contains(supportedBuiltInHandlers, *lifecycleActions.RoleProbe.BuiltinHandler) {
 				return fmt.Errorf("the builtin handler %s is not supported", *lifecycleActions.RoleProbe.BuiltinHandler)
 			}

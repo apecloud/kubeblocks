@@ -143,6 +143,7 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 	hasComponentPod := func() bool {
 		return len(pods) > 0
 	}()
+	componentPodCount := len(pods)
 
 	// check if the rsm is running
 	isRSMRunning, err := r.isRSMRunning()
@@ -198,24 +199,24 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 	r.podsReady = false
 	switch {
 	case isDeleting:
-		r.setComponentStatusPhase(appsv1alpha1.DeletingClusterCompPhase, nil, "component is Deleting")
+		r.setComponentStatusPhase(appsv1alpha1.DeletingClusterCompPhase, componentPodCount, nil, "component is Deleting")
 	case isZeroReplica && hasComponentPod:
-		r.setComponentStatusPhase(appsv1alpha1.StoppingClusterCompPhase, nil, "component is Stopping")
+		r.setComponentStatusPhase(appsv1alpha1.StoppingClusterCompPhase, componentPodCount, nil, "component is Stopping")
 		r.podsReady = true
 	case isZeroReplica:
-		r.setComponentStatusPhase(appsv1alpha1.StoppedClusterCompPhase, nil, "component is Stopped")
+		r.setComponentStatusPhase(appsv1alpha1.StoppedClusterCompPhase, componentPodCount, nil, "component is Stopped")
 		r.podsReady = true
 	case isRSMRunning && isAllConfigSynced && !hasRunningVolumeExpansion:
-		r.setComponentStatusPhase(appsv1alpha1.RunningClusterCompPhase, nil, "component is Running")
+		r.setComponentStatusPhase(appsv1alpha1.RunningClusterCompPhase, componentPodCount, nil, "component is Running")
 		r.podsReady = true
 	case !hasFailure && isInCreatingPhase:
-		r.setComponentStatusPhase(appsv1alpha1.CreatingClusterCompPhase, nil, "component is Creating")
+		r.setComponentStatusPhase(appsv1alpha1.CreatingClusterCompPhase, componentPodCount, nil, "component is Creating")
 	case !hasFailure:
-		r.setComponentStatusPhase(appsv1alpha1.UpdatingClusterCompPhase, nil, "component is Updating")
+		r.setComponentStatusPhase(appsv1alpha1.UpdatingClusterCompPhase, componentPodCount, nil, "component is Updating")
 	case !isComponentAvailable:
-		r.setComponentStatusPhase(appsv1alpha1.FailedClusterCompPhase, messages, "component is Failed")
+		r.setComponentStatusPhase(appsv1alpha1.FailedClusterCompPhase, componentPodCount, messages, "component is Failed")
 	default:
-		r.setComponentStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, nil, "component is Abnormal")
+		r.setComponentStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, componentPodCount, nil, "component is Abnormal")
 	}
 
 	// update component info to pods' annotations
@@ -461,7 +462,7 @@ func (r *componentStatusHandler) hasFailedPod(pods []*corev1.Pod) (bool, appsv1a
 }
 
 // setComponentStatusPhase sets the component phase and messages conditionally.
-func (r *componentStatusHandler) setComponentStatusPhase(phase appsv1alpha1.ClusterComponentPhase, statusMessage appsv1alpha1.ComponentMessageMap, phaseTransitionMsg string) {
+func (r *componentStatusHandler) setComponentStatusPhase(phase appsv1alpha1.ClusterComponentPhase, podCount int, statusMessage appsv1alpha1.ComponentMessageMap, phaseTransitionMsg string) {
 	updateFn := func(status *appsv1alpha1.ComponentStatus) error {
 		if status.Phase == phase {
 			return nil
@@ -474,6 +475,9 @@ func (r *componentStatusHandler) setComponentStatusPhase(phase appsv1alpha1.Clus
 				status.Message[k] = v
 			}
 		}
+		status.Replicas = &podCount
+		selector := fmt.Sprintf("%s=%s", constant.AppComponentLabelKey, r.comp.Name)
+		status.Seletor = &selector
 		return nil
 	}
 	if err := r.updateComponentStatus(phaseTransitionMsg, updateFn); err != nil {

@@ -2096,6 +2096,16 @@ func (in *ComponentStatus) DeepCopyInto(out *ComponentStatus) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.Replicas != nil {
+		in, out := &in.Replicas, &out.Replicas
+		*out = new(int)
+		**out = **in
+	}
+	if in.Seletor != nil {
+		in, out := &in.Seletor, &out.Seletor
+		*out = new(string)
+		**out = **in
+	}
 	if in.Message != nil {
 		in, out := &in.Message, &out.Message
 		*out = make(ComponentMessageMap, len(*in))

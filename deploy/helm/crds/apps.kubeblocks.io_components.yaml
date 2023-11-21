@@ -633,9 +633,19 @@ spec:
                 - Failed
                 - Abnormal
                 type: string
+              replicas:
+                description: podsCount records the number of pods related to the component.
+                type: integer
+              selector:
+                description: selector is the label selector for the component pod.
+                type: string
             type: object
         type: object
     served: true
     storage: true
     subresources:
+      scale:
+        labelSelectorPath: .status.selector
+        specReplicasPath: .spec.replicas
+        statusReplicasPath: .status.replicas
       status: {}

@@ -121,6 +121,14 @@ type ComponentStatus struct {
 	// Deleting: the component is being deleted.
 	Phase ClusterComponentPhase `json:"phase,omitempty"`
 
+	// podsCount records the number of pods related to the component.
+	// +optional
+	Replicas *int `json:"replicas,omitempty"`
+
+	// selector is the label selector for the component pod.
+	// +optional
+	Seletor *string `json:"selector,omitempty"`
+
 	// message records the component details message in current phase.
 	// Keys are podName or deployName or statefulSetName. The format is `ObjectKind/Name`.
 	// +optional
@@ -130,6 +138,7 @@ type ComponentStatus struct {
 // +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas,selectorpath=.status.selector
 // +kubebuilder:resource:categories={kubeblocks,all},shortName=cmp
 // +kubebuilder:printcolumn:name="COMPONENT-DEFINITION",type="string",JSONPath=".spec.compDef",description="component definition"
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"

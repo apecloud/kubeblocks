@@ -35,7 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
@@ -110,7 +109,6 @@ func (r *BackupScheduleReconciler) deleteExternalResources(
 		client.InNamespace(backupSchedule.Namespace),
 		client.MatchingLabels{
 			dptypes.BackupScheduleLabelKey: backupSchedule.Name,
-			constant.AppManagedByLabelKey:  constant.AppName,
 		},
 	); err != nil {
 		return err

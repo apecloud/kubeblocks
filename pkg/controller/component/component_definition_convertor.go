@@ -464,7 +464,8 @@ func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
 
 	lifecycleActions := &appsv1alpha1.ComponentLifecycleActions{}
 
-	if clusterCompDef.Probes != nil && clusterCompDef.Probes.RoleProbe != nil {
+	// RoleProbe can be defined in RSMSpec or ClusterComponentDefinition.Probes.
+	if (clusterCompDef.RSMSpec != nil && clusterCompDef.RSMSpec.RoleProbe != nil) || (clusterCompDef.Probes != nil && clusterCompDef.Probes.RoleProbe != nil) {
 		lifecycleActions.RoleProbe = c.convertRoleProbe(clusterCompDef)
 	}
 

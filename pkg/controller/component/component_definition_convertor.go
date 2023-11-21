@@ -518,7 +518,7 @@ func (c *compDefLifecycleActionsConvertor) convertBuiltinActionHandler(clusterCo
 func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) *appsv1alpha1.RoleProbeSpec {
 	// if RSMSpec has role probe CustomHandler, use it first.
 	if clusterCompDef.RSMSpec != nil && clusterCompDef.RSMSpec.RoleProbe != nil && len(clusterCompDef.RSMSpec.RoleProbe.CustomHandler) > 0 {
-		// TODO(xingran): RSMSpec.RoleProbe.CustomHandler support multiple images and commands, but ComponentDefinition.LI=ifeCycleAction.RoleProbeSpec only support one image and command now.
+		// TODO(xingran): RSMSpec.RoleProbe.CustomHandler support multiple images and commands, but ComponentDefinition.LifeCycleAction.RoleProbeSpec only support one image and command now.
 		return &appsv1alpha1.RoleProbeSpec{
 			LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
 				BuiltinHandler: nil,

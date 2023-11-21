@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
@@ -189,7 +190,6 @@ var _ = Describe("Component Definition Convertor", func() {
 					},
 				},
 				ReplicationSpec:       nil,
-				RSMSpec:               &appsv1alpha1.RSMSpec{},
 				HorizontalScalePolicy: &appsv1alpha1.HorizontalScalePolicy{},
 				SystemAccounts: &appsv1alpha1.SystemAccountSpec{
 					CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{
@@ -653,6 +653,44 @@ var _ = Describe("Component Definition Convertor", func() {
 				}
 				Expect(res).Should(BeEquivalentTo(expectedRoles))
 			})
+
+			It("rsm spec roles convertor", func() {
+				convertor := &compDefRolesConvertor{}
+				clusterCompDef.RSMSpec = &appsv1alpha1.RSMSpec{
+					Roles: []workloads.ReplicaRole{
+						{
+							Name:       "mock-leader",
+							AccessMode: workloads.ReadWriteMode,
+							CanVote:    true,
+							IsLeader:   true,
+						},
+						{
+							Name:       "mock-follower",
+							AccessMode: workloads.ReadonlyMode,
+							CanVote:    true,
+							IsLeader:   false,
+						},
+					},
+				}
+				res, err := convertor.convert(clusterCompDef)
+				Expect(err).Should(Succeed())
+
+				expectedRoles := []appsv1alpha1.ReplicaRole{
+					{
+						Name:        "mock-leader",
+						Serviceable: true,
+						Writable:    true,
+						Votable:     true,
+					},
+					{
+						Name:        "mock-follower",
+						Serviceable: true,
+						Writable:    false,
+						Votable:     true,
+					},
+				}
+				Expect(res).Should(BeEquivalentTo(expectedRoles))
+			})
 		})
 
 		It("role arbitrator", func() {
@@ -712,6 +750,32 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(*actions.RoleProbe).ShouldNot(BeEquivalentTo(*expectedRoleProbe))
 				expectedRoleProbe.SuccessThreshold = actions.RoleProbe.SuccessThreshold
 				Expect(*actions.RoleProbe).Should(BeEquivalentTo(*expectedRoleProbe))
+			})
+
+			It("rsm spec role probe convertor", func() {
+				convertor := &compDefLifecycleActionsConvertor{}
+				mockCommand := []string{
+					"mock-rsm-role-probe-command",
+				}
+				clusterCompDef.RSMSpec = &appsv1alpha1.RSMSpec{
+					RoleProbe: &workloads.RoleProbe{
+						CustomHandler: []workloads.Action{
+							{
+								Image:   "mock-rsm-role-probe-image",
+								Command: mockCommand,
+							},
+						},
+					},
+				}
+				res, err := convertor.convert(clusterCompDef)
+				Expect(err).Should(Succeed())
+
+				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
+				Expect(actions.RoleProbe).ShouldNot(BeNil())
+				Expect(actions.RoleProbe.BuiltinHandler).Should(BeNil())
+				Expect(actions.RoleProbe.CustomHandler).ShouldNot(BeNil())
+				Expect(actions.RoleProbe.CustomHandler.Image).Should(BeEquivalentTo("mock-rsm-role-probe-image"))
+				Expect(actions.RoleProbe.CustomHandler.Exec.Command).Should(BeEquivalentTo(mockCommand))
 			})
 		})
 

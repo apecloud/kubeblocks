@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -350,6 +351,12 @@ type compDefRolesConvertor struct{}
 
 func (c *compDefRolesConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+
+	// if rsm spec is not nil, convert rsm role first.
+	if clusterCompDef.RSMSpec != nil {
+		return c.convertRsmRole(clusterCompDef)
+	}
+
 	switch clusterCompDef.WorkloadType {
 	case appsv1alpha1.Consensus:
 		return c.convertConsensusRole(clusterCompDef)
@@ -376,6 +383,24 @@ func (c *compDefRolesConvertor) convert(args ...any) (any, error) {
 	default:
 		panic(fmt.Sprintf("unknown workload type: %s", clusterCompDef.WorkloadType))
 	}
+}
+
+func (c *compDefRolesConvertor) convertRsmRole(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) (any, error) {
+	if clusterCompDef.RSMSpec == nil {
+		return nil, nil
+	}
+
+	roles := make([]appsv1alpha1.ReplicaRole, 0)
+	for _, workloadRole := range clusterCompDef.RSMSpec.Roles {
+		roles = append(roles, appsv1alpha1.ReplicaRole{
+			Name:        workloadRole.Name,
+			Serviceable: workloadRole.AccessMode != workloads.NoneMode,
+			Writable:    workloadRole.AccessMode == workloads.ReadWriteMode,
+			Votable:     workloadRole.CanVote,
+		})
+	}
+
+	return roles, nil
 }
 
 func (c *compDefRolesConvertor) convertConsensusRole(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) (any, error) {
@@ -439,7 +464,8 @@ func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
 
 	lifecycleActions := &appsv1alpha1.ComponentLifecycleActions{}
 
-	if clusterCompDef.Probes != nil && clusterCompDef.Probes.RoleProbe != nil {
+	// RoleProbe can be defined in RSMSpec or ClusterComponentDefinition.Probes.
+	if (clusterCompDef.RSMSpec != nil && clusterCompDef.RSMSpec.RoleProbe != nil) || (clusterCompDef.Probes != nil && clusterCompDef.Probes.RoleProbe != nil) {
 		lifecycleActions.RoleProbe = c.convertRoleProbe(clusterCompDef)
 	}
 
@@ -490,6 +516,22 @@ func (c *compDefLifecycleActionsConvertor) convertBuiltinActionHandler(clusterCo
 }
 
 func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) *appsv1alpha1.RoleProbeSpec {
+	// if RSMSpec has role probe CustomHandler, use it first.
+	if clusterCompDef.RSMSpec != nil && clusterCompDef.RSMSpec.RoleProbe != nil && len(clusterCompDef.RSMSpec.RoleProbe.CustomHandler) > 0 {
+		// TODO(xingran): RSMSpec.RoleProbe.CustomHandler support multiple images and commands, but ComponentDefinition.LifeCycleAction.RoleProbeSpec only support one image and command now.
+		return &appsv1alpha1.RoleProbeSpec{
+			LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
+				BuiltinHandler: nil,
+				CustomHandler: &appsv1alpha1.Action{
+					Image: clusterCompDef.RSMSpec.RoleProbe.CustomHandler[0].Image,
+					Exec: &appsv1alpha1.ExecAction{
+						Command: clusterCompDef.RSMSpec.RoleProbe.CustomHandler[0].Command,
+					},
+				},
+			},
+		}
+	}
+
 	if clusterCompDef == nil || clusterCompDef.Probes == nil || clusterCompDef.Probes.RoleProbe == nil {
 		return nil
 	}

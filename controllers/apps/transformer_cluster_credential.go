@@ -22,6 +22,7 @@ package apps
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
@@ -111,27 +112,16 @@ func (t *clusterCredentialTransformer) buildClusterCredential(transCtx *clusterT
 	credential appsv1alpha1.ConnectionCredential) (*corev1.Secret, error) {
 	var (
 		cluster = transCtx.Cluster
-		compDef *appsv1alpha1.ComponentDefinition
 	)
 
-	if len(credential.ComponentName) > 0 {
-		for _, compSpec := range transCtx.ComponentSpecs {
-			if compSpec.Name != credential.ComponentName {
-				compDef = transCtx.ComponentDefs[compSpec.ComponentDef]
-				break
-			}
-		}
+	data := make(map[string][]byte)
+	if err := t.buildClusterCredentialEndpoint(transCtx, credential, &data); err != nil {
+		return nil, err
 	}
 
-	data := make(map[string][]byte)
-	if len(credential.ServiceName) > 0 {
-		if err := t.buildCredentialEndpoint(cluster, compDef, credential, &data); err != nil {
-			return nil, err
-		}
-	}
-	if len(credential.ComponentName) > 0 && len(credential.AccountName) > 0 {
-		if err := buildCredentialAccountFromSecret(transCtx, dag, cluster.Namespace, cluster.Name,
-			credential.ComponentName, credential.AccountName, &data); err != nil {
+	if len(credential.Account.Component) > 0 && len(credential.Account.Account) > 0 {
+		if err := buildConnCredentialAccount(transCtx, dag, cluster.Namespace, cluster.Name,
+			credential.Account.Component, credential.Account.Account, &data); err != nil {
 			return nil, err
 		}
 	}
@@ -140,62 +130,192 @@ func (t *clusterCredentialTransformer) buildClusterCredential(transCtx *clusterT
 	return secret, nil
 }
 
-func (t *clusterCredentialTransformer) buildCredentialEndpoint(cluster *appsv1alpha1.Cluster,
-	compDef *appsv1alpha1.ComponentDefinition, credential appsv1alpha1.ConnectionCredential, data *map[string][]byte) error {
-	serviceName, ports := t.lookupMatchedService(cluster, compDef, credential)
-	if len(serviceName) == 0 {
-		return fmt.Errorf("cluster credential references a service which is not definied: %s-%s", cluster.Name, credential.Name)
+func (t *clusterCredentialTransformer) buildClusterCredentialEndpoint(transCtx *clusterTransformContext,
+	credential appsv1alpha1.ConnectionCredential, data *map[string][]byte) error {
+	var (
+		cluster         = transCtx.Cluster
+		namespace       = cluster.Namespace
+		clusterName     = cluster.Name
+		compName        string
+		replicas        int
+		clusterServices []appsv1alpha1.Service
+		compServices    []appsv1alpha1.Service
+		compDef         *appsv1alpha1.ComponentDefinition
+	)
+	if credential.Endpoint.ServiceEndpoint != nil {
+		clusterServices = cluster.Spec.Services
 	}
-	if len(ports) == 0 {
-		return fmt.Errorf("cluster credential references a service which doesn't define any ports: %s-%s", cluster.Name, credential.Name)
+	podEndpoint := credential.Endpoint.PodEndpoint
+	if podEndpoint != nil && len(podEndpoint.Component) > 0 {
+		for _, compSpec := range transCtx.ComponentSpecs {
+			// TODO: how about there are more than one component with the same definition?
+			if compSpec.ComponentDef == podEndpoint.Component {
+				compName = compSpec.Name
+				replicas = int(compSpec.Replicas)
+				compDef = transCtx.ComponentDefs[compSpec.ComponentDef]
+				break
+			}
+		}
+		if compDef != nil {
+			compServices = compDef.Spec.Services
+		}
 	}
-	if len(credential.PortName) == 0 && len(ports) > 1 {
-		return fmt.Errorf("cluster credential should specify which port to use for the referenced service: %s-%s", cluster.Name, credential.Name)
-	}
+	return buildConnCredentialEndpoint(namespace, clusterName, compName, replicas, compDef, clusterServices, compServices, credential, data)
+}
 
-	buildCredentialEndpointFromService(credential, serviceName, ports, data)
+func buildConnCredentialEndpoint(namespace, clusterName, compName string, replicas int, compDef *appsv1alpha1.ComponentDefinition,
+	clusterService, compService []appsv1alpha1.Service, credential appsv1alpha1.ConnectionCredential, data *map[string][]byte) error {
+	var (
+		endpoint = credential.Endpoint
+		hosts    []string
+		port     string
+		err      error
+	)
+	if endpoint.ServiceEndpoint != nil && endpoint.PodEndpoint != nil {
+		return fmt.Errorf("service and pod endpoint cannot be specified at the same time")
+	}
+	if endpoint.ServiceEndpoint != nil {
+		if hosts, port, err = buildServiceEndpoint(clusterName, compName, clusterService, compService, credential); err != nil {
+			return err
+		}
+	}
+	if endpoint.PodEndpoint != nil && len(endpoint.PodEndpoint.Component) > 0 {
+		if hosts, port, err = buildPodEndpoint(namespace, clusterName, compName, replicas, compDef, credential); err != nil {
+			return err
+		}
+	}
+	buildCredentialEndpointFromService(credential, hosts, port, data)
 	return nil
 }
 
-func (t *clusterCredentialTransformer) lookupMatchedService(cluster *appsv1alpha1.Cluster,
-	compDef *appsv1alpha1.ComponentDefinition, credential appsv1alpha1.ConnectionCredential) (string, []corev1.ServicePort) {
-	for i, svc := range cluster.Spec.Services {
-		if svc.Name == credential.ServiceName {
-			serviceName := constant.GenerateClusterServiceName(cluster.Name, svc.ServiceName)
-			return serviceName, cluster.Spec.Services[i].Spec.Ports
+func buildServiceEndpoint(clusterName, compName string, clusterService, compService []appsv1alpha1.Service,
+	credential appsv1alpha1.ConnectionCredential) ([]string, string, error) {
+	var (
+		endpoint = credential.Endpoint.ServiceEndpoint
+		svcName  string
+		svcPorts []corev1.ServicePort
+	)
+	svcName, svcPorts = lookupMatchedClusterService(clusterName, clusterService, endpoint)
+	if len(svcName) == 0 {
+		svcName, svcPorts = lookupMatchedCompService(clusterName, compName, compService, endpoint)
+	}
+	if len(svcName) == 0 {
+		return nil, "", fmt.Errorf("connection credential references a service which is not definied: %s-%s", clusterName, credential.Name)
+	}
+	if len(svcPorts) == 0 {
+		return nil, "", fmt.Errorf("connection credential references a service which doesn't define any ports: %s-%s", clusterName, credential.Name)
+	}
+	if len(endpoint.Port) == 0 && len(svcPorts) > 1 {
+		return nil, "", fmt.Errorf("connection credential should specify which port to use for the referenced service: %s-%s", clusterName, credential.Name)
+	}
+	port := ""
+	if len(endpoint.Port) == 0 {
+		port = fmt.Sprintf("%d", svcPorts[0].Port)
+	} else {
+		for _, svcPort := range svcPorts {
+			if svcPort.Name == endpoint.Port {
+				port = fmt.Sprintf("%d", svcPort.Port)
+				break
+			}
 		}
 	}
-	if len(credential.ComponentName) > 0 && compDef != nil {
-		for i, svc := range compDef.Spec.Services {
-			if svc.Name == credential.ServiceName {
-				serviceName := constant.GenerateComponentServiceName(cluster.Name, credential.ComponentName, svc.ServiceName)
-				return serviceName, compDef.Spec.Services[i].Spec.Ports
-			}
+	return []string{svcName}, port, nil
+}
+
+func lookupMatchedClusterService(clusterName string, services []appsv1alpha1.Service,
+	svcEndpoint *appsv1alpha1.ConnectionServiceEndpoint) (string, []corev1.ServicePort) {
+	return lookupMatchedService(services, svcEndpoint, func(svcName string) string {
+		return constant.GenerateClusterServiceName(clusterName, svcName)
+	})
+}
+
+func lookupMatchedCompService(clusterName, compName string,
+	services []appsv1alpha1.Service, svcEndpoint *appsv1alpha1.ConnectionServiceEndpoint) (string, []corev1.ServicePort) {
+	return lookupMatchedService(services, svcEndpoint, func(svcName string) string {
+		return constant.GenerateComponentServiceName(clusterName, compName, svcName)
+	})
+}
+
+func lookupMatchedService(services []appsv1alpha1.Service, svcEndpoint *appsv1alpha1.ConnectionServiceEndpoint,
+	svcNameBuilder func(svcName string) string) (string, []corev1.ServicePort) {
+	for i, svc := range services {
+		if svc.Name == svcEndpoint.Service {
+			return svcNameBuilder(svc.ServiceName), services[i].Spec.Ports
 		}
 	}
 	return "", nil
 }
 
-func buildCredentialEndpointFromService(credential appsv1alpha1.ConnectionCredential,
-	serviceName string, ports []corev1.ServicePort, data *map[string][]byte) {
-	port := int32(0)
-	if len(credential.PortName) == 0 {
-		port = ports[0].Port
-	} else {
-		for _, servicePort := range ports {
-			if servicePort.Name == credential.PortName {
-				port = servicePort.Port
+func buildPodEndpoint(namespace, clusterName, compName string, replicas int, compDef *appsv1alpha1.ComponentDefinition,
+	credential appsv1alpha1.ConnectionCredential) ([]string, string, error) {
+	var (
+		hosts = make([]string, 0)
+		port  string
+	)
+	if len(compDef.Spec.Runtime.Containers) == 0 {
+		return nil, "", fmt.Errorf("")
+	}
+
+	for ordinal := 0; ordinal < replicas; ordinal++ {
+		hosts = append(hosts, constant.GeneratePodFQDN(namespace, clusterName, compName, ordinal))
+	}
+
+	svcEndpoint := credential.Endpoint.PodEndpoint
+	container := compDef.Spec.Runtime.Containers[0]
+	if len(svcEndpoint.Container) > 0 {
+		for i, c := range compDef.Spec.Runtime.Containers {
+			if c.Name == svcEndpoint.Container {
+				container = compDef.Spec.Runtime.Containers[i]
 				break
 			}
 		}
 	}
-	// TODO(component): define the service and port pattern
-	(*data)["endpoint"] = []byte(fmt.Sprintf("%s:%d", serviceName, port))
-	(*data)["host"] = []byte(serviceName)
-	(*data)["port"] = []byte(fmt.Sprintf("%d", port))
+	if len(container.Ports) == 0 {
+		return nil, "", fmt.Errorf("")
+	}
+	if len(svcEndpoint.Port) == 0 && len(container.Ports) > 1 {
+		return nil, "", fmt.Errorf("")
+	}
+	containerPort := container.Ports[0]
+	if len(svcEndpoint.Port) > 0 {
+		for i, port := range container.Ports {
+			if port.Name == svcEndpoint.Port {
+				containerPort = container.Ports[i]
+				break
+			}
+		}
+	}
+	if containerPort.HostPort > 0 {
+		port = fmt.Sprintf("%d", containerPort.HostPort)
+	} else {
+		port = fmt.Sprintf("%d", containerPort.ContainerPort)
+	}
+
+	return hosts, port, nil
 }
 
-func buildCredentialAccountFromSecret(ctx graph.TransformContext, dag *graph.DAG,
+func buildCredentialEndpointFromService(credential appsv1alpha1.ConnectionCredential, hosts []string, port string, data *map[string][]byte) {
+	// TODO(component): define the service and port pattern
+	endpoints := make([]string, 0)
+	if len(port) == 0 {
+		endpoints = hosts
+	} else {
+		for i := range hosts {
+			endpoints = append(endpoints, fmt.Sprintf("%s:%s", hosts[i], port))
+		}
+	}
+	if len(endpoints) > 0 {
+		(*data)["endpoint"] = []byte(strings.Join(endpoints, credential.Endpoint.Separator))
+	}
+	if len(hosts) > 0 {
+		(*data)["host"] = []byte(hosts[0])
+	}
+	if len(port) > 0 {
+		(*data)["port"] = []byte(port)
+	}
+}
+
+func buildConnCredentialAccount(ctx graph.TransformContext, dag *graph.DAG,
 	namespace, clusterName, compName, accountName string, data *map[string][]byte) error {
 	secretKey := types.NamespacedName{
 		Namespace: namespace,

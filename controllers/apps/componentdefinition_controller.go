@@ -288,7 +288,7 @@ func (r *ComponentDefinitionReconciler) validateConnectionCredentials(cli client
 
 func (r *ComponentDefinitionReconciler) validateConnectionCredential(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition, cc appsv1alpha1.ConnectionCredential) error {
-	if err := r.validateConnectionCredentialService(cmpd, cc); err != nil {
+	if err := r.validateConnectionCredentialEndpoint(cmpd, cc); err != nil {
 		return err
 	}
 	if err := r.validateConnectionCredentialAccount(cmpd, cc); err != nil {
@@ -297,49 +297,65 @@ func (r *ComponentDefinitionReconciler) validateConnectionCredential(cli client.
 	return nil
 }
 
-func (r *ComponentDefinitionReconciler) validateConnectionCredentialService(cmpd *appsv1alpha1.ComponentDefinition,
+func (r *ComponentDefinitionReconciler) validateConnectionCredentialEndpoint(cmpd *appsv1alpha1.ComponentDefinition,
 	cc appsv1alpha1.ConnectionCredential) error {
-	if len(cc.ServiceName) == 0 {
+	if cc.Endpoint.ServiceEndpoint != nil && cc.Endpoint.PodEndpoint != nil {
+		return fmt.Errorf("service and pod endpoint cannot be specified at the same time")
+	}
+	if cc.Endpoint.ServiceEndpoint != nil {
+		return r.validateConnectionCredentialServiceEndpoint(cmpd, cc)
+	}
+	return r.validateConnectionCredentialPodEndpoint(cmpd, cc)
+}
+
+func (r *ComponentDefinitionReconciler) validateConnectionCredentialServiceEndpoint(cmpd *appsv1alpha1.ComponentDefinition,
+	cc appsv1alpha1.ConnectionCredential) error {
+	svcName := cc.Endpoint.ServiceEndpoint.Service
+	if len(svcName) == 0 {
 		return fmt.Errorf("there is no component service name defined for connection credential: %s", cc.Name)
 	}
 	for _, svc := range cmpd.Spec.Services {
-		if svc.Name == cc.ServiceName {
-			return r.validateConnectionCredentialPort(cmpd, cc, svc.Spec.Ports)
+		if svc.Name == svcName {
+			return r.validateConnectionCredentialPort(cc.Name, cc.Endpoint.ServiceEndpoint.Port, svc.Spec.Ports)
 		}
 	}
 	return fmt.Errorf("there is no matched service for connection credential: %s", cc.Name)
 }
 
-func (r *ComponentDefinitionReconciler) validateConnectionCredentialPort(cmpd *appsv1alpha1.ComponentDefinition,
-	cc appsv1alpha1.ConnectionCredential, ports []corev1.ServicePort) error {
-	if len(cc.PortName) == 0 {
+func (r *ComponentDefinitionReconciler) validateConnectionCredentialPodEndpoint(cmpd *appsv1alpha1.ComponentDefinition,
+	cc appsv1alpha1.ConnectionCredential) error {
+	return nil
+}
+
+func (r *ComponentDefinitionReconciler) validateConnectionCredentialPort(credentialName, portName string, ports []corev1.ServicePort) error {
+	if len(portName) == 0 {
 		switch len(ports) {
 		case 0:
-			return fmt.Errorf("there is no port defined for connection credential: %s", cc.Name)
+			return fmt.Errorf("there is no port defined for connection credential: %s", credentialName)
 		case 1:
 			return nil
 		default:
-			return fmt.Errorf("there are multiple ports defined, it must be specified a port for connection credential: %s", cc.Name)
+			return fmt.Errorf("there are multiple ports defined, it must be specified a port for connection credential: %s", credentialName)
 		}
 	}
 	for _, port := range ports {
-		if port.Name == cc.PortName {
+		if port.Name == portName {
 			return nil
 		}
 	}
-	return fmt.Errorf("there is no matched port for connection credential: %s", cc.Name)
+	return fmt.Errorf("there is no matched port for connection credential: %s", credentialName)
 }
 
 func (r *ComponentDefinitionReconciler) validateConnectionCredentialAccount(cmpd *appsv1alpha1.ComponentDefinition,
 	cc appsv1alpha1.ConnectionCredential) error {
-	if len(cc.AccountName) == 0 {
+	if len(cc.Account.Account) == 0 {
 		return nil
 	}
 	if cmpd.Spec.SystemAccounts == nil {
 		return fmt.Errorf("there is no account defined for connection credential: %s", cc.Name)
 	}
 	for _, account := range cmpd.Spec.SystemAccounts {
-		if account.Name == cc.AccountName {
+		if account.Name == cc.Account.Account {
 			return nil
 		}
 	}

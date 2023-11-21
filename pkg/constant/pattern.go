@@ -116,3 +116,19 @@ func GenerateRSMNamePattern(clusterName, compName string) string {
 func GenerateRSMServiceNamePattern(rsmName string) string {
 	return fmt.Sprintf("%s-headless", rsmName)
 }
+
+// GeneratePodName generates the connection credential name for component.
+func GeneratePodName(clusterName, compName string, ordinal int) string {
+	return fmt.Sprintf("%s-%d", GenerateClusterComponentName(clusterName, compName), ordinal)
+}
+
+// GeneratePodSubDomain generates the connection credential name for component.
+func GeneratePodSubDomain(clusterName, compName string) string {
+	return GenerateDefaultComponentHeadlessServiceName(clusterName, compName)
+}
+
+// GeneratePodFQDN generates the connection credential name for component.
+func GeneratePodFQDN(namespace, clusterName, compName string, ordinal int) string {
+	return fmt.Sprintf("%s.%s.%s.svc",
+		GeneratePodName(clusterName, compName, ordinal), GeneratePodSubDomain(clusterName, compName), namespace)
+}

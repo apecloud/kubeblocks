@@ -325,14 +325,26 @@ var (
 		},
 		ConnectionCredentials: []appsv1alpha1.ConnectionCredential{
 			{
-				Name:        "root",
-				ServiceName: "rw",
-				AccountName: "root",
+				Name: "root",
+				Endpoint: appsv1alpha1.ConnectionEndpoint{
+					ServiceEndpoint: &appsv1alpha1.ConnectionServiceEndpoint{
+						Service: "rw",
+					},
+				},
+				Account: appsv1alpha1.ConnectionCredentialAccount{
+					Account: "root",
+				},
 			},
 			{
-				Name:        "admin",
-				ServiceName: "rw",
-				AccountName: "admin",
+				Name: "admin",
+				Endpoint: appsv1alpha1.ConnectionEndpoint{
+					ServiceEndpoint: &appsv1alpha1.ConnectionServiceEndpoint{
+						Service: "rw",
+					},
+				},
+				Account: appsv1alpha1.ConnectionCredentialAccount{
+					Account: "admin",
+				},
 			},
 		},
 		Roles: []appsv1alpha1.ReplicaRole{

@@ -903,30 +903,73 @@ spec:
                 description: connectionCredentials defines the credentials used to
                   access a cluster.
                 items:
+                  description: "ConnectionCredential defines the information needed
+                    to access a cluster or component service. For each ConnectionCredential,
+                    a k8s Secret object will be created with the scheme: \n secret.Name:
+                    <CLUSTER_NAME>-<NAME> or <CLUSTER_NAME>-<COMPONENT_NAME>-<NAME>
+                    secret.Data: endpoint: <endpoint>[,<endpoint>....] host: <host>
+                    port: <port> username: <account.name> password: <account.password>
+                    # TODO: ak/sk"
                   properties:
-                    accountName:
-                      description: AccountName specifies the name of account used
-                        to access the service. If specified, the account must be defined
-                        in @SystemAccounts. Cannot be updated.
-                      type: string
-                    componentName:
-                      description: ComponentName specifies the name of component where
-                        the account defined. For cluster-level connection credential,
-                        this field is required. Cannot be updated.
-                      type: string
+                    auth:
+                      description: Cannot be updated.
+                      properties:
+                        account:
+                          description: Account specifies the name of account used
+                            to access the service. If specified, the account must
+                            be defined in @SystemAccounts. Cannot be updated.
+                          type: string
+                        component:
+                          description: Component specifies the name of component where
+                            the account defined. For cluster-level connection credential,
+                            this field is required. Cannot be updated.
+                          type: string
+                      type: object
+                    endpoint:
+                      description: Cannot be updated.
+                      properties:
+                        podEndpoint:
+                          description: Cannot be updated.
+                          properties:
+                            component:
+                              description: Component specifies the name of component.
+                                For cluster-level connection credential, this field
+                                is required. Cannot be updated.
+                              type: string
+                            container:
+                              description: Cannot be updated.
+                              type: string
+                            port:
+                              description: Port specifies the name of the port to
+                                access the service. If the container has multiple
+                                ports, a specific port must be specified to use here.
+                                Otherwise, the unique port of the container will be
+                                used. Cannot be updated.
+                              type: string
+                          type: object
+                        separator:
+                          default: ','
+                          description: Cannot be updated.
+                          type: string
+                        serviceEndpoint:
+                          description: Cannot be updated.
+                          properties:
+                            port:
+                              description: Port specifies the name of the port to
+                                access the service. If the service has multiple ports,
+                                a specific port must be specified to use here. Otherwise,
+                                the unique port of the service will be used. Cannot
+                                be updated.
+                              type: string
+                            service:
+                              description: Service specifies the name of service to
+                                use for accessing. Cannot be updated.
+                              type: string
+                          type: object
+                      type: object
                     name:
                       description: The name of the ConnectionCredential. Cannot be
                         updated.
-                      type: string
-                    portName:
-                      description: PortName specifies the name of the port to access
-                        the service. If the service has multiple ports, a specific
-                        port must be specified to use here. Otherwise, the unique
-                        port of the service will be used. Cannot be updated.
-                      type: string
-                    serviceName:
-                      description: ServiceName specifies the name of service to use
-                        for accessing. Cannot be updated.
                       type: string
                   required:
                   - name

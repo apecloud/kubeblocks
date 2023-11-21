@@ -620,33 +620,90 @@ type Service struct {
 	RoleSelector string `json:"roleSelector,omitempty"`
 }
 
+// ConnectionCredential defines the information needed to access a cluster or component service.
+// For each ConnectionCredential, a k8s Secret object will be created with the scheme:
+//
+//	secret.Name: <CLUSTER_NAME>-<NAME> or <CLUSTER_NAME>-<COMPONENT_NAME>-<NAME>
+//	secret.Data:
+//	  endpoint: <endpoint>[,<endpoint>....]
+//	  host: <host>
+//	  port: <port>
+//	  username: <account.name>
+//	  password: <account.password>
+//	   # TODO: ak/sk
 type ConnectionCredential struct {
 	// The name of the ConnectionCredential.
 	// Cannot be updated.
 	// +required
 	Name string `json:"name"`
 
-	// ServiceName specifies the name of service to use for accessing.
 	// Cannot be updated.
 	// +optional
-	ServiceName string `json:"serviceName,omitempty"`
+	Endpoint ConnectionEndpoint `json:"endpoint,omitempty"`
 
-	// PortName specifies the name of the port to access the service.
+	// Cannot be updated.
+	// +optional
+	Account ConnectionCredentialAccount `json:"auth,omitempty"`
+}
+
+type ConnectionEndpoint struct {
+	// Cannot be updated.
+	// +optional
+	ServiceEndpoint *ConnectionServiceEndpoint `json:"serviceEndpoint,omitempty"`
+
+	// Cannot be updated.
+	// +optional
+	PodEndpoint *ConnectionPodEndpoint `json:"podEndpoint,omitempty"`
+
+	// +kubebuilder:default=","
+	// Cannot be updated.
+	// +optional
+	Separator string `json:"separator,omitempty"`
+}
+
+type ConnectionServiceEndpoint struct {
+	// Service specifies the name of service to use for accessing.
+	// Cannot be updated.
+	// +optional
+	Service string `json:"service,omitempty"`
+
+	// Port specifies the name of the port to access the service.
 	// If the service has multiple ports, a specific port must be specified to use here.
 	// Otherwise, the unique port of the service will be used.
 	// Cannot be updated.
 	// +optional
-	PortName string `json:"portName,omitempty"`
+	Port string `json:"port,omitempty"`
+}
 
-	// ComponentName specifies the name of component where the account defined.
+type ConnectionPodEndpoint struct {
+	// Component specifies the name of component.
 	// For cluster-level connection credential, this field is required.
 	// Cannot be updated.
 	// +optional
-	ComponentName string `json:"componentName,omitempty"`
+	Component string `json:"component,omitempty"`
 
-	// AccountName specifies the name of account used to access the service.
+	// Cannot be updated.
+	// +optional
+	Container string `json:"container,omitempty"`
+
+	// Port specifies the name of the port to access the service.
+	// If the container has multiple ports, a specific port must be specified to use here.
+	// Otherwise, the unique port of the container will be used.
+	// Cannot be updated.
+	// +optional
+	Port string `json:"port,omitempty"`
+}
+
+type ConnectionCredentialAccount struct {
+	// Component specifies the name of component where the account defined.
+	// For cluster-level connection credential, this field is required.
+	// Cannot be updated.
+	// +optional
+	Component string `json:"component,omitempty"`
+
+	// Account specifies the name of account used to access the service.
 	// If specified, the account must be defined in @SystemAccounts.
 	// Cannot be updated.
 	// +optional
-	AccountName string `json:"accountName,omitempty"`
+	Account string `json:"account,omitempty"`
 }

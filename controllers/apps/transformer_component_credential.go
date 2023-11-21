@@ -25,7 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -59,16 +58,23 @@ func (t *componentCredentialTransformer) Transform(ctx graph.TransformContext, d
 
 func (t *componentCredentialTransformer) buildComponentCredential(transCtx *componentTransformContext, dag *graph.DAG,
 	synthesizeComp *component.SynthesizedComponent, credential appsv1alpha1.ConnectionCredential) (*corev1.Secret, error) {
-	data := make(map[string][]byte)
-	if len(credential.ServiceName) > 0 {
-		if err := t.buildCredentialEndpoint(synthesizeComp, credential, &data); err != nil {
-			return nil, err
-		}
+	var (
+		namespace   = synthesizeComp.Namespace
+		clusterName = synthesizeComp.ClusterName
+		compName    = synthesizeComp.Name
+		replicas    = int(synthesizeComp.Replicas)
+		data        = make(map[string][]byte)
+	)
+
+	if err := buildConnCredentialEndpoint(namespace, clusterName, compName, replicas,
+		transCtx.CompDef, nil, synthesizeComp.ComponentServices, credential, &data); err != nil {
+		return nil, err
 	}
-	if len(credential.AccountName) > 0 {
+
+	if len(credential.Account.Account) > 0 {
 		var systemAccount *appsv1alpha1.SystemAccount
 		for i, account := range synthesizeComp.SystemAccounts {
-			if account.Name == credential.AccountName {
+			if account.Name == credential.Account.Account {
 				systemAccount = &synthesizeComp.SystemAccounts[i]
 				break
 			}
@@ -76,7 +82,7 @@ func (t *componentCredentialTransformer) buildComponentCredential(transCtx *comp
 		if systemAccount == nil {
 			return nil, fmt.Errorf("connection credential references a system account not defined")
 		}
-		if err := buildCredentialAccountFromSecret(transCtx, dag, synthesizeComp.Namespace, synthesizeComp.ClusterName,
+		if err := buildConnCredentialAccount(transCtx, dag, synthesizeComp.Namespace, synthesizeComp.ClusterName,
 			synthesizeComp.Name, systemAccount.Name, &data); err != nil {
 			return nil, err
 		}
@@ -84,31 +90,4 @@ func (t *componentCredentialTransformer) buildComponentCredential(transCtx *comp
 
 	secret := factory.BuildConnCredential4Component(synthesizeComp, credential.Name, data)
 	return secret, nil
-}
-
-func (t *componentCredentialTransformer) buildCredentialEndpoint(synthesizeComp *component.SynthesizedComponent,
-	credential appsv1alpha1.ConnectionCredential, data *map[string][]byte) error {
-	var service *appsv1alpha1.Service
-	for i, svc := range synthesizeComp.ComponentServices {
-		if svc.Name == credential.ServiceName {
-			service = &synthesizeComp.ComponentServices[i]
-			break
-		}
-	}
-	if service == nil {
-		return fmt.Errorf("connection credential references a service not definied, credential: %s, service: %s",
-			credential.Name, credential.ServiceName)
-	}
-	if len(service.Spec.Ports) == 0 {
-		return fmt.Errorf("connection credential references a service which doesn't define any ports, credential: %s, service: %s",
-			credential.Name, credential.ServiceName)
-	}
-	if len(credential.PortName) == 0 && len(service.Spec.Ports) > 1 {
-		return fmt.Errorf("connection credential should specify which port to use for the referenced service, credential: %s, service: %s",
-			credential.Name, credential.ServiceName)
-	}
-
-	serviceName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, service.ServiceName)
-	buildCredentialEndpointFromService(credential, serviceName, service.Spec.Ports, data)
-	return nil
 }

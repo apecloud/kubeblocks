@@ -201,10 +201,16 @@ func (builder *ComponentDefinitionBuilder) AddSystemAccount(accountName string, 
 
 func (builder *ComponentDefinitionBuilder) AddConnectionCredential(name, serviceName, portName, accountName string) *ComponentDefinitionBuilder {
 	credential := appsv1alpha1.ConnectionCredential{
-		Name:        name,
-		ServiceName: serviceName,
-		PortName:    portName,
-		AccountName: accountName,
+		Name: name,
+		Endpoint: appsv1alpha1.ConnectionEndpoint{
+			ServiceEndpoint: &appsv1alpha1.ConnectionServiceEndpoint{
+				Service: serviceName,
+				Port:    portName,
+			},
+		},
+		Account: appsv1alpha1.ConnectionCredentialAccount{
+			Account: accountName,
+		},
 	}
 	if builder.get().Spec.ConnectionCredentials == nil {
 		builder.get().Spec.ConnectionCredentials = make([]appsv1alpha1.ConnectionCredential, 0)

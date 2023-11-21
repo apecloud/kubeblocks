@@ -137,7 +137,7 @@ var _ = Describe("Restore Controller test", func() {
 
 		checkJobAndPVCSCount := func(restore *dpv1alpha1.Restore, jobReplicas, pvcReplicas, startingIndex int) {
 			Eventually(testapps.List(&testCtx, generics.JobSignature,
-				client.MatchingLabels{dprestore.DataProtectionLabelRestoreKey: restore.Name},
+				client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
 				client.InNamespace(testCtx.DefaultNamespace))).Should(HaveLen(jobReplicas))
 
 			pvcMatchingLabels := client.MatchingLabels{constant.AppManagedByLabelKey: "restore"}
@@ -158,7 +158,7 @@ var _ = Describe("Restore Controller test", func() {
 		mockRestoreJobsCompleted := func(restore *dpv1alpha1.Restore) {
 			jobList := &batchv1.JobList{}
 			Expect(k8sClient.List(ctx, jobList,
-				client.MatchingLabels{dprestore.DataProtectionLabelRestoreKey: restore.Name},
+				client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
 				client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
 			for _, v := range jobList.Items {
 				testdp.PatchK8sJobStatus(&testCtx, client.ObjectKeyFromObject(&v), batchv1.JobComplete)
@@ -208,7 +208,7 @@ var _ = Describe("Restore Controller test", func() {
 				By("mock restore job is Failed")
 				jobList := &batchv1.JobList{}
 				Expect(k8sClient.List(ctx, jobList,
-					client.MatchingLabels{dprestore.DataProtectionLabelRestoreKey: restore.Name},
+					client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
 					client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
 
 				for _, v := range jobList.Items {
@@ -261,7 +261,7 @@ var _ = Describe("Restore Controller test", func() {
 
 				jobList := &batchv1.JobList{}
 				Expect(k8sClient.List(ctx, jobList,
-					client.MatchingLabels{dprestore.DataProtectionLabelRestoreKey: restore.Name},
+					client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
 					client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
 
 				for _, v := range jobList.Items {
@@ -311,7 +311,7 @@ var _ = Describe("Restore Controller test", func() {
 
 				By("wait for creating two exec jobs with the matchLabels")
 				Eventually(testapps.List(&testCtx, generics.JobSignature,
-					client.MatchingLabels{dprestore.DataProtectionLabelRestoreKey: restore.Name},
+					client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
 					client.InNamespace(testCtx.DefaultNamespace))).Should(HaveLen(2))
 
 				By("mock exec jobs are completed")
@@ -319,7 +319,7 @@ var _ = Describe("Restore Controller test", func() {
 
 				By("wait for creating a job of jobAction with the matchLabels, expect jobs count is 3(2+1)")
 				Eventually(testapps.List(&testCtx, generics.JobSignature,
-					client.MatchingLabels{dprestore.DataProtectionLabelRestoreKey: restore.Name},
+					client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
 					client.InNamespace(testCtx.DefaultNamespace))).Should(HaveLen(3))
 
 				By("mock jobs are completed")

@@ -126,7 +126,7 @@ func GetRestoreActionsCountForPrepareData(config *dpv1alpha1.PrepareDataConfig) 
 func BuildRestoreLabels(restoreName string) map[string]string {
 	return map[string]string{
 		constant.AppManagedByLabelKey: dptypes.AppName,
-		DataProtectionLabelRestoreKey: restoreName,
+		DataProtectionRestoreLabelKey: restoreName,
 	}
 }
 

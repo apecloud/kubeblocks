@@ -1142,18 +1142,22 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	testCompConnCredential := func(compName, compDefName string) {
-		createClusterObjV2(compName, compDefObj.Name, nil)
+		replicas := 3
+		createClusterObjV2(compName, compDefObj.Name, func(f *testapps.MockClusterFactory) {
+			f.SetReplicas(int32(replicas))
+		})
 
 		By("check root conn credential")
 		serviceName := constant.GenerateComponentServiceName(clusterObj.Name, compName, "rw")
-		servicePort := "3306"
-		endpoint := fmt.Sprintf("%s:%s", serviceName, servicePort)
+		// mysql port
+		servicePort := fmt.Sprintf("%d", compDefObj.Spec.Runtime.Containers[0].Ports[0].ContainerPort)
+		serviceEndpoint := fmt.Sprintf("%s:%s", serviceName, servicePort)
 		rootSecretKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
 			Name:      constant.GenerateComponentConnCredential(clusterObj.Name, compName, "root"),
 		}
 		Eventually(testapps.CheckObj(&testCtx, rootSecretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKeyWithValue("endpoint", []byte(endpoint)))
+			g.Expect(secret.Data).Should(HaveKeyWithValue("endpoint", []byte(serviceEndpoint)))
 			g.Expect(secret.Data).Should(HaveKeyWithValue("host", []byte(serviceName)))
 			g.Expect(secret.Data).Should(HaveKeyWithValue("port", []byte(servicePort)))
 			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("root")))
@@ -1161,14 +1165,24 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 
 		By("check admin conn credential")
+		fqdn := func(ordinal int) string {
+			return constant.GeneratePodFQDN(clusterObj.Namespace, clusterObj.Name, compName, ordinal)
+		}
+		podHost := fqdn(0)
+		// paxos port
+		podPort := fmt.Sprintf("%d", compDefObj.Spec.Runtime.Containers[0].Ports[1].ContainerPort)
+		endpoints := make([]string, 0)
+		for i := 0; i < replicas; i++ {
+			endpoints = append(endpoints, fmt.Sprintf("%s:%s", fqdn(i), podPort))
+		}
 		adminSecretKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
 			Name:      constant.GenerateComponentConnCredential(clusterObj.Name, compName, "admin"),
 		}
 		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKeyWithValue("endpoint", []byte(endpoint)))
-			g.Expect(secret.Data).Should(HaveKeyWithValue("host", []byte(serviceName)))
-			g.Expect(secret.Data).Should(HaveKeyWithValue("port", []byte(servicePort)))
+			g.Expect(secret.Data).Should(HaveKeyWithValue("endpoint", []byte(strings.Join(endpoints, ","))))
+			g.Expect(secret.Data).Should(HaveKeyWithValue("host", []byte(podHost)))
+			g.Expect(secret.Data).Should(HaveKeyWithValue("port", []byte(podPort)))
 			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
 			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
 		})).Should(Succeed())

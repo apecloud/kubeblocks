@@ -332,7 +332,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 		})
 	})
 
-	FContext("connection credential", func() {
+	Context("connection credential", func() {
 		It("duplicate name", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).

@@ -338,8 +338,9 @@ var (
 			{
 				Name: "admin",
 				Endpoint: appsv1alpha1.ConnectionEndpoint{
-					ServiceEndpoint: &appsv1alpha1.ConnectionServiceEndpoint{
-						ServiceName: "rw",
+					PodEndpoint: &appsv1alpha1.ConnectionPodEndpoint{
+						Container: DefaultMySQLContainerName,
+						PortName:  "paxos",
 					},
 				},
 				Account: appsv1alpha1.ConnectionCredentialAccount{

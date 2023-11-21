@@ -179,7 +179,7 @@ func buildConnCredentialEndpoint(namespace, clusterName, compName string, replic
 			return err
 		}
 	}
-	if endpoint.PodEndpoint != nil && len(endpoint.PodEndpoint.Component) > 0 {
+	if endpoint.PodEndpoint != nil {
 		if hosts, port, err = buildPodEndpoint(namespace, clusterName, compName, replicas, compDef, credential); err != nil {
 			return err
 		}

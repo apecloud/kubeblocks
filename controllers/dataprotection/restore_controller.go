@@ -121,7 +121,7 @@ func (r *RestoreReconciler) parseRestoreJob(ctx context.Context, object client.O
 }
 
 func (r *RestoreReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, restore *dpv1alpha1.Restore) error {
-	labels := dprestore.BuildRestoreLabels(restore.Name)
+	labels := map[string]string{dprestore.DataProtectionRestoreLabelKey: restore.Name}
 	if err := deleteRelatedJobs(reqCtx, r.Client, restore.Namespace, labels); err != nil {
 		return err
 	}

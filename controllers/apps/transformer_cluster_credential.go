@@ -49,7 +49,9 @@ func (t *clusterCredentialTransformer) Transform(ctx graph.TransformContext, dag
 	}
 
 	if t.isLegacyCluster(transCtx) {
-		return t.transformClusterCredentialLegacy(transCtx, dag)
+		if err := t.transformClusterCredentialLegacy(transCtx, dag); err != nil {
+			return err
+		}
 	}
 	return t.transformClusterCredential(transCtx, dag)
 }
@@ -131,7 +133,7 @@ func (t *clusterCredentialTransformer) buildClusterCredential(transCtx *clusterT
 }
 
 func (t *clusterCredentialTransformer) buildClusterCredentialEndpoint(transCtx *clusterTransformContext,
-	credential appsv1alpha1.ConnectionCredential, data *map[string][]byte) error {
+	cc appsv1alpha1.ConnectionCredential, data *map[string][]byte) error {
 	var (
 		cluster         = transCtx.Cluster
 		namespace       = cluster.Namespace
@@ -142,25 +144,48 @@ func (t *clusterCredentialTransformer) buildClusterCredentialEndpoint(transCtx *
 		compServices    []appsv1alpha1.Service
 		compDef         *appsv1alpha1.ComponentDefinition
 	)
-	if credential.Endpoint.ServiceEndpoint != nil {
-		clusterServices = cluster.Spec.Services
+
+	findCompSpec := func(comp string) *appsv1alpha1.ClusterComponentSpec {
+		for i, spec := range transCtx.ComponentSpecs {
+			if spec.Name == comp {
+				return transCtx.ComponentSpecs[i]
+			}
+		}
+		return nil
 	}
-	podEndpoint := credential.Endpoint.PodEndpoint
-	if podEndpoint != nil && len(podEndpoint.Component) > 0 {
-		for _, compSpec := range transCtx.ComponentSpecs {
-			// TODO: how about there are more than one component with the same definition?
-			if compSpec.ComponentDef == podEndpoint.Component {
+
+	if cc.Endpoint.ServiceEndpoint != nil {
+		comp := cc.Endpoint.ServiceEndpoint.Component
+		if len(comp) == 0 {
+			clusterServices = cluster.Spec.Services
+		} else {
+			compSpec := findCompSpec(comp)
+			if compSpec == nil {
+				return fmt.Errorf("service endpoint try to bind to a component which is not defined: %s", cc.Name)
+			}
+			if compSpec != nil {
+				compDef = transCtx.ComponentDefs[compSpec.ComponentDef]
+				if compDef != nil {
+					compServices = compDef.Spec.Services
+				}
+			}
+		}
+	}
+	if cc.Endpoint.PodEndpoint != nil {
+		podEndpoint := cc.Endpoint.PodEndpoint
+		if len(podEndpoint.Component) > 0 {
+			compSpec := findCompSpec(podEndpoint.Component)
+			if compSpec == nil {
+				return fmt.Errorf("pod endpoint try to bind to a component which is not defined: %s", cc.Name)
+			}
+			if compSpec != nil {
 				compName = compSpec.Name
 				replicas = int(compSpec.Replicas)
 				compDef = transCtx.ComponentDefs[compSpec.ComponentDef]
-				break
 			}
 		}
-		if compDef != nil {
-			compServices = compDef.Spec.Services
-		}
 	}
-	return buildConnCredentialEndpoint(namespace, clusterName, compName, replicas, compDef, clusterServices, compServices, credential, data)
+	return buildConnCredentialEndpoint(namespace, clusterName, compName, replicas, compDef, clusterServices, compServices, cc, data)
 }
 
 func buildConnCredentialEndpoint(namespace, clusterName, compName string, replicas int, compDef *appsv1alpha1.ComponentDefinition,
@@ -195,8 +220,9 @@ func buildServiceEndpoint(clusterName, compName string, clusterService, compServ
 		svcName  string
 		svcPorts []corev1.ServicePort
 	)
-	svcName, svcPorts = lookupMatchedClusterService(clusterName, clusterService, endpoint)
-	if len(svcName) == 0 {
+	if len(clusterService) > 0 {
+		svcName, svcPorts = lookupMatchedClusterService(clusterName, clusterService, endpoint)
+	} else {
 		svcName, svcPorts = lookupMatchedCompService(clusterName, compName, compService, endpoint)
 	}
 	if len(svcName) == 0 {

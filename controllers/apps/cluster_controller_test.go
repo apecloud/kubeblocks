@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -320,6 +321,97 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	testClusterCredential := func(compName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory))) {
+		// By("update cluster definition to create system accounts")
+		// Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(cd *appsv1alpha1.ClusterDefinition) {
+		// })).Should(Succeed())
+
+		replicas := 3
+		createObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
+			f.SetReplicas(int32(replicas)).
+				AddService(appsv1alpha1.Service{
+					Name:        "mysql",
+					ServiceName: "", // use default service name
+					Spec: corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{
+							{
+								Name: testapps.DefaultMySQLPortName,
+								Port: testapps.DefaultMySQLPort,
+							},
+						},
+						Type: corev1.ServiceTypeClusterIP,
+					},
+					ComponentSelector: compName,
+					RoleSelector:      constant.Leader,
+				}).
+				AddConnectionCredential(appsv1alpha1.ConnectionCredential{
+					Name: "cluster",
+					Endpoint: appsv1alpha1.ConnectionEndpoint{
+						ServiceEndpoint: &appsv1alpha1.ConnectionServiceEndpoint{
+							ServiceName: "mysql",
+						},
+					},
+				}).
+				// AddConnectionCredential(appsv1alpha1.ConnectionCredential{
+				//	Name: "comp",
+				//	Endpoint: appsv1alpha1.ConnectionEndpoint{
+				//		ServiceEndpoint: &appsv1alpha1.ConnectionServiceEndpoint{
+				//			Component:   compName,
+				//			ServiceName: "mysql",
+				//		},
+				//	},
+				// }).
+				AddConnectionCredential(appsv1alpha1.ConnectionCredential{
+					Name: "pod",
+					Endpoint: appsv1alpha1.ConnectionEndpoint{
+						PodEndpoint: &appsv1alpha1.ConnectionPodEndpoint{
+							Component: compName,
+							PortName:  testapps.DefaultPaxosPortName,
+						},
+					},
+				})
+		})
+
+		By("check conn credential binding to a cluster service")
+		clusterSecretKey := types.NamespacedName{
+			Namespace: clusterKey.Namespace,
+			Name:      constant.GenerateClusterConnCredential(clusterObj.Name, "cluster"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, clusterSecretKey, func(g Gomega, secret *corev1.Secret) {
+			svcName := constant.GenerateClusterServiceName(clusterObj.Name, "")
+			g.Expect(secret.Data).Should(HaveKeyWithValue("endpoint", []byte(fmt.Sprintf("%s:%d", svcName, testapps.DefaultMySQLPort))))
+			g.Expect(secret.Data).Should(HaveKeyWithValue("host", []byte(svcName)))
+			g.Expect(secret.Data).Should(HaveKeyWithValue("port", []byte(fmt.Sprintf("%d", testapps.DefaultMySQLPort))))
+		})).Should(Succeed())
+
+		// By("check conn credential binding to a component service")
+		// compSecretKey := types.NamespacedName{
+		//	Namespace: clusterKey.Namespace,
+		//	Name:      constant.GenerateClusterConnCredential(clusterObj.Name, "cluster"),
+		// }
+		// Eventually(testapps.CheckObj(&testCtx, compSecretKey, func(g Gomega, secret *corev1.Secret) {
+		//	svcName := constant.GenerateDefaultComponentServiceName(clusterObj.Name, compName)
+		//	g.Expect(secret.Data).Should(HaveKeyWithValue("endpoint", []byte(fmt.Sprintf("%s:%d", svcName, testapps.DefaultMySQLPort))))
+		//	g.Expect(secret.Data).Should(HaveKeyWithValue("host", []byte(svcName)))
+		//	g.Expect(secret.Data).Should(HaveKeyWithValue("port", []byte(fmt.Sprintf("%d", testapps.DefaultMySQLPort))))
+		// })).Should(Succeed())
+
+		By("check conn credential binding to pods")
+		podSecretKey := types.NamespacedName{
+			Namespace: clusterKey.Namespace,
+			Name:      constant.GenerateClusterConnCredential(clusterObj.Name, "pod"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, podSecretKey, func(g Gomega, secret *corev1.Secret) {
+			fqdn := func(ordinal int) string {
+				return constant.GeneratePodFQDN(clusterObj.Namespace, clusterObj.Name, compName, ordinal)
+			}
+			endpoints := make([]string, 0)
+			for i := 0; i < replicas; i++ {
+				endpoints = append(endpoints, fmt.Sprintf("%s:%d", fqdn(i), testapps.DefaultPaxosPort))
+			}
+			g.Expect(secret.Data).Should(HaveKeyWithValue("endpoint", []byte(strings.Join(endpoints, ","))))
+			g.Expect(secret.Data).Should(HaveKeyWithValue("host", []byte(fqdn(0))))
+			g.Expect(secret.Data).Should(HaveKeyWithValue("port", []byte(fmt.Sprintf("%d", testapps.DefaultPaxosPort))))
+		})).Should(Succeed())
 	}
 
 	testClusterAffinityNToleration := func(compName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory))) {

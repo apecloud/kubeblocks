@@ -71,6 +71,11 @@ const (
 	DefaultScriptSpecName          = "script-cm"
 	DefaultScriptSpecTplRef        = "env-from-config-tpl"
 	DefaultScriptSpecVolumeName    = "script-volume"
+
+	DefaultMySQLPortName = "mysql"
+	DefaultMySQLPort     = 3306
+	DefaultPaxosPortName = "paxos"
+	DefaultPaxosPort     = 13306
 )
 
 var (
@@ -142,14 +147,14 @@ var (
 		Resources:       zeroResRequirements,
 		Ports: []corev1.ContainerPort{
 			{
-				Name:          "mysql",
+				Name:          DefaultMySQLPortName,
 				Protocol:      corev1.ProtocolTCP,
-				ContainerPort: 3306,
+				ContainerPort: DefaultMySQLPort,
 			},
 			{
-				Name:          "paxos",
+				Name:          DefaultPaxosPortName,
 				Protocol:      corev1.ProtocolTCP,
-				ContainerPort: 13306,
+				ContainerPort: DefaultPaxosPort,
 			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
@@ -217,9 +222,9 @@ var (
 
 	defaultMySQLService = appsv1alpha1.ServiceSpec{
 		Ports: []appsv1alpha1.ServicePort{{
-			Name:     "mysql",
+			Name:     DefaultMySQLPortName,
 			Protocol: corev1.ProtocolTCP,
-			Port:     3306,
+			Port:     DefaultMySQLPort,
 		}},
 	}
 

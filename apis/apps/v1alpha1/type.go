@@ -670,6 +670,13 @@ type ConnectionEndpoint struct {
 }
 
 type ConnectionServiceEndpoint struct {
+	// Component specifies the name of component to look up matched service.
+	// For cluster-level connection credential, if the component is not specified,
+	// it will look up the matched service in cluster services; otherwise, component services will be searched.
+	// Cannot be updated.
+	// +optional
+	Component string `json:"component,omitempty"`
+
 	// ServiceName specifies the name of the service to use for accessing.
 	// Cannot be updated.
 	// +optional

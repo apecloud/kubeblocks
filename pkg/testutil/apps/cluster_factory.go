@@ -91,6 +91,16 @@ func (factory *MockClusterFactory) AddService(service appsv1alpha1.Service) *Moc
 	return factory
 }
 
+func (factory *MockClusterFactory) AddConnectionCredential(connCredential appsv1alpha1.ConnectionCredential) *MockClusterFactory {
+	connCredentials := factory.Get().Spec.ConnectionCredentials
+	if len(connCredentials) == 0 {
+		connCredentials = []appsv1alpha1.ConnectionCredential{}
+	}
+	connCredentials = append(connCredentials, connCredential)
+	factory.Get().Spec.ConnectionCredentials = connCredentials
+	return factory
+}
+
 type updateFn func(comp *appsv1alpha1.ClusterComponentSpec)
 
 func (factory *MockClusterFactory) lastComponentRef(update updateFn) *MockClusterFactory {

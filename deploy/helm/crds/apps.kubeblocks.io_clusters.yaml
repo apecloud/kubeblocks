@@ -962,6 +962,14 @@ spec:
                           description: ServiceEndpoint specifies the defined service
                             to use. Cannot be updated.
                           properties:
+                            component:
+                              description: Component specifies the name of component
+                                to look up matched service. For cluster-level connection
+                                credential, if the component is not specified, it
+                                will look up the matched service in cluster services;
+                                otherwise, component services will be searched. Cannot
+                                be updated.
+                              type: string
                             portName:
                               description: PortName specifies the name of the port
                                 to access the service. If the service has multiple

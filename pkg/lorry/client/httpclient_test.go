@@ -204,12 +204,12 @@ var _ = Describe("Lorry HTTP Client", func() {
 
 		It("success", func() {
 			mockDBManager.EXPECT().CreateUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-			Expect(lorryClient.CreateUser(context.TODO(), "user-test", "password-test")).Should(Succeed())
+			Expect(lorryClient.CreateUser(context.TODO(), "user-test", "password-test", "")).Should(Succeed())
 		})
 
 		It("not implemented", func() {
 			mockDBManager.EXPECT().CreateUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf(msg))
-			err := lorryClient.CreateUser(context.TODO(), "user-test", "password-test")
+			err := lorryClient.CreateUser(context.TODO(), "user-test", "password-test", "")
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring(msg))
 		})

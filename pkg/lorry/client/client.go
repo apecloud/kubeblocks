@@ -75,11 +75,15 @@ func (cli *lorryClient) GetRole(ctx context.Context) (string, error) {
 	return role.(string), nil
 }
 
-func (cli *lorryClient) CreateUser(ctx context.Context, userName, password string) error {
+func (cli *lorryClient) CreateUser(ctx context.Context, userName, password, roleName string) error {
 	parameters := map[string]any{
 		"userName": userName,
 		"password": password,
 	}
+	if roleName != "" {
+		parameters["roleName"] = roleName
+	}
+
 	req := map[string]any{"parameters": parameters}
 	_, err := cli.Request(ctx, string(CreateUserOp), http.MethodPost, req)
 	return err

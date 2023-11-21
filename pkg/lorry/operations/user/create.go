@@ -81,5 +81,13 @@ func (s *CreateUser) Do(ctx context.Context, req *operations.OpsRequest) (*opera
 		return resp, err
 	}
 
+	if userInfo.RoleName != "" {
+		err := s.dbManager.GrantUserRole(ctx, userInfo.UserName, userInfo.RoleName)
+		if err != nil {
+			s.logger.Info("executing grantRole error", "error", err)
+			return resp, err
+		}
+	}
+
 	return resp.WithSuccess("")
 }

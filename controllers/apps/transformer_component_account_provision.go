@@ -196,7 +196,7 @@ func (t *componentAccountProvisionTransformer) provisionAccount(transCtx *compon
 		return nil
 	}
 
-	if err = lorryCli.CreateUser(transCtx.Context, string(username), string(password)); err != nil {
+	if err = lorryCli.CreateUser(transCtx.Context, string(username), string(password), ""); err != nil {
 		return err
 	}
 

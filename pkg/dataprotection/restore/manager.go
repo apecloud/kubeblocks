@@ -469,9 +469,12 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 				setToleration(targetPodList[i].Spec.Tolerations)
 			job := jobBuilder.build()
 			// create exec job in kubeblocks namespace for security
-			job.Namespace = viper.GetString(constant.CfgKeyCtrlrMgrNS)
+			kbInstalledNamespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+			if kbInstalledNamespace != "" {
+				job.Namespace = kbInstalledNamespace
+			}
 			job.Labels[DataProtectionRestoreNamespaceLabelKey] = r.Restore.Namespace
-			// use the kubeblocks's serviceAccount
+			// use the KubeBlocks' serviceAccount
 			job.Spec.Template.Spec.ServiceAccountName = viper.GetString(constant.KBServiceAcccountName)
 			restoreJobs = append(restoreJobs, job)
 		}

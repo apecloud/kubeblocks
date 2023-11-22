@@ -136,7 +136,7 @@ var _ = Describe("OpsUtil functions", func() {
 			Expect(opsSlice[1].InQueue).Should(BeTrue())
 
 			By("test enqueueOpsRequestToClusterAnnotation function with Reentry")
-			opsBehaviour, _ := opsManager.OpsMap[ops2.Spec.Type]
+			opsBehaviour := opsManager.OpsMap[ops2.Spec.Type]
 			opsSlice, _ = enqueueOpsRequestToClusterAnnotation(ctx, k8sClient, opsRes, opsBehaviour)
 			Expect(len(opsSlice)).Should(Equal(2))
 

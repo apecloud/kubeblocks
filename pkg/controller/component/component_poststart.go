@@ -70,7 +70,7 @@ func ReconcileCompPostStart(ctx context.Context,
 	}
 
 	// job executed successfully, add the annotation to indicate that the postStart has been executed and delete the job
-	if err := setPostStartDoneAnnotation(cli, cluster, synthesizeComp, dag); err != nil {
+	if err := setPostStartDoneAnnotation(cli, *cluster, synthesizeComp, dag); err != nil {
 		return err
 	}
 
@@ -326,7 +326,7 @@ func getComponentPodList(ctx context.Context, cli client.Client, cluster appsv1a
 
 // setPostStartDoneAnnotation sets the postStart done annotation to the cluster object.
 func setPostStartDoneAnnotation(cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster appsv1alpha1.Cluster,
 	synthesizeComp *SynthesizedComponent,
 	dag *graph.DAG) error {
 	graphCli := model.NewGraphClient(cli)
@@ -341,7 +341,7 @@ func setPostStartDoneAnnotation(cli client.Client,
 	clusterObj := cluster.DeepCopy()
 	timeStr := time.Now().Format(time.RFC3339Nano)
 	cluster.Annotations[compPostStartDoneKey] = timeStr
-	graphCli.Do(dag, clusterObj, cluster, model.ActionUpdatePtr(), nil)
+	graphCli.Do(dag, clusterObj, &cluster, model.ActionUpdatePtr(), nil)
 	return nil
 }
 

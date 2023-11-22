@@ -157,7 +157,7 @@ var _ = Describe("generate service descriptor", func() {
 
 	// for test GetContainerWithVolumeMount
 	Context("config template utils test", func() {
-		PIt("service reference config template render test", func() {
+		It("service reference config template render test", func() {
 			clusterKey := client.ObjectKeyFromObject(cluster)
 			req := ctrl.Request{
 				NamespacedName: clusterKey,
@@ -322,19 +322,19 @@ var _ = Describe("generate service descriptor", func() {
 			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Endpoint.ValueFrom).Should(BeNil())
 			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Port.Value).Should(Equal(serviceRefPortValue))
 			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Port.ValueFrom).Should(BeNil())
-			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Auth.Username.Value).Should(BeEmpty())
-			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Auth.Username.ValueFrom.SecretKeyRef).ShouldNot(BeNil())
-			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Auth.Password.Value).Should(BeEmpty())
-			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Auth.Password.ValueFrom.SecretKeyRef).ShouldNot(BeNil())
+			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Auth.Username.Value).Should(Equal(serviceRefUsernameValue))
+			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Auth.Username.ValueFrom).Should(BeNil())
+			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Auth.Password.Value).Should(Equal(serviceRefPasswordValue))
+			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Auth.Password.ValueFrom).Should(BeNil())
 
 			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Endpoint.Value).Should(Equal(serviceRefEndpointValue))
 			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Endpoint.ValueFrom).Should(BeNil())
 			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Port.Value).Should(Equal(serviceRefPortValue))
 			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Port.ValueFrom).Should(BeNil())
-			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Username.Value).Should(BeEmpty())
-			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Username.ValueFrom.ConfigMapKeyRef).ShouldNot(BeNil())
-			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Password.Value).Should(BeEmpty())
-			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Password.ValueFrom.ConfigMapKeyRef).ShouldNot(BeNil())
+			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Username.Value).Should(Equal(serviceRefUsernameValue))
+			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Username.ValueFrom).Should(BeNil())
+			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Password.Value).Should(Equal(serviceRefPasswordValue))
+			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Password.ValueFrom).Should(BeNil())
 		})
 	})
 })

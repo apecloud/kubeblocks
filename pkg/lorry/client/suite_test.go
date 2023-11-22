@@ -74,14 +74,15 @@ var _ = AfterSuite(func() {
 })
 
 func newTCPServer(port int) (net.Listener, int) {
+	var err error
 	for i := 0; i < 3; i++ {
-		tcpListener, _ = net.Listen("tcp", fmt.Sprintf(":%v", port))
-		if tcpListener != nil {
+		tcpListener, err = net.Listen("tcp", fmt.Sprintf("127.0.0.1:%v", port))
+		if err == nil {
 			break
 		}
 		port++
 	}
-	Expect(tcpListener).ShouldNot(BeNil())
+	Expect(err).Should(BeNil())
 	return tcpListener, port
 }
 

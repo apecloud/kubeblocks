@@ -123,7 +123,7 @@ func decodeString(f reflect.Type, t reflect.Type, data any) (any, error) {
 
 	switch t.Kind() {
 	case reflect.Uint:
-		val, err := strconv.ParseUint(dataString, 10, 64)
+		val, err := strconv.ParseUint(dataString, 10, 32)
 
 		return uint(val), invalidError(err, "uint", dataString)
 	case reflect.Uint64:
@@ -144,9 +144,9 @@ func decodeString(f reflect.Type, t reflect.Type, data any) (any, error) {
 		return uint8(val), invalidError(err, "uint8", dataString)
 
 	case reflect.Int:
-		val, err := strconv.ParseInt(dataString, 10, 64)
+		val, err := strconv.Atoi(dataString)
 
-		return int(val), invalidError(err, "int", dataString)
+		return val, invalidError(err, "int", dataString)
 	case reflect.Int64:
 		val, err := strconv.ParseInt(dataString, 10, 64)
 

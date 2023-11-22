@@ -9,7 +9,6 @@ spec:
   clusterDefinitionRef: qdrant
   backupPolicies:
   - componentDefRef: qdrant
-    retentionPeriod: 7d
     backupMethods:
     - name: datafile
       snapshotVolumes: false
@@ -27,6 +26,8 @@ spec:
     - backupMethod: datafile
       enabled: false
       cronExpression: "0 18 * * 0"
+      retentionPeriod: 7d
     - backupMethod: volume-snapshot
       enabled: false
       cronExpression: "0 18 * * 0"
+      retentionPeriod: 7d

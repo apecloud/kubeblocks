@@ -52,19 +52,15 @@ type OpsBehaviour struct {
 	FromClusterPhases []appsv1alpha1.ClusterPhase
 
 	// ToClusterPhase indicates that the cluster will enter this phase during the operation.
+	// All opsRequest with ToClusterPhase are mutually exclusive.
 	ToClusterPhase appsv1alpha1.ClusterPhase
-
-	// ProcessingReasonInClusterCondition indicates the reason of the condition that type is "OpsRequestProcessed" in Cluster.Status.Conditions and
-	// is only valid when ToClusterPhase is not empty. it will indicate what operation the cluster is doing and
-	// will be displayed of "kbcli cluster list".
-	ProcessingReasonInClusterCondition string
 
 	// CancelFunc this function defines the cancel action and does not patch/update the opsRequest by client-go in here.
 	// only update the opsRequest object, then opsRequest controller will update uniformly.
 	CancelFunc func(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) error
 
-	// IsClusterCreationEnabled indicates whether the opsRequest will create a new cluster.
-	IsClusterCreationEnabled bool
+	// IsClusterCreation indicates whether the opsRequest will create a new cluster.
+	IsClusterCreation bool
 
 	OpsHandler OpsHandler
 }
@@ -88,25 +84,3 @@ type progressResource struct {
 	clusterComponentDef *appsv1alpha1.ClusterComponentDefinition
 	opsIsCompleted      bool
 }
-
-const (
-	// ProcessingReasonHorizontalScaling is the reason of the "OpsRequestProcessed" condition for the horizontal scaling opsRequest processing in cluster.
-	ProcessingReasonHorizontalScaling = "HorizontalScaling"
-	// ProcessingReasonVerticalScaling is the reason of the "OpsRequestProcessed" condition for the vertical scaling opsRequest processing in cluster.
-	ProcessingReasonVerticalScaling = "VerticalScaling"
-	// ProcessingReasonStarting is the reason of the "OpsRequestProcessed" condition for the start opsRequest processing in cluster.
-	ProcessingReasonStarting = "Starting"
-	// ProcessingReasonStopping is the reason of the "OpsRequestProcessed" condition for the stop opsRequest processing in cluster.
-	ProcessingReasonStopping = "Stopping"
-	// ProcessingReasonRestarting is the reason of the "OpsRequestProcessed" condition for the restart opsRequest processing in cluster.
-	ProcessingReasonRestarting = "Restarting"
-	// ProcessingReasonReconfiguring is the reason of the "OpsRequestProcessed" condition for the reconfiguration opsRequest processing in cluster.
-	ProcessingReasonReconfiguring = "Reconfiguring"
-	// ProcessingReasonVersionUpgrading is the reason of the "OpsRequestProcessed" condition for the version upgrade opsRequest processing in cluster.
-	ProcessingReasonVersionUpgrading = "VersionUpgrading"
-	// ProcessingReasonSwitchovering is the reason of the "OpsRequestProcessed" condition for the switchover opsRequest processing in cluster.
-	ProcessingReasonSwitchovering = "Switchovering"
-	// ProcessingReasonBackup is the reason of the "OpsRequestProcessed" condition for the backup opsRequest processing in cluster.
-	ProcessingReasonBackup  = "Backup"
-	ProcessingReasonRestore = "Restore"
-)

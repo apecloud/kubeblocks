@@ -45,10 +45,9 @@ func init() {
 	// register restore operation, it will create a new cluster
 	// so set IsClusterCreationEnabled to true
 	restoreBehaviour := OpsBehaviour{
-		FromClusterPhases:                  appsv1alpha1.GetClusterUpRunningPhases(),
-		OpsHandler:                         RestoreOpsHandler{},
-		ProcessingReasonInClusterCondition: ProcessingReasonRestore,
-		IsClusterCreationEnabled:           true,
+		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
+		OpsHandler:        RestoreOpsHandler{},
+		IsClusterCreation: true,
 	}
 
 	opsMgr := GetOpsManager()

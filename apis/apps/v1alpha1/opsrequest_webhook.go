@@ -121,25 +121,18 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 			return err
 		}
 	}
-
-	opsNamesInQueue := make([]string, len(opsRecorder))
-	for i, v := range opsRecorder {
-		// judge whether the opsRequest meets the following conditions:
-		// 1. the opsRequest is Reentrant.
-		// 2. the opsRequest supports concurrent execution of the same kind.
-		// 3. reconfiguring is a special case, it can be executed concurrently with other opsRequests.
-		if v.Name != r.Name && v.Type != ReconfiguringType {
-			return fmt.Errorf("existing OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", v.Name, cluster.Name)
-		}
-		opsNamesInQueue[i] = v.Name
+	// check if the opsRequest can be executed in the current cluster.
+	if slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) {
+		return nil
 	}
-	// check if the opsRequest can be executed in the current cluster phase unless this opsRequest is reentrant.
-	if !slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) &&
-		!slices.Contains(opsNamesInQueue, r.Name) {
-		// if TTLSecondsBeforeAbort is not set or 0, return error
-		if r.Spec.TTLSecondsBeforeAbort == nil || *r.Spec.TTLSecondsBeforeAbort == 0 {
-			return fmt.Errorf("OpsRequest.spec.type=%s is forbidden when Cluster.status.phase=%s", r.Spec.Type, cluster.Status.Phase)
-		}
+	// check if this opsRequest needs to verify cluster phase before opsRequest starts running.
+	needCheck := len(opsRecorder) == 0 || (opsRecorder[0].Name == r.Name && opsRecorder[0].InQueue)
+	if !needCheck {
+		return nil
+	}
+	// if TTLSecondsBeforeAbort is not set or 0, return error
+	if r.Spec.TTLSecondsBeforeAbort == nil || *r.Spec.TTLSecondsBeforeAbort == 0 {
+		return fmt.Errorf("OpsRequest.spec.type=%s is forbidden when Cluster.status.phase=%s", r.Spec.Type, cluster.Status.Phase)
 	}
 	return nil
 }
@@ -157,15 +150,16 @@ func (r *OpsRequest) getCluster(ctx context.Context, k8sClient client.Client) (*
 	return cluster, nil
 }
 
-func (r *OpsRequest) getConfigMap(cmName string) (*corev1.ConfigMap, error) {
+func (r *OpsRequest) getConfigMap(ctx context.Context,
+	k8sClient client.Client,
+	cmName string) (*corev1.ConfigMap, error) {
 	cmObj := &corev1.ConfigMap{}
 	cmKey := client.ObjectKey{
 		Namespace: r.Namespace,
 		Name:      cmName,
 	}
 
-	ctx := context.Background()
-	if err := webhookMgr.client.Get(ctx, cmKey, cmObj); err != nil {
+	if err := k8sClient.Get(ctx, cmKey, cmObj); err != nil {
 		return nil, err
 	}
 	return cmObj, nil
@@ -175,8 +169,8 @@ func (r *OpsRequest) getConfigMap(cmName string) (*corev1.ConfigMap, error) {
 func (r *OpsRequest) Validate(ctx context.Context,
 	k8sClient client.Client,
 	cluster *Cluster,
-	isCreate bool) error {
-	if isCreate {
+	needCheckClusterPhase bool) error {
+	if needCheckClusterPhase {
 		if err := r.validateClusterPhase(cluster); err != nil {
 			return err
 		}
@@ -202,9 +196,6 @@ func (r *OpsRequest) validateEntry(isCreate bool) error {
 func (r *OpsRequest) validateOps(ctx context.Context,
 	k8sClient client.Client,
 	cluster *Cluster) error {
-	if webhookMgr == nil {
-		return nil
-	}
 	// Check whether the corresponding attribute is legal according to the operation type
 	switch r.Spec.Type {
 	case UpgradeType:
@@ -218,7 +209,7 @@ func (r *OpsRequest) validateOps(ctx context.Context,
 	case RestartType:
 		return r.validateRestart(cluster)
 	case ReconfiguringType:
-		return r.validateReconfigure(cluster)
+		return r.validateReconfigure(ctx, k8sClient, cluster)
 	case SwitchoverType:
 		return r.validateSwitchover(ctx, k8sClient, cluster)
 	case DataScriptType:
@@ -282,10 +273,9 @@ func (r *OpsRequest) validateVerticalScaling(cluster *Cluster) error {
 }
 
 // validateVerticalScaling validate api is legal when spec.type is VerticalScaling
-func (r *OpsRequest) validateReconfigure(cluster *Cluster) error {
-	if webhookMgr == nil || webhookMgr.client == nil {
-		return nil
-	}
+func (r *OpsRequest) validateReconfigure(ctx context.Context,
+	k8sClient client.Client,
+	cluster *Cluster) error {
 	reconfigure := r.Spec.Reconfigure
 	if reconfigure == nil {
 		return notEmptyError("spec.reconfigure")
@@ -294,7 +284,7 @@ func (r *OpsRequest) validateReconfigure(cluster *Cluster) error {
 		return fmt.Errorf("component %s not found", reconfigure.ComponentName)
 	}
 	for _, configuration := range reconfigure.Configurations {
-		cmObj, err := r.getConfigMap(fmt.Sprintf("%s-%s-%s", r.Spec.ClusterRef, reconfigure.ComponentName, configuration.Name))
+		cmObj, err := r.getConfigMap(ctx, k8sClient, fmt.Sprintf("%s-%s-%s", r.Spec.ClusterRef, reconfigure.ComponentName, configuration.Name))
 		if err != nil {
 			return err
 		}

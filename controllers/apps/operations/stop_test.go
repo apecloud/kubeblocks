@@ -70,6 +70,8 @@ var _ = Describe("Stop OpsRequest", func() {
 			ops := testapps.NewOpsRequestObj("stop-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, appsv1alpha1.StopType)
 			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			// set ops phase to Pending
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
 
 			By("test stop action and reconcile function")
 			// update ops phase to running first

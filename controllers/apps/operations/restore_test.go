@@ -77,6 +77,8 @@ var _ = Describe("Restore OpsRequest", func() {
 		It("", func() {
 			By("create Restore OpsRequest")
 			opsRes.OpsRequest = createRestoreOpsObj(clusterName, "restore-ops-"+randomStr, backupName)
+			// set ops phase to Pending
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
 
 			By("mock restore OpsRequest is Running")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)

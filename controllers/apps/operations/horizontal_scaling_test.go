@@ -71,7 +71,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 	AfterEach(cleanEnv)
 
 	initClusterAnnotationAndPhaseForOps := func(opsRes *OpsResource) {
-		Expect(opsutil.PatchClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
+		Expect(opsutil.UpdateClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
 		Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
 			opsRes.Cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
 		})).ShouldNot(HaveOccurred())
@@ -87,6 +87,8 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			By(fmt.Sprintf("create opsRequest for horizontal scaling of consensus component from 3 to %d", replicas))
 			initClusterAnnotationAndPhaseForOps(opsRes)
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, replicas)
+			// set ops phase to Pending
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
 			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, consensusComp)
 
 			By("expect for opsRequest phase is Creating after doing action")
@@ -205,7 +207,9 @@ func createHorizontalScaling(clusterName string, replicas int) *appsv1alpha1.Ops
 			Replicas:     int32(replicas),
 		},
 	}
-	return testapps.CreateOpsRequest(ctx, testCtx, ops)
+	opsRequest := testapps.CreateOpsRequest(ctx, testCtx, ops)
+	opsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
+	return opsRequest
 }
 
 func cancelOpsRequest(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, cancelTime time.Time) {

@@ -39,9 +39,8 @@ var (
 func (opsMgr *OpsManager) RegisterOps(opsType appsv1alpha1.OpsType, opsBehaviour OpsBehaviour) {
 	opsManager.OpsMap[opsType] = opsBehaviour
 	appsv1alpha1.OpsRequestBehaviourMapper[opsType] = appsv1alpha1.OpsRequestBehaviour{
-		FromClusterPhases:                  opsBehaviour.FromClusterPhases,
-		ToClusterPhase:                     opsBehaviour.ToClusterPhase,
-		ProcessingReasonInClusterCondition: opsBehaviour.ProcessingReasonInClusterCondition,
+		FromClusterPhases: opsBehaviour.FromClusterPhases,
+		ToClusterPhase:    opsBehaviour.ToClusterPhase,
 	}
 }
 
@@ -54,40 +53,38 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 		opsRequest   = opsRes.OpsRequest
 	)
 	if opsBehaviour, ok = opsMgr.OpsMap[opsRequest.Spec.Type]; !ok || opsBehaviour.OpsHandler == nil {
-		return nil, PatchOpsHandlerNotSupported(reqCtx.Ctx, cli, opsRes)
+		return &ctrl.Result{}, PatchOpsHandlerNotSupported(reqCtx.Ctx, cli, opsRes)
 	}
 
 	// validate OpsRequest.spec
 	// if the operation will create a new cluster, don't validate the cluster
-	if err = opsRequest.Validate(reqCtx.Ctx, cli, opsRes.Cluster, !opsBehaviour.IsClusterCreationEnabled); err != nil {
-		if patchErr := patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error()); patchErr != nil {
-			return nil, patchErr
-		}
-		return nil, err
+	if err = opsRequest.Validate(reqCtx.Ctx, cli, opsRes.Cluster, !opsBehaviour.IsClusterCreation); err != nil {
+		return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
 	}
 
-	// validate entry condition for OpsRequest, check if the cluster is in the right phase
-	// if the operation will create the cluster, don't need to validate it
-	if opsRequest.Status.Phase == appsv1alpha1.OpsPendingPhase && !opsBehaviour.IsClusterCreationEnabled {
+	if opsRequest.Status.Phase == appsv1alpha1.OpsPendingPhase {
+		// validate entry condition for OpsRequest, check if the cluster is in the right phase
 		if err = validateOpsWaitingPhase(opsRes.Cluster, opsRequest, opsBehaviour); err != nil {
 			// check if the error is caused by WaitForClusterPhaseErr  error
 			if _, ok := err.(*WaitForClusterPhaseErr); ok {
 				return intctrlutil.ResultToP(intctrlutil.RequeueAfter(time.Second, reqCtx.Log, ""))
 			}
-			if patchErr := patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error()); patchErr != nil {
-				return nil, patchErr
+			return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
+		}
+		if opsBehaviour.ToClusterPhase != "" {
+			// if ToClusterPhase is not empty, enqueue OpsRequest to the cluster Annotation.
+			opsRecordeSlice, err := enqueueOpsRequestToClusterAnnotation(reqCtx.Ctx, cli, opsRes, opsBehaviour)
+			if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
+				return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
+			} else if err != nil {
+				return nil, err
 			}
-			return nil, err
+			// only one operation can be running at a time if these operations are mutually exclusive(exist opsBehaviour.ToClusterPhase).
+			// other opsRequest should be reconciled.
+			if len(opsRecordeSlice) > 0 && opsRecordeSlice[0].Name != opsRequest.Name {
+				return intctrlutil.ResultToP(intctrlutil.Reconciled())
+			}
 		}
-	}
-
-	if opsRequest.Status.Phase != appsv1alpha1.OpsCreatingPhase {
-		// If the operation causes the cluster phase to change, the cluster needs to be locked.
-		// At the same time, only one operation is running if these operations are mutually exclusive(exist opsBehaviour.ToClusterPhase).
-		if err = addOpsRequestAnnotationToCluster(reqCtx.Ctx, cli, opsRes, opsBehaviour); err != nil {
-			return nil, err
-		}
-
 		opsDeepCopy := opsRequest.DeepCopy()
 		// save last configuration into status.lastConfiguration
 		if err = opsBehaviour.OpsHandler.SaveLastConfiguration(reqCtx, cli, opsRes); err != nil {
@@ -100,13 +97,10 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 	if err = opsBehaviour.OpsHandler.Action(reqCtx, cli, opsRes); err != nil {
 		// patch the status.phase to Failed when the error is FastFailError, which means the operation is failed and there is no need to retry
 		if _, ok := err.(*FastFailError); ok {
-			if patchErr := patchFastFailErrorCondition(reqCtx.Ctx, cli, opsRes, err); patchErr != nil {
-				return nil, patchErr
-			}
+			return &ctrl.Result{}, patchFastFailErrorCondition(reqCtx.Ctx, cli, opsRes, err)
 		}
 		return nil, err
 	}
-
 	return nil, nil
 }
 

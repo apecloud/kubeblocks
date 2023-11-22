@@ -200,6 +200,8 @@ var _ = Describe("", func() {
 				},
 			}
 			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			// set ops phase to Pending
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
 
 			By("mock switchover OpsRequest phase is Creating")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)

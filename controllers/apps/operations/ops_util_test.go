@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -106,5 +107,54 @@ var _ = Describe("OpsUtil functions", func() {
 
 		})
 
+		It("Test opsRequest Queue functions", func() {
+			By("init operations resources ")
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+
+			runHscaleOps := func(expectPhase appsv1alpha1.OpsPhase) *appsv1alpha1.OpsRequest {
+				ops := createHorizontalScaling(clusterName, 1)
+				opsRes.OpsRequest = ops
+				_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(expectPhase))
+				return ops
+			}
+
+			By("run first h-scale ops, expect phase to Creating")
+			ops1 := runHscaleOps(appsv1alpha1.OpsCreatingPhase)
+
+			By("run next h-scale ops, expect phase to Pending")
+			ops2 := runHscaleOps(appsv1alpha1.OpsPendingPhase)
+
+			By("check opsRequest annotation in cluster")
+			cluster := &appsv1alpha1.Cluster{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), cluster)).Should(Succeed())
+			opsSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
+			Expect(len(opsSlice)).Should(Equal(2))
+			Expect(opsSlice[0].InQueue).Should(BeFalse())
+			Expect(opsSlice[1].InQueue).Should(BeTrue())
+
+			By("test enqueueOpsRequestToClusterAnnotation function with Reentry")
+			opsBehaviour := opsManager.OpsMap[ops2.Spec.Type]
+			opsSlice, _ = enqueueOpsRequestToClusterAnnotation(ctx, k8sClient, opsRes, opsBehaviour)
+			Expect(len(opsSlice)).Should(Equal(2))
+
+			By("test DequeueOpsRequestInClusterAnnotation function when first opsRequest is Failed")
+			// mock ops1 is Failed
+			ops1.Status.Phase = appsv1alpha1.OpsFailedPhase
+			opsRes.OpsRequest = ops1
+			Expect(DequeueOpsRequestInClusterAnnotation(ctx, k8sClient, opsRes)).Should(Succeed())
+			testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(ops2), func(g Gomega, ops *appsv1alpha1.OpsRequest) {
+				// expect ops2 is Cancelled
+				g.Expect(ops.Status.Phase).Should(Equal(appsv1alpha1.OpsCancelledPhase))
+			})
+
+			testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, cluster *appsv1alpha1.Cluster) {
+				opsSlice, _ = opsutil.GetOpsRequestSliceFromCluster(cluster)
+				// expect cluster's opsRequest queue is empty
+				g.Expect(opsSlice).Should(BeEmpty())
+			})
+		})
 	})
 })

@@ -70,7 +70,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 	AfterEach(cleanEnv)
 
 	initClusterForOps := func(opsRes *OpsResource) {
-		Expect(opsutil.PatchClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
+		Expect(opsutil.UpdateClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
 		opsRes.Cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
 	}
 

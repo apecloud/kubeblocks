@@ -75,7 +75,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 	AfterEach(cleanEnv)
 
 	initClusterForOps := func(opsRes *OpsResource) {
-		Expect(opsutil.PatchClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
+		Expect(opsutil.UpdateClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
 		opsRes.Cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
 	}
 
@@ -228,6 +228,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 
 			opsManager := GetOpsManager()
 			By("init ops phase")
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
 			_, err := opsManager.Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 
@@ -319,6 +320,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			opsManager := GetOpsManager()
 			// reAction := reconfigureAction{}
 			By("Reconfigure configure")
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
 			_, err := opsManager.Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))

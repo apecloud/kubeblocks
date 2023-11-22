@@ -86,7 +86,7 @@ func NewKubernetesStore() (*KubernetesStore, error) {
 
 	clusterCompName := os.Getenv(constant.KBEnvClusterCompName)
 	if clusterCompName == "" {
-		return nil, errors.New("KB_CLUSTER_COMP_NAME must be set")
+		clusterCompName = clusterName + "-" + componentName
 	}
 
 	currentMemberName := os.Getenv(constant.KBEnvPodName)

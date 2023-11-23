@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
-	"context"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -41,7 +39,6 @@ import (
 )
 
 var _ = Describe("generate service descriptor", func() {
-
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -63,11 +60,12 @@ var _ = Describe("generate service descriptor", func() {
 	}
 
 	var (
-		mockClient          *testutil.K8sClientMockHelper
-		clusterDef          *appsv1alpha1.ClusterDefinition
-		clusterVersion      *appsv1alpha1.ClusterVersion
-		cluster             *appsv1alpha1.Cluster
-		beReferencedCluster *appsv1alpha1.Cluster
+		mockClient                    *testutil.K8sClientMockHelper
+		clusterDef                    *appsv1alpha1.ClusterDefinition
+		clusterVersion                *appsv1alpha1.ClusterVersion
+		cluster                       *appsv1alpha1.Cluster
+		beReferencedCluster           *appsv1alpha1.Cluster
+		beReferencedServiceDescriptor *appsv1alpha1.ServiceDescriptor
 	)
 
 	var (
@@ -85,8 +83,6 @@ var _ = Describe("generate service descriptor", func() {
 		externalServiceDescriptorVersion = "7.0.1"
 		internalClusterServiceRefKind    = "mysql"
 		internalClusterServiceRefVersion = "8.0.2"
-		secretName                       = constant.GenerateDefaultConnCredential(beReferencedClusterName)
-		configMapRefName                 = beReferencedClusterName + "-configmap-ref"
 		redisServiceRefDeclarationName   = "redis"
 		mysqlServiceRefDeclarationName   = "mysql"
 
@@ -128,15 +124,96 @@ var _ = Describe("generate service descriptor", func() {
 			AddInitContainerShort("nginx-init", testapps.NginxImage).
 			AddContainerShort("nginx", testapps.NginxImage).
 			Create(&testCtx).GetObject()
-		beReferencedCluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, beReferencedClusterName,
-			clusterDef.Name, clusterVersion.Name).
+
+		By("mock a service descriptor and the configmap referenced")
+		configMap := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      beReferencedClusterName + "-configmap-ref",
+				Namespace: namespace,
+			},
+			Data: map[string]string{
+				constant.ServiceDescriptorEndpointKey: serviceRefEndpointValue,
+				constant.ServiceDescriptorPortKey:     serviceRefPortValue,
+				constant.ServiceDescriptorUsernameKey: serviceRefUsernameValue,
+				constant.ServiceDescriptorPasswordKey: serviceRefPasswordValue,
+			},
+		}
+		Expect(testCtx.CheckedCreateObj(ctx, configMap)).Should(Succeed())
+		beReferencedServiceDescriptor = testapps.NewServiceDescriptorFactory(testCtx.DefaultNamespace, externalServiceDescriptorName).
+			SetServiceKind(externalServiceDescriptorKind).
+			SetServiceVersion(externalServiceDescriptorVersion).
+			SetEndpoint(appsv1alpha1.CredentialVar{
+				ValueFrom: &corev1.EnvVarSource{
+					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+						Key: constant.ServiceDescriptorEndpointKey,
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: configMap.Name,
+						},
+					},
+				},
+			}).
+			SetPort(appsv1alpha1.CredentialVar{
+				ValueFrom: &corev1.EnvVarSource{
+					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+						Key: constant.ServiceDescriptorPortKey,
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: configMap.Name,
+						},
+					},
+				},
+			}).
+			SetAuth(appsv1alpha1.ConnectionCredentialAuth{
+				Username: &appsv1alpha1.CredentialVar{
+					ValueFrom: &corev1.EnvVarSource{
+						ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+							Key: constant.ServiceDescriptorUsernameKey,
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: configMap.Name,
+							},
+						},
+					},
+				},
+				Password: &appsv1alpha1.CredentialVar{
+					ValueFrom: &corev1.EnvVarSource{
+						ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+							Key: constant.ServiceDescriptorPasswordKey,
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: configMap.Name,
+							},
+						},
+					},
+				},
+			}).
+			Create(&testCtx).
+			GetObject()
+		Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(beReferencedServiceDescriptor),
+			func(sd *appsv1alpha1.ServiceDescriptor) {
+				sd.Status.Phase = appsv1alpha1.AvailablePhase
+			})).Should(Succeed())
+
+		By("mock a cluster and the (conn credential) secret for referenced")
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      constant.GenerateDefaultConnCredential(beReferencedClusterName),
+				Namespace: namespace,
+			},
+			Data: map[string][]byte{
+				constant.ServiceDescriptorEndpointKey: []byte(serviceRefEndpointValue),
+				constant.ServiceDescriptorPortKey:     []byte(serviceRefPortValue),
+				constant.ServiceDescriptorUsernameKey: []byte(serviceRefUsernameValue),
+				constant.ServiceDescriptorPasswordKey: []byte(serviceRefPasswordValue),
+			},
+		}
+		Expect(testCtx.CheckedCreateObj(ctx, secret)).Should(Succeed())
+		beReferencedCluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, beReferencedClusterName, clusterDef.Name, clusterVersion.Name).
 			AddComponent(mysqlCompName, mysqlCompDefName).
-			Create(&testCtx).GetObject()
+			Create(&testCtx).
+			GetObject()
 
 		serviceRefs := []appsv1alpha1.ServiceRef{
 			{
 				Name:              redisServiceRefDeclarationName,
-				ServiceDescriptor: externalServiceDescriptorName,
+				ServiceDescriptor: beReferencedServiceDescriptor.Name,
 			},
 			{
 				Name:    mysqlServiceRefDeclarationName,
@@ -155,7 +232,6 @@ var _ = Describe("generate service descriptor", func() {
 		cleanEnv()
 	})
 
-	// for test GetContainerWithVolumeMount
 	Context("config template utils test", func() {
 		It("service reference config template render test", func() {
 			clusterKey := client.ObjectKeyFromObject(cluster)
@@ -167,152 +243,10 @@ var _ = Describe("generate service descriptor", func() {
 				Req: req,
 				Log: log.FromContext(ctx).WithValues("cluster", req.NamespacedName),
 			}
-			By("Create a serviceReferencesMap with SecretKeyRef and ConfigMapKeyRef for building a SynthesizedComponent Component")
-			serviceReferencesMap := map[string]*appsv1alpha1.ServiceDescriptor{
-				redisServiceRefDeclarationName: {
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      externalServiceDescriptorName,
-						Namespace: namespace,
-					},
-					Spec: appsv1alpha1.ServiceDescriptorSpec{
-						ServiceKind:    externalServiceDescriptorKind,
-						ServiceVersion: externalServiceDescriptorVersion,
-						Endpoint: &appsv1alpha1.CredentialVar{
-							ValueFrom: &corev1.EnvVarSource{
-								SecretKeyRef: &corev1.SecretKeySelector{
-									Key: constant.ServiceDescriptorEndpointKey,
-									LocalObjectReference: corev1.LocalObjectReference{
-										Name: secretName,
-									},
-								},
-							},
-						},
-						Port: &appsv1alpha1.CredentialVar{
-							ValueFrom: &corev1.EnvVarSource{
-								SecretKeyRef: &corev1.SecretKeySelector{
-									Key: constant.ServiceDescriptorPortKey,
-									LocalObjectReference: corev1.LocalObjectReference{
-										Name: secretName,
-									},
-								},
-							},
-						},
-						Auth: &appsv1alpha1.ConnectionCredentialAuth{
-							Username: &appsv1alpha1.CredentialVar{
-								ValueFrom: &corev1.EnvVarSource{
-									SecretKeyRef: &corev1.SecretKeySelector{
-										Key: constant.ServiceDescriptorUsernameKey,
-										LocalObjectReference: corev1.LocalObjectReference{
-											Name: secretName,
-										},
-									},
-								},
-							},
-							Password: &appsv1alpha1.CredentialVar{
-								ValueFrom: &corev1.EnvVarSource{
-									SecretKeyRef: &corev1.SecretKeySelector{
-										Key: constant.ServiceDescriptorPasswordKey,
-										LocalObjectReference: corev1.LocalObjectReference{
-											Name: secretName,
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				mysqlServiceRefDeclarationName: {
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      externalServiceDescriptorName,
-						Namespace: namespace,
-					},
-					Spec: appsv1alpha1.ServiceDescriptorSpec{
-						ServiceKind:    externalServiceDescriptorKind,
-						ServiceVersion: externalServiceDescriptorVersion,
-						Endpoint: &appsv1alpha1.CredentialVar{
-							ValueFrom: &corev1.EnvVarSource{
-								ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-									Key: constant.ServiceDescriptorEndpointKey,
-									LocalObjectReference: corev1.LocalObjectReference{
-										Name: configMapRefName,
-									},
-								},
-							},
-						},
-						Port: &appsv1alpha1.CredentialVar{
-							ValueFrom: &corev1.EnvVarSource{
-								ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-									Key: constant.ServiceDescriptorPortKey,
-									LocalObjectReference: corev1.LocalObjectReference{
-										Name: configMapRefName,
-									},
-								},
-							},
-						},
-						Auth: &appsv1alpha1.ConnectionCredentialAuth{
-							Username: &appsv1alpha1.CredentialVar{
-								ValueFrom: &corev1.EnvVarSource{
-									ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-										Key: constant.ServiceDescriptorUsernameKey,
-										LocalObjectReference: corev1.LocalObjectReference{
-											Name: configMapRefName,
-										},
-									},
-								},
-							},
-							Password: &appsv1alpha1.CredentialVar{
-								ValueFrom: &corev1.EnvVarSource{
-									ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-										Key: constant.ServiceDescriptorPasswordKey,
-										LocalObjectReference: corev1.LocalObjectReference{
-											Name: configMapRefName,
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			}
-			// TODO(xingran): serviceReferencesMap should be generated by the controller, test case should be refactored
 			component, err := component.BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 			Expect(component.ServiceReferences).ShouldNot(BeNil())
-			Expect(serviceReferencesMap).Should(BeNil()) // for test case fail
-
-			By("create a secret and a configmap for service reference")
-			secret := &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      secretName,
-					Namespace: namespace,
-				},
-				Data: map[string][]byte{
-					constant.ServiceDescriptorPasswordKey: []byte(serviceRefPasswordValue),
-					constant.ServiceDescriptorUsernameKey: []byte(serviceRefUsernameValue),
-					constant.ServiceDescriptorEndpointKey: []byte(serviceRefEndpointValue),
-					constant.ServiceDescriptorPortKey:     []byte(serviceRefPortValue),
-				},
-			}
-			Expect(testCtx.CheckedCreateObj(ctx, secret)).Should(Succeed())
-			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: secret.Name,
-				Namespace: secret.Namespace}, secret)).Should(Succeed())
-
-			configMap := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      configMapRefName,
-					Namespace: namespace,
-				},
-				Data: map[string]string{
-					constant.ServiceDescriptorPasswordKey: serviceRefPasswordValue,
-					constant.ServiceDescriptorUsernameKey: serviceRefUsernameValue,
-					constant.ServiceDescriptorEndpointKey: serviceRefEndpointValue,
-					constant.ServiceDescriptorPortKey:     serviceRefPortValue,
-				},
-			}
-			Expect(testCtx.CheckedCreateObj(ctx, configMap)).Should(Succeed())
-			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: configMap.Name,
-				Namespace: configMap.Namespace}, configMap)).Should(Succeed())
 
 			var v Visitor = &ComponentVisitor{component: component}
 			err = v.Visit(resolveServiceReferences(k8sClient, ctx))
@@ -322,19 +256,19 @@ var _ = Describe("generate service descriptor", func() {
 			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Endpoint.ValueFrom).Should(BeNil())
 			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Port.Value).Should(Equal(serviceRefPortValue))
 			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Port.ValueFrom).Should(BeNil())
-			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Auth.Username.Value).Should(Equal(serviceRefUsernameValue))
-			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Auth.Username.ValueFrom).Should(BeNil())
-			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Auth.Password.Value).Should(Equal(serviceRefPasswordValue))
-			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Auth.Password.ValueFrom).Should(BeNil())
+			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Auth.Username.Value).Should(BeEmpty())
+			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Auth.Username.ValueFrom.ConfigMapKeyRef).ShouldNot(BeNil())
+			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Auth.Password.Value).Should(BeEmpty())
+			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Auth.Password.ValueFrom.ConfigMapKeyRef).ShouldNot(BeNil())
 
 			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Endpoint.Value).Should(Equal(serviceRefEndpointValue))
 			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Endpoint.ValueFrom).Should(BeNil())
 			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Port.Value).Should(Equal(serviceRefPortValue))
 			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Port.ValueFrom).Should(BeNil())
-			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Username.Value).Should(Equal(serviceRefUsernameValue))
-			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Username.ValueFrom).Should(BeNil())
-			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Password.Value).Should(Equal(serviceRefPasswordValue))
-			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Password.ValueFrom).Should(BeNil())
+			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Username.Value).Should(BeEmpty())
+			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Username.ValueFrom.SecretKeyRef).ShouldNot(BeNil())
+			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Password.Value).Should(BeEmpty())
+			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Password.ValueFrom.SecretKeyRef).ShouldNot(BeNil())
 		})
 	})
 })

@@ -6,35 +6,114 @@ metadata:
     {{- include "llm.labels" . | nindent 4 }}
 data:
   start.sh: |
-    #!/bin/sh
+    #!/bin/bash
     echo "model=${MODEL_NAME}"
+    domain=${MODEL_NAME%%/*}
+    echo "domain=${domain}"
+    if [[ "${domain,,}" == "qwen" ]]; then
+      # install dependencies for qwen
+      pip install tiktoken
+    fi
+    # fix baichuan incompatible with latest transformers
+    if [[ "${domain,,}" == "baichuan-inc" ]]; then
+      pip install transformers==4.33.1 tokenizers==0.13.3
+    fi
+    country=`curl https://ifconfig.io/country_code`
+    if [ "$country" == "CN" ]; then
+      CLONE_MODEL_SCRIPT="git lfs install; git clone https://www.modelscope.cn/${MODEL_NAME}.git"
+      export MODEL_NAME="../${MODEL_NAME##*/}"
+    else
+      curl --max-time 10 https://huggingface.co/${MODEL_NAME} > /dev/null 2>&1
+      code=$?
+      if [ "$code" -ne 0 ]; then 
+        CLONE_MODEL_SCRIPT="git lfs install; git clone https://www.modelscope.cn/${MODEL_NAME}.git"
+        export MODEL_NAME="../${MODEL_NAME##*/}"
+      fi
+    fi 
+    echo "model=${MODEL_NAME}"
+    if [ -n "$CLONE_MODEL_SCRIPT" ]; then
+      bash -c "$CLONE_MODEL_SCRIPT"
+    fi
     ordinal=${KB_POD_NAME##*-}
     echo "current pod ordinal: $ordinal"
+    if [ $ordinal -eq 0 ]; then
+      /scripts/vllm-start.sh &
+      /scripts/ray-health-checker.sh &
+      ray start --head --block
+    else 
+      ray start --address="${KB_VLLM_0_HOSTNAME}:6379" --block
+    fi
+  vllm-start.sh: |
+    #!/bin/bash
+    echo "model=${MODEL_NAME}"
     echo "EXTRA_ARGS=${EXTRA_ARGS}"
     cd vllm
-    if [ $ordinal -eq 0 ]; then
-      while true; do
-        ray start --head
-        python -m vllm.entrypoints.api_server --host 0.0.0.0 --port 8080 --model ${MODEL_NAME} --max-num-batched-tokens 8192 --tensor-parallel-size ${KB_VLLM_N} ${EXTRA_ARGS}
-        code=$?
-        if [ $code -eq 0 ]; then
-          break
+    echo "model=${MODEL_NAME}" > log
+    # wait for ray start 
+    sleep 3
+    while true; do
+      node_num=`ray status | grep "1 node" | wc -l`
+      # continue waiting if ray status not ok
+      if [[ "$node_num" -ne "$KB_VLLM_N" ]]; then 
+        sleep 1
+        continue
+      fi
+      python -m vllm.entrypoints.api_server --host 0.0.0.0 --port 8000 --model ${MODEL_NAME} --gpu-memory-utilization 0.95 --max-num-seqs 512 --tensor-parallel-size ${KB_VLLM_N} ${EXTRA_ARGS} 2>&1 > log 
+      code=$?
+      if [ $code -eq 0 ]; then
+        break
+      fi
+      echo "exit with code $code, wait for 1 second and try again..." 2>&1 > log
+      sleep 1
+    done
+  ray-health-checker.sh: |
+    #!/bin/bash
+    # wait ray to start when first run
+    sleep 10 
+    while true; do
+      node_num=`ray status | grep "1 node" | wc -l`
+      if [[ "$node_num" -ne "$KB_VLLM_N" ]]; then 
+        # if ray nodes not healthy, restart vllm
+        vllm_pid=`ps aux | grep "python -m vllm.entrypoints.api_server" | grep -v grep | awk '{print $2}'`
+        if [[ "$vllm_pid" ]]; then 
+          kill -9 "$vllm_pid"
         fi
-        echo "exit with code $code, wait for 1 second and try again..."
-        sleep 1
-      done
-    else 
-      while true; do
-        ray start --address="${KB_VLLM_0_HOSTNAME}:6379"
-        code=$?
-        if [ $code -eq 0 ]; then
-          break
-        fi
-        echo "exit with code $code, wait for 1 second and try again..."
-        sleep 1
-      done
-      # keep pod running
-      while true; do
-        sleep 1
-      done
+      fi
+      sleep 3
+    done
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ggml-scripts
+  labels:
+    {{- include "llm.labels" . | nindent 4 }}
+data:
+  start.sh: |
+    #!/bin/bash
+    if [ -n "$MODEL_URL" ]; then 
+      apt-get install wget -y
+      wget "$MODEL_URL" -O model.gguf
     fi
+    if [[ -f "$MODEL" ]]; then
+      # if model file already exists, just run the server
+      sh /app/docker/simple/run.sh
+      exit 0
+    fi
+    # download model from remote
+    # if MODEL_URL configured, download model from it
+    if [ -n "$MODEL_URL" ]; then 
+      apt-get install wget -y
+      wget "$MODEL_URL" -O model.gguf
+      sh /app/docker/simple/run.sh
+      exit 0
+    fi
+    # if MODEL_NAME and QUANTIZE configured, try to build a hugging face url from it.
+    if [ -n "$MODEL_NAME" ] && [ -n "$QUANTIZE" ]; then
+      url="https://huggingface.co/$MODEL_NAME/resolve/main/$QUANTIZE.gguf"
+      wget "$url" -O model.gguf
+      sh /app/docker/simple/run.sh
+      exit 0
+    fi
+    echo "$MODEL not found"
+    exit 1

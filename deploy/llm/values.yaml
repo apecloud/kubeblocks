@@ -12,3 +12,9 @@ imageDev:
   tag: latest
   tagNew: latest-new
   tagCodeShell: latest-codeshell
+model:
+  registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+  baichuan2_7b:
+      ggml:
+        repository: apecloud/baichuan2-7b-gguf
+        version: ggml-model-q4

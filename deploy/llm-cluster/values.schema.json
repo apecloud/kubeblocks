@@ -2,11 +2,17 @@
   "$schema": "http://json-schema.org/schema#",
   "type": "object",
   "properties": {
+    "cpuMode": {
+      "title": "CPU Mode",
+      "description": "Set to true if no GPU is available",
+      "type": "boolean",
+      "default": false
+    },
     "version": {
       "title": "Version",
       "description": "Cluster version.",
       "type": "string",
-      "default": "vllm-baichuan2-13b"
+      "default": ""
     },
     "replicas": {
       "title": "Replicas",
@@ -23,8 +29,8 @@
         "number",
         "string"
       ],
-      "default": 0.5,
-      "minimum": 0.5,
+      "default": 0,
+      "minimum": 0,
       "maximum": 64,
       "multipleOf": 0.5
     },
@@ -35,24 +41,13 @@
         "number",
         "string"
       ],
-      "default": 0.5,
-      "minimum": 0.5,
+      "default": 0,
+      "minimum": 0,
       "maximum": 1000
     },
-    "storage": {
-      "title": "Storage(Gi)",
-      "description": "Storage size, the unit is Gi.",
-      "type": [
-        "number",
-        "string"
-      ],
-      "default": 20,
-      "minimum": 1,
-      "maximum": 10000
-    },
     "gpu": {
-      "title": "CPU",
-      "description": "CPU cores.",
+      "title": "GPU",
+      "description": "GPU cores.",
       "type": [
         "number",
         "string"
@@ -61,6 +56,38 @@
       "minimum": 0,
       "maximum": 64,
       "multipleOf": 1
+    },
+    "model": {
+      "title": "Model",
+      "description": "Model name",
+      "type": [
+        "string"
+      ],
+      "default": "facebook/opt-125m"
+    },
+    "url": {
+      "title": "Model URL",
+      "description": "Model URL, only work for CPU mode",
+      "type": [
+        "string"
+      ],
+      "default": ""
+    },
+    "quantize": {
+      "title": "Model Quantize",
+      "description": "Model's quantized file name, only work for CPU mode",
+      "type": [
+        "string"
+      ],
+      "default": ""
+    },
+    "extraArgs": {
+      "title": "extra arguments",
+      "description": "extra arguments that will be passed to run model",
+      "type": [
+        "string"
+      ],
+      "default": "--trust-remote-code"
     }
   }
 }

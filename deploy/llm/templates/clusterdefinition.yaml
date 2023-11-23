@@ -18,10 +18,13 @@ spec:
       service:
         ports:
           - name: model
-            port: 8080
+            port: 8000
             targetPort: model
       podSpec:
         volumes:
+          - name: dshm
+            emptyDir:
+              medium: Memory
           - name: model-store
             emptyDir: {}
         containers:
@@ -29,9 +32,13 @@ spec:
             imagePullPolicy: {{default .Values.image.pullPolicy "IfNotPresent"}}
             securityContext:
               runAsUser: 0
+              privileged: true
+              allowPrivilegeEscalation: true
             terminationMessagePath: /dev/termination-log
             terminationMessagePolicy: File
             volumeMounts:
+              - mountPath: /dev/shm
+                name: dshm
               - mountPath: /llm/config/
                 name: config
               - name: scripts
@@ -42,7 +49,7 @@ spec:
               - /scripts/start.sh
             ports:
               - name: model
-                containerPort: 8080
+                containerPort: 8000
   connectionCredential:
     username: root
     password: ""
@@ -59,6 +66,12 @@ spec:
     - name: ggml
       workloadType: Stateful
       characterType: ggml
+      scriptSpecs:
+        - name: ggml-scripts
+          templateRef: ggml-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
       service:
         ports:
           - name: model
@@ -73,11 +86,17 @@ spec:
             imagePullPolicy: {{default .Values.imageDev.pullPolicy "IfNotPresent"}}
             securityContext:
               runAsUser: 0
+              privileged: true
+              allowPrivilegeEscalation: true
             terminationMessagePath: /dev/termination-log
             terminationMessagePolicy: File
             volumeMounts:
               - name: models
                 mountPath: /models
+              - name: scripts
+                mountPath: /scripts
+            command:
+              - /scripts/start.sh
             ports:
               - name: model
                 containerPort: 8000

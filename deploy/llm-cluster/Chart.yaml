@@ -3,7 +3,7 @@ annotations:
 apiVersion: v2
 name: llm-cluster
 type: application
-version: 0.7.0-alpha.0
+version: 0.7.0
 description: A vLLM Cluster Helm chart for KubeBlocks.
 dependencies:
   - name: kblib

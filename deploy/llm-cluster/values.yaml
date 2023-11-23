@@ -4,7 +4,7 @@
 
 ## @param version llm cluster version
 ##
-version: vllm-baichuan2-13b
+version: ""
 
 ## @param replicas specify cluster replicas
 ##
@@ -12,18 +12,22 @@ replicas: 1
 
 ## @param cpu
 ##
-cpu: 0.5
+cpu: 0
 
 ## @param memory, the unit is Gi
 ##
-memory: 0.5
-
-## @param storage size, the unit is Gi
-##
-storage: 20
+memory: 0
 
 ## @param gpu
 ##
 gpu: 1
 
-developMode: false
+cpuMode: false
+
+model: "facebook/opt-125m"
+
+extraArgs: "--trust-remote-code"
+
+url: ""
+
+quantize: ""

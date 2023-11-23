@@ -197,7 +197,6 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 			completedCount += 1
 			continue
 		}
-
 		// check the current component switchoverJob whether succeed
 		jobName := genSwitchoverJobName(opsRes.Cluster.Name, switchover.ComponentName, switchoverCondition.ObservedGeneration)
 		checkJobProcessDetail := appsv1alpha1.ProgressStatusDetail{
@@ -221,15 +220,15 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 			Message:   fmt.Sprintf("waiting for component %s pod role label consistency after switchover", switchover.ComponentName),
 		}
 		compSpec := opsRes.Cluster.Spec.GetComponentByName(switchover.ComponentName)
-		comp, err := component.BuildComponent(opsRes.Cluster, compSpec)
-		if err != nil {
+		comp, errBuild := component.BuildComponent(opsRes.Cluster, compSpec)
+		if errBuild != nil {
 			checkRoleLabelProcessDetail.Message = fmt.Sprintf("handleSwitchoverProgress build component %s failed", switchover.ComponentName)
 			checkRoleLabelProcessDetail.Status = appsv1alpha1.FailedProgressStatus
 			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.UpdatingClusterCompPhase, checkRoleLabelProcessDetail, switchover.ComponentName)
 			continue
 		}
-		_, synthesisComp, err := component.BuildSynthesizedComponent4Generated(reqCtx, cli, opsRes.Cluster, comp)
-		if err != nil {
+		_, synthesisComp, errBuild := component.BuildSynthesizedComponent4Generated(reqCtx, cli, opsRes.Cluster, comp)
+		if errBuild != nil {
 			checkRoleLabelProcessDetail.Message = fmt.Sprintf("handleSwitchoverProgress build synthesisComponent %s failed", switchover.ComponentName)
 			checkRoleLabelProcessDetail.Status = appsv1alpha1.FailedProgressStatus
 			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.UpdatingClusterCompPhase, checkRoleLabelProcessDetail, switchover.ComponentName)

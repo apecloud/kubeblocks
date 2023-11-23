@@ -511,7 +511,7 @@ func PatchBackupObjectMeta(
 		request.Labels[v] = targetPod.Labels[v]
 	}
 
-	request.Labels[constant.AppManagedByLabelKey] = constant.AppName
+	request.Labels[constant.AppManagedByLabelKey] = dptypes.AppName
 	request.Labels[dptypes.BackupTypeLabelKey] = request.GetBackupType()
 	request.Labels[dptypes.BackupPolicyLabelKey] = request.Spec.BackupPolicyName
 	// wait for the backup repo controller to prepare the essential resource.

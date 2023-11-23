@@ -9,7 +9,6 @@ spec:
   clusterDefinitionRef: redis
   backupPolicies:
   - componentDefRef: redis
-    retentionPeriod: 7d
     target:
       role: primary
     backupMethods:
@@ -29,6 +28,8 @@ spec:
     - backupMethod: datafile
       enabled: false
       cronExpression: "0 18 * * 0"
+      retentionPeriod: 7d
     - backupMethod: volume-snapshot
       enabled: false
       cronExpression: "0 18 * * 0"
+      retentionPeriod: 7d

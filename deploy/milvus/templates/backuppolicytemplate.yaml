@@ -9,7 +9,6 @@ spec:
   clusterDefinitionRef: milvus
   backupPolicies:
   - componentDefRef: milvus
-    retentionPeriod: 7d
     backupMethods:
     - name: volume-snapshot
       snapshotVolumes: true
@@ -18,5 +17,6 @@ spec:
         - data
     schedules:
     - backupMethod: volume-snapshot
+      retentionPeriod: 7d
       enabled: false
       cronExpression: "0 18 * * 0"

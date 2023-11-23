@@ -116,7 +116,7 @@ var _ = Describe("Restore Controller test", func() {
 			schedulingSpec := dpv1alpha1.SchedulingSpec{
 				NodeName: nodeName,
 			}
-			restoreFactory := testdp.NewRestoreactory(testCtx.DefaultNamespace, testdp.RestoreName).
+			restoreFactory := testdp.NewRestoreFactory(testCtx.DefaultNamespace, testdp.RestoreName).
 				SetBackup(backup.Name, testCtx.DefaultNamespace).
 				SetSchedulingSpec(schedulingSpec)
 

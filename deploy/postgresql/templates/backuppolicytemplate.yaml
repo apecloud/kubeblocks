@@ -9,7 +9,6 @@ spec:
   clusterDefinitionRef: postgresql
   backupPolicies:
   - componentDefRef: postgresql
-    retentionPeriod: 7d
     target:
       role: primary
     backupMethods:
@@ -37,6 +36,8 @@ spec:
     - backupMethod: pg-basebackup
       enabled: false
       cronExpression: "0 18 * * *"
+      retentionPeriod: 7d
     - backupMethod: volume-snapshot
       enabled: false
       cronExpression: "0 18 * * *"
+      retentionPeriod: 7d

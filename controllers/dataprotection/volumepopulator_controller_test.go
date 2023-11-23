@@ -111,7 +111,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 			backup := mockBackupForRestore(actionSet.Name, "", mockBackupCompleted, useVolumeSnapshotBackup)
 
 			By("create restore ")
-			restore := testdp.NewRestoreactory(testCtx.DefaultNamespace, testdp.RestoreName).
+			restore := testdp.NewRestoreFactory(testCtx.DefaultNamespace, testdp.RestoreName).
 				SetBackup(backup.Name, testCtx.DefaultNamespace).
 				SetDataSourceRef(testdp.DataVolumeName, testdp.DataVolumeMountPath).
 				Create(&testCtx).GetObject()

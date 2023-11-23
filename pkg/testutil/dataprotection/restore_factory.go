@@ -33,7 +33,7 @@ type MockRestoreFactory struct {
 	testapps.BaseFactory[dpv1alpha1.Restore, *dpv1alpha1.Restore, MockRestoreFactory]
 }
 
-func NewRestoreactory(namespace, name string) *MockRestoreFactory {
+func NewRestoreFactory(namespace, name string) *MockRestoreFactory {
 	f := &MockRestoreFactory{}
 	f.Init(namespace, name,
 		&dpv1alpha1.Restore{

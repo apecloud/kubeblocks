@@ -55,3 +55,14 @@ data:
       format: ini
       iniConfig:
         sectionName: mysqld
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql8.0-auditlog-config-template
+  labels:
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
+data:
+  my.cnf: |-
+    {{- .Files.Get "config/mysql8-auditlog-config.tpl" | nindent 4 }}
+---

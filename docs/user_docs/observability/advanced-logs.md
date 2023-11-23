@@ -70,7 +70,7 @@ Before enabling the advanced logs function, deploy a Loki node first and then ap
 
 3. Run Grafana to view the status of Loki. For example,
 
-   ![Loki in Grafana]
+   ![Loki in Grafana](./../../img/observability-loki-dashboard.png)
 
 4. (Optional) Disable the Agamotto add-on.
 

@@ -110,7 +110,7 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
      terminationPolicy: Halt
    ```
   
-2. Check the cluste status to validate the vertical scaling.
+2. Check the cluster status to validate the vertical scaling.
 
     ```bash
     kbcli cluster list mysql-cluster
@@ -126,7 +126,7 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
 
 :::note
 
-Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the opsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
+Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
 
 :::
 

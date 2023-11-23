@@ -57,7 +57,7 @@ The example below configures systemLog.verbosity to 1.
           kbcli cluster describe-ops mongodb-cluster-reconfiguring-q8ndn -n default
    ```
 
-2. Check configure history.
+2. Check the configuration history.
 
    ```bash
 

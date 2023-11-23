@@ -21,13 +21,12 @@ package configuration
 
 import (
 	"context"
-	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	ictrlclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
 
@@ -80,7 +79,7 @@ func (r *ComponentVisitor) Visit(fn VisitorFunc) error {
 }
 
 // resolveServiceReferences is the visitor function to resolve the service reference
-func resolveServiceReferences(cli ictrlclient.ReadonlyClient, ctx context.Context) VisitorFunc {
+func resolveServiceReferences(cli client.Reader, ctx context.Context) VisitorFunc {
 	return func(component *component.SynthesizedComponent, err error) error {
 		if err != nil {
 			return err
@@ -89,8 +88,12 @@ func resolveServiceReferences(cli ictrlclient.ReadonlyClient, ctx context.Contex
 			return nil
 		}
 		for _, serviceDescriptor := range component.ServiceReferences {
-			// TODO: currently, only support endpoint and port, serviceDescriptor.Spec.Auth is not supported
-			if err := resolveCredentialVar(cli, ctx, serviceDescriptor.Namespace, serviceDescriptor.Spec.Endpoint, serviceDescriptor.Spec.Port); err != nil {
+			// only support referencing endpoint and port in configuration
+			credentialVars := []*appsv1alpha1.CredentialVar{
+				serviceDescriptor.Spec.Endpoint,
+				serviceDescriptor.Spec.Port,
+			}
+			if err = resolveCredentialVar(cli, ctx, serviceDescriptor.Namespace, credentialVars...); err != nil {
 				return err
 			}
 		}
@@ -100,65 +103,63 @@ func resolveServiceReferences(cli ictrlclient.ReadonlyClient, ctx context.Contex
 
 // resolveCredentialVar resolve the credentialVar.ValueFrom to the real value
 // TODO: currently, we set the valueFrom to the value, which need to be refactored
-func resolveCredentialVar(cli ictrlclient.ReadonlyClient, ctx context.Context, namespace string, credentialVars ...*appsv1alpha1.CredentialVar) error {
-	resolveSecretKeyRef := func(credentialVar *appsv1alpha1.CredentialVar) error {
-		if credentialVar.ValueFrom == nil || credentialVar.ValueFrom.SecretKeyRef == nil {
-			return nil
-		}
-		secretName := credentialVar.ValueFrom.SecretKeyRef.Name
-		secretKey := credentialVar.ValueFrom.SecretKeyRef.Key
-		secretRef := &corev1.Secret{}
-		if err := cli.Get(ctx, types.NamespacedName{Name: secretName, Namespace: namespace}, secretRef); err != nil {
-			return err
-		}
-		runtimeValBytes, ok := secretRef.Data[secretKey]
-		if !ok {
-			return fmt.Errorf("couldn't find key %v in Secret %v/%v", secretKey, namespace, secretName)
-		}
-		// Set the valueFrom to the value and clear the valueFrom
-		credentialVar.ValueFrom = nil
-		credentialVar.Value = string(runtimeValBytes)
-		return nil
-	}
-
-	resolveConfigMapKeyRef := func(credentialVar *appsv1alpha1.CredentialVar) error {
-		if credentialVar.ValueFrom == nil || credentialVar.ValueFrom.ConfigMapKeyRef == nil {
-			return nil
-		}
-		configMapName := credentialVar.ValueFrom.ConfigMapKeyRef.Name
-		configMapKey := credentialVar.ValueFrom.ConfigMapKeyRef.Key
-		configMapRef := &corev1.ConfigMap{}
-		if err := cli.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: namespace}, configMapRef); err != nil {
-			return err
-		}
-		runtimeValBytes, ok := configMapRef.Data[configMapKey]
-		if !ok {
-			return fmt.Errorf("couldn't find key %v in ConfigMap %v/%v", configMapKey, namespace, configMapName)
-		}
-		// Set the valueFrom to the value and clear the valueFrom
-		credentialVar.ValueFrom = nil
-		credentialVar.Value = runtimeValBytes
-		return nil
-	}
-
-	if len(credentialVars) == 0 {
-		return nil
-	}
-
+func resolveCredentialVar(cli client.Reader, ctx context.Context, namespace string, credentialVars ...*appsv1alpha1.CredentialVar) error {
 	for _, credentialVar := range credentialVars {
 		// TODO: replace the build-in placeholder with the real value
-		if credentialVar.Value != "" {
-			return nil
+		if credentialVar == nil || credentialVar.Value != "" {
+			continue
 		}
 		// TODO: currently, we set the valueFrom to the value, which need to be refactored
 		if credentialVar.ValueFrom != nil {
-			if err := resolveSecretKeyRef(credentialVar); err != nil {
+			if err := resolveSecretRef(cli, ctx, namespace, credentialVar); err != nil {
 				return err
 			}
-			if err := resolveConfigMapKeyRef(credentialVar); err != nil {
+			if err := resolveConfigMapRef(cli, ctx, namespace, credentialVar); err != nil {
 				return err
 			}
 		}
 	}
+	return nil
+}
+
+func resolveSecretRef(cli client.Reader, ctx context.Context, namespace string, credentialVar *appsv1alpha1.CredentialVar) error {
+	if credentialVar.ValueFrom == nil || credentialVar.ValueFrom.SecretKeyRef == nil {
+		return nil
+	}
+	secretName := credentialVar.ValueFrom.SecretKeyRef.Name
+	secretKey := credentialVar.ValueFrom.SecretKeyRef.Key
+	secretRef := &corev1.Secret{}
+	if err := cli.Get(ctx, types.NamespacedName{Name: secretName, Namespace: namespace}, secretRef); err != nil {
+		return err
+	}
+	runtimeValBytes, ok := secretRef.Data[secretKey]
+	if !ok {
+		// return fmt.Errorf("couldn't find key %v in Secret %v/%v", secretKey, namespace, secretName)
+		return nil
+	}
+	// Set the valueFrom to the value and clear the valueFrom
+	credentialVar.ValueFrom = nil
+	credentialVar.Value = string(runtimeValBytes)
+	return nil
+}
+
+func resolveConfigMapRef(cli client.Reader, ctx context.Context, namespace string, credentialVar *appsv1alpha1.CredentialVar) error {
+	if credentialVar.ValueFrom == nil || credentialVar.ValueFrom.ConfigMapKeyRef == nil {
+		return nil
+	}
+	configMapName := credentialVar.ValueFrom.ConfigMapKeyRef.Name
+	configMapKey := credentialVar.ValueFrom.ConfigMapKeyRef.Key
+	configMapRef := &corev1.ConfigMap{}
+	if err := cli.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: namespace}, configMapRef); err != nil {
+		return err
+	}
+	runtimeValBytes, ok := configMapRef.Data[configMapKey]
+	if !ok {
+		// return fmt.Errorf("couldn't find key %v in ConfigMap %v/%v", configMapKey, namespace, configMapName)
+		return nil
+	}
+	// Set the valueFrom to the value and clear the valueFrom
+	credentialVar.ValueFrom = nil
+	credentialVar.Value = runtimeValBytes
 	return nil
 }

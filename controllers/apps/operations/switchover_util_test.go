@@ -123,24 +123,24 @@ var _ = Describe("Switchover Util", func() {
 		compSpec := clusterObj.Spec.GetComponentByName(opsSwitchover.ComponentName)
 		comp, err := component.BuildComponent(clusterObj, compSpec)
 		Expect(err).Should(Succeed())
-		_, synthesisComp, err := component.BuildSynthesizedComponent4Generated(reqCtx, k8sClient, clusterObj, comp)
+		_, synthesizedComp, err := component.BuildSynthesizedComponent4Generated(reqCtx, k8sClient, clusterObj, comp)
 		Expect(err).Should(Succeed())
-		Expect(synthesisComp).ShouldNot(BeNil())
+		Expect(synthesizedComp).ShouldNot(BeNil())
 
 		By("Test opsSwitchover.Instance is already primary, and do not need to do switchover.")
-		needSwitchover, err := needDoSwitchover(testCtx.Ctx, k8sClient, clusterObj, synthesisComp, opsSwitchover)
+		needSwitchover, err := needDoSwitchover(testCtx.Ctx, k8sClient, clusterObj, synthesizedComp, opsSwitchover)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeFalse())
 
 		By("Test opsSwitchover.Instance is not primary, and need to do switchover.")
 		opsSwitchover.InstanceName = fmt.Sprintf("%s-%s-%d", clusterObj.Name, testapps.DefaultRedisCompSpecName, 1)
-		needSwitchover, err = needDoSwitchover(testCtx.Ctx, k8sClient, clusterObj, synthesisComp, opsSwitchover)
+		needSwitchover, err = needDoSwitchover(testCtx.Ctx, k8sClient, clusterObj, synthesizedComp, opsSwitchover)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeTrue())
 
 		By("Test opsSwitchover.Instance is *, and need to do switchover.")
 		opsSwitchover.InstanceName = "*"
-		needSwitchover, err = needDoSwitchover(testCtx.Ctx, k8sClient, clusterObj, synthesisComp, opsSwitchover)
+		needSwitchover, err = needDoSwitchover(testCtx.Ctx, k8sClient, clusterObj, synthesizedComp, opsSwitchover)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeTrue())
 	}
@@ -189,10 +189,10 @@ var _ = Describe("Switchover Util", func() {
 		compSpec := clusterObj.Spec.GetComponentByName(opsSwitchover.ComponentName)
 		comp, err := component.BuildComponent(clusterObj, compSpec)
 		Expect(err).Should(Succeed())
-		_, synthesisComp, err := component.BuildSynthesizedComponent4Generated(reqCtx, k8sClient, clusterObj, comp)
+		_, synthesizedComp, err := component.BuildSynthesizedComponent4Generated(reqCtx, k8sClient, clusterObj, comp)
 		Expect(err).Should(Succeed())
-		Expect(synthesisComp).ShouldNot(BeNil())
-		err = createSwitchoverJob(reqCtx, k8sClient, clusterObj, synthesisComp, opsSwitchover)
+		Expect(synthesizedComp).ShouldNot(BeNil())
+		err = createSwitchoverJob(reqCtx, k8sClient, clusterObj, synthesizedComp, opsSwitchover)
 		Expect(err).Should(Succeed())
 	}
 

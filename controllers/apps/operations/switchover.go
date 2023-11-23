@@ -67,11 +67,11 @@ func (r switchoverOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestC
 		if err != nil {
 			return nil, err
 		}
-		_, synthesisComp, err := component.BuildSynthesizedComponent4Generated(reqCtx, cli, opsRes.Cluster, comp)
+		_, synthesizedComp, err := component.BuildSynthesizedComponent4Generated(reqCtx, cli, opsRes.Cluster, comp)
 		if err != nil {
 			return nil, err
 		}
-		pod, err := getServiceableNWritablePod(reqCtx.Ctx, cli, *opsRes.Cluster, *synthesisComp)
+		pod, err := getServiceableNWritablePod(reqCtx.Ctx, cli, *opsRes.Cluster, *synthesizedComp)
 		if err != nil {
 			return nil, err
 		}
@@ -134,11 +134,11 @@ func doSwitchoverComponents(reqCtx intctrlutil.RequestCtx, cli client.Client, op
 		if err != nil {
 			return err
 		}
-		_, synthesisComp, err := component.BuildSynthesizedComponent4Generated(reqCtx, cli, opsRes.Cluster, comp)
+		_, synthesizedComp, err := component.BuildSynthesizedComponent4Generated(reqCtx, cli, opsRes.Cluster, comp)
 		if err != nil {
 			return err
 		}
-		needSwitchover, err := needDoSwitchover(reqCtx.Ctx, cli, opsRes.Cluster, synthesisComp, &switchover)
+		needSwitchover, err := needDoSwitchover(reqCtx.Ctx, cli, opsRes.Cluster, synthesizedComp, &switchover)
 		if err != nil {
 			return err
 		}
@@ -156,7 +156,7 @@ func doSwitchoverComponents(reqCtx intctrlutil.RequestCtx, cli client.Client, op
 				ProgressDetails: []appsv1alpha1.ProgressStatusDetail{},
 			}
 		}
-		if err := createSwitchoverJob(reqCtx, cli, opsRes.Cluster, synthesisComp, &switchover); err != nil {
+		if err := createSwitchoverJob(reqCtx, cli, opsRes.Cluster, synthesizedComp, &switchover); err != nil {
 			return err
 		}
 	}
@@ -227,14 +227,14 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.UpdatingClusterCompPhase, checkRoleLabelProcessDetail, switchover.ComponentName)
 			continue
 		}
-		_, synthesisComp, errBuild := component.BuildSynthesizedComponent4Generated(reqCtx, cli, opsRes.Cluster, comp)
+		_, synthesizedComp, errBuild := component.BuildSynthesizedComponent4Generated(reqCtx, cli, opsRes.Cluster, comp)
 		if errBuild != nil {
-			checkRoleLabelProcessDetail.Message = fmt.Sprintf("handleSwitchoverProgress build synthesisComponent %s failed", switchover.ComponentName)
+			checkRoleLabelProcessDetail.Message = fmt.Sprintf("handleSwitchoverProgress build synthesizedComponent %s failed", switchover.ComponentName)
 			checkRoleLabelProcessDetail.Status = appsv1alpha1.FailedProgressStatus
 			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.UpdatingClusterCompPhase, checkRoleLabelProcessDetail, switchover.ComponentName)
 			continue
 		}
-		consistency, err = checkPodRoleLabelConsistency(reqCtx.Ctx, cli, opsRes.Cluster, *synthesisComp, &switchover, switchoverCondition)
+		consistency, err = checkPodRoleLabelConsistency(reqCtx.Ctx, cli, opsRes.Cluster, *synthesizedComp, &switchover, switchoverCondition)
 		if err != nil {
 			checkRoleLabelProcessDetail.Message = fmt.Sprintf("waiting for component %s pod role label consistency after switchover", switchover.ComponentName)
 			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.UpdatingClusterCompPhase, checkRoleLabelProcessDetail, switchover.ComponentName)

@@ -120,7 +120,7 @@ var _ = Describe("Backup Deleter Test", func() {
 			}
 
 			By("create restore")
-			restoreFactory := testdp.NewRestoreactory(testCtx.DefaultNamespace, testdp.RestoreName).
+			restoreFactory := testdp.NewRestoreFactory(testCtx.DefaultNamespace, testdp.RestoreName).
 				SetBackup(backup.Name, testCtx.DefaultNamespace).
 				SetSchedulingSpec(schedulingSpec)
 

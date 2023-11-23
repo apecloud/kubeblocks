@@ -9,7 +9,6 @@ spec:
   clusterDefinitionRef: weaviate
   backupPolicies:
   - componentDefRef: weaviate
-    retentionPeriod: 7d
     backupMethods:
     - name: volume-snapshot
       snapshotVolumes: true
@@ -20,3 +19,4 @@ spec:
     - backupMethod: volume-snapshot
       enabled: false
       cronExpression: "0 18 * * 0"
+      retentionPeriod: 7d

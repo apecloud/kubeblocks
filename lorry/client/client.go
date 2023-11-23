@@ -315,7 +315,7 @@ func NewHTTPClientWithChannelPod(pod *corev1.Pod, characterType string) (*Operat
 	if ip == "" {
 		return nil, fmt.Errorf("pod %v has no ip", pod.Name)
 	}
-	container, err := intctrlutil.GetProbeContainerName(pod)
+	container, err := intctrlutil.GetLorryContainerName(pod)
 	if err != nil {
 		return nil, err
 	}

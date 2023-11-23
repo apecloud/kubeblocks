@@ -90,11 +90,15 @@ create_replication() {
     else
       primary_fqdn="$primary.$KB_CLUSTER_NAME-$KB_COMP_NAME-headless.$KB_NAMESPACE.svc"
       echo "primary_fqdn=$primary_fqdn" >> /etc/redis/.kb_set_up.log
+      echo "wait for primary:$primary_fqdn redis-server to start"
       if [ ! -z "$REDIS_DEFAULT_PASSWORD" ]; then
-        retry redis-cli -h $primary_fqdn -p 6379 -a "$REDIS_DEFAULT_PASSWORD" ping
+        # wait for primary redis-server to start
+        until redis-cli -h $primary_fqdn -p 6379 -a "$REDIS_DEFAULT_PASSWORD" ping; do sleep 2; done
+        echo "start to create a replication relationship"
         redis-cli -h 127.0.0.1 -p 6379 -a "$REDIS_DEFAULT_PASSWORD" replicaof $primary_fqdn 6379
       else
-        retry redis-cli -h $primary_fqdn -p 6379 ping
+        until redis-cli -h $primary_fqdn -p 6379 ping; do sleep 2; done
+        echo "start to create a replication relationship"
         redis-cli -h 127.0.0.1 -p 6379 replicaof $primary_fqdn 6379
       fi
       if [ $? -ne 0 ]; then
@@ -105,6 +109,7 @@ create_replication() {
           redis-cli -h 127.0.0.1 -p 6379 shutdown
         fi
       fi
+      echo "create a replication relationship succeeded."
     fi
 }
 

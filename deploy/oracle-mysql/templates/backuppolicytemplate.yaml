@@ -9,7 +9,6 @@ spec:
   clusterDefinitionRef: oracle-mysql
   backupPolicies:
   - componentDefRef: mysql-compdef
-    retentionPeriod: 7d
     backupMethods:
     - name: xtrabackup
       snapshotVolumes: false
@@ -26,7 +25,9 @@ spec:
     schedules:
     - backupMethod: datafile
       enabled: false
+      retentionPeriod: 7d
       cronExpression: "0 18 * * 0"
     - backupMethod: volume-snapshot
       enabled: false
       cronExpression: "0 18 * * 0"
+      retentionPeriod: 7d

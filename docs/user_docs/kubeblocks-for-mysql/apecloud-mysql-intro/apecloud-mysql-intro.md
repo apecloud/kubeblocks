@@ -26,7 +26,7 @@ ApeCloud MySQL supports four roles, **Leader**, **Follower**, **Candidate**, and
   ---- |----| ----|----|----|
   **Capability**|RW/HA|RO/HA|RO|-|
 
-![Role_changing](./../../../img/intro_role_changing.png)
+![Role_changing](../../../img/apecloud-mysql-intro-role-changing.jpg)
 
 ### Failover
 

@@ -498,6 +498,12 @@ type ComponentLifecycleActions struct {
 	// Dedicated env vars for the action:
 	// - KB_SWITCHOVER_CANDIDATE_NAME: The name of the new candidate replica's Pod. It may be empty.
 	// - KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new candidate replica. It may be empty.
+	// - KB_LEADER_POD_IP: The IP address of the original leader's Pod before switchover.
+	// - KB_LEADER_POD_NAME: The name of the original leader's Pod before switchover.
+	// - KB_LEADER_POD_FQDN: The FQDN of the original leader's Pod before switchover.
+	// The env vars with following prefix are deprecated and will be removed in the future:
+	// - KB_REPLICATION_PRIMARY_POD_: The prefix of the environment variables of the original primary's Pod before switchover.
+	// - KB_CONSENSUS_LEADER_POD_: The prefix of the environment variables of the original leader's Pod before switchover.
 	// Cannot be updated.
 	// +optional
 	Switchover *ComponentSwitchoverSpec `json:"switchover,omitempty"`
@@ -562,10 +568,12 @@ type ComponentLifecycleActions struct {
 
 type ComponentSwitchoverSpec struct {
 	// withCandidate corresponds to the switchover of the specified candidate primary or leader instance.
+	// Currently, only Action.Exec is supported, Action.HTTP is not supported.
 	// +optional
 	WithCandidate *Action `json:"withCandidate,omitempty"`
 
 	// withoutCandidate corresponds to a switchover that does not specify a candidate primary or leader instance.
+	// Currently, only Action.Exec is supported, Action.HTTP is not supported.
 	// +optional
 	WithoutCandidate *Action `json:"withoutCandidate,omitempty"`
 

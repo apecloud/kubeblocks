@@ -275,14 +275,20 @@ const (
 	KBSwitchoverJobNamePrefix    = "kb-switchover-job"
 	KBSwitchoverJobContainerName = "kb-switchover-job-container"
 
-	KBSwitchoverCandidateName             = "KB_SWITCHOVER_CANDIDATE_NAME"
-	KBSwitchoverCandidateFqdn             = "KB_SWITCHOVER_CANDIDATE_FQDN"
+	KBSwitchoverCandidateName = "KB_SWITCHOVER_CANDIDATE_NAME"
+	KBSwitchoverCandidateFqdn = "KB_SWITCHOVER_CANDIDATE_FQDN"
+
+	// KBSwitchoverReplicationPrimaryPodIP and the others Replication and Consensus switchover constants will be deprecated in the future, use KBSwitchoverLeaderPodIP instead.
 	KBSwitchoverReplicationPrimaryPodIP   = "KB_REPLICATION_PRIMARY_POD_IP"
 	KBSwitchoverReplicationPrimaryPodName = "KB_REPLICATION_PRIMARY_POD_NAME"
 	KBSwitchoverReplicationPrimaryPodFqdn = "KB_REPLICATION_PRIMARY_POD_FQDN"
 	KBSwitchoverConsensusLeaderPodIP      = "KB_CONSENSUS_LEADER_POD_IP"
 	KBSwitchoverConsensusLeaderPodName    = "KB_CONSENSUS_LEADER_POD_NAME"
 	KBSwitchoverConsensusLeaderPodFqdn    = "KB_CONSENSUS_LEADER_POD_FQDN"
+
+	KBSwitchoverLeaderPodIP   = "KB_LEADER_POD_IP"
+	KBSwitchoverLeaderPodName = "KB_LEADER_POD_NAME"
+	KBSwitchoverLeaderPodFqdn = "KB_LEADER_POD_FQDN"
 )
 
 // username and password are keys in created secrets for others to refer to.

@@ -121,7 +121,7 @@ type ComponentDefinitionSpec struct {
 	// +listType=map
 	// +listMapKey=name
 	// +optional
-	// TODO: support referencing configs from other components.
+	// TODO: support referencing configs from other components or clusters.
 	Configs []ComponentConfigSpec `json:"configs,omitempty"`
 
 	// LogConfigs is detail log file config which provided by provider.
@@ -199,6 +199,8 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	ServiceRefDeclarations []ServiceRefDeclaration `json:"serviceRefDeclarations,omitempty"`
 
+	// User-defined environment variables.
+	// These can be used as env vars for pods or actions, or to render the templates of config or script.
 	// Cannot be updated.
 	// +optional
 	EnvVars []EnvVar `json:"envVars,omitempty"`

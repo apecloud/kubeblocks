@@ -677,20 +677,23 @@ type EnvVar struct {
 }
 
 // All the builtin system env vars can be referenced directly.
-// -------------------------------------------------------------
-// | object    | attribute | var             |   | description |
-// -------------------------------------------------------------
-// | Namespace |           | KB_NAMESPACE    |   |             |
-// | Cluster   | name      | KB_CLUSTER_NAME |   |             |
-// |           | UID       | KB_CLUSTER_UID  |   |             |
-// | Pod       | name      | KB_POD_NAME     |   |             |
-// |           | UID       | KB_POD_UID      | x |             |
-// |           | IP        | KB_POD_IP       | x |             |
-// |           | FQDN      | KB_POD_FQDN     |   |             |
-// |           | ordinal   | KB_POD_ORDINAL  |   |             |
-// | Host      | name      | KB_HOST_NAME    | x |             |
-// |           | IP        | KB_HOST_IP      | x |             |
-// -------------------------------------------------------------
+// TODO: resources
+// -------------------------------------------------------------------------------------------------------
+// | object    | attribute | var                   |  config & script | env (pod & action) | description |
+// -------------------------------------------------------------------------------------------------------
+// | Namespace |           | KB_NAMESPACE          |                  |                    |             |
+// | Cluster   | name      | KB_CLUSTER_NAME       |                  |                    |             |
+// |           | UID       | KB_CLUSTER_UID        |                  |                    |             |
+// | Component | name      | KB_COMPONENT_NAME     |                  |                    |             |
+// |           | replicas  | KB_COMPONENT_REPLICAS |                  |                    |             |
+// | Pod       | name      | KB_POD_NAME           |                  |                    |             |
+// |           | UID       | KB_POD_UID            | x                |                    |             |
+// |           | IP        | KB_POD_IP             | x                |                    |             |
+// |           | FQDN      | KB_POD_FQDN           |                  |                    |             |
+// |           | ordinal   | KB_POD_ORDINAL        |                  |                    |             |
+// | Host      | name      | KB_HOST_NAME          | x                |                    |             |
+// |           | IP        | KB_HOST_IP            | x                |                    |             |
+// -------------------------------------------------------------------------------------------------------
 
 type EnvVarValue struct {
 	// +required
@@ -760,6 +763,7 @@ type ServiceKeySelector struct {
 	Keys ServiceEnvKeys `json:"keys,omitempty"`
 }
 
+// CredentialEnvKeys will only be used as env vars for pods or actions, and will not be used to render the templates.
 type CredentialEnvKeys struct {
 	// +optional
 	Username *EnvKeyOption `json:"username,omitempty"`

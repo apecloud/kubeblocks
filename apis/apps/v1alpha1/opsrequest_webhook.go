@@ -649,7 +649,7 @@ func validateSwitchoverResourceList(ctx context.Context, cli client.Client, clus
 		// TODO(xingran): this will be removed in the future.
 		validateBaseOnClusterCompDef := func(clusterCmpDef string) error {
 			// check clusterComponentDefinition whether support switchover
-			clusterCompDefObj, err := GetClusterComponentDefByName(ctx, cli, *cluster, clusterCmpDef)
+			clusterCompDefObj, err := getClusterComponentDefByName(ctx, cli, *cluster, clusterCmpDef)
 			if err != nil {
 				return err
 			}
@@ -706,7 +706,7 @@ func validateSwitchoverResourceList(ctx context.Context, cli client.Client, clus
 				}
 				return targetRole, nil
 			}
-			compDefObj, err := GetComponentDefByName(ctx, cli, compDef)
+			compDefObj, err := getComponentDefByName(ctx, cli, compDef)
 			if compDefObj == nil {
 				return fmt.Errorf("this component %s referenced componentDefinition is invalid", switchover.ComponentName)
 			}
@@ -762,4 +762,28 @@ func validateSwitchoverResourceList(ctx context.Context, cli client.Client, clus
 		}
 	}
 	return nil
+}
+
+// getComponentDefByName gets ComponentDefinition with compDefName
+func getComponentDefByName(ctx context.Context, cli client.Client, compDefName string) (*ComponentDefinition, error) {
+	compDef := &ComponentDefinition{}
+	if err := cli.Get(ctx, types.NamespacedName{Name: compDefName}, compDef); err != nil {
+		return nil, err
+	}
+	return compDef, nil
+}
+
+// getClusterComponentDefByName gets component from ClusterDefinition with compDefName
+func getClusterComponentDefByName(ctx context.Context, cli client.Client, cluster Cluster,
+	compDefName string) (*ClusterComponentDefinition, error) {
+	clusterDef := &ClusterDefinition{}
+	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
+		return nil, err
+	}
+	for _, component := range clusterDef.Spec.ComponentDefs {
+		if component.Name == compDefName {
+			return &component, nil
+		}
+	}
+	return nil, ErrNotMatchingCompDef
 }

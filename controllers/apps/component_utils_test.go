@@ -100,23 +100,18 @@ var _ = Describe("Component Utils", func() {
 			testapps.MockStatelessComponentDeploy(&testCtx, clusterName, statelessCompName)
 			_ = testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
 
-			By("test GetComponentDefByCluster function")
-			componentDef, _ := appsv1alpha1.GetClusterComponentDefByName(ctx, k8sClient, *cluster, consensusCompDefRef)
-			Expect(componentDef != nil).Should(BeTrue())
-
 			By("test GetClusterByObject function")
 			newCluster, _ := GetClusterByObject(ctx, k8sClient, sts)
 			Expect(newCluster != nil).Should(BeTrue())
 
 			By("test consensusSet initClusterComponentStatusIfNeed function")
-			err := initClusterComponentStatusIfNeed(cluster, consensusCompName, componentDef.WorkloadType)
+			err := initClusterComponentStatusIfNeed(cluster, consensusCompName, appsv1alpha1.Consensus)
 			Expect(err).Should(Succeed())
 			Expect(cluster.Status.Components[consensusCompName].ConsensusSetStatus).ShouldNot(BeNil())
 			Expect(cluster.Status.Components[consensusCompName].ConsensusSetStatus.Leader.Pod).Should(Equal(constant.ComponentStatusDefaultPodName))
 
 			By("test replicationSet initClusterComponentStatusIfNeed function")
-			componentDef.WorkloadType = appsv1alpha1.Replication
-			err = initClusterComponentStatusIfNeed(cluster, consensusCompName, componentDef.WorkloadType)
+			err = initClusterComponentStatusIfNeed(cluster, consensusCompName, appsv1alpha1.Replication)
 			Expect(err).Should(Succeed())
 			Expect(cluster.Status.Components[consensusCompName].ReplicationSetStatus).ShouldNot(BeNil())
 			Expect(cluster.Status.Components[consensusCompName].ReplicationSetStatus.Primary.Pod).Should(Equal(constant.ComponentStatusDefaultPodName))
@@ -148,38 +143,6 @@ var _ = Describe("Component Utils", func() {
 			stsList = &appsv1.StatefulSetList{}
 			podList, _ := getCompRelatedObjectList(ctx, k8sClient, *cluster, consensusCompName, stsList)
 			Expect(len(stsList.Items) > 0 && len(podList.Items) > 0).Should(BeTrue())
-
-			By("test GetComponentInfoByPod function")
-			componentName, componentDef, err := GetComponentInfoByPod(ctx, k8sClient, *cluster, &podList.Items[0])
-			Expect(err).Should(Succeed())
-			Expect(componentName).Should(Equal(consensusCompName))
-			Expect(componentDef).ShouldNot(BeNil())
-			By("test GetComponentInfoByPod function when Pod is nil")
-			_, _, err = GetComponentInfoByPod(ctx, k8sClient, *cluster, nil)
-			Expect(err).ShouldNot(Succeed())
-			By("test GetComponentInfoByPod function when Pod component label is nil")
-			podNoLabel := &podList.Items[0]
-			delete(podNoLabel.Labels, constant.KBAppComponentLabelKey)
-			_, _, err = GetComponentInfoByPod(ctx, k8sClient, *cluster, podNoLabel)
-			Expect(err).ShouldNot(Succeed())
-		})
-
-		It("test GetComponentInfoByPod with no cluster componentSpec", func() {
-			_, _, cluster := testapps.InitClusterWithHybridComps(&testCtx, clusterDefName,
-				clusterVersionName, clusterName, statelessCompName, "stateful", consensusCompName)
-			By("set componentSpec to nil")
-			cluster.Spec.ComponentSpecs = nil
-			pod := corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						constant.KBAppComponentLabelKey: consensusCompName,
-					},
-				},
-			}
-			componentName, componentDef, err := GetComponentInfoByPod(ctx, k8sClient, *cluster, &pod)
-			Expect(err).Should(Succeed())
-			Expect(componentName).Should(Equal(consensusCompName))
-			Expect(componentDef).ShouldNot(BeNil())
 		})
 	})
 

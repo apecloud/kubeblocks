@@ -17,15 +17,12 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // +genclient
@@ -622,13 +619,4 @@ type RoleProbeSpec struct {
 	// Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.
 	// +optional
 	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty" protobuf:"varint,7,opt,name=terminationGracePeriodSeconds"`
-}
-
-// GetComponentDefByName gets ComponentDefinition with compDefName
-func GetComponentDefByName(ctx context.Context, cli client.Client, compDefName string) (*ComponentDefinition, error) {
-	compDef := &ComponentDefinition{}
-	if err := cli.Get(ctx, types.NamespacedName{Name: compDefName}, compDef); err != nil {
-		return nil, err
-	}
-	return compDef, nil
 }

@@ -30,6 +30,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -115,20 +116,29 @@ var _ = Describe("Switchover Util", func() {
 			ComponentOps: appsv1alpha1.ComponentOps{ComponentName: testapps.DefaultRedisCompSpecName},
 			InstanceName: fmt.Sprintf("%s-%s-%d", clusterObj.Name, testapps.DefaultRedisCompSpecName, 0),
 		}
+
+		reqCtx := intctrlutil.RequestCtx{
+			Ctx: testCtx.Ctx,
+		}
+		compSpec := clusterObj.Spec.GetComponentByName(opsSwitchover.ComponentName)
+		synthesizedComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, k8sClient, clusterObj, compSpec)
+		Expect(err).Should(Succeed())
+		Expect(synthesizedComp).ShouldNot(BeNil())
+
 		By("Test opsSwitchover.Instance is already primary, and do not need to do switchover.")
-		needSwitchover, err := needDoSwitchover(testCtx.Ctx, k8sClient, clusterObj, &clusterObj.Spec.ComponentSpecs[0], opsSwitchover)
+		needSwitchover, err := needDoSwitchover(testCtx.Ctx, k8sClient, clusterObj, synthesizedComp, opsSwitchover)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeFalse())
 
 		By("Test opsSwitchover.Instance is not primary, and need to do switchover.")
 		opsSwitchover.InstanceName = fmt.Sprintf("%s-%s-%d", clusterObj.Name, testapps.DefaultRedisCompSpecName, 1)
-		needSwitchover, err = needDoSwitchover(testCtx.Ctx, k8sClient, clusterObj, &clusterObj.Spec.ComponentSpecs[0], opsSwitchover)
+		needSwitchover, err = needDoSwitchover(testCtx.Ctx, k8sClient, clusterObj, synthesizedComp, opsSwitchover)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeTrue())
 
 		By("Test opsSwitchover.Instance is *, and need to do switchover.")
 		opsSwitchover.InstanceName = "*"
-		needSwitchover, err = needDoSwitchover(testCtx.Ctx, k8sClient, clusterObj, &clusterObj.Spec.ComponentSpecs[0], opsSwitchover)
+		needSwitchover, err = needDoSwitchover(testCtx.Ctx, k8sClient, clusterObj, synthesizedComp, opsSwitchover)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeTrue())
 	}
@@ -174,7 +184,11 @@ var _ = Describe("Switchover Util", func() {
 			Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
 		}
 		By("Test create a job to do switchover")
-		err := createSwitchoverJob(reqCtx, k8sClient, clusterObj, &clusterObj.Spec.ComponentSpecs[0], &clusterDefObj.Spec.ComponentDefs[0], opsSwitchover)
+		compSpec := clusterObj.Spec.GetComponentByName(opsSwitchover.ComponentName)
+		synthesizedComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, k8sClient, clusterObj, compSpec)
+		Expect(err).Should(Succeed())
+		Expect(synthesizedComp).ShouldNot(BeNil())
+		err = createSwitchoverJob(reqCtx, k8sClient, clusterObj, synthesizedComp, opsSwitchover)
 		Expect(err).Should(Succeed())
 	}
 

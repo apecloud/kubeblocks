@@ -216,9 +216,9 @@ func (p *clusterPlan) handlePlanExecutionError(err error) error {
 // Do the real works
 
 // NewClusterPlanBuilder returns a clusterPlanBuilder powered PlanBuilder
-func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.Request) graph.PlanBuilder {
+func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client) graph.PlanBuilder {
 	return &clusterPlanBuilder{
-		req: req,
+		req: ctx.Req,
 		cli: cli,
 		transCtx: &clusterTransformContext{
 			Context:       ctx.Ctx,

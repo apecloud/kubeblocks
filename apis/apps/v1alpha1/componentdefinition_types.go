@@ -121,6 +121,7 @@ type ComponentDefinitionSpec struct {
 	// +listType=map
 	// +listMapKey=name
 	// +optional
+	// TODO: support referencing configs from other components.
 	Configs []ComponentConfigSpec `json:"configs,omitempty"`
 
 	// LogConfigs is detail log file config which provided by provider.
@@ -197,6 +198,10 @@ type ComponentDefinitionSpec struct {
 	// Cannot be updated.
 	// +optional
 	ServiceRefDeclarations []ServiceRefDeclaration `json:"serviceRefDeclarations,omitempty"`
+
+	// Cannot be updated.
+	// +optional
+	EnvVars []EnvVar `json:"envVars,omitempty"`
 }
 
 // ComponentDefinitionStatus defines the observed state of ComponentDefinition.

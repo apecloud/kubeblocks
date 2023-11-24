@@ -651,3 +651,224 @@ type ConnectionCredential struct {
 	// +optional
 	AccountName string `json:"accountName,omitempty"`
 }
+
+// EnvVar represents an environment variable present in a Container.
+type EnvVar struct {
+	// Name of the environment variable. Must be a C_IDENTIFIER.
+	// +required
+	Name string `json:"name"`
+
+	// Optional: no more than one of the following may be specified.
+
+	// Variable references $(VAR_NAME) are expanded
+	// using the previously defined environment variables in the container and
+	// any service environment variables. If a variable cannot be resolved,
+	// the reference in the input string will be unchanged. Double $$ are reduced
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+	// "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+	// Escaped references will never be expanded, regardless of whether the variable
+	// exists or not.
+	// Defaults to "".
+	// +optional
+	Value EnvVarValue `json:"value,omitempty"`
+	// Source for the environment variable's value. Cannot be used if value is not empty.
+	// +optional
+	ValueFrom *EnvVarSource `json:"valueFrom,omitempty"`
+}
+
+// All the builtin system env vars can be referenced directly.
+// -------------------------------------------------------------
+// | object    | attribute | var             |   | description |
+// -------------------------------------------------------------
+// | Namespace |           | KB_NAMESPACE    |   |             |
+// | Cluster   | name      | KB_CLUSTER_NAME |   |             |
+// |           | UID       | KB_CLUSTER_UID  |   |             |
+// | Pod       | name      | KB_POD_NAME     |   |             |
+// |           | UID       | KB_POD_UID      | x |             |
+// |           | IP        | KB_POD_IP       | x |             |
+// |           | FQDN      | KB_POD_FQDN     |   |             |
+// |           | ordinal   | KB_POD_ORDINAL  |   |             |
+// | Host      | name      | KB_HOST_NAME    | x |             |
+// |           | IP        | KB_HOST_IP      | x |             |
+// -------------------------------------------------------------
+
+type EnvVarValue struct {
+	// +required
+	Value string `json:"value,omitempty"`
+
+	// +kubebuilder:default=false
+	// +optional
+	Builtin bool `json:"builtin,omitempty"`
+
+	// +kubebuilder:default=false
+	// +optional
+	EnvVar bool `json:"envVar,omitempty"`
+}
+
+type EnvVarSource struct {
+	// Selects a key of a ConfigMap.
+	// +optional
+	ConfigMapKeyRef *corev1.ConfigMapKeySelector `json:"configMapKeyRef,omitempty"`
+
+	// Selects a key of a secret in the pod's namespace
+	// +optional
+	SecretKeyRef *corev1.SecretKeySelector `json:"secretKeyRef,omitempty"`
+
+	// +optional
+	ServiceKeyRef *ServiceKeySelector `json:"serviceKeyRef,omitempty"`
+
+	// +optional
+	CredentialKeyRef *CredentialKeySelector `json:"credentialKeyRef,omitempty"`
+
+	// +optional
+	ServiceRefKeyRef *ServiceRefKeySelector `json:"serviceRefKeyRef,omitempty"`
+}
+
+// EnvKeyOption
+// +enum
+// +kubebuilder:validation:Enum={Required,Optional}
+type EnvKeyOption string
+
+const (
+	EnvKeyRequired EnvKeyOption = "Required"
+	EnvKeyOptional EnvKeyOption = "Optional"
+)
+
+type NamedEnvKeyOption struct {
+	EnvKeyOption `json:",inline"`
+
+	// +optional
+	Name string `json:"name,omitempty"`
+}
+
+type ServiceEnvKeys struct {
+	// +optional
+	Endpoint *EnvKeyOption `json:"endpoint,omitempty"`
+
+	// +optional
+	Host *EnvKeyOption `json:"host,omitempty"`
+
+	// +optional
+	Port *NamedEnvKeyOption `json:"port,omitempty"`
+}
+
+type ServiceKeySelector struct {
+	// The Service to select from.
+	ClusterObjectReference `json:",inline"`
+
+	// +optional
+	Keys ServiceEnvKeys `json:"keys,omitempty"`
+}
+
+type CredentialEnvKeys struct {
+	// +optional
+	Username *EnvKeyOption `json:"username,omitempty"`
+
+	// +optional
+	Password *EnvKeyOption `json:"password,omitempty"`
+}
+
+type CredentialKeySelector struct {
+	// The ConfigMap to select from.
+	ClusterObjectReference `json:",inline"`
+
+	// +optional
+	Keys CredentialEnvKeys `json:"keys,omitempty"`
+}
+
+type ServiceRefKeySelector struct {
+	// The ConfigMap to select from.
+	ClusterObjectReference `json:",inline"`
+
+	// +optional
+	ServiceKeys ServiceEnvKeys `json:"serviceKeys,omitempty"`
+
+	// +optional
+	CredentialKeys CredentialEnvKeys `json:"credentialKeys,omitempty"`
+}
+
+// ClusterObjectReference contains enough information to let you locate the
+// referenced object inside the same cluster.
+// +structType=atomic
+type ClusterObjectReference struct {
+	// Component of the referent.
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+	// +optional
+	Component string `json:"component,omitempty"`
+
+	// Name of the referent.
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// Specify whether the object must be defined.
+	// +optional
+	Optional *bool `json:"optional,omitempty"`
+}
+
+// Example of milvus components
+//envVars:
+//    - name: ETCD_ENDPOINT
+//      valueFrom:
+//        serviceRefKeyRef:
+//          name: milvus-meta-storage
+//          serviceKeys:
+//            endpoint: Required
+//    - name: PULSAR_SERVER
+//      valueFrom:
+//        serviceRefKeyRef:
+//          name: milvus-log-storage
+//          serviceKeys:
+//            host: Required
+//    - name: PULSAR_PORT
+//      valueFrom:
+//        serviceRefKeyRef:
+//          name: milvus-log-storage
+//          serviceKeys:
+//            port: Required
+//    - name: MINIO_SERVER
+//      valueFrom:
+//        serviceRefKeyRef:
+//          name: milvus-object-storage
+//          serviceKeys:
+//            host: Required
+//    - name: MINIO_PORT
+//      valueFrom:
+//        serviceRefKeyRef:
+//          name: milvus-object-storage
+//          serviceKeys:
+//            port:
+//              EnvKeyOption: Required
+//    - name: MINIO_ACCESS_KEY
+//      valueFrom:
+//        serviceRefKeyRef:
+//          name: milvus-object-storage
+//          credentialKeyRef:
+//            username: Required
+//    - name: MINIO_SECRET_KEY
+//      valueFrom:
+//        serviceRefKeyRef:
+//          name: milvus-object-storage
+//          credentialKeyRef:
+//            password: Required
+
+// the config file of milvus components
+//etcd:
+//  endpoints:
+//    - {{$ETCD_ENDPOINT}}
+//  rootPath: {{$KB_CLUSTER_NAME}}
+//messageQueue: pulsar
+//minio:
+//  address: {{$MINIO_SERVER}}
+//  port: {{$MINIO_PORT}}
+//  accessKeyID: {{$MINIO_ACCESS_KEY}}
+//  secretAccessKey: {{$MINIO_SECRET_KEY}}
+//  bucketName: {{$KB_CLUSTER_NAME}}
+//mq:
+//  type: pulsar
+//msgChannel:
+//  chanNamePrefix:
+//    cluster: {{$KB_CLUSTER_NAME}}
+//pulsar:
+//  address: {{$PULSAR_SERVER}}
+//  port: {{$PULSAR_PORT}}

@@ -26,7 +26,10 @@ chartLocationURL: {{ $base }}/{{ $fullChart }}.tgz
 {{- end }}
 
 {{/*
-Build add-on CR
+Build add-on CR.
+When upgrade KubeBlocks, if the add-on CR already exists, we will do not upgrade it if
+cascadeUpgradeAddons is false, and use the existing add-on. Otherwise, we will upgrade it.
+
 Parameters:
 - name: name of the addon
 - version: version of the addon
@@ -37,6 +40,15 @@ Parameters:
 - kbVersion: KubeBlocks version that this addon is compatible with
 */}}
 {{- define "kubeblocks.buildAddonCR" }}
+{{- $upgrade:= or .Release.IsInstall (and .Release.IsUpgrade .Values.cascadeUpgradeAddons) }}
+{{- $existingAddon := lookup "extensions.kubeblocks.io/v1alpha1" "Addon" "" .name -}}
+{{- if and (not $upgrade) $existingAddon -}}
+{{- $obj := fromYaml (toYaml $existingAddon) -}}
+{{- $metadata := get $obj "metadata" -}}
+{{- $metadata = unset $metadata "managedFields" -}}
+{{- $obj = set $obj "metadata" $metadata -}}
+{{ $obj | toYaml }}
+{{- else -}}
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
@@ -66,4 +78,5 @@ spec:
   - enabled: true
   installable:
     autoInstall: {{ .autoInstall }}
+{{- end -}}
 {{- end -}}

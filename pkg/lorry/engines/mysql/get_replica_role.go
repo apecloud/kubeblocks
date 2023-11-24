@@ -28,13 +28,14 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 )
 
-func (mgr *Manager) GetReplicaRole(_ context.Context, cluster *dcs.Cluster) (string, error) {
+func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (string, error) {
 	if cluster == nil {
 		return "", errors.New("cluster not found")
 	}
 
 	if !cluster.IsLocked() {
-		return "", errors.New("cluster has no leader lease")
+		mgr.Logger.Info("cluster has no leader lease")
+		return mgr.getReplicaRoleFromDB(ctx)
 	}
 
 	if cluster.Leader.Name != mgr.CurrentMemberName {
@@ -42,65 +43,68 @@ func (mgr *Manager) GetReplicaRole(_ context.Context, cluster *dcs.Cluster) (str
 	}
 
 	return models.PRIMARY, nil
-	// slaveRunning, err := mgr.isSlaveRunning(ctx)
-	// if err != nil {
-	// 	return "", err
-	// }
-	// if slaveRunning {
-	// 	return SECONDARY, nil
-	// }
-
-	// hasSlave, err := mgr.hasSlaveHosts(ctx)
-	// if err != nil {
-	// 	return "", err
-	// }
-	// if hasSlave {
-	// 	return PRIMARY, nil
-	// }
-
-	// isReadonly, err := mgr.IsReadonly(ctx, nil, nil)
-	// if err != nil {
-	// 	return "", err
-	// }
-	// if isReadonly {
-	// 	// TODO: in case of diskFull lock, database will be set readonly,
-	// 	// how to deal with this situation
-	// 	return SECONDARY, nil
-	// }
-
-	// return PRIMARY, nil
 }
 
-// func (mgr *Manager) isSlaveRunning(ctx context.Context) (bool, error) {
-// 	var rowMap = mgr.slaveStatus
-//
-// 	if len(rowMap) == 0 {
-// 		return false, nil
-// 	}
-// 	ioRunning := rowMap.GetString("Slave_IO_Running")
-// 	sqlRunning := rowMap.GetString("Slave_SQL_Running")
-// 	if ioRunning == "Yes" || sqlRunning == "Yes" {
-// 		return true, nil
-// 	}
-// 	return false, nil
-// }
-//
-// func (mgr *Manager) hasSlaveHosts(ctx context.Context) (bool, error) {
-// 	sql := "show slave hosts"
-// 	var rowMap RowMap
-//
-// 	err := QueryRowsMap(mgr.DB, sql, func(rMap RowMap) error {
-// 		rowMap = rMap
-// 		return nil
-// 	})
-// 	if err != nil {
-// 		mgr.Logger.Error(err, fmt.Sprintf("error executing %s", sql))
-// 		return false, err
-// 	}
-//
-// 	if len(rowMap) == 0 {
-// 		return false, nil
-// 	}
-//
-// 	return true, nil
-// }
+func (mgr *Manager) getReplicaRoleFromDB(ctx context.Context) (string, error) {
+	slaveRunning, err := mgr.isSlaveRunning(ctx)
+	if err != nil {
+		return "", err
+	}
+	if slaveRunning {
+		return models.SECONDARY, nil
+	}
+
+	hasSlave, err := mgr.hasSlaveHosts(ctx)
+	if err != nil {
+		return "", err
+	}
+	if hasSlave {
+		return models.PRIMARY, nil
+	}
+
+	isReadonly, err := mgr.IsReadonly(ctx, nil, nil)
+	if err != nil {
+		return "", err
+	}
+	if isReadonly {
+		// TODO: in case of diskFull lock, database will be set readonly,
+		// how to deal with this situation
+		return models.SECONDARY, nil
+	}
+
+	return models.PRIMARY, nil
+}
+
+func (mgr *Manager) isSlaveRunning(ctx context.Context) (bool, error) {
+	var rowMap = mgr.slaveStatus
+
+	if len(rowMap) == 0 {
+		return false, nil
+	}
+	ioRunning := rowMap.GetString("Slave_IO_Running")
+	sqlRunning := rowMap.GetString("Slave_SQL_Running")
+	if ioRunning == "Yes" || sqlRunning == "Yes" {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (mgr *Manager) hasSlaveHosts(ctx context.Context) (bool, error) {
+	sql := "show slave hosts"
+	var rowMap RowMap
+
+	err := QueryRowsMap(mgr.DB, sql, func(rMap RowMap) error {
+		rowMap = rMap
+		return nil
+	})
+	if err != nil {
+		mgr.Logger.Info(sql+" failed", "error", err)
+		return false, err
+	}
+
+	if len(rowMap) == 0 {
+		return false, nil
+	}
+
+	return true, nil
+}

@@ -46,6 +46,7 @@ Parameters:
 {{- $obj := fromYaml (toYaml $existingAddon) -}}
 {{- $metadata := get $obj "metadata" -}}
 {{- $metadata = unset $metadata "managedFields" -}}
+{{- $metadata = unset $metadata "resourceVersion" -}}
 {{- $obj = set $obj "metadata" $metadata -}}
 {{ $obj | toYaml }}
 {{- else -}}

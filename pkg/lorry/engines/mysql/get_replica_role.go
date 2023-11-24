@@ -21,7 +21,6 @@ package mysql
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/pkg/errors"
 
@@ -99,7 +98,7 @@ func (mgr *Manager) hasSlaveHosts(ctx context.Context) (bool, error) {
 		return nil
 	})
 	if err != nil {
-		mgr.Logger.Error(err, fmt.Sprintf("error executing %s", sql))
+		mgr.Logger.Info(sql+" failed", "error", err)
 		return false, err
 	}
 

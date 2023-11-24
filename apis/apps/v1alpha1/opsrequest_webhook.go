@@ -707,6 +707,9 @@ func validateSwitchoverResourceList(ctx context.Context, cli client.Client, clus
 				return targetRole, nil
 			}
 			compDefObj, err := getComponentDefByName(ctx, cli, compDef)
+			if err != nil {
+				return err
+			}
 			if compDefObj == nil {
 				return fmt.Errorf("this component %s referenced componentDefinition is invalid", switchover.ComponentName)
 			}

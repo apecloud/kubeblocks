@@ -219,7 +219,7 @@ var _ = Describe("", func() {
 			Expect(err.Error()).Should(ContainSubstring("job check conditions status failed"))
 
 			By("mock job status to success.")
-			jobName := fmt.Sprintf("%s-%s-%s-%d", constant.KBSwitchoverJobNamePrefix, opsRes.Cluster.Name, consensusComp, opsRes.Cluster.Generation)
+			jobName := fmt.Sprintf("%s-%s-%s-%d", KBSwitchoverJobNamePrefix, opsRes.Cluster.Name, consensusComp, opsRes.Cluster.Generation)
 			key := types.NamespacedName{
 				Name:      jobName,
 				Namespace: clusterObj.Namespace,

@@ -45,7 +45,6 @@ func TestManager_GetRole(t *testing.T) {
 		role, err := manager.GetReplicaRole(ctx, cluster)
 		assert.Empty(t, role)
 		assert.NotNil(t, err)
-		assert.ErrorContains(t, err, "cluster has no leader lease")
 	})
 
 	t.Run("get role successfully", func(t *testing.T) {

@@ -101,7 +101,7 @@ var _ = Describe("Component Utils", func() {
 			_ = testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
 
 			By("test GetComponentDefByCluster function")
-			componentDef, _ := appsv1alpha1.GetComponentDefByCluster(ctx, k8sClient, *cluster, consensusCompDefRef)
+			componentDef, _ := appsv1alpha1.GetClusterComponentDefByName(ctx, k8sClient, *cluster, consensusCompDefRef)
 			Expect(componentDef != nil).Should(BeTrue())
 
 			By("test GetClusterByObject function")

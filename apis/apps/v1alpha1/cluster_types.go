@@ -1008,8 +1008,8 @@ func ComponentPodsAreReady(podsAreReady *bool) bool {
 	return podsAreReady != nil && *podsAreReady
 }
 
-// GetComponentDefByCluster gets component from ClusterDefinition with compDefName
-func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster Cluster,
+// GetClusterComponentDefByName gets component from ClusterDefinition with compDefName
+func GetClusterComponentDefByName(ctx context.Context, cli client.Client, cluster Cluster,
 	compDefName string) (*ClusterComponentDefinition, error) {
 	clusterDef := &ClusterDefinition{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {

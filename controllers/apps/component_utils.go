@@ -154,7 +154,7 @@ func GetComponentInfoByPod(ctx context.Context,
 	if len(compDefName) == 0 && len(cluster.Spec.ComponentSpecs) == 0 {
 		compDefName = componentName
 	}
-	componentDef, err = appsv1alpha1.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
+	componentDef, err = appsv1alpha1.GetClusterComponentDefByName(ctx, cli, cluster, compDefName)
 	if err != nil {
 		return componentName, componentDef, err
 	}

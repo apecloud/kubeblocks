@@ -39,11 +39,34 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
+// switchover constants
 const (
-	SwitchoverCheckJobKey       = "CheckJob"
-	SwitchoverCheckRoleLabelKey = "CheckRoleLabel"
-
 	OpsReasonForSkipSwitchover = "SkipSwitchover"
+
+	KBSwitchoverCandidateInstanceForAnyPod = "*"
+
+	KBJobTTLSecondsAfterFinished  = 5
+	KBSwitchoverJobLabelKey       = "kubeblocks.io/switchover-job"
+	KBSwitchoverJobLabelValue     = "kb-switchover-job"
+	KBSwitchoverJobNamePrefix     = "kb-switchover-job"
+	KBSwitchoverJobContainerName  = "kb-switchover-job-container"
+	KBSwitchoverCheckJobKey       = "CheckJob"
+	KBSwitchoverCheckRoleLabelKey = "CheckRoleLabel"
+
+	KBSwitchoverCandidateName = "KB_SWITCHOVER_CANDIDATE_NAME"
+	KBSwitchoverCandidateFqdn = "KB_SWITCHOVER_CANDIDATE_FQDN"
+
+	// KBSwitchoverReplicationPrimaryPodIP and the others Replication and Consensus switchover constants will be deprecated in the future, use KBSwitchoverLeaderPodIP instead.
+	KBSwitchoverReplicationPrimaryPodIP   = "KB_REPLICATION_PRIMARY_POD_IP"
+	KBSwitchoverReplicationPrimaryPodName = "KB_REPLICATION_PRIMARY_POD_NAME"
+	KBSwitchoverReplicationPrimaryPodFqdn = "KB_REPLICATION_PRIMARY_POD_FQDN"
+	KBSwitchoverConsensusLeaderPodIP      = "KB_CONSENSUS_LEADER_POD_IP"
+	KBSwitchoverConsensusLeaderPodName    = "KB_CONSENSUS_LEADER_POD_NAME"
+	KBSwitchoverConsensusLeaderPodFqdn    = "KB_CONSENSUS_LEADER_POD_FQDN"
+
+	KBSwitchoverLeaderPodIP   = "KB_LEADER_POD_IP"
+	KBSwitchoverLeaderPodName = "KB_LEADER_POD_NAME"
+	KBSwitchoverLeaderPodFqdn = "KB_LEADER_POD_FQDN"
 )
 
 // needDoSwitchover checks whether we need to perform a switchover.
@@ -61,7 +84,7 @@ func needDoSwitchover(ctx context.Context,
 		return false, nil
 	}
 	switch switchover.InstanceName {
-	case constant.KBSwitchoverCandidateInstanceForAnyPod:
+	case KBSwitchoverCandidateInstanceForAnyPod:
 		return true, nil
 	default:
 		podList, err := component.GetComponentPodList(ctx, cli, *cluster, synthesizedComp.Name)
@@ -144,7 +167,7 @@ func checkPodRoleLabelConsistency(ctx context.Context,
 			continue
 		}
 		switch switchoverMessage.Switchover.InstanceName {
-		case constant.KBSwitchoverCandidateInstanceForAnyPod:
+		case KBSwitchoverCandidateInstanceForAnyPod:
 			if pod.Name != switchoverMessage.OldPrimary {
 				return true, nil
 			}
@@ -171,7 +194,7 @@ func renderSwitchoverCmdJob(ctx context.Context,
 		return nil, err
 	}
 	if pod == nil {
-		return nil, errors.New("primary pod not found")
+		return nil, errors.New("serviceable and writable pod not found")
 	}
 
 	renderJobPodVolumes := func(scriptSpecSelectors []appsv1alpha1.ScriptSpecSelector) ([]corev1.Volume, []corev1.VolumeMount) {
@@ -217,7 +240,7 @@ func renderSwitchoverCmdJob(ctx context.Context,
 			scriptSpecSelectors []appsv1alpha1.ScriptSpecSelector
 		)
 		switch switchover.InstanceName {
-		case constant.KBSwitchoverCandidateInstanceForAnyPod:
+		case KBSwitchoverCandidateInstanceForAnyPod:
 			if switchoverSpec.WithoutCandidate != nil && switchoverSpec.WithoutCandidate.Exec != nil {
 				cmdExecutorConfig = switchoverSpec.WithoutCandidate
 			}
@@ -251,7 +274,7 @@ func renderSwitchoverCmdJob(ctx context.Context,
 						RestartPolicy: corev1.RestartPolicyNever,
 						Containers: []corev1.Container{
 							{
-								Name:            constant.KBSwitchoverJobContainerName,
+								Name:            KBSwitchoverJobContainerName,
 								Image:           cmdExecutorConfig.Image,
 								ImagePullPolicy: corev1.PullIfNotPresent,
 								Command:         cmdExecutorConfig.Exec.Command,
@@ -283,16 +306,16 @@ func renderSwitchoverCmdJob(ctx context.Context,
 
 // genSwitchoverJobName generates the switchover job name.
 func genSwitchoverJobName(clusterName, componentName string, generation int64) string {
-	return fmt.Sprintf("%s-%s-%s-%d", constant.KBSwitchoverJobNamePrefix, clusterName, componentName, generation)
+	return fmt.Sprintf("%s-%s-%s-%d", KBSwitchoverJobNamePrefix, clusterName, componentName, generation)
 }
 
 // getSwitchoverCmdJobLabel gets the labels for job that execute the switchover commands.
 func getSwitchoverCmdJobLabel(clusterName, componentName string) map[string]string {
 	return map[string]string{
-		constant.AppInstanceLabelKey:     clusterName,
-		constant.KBAppComponentLabelKey:  componentName,
-		constant.AppManagedByLabelKey:    constant.AppName,
-		constant.KBSwitchoverJobLabelKey: constant.KBSwitchoverJobLabelValue,
+		constant.AppInstanceLabelKey:    clusterName,
+		constant.KBAppComponentLabelKey: componentName,
+		constant.AppManagedByLabelKey:   constant.AppName,
+		KBSwitchoverJobLabelKey:         KBSwitchoverJobLabelValue,
 	}
 }
 
@@ -305,16 +328,16 @@ func buildSwitchoverCandidateEnv(
 	if switchover == nil {
 		return nil
 	}
-	if switchover.InstanceName == constant.KBSwitchoverCandidateInstanceForAnyPod {
+	if switchover.InstanceName == KBSwitchoverCandidateInstanceForAnyPod {
 		return nil
 	}
 	return []corev1.EnvVar{
 		{
-			Name:  constant.KBSwitchoverCandidateName,
+			Name:  KBSwitchoverCandidateName,
 			Value: switchover.InstanceName,
 		},
 		{
-			Name:  constant.KBSwitchoverCandidateFqdn,
+			Name:  KBSwitchoverCandidateFqdn,
 			Value: fmt.Sprintf("%s.%s", switchover.InstanceName, svcName),
 		},
 	}
@@ -339,7 +362,7 @@ func buildSwitchoverEnvs(ctx context.Context,
 	replaceSwitchoverConnCredentialEnv(synthesizeComp.LifecycleActions.Switchover, cluster.Name, synthesizeComp.Name)
 	var switchoverEnvs []corev1.EnvVar
 	switch switchover.InstanceName {
-	case constant.KBSwitchoverCandidateInstanceForAnyPod:
+	case KBSwitchoverCandidateInstanceForAnyPod:
 		if synthesizeComp.LifecycleActions.Switchover.WithoutCandidate != nil {
 			switchoverEnvs = append(switchoverEnvs, synthesizeComp.LifecycleActions.Switchover.WithoutCandidate.Env...)
 		}
@@ -396,15 +419,15 @@ func buildSwitchoverWorkloadEnvs(ctx context.Context,
 
 	workloadEnvs = append(workloadEnvs, []corev1.EnvVar{
 		{
-			Name:  constant.KBSwitchoverLeaderPodIP,
+			Name:  KBSwitchoverLeaderPodIP,
 			Value: pod.Status.PodIP,
 		},
 		{
-			Name:  constant.KBSwitchoverLeaderPodName,
+			Name:  KBSwitchoverLeaderPodName,
 			Value: pod.Name,
 		},
 		{
-			Name:  constant.KBSwitchoverLeaderPodFqdn,
+			Name:  KBSwitchoverLeaderPodFqdn,
 			Value: fmt.Sprintf("%s.%s", pod.Name, svcName),
 		},
 	}...)
@@ -412,27 +435,27 @@ func buildSwitchoverWorkloadEnvs(ctx context.Context,
 	// TODO(xingran): backward compatibility for the old env based on workloadType, it will be removed in the future
 	workloadEnvs = append(workloadEnvs, []corev1.EnvVar{
 		{
-			Name:  constant.KBSwitchoverReplicationPrimaryPodIP,
+			Name:  KBSwitchoverReplicationPrimaryPodIP,
 			Value: pod.Status.PodIP,
 		},
 		{
-			Name:  constant.KBSwitchoverReplicationPrimaryPodName,
+			Name:  KBSwitchoverReplicationPrimaryPodName,
 			Value: pod.Name,
 		},
 		{
-			Name:  constant.KBSwitchoverReplicationPrimaryPodFqdn,
+			Name:  KBSwitchoverReplicationPrimaryPodFqdn,
 			Value: fmt.Sprintf("%s.%s", pod.Name, svcName),
 		},
 		{
-			Name:  constant.KBSwitchoverConsensusLeaderPodIP,
+			Name:  KBSwitchoverConsensusLeaderPodIP,
 			Value: pod.Status.PodIP,
 		},
 		{
-			Name:  constant.KBSwitchoverConsensusLeaderPodName,
+			Name:  KBSwitchoverConsensusLeaderPodName,
 			Value: pod.Name,
 		},
 		{
-			Name:  constant.KBSwitchoverConsensusLeaderPodFqdn,
+			Name:  KBSwitchoverConsensusLeaderPodFqdn,
 			Value: fmt.Sprintf("%s.%s", pod.Name, svcName),
 		},
 	}...)
@@ -464,7 +487,7 @@ func cleanJobWithLabels(ctx context.Context,
 		return err
 	}
 	for _, job := range jobList {
-		var ttl = int32(constant.KBJobTTLSecondsAfterFinished)
+		var ttl = int32(KBJobTTLSecondsAfterFinished)
 		patch := client.MergeFrom(job.DeepCopy())
 		job.Spec.TTLSecondsAfterFinished = &ttl
 		if err := cli.Patch(ctx, &job, patch); err != nil {
@@ -484,7 +507,7 @@ func cleanJobByName(ctx context.Context,
 	if err := cli.Get(ctx, key, job); err != nil {
 		return err
 	}
-	var ttl = int32(constant.KBJobTTLSecondsAfterFinished)
+	var ttl = int32(KBJobTTLSecondsAfterFinished)
 	patch := client.MergeFrom(job.DeepCopy())
 	job.Spec.TTLSecondsAfterFinished = &ttl
 	if err := cli.Patch(ctx, job, patch); err != nil {

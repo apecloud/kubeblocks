@@ -32,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	// testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
 var _ = Describe("OpsRequest webhook", func() {
@@ -43,6 +42,7 @@ var _ = Describe("OpsRequest webhook", func() {
 	var (
 		randomStr                    = testCtx.GetRandomStr()
 		clusterDefinitionName        = "opswebhook-mysql-definition-" + randomStr
+		componentDefinitionName      = "opswk-compdef-" + randomStr
 		clusterVersionName           = "opswebhook-mysql-clusterversion-" + randomStr
 		clusterVersionNameForUpgrade = "opswebhook-mysql-upgrade-" + randomStr
 		clusterName                  = "opswebhook-mysql-" + randomStr
@@ -481,6 +481,102 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
 	}
 
+	testSwitchoverWithCompDef := func(clusterDef *ClusterDefinition, compDef *ComponentDefinition, cluster *Cluster) {
+		switchoverList := []Switchover{
+			{
+				ComponentOps: ComponentOps{ComponentName: "switchover-component-not-exist"},
+				InstanceName: "*",
+			},
+			{
+				ComponentOps: ComponentOps{ComponentName: componentName},
+				InstanceName: "",
+			},
+			{
+				ComponentOps: ComponentOps{ComponentName: componentName},
+				InstanceName: "switchover-instance-name-not-exist",
+			},
+			{
+				ComponentOps: ComponentOps{ComponentName: componentName},
+				InstanceName: "*",
+			},
+			{
+				ComponentOps: ComponentOps{ComponentName: componentName},
+				InstanceName: fmt.Sprintf("%s-%s-0", cluster.Name, componentName),
+			},
+		}
+
+		patch := client.MergeFrom(cluster.DeepCopy())
+		cluster.Spec.ComponentSpecs[0].ComponentDef = compDef.Name
+		cluster.Spec.ComponentSpecs[1].ComponentDef = compDef.Name
+		Expect(k8sClient.Patch(ctx, cluster, patch)).Should(Succeed())
+
+		By("By testing switchover - target component not exist")
+		opsRequest := createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[0]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring(notFoundComponentsString("switchover-component-not-exist")))
+
+		By("By testing switchover - target switchover.Instance cannot be empty")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[1]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("switchover.instanceName"))
+
+		By("By testing switchover - componentDefinition has no ComponentSwitchoverSpec and do not support switchover")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[3]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("does not support switchover"))
+
+		By("By testing switchover - target switchover.Instance cannot be empty")
+		patch = client.MergeFrom(compDef.DeepCopy())
+		commandExecutorEnvItem := &CommandExecutorEnvItem{
+			Image: "test-image",
+			Env:   []corev1.EnvVar{},
+		}
+		commandExecutorItem := &CommandExecutorItem{
+			Command: []string{"echo", "hello"},
+			Args:    []string{},
+		}
+		scriptSpecSelectors := []ScriptSpecSelector{
+			{
+				Name: "test-mock-cm",
+			},
+			{
+				Name: "test-mock-cm-2",
+			},
+		}
+		lifeCycleAction := &ComponentLifecycleActions{
+			Switchover: &ComponentSwitchoverSpec{
+				WithCandidate: &Action{
+					Image: commandExecutorEnvItem.Image,
+					Env:   commandExecutorEnvItem.Env,
+					Exec: &ExecAction{
+						Command: commandExecutorItem.Command,
+						Args:    commandExecutorItem.Args,
+					},
+				},
+				WithoutCandidate: &Action{
+					Image: commandExecutorEnvItem.Image,
+					Env:   commandExecutorEnvItem.Env,
+					Exec: &ExecAction{
+						Command: commandExecutorItem.Command,
+						Args:    commandExecutorItem.Args,
+					},
+				},
+				ScriptSpecSelectors: scriptSpecSelectors,
+			},
+		}
+
+		compDef.Spec.LifecycleActions = lifeCycleAction
+		Expect(k8sClient.Patch(ctx, compDef, patch)).Should(Succeed())
+		tmp := &ComponentDefinition{}
+		_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: compDef.Name}, tmp)
+		Expect(tmp.Spec.LifecycleActions.Switchover).ShouldNot(BeNil())
+
+		By("By testing switchover - switchover.InstanceName is * and should succeed ")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[3]}
+		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
+	}
+
 	testWhenClusterDeleted := func(cluster *Cluster, opsRequest *OpsRequest) {
 		By("delete cluster")
 		newCluster := &Cluster{}
@@ -548,14 +644,16 @@ var _ = Describe("OpsRequest webhook", func() {
 
 	Context("When clusterVersion create and update", func() {
 		It("Should webhook validate passed", func() {
-			By("By create a clusterDefinition")
-
 			// wait until ClusterDefinition and ClusterVersion created
+			By("By create a clusterDefinition")
 			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
 			Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
 			By("By creating a clusterVersion")
 			clusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName)
 			Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
+			By("By creating a componentDefinition")
+			compDef := createTestComponentDefObj(componentDefinitionName)
+			Expect(testCtx.CheckedCreateObj(ctx, compDef)).Should(Succeed())
 
 			opsRequest := createTestOpsRequest(clusterName, opsRequestName, UpgradeType)
 
@@ -581,6 +679,30 @@ var _ = Describe("OpsRequest webhook", func() {
 			opsRequest = testRestart(cluster)
 
 			testWhenClusterDeleted(cluster, opsRequest)
+		})
+
+		It("test switchover with component definition", func() {
+			// wait until ClusterDefinition and ClusterVersion created
+			By("By create a clusterDefinition")
+			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
+			Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
+			By("By creating a clusterVersion")
+			clusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName)
+			Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
+			By("By creating a componentDefinition")
+			compDef := createTestComponentDefObj(componentDefinitionName)
+			Expect(testCtx.CheckedCreateObj(ctx, compDef)).Should(Succeed())
+
+			opsRequest := createTestOpsRequest(clusterName, opsRequestName, UpgradeType)
+
+			// create Cluster
+			By("By testing spec.clusterDef is legal")
+			Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(HaveOccurred())
+			By("By create a new cluster ")
+			cluster, _ := createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
+			Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
+
+			testSwitchoverWithCompDef(clusterDef, compDef, cluster)
 		})
 
 		It("check datascript opts", func() {

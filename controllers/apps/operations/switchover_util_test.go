@@ -121,9 +121,7 @@ var _ = Describe("Switchover Util", func() {
 			Ctx: testCtx.Ctx,
 		}
 		compSpec := clusterObj.Spec.GetComponentByName(opsSwitchover.ComponentName)
-		comp, err := component.BuildComponent(clusterObj, compSpec)
-		Expect(err).Should(Succeed())
-		_, synthesizedComp, err := component.BuildSynthesizedComponent4Generated(reqCtx, k8sClient, clusterObj, comp)
+		synthesizedComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, k8sClient, clusterObj, compSpec)
 		Expect(err).Should(Succeed())
 		Expect(synthesizedComp).ShouldNot(BeNil())
 
@@ -187,9 +185,7 @@ var _ = Describe("Switchover Util", func() {
 		}
 		By("Test create a job to do switchover")
 		compSpec := clusterObj.Spec.GetComponentByName(opsSwitchover.ComponentName)
-		comp, err := component.BuildComponent(clusterObj, compSpec)
-		Expect(err).Should(Succeed())
-		_, synthesizedComp, err := component.BuildSynthesizedComponent4Generated(reqCtx, k8sClient, clusterObj, comp)
+		synthesizedComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, k8sClient, clusterObj, compSpec)
 		Expect(err).Should(Succeed())
 		Expect(synthesizedComp).ShouldNot(BeNil())
 		err = createSwitchoverJob(reqCtx, k8sClient, clusterObj, synthesizedComp, opsSwitchover)

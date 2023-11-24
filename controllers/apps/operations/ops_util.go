@@ -105,8 +105,8 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 	if len(componentNameMap) == 0 {
 		checkAllClusterComponent = true
 	}
-	patch := client.MergeFrom(opsRequest.DeepCopy())
-	oldOpsRequestStatus := opsRequest.Status.DeepCopy()
+	oldOpsRequest := opsRequest.DeepCopy()
+	patch := client.MergeFrom(oldOpsRequest)
 	if opsRequest.Status.Components == nil {
 		opsRequest.Status.Components = map[string]appsv1alpha1.OpsRequestComponentStatus{}
 	}
@@ -154,7 +154,7 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 		opsRequest.Status.Components[k] = compStatus
 	}
 	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedProgressCount, expectProgressCount)
-	if !reflect.DeepEqual(opsRequest.Status, *oldOpsRequestStatus) {
+	if !reflect.DeepEqual(opsRequest.Status, oldOpsRequest.Status) {
 		if err = cli.Status().Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
 			return opsRequestPhase, 0, err
 		}
@@ -275,8 +275,8 @@ func patchValidateErrorCondition(ctx context.Context, cli client.Client, opsRes 
 	return PatchOpsStatus(ctx, cli, opsRes, appsv1alpha1.OpsFailedPhase, condition)
 }
 
-// patchFastFailErrorCondition patches a new failed condition to the OpsRequest.status.conditions.
-func patchFastFailErrorCondition(ctx context.Context, cli client.Client, opsRes *OpsResource, err error) error {
+// patchFatalFailErrorCondition patches a new failed condition to the OpsRequest.status.conditions.
+func patchFatalFailErrorCondition(ctx context.Context, cli client.Client, opsRes *OpsResource, err error) error {
 	condition := appsv1alpha1.NewFailedCondition(opsRes.OpsRequest, err)
 	return PatchOpsStatus(ctx, cli, opsRes, appsv1alpha1.OpsFailedPhase, condition)
 }

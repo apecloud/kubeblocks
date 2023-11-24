@@ -39,9 +39,10 @@ import (
 // BuildSynthesizedComponent builds a new SynthesizedComponent object, which is a mixture of component-related configs from ComponentDefinition and Component.
 func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
+	cluster *appsv1alpha1.Cluster,
 	compDef *appsv1alpha1.ComponentDefinition,
 	comp *appsv1alpha1.Component) (*SynthesizedComponent, error) {
-	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil, nil)
+	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, cluster, nil)
 }
 
 // BuildSynthesizedComponent4Generated builds SynthesizedComponent for generated Component which w/o ComponentDefinition.
@@ -210,6 +211,10 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 
 	// replace podSpec containers env default credential placeholder
 	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForConnCredential(synthesizeComp.ClusterName))
+
+	// replace podSpec containers env component connection credential placeholder
+	// TODO: replace the all placeholder for the secret name.
+	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForCompConnCredential(synthesizeComp.ClusterName, synthesizeComp.Name))
 
 	return synthesizeComp, nil
 }
@@ -495,6 +500,15 @@ func doContainerAttrOverride(compContainer *corev1.Container, container corev1.C
 func GetEnvReplacementMapForConnCredential(clusterName string) map[string]string {
 	return map[string]string{
 		constant.KBConnCredentialPlaceHolder: constant.GenerateDefaultConnCredential(clusterName),
+	}
+}
+
+// GetEnvReplacementMapForCompConnCredential gets the replacement map for component connect credential
+func GetEnvReplacementMapForCompConnCredential(clusterName, componentName string) map[string]string {
+	return map[string]string{
+		constant.EnvPlaceHolder(constant.KBEnvComponentName):   componentName,
+		constant.EnvPlaceHolder(constant.KBEnvClusterName):     clusterName,
+		constant.EnvPlaceHolder(constant.KBEnvClusterCompName): constant.GenerateClusterComponentName(clusterName, componentName),
 	}
 }
 

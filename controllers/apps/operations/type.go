@@ -66,6 +66,7 @@ type OpsBehaviour struct {
 }
 
 type OpsResource struct {
+	OpsDef         *appsv1alpha1.OpsDefinition
 	OpsRequest     *appsv1alpha1.OpsRequest
 	Cluster        *appsv1alpha1.Cluster
 	Recorder       record.EventRecorder

@@ -32,6 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 func FullName(clusterName, compName string) string {
@@ -187,4 +188,20 @@ func getCompLabelValue(comp *appsv1alpha1.Component, label string) (string, erro
 		return "", fmt.Errorf("required label %s is not provided, component: %s", label, comp.GetName())
 	}
 	return val, nil
+}
+
+// GetCompDefinition gets the component definition by component name.
+func GetCompDefinition(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	compName string) (*appsv1alpha1.ComponentDefinition, error) {
+	compDefName := cluster.Spec.GetComponentDefName(compName)
+	if len(compDefName) == 0 {
+		return nil, intctrlutil.NewNotFound(`can not found component definition by the component name "%s"`, compName)
+	}
+	compDef := &appsv1alpha1.ComponentDefinition{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: compDefName}, compDef); err != nil {
+		return nil, err
+	}
+	return compDef, nil
 }

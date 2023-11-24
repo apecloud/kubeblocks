@@ -190,9 +190,9 @@ func buildCredentialEndpointFromService(credential appsv1alpha1.ConnectionCreden
 		}
 	}
 	// TODO(component): define the service and port pattern
-	(*data)["endpoint"] = []byte(fmt.Sprintf("%s:%d", serviceName, port))
-	(*data)["host"] = []byte(serviceName)
-	(*data)["port"] = []byte(fmt.Sprintf("%d", port))
+	(*data)[constant.SecretEndpointKey] = []byte(fmt.Sprintf("%s:%d", serviceName, port))
+	(*data)[constant.SecretHostKey] = []byte(serviceName)
+	(*data)[constant.SecretPortKey] = []byte(fmt.Sprintf("%d", port))
 }
 
 func buildCredentialAccountFromSecret(ctx graph.TransformContext, dag *graph.DAG,

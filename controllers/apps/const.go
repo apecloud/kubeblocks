@@ -26,7 +26,7 @@ const (
 	// name of our custom finalizer
 	dbClusterDefFinalizerName   = "clusterdefinition.kubeblocks.io/finalizer"
 	clusterVersionFinalizerName = "clusterversion.kubeblocks.io/finalizer"
-	opsRequestFinalizerName     = "opsrequest.kubeblocks.io/finalizer"
+	opsDefinitionFinalizerName  = "opsdefinition.kubeblocks.io/finalizer"
 
 	// annotations keys
 	// lifecycleAnnotationKey = "cluster.kubeblocks.io/lifecycle"

@@ -64,6 +64,10 @@ func (c *FakeAppsV1alpha1) ConfigConstraints() v1alpha1.ConfigConstraintInterfac
 	return &FakeConfigConstraints{c}
 }
 
+func (c *FakeAppsV1alpha1) OpsDefinitions() v1alpha1.OpsDefinitionInterface {
+	return &FakeOpsDefinitions{c}
+}
+
 func (c *FakeAppsV1alpha1) OpsRequests(namespace string) v1alpha1.OpsRequestInterface {
 	return &FakeOpsRequests{c, namespace}
 }

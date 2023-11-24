@@ -27,3 +27,6 @@ depend-charts/
 
 # dashboards
 dashboards/
+
+# crds, need to separate installation
+crds/

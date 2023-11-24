@@ -101,6 +101,12 @@ type ComponentDefinitionSpec struct {
 	// +kubebuilder:validation:Required
 	Runtime corev1.PodSpec `json:"runtime"`
 
+	// User-defined environment variables.
+	// These can be used as env vars for pods or actions, or to render the templates of config or script.
+	// Cannot be updated.
+	// +optional
+	Env []EnvVar `json:"env,omitempty"`
+
 	// Volumes defines the persistent volumes needed by the component.
 	// The users are responsible for providing these volumes when creating a component instance.
 	// Cannot be updated.
@@ -198,12 +204,6 @@ type ComponentDefinitionSpec struct {
 	// Cannot be updated.
 	// +optional
 	ServiceRefDeclarations []ServiceRefDeclaration `json:"serviceRefDeclarations,omitempty"`
-
-	// User-defined environment variables.
-	// These can be used as env vars for pods or actions, or to render the templates of config or script.
-	// Cannot be updated.
-	// +optional
-	EnvVars []EnvVar `json:"envVars,omitempty"`
 }
 
 // ComponentDefinitionStatus defines the observed state of ComponentDefinition.

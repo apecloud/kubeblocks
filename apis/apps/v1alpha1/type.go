@@ -652,82 +652,72 @@ type ConnectionCredential struct {
 	AccountName string `json:"accountName,omitempty"`
 }
 
-// EnvVar represents an environment variable present in a Container.
+// List of all the built-in variables defined by KB.
+// When rendering the environment variables of Pod or Action, and the templates of config or script,
+// these variables will be passed in by default, so you can use them directly without declaring them.
+// TODO: resources.
+// ---------------------------------------------------------------------------------
+// |           |           |                       |  available in   |             |
+// | object    | attribute | var                   | template | Env  | description |
+// ---------------------------------------------------------------------------------
+// | Namespace |           | KB_NAMESPACE          |          |      |             |
+// | Cluster   | name      | KB_CLUSTER_NAME       |          |      |             |
+// |           | UID       | KB_CLUSTER_UID        |          |      |             |
+// | Component | name      | KB_COMPONENT_NAME     |          |      |             |
+// |           | replicas  | KB_COMPONENT_REPLICAS |          |      |             |
+// | Pod       | name      | KB_POD_NAME           |          |      |             |
+// |           | UID       | KB_POD_UID            |     x    |      |             |
+// |           | IP        | KB_POD_IP             |     x    |      |             |
+// |           | FQDN      | KB_POD_FQDN           |          |      |             |
+// |           | ordinal   | KB_POD_ORDINAL        |          |      |             |
+// | Host      | name      | KB_HOST_NAME          |     x    |      |             |
+// |           | IP        | KB_HOST_IP            |     x    |      |             |
+// ---------------------------------------------------------------------------------
+
+// EnvVar represents a variable present in the env of Pod/Action or the template of config/script.
 type EnvVar struct {
-	// Name of the environment variable. Must be a C_IDENTIFIER.
+	// Name of the variable. Must be a C_IDENTIFIER.
 	// +required
 	Name string `json:"name"`
 
 	// Optional: no more than one of the following may be specified.
 
-	// Variable references $(VAR_NAME) are expanded
-	// using the previously defined environment variables in the container and
-	// any service environment variables. If a variable cannot be resolved,
-	// the reference in the input string will be unchanged. Double $$ are reduced
-	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+	// Variable references $(VAR_NAME) are expanded using the previously defined variables in the current context.
+	// If a variable cannot be resolved, the reference in the input string will be unchanged.
+	// Double $$ are reduced to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
 	// "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
-	// Escaped references will never be expanded, regardless of whether the variable
-	// exists or not.
+	// Escaped references will never be expanded, regardless of whether the variable exists or not.
 	// Defaults to "".
 	// +optional
-	Value EnvVarValue `json:"value,omitempty"`
-	// Source for the environment variable's value. Cannot be used if value is not empty.
+	Value string `json:"value,omitempty"`
+	// Source for the variable's value. Cannot be used if value is not empty.
 	// +optional
 	ValueFrom *EnvVarSource `json:"valueFrom,omitempty"`
 }
 
-// All the builtin system env vars can be referenced directly.
-// TODO: resources
-// -------------------------------------------------------------------------------------------------------
-// | object    | attribute | var                   |  config & script | env (pod & action) | description |
-// -------------------------------------------------------------------------------------------------------
-// | Namespace |           | KB_NAMESPACE          |                  |                    |             |
-// | Cluster   | name      | KB_CLUSTER_NAME       |                  |                    |             |
-// |           | UID       | KB_CLUSTER_UID        |                  |                    |             |
-// | Component | name      | KB_COMPONENT_NAME     |                  |                    |             |
-// |           | replicas  | KB_COMPONENT_REPLICAS |                  |                    |             |
-// | Pod       | name      | KB_POD_NAME           |                  |                    |             |
-// |           | UID       | KB_POD_UID            | x                |                    |             |
-// |           | IP        | KB_POD_IP             | x                |                    |             |
-// |           | FQDN      | KB_POD_FQDN           |                  |                    |             |
-// |           | ordinal   | KB_POD_ORDINAL        |                  |                    |             |
-// | Host      | name      | KB_HOST_NAME          | x                |                    |             |
-// |           | IP        | KB_HOST_IP            | x                |                    |             |
-// -------------------------------------------------------------------------------------------------------
-
-type EnvVarValue struct {
-	// +required
-	Value string `json:"value,omitempty"`
-
-	// +kubebuilder:default=false
-	// +optional
-	Builtin bool `json:"builtin,omitempty"`
-
-	// +kubebuilder:default=false
-	// +optional
-	EnvVar bool `json:"envVar,omitempty"`
-}
-
+// EnvVarSource represents a source for the value of an EnvVar.
 type EnvVarSource struct {
 	// Selects a key of a ConfigMap.
 	// +optional
 	ConfigMapKeyRef *corev1.ConfigMapKeySelector `json:"configMapKeyRef,omitempty"`
 
-	// Selects a key of a secret in the pod's namespace
+	// Selects a key of a Secret.
 	// +optional
 	SecretKeyRef *corev1.SecretKeySelector `json:"secretKeyRef,omitempty"`
 
+	// Selects a defined key of a Service.
 	// +optional
 	ServiceKeyRef *ServiceKeySelector `json:"serviceKeyRef,omitempty"`
 
+	// Selects a defined key of a Credential (SystemAccount).
 	// +optional
 	CredentialKeyRef *CredentialKeySelector `json:"credentialKeyRef,omitempty"`
 
+	// Selects a defined key of a ServiceRef.
 	// +optional
 	ServiceRefKeyRef *ServiceRefKeySelector `json:"serviceRefKeyRef,omitempty"`
 }
 
-// EnvKeyOption
 // +enum
 // +kubebuilder:validation:Enum={Required,Optional}
 type EnvKeyOption string
@@ -744,6 +734,7 @@ type NamedEnvKeyOption struct {
 	Name string `json:"name,omitempty"`
 }
 
+// ServiceEnvKeys defines the keys can be referenced from a Service.
 type ServiceEnvKeys struct {
 	// +optional
 	Endpoint *EnvKeyOption `json:"endpoint,omitempty"`
@@ -755,15 +746,8 @@ type ServiceEnvKeys struct {
 	Port *NamedEnvKeyOption `json:"port,omitempty"`
 }
 
-type ServiceKeySelector struct {
-	// The Service to select from.
-	ClusterObjectReference `json:",inline"`
-
-	// +optional
-	Keys ServiceEnvKeys `json:"keys,omitempty"`
-}
-
-// CredentialEnvKeys will only be used as env vars for pods or actions, and will not be used to render the templates.
+// CredentialEnvKeys defines the keys can be referenced from a Credential (SystemAccount).
+// !!!!! CredentialEnvKeys will only be used as environment variables for Pod or Action, and will not be used to render the templates.
 type CredentialEnvKeys struct {
 	// +optional
 	Username *EnvKeyOption `json:"username,omitempty"`
@@ -772,35 +756,47 @@ type CredentialEnvKeys struct {
 	Password *EnvKeyOption `json:"password,omitempty"`
 }
 
+// ServiceKeySelector selects a key from a Service.
+// +structType=atomic
+type ServiceKeySelector struct {
+	// The Service to select from.
+	// It can be referenced from the default headless service by setting the name to "headless".
+	ClusterObjectReference `json:",inline"`
+
+	ServiceEnvKeys `json:",inline"`
+}
+
+// CredentialKeySelector selects a key from a Credential (SystemAccount).
+// +structType=atomic
 type CredentialKeySelector struct {
-	// The ConfigMap to select from.
+	// The Credential (SystemAccount) to select from.
 	ClusterObjectReference `json:",inline"`
 
-	// +optional
-	Keys CredentialEnvKeys `json:"keys,omitempty"`
+	CredentialEnvKeys `json:",inline"`
 }
 
+// ServiceRefKeySelector selects a key from a ServiceRefDeclaration.
+// +structType=atomic
 type ServiceRefKeySelector struct {
-	// The ConfigMap to select from.
+	// The ServiceRefDeclaration to select from.
 	ClusterObjectReference `json:",inline"`
 
 	// +optional
-	ServiceKeys ServiceEnvKeys `json:"serviceKeys,omitempty"`
+	ServiceKey *ServiceEnvKeys `json:"serviceKey,omitempty"`
 
 	// +optional
-	CredentialKeys CredentialEnvKeys `json:"credentialKeys,omitempty"`
+	CredentialKey *CredentialEnvKeys `json:"credentialKey,omitempty"`
 }
 
-// ClusterObjectReference contains enough information to let you locate the
-// referenced object inside the same cluster.
+// ClusterObjectReference contains information to let you locate the referenced object inside the same cluster.
 // +structType=atomic
 type ClusterObjectReference struct {
-	// Component of the referent.
+	// Component of the referent object resident in.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
 	// +optional
 	Component string `json:"component,omitempty"`
 
-	// Name of the referent.
+	// Name of the referent object.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
 	// +optional
 	Name string `json:"name,omitempty"`
@@ -810,8 +806,8 @@ type ClusterObjectReference struct {
 	Optional *bool `json:"optional,omitempty"`
 }
 
-// Example of milvus components
-//envVars:
+// Example of a milvus component definition:
+//  envVars:
 //    - name: ETCD_ENDPOINT
 //      valueFrom:
 //        serviceRefKeyRef:
@@ -842,7 +838,7 @@ type ClusterObjectReference struct {
 //          name: milvus-object-storage
 //          serviceKeys:
 //            port:
-//              EnvKeyOption: Required
+//              ObjectKeyOption: Required
 //    - name: MINIO_ACCESS_KEY
 //      valueFrom:
 //        serviceRefKeyRef:
@@ -856,23 +852,23 @@ type ClusterObjectReference struct {
 //          credentialKeyRef:
 //            password: Required
 
-// the config file of milvus components
-//etcd:
-//  endpoints:
-//    - {{$ETCD_ENDPOINT}}
-//  rootPath: {{$KB_CLUSTER_NAME}}
-//messageQueue: pulsar
-//minio:
-//  address: {{$MINIO_SERVER}}
-//  port: {{$MINIO_PORT}}
-//  accessKeyID: {{$MINIO_ACCESS_KEY}}
-//  secretAccessKey: {{$MINIO_SECRET_KEY}}
-//  bucketName: {{$KB_CLUSTER_NAME}}
-//mq:
-//  type: pulsar
-//msgChannel:
-//  chanNamePrefix:
-//    cluster: {{$KB_CLUSTER_NAME}}
-//pulsar:
-//  address: {{$PULSAR_SERVER}}
-//  port: {{$PULSAR_PORT}}
+// The config file of milvus components will be:
+// etcd:
+//   endpoints:
+//     - {{$ETCD_ENDPOINT}}
+//   rootPath: {{$KB_CLUSTER_NAME}}
+// messageQueue: pulsar
+// minio:
+//   address: {{$MINIO_SERVER}}
+//   port: {{$MINIO_PORT}}
+//   accessKeyID: {{$MINIO_ACCESS_KEY}}
+//   secretAccessKey: {{$MINIO_SECRET_KEY}}
+//   bucketName: {{$KB_CLUSTER_NAME}}
+// mq:
+//   type: pulsar
+// msgChannel:
+//   chanNamePrefix:
+//     cluster: {{$KB_CLUSTER_NAME}}
+// pulsar:
+//   address: {{$PULSAR_SERVER}}
+//   port: {{$PULSAR_PORT}}

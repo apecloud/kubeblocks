@@ -1,7 +1,7 @@
 ---
 title: Scale for a Pulsar
 description: How to scale a Pulsar cluster, horizontal scaling, vertical scaling
-keywords: [mysql, horizontal scaling, vertical scaling]
+keywords: [pulsar, horizontal scaling, vertical scaling]
 sidebar_position: 2
 sidebar_label: Scale
 ---
@@ -92,7 +92,7 @@ kbcli cluster list pulsar
 
 :::note
 
-Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the opsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
+Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
 
 :::
 

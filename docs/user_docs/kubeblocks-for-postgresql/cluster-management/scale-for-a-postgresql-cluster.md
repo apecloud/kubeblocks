@@ -142,7 +142,7 @@ pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete
 
 :::note
 
-Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the opsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
+Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
 
 :::
 

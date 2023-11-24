@@ -1,7 +1,7 @@
 ---
 title: MySQL introduction
 description: MySQL introduction
-keywords: [apecloud, mysql, introduction]
+keywords: [apecloud mysql, mysql, introduction]
 sidebar_position: 1
 ---
 
@@ -22,11 +22,11 @@ ApeCloud MySQL supports four roles, **Leader**, **Follower**, **Candidate**, and
 - Learner: This role is usually used for cross-regional consistent read-only data. Data synchronization is performed through the Paxos protocol, and the data source can be a Leader or a Follower. The learner is a special role in the consensus algorithm protocol, and does not participate in voting or being elected as a Candidate role.
 - Candidate: The Candidate is an intermediate role that exists only during the election process or when a majority number is not enough to select the Leader role.  Normally, all Candidates in a high availability cluster will eventually become a Leader or a Follower after the election is completed.
 
- Role |  Leader |Follower | Learner | Candidate |
-  ---- |----| ----|----|----|
-  **Capability**|RW/HA|RO/HA|RO|-|
+| Role |  Leader |Follower | Learner | Candidate |
+| ---- |----| ----|----|----|
+| **Capability**|RW/HA|RO/HA|RO|-|
 
-![Role_changing](./../../../img/intro_role_changing.png)
+![Role_changing](../../../img/apecloud-mysql-intro-role-changing.jpg)
 
 ### Failover
 

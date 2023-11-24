@@ -330,7 +330,7 @@ View the log of VTGate.
 kubectl logs myproxy-cluster-vtgate-8659d5db95-4dzt5
 ```
 
-View the log of VTTable and `-c` is required.
+View the log of VTTablet and `-c` is required.
 
 ```bash
 kubectl logs myproxy-cluster-mysql-0 -c vttablet

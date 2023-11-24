@@ -115,5 +115,9 @@ data:
       sh /app/docker/simple/run.sh
       exit 0
     fi
-    echo "$MODEL not found"
-    exit 1
+    echo "Warning: model$MODEL not found"
+    echo "try to download default model vicuna-7b-v1.5.Q2_K.gguf"
+    default_url="https://huggingface.co/TheBloke/vicuna-7B-v1.5-GGUF/resolve/main/vicuna-7b-v1.5.Q2_K.gguf"
+    apt-get install wget -y
+    wget "$default_url" -O model.gguf
+    sh /app/docker/simple/run.sh

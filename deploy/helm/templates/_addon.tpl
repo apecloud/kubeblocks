@@ -40,7 +40,7 @@ Parameters:
 - kbVersion: KubeBlocks version that this addon is compatible with
 */}}
 {{- define "kubeblocks.buildAddonCR" }}
-{{- $upgrade:= or .Release.IsInstall (and .Release.IsUpgrade .Values.cascadeUpgradeAddons) }}
+{{- $upgrade:= or .Release.IsInstall (and .Release.IsUpgrade .Values.upgradeAddons) }}
 {{- $existingAddon := lookup "extensions.kubeblocks.io/v1alpha1" "Addon" "" .name -}}
 {{- if and (not $upgrade) $existingAddon -}}
 {{- $obj := fromYaml (toYaml $existingAddon) -}}

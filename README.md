@@ -15,15 +15,15 @@
 
 ## What is KubeBlocks
 
-KubeBlocks is an open source system software that runs and manages data infrastructure on Kubernetes. The name KubeBlocks is inspired by Kubernetes and LEGO blocks, signifying that running and managing data infrastructure on K8s can be standard and productive, like playing with LEGO blocks. 
+KubeBlocks is an open-source control plane software that runs and manages databases, message queues and other data infrastructure on K8s. The name KubeBlocks is inspired by Kubernetes and LEGO blocks, signifying that running and managing data infrastructure on K8s can be standard and productive, like playing with LEGO blocks. 
 
-KubeBlocks could manage various type of database & data-processing engines, including RDBMSs (MySQL, PostgreSQL), Caches(Redis), NoSQLs (MongoDB), MQs(Kafka, Pulsar), and vector databases(Milvus, Qdrant, Weaviate), and the community is actively integrating more types of engines into KubeBlocks. Currently it has supported 32 types of engines!
+KubeBlocks could manage various type of engines, including RDBMSs (MySQL, PostgreSQL), Caches(Redis), NoSQLs (MongoDB), MQs(Kafka, Pulsar), and vector databases(Milvus, Qdrant, Weaviate), and the community is actively integrating more types of engines into KubeBlocks. Currently it has supported 32 types of engines!
 
-The core of KubeBlocks is a K8s operator, which defines a set of CRDs to abstract the common attributes of various database & data-processing engines. KubeBlocks helps developers, SREs, and platform engineers deploy and maintain dedicated DBPaaS, and supports both public cloud vendors and on-premise environments.
+The core of KubeBlocks is a K8s operator, which defines a set of CRDs to abstract the common attributes of various engines. KubeBlocks helps developers, SREs, and platform engineers deploy and maintain dedicated DBPaaS, and supports both public cloud vendors and on-premise environments.
 
 ### Why you need KubeBlocks
 
-KubeBlocks integrates the most popular data/database engines and provides rich management functions, along with declarative APIs, on various environments. Furthermore, KubeBlocks offers the following benefits:
+KubeBlocks integrates the most popular database/message-queue/data-processing engines and provides rich management functions, along with declarative APIs, on various environments. Furthermore, KubeBlocks offers the following benefits:
 
 * Cost-effective
   
@@ -39,7 +39,7 @@ KubeBlocks integrates the most popular data/database engines and provides rich m
 
 * Extensibility
   
-  KubeBlocks provides the addon mechanism for integrating new data/database engines. So it can be extended to run the databases your project needs.
+  KubeBlocks provides the addon mechanism for integrating new engines. So it can be extended to run the databases your project needs.
 
 ### Goals
 - Being open and cloud-neutral

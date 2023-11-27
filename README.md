@@ -11,7 +11,7 @@
 ![maturity](https://img.shields.io/static/v1?label=maturity&message=alpha&color=red)
 [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/kubeblocks)](https://artifacthub.io/packages/search?repo=kubeblocks)
 
-![image](./docs/img/banner-readmenew.png)
+![image](./docs/img/banner-readmenewpic.jpeg)
 
 ## What is KubeBlocks
 

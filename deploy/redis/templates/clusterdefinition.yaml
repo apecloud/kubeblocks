@@ -213,6 +213,8 @@ spec:
     - name: redis-sentinel
       workloadType: Stateful
       characterType: redis
+      statefulSpec:
+        updateStrategy: BestEffortParallel
       service:
         ports:
           - name: redis-sentinel

@@ -106,6 +106,7 @@ jobs:
       VERSION: "${{ needs.release-version.outputs.release-version }}"
       APECD_REF: "v0.1.24"
       DOCKERFILE_PATH: "./docker/Dockerfile-dev"
+      CONTEXT: "./docker"
     secrets: inherit
 
   release-message:

@@ -727,8 +727,13 @@ const (
 	EnvKeyOptional EnvKeyOption = "Optional"
 )
 
-type NamedEnvKeyOption struct {
-	EnvKeyOption `json:",inline"`
+type EnvKey struct {
+	// +optional
+	Option *EnvKeyOption `json:"option,omitempty"`
+}
+
+type NamedEnvKey struct {
+	EnvKey `json:",inline"`
 
 	// +optional
 	Name string `json:"name,omitempty"`
@@ -737,23 +742,23 @@ type NamedEnvKeyOption struct {
 // ServiceEnvKeys defines the keys can be referenced from a Service.
 type ServiceEnvKeys struct {
 	// +optional
-	Endpoint *EnvKeyOption `json:"endpoint,omitempty"`
+	Endpoint *EnvKey `json:"endpoint,omitempty"`
 
 	// +optional
-	Host *EnvKeyOption `json:"host,omitempty"`
+	Host *EnvKey `json:"host,omitempty"`
 
 	// +optional
-	Port *NamedEnvKeyOption `json:"port,omitempty"`
+	Port *NamedEnvKey `json:"port,omitempty"`
 }
 
 // CredentialEnvKeys defines the keys can be referenced from a Credential (SystemAccount).
 // !!!!! CredentialEnvKeys will only be used as environment variables for Pod or Action, and will not be used to render the templates.
 type CredentialEnvKeys struct {
 	// +optional
-	Username *EnvKeyOption `json:"username,omitempty"`
+	Username *EnvKey `json:"username,omitempty"`
 
 	// +optional
-	Password *EnvKeyOption `json:"password,omitempty"`
+	Password *EnvKey `json:"password,omitempty"`
 }
 
 // ServiceKeySelector selects a key from a Service.

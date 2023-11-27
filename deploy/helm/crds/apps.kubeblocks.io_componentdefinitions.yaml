@@ -59,9 +59,10 @@ spec:
               operation behaviors.
             properties:
               configs:
-                description: The configs field provided by provider, and finally this
-                  configTemplateRefs will be rendered into the user's own configuration
-                  file according to the user's cluster. Cannot be updated.
+                description: 'The configs field provided by provider, and finally
+                  this configTemplateRefs will be rendered into the user''s own configuration
+                  file according to the user''s cluster. Cannot be updated. TODO:
+                  support referencing configs from other components or clusters.'
                 items:
                   properties:
                     asEnvFrom:
@@ -199,6 +200,218 @@ spec:
                 description: Description is a brief description of the component.
                 maxLength: 256
                 type: string
+              env:
+                description: User-defined environment variables. These can be used
+                  as env vars for pods or actions, or to render the templates of config
+                  or script. Cannot be updated.
+                items:
+                  description: EnvVar represents a variable present in the env of
+                    Pod/Action or the template of config/script.
+                  properties:
+                    name:
+                      description: Name of the variable. Must be a C_IDENTIFIER.
+                      type: string
+                    value:
+                      description: 'Variable references $(VAR_NAME) are expanded using
+                        the previously defined variables in the current context. If
+                        a variable cannot be resolved, the reference in the input
+                        string will be unchanged. Double $$ are reduced to a single
+                        $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+                        "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+                        Escaped references will never be expanded, regardless of whether
+                        the variable exists or not. Defaults to "".'
+                      type: string
+                    valueFrom:
+                      description: Source for the variable's value. Cannot be used
+                        if value is not empty.
+                      properties:
+                        configMapKeyRef:
+                          description: Selects a key of a ConfigMap.
+                          properties:
+                            key:
+                              description: The key to select.
+                              type: string
+                            name:
+                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              type: string
+                            optional:
+                              description: Specify whether the ConfigMap or its key
+                                must be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        credentialKeyRef:
+                          description: Selects a defined key of a Credential (SystemAccount).
+                          properties:
+                            component:
+                              description: 'Component of the referent object resident
+                                in. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                              type: string
+                            name:
+                              description: 'Name of the referent object. More info:
+                                https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                              type: string
+                            optional:
+                              description: Specify whether the object must be defined.
+                              type: boolean
+                            password:
+                              properties:
+                                option:
+                                  enum:
+                                  - Required
+                                  - Optional
+                                  type: string
+                              type: object
+                            username:
+                              properties:
+                                option:
+                                  enum:
+                                  - Required
+                                  - Optional
+                                  type: string
+                              type: object
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        secretKeyRef:
+                          description: Selects a key of a Secret.
+                          properties:
+                            key:
+                              description: The key of the secret to select from.  Must
+                                be a valid secret key.
+                              type: string
+                            name:
+                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              type: string
+                            optional:
+                              description: Specify whether the Secret or its key must
+                                be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        serviceKeyRef:
+                          description: Selects a defined key of a Service.
+                          properties:
+                            component:
+                              description: 'Component of the referent object resident
+                                in. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                              type: string
+                            endpoint:
+                              properties:
+                                option:
+                                  enum:
+                                  - Required
+                                  - Optional
+                                  type: string
+                              type: object
+                            host:
+                              properties:
+                                option:
+                                  enum:
+                                  - Required
+                                  - Optional
+                                  type: string
+                              type: object
+                            name:
+                              description: 'Name of the referent object. More info:
+                                https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                              type: string
+                            optional:
+                              description: Specify whether the object must be defined.
+                              type: boolean
+                            port:
+                              properties:
+                                name:
+                                  type: string
+                                option:
+                                  enum:
+                                  - Required
+                                  - Optional
+                                  type: string
+                              type: object
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        serviceRefKeyRef:
+                          description: Selects a defined key of a ServiceRef.
+                          properties:
+                            component:
+                              description: 'Component of the referent object resident
+                                in. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                              type: string
+                            credentialKey:
+                              description: CredentialEnvKeys defines the keys can
+                                be referenced from a Credential (SystemAccount). !!!!!
+                                CredentialEnvKeys will only be used as environment
+                                variables for Pod or Action, and will not be used
+                                to render the templates.
+                              properties:
+                                password:
+                                  properties:
+                                    option:
+                                      enum:
+                                      - Required
+                                      - Optional
+                                      type: string
+                                  type: object
+                                username:
+                                  properties:
+                                    option:
+                                      enum:
+                                      - Required
+                                      - Optional
+                                      type: string
+                                  type: object
+                              type: object
+                            name:
+                              description: 'Name of the referent object. More info:
+                                https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                              type: string
+                            optional:
+                              description: Specify whether the object must be defined.
+                              type: boolean
+                            serviceKey:
+                              description: ServiceEnvKeys defines the keys can be
+                                referenced from a Service.
+                              properties:
+                                endpoint:
+                                  properties:
+                                    option:
+                                      enum:
+                                      - Required
+                                      - Optional
+                                      type: string
+                                  type: object
+                                host:
+                                  properties:
+                                    option:
+                                      enum:
+                                      - Required
+                                      - Optional
+                                      type: string
+                                  type: object
+                                port:
+                                  properties:
+                                    name:
+                                      type: string
+                                    option:
+                                      enum:
+                                      - Required
+                                      - Optional
+                                      type: string
+                                  type: object
+                              type: object
+                          type: object
+                          x-kubernetes-map-type: atomic
+                      type: object
+                  required:
+                  - name
+                  type: object
+                type: array
               labels:
                 additionalProperties:
                   description: BuiltInString defines a string type that may contain

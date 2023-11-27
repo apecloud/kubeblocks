@@ -61,8 +61,8 @@ You can also view the details of this configuration file and parameters.
 
   * Allowed Values: It defines the valid value range of this parameter.
   * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter configuration takes effect. There are two different configuration strategies based on the effectiveness type of modified parameters, i.e. **dynamic** and **static**.
-    * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and can be updated online. Follow the instructions in [Configure dynamic parameters](#configure-dynamic-parameters).
-    * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make configuration effective. Follow the instructions in [Configure static parameters](#configure-static-parameters).
+    * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and can be updated online.
+    * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make the configuration effective.
   * Description: It describes the parameter definition.
 
 ## Configure parameters
@@ -161,9 +161,9 @@ The example below configures `acllog-max-len`.
 
 ### Configure parameters with edit-config command
 
-For your convenience, KubeBlocks offers a tool `edit-config` to help you to configure parameter in a visulized way.
+For your convenience, KubeBlocks offers a tool `edit-config` to help you configure parameters in a visualized way.
 
-For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on notepad.
+For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on the notepad.
 
 1. Edit the configuration file.
 

@@ -1,7 +1,7 @@
 ---
 title: Full feature and limit list
 description: The full feature and limit list of KubeBlocks migration function for PostgreSQL
-keywords: [postgresql, migration, migrate data in PostgreSQL to KubeBlocks, full feature, limit]
+keywords: [mysql, migration, migrate data in MySQL to KubeBlocks, full feature, limit]
 sidebar_position: 1
 sidebar_label: Full feature and limit list
 ---
@@ -36,7 +36,7 @@ sidebar_label: Full feature and limit list
   * Except for the incremental data migration module, other modules do not support resumable upload, i.e. if an exception occurs in this module, such as pod failure caused by downtime and network disconnection, a re-migration is required.
   * During the data transmission task, DDL on the migration objects in the source database is not supported.
   * The table name and field name cannot contain Chinese characters and special characters like a single quotation mark (') and a comma (,).
-  * During the migration process, the switchover of primary and secondry nodes in the source library is not supported, which may cause the connection string specified in the task configuration to change. This further leads to migration link failure.
+  * During the migration process, the switchover of primary and secondary nodes in the source library is not supported, which may cause the connection string specified in the task configuration to change. This further leads to migration link failure.
 * Precheck module: None
 * Structure initialization module
   * The user-defined type is not supported.

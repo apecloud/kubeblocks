@@ -136,7 +136,7 @@ var _ = Describe("Prepare Test", func() {
 				ClusterName:   synthesizeComp.ClusterName,
 				ComponentName: synthesizeComp.Name,
 			}
-			err = RenderConfigNScriptFiles(resCtx, clusterVersionObj, cluster, synthesizeComp, synthesizeComp.PodSpec, nil)
+			err = RenderConfigNScriptFiles(resCtx, cluster, synthesizeComp, synthesizeComp.PodSpec, nil)
 			Expect(err).Should(Succeed())
 			Expect(configuration.CheckEnvFrom(&synthesizeComp.PodSpec.Containers[0], cfgcore.GenerateEnvFromName(cfgcore.GetComponentCfgName(cluster.Name, synthesizeComp.Name, configSpecName)))).Should(BeFalse())
 			// TODO(xingran): add more test cases

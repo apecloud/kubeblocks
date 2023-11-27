@@ -111,7 +111,7 @@ max_connections=666
 					Name:      testClusterName,
 					Namespace: "default",
 				},
-			}, nil, nil, nil)
+			}, nil, nil)
 		Expect(templateBuilder.injectBuiltInObjectsAndFunctions(
 			&corev1.PodSpec{}, nil, &component.SynthesizedComponent{}, nil)).Should(Succeed())
 

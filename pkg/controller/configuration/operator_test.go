@@ -59,7 +59,6 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 			ComponentName: mysqlCompName,
 		},
 			clusterObj,
-			clusterVersionObj,
 			clusterComponent,
 			clusterComponent.PodSpec,
 			nil)

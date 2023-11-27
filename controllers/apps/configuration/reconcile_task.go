@@ -83,7 +83,6 @@ func syncImpl(fetcher *Task,
 	err = configuration.NewReconcilePipeline(configuration.ReconcileCtx{
 		ResourceCtx: fetcher.ResourceCtx,
 		Cluster:     fetcher.ClusterObj,
-		ClusterVer:  fetcher.ClusterVerObj,
 		Component:   component,
 		PodSpec:     component.PodSpec,
 	}, item, status, configSpec).

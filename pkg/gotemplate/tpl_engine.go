@@ -214,7 +214,8 @@ func (t *TplEngine) importSelfModuleFuncs(funcs map[string]functional, fn func(t
 }
 
 // NewTplEngine creates go template helper
-func NewTplEngine(values *TplValues, funcs *BuiltInObjectsFunc, tplName string, cli types2.ReadonlyClient, ctx context.Context, options ...TplEngineOptions) *TplEngine {
+func NewTplEngine(values *TplValues, funcs *BuiltInObjectsFunc, tplName string, cli client.Reader, ctx context.Context, options ...TplEngineOptions) *TplEngine {
+
 	coreBuiltinFuncs := sprig.TxtFuncMap()
 
 	// custom funcs

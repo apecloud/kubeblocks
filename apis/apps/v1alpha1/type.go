@@ -742,9 +742,6 @@ type NamedEnvKey struct {
 // ServiceEnvKeys defines the keys can be referenced from a Service.
 type ServiceEnvKeys struct {
 	// +optional
-	Endpoint *EnvKey `json:"endpoint,omitempty"`
-
-	// +optional
 	Host *EnvKey `json:"host,omitempty"`
 
 	// +optional
@@ -759,6 +756,17 @@ type CredentialEnvKeys struct {
 
 	// +optional
 	Password *EnvKey `json:"password,omitempty"`
+}
+
+// ServiceRefEnvKeys defines the keys can be referenced from a ServiceRef.
+type ServiceRefEnvKeys struct {
+	// +optional
+	Endpoint *EnvKey `json:"endpoint,omitempty"`
+
+	// +optional
+	Port *NamedEnvKey `json:"port,omitempty"`
+
+	CredentialEnvKeys `json:",inline"`
 }
 
 // ServiceKeySelector selects a key from a Service.
@@ -786,11 +794,7 @@ type ServiceRefKeySelector struct {
 	// The ServiceRefDeclaration to select from.
 	ClusterObjectReference `json:",inline"`
 
-	// +optional
-	ServiceKey *ServiceEnvKeys `json:"serviceKey,omitempty"`
-
-	// +optional
-	CredentialKey *CredentialEnvKeys `json:"credentialKey,omitempty"`
+	ServiceRefEnvKeys `json:",inline"`
 }
 
 // ClusterObjectReference contains information to let you locate the referenced object inside the same cluster.

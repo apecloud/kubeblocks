@@ -301,14 +301,6 @@ spec:
                               description: 'Component of the referent object resident
                                 in. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
                               type: string
-                            endpoint:
-                              properties:
-                                option:
-                                  enum:
-                                  - Required
-                                  - Optional
-                                  type: string
-                              type: object
                             host:
                               properties:
                                 option:
@@ -343,29 +335,13 @@ spec:
                               description: 'Component of the referent object resident
                                 in. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
                               type: string
-                            credentialKey:
-                              description: CredentialEnvKeys defines the keys can
-                                be referenced from a Credential (SystemAccount). !!!!!
-                                CredentialEnvKeys will only be used as environment
-                                variables for Pod or Action, and will not be used
-                                to render the templates.
+                            endpoint:
                               properties:
-                                password:
-                                  properties:
-                                    option:
-                                      enum:
-                                      - Required
-                                      - Optional
-                                      type: string
-                                  type: object
-                                username:
-                                  properties:
-                                    option:
-                                      enum:
-                                      - Required
-                                      - Optional
-                                      type: string
-                                  type: object
+                                option:
+                                  enum:
+                                  - Required
+                                  - Optional
+                                  type: string
                               type: object
                             name:
                               description: 'Name of the referent object. More info:
@@ -374,36 +350,31 @@ spec:
                             optional:
                               description: Specify whether the object must be defined.
                               type: boolean
-                            serviceKey:
-                              description: ServiceEnvKeys defines the keys can be
-                                referenced from a Service.
+                            password:
                               properties:
-                                endpoint:
-                                  properties:
-                                    option:
-                                      enum:
-                                      - Required
-                                      - Optional
-                                      type: string
-                                  type: object
-                                host:
-                                  properties:
-                                    option:
-                                      enum:
-                                      - Required
-                                      - Optional
-                                      type: string
-                                  type: object
-                                port:
-                                  properties:
-                                    name:
-                                      type: string
-                                    option:
-                                      enum:
-                                      - Required
-                                      - Optional
-                                      type: string
-                                  type: object
+                                option:
+                                  enum:
+                                  - Required
+                                  - Optional
+                                  type: string
+                              type: object
+                            port:
+                              properties:
+                                name:
+                                  type: string
+                                option:
+                                  enum:
+                                  - Required
+                                  - Optional
+                                  type: string
+                              type: object
+                            username:
+                              properties:
+                                option:
+                                  enum:
+                                  - Required
+                                  - Optional
+                                  type: string
                               type: object
                           type: object
                           x-kubernetes-map-type: atomic

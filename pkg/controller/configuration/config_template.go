@@ -24,19 +24,30 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	ictrlclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/gotemplate"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// General Built-in objects
+// General built-in vars
+const (
+	builtinNamespaceVar         = "KB_NAMESPACE"
+	builtinClusterNameVar       = "KB_CLUSTER_NAME"
+	builtinClusterUIDVar        = "KB_CLUSTER_UID"
+	builtinComponentNameVar     = "KB_COMPONENT_NAME"
+	builtinComponentReplicasVar = "KB_COMPONENT_REPLICAS"
+	builtinPodNameVar           = "KB_POD_NAME"
+	builtinPodFQDNVar           = "KB_POD_FQDN"
+	builtinPodOrdinalVar        = "KB_POD_ORDINAL"
+)
+
+// General built-in objects
 const (
 	builtinClusterObject           = "cluster"
 	builtinComponentObject         = "component"
@@ -46,7 +57,7 @@ const (
 	builtinClusterDomainObject     = "clusterDomain"
 )
 
-// General Built-in functions
+// General built-in functions
 const (
 	builtInGetVolumeFunctionName                 = "getVolumePathByName"
 	builtInGetPvcFunctionName                    = "getPVCByName"
@@ -68,6 +79,23 @@ const (
 	builtInGetCAFile   = "getCAFile"
 	builtInGetCertFile = "getCertFile"
 	builtInGetKeyFile  = "getKeyFile"
+)
+
+var (
+	builtinEnvVars = map[string]string{
+		"KB_NAMESPACE":          "",
+		"KB_CLUSTER_NAME":       "",
+		"KB_CLUSTER_UID":        "",
+		"KB_COMPONENT_NAME":     "",
+		"KB_COMPONENT_REPLICAS": "",
+		"KB_POD_NAME":           "",
+		"KB_POD_UID":            "",
+		"KB_POD_IP":             "",
+		"KB_POD_FQDN":           "",
+		"KB_POD_ORDINAL":        "",
+		"KB_HOST_NAME":          "",
+		"KB_HOST_IP":            "",
+	}
 )
 
 type ResourceDefinition struct {
@@ -101,7 +129,7 @@ type configTemplateBuilder struct {
 	podSpec        *corev1.PodSpec
 
 	ctx context.Context
-	cli ictrlclient.ReadonlyClient
+	cli client.Reader
 }
 
 func newTemplateBuilder(
@@ -154,15 +182,16 @@ func (c *configTemplateBuilder) builtinObjectsAsValues() (*gotemplate.TplValues,
 		return nil, err
 	}
 
-	builtInObjs := map[string]interface{}{
-		builtinClusterObject:           c.cluster,
-		builtinComponentObject:         c.component,
-		builtinPodObject:               c.podSpec,
-		builtinComponentResourceObject: c.componentValues.Resource,
-		builtinClusterVersionObject:    c.clusterVersion,
-		builtinClusterDomainObject:     viper.GetString(constant.KubernetesClusterDomainEnv),
+	vars := map[string]any{}
+	maps.Copy(vars, builtinObjects(c))
+	maps.Copy(vars, builtinVars(c))
+	objVars, err := resolveClusterObjectRefVars(c)
+	if err != nil {
+		return nil, err
 	}
-	b, err := json.Marshal(builtInObjs)
+	maps.Copy(vars, objVars)
+
+	b, err := json.Marshal(vars)
 	if err != nil {
 		return nil, err
 	}

@@ -43,6 +43,7 @@ type SynthesizedComponent struct {
 	CompDefName          string                                 `json:"compDefName,omitempty"`  // the name of the componentDefinition
 	Replicas             int32                                  `json:"replicas"`
 	PodSpec              *corev1.PodSpec                        `json:"podSpec,omitempty"`
+	Env                  []v1alpha1.EnvVar                      `json:"env,omitempty"`
 	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 	Monitor              *MonitorConfig                         `json:"monitor,omitempty"`
 	EnabledLogs          []string                               `json:"enabledLogs,omitempty"`

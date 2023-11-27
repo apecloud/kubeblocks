@@ -248,43 +248,6 @@ var _ = Describe("builder", func() {
 			Expect(credential.StringData["RANDOM_PASSWD"]).Should(Equal(originalPassword))
 		})
 
-		It("builds StatefulSet correctly", func() {
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
-
-			sts, err := BuildSts(cluster, synthesizedComponent)
-			Expect(err).Should(BeNil())
-			Expect(sts).ShouldNot(BeNil())
-			// test  replicas = 0
-			newComponent := *synthesizedComponent
-			newComponent.Replicas = 0
-			sts, err = BuildSts(cluster, &newComponent)
-			Expect(err).Should(BeNil())
-			Expect(sts).ShouldNot(BeNil())
-			Expect(*sts.Spec.Replicas).Should(Equal(int32(0)))
-			Expect(sts.Spec.VolumeClaimTemplates[0].Labels[constant.VolumeTypeLabelKey]).
-				Should(Equal(string(appsv1alpha1.VolumeTypeData)))
-			// test workload type replication
-			replComponent := *synthesizedComponent
-			replComponent.Replicas = 2
-			replComponent.WorkloadType = appsv1alpha1.Replication
-			sts, err = BuildSts(cluster, &replComponent)
-			Expect(err).Should(BeNil())
-			Expect(sts).ShouldNot(BeNil())
-			Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(2))
-			// test extra envs
-			Expect(sts.Spec.Template.Spec.Containers).ShouldNot(BeEmpty())
-			for _, container := range sts.Spec.Template.Spec.Containers {
-				isContainEnv := false
-				for _, env := range container.Env {
-					if env.Name == "mock-key" && env.Value == "mock-value" {
-						isContainEnv = true
-						break
-					}
-				}
-				Expect(isContainEnv).Should(BeTrue())
-			}
-		})
-
 		It("builds RSM correctly", func() {
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
 

@@ -31,7 +31,6 @@ import (
 
 	"github.com/google/uuid"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -191,60 +190,6 @@ func BuildPersistentVolumeClaimLabels(component *component.SynthesizedComponent,
 			}
 		}
 	}
-}
-
-func BuildSts(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*appsv1.StatefulSet, error) {
-	vctToPVC := func(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
-		return corev1.PersistentVolumeClaim{
-			ObjectMeta: vct.ObjectMeta,
-			Spec:       vct.Spec,
-		}
-	}
-	commonLabels := constant.GetKBWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
-	podBuilder := builder.NewPodBuilder("", "").
-		AddLabelsInMap(commonLabels).
-		AddLabelsInMap(constant.GetClusterCompDefLabel(component.ClusterCompDefName)).
-		AddLabelsInMap(constant.GetWorkloadTypeLabel(string(component.WorkloadType)))
-	if len(cluster.Spec.ClusterVersionRef) > 0 {
-		podBuilder.AddLabelsInMap(constant.GetClusterVersionLabel(cluster.Spec.ClusterVersionRef))
-	}
-	template := corev1.PodTemplateSpec{
-		ObjectMeta: podBuilder.GetObject().ObjectMeta,
-		Spec:       *component.PodSpec,
-	}
-	stsBuilder := builder.NewStatefulSetBuilder(cluster.Namespace, cluster.Name+"-"+component.Name).
-		AddLabelsInMap(commonLabels).
-		AddLabelsInMap(constant.GetClusterCompDefLabel(component.ClusterCompDefName)).
-		AddMatchLabelsInMap(commonLabels).
-		SetServiceName(cluster.Name + "-" + component.Name + "-headless").
-		SetReplicas(component.Replicas).
-		SetTemplate(template)
-
-	var vcts []corev1.PersistentVolumeClaim
-	for _, vct := range component.VolumeClaimTemplates {
-		vcts = append(vcts, vctToPVC(vct))
-	}
-	stsBuilder.SetVolumeClaimTemplates(vcts...)
-
-	if component.StatefulSetWorkload != nil {
-		podManagementPolicy, updateStrategy := component.StatefulSetWorkload.FinalStsUpdateStrategy()
-		stsBuilder.SetPodManagementPolicy(podManagementPolicy).SetUpdateStrategy(updateStrategy)
-	}
-
-	sts := stsBuilder.GetObject()
-
-	// update sts.spec.volumeClaimTemplates[].metadata.labels
-	if len(sts.Spec.VolumeClaimTemplates) > 0 && len(sts.GetLabels()) > 0 {
-		for index, vct := range sts.Spec.VolumeClaimTemplates {
-			BuildPersistentVolumeClaimLabels(component, &vct, vct.Name)
-			sts.Spec.VolumeClaimTemplates[index] = vct
-		}
-	}
-
-	if err := processContainersInjection(cluster, component, &sts.Spec.Template.Spec); err != nil {
-		return nil, err
-	}
-	return sts, nil
 }
 
 func fixService(namespace, prefix string, component *component.SynthesizedComponent, alternativeServices ...corev1.Service) []corev1.Service {

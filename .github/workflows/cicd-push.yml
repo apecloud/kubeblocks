@@ -66,14 +66,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install pcregrep
 
-      - name: gen pcregrep
-        run: |
-          pcregrep --exclude-dir=mtr -r -n -I '[^\x00-\x7f]' . > pcregrep.out
-
       - name: pcregrep Chinese
         run: |
           FILE_PATH=`git diff --name-only HEAD ${{ needs.trigger-mode.outputs.base-commitid }}`
           echo "FILE_PATH: $FILE_PATH"
+          for filePath in $(echo "$FILE_PATH"); do
+              filePath="${filePath%/*}"
+              if [[ -d $filePath ]]; then
+                  echo $(pcregrep -r -n -I '[^\x00-\x7f]' $filePath >> pcregrep.out)
+              fi
+          done
+          
           python ${{ github.workspace }}/.github/utils/pcregrep.py \
             --source="${{ github.workspace }}/pcregrep.out" \
             --filter="$FILE_PATH"

@@ -1,6 +1,7 @@
 ---
 title: Advanced logs
-description: How to configure advanced log function for a database using KubeBlocks v0.6.0
+description: How to configure advanced log function for a database using KubeBlocks
+keywords: [advanced logs, observability]
 sidebar_position: 4
 sidebar_label: Advanced logs
 ---
@@ -70,7 +71,7 @@ Before enabling the advanced logs function, deploy a Loki node first and then ap
 
 3. Run Grafana to view the status of Loki. For example,
 
-   ![Loki in Grafana]
+   ![Loki in Grafana](./../../img/observability-loki-dashboard.png)
 
 4. (Optional) Disable the Agamotto add-on.
 
@@ -273,7 +274,7 @@ For more LogCLI and LogQL grammar, refer to the [Loki official documentation](ht
 
 By default, in the ClusterDefinition of MySQL, there is a sidecar container named `metrics` in the podSpec definition of the `mysql component`.
 
-This `metrics` container detects the error logs and slow logs output by the MySQL in real-time, and dumps the logs to the host's `/var/log/KubeBlocks` directory. To prevent taking up too much host disk space, the default size of each file is 10 MB, and a maximum of 2 files can be saved.
+This `metrics` container detects the error logs and slow logs output by MySQL in real-time, and dumps the logs to the host's `/var/log/KubeBlocks` directory. To prevent taking up too much host disk space, the default size of each file is 10 MB, and a maximum of 2 files can be saved.
 
 In addition, the Agamotto component deployed on the host detects the `/var/log/KubeBlocks` folder in real-time and collects the log data in it to complete the entire log data collection link.
 

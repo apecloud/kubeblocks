@@ -1,7 +1,7 @@
 ---
 title: Scale for a Kafka cluster
 description: How to scale a Kafka cluster, horizontal scaling, vertical scaling
-keywords: [mysql, horizontal scaling, vertical scaling]
+keywords: [kafka, horizontal scaling, vertical scaling]
 sidebar_position: 3
 sidebar_label: Scale
 ---
@@ -110,7 +110,7 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
      terminationPolicy: Halt
    ```
   
-2. Check the cluste status to validate the vertical scaling.
+2. Check the cluster status to validate the vertical scaling.
 
     ```bash
     kbcli cluster list mysql-cluster
@@ -126,7 +126,7 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
 
 :::note
 
-Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the opsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
+Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
 
 :::
 
@@ -143,7 +143,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 ### Before you start
 
 - Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
-- You are not recommended to perform horizontal scaling on controller node, including the controller node both in combined mode and separated node.
+- You are not recommended to perform horizontal scaling on the controller node, including the controller node both in combined mode and separated node.
 - When scaling in horizontally, you must know the topic partition storage, if the topic has only one replication, data loss may caused when you scale in broker.
 
  ```bash

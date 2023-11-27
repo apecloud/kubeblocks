@@ -90,7 +90,7 @@ It is recommended to prepare data sampling for verification after the migration 
 
 2. (Optional) Specify migration steps by the flag `--steps`.
 
-   The default steps follow the order precheck -> structure initialization -> data initialization -> incremental migration. You can use `--steps` to specify migration steps. For example, perform tasks in the order of precheck -> structure initialization -> data initialization -> incremental migration.
+   The default steps follow the order precheck -> structure initialization -> data initialization -> incremental migration. You can use `--steps` to specify migration steps. For example, perform tasks in the order of precheck -> data initialization -> incremental migration.
 
    ```bash
    kbcli migration create mytask --template apecloud-mysql2mysql \

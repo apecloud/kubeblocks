@@ -23,9 +23,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestManager_GetRole(t *testing.T) {

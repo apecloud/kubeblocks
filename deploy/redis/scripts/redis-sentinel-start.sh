@@ -13,11 +13,15 @@ set -ex
 {{- $primary_svc := printf "%s-%s.%s.svc" $clusterName $redis_component.name $namespace }}
 echo "Waiting for redis service {{ $primary_svc }} to be ready..."
 if [ ! -z "$REDIS_DEFAULT_PASSWORD" ]; then
-  until redis-cli -h {{ $primary_svc }} -p 6379 -a $REDIS_DEFAULT_PASSWORD ping; do sleep 1; done
+  timeout 300 sh -c 'until redis-cli -h {{ $primary_svc }} -p 6379 -a $REDIS_DEFAULT_PASSWORD ping; do sleep 2; done'
 else
-  until redis-cli -h {{ $primary_svc }} -p 6379 ping; do sleep 1; done
+  timeout 300 sh -c 'until redis-cli -h {{ $primary_svc }} -p 6379 ping; do sleep 1; done'
 fi
-echo "redis service ready, Starting sentinel..."
+if [ $? -ne 0 ]; then
+  echo "Redis service is not ready, exiting..."
+  exit 1
+fi
+echo "Redis service ready, Starting sentinel..."
 echo "sentinel announce-ip $KB_POD_FQDN" >> /etc/sentinel/redis-sentinel.conf
 exec redis-server /etc/sentinel/redis-sentinel.conf --sentinel
 echo "Start sentinel succeeded!"

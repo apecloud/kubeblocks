@@ -21,7 +21,7 @@ if [ ! -z "$REDIS_SENTINEL_PASSWORD" ]; then
 fi
 if [ ! -z "$REDIS_DEFAULT_PASSWORD" ]; then
   echo "protected-mode yes" >> /etc/redis/redis.conf
-  echo "user default on allcommands allkeys >$REDIS_DEFAULT_PASSWORD" >> /data/users.acl
+  echo "user default on >$REDIS_DEFAULT_PASSWORD ~* &* +@all " >> /data/users.acl
 else
   echo "protected-mode no" >> /etc/redis/redis.conf
 fi

@@ -68,7 +68,6 @@ type SynthesizedComponent struct {
 
 	// TODO(xingran): The following fields will be deprecated after version 0.8.0 and will be replaced with a new data structure.
 	CustomLabelSpecs    []v1alpha1.CustomLabelSpec        `json:"customLabelSpecs,omitempty"`    // The CustomLabelSpecs will be replaced with Labels in the future.
-	SwitchoverSpec      *v1alpha1.SwitchoverSpec          `json:"switchoverSpec,omitempty"`      // The SwitchoverSpec will be replaced with LifecycleActions.Switchover in the future.
 	Probes              *v1alpha1.ClusterDefinitionProbes `json:"probes,omitempty"`              // The Probes will be replaced with LifecycleActions.RoleProbe in the future.
 	VolumeTypes         []v1alpha1.VolumeTypeSpec         `json:"volumeTypes,omitempty"`         // The VolumeTypes will be replaced with Volumes in the future.
 	VolumeProtection    *v1alpha1.VolumeProtectionSpec    `json:"volumeProtection,omitempty"`    // The VolumeProtection will be replaced with Volumes in the future.

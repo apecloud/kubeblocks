@@ -331,7 +331,6 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 		synthesizeComp.Probes = clusterCompDef.Probes
 		synthesizeComp.VolumeTypes = clusterCompDef.VolumeTypes
 		synthesizeComp.VolumeProtection = clusterCompDef.VolumeProtectionSpec
-		synthesizeComp.SwitchoverSpec = clusterCompDef.SwitchoverSpec
 		synthesizeComp.MinAvailable = clusterCompSpec.GetMinAvailable(clusterCompDef.GetMinAvailable())
 		// TODO(xingran): this is to ensure compatibility with instances prior to version 0.8.0.
 		// The old implementation relies on ClusterCompDef for environmental variables and sets them in labels on the rsm and pod.
@@ -376,8 +375,6 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 			for _, c := range clusterCompVer.VersionsCtx.Containers {
 				synthesizeComp.PodSpec.Containers = appendOrOverrideContainerAttr(synthesizeComp.PodSpec.Containers, c)
 			}
-			// override component.SwitchoverSpec
-			overrideSwitchoverSpecAttr(synthesizeComp.SwitchoverSpec, clusterCompVer.SwitchoverSpec)
 		}
 	}
 

@@ -137,30 +137,6 @@ func initClusterComponentStatusIfNeed(
 	return nil
 }
 
-// GetComponentInfoByPod gets componentName and componentDefinition info by Pod.
-func GetComponentInfoByPod(ctx context.Context,
-	cli client.Client,
-	cluster appsv1alpha1.Cluster,
-	pod *corev1.Pod) (componentName string, componentDef *appsv1alpha1.ClusterComponentDefinition, err error) {
-	if pod == nil || pod.Labels == nil {
-		return "", nil, errors.New("pod or pod's label is nil")
-	}
-	componentName, ok := pod.Labels[constant.KBAppComponentLabelKey]
-	if !ok {
-		return "", nil, errors.New("pod component name label is nil")
-	}
-	compDefName := cluster.Spec.GetComponentDefRefName(componentName)
-	// if no componentSpec found, then componentName is componentDefName
-	if len(compDefName) == 0 && len(cluster.Spec.ComponentSpecs) == 0 {
-		compDefName = componentName
-	}
-	componentDef, err = appsv1alpha1.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
-	if err != nil {
-		return componentName, componentDef, err
-	}
-	return componentName, componentDef, nil
-}
-
 // getCompRelatedObjectList gets the related pods and workloads of the component
 func getCompRelatedObjectList(ctx context.Context,
 	cli client.Client,

@@ -32,14 +32,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
-// BuildRSMWrapper builds a ReplicatedStateMachine object based on Cluster, SynthesizedComponent.
-func BuildRSMWrapper(cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
-	// build rsm from new ClusterDefinition API, and convert componentDefinition attributes to rsm attributes.
-	return BuildRSMFromConvertor(cluster, synthesizeComp)
-}
-
-// BuildRSMFromConvertor builds a ReplicatedStateMachine object based on the new ComponentDefinition and Component API, and does not depend on the deprecated fields in the SynthesizedComponent.
-func BuildRSMFromConvertor(cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
+// BuildRSM builds a ReplicatedStateMachine object based on Cluster, SynthesizedComponent.
+func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
 	commonLabels := constant.GetKBWellKnownLabelsWithCompDef(synthesizeComp.CompDefName, cluster.Name, synthesizeComp.Name)
 
 	// TODO(xingran): Need to review how to set pod labels based on the new ComponentDefinition API. workloadType label has been removed.
@@ -93,127 +87,11 @@ func BuildRSMFromConvertor(cluster *appsv1alpha1.Cluster, synthesizeComp *compon
 	return convertedRSM, nil
 }
 
-// BuildRSM builds a ReplicatedStateMachine object based on the old CLusterDefinition API, and depends on the the deprecated fields in the SynthesizedComponent.
-// TODO(xingran): This function will be deprecated in the future, and the BuildRSMFromConvertor function will be used instead, do not add new features to this function.
-func BuildRSM(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
-	commonLabels := constant.GetKBWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
-
-	podBuilder := builder.NewPodBuilder("", "").
-		AddLabelsInMap(commonLabels).
-		AddLabelsInMap(constant.GetClusterCompDefLabel(component.ClusterCompDefName)).
-		AddLabelsInMap(constant.GetWorkloadTypeLabel(string(component.WorkloadType)))
-	if len(cluster.Spec.ClusterVersionRef) > 0 {
-		podBuilder.AddLabelsInMap(constant.GetClusterVersionLabel(cluster.Spec.ClusterVersionRef))
-	}
-	template := corev1.PodTemplateSpec{
-		ObjectMeta: podBuilder.GetObject().ObjectMeta,
-		Spec:       *component.PodSpec,
-	}
-
-	monitorAnnotations := getMonitorAnnotations(component)
-	rsmName := constant.GenerateRSMNamePattern(cluster.Name, component.Name)
-	rsmBuilder := builder.NewReplicatedStateMachineBuilder(cluster.Namespace, rsmName).
-		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
-		AddAnnotationsInMap(monitorAnnotations).
-		AddLabelsInMap(commonLabels).
-		AddLabelsInMap(constant.GetClusterCompDefLabel(component.ClusterCompDefName)).
-		AddMatchLabelsInMap(commonLabels).
-		SetServiceName(constant.GenerateRSMServiceNamePattern(rsmName)).
-		SetReplicas(component.Replicas).
-		SetTemplate(template)
-
-	var vcts []corev1.PersistentVolumeClaim
-	for _, vct := range component.VolumeClaimTemplates {
-		vcts = append(vcts, vctToPVC(vct))
-	}
-	rsmBuilder.SetVolumeClaimTemplates(vcts...)
-
-	if component.StatefulSetWorkload != nil {
-		podManagementPolicy, updateStrategy := component.StatefulSetWorkload.FinalStsUpdateStrategy()
-		rsmBuilder.SetPodManagementPolicy(podManagementPolicy).SetUpdateStrategy(updateStrategy)
-	}
-
-	service, alternativeServices := separateServices(component.Services)
-	addServiceCommonLabels(service, commonLabels, component.ClusterCompDefName)
-	for i := range alternativeServices {
-		addServiceCommonLabels(&alternativeServices[i], commonLabels, component.ClusterCompDefName)
-	}
-	if service != nil {
-		rsmBuilder.SetService(service)
-	}
-	if len(alternativeServices) == 0 {
-		alternativeServices = nil
-	}
-	alternativeServices = fixService(cluster.Namespace, rsmName, component, alternativeServices...)
-	rsmBuilder.SetAlternativeServices(alternativeServices)
-
-	secretName := constant.GenerateDefaultConnCredential(cluster.Name)
-	credential := workloads.Credential{
-		Username: workloads.CredentialVar{
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: secretName,
-					},
-					Key: constant.AccountNameForSecret,
-				},
-			},
-		},
-		Password: workloads.CredentialVar{
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: secretName,
-					},
-					Key: constant.AccountPasswdForSecret,
-				},
-			},
-		},
-	}
-	rsmBuilder.SetCredential(credential)
-
-	roles, roleProbe, membershipReconfiguration, memberUpdateStrategy := buildRoleInfo(component)
-	rsm := rsmBuilder.SetRoles(roles).
-		SetRoleProbe(roleProbe).
-		SetMembershipReconfiguration(membershipReconfiguration).
-		SetMemberUpdateStrategy(memberUpdateStrategy).
-		GetObject()
-
-	// update sts.spec.volumeClaimTemplates[].metadata.labels
-	if len(rsm.Spec.VolumeClaimTemplates) > 0 && len(rsm.GetLabels()) > 0 {
-		for index, vct := range rsm.Spec.VolumeClaimTemplates {
-			BuildPersistentVolumeClaimLabels(component, &vct, vct.Name)
-			rsm.Spec.VolumeClaimTemplates[index] = vct
-		}
-	}
-
-	if err := processContainersInjection(cluster, component, &rsm.Spec.Template.Spec); err != nil {
-		return nil, err
-	}
-	return rsm, nil
-}
-
 func vctToPVC(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
 	return corev1.PersistentVolumeClaim{
 		ObjectMeta: vct.ObjectMeta,
 		Spec:       vct.Spec,
 	}
-}
-
-// addServiceCommonLabels adds labels to the service.
-func addServiceCommonLabels(service *corev1.Service, commonLabels map[string]string, compDefName string) {
-	if service == nil {
-		return
-	}
-	labels := service.Labels
-	if labels == nil {
-		labels = make(map[string]string, 0)
-	}
-	for k, v := range commonLabels {
-		labels[k] = v
-	}
-	labels[constant.AppComponentLabelKey] = compDefName
-	service.Labels = labels
 }
 
 // getMonitorAnnotations returns the annotations for the monitor.

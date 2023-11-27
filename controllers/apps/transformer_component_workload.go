@@ -96,7 +96,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	buildPodSpecVolumeMounts(synthesizeComp)
 
 	// build rsm workload
-	protoRSM, err := factory.BuildRSMWrapper(cluster, synthesizeComp)
+	protoRSM, err := factory.BuildRSM(cluster, synthesizeComp)
 	if err != nil {
 		return err
 	}

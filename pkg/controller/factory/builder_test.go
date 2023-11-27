@@ -286,25 +286,6 @@ var _ = Describe("builder", func() {
 				Expect(isContainEnv).Should(BeTrue())
 			}
 
-			// test service labels
-			expectLabelsExist := func(labels map[string]string) {
-				expectedLabels := map[string]string{
-					constant.AppManagedByLabelKey:   constant.AppName,
-					constant.AppNameLabelKey:        replComponent.ClusterDefName,
-					constant.AppInstanceLabelKey:    cluster.Name,
-					constant.KBAppComponentLabelKey: replComponent.Name,
-					constant.AppComponentLabelKey:   replComponent.ClusterCompDefName,
-				}
-				Expect(labels).ShouldNot(BeNil())
-				for k, ev := range expectedLabels {
-					v, ok := labels[k]
-					Expect(ok).Should(BeTrue())
-					Expect(v).Should(Equal(ev))
-				}
-			}
-			Expect(rsm.Spec.Service).ShouldNot(BeNil())
-			expectLabelsExist(rsm.Spec.Service.Labels)
-
 			// test roles
 			Expect(rsm.Spec.Roles).Should(HaveLen(2))
 			for _, roleName := range []string{constant.Primary, constant.Secondary} {

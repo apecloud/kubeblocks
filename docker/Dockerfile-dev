@@ -14,7 +14,8 @@ ARG INSTALL_ZSH="true"
 ARG KUBECTL_VERSION="latest"
 ARG HELM_VERSION="latest"
 ARG MINIKUBE_VERSION="latest"
-ARG GOLANGCI_LINT_VERSION="1.49.0"
+ARG ETCD_VERSION="v3.5.10"
+ARG GOLANGCI_LINT_VERSION="1.54.2"
 
 ARG USERNAME=kubeblocks
 ARG USER_UID=1000
@@ -42,8 +43,8 @@ RUN bash /tmp/library-scripts/setup-user.sh "${USERNAME}" "${PATH}" \
     # Install Docker CLI and Engine for Docker-in-Docker (using Docker CE).
     && bash /tmp/library-scripts/docker-in-docker-debian.sh "true" "${USERNAME}" "false" "latest" \
     #
-    # Install Kubectl, Helm and Minkikube.
-    && bash /tmp/library-scripts/kubectl-helm-debian.sh "${KUBECTL_VERSION}" "${HELM_VERSION}" "${MINIKUBE_VERSION}" \
+    # Install Kubectl, Helm and Minikube.
+    && bash /tmp/library-scripts/kubectl-helm-debian.sh "${KUBECTL_VERSION}" "${HELM_VERSION}" "${MINIKUBE_VERSION}" "${ETCD_VERSION}"\
     #
     # Install Go tools.
     && bash /tmp/library-scripts/go-debian.sh "none" "/usr/local/go" "/go" "${USERNAME}" "false" \

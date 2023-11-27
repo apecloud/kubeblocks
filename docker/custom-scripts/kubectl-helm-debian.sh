@@ -33,10 +33,11 @@ set -e
 KUBECTL_VERSION="${1:-"latest"}"
 HELM_VERSION="${2:-"latest"}"
 MINIKUBE_VERSION="${3:-"none"}" # latest is also valid
-KUBECTL_SHA256="${4:-"automatic"}"
-HELM_SHA256="${5:-"automatic"}"
-MINIKUBE_SHA256="${6:-"automatic"}"
-USERNAME=${7:-"automatic"}
+ETCD_VERSION="${4:-"none"}"
+KUBECTL_SHA256="${5:-"automatic"}"
+HELM_SHA256="${6:-"automatic"}"
+MINIKUBE_SHA256="${7:-"automatic"}"
+USERNAME=${8:-"automatic"}
 
 HELM_GPG_KEYS_URI="https://raw.githubusercontent.com/helm/helm/main/KEYS"
 GPG_KEY_SERVERS="keyserver hkp://keyserver.ubuntu.com:80
@@ -223,6 +224,16 @@ if [ "${MINIKUBE_VERSION}" != "none" ]; then
         echo '(!) minikube installation failed!'
         exit 1
     fi
+fi
+
+# Install etcd
+if [ "${ETCD_VERSION}" != "none" ]; then
+    echo "Downloading etcd..."
+    curl -L "https://github.com/etcd-io/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-${architecture}.tar.gz" -o "/tmp/etcd-${ETCD_VERSION}-linux-${architecture}.tar.gz"
+    tar xf "/tmp/etcd-${ETCD_VERSION}-linux-${architecture}.tar.gz" -C /tmp
+    mv -f "/tmp/etcd-${ETCD_VERSION}-linux-${architecture}/etcd" /usr/local/bin/etcd
+    mv -f "/tmp/etcd-${ETCD_VERSION}-linux-${architecture}/etcdctl" /usr/local/bin/etcdctl
+    rm -rf "/tmp/etcd-${ETCD_VERSION}-linux-${architecture}"
 fi
 
 if ! type docker > /dev/null 2>&1; then

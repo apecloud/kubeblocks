@@ -13,17 +13,6 @@
 
 ![image](./docs/img/banner-readme.png)
 
-- [KubeBlocks](#kubeblocks)
-  - [What is KubeBlocks](#what-is-kubeblocks)
-    - [Why you need KubeBlocks](#why-you-need-kubeblocks)
-    - [Goals](#goals)
-    - [Key features](#key-features)
-  - [Get started with KubeBlocks](#get-started-with-kubeblocks)
-  - [Community](#community)
-  - [Contributing to KubeBlocks](#contributing-to-kubeblocks)
-  - [Report Vulnerability](#report-vulnerability)
-  - [License](#license)
-
 ## What is KubeBlocks
 
 KubeBlocks is an open source system software that runs and manages data infrastructure on Kubernetes. The name KubeBlocks is inspired by Kubernetes and LEGO blocks, signifying that running and managing data infrastructure on K8s can be standard and productive, like playing with LEGO blocks. 

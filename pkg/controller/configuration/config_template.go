@@ -35,18 +35,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/gotemplate"
 )
 
-// General built-in vars
-const (
-	builtinNamespaceVar         = "KB_NAMESPACE"
-	builtinClusterNameVar       = "KB_CLUSTER_NAME"
-	builtinClusterUIDVar        = "KB_CLUSTER_UID"
-	builtinComponentNameVar     = "KB_COMPONENT_NAME"
-	builtinComponentReplicasVar = "KB_COMPONENT_REPLICAS"
-	builtinPodNameVar           = "KB_POD_NAME"
-	builtinPodFQDNVar           = "KB_POD_FQDN"
-	builtinPodOrdinalVar        = "KB_POD_ORDINAL"
-)
-
 // General built-in objects
 const (
 	builtinClusterObject           = "cluster"

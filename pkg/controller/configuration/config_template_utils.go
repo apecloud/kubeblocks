@@ -186,14 +186,14 @@ func builtinVars(builder *configTemplateBuilder) map[string]any {
 	)
 	if comp != nil {
 		return map[string]any{
-			builtinNamespaceVar:         comp.Namespace,
-			builtinClusterNameVar:       comp.ClusterName,
-			builtinClusterUIDVar:        comp.ClusterUID,
-			builtinComponentNameVar:     comp.Name,
-			builtinComponentReplicasVar: fmt.Sprintf("%d", comp.Replicas),
-			builtinPodNameVar:           constant.GeneratePodName(comp.ClusterName, comp.Name, ordinal),
-			builtinPodFQDNVar:           constant.GeneratePodFQDN(comp.Namespace, comp.ClusterName, comp.Name, ordinal),
-			builtinPodOrdinalVar:        fmt.Sprintf("%d", ordinal),
+			constant.KBEnvNamespace:         comp.Namespace,
+			constant.KBEnvClusterName:       comp.ClusterName,
+			constant.KBEnvClusterUID:        comp.ClusterUID,
+			constant.KBEnvComponentName:     comp.Name,
+			constant.KBEnvComponentReplicas: fmt.Sprintf("%d", comp.Replicas),
+			constant.KBEnvPodName:           constant.GeneratePodName(comp.ClusterName, comp.Name, ordinal),
+			constant.KBEnvPodFQDN:           constant.GeneratePodFQDN(comp.Namespace, comp.ClusterName, comp.Name, ordinal),
+			constant.KBEnvPodOrdinal:        fmt.Sprintf("%d", ordinal),
 		}
 	}
 	return nil

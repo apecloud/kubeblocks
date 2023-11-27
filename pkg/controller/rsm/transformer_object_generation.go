@@ -508,7 +508,7 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 			},
 		},
 		corev1.EnvVar{
-			Name: constant.KBEnvComponentName,
+			Name: constant.KBEnvComponentNameLegacy,
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
 					FieldPath: "metadata.labels['" + constant.KBAppComponentLabelKey + "']",

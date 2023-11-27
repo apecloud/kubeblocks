@@ -83,14 +83,14 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 		name      string
 		fieldPath string
 	}{
+		{name: constant.KBEnvNamespace, fieldPath: "metadata.namespace"},
 		{name: constant.KBEnvPodName, fieldPath: "metadata.name"},
 		{name: constant.KBEnvPodUID, fieldPath: "metadata.uid"},
-		{name: constant.KBEnvNamespace, fieldPath: "metadata.namespace"},
-		{name: "KB_SA_NAME", fieldPath: "spec.serviceAccountName"},
+		{name: constant.KBEnvPodIP, fieldPath: "status.podIP"},
+		{name: constant.KBEnvPodIPs, fieldPath: "status.podIPs"},
 		{name: constant.KBEnvNodeName, fieldPath: "spec.nodeName"},
 		{name: constant.KBEnvHostIP, fieldPath: "status.hostIP"},
-		{name: "KB_POD_IP", fieldPath: "status.podIP"},
-		{name: "KB_POD_IPS", fieldPath: "status.podIPs"},
+		{name: "KB_SA_NAME", fieldPath: "spec.serviceAccountName"},
 		// TODO: need to deprecate following
 		{name: "KB_HOSTIP", fieldPath: "status.hostIP"},
 		{name: "KB_PODIP", fieldPath: "status.podIP"},

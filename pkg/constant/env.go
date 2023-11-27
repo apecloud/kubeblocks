@@ -20,24 +20,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package constant
 
 const (
-	KBEnvNamespace            = "KB_NAMESPACE"
-	KBEnvHostIP               = "KB_HOST_IP"
-	KBEnvNodeName             = "KB_NODENAME"
-	KBEnvPodName              = "KB_POD_NAME"
-	KBEnvPodUID               = "KB_POD_UID"
-	KBEnvVolumeProtectionSpec = "KB_VOLUME_PROTECTION_SPEC"
+	KBEnvNamespace          = "KB_NAMESPACE"
+	KBEnvClusterName        = "KB_CLUSTER_NAME"
+	KBEnvClusterUID         = "KB_CLUSTER_UID"
+	KBEnvComponentName      = "KB_COMPONENT_NAME"
+	KBEnvComponentReplicas  = "KB_COMPONENT_REPLICAS"
+	KBEnvPodName            = "KB_POD_NAME"
+	KBEnvPodUID             = "KB_POD_UID"
+	KBEnvPodIP              = "KB_POD_IP"
+	KBEnvPodIPs             = "KB_POD_IPS"
+	KBEnvPodFQDN            = "KB_POD_FQDN"
+	KBEnvPodOrdinal         = "KB_POD_ORDINAL"
+	KBEnvHostIP             = "KB_HOST_IP"
+	KBEnvNodeName           = "KB_NODENAME"
+	KBEnvServiceAccountName = "KB_SERVICE_ACCOUNT_NAME"
 )
 
 // Lorry env names
 const (
-	KBEnvClusterName     = "KB_CLUSTER_NAME"
-	KBEnvComponentName   = "KB_COMP_NAME"
-	KBEnvClusterCompName = "KB_CLUSTER_COMP_NAME"
-	KBEnvWorkloadType    = "KB_WORKLOAD_TYPE"
-	KBEnvBuiltinHandler  = "KB_BUILTIN_HANDLER"
-	KBEnvCharacterType   = "KB_SERVICE_CHARACTER_TYPE"
-	KBEnvServiceUser     = "KB_SERVICE_USER"
-	KBEnvServicePassword = "KB_SERVICE_PASSWORD"
+	KBEnvComponentNameLegacy = "KB_COMP_NAME"
+	KBEnvClusterCompName     = "KB_CLUSTER_COMP_NAME"
+	KBEnvWorkloadType        = "KB_WORKLOAD_TYPE"
+	KBEnvBuiltinHandler      = "KB_BUILTIN_HANDLER"
+	KBEnvCharacterType       = "KB_SERVICE_CHARACTER_TYPE"
+	KBEnvServiceUser         = "KB_SERVICE_USER"
+	KBEnvServicePassword     = "KB_SERVICE_PASSWORD"
 
 	// KBEnvServiceRoles defines the Roles configured in the cluster definition that are visible to users.
 	KBEnvServiceRoles = "KB_SERVICE_ROLES"
@@ -60,4 +67,6 @@ const (
 	// KBEnvRsmRoleUpdateMechanism defines the method to send events: DirectAPIServerEventUpdate(through lorry service), ReadinessProbeEventUpdate(through kubelet service)
 	KBEnvRsmRoleUpdateMechanism = "KB_RSM_ROLE_UPDATE_MECHANISM"
 	KBEnvRoleProbeTimeout       = "KB_RSM_ROLE_PROBE_TIMEOUT"
+
+	KBEnvVolumeProtectionSpec = "KB_VOLUME_PROTECTION_SPEC"
 )

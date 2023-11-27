@@ -79,7 +79,7 @@ func NewKubernetesStore() (*KubernetesStore, error) {
 		return nil, errors.New("KB_CLUSTER_NAME must be set")
 	}
 
-	componentName := os.Getenv(constant.KBEnvComponentName)
+	componentName := os.Getenv(constant.KBEnvComponentNameLegacy)
 	if componentName == "" {
 		return nil, errors.New("KB_COMP_NAME must be set")
 	}

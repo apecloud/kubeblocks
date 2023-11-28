@@ -293,6 +293,7 @@ func buildEnv4CompRef(cluster *appsv1alpha1.Cluster, synthesizedComp *component.
 }
 
 func buildEnv4ClusterObjectRef(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) ([]corev1.EnvVar, error) {
+	// TODO: impl
 	return []corev1.EnvVar{}, nil
 }
 

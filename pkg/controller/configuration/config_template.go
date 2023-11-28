@@ -69,23 +69,6 @@ const (
 	builtInGetKeyFile  = "getKeyFile"
 )
 
-var (
-	builtinEnvVars = map[string]string{
-		"KB_NAMESPACE":          "",
-		"KB_CLUSTER_NAME":       "",
-		"KB_CLUSTER_UID":        "",
-		"KB_COMPONENT_NAME":     "",
-		"KB_COMPONENT_REPLICAS": "",
-		"KB_POD_NAME":           "",
-		"KB_POD_UID":            "",
-		"KB_POD_IP":             "",
-		"KB_POD_FQDN":           "",
-		"KB_POD_ORDINAL":        "",
-		"KB_HOST_NAME":          "",
-		"KB_HOST_IP":            "",
-	}
-)
-
 type ResourceDefinition struct {
 	MemorySize int64 `json:"memorySize,omitempty"`
 	CoreNum    int64 `json:"coreNum,omitempty"`

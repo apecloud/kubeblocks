@@ -654,7 +654,7 @@ type ConnectionCredential struct {
 
 // List of all the built-in variables defined by KB.
 // When rendering the environment variables of Pod or Action, and the templates of config or script,
-// these variables will be passed in by default, so you can use them directly without declaring them.
+// these variables will be passed in by default, so you can use them directly without declaration.
 // TODO: resources.
 // ---------------------------------------------------------------------------------
 // |           |           |                       |  available in   |             |

@@ -172,6 +172,7 @@ func resolveSecretKeyRef(ctx context.Context, cli client.Reader,
 
 func resolveNativeObjectKey(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	obj client.Object, objName, key string, optional *bool, resolve func(obj client.Object) any) (any, error) {
+	kind := obj.GetObjectKind().GroupVersionKind().Kind
 	_optional := func() bool {
 		return optional != nil && *optional
 	}
@@ -179,7 +180,7 @@ func resolveNativeObjectKey(ctx context.Context, cli client.Reader, synthesizedC
 		if _optional() {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("")
+		return nil, fmt.Errorf("the name of %s object is empty when resolving vars", kind)
 	}
 
 	objKey := types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: objName}
@@ -187,7 +188,7 @@ func resolveNativeObjectKey(ctx context.Context, cli client.Reader, synthesizedC
 		if apierrors.IsNotFound(err) && _optional() {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("resolving vars from %s object %s error: %s", kind, objName, err.Error())
 	}
 
 	if v := resolve(obj); v != nil {
@@ -196,7 +197,7 @@ func resolveNativeObjectKey(ctx context.Context, cli client.Reader, synthesizedC
 	if _optional() {
 		return nil, nil
 	}
-	return nil, fmt.Errorf("")
+	return nil, fmt.Errorf("the required var is not found in %s object %s", kind, objName)
 }
 
 func resolveServiceKeyRef(synthesizedComp *SynthesizedComponent, selector appsv1alpha1.ServiceKeySelector) (any, error) {
@@ -226,51 +227,6 @@ func resolveServiceKeyPortRef(synthesizedComp *SynthesizedComponent, selector ap
 	})
 }
 
-func resolveServiceKeyRefLow(synthesizedComp *SynthesizedComponent, selector appsv1alpha1.ServiceKeySelector,
-	key appsv1alpha1.EnvKey, resolve func(appsv1alpha1.Service) any) (any, error) {
-	objOptional := func() bool {
-		return selector.Optional != nil && *selector.Optional
-	}
-	keyOptional := func() bool {
-		return key.Option != nil && *key.Option == appsv1alpha1.EnvKeyOptional
-	}
-	if len(selector.Name) == 0 {
-		if objOptional() {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("")
-	}
-
-	services := synthesizedComp.ComponentServices
-	if len(selector.Component) != 0 && selector.Component != synthesizedComp.CompDefName {
-		services = []appsv1alpha1.Service{} // TODO: other component?
-	}
-
-	// TODO: default headless service
-	var service *appsv1alpha1.Service
-	for i, svc := range services {
-		if svc.Name == selector.Name {
-			service = &services[i]
-			break
-		}
-	}
-	if service == nil {
-		if keyOptional() {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("")
-	}
-
-	val := resolve(*service)
-	if val == nil {
-		if keyOptional() {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("")
-	}
-	return val, nil
-}
-
 func resolveCredentialKeyRef(synthesizedComp *SynthesizedComponent, selector appsv1alpha1.CredentialKeySelector,
 	resolveCredential bool) (any, error) {
 	if resolveCredential && selector.Username != nil {
@@ -294,45 +250,6 @@ func resolveCredentialKeyPasswordRef(synthesizedComp *SynthesizedComponent, sele
 		func(account appsv1alpha1.SystemAccount) any {
 			return "" // TODO: get the password
 		})
-}
-
-func resolveCredentialKeyRefLow(synthesizedComp *SynthesizedComponent, selector appsv1alpha1.CredentialKeySelector,
-	key appsv1alpha1.EnvKey, resolve func(appsv1alpha1.SystemAccount) any) (any, error) {
-	objOptional := func() bool {
-		return selector.Optional != nil && *selector.Optional
-	}
-	keyOptional := func() bool {
-		return key.Option != nil && *key.Option == appsv1alpha1.EnvKeyOptional
-	}
-	if len(selector.Name) == 0 {
-		if objOptional() {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("")
-	}
-
-	var account *appsv1alpha1.SystemAccount
-	for i, a := range synthesizedComp.SystemAccounts {
-		if a.Name == selector.Name {
-			account = &synthesizedComp.SystemAccounts[i]
-			break
-		}
-	}
-	if account == nil {
-		if keyOptional() {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("")
-	}
-
-	val := resolve(*account)
-	if val == nil {
-		if keyOptional() {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("")
-	}
-	return val, nil
 }
 
 func resolveServiceRefKeyRef(synthesizedComp *SynthesizedComponent, selector appsv1alpha1.ServiceRefKeySelector,
@@ -392,41 +309,84 @@ func resolveServiceRefKeyPasswordRef(synthesizedComp *SynthesizedComponent, sele
 		})
 }
 
+func resolveServiceKeyRefLow(synthesizedComp *SynthesizedComponent, selector appsv1alpha1.ServiceKeySelector,
+	key appsv1alpha1.EnvKey, resolveKey func(appsv1alpha1.Service) any) (any, error) {
+	return resolveClusterObjectKeyRef("Service", selector.ClusterObjectReference, key,
+		func() any {
+			services := synthesizedComp.ComponentServices
+			if len(selector.Component) != 0 && selector.Component != synthesizedComp.CompDefName {
+				services = []appsv1alpha1.Service{} // TODO: other component?
+			}
+
+			// TODO: default headless service
+			for i, svc := range services {
+				if svc.Name == selector.Name {
+					return &services[i]
+				}
+			}
+			return nil
+		},
+		func(obj any) any {
+			return resolveKey(*(obj.(*appsv1alpha1.Service)))
+		})
+}
+
+func resolveCredentialKeyRefLow(synthesizedComp *SynthesizedComponent, selector appsv1alpha1.CredentialKeySelector,
+	key appsv1alpha1.EnvKey, resolveKey func(appsv1alpha1.SystemAccount) any) (any, error) {
+	return resolveClusterObjectKeyRef("Credential", selector.ClusterObjectReference, key,
+		func() any {
+			for i, account := range synthesizedComp.SystemAccounts {
+				if account.Name == selector.Name {
+					return &synthesizedComp.SystemAccounts[i]
+				}
+			}
+			return nil
+		},
+		func(obj any) any {
+			return resolveKey(*(obj.(*appsv1alpha1.SystemAccount)))
+		})
+}
+
 func resolveServiceRefKeyRefLow(synthesizedComp *SynthesizedComponent, selector appsv1alpha1.ServiceRefKeySelector,
-	key appsv1alpha1.EnvKey, resolve func(appsv1alpha1.ServiceDescriptor) any) (any, error) {
+	key appsv1alpha1.EnvKey, resolveKey func(appsv1alpha1.ServiceDescriptor) any) (any, error) {
+	return resolveClusterObjectKeyRef("ServiceRef", selector.ClusterObjectReference, key,
+		func() any {
+			return synthesizedComp.ServiceReferences[selector.Name]
+		},
+		func(obj any) any {
+			return resolveKey(*(obj.(*appsv1alpha1.ServiceDescriptor)))
+		})
+}
+
+func resolveClusterObjectKeyRef(kind string, objRef appsv1alpha1.ClusterObjectReference, key appsv1alpha1.EnvKey,
+	matchObj func() any, resolveKey func(any) any) (any, error) {
 	objOptional := func() bool {
-		return selector.Optional != nil && *selector.Optional
+		return objRef.Optional != nil && *objRef.Optional
 	}
 	keyOptional := func() bool {
 		return key.Option != nil && *key.Option == appsv1alpha1.EnvKeyOptional
 	}
-	if len(selector.Name) == 0 {
+	if len(objRef.Name) == 0 {
 		if objOptional() {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("")
+		return nil, fmt.Errorf("the name of %s object is empty when resolving vars", kind)
 	}
 
-	var svcRef *appsv1alpha1.ServiceDescriptor
-	for name, ref := range synthesizedComp.ServiceReferences {
-		if name == selector.Name {
-			svcRef = ref
-			break
-		}
-	}
-	if svcRef == nil {
+	obj := matchObj()
+	if obj == nil {
 		if keyOptional() {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("")
+		return nil, fmt.Errorf("%s object %s is not found when resolving vars", kind, objRef.Name)
 	}
 
-	val := resolve(*svcRef)
+	val := resolveKey(obj)
 	if val == nil {
 		if keyOptional() {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("")
+		return nil, fmt.Errorf("the required var is not found in %s object %s", kind, objRef.Name)
 	}
 	return val, nil
 }

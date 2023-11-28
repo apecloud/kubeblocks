@@ -29,10 +29,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	ictrlclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/gotemplate"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // General built-in objects
@@ -142,19 +144,11 @@ func (c *configTemplateBuilder) render(configs map[string]string) (map[string]st
 }
 
 func (c *configTemplateBuilder) builtinObjectsAsValues() (*gotemplate.TplValues, error) {
-	// resolve service references before building env vars
-	if err := component.ResolveServiceReferences(c.cli, c.ctx, c.component); err != nil {
-		return nil, err
-	}
-
-	vars := map[string]any{}
-	maps.Copy(vars, builtinObjects(c))
-	maps.Copy(vars, builtinVars(c))
-	objVars, err := resolveClusterObjectRefVars(c)
+	vars, err := component.ResolveVars4Template(c.ctx, c.cli, c.component)
 	if err != nil {
 		return nil, err
 	}
-	maps.Copy(vars, objVars)
+	maps.Copy(vars, builtinObjects(c))
 
 	b, err := json.Marshal(vars)
 	if err != nil {
@@ -165,6 +159,16 @@ func (c *configTemplateBuilder) builtinObjectsAsValues() (*gotemplate.TplValues,
 		return nil, err
 	}
 	return &tplValue, nil
+}
+
+func builtinObjects(builder *configTemplateBuilder) map[string]any {
+	return map[string]any{
+		builtinClusterObject:           builder.cluster,
+		builtinComponentObject:         builder.component,
+		builtinPodObject:               builder.podSpec,
+		builtinComponentResourceObject: builder.componentValues.Resource,
+		builtinClusterDomainObject:     viper.GetString(constant.KubernetesClusterDomainEnv),
+	}
 }
 
 func (c *configTemplateBuilder) injectBuiltInObjectsAndFunctions(

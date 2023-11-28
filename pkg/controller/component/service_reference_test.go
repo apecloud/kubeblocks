@@ -247,7 +247,7 @@ var _ = Describe("service reference", func() {
 			Expect(component).ShouldNot(BeNil())
 			Expect(component.ServiceReferences).ShouldNot(BeNil())
 
-			err = ResolveServiceReferences(k8sClient, ctx, component)
+			err = resolveServiceReferences(ctx, k8sClient, component)
 			Expect(err).Should(Succeed())
 			Expect(component.ServiceReferences).ShouldNot(BeNil())
 			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Endpoint.Value).Should(Equal(serviceRefEndpointValue))

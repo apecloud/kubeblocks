@@ -360,8 +360,6 @@ spec:
                               type: object
                             port:
                               properties:
-                                name:
-                                  type: string
                                 option:
                                   enum:
                                   - Required

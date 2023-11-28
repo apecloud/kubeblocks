@@ -4614,7 +4614,7 @@ func (in *ServiceRefEnvKeys) DeepCopyInto(out *ServiceRefEnvKeys) {
 	}
 	if in.Port != nil {
 		in, out := &in.Port, &out.Port
-		*out = new(NamedEnvKey)
+		*out = new(EnvKey)
 		(*in).DeepCopyInto(*out)
 	}
 	in.CredentialEnvKeys.DeepCopyInto(&out.CredentialEnvKeys)

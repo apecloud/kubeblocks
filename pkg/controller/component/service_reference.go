@@ -29,14 +29,14 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
-func ResolveServiceReferences(cli client.Reader, ctx context.Context, comp *SynthesizedComponent) error {
+func resolveServiceReferences(ctx context.Context, cli client.Reader, comp *SynthesizedComponent) error {
 	for _, serviceDescriptor := range comp.ServiceReferences {
 		// Only support referencing endpoint and port in configuration
 		credentialVars := []*appsv1alpha1.CredentialVar{
 			serviceDescriptor.Spec.Endpoint,
 			serviceDescriptor.Spec.Port,
 		}
-		if err := resolveServiceRefCredentialVars(cli, ctx, serviceDescriptor.Namespace, credentialVars...); err != nil {
+		if err := resolveServiceRefCredentialVars(ctx, cli, serviceDescriptor.Namespace, credentialVars...); err != nil {
 			return err
 		}
 	}
@@ -45,7 +45,7 @@ func ResolveServiceReferences(cli client.Reader, ctx context.Context, comp *Synt
 
 // resolveServiceRefCredentialVars resolves the credentialVar.ValueFrom to the real value
 // TODO: currently, we set the valueFrom to the value, which need to be refactored
-func resolveServiceRefCredentialVars(cli client.Reader, ctx context.Context,
+func resolveServiceRefCredentialVars(ctx context.Context, cli client.Reader,
 	namespace string, credentialVars ...*appsv1alpha1.CredentialVar) error {
 	for _, credentialVar := range credentialVars {
 		// TODO: replace the build-in placeholder with the real value
@@ -54,10 +54,10 @@ func resolveServiceRefCredentialVars(cli client.Reader, ctx context.Context,
 		}
 		// TODO: currently, we set the valueFrom to the value, which need to be refactored
 		if credentialVar.ValueFrom != nil {
-			if err := resolveSecretRefCredentialVar(cli, ctx, namespace, credentialVar); err != nil {
+			if err := resolveSecretRefCredentialVar(ctx, cli, namespace, credentialVar); err != nil {
 				return err
 			}
-			if err := resolveConfigMapRefCredentialVar(cli, ctx, namespace, credentialVar); err != nil {
+			if err := resolveConfigMapRefCredentialVar(ctx, cli, namespace, credentialVar); err != nil {
 				return err
 			}
 		}
@@ -65,7 +65,7 @@ func resolveServiceRefCredentialVars(cli client.Reader, ctx context.Context,
 	return nil
 }
 
-func resolveSecretRefCredentialVar(cli client.Reader, ctx context.Context,
+func resolveSecretRefCredentialVar(ctx context.Context, cli client.Reader,
 	namespace string, credentialVar *appsv1alpha1.CredentialVar) error {
 	if credentialVar.ValueFrom == nil || credentialVar.ValueFrom.SecretKeyRef == nil {
 		return nil
@@ -87,7 +87,7 @@ func resolveSecretRefCredentialVar(cli client.Reader, ctx context.Context,
 	return nil
 }
 
-func resolveConfigMapRefCredentialVar(cli client.Reader, ctx context.Context,
+func resolveConfigMapRefCredentialVar(ctx context.Context, cli client.Reader,
 	namespace string, credentialVar *appsv1alpha1.CredentialVar) error {
 	if credentialVar.ValueFrom == nil || credentialVar.ValueFrom.ConfigMapKeyRef == nil {
 		return nil

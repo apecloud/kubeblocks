@@ -764,7 +764,7 @@ type ServiceRefEnvKeys struct {
 	Endpoint *EnvKey `json:"endpoint,omitempty"`
 
 	// +optional
-	Port *NamedEnvKey `json:"port,omitempty"`
+	Port *EnvKey `json:"port,omitempty"`
 
 	CredentialEnvKeys `json:",inline"`
 }

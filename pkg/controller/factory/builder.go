@@ -97,6 +97,7 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synthesi
 		}
 	}
 
+	// TODO: move env building out of here.
 	if err = buildTemplatePodSpecEnv(cluster, synthesizedComp, rsmObj); err != nil {
 		return nil, err
 	}
@@ -186,12 +187,6 @@ func buildTemplateEnvVars(cluster *appsv1alpha1.Cluster,
 	envVars = append(envVars, udeVars...)
 
 	envVars = append(envVars, buildEnv4CompRef(cluster, synthesizedComp)...)
-
-	objRefVars, err := buildEnv4ClusterObjectRef(cluster, synthesizedComp)
-	if err != nil {
-		return nil, err
-	}
-	envVars = append(envVars, objRefVars...)
 
 	return envVars, nil
 }
@@ -290,11 +285,6 @@ func buildEnv4CompRef(cluster *appsv1alpha1.Cluster, synthesizedComp *component.
 		vars = append(vars, *env)
 	}
 	return vars
-}
-
-func buildEnv4ClusterObjectRef(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) ([]corev1.EnvVar, error) {
-	// TODO: impl
-	return []corev1.EnvVar{}, nil
 }
 
 func setDefaultResourceLimits(rsm *workloads.ReplicatedStateMachine) {

@@ -234,7 +234,7 @@ bootstrap:
 						Namespace: "default",
 					},
 				},
-				nil, ctx, mockClient.Client(),
+				ctx, mockClient.Client(),
 			)
 
 			localObjs := []coreclient.Object{

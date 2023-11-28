@@ -38,10 +38,9 @@ import (
 type ReconcileCtx struct {
 	*intctrlutil.ResourceCtx
 
-	Cluster    *appsv1alpha1.Cluster
-	ClusterVer *appsv1alpha1.ClusterVersion
-	Component  *component.SynthesizedComponent
-	PodSpec    *corev1.PodSpec
+	Cluster   *appsv1alpha1.Cluster
+	Component *component.SynthesizedComponent
+	PodSpec   *corev1.PodSpec
 
 	Cache []client.Object
 }
@@ -89,7 +88,7 @@ func NewReconcilePipeline(ctx ReconcileCtx, item appsv1alpha1.ConfigurationItemD
 func (p *pipeline) Prepare() *pipeline {
 	buildTemplate := func() (err error) {
 		ctx := p.ctx
-		templateBuilder := newTemplateBuilder(p.ClusterName, p.Namespace, ctx.Cluster, ctx.ClusterVer, p.Context, p.Client)
+		templateBuilder := newTemplateBuilder(p.ClusterName, p.Namespace, ctx.Cluster, p.Context, p.Client)
 		// Prepare built-in objects and built-in functions
 		if err = templateBuilder.injectBuiltInObjectsAndFunctions(ctx.PodSpec, ctx.Component.ConfigTemplates, ctx.Component, ctx.Cache); err != nil {
 			return
@@ -256,7 +255,7 @@ func (p *updatePipeline) PrepareForTemplate() *updatePipeline {
 		if p.isDone() {
 			return
 		}
-		templateBuilder := newTemplateBuilder(p.ClusterName, p.Namespace, p.ctx.Cluster, p.ctx.ClusterVer, p.Context, p.Client)
+		templateBuilder := newTemplateBuilder(p.ClusterName, p.Namespace, p.ctx.Cluster, p.Context, p.Client)
 		// Prepare built-in objects and built-in functions
 		if err = templateBuilder.injectBuiltInObjectsAndFunctions(p.ctx.PodSpec, []appsv1alpha1.ComponentConfigSpec{*p.configSpec}, p.ctx.Component, p.ctx.Cache); err != nil {
 			return

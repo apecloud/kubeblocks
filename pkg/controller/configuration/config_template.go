@@ -41,7 +41,6 @@ const (
 	builtinClusterObject           = "cluster"
 	builtinComponentObject         = "component"
 	builtinPodObject               = "podSpec"
-	builtinClusterVersionObject    = "version"
 	builtinComponentResourceObject = "componentResource"
 	builtinClusterDomainObject     = "clusterDomain"
 )
@@ -95,10 +94,9 @@ type configTemplateBuilder struct {
 	builtInFunctions *gotemplate.BuiltInObjectsFunc
 
 	// cluster object
-	component      *component.SynthesizedComponent
-	clusterVersion *appsv1alpha1.ClusterVersion
-	cluster        *appsv1alpha1.Cluster
-	podSpec        *corev1.PodSpec
+	component *component.SynthesizedComponent
+	cluster   *appsv1alpha1.Cluster
+	podSpec   *corev1.PodSpec
 
 	ctx context.Context
 	cli ictrlclient.ReadonlyClient
@@ -107,17 +105,15 @@ type configTemplateBuilder struct {
 func newTemplateBuilder(
 	clusterName, namespace string,
 	cluster *appsv1alpha1.Cluster,
-	version *appsv1alpha1.ClusterVersion,
 	ctx context.Context,
 	cli ictrlclient.ReadonlyClient) *configTemplateBuilder {
 	return &configTemplateBuilder{
-		namespace:      namespace,
-		clusterName:    clusterName,
-		cluster:        cluster,
-		clusterVersion: version,
-		templateName:   "KbTemplate",
-		ctx:            ctx,
-		cli:            cli,
+		namespace:    namespace,
+		clusterName:  clusterName,
+		cluster:      cluster,
+		templateName: "KbTemplate",
+		ctx:          ctx,
+		cli:          cli,
 	}
 }
 
@@ -159,7 +155,6 @@ func (c *configTemplateBuilder) builtinObjectsAsValues() (*gotemplate.TplValues,
 		builtinComponentObject:         c.component,
 		builtinPodObject:               c.podSpec,
 		builtinComponentResourceObject: c.componentValues.Resource,
-		builtinClusterVersionObject:    c.clusterVersion,
 		builtinClusterDomainObject:     viper.GetString(constant.KubernetesClusterDomainEnv),
 	}
 	b, err := json.Marshal(builtInObjs)

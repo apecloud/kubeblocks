@@ -1,0 +1,8 @@
+{{- include "kubeblocks.buildAddonCR" (merge (dict
+  "kbVersion" ">=0.7.0"
+  "name" "oracle"
+  "version" "0.7.0"
+  "model" "RDBMS"
+  "provider" "apecloud"
+  "description" "Oracle database addon."
+  "autoInstall" false) . ) -}}

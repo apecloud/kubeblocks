@@ -18,7 +18,7 @@ on:
       CLOUD_PROVIDER:
         description: 'cloud provider'
         required: true
-        default: 'gke'
+        default: 'eks'
         type: choice
         options:
           - gke

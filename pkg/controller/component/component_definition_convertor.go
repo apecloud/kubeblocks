@@ -322,7 +322,7 @@ type compDefUpdateStrategyConvertor struct{}
 
 func (c *compDefUpdateStrategyConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	defaultUpdateStrategy := appsv1alpha1.BestEffortParallelStrategy
+	defaultUpdateStrategy := appsv1alpha1.SerialStrategy
 	strategy := &defaultUpdateStrategy
 
 	switch clusterCompDef.WorkloadType {

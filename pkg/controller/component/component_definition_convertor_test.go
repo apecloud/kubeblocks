@@ -594,7 +594,7 @@ var _ = Describe("Component Definition Convertor", func() {
 
 				strategy := res.(*appsv1alpha1.UpdateStrategy)
 				// default update strategy
-				Expect(*strategy).Should(BeEquivalentTo(appsv1alpha1.BestEffortParallelStrategy))
+				Expect(*strategy).Should(BeEquivalentTo(appsv1alpha1.SerialStrategy))
 			})
 
 			It("ok", func() {

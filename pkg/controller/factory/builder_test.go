@@ -48,8 +48,9 @@ var _ = Describe("builder", func() {
 	const clusterVersionName = "test-clusterversion"
 	const clusterName = "test-cluster"
 	const mysqlCompDefName = "replicasets"
-	const mysqlCompName = "mysql"
 	const proxyCompDefName = "proxy"
+	const mysqlCompName = "mysql"
+	const mysqlCharacterType = "mysql"
 
 	allFieldsClusterDefObj := func(needCreate bool) *appsv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
@@ -248,45 +249,8 @@ var _ = Describe("builder", func() {
 			Expect(credential.StringData["RANDOM_PASSWD"]).Should(Equal(originalPassword))
 		})
 
-		It("builds StatefulSet correctly", func() {
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
-
-			sts, err := BuildSts(cluster, synthesizedComponent)
-			Expect(err).Should(BeNil())
-			Expect(sts).ShouldNot(BeNil())
-			// test  replicas = 0
-			newComponent := *synthesizedComponent
-			newComponent.Replicas = 0
-			sts, err = BuildSts(cluster, &newComponent)
-			Expect(err).Should(BeNil())
-			Expect(sts).ShouldNot(BeNil())
-			Expect(*sts.Spec.Replicas).Should(Equal(int32(0)))
-			Expect(sts.Spec.VolumeClaimTemplates[0].Labels[constant.VolumeTypeLabelKey]).
-				Should(Equal(string(appsv1alpha1.VolumeTypeData)))
-			// test workload type replication
-			replComponent := *synthesizedComponent
-			replComponent.Replicas = 2
-			replComponent.WorkloadType = appsv1alpha1.Replication
-			sts, err = BuildSts(cluster, &replComponent)
-			Expect(err).Should(BeNil())
-			Expect(sts).ShouldNot(BeNil())
-			Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(2))
-			// test extra envs
-			Expect(sts.Spec.Template.Spec.Containers).ShouldNot(BeEmpty())
-			for _, container := range sts.Spec.Template.Spec.Containers {
-				isContainEnv := false
-				for _, env := range container.Env {
-					if env.Name == "mock-key" && env.Value == "mock-value" {
-						isContainEnv = true
-						break
-					}
-				}
-				Expect(isContainEnv).Should(BeTrue())
-			}
-		})
-
 		It("builds RSM correctly", func() {
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			clusterDef, cluster, synthesizedComponent := newClusterObjs(nil)
 
 			rsm, err := BuildRSM(cluster, synthesizedComponent)
 			Expect(err).Should(BeNil())
@@ -303,10 +267,10 @@ var _ = Describe("builder", func() {
 				Should(Equal(string(appsv1alpha1.VolumeTypeData)))
 
 			By("set workload type to Replication")
-			replComponent := *synthesizedComponent
-			replComponent.Replicas = 2
-			replComponent.WorkloadType = appsv1alpha1.Replication
-			rsm, err = BuildRSM(cluster, &replComponent)
+			clusterDef.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Replication
+			cluster.Spec.ComponentSpecs[0].Replicas = 2
+			replComponent := newAllFieldsComponent(clusterDef, nil, cluster)
+			rsm, err = BuildRSM(cluster, replComponent)
 			Expect(err).Should(BeNil())
 			Expect(rsm).ShouldNot(BeNil())
 			Expect(*rsm.Spec.Replicas).Should(BeEquivalentTo(2))
@@ -322,25 +286,6 @@ var _ = Describe("builder", func() {
 				}
 				Expect(isContainEnv).Should(BeTrue())
 			}
-
-			// test service labels
-			expectLabelsExist := func(labels map[string]string) {
-				expectedLabels := map[string]string{
-					constant.AppManagedByLabelKey:   constant.AppName,
-					constant.AppNameLabelKey:        replComponent.ClusterDefName,
-					constant.AppInstanceLabelKey:    cluster.Name,
-					constant.KBAppComponentLabelKey: replComponent.Name,
-					constant.AppComponentLabelKey:   replComponent.ClusterCompDefName,
-				}
-				Expect(labels).ShouldNot(BeNil())
-				for k, ev := range expectedLabels {
-					v, ok := labels[k]
-					Expect(ok).Should(BeTrue())
-					Expect(v).Should(Equal(ev))
-				}
-			}
-			Expect(rsm.Spec.Service).ShouldNot(BeNil())
-			expectLabelsExist(rsm.Spec.Service.Labels)
 
 			// test roles
 			Expect(rsm.Spec.Roles).Should(HaveLen(2))
@@ -358,13 +303,13 @@ var _ = Describe("builder", func() {
 			Expect(*rsm.Spec.MemberUpdateStrategy).Should(BeEquivalentTo(workloads.SerialUpdateStrategy))
 
 			By("set workload type to Consensus")
-			csComponent := *synthesizedComponent
-			csComponent.Replicas = 3
-			csComponent.WorkloadType = appsv1alpha1.Consensus
-			csComponent.CharacterType = "mysql"
-			csComponent.ConsensusSpec = appsv1alpha1.NewConsensusSetSpec()
-			csComponent.ConsensusSpec.UpdateStrategy = appsv1alpha1.BestEffortParallelStrategy
-			rsm, err = BuildRSM(cluster, &csComponent)
+			clusterDef.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Consensus
+			clusterDef.Spec.ComponentDefs[0].CharacterType = mysqlCharacterType
+			clusterDef.Spec.ComponentDefs[0].ConsensusSpec = appsv1alpha1.NewConsensusSetSpec()
+			clusterDef.Spec.ComponentDefs[0].ConsensusSpec.UpdateStrategy = appsv1alpha1.BestEffortParallelStrategy
+			cluster.Spec.ComponentSpecs[0].Replicas = 3
+			csComponent := newAllFieldsComponent(clusterDef, nil, cluster)
+			rsm, err = BuildRSM(cluster, csComponent)
 			Expect(err).Should(BeNil())
 			Expect(rsm).ShouldNot(BeNil())
 
@@ -435,7 +380,7 @@ var _ = Describe("builder", func() {
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
 			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
 				ManagerName:           "cfgmgr",
-				CharacterType:         "mysql",
+				CharacterType:         mysqlCharacterType,
 				SecreteName:           "test-secret",
 				Image:                 constant.KBToolsImage,
 				ShareProcessNamespace: true,

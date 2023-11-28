@@ -1,0 +1,70 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: oracle
+  labels:
+    {{- include "oracle.labels" . | nindent 4 }}
+spec:
+  type: oracle
+  connectionCredential:
+    username: kbadmin
+    password: "$(RANDOM_PASSWD)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-oracle)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_tcp-oracle)"
+  componentDefs:
+    - name: oracle
+      workloadType: Stateful
+      characterType: oracle
+      service:
+        ports:
+          - name: tcp-oracle
+            port: 1521
+            targetPort: tcp-oracle
+          - name: oem-express
+            port: 5500
+            targetPort: oem-express
+      volumeTypes:
+        - name: data
+          type: data
+      podSpec:
+        securityContext:
+          runAsUser: 0
+          fsGroup: 103
+          runAsGroup: 103
+        containers:
+          - name:  oracle
+            volumeMounts:
+              - mountPath: /opt/oracle/oradata
+                name: data
+            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+            securityContext:
+              runAsUser: 54321
+            ports:
+              - name: tcp-oracle
+                containerPort: 1521
+              - name: oem-express
+                containerPort: 5500
+            env:
+              - name: ORACLE_SID
+                value: "ORCLCDB"
+              - name: ORACLE_PDB
+                value: "ORCLPDB1"
+              - name: ORACLE_PWD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+              - name: AUTO_MEM_CALCULATION
+                value: "TRUE"
+              - name: INIT_CPU_COUNT
+              - name: INIT_PROCESSES
+              - name: ORACLE_EDITION
+                value: "enterprise"
+        volumes:
+          - name: dshm
+            emptyDir:
+              medium: Memory
+              {{- with .Values.shmVolume.sizeLimit }}
+              sizeLimit: {{ . }}
+              {{- end }}

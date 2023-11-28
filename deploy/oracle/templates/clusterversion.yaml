@@ -1,0 +1,15 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  # major version of the component defined in values.yaml
+  name: oracle-{{ .Values.image.tag }}
+  labels:
+    {{- include "oracle.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: oracle
+  componentVersions:
+    - componentDefRef: oracle
+      versionsContext:
+        containers:
+          - name: oracle
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}

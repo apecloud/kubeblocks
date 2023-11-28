@@ -60,7 +60,7 @@ require (
 	go.etcd.io/etcd/server/v3 v3.5.9
 	go.mongodb.org/mongo-driver v1.11.6
 	go.uber.org/automaxprocs v1.5.2
-	go.uber.org/zap v1.24.0
+	go.uber.org/zap v1.26.0
 	golang.org/x/crypto v0.14.0
 	golang.org/x/exp v0.0.0-20230711153332-06a737ee72cb
 	golang.org/x/net v0.17.0

@@ -64,7 +64,7 @@ RUN bash /tmp/library-scripts/setup-user.sh "${USERNAME}" "${PATH}" \
     && apt-get autoremove -y && apt-get clean -y && rm -rf /tmp/library-scripts/
 
 # [Optional] Uncomment the next line to use go get to install anything else you need
-RUN go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+# RUN go get -x <your-dependency-or-tool>
 
 # [Optional] Uncomment this section to install additional OS packages.
 # RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \

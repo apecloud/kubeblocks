@@ -242,13 +242,13 @@ func (m *Commands) ConnectCommand(connectInfo *engines.AuthInfo) []string {
 	userPass := m.info.PasswordEnv
 
 	if connectInfo != nil {
-		userName = connectInfo.UserName
-		userPass = connectInfo.UserPasswd
+		userName = engines.AddSingleQuote(connectInfo.UserName)
+		userPass = engines.AddSingleQuote(connectInfo.UserPasswd)
 	}
 
 	// please refer to PostgreSQL documentation for more details
 	// https://www.postgresql.org/docs/current/libpq-envars.html
-	cmd := []string{fmt.Sprintf("PGUSER=%s PGPASSWORD=%s PGDATABASE=%s %s", engines.AddSingleQuote(userName), engines.AddSingleQuote(userPass), m.info.Database, m.info.Client)}
+	cmd := []string{fmt.Sprintf("PGUSER=%s PGPASSWORD=%s PGDATABASE=%s %s", userName, userPass, m.info.Database, m.info.Client)}
 	return []string{"sh", "-c", strings.Join(cmd, " ")}
 }
 

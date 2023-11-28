@@ -142,10 +142,8 @@ func (c *configTemplateBuilder) render(configs map[string]string) (map[string]st
 }
 
 func (c *configTemplateBuilder) builtinObjectsAsValues() (*gotemplate.TplValues, error) {
-	// preHandle the component
-	var v Visitor = &ComponentVisitor{component: c.component}
-	// v = NewDecoratedVisitor(v, resolveServiceReferences(c.cli, c.ctx, c.namespace))
-	if err := v.Visit(resolveServiceReferences(c.cli, c.ctx)); err != nil {
+	// resolve service references before building env vars
+	if err := component.ResolveServiceReferences(c.cli, c.ctx, c.component); err != nil {
 		return nil, err
 	}
 

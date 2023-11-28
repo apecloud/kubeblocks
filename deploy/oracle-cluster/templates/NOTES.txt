@@ -1,3 +1,0 @@
-KubeBlocks Oracle 19.3.0-ee cluster helm chart.
-
-Using `kubectl port-forward services/<service-name> 1521:1521 && sqlplus sys/$ORACLE_PWD@//localhost:1521/$ORACLE_SID as sysdba` or `kbcli cluster connect <cluster-name>` to connect with Oracle cluster.

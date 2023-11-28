@@ -34,7 +34,6 @@ type configOperator struct {
 
 func NewConfigReconcileTask(resourceCtx *intctrlutil.ResourceCtx,
 	cluster *appsv1alpha1.Cluster,
-	clusterVersion *appsv1alpha1.ClusterVersion,
 	component *component.SynthesizedComponent,
 	podSpec *corev1.PodSpec,
 	localObjs []client.Object,
@@ -43,7 +42,6 @@ func NewConfigReconcileTask(resourceCtx *intctrlutil.ResourceCtx,
 		ReconcileCtx{
 			ResourceCtx: resourceCtx,
 			Cluster:     cluster,
-			ClusterVer:  clusterVersion,
 			Component:   component,
 			PodSpec:     podSpec,
 			Cache:       localObjs,

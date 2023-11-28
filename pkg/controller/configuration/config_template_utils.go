@@ -174,7 +174,6 @@ func builtinObjects(builder *configTemplateBuilder) map[string]any {
 		builtinComponentObject:         builder.component,
 		builtinPodObject:               builder.podSpec,
 		builtinComponentResourceObject: builder.componentValues.Resource,
-		builtinClusterVersionObject:    builder.clusterVersion,
 		builtinClusterDomainObject:     viper.GetString(constant.KubernetesClusterDomainEnv),
 	}
 }

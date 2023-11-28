@@ -60,58 +60,58 @@ const (
 )
 
 // BuildRSM builds a ReplicatedStateMachine object based on Cluster, SynthesizedComponent.
-func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
-	commonLabels := constant.GetKBWellKnownLabelsWithCompDef(synthesizeComp.CompDefName, cluster.Name, synthesizeComp.Name)
+func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
+	labels := constant.GetKBWellKnownLabelsWithCompDef(synthesizedComp.CompDefName, cluster.Name, synthesizedComp.Name)
 
 	// TODO(xingran): Need to review how to set pod labels based on the new ComponentDefinition API. workloadType label has been removed.
 	podBuilder := builder.NewPodBuilder("", "").
-		AddLabelsInMap(commonLabels).
-		AddLabelsInMap(constant.GetComponentDefLabel(synthesizeComp.CompDefName)).
-		AddLabelsInMap(constant.GetAppVersionLabel(synthesizeComp.CompDefName))
-
+		AddLabelsInMap(labels).
+		AddLabelsInMap(constant.GetComponentDefLabel(synthesizedComp.CompDefName)).
+		AddLabelsInMap(constant.GetAppVersionLabel(synthesizedComp.CompDefName))
 	template := corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
-		Spec:       *synthesizeComp.PodSpec.DeepCopy(),
+		Spec:       *synthesizedComp.PodSpec.DeepCopy(),
 	}
 
-	monitorAnnotations := getMonitorAnnotations(synthesizeComp)
-	rsmName := constant.GenerateRSMNamePattern(cluster.Name, synthesizeComp.Name)
+	rsmName := constant.GenerateRSMNamePattern(cluster.Name, synthesizedComp.Name)
 	rsmBuilder := builder.NewReplicatedStateMachineBuilder(cluster.Namespace, rsmName).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
-		AddAnnotationsInMap(monitorAnnotations).
-		AddLabelsInMap(commonLabels).
-		AddLabelsInMap(constant.GetComponentDefLabel(synthesizeComp.CompDefName)).
-		AddMatchLabelsInMap(commonLabels).
+		AddAnnotationsInMap(getMonitorAnnotations(synthesizedComp)).
+		AddLabelsInMap(labels).
+		AddLabelsInMap(constant.GetComponentDefLabel(synthesizedComp.CompDefName)).
+		AddMatchLabelsInMap(labels).
 		SetServiceName(constant.GenerateRSMServiceNamePattern(rsmName)).
-		SetReplicas(synthesizeComp.Replicas).
+		SetReplicas(synthesizedComp.Replicas).
 		SetTemplate(template)
 
 	var vcts []corev1.PersistentVolumeClaim
-	for _, vct := range synthesizeComp.VolumeClaimTemplates {
+	for _, vct := range synthesizedComp.VolumeClaimTemplates {
 		vcts = append(vcts, vctToPVC(vct))
 	}
 	rsmBuilder.SetVolumeClaimTemplates(vcts...)
 
 	// convert componentDef attributes to rsm attributes. including service, credential, roles, roleProbe, membershipReconfiguration, memberUpdateStrategy, etc.
-	convertedRSM, err := component.BuildRSMFrom(cluster, synthesizeComp, rsmBuilder.GetObject())
+	rsmObj, err := component.BuildRSMFrom(cluster, synthesizedComp, rsmBuilder.GetObject())
 	if err != nil {
 		return nil, err
 	}
 
 	// update sts.spec.volumeClaimTemplates[].metadata.labels
-	// TODO(xingran): synthesizeComp.VolumeTypes has been removed, and the following code needs to be refactored.
-	if len(convertedRSM.Spec.VolumeClaimTemplates) > 0 && len(convertedRSM.GetLabels()) > 0 {
-		for index, vct := range convertedRSM.Spec.VolumeClaimTemplates {
-			BuildPersistentVolumeClaimLabels(synthesizeComp, &vct, vct.Name)
-			convertedRSM.Spec.VolumeClaimTemplates[index] = vct
+	// TODO(xingran): synthesizedComp.VolumeTypes has been removed, and the following code needs to be refactored.
+	if len(rsmObj.Spec.VolumeClaimTemplates) > 0 && len(rsmObj.GetLabels()) > 0 {
+		for index, vct := range rsmObj.Spec.VolumeClaimTemplates {
+			BuildPersistentVolumeClaimLabels(synthesizedComp, &vct, vct.Name)
+			rsmObj.Spec.VolumeClaimTemplates[index] = vct
 		}
 	}
 
-	if err := processContainersInjection(cluster, synthesizeComp, &convertedRSM.Spec.Template.Spec); err != nil {
+	if err = buildTemplatePodSpecEnv(cluster, synthesizedComp, rsmObj); err != nil {
 		return nil, err
 	}
 
-	return convertedRSM, nil
+	setDefaultResourceLimits(rsmObj)
+
+	return rsmObj, nil
 }
 
 func vctToPVC(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
@@ -122,47 +122,92 @@ func vctToPVC(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeC
 }
 
 // getMonitorAnnotations returns the annotations for the monitor.
-func getMonitorAnnotations(synthesizeComp *component.SynthesizedComponent) map[string]string {
+func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent) map[string]string {
 	annotations := make(map[string]string, 0)
 	falseStr := "false"
 	trueStr := "true"
 	switch {
-	case !synthesizeComp.Monitor.Enable:
+	case !synthesizedComp.Monitor.Enable:
 		annotations["monitor.kubeblocks.io/scrape"] = falseStr
 		annotations["monitor.kubeblocks.io/agamotto"] = falseStr
-	case synthesizeComp.Monitor.BuiltIn:
+	case synthesizedComp.Monitor.BuiltIn:
 		annotations["monitor.kubeblocks.io/scrape"] = falseStr
 		annotations["monitor.kubeblocks.io/agamotto"] = trueStr
 	default:
 		annotations["monitor.kubeblocks.io/scrape"] = trueStr
-		annotations["monitor.kubeblocks.io/path"] = synthesizeComp.Monitor.ScrapePath
-		annotations["monitor.kubeblocks.io/port"] = strconv.Itoa(int(synthesizeComp.Monitor.ScrapePort))
+		annotations["monitor.kubeblocks.io/path"] = synthesizedComp.Monitor.ScrapePath
+		annotations["monitor.kubeblocks.io/port"] = strconv.Itoa(int(synthesizedComp.Monitor.ScrapePort))
 		annotations["monitor.kubeblocks.io/scheme"] = "http"
 		annotations["monitor.kubeblocks.io/agamotto"] = falseStr
 	}
 	return rsm.AddAnnotationScope(rsm.HeadlessServiceScope, annotations)
 }
 
-func processContainersInjection(cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent,
-	podSpec *corev1.PodSpec) error {
+func buildTemplatePodSpecEnv(cluster *appsv1alpha1.Cluster,
+	synthesizedComp *component.SynthesizedComponent, rsm *workloads.ReplicatedStateMachine) error {
+	envVars, err := buildTemplateEnvVars(cluster, synthesizedComp)
+	if err != nil {
+		return err
+	}
 	for _, cc := range []*[]corev1.Container{
-		&podSpec.Containers,
-		&podSpec.InitContainers,
+		&rsm.Spec.Template.Spec.Containers,
+		&rsm.Spec.Template.Spec.InitContainers,
 	} {
 		for i := range *cc {
-			if err := injectEnvs(cluster, component, &(*cc)[i]); err != nil {
-				return err
+			// have injected variables placed at the front of the slice
+			c := &(*cc)[i]
+			if c.Env == nil {
+				c.Env = envVars
+			} else {
+				c.Env = append(envVars, c.Env...)
 			}
-			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&(*cc)[i])
 		}
 	}
 	return nil
 }
 
-func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, c *corev1.Container) error {
+func buildTemplateContainerEnv(cluster *appsv1alpha1.Cluster,
+	synthesizedComp *component.SynthesizedComponent, c *corev1.Container) error {
+	envVars, err := buildTemplateEnvVars(cluster, synthesizedComp)
+	if err != nil {
+		return err
+	}
+	if c.Env == nil {
+		c.Env = envVars
+	} else {
+		c.Env = append(envVars, c.Env...)
+	}
+	return nil
+}
+
+func buildTemplateEnvVars(cluster *appsv1alpha1.Cluster,
+	synthesizedComp *component.SynthesizedComponent) ([]corev1.EnvVar, error) {
+	envVars := buildDefaultEnvWithFieldRef()
+	envVars = append(envVars, buildDefaultEnvWithValue(cluster, synthesizedComp)...)
+
+	envVars = append(envVars, buildEnv4TLS(cluster, synthesizedComp)...)
+
+	udeVars, err := buildEnv4UserDefined(cluster, synthesizedComp)
+	if err != nil {
+		return nil, err
+	}
+	envVars = append(envVars, udeVars...)
+
+	envVars = append(envVars, buildEnv4CompRef(cluster, synthesizedComp)...)
+
+	objRefVars, err := buildEnv4ClusterObjectRef(cluster, synthesizedComp)
+	if err != nil {
+		return nil, err
+	}
+	envVars = append(envVars, objRefVars...)
+
+	return envVars, nil
+}
+
+func buildDefaultEnvWithFieldRef() []corev1.EnvVar {
+	vars := make([]corev1.EnvVar, 0)
 	// can not use map, it is unordered
-	envFieldPathSlice := []struct {
+	namedFields := []struct {
 		name      string
 		fieldPath string
 	}{
@@ -179,10 +224,8 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 		{name: "KB_PODIP", fieldPath: "status.podIP"},
 		{name: "KB_PODIPS", fieldPath: "status.podIPs"},
 	}
-
-	toInjectEnvs := make([]corev1.EnvVar, 0, len(envFieldPathSlice)+len(c.Env))
-	for _, v := range envFieldPathSlice {
-		toInjectEnvs = append(toInjectEnvs, corev1.EnvVar{
+	for _, v := range namedFields {
+		vars = append(vars, corev1.EnvVar{
 			Name: v.name,
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
@@ -192,66 +235,81 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 			},
 		})
 	}
+	return vars
+}
 
+func buildDefaultEnvWithValue(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) []corev1.EnvVar {
 	var kbClusterPostfix8 string
 	if len(cluster.UID) > 8 {
 		kbClusterPostfix8 = string(cluster.UID)[len(cluster.UID)-8:]
 	} else {
 		kbClusterPostfix8 = string(cluster.UID)
 	}
-	toInjectEnvs = append(toInjectEnvs, []corev1.EnvVar{
+	return []corev1.EnvVar{
 		{Name: "KB_CLUSTER_NAME", Value: cluster.Name},
-		{Name: "KB_COMP_NAME", Value: component.Name},
-		{Name: "KB_CLUSTER_COMP_NAME", Value: cluster.Name + "-" + component.Name},
+		{Name: "KB_COMP_NAME", Value: synthesizedComp.Name},
+		{Name: "KB_CLUSTER_COMP_NAME", Value: cluster.Name + "-" + synthesizedComp.Name},
 		{Name: "KB_CLUSTER_UID_POSTFIX_8", Value: kbClusterPostfix8},
-		{Name: "KB_POD_FQDN", Value: fmt.Sprintf("%s.%s-headless.%s.svc", "$(KB_POD_NAME)",
-			"$(KB_CLUSTER_COMP_NAME)", "$(KB_NAMESPACE)")},
-	}...)
+		{Name: "KB_POD_FQDN", Value: fmt.Sprintf("%s.%s-headless.%s.svc", "$(KB_POD_NAME)", "$(KB_CLUSTER_COMP_NAME)", "$(KB_NAMESPACE)")},
+	}
+}
 
-	if component.TLSConfig != nil && component.TLSConfig.Enable {
-		toInjectEnvs = append(toInjectEnvs, []corev1.EnvVar{
-			{Name: "KB_TLS_CERT_PATH", Value: MountPath},
-			{Name: "KB_TLS_CA_FILE", Value: CAName},
-			{Name: "KB_TLS_CERT_FILE", Value: CertName},
-			{Name: "KB_TLS_KEY_FILE", Value: KeyName},
-		}...)
+func buildEnv4TLS(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) []corev1.EnvVar {
+	if synthesizedComp.TLSConfig == nil || !synthesizedComp.TLSConfig.Enable {
+		return []corev1.EnvVar{}
+	}
+	return []corev1.EnvVar{
+		{Name: "KB_TLS_CERT_PATH", Value: MountPath},
+		{Name: "KB_TLS_CA_FILE", Value: CAName},
+		{Name: "KB_TLS_CERT_FILE", Value: CertName},
+		{Name: "KB_TLS_KEY_FILE", Value: KeyName},
+	}
+}
+
+func buildEnv4UserDefined(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) ([]corev1.EnvVar, error) {
+	vars := make([]corev1.EnvVar, 0)
+	str, ok := cluster.Annotations[constant.ExtraEnvAnnotationKey]
+	if !ok {
+		return vars, nil
 	}
 
-	if udeValue, ok := cluster.Annotations[constant.ExtraEnvAnnotationKey]; ok {
-		udeMap := make(map[string]string)
-		if err := json.Unmarshal([]byte(udeValue), &udeMap); err != nil {
-			return err
-		}
-		keys := make([]string, 0)
-		for k := range udeMap {
-			if k == "" || udeMap[k] == "" {
-				continue
-			}
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, k := range keys {
-			toInjectEnvs = append(toInjectEnvs, corev1.EnvVar{
-				Name:  k,
-				Value: udeMap[k],
-			})
-		}
+	udeMap := make(map[string]string)
+	if err := json.Unmarshal([]byte(str), &udeMap); err != nil {
+		return nil, err
 	}
+	keys := make([]string, 0)
+	for k := range udeMap {
+		if k == "" || udeMap[k] == "" {
+			continue
+		}
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
 
-	// build env from componentRefEnv
-	if component.ComponentRefEnvs != nil {
-		for _, env := range component.ComponentRefEnvs {
-			toInjectEnvs = append(toInjectEnvs, *env)
+	for _, k := range keys {
+		vars = append(vars, corev1.EnvVar{Name: k, Value: udeMap[k]})
+	}
+	return vars, nil
+}
+
+func buildEnv4CompRef(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) []corev1.EnvVar {
+	vars := make([]corev1.EnvVar, 0)
+	for _, env := range synthesizedComp.ComponentRefEnvs {
+		vars = append(vars, *env)
+	}
+	return vars
+}
+
+func buildEnv4ClusterObjectRef(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) ([]corev1.EnvVar, error) {
+	return []corev1.EnvVar{}, nil
+}
+
+func setDefaultResourceLimits(rsm *workloads.ReplicatedStateMachine) {
+	for _, cc := range []*[]corev1.Container{&rsm.Spec.Template.Spec.Containers, &rsm.Spec.Template.Spec.InitContainers} {
+		for i := range *cc {
+			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&(*cc)[i])
 		}
 	}
-
-	// have injected variables placed at the front of the slice
-	if len(c.Env) == 0 {
-		c.Env = toInjectEnvs
-	} else {
-		c.Env = append(toInjectEnvs, c.Env...)
-	}
-	return nil
 }
 
 // BuildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels from sts to pvc.
@@ -546,7 +604,7 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams,
 		})
 	}
 	container := containerBuilder.GetObject()
-	if err := injectEnvs(sidecarRenderedParam.Cluster, component, container); err != nil {
+	if err := buildTemplateContainerEnv(sidecarRenderedParam.Cluster, component, container); err != nil {
 		return nil, err
 	}
 	intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
@@ -585,7 +643,7 @@ func BuildRestoreJob(cluster *appsv1alpha1.Cluster, synthesizedComponent *compon
 		GetObject()
 	containers := job.Spec.Template.Spec.Containers
 	if len(containers) > 0 {
-		if err := injectEnvs(cluster, synthesizedComponent, &containers[0]); err != nil {
+		if err := buildTemplateContainerEnv(cluster, synthesizedComponent, &containers[0]); err != nil {
 			return nil, err
 		}
 		intctrlutil.InjectZeroResourcesLimitsIfEmpty(&containers[0])
@@ -613,7 +671,7 @@ func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildPa
 	}
 	for i := range toolContainers {
 		container := &toolContainers[i]
-		if err := injectEnvs(sidecarRenderedParam.Cluster, component, container); err != nil {
+		if err := buildTemplateContainerEnv(sidecarRenderedParam.Cluster, component, container); err != nil {
 			return nil, err
 		}
 		intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)

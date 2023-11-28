@@ -51,14 +51,6 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-const (
-	VolumeName = "tls"
-	CAName     = "ca.crt"
-	CertName   = "tls.crt"
-	KeyName    = "tls.key"
-	MountPath  = "/etc/pki/tls"
-)
-
 // BuildRSM builds a ReplicatedStateMachine object based on Cluster, SynthesizedComponent.
 func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
 	labels := constant.GetKBWellKnownLabelsWithCompDef(synthesizedComp.CompDefName, cluster.Name, synthesizedComp.Name)
@@ -259,10 +251,10 @@ func buildEnv4TLS(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synt
 		return []corev1.EnvVar{}
 	}
 	return []corev1.EnvVar{
-		{Name: "KB_TLS_CERT_PATH", Value: MountPath},
-		{Name: "KB_TLS_CA_FILE", Value: CAName},
-		{Name: "KB_TLS_CERT_FILE", Value: CertName},
-		{Name: "KB_TLS_KEY_FILE", Value: KeyName},
+		{Name: "KB_TLS_CERT_PATH", Value: constant.MountPath},
+		{Name: "KB_TLS_CA_FILE", Value: constant.CAName},
+		{Name: "KB_TLS_CERT_FILE", Value: constant.CertName},
+		{Name: "KB_TLS_KEY_FILE", Value: constant.KeyName},
 	}
 }
 

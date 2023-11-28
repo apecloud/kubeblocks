@@ -54,7 +54,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -1221,29 +1220,29 @@ var _ = Describe("Component Controller", func() {
 			Name:      plan.GenerateTLSSecretName(clusterObj.Name, compName),
 		}
 		Eventually(testapps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKey(factory.CAName))
-			g.Expect(secret.Data).Should(HaveKey(factory.CertName))
-			g.Expect(secret.Data).Should(HaveKey(factory.KeyName))
+			g.Expect(secret.Data).Should(HaveKey(constant.CAName))
+			g.Expect(secret.Data).Should(HaveKey(constant.CertName))
+			g.Expect(secret.Data).Should(HaveKey(constant.KeyName))
 		})).Should(Succeed())
 
 		By("check pod's volumes and mounts")
 		targetVolume := corev1.Volume{
-			Name: factory.VolumeName,
+			Name: constant.VolumeName,
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: secretKey.Name,
 					Items: []corev1.KeyToPath{
-						{Key: factory.CAName, Path: factory.CAName},
-						{Key: factory.CertName, Path: factory.CertName},
-						{Key: factory.KeyName, Path: factory.KeyName},
+						{Key: constant.CAName, Path: constant.CAName},
+						{Key: constant.CertName, Path: constant.CertName},
+						{Key: constant.KeyName, Path: constant.KeyName},
 					},
 					Optional: func() *bool { o := false; return &o }(),
 				},
 			},
 		}
 		targetVolumeMount := corev1.VolumeMount{
-			Name:      factory.VolumeName,
-			MountPath: factory.MountPath,
+			Name:      constant.VolumeName,
+			MountPath: constant.MountPath,
 			ReadOnly:  true,
 		}
 		rsmKey := types.NamespacedName{

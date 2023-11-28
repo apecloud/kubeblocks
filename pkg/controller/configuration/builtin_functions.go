@@ -27,8 +27,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/gotemplate"
 )
@@ -279,17 +279,17 @@ func getPVCSize(args interface{}) (int64, error) {
 
 // getCAFile gets CA file
 func getCAFile() string {
-	return factory.MountPath + "/" + factory.CAName
+	return constant.MountPath + "/" + constant.CAName
 }
 
 // getCertFile gets cert file
 func getCertFile() string {
-	return factory.MountPath + "/" + factory.CertName
+	return constant.MountPath + "/" + constant.CertName
 }
 
 // getKeyFile gets key file
 func getKeyFile() string {
-	return factory.MountPath + "/" + factory.KeyName
+	return constant.MountPath + "/" + constant.KeyName
 }
 
 // BuiltInCustomFunctions builds a map of customized functions for KubeBlocks

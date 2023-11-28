@@ -215,7 +215,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	// TODO(xingran): This is a temporary solution used to reference component connection credentials defined in ComponentDefinition. it will be refactored in the future.
 	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForCompConnCredential(synthesizeComp.ClusterName, synthesizeComp.Name))
 
-	if err = buildPodSpecEnvVars(reqCtx.Ctx, cli, synthesizeComp); err != nil {
+	if err = buildTemplatePodSpecEnv(reqCtx.Ctx, cli, synthesizeComp); err != nil {
 		return nil, err
 	}
 

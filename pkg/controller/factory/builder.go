@@ -25,13 +25,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -98,9 +96,9 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synthesi
 	}
 
 	// TODO: move env building out of here.
-	if err = buildTemplatePodSpecEnv(cluster, synthesizedComp, rsmObj); err != nil {
-		return nil, err
-	}
+	// if err = buildTemplatePodSpecEnv(cluster, synthesizedComp, rsmObj); err != nil {
+	//	return nil, err
+	// }
 
 	setDefaultResourceLimits(rsmObj)
 
@@ -136,156 +134,156 @@ func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent) map[
 	return rsm.AddAnnotationScope(rsm.HeadlessServiceScope, annotations)
 }
 
-func buildTemplatePodSpecEnv(cluster *appsv1alpha1.Cluster,
-	synthesizedComp *component.SynthesizedComponent, rsm *workloads.ReplicatedStateMachine) error {
-	envVars, err := buildTemplateEnvVars(cluster, synthesizedComp)
-	if err != nil {
-		return err
-	}
-	for _, cc := range []*[]corev1.Container{
-		&rsm.Spec.Template.Spec.Containers,
-		&rsm.Spec.Template.Spec.InitContainers,
-	} {
-		for i := range *cc {
-			// have injected variables placed at the front of the slice
-			c := &(*cc)[i]
-			if c.Env == nil {
-				c.Env = envVars
-			} else {
-				c.Env = append(envVars, c.Env...)
-			}
-		}
-	}
-	return nil
-}
+// func buildTemplatePodSpecEnv(cluster *appsv1alpha1.Cluster,
+//	synthesizedComp *component.SynthesizedComponent, rsm *workloads.ReplicatedStateMachine) error {
+//	envVars, err := buildTemplateEnvVars(cluster, synthesizedComp)
+//	if err != nil {
+//		return err
+//	}
+//	for _, cc := range []*[]corev1.Container{
+//		&rsm.Spec.Template.Spec.Containers,
+//		&rsm.Spec.Template.Spec.InitContainers,
+//	} {
+//		for i := range *cc {
+//			// have injected variables placed at the front of the slice
+//			c := &(*cc)[i]
+//			if c.Env == nil {
+//				c.Env = envVars
+//			} else {
+//				c.Env = append(envVars, c.Env...)
+//			}
+//		}
+//	}
+//	return nil
+// }
 
-func buildTemplateContainerEnv(cluster *appsv1alpha1.Cluster,
-	synthesizedComp *component.SynthesizedComponent, c *corev1.Container) error {
-	envVars, err := buildTemplateEnvVars(cluster, synthesizedComp)
-	if err != nil {
-		return err
-	}
-	if c.Env == nil {
-		c.Env = envVars
-	} else {
-		c.Env = append(envVars, c.Env...)
-	}
-	return nil
-}
+// func buildTemplateContainerEnv(cluster *appsv1alpha1.Cluster,
+//	synthesizedComp *component.SynthesizedComponent, c *corev1.Container) error {
+//	envVars, err := buildTemplateEnvVars(cluster, synthesizedComp)
+//	if err != nil {
+//		return err
+//	}
+//	if c.Env == nil {
+//		c.Env = envVars
+//	} else {
+//		c.Env = append(envVars, c.Env...)
+//	}
+//	return nil
+// }
 
-func buildTemplateEnvVars(cluster *appsv1alpha1.Cluster,
-	synthesizedComp *component.SynthesizedComponent) ([]corev1.EnvVar, error) {
-	envVars := buildDefaultEnvWithFieldRef()
-	envVars = append(envVars, buildDefaultEnvWithValue(cluster, synthesizedComp)...)
+// func buildTemplateEnvVars(cluster *appsv1alpha1.Cluster,
+//	synthesizedComp *component.SynthesizedComponent) ([]corev1.EnvVar, error) {
+//	envVars := buildDefaultEnvWithFieldRef()
+//	envVars = append(envVars, buildDefaultEnvWithValue(cluster, synthesizedComp)...)
+//
+//	envVars = append(envVars, buildEnv4TLS(cluster, synthesizedComp)...)
+//
+//	udeVars, err := buildEnv4UserDefined(cluster, synthesizedComp)
+//	if err != nil {
+//		return nil, err
+//	}
+//	envVars = append(envVars, udeVars...)
+//
+//	envVars = append(envVars, buildEnv4CompRef(cluster, synthesizedComp)...)
+//
+//	return envVars, nil
+// }
 
-	envVars = append(envVars, buildEnv4TLS(cluster, synthesizedComp)...)
-
-	udeVars, err := buildEnv4UserDefined(cluster, synthesizedComp)
-	if err != nil {
-		return nil, err
-	}
-	envVars = append(envVars, udeVars...)
-
-	envVars = append(envVars, buildEnv4CompRef(cluster, synthesizedComp)...)
-
-	return envVars, nil
-}
-
-func buildDefaultEnvWithFieldRef() []corev1.EnvVar {
-	vars := make([]corev1.EnvVar, 0)
-	// can not use map, it is unordered
-	namedFields := []struct {
-		name      string
-		fieldPath string
-	}{
-		{name: constant.KBEnvNamespace, fieldPath: "metadata.namespace"},
-		{name: constant.KBEnvPodName, fieldPath: "metadata.name"},
-		{name: constant.KBEnvPodUID, fieldPath: "metadata.uid"},
-		{name: constant.KBEnvPodIP, fieldPath: "status.podIP"},
-		{name: constant.KBEnvPodIPs, fieldPath: "status.podIPs"},
-		{name: constant.KBEnvNodeName, fieldPath: "spec.nodeName"},
-		{name: constant.KBEnvHostIP, fieldPath: "status.hostIP"},
-		{name: "KB_SA_NAME", fieldPath: "spec.serviceAccountName"},
-		// TODO: need to deprecate following
-		{name: "KB_HOSTIP", fieldPath: "status.hostIP"},
-		{name: "KB_PODIP", fieldPath: "status.podIP"},
-		{name: "KB_PODIPS", fieldPath: "status.podIPs"},
-	}
-	for _, v := range namedFields {
-		vars = append(vars, corev1.EnvVar{
-			Name: v.name,
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  v.fieldPath,
-				},
-			},
-		})
-	}
-	return vars
-}
-
-func buildDefaultEnvWithValue(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) []corev1.EnvVar {
-	var kbClusterPostfix8 string
-	if len(cluster.UID) > 8 {
-		kbClusterPostfix8 = string(cluster.UID)[len(cluster.UID)-8:]
-	} else {
-		kbClusterPostfix8 = string(cluster.UID)
-	}
-	return []corev1.EnvVar{
-		{Name: "KB_CLUSTER_NAME", Value: cluster.Name},
-		{Name: "KB_COMP_NAME", Value: synthesizedComp.Name},
-		{Name: "KB_CLUSTER_COMP_NAME", Value: cluster.Name + "-" + synthesizedComp.Name},
-		{Name: "KB_CLUSTER_UID_POSTFIX_8", Value: kbClusterPostfix8},
-		{Name: "KB_POD_FQDN", Value: fmt.Sprintf("%s.%s-headless.%s.svc", "$(KB_POD_NAME)", "$(KB_CLUSTER_COMP_NAME)", "$(KB_NAMESPACE)")},
-	}
-}
-
-func buildEnv4TLS(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) []corev1.EnvVar {
-	if synthesizedComp.TLSConfig == nil || !synthesizedComp.TLSConfig.Enable {
-		return []corev1.EnvVar{}
-	}
-	return []corev1.EnvVar{
-		{Name: "KB_TLS_CERT_PATH", Value: constant.MountPath},
-		{Name: "KB_TLS_CA_FILE", Value: constant.CAName},
-		{Name: "KB_TLS_CERT_FILE", Value: constant.CertName},
-		{Name: "KB_TLS_KEY_FILE", Value: constant.KeyName},
-	}
-}
-
-func buildEnv4UserDefined(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) ([]corev1.EnvVar, error) {
-	vars := make([]corev1.EnvVar, 0)
-	str, ok := cluster.Annotations[constant.ExtraEnvAnnotationKey]
-	if !ok {
-		return vars, nil
-	}
-
-	udeMap := make(map[string]string)
-	if err := json.Unmarshal([]byte(str), &udeMap); err != nil {
-		return nil, err
-	}
-	keys := make([]string, 0)
-	for k := range udeMap {
-		if k == "" || udeMap[k] == "" {
-			continue
-		}
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	for _, k := range keys {
-		vars = append(vars, corev1.EnvVar{Name: k, Value: udeMap[k]})
-	}
-	return vars, nil
-}
-
-func buildEnv4CompRef(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) []corev1.EnvVar {
-	vars := make([]corev1.EnvVar, 0)
-	for _, env := range synthesizedComp.ComponentRefEnvs {
-		vars = append(vars, *env)
-	}
-	return vars
-}
+// func buildDefaultEnvWithFieldRef() []corev1.EnvVar {
+//	vars := make([]corev1.EnvVar, 0)
+//	// can not use map, it is unordered
+//	namedFields := []struct {
+//		name      string
+//		fieldPath string
+//	}{
+//		{name: constant.KBEnvNamespace, fieldPath: "metadata.namespace"},
+//		{name: constant.KBEnvPodName, fieldPath: "metadata.name"},
+//		{name: constant.KBEnvPodUID, fieldPath: "metadata.uid"},
+//		{name: constant.KBEnvPodIP, fieldPath: "status.podIP"},
+//		{name: constant.KBEnvPodIPs, fieldPath: "status.podIPs"},
+//		{name: constant.KBEnvNodeName, fieldPath: "spec.nodeName"},
+//		{name: constant.KBEnvHostIP, fieldPath: "status.hostIP"},
+//		{name: "KB_SA_NAME", fieldPath: "spec.serviceAccountName"},
+//		// TODO: need to deprecate following
+//		{name: "KB_HOSTIP", fieldPath: "status.hostIP"},
+//		{name: "KB_PODIP", fieldPath: "status.podIP"},
+//		{name: "KB_PODIPS", fieldPath: "status.podIPs"},
+//	}
+//	for _, v := range namedFields {
+//		vars = append(vars, corev1.EnvVar{
+//			Name: v.name,
+//			ValueFrom: &corev1.EnvVarSource{
+//				FieldRef: &corev1.ObjectFieldSelector{
+//					APIVersion: "v1",
+//					FieldPath:  v.fieldPath,
+//				},
+//			},
+//		})
+//	}
+//	return vars
+// }
+//
+// func buildDefaultEnvWithValue(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) []corev1.EnvVar {
+//	var kbClusterPostfix8 string
+//	if len(cluster.UID) > 8 {
+//		kbClusterPostfix8 = string(cluster.UID)[len(cluster.UID)-8:]
+//	} else {
+//		kbClusterPostfix8 = string(cluster.UID)
+//	}
+//	return []corev1.EnvVar{
+//		{Name: "KB_CLUSTER_NAME", Value: cluster.Name},
+//		{Name: "KB_COMP_NAME", Value: synthesizedComp.Name},
+//		{Name: "KB_CLUSTER_COMP_NAME", Value: cluster.Name + "-" + synthesizedComp.Name},
+//		{Name: "KB_CLUSTER_UID_POSTFIX_8", Value: kbClusterPostfix8},
+//		{Name: "KB_POD_FQDN", Value: fmt.Sprintf("%s.%s-headless.%s.svc", "$(KB_POD_NAME)", "$(KB_CLUSTER_COMP_NAME)", "$(KB_NAMESPACE)")},
+//	}
+// }
+//
+// func buildEnv4TLS(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) []corev1.EnvVar {
+//	if synthesizedComp.TLSConfig == nil || !synthesizedComp.TLSConfig.Enable {
+//		return []corev1.EnvVar{}
+//	}
+//	return []corev1.EnvVar{
+//		{Name: "KB_TLS_CERT_PATH", Value: constant.MountPath},
+//		{Name: "KB_TLS_CA_FILE", Value: constant.CAName},
+//		{Name: "KB_TLS_CERT_FILE", Value: constant.CertName},
+//		{Name: "KB_TLS_KEY_FILE", Value: constant.KeyName},
+//	}
+// }
+//
+// func buildEnv4UserDefined(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) ([]corev1.EnvVar, error) {
+//	vars := make([]corev1.EnvVar, 0)
+//	str, ok := cluster.Annotations[constant.ExtraEnvAnnotationKey]
+//	if !ok {
+//		return vars, nil
+//	}
+//
+//	udeMap := make(map[string]string)
+//	if err := json.Unmarshal([]byte(str), &udeMap); err != nil {
+//		return nil, err
+//	}
+//	keys := make([]string, 0)
+//	for k := range udeMap {
+//		if k == "" || udeMap[k] == "" {
+//			continue
+//		}
+//		keys = append(keys, k)
+//	}
+//	sort.Strings(keys)
+//
+//	for _, k := range keys {
+//		vars = append(vars, corev1.EnvVar{Name: k, Value: udeMap[k]})
+//	}
+//	return vars, nil
+// }
+//
+// func buildEnv4CompRef(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) []corev1.EnvVar {
+//	vars := make([]corev1.EnvVar, 0)
+//	for _, env := range synthesizedComp.ComponentRefEnvs {
+//		vars = append(vars, *env)
+//	}
+//	return vars
+// }
 
 func setDefaultResourceLimits(rsm *workloads.ReplicatedStateMachine) {
 	for _, cc := range []*[]corev1.Container{&rsm.Spec.Template.Spec.Containers, &rsm.Spec.Template.Spec.InitContainers} {
@@ -587,57 +585,12 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams,
 		})
 	}
 	container := containerBuilder.GetObject()
-	if err := buildTemplateContainerEnv(sidecarRenderedParam.Cluster, component, container); err != nil {
-		return nil, err
-	}
-	intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
+	// TODO: remove this, env and default resource limits will be set at building RSM.
+	// if err := buildTemplateContainerEnv(sidecarRenderedParam.Cluster, component, container); err != nil {
+	//	return nil, err
+	// }
+	// intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
 	return container, nil
-}
-
-func BuildRestoreJob(cluster *appsv1alpha1.Cluster, synthesizedComponent *component.SynthesizedComponent, name, image string, command []string,
-	volumes []corev1.Volume, volumeMounts []corev1.VolumeMount, env []corev1.EnvVar, resources *corev1.ResourceRequirements) (*batchv1.Job, error) {
-	containerBuilder := builder.NewContainerBuilder("restore").
-		SetImage(image).
-		SetImagePullPolicy(corev1.PullIfNotPresent).
-		AddCommands(command...).
-		AddVolumeMounts(volumeMounts...).
-		AddEnv(env...)
-	if resources != nil {
-		containerBuilder.SetResources(*resources)
-	}
-	container := containerBuilder.GetObject()
-
-	ctx := corev1.PodSecurityContext{}
-	user := int64(0)
-	ctx.RunAsUser = &user
-	pod := builder.NewPodBuilder(cluster.Namespace, "").
-		AddContainer(*container).
-		AddVolumes(volumes...).
-		SetRestartPolicy(corev1.RestartPolicyOnFailure).
-		SetSecurityContext(ctx).
-		GetObject()
-	template := corev1.PodTemplateSpec{
-		Spec: pod.Spec,
-	}
-
-	job := builder.NewJobBuilder(cluster.Namespace, name).
-		AddLabels(constant.AppManagedByLabelKey, constant.AppName).
-		SetPodTemplateSpec(template).
-		GetObject()
-	containers := job.Spec.Template.Spec.Containers
-	if len(containers) > 0 {
-		if err := buildTemplateContainerEnv(cluster, synthesizedComponent, &containers[0]); err != nil {
-			return nil, err
-		}
-		intctrlutil.InjectZeroResourcesLimitsIfEmpty(&containers[0])
-	}
-	compSpec := cluster.Spec.GetComponentByName(synthesizedComponent.Name)
-	tolerations, err := component.BuildTolerations(cluster, compSpec)
-	if err != nil {
-		return nil, err
-	}
-	job.Spec.Template.Spec.Tolerations = tolerations
-	return job, nil
 }
 
 func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent, toolsMetas []appsv1alpha1.ToolConfig, toolsMap map[string]cfgcm.ConfigSpecMeta) ([]corev1.Container, error) {
@@ -654,10 +607,11 @@ func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildPa
 	}
 	for i := range toolContainers {
 		container := &toolContainers[i]
-		if err := buildTemplateContainerEnv(sidecarRenderedParam.Cluster, component, container); err != nil {
-			return nil, err
-		}
-		intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
+		// TODO: remove this, env and default resource limits will be set at building RSM.
+		// if err := buildTemplateContainerEnv(sidecarRenderedParam.Cluster, component, container); err != nil {
+		//	return nil, err
+		// }
+		// intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
 		if meta, ok := toolsMap[container.Name]; ok {
 			setToolsScriptsPath(container, meta)
 		}

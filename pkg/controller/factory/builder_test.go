@@ -249,7 +249,7 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds RSM correctly", func() {
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			clusterDef, cluster, synthesizedComponent := newClusterObjs(nil)
 
 			rsm, err := BuildRSM(cluster, synthesizedComponent)
 			Expect(err).Should(BeNil())
@@ -266,10 +266,10 @@ var _ = Describe("builder", func() {
 				Should(Equal(string(appsv1alpha1.VolumeTypeData)))
 
 			By("set workload type to Replication")
-			replComponent := *synthesizedComponent
-			replComponent.Replicas = 2
-			replComponent.WorkloadType = appsv1alpha1.Replication
-			rsm, err = BuildRSM(cluster, &replComponent)
+			clusterDef.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Replication
+			cluster.Spec.ComponentSpecs[0].Replicas = 2
+			replComponent := newAllFieldsComponent(clusterDef, nil, cluster)
+			rsm, err = BuildRSM(cluster, replComponent)
 			Expect(err).Should(BeNil())
 			Expect(rsm).ShouldNot(BeNil())
 			Expect(*rsm.Spec.Replicas).Should(BeEquivalentTo(2))
@@ -302,13 +302,13 @@ var _ = Describe("builder", func() {
 			Expect(*rsm.Spec.MemberUpdateStrategy).Should(BeEquivalentTo(workloads.SerialUpdateStrategy))
 
 			By("set workload type to Consensus")
-			csComponent := *synthesizedComponent
-			csComponent.Replicas = 3
-			csComponent.WorkloadType = appsv1alpha1.Consensus
-			csComponent.CharacterType = "mysql"
-			csComponent.ConsensusSpec = appsv1alpha1.NewConsensusSetSpec()
-			csComponent.ConsensusSpec.UpdateStrategy = appsv1alpha1.BestEffortParallelStrategy
-			rsm, err = BuildRSM(cluster, &csComponent)
+			clusterDef.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Consensus
+			clusterDef.Spec.ComponentDefs[0].CharacterType = "mysql"
+			clusterDef.Spec.ComponentDefs[0].ConsensusSpec = appsv1alpha1.NewConsensusSetSpec()
+			clusterDef.Spec.ComponentDefs[0].ConsensusSpec.UpdateStrategy = appsv1alpha1.BestEffortParallelStrategy
+			cluster.Spec.ComponentSpecs[0].Replicas = 3
+			csComponent := newAllFieldsComponent(clusterDef, nil, cluster)
+			rsm, err = BuildRSM(cluster, csComponent)
 			Expect(err).Should(BeNil())
 			Expect(rsm).ShouldNot(BeNil())
 

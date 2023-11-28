@@ -1,4 +1,0 @@
-Standalone Oracle cluster-definition and cluster-version in Kubeblocks
-
-Note: Oracle database requires a minimum of 2GiB of memory.
-Using `kbcli cluster create --cluster-definition oracle --set memory=4Gi` to create a Oracle cluster

@@ -7,7 +7,7 @@ metadata:
 spec:
   type: oracle
   connectionCredential:
-    username: kbadmin
+    username: sys
     password: "$(RANDOM_PASSWD)"
     endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-oracle)"
     host: "$(SVC_FQDN)"
@@ -61,6 +61,14 @@ spec:
               - name: INIT_PROCESSES
               - name: ORACLE_EDITION
                 value: "enterprise"
+            readinessProbe:
+              failureThreshold: 3
+              initialDelaySeconds: 10
+              periodSeconds: 30
+              successThreshold: 1
+              timeoutSeconds: 5
+              exec:
+                command: [ "/bin/sh", "-c", "if [ -f $ORACLE_BASE/checkDBLockStatus.sh ]; then $ORACLE_BASE/checkDBLockStatus.sh ; else $ORACLE_BASE/checkDBStatus.sh; fi " ]
         volumes:
           - name: dshm
             emptyDir:

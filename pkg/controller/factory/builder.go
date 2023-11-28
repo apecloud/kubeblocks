@@ -31,7 +31,6 @@ import (
 
 	"github.com/google/uuid"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -42,11 +41,11 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/common"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -59,6 +58,90 @@ const (
 	KeyName    = "tls.key"
 	MountPath  = "/etc/pki/tls"
 )
+
+// BuildRSM builds a ReplicatedStateMachine object based on Cluster, SynthesizedComponent.
+func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
+	commonLabels := constant.GetKBWellKnownLabelsWithCompDef(synthesizeComp.CompDefName, cluster.Name, synthesizeComp.Name)
+
+	// TODO(xingran): Need to review how to set pod labels based on the new ComponentDefinition API. workloadType label has been removed.
+	podBuilder := builder.NewPodBuilder("", "").
+		AddLabelsInMap(commonLabels).
+		AddLabelsInMap(constant.GetComponentDefLabel(synthesizeComp.CompDefName)).
+		AddLabelsInMap(constant.GetAppVersionLabel(synthesizeComp.CompDefName))
+
+	template := corev1.PodTemplateSpec{
+		ObjectMeta: podBuilder.GetObject().ObjectMeta,
+		Spec:       *synthesizeComp.PodSpec.DeepCopy(),
+	}
+
+	monitorAnnotations := getMonitorAnnotations(synthesizeComp)
+	rsmName := constant.GenerateRSMNamePattern(cluster.Name, synthesizeComp.Name)
+	rsmBuilder := builder.NewReplicatedStateMachineBuilder(cluster.Namespace, rsmName).
+		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
+		AddAnnotationsInMap(monitorAnnotations).
+		AddLabelsInMap(commonLabels).
+		AddLabelsInMap(constant.GetComponentDefLabel(synthesizeComp.CompDefName)).
+		AddMatchLabelsInMap(commonLabels).
+		SetServiceName(constant.GenerateRSMServiceNamePattern(rsmName)).
+		SetReplicas(synthesizeComp.Replicas).
+		SetTemplate(template)
+
+	var vcts []corev1.PersistentVolumeClaim
+	for _, vct := range synthesizeComp.VolumeClaimTemplates {
+		vcts = append(vcts, vctToPVC(vct))
+	}
+	rsmBuilder.SetVolumeClaimTemplates(vcts...)
+
+	// convert componentDef attributes to rsm attributes. including service, credential, roles, roleProbe, membershipReconfiguration, memberUpdateStrategy, etc.
+	convertedRSM, err := component.BuildRSMFrom(cluster, synthesizeComp, rsmBuilder.GetObject())
+	if err != nil {
+		return nil, err
+	}
+
+	// update sts.spec.volumeClaimTemplates[].metadata.labels
+	// TODO(xingran): synthesizeComp.VolumeTypes has been removed, and the following code needs to be refactored.
+	if len(convertedRSM.Spec.VolumeClaimTemplates) > 0 && len(convertedRSM.GetLabels()) > 0 {
+		for index, vct := range convertedRSM.Spec.VolumeClaimTemplates {
+			BuildPersistentVolumeClaimLabels(synthesizeComp, &vct, vct.Name)
+			convertedRSM.Spec.VolumeClaimTemplates[index] = vct
+		}
+	}
+
+	if err := processContainersInjection(cluster, synthesizeComp, &convertedRSM.Spec.Template.Spec); err != nil {
+		return nil, err
+	}
+
+	return convertedRSM, nil
+}
+
+func vctToPVC(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
+	return corev1.PersistentVolumeClaim{
+		ObjectMeta: vct.ObjectMeta,
+		Spec:       vct.Spec,
+	}
+}
+
+// getMonitorAnnotations returns the annotations for the monitor.
+func getMonitorAnnotations(synthesizeComp *component.SynthesizedComponent) map[string]string {
+	annotations := make(map[string]string, 0)
+	falseStr := "false"
+	trueStr := "true"
+	switch {
+	case !synthesizeComp.Monitor.Enable:
+		annotations["monitor.kubeblocks.io/scrape"] = falseStr
+		annotations["monitor.kubeblocks.io/agamotto"] = falseStr
+	case synthesizeComp.Monitor.BuiltIn:
+		annotations["monitor.kubeblocks.io/scrape"] = falseStr
+		annotations["monitor.kubeblocks.io/agamotto"] = trueStr
+	default:
+		annotations["monitor.kubeblocks.io/scrape"] = trueStr
+		annotations["monitor.kubeblocks.io/path"] = synthesizeComp.Monitor.ScrapePath
+		annotations["monitor.kubeblocks.io/port"] = strconv.Itoa(int(synthesizeComp.Monitor.ScrapePort))
+		annotations["monitor.kubeblocks.io/scheme"] = "http"
+		annotations["monitor.kubeblocks.io/agamotto"] = falseStr
+	}
+	return rsm.AddAnnotationScope(rsm.HeadlessServiceScope, annotations)
+}
 
 func processContainersInjection(cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
@@ -191,239 +274,6 @@ func BuildPersistentVolumeClaimLabels(component *component.SynthesizedComponent,
 			}
 		}
 	}
-}
-
-func BuildSts(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*appsv1.StatefulSet, error) {
-	vctToPVC := func(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
-		return corev1.PersistentVolumeClaim{
-			ObjectMeta: vct.ObjectMeta,
-			Spec:       vct.Spec,
-		}
-	}
-	commonLabels := constant.GetKBWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
-	podBuilder := builder.NewPodBuilder("", "").
-		AddLabelsInMap(commonLabels).
-		AddLabelsInMap(constant.GetClusterCompDefLabel(component.ClusterCompDefName)).
-		AddLabelsInMap(constant.GetWorkloadTypeLabel(string(component.WorkloadType)))
-	if len(cluster.Spec.ClusterVersionRef) > 0 {
-		podBuilder.AddLabelsInMap(constant.GetClusterVersionLabel(cluster.Spec.ClusterVersionRef))
-	}
-	template := corev1.PodTemplateSpec{
-		ObjectMeta: podBuilder.GetObject().ObjectMeta,
-		Spec:       *component.PodSpec,
-	}
-	stsBuilder := builder.NewStatefulSetBuilder(cluster.Namespace, cluster.Name+"-"+component.Name).
-		AddLabelsInMap(commonLabels).
-		AddLabelsInMap(constant.GetClusterCompDefLabel(component.ClusterCompDefName)).
-		AddMatchLabelsInMap(commonLabels).
-		SetServiceName(cluster.Name + "-" + component.Name + "-headless").
-		SetReplicas(component.Replicas).
-		SetTemplate(template)
-
-	var vcts []corev1.PersistentVolumeClaim
-	for _, vct := range component.VolumeClaimTemplates {
-		vcts = append(vcts, vctToPVC(vct))
-	}
-	stsBuilder.SetVolumeClaimTemplates(vcts...)
-
-	if component.StatefulSetWorkload != nil {
-		podManagementPolicy, updateStrategy := component.StatefulSetWorkload.FinalStsUpdateStrategy()
-		stsBuilder.SetPodManagementPolicy(podManagementPolicy).SetUpdateStrategy(updateStrategy)
-	}
-
-	sts := stsBuilder.GetObject()
-
-	// update sts.spec.volumeClaimTemplates[].metadata.labels
-	if len(sts.Spec.VolumeClaimTemplates) > 0 && len(sts.GetLabels()) > 0 {
-		for index, vct := range sts.Spec.VolumeClaimTemplates {
-			BuildPersistentVolumeClaimLabels(component, &vct, vct.Name)
-			sts.Spec.VolumeClaimTemplates[index] = vct
-		}
-	}
-
-	if err := processContainersInjection(cluster, component, &sts.Spec.Template.Spec); err != nil {
-		return nil, err
-	}
-	return sts, nil
-}
-
-func fixService(namespace, prefix string, component *component.SynthesizedComponent, alternativeServices ...corev1.Service) []corev1.Service {
-	leaderName := getLeaderName(component)
-	for i := range alternativeServices {
-		if len(alternativeServices[i].Name) > 0 {
-			alternativeServices[i].Name = prefix + "-" + alternativeServices[i].Name
-		}
-		if len(alternativeServices[i].Namespace) == 0 {
-			alternativeServices[i].Namespace = namespace
-		}
-		if alternativeServices[i].Spec.Type == corev1.ServiceTypeLoadBalancer {
-			alternativeServices[i].Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyTypeLocal
-		}
-		if len(leaderName) > 0 {
-			selector := alternativeServices[i].Spec.Selector
-			if selector == nil {
-				selector = make(map[string]string, 0)
-			}
-			selector[constant.RoleLabelKey] = leaderName
-			alternativeServices[i].Spec.Selector = selector
-		}
-	}
-	return alternativeServices
-}
-
-func getLeaderName(component *component.SynthesizedComponent) string {
-	if component == nil {
-		return ""
-	}
-	switch component.WorkloadType {
-	case appsv1alpha1.Consensus:
-		if component.ConsensusSpec != nil {
-			return component.ConsensusSpec.Leader.Name
-		}
-	case appsv1alpha1.Replication:
-		return constant.Primary
-	}
-	return ""
-}
-
-// separateServices separates 'services' to a main service from cd and alternative services from cluster
-func separateServices(services []corev1.Service) (*corev1.Service, []corev1.Service) {
-	if len(services) == 0 {
-		return nil, nil
-	}
-	// from component.buildComponent (which contains component.Services' building process), the first item should be the main service
-	// TODO(free6om): make two fields in component(i.e. Service and AlternativeServices) after RSM passes all testes.
-	return &services[0], services[1:]
-}
-
-func buildRoleInfo(component *component.SynthesizedComponent) ([]workloads.ReplicaRole, *workloads.RoleProbe, *workloads.MembershipReconfiguration, *workloads.MemberUpdateStrategy) {
-	if component.RSMSpec != nil {
-		return buildRoleInfo2(component)
-	}
-
-	var (
-		roles           []workloads.ReplicaRole
-		probe           *workloads.RoleProbe
-		reconfiguration *workloads.MembershipReconfiguration
-		strategy        *workloads.MemberUpdateStrategy
-	)
-
-	handler := convertCharacterTypeToHandler(component.CharacterType, component.WorkloadType == appsv1alpha1.Consensus)
-
-	if handler != nil && component.Probes != nil && component.Probes.RoleProbe != nil {
-		probe = &workloads.RoleProbe{}
-		probe.BuiltinHandler = (*string)(handler)
-		roleProbe := component.Probes.RoleProbe
-		probe.PeriodSeconds = roleProbe.PeriodSeconds
-		probe.TimeoutSeconds = roleProbe.TimeoutSeconds
-		probe.FailureThreshold = roleProbe.FailureThreshold
-		// set to default value
-		probe.SuccessThreshold = 1
-		probe.RoleUpdateMechanism = workloads.DirectAPIServerEventUpdate
-	}
-
-	reconfiguration = nil
-
-	switch component.WorkloadType {
-	case appsv1alpha1.Consensus:
-		roles, strategy = buildRoleInfoFromConsensus(component.ConsensusSpec)
-	case appsv1alpha1.Replication:
-		roles = buildRoleInfoFromReplication()
-		reconfiguration = nil
-		strgy := workloads.SerialUpdateStrategy
-		strategy = &strgy
-	}
-
-	return roles, probe, reconfiguration, strategy
-}
-
-func buildRoleInfo2(component *component.SynthesizedComponent) ([]workloads.ReplicaRole, *workloads.RoleProbe, *workloads.MembershipReconfiguration, *workloads.MemberUpdateStrategy) {
-	rsmSpec := component.RSMSpec
-	return rsmSpec.Roles, rsmSpec.RoleProbe, rsmSpec.MembershipReconfiguration, rsmSpec.MemberUpdateStrategy
-}
-
-func buildRoleInfoFromReplication() []workloads.ReplicaRole {
-	return []workloads.ReplicaRole{
-		{
-			Name:       constant.Primary,
-			IsLeader:   true,
-			CanVote:    true,
-			AccessMode: workloads.ReadWriteMode,
-		},
-		{
-			Name:       constant.Secondary,
-			IsLeader:   false,
-			CanVote:    true,
-			AccessMode: workloads.ReadonlyMode,
-		},
-	}
-}
-
-func buildRoleInfoFromConsensus(consensusSpec *appsv1alpha1.ConsensusSetSpec) ([]workloads.ReplicaRole, *workloads.MemberUpdateStrategy) {
-	if consensusSpec == nil {
-		return nil, nil
-	}
-
-	var (
-		roles    []workloads.ReplicaRole
-		strategy *workloads.MemberUpdateStrategy
-	)
-
-	roles = append(roles, workloads.ReplicaRole{
-		Name:       consensusSpec.Leader.Name,
-		IsLeader:   true,
-		CanVote:    true,
-		AccessMode: workloads.AccessMode(consensusSpec.Leader.AccessMode),
-	})
-	for _, follower := range consensusSpec.Followers {
-		roles = append(roles, workloads.ReplicaRole{
-			Name:       follower.Name,
-			IsLeader:   false,
-			CanVote:    true,
-			AccessMode: workloads.AccessMode(follower.AccessMode),
-		})
-	}
-	if consensusSpec.Learner != nil {
-		roles = append(roles, workloads.ReplicaRole{
-			Name:       consensusSpec.Learner.Name,
-			IsLeader:   false,
-			CanVote:    false,
-			AccessMode: workloads.AccessMode(consensusSpec.Learner.AccessMode),
-		})
-	}
-
-	strgy := workloads.MemberUpdateStrategy(consensusSpec.UpdateStrategy)
-	strategy = &strgy
-
-	return roles, strategy
-}
-
-func convertCharacterTypeToHandler(characterType string, isConsensus bool) *common.BuiltinHandler {
-	var handler common.BuiltinHandler
-	kind := strings.ToLower(characterType)
-	switch kind {
-	case "mysql": //nolint:goconst
-		if isConsensus {
-			handler = common.WeSQLHandler
-		} else {
-			handler = common.MySQLHandler
-		}
-	case "postgres", "postgresql":
-		handler = common.PostgresHandler
-	case "mongodb":
-
-		handler = common.MongoDBHandler
-	case "etcd":
-		handler = common.ETCDHandler
-	case "redis":
-		handler = common.RedisHandler
-	case "kafka":
-		handler = common.KafkaHandler
-	}
-	if handler != "" {
-		return &handler
-	}
-	return nil
 }
 
 func randomString(length int) string {

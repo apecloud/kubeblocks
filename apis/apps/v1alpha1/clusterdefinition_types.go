@@ -106,7 +106,7 @@ type PasswordConfig struct {
 	// numSymbols defines number of symbols.
 	// +kubebuilder:validation:Maximum=8
 	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:default=4
+	// +kubebuilder:default=0
 	// +optional
 	NumSymbols int32 `json:"numSymbols,omitempty"`
 	// letterCase defines to use lower-cases, upper-cases or mixed-cases of letters.

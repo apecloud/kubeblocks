@@ -669,7 +669,7 @@ type ConnectionCredential struct {
 // | Pod       | name      | KB_POD_NAME          |     x    |      |             |
 // |           | UID       | KB_POD_UID           |     x    |      |             |
 // |           | IP        | KB_POD_IP            |     x    |      |             |
-// |           | IPs        | KB_POD_IPS          |     x    |      |             |
+// |           | IPs       | KB_POD_IPS           |     x    |      |             |
 // |           | FQDN      | KB_POD_FQDN          |     x    |      |             |
 // |           | ordinal   | KB_POD_ORDINAL       |     x    |      |             |
 // | Host      | name      | KB_NODENAME          |     x    |      |             |

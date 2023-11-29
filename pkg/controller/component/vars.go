@@ -36,6 +36,31 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
+func ResolveEnvNTemplateVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	annotations map[string]string, definedEnvVars []appsv1alpha1.EnvVar) error {
+	templateVars, credentialVars, err := resolveTemplateVars(ctx, cli, synthesizedComp, definedEnvVars)
+	if err != nil {
+		return err
+	}
+
+	envVars := make([]corev1.EnvVar, 0)
+	envVars = append(envVars, templateVars2EnvVar(templateVars)...)
+	envVars = append(envVars, templateVars2EnvVar(credentialVars)...)
+	envVars = append(envVars, buildDefaultEnv()...)
+	envVars = append(envVars, buildEnv4TLS(synthesizedComp)...)
+	vars, err := buildEnv4UserDefined(annotations)
+	if err != nil {
+		return err
+	}
+	envVars = append(envVars, vars...)
+	// TODO: remove this later
+	envVars = append(envVars, synthesizedComp.ComponentRefEnvs...)
+
+	setEnvNTemplateVars(templateVars, envVars, synthesizedComp)
+
+	return nil
+}
+
 func setEnvNTemplateVars(templateVars map[string]any, envVars []corev1.EnvVar, synthesizedComp *SynthesizedComponent) {
 	synthesizedComp.TemplateVars = templateVars
 
@@ -53,29 +78,6 @@ func setEnvNTemplateVars(templateVars map[string]any, envVars []corev1.EnvVar, s
 			}
 		}
 	}
-}
-
-func resolveEnvNTemplateVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	annotations map[string]string, definedEnvVars []appsv1alpha1.EnvVar) (map[string]any, []corev1.EnvVar, error) {
-	templateVars, credentialVars, err := resolveTemplateVars(ctx, cli, synthesizedComp, definedEnvVars)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	envVars := make([]corev1.EnvVar, 0)
-	envVars = append(envVars, templateVars2EnvVar(templateVars)...)
-	envVars = append(envVars, templateVars2EnvVar(credentialVars)...)
-	envVars = append(envVars, buildDefaultEnv()...)
-	envVars = append(envVars, buildEnv4TLS(synthesizedComp)...)
-	vars, err := buildEnv4UserDefined(annotations)
-	if err != nil {
-		return nil, nil, err
-	}
-	envVars = append(envVars, vars...)
-	// TODO: remove this later
-	envVars = append(envVars, synthesizedComp.ComponentRefEnvs...)
-
-	return templateVars, envVars, nil
 }
 
 func templateVars2EnvVar(vars map[string]any) []corev1.EnvVar {

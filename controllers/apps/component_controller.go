@@ -146,6 +146,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentTLSTransformer{},
 			// handle component custom volumes
 			&componentCustomVolumesTransformer{},
+			// resolve and build vars for template and Env
+			&componentVarsTransformer{},
 			// render component configurations
 			&componentConfigurationTransformer{Client: r.Client},
 			// handle the component workload

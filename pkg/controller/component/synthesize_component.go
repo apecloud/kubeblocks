@@ -207,13 +207,6 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		return nil, err
 	}
 
-	// resolve and update vars for template and Env
-	if templateVars, envVars, err := resolveEnvNTemplateVars(reqCtx.Ctx, cli, synthesizeComp, cluster.Annotations, compDef.Spec.Env); err != nil {
-		return nil, err
-	} else {
-		setEnvNTemplateVars(templateVars, envVars, synthesizeComp)
-	}
-
 	// replace podSpec containers env default credential placeholder
 	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForConnCredential(synthesizeComp.ClusterName))
 

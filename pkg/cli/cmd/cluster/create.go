@@ -1150,7 +1150,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 				return nil, err
 			}
 		}
-		// copy component if compNum is greater than 1
+		// copy component if compNum is greater than or equal to 1
 		if compNum > 0 {
 			for i := 1; i < compNum; i++ {
 				newComp := compObj.DeepCopy()

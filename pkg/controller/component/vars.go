@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
@@ -45,7 +46,8 @@ func ResolveVars4Template(ctx context.Context, cli client.Reader, synthesizedCom
 	return vars, nil
 }
 
-func buildTemplatePodSpecEnv(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent) error {
+func buildTemplatePodSpecEnv(ctx context.Context, cli client.Reader,
+	synthesizedComp *SynthesizedComponent, annotations map[string]string) error {
 	envVars := make([]corev1.EnvVar, 0)
 
 	addVars := func(vars map[string]any) {
@@ -64,12 +66,16 @@ func buildTemplatePodSpecEnv(ctx context.Context, cli client.Reader, synthesized
 	}
 	addVars(vars)
 
-	for _, build := range []func(*SynthesizedComponent) []corev1.EnvVar{
-		// TODO: ude
-		buildDefaultEnv, buildEnv4TLS /* buildEnv4UserDefined, */, buildEnv4CompRef,
-	} {
-		envVars = append(envVars, build(synthesizedComp)...)
+	envVars = append(envVars, buildDefaultEnv()...)
+	envVars = append(envVars, buildEnv4TLS(synthesizedComp)...)
+	if annotations != nil {
+		vars, err := buildEnv4UserDefined(annotations)
+		if err != nil {
+			return err
+		}
+		envVars = append(envVars, vars...)
 	}
+	envVars = append(envVars, buildEnv4CompRef(synthesizedComp)...)
 
 	for _, cc := range []*[]corev1.Container{
 		&synthesizedComp.PodSpec.InitContainers,
@@ -88,14 +94,34 @@ func buildTemplatePodSpecEnv(ctx context.Context, cli client.Reader, synthesized
 	return nil
 }
 
-func buildDefaultEnv(synthesizedComp *SynthesizedComponent) []corev1.EnvVar {
+func builtinVars(synthesizedComp *SynthesizedComponent) map[string]any {
+	var kbClusterPostfix8 string
+	if len(synthesizedComp.ClusterUID) > 8 {
+		kbClusterPostfix8 = synthesizedComp.ClusterUID[len(synthesizedComp.ClusterUID)-8:]
+	} else {
+		kbClusterPostfix8 = synthesizedComp.ClusterUID
+	}
+	if synthesizedComp != nil {
+		return map[string]any{
+			constant.KBEnvNamespace:                    synthesizedComp.Namespace,
+			constant.KBEnvClusterName:                  synthesizedComp.ClusterName,
+			constant.KBEnvClusterUID:                   synthesizedComp.ClusterUID,
+			constant.KBEnvClusterCompName:              constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name),
+			constant.KBEnvCompName:                     synthesizedComp.Name,
+			constant.KBEnvCompReplicas:                 strconv.Itoa(int(synthesizedComp.Replicas)),
+			constant.KBEnvClusterUIDPostfix8Deprecated: kbClusterPostfix8,
+		}
+	}
+	return nil
+}
+
+func buildDefaultEnv() []corev1.EnvVar {
 	vars := make([]corev1.EnvVar, 0)
 	// can not use map, it is unordered
 	namedFields := []struct {
 		name      string
 		fieldPath string
 	}{
-		{name: constant.KBEnvNamespace, fieldPath: "metadata.namespace"},
 		{name: constant.KBEnvPodName, fieldPath: "metadata.name"},
 		{name: constant.KBEnvPodUID, fieldPath: "metadata.uid"},
 		{name: constant.KBEnvPodIP, fieldPath: "status.podIP"},
@@ -103,6 +129,7 @@ func buildDefaultEnv(synthesizedComp *SynthesizedComponent) []corev1.EnvVar {
 		{name: constant.KBEnvNodeName, fieldPath: "spec.nodeName"},
 		{name: constant.KBEnvHostIP, fieldPath: "status.hostIP"},
 		{name: constant.KBEnvServiceAccountName, fieldPath: "spec.serviceAccountName"},
+		// deprecated
 		{name: constant.KBEnvHostIPDeprecated, fieldPath: "status.hostIP"},
 		{name: constant.KBEnvPodIPDeprecated, fieldPath: "status.podIP"},
 		{name: constant.KBEnvPodIPsDeprecated, fieldPath: "status.podIPs"},
@@ -118,49 +145,36 @@ func buildDefaultEnv(synthesizedComp *SynthesizedComponent) []corev1.EnvVar {
 			},
 		})
 	}
-
-	var kbClusterPostfix8 string
-	if len(synthesizedComp.ClusterUID) > 8 {
-		kbClusterPostfix8 = synthesizedComp.ClusterUID[len(synthesizedComp.ClusterUID)-8:]
-	} else {
-		kbClusterPostfix8 = synthesizedComp.ClusterUID
-	}
-	vars = append(vars, []corev1.EnvVar{
-		{Name: constant.KBEnvClusterName, Value: synthesizedComp.ClusterName},
-		{Name: constant.KBEnvCompName, Value: synthesizedComp.Name},
-		{Name: constant.KBEnvClusterCompName, Value: synthesizedComp.ClusterName + "-" + synthesizedComp.Name},
-		{Name: constant.KBEnvClusterUIDPostfix8Deprecated, Value: kbClusterPostfix8},
-		{Name: constant.KBEnvPodFQDN, Value: fmt.Sprintf("%s.%s-headless.%s.svc",
-			constant.EnvPlaceHolder(constant.KBEnvPodName),
-			constant.EnvPlaceHolder(constant.KBEnvClusterCompName),
-			constant.EnvPlaceHolder(constant.KBEnvNamespace))},
-	}...)
-
+	vars = append(vars, corev1.EnvVar{
+		Name: constant.KBEnvPodFQDN,
+		Value: fmt.Sprintf("%s.%s-headless.%s.svc", constant.EnvPlaceHolder(constant.KBEnvPodName),
+			constant.EnvPlaceHolder(constant.KBEnvClusterCompName), constant.EnvPlaceHolder(constant.KBEnvNamespace)),
+	})
 	return vars
 }
 
 func buildEnv4TLS(synthesizedComp *SynthesizedComponent) []corev1.EnvVar {
-	if synthesizedComp.TLSConfig != nil && synthesizedComp.TLSConfig.Enable {
-		return []corev1.EnvVar{
-			{Name: constant.KBEnvTLSCertPath, Value: constant.MountPath},
-			{Name: constant.KBEnvTLSCAFile, Value: constant.CAName},
-			{Name: constant.KBEnvTLSCertFile, Value: constant.CertName},
-			{Name: constant.KBEnvTLSKeyFile, Value: constant.KeyName},
-		}
+	if synthesizedComp.TLSConfig == nil || !synthesizedComp.TLSConfig.Enable {
+		return []corev1.EnvVar{}
 	}
-	return []corev1.EnvVar{}
+	return []corev1.EnvVar{
+		{Name: constant.KBEnvTLSCertPath, Value: constant.MountPath},
+		{Name: constant.KBEnvTLSCAFile, Value: constant.CAName},
+		{Name: constant.KBEnvTLSCertFile, Value: constant.CertName},
+		{Name: constant.KBEnvTLSKeyFile, Value: constant.KeyName},
+	}
 }
 
-func buildEnv4UserDefined(cluster *appsv1alpha1.Cluster, synthesizedComp *SynthesizedComponent) []corev1.EnvVar {
+func buildEnv4UserDefined(annotations map[string]string) ([]corev1.EnvVar, error) {
 	vars := make([]corev1.EnvVar, 0)
-	str, ok := cluster.Annotations[constant.ExtraEnvAnnotationKey]
+	str, ok := annotations[constant.ExtraEnvAnnotationKey]
 	if !ok {
-		return vars
+		return vars, nil
 	}
 
 	udeMap := make(map[string]string)
 	if err := json.Unmarshal([]byte(str), &udeMap); err != nil {
-		return nil // TODO: error
+		return nil, err
 	}
 	keys := make([]string, 0)
 	for k := range udeMap {
@@ -174,34 +188,16 @@ func buildEnv4UserDefined(cluster *appsv1alpha1.Cluster, synthesizedComp *Synthe
 	for _, k := range keys {
 		vars = append(vars, corev1.EnvVar{Name: k, Value: udeMap[k]})
 	}
-	return vars
+	return vars, nil
 }
 
+// TODO: remove this later
 func buildEnv4CompRef(synthesizedComp *SynthesizedComponent) []corev1.EnvVar {
 	vars := make([]corev1.EnvVar, 0)
 	for _, env := range synthesizedComp.ComponentRefEnvs {
 		vars = append(vars, *env)
 	}
 	return vars
-}
-
-func builtinVars(synthesizedComp *SynthesizedComponent) map[string]any {
-	var (
-		ordinal = 0 // TODO: ordinal
-	)
-	if synthesizedComp != nil {
-		return map[string]any{
-			constant.KBEnvNamespace:    synthesizedComp.Namespace,
-			constant.KBEnvClusterName:  synthesizedComp.ClusterName,
-			constant.KBEnvClusterUID:   synthesizedComp.ClusterUID,
-			constant.KBEnvCompName:     synthesizedComp.Name,
-			constant.KBEnvCompReplicas: fmt.Sprintf("%d", synthesizedComp.Replicas),
-			constant.KBEnvPodName:      constant.GeneratePodName(synthesizedComp.ClusterName, synthesizedComp.Name, ordinal),
-			constant.KBEnvPodFQDN:      constant.GeneratePodFQDN(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, ordinal),
-			constant.KBEnvPodOrdinal:   fmt.Sprintf("%d", ordinal),
-		}
-	}
-	return nil
 }
 
 func resolveClusterObjectRefVars(ctx context.Context, cli client.Reader,

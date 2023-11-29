@@ -211,7 +211,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	// replace podSpec containers env default credential placeholder
 	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForConnCredential(synthesizeComp.ClusterName))
 
-	if err = buildTemplatePodSpecEnv(reqCtx.Ctx, cli, synthesizeComp); err != nil {
+	if err = buildTemplatePodSpecEnv(reqCtx.Ctx, cli, synthesizeComp, cluster.Annotations); err != nil {
 		return nil, err
 	}
 

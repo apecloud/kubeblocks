@@ -666,13 +666,15 @@ type ConnectionCredential struct {
 // |           | comp name | KB_CLUSTER_COMP_NAME |          |      |             |
 // | Component | name      | KB_COMP_NAME         |          |      |             |
 // |           | replicas  | KB_COMP_REPLICAS     |          |      |             |
-// | Pod       | name      | KB_POD_NAME          |          |      |             |
+// | Pod       | name      | KB_POD_NAME          |     x    |      |             |
 // |           | UID       | KB_POD_UID           |     x    |      |             |
 // |           | IP        | KB_POD_IP            |     x    |      |             |
-// |           | FQDN      | KB_POD_FQDN          |          |      |             |
-// |           | ordinal   | KB_POD_ORDINAL       |          |      |             |
+// |           | IPs        | KB_POD_IPS          |     x    |      |             |
+// |           | FQDN      | KB_POD_FQDN          |     x    |      |             |
+// |           | ordinal   | KB_POD_ORDINAL       |     x    |      |             |
 // | Host      | name      | KB_NODENAME          |     x    |      |             |
 // |           | IP        | KB_HOST_IP           |     x    |      |             |
+// | SA        | name      | KB_SA_NAME           |     x    |      |             |
 // --------------------------------------------------------------------------------
 
 // EnvVar represents a variable present in the env of Pod/Action or the template of config/script.

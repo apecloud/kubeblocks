@@ -102,11 +102,11 @@ func buildDefaultEnv(synthesizedComp *SynthesizedComponent) []corev1.EnvVar {
 		{name: constant.KBEnvPodIPs, fieldPath: "status.podIPs"},
 		{name: constant.KBEnvNodeName, fieldPath: "spec.nodeName"},
 		{name: constant.KBEnvHostIP, fieldPath: "status.hostIP"},
-		{name: "KB_SA_NAME", fieldPath: "spec.serviceAccountName"},
-		// TODO: need to deprecate following
-		{name: "KB_HOSTIP", fieldPath: "status.hostIP"},
-		{name: "KB_PODIP", fieldPath: "status.podIP"},
-		{name: "KB_PODIPS", fieldPath: "status.podIPs"},
+		{name: constant.KBEnvServiceAccountName, fieldPath: "spec.serviceAccountName"},
+		{name: constant.KBEnvServiceAccountNameDeprecated, fieldPath: "spec.serviceAccountName"},
+		{name: constant.KBEnvHostIPDeprecated, fieldPath: "status.hostIP"},
+		{name: constant.KBEnvPodIPDeprecated, fieldPath: "status.podIP"},
+		{name: constant.KBEnvPodIPsDeprecated, fieldPath: "status.podIPs"},
 	}
 	for _, v := range namedFields {
 		vars = append(vars, corev1.EnvVar{
@@ -127,11 +127,14 @@ func buildDefaultEnv(synthesizedComp *SynthesizedComponent) []corev1.EnvVar {
 		kbClusterPostfix8 = synthesizedComp.ClusterUID
 	}
 	vars = append(vars, []corev1.EnvVar{
-		{Name: "KB_CLUSTER_NAME", Value: synthesizedComp.ClusterName},
-		{Name: "KB_COMP_NAME", Value: synthesizedComp.Name},
-		{Name: "KB_CLUSTER_COMP_NAME", Value: synthesizedComp.ClusterName + "-" + synthesizedComp.Name},
-		{Name: "KB_CLUSTER_UID_POSTFIX_8", Value: kbClusterPostfix8},
-		{Name: "KB_POD_FQDN", Value: fmt.Sprintf("%s.%s-headless.%s.svc", "$(KB_POD_NAME)", "$(KB_CLUSTER_COMP_NAME)", "$(KB_NAMESPACE)")},
+		{Name: constant.KBEnvClusterName, Value: synthesizedComp.ClusterName},
+		{Name: constant.KBEnvComponentNameDeprecated, Value: synthesizedComp.Name},
+		{Name: constant.KBEnvClusterCompName, Value: synthesizedComp.ClusterName + "-" + synthesizedComp.Name},
+		{Name: constant.KBEnvClusterUIDPostfix8Deprecated, Value: kbClusterPostfix8},
+		{Name: constant.KBEnvPodFQDN, Value: fmt.Sprintf("%s.%s-headless.%s.svc",
+			constant.EnvPlaceHolder(constant.KBEnvPodName),
+			constant.EnvPlaceHolder(constant.KBEnvClusterCompName),
+			constant.EnvPlaceHolder(constant.KBEnvNamespace))},
 	}...)
 
 	return vars
@@ -140,10 +143,10 @@ func buildDefaultEnv(synthesizedComp *SynthesizedComponent) []corev1.EnvVar {
 func buildEnv4TLS(synthesizedComp *SynthesizedComponent) []corev1.EnvVar {
 	if synthesizedComp.TLSConfig != nil && synthesizedComp.TLSConfig.Enable {
 		return []corev1.EnvVar{
-			{Name: "KB_TLS_CERT_PATH", Value: constant.MountPath},
-			{Name: "KB_TLS_CA_FILE", Value: constant.CAName},
-			{Name: "KB_TLS_CERT_FILE", Value: constant.CertName},
-			{Name: "KB_TLS_KEY_FILE", Value: constant.KeyName},
+			{Name: constant.KBEnvTLSCertPath, Value: constant.MountPath},
+			{Name: constant.KBEnvTLSCAFile, Value: constant.CAName},
+			{Name: constant.KBEnvTLSCertFile, Value: constant.CertName},
+			{Name: constant.KBEnvTLSKeyFile, Value: constant.KeyName},
 		}
 	}
 	return []corev1.EnvVar{}

@@ -19,6 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package constant
 
+import "fmt"
+
 const (
 	// config keys used in viper, DON'T refactor the value without careful inspections
 	CfgKeyServerInfo                    = "_KUBE_SERVER_INFO"
@@ -45,13 +47,13 @@ const (
 	CfgKeyDPEncryptionKey = "DP_ENCRYPTION_KEY"
 )
 
-const (
+var (
 	KBConnCredentialPlaceHolder     = "$(CONN_CREDENTIAL_SECRET_NAME)"
 	KBComponentEnvCMPlaceHolder     = "$(COMP_ENV_CM_NAME)"
-	KBCompNamePlaceHolder           = "$(KB_COMP_NAME)"
-	KBClusterNamePlaceHolder        = "$(KB_CLUSTER_NAME)"
-	KBClusterCompNamePlaceHolder    = "$(KB_CLUSTER_COMP_NAME)"
-	KBClusterUIDPostfix8PlaceHolder = "$(KB_CLUSTER_UID_POSTFIX_8)"
+	KBCompNamePlaceHolder           = fmt.Sprintf("$(%s)", KBEnvComponentNameDeprecated)
+	KBClusterNamePlaceHolder        = fmt.Sprintf("$(%s)", KBEnvClusterName)
+	KBClusterCompNamePlaceHolder    = fmt.Sprintf("$(%s)", KBEnvClusterCompName)
+	KBClusterUIDPostfix8PlaceHolder = fmt.Sprintf("$(%s)", KBEnvClusterUIDPostfix8Deprecated)
 	KBToolsImagePlaceHolder         = "$(KUBEBLOCKS_TOOLS_IMAGE)"
 
 	// KBComponentConnCredentialPlaceHolder is the prefix of the placeholder for componentDefinition connection credential secret name

@@ -57,7 +57,7 @@ func TestNewManager(t *testing.T) {
 
 		assert.Nil(t, manager)
 		assert.NotNil(t, err)
-		assert.ErrorContains(t, err, "KB_POD_NAME is not set")
+		assert.ErrorContains(t, err, fmt.Sprintf("%s is not set", constant.KBEnvPodName))
 	})
 
 	viper.Set(constant.KBEnvPodName, "fake")

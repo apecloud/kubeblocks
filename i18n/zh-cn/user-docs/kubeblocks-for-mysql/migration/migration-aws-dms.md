@@ -75,14 +75,14 @@ sidebar_label: 通过 AWS DMS 迁移
 
 #### 使用 Network Load Balancer (NLB) 暴露服务
 
-1. Install Load Balancer Controller on EKS.
+1. 在 EKS 集群上安装 AWS Load Balancer Controller。
 
-   For installation details, refer to [Installing the AWS Load Balancer Controller add-on](https://docs.aws.amazon.com/eks/latest/userguide/aws-load-balancer-controller.html).
+   安装详情请参考安装 [AWS Load Balancer Controller 附加组件](https://docs.aws.amazon.com/eks/latest/userguide/aws-load-balancer-controller.html)。
 
-   For how to create NLB in a cluster, refer to [Network load balancing on Amazon EKS](https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html).
-2. Create a service that uses NLB to expose the ApeCloud MySQL service.
+   在集群中创建 NLB 详情请参考 [Amazon EKS 上的网络负载均衡](https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html)。
+2. 创建使用 NLB 的服务，暴露 ApeCloud MySQL 服务。
 
-   Configure `metadata.name`, `metadata.annotations`, `metadata.labels`, and `spec.selector` according to your actual environment.
+   根据实际环境配置 `metadata.name`、`metadata.annotations`、`metadata.labels` 和 `spec.selector`。
 
    ```yaml
    cat <<EOF | kubectl apply -f -
@@ -115,7 +115,7 @@ sidebar_label: 通过 AWS DMS 迁移
    EOF
    ```
 
-3. Check whether this new service and NLB run normally.
+3. 检查新服务和 NLB 是否正常运行。
 
    ```bash
    kubectl get svc 
@@ -124,44 +124,49 @@ sidebar_label: 通过 AWS DMS 迁移
    apecloud-mysql-service         LoadBalancer   10.100.xx.xx     k8s-xx-xx-xx.elb.cn-northwest-1.amazonaws.com.cn   3306:xx/TCP
    ```
 
-   Make sure the server runs normally and can generate EXTERNAL-IP. Meanwhile, verify whether the NLB state is `Active` by the AWS console, then you can access the cluster by EXTERNAL-IP:Port.
+   确保服务器正常运行并能够生成 EXTERNAL-IP。同时，通过 AWS 控制台验证 NLB 状态是否为 Active，随后即可通过 EXTERNAL-IP:Port 访问集群。
 
    ![NLB-active](./../../../img/mysql_migration_active.png)
 
-### Expose the source network
+### 暴露源端网络
 
-There exist four different conditions for the source network. Choose one method to expose the source network according to your actual environment.
+共有四种不同的源网络条件，请根据实际情况选择一种暴露源端网络。
 
-* Alibaba Cloud ApsaraDB RDS
+* 阿里云 RDS
   
-   Use the public network. Refer to [Apply for or release a public endpoint for an ApsaraDB RDS for MySQL instance](https://www.alibabacloud.com/help/en/apsaradb-for-rds/latest/apply-for-or-release-a-public-endpoint-for-an-apsaradb-rds-for-mysql-instance) to release a public endpoint then create an endpoint in AWS DMS.
+   使用公网。参考[该文档](https://help.aliyun.com/zh/rds/apsaradb-rds-for-mysql/apply-for-or-release-a-public-endpoint-for-an-apsaradb-rds-for-mysql-instance)开放公网访问，在AWS DMS创建Endpoint即可
 
-* RDS within the same VPC in AWS
+* AWS同一VPC下RDS
   
-   You only need to specify an RDS when creating an endpoint in DMS and no extra operation is required.
+   在创建 DMS 终端节点时，只需指定一个 RDS，无需进行额外操作。
 
-   For creating an endpoint, refer to step 2 in [Configure AWS DMS tasks](#configure-aws-dms-tasks).
+   创建终端节点可参考[配置 AWS DMS 任务](#配置-aws-dms-任务)中的第 2 步。
 
-* RDS within different VPCs in AWS
+* AWS 不同 VPC 下 RDS
+
+   使用公网来创建终端节点。参考[此文档](https://repost.aws/zh-Hans/knowledge-center/aurora-mysql-connect-outside-vpc)将集群配置为公网访问可用，然后在 AWS DMS 中创建一个终端节点。
+
+   创建终端节点可参考[配置 AWS DMS 任务](#配置-aws-dms-任务)中的第 2 步。
+
+* AWS EKS 中的 MySQL
   
-   Use the public network to create an endpoint. Refer to [this document](https://aws.amazon.com/premiumsupport/knowledge-center/aurora-mysql-connect-outside-vpc/?nc1=h_ls) to make public network access available, then create an endpoint in AWS DMS.
+   使用NLB暴露服务。
 
-   For creating an endpoint, refer to step 2 in [Configure AWS DMS tasks](#configure-aws-dms-tasks).
+  1. 安装Load Balancer Controller
 
-* MySQL in AWS EKS
-  
-   Use NLB to expose the service.
+     安装详情请参考[安装 AWS Load Balancer Controller 附加组件](https://docs.aws.amazon.com/zh_cn/eks/latest/userguide/aws-load-balancer-controller.html)。
 
-  1. Install Load Balancer Controller.
+     在集群中创建 NLB 详情请参考 [Amazon EKS 上的网络负载均衡](https://docs.aws.amazon.com/zh_cn/eks/latest/userguide/network-load-balancing.html)。
 
-     For installation details, refer to [Installing the AWS Load Balancer Controller add-on](https://docs.aws.amazon.com/eks/latest/userguide/aws-load-balancer-controller.html).
-
-     For how to create NLB in a cluster, refer to [Network load balancing on Amazon EKS](https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html).
-  2. Create the service using NLB.
+  2. 使用 NLB 创建服务。
 
      Make sure the value of `some.label.key` in `metadata.labels` is consistent with the value of ApeCloud MySQL you created.
 
      Configure `port` and `targetPort` in `spec.ports` according to your current environment.
+
+     确保 `metadata.labels` 中 `some.label.key` 的值与创建的 ApeCloud MySQL 的值一致。
+
+     根据当前环境，配置 `spec.ports` 中的 `port` 和 `targetPort`。
 
      ```yaml
      cat <<EOF | kubectl apply -f -
@@ -188,41 +193,39 @@ There exist four different conditions for the source network. Choose one method 
      EOF
      ```
 
-  3. Make sure Service and NLB run normally.
+  3. 确保 Service 和 NLB 正常运行。
 
-     Refer to step 3 in [Use Network Load Balancer (NLB) to expose the service](#use-network-load-balancer-nlb-to-expose-the-service) for details.
+     详情请参考[使用网络负载均衡器（NLB）暴露服务](#使用-network-load-balancer-nlb-暴露服务)中的第 3 步。
 
-## Configure AWS DMS tasks
+## 配置 AWS DMS 任务
 
-Pay attention to the following potential issues during the migration task.
+在迁移过程中，请注意：
 
-* Double write
+* 双写问题
   
-   During the migration, make sure no business is writing to the target data instance. Otherwise, double write occurs.
+   迁移期间，需要保证目标数据实例上没有业务写入，否则会出现数据问题.
 
-* Disk space of the target instance
+* 目标实例磁盘空间问题
   
-   Since the transfer tool uses a concurrent write model when writing to the target database, out-of-order writes may occur, which may trigger page splitting and cause the data space of the target database to be slightly enlarged compared with that of the original instance. It is recommended to plan appropriately when allocating the storage size of the target database, for example, at least 1.5 times the current storage size of the source database.
+   由于传输工具写目标数据库时是并发写入模型，存在乱序写入的情况，可能会触发页分裂问题导致目标数据库的数据空间相比原实例的空间有些许放大。建议在分配目标数据库存储大小时可以适当多规划一些，比如至少有源数据库当前存储的1.5倍。
 
-* DDL and onlineDDL
+* DDL&onlineDDL问题
   
-   Locked structure changes often affect the speed of data migration.
+   有锁结构变更往往会影响数据迁移的速度。
 
-   The lock-free structure change is based on the rename of the temporary table in principle, which causes data problems if the migration object is not the whole database migration.
+   而无锁结构变更，由于原理上是基于临时表rename，在迁移对象不是整库迁移的前提下会导致数据问题。
 
-   For example, if the migration object chooses to migrate db1.table1 to the target, and an onlineDDL is performed on db1.table1 on the source database during the process, the data of db1.table1 on the target database will be inconsistent with the source database.
+   例如，如果迁移对象选择迁移db1.table1到目标，过程中在源数据库上针对db1.table1做了一次onlineDDL，那么目标数据库上的db1.table1的数据将和源数据库不一致。
 
-   It should be noted that the way some database management tools initiate DDL is performed by using lock-free mutation by default.
+   需要注意的是，某些数据库管理工具发起DDL的方式默认是使用无锁变更执行的。
 
-   Migration is a short-term behavior. To avoid unnecessary troubles, it is recommended not to perform DDL operations during the migration process.
+   迁移属于短期行为，为避免不必要的麻烦，建议迁移过程中尽量不要做DDL操作。
 
-* BinLog retention hours
+* binlog保存时间
 
-   The incrementally migrating process of data transmission relies on the BinLog of the source database.
+   数据传输增量迁移的过程依赖源数据库的binlog，为避免数据传输发生较长时间中断，在恢复时因源数据库中binlog被清理导致迁移无法恢复的情况，建议将binlog的保存时间适当调长。
 
-   It is recommended to extend the BinLog retention hours to avoid a long-term interruption and the situation that the BinLog of the source database is cleared during recovery, resulting in the migration not being resumed.
-
-   For example, in AWS RDS, connect to the database and run the command below:
+   例如，在 AWS RDS 中连接到数据库并执行以下命令：
 
    ```bash
    # View configuration
@@ -243,107 +246,111 @@ Pay attention to the following potential issues during the migration task.
    call mysql.rds_set_configuration('binlog retention hours', 72);
    ```
 
-***Steps:***
+***步骤：***
 
-1. Create a Replication Instance for migration.
+1. 创建迁移用Replication Instance
 
-   Go to **DMS** -> **Replication Instance** and click **Create replication instance**.
+   Go to **DMS** -> **Replication Instance** and click **Create replication instance**.点击 **DMS** ->  **Replication Instance**，**创建复制实例**。
 
    :::caution
 
-   Select the VPC that you have configured in EKS.
+   选择你在 EKS 中配置的 VPC。
 
    :::
 
    ![Create replication instance](./../../../img/mysql_migration_replication_instance.png)
 
-2. Create endpoints.
+2. 创建 endpoint 。
 
-   Go to **DMS** -> **Endpoints** and click **Create endpoint**.
+   点击 **DMS** -> **Endpoints**，**创建终端节点**。
 
    ![Create endpoint](./../../../img/mysql_migration_create_endpoints.png)
 
-   Create the source endpoint and target endpoint respectively. If the target endpoint is the RDS instance, check **Select RDS DB instance** to configure it.
+   分别创建 source endpoint 和 target endpoint。如果目标终端是 RDS 实例，请勾选 **选择 RDS DB 实例** 进行配置。
 
    ![Select RDS DB instance](./../../../img/mysql_migration_select_rds_db_instance.png)
 
-   After configuration, specify a replication instance to test the connection.
+   配置完成后，可以使用指定的 Replication instance测试下连通性：
 
    ![Test connection](./../../../img/mysql_migration_test_connection.png)
 
-3. Create migration tasks.
+3. 创建迁移任务。
 
    ![Create task](./../../../img/mysql_migration_create_task.png)
 
-   Click **Create task** and configure the task according to the instructions.
+   点击**创建任务**，并根据指示配置任务。
 
-   Pay attention to the following parameters.
+   注意以下参数：
 
-   * Migration Type
+   * 迁移类型
 
      ![Migration type](./../../../img/mysql_migration_migration_type.png)
 
-     AWS DMS provides three migration types:
+     AWS DMS 提供三种迁移类型：
 
      * Migrate existing data: AWS DMS migrates only your existing data. Changes to your source data aren’t captured and applied to your target.
      * Migrate existing data and replicate ongoing changes: AWS DMS migrates both existing data and ongoing data changes, i.e. the existing data before the migration task and the data changes during the migration task will be synchronized to the target instance.
      * Replicate data changes only: AWS DMS only migrates the ongoing data changes. If you select this type, you can use **CDC start mode for source transactions** to specify a location and migrate the data changes.
-    For this tutorial, select **Migrate existing data and replicate ongoing changes**.
+     * Migrate existing data：只迁移存量数据，即任务运行后源实例发生的变更不会迁移到目标实例
+     * Migrate existing data and replicate ongoing changes：迁移存量+增量数据，即任务运行前的存量数据和任务运行中的增量数据都会被同步到目标实例
+     * Replicate data changes only：只迁移增量数据，可以配合后面的“CDC start mode for source transactions”配置指定位点迁移增量数据
 
-   * Target table preparation mode
+    在本文的迁移场景中，使用“**Migrate existing data and replicate ongoing changes**” 即可。
+
+   * 目标表准备模式
 
      ![Target table preparation mode](./../../../img/mysql_migration_target_table_preparation_mode.png)
 
-     The target table preparation mode specifies the initial mode of the data structure. You can click the Info link beside the options to view the definition of each mode. For example, if ApeCloud MySQL is a newly created empty instance, you can select **Do nothing** mode.
+     目标表准备模式指定了数据结构的初始模式。你可以点击选项旁边的 Info 链接查看每种模式的定义。如果 ApeCloud MySQL 是一个新创建的空实例，你可以选择 **Do nothing** 模式。
 
-     In addition, create a database on ApeCloud MySQL before migration because AWS DMS does not create a database.
+     此外需注意，AWS DMS 不会自动创建数据库，迁移前，需在 ApeCloud MySQL 上创建一个数据库。
 
-   * Turn on validation
+   * 启用验证功能
   
-     It is recommended to enable this function.
+     建议启用此功能。
 
      ![Turn on validation](./../../../img/mysql_migration_turn_on_validation.png)
 
-   * Batch-optimized apply
+   * Batch 优化的应用模式
   
-     It is recommended to enable this function as this function enables you to write target instances in batch and can improve the write speed.
+     建议启用此功能。该功能支持批量写目标实例，能显著提升写入速度
 
      ![Batch-optimized apply](./../../../img/mysql_migration_batch_optimized_apply.png)
 
-   * Full load tuning settings: Maximum number of tables to load in parallel
+   * 全量加载调优设置：并行加载的最大表数
 
-     This number decides how many concurrencies DMS uses to get source table data. Theoretically speaking, this can cause pressure on the source table during the full-load migration. Lower this number when the business in the source table is delicate.
+     该数值决定了 DMS 在获取源表数据时使用的并发数。理论上全量加载迁移可能给源表造成压力，当源表中的业务较为敏感时，可以降低这个数值。
 
      ![Full load tuning settings](./../../../img/mysql_migration_full_load_tuning_settings.png)
 
-   * Table Mapping
+   * 表映射
 
-     Table mapping decides which tables in the database are used for migration and can also apply easy conversions. It is recommended to enable **Wizard** mode to configure this parameter.
-4. Start the migration task.
+     表映射决定了哪些表可以用于数据库迁移并应用简单的转换。建议启用 **Wizard** 模式来配置此参数。
+4. 开始迁移任务。
 
-## Switch applications
+## 应用切换
 
-***Before you start***
+***开始之前***
 
-* Make sure DMS migration tasks run normally. If you perform a validation task, make sure the results are as expected.
-* To differentiate conversation and improve data security, it is recommended to create and authorize a database account solely for migration.
-* It is recommended to switch applications during business off-peak hours because for safety concerns during the switching process, it is necessary to stop business write.
+* 确保 DMS 迁移任务正常运行。若已启动验证，请确保结果符合预期。
+* 为了便于区分会话并提高数据安全性，建议创建并授权一个专门用于迁移的数据库帐户。
+* 切换过程保险起见需要停止业务写入，同时，建议在业务低峰期做切换。
 
-***Steps:***
+***步骤：***
 
-1. Make sure the transmission task runs normally.
+1. 确保传输任务正常运行。
 
-   Pay attention to **Status**, **Last updated in Table statistics**, and **CDC latency target** in **CloudWatch metrics**.
+   Pay attention to **Status**, **Last updated in Table statistics**, and **CDC latency target** in **CloudWatch metrics**.重点关注表统计数据中的**任务状态**和**最后更新时间**，以及 CloudWatch 指标中的 **CDCLatencyTarget**。
 
-   You can also refer to [this document](https://aws.amazon.com/premiumsupport/knowledge-center/dms-stuck-task-progress/?nc1=h_ls) to verify the migration task.
+   你还可以参考[此文档](https://repost.aws/zh-Hans/knowledge-center/dms-stuck-task-progress)来检查迁移任务。
 
    ![Status](./../../../img/mysql_migration_application_status.png)
 
    ![CDC](./../../../img/mysql_migration_application_cdc.png)
 
-2. Pause business and prohibit new business write in the source database.
-3. Verify the transmission task status again to make sure the task runs normally and the running status lasts at least 1 minute.
+2. 暂停业务，禁止新的业务数据写入源库。
+3. 再次查看传输任务的状态，确保任务正常运行且至少持续 1 分钟。
 
-   Refer to step 1 above to observe whether the link is normal and whether latency exists.
-4. Use the target database to resume business.
-5. Verify the migration with business.
+   参考步骤 1，观察链接是否正常，是否存在延迟。
+4. 使用目标数据库恢复业务。
+5. 验证迁移结果。

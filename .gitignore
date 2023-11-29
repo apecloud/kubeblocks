@@ -65,4 +65,5 @@ deploy/**/Chart.lock
 deploy/**/charts
 
 # cli embed chart directory
-pkg/cli/cluster/charts/
+# exclude ignore for go package
+!pkg/cli/cluster/charts/*.tgz

@@ -42,9 +42,8 @@ const (
 
 // Component
 const (
-	KBEnvComponentName           = "KB_COMPONENT_NAME"
-	KBEnvComponentReplicas       = "KB_COMPONENT_REPLICAS"
-	KBEnvComponentNameDeprecated = "KB_COMP_NAME"
+	KBEnvCompName     = "KB_COMP_NAME"
+	KBEnvCompReplicas = "KB_COMP_REPLICAS"
 )
 
 // Pod
@@ -68,8 +67,7 @@ const (
 
 // ServiceAccount
 const (
-	KBEnvServiceAccountName           = "KB_SERVICE_ACCOUNT_NAME"
-	KBEnvServiceAccountNameDeprecated = "KB_SA_NAME"
+	KBEnvServiceAccountName = "KB_SA_NAME"
 )
 
 // TLS

@@ -19,8 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package constant
 
-import "fmt"
-
 const (
 	// config keys used in viper, DON'T refactor the value without careful inspections
 	CfgKeyServerInfo                    = "_KUBE_SERVER_INFO"
@@ -48,14 +46,9 @@ const (
 )
 
 var (
-	KBConnCredentialPlaceHolder     = "$(CONN_CREDENTIAL_SECRET_NAME)"
-	KBComponentEnvCMPlaceHolder     = "$(COMP_ENV_CM_NAME)"
-	KBCompNamePlaceHolder           = fmt.Sprintf("$(%s)", KBEnvComponentNameDeprecated)
-	KBClusterNamePlaceHolder        = fmt.Sprintf("$(%s)", KBEnvClusterName)
-	KBClusterCompNamePlaceHolder    = fmt.Sprintf("$(%s)", KBEnvClusterCompName)
-	KBClusterUIDPostfix8PlaceHolder = fmt.Sprintf("$(%s)", KBEnvClusterUIDPostfix8Deprecated)
-	KBToolsImagePlaceHolder         = "$(KUBEBLOCKS_TOOLS_IMAGE)"
-
+	KBConnCredentialPlaceHolder = "$(CONN_CREDENTIAL_SECRET_NAME)"
+	KBComponentEnvCMPlaceHolder = "$(COMP_ENV_CM_NAME)"
+	KBToolsImagePlaceHolder     = "$(KUBEBLOCKS_TOOLS_IMAGE)"
 	// KBComponentConnCredentialPlaceHolder is the prefix of the placeholder for componentDefinition connection credential secret name
 	// TODO(xingran): This is a temporary solution used to reference component connection credentials defined in ComponentDefinition. The suffix is ComponentDefinition.Spec.ConnectionCredentials[x].Name, There will be a unified referencing scheme designed in the future.
 	KBComponentConnCredentialPlaceHolder = "$(COMPONENT_CONN_CREDENTIAL_SECRET_NAME)"

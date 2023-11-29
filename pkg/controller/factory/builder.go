@@ -407,14 +407,14 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 		randomPassword = restorePassword
 	}
 	m := map[string]string{
-		"$(RANDOM_PASSWD)":                    randomPassword,
-		"$(UUID)":                             uuidStr,
-		"$(UUID_B64)":                         uuidB64,
-		"$(UUID_STR_B64)":                     uuidStrB64,
-		"$(UUID_HEX)":                         uuidHex,
-		"$(SVC_FQDN)":                         constant.GenerateDefaultComponentServiceName(cluster.Name, component.Name),
-		constant.KBClusterCompNamePlaceHolder: constant.GenerateClusterComponentName(cluster.Name, component.Name),
-		"$(HEADLESS_SVC_FQDN)":                constant.GenerateDefaultComponentHeadlessServiceName(cluster.Name, component.Name),
+		"$(RANDOM_PASSWD)": randomPassword,
+		"$(UUID)":          uuidStr,
+		"$(UUID_B64)":      uuidB64,
+		"$(UUID_STR_B64)":  uuidStrB64,
+		"$(UUID_HEX)":      uuidHex,
+		"$(SVC_FQDN)":      constant.GenerateDefaultComponentServiceName(cluster.Name, component.Name),
+		constant.EnvPlaceHolder(constant.KBEnvClusterCompName): constant.GenerateClusterComponentName(cluster.Name, component.Name),
+		"$(HEADLESS_SVC_FQDN)": constant.GenerateDefaultComponentHeadlessServiceName(cluster.Name, component.Name),
 	}
 	if len(component.Services) > 0 {
 		for _, p := range component.Services[0].Spec.Ports {

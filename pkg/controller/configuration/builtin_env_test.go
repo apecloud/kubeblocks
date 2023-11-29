@@ -108,7 +108,7 @@ bootstrap:
 							Value: "my",
 						},
 						{
-							Name:  constant.KBEnvComponentNameDeprecated,
+							Name:  constant.KBEnvCompName,
 							Value: "mysql",
 						},
 						{
@@ -257,7 +257,7 @@ bootstrap:
 				// KB_LEADER from envFrom configmap
 				// MEMORY_SIZE, CPU from resourceFieldRef
 				"my":            fmt.Sprintf("{{ getEnvByName ( index $.podSpec.containers 0 ) \"%s\" }}", constant.KBEnvClusterName),
-				"mysql":         fmt.Sprintf("{{ getEnvByName ( index $.podSpec.containers 0 ) \"%s\" }}", constant.KBEnvComponentNameDeprecated),
+				"mysql":         fmt.Sprintf("{{ getEnvByName ( index $.podSpec.containers 0 ) \"%s\" }}", constant.KBEnvCompName),
 				"root":          "{{ getEnvByName ( index $.podSpec.containers 0 ) \"MYSQL_USER\" }}",
 				"4zrqfl2r":      "{{ getEnvByName ( index $.podSpec.containers 0 ) \"MYSQL_PASSWORD\" }}",
 				patroniTemplate: "{{ getEnvByName ( index $.podSpec.containers 0 ) \"SPILO_CONFIGURATION\" }}",

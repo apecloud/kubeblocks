@@ -79,9 +79,9 @@ func NewKubernetesStore() (*KubernetesStore, error) {
 		return nil, errors.New(fmt.Sprintf("%s must be set", constant.KBEnvClusterName))
 	}
 
-	componentName := os.Getenv(constant.KBEnvComponentNameDeprecated)
+	componentName := os.Getenv(constant.KBEnvCompName)
 	if componentName == "" {
-		return nil, errors.New(fmt.Sprintf("%s must be set", constant.KBEnvComponentNameDeprecated))
+		return nil, errors.New(fmt.Sprintf("%s must be set", constant.KBEnvCompName))
 	}
 
 	clusterCompName := os.Getenv(constant.KBEnvClusterCompName)

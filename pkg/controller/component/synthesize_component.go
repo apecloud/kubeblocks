@@ -502,16 +502,16 @@ func replaceContainerPlaceholderTokens(component *SynthesizedComponent, namedVal
 func GetReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName string) map[string]string {
 	cc := constant.GenerateClusterComponentName(clusterName, componentName)
 	replacementMap := map[string]string{
-		constant.KBClusterNamePlaceHolder:     clusterName,
-		constant.KBCompNamePlaceHolder:        componentName,
-		constant.KBClusterCompNamePlaceHolder: cc,
-		constant.KBComponentEnvCMPlaceHolder:  constant.GenerateClusterComponentEnvPattern(clusterName, componentName),
+		constant.EnvPlaceHolder(constant.KBEnvClusterName):     clusterName,
+		constant.EnvPlaceHolder(constant.KBEnvCompName):        componentName,
+		constant.EnvPlaceHolder(constant.KBEnvClusterCompName): cc,
+		constant.KBComponentEnvCMPlaceHolder:                   constant.GenerateClusterComponentEnvPattern(clusterName, componentName),
 	}
+	clusterUIDPostfix := clusterUID
 	if len(clusterUID) > 8 {
-		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = clusterUID[len(clusterUID)-8:]
-	} else {
-		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = clusterUID
+		clusterUIDPostfix = clusterUID[len(clusterUID)-8:]
 	}
+	replacementMap[constant.EnvPlaceHolder(constant.KBEnvClusterUIDPostfix8Deprecated)] = clusterUIDPostfix
 	return replacementMap
 }
 

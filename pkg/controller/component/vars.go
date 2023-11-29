@@ -103,7 +103,6 @@ func buildDefaultEnv(synthesizedComp *SynthesizedComponent) []corev1.EnvVar {
 		{name: constant.KBEnvNodeName, fieldPath: "spec.nodeName"},
 		{name: constant.KBEnvHostIP, fieldPath: "status.hostIP"},
 		{name: constant.KBEnvServiceAccountName, fieldPath: "spec.serviceAccountName"},
-		{name: constant.KBEnvServiceAccountNameDeprecated, fieldPath: "spec.serviceAccountName"},
 		{name: constant.KBEnvHostIPDeprecated, fieldPath: "status.hostIP"},
 		{name: constant.KBEnvPodIPDeprecated, fieldPath: "status.podIP"},
 		{name: constant.KBEnvPodIPsDeprecated, fieldPath: "status.podIPs"},
@@ -128,7 +127,7 @@ func buildDefaultEnv(synthesizedComp *SynthesizedComponent) []corev1.EnvVar {
 	}
 	vars = append(vars, []corev1.EnvVar{
 		{Name: constant.KBEnvClusterName, Value: synthesizedComp.ClusterName},
-		{Name: constant.KBEnvComponentNameDeprecated, Value: synthesizedComp.Name},
+		{Name: constant.KBEnvCompName, Value: synthesizedComp.Name},
 		{Name: constant.KBEnvClusterCompName, Value: synthesizedComp.ClusterName + "-" + synthesizedComp.Name},
 		{Name: constant.KBEnvClusterUIDPostfix8Deprecated, Value: kbClusterPostfix8},
 		{Name: constant.KBEnvPodFQDN, Value: fmt.Sprintf("%s.%s-headless.%s.svc",
@@ -192,14 +191,14 @@ func builtinVars(synthesizedComp *SynthesizedComponent) map[string]any {
 	)
 	if synthesizedComp != nil {
 		return map[string]any{
-			constant.KBEnvNamespace:         synthesizedComp.Namespace,
-			constant.KBEnvClusterName:       synthesizedComp.ClusterName,
-			constant.KBEnvClusterUID:        synthesizedComp.ClusterUID,
-			constant.KBEnvComponentName:     synthesizedComp.Name,
-			constant.KBEnvComponentReplicas: fmt.Sprintf("%d", synthesizedComp.Replicas),
-			constant.KBEnvPodName:           constant.GeneratePodName(synthesizedComp.ClusterName, synthesizedComp.Name, ordinal),
-			constant.KBEnvPodFQDN:           constant.GeneratePodFQDN(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, ordinal),
-			constant.KBEnvPodOrdinal:        fmt.Sprintf("%d", ordinal),
+			constant.KBEnvNamespace:    synthesizedComp.Namespace,
+			constant.KBEnvClusterName:  synthesizedComp.ClusterName,
+			constant.KBEnvClusterUID:   synthesizedComp.ClusterUID,
+			constant.KBEnvCompName:     synthesizedComp.Name,
+			constant.KBEnvCompReplicas: fmt.Sprintf("%d", synthesizedComp.Replicas),
+			constant.KBEnvPodName:      constant.GeneratePodName(synthesizedComp.ClusterName, synthesizedComp.Name, ordinal),
+			constant.KBEnvPodFQDN:      constant.GeneratePodFQDN(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, ordinal),
+			constant.KBEnvPodOrdinal:   fmt.Sprintf("%d", ordinal),
 		}
 	}
 	return nil

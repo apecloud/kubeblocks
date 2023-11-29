@@ -57,7 +57,7 @@ type SynthesizedComponent struct {
 
 	// The following fields were introduced with the ComponentDefinition and Component API in KubeBlocks version 0.8.0
 	Roles                 []v1alpha1.ReplicaRole              `json:"roles,omitempty"`
-	Labels                map[string]v1alpha1.BuiltInString   `json:"labels,omitempty"`
+	Labels                map[string]string                   `json:"labels,omitempty"`
 	ConnectionCredentials []v1alpha1.ConnectionCredential     `json:"connectionCredentials,omitempty"`
 	UpdateStrategy        *v1alpha1.UpdateStrategy            `json:"updateStrategy,omitempty"`
 	PolicyRules           []rbacv1.PolicyRule                 `json:"policyRules,omitempty"`

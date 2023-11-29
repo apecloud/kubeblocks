@@ -211,7 +211,7 @@ func (f *MockComponentDefinitionFactory) SetPolicyRules(rules []rbacv1.PolicyRul
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) SetLabels(labels map[string]appsv1alpha1.BuiltInString) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) SetLabels(labels map[string]string) *MockComponentDefinitionFactory {
 	f.Get().Spec.Labels = labels
 	return f
 }

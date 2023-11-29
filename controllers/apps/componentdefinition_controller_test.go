@@ -231,19 +231,6 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
 		})
 
-		It("duplicate service names - default & named", func() {
-			By("create a ComponentDefinition obj")
-			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
-				SetRuntime(nil).
-				AddService("default", "", 3306, "leader").
-				AddService("readonly", defaultServiceName, 3306, "follower").
-				AddRole("leader", true, true).
-				AddRole("follower", true, false).
-				Create(&testCtx).GetObject()
-
-			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
-		})
-
 		It("w/o port", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).

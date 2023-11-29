@@ -181,7 +181,7 @@ func (builder *ComponentDefinitionBuilder) SetPolicyRules(rules []rbacv1.PolicyR
 	return builder
 }
 
-func (builder *ComponentDefinitionBuilder) SetLabels(labels map[string]appsv1alpha1.BuiltInString) *ComponentDefinitionBuilder {
+func (builder *ComponentDefinitionBuilder) SetLabels(labels map[string]string) *ComponentDefinitionBuilder {
 	builder.get().Spec.Labels = labels
 	return builder
 }

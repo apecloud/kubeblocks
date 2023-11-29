@@ -383,10 +383,6 @@ spec:
                 type: array
               labels:
                 additionalProperties:
-                  description: BuiltInString defines a string type that may contain
-                    references to BuiltInEnvVar and/or BuiltInGeneratorVar placeholders.
-                    These placeholders are meant to be replaced with actual values
-                    at runtime to provide dynamic content.
                   type: string
                 description: Labels defines static labels that will be patched to
                   all k8s resources created for the component. If a label key conflicts

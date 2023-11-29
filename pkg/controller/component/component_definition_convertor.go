@@ -280,9 +280,9 @@ func (c *compDefLabelsConvertor) convert(args ...any) (any, error) {
 		return nil, nil
 	}
 
-	labels := make(map[string]appsv1alpha1.BuiltInString, 0)
+	labels := make(map[string]string, 0)
 	for _, customLabel := range clusterCompDef.CustomLabelSpecs {
-		labels[customLabel.Key] = appsv1alpha1.BuiltInString(customLabel.Value)
+		labels[customLabel.Key] = customLabel.Value
 	}
 	return labels, nil
 }

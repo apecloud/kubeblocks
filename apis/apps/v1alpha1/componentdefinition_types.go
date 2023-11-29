@@ -164,7 +164,7 @@ type ComponentDefinitionSpec struct {
 	// If a label key conflicts with any other system labels or user-specified labels, it will be silently ignored.
 	// Cannot be updated.
 	// +optional
-	Labels map[string]BuiltInString `json:"labels,omitempty"`
+	Labels map[string]string `json:"labels,omitempty"`
 
 	// SystemAccounts defines the pre-defined system accounts required to manage the component.
 	// TODO(component): accounts KB required

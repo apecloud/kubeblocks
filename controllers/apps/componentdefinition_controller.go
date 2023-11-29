@@ -38,10 +38,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-var (
-	defaultServiceName = fmt.Sprintf("%s-%s", appsv1alpha1.KBClusterName, appsv1alpha1.KBComponentName)
-)
-
 // ComponentDefinitionReconciler reconciles a ComponentDefinition object
 type ComponentDefinitionReconciler struct {
 	client.Client
@@ -201,11 +197,6 @@ func (r *ComponentDefinitionReconciler) validateServices(cli client.Client, rctx
 		return fmt.Errorf("duplicate names of component service are not allowed")
 	}
 
-	for i, svc := range cmpd.Spec.Services {
-		if len(svc.ServiceName) == 0 {
-			cmpd.Spec.Services[i].ServiceName = defaultServiceName
-		}
-	}
 	if !checkUniqueItemWithValue(cmpd.Spec.Services, "ServiceName", nil) {
 		return fmt.Errorf("duplicate service names are not allowed")
 	}

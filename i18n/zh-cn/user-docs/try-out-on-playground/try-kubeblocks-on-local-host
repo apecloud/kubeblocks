@@ -22,7 +22,9 @@ sidebar_position: 2
 
 *步骤：*
 1. 安装 Playground。
+```
 kbcli playground init
+```
 该命令执行以下操作：
 1. 在使用 K3d 的容器中创建一个 Kubernetes 集群。
 2. 在 K3d 集群中部署 KubeBlocks。
@@ -30,14 +32,17 @@ kbcli playground init
 :::note
 如果你之前执行过 kbcli playground init 但是失败了，再次执行该命令可能会导致报错。请先执行 kbcli playground destroy 清理环境，再执行 kbcli playground init。
 如果你在 Windows 上执行 Playground 并报以下错误，这是由 Windows 11 的安全策略导致的。你操作的 kbcli.exe 可能经过第三方篡改（或者在你在 Windows 上通过 source build 出的 kbcli）。
+  ```
   error: failed to set up k3d cluster: failed to create k3d cluster kb-playground: Failed Cluster Start: Failed to start server k3d-kb-playground-server-0: Node k3d-kb-playground-server-0 failed to get ready: error waiting for log line k3s is up and running from node 'k3d-kb-playground-server-0': stopped returning log lines
+  ```
 解决方案是：
 1. 卸载或删除当前的 kbcli.exe 文件。
 2. 使用 winget 下载最新的 kbcli，或者访问 KubeBlocks 的 GitHub 发布页面 重新下载 kbcli。
 :::
 
-2. 反复检查 MySQL 集群，直到状态变为 Running。
-```kbcli cluster list
+3. 反复检查 MySQL 集群，直到状态变为 Running。
+```
+kbcli cluster list
 ```
 *结果*
 你刚刚在默认命名空间中创建了一个名为 `mycluster` 的集群。你可以在安装成功的提示语下可以看到用户指南。执行 `kbcli playground init -h` 可以再次查看此指南。

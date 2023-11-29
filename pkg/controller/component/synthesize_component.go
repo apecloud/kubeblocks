@@ -211,10 +211,6 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	// replace podSpec containers env default credential placeholder
 	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForConnCredential(synthesizeComp.ClusterName))
 
-	// replace podSpec containers env component connection credential placeholder
-	// TODO(xingran): This is a temporary solution used to reference component connection credentials defined in ComponentDefinition. it will be refactored in the future.
-	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForCompConnCredential(synthesizeComp.ClusterName, synthesizeComp.Name))
-
 	if err = buildTemplatePodSpecEnv(reqCtx.Ctx, cli, synthesizeComp); err != nil {
 		return nil, err
 	}
@@ -479,13 +475,6 @@ func doContainerAttrOverride(compContainer *corev1.Container, container corev1.C
 func GetEnvReplacementMapForConnCredential(clusterName string) map[string]string {
 	return map[string]string{
 		constant.KBConnCredentialPlaceHolder: constant.GenerateDefaultConnCredential(clusterName),
-	}
-}
-
-// GetEnvReplacementMapForCompConnCredential gets the replacement map for component connect credential
-func GetEnvReplacementMapForCompConnCredential(clusterName, componentName string) map[string]string {
-	return map[string]string{
-		constant.KBComponentConnCredentialPlaceHolder: constant.GenerateClusterComponentName(clusterName, componentName),
 	}
 }
 

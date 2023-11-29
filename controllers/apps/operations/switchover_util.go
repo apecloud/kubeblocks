@@ -391,11 +391,9 @@ func replaceSwitchoverConnCredentialEnv(switchoverSpec *appsv1alpha1.ComponentSw
 		return
 	}
 	connCredentialMap := component.GetEnvReplacementMapForConnCredential(clusterName)
-	compConnCredentialMap := component.GetEnvReplacementMapForCompConnCredential(clusterName, componentName)
 	replaceEnvVars := func(action *appsv1alpha1.Action) {
 		if action != nil {
 			action.Env = component.ReplaceSecretEnvVars(connCredentialMap, action.Env)
-			action.Env = component.ReplaceSecretEnvVars(compConnCredentialMap, action.Env)
 		}
 	}
 	replaceEnvVars(switchoverSpec.WithCandidate)

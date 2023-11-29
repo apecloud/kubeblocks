@@ -17,11 +17,10 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package foxlake
+package opengauss
 
 import (
 	"fmt"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -39,43 +38,39 @@ type Commands struct {
 func NewCommands() engines.ClusterCommands {
 	return &Commands{
 		info: engines.EngineInfo{
-			Client:      "usql",
-			Container:   "foxlake",
-			UserEnv:     "$FOXLAKE_ROOT_USER",
-			PasswordEnv: "$FOXLAKE_ROOT_PASSWORD",
+			Client:      "gsql",
+			PasswordEnv: "$GS_PASSWORD",
+			UserEnv:     "$GS_USERNAME",
+			Database:    "$GS_DATABASE",
 		},
 		examples: map[models.ClientType]engines.BuildConnectExample{
 			models.CLI: func(info *engines.ConnectionInfo) string {
-				return fmt.Sprintf(`# foxlake client connection example
-mysql -h%s -P%s -u%s -p%s
-`, info.Host, info.Port, info.User, info.Password)
+				return fmt.Sprintf(`# opengauss client connection example
+gsql -U %s -W %s -d %s`, info.User, info.Password, info.Database)
 			},
 		},
 	}
 }
 
-func (r *Commands) ConnectCommand(connectInfo *engines.AuthInfo) []string {
-	userName := r.info.UserEnv
-	userPass := r.info.PasswordEnv
-	dsn := fmt.Sprintf("mysql://%s:%s@:${serverPort}", userName, userPass)
-	if connectInfo != nil {
-		userName = connectInfo.UserName
-		userPass = connectInfo.UserPasswd
-		dsn = engines.AddSingleQuote(fmt.Sprintf("mysql://%s:%s@:${serverPort}", userName, userPass))
+func (c *Commands) ConnectCommand(info *engines.AuthInfo) []string {
+	userName := c.info.UserEnv
+	userPass := c.info.PasswordEnv
+	dataBase := c.info.Database
+	if info != nil {
+		userName = engines.AddSingleQuote(info.UserName)
+		userPass = engines.AddSingleQuote(info.UserPasswd)
 	}
-
-	foxlakeCmd := []string{fmt.Sprintf("%s %s", r.info.Client, dsn)}
-	return []string{"sh", "-c", strings.Join(foxlakeCmd, " ")}
+	return []string{"sh", "-c", fmt.Sprintf("%s -U%s -W%s -d%s", c.info.Client, userName, userPass, dataBase)}
 }
 
-func (r *Commands) Container() string {
-	return r.info.Container
+func (c *Commands) Container() string {
+	return c.info.Container
 }
 
-func (r *Commands) ConnectExample(info *engines.ConnectionInfo, client string) string {
-	return engines.BuildExample(info, client, r.examples)
+func (c *Commands) ConnectExample(info *engines.ConnectionInfo, client string) string {
+	return engines.BuildExample(info, client, c.examples)
 }
 
-func (r *Commands) ExecuteCommand([]string) ([]string, []corev1.EnvVar, error) {
-	return nil, nil, fmt.Errorf("%s not implemented", r.info.Client)
+func (c *Commands) ExecuteCommand(strings []string) ([]string, []corev1.EnvVar, error) {
+	return nil, nil, fmt.Errorf("opengauss execute cammand interface do not implement")
 }

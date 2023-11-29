@@ -380,6 +380,10 @@ addonHelmInstallOptions:
 - "--wait"
 - "--insecure-skip-tls-verify"
 
+## @param upgradeAddons - upgrade addons when upgrade this chart.
+## For avoiding the addon CRs being upgraded when upgrade this chart, set this value to false.
+upgradeAddons: false
+
 ## Prometheus Addon
 ##
 prometheus:

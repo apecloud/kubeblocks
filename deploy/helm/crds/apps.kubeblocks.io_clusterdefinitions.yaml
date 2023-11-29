@@ -9672,7 +9672,7 @@ spec:
                               minimum: 0
                               type: integer
                             numSymbols:
-                              default: 4
+                              default: 0
                               description: numSymbols defines number of symbols.
                               format: int32
                               maximum: 8

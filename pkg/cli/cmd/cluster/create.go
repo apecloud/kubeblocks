@@ -168,6 +168,7 @@ const (
 	keyStorage      setKey = "storage"
 	keyStorageClass setKey = "storageClass"
 	keySwitchPolicy setKey = "switchPolicy"
+	keyCompNum      setKey = "compNum"
 	keyUnknown      setKey = "unknown"
 )
 
@@ -1021,6 +1022,16 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 			}
 		}
 
+		// TODO(ct): should not hard code this
+		if c.CharacterType == "zookeeper" && key == keyReplicas {
+			if c.Name == "ch-keeper" {
+				return "3"
+			}
+			if c.Name == "zookeeper" {
+				return "0"
+			}
+		}
+
 		// get value from environment variables
 		cfg := setKeyCfg[key]
 		return viper.GetString(cfg)
@@ -1131,6 +1142,22 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 			return nil, err
 		}
 		comps = append(comps, compObj)
+		compNum := 0
+		compNumStr := getVal(&c, keyCompNum, sets)
+		if len(compNumStr) > 0 {
+			compNum, err = strconv.Atoi(compNumStr)
+			if err != nil {
+				return nil, err
+			}
+		}
+		// copy component if compNum is greater than 1
+		if compNum > 0 {
+			for i := 1; i < compNum; i++ {
+				newComp := compObj.DeepCopy()
+				newComp.Name = compObj.Name + "-" + strconv.Itoa(i)
+				comps = append(comps, newComp)
+			}
+		}
 	}
 	return comps, nil
 }
@@ -1558,6 +1585,7 @@ func setKeys() []string {
 		string(keyClass),
 		string(keyStorageClass),
 		string(keySwitchPolicy),
+		string(keyCompNum),
 	}
 }
 

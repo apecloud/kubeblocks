@@ -143,7 +143,6 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		FullCompName:          comp.Name,
 		CompDefName:           compDef.Name,
 		PodSpec:               &compDef.Spec.Runtime,
-		Env:                   compDefObj.Spec.Env,
 		LogConfigs:            compDefObj.Spec.LogConfigs,
 		ConfigTemplates:       compDefObj.Spec.Configs,
 		ScriptTemplates:       compDefObj.Spec.Scripts,
@@ -208,12 +207,15 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		return nil, err
 	}
 
+	// resolve and update vars for template and Env
+	if templateVars, envVars, err := resolveEnvNTemplateVars(reqCtx.Ctx, cli, synthesizeComp, cluster.Annotations, compDef.Spec.Env); err != nil {
+		return nil, err
+	} else {
+		setEnvNTemplateVars(templateVars, envVars, synthesizeComp)
+	}
+
 	// replace podSpec containers env default credential placeholder
 	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForConnCredential(synthesizeComp.ClusterName))
-
-	if err = buildTemplatePodSpecEnv(reqCtx.Ctx, cli, synthesizeComp, cluster.Annotations); err != nil {
-		return nil, err
-	}
 
 	return synthesizeComp, nil
 }

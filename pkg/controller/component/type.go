@@ -43,7 +43,6 @@ type SynthesizedComponent struct {
 	CompDefName          string                                 `json:"compDefName,omitempty"`  // the name of the componentDefinition
 	Replicas             int32                                  `json:"replicas"`
 	PodSpec              *corev1.PodSpec                        `json:"podSpec,omitempty"`
-	Env                  []v1alpha1.EnvVar                      `json:"env,omitempty"`
 	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 	Monitor              *MonitorConfig                         `json:"monitor,omitempty"`
 	EnabledLogs          []string                               `json:"enabledLogs,omitempty"`
@@ -52,8 +51,9 @@ type SynthesizedComponent struct {
 	ScriptTemplates      []v1alpha1.ComponentTemplateSpec       `json:"scriptTemplates,omitempty"`
 	TLSConfig            *v1alpha1.TLSConfig                    `json:"tlsConfig"`
 	ServiceAccountName   string                                 `json:"serviceAccountName,omitempty"`
-	ComponentRefEnvs     []*corev1.EnvVar                       `json:"componentRefEnvs,omitempty"`
+	ComponentRefEnvs     []corev1.EnvVar                        `json:"componentRefEnvs,omitempty"`
 	ServiceReferences    map[string]*v1alpha1.ServiceDescriptor `json:"serviceReferences,omitempty"`
+	TemplateVars         map[string]any                         `json:"templateVars,omitempty"`
 
 	// The following fields were introduced with the ComponentDefinition and Component API in KubeBlocks version 0.8.0
 	Roles                 []v1alpha1.ReplicaRole              `json:"roles,omitempty"`

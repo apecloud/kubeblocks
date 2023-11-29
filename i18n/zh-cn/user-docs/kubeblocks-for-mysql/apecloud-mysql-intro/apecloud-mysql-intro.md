@@ -50,3 +50,5 @@ ApeCloud MySQL 支持四种角色类型，即 **Leader**（领导者）、**Foll
 | 8 | 5 | 3 |
 | 9 | 5 | 4 |
 | 10 | 6 | 4 |
+
+![ApeCloud MySQL 角色切换](./../../../img/apecloud-mysql-intro-role-changing.jpg)

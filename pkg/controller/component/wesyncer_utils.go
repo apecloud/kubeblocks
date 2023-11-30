@@ -68,8 +68,10 @@ func buildWeSyncerInitContainer(component *SynthesizedComponent, container *core
 
 func modifyMainContainerForWesyncer(component *SynthesizedComponent, wesyncerSvcHTTPPort int) {
 	container := component.PodSpec.Containers[0]
-	command := []string{"/kubeblocks/wesyncer", "run",
-		"--dapr-http-port", strconv.Itoa(wesyncerSvcHTTPPort),
+	command := []string{"/kubeblocks/wesyncer",
+		"--config-path", "/kubeblocks/config/components",
+		"--port", strconv.Itoa(wesyncerSvcHTTPPort),
+		// "--zap-log-level", "debug",
 		"--"}
 	container.Command = append(command, container.Command...)
 	volumeMount := corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"}

@@ -94,14 +94,21 @@ func (r *ComponentClassReconciler) Reconcile(ctx context.Context, req reconcile.
 
 	patch := client.MergeFrom(classDefinition.DeepCopy())
 	var (
-		classList       []appsv1alpha1.ComponentClass
+		classList []appsv1alpha1.ComponentClass
+		// TODO(xingran): clusterDefinition label will be deprecated in the future, use componentDefinition label instead
 		clusterDefRef   = classDefinition.GetLabels()[constant.ClusterDefLabelKey]
 		componentDefRef = classDefinition.GetLabels()[constant.KBAppComponentDefRefLabelKey]
+		compDefRef      = classDefinition.GetLabels()[constant.ComponentDefinitionLabelKey]
 	)
 
 	var rules []appsv1alpha1.ResourceConstraintRule
 	for _, constraint := range constraintsMap {
-		rules = append(rules, constraint.FindRules(clusterDefRef, componentDefRef)...)
+		if compDefRef != "" {
+			rules = append(rules, constraint.FindRulesWithCompDef(compDefRef)...)
+
+		} else {
+			rules = append(rules, constraint.FindRules(clusterDefRef, componentDefRef)...)
+		}
 	}
 
 	for _, v := range classes {

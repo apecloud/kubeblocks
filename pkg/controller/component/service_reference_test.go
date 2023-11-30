@@ -51,11 +51,12 @@ var _ = Describe("service reference", func() {
 		// resources should be released in following order
 		// non-namespaced
 		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterVersionSignature, true, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterDefinitionSignature, true, ml)
 
 		// namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterVersionSignature, true, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterDefinitionSignature, true, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ServiceDescriptorSignature, true, inNS, ml)
 	}
 
 	var (

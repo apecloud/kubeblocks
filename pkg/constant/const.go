@@ -98,8 +98,8 @@ const (
 	ClusterAccountLabelKey                   = "account.kubeblocks.io/name"
 	KBAppClusterUIDLabelKey                  = "apps.kubeblocks.io/cluster-uid"
 	KBAppComponentLabelKey                   = "apps.kubeblocks.io/component-name"
-	KBAppComponentDefRefLabelKey             = "apps.kubeblocks.io/component-def-ref"
-	KBAppClusterDefTypeLabelKey              = "apps.kubeblocks.io/cluster-type" // refer clusterDefinition.Spec.Type (deprecated)
+	KBAppComponentDefRefLabelKey             = "apps.kubeblocks.io/component-def-ref" // refer clusterDefinition.Spec.ComponentDefs[*].Name before KubeBlocks Version 0.8.0 or refer ComponentDefinition.Name after KubeBlocks Version 0.8.0
+	KBAppClusterDefTypeLabelKey              = "apps.kubeblocks.io/cluster-type"      // refer clusterDefinition.Spec.Type (deprecated)
 	AppConfigTypeLabelKey                    = "apps.kubeblocks.io/config-type"
 	KBManagedByKey                           = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created
 	PVCNameLabelKey                          = "apps.kubeblocks.io/pvc-name"

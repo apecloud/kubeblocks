@@ -22,6 +22,7 @@ package apps
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -31,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/class"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -87,7 +87,7 @@ func (r *ComponentClassReconciler) Reconcile(ctx context.Context, req reconcile.
 		return intctrlutil.Reconciled()
 	}
 
-	classes, err := class.ParseComponentClasses(*classDefinition)
+	classes, err := component.ParseComponentClasses(*classDefinition)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "parse component classes failed")
 	}

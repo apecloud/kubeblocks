@@ -36,11 +36,18 @@ type ComponentResourceConstraintSpec struct {
 	// +kubebuilder:validation:Required
 	Rules []ResourceConstraintRule `json:"rules"`
 
-	// selector is used to bind the resource constraint to cluster definitions.
+	// selector is used to bind the resource constraint to cluster definitions based on ClusterDefinition API.
 	// +listType=map
 	// +listMapKey=clusterDefRef
+	//+kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.8.0, use ComponentSelector instead."
 	// +optional
 	Selector []ClusterResourceConstraintSelector `json:"selector,omitempty"`
+
+	// componentSelector is used to bind the resource constraint to components based on ComponentDefinition API.
+	// +listType=map
+	// +listMapKey=componentDefRef
+	// +optional
+	ComponentSelector []ComponentResourceConstraintSelector `json:"componentSelector,omitempty"`
 }
 
 type ClusterResourceConstraintSelector struct {
@@ -56,7 +63,8 @@ type ClusterResourceConstraintSelector struct {
 }
 
 type ComponentResourceConstraintSelector struct {
-	// componentDefRef is the name of the component definition in the cluster definition.
+	// In versions prior to KB 0.8.0, ComponentDefRef is the name of the component definition in the ClusterDefinition.
+	// In KB 0.8.0 and later versions, ComponentDefRef is the name of ComponentDefinition.
 	// +kubebuilder:validation:Required
 	ComponentDefRef string `json:"componentDefRef"`
 
@@ -344,7 +352,8 @@ func (c *ComponentResourceConstraint) MatchClass(clusterDefRef, componentDefRef 
 	return len(constraints) > 0
 }
 
-// FindRules find all constraint rules that the component should conform to.
+// FindRules find all constraint rules that the component should conform to based on ClusterDefinition API.
+// TODO(xingran): it will be deprecated in the future, use FindRulesWithCompDef instead.
 func (c *ComponentResourceConstraint) FindRules(clusterDefRef, componentDefRef string) []ResourceConstraintRule {
 	rules := make(map[string]bool)
 	for _, selector := range c.Spec.Selector {
@@ -358,6 +367,29 @@ func (c *ComponentResourceConstraint) FindRules(clusterDefRef, componentDefRef s
 			for _, name := range item.Rules {
 				rules[name] = true
 			}
+		}
+	}
+
+	var result []ResourceConstraintRule
+	for _, rule := range c.Spec.Rules {
+		if _, ok := rules[rule.Name]; !ok {
+			continue
+		}
+		result = append(result, rule)
+	}
+	return result
+}
+
+// FindRulesWithCompDef find all constraint rules that the component should conform to based on ComponentDefinition API.
+func (c *ComponentResourceConstraint) FindRulesWithCompDef(compDef string) []ResourceConstraintRule {
+	rules := make(map[string]bool)
+
+	for _, selector := range c.Spec.ComponentSelector {
+		if selector.ComponentDefRef != compDef {
+			continue
+		}
+		for _, name := range selector.Rules {
+			rules[name] = true
 		}
 	}
 

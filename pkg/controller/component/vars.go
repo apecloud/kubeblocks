@@ -38,7 +38,7 @@ import (
 
 func ResolveEnvNTemplateVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	annotations map[string]string, definedVars []appsv1alpha1.EnvVar) error {
-	templateVars, credentialVars, err := resolveTemplateVars(ctx, cli, synthesizedComp, definedVars)
+	templateVars, credentialVars, err := resolveBuiltinNObjectRefVars(ctx, cli, synthesizedComp, definedVars)
 	if err != nil {
 		return err
 	}
@@ -92,7 +92,7 @@ func templateVars2EnvVar(vars map[string]any) []corev1.EnvVar {
 	return envVars
 }
 
-func resolveTemplateVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+func resolveBuiltinNObjectRefVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	definedVars []appsv1alpha1.EnvVar) (map[string]any, map[string]any, error) {
 	vars := builtinTemplateVars(synthesizedComp)
 	vars1, vars2, err := resolveClusterObjectRefVars(ctx, cli, synthesizedComp, definedVars)
@@ -214,7 +214,7 @@ func resolveClusterObjectRefVars(ctx context.Context, cli client.Reader, synthes
 		case len(v.Value) > 0:
 			vars1[v.Name] = v.Value
 		case v.ValueFrom != nil:
-			val1, val2, err := resolveClusterObjectRef(ctx, cli, synthesizedComp, *v.ValueFrom)
+			val1, val2, err := resolveClusterObjectVarRef(ctx, cli, synthesizedComp, *v.ValueFrom)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -231,7 +231,7 @@ func resolveClusterObjectRefVars(ctx context.Context, cli client.Reader, synthes
 	return vars1, vars2, nil
 }
 
-func resolveClusterObjectRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+func resolveClusterObjectVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	source appsv1alpha1.VarSource) (any, any, error) {
 	switch {
 	case source.ConfigMapKeyRef != nil:
@@ -355,9 +355,9 @@ func resolveCredentialUsernameRef(ctx context.Context, cli client.Reader, synthe
 	selector appsv1alpha1.CredentialVarSelector) (any, any, error) {
 	return resolveCredentialVarRefLow(ctx, cli, synthesizedComp, selector, selector.Username,
 		func(secret corev1.Secret) (any, any) {
-			if secret.Data == nil {
+			if secret.Data != nil {
 				if val, ok := secret.Data[constant.AccountNameForSecret]; ok {
-					return nil, val
+					return nil, string(val)
 				}
 			}
 			return nil, nil
@@ -368,9 +368,9 @@ func resolveCredentialPasswordRef(ctx context.Context, cli client.Reader, synthe
 	selector appsv1alpha1.CredentialVarSelector) (any, any, error) {
 	return resolveCredentialVarRefLow(ctx, cli, synthesizedComp, selector, selector.Password,
 		func(secret corev1.Secret) (any, any) {
-			if secret.Data == nil {
+			if secret.Data != nil {
 				if val, ok := secret.Data[constant.AccountPasswdForSecret]; ok {
-					return nil, val
+					return nil, string(val)
 				}
 			}
 			return nil, nil
@@ -435,7 +435,7 @@ func resolveServiceRefPasswordRef(synthesizedComp *SynthesizedComponent, selecto
 
 func resolveServiceVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	selector appsv1alpha1.ServiceVarSelector, option *appsv1alpha1.VarOption, resolveVar func(corev1.Service) (any, any)) (any, any, error) {
-	return resolveClusterObjectVarRef("Service", selector.ClusterObjectReference, option,
+	return resolveClusterObjectVar("Service", selector.ClusterObjectReference, option,
 		func() (any, error) {
 			compName := selector.Component
 			if len(compName) == 0 {
@@ -465,7 +465,7 @@ func resolveServiceVarRefLow(ctx context.Context, cli client.Reader, synthesized
 
 func resolveCredentialVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	selector appsv1alpha1.CredentialVarSelector, option *appsv1alpha1.VarOption, resolveVar func(corev1.Secret) (any, any)) (any, any, error) {
-	return resolveClusterObjectVarRef("Credential", selector.ClusterObjectReference, option,
+	return resolveClusterObjectVar("Credential", selector.ClusterObjectReference, option,
 		func() (any, error) {
 			compName := selector.Component
 			if len(compName) == 0 {
@@ -491,7 +491,7 @@ func resolveCredentialVarRefLow(ctx context.Context, cli client.Reader, synthesi
 
 func resolveServiceRefVarRefLow(synthesizedComp *SynthesizedComponent, selector appsv1alpha1.ServiceRefVarSelector,
 	option *appsv1alpha1.VarOption, resolveVar func(appsv1alpha1.ServiceDescriptor) (any, any)) (any, any, error) {
-	return resolveClusterObjectVarRef("ServiceRef", selector.ClusterObjectReference, option,
+	return resolveClusterObjectVar("ServiceRef", selector.ClusterObjectReference, option,
 		func() (any, error) {
 			if synthesizedComp.ServiceReferences == nil {
 				return nil, nil
@@ -503,7 +503,7 @@ func resolveServiceRefVarRefLow(synthesizedComp *SynthesizedComponent, selector 
 		})
 }
 
-func resolveClusterObjectVarRef(kind string, objRef appsv1alpha1.ClusterObjectReference, option *appsv1alpha1.VarOption,
+func resolveClusterObjectVar(kind string, objRef appsv1alpha1.ClusterObjectReference, option *appsv1alpha1.VarOption,
 	resolveObj func() (any, error), resolveVar func(any) (any, any)) (any, any, error) {
 	objOptional := func() bool {
 		return objRef.Optional != nil && *objRef.Optional

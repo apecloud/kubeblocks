@@ -1173,6 +1173,196 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
+	testCompVars := func(compName, compDefName string) {
+		compDefKey := client.ObjectKeyFromObject(compDefObj)
+		Eventually(testapps.GetAndChangeObj(&testCtx, compDefKey, func(compDef *appsv1alpha1.ComponentDefinition) {
+			compDef.Spec.Vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "SERVICE_HOST",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name: compDefObj.Spec.Services[0].Name,
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Host: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+				{
+					Name: "SERVICE_PORT",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name: compDefObj.Spec.Services[0].Name,
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Port: &appsv1alpha1.NamedVar{},
+							},
+						},
+					},
+				},
+				{
+					Name: "USERNAME",
+					ValueFrom: &appsv1alpha1.VarSource{
+						CredentialVarRef: &appsv1alpha1.CredentialVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name: compDefObj.Spec.SystemAccounts[0].Name,
+							},
+							CredentialVars: appsv1alpha1.CredentialVars{
+								Username: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+				{
+					Name: "PASSWORD",
+					ValueFrom: &appsv1alpha1.VarSource{
+						CredentialVarRef: &appsv1alpha1.CredentialVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name: compDefObj.Spec.SystemAccounts[0].Name,
+							},
+							CredentialVars: appsv1alpha1.CredentialVars{
+								Password: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+		})).Should(Succeed())
+		createClusterObjV2(compName, compDefObj.Name, nil)
+
+		By("check workload template env")
+		targetEnvVars := map[string]corev1.EnvVar{
+			"SERVICE_HOST": {
+				Name:  "SERVICE_HOST",
+				Value: constant.GenerateComponentServiceName(clusterObj.Name, compName, compDefObj.Spec.Services[0].Name),
+			},
+			"SERVICE_PORT": {
+				Name:  "SERVICE_PORT",
+				Value: strconv.Itoa(int(compDefObj.Spec.Services[0].Spec.Ports[0].Port)),
+			},
+			"USERNAME": {
+				Name:  "USERNAME",
+				Value: compDefObj.Spec.SystemAccounts[0].Name,
+			},
+			// "PASSWORD": {
+			//	Name:  "PASSWORD",
+			//	Value: "",
+			// },
+			constant.KBEnvNamespace: {
+				Name:  constant.KBEnvNamespace,
+				Value: clusterObj.Namespace,
+			},
+			constant.KBEnvClusterName: {
+				Name:  constant.KBEnvClusterName,
+				Value: clusterObj.Name,
+			},
+			constant.KBEnvClusterUID: {
+				Name:  constant.KBEnvClusterUID,
+				Value: string(clusterObj.UID),
+			},
+			constant.KBEnvClusterCompName: {
+				Name:  constant.KBEnvClusterCompName,
+				Value: constant.GenerateClusterComponentName(clusterObj.Name, compName),
+			},
+			constant.KBEnvCompName: {
+				Name:  constant.KBEnvCompName,
+				Value: compName,
+			},
+			constant.KBEnvCompReplicas: {
+				Name:  constant.KBEnvCompReplicas,
+				Value: "1", // default replicas
+			},
+			constant.KBEnvPodName: {
+				Name: constant.KBEnvPodName,
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "metadata.name",
+					},
+				},
+			},
+			constant.KBEnvPodUID: {
+				Name: constant.KBEnvPodUID,
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "metadata.uid",
+					},
+				},
+			},
+			constant.KBEnvPodIP: {
+				Name: constant.KBEnvPodIP,
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "status.podIP",
+					},
+				},
+			},
+			constant.KBEnvPodIPs: {
+				Name: constant.KBEnvPodIPs,
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "status.podIPs",
+					},
+				},
+			},
+			constant.KBEnvPodFQDN: {
+				Name: constant.KBEnvPodFQDN,
+				Value: fmt.Sprintf("%s.%s-headless.%s.svc", constant.EnvPlaceHolder(constant.KBEnvPodName),
+					constant.EnvPlaceHolder(constant.KBEnvClusterCompName), constant.EnvPlaceHolder(constant.KBEnvNamespace)),
+			},
+			constant.KBEnvNodeName: {
+				Name: constant.KBEnvNodeName,
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "spec.nodeName",
+					},
+				},
+			},
+			constant.KBEnvHostIP: {
+				Name: constant.KBEnvHostIP,
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "status.hostIP",
+					},
+				},
+			},
+			constant.KBEnvServiceAccountName: {
+				Name: constant.KBEnvServiceAccountName,
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "spec.serviceAccountName",
+					},
+				},
+			},
+		}
+		rsmKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      compObj.Name,
+		}
+		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+			for _, cc := range [][]corev1.Container{rsm.Spec.Template.Spec.InitContainers, rsm.Spec.Template.Spec.Containers} {
+				for _, c := range cc {
+					envValueMapping := map[string]corev1.EnvVar{}
+					for i, env := range c.Env {
+						if _, ok := targetEnvVars[env.Name]; ok {
+							envValueMapping[env.Name] = c.Env[i]
+						}
+					}
+					g.Expect(envValueMapping).Should(BeEquivalentTo(targetEnvVars))
+				}
+			}
+		})).Should(Succeed())
+	}
+
 	testCompRole := func(compName, compDefName string) {
 		createClusterObjV2(compName, compDefObj.Name, nil)
 
@@ -1791,6 +1981,10 @@ var _ = Describe("Component Controller", func() {
 
 		It("with component conn credentials", func() {
 			testCompConnCredential(defaultCompName, compDefName)
+		})
+
+		It("with component vars", func() {
+			testCompVars(defaultCompName, compDefName)
 		})
 
 		It("with component roles", func() {

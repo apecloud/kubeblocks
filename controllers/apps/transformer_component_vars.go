@@ -59,7 +59,7 @@ type varsTransformerReader struct {
 func (r *varsTransformerReader) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 	for _, val := range r.graphCli.FindAll(r.dag, obj) {
 		if client.ObjectKeyFromObject(val) == key {
-			reflect.ValueOf(obj).Elem().Set(reflect.ValueOf(val))
+			reflect.ValueOf(obj).Elem().Set(reflect.ValueOf(val).Elem())
 			return nil
 		}
 	}

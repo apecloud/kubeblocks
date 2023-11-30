@@ -725,7 +725,7 @@ type VarSource struct {
 // +kubebuilder:validation:Enum={Required,Optional}
 type VarOption string
 
-const (
+var (
 	VarRequired VarOption = "Required"
 	VarOptional VarOption = "Optional"
 )

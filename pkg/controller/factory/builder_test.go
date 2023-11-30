@@ -150,6 +150,8 @@ var _ = Describe("builder", func() {
 			clusterDef, clusterVer, cluster, &cluster.Spec.ComponentSpecs[0])
 		Expect(err).Should(Succeed())
 		Expect(synthesizeComp).ShouldNot(BeNil())
+		// to resolve and inject env vars
+		Expect(component.ResolveEnvNTemplateVars(reqCtx.Ctx, testCtx.Cli, synthesizeComp, cluster.Annotations, nil)).Should(Succeed())
 		return synthesizeComp
 	}
 	newClusterObjs := func(clusterDefObj *appsv1alpha1.ClusterDefinition) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.Cluster, *component.SynthesizedComponent) {

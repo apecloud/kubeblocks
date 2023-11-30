@@ -653,7 +653,7 @@ var _ = Describe("vars", func() {
 				},
 			}
 			synthesizedComp.ServiceReferences = map[string]*appsv1alpha1.ServiceDescriptor{
-				"serviceref": &appsv1alpha1.ServiceDescriptor{
+				"serviceref": {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: testCtx.DefaultNamespace,
 						Name:      "serviceref",

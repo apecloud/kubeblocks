@@ -223,6 +223,7 @@ func String2RoleType(roleName string) RoleType {
 }
 
 func SentProbeEvent(ctx context.Context, opsResult OpsResult, resp *ProbeResponse, log logr.Logger) {
+	ctx = context.Background()
 	log.Info(fmt.Sprintf("send event: %v", opsResult))
 	roleUpdateMechanism := workloads.DirectAPIServerEventUpdate
 	if viper.IsSet(RSMRoleUpdateMechanismVarName) {

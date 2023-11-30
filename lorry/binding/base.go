@@ -250,7 +250,9 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *ProbeRequest, 
 	opsRes["role"] = role
 	if ops.OriRole != role {
 		ops.OriRole = role
-		go SentProbeEvent(ctx, opsRes, resp, ops.Logger)
+		if role != "" {
+			go SentProbeEvent(ctx, opsRes, resp, ops.Logger)
+		}
 	}
 
 	// RoleUnchangedCount is the count of consecutive role unchanged checks.

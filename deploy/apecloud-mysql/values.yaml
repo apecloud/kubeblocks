@@ -59,6 +59,7 @@ imagePullSecrets: [ ]
 nameOverride: ""
 fullnameOverride: ""
 clusterVersionOverride: ""
+auditlogClusterVersionOverride: "8.0.31"
 
 mysqlConfigs:
   dataMountPath: /data/mysql

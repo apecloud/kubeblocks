@@ -187,7 +187,10 @@ func (r *configObserverOptions) printExplainConfigure(configSpecs configSpecsTyp
 		}
 		schema.Schema = apiSchema
 	}
-	return r.printConfigConstraint(schema.Schema, cfgutil.NewSet(confSpec.StaticParameters...), cfgutil.NewSet(confSpec.DynamicParameters...))
+	return r.printConfigConstraint(schema.Schema,
+		cfgutil.NewSet(confSpec.StaticParameters...),
+		cfgutil.NewSet(confSpec.DynamicParameters...),
+		cfgutil.NewSet(confSpec.ImmutableParameters...))
 }
 
 func (r *configObserverOptions) getReconfigureMeta(configSpecs configSpecsType) ([]types.ConfigTemplateInfo, error) {
@@ -285,8 +288,7 @@ func (r *configObserverOptions) isSpecificParam(paramName string) bool {
 	return r.paramName == paramName
 }
 
-func (r *configObserverOptions) printConfigConstraint(schema *apiext.JSONSchemaProps,
-	staticParameters, dynamicParameters *cfgutil.Sets) error {
+func (r *configObserverOptions) printConfigConstraint(schema *apiext.JSONSchemaProps, staticParameters, dynamicParameters, immutableParameters *cfgutil.Sets) error {
 	var (
 		maxDocumentLength = 100
 		maxEnumLength     = 20
@@ -307,7 +309,7 @@ func (r *configObserverOptions) printConfigConstraint(schema *apiext.JSONSchemaP
 			return err
 		}
 		pt.scope = "Global"
-		pt.dynamic = isDynamicType(pt, staticParameters, dynamicParameters)
+		pt.dynamic = isDynamicType(pt, staticParameters, dynamicParameters, immutableParameters)
 
 		if r.hasSpecificParam() {
 			printSingleParameterSchema(pt)
@@ -360,8 +362,10 @@ func getValidUpdatedParams(status appsv1alpha1.OpsRequestStatus) string {
 	return string(b)
 }
 
-func isDynamicType(pt *parameterSchema, staticParameters, dynamicParameters *cfgutil.Sets) bool {
+func isDynamicType(pt *parameterSchema, staticParameters, dynamicParameters, immutableParameters *cfgutil.Sets) bool {
 	switch {
+	case immutableParameters.InArray(pt.name):
+		return false
 	case staticParameters.InArray(pt.name):
 		return false
 	case dynamicParameters.InArray(pt.name):

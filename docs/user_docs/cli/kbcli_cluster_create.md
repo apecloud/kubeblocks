@@ -107,6 +107,7 @@ kbcli cluster create [NAME] [flags]
       --backup-starting-deadline-minutes int   the deadline in minutes for starting the backup job if it misses its scheduled time for any reason
       --cluster-definition string              Specify cluster definition, run "kbcli cd list" to show all available cluster definitions
       --cluster-version string                 Specify cluster version, run "kbcli cv list" to show all available cluster versions, use the latest version if not specified
+      --create-only-set                        Create components exclusively configured in 'set'
       --dry-run string[="unchanged"]           Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
       --edit                                   Edit the API resource before creating
       --enable-all-logs                        Enable advanced application all log extraction, set to true will ignore enabledLogs of component level, default is false

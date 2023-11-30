@@ -2,6 +2,8 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
   name: ac-mysql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  annotations:
+    kubeblocks.io/is-default-cluster-version: "true"
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:

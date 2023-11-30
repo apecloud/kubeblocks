@@ -8,6 +8,8 @@ image:
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: 8.0.30-5.beta2.20230830.g4ca1eb8.13
+  audit:
+    tag: 8.0.30-5.auditlogtest.20231121.g143b127.13
 
 ## MySQL Cluster parameters
 cluster:
@@ -68,6 +70,7 @@ logConfigs:
   error: /data/mysql/log/mysqld-error.log
   slow: /data/mysql/log/mysqld-slowquery.log
   general: /data/mysql/log/mysqld.log
+  auditlog: /data/mysql/auditlog/*.alog
 
 vtgateLogConfigs:
   error: /vtdataroot/vtgate.ERROR

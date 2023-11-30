@@ -1535,6 +1535,24 @@
 	// For SQL window functions, determines whether to enable inversion optimization for moving window frames also for floating values.
 	windowing_use_high_precision: string & "0" | "1" | "OFF" | "ON" | *"1"
 
+	// Mysql audit log version.
+	rds_audit_log_version?: string & "MYSQL_V1" | "MYSQL_V3"
+
+	// To select the log format that the audit log plugin uses to write its log file, set the audit_log_format system variable at server startup
+	rds_audit_log_format?: string & "JSON" | "PLAIN"
+
+	// The option to enable or disable audit log.
+	rds_audit_log_enabled?: string & "0" | "1" | "OFF" | "ON" | *"OFF"
+
+	// The policy controlling how the audit log plugin writes connection events to its log file. Supported values are 'ALL' (default), 'ERRORS' and 'NONE'.
+	rds_audit_log_connection_policy?: string & "ALL" | "ERRORS" | "NONE"
+
+	// The policy controlling how the audit log plugin writes  query events to its log file. Supported values are 'ALL' (default), 'UPDATES',  'UPDATES_OR_ERRORS', 'ERRORS' and 'NONE'.
+	rds_audit_log_statement_policy?: string & "ALL" | "UPDATES" | "NONE" | "ERRORS" | "UPDATES_OR_ERRORS"
+
+	// Max number of rows in each audit log file. Log records will be discarded above this number.
+	rds_audit_log_row_limit?: int & >0
+
 	// other parameters
 	// reference mysql parameters
 	...

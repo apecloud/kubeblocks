@@ -2,7 +2,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: ac-mysql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}-auditlog
+  name: ac-mysql-{{ .Values.auditlogClusterVersionOverride }}
   annotations:
     kubeblocks.io/is-default-cluster-version: "false"
   labels:

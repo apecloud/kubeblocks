@@ -280,7 +280,7 @@ type RoleArbitrator string
 const (
 	ExternalRoleArbitrator   RoleArbitrator = "External"
 	KubeBlocksRoleArbitrator RoleArbitrator = "KubeBlocks"
-	LorryRoleArbitrator      RoleArbitrator = "Lorry"
+	WesyncerRoleArbitrator   RoleArbitrator = "Wesyncer"
 )
 
 // ReplicaRole represents a role that can be assumed by a component instance.

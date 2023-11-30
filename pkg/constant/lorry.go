@@ -30,16 +30,16 @@ const (
 
 const (
 	ApeCloudPostgresqlWeSyncerType = "apecloud-postgresql"
+	OfficialPostgresqlWeSyncerType = "official-postgresql"
 	MongoDBWeSyncerType            = "mongodb"
 	MySQLWeSyncerType              = "mysql"
 	WeSQLWeSyncerType              = "wesql"
 )
 
-func GetSupportWeSyncerType() []string {
-	return []string{
-		ApeCloudPostgresqlWeSyncerType,
-		MongoDBWeSyncerType,
-		MySQLWeSyncerType,
-		WeSQLWeSyncerType,
-	}
+var WeSyncerSupportTypes = []string{
+	ApeCloudPostgresqlWeSyncerType,
+	OfficialPostgresqlWeSyncerType,
+	MongoDBWeSyncerType,
+	MySQLWeSyncerType,
+	WeSQLWeSyncerType,
 }

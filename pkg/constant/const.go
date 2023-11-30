@@ -67,6 +67,7 @@ const (
 const (
 	KBServiceAccountName     = "KUBEBLOCKS_SERVICEACCOUNT_NAME"
 	KBToolsImage             = "KUBEBLOCKS_TOOLS_IMAGE"
+	KBWesyncerImage          = "KUBEBLOCKS_WESYNCER_IMAGE"
 	KBImagePullPolicy        = "KUBEBLOCKS_IMAGE_PULL_POLICY"
 	KBDataScriptClientsImage = "KUBEBLOCKS_DATASCRIPT_CLIENTS_IMAGE"
 )
@@ -228,9 +229,11 @@ const (
 
 const (
 	// Container port name
+	WesyncerHTTPPortName               = "wesyncer-http-port"
 	LorryHTTPPortName                  = "lorry-http-port"
 	LorryGRPCPortName                  = "lorry-grpc-port"
-	ProbeInitContainerName             = "kb-initprobe"
+	WesyncerInitContainerName          = "kb-init-wesyncer"
+	LorryContainerName                 = "kb-lorry"
 	WeSyncerContainerName              = "kb-we-syncer"
 	RoleProbeContainerName             = "kb-checkrole"
 	StatusProbeContainerName           = "kb-checkstatus"

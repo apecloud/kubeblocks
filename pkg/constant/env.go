@@ -26,6 +26,10 @@ const (
 	KBEnvPodName              = "KB_POD_NAME"
 	KBEnvPodUID               = "KB_POD_UID"
 	KBEnvVolumeProtectionSpec = "KB_VOLUME_PROTECTION_SPEC"
+	KBEnvWeSyncerHTTPPort     = "WESYNCER_SERVICE_HTTP_PORT"
+	KBEnvLorryHTTPPort        = "LORRY_SERVICE_HTTP_PORT"
+	KBEnvLorryGRPCPort        = "LORRY_SERVICE_GRPC_PORT"
+	KBEnvLorryLogLevel        = "LORRY_SERVICE_LOG_LEVEL"
 )
 
 // Lorry env names

@@ -35,11 +35,21 @@ Common labels
 */}}
 {{- define "pulsar.labels" -}}
 helm.sh/chart: {{ include "pulsar.chart" . }}
+{{ include "pulsar.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
+
+{{/*
+Selector labels
+*/}}
+{{- define "pulsar.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "pulsar.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+
 
 {{/*
 Create full image name

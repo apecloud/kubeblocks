@@ -458,6 +458,7 @@ const (
 	ApeCloudPostgresqlBuiltinActionHandler BuiltinActionHandlerType = "apecloud-postgresql"
 	PolarDBXBuiltinActionHandler           BuiltinActionHandlerType = "polardbx"
 	UnknownBuiltinActionHandler            BuiltinActionHandlerType = "unknown"
+	CustomActionHandler                    BuiltinActionHandlerType = "custom"
 )
 
 type LifecycleActionHandler struct {

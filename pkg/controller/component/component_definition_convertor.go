@@ -517,18 +517,30 @@ func (c *compDefLifecycleActionsConvertor) convertBuiltinActionHandler(clusterCo
 
 func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) *appsv1alpha1.RoleProbeSpec {
 	// if RSMSpec has role probe CustomHandler, use it first.
-	if clusterCompDef.RSMSpec != nil && clusterCompDef.RSMSpec.RoleProbe != nil && len(clusterCompDef.RSMSpec.RoleProbe.CustomHandler) > 0 {
-		// TODO(xingran): RSMSpec.RoleProbe.CustomHandler support multiple images and commands, but ComponentDefinition.LifeCycleAction.RoleProbeSpec only support one image and command now.
-		return &appsv1alpha1.RoleProbeSpec{
-			LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
-				BuiltinHandler: nil,
-				CustomHandler: &appsv1alpha1.Action{
-					Image: clusterCompDef.RSMSpec.RoleProbe.CustomHandler[0].Image,
-					Exec: &appsv1alpha1.ExecAction{
-						Command: clusterCompDef.RSMSpec.RoleProbe.CustomHandler[0].Command,
+	if clusterCompDef.RSMSpec != nil && clusterCompDef.RSMSpec.RoleProbe != nil {
+		if clusterCompDef.RSMSpec.RoleProbe.BuiltinHandler != nil && *clusterCompDef.RSMSpec.RoleProbe.BuiltinHandler != "" {
+			handler := appsv1alpha1.BuiltinActionHandlerType(*clusterCompDef.RSMSpec.RoleProbe.BuiltinHandler)
+			return &appsv1alpha1.RoleProbeSpec{
+				LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
+					BuiltinHandler: &handler,
+				},
+			}
+		}
+
+		if len(clusterCompDef.RSMSpec.RoleProbe.CustomHandler) > 0 {
+			// TODO(xingran): RSMSpec.RoleProbe.CustomHandler support multiple images and commands, but ComponentDefinition.LifeCycleAction.RoleProbeSpec only support one image and command now.
+			handler := appsv1alpha1.CustomActionHandler
+			return &appsv1alpha1.RoleProbeSpec{
+				LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
+					BuiltinHandler: &handler,
+					CustomHandler: &appsv1alpha1.Action{
+						Image: clusterCompDef.RSMSpec.RoleProbe.CustomHandler[0].Image,
+						Exec: &appsv1alpha1.ExecAction{
+							Command: clusterCompDef.RSMSpec.RoleProbe.CustomHandler[0].Command,
+						},
 					},
 				},
-			},
+			}
 		}
 	}
 

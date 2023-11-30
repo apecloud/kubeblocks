@@ -335,28 +335,26 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 		return *synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler
 	}
 
-	actions := []struct {
-		LifeCycleActionHandlers *appsv1alpha1.LifecycleActionHandler
-	}{
-		{synthesizeComp.LifecycleActions.PostStart},
-		{synthesizeComp.LifecycleActions.PreStop},
-		{synthesizeComp.LifecycleActions.MemberJoin},
-		{synthesizeComp.LifecycleActions.MemberLeave},
-		{synthesizeComp.LifecycleActions.Readonly},
-		{synthesizeComp.LifecycleActions.Readwrite},
-		{synthesizeComp.LifecycleActions.DataPopulate},
-		{synthesizeComp.LifecycleActions.DataAssemble},
-		{synthesizeComp.LifecycleActions.Reconfigure},
-		{synthesizeComp.LifecycleActions.AccountProvision},
+	actions := []*appsv1alpha1.LifecycleActionHandler{
+		synthesizeComp.LifecycleActions.PostStart,
+		synthesizeComp.LifecycleActions.PreStop,
+		synthesizeComp.LifecycleActions.MemberJoin,
+		synthesizeComp.LifecycleActions.MemberLeave,
+		synthesizeComp.LifecycleActions.Readonly,
+		synthesizeComp.LifecycleActions.Readwrite,
+		synthesizeComp.LifecycleActions.DataPopulate,
+		synthesizeComp.LifecycleActions.DataAssemble,
+		synthesizeComp.LifecycleActions.Reconfigure,
+		synthesizeComp.LifecycleActions.AccountProvision,
 	}
 
 	for _, action := range actions {
-		if action.LifeCycleActionHandlers != nil && action.LifeCycleActionHandlers.BuiltinHandler != nil {
-			return *action.LifeCycleActionHandlers.BuiltinHandler
+		if action != nil && action.BuiltinHandler != nil {
+			return *action.BuiltinHandler
 		}
 	}
 
-	return appsv1alpha1.UnknownBuiltinActionHandler
+	return appsv1alpha1.CustomActionHandler
 }
 
 // isSupportWeSyncer checks if we need to inject a kb-we-syncer container

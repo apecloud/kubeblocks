@@ -169,6 +169,7 @@ const (
 	keyStorageClass setKey = "storageClass"
 	keySwitchPolicy setKey = "switchPolicy"
 	keyCompNum      setKey = "compNum"
+	keyMonitor      setKey = "monitor"
 	keyUnknown      setKey = "unknown"
 )
 
@@ -315,15 +316,6 @@ func NewCreateOptions(f cmdutil.Factory, streams genericiooptions.IOStreams) *Cr
 	o.CreateOptions.CreateDependencies = o.CreateDependencies
 	o.CreateOptions.CleanUpFn = o.CleanUp
 	return o
-}
-
-func setMonitor(monitoringInterval uint8, components []map[string]interface{}) {
-	if len(components) == 0 {
-		return
-	}
-	for _, component := range components {
-		component[monitorKey] = monitoringInterval != 0
-	}
 }
 
 func getRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, volumeRestorePolicy string, compSpecsCount int, firstCompName string, restoreTime string) (string, error) {
@@ -548,7 +540,6 @@ func (o *CreateOptions) Complete() error {
 		return err
 	}
 
-	setMonitor(o.MonitoringInterval, components)
 	if err = setBackup(o, components); err != nil {
 		return err
 	}
@@ -632,7 +623,7 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 	}
 
 	if clusterCompSpecs != nil {
-		setsCompSpecs, err := buildClusterComp(cd, compSets, clsMgr, o.CreateOnlySet)
+		setsCompSpecs, err := buildClusterComp(cd, compSets, clsMgr, o.MonitoringInterval, o.CreateOnlySet)
 		if err != nil {
 			return nil, err
 		}
@@ -646,7 +637,7 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 			compSpecs = append(compSpecs, &comp)
 		}
 	} else {
-		compSpecs, err = buildClusterComp(cd, compSets, clsMgr, o.CreateOnlySet)
+		compSpecs, err = buildClusterComp(cd, compSets, clsMgr, o.MonitoringInterval, o.CreateOnlySet)
 		if err != nil {
 			return nil, err
 		}
@@ -987,7 +978,11 @@ func setEnableAllLogs(c *appsv1alpha1.Cluster, cd *appsv1alpha1.ClusterDefinitio
 	}
 }
 
-func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string, clsMgr *class.Manager, createOnlySet bool) ([]*appsv1alpha1.ClusterComponentSpec, error) {
+func buildClusterComp(cd *appsv1alpha1.ClusterDefinition,
+	setsMap map[string]map[setKey]string,
+	clsMgr *class.Manager,
+	monitoringInterval uint8,
+	createOnlySet bool) ([]*appsv1alpha1.ClusterComponentSpec, error) {
 	// get value from set values and environment variables, the second return value is
 	// true if the value is from environment variables
 	getVal := func(c *appsv1alpha1.ClusterComponentDefinition, key setKey, sets map[setKey]string) string {
@@ -1033,7 +1028,10 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 				return "0"
 			}
 		}
-
+		if createOnlySet && key == keyStorage {
+			// storage is optional for components. if the storage is not set and createOnlySet is true, ignore it.
+			return ""
+		}
 		// get value from environment variables
 		cfg := setKeyCfg[key]
 		return viper.GetString(cfg)
@@ -1124,26 +1122,39 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 			Requests: resourceList,
 			Limits:   resourceList,
 		}
-		compObj.VolumeClaimTemplates = []appsv1alpha1.ClusterComponentVolumeClaimTemplate{{
-			Name: "data",
-			Spec: appsv1alpha1.PersistentVolumeClaimSpec{
-				AccessModes: []corev1.PersistentVolumeAccessMode{
-					corev1.ReadWriteOnce,
-				},
-				Resources: corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceStorage: resource.MustParse(getVal(&c, keyStorage, sets)),
+		storageSize := getVal(&c, keyStorage, sets)
+		if storageSize != "" {
+			compObj.VolumeClaimTemplates = []appsv1alpha1.ClusterComponentVolumeClaimTemplate{{
+				Name: "data",
+				Spec: appsv1alpha1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{
+						corev1.ReadWriteOnce,
+					},
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse(getVal(&c, keyStorage, sets)),
+						},
 					},
 				},
-			},
-		}}
-		storageClass := getVal(&c, keyStorageClass, sets)
-		if len(storageClass) != 0 {
-			// now the clusterdefinition components mostly have only one VolumeClaimTemplates in default
-			compObj.VolumeClaimTemplates[0].Spec.StorageClassName = &storageClass
+			}}
+			storageClass := getVal(&c, keyStorageClass, sets)
+			if len(storageClass) != 0 {
+				// now the clusterdefinition components mostly have only one VolumeClaimTemplates in default
+				compObj.VolumeClaimTemplates[0].Spec.StorageClassName = &storageClass
+			}
 		}
 		if err = buildSwitchPolicy(&c, compObj, sets); err != nil {
 			return nil, err
+		}
+		// set component monitor
+		monitor := getVal(&c, keyMonitor, sets)
+		if monitor == "" {
+			compObj.Monitor = monitoringInterval != 0
+		} else {
+			compObj.Monitor, err = strconv.ParseBool(monitor)
+			if err != nil {
+				return nil, fmt.Errorf("parsing monitor failed: %s", err.Error())
+			}
 		}
 		comps = append(comps, compObj)
 		compNum := 0
@@ -1352,7 +1363,7 @@ func getStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, er
 	for _, item := range list.Items {
 		allStorageClasses[item.GetName()] = struct{}{}
 		annotations := item.GetAnnotations()
-		if !existedDefault && annotations != nil && (annotations[storage.IsDefaultStorageClassAnnotation] == annotationTrueValue || annotations[storage.BetaIsDefaultStorageClassAnnotation] == annotationTrueValue) {
+		if !existedDefault && annotations != nil && (annotations[storage.IsDefaultStorageClassAnnotation] == TrueValue || annotations[storage.BetaIsDefaultStorageClassAnnotation] == TrueValue) {
 			existedDefault = true
 		}
 	}
@@ -1538,7 +1549,7 @@ func getBackupMethodsFromBackupPolicyTemplates(dynamic dynamic.Interface, cluste
 		defaultBackupPolicyTemplate = backupPolicyTemplates[0]
 	}
 	for _, backupPolicyTemplate := range backupPolicyTemplates {
-		if backupPolicyTemplate.Annotations[dptypes.DefaultBackupPolicyTemplateAnnotationKey] == annotationTrueValue {
+		if backupPolicyTemplate.Annotations[dptypes.DefaultBackupPolicyTemplateAnnotationKey] == TrueValue {
 			defaultBackupPolicyTemplate = backupPolicyTemplate
 			break
 		}
@@ -1589,6 +1600,7 @@ func setKeys() []string {
 		string(keyClass),
 		string(keyStorageClass),
 		string(keySwitchPolicy),
+		string(keyMonitor),
 		string(keyCompNum),
 	}
 }

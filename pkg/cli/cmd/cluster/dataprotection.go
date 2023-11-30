@@ -120,7 +120,7 @@ var (
 	`)
 )
 
-const annotationTrueValue = "true"
+const TrueValue = "true"
 
 type CreateBackupOptions struct {
 	BackupMethod     string `json:"backupMethod"`
@@ -250,7 +250,7 @@ func (o *CreateBackupOptions) getDefaultBackupPolicy() (string, error) {
 	}
 	var defaultBackupPolicies []unstructured.Unstructured
 	for _, obj := range objs.Items {
-		if obj.GetAnnotations()[dptypes.DefaultBackupPolicyAnnotationKey] == annotationTrueValue {
+		if obj.GetAnnotations()[dptypes.DefaultBackupPolicyAnnotationKey] == TrueValue {
 			defaultBackupPolicies = append(defaultBackupPolicies, obj)
 		}
 	}

@@ -120,7 +120,6 @@ func (c *componentPlanBuilder) Build() (graph.Plan, error) {
 	dag := graph.NewDAG()
 	err := c.transformers.ApplyTo(c.transCtx, dag)
 	if err != nil {
-		fmt.Printf("component - build error: %s\n", err.Error())
 		c.transCtx.Logger.V(1).Info(fmt.Sprintf("build error: %s", err.Error()))
 	}
 	c.transCtx.Logger.V(1).Info(fmt.Sprintf("DAG: %s", dag))
@@ -137,7 +136,6 @@ func (c *componentPlanBuilder) Build() (graph.Plan, error) {
 func (p *componentPlan) Execute() error {
 	err := p.dag.WalkReverseTopoOrder(p.walkFunc, nil)
 	if err != nil {
-		fmt.Printf("component - execute error: %s\n", err.Error())
 		p.transCtx.Logger.V(1).Info(fmt.Sprintf("execute error: %s", err.Error()))
 	}
 	return err

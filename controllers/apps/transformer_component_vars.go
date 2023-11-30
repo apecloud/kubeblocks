@@ -47,7 +47,7 @@ func (t *componentVarsTransformer) Transform(ctx graph.TransformContext, dag *gr
 	reader := &varsTransformerReader{transCtx.Client, graphCli, dag}
 	synthesizedComp := transCtx.SynthesizeComponent
 	return component.ResolveEnvNTemplateVars(transCtx.Context, reader,
-		synthesizedComp, transCtx.Cluster.Annotations, transCtx.CompDef.Spec.Env)
+		synthesizedComp, transCtx.Cluster.Annotations, transCtx.CompDef.Spec.Vars)
 }
 
 type varsTransformerReader struct {

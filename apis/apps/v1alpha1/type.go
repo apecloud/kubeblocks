@@ -653,7 +653,7 @@ type ConnectionCredential struct {
 }
 
 // List of all the built-in variables defined by KB.
-// When rendering the environment variables of Pod or Action, and the templates of config or script,
+// When rendering the environment variables of Pod & Action, and the templates of config & script,
 // these variables will be passed in by default, so you can use them directly without declaration.
 // TODO: resources.
 // --------------------------------------------------------------------------------
@@ -695,11 +695,11 @@ type EnvVar struct {
 	Value string `json:"value,omitempty"`
 	// Source for the variable's value. Cannot be used if value is not empty.
 	// +optional
-	ValueFrom *EnvVarSource `json:"valueFrom,omitempty"`
+	ValueFrom *VarSource `json:"valueFrom,omitempty"`
 }
 
-// EnvVarSource represents a source for the value of an EnvVar.
-type EnvVarSource struct {
+// VarSource represents a source for the value of an EnvVar.
+type VarSource struct {
 	// Selects a key of a ConfigMap.
 	// +optional
 	ConfigMapKeyRef *corev1.ConfigMapKeySelector `json:"configMapKeyRef,omitempty"`
@@ -708,100 +708,92 @@ type EnvVarSource struct {
 	// +optional
 	SecretKeyRef *corev1.SecretKeySelector `json:"secretKeyRef,omitempty"`
 
-	// Selects a defined key of a Service.
+	// Selects a defined var of a Service.
 	// +optional
-	ServiceKeyRef *ServiceKeySelector `json:"serviceKeyRef,omitempty"`
+	ServiceVarRef *ServiceVarSelector `json:"serviceVarRef,omitempty"`
 
-	// Selects a defined key of a Credential (SystemAccount).
+	// Selects a defined var of a Credential (SystemAccount).
 	// +optional
-	CredentialKeyRef *CredentialKeySelector `json:"credentialKeyRef,omitempty"`
+	CredentialVarRef *CredentialVarSelector `json:"credentialVarRef,omitempty"`
 
-	// Selects a defined key of a ServiceRef.
+	// Selects a defined var of a ServiceRef.
 	// +optional
-	ServiceRefKeyRef *ServiceRefKeySelector `json:"serviceRefKeyRef,omitempty"`
+	ServiceRefVarRef *ServiceRefVarSelector `json:"serviceRefVarRef,omitempty"`
 }
 
 // +enum
 // +kubebuilder:validation:Enum={Required,Optional}
-type EnvKeyOption string
+type VarOption string
 
 const (
-	EnvKeyRequired EnvKeyOption = "Required"
-	EnvKeyOptional EnvKeyOption = "Optional"
+	VarRequired VarOption = "Required"
+	VarOptional VarOption = "Optional"
 )
 
-type EnvKey struct {
-	// +optional
-	Option *EnvKeyOption `json:"option,omitempty"`
-}
-
-type NamedEnvKey struct {
-	EnvKey `json:",inline"`
-
+type NamedVar struct {
 	// +optional
 	Name string `json:"name,omitempty"`
+
+	// +optional
+	Option *VarOption `json:"option,omitempty"`
 }
 
-// ServiceEnvKeys defines the keys can be referenced from a Service.
-type ServiceEnvKeys struct {
+// ServiceVars defines the vars can be referenced from a Service.
+type ServiceVars struct {
 	// +optional
-	Host *EnvKey `json:"host,omitempty"`
+	Host *VarOption `json:"host,omitempty"`
 
 	// +optional
-	Port *NamedEnvKey `json:"port,omitempty"`
+	Port *NamedVar `json:"port,omitempty"`
 }
 
-// CredentialEnvKeys defines the keys can be referenced from a Credential (SystemAccount).
-// !!!!! CredentialEnvKeys will only be used as environment variables for Pod or Action, and will not be used to render the templates.
-type CredentialEnvKeys struct {
+// CredentialVars defines the vars can be referenced from a Credential (SystemAccount).
+// !!!!! CredentialVars will only be used as environment variables for Pods & Actions, and will not be used to render the templates.
+type CredentialVars struct {
 	// +optional
-	Username *EnvKey `json:"username,omitempty"`
+	Username *VarOption `json:"username,omitempty"`
 
 	// +optional
-	Password *EnvKey `json:"password,omitempty"`
+	Password *VarOption `json:"password,omitempty"`
 }
 
-// ServiceRefEnvKeys defines the keys can be referenced from a ServiceRef.
-type ServiceRefEnvKeys struct {
+// ServiceRefVars defines the vars can be referenced from a ServiceRef.
+type ServiceRefVars struct {
 	// +optional
-	Endpoint *EnvKey `json:"endpoint,omitempty"`
+	Endpoint *VarOption `json:"endpoint,omitempty"`
 
 	// +optional
-	Port *EnvKey `json:"port,omitempty"`
+	Port *VarOption `json:"port,omitempty"`
 
-	CredentialEnvKeys `json:",inline"`
+	CredentialVars `json:",inline"`
 }
 
-// ServiceKeySelector selects a key from a Service.
-// +structType=atomic
-type ServiceKeySelector struct {
+// ServiceVarSelector selects a var from a Service.
+type ServiceVarSelector struct {
 	// The Service to select from.
 	// It can be referenced from the default headless service by setting the name to "headless".
 	ClusterObjectReference `json:",inline"`
 
-	ServiceEnvKeys `json:",inline"`
+	ServiceVars `json:",inline"`
 }
 
-// CredentialKeySelector selects a key from a Credential (SystemAccount).
-// +structType=atomic
-type CredentialKeySelector struct {
+// CredentialVarSelector selects a var from a Credential (SystemAccount).
+type CredentialVarSelector struct {
 	// The Credential (SystemAccount) to select from.
 	ClusterObjectReference `json:",inline"`
 
-	CredentialEnvKeys `json:",inline"`
+	CredentialVars `json:",inline"`
 }
 
-// ServiceRefKeySelector selects a key from a ServiceRefDeclaration.
-// +structType=atomic
-type ServiceRefKeySelector struct {
+// ServiceRefVarSelector selects a var from a ServiceRefDeclaration.
+type ServiceRefVarSelector struct {
 	// The ServiceRefDeclaration to select from.
 	ClusterObjectReference `json:",inline"`
 
-	ServiceRefEnvKeys `json:",inline"`
+	ServiceRefVars `json:",inline"`
 }
 
 // ClusterObjectReference contains information to let you locate the referenced object inside the same cluster.
-// +structType=atomic
 type ClusterObjectReference struct {
 	// Component of the referent object resident in.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
@@ -817,70 +809,3 @@ type ClusterObjectReference struct {
 	// +optional
 	Optional *bool `json:"optional,omitempty"`
 }
-
-// Example of a milvus component definition:
-//  envVars:
-//    - name: ETCD_ENDPOINT
-//      valueFrom:
-//        serviceRefKeyRef:
-//          name: milvus-meta-storage
-//          serviceKeys:
-//            endpoint: Required
-//    - name: PULSAR_SERVER
-//      valueFrom:
-//        serviceRefKeyRef:
-//          name: milvus-log-storage
-//          serviceKeys:
-//            host: Required
-//    - name: PULSAR_PORT
-//      valueFrom:
-//        serviceRefKeyRef:
-//          name: milvus-log-storage
-//          serviceKeys:
-//            port: Required
-//    - name: MINIO_SERVER
-//      valueFrom:
-//        serviceRefKeyRef:
-//          name: milvus-object-storage
-//          serviceKeys:
-//            host: Required
-//    - name: MINIO_PORT
-//      valueFrom:
-//        serviceRefKeyRef:
-//          name: milvus-object-storage
-//          serviceKeys:
-//            port:
-//              ObjectKeyOption: Required
-//    - name: MINIO_ACCESS_KEY
-//      valueFrom:
-//        serviceRefKeyRef:
-//          name: milvus-object-storage
-//          credentialKeyRef:
-//            username: Required
-//    - name: MINIO_SECRET_KEY
-//      valueFrom:
-//        serviceRefKeyRef:
-//          name: milvus-object-storage
-//          credentialKeyRef:
-//            password: Required
-
-// The config file of milvus components will be:
-// etcd:
-//   endpoints:
-//     - {{$ETCD_ENDPOINT}}
-//   rootPath: {{$KB_CLUSTER_NAME}}
-// messageQueue: pulsar
-// minio:
-//   address: {{$MINIO_SERVER}}
-//   port: {{$MINIO_PORT}}
-//   accessKeyID: {{$MINIO_ACCESS_KEY}}
-//   secretAccessKey: {{$MINIO_SECRET_KEY}}
-//   bucketName: {{$KB_CLUSTER_NAME}}
-// mq:
-//   type: pulsar
-// msgChannel:
-//   chanNamePrefix:
-//     cluster: {{$KB_CLUSTER_NAME}}
-// pulsar:
-//   address: {{$PULSAR_SERVER}}
-//   port: {{$PULSAR_PORT}}

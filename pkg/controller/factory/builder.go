@@ -428,13 +428,7 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams,
 			RunAsUser: &user,
 		})
 	}
-	container := containerBuilder.GetObject()
-	// TODO: remove this, env and default resource limits will be set at building RSM.
-	// if err := buildTemplateContainerEnv(sidecarRenderedParam.Cluster, component, container); err != nil {
-	//	return nil, err
-	// }
-	// intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
-	return container, nil
+	return containerBuilder.GetObject(), nil
 }
 
 func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent, toolsMetas []appsv1alpha1.ToolConfig, toolsMap map[string]cfgcm.ConfigSpecMeta) ([]corev1.Container, error) {
@@ -451,11 +445,6 @@ func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildPa
 	}
 	for i := range toolContainers {
 		container := &toolContainers[i]
-		// TODO: remove this, env and default resource limits will be set at building RSM.
-		// if err := buildTemplateContainerEnv(sidecarRenderedParam.Cluster, component, container); err != nil {
-		//	return nil, err
-		// }
-		// intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
 		if meta, ok := toolsMap[container.Name]; ok {
 			setToolsScriptsPath(container, meta)
 		}

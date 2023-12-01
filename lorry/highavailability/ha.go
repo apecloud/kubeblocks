@@ -274,8 +274,12 @@ func (ha *Ha) Start() {
 	}
 
 	for {
+		startAt := time.Now()
 		ha.RunCycle()
-		time.Sleep(10 * time.Second)
+		duration := time.Since(startAt)
+		if duration < 10*time.Second {
+			time.Sleep(10*time.Second - duration)
+		}
 	}
 }
 

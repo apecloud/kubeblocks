@@ -329,6 +329,9 @@ func resolveServicePortRef(ctx context.Context, cli client.Reader, synthesizedCo
 				return strconv.Itoa(int(svcPort.Port)), nil
 			}
 		}
+		if len(svc.Spec.Ports) == 1 && (len(svc.Spec.Ports[0].Name) == 0 || len(selector.Port.Name) == 0) {
+			return strconv.Itoa(int(svc.Spec.Ports[0].Port)), nil
+		}
 		return nil, nil
 	}
 	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.Port.Option, resolvePort)

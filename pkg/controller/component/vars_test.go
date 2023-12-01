@@ -428,7 +428,23 @@ var _ = Describe("vars", func() {
 						},
 					},
 				},
-				// TODO: w/o port name
+				{
+					Name: "service-port-wo-name",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name:     "service-wo-port-name",
+								Optional: required(),
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Port: &appsv1alpha1.NamedVar{
+									Name:   "default",
+									Option: &appsv1alpha1.VarRequired,
+								},
+							},
+						},
+					},
+				},
 			}
 			svcName := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "service")
 			svcPort := 3306
@@ -449,13 +465,28 @@ var _ = Describe("vars", func() {
 							},
 						},
 					},
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "service-wo-port-name"),
+						},
+						Spec: corev1.ServiceSpec{
+							Ports: []corev1.ServicePort{
+								{
+									Port: int32(svcPort + 1),
+								},
+							},
+						},
+					},
 				},
 			}
 			Expect(ResolveEnvNTemplateVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)).Should(Succeed())
 			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("service-host", svcName))
 			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("service-port", strconv.Itoa(svcPort)))
+			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("service-port-wo-name", strconv.Itoa(svcPort+1)))
 			checkEnvVarExist(synthesizedComp, "service-host", svcName)
 			checkEnvVarExist(synthesizedComp, "service-port", strconv.Itoa(svcPort))
+			checkEnvVarExist(synthesizedComp, "service-port-wo-name", strconv.Itoa(svcPort+1))
 		})
 
 		It("credential vars", func() {

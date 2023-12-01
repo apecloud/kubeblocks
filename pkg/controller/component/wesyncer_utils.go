@@ -66,24 +66,75 @@ func buildWeSyncerInitContainer(component *SynthesizedComponent, container *core
 	container.VolumeMounts = []corev1.VolumeMount{volumeMount}
 }
 
-func modifyMainContainerForWesyncer(component *SynthesizedComponent, wesyncerSvcHTTPPort int) {
+func modifyMainContainerForWesyncer(component *SynthesizedComponent, weSyncerSvcHTTPPort int) {
 	container := component.PodSpec.Containers[0]
 	command := []string{"/kubeblocks/wesyncer",
 		"--config-path", "/kubeblocks/config/components",
-		"--port", strconv.Itoa(wesyncerSvcHTTPPort),
+		"--port", strconv.Itoa(weSyncerSvcHTTPPort),
 		// "--zap-log-level", "debug",
 		"--"}
 	container.Command = append(command, container.Command...)
 	volumeMount := corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"}
 	container.VolumeMounts = append(container.VolumeMounts, volumeMount)
-	container.Env = append(container.Env, buildContainerEnvs(component)...)
+	container.Env = append(container.Env, buildWeSyncerEnvs(component)...)
 
 	container.Ports = append(container.Ports, corev1.ContainerPort{
-		ContainerPort: int32(wesyncerSvcHTTPPort),
+		ContainerPort: int32(weSyncerSvcHTTPPort),
 		Name:          constant.WesyncerHTTPPortName,
 		Protocol:      "TCP",
 	})
 	component.PodSpec.Containers[0] = container
+}
+
+func buildWeSyncerEnvs(synthesizeComp *SynthesizedComponent) []corev1.EnvVar {
+	var (
+		secretName     string
+		sysInitAccount *appsv1alpha1.SystemAccount
+	)
+
+	// TODO(lorry): use the buildIn kbprobe system account as the default credential
+	for index, sysAccount := range synthesizeComp.SystemAccounts {
+		if sysAccount.InitAccount {
+			sysInitAccount = &synthesizeComp.SystemAccounts[index]
+			break
+		}
+	}
+	if sysInitAccount != nil {
+		secretName = constant.GenerateComponentConnCredential(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
+	} else {
+		secretName = constant.GenerateDefaultConnCredential(synthesizeComp.ClusterName)
+	}
+	envs := []corev1.EnvVar{
+		// inject the default built-in handler env to lorry container.
+		{
+			Name:      constant.KBEnvBuiltinHandler,
+			Value:     string(getWeSyncerType(synthesizeComp)),
+			ValueFrom: nil,
+		},
+		{
+			Name: constant.KBEnvServiceUser,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key: constant.AccountNameForSecret,
+				},
+			},
+		},
+		{
+			Name: constant.KBEnvServicePassword,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key: constant.AccountPasswdForSecret,
+				},
+			},
+		},
+	}
+	return envs
 }
 
 func getWeSyncerType(synthesizeComp *SynthesizedComponent) string {

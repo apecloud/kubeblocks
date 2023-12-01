@@ -552,7 +552,7 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 
 	tryToGetRoleProbeContainer := func() *corev1.Container {
 		for i, container := range template.Spec.Containers {
-			if container.Name == constant.RoleProbeContainerName {
+			if container.Name == constant.LorryContainerName {
 				return &template.Spec.Containers[i]
 			}
 		}

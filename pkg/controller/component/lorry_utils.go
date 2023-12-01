@@ -162,7 +162,7 @@ func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container 
 		}
 	}
 
-	container.Env = append(container.Env, buildContainerEnvs(synthesizeComp)...)
+	container.Env = append(container.Env, buildLorryEnvs(synthesizeComp)...)
 	container.Ports = []corev1.ContainerPort{
 		{
 			ContainerPort: int32(lorrySvcHTTPPort),
@@ -177,7 +177,7 @@ func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container 
 	}
 }
 
-func buildContainerEnvs(synthesizeComp *SynthesizedComponent) []corev1.EnvVar {
+func buildLorryEnvs(synthesizeComp *SynthesizedComponent) []corev1.EnvVar {
 	var (
 		secretName     string
 		sysInitAccount *appsv1alpha1.SystemAccount

@@ -34,11 +34,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	kzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/grpcserver"
-	"github.com/apecloud/kubeblocks/pkg/lorry/highavailability"
 	"github.com/apecloud/kubeblocks/pkg/lorry/httpserver"
 	opsregister "github.com/apecloud/kubeblocks/pkg/lorry/operations/register"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -87,18 +85,18 @@ func main() {
 	}
 
 	// Start HA
-	characterType := viper.GetString(constant.KBEnvCharacterType)
-	if viper.IsSet(constant.KBEnvBuiltinHandler) {
-		characterType = viper.GetString(constant.KBEnvBuiltinHandler)
-	}
-	workloadType := viper.GetString(constant.KBEnvWorkloadType)
-	if highavailability.IsHAAvailable(characterType, workloadType) {
-		ha := highavailability.NewHa()
-		if ha != nil {
-			defer ha.ShutdownWithWait()
-			go ha.Start()
-		}
-	}
+	// characterType := viper.GetString(constant.KBEnvCharacterType)
+	// if viper.IsSet(constant.KBEnvBuiltinHandler) {
+	// 	characterType = viper.GetString(constant.KBEnvBuiltinHandler)
+	// }
+	// workloadType := viper.GetString(constant.KBEnvWorkloadType)
+	// if highavailability.IsHAAvailable(characterType, workloadType) {
+	// 	ha := highavailability.NewHa()
+	// 	if ha != nil {
+	// 		defer ha.ShutdownWithWait()
+	// 		go ha.Start()
+	// 	}
+	// }
 
 	// start grpc server for role probe
 	grpcServer, err := grpcserver.NewGRPCServer()

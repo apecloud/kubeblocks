@@ -229,7 +229,7 @@ const (
 
 const (
 	// Container port name
-	WesyncerHTTPPortName               = "wesyncer-http-port"
+	WesyncerHTTPPortName               = "wesyncer-port"
 	LorryHTTPPortName                  = "lorry-http-port"
 	LorryGRPCPortName                  = "lorry-grpc-port"
 	WesyncerInitContainerName          = "kb-init-wesyncer"

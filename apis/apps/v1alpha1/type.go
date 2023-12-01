@@ -652,30 +652,32 @@ type ConnectionCredential struct {
 	AccountName string `json:"accountName,omitempty"`
 }
 
-// List of all the built-in variables defined by KB.
-// When rendering the environment variables of Pod & Action, and the templates of config & script,
-// these variables will be passed in by default, so you can use them directly without declaration.
+// List of all the built-in variables provided by KubeBlocks.
+// These variables are automatically available when building environment variables for Pods and Actions, as well as
+// rendering templates for config and script. Users can directly use these variables without explicit declaration.
+//
+// Note: Dynamic variables have values that may change at runtime, so exercise caution when using them.
+//
 // TODO: resources.
-// --------------------------------------------------------------------------------
-// |           |           |                      |  available in   |             |
-// | object    | attribute | var                  | template | Env  | description |
-// --------------------------------------------------------------------------------
-// | Namespace |           | KB_NAMESPACE         |          |      |             |
-// | Cluster   | name      | KB_CLUSTER_NAME      |          |      |             |
-// |           | UID       | KB_CLUSTER_UID       |          |      |             |
-// |           | comp name | KB_CLUSTER_COMP_NAME |          |      |             |
-// | Component | name      | KB_COMP_NAME         |          |      |             |
-// |           | replicas  | KB_COMP_REPLICAS     |          |      |             |
-// | Pod       | name      | KB_POD_NAME          |     x    |      |             |
-// |           | UID       | KB_POD_UID           |     x    |      |             |
-// |           | IP        | KB_POD_IP            |     x    |      |             |
-// |           | IPs       | KB_POD_IPS           |     x    |      |             |
-// |           | FQDN      | KB_POD_FQDN          |     x    |      |             |
-// |           | ordinal   | KB_POD_ORDINAL       |     x    |      |             |
-// | Host      | name      | KB_NODENAME          |     x    |      |             |
-// |           | IP        | KB_HOST_IP           |     x    |      |             |
-// | SA        | name      | KB_SA_NAME           |     x    |      |             |
-// --------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// | Object    | Attribute | Variable             | Template | Env  | Dynamic |
+// ----------------------------------------------------------------------------
+// | Namespace |           | KB_NAMESPACE         |          |      |         |
+// | Cluster   | Name      | KB_CLUSTER_NAME      |          |      |         |
+// |           | UID       | KB_CLUSTER_UID       |          |      |         |
+// |           | Component | KB_CLUSTER_COMP_NAME |          |      |         |
+// | Component | Name      | KB_COMP_NAME         |          |      |         |
+// |           | Replicas  | KB_COMP_REPLICAS     |          |      |         |
+// | Pod       | Name      | KB_POD_NAME          |     x    |      |    ✓    |
+// |           | UID       | KB_POD_UID           |     x    |      |    ✓    |
+// |           | IP        | KB_POD_IP            |     x    |      |    ✓    |
+// |           | IPs       | KB_POD_IPS           |     x    |      |    ✓    |
+// |           | FQDN      | KB_POD_FQDN          |     x    |      |         |
+// |           | Ordinal   | KB_POD_ORDINAL       |     x    |      |         |
+// | Host      | Name      | KB_NODENAME          |     x    |      |    ✓    |
+// |           | IP        | KB_HOST_IP           |     x    |      |    ✓    |
+// | SA        | Name      | KB_SA_NAME           |     x    |      |         |
+// ----------------------------------------------------------------------------
 
 // EnvVar represents a variable present in the env of Pod/Action or the template of config/script.
 type EnvVar struct {

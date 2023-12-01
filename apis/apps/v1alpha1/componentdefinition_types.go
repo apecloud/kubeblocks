@@ -101,8 +101,9 @@ type ComponentDefinitionSpec struct {
 	// +kubebuilder:validation:Required
 	Runtime corev1.PodSpec `json:"runtime"`
 
-	// User-defined variables.
-	// These can be used as environment variables for pods & actions, or to render the templates of config & script.
+	// Vars represents user-defined variables.
+	// These variables can be utilized as environment variables for Pods and Actions, or to render the templates of config and script.
+	// When used as environment variables, these variables are placed in front of the environment variables declared in the Pod.
 	// Cannot be updated.
 	// +optional
 	Vars []EnvVar `json:"vars,omitempty"`

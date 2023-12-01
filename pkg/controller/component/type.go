@@ -38,9 +38,10 @@ type SynthesizedComponent struct {
 	Namespace            string                                 `json:"namespace,omitempty"`
 	ClusterName          string                                 `json:"clusterName,omitempty"`
 	ClusterUID           string                                 `json:"clusterUID,omitempty"`
-	Name                 string                                 `json:"name,omitempty"`         // the name of the component without clusterName prefix
-	FullCompName         string                                 `json:"fullCompName,omitempty"` // the full name of the component with clusterName prefix
-	CompDefName          string                                 `json:"compDefName,omitempty"`  // the name of the componentDefinition
+	Comp2CompDefs        map[string]string                      `json:"comp2CompDefs,omitempty"` // {compName: compDefName}
+	Name                 string                                 `json:"name,omitempty"`          // the name of the component without clusterName prefix
+	FullCompName         string                                 `json:"fullCompName,omitempty"`  // the full name of the component with clusterName prefix
+	CompDefName          string                                 `json:"compDefName,omitempty"`   // the name of the componentDefinition
 	Replicas             int32                                  `json:"replicas"`
 	PodSpec              *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`

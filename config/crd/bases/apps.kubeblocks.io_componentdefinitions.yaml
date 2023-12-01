@@ -11728,13 +11728,12 @@ spec:
                         credentialVarRef:
                           description: Selects a defined var of a Credential (SystemAccount).
                           properties:
-                            component:
-                              description: 'Component of the referent object resident
-                                in. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                            compDef:
+                              description: CompDef specifies the definition used by
+                                the component that the referent object resident in.
                               type: string
                             name:
-                              description: 'Name of the referent object. More info:
-                                https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                              description: Name of the referent object.
                               type: string
                             optional:
                               description: Specify whether the object must be defined.
@@ -11772,9 +11771,9 @@ spec:
                         serviceRefVarRef:
                           description: Selects a defined var of a ServiceRef.
                           properties:
-                            component:
-                              description: 'Component of the referent object resident
-                                in. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                            compDef:
+                              description: CompDef specifies the definition used by
+                                the component that the referent object resident in.
                               type: string
                             endpoint:
                               enum:
@@ -11782,8 +11781,7 @@ spec:
                               - Optional
                               type: string
                             name:
-                              description: 'Name of the referent object. More info:
-                                https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                              description: Name of the referent object.
                               type: string
                             optional:
                               description: Specify whether the object must be defined.
@@ -11807,9 +11805,9 @@ spec:
                         serviceVarRef:
                           description: Selects a defined var of a Service.
                           properties:
-                            component:
-                              description: 'Component of the referent object resident
-                                in. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                            compDef:
+                              description: CompDef specifies the definition used by
+                                the component that the referent object resident in.
                               type: string
                             host:
                               enum:
@@ -11817,8 +11815,7 @@ spec:
                               - Optional
                               type: string
                             name:
-                              description: 'Name of the referent object. More info:
-                                https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                              description: Name of the referent object.
                               type: string
                             optional:
                               description: Specify whether the object must be defined.

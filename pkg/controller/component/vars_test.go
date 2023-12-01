@@ -137,6 +137,7 @@ var _ = Describe("vars", func() {
 				ClusterName: "test-cluster",
 				ClusterUID:  string(uuid.NewUUID()),
 				Name:        "comp",
+				CompDefName: "compDef",
 				Replicas:    1,
 				PodSpec: &corev1.PodSpec{
 					InitContainers: []corev1.Container{
@@ -722,6 +723,115 @@ var _ = Describe("vars", func() {
 			checkEnvVarExist(synthesizedComp, "serviceref-port", "port")
 			checkEnvVarExist(synthesizedComp, "serviceref-username", "username")
 			checkEnvVarExist(synthesizedComp, "serviceref-password", "password")
+		})
+
+		It("referent component", func() {
+			By("component not found w/ optional")
+			vars := []appsv1alpha1.EnvVar{
+				{
+					Name: "service-host",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  "non-exist",
+								Name:     "service",
+								Optional: optional(),
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Host: &appsv1alpha1.VarOptional,
+							},
+						},
+					},
+				},
+			}
+			Expect(ResolveEnvNTemplateVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil, vars)).Should(Succeed())
+			Expect(synthesizedComp.TemplateVars).ShouldNot(HaveKey("service-host"))
+			checkEnvVarNotExist(synthesizedComp, "service-host")
+
+			By("component not found w/ required")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "service-host",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  "non-exist",
+								Name:     "service",
+								Optional: required(),
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Host: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+			Expect(ResolveEnvNTemplateVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil, vars)).ShouldNot(Succeed())
+
+			By("more than one component found")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "service-host",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  synthesizedComp.CompDefName,
+								Name:     "service",
+								Optional: required(),
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Host: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+			synthesizedComp.Comp2CompDefs = map[string]string{
+				synthesizedComp.Name: synthesizedComp.CompDefName,
+				"other-comp":         synthesizedComp.CompDefName,
+			}
+			Expect(ResolveEnvNTemplateVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil, vars)).ShouldNot(Succeed())
+
+			By("ok")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "service-host",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  synthesizedComp.CompDefName,
+								Name:     "service",
+								Optional: required(),
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Host: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
+			svcName := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "service")
+			reader := &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      svcName,
+						},
+						Spec: corev1.ServiceSpec{
+							Ports: []corev1.ServicePort{
+								{
+									Port: int32(3306),
+								},
+							},
+						},
+					},
+				},
+			}
+			Expect(ResolveEnvNTemplateVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)).Should(Succeed())
+			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("service-host", svcName))
+			checkEnvVarExist(synthesizedComp, "service-host", svcName)
 		})
 	})
 })

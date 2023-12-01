@@ -25,9 +25,11 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -439,26 +441,14 @@ func resolveServiceRefPasswordRef(synthesizedComp *SynthesizedComponent, selecto
 func resolveServiceVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	selector appsv1alpha1.ServiceVarSelector, option *appsv1alpha1.VarOption, resolveVar func(any) (any, any)) (any, any, error) {
 	resolveObj := func() (any, error) {
-		compName := selector.Component
-		if len(compName) == 0 {
-			compName = synthesizedComp.Name
-		}
-		svcName := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, compName, selector.Name)
-		if selector.Name == "headless" {
-			svcName = constant.GenerateDefaultComponentHeadlessServiceName(synthesizedComp.ClusterName, compName)
-		}
-		svcKey := types.NamespacedName{
-			Namespace: synthesizedComp.Namespace,
-			Name:      svcName,
-		}
-		svc := &corev1.Service{}
-		if err := cli.Get(ctx, svcKey, svc); err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil, nil
+		objName := func(compName string) string {
+			svcName := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, compName, selector.Name)
+			if selector.Name == "headless" {
+				svcName = constant.GenerateDefaultComponentHeadlessServiceName(synthesizedComp.ClusterName, compName)
 			}
-			return nil, err
+			return svcName
 		}
-		return svc, nil
+		return resolveReferentObject(ctx, cli, synthesizedComp, selector.ClusterObjectReference, objName, &corev1.Service{})
 	}
 	return resolveClusterObjectVar("Service", selector.ClusterObjectReference, option, resolveObj, resolveVar)
 }
@@ -466,22 +456,10 @@ func resolveServiceVarRefLow(ctx context.Context, cli client.Reader, synthesized
 func resolveCredentialVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	selector appsv1alpha1.CredentialVarSelector, option *appsv1alpha1.VarOption, resolveVar func(any) (any, any)) (any, any, error) {
 	resolveObj := func() (any, error) {
-		compName := selector.Component
-		if len(compName) == 0 {
-			compName = synthesizedComp.Name
+		objName := func(compName string) string {
+			return constant.GenerateAccountSecretName(synthesizedComp.ClusterName, compName, selector.Name)
 		}
-		secretKey := types.NamespacedName{
-			Namespace: synthesizedComp.Namespace,
-			Name:      constant.GenerateAccountSecretName(synthesizedComp.ClusterName, compName, selector.Name),
-		}
-		secret := &corev1.Secret{}
-		if err := cli.Get(ctx, secretKey, secret); err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil, nil
-			}
-			return nil, err
-		}
-		return secret, nil
+		return resolveReferentObject(ctx, cli, synthesizedComp, selector.ClusterObjectReference, objName, &corev1.Secret{})
 	}
 	return resolveClusterObjectVar("Credential", selector.ClusterObjectReference, option, resolveObj, resolveVar)
 }
@@ -495,6 +473,48 @@ func resolveServiceRefVarRefLow(synthesizedComp *SynthesizedComponent, selector 
 		return synthesizedComp.ServiceReferences[selector.Name], nil
 	}
 	return resolveClusterObjectVar("ServiceRef", selector.ClusterObjectReference, option, resolveObj, resolveVar)
+}
+
+func resolveReferentObject(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	objRef appsv1alpha1.ClusterObjectReference, objName func(string) string, obj client.Object) (any, error) {
+	compName, err := resolveReferentComponent(synthesizedComp, objRef)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	objKey := types.NamespacedName{
+		Namespace: synthesizedComp.Namespace,
+		Name:      objName(compName),
+	}
+	if err = cli.Get(ctx, objKey, obj); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return obj, nil
+}
+
+func resolveReferentComponent(synthesizedComp *SynthesizedComponent, objRef appsv1alpha1.ClusterObjectReference) (string, error) {
+	if len(objRef.CompDef) == 0 || objRef.CompDef == synthesizedComp.CompDefName {
+		return synthesizedComp.Name, nil
+	}
+	compNames := make([]string, 0)
+	for k, v := range synthesizedComp.Comp2CompDefs {
+		if v == objRef.CompDef {
+			compNames = append(compNames, k)
+		}
+	}
+	switch len(compNames) {
+	case 1:
+		return compNames[0], nil
+	case 0:
+		return "", apierrors.NewNotFound(schema.GroupResource{}, "") // the error msg is trivial
+	default:
+		return "", fmt.Errorf("more than one referent component found: %s", strings.Join(compNames, ","))
+	}
 }
 
 func resolveClusterObjectVar(kind string, objRef appsv1alpha1.ClusterObjectReference, option *appsv1alpha1.VarOption,

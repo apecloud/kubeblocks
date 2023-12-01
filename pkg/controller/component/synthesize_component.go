@@ -139,6 +139,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		Namespace:             comp.Namespace,
 		ClusterName:           clusterName,
 		ClusterUID:            clusterUID,
+		Comp2CompDefs:         buildComp2CompDefs(cluster, clusterCompSpec),
 		Name:                  compName,
 		FullCompName:          comp.Name,
 		CompDefName:           compDef.Name,
@@ -211,6 +212,27 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForConnCredential(synthesizeComp.ClusterName))
 
 	return synthesizeComp, nil
+}
+
+func buildComp2CompDefs(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) map[string]string {
+	if cluster == nil {
+		return nil
+	}
+	if len(cluster.Spec.ComponentSpecs) == 0 {
+		if clusterCompSpec == nil || len(clusterCompSpec.ComponentDefRef) == 0 {
+			return nil
+		}
+		return map[string]string{
+			clusterCompSpec.Name: clusterCompSpec.ComponentDefRef,
+		}
+	}
+	mapping := make(map[string]string)
+	for _, comp := range cluster.Spec.ComponentSpecs {
+		if len(comp.ComponentDefRef) > 0 {
+			mapping[comp.Name] = comp.ComponentDefRef
+		}
+	}
+	return mapping
 }
 
 // buildAffinitiesAndTolerations builds affinities and tolerations for component.

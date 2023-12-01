@@ -797,13 +797,11 @@ type ServiceRefVarSelector struct {
 
 // ClusterObjectReference contains information to let you locate the referenced object inside the same cluster.
 type ClusterObjectReference struct {
-	// Component of the referent object resident in.
-	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+	// CompDef specifies the definition used by the component that the referent object resident in.
 	// +optional
-	Component string `json:"component,omitempty"`
+	CompDef string `json:"compDef,omitempty"`
 
 	// Name of the referent object.
-	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
 	// +optional
 	Name string `json:"name,omitempty"`
 

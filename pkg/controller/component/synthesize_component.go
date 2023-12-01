@@ -582,7 +582,7 @@ func getClassManager(ctx context.Context, cli client.Reader, synthesizedComp *Sy
 		classDefinitionList appsv1alpha1.ComponentClassDefinitionList
 		ml                  []client.ListOption
 	)
-	if synthesizedComp.ClusterDefName == "" {
+	if synthesizedComp.ClusterDefName != "" {
 		ml = []client.ListOption{
 			client.MatchingLabels{constant.ClusterDefLabelKey: synthesizedComp.ClusterDefName},
 		}

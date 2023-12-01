@@ -144,11 +144,9 @@ func (c *configTemplateBuilder) render(configs map[string]string) (map[string]st
 }
 
 func (c *configTemplateBuilder) builtinObjectsAsValues() (*gotemplate.TplValues, error) {
-	vars := c.component.TemplateVars
-	if vars == nil {
-		vars = builtinObjects(c)
-	} else {
-		maps.Copy(vars, builtinObjects(c))
+	vars := builtinObjects(c)
+	if c.component.TemplateVars != nil {
+		maps.Copy(vars, c.component.TemplateVars)
 	}
 
 	b, err := json.Marshal(vars)

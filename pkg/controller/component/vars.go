@@ -26,7 +26,6 @@ import (
 	"sort"
 	"strconv"
 
-	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -44,8 +43,8 @@ func ResolveEnvNTemplateVars(ctx context.Context, cli client.Reader, synthesized
 	}
 
 	envVars := make([]corev1.EnvVar, 0)
-	envVars = append(envVars, templateVars2EnvVar(templateVars)...)
-	envVars = append(envVars, templateVars2EnvVar(credentialVars)...)
+	envVars = append(envVars, templateVars...)
+	envVars = append(envVars, credentialVars...)
 	envVars = append(envVars, buildDefaultEnv()...)
 	envVars = append(envVars, buildEnv4TLS(synthesizedComp)...)
 	vars, err := buildEnv4UserDefined(annotations)
@@ -61,8 +60,13 @@ func ResolveEnvNTemplateVars(ctx context.Context, cli client.Reader, synthesized
 	return nil
 }
 
-func setEnvNTemplateVars(templateVars map[string]any, envVars []corev1.EnvVar, synthesizedComp *SynthesizedComponent) {
-	synthesizedComp.TemplateVars = templateVars
+func setEnvNTemplateVars(templateVars []corev1.EnvVar, envVars []corev1.EnvVar, synthesizedComp *SynthesizedComponent) {
+	if synthesizedComp.TemplateVars == nil {
+		synthesizedComp.TemplateVars = make(map[string]any)
+	}
+	for _, v := range templateVars {
+		synthesizedComp.TemplateVars[v.Name] = v.Value
+	}
 
 	for _, cc := range []*[]corev1.Container{
 		&synthesizedComp.PodSpec.InitContainers,
@@ -80,30 +84,18 @@ func setEnvNTemplateVars(templateVars map[string]any, envVars []corev1.EnvVar, s
 	}
 }
 
-func templateVars2EnvVar(vars map[string]any) []corev1.EnvVar {
-	envVars := make([]corev1.EnvVar, 0)
-	for name, val := range vars {
-		value := ""
-		if val != nil {
-			value = val.(string)
-		}
-		envVars = append(envVars, corev1.EnvVar{Name: name, Value: value})
-	}
-	return envVars
-}
-
 func resolveBuiltinNObjectRefVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	definedVars []appsv1alpha1.EnvVar) (map[string]any, map[string]any, error) {
+	definedVars []appsv1alpha1.EnvVar) ([]corev1.EnvVar, []corev1.EnvVar, error) {
 	vars := builtinTemplateVars(synthesizedComp)
 	vars1, vars2, err := resolveClusterObjectRefVars(ctx, cli, synthesizedComp, definedVars)
 	if err != nil {
 		return nil, nil, err
 	}
-	maps.Copy(vars, vars1)
+	vars = append(vars, vars1...)
 	return vars, vars2, nil
 }
 
-func builtinTemplateVars(synthesizedComp *SynthesizedComponent) map[string]any {
+func builtinTemplateVars(synthesizedComp *SynthesizedComponent) []corev1.EnvVar {
 	var kbClusterPostfix8 string
 	if len(synthesizedComp.ClusterUID) > 8 {
 		kbClusterPostfix8 = synthesizedComp.ClusterUID[len(synthesizedComp.ClusterUID)-8:]
@@ -111,17 +103,17 @@ func builtinTemplateVars(synthesizedComp *SynthesizedComponent) map[string]any {
 		kbClusterPostfix8 = synthesizedComp.ClusterUID
 	}
 	if synthesizedComp != nil {
-		return map[string]any{
-			constant.KBEnvNamespace:                    synthesizedComp.Namespace,
-			constant.KBEnvClusterName:                  synthesizedComp.ClusterName,
-			constant.KBEnvClusterUID:                   synthesizedComp.ClusterUID,
-			constant.KBEnvClusterCompName:              constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name),
-			constant.KBEnvCompName:                     synthesizedComp.Name,
-			constant.KBEnvCompReplicas:                 strconv.Itoa(int(synthesizedComp.Replicas)),
-			constant.KBEnvClusterUIDPostfix8Deprecated: kbClusterPostfix8,
+		return []corev1.EnvVar{
+			{Name: constant.KBEnvNamespace, Value: synthesizedComp.Namespace},
+			{Name: constant.KBEnvClusterName, Value: synthesizedComp.ClusterName},
+			{Name: constant.KBEnvClusterUID, Value: synthesizedComp.ClusterUID},
+			{Name: constant.KBEnvClusterCompName, Value: constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name)},
+			{Name: constant.KBEnvCompName, Value: synthesizedComp.Name},
+			{Name: constant.KBEnvCompReplicas, Value: strconv.Itoa(int(synthesizedComp.Replicas))},
+			{Name: constant.KBEnvClusterUIDPostfix8Deprecated, Value: kbClusterPostfix8},
 		}
 	}
-	return nil
+	return []corev1.EnvVar{}
 }
 
 func buildDefaultEnv() []corev1.EnvVar {
@@ -204,28 +196,28 @@ func buildEnv4UserDefined(annotations map[string]string) ([]corev1.EnvVar, error
 }
 
 func resolveClusterObjectRefVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	definedVars []appsv1alpha1.EnvVar) (map[string]any, map[string]any, error) {
+	definedVars []appsv1alpha1.EnvVar) ([]corev1.EnvVar, []corev1.EnvVar, error) {
 	if synthesizedComp == nil {
 		return nil, nil, nil
 	}
-	vars1, vars2 := map[string]any{}, map[string]any{}
+	vars1, vars2 := make([]corev1.EnvVar, 0), make([]corev1.EnvVar, 0)
 	for _, v := range definedVars {
 		switch {
 		case len(v.Value) > 0:
-			vars1[v.Name] = v.Value
+			vars1 = append(vars1, corev1.EnvVar{Name: v.Name, Value: v.Value})
 		case v.ValueFrom != nil:
 			val1, val2, err := resolveClusterObjectVarRef(ctx, cli, synthesizedComp, *v.ValueFrom)
 			if err != nil {
 				return nil, nil, err
 			}
 			if val1 != nil {
-				vars1[v.Name] = val1
+				vars1 = append(vars1, corev1.EnvVar{Name: v.Name, Value: val1.(string)})
 			}
 			if val2 != nil {
-				vars2[v.Name] = val2
+				vars2 = append(vars2, corev1.EnvVar{Name: v.Name, Value: val2.(string)})
 			}
 		default:
-			vars1[v.Name] = nil
+			vars1 = append(vars1, corev1.EnvVar{Name: v.Name, Value: ""})
 		}
 	}
 	return vars1, vars2, nil

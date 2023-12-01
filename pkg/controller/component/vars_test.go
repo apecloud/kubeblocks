@@ -68,11 +68,15 @@ var _ = Describe("vars", func() {
 		return &o
 	}
 
-	checkTemplateVars := func(synthesizedComp *SynthesizedComponent, targetVars map[string]any) {
-		vars := map[string]any{}
-		for k, v := range synthesizedComp.TemplateVars {
-			if _, ok := targetVars[k]; ok {
-				vars[k] = v
+	checkTemplateVars := func(synthesizedComp *SynthesizedComponent, targetVars []corev1.EnvVar) {
+		vars := make([]corev1.EnvVar, 0)
+		for _, v := range targetVars {
+			if a, ok := synthesizedComp.TemplateVars[v.Name]; ok {
+				val := ""
+				if a != nil {
+					val = a.(string)
+				}
+				vars = append(vars, corev1.EnvVar{Name: v.Name, Value: val})
 			}
 		}
 		Expect(vars).Should(BeEquivalentTo(targetVars))
@@ -177,7 +181,7 @@ var _ = Describe("vars", func() {
 			checkTemplateVars(synthesizedComp, builtinTemplateVars(synthesizedComp))
 
 			By("check default env vars")
-			targetEnvVars := templateVars2EnvVar(builtinTemplateVars(synthesizedComp))
+			targetEnvVars := builtinTemplateVars(synthesizedComp)
 			targetEnvVars = append(targetEnvVars, buildDefaultEnv()...)
 			checkEnvVars(synthesizedComp, targetEnvVars)
 		})

@@ -96,6 +96,14 @@ func (f *MockComponentDefinitionFactory) AddVolumeMounts(containerName string, v
 	return f
 }
 
+func (f *MockComponentDefinitionFactory) AddVar(v appsv1alpha1.EnvVar) *MockComponentDefinitionFactory {
+	if f.Get().Spec.Vars == nil {
+		f.Get().Spec.Vars = make([]appsv1alpha1.EnvVar, 0)
+	}
+	f.Get().Spec.Vars = append(f.Get().Spec.Vars, v)
+	return f
+}
+
 func (f *MockComponentDefinitionFactory) AddVolume(name string, snapshot bool, watermark int) *MockComponentDefinitionFactory {
 	vol := appsv1alpha1.ComponentVolume{
 		Name:          name,

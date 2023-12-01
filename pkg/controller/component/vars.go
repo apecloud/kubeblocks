@@ -313,23 +313,25 @@ func resolveServiceVarRef(ctx context.Context, cli client.Reader, synthesizedCom
 
 func resolveServiceHostRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	selector appsv1alpha1.ServiceVarSelector) (any, any, error) {
-	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.Host,
-		func(svc corev1.Service) (any, any) {
-			return svc.Name, nil
-		})
+	resolveHost := func(obj any) (any, any) {
+		svc := obj.(*corev1.Service)
+		return svc.Name, nil
+	}
+	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.Host, resolveHost)
 }
 
 func resolveServicePortRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	selector appsv1alpha1.ServiceVarSelector) (any, any, error) {
-	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.Port.Option,
-		func(svc corev1.Service) (any, any) {
-			for _, svcPort := range svc.Spec.Ports {
-				if svcPort.Name == selector.Port.Name {
-					return strconv.Itoa(int(svcPort.Port)), nil
-				}
+	resolvePort := func(obj any) (any, any) {
+		svc := obj.(*corev1.Service)
+		for _, svcPort := range svc.Spec.Ports {
+			if svcPort.Name == selector.Port.Name {
+				return strconv.Itoa(int(svcPort.Port)), nil
 			}
-			return nil, nil
-		})
+		}
+		return nil, nil
+	}
+	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.Port.Option, resolvePort)
 }
 
 func resolveCredentialVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
@@ -345,28 +347,30 @@ func resolveCredentialVarRef(ctx context.Context, cli client.Reader, synthesized
 
 func resolveCredentialUsernameRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	selector appsv1alpha1.CredentialVarSelector) (any, any, error) {
-	return resolveCredentialVarRefLow(ctx, cli, synthesizedComp, selector, selector.Username,
-		func(secret corev1.Secret) (any, any) {
-			if secret.Data != nil {
-				if val, ok := secret.Data[constant.AccountNameForSecret]; ok {
-					return nil, string(val)
-				}
+	resolveUsername := func(obj any) (any, any) {
+		secret := obj.(*corev1.Secret)
+		if secret.Data != nil {
+			if val, ok := secret.Data[constant.AccountNameForSecret]; ok {
+				return nil, string(val)
 			}
-			return nil, nil
-		})
+		}
+		return nil, nil
+	}
+	return resolveCredentialVarRefLow(ctx, cli, synthesizedComp, selector, selector.Username, resolveUsername)
 }
 
 func resolveCredentialPasswordRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	selector appsv1alpha1.CredentialVarSelector) (any, any, error) {
-	return resolveCredentialVarRefLow(ctx, cli, synthesizedComp, selector, selector.Password,
-		func(secret corev1.Secret) (any, any) {
-			if secret.Data != nil {
-				if val, ok := secret.Data[constant.AccountPasswdForSecret]; ok {
-					return nil, string(val)
-				}
+	resolvePassword := func(obj any) (any, any) {
+		secret := obj.(*corev1.Secret)
+		if secret.Data != nil {
+			if val, ok := secret.Data[constant.AccountPasswdForSecret]; ok {
+				return nil, string(val)
 			}
-			return nil, nil
-		})
+		}
+		return nil, nil
+	}
+	return resolveCredentialVarRefLow(ctx, cli, synthesizedComp, selector, selector.Password, resolvePassword)
 }
 
 func resolveServiceRefVarRef(synthesizedComp *SynthesizedComponent, selector appsv1alpha1.ServiceRefVarSelector) (any, any, error) {
@@ -386,113 +390,108 @@ func resolveServiceRefVarRef(synthesizedComp *SynthesizedComponent, selector app
 }
 
 func resolveServiceRefEndpointRef(synthesizedComp *SynthesizedComponent, selector appsv1alpha1.ServiceRefVarSelector) (any, any, error) {
-	return resolveServiceRefVarRefLow(synthesizedComp, selector, selector.Endpoint,
-		func(sd appsv1alpha1.ServiceDescriptor) (any, any) {
-			if sd.Spec.Endpoint == nil {
-				return nil, nil
-			}
-			return sd.Spec.Endpoint.Value, nil
-		})
+	resolveEndpoint := func(obj any) (any, any) {
+		sd := obj.(*appsv1alpha1.ServiceDescriptor)
+		if sd.Spec.Endpoint == nil {
+			return nil, nil
+		}
+		return sd.Spec.Endpoint.Value, nil
+	}
+	return resolveServiceRefVarRefLow(synthesizedComp, selector, selector.Endpoint, resolveEndpoint)
 }
 
 func resolveServiceRefPortRef(synthesizedComp *SynthesizedComponent, selector appsv1alpha1.ServiceRefVarSelector) (any, any, error) {
-	return resolveServiceRefVarRefLow(synthesizedComp, selector, selector.Port,
-		func(sd appsv1alpha1.ServiceDescriptor) (any, any) {
-			if sd.Spec.Port == nil {
-				return nil, nil
-			}
-			return sd.Spec.Port.Value, nil
-		})
+	resolvePort := func(obj any) (any, any) {
+		sd := obj.(*appsv1alpha1.ServiceDescriptor)
+		if sd.Spec.Port == nil {
+			return nil, nil
+		}
+		return sd.Spec.Port.Value, nil
+	}
+	return resolveServiceRefVarRefLow(synthesizedComp, selector, selector.Port, resolvePort)
 }
 
 func resolveServiceRefUsernameRef(synthesizedComp *SynthesizedComponent, selector appsv1alpha1.ServiceRefVarSelector) (any, any, error) {
-	return resolveServiceRefVarRefLow(synthesizedComp, selector, selector.Username,
-		func(sd appsv1alpha1.ServiceDescriptor) (any, any) {
-			if sd.Spec.Auth == nil || sd.Spec.Auth.Username == nil {
-				return nil, nil
-			}
-			return nil, sd.Spec.Auth.Username.Value
-		})
+	resolveUsername := func(obj any) (any, any) {
+		sd := obj.(*appsv1alpha1.ServiceDescriptor)
+		if sd.Spec.Auth == nil || sd.Spec.Auth.Username == nil {
+			return nil, nil
+		}
+		return nil, sd.Spec.Auth.Username.Value
+	}
+	return resolveServiceRefVarRefLow(synthesizedComp, selector, selector.Username, resolveUsername)
 }
 
 func resolveServiceRefPasswordRef(synthesizedComp *SynthesizedComponent, selector appsv1alpha1.ServiceRefVarSelector) (any, any, error) {
-	return resolveServiceRefVarRefLow(synthesizedComp, selector, selector.Password,
-		func(sd appsv1alpha1.ServiceDescriptor) (any, any) {
-			if sd.Spec.Auth == nil || sd.Spec.Auth.Password == nil {
-				return nil, nil
-			}
-			return nil, sd.Spec.Auth.Password.Value
-		})
+	resolvePassword := func(obj any) (any, any) {
+		sd := obj.(*appsv1alpha1.ServiceDescriptor)
+		if sd.Spec.Auth == nil || sd.Spec.Auth.Password == nil {
+			return nil, nil
+		}
+		return nil, sd.Spec.Auth.Password.Value
+	}
+	return resolveServiceRefVarRefLow(synthesizedComp, selector, selector.Password, resolvePassword)
 }
 
 func resolveServiceVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	selector appsv1alpha1.ServiceVarSelector, option *appsv1alpha1.VarOption, resolveVar func(corev1.Service) (any, any)) (any, any, error) {
-	return resolveClusterObjectVar("Service", selector.ClusterObjectReference, option,
-		func() (any, error) {
-			compName := selector.Component
-			if len(compName) == 0 {
-				compName = synthesizedComp.Name
+	selector appsv1alpha1.ServiceVarSelector, option *appsv1alpha1.VarOption, resolveVar func(any) (any, any)) (any, any, error) {
+	resolveObj := func() (any, error) {
+		compName := selector.Component
+		if len(compName) == 0 {
+			compName = synthesizedComp.Name
+		}
+		svcName := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, compName, selector.Name)
+		if selector.Name == "headless" {
+			svcName = constant.GenerateDefaultComponentHeadlessServiceName(synthesizedComp.ClusterName, compName)
+		}
+		svcKey := types.NamespacedName{
+			Namespace: synthesizedComp.Namespace,
+			Name:      svcName,
+		}
+		svc := &corev1.Service{}
+		if err := cli.Get(ctx, svcKey, svc); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil, nil
 			}
-			svcName := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, compName, selector.Name)
-			if selector.Name == "headless" {
-				svcName = constant.GenerateDefaultComponentHeadlessServiceName(synthesizedComp.ClusterName, compName)
-			}
-			svcKey := types.NamespacedName{
-				Namespace: synthesizedComp.Namespace,
-				Name:      svcName,
-			}
-			svc := &corev1.Service{}
-			if err := cli.Get(ctx, svcKey, svc); err != nil {
-				if apierrors.IsNotFound(err) {
-					return nil, nil
-				}
-				return nil, err
-			}
-			return svc, nil
-		},
-		func(obj any) (any, any) {
-			return resolveVar(*(obj.(*corev1.Service)))
-		})
+			return nil, err
+		}
+		return svc, nil
+	}
+	return resolveClusterObjectVar("Service", selector.ClusterObjectReference, option, resolveObj, resolveVar)
 }
 
 func resolveCredentialVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	selector appsv1alpha1.CredentialVarSelector, option *appsv1alpha1.VarOption, resolveVar func(corev1.Secret) (any, any)) (any, any, error) {
-	return resolveClusterObjectVar("Credential", selector.ClusterObjectReference, option,
-		func() (any, error) {
-			compName := selector.Component
-			if len(compName) == 0 {
-				compName = synthesizedComp.Name
+	selector appsv1alpha1.CredentialVarSelector, option *appsv1alpha1.VarOption, resolveVar func(any) (any, any)) (any, any, error) {
+	resolveObj := func() (any, error) {
+		compName := selector.Component
+		if len(compName) == 0 {
+			compName = synthesizedComp.Name
+		}
+		secretKey := types.NamespacedName{
+			Namespace: synthesizedComp.Namespace,
+			Name:      constant.GenerateAccountSecretName(synthesizedComp.ClusterName, compName, selector.Name),
+		}
+		secret := &corev1.Secret{}
+		if err := cli.Get(ctx, secretKey, secret); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil, nil
 			}
-			secretKey := types.NamespacedName{
-				Namespace: synthesizedComp.Namespace,
-				Name:      constant.GenerateAccountSecretName(synthesizedComp.ClusterName, compName, selector.Name),
-			}
-			secret := &corev1.Secret{}
-			if err := cli.Get(ctx, secretKey, secret); err != nil {
-				if apierrors.IsNotFound(err) {
-					return nil, nil
-				}
-				return nil, err
-			}
-			return secret, nil
-		},
-		func(obj any) (any, any) {
-			return resolveVar(*(obj.(*corev1.Secret)))
-		})
+			return nil, err
+		}
+		return secret, nil
+	}
+	return resolveClusterObjectVar("Credential", selector.ClusterObjectReference, option, resolveObj, resolveVar)
 }
 
 func resolveServiceRefVarRefLow(synthesizedComp *SynthesizedComponent, selector appsv1alpha1.ServiceRefVarSelector,
-	option *appsv1alpha1.VarOption, resolveVar func(appsv1alpha1.ServiceDescriptor) (any, any)) (any, any, error) {
-	return resolveClusterObjectVar("ServiceRef", selector.ClusterObjectReference, option,
-		func() (any, error) {
-			if synthesizedComp.ServiceReferences == nil {
-				return nil, nil
-			}
-			return synthesizedComp.ServiceReferences[selector.Name], nil
-		},
-		func(obj any) (any, any) {
-			return resolveVar(*(obj.(*appsv1alpha1.ServiceDescriptor)))
-		})
+	option *appsv1alpha1.VarOption, resolveVar func(any) (any, any)) (any, any, error) {
+	resolveObj := func() (any, error) {
+		if synthesizedComp.ServiceReferences == nil {
+			return nil, nil
+		}
+		return synthesizedComp.ServiceReferences[selector.Name], nil
+	}
+	return resolveClusterObjectVar("ServiceRef", selector.ClusterObjectReference, option, resolveObj, resolveVar)
 }
 
 func resolveClusterObjectVar(kind string, objRef appsv1alpha1.ClusterObjectReference, option *appsv1alpha1.VarOption,

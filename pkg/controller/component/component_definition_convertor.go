@@ -45,6 +45,7 @@ func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterCo
 		"servicekind":            &compDefServiceKindConvertor{},
 		"serviceversion":         &compDefServiceVersionConvertor{},
 		"runtime":                &compDefRuntimeConvertor{},
+		"vars":                   &compDefVarsConvertor{},
 		"volumes":                &compDefVolumesConvertor{},
 		"services":               &compDefServicesConvertor{},
 		"configs":                &compDefConfigsConvertor{},
@@ -121,6 +122,12 @@ func (c *compDefRuntimeConvertor) convert(args ...any) (any, error) {
 		}
 	}
 	return *podSpec, nil
+}
+
+type compDefVarsConvertor struct{}
+
+func (c *compDefVarsConvertor) convert(args ...any) (any, error) {
+	return nil, nil
 }
 
 // compDefVolumesConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Volumes.

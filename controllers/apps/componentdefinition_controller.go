@@ -146,6 +146,7 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 	cmpd *appsv1alpha1.ComponentDefinition) error {
 	for _, validator := range []func(client.Client, intctrlutil.RequestCtx, *appsv1alpha1.ComponentDefinition) error{
 		r.validateRuntime,
+		r.validateVars,
 		r.validateVolumes,
 		r.validateServices,
 		r.validateConfigs,
@@ -166,6 +167,11 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 }
 
 func (r *ComponentDefinitionReconciler) validateRuntime(cli client.Client, rctx intctrlutil.RequestCtx,
+	cmpd *appsv1alpha1.ComponentDefinition) error {
+	return nil
+}
+
+func (r *ComponentDefinitionReconciler) validateVars(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
 	return nil
 }

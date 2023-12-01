@@ -1551,7 +1551,7 @@
 	rds_audit_log_statement_policy?: string & "ALL" | "UPDATES" | "NONE" | "ERRORS" | "UPDATES_OR_ERRORS"
 
 	// Max number of rows in each audit log file. Log records will be discarded above this number.
-	rds_audit_log_row_limit?: int & >0
+	rds_audit_log_row_limit?: int & >=1 | *100000
 
 	// other parameters
 	// reference mysql parameters

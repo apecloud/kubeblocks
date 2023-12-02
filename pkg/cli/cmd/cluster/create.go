@@ -152,9 +152,10 @@ var clusterCreateExample = templates.Examples(`
 `)
 
 const (
-	CueTemplateName = "cluster_template.cue"
-	monitorKey      = "monitor"
-	apeCloudMysql   = "apecloud-mysql"
+	CueTemplateName   = "cluster_template.cue"
+	monitorKey        = "monitor"
+	apeCloudMysql     = "apecloud-mysql"
+	defaultVolumeName = "data"
 )
 
 type setKey string
@@ -200,6 +201,11 @@ const (
 
 	storageKeyUnknown storageKey = "unknown"
 )
+
+// set the components volume names, key is the component type.
+var componentVolumes = map[string][]string{
+	"bookies": {"journal", "ledgers"},
+}
 
 // UpdatableFlags is the flags that cat be updated by update command
 type UpdatableFlags struct {
@@ -1086,7 +1092,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition,
 			}
 
 			// TODO(ct): hack for pulsar, remove
-			if cd.Name == "pulsar" && c.CharacterType == "pulsar-proxy" {
+			if cd.Name == "pulsar" && (c.CharacterType == "pulsar-proxy" || c.CharacterType == "pulsar-bookie-recovery") {
 				replicas = 0
 			}
 		}
@@ -1136,23 +1142,30 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition,
 		}
 		storageSize := getVal(&c, keyStorage, sets)
 		if storageSize != "" {
-			compObj.VolumeClaimTemplates = []appsv1alpha1.ClusterComponentVolumeClaimTemplate{{
-				Name: "data",
-				Spec: appsv1alpha1.PersistentVolumeClaimSpec{
-					AccessModes: []corev1.PersistentVolumeAccessMode{
-						corev1.ReadWriteOnce,
-					},
-					Resources: corev1.ResourceRequirements{
-						Requests: corev1.ResourceList{
-							corev1.ResourceStorage: resource.MustParse(getVal(&c, keyStorage, sets)),
+			volumes := componentVolumes[c.Name]
+			if len(volumes) == 0 {
+				volumes = []string{defaultVolumeName}
+			}
+			for index := range volumes {
+				vct := appsv1alpha1.ClusterComponentVolumeClaimTemplate{
+					Name: volumes[index],
+					Spec: appsv1alpha1.PersistentVolumeClaimSpec{
+						AccessModes: []corev1.PersistentVolumeAccessMode{
+							corev1.ReadWriteOnce,
+						},
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceStorage: resource.MustParse(getVal(&c, keyStorage, sets)),
+							},
 						},
 					},
-				},
-			}}
-			storageClass := getVal(&c, keyStorageClass, sets)
-			if len(storageClass) != 0 {
-				// now the clusterdefinition components mostly have only one VolumeClaimTemplates in default
-				compObj.VolumeClaimTemplates[0].Spec.StorageClassName = &storageClass
+				}
+				storageClass := getVal(&c, keyStorageClass, sets)
+				if len(storageClass) != 0 {
+					// now the clusterdefinition components mostly have only one VolumeClaimTemplates in default
+					vct.Spec.StorageClassName = &storageClass
+				}
+				compObj.VolumeClaimTemplates = append(compObj.VolumeClaimTemplates, vct)
 			}
 		}
 		if err = buildSwitchPolicy(&c, compObj, sets); err != nil {

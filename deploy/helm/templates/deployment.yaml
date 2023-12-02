@@ -37,11 +37,15 @@ spec:
         - name: tools
           image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
           command:
             - /bin/true
         - name: datascript
           image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.datascript.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
           command:
             - /bin/true
       containers:

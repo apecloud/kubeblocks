@@ -26,9 +26,9 @@ import (
 	"sync"
 	"text/template"
 
-	"github.com/ghodss/yaml"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/yaml"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"

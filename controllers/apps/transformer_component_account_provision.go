@@ -75,7 +75,9 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 		}
 		if err = t.provisionAccount(transCtx, cond, lorryCli, account); err != nil {
 			t.markProvisionAsFailed(transCtx, &cond, err)
-			return err
+			// TODO(xingran & xuanchi): lorry invoke error when in local-dev env: context deadline exceeded, issue need to be fixed: https://github.com/apecloud/kubeblocks/issues/5986
+			return nil
+			// return err
 		}
 		t.markAccountProvisioned(&cond, account)
 	}

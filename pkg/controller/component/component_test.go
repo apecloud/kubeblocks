@@ -286,6 +286,7 @@ var _ = Describe("component module", func() {
 			Expect(component.Services[1].Name).Should(Equal("vpc"))
 			Expect(component.Services[1].Annotations["networking.gke.io/load-balancer-type"]).Should(Equal("Internal"))
 			Expect(component.Services[1].Spec.Type).Should(BeEquivalentTo("LoadBalancer"))
+			Expect(component.Services[1].Spec.Selector).Should(HaveLen(3))
 		})
 
 		It("Test replace secretRef env placeholder token", func() {

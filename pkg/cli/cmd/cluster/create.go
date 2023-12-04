@@ -1080,30 +1080,10 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition,
 		if setReplicas > math.MaxInt32 {
 			return nil, fmt.Errorf("repicas is illegal, exceed max. value (%d) ", math.MaxInt32)
 		}
-		replicas := int32(setReplicas)
-
-		// if replicas not set
-		/*		if v := sets[keyReplicas]; len(v) > 0 {
-				// TODO(ct): hack for clickhouse, remove
-				if cd.Name == "clickhouse" && c.CharacterType == "zookeeper" {
-					if c.Name == "ch-keeper" {
-						replicas = 3
-					}
-					if c.Name == "zookeeper" {
-						replicas = 0
-					}
-				}
-
-				// TODO(ct): hack for pulsar, remove
-				if cd.Name == "pulsar" && (c.CharacterType == "pulsar-proxy" || c.CharacterType == "pulsar-bookie-recovery") {
-					replicas = 0
-				}
-			}*/
-
 		compObj := &appsv1alpha1.ClusterComponentSpec{
 			Name:            c.Name,
 			ComponentDefRef: c.Name,
-			Replicas:        replicas,
+			Replicas:        int32(setReplicas),
 		}
 
 		// class has higher priority than other resource related parameters

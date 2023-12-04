@@ -280,6 +280,20 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
+	fillServiceSelector := func() {
+		for i, service := range component.Services {
+			selector := service.Spec.Selector
+			if selector == nil {
+				selector = make(map[string]string, 0)
+			}
+			selector[constant.AppManagedByLabelKey] = constant.AppName
+			selector[constant.AppInstanceLabelKey] = cluster.Name
+			selector[constant.KBAppComponentLabelKey] = component.Name
+			component.Services[i].Spec.Selector = selector
+		}
+	}
+	fillServiceSelector()
+
 	buildMonitorConfig(clusterCompDefObj, clusterCompSpec, component)
 
 	// lorry container requires a service account with adequate privileges.

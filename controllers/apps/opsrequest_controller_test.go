@@ -302,7 +302,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			}
 			testVerticalScaleCPUAndMemory(testapps.StatefulMySQLComponent, ctx)
 		})
-		
+
 		It("create cluster by resource, vertical scaling by class", func() {
 			ctx := verticalScalingContext{
 				source: resourceContext{resource: testapps.Class1c1g.ToResourceRequirements()},

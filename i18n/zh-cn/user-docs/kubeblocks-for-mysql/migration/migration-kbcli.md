@@ -1,19 +1,19 @@
 ---
-title: Migrate data in MySQL to KubeBlocks
-description: How to migrate data in MySQL v8.* to KubeBlocks by kbcli migration
-keywords: [mysql, migration, kbcli migration, migrate data in MySQL to KubeBlocks]
+title: 使用 kbcli 迁移 MySQL 数据
+description: 如何使用 kbcli 迁移 MySQL 数据
+keywords: [mysql, 迁移, kbcli migration]
 sidebar_position: 2
-sidebar_label: Migration by kbcli
+sidebar_label: 使用 kbcli 迁移 MySQL 数据
 ---
 
-# Migrate data in MySQL to KubeBlocks
+# 使用 kbcli 迁移 MySQL 数据
 
-## Before you start
+## 开始之前
 
-### Enable kbcli migration
+### 启用 kbcli migration
 
-1. Install KubeBlocks: You can install KubeBlocks by [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
-2. [Enable the migration add-on](./../../overview/supported-addons.md).
+1. 安装 KubeBlocks: 你可以用 kbcli 或者 Helm 安装 KubeBlocks。
+2. [启用迁移功能](./../../overview/supported-addons.md).
 
    ```bash
    kbcli addon list
@@ -21,30 +21,30 @@ sidebar_label: Migration by kbcli
    kbcli addon enable migration
    ```
 
-### Configure the source
+### 配置源
 
-Modify the configuration of the source to support CDC.
+修改源的配置以支持 CDC。
 
-1. Open 'log_bin' configuration.
-2. Set 'binlog_format' configuration to 'row'.
-3. Set 'binlog_row_image' configuration to 'full'.
+1. 打开 'log_bin' 配置。
+2. 将 'binlog_format' 配置为 'row'。
+3. 将 'binlog_row_image' 配置为 'full'。
 
 :::note
 
-1. Modifying 'log_bin' configuration restarts the database. Make sure the modification is performed during off-peak hours.
-2. Modifying 'binlog_format' and 'binlog_row_image' configurations does not affect the existing binlog format. Make sure the log timestamp of pulling CDC (usually the time CDC starts) occurs after the modifications are completed.
+1. 修改 'log_bin' 会重启数据库，请确保在非高峰时段进行修改。
+2. 修改 'binlog_format' 和 'binlog_row_image' 不会影响现有的 binlog 格式。确保 CDC 拉取的日志时间戳（通常是 CDC 的启动时间）发生在更改完成之后。
 
 :::
 
-### Check the account permission
+### 检查账号权限
 
-Make sure both the source and sink account meet the following permissions.
+确保源账号和目标账号满足以下权限要求。
 
-* The source account
+* 源库
   * REPLICATION SLAVE
   * REPLICATION CLIENT
   * SELECT
-* The sink account
+* 目标库
   * SELECT
   * INSERT
   * UPDATE
@@ -53,23 +53,23 @@ Make sure both the source and sink account meet the following permissions.
   * ALTER
   * DROP
 
-### Initialize the sink
+### 初始化目标数据库
 
-Create a database named `db_test`.
+创建一个名为 db_test 的数据库。
 
 ```bash
 create database if not exists db_test
 ```
 
-### Prepare data sampling
+### 数据采样
 
-It is recommended to prepare data sampling for verification after the migration to ensure correctness.
+为了确保正确性，建议在迁移后准备数据采样进行验证。
 
-## Migrate data
+## 迁移数据
 
-### Steps
+### 步骤
 
-1. Create a migration task.
+1. 创建迁移任务。
 
    ```bash
    kbcli migration create mytask --template apecloud-mysql2mysql \
@@ -78,19 +78,19 @@ It is recommended to prepare data sampling for verification after the migration 
    --migration-object '"public.table_test_1","public.table_test_2"'
    ```
 
-   :paperclip: Table 1. Options explanation
+   :paperclip: 表 1. 选项详情
 
-   | Option     | Descriprion |
+   | 选项        | 解释        |
    | :--------- | :---------- |
-   | mystask    | The name of the migration task. You can customize it. |
-   | `--template` | It specifies the migration template. `--template apecloud-mysql2mysql` means that this migration task uses the template of migrating from MySQL to MySQL created by KubeBlocks. Run `kbcli migration templates` to view all available templates and the supported database information.   |
-   | `--source`  | It specifies the source. `user:123456@127.0.0.1:5432/db_test` in the above example follows the format `${user_name}:${password}@${database connection url}/${database}`. For this guide, the connection URL uses the public network address. |
-   | `--sink`     | It specifies the destination. `user:123456@127.0.0.2:5432/db_test` in the above example follows the format `${user_name}:${password}@${database connection url}/${database}`. For this guide, the connection URL uses the service address inside the Kubernetes cluster. |
-   | `--migration-object`  | It specifies the migration object. The above example describes data in "public.table_test_1" and "public.table_test_2", including structure data, stock data, and incremental data generated during running migration task, will be migrated to the sink.    |
+   | mystask    | 迁移任务的名称，可以自定义。 |
+   | `--template` | 指定迁移模板。`--template apecloud-mysql2mysql` 表示此迁移任务使用由 KubeBlocks 创建的从 MySQL 到 MySQL 的模板。执行 `kbcli migration templates` 可查看所有可用的模板和支持的数据库信息。   |
+   | `--source`  | 指定源。上例中的 `user:123456@127.0.0.1:5432/db_test` 遵循 `${user_name}:${password}@${database connection url}/${database}` 的格式。在本文档中，连接 URL 使用的是公网地址。 |
+   | `--sink`     | 指定目标。上例中的 `user:123456@127.0.0.2:5432/db_test` 遵循 $`{user_name}:${password}@${database connection url}/${database}` 的格式。在本文档中，连接 URL 使用的是 Kubernetes 集群内部的服务地址 |
+   | `--migration-object`  | 指定迁移对象。也就是上例中 "public.table_test_1" 和 "public.table_test_2" 中的数据，包括结构数据和库存数据，在迁移期间生成的增量数据将被迁移到目标位置。    |
 
-2. (Optional) Specify migration steps by the flag `--steps`.
+2. （可选）通过 --steps 指定迁移步骤。
 
-   The default steps follow the order precheck -> structure initialization -> data initialization -> incremental migration. You can use `--steps` to specify migration steps. For example, perform tasks in the order of precheck -> data initialization -> incremental migration.
+   默认按照预检查 -> 结构初始化 -> 数据初始化 -> 增量迁移的顺序进行迁移。你可以使用 `--steps` 参数来指定迁移步骤。例如，按照预检查 -> 数据初始化 -> 增量迁移的顺序执行任务。
 
    ```bash
    kbcli migration create mytask --template apecloud-mysql2mysql \
@@ -100,103 +100,103 @@ It is recommended to prepare data sampling for verification after the migration 
    --steps precheck=true,init-struct=false,init-data=true,cdc=true
    ```
 
-3. View the task status.
+3. 查看任务状态。
 
    ```bash
-   # View the migration task list
+   # 查看迁移任务列表
    kbcli migration list
 
-   # View the details of a specified task
+   # 查看指定任务的详细信息
    kbcli migration describe ${migration-task-name}
    ```
 
-   Pay attention to Initialization, CDC, and CDC Metrics.
+   有关初始化、CDC 和 CDC Metrics 有几点需要说明。
 
-   * Initialization
-     * Precheck: If the status shows `Failed`, it means the initialization precheck does not pass. Troubleshoot the initialization by [the following examples in troubleshooting](#troubleshooting).
-     * Init-struct: Structure initialization. Idempotent processing logic is adopted. A failure occurs only when a severe problem occurs, such as failing to connect a database.
-     * Init-data: Data initialization. If there is a large amount of stock data, it takes a long time to perform this step and you should pay attention to Status.
-   * CDC: Incremental migration. Based on the timestamp recorded by the system before the init-data step, the system starts data migration following eventual consistency and performs capturing the source library WAL (Write Ahead Log) changes -> writing to the sink. Under normal circumstances, the CDC phase continues if the migration link is not actively terminated.
-   * CDC Metrics: Incremental migration indicators. Currently, the indicators mainly provide the WAL LSN (Log Sequencer Number) of the source library and the corresponding timestamp (note that the timestamp shows the local time zone of the Pod Container runtime) when the CDC process has completed "capturing -> writing" process.
+   * 初始化
+     * Precheck：预检查。如果状态显示为 `Failed`，表示初始化预检查未通过。请参考[故障排除](#故障排除)中的示例解决问题。
+     * Init-struct：结构初始化。采用幂等处理逻辑，只有在发生严重问题（例如无法连接数据库）时才会失败。
+     * Init-data：数据初始化。如果存在大量库存数据，该步骤需要花费较长时间，请注意查看 `Status`。
+   * CDC: 增量迁移。基于 init-data 步骤之前系统记录的时间戳，系统将按照最终一致性的原则开始数据迁移，并执行源库的 WAL（预写式日志）变更捕获 -> 写入到目标库。正常情况下，如果迁移链路没有被主动终止，CDC 会持续进行。
+   * CDC Metrics：增量迁移指标。目前主要提供源库的 WAL LSN（日志序列号）和 CDC 完成“捕获 -> 写入”过程的相应时间戳（请注意时间戳显示的是 Pod 容器运行时的本地时区）。
 
      :::note
 
-     The CDC Metrics are updated every 10 minutes by the system, i.e. if there exists continuous data writing into the source, metrics.timestamp here delays 10 minutes compared with the current time.
+     系统每 10 分钟更新一次 CDC Metrics。即，如果源库存在连续的数据写入，metrics.timestamp 会相对于当前时间延迟 10 分钟。
 
      :::
 
-4. Validate the migration with the prepared data sampling.
+4. 使用准备好的数据采样对迁移进行验证。
 
-### Troubleshooting
+### 故障排除
 
-If any step above fails, run the command below to troubleshoot the failure.
+如果上述任何步骤失败，可执行以下命令排查失败原因。
 
 ```bash
 # --step: Specify the step. Allowed values: precheck,init-struct,init-data,cdc
 kbcli migration logs ${migration-task-name} --step ${step-name}
 ```
 
-## Switch applications
+## 切换应用程序
 
-### Before you start
+### 开始之前
 
-* Make sure the KubeBlocks migration task runs normally.
-* To differentiate the dialogue information and to improve data security, it is recommended to create and authorize another account dedicated to data migration.
-* For safety concerns, it is necessary to stop the business write and switch the application during off-peak hours.
-* Before switching the application, it is recommended to prepare data sampling for verification after switching to ensure correctness.
+* 确保 KubeBlocks 迁移任务正常运行。
+* 为了区分对话信息并提高数据安全性，建议创建和授权另一个专用于数据迁移的账号。
+* 切换过程保险起见需要停止业务写入，建议在业务低峰期做切换。
+* 切换前建议进行抽样数据验证，以确保正确性。
 
-### Steps
+### 步骤
 
-1. Check the migration task status and ensure the task is performed normally.
-   1. Describe the migration task details and all steps in Initialization are `Complete` and CDC is `Running`.
+1. 检查迁移任务状态，确保任务正常进行。
+   1. 查看详细信息，确保初始化的所有步骤均为 `Complete`，且 CDC 处于 `Running` 状态。
 
       ```bash
       kbcli migration describe ${migration-task-name}
       ```
 
-   2. Under the prerequisite that there exists continuous write into the source, observe whether the timestamp is still in progress and whether there is almost no delay. For example,
+   2. 在源库连续写入的前提下，观察位点是否仍在持续推进切几乎没有延迟。例如：
 
       ```bash
       kbcli migration logs ${migration-task-name} --step cdc | grep current_position
       ```
 
-      The results update every 10 seconds.
+      输出结果 10 秒刷新一次。
 
       ![Timestamp](../../../img/pgsql-migration-timestamp.png)
-2. Pause the business and stop new business data from being written into the source.
-3. View the migration status again and ensure the migration task runs normally, lasting at least one minute.
+2. 将业务暂时中断，禁止新的业务数据写入源库。
+3. 再次判断传输任务状态，确认任务正常，保持至少1分钟。
 
-   Refer to the operations in step 1 and observe whether the link is normal and the timestamp meets the expectation.
-4. Use the sink to restore the business.
-5. Validate the switch with the prepared data sampling.
+   参考第一步的方法，观察链路是否正常且位点是否符合预期。
+4. 使用目标数据库恢复业务。
+5. 使用准备好的数据采样验证切换是否正确。
 
-## Clean up the environment
+## 清理环境
 
-After the migration task is completed, you can terminate the migration task and function.
+在迁移任务完成后，可以终止迁移任务和相关功能。
 
-### Terminate the migration task
+### 删除任务
 
-Deleting the migration task does not affect the data in the source and sink.
+终止迁移任务不会影响源数据库和目标数据库中的数据。
 
 ```bash
 kbcli migration terminate ${migration-task-name}
 ```
 
-### Terminate kbcli migration
+### 停用 kbcli migration
 
-1. Check whether there are running migration tasks.
+1. 检查是否有正在运行的迁移任务。
 
    ```bash
    kbcli migration list
    ```
 
-2. Disable the migration add-on.
+2. 禁用迁移插件。
 
    ```bash
    kbcli addon disable migration
    ```
 
-3. Delete the Kubernetes CRD (Custom Resource Definition) manually.
+3. 手动删除 Kubernetes CRD（自定义资源定义）。
 
    ```bash
    kubectl delete crd migrationtasks.datamigration.apecloud.io migrationtemplates.datamigration.apecloud.io serialjobs.common.apecloud.io

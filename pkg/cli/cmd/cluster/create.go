@@ -1057,8 +1057,11 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition,
 
 	var comps []*appsv1alpha1.ClusterComponentSpec
 	for i, c := range cd.Spec.ComponentDefs {
-		sets := setsMap[c.Name]
+		sets, ok := setsMap[c.Name]
 
+		if createOnlySet && !ok {
+			continue
+		}
 		// HACK: for apecloud-mysql cluster definition, if setsMap is empty, user
 		// does not specify any set, so we only build the first component.
 		// TODO(ldm): remove this hack and use helm chart to render the cluster.
@@ -1077,35 +1080,10 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition,
 		if setReplicas > math.MaxInt32 {
 			return nil, fmt.Errorf("repicas is illegal, exceed max. value (%d) ", math.MaxInt32)
 		}
-		replicas := int32(setReplicas)
-
-		// if replicas not set
-		if v := sets[keyReplicas]; len(v) > 0 {
-			// TODO(ct): hack for clickhouse, remove
-			if cd.Name == "clickhouse" && c.CharacterType == "zookeeper" {
-				if c.Name == "ch-keeper" {
-					replicas = 3
-				}
-				if c.Name == "zookeeper" {
-					replicas = 0
-				}
-			}
-
-			// TODO(ct): hack for pulsar, remove
-			if cd.Name == "pulsar" && (c.CharacterType == "pulsar-proxy" || c.CharacterType == "pulsar-bookie-recovery") {
-				replicas = 0
-			}
-		}
-
-		// only if replicas == 0 then createOnlySet will work
-		if createOnlySet && replicas == 0 {
-			continue
-		}
-
 		compObj := &appsv1alpha1.ClusterComponentSpec{
 			Name:            c.Name,
 			ComponentDefRef: c.Name,
-			Replicas:        replicas,
+			Replicas:        int32(setReplicas),
 		}
 
 		// class has higher priority than other resource related parameters

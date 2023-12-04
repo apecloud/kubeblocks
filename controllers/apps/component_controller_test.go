@@ -1140,39 +1140,6 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
-	testCompConnCredential := func(compName, compDefName string) {
-		createClusterObjV2(compName, compDefObj.Name, nil)
-
-		By("check root conn credential")
-		serviceName := constant.GenerateComponentServiceName(clusterObj.Name, compName, "rw")
-		servicePort := "3306"
-		endpoint := fmt.Sprintf("%s:%s", serviceName, servicePort)
-		rootSecretKey := types.NamespacedName{
-			Namespace: compObj.Namespace,
-			Name:      constant.GenerateComponentConnCredential(clusterObj.Name, compName, "root"),
-		}
-		Eventually(testapps.CheckObj(&testCtx, rootSecretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKeyWithValue("endpoint", []byte(endpoint)))
-			g.Expect(secret.Data).Should(HaveKeyWithValue("host", []byte(serviceName)))
-			g.Expect(secret.Data).Should(HaveKeyWithValue("port", []byte(servicePort)))
-			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("root")))
-			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
-		})).Should(Succeed())
-
-		By("check admin conn credential")
-		adminSecretKey := types.NamespacedName{
-			Namespace: compObj.Namespace,
-			Name:      constant.GenerateComponentConnCredential(clusterObj.Name, compName, "admin"),
-		}
-		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKeyWithValue("endpoint", []byte(endpoint)))
-			g.Expect(secret.Data).Should(HaveKeyWithValue("host", []byte(serviceName)))
-			g.Expect(secret.Data).Should(HaveKeyWithValue("port", []byte(servicePort)))
-			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
-			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
-		})).Should(Succeed())
-	}
-
 	testCompVars := func(compName, compDefName string) {
 		compDefKey := client.ObjectKeyFromObject(compDefObj)
 		Eventually(testapps.GetAndChangeObj(&testCtx, compDefKey, func(compDef *appsv1alpha1.ComponentDefinition) {
@@ -1977,10 +1944,6 @@ var _ = Describe("Component Controller", func() {
 
 		It("with component system accounts", func() {
 			testCompSystemAccount(defaultCompName, compDefName)
-		})
-
-		It("with component conn credentials", func() {
-			testCompConnCredential(defaultCompName, compDefName)
 		})
 
 		It("with component vars", func() {

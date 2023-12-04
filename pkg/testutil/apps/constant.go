@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 const (
@@ -166,17 +165,7 @@ var (
 				MountPath: "/scripts",
 			},
 		},
-		Env: []corev1.EnvVar{{
-			Name: "MYSQL_ROOT_PASSWORD",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: constant.KBConnCredentialPlaceHolder,
-					},
-					Key: "password",
-				},
-			},
-		}},
+		Env:     []corev1.EnvVar{{}},
 		Command: []string{"/scripts/setup.sh"},
 	}
 
@@ -321,18 +310,6 @@ var (
 					NumSymbols: 0,
 					LetterCase: appsv1alpha1.MixedCases,
 				},
-			},
-		},
-		ConnectionCredentials: []appsv1alpha1.ConnectionCredential{
-			{
-				Name:        "root",
-				ServiceName: "rw",
-				AccountName: "root",
-			},
-			{
-				Name:        "admin",
-				ServiceName: "rw",
-				AccountName: "admin",
 			},
 		},
 		Roles: []appsv1alpha1.ReplicaRole{

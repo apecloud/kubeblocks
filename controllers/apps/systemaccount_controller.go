@@ -218,7 +218,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		reqCtx.Log.V(1).Info("detected database facts", "cluster", req.NamespacedName, "accounts", detectedEngineFacts)
 
 		// replace KubeBlocks ENVs.
-		replaceEnvsValues(cluster.Name, compDef.SystemAccounts)
+		replaceEnvsValues(cluster.Name, compDef.SystemAccounts, nil)
 
 		for _, account := range compDef.SystemAccounts.Accounts {
 			accountID := account.Name.GetAccountID()

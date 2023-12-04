@@ -295,17 +295,15 @@ var _ = Describe("OpsRequest Controller", func() {
 			testVerticalScaleCPUAndMemory(testapps.StatefulMySQLComponent, ctx)
 		})
 
-		// TODO(component): class ref
-		PIt("create cluster by class, vertical scaling by class", func() {
+		It("create cluster by class, vertical scaling by class", func() {
 			ctx := verticalScalingContext{
 				source: resourceContext{class: &testapps.Class1c1g},
 				target: resourceContext{class: &testapps.Class2c4g},
 			}
 			testVerticalScaleCPUAndMemory(testapps.StatefulMySQLComponent, ctx)
 		})
-
-		// TODO(component): class ref
-		PIt("create cluster by resource, vertical scaling by class", func() {
+		
+		It("create cluster by resource, vertical scaling by class", func() {
 			ctx := verticalScalingContext{
 				source: resourceContext{resource: testapps.Class1c1g.ToResourceRequirements()},
 				target: resourceContext{class: &testapps.Class2c4g},

@@ -299,6 +299,10 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *ProbeRequest, re
 // roleValidate is used to filter the internal roles and decrease the number
 // of report events to reduce the possibility of event conflicts.
 func (ops *BaseOperations) roleValidate(role string) (bool, string) {
+	if role == "" {
+		return false, "role is none"
+	}
+
 	// do not validate them when db roles setting is missing
 	if len(ops.DBRoles) == 0 {
 		return true, ""

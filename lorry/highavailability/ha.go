@@ -87,7 +87,7 @@ func GetHa() *Ha {
 func (ha *Ha) RunCycle() {
 	cluster, err := ha.dcs.GetCluster()
 	if err != nil {
-		ha.logger.Error(err, "Get Cluster err")
+		ha.logger.Error(err, "Get Cluster failed")
 		return
 	}
 

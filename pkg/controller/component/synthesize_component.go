@@ -219,17 +219,17 @@ func buildComp2CompDefs(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1al
 		return nil
 	}
 	if len(cluster.Spec.ComponentSpecs) == 0 {
-		if clusterCompSpec == nil || len(clusterCompSpec.ComponentDefRef) == 0 {
+		if clusterCompSpec == nil || len(clusterCompSpec.ComponentDef) == 0 {
 			return nil
 		}
 		return map[string]string{
-			clusterCompSpec.Name: clusterCompSpec.ComponentDefRef,
+			clusterCompSpec.Name: clusterCompSpec.ComponentDef,
 		}
 	}
 	mapping := make(map[string]string)
 	for _, comp := range cluster.Spec.ComponentSpecs {
-		if len(comp.ComponentDefRef) > 0 {
-			mapping[comp.Name] = comp.ComponentDefRef
+		if len(comp.ComponentDef) > 0 {
+			mapping[comp.Name] = comp.ComponentDef
 		}
 	}
 	return mapping

@@ -281,9 +281,24 @@ func (r *OpsRequest) validateReconfigure(ctx context.Context,
 	k8sClient client.Client,
 	cluster *Cluster) error {
 	reconfigure := r.Spec.Reconfigure
-	if reconfigure == nil {
+	if reconfigure == nil && len(r.Spec.Reconfigures) == 0 {
 		return notEmptyError("spec.reconfigure")
 	}
+	if reconfigure != nil {
+		return r.validateReconfigureParams(ctx, k8sClient, cluster, reconfigure)
+	}
+	for _, reconfigure := range r.Spec.Reconfigures {
+		if err := r.validateReconfigureParams(ctx, k8sClient, cluster, &reconfigure); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *OpsRequest) validateReconfigureParams(ctx context.Context,
+	k8sClient client.Client,
+	cluster *Cluster,
+	reconfigure *Reconfigure) error {
 	if cluster.Spec.GetComponentByName(reconfigure.ComponentName) == nil {
 		return fmt.Errorf("component %s not found", reconfigure.ComponentName)
 	}

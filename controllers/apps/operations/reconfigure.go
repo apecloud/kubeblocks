@@ -70,9 +70,6 @@ func handleReconfigureStatusProgress(result *appsv1alpha1.ReconcileDetail, opsSt
 			cmStatus.Message = result.ErrMessage
 			cmStatus.Status = string(phase)
 		}
-		// if cmStatus.SucceedCount != core.Unconfirmed && cmStatus.ExpectedCount != core.Unconfirmed {
-		// 	opsStatus.Progress = getSlowestReconfiguringProgress(opsStatus.ReconfiguringStatus.ConfigurationStatus)
-		// }
 		return
 	}
 }
@@ -115,55 +112,15 @@ func (r *reconfigureAction) syncDependResources(reqCtx intctrlutil.RequestCtx, c
 }
 
 func (r *reconfigureAction) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
-	status := resource.OpsRequest.Status
-	if len(status.Conditions) == 0 {
-		return status.Phase, 30 * time.Second, nil
-	}
-
-	opsDeepCopy := resource.OpsRequest.DeepCopy()
-
-	isFinished := true
-	statusAsComponents := make([]appsv1alpha1.ConfigurationItemStatus, 0)
-	opsRequest := resource.OpsRequest.Spec
-	if opsRequest.Reconfigure != nil && len(opsRequest.Reconfigure.Configurations) > 0 {
-		params := reconfigureParams{
-			resource:            resource,
-			reqCtx:              reqCtx,
-			cli:                 cli,
-			clusterName:         resource.Cluster.Name,
-			componentName:       opsRequest.Reconfigure.ComponentName,
-			opsRequest:          resource.OpsRequest,
-			configurationItem:   opsRequest.Reconfigure.Configurations[0],
-			configurationStatus: initReconfigureStatus(resource.OpsRequest, ""),
-		}
-		phase, err := r.doSyncReconfigureStatus(params)
-		if err != nil {
-			return "", 30 * time.Second, err
-		}
-		if phase == appsv1alpha1.OpsFailedPhase {
-			return appsv1alpha1.OpsFailedPhase, 0, nil
-		}
-		if phase != appsv1alpha1.OpsSucceedPhase {
-			isFinished = false
-		}
-		statusAsComponents = append(statusAsComponents, params.configurationStatus.ConfigurationStatus[0])
-	}
+	var (
+		isFinished = true
+		opsRequest = resource.OpsRequest.Spec
+	)
 
 	// Node: support multiple component
-	for _, reconfigure := range opsRequest.Reconfigures {
-		if len(reconfigure.Configurations) == 0 {
-			continue
-		}
-		params := reconfigureParams{
-			resource:            resource,
-			reqCtx:              reqCtx,
-			cli:                 cli,
-			clusterName:         resource.Cluster.Name,
-			componentName:       reconfigure.ComponentName,
-			opsRequest:          resource.OpsRequest,
-			configurationItem:   reconfigure.Configurations[0],
-			configurationStatus: initReconfigureStatus(resource.OpsRequest, reconfigure.ComponentName),
-		}
+	opsDeepCopy := resource.OpsRequest.DeepCopy()
+	statusAsComponents := make([]appsv1alpha1.ConfigurationItemStatus, 0)
+	for _, params := range fromReconfigureOperations(opsRequest, reqCtx, cli, resource) {
 		phase, err := r.doSyncReconfigureStatus(params)
 		if err != nil {
 			return "", 30 * time.Second, err
@@ -182,6 +139,32 @@ func (r *reconfigureAction) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli c
 		phase = appsv1alpha1.OpsSucceedPhase
 	}
 	return syncReconfigureForOps(reqCtx, cli, resource, statusAsComponents, opsDeepCopy, phase)
+}
+
+func fromReconfigureOperations(request appsv1alpha1.OpsRequestSpec, reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) (reconfigures []reconfigureParams) {
+	var operations []appsv1alpha1.Reconfigure
+
+	if request.Reconfigure != nil {
+		operations = append(operations, *request.Reconfigure)
+	}
+	operations = append(operations, request.Reconfigures...)
+
+	for _, reconfigure := range operations {
+		if len(reconfigure.Configurations) == 0 {
+			continue
+		}
+		reconfigures = append(reconfigures, reconfigureParams{
+			resource:            resource,
+			reqCtx:              reqCtx,
+			cli:                 cli,
+			clusterName:         resource.Cluster.Name,
+			componentName:       reconfigure.ComponentName,
+			opsRequest:          resource.OpsRequest,
+			configurationItem:   reconfigure.Configurations[0],
+			configurationStatus: initReconfigureStatus(resource.OpsRequest, reconfigure.ComponentName),
+		})
+	}
+	return reconfigures
 }
 
 func syncReconfigureForOps(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource, statusAsComponents []appsv1alpha1.ConfigurationItemStatus, opsDeepCopy *appsv1alpha1.OpsRequest, phase appsv1alpha1.OpsPhase) (appsv1alpha1.OpsPhase, time.Duration, error) {
@@ -245,6 +228,7 @@ func (r *reconfigureAction) doSyncReconfigureStatus(params reconfigureParams) (a
 
 func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) error {
 	opsRequest := resource.OpsRequest.Spec
+	// @deprecate for kb-0.9
 	if opsRequest.Reconfigure != nil && len(opsRequest.Reconfigure.Configurations) > 0 {
 		status := initReconfigureStatus(resource.OpsRequest, "")
 		return r.doReconfigure(reconfigureParams{
@@ -380,7 +364,7 @@ func isNoChange(conditions []metav1.Condition) bool {
 
 func initReconfigureStatus(opsRequest *appsv1alpha1.OpsRequest, componentName string) *appsv1alpha1.ReconfiguringStatus {
 	status := &opsRequest.Status
-	if componentName == "" {
+	if componentName == "" || (opsRequest.Spec.Reconfigure != nil && opsRequest.Spec.Reconfigure.ComponentName == componentName) {
 		if status.ReconfiguringStatus == nil {
 			status.ReconfiguringStatus = &appsv1alpha1.ReconfiguringStatus{
 				ConfigurationStatus: make([]appsv1alpha1.ConfigurationItemStatus, 0),

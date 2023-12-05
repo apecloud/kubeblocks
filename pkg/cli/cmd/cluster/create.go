@@ -33,7 +33,6 @@ import (
 	"time"
 
 	"github.com/ghodss/yaml"
-	"github.com/robfig/cron/v3"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
@@ -204,7 +203,11 @@ const (
 
 // set the components volume names, key is the component type.
 var componentVolumes = map[string][]string{
-	"bookies": {"journal", "ledgers"},
+	"bookies":      {"journal", "ledgers"},
+	// kafka controller
+	"controller":   {"metadata"},
+	"kafka-broker": {"metadata", "data"},
+	"kafka-server": {"metadata", "data"},
 }
 
 // UpdatableFlags is the flags that cat be updated by update command

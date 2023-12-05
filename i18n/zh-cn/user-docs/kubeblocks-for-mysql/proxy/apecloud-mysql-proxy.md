@@ -1,40 +1,40 @@
 ---
-title: How to use ApeCloud MySQL Proxy Cluster
-description: ApeCloud MySQL Proxy Cluster tutorial
-keywords: [apecloud mysql proxy, proxy]
+title: ApeCloud MySQL 代理
+description: 如何使用 ApeCloud MySQL 代理
+keywords: [apecloud mysql 代理, 代理]
 sidebar_position: 2
-sidebar_label: ApeCloud MySQL Proxy Cluster
+sidebar_label: ApeCloud MySQL 代理
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# ApeCloud MySQL Proxy
+# ApeCloud MySQL 代理
 
-## Before you start
+## 开始之前
 
-1. [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md).
+1. [安装 kbcli](./../../installation/install-kbcli.md).
 2. Install KubeBlocks.
 
-   You can run `kbcli playground init` to install a k3d cluster and KubeBlocks. For details, refer to [Try KubeBlocks on your laptop](./../../try-out-on-playground/try-kubeblocks-on-your-laptop.md) or [Try KubeBlocks on cloud](./../../try-out-on-playground/try-kubeblocks-on-cloud.md).
+   可以执行 kbcli playground init 安装 k3d 集群和 KubeBlocks。详情请参考[在本地使用 KubeBlocks](链接) 或[在云上使用 KubeBlocks](链接)。
 
    ```bash
    kbcli playground init
 
-   # Use --version to specify a version
+   # 使用--version 指定版本
    kbcli playground init --version='0.6.0'
    ```
 
-   Or if you already have a Kubernetes cluster, you can choose install KubeBlocks by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm) or [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
-3. Prepare an ApeCloud MySQL RaftGroup named `mycluster` for demonstrating how to enable the proxy function for an existing cluster. Refer to [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md#create-a-mysql-cluster) for details.
+   如果已经有 Kubernetes 集群，可以选择用 [Helm](链接) 或 [kbcli](链接) 安装 KubeBlocks。
+3. 准备一个名为 mycluster 的 ApeCloud MySQL 三节点集群，用于演示如何为现有集群启用代理功能。详情请参考[创建 MySQL 集群](链接)。
 
-## Create a Proxy Cluster
+## 创建代理集群
 
 <Tabs>
 
 <TabItem value="kbcli" label="kbcli" default>
 
-It is recommended to use kbcli to create an ApeCloud MySQL Proxy Cluster.
+建议使用 kbcli 创建 ApeCloud MySQL 代理集群。
 
 ```bash
 kbcli cluster create mysql myproxy --mode raftGroup --availability-policy none --proxy-enabled true
@@ -44,37 +44,37 @@ kbcli cluster create mysql myproxy --mode raftGroup --availability-policy none -
 
 <TabItem value="Helm" label="Helm">
 
-1. Add the KubeBlocks repository.
+1. 添加 KubeBlocks 仓库。
 
    ```bash
    helm repo add kubeblocks https://apecloud.github.io/helm-charts
    ```
 
-2. View the repository list to verify whether the KubeBlocks repository is added successfully.
+2. 查看仓库列表，验证 KubeBlocks 仓库是否添加成功。
 
    ```bash
    helm repo list
    ```
 
-3. Run the update command to make sure you have added the latest version.
+3. 执行 `update` 命令，确保已添加最新版本。
 
    ```bash
    helm repo update
    ```
 
-4. View all versions of ApeCloud MySQL Proxy.
+4. 查看各版本的 ApeCloud MySQL 代理。
 
    ```bash
    helm search repo kubeblocks/apecloud-mysql --devel --versions
    ```
 
-5. (Optional) If you disable the `apecloud-mysql` add-on when installing KuebBlocks, run the command below to specify a version and install the cluster definition of ApeCloud MySQL. Skip this step if you install KubeBlocks with the default settings.
+5. （可选）如果安装 KubeBlocks 时禁用了 `apecloud-mysql` 插件，执行以下命令指定版本并安装 ApeCloud MySQL 集群定义。如果使用默认设置安装 KubeBlocks，请跳过此步骤。
 
    ```bash
    helm install myproxy kubeblocks/apecloud-mysql --version=v0.6.0
    ```
 
-6. Create an ApeCloud MySQL Proxy Cluster.
+6. 创建 ApeCloud MySQL 代理集群。
 
    ```bash
    helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.6.0 --set mode=raftGroup,proxyEnabled=true 
@@ -82,7 +82,7 @@ kbcli cluster create mysql myproxy --mode raftGroup --availability-policy none -
 
 :::note
 
-If you only have one node for deploying a RaftGroup, set the `availability-policy` as `none` when creating a RaftGroup.
+如果只有一个节点用于部署 ApeCloud MySQL 集群版，请在创建时将 `availability-policy` 设置为 `none`。
 
 ```bash
 helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.6.0 --set mode=raftGroup,proxyEnabled=true --set extra.availabilityPolicy=none
@@ -94,14 +94,14 @@ helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.6.0 --set mo
 
 </Tabs>
 
-## Enable Proxy dynamically
+## 动态启用代理
 
-As its name suggests, ApeCloud MySQL Proxy in nature is a database proxy. An ApeCloud MySQL RaftGroup Cluster can be switched to an ApeCloud MySQL Proxy Cluster by setting `proxyEnabled=true`.
+ApeCloud MySQL 代理本质是一个数据库代理。通过设置 `proxyEnabled=true`，可以将 ApeCloud MySQL 集群版切换为 ApeCloud MySQL 代理集群。
 
 <Tabs>
 <TabItem value="kbcli" label="kbcli" default>
 
-Coming soon...
+敬请期待......
 
 </TabItem>
 
@@ -115,16 +115,16 @@ helm upgrade mycluster kubeblocks/apecloud-mysql-cluster --set mode=raftGroup,pr
 
 </Tabs>
 
-## Connect Proxy Cluster
+## 连接代理集群
 
-ApeCloud MySQL Proxy is routed through the `vtgate` component, and the way the MySQL Server accesses `vtgate` is similar to the way of accessing `mysqld`. The external SQL access address provided by ApeCloud MySQL Proxy is the `vtgate` address and port. The `vtgate` address created by KubeBlocks by default is `myproxy-cluster-vtgate-headless`, and the port number is `15306`. You can visit ApeCloud MySQL Proxy through the MySQL Server in any pod under the same namespace as ApeCloud MySQL Proxy.
+ApeCloud MySQL 代理通过 `vtgate` 组件进行路由，MySQL 服务器访问 `vtgate` 的方式和访问 `mysqld` 很像。代理提供的外部 SQL 访问地址是 `vtgate` 的地址和端口，而 KubeBlocks 默认创建的 `vtgate` 地址是 `myproxy-cluster-vtgate-headless`，端口号为 `15306`。你可以通过与代理处于相同命名空间的任意 Pod 中的 MySQL 服务器访问 ApeCloud MySQL 代理。
 
-### Connect Proxy Cluster by VTGate
+### 通过 VTGate 连接代理集群
 
 <Tabs>
 <TabItem value="kbcli" label="kbcli" default>
 
-Run the command below to connect to the Proxy Cluster.
+执行以下命令连接到代理集群。
 
 ```bash
 kbcli cluster connect myproxy --component vtgate
@@ -134,13 +134,13 @@ kbcli cluster connect myproxy --component vtgate
 
 <TabItem value="port-forward" label="port-forward">
 
-1. Expose the port of VTGate to the localhost so that the localhost can access the Proxy.
+1. 将 VTGate 的端口映射到本地主机，使本地主机可以访问代理。
 
    ```bash
    kubectl port-forward svc/vt-vtgate-headless 15306:15306
    ```
 
-2. Connect to the cluster.
+2. 连接到集群。
 
    ```bash
    mysql -h 127.0.0.1 -P 15306
@@ -149,13 +149,13 @@ kbcli cluster connect myproxy --component vtgate
 </TabItem>
 </Tabs>
 
-### Connect Proxy Cluster by MySQL Server
+### 通过 MySQL 服务器连接代理集群
 
 <Tabs>
 
 <TabItem value="kbcli" label="kbcli" default>
 
-Run the command below to connect to the MySQL Server.
+执行以下命令连接到 MySQL 服务器。
 
 ```bash
 kbcli cluster connect myproxy
@@ -165,13 +165,13 @@ kbcli cluster connect myproxy
 
 <TabItem value="port-forward" label="port-forward">
 
-1. Expose the port of the MySQL Server to the localhost so that the localhost can access the MySQL Server.
+1. 将 MySQL 服务器的端口映射到本地主机，使本地主机可以访问 MySQL 服务器。
 
    ```bash
    kubectl port-forward svc/vt-mysql 3306:3306
    ```
 
-2. Connect to the cluster.
+2. 连接到集群。
 
    ```bash
    mysql -h 127.0.0.1 -P 3306
@@ -182,15 +182,15 @@ kbcli cluster connect myproxy
 
 :::note
 
-If you need to test the failover of MySQL, you need to delete the Pod first and continue to port-forward the port, and you can also write a shell script. Here are examples.
+如果要测试 MySQL 的故障切换功能，请先删除 Pod，然后进行端口转发。或者你可以编写一个 shell 脚本进行测试。比如，
 
-For VTGate,
+如果使用 VTGate：
 
 ```bash
 while true; do date; kubectl port-forward svc/vt-vtgate-headless 15306:15306; sleep 0.5; done
 ```
 
-For the MySQL Server,
+如果使用 MySQL：
 
 ```bash
 while true; do date; kubectl port-forward svc/vt-mysql 3306:3306; sleep 0.5; done
@@ -198,13 +198,13 @@ while true; do date; kubectl port-forward svc/vt-mysql 3306:3306; sleep 0.5; don
 
 :::
 
-## Configure Proxy Cluster parameters
+## 配置代理集群参数
 
-VTGate, VTConsensus, and VTTablet support parameter configuration. You can configure VTGate and VTConsensus by using `--component` to specify a component and configure VTTablet by using `--component=mysql --config-specs=vttablet-config` to specify both a component and a configuration file template since VTTablet is the sidecar of the MySQL component.
+VTGate、VTConsensus 和 VTTablet 都支持参数配置。你可以使用 `--component` 参数指定组件来配置 VTGate 和 VTConsensus，使用 `--component=mysql --config-specs=vttablet-config` 同时指定组件和配置文件模板来配置 VTTablet，因为 VTTablet 是 MySQL 组件的附属组件。
 
-### View parameter details
+### 查看参数详情
 
-* View the details of the current configuration file.
+* 查看当前配置文件的详细信息。
 
    ```bash
    # vtgate
@@ -217,7 +217,7 @@ VTGate, VTConsensus, and VTTablet support parameter configuration. You can confi
    kbcli cluster describe-config myproxy --component mysql --show-detail --config-specs vttablet-config
    ```
 
-* View the parameter descriptions.
+* 查看参数描述。
 
    ```bash
    # vtgate
@@ -227,15 +227,15 @@ VTGate, VTConsensus, and VTTablet support parameter configuration. You can confi
    kbcli cluster explain-config myproxy --component mysql --config-specs=vttablet-config
    ```
 
-* View the definition of a specified parameter.
+* 查看指定参数的定义。
 
    ```bash
    kbcli cluster explain-config myproxy --component vtgate --param=healthcheck_timeout
    ```
 
-### Reconfigure parameters
+### 重新配置参数
 
-1. View the current values in the MySQL Server.
+1. 查看 MySQL 服务器中的当前值。
 
    ```bash
    kbcli cluster connect myproxy --component=vtgate
@@ -249,11 +249,11 @@ VTGate, VTConsensus, and VTTablet support parameter configuration. You can confi
    mysql> show variables like '%health_check_interval%';
    ```
 
-2. Configure the `healthcheck_timeout` for VTGate and the `health_check_interval` for VTTablet.
+2. 配置 VTGate 的 `healthcheck_timeout` 和 VTTablet 的 `health_check_interval`。
 
-   You can use `--set` flag or edit the parameter configuration file to edit values.
+   你可以通过使用 `--set` 或编辑参数配置文件进行配置。
 
-   * By using `--set` flag
+   * 使用 `--set`。
 
       ```bash
       # vtgate
@@ -263,7 +263,7 @@ VTGate, VTConsensus, and VTTablet support parameter configuration. You can confi
       kbcli cluster configure myproxy --set=health_check_interval=4s --component=mysql --config-spec=vttablet-config
       ```
 
-   * By editing the parameter configuration file
+   * 编辑参数配置文件。
 
       ```bash
       kbcli cluster edit-config myproxy --component vtgate
@@ -271,7 +271,7 @@ VTGate, VTConsensus, and VTTablet support parameter configuration. You can confi
 
 :::note
 
-After the `vtgate` parameter values configuration command is executed, a new vtgate Pod is started and the old vtgate Pod is terminated. You can run the command below to monitor whether the old Pod is terminated.
+执行 `vtgate` 参数配置命令后，会启动一个新的 vtgate Pod，并终止旧的 vtgate Pod。你可以执行以下命令监视旧 Pod 是否被终止。
 
 ```bash
 kubectl get pod <vtgate-pod-name> -w
@@ -279,7 +279,7 @@ kubectl get pod <vtgate-pod-name> -w
 
 :::
 
-3. Use the output command to view the configuration status. For example,
+3. 执行以下命令查看配置状态。比如，
 
    ```bash
    kbcli cluster describe-ops myproxy -reconfiguring-lth8d -n default
@@ -287,19 +287,19 @@ kubectl get pod <vtgate-pod-name> -w
 
 :::note
 
-For more information about parameter configuration, refer to [Configuration](./../configuration/configuration.md).
+关于参数配置的更多信息，请参考[配置](链接)。
 
 :::
 
-## Log
+## 日志
 
-You can view the log files of components, Pods, and containers by both kbcli and kubectl.
+你可以使用 kbcli 和 kubectl 来查看组件、Pod 和容器的日志文件。
 
 <Tabs>
 
 <TabItem value="kbcli" label="kbcli" default>
 
-View the log of different components.
+查看不同组件的日志。
 
 ```bash
 kbcli cluster list-logs myproxy
@@ -308,13 +308,13 @@ kbcli cluster list-logs myproxy --component vtcontroller
 kbcli cluster list-logs myproxy --component mysql
 ```
 
-View the log of a Pod.
+查看 Pod 日志。
 
 ```bash
 kbcli cluster logs myproxy --instance myproxy-vtgate-85bdcf99df-wbmnl
 ```
 
-View the log of a container in a Pod.
+查看 Pod 中容器的日志。
 
 ```bash
 kbcli cluster logs myproxy --instance myproxy-mysql-0 -c vttablet
@@ -324,26 +324,26 @@ kbcli cluster logs myproxy --instance myproxy-mysql-0 -c vttablet
 
 <TabItem value="kubectl" label="kubectl" default>
 
-View the log of VTGate.
+查看 VTGate 的日志。
 
 ```bash
 kubectl logs myproxy-cluster-vtgate-8659d5db95-4dzt5
 ```
 
-View the log of VTTablet and `-c` is required.
+查看 VTTable 的日志，`-c` 是必需的。
 
 ```bash
 kubectl logs myproxy-cluster-mysql-0 -c vttablet
 ```
 
-Enter the container and view more logs of VTGate.
+进入容器并查看更多 VTGate 日志。
 
 ```bash
 kubectl exec -it myproxy-cluster-vtgate-8659d5db95-4dzt5 -- bash
 ls /vtdataroot
 ```
 
-Enter the container and view more logs of VTTable.
+进入容器并查看更多 VTTablet 日志。
 
 ```bash
 kubectl exec -it myproxy-cluster-mysql-0  -c vttablet -- bash
@@ -354,21 +354,21 @@ ls /vtdataroot
 
 </Tabs>
 
-## Monitoring
+## 监控
 
 :::note
 
-In the production environment, all monitoring add-ons are disabled by default when installing KubeBlocks. You can enable these add-ons but it is highly recommended to build your monitoring system or purchase a third-party monitoring service. For details, refer to [Monitoring](./../../observability/monitor-database.md).
+在生产环境安装 KubeBlocks 时，所有监控插件默认处于禁用状态。你可以自行启用这些插件，但强烈建议你构建自己的监控系统或购买第三方监控服务。详情请参考[监控](链接)。
 
 :::
 
-1. Enable the monitoring function.
+1. 启用监控功能。
 
    ```bash
    kbcli cluster update myproxy --monitor=true
    ```
 
-2. View the add-on list and enable the Grafana add-on.
+2. 查看插件列表并启用 Grafana 插件。
 
    ```bash
    kbcli addon list 
@@ -376,41 +376,41 @@ In the production environment, all monitoring add-ons are disabled by default wh
    kbcli addon enable grafana
    ```
 
-3. View the dashboard list.
+3. 查看仪表盘列表。
 
    ```bash
    kbcli dashboard list
    ```
 
-4. Open the Grafana dashboard.
+4. 打开 Grafana 仪表盘。
 
    ```bash
    kbcli dashboard open kubeblocks-grafana
    ```
 
-## Read-write splitting
+## 读写分离
 
-You can enable the read-write splitting function.
+你可以启用读写分离功能。
 
 ```bash
 kbcli cluster configure myproxy --component vtgate --set=read_write_splitting_policy=random
 ```
 
-You can also set the ratio for read-write splitting and here is an example of directing 70% flow to the read-only node.
+还可以设置读写分离的比例。如下是设置 70% 的流量导向只读节点的例子。
 
 ```bash
 kbcli cluster configure myproxy --component vtgate --set=read_write_splitting_ratio=70
 ```
 
-Moreover, you can [use Grafana](#monitoring) or run `show workload` to view the flow distribution.
+此外，你还可以[使用 Grafana](monitoring链接) 或执行 `show workload` 来查看流量分布。
 
 ```bash
 show workload;
 ```
 
-## Transparent failover
+## 透明的故障切换
 
-Run the command below to implement transparent failover.
+执行以下命令，实现透明的故障切换。
 
 ```bash
 kbcli cluster configure myproxy --component vtgate --set=enable_buffer=true

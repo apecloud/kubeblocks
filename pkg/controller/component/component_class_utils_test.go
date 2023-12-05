@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package class
+package component
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -92,157 +92,211 @@ var _ = Describe("utils", func() {
 
 		When("component have class definition", func() {
 			It("should succeed with valid classDefRef", func() {
-				comp := &v1alpha1.ClusterComponentSpec{
-					ComponentDefRef: compType1,
-					ClassDefRef: &v1alpha1.ClassDefRef{
-						Name:  kbClassDefinitionObjName,
-						Class: testapps.Class1c1g.Name,
+				synthesizedComp := &SynthesizedComponent{
+					ClusterDefName:     clusterDefinitionName,
+					ClusterCompDefName: compType1,
+				}
+				comp := &v1alpha1.Component{
+					Spec: v1alpha1.ComponentSpec{
+						ClassDefRef: &v1alpha1.ClassDefRef{
+							Name:  kbClassDefinitionObjName,
+							Class: testapps.Class1c1g.Name,
+						},
 					},
 				}
-				cls, err := clsMgr.ChooseClass(comp)
+				cls, err := clsMgr.ChooseClass(synthesizedComp, comp)
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(cls.CPU.Equal(testapps.Class1c1g.CPU)).Should(BeTrue())
 				Expect(cls.Memory.Equal(testapps.Class1c1g.Memory)).Should(BeTrue())
-				comp.Resources = cls.ToResourceRequirements()
-				Expect(clsMgr.ValidateResources(clusterDefinitionName, comp)).ShouldNot(HaveOccurred())
+				comp.Spec.Resources = cls.ToResourceRequirements()
+				Expect(clsMgr.ValidateResources(synthesizedComp, comp)).ShouldNot(HaveOccurred())
 			})
 
 			It("should match minimal class with partial classDefRef", func() {
-				comp := &v1alpha1.ClusterComponentSpec{
-					ComponentDefRef: compType1,
-					ClassDefRef: &v1alpha1.ClassDefRef{
-						Class: "large",
+				synthesizedComp := &SynthesizedComponent{
+					ClusterDefName:     clusterDefinitionName,
+					ClusterCompDefName: compType1,
+				}
+				comp := &v1alpha1.Component{
+					Spec: v1alpha1.ComponentSpec{
+						ClassDefRef: &v1alpha1.ClassDefRef{
+							Class: "large",
+						},
 					},
 				}
-				cls, err := clsMgr.ChooseClass(comp)
+				cls, err := clsMgr.ChooseClass(synthesizedComp, comp)
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(cls.CPU.String()).Should(Equal("100"))
 				Expect(cls.Memory.String()).Should(Equal("200Gi"))
-				comp.Resources = cls.ToResourceRequirements()
-				Expect(clsMgr.ValidateResources(clusterDefinitionName, comp)).ShouldNot(HaveOccurred())
+				comp.Spec.Resources = cls.ToResourceRequirements()
+				Expect(clsMgr.ValidateResources(synthesizedComp, comp)).ShouldNot(HaveOccurred())
 			})
 
 			It("should fail with invalid classDefRef", func() {
-				comp := &v1alpha1.ClusterComponentSpec{
-					ComponentDefRef: compType1,
-					ClassDefRef:     &v1alpha1.ClassDefRef{Class: "class-not-exists"},
+				synthesizedComp := &SynthesizedComponent{
+					ClusterDefName:     clusterDefinitionName,
+					ClusterCompDefName: compType1,
 				}
-				_, err := clsMgr.ChooseClass(comp)
+				comp := &v1alpha1.Component{
+					Spec: v1alpha1.ComponentSpec{
+						ClassDefRef: &v1alpha1.ClassDefRef{Class: "class-not-exists"},
+					},
+				}
+				_, err := clsMgr.ChooseClass(synthesizedComp, comp)
 				Expect(err).Should(HaveOccurred())
 			})
 
 			It("should succeed with valid resource", func() {
-				comp := &v1alpha1.ClusterComponentSpec{
-					ComponentDefRef: compType1,
-					Resources: corev1.ResourceRequirements{
-						Requests: buildResource("1", "1Gi"),
+				synthesizedComp := &SynthesizedComponent{
+					ClusterDefName:     clusterDefinitionName,
+					ClusterCompDefName: compType1,
+				}
+				comp := &v1alpha1.Component{
+					Spec: v1alpha1.ComponentSpec{
+						Resources: corev1.ResourceRequirements{
+							Requests: buildResource("1", "1Gi"),
+						},
 					},
 				}
-				cls, err := clsMgr.ChooseClass(comp)
+				cls, err := clsMgr.ChooseClass(synthesizedComp, comp)
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(cls.CPU.Equal(testapps.Class1c1g.CPU)).Should(BeTrue())
 				Expect(cls.Memory.Equal(testapps.Class1c1g.Memory)).Should(BeTrue())
-				comp.Resources = cls.ToResourceRequirements()
-				Expect(clsMgr.ValidateResources(clusterDefinitionName, comp)).ShouldNot(HaveOccurred())
+				comp.Spec.Resources = cls.ToResourceRequirements()
+				Expect(clsMgr.ValidateResources(synthesizedComp, comp)).ShouldNot(HaveOccurred())
 			})
 
 			It("should fail with invalid cpu resource", func() {
-				comp := &v1alpha1.ClusterComponentSpec{
-					ComponentDefRef: compType1,
-					Resources: corev1.ResourceRequirements{
-						Requests: buildResource("100", "2Gi"),
+				synthesizedComp := &SynthesizedComponent{
+					ClusterDefName:     clusterDefinitionName,
+					ClusterCompDefName: compType1,
+				}
+				comp := &v1alpha1.Component{
+					Spec: v1alpha1.ComponentSpec{
+						Resources: corev1.ResourceRequirements{
+							Requests: buildResource("100", "2Gi"),
+						},
 					},
 				}
-				_, err := clsMgr.ChooseClass(comp)
+				_, err := clsMgr.ChooseClass(synthesizedComp, comp)
 				Expect(err).Should(HaveOccurred())
 			})
 
 			It("should fail with invalid memory resource", func() {
-				comp := &v1alpha1.ClusterComponentSpec{
-					ComponentDefRef: compType1,
-					Resources: corev1.ResourceRequirements{
-						Requests: buildResource("1", "200Gi"),
+				synthesizedComp := &SynthesizedComponent{
+					ClusterDefName:     clusterDefinitionName,
+					ClusterCompDefName: compType1,
+				}
+				comp := &v1alpha1.Component{
+					Spec: v1alpha1.ComponentSpec{
+						Resources: corev1.ResourceRequirements{
+							Requests: buildResource("1", "200Gi"),
+						},
 					},
 				}
-				_, err := clsMgr.ChooseClass(comp)
+				_, err := clsMgr.ChooseClass(synthesizedComp, comp)
 				Expect(err).Should(HaveOccurred())
 			})
 
 			It("should match minimal class with empty resource", func() {
-				comp := &v1alpha1.ClusterComponentSpec{
-					ComponentDefRef: compType1,
+				synthesizedComp := &SynthesizedComponent{
+					ClusterDefName:     clusterDefinitionName,
+					ClusterCompDefName: compType1,
 				}
-				cls, err := clsMgr.ChooseClass(comp)
+				comp := &v1alpha1.Component{}
+
+				cls, err := clsMgr.ChooseClass(synthesizedComp, comp)
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(cls.CPU.String()).Should(Equal("1"))
 				Expect(cls.Memory.String()).Should(Equal("1Gi"))
-				comp.Resources = cls.ToResourceRequirements()
-				Expect(clsMgr.ValidateResources(clusterDefinitionName, comp)).ShouldNot(HaveOccurred())
+				comp.Spec.Resources = cls.ToResourceRequirements()
+				Expect(clsMgr.ValidateResources(synthesizedComp, comp)).ShouldNot(HaveOccurred())
 			})
 
 			It("should match minimal memory if with only cpu", func() {
-				comp := &v1alpha1.ClusterComponentSpec{
-					ComponentDefRef: compType1,
-					Resources: corev1.ResourceRequirements{
-						Requests: buildResource("2", ""),
+				synthesizedComp := &SynthesizedComponent{
+					ClusterDefName:     clusterDefinitionName,
+					ClusterCompDefName: compType1,
+				}
+				comp := &v1alpha1.Component{
+					Spec: v1alpha1.ComponentSpec{
+						Resources: corev1.ResourceRequirements{
+							Requests: buildResource("2", ""),
+						},
 					},
 				}
-				cls, err := clsMgr.ChooseClass(comp)
+				cls, err := clsMgr.ChooseClass(synthesizedComp, comp)
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(cls.CPU.String()).Should(Equal("2"))
 				Expect(cls.Memory.String()).Should(Equal("4Gi"))
-				comp.Resources = cls.ToResourceRequirements()
-				Expect(clsMgr.ValidateResources(clusterDefinitionName, comp)).ShouldNot(HaveOccurred())
+				comp.Spec.Resources = cls.ToResourceRequirements()
+				Expect(clsMgr.ValidateResources(synthesizedComp, comp)).ShouldNot(HaveOccurred())
 			})
 
 			It("should match minimal cpu if with only memory", func() {
-				comp := &v1alpha1.ClusterComponentSpec{
-					ComponentDefRef: compType1,
-					Resources: corev1.ResourceRequirements{
-						Requests: buildResource("", "4Gi"),
-					},
+				synthesizedComp := &SynthesizedComponent{
+					ClusterDefName:     clusterDefinitionName,
+					ClusterCompDefName: compType1,
 				}
-				cls, err := clsMgr.ChooseClass(comp)
+				comp := &v1alpha1.Component{
+					Spec: v1alpha1.ComponentSpec{
+						Resources: corev1.ResourceRequirements{
+							Requests: buildResource("", "4Gi"),
+						}},
+				}
+				cls, err := clsMgr.ChooseClass(synthesizedComp, comp)
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(cls.CPU.String()).Should(Equal("1"))
 				Expect(cls.Memory.String()).Should(Equal("4Gi"))
-				comp.Resources = cls.ToResourceRequirements()
-				Expect(clsMgr.ValidateResources(clusterDefinitionName, comp)).ShouldNot(HaveOccurred())
+				comp.Spec.Resources = cls.ToResourceRequirements()
+				Expect(clsMgr.ValidateResources(synthesizedComp, comp)).ShouldNot(HaveOccurred())
 			})
 		})
 
 		When("component without class definition", func() {
 			It("should succeed without classDefRef", func() {
-				comp := &v1alpha1.ClusterComponentSpec{
-					ComponentDefRef: compType2,
+				synthesizedComp := &SynthesizedComponent{
+					ClusterDefName:     clusterDefinitionName,
+					ClusterCompDefName: compType2,
 				}
-				cls, err := clsMgr.ChooseClass(comp)
+				comp := &v1alpha1.Component{}
+				cls, err := clsMgr.ChooseClass(synthesizedComp, comp)
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(cls).Should(BeNil())
-				Expect(clsMgr.ValidateResources(clusterDefinitionName, comp)).ShouldNot(HaveOccurred())
+				Expect(clsMgr.ValidateResources(synthesizedComp, comp)).ShouldNot(HaveOccurred())
 			})
 
 			It("should fail with classDefRef", func() {
-				comp := &v1alpha1.ClusterComponentSpec{
-					ComponentDefRef: compType2,
-					ClassDefRef:     &v1alpha1.ClassDefRef{Class: testapps.Class1c1gName},
+				synthesizedComp := &SynthesizedComponent{
+					ClusterDefName:     clusterDefinitionName,
+					ClusterCompDefName: compType2,
 				}
-				_, err := clsMgr.ChooseClass(comp)
+				comp := &v1alpha1.Component{
+					Spec: v1alpha1.ComponentSpec{
+						ClassDefRef: &v1alpha1.ClassDefRef{Class: testapps.Class1c1gName},
+					},
+				}
+				_, err := clsMgr.ChooseClass(synthesizedComp, comp)
 				Expect(err).Should(HaveOccurred())
-				Expect(clsMgr.ValidateResources(clusterDefinitionName, comp)).Should(HaveOccurred())
+				Expect(clsMgr.ValidateResources(synthesizedComp, comp)).Should(HaveOccurred())
 			})
 
 			It("should succeed without classDefRef", func() {
-				comp := &v1alpha1.ClusterComponentSpec{
-					ComponentDefRef: compType2,
-					Resources: corev1.ResourceRequirements{
-						Requests: buildResource("100", "200Gi"),
+				synthesizedComp := &SynthesizedComponent{
+					ClusterDefName:     clusterDefinitionName,
+					ClusterCompDefName: compType2,
+				}
+				comp := &v1alpha1.Component{
+					Spec: v1alpha1.ComponentSpec{
+						Resources: corev1.ResourceRequirements{
+							Requests: buildResource("100", "200Gi"),
+						},
 					},
 				}
-				cls, err := clsMgr.ChooseClass(comp)
+				cls, err := clsMgr.ChooseClass(synthesizedComp, comp)
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(cls).Should(BeNil())
-				Expect(clsMgr.ValidateResources(clusterDefinitionName, comp)).ShouldNot(HaveOccurred())
+				Expect(clsMgr.ValidateResources(synthesizedComp, comp)).ShouldNot(HaveOccurred())
 			})
 		})
 	})

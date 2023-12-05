@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/class"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -87,21 +87,28 @@ func (r *ComponentClassReconciler) Reconcile(ctx context.Context, req reconcile.
 		return intctrlutil.Reconciled()
 	}
 
-	classes, err := class.ParseComponentClasses(*classDefinition)
+	classes, err := component.ParseComponentClasses(*classDefinition)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "parse component classes failed")
 	}
 
 	patch := client.MergeFrom(classDefinition.DeepCopy())
 	var (
-		classList       []appsv1alpha1.ComponentClass
+		classList []appsv1alpha1.ComponentClass
+		// TODO(xingran): clusterDefinition label will be deprecated in the future, use componentDefinition label instead
 		clusterDefRef   = classDefinition.GetLabels()[constant.ClusterDefLabelKey]
 		componentDefRef = classDefinition.GetLabels()[constant.KBAppComponentDefRefLabelKey]
+		compDefRef      = classDefinition.GetLabels()[constant.ComponentDefinitionLabelKey]
 	)
 
 	var rules []appsv1alpha1.ResourceConstraintRule
 	for _, constraint := range constraintsMap {
-		rules = append(rules, constraint.FindRules(clusterDefRef, componentDefRef)...)
+		if compDefRef != "" {
+			rules = append(rules, constraint.FindRulesWithCompDef(compDefRef)...)
+
+		} else {
+			rules = append(rules, constraint.FindRules(clusterDefRef, componentDefRef)...)
+		}
 	}
 
 	for _, v := range classes {

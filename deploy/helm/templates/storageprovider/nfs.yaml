@@ -1,0 +1,41 @@
+apiVersion: storage.kubeblocks.io/v1alpha1
+kind: StorageProvider
+metadata:
+  name: nfs
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+spec:
+  csiDriverName: nfs.csi.k8s.io
+
+  storageClassTemplate: |
+    provisioner: nfs.csi.k8s.io
+    parameters:
+      server: {{ `{{ .Parameters.nfsServer }}` }}
+      share: {{ `{{ .Parameters.nfsShare }}` }}
+      subDir: {{ `{{ .Parameters.nfsSubDir }}` }}
+      mountPermissions: "0777"
+    {{ `{{- if .Parameters.nfsMountOptions }}` }}
+    {{ `{{- $options := splitList " " .Parameters.nfsMountOptions }}` }}
+    mountOptions: {{ `{{ $options | toJson }}` }}
+    {{ `{{- end }}` }}
+
+  parametersSchema:
+    openAPIV3Schema:
+      type: "object"
+      properties:
+        nfsServer:
+          type: string
+          description: "NFS Server address"
+        nfsShare:
+          type: string
+          description: "NFS share path"
+          default: "/"
+        nfsSubDir:
+          type: string
+          description: "sub directory under nfs share"
+        nfsMountOptions:
+          type: string
+          description: "extra mount options"
+
+      required:
+        - nfsServer

@@ -119,18 +119,17 @@ func (r *reconfigureAction) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli c
 	// Node: support multiple component
 	opsDeepCopy := resource.OpsRequest.DeepCopy()
 	statusAsComponents := make([]appsv1alpha1.ConfigurationItemStatus, 0)
-	for _, params := range fromReconfigureOperations(opsRequest, reqCtx, cli, resource) {
-		phase, err := r.doSyncReconfigureStatus(params)
-		if err != nil {
+	for _, reconfigureParams := range fromReconfigureOperations(opsRequest, reqCtx, cli, resource) {
+		phase, err := r.doSyncReconfigureStatus(reconfigureParams)
+		switch {
+		case err != nil:
 			return "", 30 * time.Second, err
-		}
-		if phase == appsv1alpha1.OpsFailedPhase {
+		case phase == appsv1alpha1.OpsFailedPhase:
 			return appsv1alpha1.OpsFailedPhase, 0, nil
-		}
-		if phase != appsv1alpha1.OpsSucceedPhase {
+		case phase != appsv1alpha1.OpsSucceedPhase:
 			isFinished = false
 		}
-		statusAsComponents = append(statusAsComponents, params.configurationStatus.ConfigurationStatus[0])
+		statusAsComponents = append(statusAsComponents, reconfigureParams.configurationStatus.ConfigurationStatus[0])
 	}
 
 	phase := appsv1alpha1.OpsRunningPhase
@@ -227,44 +226,16 @@ func (r *reconfigureAction) doSyncReconfigureStatus(params reconfigureParams) (a
 
 func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) error {
 	opsRequest := resource.OpsRequest.Spec
-	// @deprecate for kb-0.9
-	if opsRequest.Reconfigure != nil && len(opsRequest.Reconfigure.Configurations) > 0 {
-		status := initReconfigureStatus(resource.OpsRequest, "")
-		return r.doReconfigure(reconfigureParams{
-			resource:            resource,
-			reqCtx:              reqCtx,
-			cli:                 cli,
-			clusterName:         resource.Cluster.Name,
-			componentName:       opsRequest.Reconfigure.ComponentName,
-			opsRequest:          resource.OpsRequest,
-			configurationItem:   opsRequest.Reconfigure.Configurations[0],
-			configurationStatus: status,
-		})
-	}
 	// Node: support multiple component
-	for _, reconfigure := range opsRequest.Reconfigures {
-		if len(reconfigure.Configurations) == 0 {
-			continue
-		}
-		status := initReconfigureStatus(resource.OpsRequest, reconfigure.ComponentName)
-		err := r.doReconfigure(reconfigureParams{
-			resource:            resource,
-			reqCtx:              reqCtx,
-			cli:                 cli,
-			clusterName:         resource.Cluster.Name,
-			componentName:       reconfigure.ComponentName,
-			opsRequest:          resource.OpsRequest,
-			configurationItem:   reconfigure.Configurations[0],
-			configurationStatus: status,
-		})
-		if err != nil {
+	for _, reconfigureParams := range fromReconfigureOperations(opsRequest, reqCtx, cli, resource) {
+		if err := r.doReconfiguring(reconfigureParams); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *reconfigureAction) doReconfigure(params reconfigureParams) error {
+func (r *reconfigureAction) doReconfiguring(params reconfigureParams) error {
 	if !needReconfigure(params.opsRequest, params.configurationStatus) {
 		return nil
 	}

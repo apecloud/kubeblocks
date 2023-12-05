@@ -141,7 +141,7 @@ var _ = Describe("object generation transformer test.", func() {
 			requiredKeys := []string{
 				"KB_REPLICA_COUNT",
 				"KB_0_HOSTNAME",
-				"KB_CLUSTER_UID",
+				constant.KBEnvClusterUID,
 			}
 			cfg := buildEnvConfigData(*rsm)
 
@@ -153,7 +153,7 @@ var _ = Describe("object generation transformer test.", func() {
 			}
 
 			By("builds env config with resources recreate")
-			Expect(cfg["KB_CLUSTER_UID"]).Should(BeEquivalentTo(uid))
+			Expect(cfg[constant.KBEnvClusterUID]).Should(BeEquivalentTo(uid))
 
 			By("builds Env Config with ConsensusSet status correctly")
 			toCheckKeys := append(requiredKeys, []string{

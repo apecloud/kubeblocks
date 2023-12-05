@@ -59,9 +59,10 @@ spec:
               operation behaviors.
             properties:
               configs:
-                description: The configs field provided by provider, and finally this
-                  configTemplateRefs will be rendered into the user's own configuration
-                  file according to the user's cluster. Cannot be updated.
+                description: 'The configs field provided by provider, and finally
+                  this configTemplateRefs will be rendered into the user''s own configuration
+                  file according to the user''s cluster. Cannot be updated. TODO:
+                  support referencing configs from other components or clusters.'
                 items:
                   properties:
                     asEnvFrom:
@@ -201,10 +202,6 @@ spec:
                 type: string
               labels:
                 additionalProperties:
-                  description: BuiltInString defines a string type that may contain
-                    references to BuiltInEnvVar and/or BuiltInGeneratorVar placeholders.
-                    These placeholders are meant to be replaced with actual values
-                    at runtime to provide dynamic content.
                   type: string
                 description: Labels defines static labels that will be patched to
                   all k8s resources created for the component. If a label key conflicts
@@ -11683,6 +11680,178 @@ spec:
                 - BestEffortParallel
                 - Parallel
                 type: string
+              vars:
+                description: Vars represents user-defined variables. These variables
+                  can be utilized as environment variables for Pods and Actions, or
+                  to render the templates of config and script. When used as environment
+                  variables, these variables are placed in front of the environment
+                  variables declared in the Pod. Cannot be updated.
+                items:
+                  description: EnvVar represents a variable present in the env of
+                    Pod/Action or the template of config/script.
+                  properties:
+                    name:
+                      description: Name of the variable. Must be a C_IDENTIFIER.
+                      type: string
+                    value:
+                      description: 'Variable references $(VAR_NAME) are expanded using
+                        the previously defined variables in the current context. If
+                        a variable cannot be resolved, the reference in the input
+                        string will be unchanged. Double $$ are reduced to a single
+                        $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+                        "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+                        Escaped references will never be expanded, regardless of whether
+                        the variable exists or not. Defaults to "".'
+                      type: string
+                    valueFrom:
+                      description: Source for the variable's value. Cannot be used
+                        if value is not empty.
+                      properties:
+                        configMapKeyRef:
+                          description: Selects a key of a ConfigMap.
+                          properties:
+                            key:
+                              description: The key to select.
+                              type: string
+                            name:
+                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              type: string
+                            optional:
+                              description: Specify whether the ConfigMap or its key
+                                must be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        credentialVarRef:
+                          description: Selects a defined var of a Credential (SystemAccount).
+                          properties:
+                            compDef:
+                              description: CompDef specifies the definition used by
+                                the component that the referent object resident in.
+                              type: string
+                            name:
+                              description: Name of the referent object.
+                              type: string
+                            optional:
+                              description: Specify whether the object must be defined.
+                              type: boolean
+                            password:
+                              description: VarOption defines whether a variable is
+                                required or optional.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            username:
+                              description: VarOption defines whether a variable is
+                                required or optional.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                          type: object
+                        secretKeyRef:
+                          description: Selects a key of a Secret.
+                          properties:
+                            key:
+                              description: The key of the secret to select from.  Must
+                                be a valid secret key.
+                              type: string
+                            name:
+                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              type: string
+                            optional:
+                              description: Specify whether the Secret or its key must
+                                be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        serviceRefVarRef:
+                          description: Selects a defined var of a ServiceRef.
+                          properties:
+                            compDef:
+                              description: CompDef specifies the definition used by
+                                the component that the referent object resident in.
+                              type: string
+                            endpoint:
+                              description: VarOption defines whether a variable is
+                                required or optional.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            name:
+                              description: Name of the referent object.
+                              type: string
+                            optional:
+                              description: Specify whether the object must be defined.
+                              type: boolean
+                            password:
+                              description: VarOption defines whether a variable is
+                                required or optional.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            port:
+                              description: VarOption defines whether a variable is
+                                required or optional.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            username:
+                              description: VarOption defines whether a variable is
+                                required or optional.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                          type: object
+                        serviceVarRef:
+                          description: Selects a defined var of a Service.
+                          properties:
+                            compDef:
+                              description: CompDef specifies the definition used by
+                                the component that the referent object resident in.
+                              type: string
+                            host:
+                              description: VarOption defines whether a variable is
+                                required or optional.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            name:
+                              description: Name of the referent object.
+                              type: string
+                            optional:
+                              description: Specify whether the object must be defined.
+                              type: boolean
+                            port:
+                              properties:
+                                name:
+                                  type: string
+                                option:
+                                  description: VarOption defines whether a variable
+                                    is required or optional.
+                                  enum:
+                                  - Required
+                                  - Optional
+                                  type: string
+                              type: object
+                          type: object
+                      type: object
+                  required:
+                  - name
+                  type: object
+                type: array
               volumes:
                 description: Volumes defines the persistent volumes needed by the
                   component. The users are responsible for providing these volumes

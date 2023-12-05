@@ -412,11 +412,11 @@ func UpdateCustomLabelToPods(ctx context.Context,
 			})
 			// pod already in dag, merge labels
 			if idx >= 0 {
-				updateObjLabel(cluster.Name, string(cluster.UID), component.Name, labelKey, string(labelValue), pods[idx])
+				updateObjLabel(cluster.Name, string(cluster.UID), component.Name, labelKey, labelValue, pods[idx])
 				continue
 			}
 			pod := &podList.Items[i]
-			updateObjLabel(cluster.Name, string(cluster.UID), component.Name, labelKey, string(labelValue), pod)
+			updateObjLabel(cluster.Name, string(cluster.UID), component.Name, labelKey, labelValue, pod)
 			graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), nil)
 		}
 	}

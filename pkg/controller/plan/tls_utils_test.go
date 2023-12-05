@@ -34,7 +34,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
@@ -53,9 +52,9 @@ var _ = Describe("TLSUtilsTest", func() {
 			Expect(secret.Labels[constant.AppInstanceLabelKey]).Should(Equal(clusterName))
 			Expect(secret.Labels[constant.KBManagedByKey]).Should(Equal(constant.AppName))
 			Expect(secret.StringData).ShouldNot(BeNil())
-			Expect(secret.StringData[factory.CAName]).ShouldNot(BeZero())
-			Expect(secret.StringData[factory.CertName]).ShouldNot(BeZero())
-			Expect(secret.StringData[factory.KeyName]).ShouldNot(BeZero())
+			Expect(secret.StringData[constant.CAName]).ShouldNot(BeZero())
+			Expect(secret.StringData[constant.CertName]).ShouldNot(BeZero())
+			Expect(secret.StringData[constant.KeyName]).ShouldNot(BeZero())
 		})
 	})
 

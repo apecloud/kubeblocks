@@ -140,6 +140,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		Namespace:             comp.Namespace,
 		ClusterName:           clusterName,
 		ClusterUID:            clusterUID,
+		Comp2CompDefs:         buildComp2CompDefs(cluster, clusterCompSpec),
 		Name:                  compName,
 		FullCompName:          comp.Name,
 		CompDefName:           compDef.Name,
@@ -210,11 +211,28 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	// replace podSpec containers env default credential placeholder
 	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForConnCredential(synthesizeComp.ClusterName))
 
-	// replace podSpec containers env component connection credential placeholder
-	// TODO(xingran): This is a temporary solution used to reference component connection credentials defined in ComponentDefinition. it will be refactored in the future.
-	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForCompConnCredential(synthesizeComp.ClusterName, synthesizeComp.Name))
-
 	return synthesizeComp, nil
+}
+
+func buildComp2CompDefs(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) map[string]string {
+	if cluster == nil {
+		return nil
+	}
+	if len(cluster.Spec.ComponentSpecs) == 0 {
+		if clusterCompSpec == nil || len(clusterCompSpec.ComponentDef) == 0 {
+			return nil
+		}
+		return map[string]string{
+			clusterCompSpec.Name: clusterCompSpec.ComponentDef,
+		}
+	}
+	mapping := make(map[string]string)
+	for _, comp := range cluster.Spec.ComponentSpecs {
+		if len(comp.ComponentDef) > 0 {
+			mapping[comp.Name] = comp.ComponentDef
+		}
+	}
+	return mapping
 }
 
 // buildAffinitiesAndTolerations builds affinities and tolerations for component.
@@ -275,7 +293,8 @@ func buildServiceReferences(reqCtx intctrlutil.RequestCtx, cli roclient.Readonly
 		return err
 	}
 	synthesizeComp.ServiceReferences = serviceReferences
-	return nil
+
+	return resolveServiceReferences(reqCtx.Ctx, cli, synthesizeComp)
 }
 
 // buildComponentRef builds componentServices for component.
@@ -479,13 +498,6 @@ func GetEnvReplacementMapForConnCredential(clusterName string) map[string]string
 	}
 }
 
-// GetEnvReplacementMapForCompConnCredential gets the replacement map for component connect credential
-func GetEnvReplacementMapForCompConnCredential(clusterName, componentName string) map[string]string {
-	return map[string]string{
-		constant.KBComponentConnCredentialPlaceHolder: constant.GenerateClusterComponentName(clusterName, componentName),
-	}
-}
-
 func replaceContainerPlaceholderTokens(component *SynthesizedComponent, namedValuesMap map[string]string) {
 	// replace env[].valueFrom.secretKeyRef.name variables
 	for _, cc := range [][]corev1.Container{component.PodSpec.InitContainers, component.PodSpec.Containers} {
@@ -499,16 +511,16 @@ func replaceContainerPlaceholderTokens(component *SynthesizedComponent, namedVal
 func GetReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName string) map[string]string {
 	cc := constant.GenerateClusterComponentName(clusterName, componentName)
 	replacementMap := map[string]string{
-		constant.KBClusterNamePlaceHolder:     clusterName,
-		constant.KBCompNamePlaceHolder:        componentName,
-		constant.KBClusterCompNamePlaceHolder: cc,
-		constant.KBComponentEnvCMPlaceHolder:  constant.GenerateClusterComponentEnvPattern(clusterName, componentName),
+		constant.EnvPlaceHolder(constant.KBEnvClusterName):     clusterName,
+		constant.EnvPlaceHolder(constant.KBEnvCompName):        componentName,
+		constant.EnvPlaceHolder(constant.KBEnvClusterCompName): cc,
+		constant.KBComponentEnvCMPlaceHolder:                   constant.GenerateClusterComponentEnvPattern(clusterName, componentName),
 	}
+	clusterUIDPostfix := clusterUID
 	if len(clusterUID) > 8 {
-		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = clusterUID[len(clusterUID)-8:]
-	} else {
-		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = clusterUID
+		clusterUIDPostfix = clusterUID[len(clusterUID)-8:]
 	}
+	replacementMap[constant.EnvPlaceHolder(constant.KBEnvClusterUIDPostfix8Deprecated)] = clusterUIDPostfix
 	return replacementMap
 }
 

@@ -150,6 +150,8 @@ var _ = Describe("builder", func() {
 			clusterDef, clusterVer, cluster, &cluster.Spec.ComponentSpecs[0])
 		Expect(err).Should(Succeed())
 		Expect(synthesizeComp).ShouldNot(BeNil())
+		// to resolve and inject env vars
+		Expect(component.ResolveEnvNTemplateVars(reqCtx.Ctx, testCtx.Cli, synthesizeComp, cluster.Annotations, nil)).Should(Succeed())
 		return synthesizeComp
 	}
 	newClusterObjs := func(clusterDefObj *appsv1alpha1.ClusterDefinition) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.Cluster, *component.SynthesizedComponent) {
@@ -395,34 +397,6 @@ var _ = Describe("builder", func() {
 			Expect(configmap.SecurityContext).ShouldNot(BeNil())
 			Expect(configmap.SecurityContext.RunAsUser).ShouldNot(BeNil())
 			Expect(*configmap.SecurityContext.RunAsUser).Should(BeEquivalentTo(int64(0)))
-		})
-
-		It("builds restore job correctly", func() {
-			key := types.NamespacedName{Name: "restore", Namespace: "default"}
-			volumes := []corev1.Volume{}
-			volumeMounts := []corev1.VolumeMount{}
-			env := []corev1.EnvVar{}
-			component := &component.SynthesizedComponent{
-				Name: mysqlCompName,
-			}
-			cluster := &appsv1alpha1.Cluster{
-				ObjectMeta: metav1.ObjectMeta{Namespace: key.Namespace},
-				Spec: appsv1alpha1.ClusterSpec{
-					Tolerations: []corev1.Toleration{
-						{
-							Key:      "testKey",
-							Value:    "testValue",
-							Operator: corev1.TolerationOpExists,
-						},
-					},
-				},
-			}
-			job, err := BuildRestoreJob(cluster, component, key.Name, "", []string{"sh"}, volumes, volumeMounts, env, nil)
-			Expect(err).Should(BeNil())
-			Expect(job).ShouldNot(BeNil())
-			Expect(job.Name).Should(Equal(key.Name))
-			Expect(len(job.Spec.Template.Spec.Tolerations) > 0).Should(BeTrue())
-			Expect(job.Spec.Template.Spec.Tolerations[0].Key).Should(Equal("testKey"))
 		})
 
 		It("builds volume snapshot class correctly", func() {

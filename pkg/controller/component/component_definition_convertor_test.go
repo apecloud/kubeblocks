@@ -538,10 +538,10 @@ var _ = Describe("Component Definition Convertor", func() {
 			res, err := convertor.convert(clusterCompDef)
 			Expect(err).Should(Succeed())
 
-			labels := res.(map[string]appsv1alpha1.BuiltInString)
-			expectedLabels := map[string]appsv1alpha1.BuiltInString{}
+			labels := res.(map[string]string)
+			expectedLabels := map[string]string{}
 			for _, item := range clusterCompDef.CustomLabelSpecs {
-				expectedLabels[item.Key] = appsv1alpha1.BuiltInString(item.Value)
+				expectedLabels[item.Key] = item.Value
 			}
 			Expect(labels).Should(BeEquivalentTo(expectedLabels))
 		})

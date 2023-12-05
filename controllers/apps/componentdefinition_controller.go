@@ -38,10 +38,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-var (
-	defaultServiceName = fmt.Sprintf("%s-%s", appsv1alpha1.KBClusterName, appsv1alpha1.KBComponentName)
-)
-
 // ComponentDefinitionReconciler reconciles a ComponentDefinition object
 type ComponentDefinitionReconciler struct {
 	client.Client
@@ -150,6 +146,7 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 	cmpd *appsv1alpha1.ComponentDefinition) error {
 	for _, validator := range []func(client.Client, intctrlutil.RequestCtx, *appsv1alpha1.ComponentDefinition) error{
 		r.validateRuntime,
+		r.validateVars,
 		r.validateVolumes,
 		r.validateServices,
 		r.validateConfigs,
@@ -170,6 +167,11 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 }
 
 func (r *ComponentDefinitionReconciler) validateRuntime(cli client.Client, rctx intctrlutil.RequestCtx,
+	cmpd *appsv1alpha1.ComponentDefinition) error {
+	return nil
+}
+
+func (r *ComponentDefinitionReconciler) validateVars(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
 	return nil
 }
@@ -201,11 +203,6 @@ func (r *ComponentDefinitionReconciler) validateServices(cli client.Client, rctx
 		return fmt.Errorf("duplicate names of component service are not allowed")
 	}
 
-	for i, svc := range cmpd.Spec.Services {
-		if len(svc.ServiceName) == 0 {
-			cmpd.Spec.Services[i].ServiceName = defaultServiceName
-		}
-	}
 	if !checkUniqueItemWithValue(cmpd.Spec.Services, "ServiceName", nil) {
 		return fmt.Errorf("duplicate service names are not allowed")
 	}

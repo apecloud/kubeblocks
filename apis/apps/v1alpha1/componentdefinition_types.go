@@ -101,6 +101,13 @@ type ComponentDefinitionSpec struct {
 	// +kubebuilder:validation:Required
 	Runtime corev1.PodSpec `json:"runtime"`
 
+	// Vars represents user-defined variables.
+	// These variables can be utilized as environment variables for Pods and Actions, or to render the templates of config and script.
+	// When used as environment variables, these variables are placed in front of the environment variables declared in the Pod.
+	// Cannot be updated.
+	// +optional
+	Vars []EnvVar `json:"vars,omitempty"`
+
 	// Volumes defines the persistent volumes needed by the component.
 	// The users are responsible for providing these volumes when creating a component instance.
 	// Cannot be updated.
@@ -121,6 +128,7 @@ type ComponentDefinitionSpec struct {
 	// +listType=map
 	// +listMapKey=name
 	// +optional
+	// TODO: support referencing configs from other components or clusters.
 	Configs []ComponentConfigSpec `json:"configs,omitempty"`
 
 	// LogConfigs is detail log file config which provided by provider.
@@ -157,7 +165,7 @@ type ComponentDefinitionSpec struct {
 	// If a label key conflicts with any other system labels or user-specified labels, it will be silently ignored.
 	// Cannot be updated.
 	// +optional
-	Labels map[string]BuiltInString `json:"labels,omitempty"`
+	Labels map[string]string `json:"labels,omitempty"`
 
 	// SystemAccounts defines the pre-defined system accounts required to manage the component.
 	// TODO(component): accounts KB required

@@ -82,6 +82,14 @@ func (builder *ComponentDefinitionBuilder) AddVolumeMounts(containerName string,
 	return builder
 }
 
+func (builder *ComponentDefinitionBuilder) AddVar(v appsv1alpha1.EnvVar) *ComponentDefinitionBuilder {
+	if builder.get().Spec.Vars == nil {
+		builder.get().Spec.Vars = make([]appsv1alpha1.EnvVar, 0)
+	}
+	builder.get().Spec.Vars = append(builder.get().Spec.Vars, v)
+	return builder
+}
+
 func (builder *ComponentDefinitionBuilder) AddVolume(name string, snapshot bool, watermark int) *ComponentDefinitionBuilder {
 	vol := appsv1alpha1.ComponentVolume{
 		Name:          name,
@@ -181,7 +189,7 @@ func (builder *ComponentDefinitionBuilder) SetPolicyRules(rules []rbacv1.PolicyR
 	return builder
 }
 
-func (builder *ComponentDefinitionBuilder) SetLabels(labels map[string]appsv1alpha1.BuiltInString) *ComponentDefinitionBuilder {
+func (builder *ComponentDefinitionBuilder) SetLabels(labels map[string]string) *ComponentDefinitionBuilder {
 	builder.get().Spec.Labels = labels
 	return builder
 }

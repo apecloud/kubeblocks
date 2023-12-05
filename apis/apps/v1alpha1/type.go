@@ -651,3 +651,162 @@ type ConnectionCredential struct {
 	// +optional
 	AccountName string `json:"accountName,omitempty"`
 }
+
+// List of all the built-in variables provided by KubeBlocks.
+// These variables are automatically available when building environment variables for Pods and Actions, as well as
+// rendering templates for config and script. Users can directly use these variables without explicit declaration.
+//
+// Note: Dynamic variables have values that may change at runtime, so exercise caution when using them.
+//
+// TODO: resources.
+// ----------------------------------------------------------------------------
+// | Object    | Attribute | Variable             | Template | Env  | Dynamic |
+// ----------------------------------------------------------------------------
+// | Namespace |           | KB_NAMESPACE         |          |      |         |
+// | Cluster   | Name      | KB_CLUSTER_NAME      |          |      |         |
+// |           | UID       | KB_CLUSTER_UID       |          |      |         |
+// |           | Component | KB_CLUSTER_COMP_NAME |          |      |         |
+// | Component | Name      | KB_COMP_NAME         |          |      |         |
+// |           | Replicas  | KB_COMP_REPLICAS     |          |      |         |
+// | Pod       | Name      | KB_POD_NAME          |     x    |      |    ✓    |
+// |           | UID       | KB_POD_UID           |     x    |      |    ✓    |
+// |           | IP        | KB_POD_IP            |     x    |      |    ✓    |
+// |           | IPs       | KB_POD_IPS           |     x    |      |    ✓    |
+// |           | FQDN      | KB_POD_FQDN          |     x    |      |         |
+// |           | Ordinal   | KB_POD_ORDINAL       |     x    |      |         |
+// | Host      | Name      | KB_NODENAME          |     x    |      |    ✓    |
+// |           | IP        | KB_HOST_IP           |     x    |      |    ✓    |
+// | SA        | Name      | KB_SA_NAME           |     x    |      |         |
+// ----------------------------------------------------------------------------
+
+// EnvVar represents a variable present in the env of Pod/Action or the template of config/script.
+type EnvVar struct {
+	// Name of the variable. Must be a C_IDENTIFIER.
+	// +required
+	Name string `json:"name"`
+
+	// Optional: no more than one of the following may be specified.
+
+	// Variable references $(VAR_NAME) are expanded using the previously defined variables in the current context.
+	// If a variable cannot be resolved, the reference in the input string will be unchanged.
+	// Double $$ are reduced to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+	// "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+	// Escaped references will never be expanded, regardless of whether the variable exists or not.
+	// Defaults to "".
+	// +optional
+	Value string `json:"value,omitempty"`
+	// Source for the variable's value. Cannot be used if value is not empty.
+	// +optional
+	ValueFrom *VarSource `json:"valueFrom,omitempty"`
+}
+
+// VarSource represents a source for the value of an EnvVar.
+type VarSource struct {
+	// Selects a key of a ConfigMap.
+	// +optional
+	ConfigMapKeyRef *corev1.ConfigMapKeySelector `json:"configMapKeyRef,omitempty"`
+
+	// Selects a key of a Secret.
+	// +optional
+	SecretKeyRef *corev1.SecretKeySelector `json:"secretKeyRef,omitempty"`
+
+	// Selects a defined var of a Service.
+	// +optional
+	ServiceVarRef *ServiceVarSelector `json:"serviceVarRef,omitempty"`
+
+	// Selects a defined var of a Credential (SystemAccount).
+	// +optional
+	CredentialVarRef *CredentialVarSelector `json:"credentialVarRef,omitempty"`
+
+	// Selects a defined var of a ServiceRef.
+	// +optional
+	ServiceRefVarRef *ServiceRefVarSelector `json:"serviceRefVarRef,omitempty"`
+}
+
+// VarOption defines whether a variable is required or optional.
+// +enum
+// +kubebuilder:validation:Enum={Required,Optional}
+type VarOption string
+
+var (
+	VarRequired VarOption = "Required"
+	VarOptional VarOption = "Optional"
+)
+
+type NamedVar struct {
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// +optional
+	Option *VarOption `json:"option,omitempty"`
+}
+
+// ServiceVars defines the vars can be referenced from a Service.
+type ServiceVars struct {
+	// +optional
+	Host *VarOption `json:"host,omitempty"`
+
+	// +optional
+	Port *NamedVar `json:"port,omitempty"`
+}
+
+// CredentialVars defines the vars can be referenced from a Credential (SystemAccount).
+// !!!!! CredentialVars will only be used as environment variables for Pods & Actions, and will not be used to render the templates.
+type CredentialVars struct {
+	// +optional
+	Username *VarOption `json:"username,omitempty"`
+
+	// +optional
+	Password *VarOption `json:"password,omitempty"`
+}
+
+// ServiceRefVars defines the vars can be referenced from a ServiceRef.
+type ServiceRefVars struct {
+	// +optional
+	Endpoint *VarOption `json:"endpoint,omitempty"`
+
+	// +optional
+	Port *VarOption `json:"port,omitempty"`
+
+	CredentialVars `json:",inline"`
+}
+
+// ServiceVarSelector selects a var from a Service.
+type ServiceVarSelector struct {
+	// The Service to select from.
+	// It can be referenced from the default headless service by setting the name to "headless".
+	ClusterObjectReference `json:",inline"`
+
+	ServiceVars `json:",inline"`
+}
+
+// CredentialVarSelector selects a var from a Credential (SystemAccount).
+type CredentialVarSelector struct {
+	// The Credential (SystemAccount) to select from.
+	ClusterObjectReference `json:",inline"`
+
+	CredentialVars `json:",inline"`
+}
+
+// ServiceRefVarSelector selects a var from a ServiceRefDeclaration.
+type ServiceRefVarSelector struct {
+	// The ServiceRefDeclaration to select from.
+	ClusterObjectReference `json:",inline"`
+
+	ServiceRefVars `json:",inline"`
+}
+
+// ClusterObjectReference contains information to let you locate the referenced object inside the same cluster.
+type ClusterObjectReference struct {
+	// CompDef specifies the definition used by the component that the referent object resident in.
+	// +optional
+	CompDef string `json:"compDef,omitempty"`
+
+	// Name of the referent object.
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// Specify whether the object must be defined.
+	// +optional
+	Optional *bool `json:"optional,omitempty"`
+}

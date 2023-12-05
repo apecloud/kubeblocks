@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package configuration
+package component
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -31,14 +31,13 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
-var _ = Describe("generate service descriptor", func() {
+var _ = Describe("service reference", func() {
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -52,11 +51,12 @@ var _ = Describe("generate service descriptor", func() {
 		// resources should be released in following order
 		// non-namespaced
 		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterVersionSignature, true, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterDefinitionSignature, true, ml)
 
 		// namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterVersionSignature, true, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterDefinitionSignature, true, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ServiceDescriptorSignature, true, inNS, ml)
 	}
 
 	var (
@@ -232,8 +232,8 @@ var _ = Describe("generate service descriptor", func() {
 		cleanEnv()
 	})
 
-	Context("config template utils test", func() {
-		It("service reference config template render test", func() {
+	Context("service reference test", func() {
+		It("service reference test", func() {
 			clusterKey := client.ObjectKeyFromObject(cluster)
 			req := ctrl.Request{
 				NamespacedName: clusterKey,
@@ -243,13 +243,12 @@ var _ = Describe("generate service descriptor", func() {
 				Req: req,
 				Log: log.FromContext(ctx).WithValues("cluster", req.NamespacedName),
 			}
-			component, err := component.BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, &cluster.Spec.ComponentSpecs[0])
+			component, err := BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 			Expect(component.ServiceReferences).ShouldNot(BeNil())
 
-			var v Visitor = &ComponentVisitor{component: component}
-			err = v.Visit(resolveServiceReferences(k8sClient, ctx))
+			err = resolveServiceReferences(ctx, k8sClient, component)
 			Expect(err).Should(Succeed())
 			Expect(component.ServiceReferences).ShouldNot(BeNil())
 			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Endpoint.Value).Should(Equal(serviceRefEndpointValue))

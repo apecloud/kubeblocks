@@ -38,9 +38,10 @@ type SynthesizedComponent struct {
 	Namespace            string                                 `json:"namespace,omitempty"`
 	ClusterName          string                                 `json:"clusterName,omitempty"`
 	ClusterUID           string                                 `json:"clusterUID,omitempty"`
-	Name                 string                                 `json:"name,omitempty"`         // the name of the component without clusterName prefix
-	FullCompName         string                                 `json:"fullCompName,omitempty"` // the full name of the component with clusterName prefix
-	CompDefName          string                                 `json:"compDefName,omitempty"`  // the name of the componentDefinition
+	Comp2CompDefs        map[string]string                      `json:"comp2CompDefs,omitempty"` // {compName: compDefName}
+	Name                 string                                 `json:"name,omitempty"`          // the name of the component without clusterName prefix
+	FullCompName         string                                 `json:"fullCompName,omitempty"`  // the full name of the component with clusterName prefix
+	CompDefName          string                                 `json:"compDefName,omitempty"`   // the name of the componentDefinition
 	Replicas             int32                                  `json:"replicas"`
 	PodSpec              *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
@@ -51,12 +52,14 @@ type SynthesizedComponent struct {
 	ScriptTemplates      []v1alpha1.ComponentTemplateSpec       `json:"scriptTemplates,omitempty"`
 	TLSConfig            *v1alpha1.TLSConfig                    `json:"tlsConfig"`
 	ServiceAccountName   string                                 `json:"serviceAccountName,omitempty"`
-	ComponentRefEnvs     []*corev1.EnvVar                       `json:"componentRefEnvs,omitempty"`
-	ServiceReferences    map[string]*v1alpha1.ServiceDescriptor `json:"serviceReferences,omitempty"`
+	// TODO: remove this later
+	ComponentRefEnvs  []corev1.EnvVar                        `json:"componentRefEnvs,omitempty"`
+	ServiceReferences map[string]*v1alpha1.ServiceDescriptor `json:"serviceReferences,omitempty"`
+	TemplateVars      map[string]any                         `json:"templateVars,omitempty"`
 
 	// The following fields were introduced with the ComponentDefinition and Component API in KubeBlocks version 0.8.0
 	Roles                 []v1alpha1.ReplicaRole              `json:"roles,omitempty"`
-	Labels                map[string]v1alpha1.BuiltInString   `json:"labels,omitempty"`
+	Labels                map[string]string                   `json:"labels,omitempty"`
 	ConnectionCredentials []v1alpha1.ConnectionCredential     `json:"connectionCredentials,omitempty"`
 	UpdateStrategy        *v1alpha1.UpdateStrategy            `json:"updateStrategy,omitempty"`
 	PolicyRules           []rbacv1.PolicyRule                 `json:"policyRules,omitempty"`

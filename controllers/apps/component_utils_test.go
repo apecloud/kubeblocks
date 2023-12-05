@@ -172,9 +172,10 @@ var _ = Describe("Component Utils", func() {
 				sts := testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusCompName)
 				pods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
 				mockLabelKey := "mock-label-key"
-				mockLabelPlaceHolderValue := "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)"
-				customLabels := map[string]appsv1alpha1.BuiltInString{
-					mockLabelKey: appsv1alpha1.BuiltInString(mockLabelPlaceHolderValue),
+				mockLabelPlaceHolderValue := fmt.Sprintf("%s-%s",
+					constant.EnvPlaceHolder(constant.KBEnvClusterName), constant.EnvPlaceHolder(constant.KBEnvCompName))
+				customLabels := map[string]string{
+					mockLabelKey: mockLabelPlaceHolderValue,
 				}
 				comp := &component.SynthesizedComponent{
 					Name:   consensusCompName,

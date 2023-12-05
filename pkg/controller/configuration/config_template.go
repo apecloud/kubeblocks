@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -36,7 +37,7 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// General Built-in objects
+// General built-in objects
 const (
 	builtinClusterObject           = "cluster"
 	builtinComponentObject         = "component"
@@ -45,7 +46,7 @@ const (
 	builtinClusterDomainObject     = "clusterDomain"
 )
 
-// General Built-in functions
+// General built-in functions
 const (
 	builtInGetVolumeFunctionName                 = "getVolumePathByName"
 	builtInGetPvcFunctionName                    = "getPVCByName"
@@ -99,7 +100,7 @@ type configTemplateBuilder struct {
 	podSpec   *corev1.PodSpec
 
 	ctx context.Context
-	cli ictrlclient.ReadonlyClient
+	cli client.Reader
 }
 
 func newTemplateBuilder(
@@ -143,21 +144,12 @@ func (c *configTemplateBuilder) render(configs map[string]string) (map[string]st
 }
 
 func (c *configTemplateBuilder) builtinObjectsAsValues() (*gotemplate.TplValues, error) {
-	// preHandle the component
-	var v Visitor = &ComponentVisitor{component: c.component}
-	// v = NewDecoratedVisitor(v, resolveServiceReferences(c.cli, c.ctx, c.namespace))
-	if err := v.Visit(resolveServiceReferences(c.cli, c.ctx)); err != nil {
-		return nil, err
+	vars := builtinObjects(c)
+	if c.component.TemplateVars != nil {
+		maps.Copy(vars, c.component.TemplateVars)
 	}
 
-	builtInObjs := map[string]interface{}{
-		builtinClusterObject:           c.cluster,
-		builtinComponentObject:         c.component,
-		builtinPodObject:               c.podSpec,
-		builtinComponentResourceObject: c.componentValues.Resource,
-		builtinClusterDomainObject:     viper.GetString(constant.KubernetesClusterDomainEnv),
-	}
-	b, err := json.Marshal(builtInObjs)
+	b, err := json.Marshal(vars)
 	if err != nil {
 		return nil, err
 	}
@@ -166,6 +158,16 @@ func (c *configTemplateBuilder) builtinObjectsAsValues() (*gotemplate.TplValues,
 		return nil, err
 	}
 	return &tplValue, nil
+}
+
+func builtinObjects(builder *configTemplateBuilder) map[string]any {
+	return map[string]any{
+		builtinClusterObject:           builder.cluster,
+		builtinComponentObject:         builder.component,
+		builtinPodObject:               builder.podSpec,
+		builtinComponentResourceObject: builder.componentValues.Resource,
+		builtinClusterDomainObject:     viper.GetString(constant.KubernetesClusterDomainEnv),
+	}
 }
 
 func (c *configTemplateBuilder) injectBuiltInObjectsAndFunctions(

@@ -29,6 +29,7 @@ options: {
 	nodeLabels: {}
 	tolerations: [...]
 	annotations: {}
+	labels: {}
 	backupConfig: {}
 }
 
@@ -40,6 +41,7 @@ content: {
 		name:        options.name
 		namespace:   options.namespace
 		annotations: options.annotations
+		labels: options.labels
 	}
 	spec: {
 		clusterDefinitionRef: options.clusterDefRef

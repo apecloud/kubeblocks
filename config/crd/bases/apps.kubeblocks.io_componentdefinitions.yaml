@@ -11739,11 +11739,15 @@ spec:
                               description: Specify whether the object must be defined.
                               type: boolean
                             password:
+                              description: VarOption defines whether a variable is
+                                required or optional.
                               enum:
                               - Required
                               - Optional
                               type: string
                             username:
+                              description: VarOption defines whether a variable is
+                                required or optional.
                               enum:
                               - Required
                               - Optional
@@ -11776,6 +11780,8 @@ spec:
                                 the component that the referent object resident in.
                               type: string
                             endpoint:
+                              description: VarOption defines whether a variable is
+                                required or optional.
                               enum:
                               - Required
                               - Optional
@@ -11787,16 +11793,22 @@ spec:
                               description: Specify whether the object must be defined.
                               type: boolean
                             password:
+                              description: VarOption defines whether a variable is
+                                required or optional.
                               enum:
                               - Required
                               - Optional
                               type: string
                             port:
+                              description: VarOption defines whether a variable is
+                                required or optional.
                               enum:
                               - Required
                               - Optional
                               type: string
                             username:
+                              description: VarOption defines whether a variable is
+                                required or optional.
                               enum:
                               - Required
                               - Optional
@@ -11810,6 +11822,8 @@ spec:
                                 the component that the referent object resident in.
                               type: string
                             host:
+                              description: VarOption defines whether a variable is
+                                required or optional.
                               enum:
                               - Required
                               - Optional
@@ -11825,6 +11839,8 @@ spec:
                                 name:
                                   type: string
                                 option:
+                                  description: VarOption defines whether a variable
+                                    is required or optional.
                                   enum:
                                   - Required
                                   - Optional

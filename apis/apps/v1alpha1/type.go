@@ -723,6 +723,7 @@ type VarSource struct {
 	ServiceRefVarRef *ServiceRefVarSelector `json:"serviceRefVarRef,omitempty"`
 }
 
+// VarOption defines whether a variable is required or optional.
 // +enum
 // +kubebuilder:validation:Enum={Required,Optional}
 type VarOption string

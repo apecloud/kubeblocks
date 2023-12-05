@@ -239,7 +239,9 @@ func SentProbeEvent(ctx context.Context, opsResult OpsResult, resp *ProbeRespons
 			return
 		}
 
-		_ = sendEvent(ctx1, log, event)
+		go func() {
+			_ = sendEvent(ctx1, log, event)
+		}()
 	default:
 		log.Info(fmt.Sprintf("no event sent, RoleUpdateMechanism: %s", roleUpdateMechanism))
 	}

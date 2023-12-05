@@ -233,7 +233,7 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *ProbeRequest, 
 		opsRes["message"] = err.Error()
 		if ops.CheckRoleFailedCount%ops.FailedEventReportFrequency == 0 {
 			ops.Logger.Info("role checks failed continuously", "times", ops.CheckRoleFailedCount)
-			go SentProbeEvent(ctx, opsRes, resp, ops.Logger)
+			SentProbeEvent(ctx, opsRes, resp, ops.Logger)
 		}
 		ops.CheckRoleFailedCount++
 		return opsRes, nil
@@ -251,7 +251,7 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *ProbeRequest, 
 	if ops.OriRole != role {
 		ops.OriRole = role
 		if role != "" {
-			go SentProbeEvent(ctx, opsRes, resp, ops.Logger)
+			SentProbeEvent(ctx, opsRes, resp, ops.Logger)
 		}
 	}
 

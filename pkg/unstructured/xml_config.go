@@ -113,7 +113,8 @@ func (x *xmlConfig) SubConfig(key string) ConfigObject {
 }
 
 func (x *xmlConfig) Marshal() (string, error) {
-	b, err := x.data.Xml()
+	// b, err := x.data.Xml()
+	b, err := x.data.XmlIndent("", "    ")
 	if err != nil {
 		return "", err
 	}

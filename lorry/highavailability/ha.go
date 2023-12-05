@@ -212,9 +212,10 @@ func (ha *Ha) RunCycle() {
 func (ha *Ha) Start() {
 	ha.logger.Info("HA starting")
 	cluster, err := ha.dcs.GetCluster()
-	if cluster == nil {
-		ha.logger.Error(err, "Get Cluster error, so HA exists.", "cluster-name", ha.dcs.GetClusterName())
-		return
+	for cluster == nil {
+		ha.logger.Error(err, "Get Cluster failed.", "cluster-name", ha.dcs.GetClusterName())
+		time.Sleep(10 * time.Second)
+		cluster, err = ha.dcs.GetCluster()
 	}
 
 	isPodReady, err := ha.IsPodReady()

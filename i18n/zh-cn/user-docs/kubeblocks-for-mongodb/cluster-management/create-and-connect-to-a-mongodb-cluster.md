@@ -1,7 +1,7 @@
 ---
 title: 创建并连接到 MongoDB 集群
 description: 如何创建并连接到 MongoDB 集群
-keywords: [MongoDB, 创建 MongoDB 集群, 连接 MongoDB 集群]
+keywords: [mongodb, 创建 mongodb 集群, 连接 mongodb 集群]
 sidebar_position: 1
 sidebar_label: 创建并连接
 ---
@@ -65,7 +65,7 @@ import TabItem from '@theme/TabItem';
 
   <TabItem value="kubectl" label="kubectl">
 
-  确保使用 `kubectl get clusterdefinitions mongodb` 命令安装 `mongodb` 集群定义。
+  查看 `mongodb` 集群定义是否可用。
   ```bash
   kubectl get clusterdefinitions mongodb
   >

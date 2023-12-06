@@ -43,16 +43,6 @@ func SetOpsRequestToCluster(cluster *appsv1alpha1.Cluster, opsRequestSlice []app
 	}
 }
 
-// PatchClusterOpsAnnotations patches OpsRequest annotation in Cluster.annotations
-func PatchClusterOpsAnnotations(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	opsRequestSlice []appsv1alpha1.OpsRecorder) error {
-	patch := client.MergeFrom(cluster.DeepCopy())
-	SetOpsRequestToCluster(cluster, opsRequestSlice)
-	return cli.Patch(ctx, cluster, patch)
-}
-
 // UpdateClusterOpsAnnotations updates OpsRequest annotation in Cluster.annotations
 func UpdateClusterOpsAnnotations(ctx context.Context,
 	cli client.Client,

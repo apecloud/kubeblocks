@@ -11,28 +11,19 @@
 ![maturity](https://img.shields.io/static/v1?label=maturity&message=alpha&color=red)
 [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/kubeblocks)](https://artifacthub.io/packages/search?repo=kubeblocks)
 
-![image](./docs/img/banner-readme.png)
-
-- [KubeBlocks](#kubeblocks)
-  - [What is KubeBlocks](#what-is-kubeblocks)
-    - [Why you need KubeBlocks](#why-you-need-kubeblocks)
-    - [Goals](#goals)
-    - [Key features](#key-features)
-  - [Get started with KubeBlocks](#get-started-with-kubeblocks)
-  - [Community](#community)
-  - [Contributing to KubeBlocks](#contributing-to-kubeblocks)
-  - [Report Vulnerability](#report-vulnerability)
-  - [License](#license)
+![image](./docs/img/banner-readme.jpeg)
 
 ## What is KubeBlocks
 
-KubeBlocks is an open source system software that runs and manages data infrastructure on Kubernetes. It could manage various data/database engines, including RDBMSs (MySQL, PostgreSQL), Caches(Redis), NoSQLs (MongoDB), MQs(Kafka, Pulsar), and vector databases(Milvus, Qdrant, Weaviate), and the community is actively integrating more types of data/database engines into KubeBlocks. KubeBlocks helps developers, SREs, and platform engineers deploy and maintain dedicated DBPaaS, and supports a variety of public clouds and on-premise environments. 
+KubeBlocks is an open-source control plane software that runs and manages databases, message queues and other data infrastructure on K8s. The name KubeBlocks is inspired by Kubernetes and LEGO blocks, signifying that running and managing data infrastructure on K8s can be standard and productive, like playing with LEGO blocks. 
 
-KubeBlocks is designed for production purposes, providing secure, cost-effective, high-available and extensible DBPaaS solution for enterprise. The name KubeBlocks is inspired by Kubernetes and LEGO blocks, signifying that integrating data infrastructure on K8s can be standard and productive, like playing with LEGO blocks. The core of KubeBlocks is a K8s operator, which defines a set of CRDs to abstract the common attributes of various data/database engines, thereby supporting the rapid integration of a new data/database system into KubeBlocks while keeping the same operating experience and expected behaviors.
+KubeBlocks could manage various type of engines, including RDBMSs (MySQL, PostgreSQL), Caches(Redis), NoSQLs (MongoDB), MQs(Kafka, Pulsar), and vector databases(Milvus, Qdrant, Weaviate), and the community is actively integrating more types of engines into KubeBlocks. Currently it has supported 32 types of engines!
+
+The core of KubeBlocks is a K8s operator, which defines a set of CRDs to abstract the common attributes of various engines. KubeBlocks helps developers, SREs, and platform engineers deploy and maintain dedicated DBPaaS, and supports both public cloud vendors and on-premise environments.
 
 ### Why you need KubeBlocks
 
-KubeBlocks integrates the most popular data/database engines and provides rich management functions, along with declarative APIs, on various environments. Furthermore, KubeBlocks offers the following benefits:
+KubeBlocks integrates the most popular database/message-queue/data-processing engines and provides rich management functions, along with declarative APIs, on various environments. Furthermore, KubeBlocks offers the following benefits:
 
 * Cost-effective
   
@@ -48,9 +39,10 @@ KubeBlocks integrates the most popular data/database engines and provides rich m
 
 * Extensibility
   
-  KubeBlocks provides the addon mechanism for integrating new data/database engines. So it can be extended to run the databases your project needs.
+  KubeBlocks provides the addon mechanism for integrating new engines. So it can be extended to run the databases your project needs.
 
 ### Goals
+
 - Being open and cloud-neutral
 - Promoting the containerization of database workloads
 - Promoting IaC and GitOps in the field of databases
@@ -71,7 +63,7 @@ KubeBlocks integrates the most popular data/database engines and provides rich m
 
 ## Community
 
-- KubeBlocks [Slack Channel](https://join.slack.com/t/kubeblocks/shared_invite/zt-23vym7xpx-Xu3xcE7HmcqGKvTX4U9yTg)
+- KubeBlocks [Slack Channel](https://join.slack.com/t/kubeblocks/shared_invite/zt-2884w01z6-DMMzLR70E~2G4uvbMr_RJw)
 - KubeBlocks Github [Discussions](https://github.com/apecloud/kubeblocks/discussions)
 
 ## Contributing to KubeBlocks

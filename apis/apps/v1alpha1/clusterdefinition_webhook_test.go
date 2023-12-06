@@ -443,11 +443,6 @@ spec:
           - mountPath: /data/config/mysql
             name: mysql-config
         env:
-          - name: "MYSQL_ROOT_PASSWORD"
-            valueFrom:
-              secretKeyRef:
-                name: $(CONN_CREDENTIAL_SECRET_NAME)
-                key: password
         command: ["/usr/bin/bash", "-c"]
 `, name)
 	clusterDefinition := &ClusterDefinition{}

@@ -200,6 +200,8 @@ var _ = Describe("", func() {
 				},
 			}
 			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			// set ops phase to Pending
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
 
 			By("mock switchover OpsRequest phase is Creating")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
@@ -217,7 +219,7 @@ var _ = Describe("", func() {
 			Expect(err.Error()).Should(ContainSubstring("job check conditions status failed"))
 
 			By("mock job status to success.")
-			jobName := fmt.Sprintf("%s-%s-%s-%d", constant.KBSwitchoverJobNamePrefix, opsRes.Cluster.Name, consensusComp, opsRes.Cluster.Generation)
+			jobName := fmt.Sprintf("%s-%s-%s-%d", KBSwitchoverJobNamePrefix, opsRes.Cluster.Name, consensusComp, opsRes.Cluster.Generation)
 			key := types.NamespacedName{
 				Name:      jobName,
 				Namespace: clusterObj.Namespace,

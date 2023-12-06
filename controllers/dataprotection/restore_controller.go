@@ -60,16 +60,11 @@ type RestoreReconciler struct {
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restores/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
 func (r *RestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
-		Log:      log.FromContext(ctx).WithValues("backup", req.NamespacedName),
+		Log:      log.FromContext(ctx).WithValues("restore", req.NamespacedName),
 		Recorder: r.Recorder,
 	}
 
@@ -112,8 +107,8 @@ func (r *RestoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *RestoreReconciler) parseRestoreJob(ctx context.Context, object client.Object) []reconcile.Request {
 	job := object.(*batchv1.Job)
 	var requests []reconcile.Request
-	restoreName := job.Labels[dprestore.DataProtectionLabelRestoreKey]
-	restoreNamespace := job.Labels[dprestore.DataProtectionLabelRestoreNamespaceKey]
+	restoreName := job.Labels[dprestore.DataProtectionRestoreLabelKey]
+	restoreNamespace := job.Labels[dprestore.DataProtectionRestoreNamespaceLabelKey]
 	if restoreName != "" && restoreNamespace != "" {
 		requests = append(requests, reconcile.Request{
 			NamespacedName: types.NamespacedName{
@@ -126,7 +121,7 @@ func (r *RestoreReconciler) parseRestoreJob(ctx context.Context, object client.O
 }
 
 func (r *RestoreReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, restore *dpv1alpha1.Restore) error {
-	labels := dprestore.BuildRestoreLabels(restore.Name)
+	labels := map[string]string{dprestore.DataProtectionRestoreLabelKey: restore.Name}
 	if err := deleteRelatedJobs(reqCtx, r.Client, restore.Namespace, labels); err != nil {
 		return err
 	}
@@ -140,7 +135,9 @@ func (r *RestoreReconciler) newAction(reqCtx intctrlutil.RequestCtx, restore *dp
 	if restore.Labels == nil {
 		restore.Labels = map[string]string{}
 	}
-	restore.Labels[constant.AppManagedByLabelKey] = constant.AppName
+	if _, ok := restore.Labels[constant.AppManagedByLabelKey]; !ok {
+		restore.Labels[constant.AppManagedByLabelKey] = dptypes.AppName
+	}
 	if !reflect.DeepEqual(restore.ObjectMeta, oldRestore.ObjectMeta) {
 		if err := r.Client.Patch(reqCtx.Ctx, restore, patch); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")

@@ -96,6 +96,14 @@ func (f *MockComponentDefinitionFactory) AddVolumeMounts(containerName string, v
 	return f
 }
 
+func (f *MockComponentDefinitionFactory) AddVar(v appsv1alpha1.EnvVar) *MockComponentDefinitionFactory {
+	if f.Get().Spec.Vars == nil {
+		f.Get().Spec.Vars = make([]appsv1alpha1.EnvVar, 0)
+	}
+	f.Get().Spec.Vars = append(f.Get().Spec.Vars, v)
+	return f
+}
+
 func (f *MockComponentDefinitionFactory) AddVolume(name string, snapshot bool, watermark int) *MockComponentDefinitionFactory {
 	vol := appsv1alpha1.ComponentVolume{
 		Name:          name,
@@ -211,7 +219,7 @@ func (f *MockComponentDefinitionFactory) SetPolicyRules(rules []rbacv1.PolicyRul
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) SetLabels(labels map[string]appsv1alpha1.BuiltInString) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) SetLabels(labels map[string]string) *MockComponentDefinitionFactory {
 	f.Get().Spec.Labels = labels
 	return f
 }
@@ -226,46 +234,6 @@ func (f *MockComponentDefinitionFactory) AddSystemAccount(accountName string, in
 		f.Get().Spec.SystemAccounts = make([]appsv1alpha1.SystemAccount, 0)
 	}
 	f.Get().Spec.SystemAccounts = append(f.Get().Spec.SystemAccounts, account)
-	return f
-}
-
-func (f *MockComponentDefinitionFactory) AddConnectionCredential(name, serviceName, portName, accountName string) *MockComponentDefinitionFactory {
-	credential := appsv1alpha1.ConnectionCredential{
-		Name: name,
-		Endpoint: appsv1alpha1.ConnectionEndpoint{
-			ServiceEndpoint: &appsv1alpha1.ConnectionServiceEndpoint{
-				ServiceName: serviceName,
-				PortName:    portName,
-			},
-		},
-		Account: appsv1alpha1.ConnectionCredentialAccount{
-			AccountName: accountName,
-		},
-	}
-	return f.AddConnectionCredentialObj(credential)
-}
-
-func (f *MockComponentDefinitionFactory) AddConnectionCredential4Pod(name, container, portName, accountName string) *MockComponentDefinitionFactory {
-	credential := appsv1alpha1.ConnectionCredential{
-		Name: name,
-		Endpoint: appsv1alpha1.ConnectionEndpoint{
-			PodEndpoint: &appsv1alpha1.ConnectionPodEndpoint{
-				Container: container,
-				PortName:  portName,
-			},
-		},
-		Account: appsv1alpha1.ConnectionCredentialAccount{
-			AccountName: accountName,
-		},
-	}
-	return f.AddConnectionCredentialObj(credential)
-}
-
-func (f *MockComponentDefinitionFactory) AddConnectionCredentialObj(credential appsv1alpha1.ConnectionCredential) *MockComponentDefinitionFactory {
-	if f.Get().Spec.ConnectionCredentials == nil {
-		f.Get().Spec.ConnectionCredentials = make([]appsv1alpha1.ConnectionCredential, 0)
-	}
-	f.Get().Spec.ConnectionCredentials = append(f.Get().Spec.ConnectionCredentials, credential)
 	return f
 }
 

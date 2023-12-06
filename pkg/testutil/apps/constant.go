@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 const (
@@ -171,17 +170,7 @@ var (
 				MountPath: "/scripts",
 			},
 		},
-		Env: []corev1.EnvVar{{
-			Name: "MYSQL_ROOT_PASSWORD",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: constant.KBConnCredentialPlaceHolder,
-					},
-					Key: "password",
-				},
-			},
-		}},
+		Env:     []corev1.EnvVar{{}},
 		Command: []string{"/scripts/setup.sh"},
 	}
 
@@ -325,31 +314,6 @@ var (
 					NumDigits:  5,
 					NumSymbols: 0,
 					LetterCase: appsv1alpha1.MixedCases,
-				},
-			},
-		},
-		ConnectionCredentials: []appsv1alpha1.ConnectionCredential{
-			{
-				Name: "root",
-				Endpoint: appsv1alpha1.ConnectionEndpoint{
-					ServiceEndpoint: &appsv1alpha1.ConnectionServiceEndpoint{
-						ServiceName: "rw",
-					},
-				},
-				Account: appsv1alpha1.ConnectionCredentialAccount{
-					AccountName: "root",
-				},
-			},
-			{
-				Name: "admin",
-				Endpoint: appsv1alpha1.ConnectionEndpoint{
-					PodEndpoint: &appsv1alpha1.ConnectionPodEndpoint{
-						Container: DefaultMySQLContainerName,
-						PortName:  "paxos",
-					},
-				},
-				Account: appsv1alpha1.ConnectionCredentialAccount{
-					AccountName: "admin",
 				},
 			},
 		},

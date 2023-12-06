@@ -42,7 +42,7 @@ func buildComponentRef(clusterDef *appsv1alpha1.ClusterDefinition,
 		return nil
 	}
 
-	component.ComponentRefEnvs = make([]*corev1.EnvVar, 0)
+	component.ComponentRefEnvs = make([]corev1.EnvVar, 0)
 
 	for _, compRef := range compRefs {
 		referredComponentDef := clusterDef.GetComponentDefByName(compRef.ComponentDefName)
@@ -60,7 +60,7 @@ func buildComponentRef(clusterDef *appsv1alpha1.ClusterDefinition,
 
 		envMap := make(map[string]string)
 		for _, refEnv := range compRef.ComponentRefEnvs {
-			env := &corev1.EnvVar{Name: refEnv.Name}
+			env := corev1.EnvVar{Name: refEnv.Name}
 			var err error
 			if len(refEnv.Value) != 0 {
 				env.Value = refEnv.Value

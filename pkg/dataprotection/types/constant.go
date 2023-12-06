@@ -19,6 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package types
 
+const AppName = "kubeblocks-dataprotection"
+
 // config keys used in viper
 const (
 	// CfgKeyGCFrequencySeconds is the key of gc frequency, its unit is second

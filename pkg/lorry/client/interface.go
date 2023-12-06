@@ -26,7 +26,7 @@ type Client interface {
 	GetRole(ctx context.Context) (string, error)
 
 	// user management funcs
-	CreateUser(ctx context.Context, userName, password string) error
+	CreateUser(ctx context.Context, userName, password, roleName string) error
 	DeleteUser(ctx context.Context, userName string) error
 	DescribeUser(ctx context.Context, userName string) (map[string]any, error)
 	GrantUserRole(ctx context.Context, userName, roleName string) error

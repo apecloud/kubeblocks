@@ -159,6 +159,12 @@ func (r *restoreJobBuilder) setJobName(jobName string) *restoreJobBuilder {
 }
 
 func (r *restoreJobBuilder) addLabel(key, value string) *restoreJobBuilder {
+	if r.labels == nil {
+		r.labels = map[string]string{}
+	}
+	if _, ok := r.labels[key]; ok {
+		return r
+	}
 	r.labels[key] = value
 	return r
 }

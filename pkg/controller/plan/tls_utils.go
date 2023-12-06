@@ -34,7 +34,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	client2 "github.com/apecloud/kubeblocks/pkg/controller/client"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 )
 
 // ComposeTLSSecret composes a TSL secret object.
@@ -64,9 +63,9 @@ func ComposeTLSSecret(namespace, clusterName, componentName string) (*v1.Secret,
 	}
 	cert := out[:index]
 	key := out[index:]
-	secret.StringData[factory.CAName] = cert
-	secret.StringData[factory.CertName] = cert
-	secret.StringData[factory.KeyName] = key
+	secret.StringData[constant.CAName] = cert
+	secret.StringData[constant.CertName] = cert
+	secret.StringData[constant.KeyName] = key
 	return secret, nil
 }
 

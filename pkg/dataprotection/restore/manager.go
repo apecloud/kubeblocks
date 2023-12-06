@@ -371,7 +371,7 @@ func (r *RestoreManager) BuildVolumePopulateJob(
 	}
 	jobBuilder := newRestoreJobBuilder(r.Restore, backupSet, backupRepo, dpv1alpha1.PrepareData).
 		setJobName(fmt.Sprintf("%s-%d", populatePVC.Name, index)).
-		addLabel(DataProtectionLabelPopulatePVCKey, populatePVC.Name).
+		addLabel(DataProtectionPopulatePVCLabelKey, populatePVC.Name).
 		setImage(backupSet.ActionSet.Spec.Restore.PrepareData.Image).
 		setCommand(backupSet.ActionSet.Spec.Restore.PrepareData.Command).
 		attachBackupRepo().
@@ -469,10 +469,13 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 				setToleration(targetPodList[i].Spec.Tolerations)
 			job := jobBuilder.build()
 			// create exec job in kubeblocks namespace for security
-			job.Namespace = viper.GetString(constant.CfgKeyCtrlrMgrNS)
-			job.Labels[DataProtectionLabelRestoreNamespaceKey] = r.Restore.Namespace
-			// use the kubeblocks's serviceAccount
-			job.Spec.Template.Spec.ServiceAccountName = viper.GetString(constant.KBServiceAccountName)
+			kbInstalledNamespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+			if kbInstalledNamespace != "" {
+				job.Namespace = kbInstalledNamespace
+				// use the KubeBlocks' serviceAccount
+				job.Spec.Template.Spec.ServiceAccountName = viper.GetString(constant.KBServiceAccountName)
+			}
+			job.Labels[DataProtectionRestoreNamespaceLabelKey] = r.Restore.Namespace
 			restoreJobs = append(restoreJobs, job)
 		}
 		return restoreJobs, nil

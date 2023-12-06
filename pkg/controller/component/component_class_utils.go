@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package class
+package component
 
 import (
 	"fmt"
@@ -26,11 +26,12 @@ import (
 	"sync"
 	"text/template"
 
-	"github.com/ghodss/yaml"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/yaml"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var (
@@ -83,31 +84,42 @@ var (
 )
 
 // ValidateResources validates if the resources of the component is invalid
-func (r *Manager) ValidateResources(clusterDefRef string, comp *v1alpha1.ClusterComponentSpec) error {
-	if comp.ClassDefRef != nil && comp.ClassDefRef.Class != "" {
-		if r.HasClass(comp.ComponentDefRef, *comp.ClassDefRef) {
-			return nil
+// TODO(xingran): remove the dependency of SynthesizedComponent.ClusterDefName and SynthesizedComponent.ClusterCompDefName in the future
+func (r *Manager) ValidateResources(synthesizedComp *SynthesizedComponent, comp *v1alpha1.Component) error {
+	if comp.Spec.ClassDefRef != nil && comp.Spec.ClassDefRef.Class != "" {
+		if synthesizedComp.ClusterDefName != "" && synthesizedComp.ClusterCompDefName != "" {
+			if r.HasClass(synthesizedComp.ClusterCompDefName, *comp.Spec.ClassDefRef) {
+				return nil
+			}
+		} else {
+			if r.HasClass(comp.Spec.CompDef, *comp.Spec.ClassDefRef) {
+				return nil
+			}
 		}
 		return ErrClassNotFound
 	}
 
 	var rules []v1alpha1.ResourceConstraintRule
 	for _, constraint := range r.constraints {
-		rules = append(rules, constraint.FindRules(clusterDefRef, comp.ComponentDefRef)...)
+		if synthesizedComp.ClusterDefName != "" && synthesizedComp.ClusterCompDefName != "" {
+			rules = append(rules, constraint.FindRules(synthesizedComp.ClusterDefName, synthesizedComp.ClusterCompDefName)...)
+		} else {
+			rules = append(rules, constraint.FindRulesWithCompDef(synthesizedComp.CompDefName)...)
+		}
 	}
 	if len(rules) == 0 {
 		return nil
 	}
 
 	for _, rule := range rules {
-		if !rule.ValidateResources(comp.Resources.Requests) {
+		if !rule.ValidateResources(comp.Spec.Resources.Requests) {
 			continue
 		}
 
 		// validate volume
 		match := true
 		// all volumes should match the rules
-		for _, volume := range comp.VolumeClaimTemplates {
+		for _, volume := range synthesizedComp.VolumeClaimTemplates {
 			if !rule.ValidateStorage(volume.Spec.Resources.Requests.Storage()) {
 				match = false
 				break
@@ -120,11 +132,13 @@ func (r *Manager) ValidateResources(clusterDefRef string, comp *v1alpha1.Cluster
 	return ErrInvalidResource
 }
 
-func (r *Manager) GetResources(clusterDefRef string, comp *v1alpha1.ClusterComponentSpec) (corev1.ResourceList, error) {
+// GetResources returns the resource list of the component
+// TODO(xingran): remove the dependency of SynthesizedComponent.ClusterDefName and SynthesizedComponent.ClusterCompDefName in the future
+func (r *Manager) GetResources(synthesizedComp *SynthesizedComponent, comp *v1alpha1.Component) (corev1.ResourceList, error) {
 	result := corev1.ResourceList{}
 
-	if comp.ClassDefRef != nil && comp.ClassDefRef.Class != "" {
-		cls, err := r.ChooseClass(comp)
+	if comp.Spec.ClassDefRef != nil && comp.Spec.ClassDefRef.Class != "" {
+		cls, err := r.ChooseClass(synthesizedComp, comp)
 		if err != nil {
 			return result, err
 		}
@@ -133,7 +147,11 @@ func (r *Manager) GetResources(clusterDefRef string, comp *v1alpha1.ClusterCompo
 
 	var rules []v1alpha1.ResourceConstraintRule
 	for _, constraint := range r.constraints {
-		rules = append(rules, constraint.FindRules(clusterDefRef, comp.ComponentDefRef)...)
+		if synthesizedComp.ClusterDefName != "" && synthesizedComp.ClusterCompDefName != "" {
+			rules = append(rules, constraint.FindRules(synthesizedComp.ClusterDefName, synthesizedComp.ClusterCompDefName)...)
+		} else {
+			rules = append(rules, constraint.FindRulesWithCompDef(synthesizedComp.CompDefName)...)
+		}
 	}
 	if len(rules) == 0 {
 		return nil, nil
@@ -142,14 +160,14 @@ func (r *Manager) GetResources(clusterDefRef string, comp *v1alpha1.ClusterCompo
 	var resourcesList []corev1.ResourceList
 	for _, rule := range rules {
 		resources := corev1.ResourceList{}
-		for k, v := range comp.Resources.Requests {
+		for k, v := range comp.Spec.Resources.Requests {
 			resources[k] = v
 		}
 		if !rule.ValidateResources(resources) {
 			continue
 		}
 		match := true
-		for _, volume := range comp.VolumeClaimTemplates {
+		for _, volume := range synthesizedComp.VolumeClaimTemplates {
 			if !rule.ValidateStorage(volume.Spec.Resources.Requests.Storage()) {
 				match = false
 				break
@@ -172,22 +190,30 @@ func (r *Manager) GetResources(clusterDefRef string, comp *v1alpha1.ClusterCompo
 }
 
 // ChooseClass chooses the classes to be used for a given component with constraints
-func (r *Manager) ChooseClass(comp *v1alpha1.ClusterComponentSpec) (*ComponentClassWithRef, error) {
+// TODO(xingran): remove the dependency of SynthesizedComponent.ClusterDefName and SynthesizedComponent.ClusterCompDefName in the future
+func (r *Manager) ChooseClass(synthesizedComp *SynthesizedComponent, comp *v1alpha1.Component) (*ComponentClassWithRef, error) {
 	var (
 		cls     *ComponentClassWithRef
-		classes = r.classes[comp.ComponentDefRef]
+		classes []*ComponentClassWithRef
 	)
+
+	// for backward compatibility with ClusterDefinition API.
+	if synthesizedComp.ClusterDefName != "" && synthesizedComp.ClusterCompDefName != "" {
+		classes = r.classes[synthesizedComp.ClusterCompDefName]
+	} else {
+		classes = r.classes[comp.Spec.CompDef]
+	}
 	switch {
-	case comp.ClassDefRef != nil && comp.ClassDefRef.Class != "":
+	case comp.Spec.ClassDefRef != nil && comp.Spec.ClassDefRef.Class != "":
 		if classes == nil {
-			return nil, fmt.Errorf("can not find classes for component %s", comp.ComponentDefRef)
+			return nil, fmt.Errorf("can not find classes for component %s", comp.Name)
 		}
 		for _, v := range classes {
-			if comp.ClassDefRef.Name != "" && comp.ClassDefRef.Name != v.ClassDefRef.Name {
+			if comp.Spec.ClassDefRef.Name != "" && comp.Spec.ClassDefRef.Name != v.ClassDefRef.Name {
 				continue
 			}
 
-			if comp.ClassDefRef.Class != v.ClassDefRef.Class {
+			if comp.Spec.ClassDefRef.Class != v.ClassDefRef.Class {
 				continue
 			}
 
@@ -196,10 +222,10 @@ func (r *Manager) ChooseClass(comp *v1alpha1.ClusterComponentSpec) (*ComponentCl
 			}
 		}
 		if cls == nil {
-			return nil, fmt.Errorf("unknown component class %s", comp.ClassDefRef.Class)
+			return nil, fmt.Errorf("unknown component class %s", comp.Spec.ClassDefRef.Class)
 		}
 	case classes != nil:
-		candidates := filterClassByResources(classes, comp.Resources.Requests)
+		candidates := filterClassByResources(classes, comp.Spec.Resources.Requests)
 		if len(candidates) == 0 {
 			return nil, fmt.Errorf("can not find matching class for component %s", comp.Name)
 		}
@@ -227,14 +253,9 @@ func filterClassByResources(classes []*ComponentClassWithRef, resources corev1.R
 	return candidates
 }
 
-// GetCustomClassObjectName returns the name of the ComponentClassDefinition object containing the custom classes
-func GetCustomClassObjectName(cdName string, componentName string) string {
-	return fmt.Sprintf("kb.classes.custom.%s.%s", cdName, componentName)
-}
-
 func getClasses(classDefinitionList v1alpha1.ComponentClassDefinitionList) (map[string][]*ComponentClassWithRef, error) {
 	var (
-		compTypeLabel    = "apps.kubeblocks.io/component-def-ref"
+		compTypeLabel    = constant.KBAppComponentDefRefLabelKey
 		componentClasses = make(map[string][]*ComponentClassWithRef)
 	)
 	for _, classDefinition := range classDefinitionList.Items {
@@ -348,4 +369,8 @@ func renderTemplate(tpl string, values map[string]interface{}) (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+func ignoreResourceConstraint(component *v1alpha1.Component) bool {
+	return strings.ToLower(component.GetAnnotations()[constant.IgnoreResourceConstraint]) == "true"
 }

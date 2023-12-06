@@ -101,6 +101,13 @@ type ComponentDefinitionSpec struct {
 	// +kubebuilder:validation:Required
 	Runtime corev1.PodSpec `json:"runtime"`
 
+	// Vars represents user-defined variables.
+	// These variables can be utilized as environment variables for Pods and Actions, or to render the templates of config and script.
+	// When used as environment variables, these variables are placed in front of the environment variables declared in the Pod.
+	// Cannot be updated.
+	// +optional
+	Vars []EnvVar `json:"vars,omitempty"`
+
 	// Volumes defines the persistent volumes needed by the component.
 	// The users are responsible for providing these volumes when creating a component instance.
 	// Cannot be updated.
@@ -121,6 +128,7 @@ type ComponentDefinitionSpec struct {
 	// +listType=map
 	// +listMapKey=name
 	// +optional
+	// TODO: support referencing configs from other components or clusters.
 	Configs []ComponentConfigSpec `json:"configs,omitempty"`
 
 	// LogConfigs is detail log file config which provided by provider.
@@ -157,18 +165,13 @@ type ComponentDefinitionSpec struct {
 	// If a label key conflicts with any other system labels or user-specified labels, it will be silently ignored.
 	// Cannot be updated.
 	// +optional
-	Labels map[string]BuiltInString `json:"labels,omitempty"`
+	Labels map[string]string `json:"labels,omitempty"`
 
 	// SystemAccounts defines the pre-defined system accounts required to manage the component.
 	// TODO(component): accounts KB required
 	// Cannot be updated.
 	// +optional
 	SystemAccounts []SystemAccount `json:"systemAccounts,omitempty"`
-
-	// ConnectionCredentials defines the default connection credentials that can be used to access the component service.
-	// Cannot be updated.
-	// +optional
-	ConnectionCredentials []ConnectionCredential `json:"connectionCredentials,omitempty"`
 
 	// UpdateStrategy defines the strategy for updating the component instance.
 	// Cannot be updated.
@@ -498,6 +501,12 @@ type ComponentLifecycleActions struct {
 	// Dedicated env vars for the action:
 	// - KB_SWITCHOVER_CANDIDATE_NAME: The name of the new candidate replica's Pod. It may be empty.
 	// - KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new candidate replica. It may be empty.
+	// - KB_LEADER_POD_IP: The IP address of the original leader's Pod before switchover.
+	// - KB_LEADER_POD_NAME: The name of the original leader's Pod before switchover.
+	// - KB_LEADER_POD_FQDN: The FQDN of the original leader's Pod before switchover.
+	// The env vars with following prefix are deprecated and will be removed in the future:
+	// - KB_REPLICATION_PRIMARY_POD_: The prefix of the environment variables of the original primary's Pod before switchover.
+	// - KB_CONSENSUS_LEADER_POD_: The prefix of the environment variables of the original leader's Pod before switchover.
 	// Cannot be updated.
 	// +optional
 	Switchover *ComponentSwitchoverSpec `json:"switchover,omitempty"`
@@ -562,10 +571,12 @@ type ComponentLifecycleActions struct {
 
 type ComponentSwitchoverSpec struct {
 	// withCandidate corresponds to the switchover of the specified candidate primary or leader instance.
+	// Currently, only Action.Exec is supported, Action.HTTP is not supported.
 	// +optional
 	WithCandidate *Action `json:"withCandidate,omitempty"`
 
 	// withoutCandidate corresponds to a switchover that does not specify a candidate primary or leader instance.
+	// Currently, only Action.Exec is supported, Action.HTTP is not supported.
 	// +optional
 	WithoutCandidate *Action `json:"withoutCandidate,omitempty"`
 

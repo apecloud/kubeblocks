@@ -128,7 +128,14 @@ func (factory *MockComponentResourceConstraintFactory) AddConstraints(constraint
 	return factory
 }
 
+// AddSelector add a cluster resource constraint selector
+// TODO(xingran): it will be deprecated in the future, use AddComponentSelector instead
 func (factory *MockComponentResourceConstraintFactory) AddSelector(selector appsv1alpha1.ClusterResourceConstraintSelector) *MockComponentResourceConstraintFactory {
 	factory.Get().Spec.Selector = append(factory.Get().Spec.Selector, selector)
+	return factory
+}
+
+func (factory *MockComponentResourceConstraintFactory) AddComponentSelector(compSelector appsv1alpha1.ComponentResourceConstraintSelector) *MockComponentResourceConstraintFactory {
+	factory.Get().Spec.ComponentSelector = append(factory.Get().Spec.ComponentSelector, compSelector)
 	return factory
 }

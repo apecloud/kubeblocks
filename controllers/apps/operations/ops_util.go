@@ -22,12 +22,12 @@ package operations
 import (
 	"context"
 	"fmt"
-	"math"
 	"reflect"
 	"time"
 
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -40,8 +40,12 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// componentFailedTimeout when the duration of component failure exceeds this threshold, it is determined that opsRequest has failed
-const componentFailedTimeout = 30 * time.Second
+const (
+	// componentFailedTimeout when the duration of component failure exceeds this threshold, it is determined that opsRequest has failed
+	componentFailedTimeout = 30 * time.Second
+
+	opsRequestQueueLimitSize = 10
+)
 
 var _ error = &WaitForClusterPhaseErr{}
 
@@ -227,17 +231,17 @@ func PatchOpsStatusWithOpsDeepCopy(ctx context.Context,
 		}
 		opsRes.Recorder.Event(opsRequest, eventType, v.Reason, v.Message)
 	}
+	opsRequest.Status.Phase = phase
 	if opsRequest.IsComplete(phase) {
 		opsRequest.Status.CompletionTimestamp = metav1.Time{Time: time.Now()}
 		// when OpsRequest is completed, remove it from annotation
-		if err := DeleteOpsRequestAnnotationInCluster(ctx, cli, opsRes); err != nil {
+		if err := DequeueOpsRequestInClusterAnnotation(ctx, cli, opsRes); err != nil {
 			return err
 		}
 	}
-	if phase == appsv1alpha1.OpsCreatingPhase && opsRequest.Status.Phase != phase {
+	if phase == appsv1alpha1.OpsCreatingPhase && opsRequest.Status.StartTimestamp.IsZero() {
 		opsRequest.Status.StartTimestamp = metav1.Time{Time: time.Now()}
 	}
-	opsRequest.Status.Phase = phase
 	return cli.Status().Patch(ctx, opsRequest, patch)
 }
 
@@ -303,9 +307,9 @@ func patchOpsRequestToCreating(reqCtx intctrlutil.RequestCtx,
 	return PatchOpsStatusWithOpsDeepCopy(reqCtx.Ctx, cli, opsRes, opsDeepCoy, appsv1alpha1.OpsCreatingPhase, validatePassCondition, condition)
 }
 
-// DeleteOpsRequestAnnotationInCluster when OpsRequest.status.phase is Succeeded or Failed
+// DequeueOpsRequestInClusterAnnotation when OpsRequest.status.phase is Succeeded or Failed
 // we should remove the OpsRequest Annotation of cluster, then unlock cluster
-func DeleteOpsRequestAnnotationInCluster(ctx context.Context, cli client.Client, opsRes *OpsResource) error {
+func DequeueOpsRequestInClusterAnnotation(ctx context.Context, cli client.Client, opsRes *OpsResource) error {
 	var (
 		opsRequestSlice []appsv1alpha1.OpsRecorder
 		err             error
@@ -313,43 +317,87 @@ func DeleteOpsRequestAnnotationInCluster(ctx context.Context, cli client.Client,
 	if opsRequestSlice, err = opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster); err != nil {
 		return err
 	}
-	index, opsRecord := GetOpsRecorderFromSlice(opsRequestSlice, opsRes.OpsRequest.Name)
-	if opsRecord.Name == "" {
+	index, _ := GetOpsRecorderFromSlice(opsRequestSlice, opsRes.OpsRequest.Name)
+	if index == -1 {
 		return nil
 	}
-	// delete the opsRequest information in Cluster.annotations
-	opsRequestSlice = slices.Delete(opsRequestSlice, index, index+1)
-	return opsutil.PatchClusterOpsAnnotations(ctx, cli, opsRes.Cluster, opsRequestSlice)
+	if opsRes.OpsRequest.Status.Phase == appsv1alpha1.OpsFailedPhase && index == 0 {
+		// 1. update all pending opsRequest phase to Cancelled if the head opsRequest is Failed.
+		for i := 1; i < len(opsRequestSlice); i++ {
+			ops := &appsv1alpha1.OpsRequest{}
+			if err = cli.Get(ctx, client.ObjectKey{Name: opsRequestSlice[i].Name, Namespace: opsRes.OpsRequest.Namespace}, ops); err != nil {
+				if apierrors.IsNotFound(err) {
+					continue
+				}
+				return err
+			}
+			patch := client.MergeFrom(ops.DeepCopy())
+			ops.Status.Phase = appsv1alpha1.OpsCancelledPhase
+			ops.Status.CompletionTimestamp = metav1.Time{Time: time.Now()}
+			ops.SetStatusCondition(metav1.Condition{
+				Type:    appsv1alpha1.ConditionTypeCancelled,
+				Reason:  appsv1alpha1.ReasonOpsCancelByController,
+				Status:  metav1.ConditionTrue,
+				Message: fmt.Sprintf(`Cancelled by controller due to the failure of previous OpsRequest "%s"`, opsRes.OpsRequest.Name),
+			})
+			if err = cli.Status().Patch(ctx, ops, patch); err != nil && apierrors.IsNotFound(err) {
+				return err
+			}
+		}
+		// 2. cleanup opsRequest queue
+		opsRequestSlice = nil
+	} else {
+		// delete the opsRequest in Cluster.annotations
+		opsRequestSlice = slices.Delete(opsRequestSlice, index, index+1)
+	}
+	return opsutil.UpdateClusterOpsAnnotations(ctx, cli, opsRes.Cluster, opsRequestSlice)
 }
 
-// addOpsRequestAnnotationToCluster adds the OpsRequest Annotation to Cluster.metadata.Annotations to acquire the lock.
-func addOpsRequestAnnotationToCluster(ctx context.Context, cli client.Client, opsRes *OpsResource, opsBehaviour OpsBehaviour) error {
+// enqueueOpsRequestToClusterAnnotation adds the OpsRequest Annotation to Cluster.metadata.Annotations to acquire the lock.
+func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client, opsRes *OpsResource, opsBehaviour OpsBehaviour) ([]appsv1alpha1.OpsRecorder, error) {
 	var (
 		opsRequestSlice []appsv1alpha1.OpsRecorder
 		err             error
 	)
 	if opsBehaviour.ToClusterPhase == "" {
-		return nil
+		return nil, nil
 	}
-	// if the running opsRequest is deleted, do not patch the opsRequest annotation on cluster.
+	// if the running opsRequest is deleted, do not enqueue the opsRequest to cluster annotation.
 	if !opsRes.OpsRequest.DeletionTimestamp.IsZero() {
-		return nil
+		return nil, nil
 	}
 	if opsRequestSlice, err = opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster); err != nil {
-		return err
+		return nil, err
 	}
-	// check the OpsRequest is existed
-	if _, opsRecorder := GetOpsRecorderFromSlice(opsRequestSlice, opsRes.OpsRequest.Name); opsRecorder.Name != "" {
-		return nil
+
+	index, opsRecorder := GetOpsRecorderFromSlice(opsRequestSlice, opsRes.OpsRequest.Name)
+	switch index {
+	case -1:
+		// if not exists but reach the queue limit size, throw an error
+		if len(opsRequestSlice) >= opsRequestQueueLimitSize {
+			return nil, intctrlutil.NewFatalError("The opsRequest queue is limited to a size of 8")
+		}
+		// if not exists, enqueue
+		if opsRequestSlice == nil {
+			opsRequestSlice = make([]appsv1alpha1.OpsRecorder, 0)
+		}
+		opsRequestSlice = append(opsRequestSlice, appsv1alpha1.OpsRecorder{
+			Name:    opsRes.OpsRequest.Name,
+			Type:    opsRes.OpsRequest.Spec.Type,
+			InQueue: len(opsRequestSlice) != 0,
+		})
+	case 0:
+		// head opsRequest
+		if !opsRecorder.InQueue {
+			return opsRequestSlice, nil
+		}
+		// mark the head opsRequest is running
+		opsRequestSlice[0].InQueue = false
+	default:
+		// if exists and is not the head opsRequest, return
+		return opsRequestSlice, nil
 	}
-	if opsRequestSlice == nil {
-		opsRequestSlice = make([]appsv1alpha1.OpsRecorder, 0)
-	}
-	opsRequestSlice = append(opsRequestSlice, appsv1alpha1.OpsRecorder{
-		Name: opsRes.OpsRequest.Name,
-		Type: opsRes.OpsRequest.Spec.Type,
-	})
-	return opsutil.UpdateClusterOpsAnnotations(ctx, cli, opsRes.Cluster, opsRequestSlice)
+	return opsRequestSlice, opsutil.UpdateClusterOpsAnnotations(ctx, cli, opsRes.Cluster, opsRequestSlice)
 }
 
 // isOpsRequestFailedPhase checks the OpsRequest phase is Failed
@@ -357,6 +405,13 @@ func isOpsRequestFailedPhase(opsRequestPhase appsv1alpha1.OpsPhase) bool {
 	return opsRequestPhase == appsv1alpha1.OpsFailedPhase
 }
 
+// patchReconfigureOpsStatus when Reconfigure is running, we should update status to OpsRequest.Status.ConfigurationStatus.
+//
+// NOTES:
+// opsStatus describes status of OpsRequest.
+// reconfiguringStatus describes status of reconfiguring operation, which contains multiple configuration templates.
+// cmStatus describes status of configmap, it is uniquely associated with a configuration template, which contains multiple keys, each key is name of a configuration file.
+// execStatus describes the result of the execution of the state machine, which is designed to solve how to conduct the reconfiguring operation, such as whether to restart, how to send a signal to the process.
 func updateReconfigureStatusByCM(reconfiguringStatus *appsv1alpha1.ReconfiguringStatus, tplName string,
 	handleReconfigureStatus handleReconfigureOpsStatus) error {
 	for i, cmStatus := range reconfiguringStatus.ConfigurationStatus {
@@ -374,43 +429,6 @@ func updateReconfigureStatusByCM(reconfiguringStatus *appsv1alpha1.Reconfiguring
 	})
 	cmStatus := &reconfiguringStatus.ConfigurationStatus[cmCount]
 	return handleReconfigureStatus(cmStatus)
-}
-
-// patchReconfigureOpsStatus when Reconfigure is running, we should update status to OpsRequest.Status.ConfigurationStatus.
-//
-// NOTES:
-// opsStatus describes status of OpsRequest.
-// reconfiguringStatus describes status of reconfiguring operation, which contains multiple configuration templates.
-// cmStatus describes status of configmap, it is uniquely associated with a configuration template, which contains multiple keys, each key is name of a configuration file.
-// execStatus describes the result of the execution of the state machine, which is designed to solve how to conduct the reconfiguring operation, such as whether to restart, how to send a signal to the process.
-func patchReconfigureOpsStatus(
-	opsRes *OpsResource,
-	tplName string,
-	handleReconfigureStatus handleReconfigureOpsStatus) error {
-	var opsRequest = opsRes.OpsRequest
-	if opsRequest.Status.ReconfiguringStatus == nil {
-		opsRequest.Status.ReconfiguringStatus = &appsv1alpha1.ReconfiguringStatus{
-			ConfigurationStatus: make([]appsv1alpha1.ConfigurationItemStatus, 0),
-		}
-	}
-
-	reconfiguringStatus := opsRequest.Status.ReconfiguringStatus
-	return updateReconfigureStatusByCM(reconfiguringStatus, tplName, handleReconfigureStatus)
-}
-
-// getSlowestReconfiguringProgress gets the progress of the reconfiguring operations.
-func getSlowestReconfiguringProgress(status []appsv1alpha1.ConfigurationItemStatus) string {
-	slowest := appsv1alpha1.ConfigurationItemStatus{
-		SucceedCount:  math.MaxInt32,
-		ExpectedCount: -1,
-	}
-
-	for _, st := range status {
-		if st.SucceedCount < slowest.SucceedCount {
-			slowest = st
-		}
-	}
-	return fmt.Sprintf("%d/%d", slowest.SucceedCount, slowest.ExpectedCount)
 }
 
 func getTargetResourcesOfLastComponent(lastConfiguration appsv1alpha1.LastConfiguration, compName string, resourceKey appsv1alpha1.ComponentResourceKey) []string {
@@ -449,24 +467,21 @@ func validateOpsWaitingPhase(cluster *appsv1alpha1.Cluster, ops *appsv1alpha1.Op
 	// or opsRequest status.phase is not Pending,
 	// or opsRequest will create cluster,
 	// we don't validate the cluster phase.
-	if len(opsBehaviour.FromClusterPhases) == 0 || ops.Status.Phase != appsv1alpha1.OpsPendingPhase {
+	if len(opsBehaviour.FromClusterPhases) == 0 || ops.Status.Phase != appsv1alpha1.OpsPendingPhase || opsBehaviour.IsClusterCreation {
 		return nil
 	}
-	// check if the opsRequest can be executed in the current cluster phase unless this opsRequest is reentrant.
-	if !slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) {
-		// check if entry-condition is met
-		// if the cluster is not in the expected phase, we should wait for it for up to TTLSecondsBeforeAbort seconds.
-		// if len(opsRecorder) == 0 && !slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) {
-		// TTLSecondsBeforeAbort is 0 means that the we do not need to wait for the cluster to reach the expected phase.
-		if ops.Spec.TTLSecondsBeforeAbort == nil || (time.Now().After(ops.GetCreationTimestamp().Add(time.Duration(*ops.Spec.TTLSecondsBeforeAbort) * time.Second))) {
-			return fmt.Errorf("OpsRequest.spec.type=%s is forbidden when Cluster.status.phase=%s", ops.Spec.Type, cluster.Status.Phase)
-		}
-
-		return &WaitForClusterPhaseErr{
-			clusterName:   cluster.Name,
-			currentPhase:  cluster.Status.Phase,
-			expectedPhase: opsBehaviour.FromClusterPhases,
-		}
+	if slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) {
+		return nil
 	}
-	return nil
+	// check if entry-condition is met
+	// if the cluster is not in the expected phase, we should wait for it for up to TTLSecondsBeforeAbort seconds.
+	if ops.Spec.TTLSecondsBeforeAbort == nil || (time.Now().After(ops.GetCreationTimestamp().Add(time.Duration(*ops.Spec.TTLSecondsBeforeAbort) * time.Second))) {
+		return nil
+	}
+
+	return &WaitForClusterPhaseErr{
+		clusterName:   cluster.Name,
+		currentPhase:  cluster.Status.Phase,
+		expectedPhase: opsBehaviour.FromClusterPhases,
+	}
 }

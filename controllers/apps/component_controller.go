@@ -140,12 +140,12 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentAccountTransformer{},
 			// provision component system accounts
 			&componentAccountProvisionTransformer{},
-			// handle component connection credentials
-			&componentCredentialTransformer{},
 			// handle tls volume and cert
 			&componentTLSTransformer{},
 			// handle component custom volumes
 			&componentCustomVolumesTransformer{},
+			// resolve and build vars for template and Env
+			&componentVarsTransformer{},
 			// render component configurations
 			&componentConfigurationTransformer{Client: r.Client},
 			// handle the component workload
@@ -213,11 +213,12 @@ func (r *ComponentReconciler) filterComponentResources(ctx context.Context, obj 
 	if _, ok := labels[constant.KBAppComponentLabelKey]; !ok {
 		return []reconcile.Request{}
 	}
+	fullCompName := constant.GenerateClusterComponentName(labels[constant.AppInstanceLabelKey], labels[constant.KBAppComponentLabelKey])
 	return []reconcile.Request{
 		{
 			NamespacedName: types.NamespacedName{
 				Namespace: obj.GetNamespace(),
-				Name:      obj.GetName(),
+				Name:      fullCompName,
 			},
 		},
 	}

@@ -17,17 +17,35 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package class
+package main
 
 import (
-	"testing"
+	"os"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	hclog "github.com/hashicorp/go-hclog"
+	dbplugin "github.com/hashicorp/vault/sdk/database/dbplugin/v5"
+
+	"github.com/apecloud/kubeblocks/pkg/lorry/vault"
 )
 
-func TestClass(t *testing.T) {
-	RegisterFailHandler(Fail)
+func main() {
+	err := Run()
+	if err != nil {
+		logger := hclog.New(&hclog.LoggerOptions{})
 
-	RunSpecs(t, "Class Test Suite")
+		logger.Error("plugin shutting down", "error", err)
+		os.Exit(1)
+	}
+}
+
+// Run instantiates a LorryDB object, and runs the RPC server for the plugin
+func Run() error {
+	db, err := vault.New()
+	if err != nil {
+		return err
+	}
+
+	dbplugin.Serve(db.(dbplugin.Database))
+
+	return nil
 }

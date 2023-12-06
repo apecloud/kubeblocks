@@ -142,10 +142,9 @@ max_connections = '1000'
 					ClusterName:   clusterName,
 					ComponentName: mysqlCompName,
 				},
-				Cluster:    clusterObj,
-				ClusterVer: clusterVersionObj,
-				Component:  clusterComponent,
-				PodSpec:    clusterComponent.PodSpec,
+				Cluster:   clusterObj,
+				Component: clusterComponent,
+				PodSpec:   clusterComponent.PodSpec,
 			})
 
 			By("mock api resource for configuration")
@@ -188,7 +187,6 @@ max_connections = '1000'
 			reconcileTask := NewReconcilePipeline(ReconcileCtx{
 				ResourceCtx: createPipeline.ResourceCtx,
 				Cluster:     clusterObj,
-				ClusterVer:  clusterVersionObj,
 				Component:   clusterComponent,
 				PodSpec:     clusterComponent.PodSpec,
 			}, item, &configurationObj.Status.ConfigurationItemStatus[0], nil)

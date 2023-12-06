@@ -132,7 +132,7 @@ func buildBasicContainer(synthesizeComp *SynthesizedComponent) *corev1.Container
 		}
 	}
 	if sysInitAccount != nil {
-		secretName = constant.GenerateComponentConnCredential(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
+		secretName = constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
 	} else {
 		secretName = constant.GenerateDefaultConnCredential(synthesizeComp.ClusterName)
 	}
@@ -221,7 +221,7 @@ func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container 
 		}
 	}
 	if sysInitAccount != nil {
-		secretName = constant.GenerateComponentConnCredential(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
+		secretName = constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
 	} else {
 		secretName = constant.GenerateDefaultConnCredential(synthesizeComp.ClusterName)
 	}

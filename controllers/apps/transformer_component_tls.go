@@ -26,9 +26,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
@@ -124,9 +124,9 @@ func composeTLSVolume(clusterName string, synthesizeComp component.SynthesizedCo
 	switch tls.Issuer.Name {
 	case appsv1alpha1.IssuerKubeBlocks:
 		secretName = plan.GenerateTLSSecretName(clusterName, synthesizeComp.Name)
-		ca = factory.CAName
-		cert = factory.CertName
-		key = factory.KeyName
+		ca = constant.CAName
+		cert = constant.CertName
+		key = constant.KeyName
 	case appsv1alpha1.IssuerUserProvided:
 		secretName = tls.Issuer.SecretRef.Name
 		ca = tls.Issuer.SecretRef.CA
@@ -134,14 +134,14 @@ func composeTLSVolume(clusterName string, synthesizeComp component.SynthesizedCo
 		key = tls.Issuer.SecretRef.Key
 	}
 	volume := corev1.Volume{
-		Name: factory.VolumeName,
+		Name: constant.VolumeName,
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
 				SecretName: secretName,
 				Items: []corev1.KeyToPath{
-					{Key: ca, Path: factory.CAName},
-					{Key: cert, Path: factory.CertName},
-					{Key: key, Path: factory.KeyName},
+					{Key: ca, Path: constant.CAName},
+					{Key: cert, Path: constant.CertName},
+					{Key: key, Path: constant.KeyName},
 				},
 				Optional: func() *bool { o := false; return &o }(),
 			},
@@ -153,8 +153,8 @@ func composeTLSVolume(clusterName string, synthesizeComp component.SynthesizedCo
 
 func composeTLSVolumeMount() corev1.VolumeMount {
 	return corev1.VolumeMount{
-		Name:      factory.VolumeName,
-		MountPath: factory.MountPath,
+		Name:      constant.VolumeName,
+		MountPath: constant.MountPath,
 		ReadOnly:  true,
 	}
 }

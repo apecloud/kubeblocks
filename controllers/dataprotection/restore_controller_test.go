@@ -26,15 +26,16 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/types"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -115,7 +116,7 @@ var _ = Describe("Restore Controller test", func() {
 			schedulingSpec := dpv1alpha1.SchedulingSpec{
 				NodeName: nodeName,
 			}
-			restoreFactory := testdp.NewRestoreactory(testCtx.DefaultNamespace, testdp.RestoreName).
+			restoreFactory := testdp.NewRestoreFactory(testCtx.DefaultNamespace, testdp.RestoreName).
 				SetBackup(backup.Name, testCtx.DefaultNamespace).
 				SetSchedulingSpec(schedulingSpec)
 
@@ -136,7 +137,7 @@ var _ = Describe("Restore Controller test", func() {
 
 		checkJobAndPVCSCount := func(restore *dpv1alpha1.Restore, jobReplicas, pvcReplicas, startingIndex int) {
 			Eventually(testapps.List(&testCtx, generics.JobSignature,
-				client.MatchingLabels{dprestore.DataProtectionLabelRestoreKey: restore.Name},
+				client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
 				client.InNamespace(testCtx.DefaultNamespace))).Should(HaveLen(jobReplicas))
 
 			pvcMatchingLabels := client.MatchingLabels{constant.AppManagedByLabelKey: "restore"}
@@ -157,7 +158,7 @@ var _ = Describe("Restore Controller test", func() {
 		mockRestoreJobsCompleted := func(restore *dpv1alpha1.Restore) {
 			jobList := &batchv1.JobList{}
 			Expect(k8sClient.List(ctx, jobList,
-				client.MatchingLabels{dprestore.DataProtectionLabelRestoreKey: restore.Name},
+				client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
 				client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
 			for _, v := range jobList.Items {
 				testdp.PatchK8sJobStatus(&testCtx, client.ObjectKeyFromObject(&v), batchv1.JobComplete)
@@ -207,7 +208,7 @@ var _ = Describe("Restore Controller test", func() {
 				By("mock restore job is Failed")
 				jobList := &batchv1.JobList{}
 				Expect(k8sClient.List(ctx, jobList,
-					client.MatchingLabels{dprestore.DataProtectionLabelRestoreKey: restore.Name},
+					client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
 					client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
 
 				for _, v := range jobList.Items {
@@ -260,10 +261,11 @@ var _ = Describe("Restore Controller test", func() {
 
 				jobList := &batchv1.JobList{}
 				Expect(k8sClient.List(ctx, jobList,
-					client.MatchingLabels{dprestore.DataProtectionLabelRestoreKey: restore.Name},
+					client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
 					client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
 
 				for _, v := range jobList.Items {
+					Expect(v.Labels[constant.AppManagedByLabelKey]).Should(Equal(dptypes.AppName))
 					finished, _, _ := dputils.IsJobFinished(&v)
 					Expect(finished).Should(BeFalse())
 				}
@@ -309,7 +311,7 @@ var _ = Describe("Restore Controller test", func() {
 
 				By("wait for creating two exec jobs with the matchLabels")
 				Eventually(testapps.List(&testCtx, generics.JobSignature,
-					client.MatchingLabels{dprestore.DataProtectionLabelRestoreKey: restore.Name},
+					client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
 					client.InNamespace(testCtx.DefaultNamespace))).Should(HaveLen(2))
 
 				By("mock exec jobs are completed")
@@ -317,7 +319,7 @@ var _ = Describe("Restore Controller test", func() {
 
 				By("wait for creating a job of jobAction with the matchLabels, expect jobs count is 3(2+1)")
 				Eventually(testapps.List(&testCtx, generics.JobSignature,
-					client.MatchingLabels{dprestore.DataProtectionLabelRestoreKey: restore.Name},
+					client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
 					client.InNamespace(testCtx.DefaultNamespace))).Should(HaveLen(3))
 
 				By("mock jobs are completed")

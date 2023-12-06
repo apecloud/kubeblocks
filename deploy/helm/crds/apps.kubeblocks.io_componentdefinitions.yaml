@@ -59,9 +59,10 @@ spec:
               operation behaviors.
             properties:
               configs:
-                description: The configs field provided by provider, and finally this
-                  configTemplateRefs will be rendered into the user's own configuration
-                  file according to the user's cluster. Cannot be updated.
+                description: 'The configs field provided by provider, and finally
+                  this configTemplateRefs will be rendered into the user''s own configuration
+                  file according to the user''s cluster. Cannot be updated. TODO:
+                  support referencing configs from other components or clusters.'
                 items:
                   properties:
                     asEnvFrom:
@@ -161,109 +162,12 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
-              connectionCredentials:
-                description: ConnectionCredentials defines the default connection
-                  credentials that can be used to access the component service. Cannot
-                  be updated.
-                items:
-                  description: "ConnectionCredential defines the information needed
-                    to access a cluster or component service. For each ConnectionCredential,
-                    a k8s Secret object will be created with the scheme: \n ObjectMeta:
-                    Name: <CLUSTER_NAME>-<NAME> or <CLUSTER_NAME>-<COMPONENT_NAME>-<NAME>
-                    Spec: Data: endpoint: <endpoint>[,<endpoint>....] host: <host>
-                    port: <port> username: <account.name>  # TODO: ak/sk password:
-                    <account.password>"
-                  properties:
-                    account:
-                      description: Account specifies the defined system account to
-                        be used for accessing the service. Cannot be updated.
-                      properties:
-                        accountName:
-                          description: AccountName specifies the name of account used
-                            to access the service. If specified, the account must
-                            be defined in @SystemAccounts. Cannot be updated.
-                          type: string
-                        component:
-                          description: Component specifies the name of component where
-                            the account defined. For cluster-level connection credential,
-                            this field is required. Cannot be updated.
-                          type: string
-                      type: object
-                    endpoint:
-                      description: Endpoint specifies the connection endpoint information.
-                        It can be either a defined service or pods' FQDN of a specified
-                        component. Cannot be updated.
-                      properties:
-                        podEndpoint:
-                          description: PodEndpoint specifies the pod endpoint information.
-                            Cannot be updated.
-                          properties:
-                            component:
-                              description: Component specifies the name of component.
-                                For cluster-level connection credential, this field
-                                is required. Cannot be updated.
-                              type: string
-                            container:
-                              description: Container specifies the name of the container
-                                in the Pod. Cannot be updated.
-                              type: string
-                            portName:
-                              description: PortName specifies the name of the port
-                                to access the service. If the container has multiple
-                                ports, a specific port must be specified to use here.
-                                Otherwise, the unique port of the container will be
-                                used. Cannot be updated.
-                              type: string
-                          type: object
-                        separator:
-                          default: ','
-                          description: Separator is used if there are multiple endpoints
-                            for accessing the service. It defines the separator to
-                            join multiple endpoints. Cannot be updated.
-                          type: string
-                        serviceEndpoint:
-                          description: ServiceEndpoint specifies the defined service
-                            to use. Cannot be updated.
-                          properties:
-                            component:
-                              description: Component specifies the name of component
-                                to look up matched service. For cluster-level connection
-                                credential, if the component is not specified, it
-                                will look up the matched service in cluster services;
-                                otherwise, component services will be searched. Cannot
-                                be updated.
-                              type: string
-                            portName:
-                              description: PortName specifies the name of the port
-                                to access the service. If the service has multiple
-                                ports, a specific port must be specified to use here.
-                                Otherwise, the unique port of the service will be
-                                used. Cannot be updated.
-                              type: string
-                            serviceName:
-                              description: ServiceName specifies the name of the service
-                                to use for accessing. Cannot be updated.
-                              type: string
-                          type: object
-                      type: object
-                    name:
-                      description: The name of the ConnectionCredential. Cannot be
-                        updated.
-                      type: string
-                  required:
-                  - name
-                  type: object
-                type: array
               description:
                 description: Description is a brief description of the component.
                 maxLength: 256
                 type: string
               labels:
                 additionalProperties:
-                  description: BuiltInString defines a string type that may contain
-                    references to BuiltInEnvVar and/or BuiltInGeneratorVar placeholders.
-                    These placeholders are meant to be replaced with actual values
-                    at runtime to provide dynamic content.
                   type: string
                 description: Labels defines static labels that will be patched to
                   all k8s resources created for the component. If a label key conflicts
@@ -3238,7 +3142,16 @@ spec:
                       - restart - scale-in Dedicated env vars for the action: - KB_SWITCHOVER_CANDIDATE_NAME:
                       The name of the new candidate replica''s Pod. It may be empty.
                       - KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new candidate
-                      replica. It may be empty. Cannot be updated.'
+                      replica. It may be empty. - KB_LEADER_POD_IP: The IP address
+                      of the original leader''s Pod before switchover. - KB_LEADER_POD_NAME:
+                      The name of the original leader''s Pod before switchover. -
+                      KB_LEADER_POD_FQDN: The FQDN of the original leader''s Pod before
+                      switchover. The env vars with following prefix are deprecated
+                      and will be removed in the future: - KB_REPLICATION_PRIMARY_POD_:
+                      The prefix of the environment variables of the original primary''s
+                      Pod before switchover. - KB_CONSENSUS_LEADER_POD_: The prefix
+                      of the environment variables of the original leader''s Pod before
+                      switchover. Cannot be updated.'
                     properties:
                       scriptSpecSelectors:
                         description: scriptSpecSelectors defines the selector of the
@@ -3259,7 +3172,8 @@ spec:
                         type: array
                       withCandidate:
                         description: withCandidate corresponds to the switchover of
-                          the specified candidate primary or leader instance.
+                          the specified candidate primary or leader instance. Currently,
+                          only Action.Exec is supported, Action.HTTP is not supported.
                         properties:
                           container:
                             description: Container defines the name of the container
@@ -3511,6 +3425,8 @@ spec:
                       withoutCandidate:
                         description: withoutCandidate corresponds to a switchover
                           that does not specify a candidate primary or leader instance.
+                          Currently, only Action.Exec is supported, Action.HTTP is
+                          not supported.
                         properties:
                           container:
                             description: Container defines the name of the container
@@ -11692,7 +11608,7 @@ spec:
                           minimum: 0
                           type: integer
                         numSymbols:
-                          default: 4
+                          default: 0
                           description: numSymbols defines number of symbols.
                           format: int32
                           maximum: 8
@@ -11730,6 +11646,178 @@ spec:
                 - BestEffortParallel
                 - Parallel
                 type: string
+              vars:
+                description: Vars represents user-defined variables. These variables
+                  can be utilized as environment variables for Pods and Actions, or
+                  to render the templates of config and script. When used as environment
+                  variables, these variables are placed in front of the environment
+                  variables declared in the Pod. Cannot be updated.
+                items:
+                  description: EnvVar represents a variable present in the env of
+                    Pod/Action or the template of config/script.
+                  properties:
+                    name:
+                      description: Name of the variable. Must be a C_IDENTIFIER.
+                      type: string
+                    value:
+                      description: 'Variable references $(VAR_NAME) are expanded using
+                        the previously defined variables in the current context. If
+                        a variable cannot be resolved, the reference in the input
+                        string will be unchanged. Double $$ are reduced to a single
+                        $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+                        "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+                        Escaped references will never be expanded, regardless of whether
+                        the variable exists or not. Defaults to "".'
+                      type: string
+                    valueFrom:
+                      description: Source for the variable's value. Cannot be used
+                        if value is not empty.
+                      properties:
+                        configMapKeyRef:
+                          description: Selects a key of a ConfigMap.
+                          properties:
+                            key:
+                              description: The key to select.
+                              type: string
+                            name:
+                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              type: string
+                            optional:
+                              description: Specify whether the ConfigMap or its key
+                                must be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        credentialVarRef:
+                          description: Selects a defined var of a Credential (SystemAccount).
+                          properties:
+                            compDef:
+                              description: CompDef specifies the definition used by
+                                the component that the referent object resident in.
+                              type: string
+                            name:
+                              description: Name of the referent object.
+                              type: string
+                            optional:
+                              description: Specify whether the object must be defined.
+                              type: boolean
+                            password:
+                              description: VarOption defines whether a variable is
+                                required or optional.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            username:
+                              description: VarOption defines whether a variable is
+                                required or optional.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                          type: object
+                        secretKeyRef:
+                          description: Selects a key of a Secret.
+                          properties:
+                            key:
+                              description: The key of the secret to select from.  Must
+                                be a valid secret key.
+                              type: string
+                            name:
+                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              type: string
+                            optional:
+                              description: Specify whether the Secret or its key must
+                                be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        serviceRefVarRef:
+                          description: Selects a defined var of a ServiceRef.
+                          properties:
+                            compDef:
+                              description: CompDef specifies the definition used by
+                                the component that the referent object resident in.
+                              type: string
+                            endpoint:
+                              description: VarOption defines whether a variable is
+                                required or optional.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            name:
+                              description: Name of the referent object.
+                              type: string
+                            optional:
+                              description: Specify whether the object must be defined.
+                              type: boolean
+                            password:
+                              description: VarOption defines whether a variable is
+                                required or optional.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            port:
+                              description: VarOption defines whether a variable is
+                                required or optional.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            username:
+                              description: VarOption defines whether a variable is
+                                required or optional.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                          type: object
+                        serviceVarRef:
+                          description: Selects a defined var of a Service.
+                          properties:
+                            compDef:
+                              description: CompDef specifies the definition used by
+                                the component that the referent object resident in.
+                              type: string
+                            host:
+                              description: VarOption defines whether a variable is
+                                required or optional.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            name:
+                              description: Name of the referent object.
+                              type: string
+                            optional:
+                              description: Specify whether the object must be defined.
+                              type: boolean
+                            port:
+                              properties:
+                                name:
+                                  type: string
+                                option:
+                                  description: VarOption defines whether a variable
+                                    is required or optional.
+                                  enum:
+                                  - Required
+                                  - Optional
+                                  type: string
+                              type: object
+                          type: object
+                      type: object
+                  required:
+                  - name
+                  type: object
+                type: array
               volumes:
                 description: Volumes defines the persistent volumes needed by the
                   component. The users are responsible for providing these volumes

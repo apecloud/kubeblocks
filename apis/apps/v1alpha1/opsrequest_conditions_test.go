@@ -25,7 +25,6 @@ import (
 
 func TestNewAllCondition(t *testing.T) {
 	opsRequest := createTestOpsRequest("mysql-test", "mysql-restart", RestartType)
-	NewProgressingCondition(opsRequest)
 	NewVolumeExpandingCondition(opsRequest)
 	NewRestartingCondition(opsRequest)
 	NewHorizontalScalingCondition(opsRequest)
@@ -58,7 +57,7 @@ func TestNewAllCondition(t *testing.T) {
 
 func TestSetStatusCondition(t *testing.T) {
 	opsRequest := createTestOpsRequest("mysql-test", "mysql-restart", RestartType)
-	progressingCondition := NewProgressingCondition(opsRequest)
+	progressingCondition := NewVerticalScalingCondition(opsRequest)
 	opsRequest.SetStatusCondition(*progressingCondition)
 	checkCondition := meta.FindStatusCondition(opsRequest.Status.Conditions, progressingCondition.Type)
 	if checkCondition == nil {

@@ -22,21 +22,23 @@ package grpcserver
 import (
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/golang/mock/gomock"
 	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 )
 
 func init() {
 	viper.AutomaticEnv()
-	viper.SetDefault("KB_POD_NAME", "pod-test")
-	viper.SetDefault("KB_CLUSTER_COMP_NAME", "cluster-component-test")
-	viper.SetDefault("KB_NAMESPACE", "namespace-test")
+	viper.SetDefault(constant.KBEnvPodName, "pod-test")
+	viper.SetDefault(constant.KBEnvClusterCompName, "cluster-component-test")
+	viper.SetDefault(constant.KBEnvNamespace, "namespace-test")
 	ctrl.SetLogger(zap.New())
 }
 

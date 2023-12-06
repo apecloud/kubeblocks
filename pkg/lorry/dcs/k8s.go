@@ -76,27 +76,27 @@ func NewKubernetesStore() (*KubernetesStore, error) {
 
 	clusterName := os.Getenv(constant.KBEnvClusterName)
 	if clusterName == "" {
-		return nil, errors.New("KB_CLUSTER_NAME must be set")
+		return nil, errors.New(fmt.Sprintf("%s must be set", constant.KBEnvClusterName))
 	}
 
-	componentName := os.Getenv(constant.KBEnvComponentName)
+	componentName := os.Getenv(constant.KBEnvCompName)
 	if componentName == "" {
-		return nil, errors.New("KB_COMP_NAME must be set")
+		return nil, errors.New(fmt.Sprintf("%s must be set", constant.KBEnvCompName))
 	}
 
 	clusterCompName := os.Getenv(constant.KBEnvClusterCompName)
 	if clusterCompName == "" {
-		return nil, errors.New("KB_CLUSTER_COMP_NAME must be set")
+		clusterCompName = clusterName + "-" + componentName
 	}
 
 	currentMemberName := os.Getenv(constant.KBEnvPodName)
 	if clusterName == "" {
-		return nil, errors.New("KB_POD_NAME must be set")
+		return nil, errors.New(fmt.Sprintf("%s must be set", constant.KBEnvPodName))
 	}
 
 	namespace := os.Getenv(constant.KBEnvNamespace)
 	if namespace == "" {
-		return nil, errors.New("KB_NAMESPACE must be set")
+		return nil, errors.New(fmt.Sprintf("%s must be set", constant.KBEnvNamespace))
 	}
 
 	store := &KubernetesStore{

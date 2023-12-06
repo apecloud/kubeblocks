@@ -46,17 +46,10 @@ const (
 )
 
 const (
-	KBConnCredentialPlaceHolder     = "$(CONN_CREDENTIAL_SECRET_NAME)"
-	KBComponentEnvCMPlaceHolder     = "$(COMP_ENV_CM_NAME)"
-	KBCompNamePlaceHolder           = "$(KB_COMP_NAME)"
-	KBClusterNamePlaceHolder        = "$(KB_CLUSTER_NAME)"
-	KBClusterCompNamePlaceHolder    = "$(KB_CLUSTER_COMP_NAME)"
-	KBClusterUIDPostfix8PlaceHolder = "$(KB_CLUSTER_UID_POSTFIX_8)"
-	KBToolsImagePlaceHolder         = "$(KUBEBLOCKS_TOOLS_IMAGE)"
-
-	// KBComponentConnCredentialPlaceHolder is the prefix of the placeholder for componentDefinition connection credential secret name
-	// TODO(xingran): This is a temporary solution used to reference component connection credentials defined in ComponentDefinition. The suffix is ComponentDefinition.Spec.ConnectionCredentials[x].Name, There will be a unified referencing scheme designed in the future.
-	KBComponentConnCredentialPlaceHolder = "$(COMPONENT_CONN_CREDENTIAL_SECRET_NAME)"
+	// TODO: deprecated, will be removed later.
+	KBConnCredentialPlaceHolder = "$(CONN_CREDENTIAL_SECRET_NAME)"
+	KBComponentEnvCMPlaceHolder = "$(COMP_ENV_CM_NAME)"
+	KBToolsImagePlaceHolder     = "$(KUBEBLOCKS_TOOLS_IMAGE)"
 )
 
 const (
@@ -92,15 +85,14 @@ const (
 
 	// kubeblocks.io labels
 	BackupProtectionLabelKey                 = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
-	BackupToolTypeLabelKey                   = "kubeblocks.io/backup-tool-type"
-	AddonProviderLabelKey                    = "kubeblocks.io/provider" // AddonProviderLabelKey marks the addon provider
-	RoleLabelKey                             = "kubeblocks.io/role"     // RoleLabelKey consensusSet and replicationSet role label key
+	AddonProviderLabelKey                    = "kubeblocks.io/provider"          // AddonProviderLabelKey marks the addon provider
+	RoleLabelKey                             = "kubeblocks.io/role"              // RoleLabelKey consensusSet and replicationSet role label key
 	VolumeTypeLabelKey                       = "kubeblocks.io/volume-type"
 	ClusterAccountLabelKey                   = "account.kubeblocks.io/name"
 	KBAppClusterUIDLabelKey                  = "apps.kubeblocks.io/cluster-uid"
 	KBAppComponentLabelKey                   = "apps.kubeblocks.io/component-name"
-	KBAppComponentDefRefLabelKey             = "apps.kubeblocks.io/component-def-ref"
-	KBAppClusterDefTypeLabelKey              = "apps.kubeblocks.io/cluster-type" // refer clusterDefinition.Spec.Type (deprecated)
+	KBAppComponentDefRefLabelKey             = "apps.kubeblocks.io/component-def-ref" // refer clusterDefinition.Spec.ComponentDefs[*].Name before KubeBlocks Version 0.8.0 or refer ComponentDefinition.Name after KubeBlocks Version 0.8.0
+	KBAppClusterDefTypeLabelKey              = "apps.kubeblocks.io/cluster-type"      // refer clusterDefinition.Spec.Type (deprecated)
 	AppConfigTypeLabelKey                    = "apps.kubeblocks.io/config-type"
 	KBManagedByKey                           = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created
 	PVCNameLabelKey                          = "apps.kubeblocks.io/pvc-name"
@@ -264,26 +256,6 @@ const (
 	Leader   = "leader"
 	Follower = "follower"
 	Learner  = "learner"
-)
-
-// switchover constants
-const (
-	KBJobTTLSecondsAfterFinished           = 5
-	KBSwitchoverCandidateInstanceForAnyPod = "*"
-
-	KBSwitchoverJobLabelKey      = "kubeblocks.io/switchover-job"
-	KBSwitchoverJobLabelValue    = "kb-switchover-job"
-	KBSwitchoverJobNamePrefix    = "kb-switchover-job"
-	KBSwitchoverJobContainerName = "kb-switchover-job-container"
-
-	KBSwitchoverCandidateName             = "KB_SWITCHOVER_CANDIDATE_NAME"
-	KBSwitchoverCandidateFqdn             = "KB_SWITCHOVER_CANDIDATE_FQDN"
-	KBSwitchoverReplicationPrimaryPodIP   = "KB_REPLICATION_PRIMARY_POD_IP"
-	KBSwitchoverReplicationPrimaryPodName = "KB_REPLICATION_PRIMARY_POD_NAME"
-	KBSwitchoverReplicationPrimaryPodFqdn = "KB_REPLICATION_PRIMARY_POD_FQDN"
-	KBSwitchoverConsensusLeaderPodIP      = "KB_CONSENSUS_LEADER_POD_IP"
-	KBSwitchoverConsensusLeaderPodName    = "KB_CONSENSUS_LEADER_POD_NAME"
-	KBSwitchoverConsensusLeaderPodFqdn    = "KB_CONSENSUS_LEADER_POD_FQDN"
 )
 
 // username and password are keys in created secrets for others to refer to.

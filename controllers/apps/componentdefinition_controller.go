@@ -38,10 +38,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-var (
-	defaultServiceName = fmt.Sprintf("%s-%s", appsv1alpha1.KBClusterName, appsv1alpha1.KBComponentName)
-)
-
 // ComponentDefinitionReconciler reconciles a ComponentDefinition object
 type ComponentDefinitionReconciler struct {
 	client.Client
@@ -150,6 +146,7 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 	cmpd *appsv1alpha1.ComponentDefinition) error {
 	for _, validator := range []func(client.Client, intctrlutil.RequestCtx, *appsv1alpha1.ComponentDefinition) error{
 		r.validateRuntime,
+		r.validateVars,
 		r.validateVolumes,
 		r.validateServices,
 		r.validateConfigs,
@@ -157,7 +154,6 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 		r.validatePolicyRules,
 		r.validateLabels,
 		r.validateSystemAccounts,
-		r.validateConnectionCredentials,
 		r.validateReplicaRoles,
 		r.validateLifecycleActions,
 		r.validateComponentDefRef,
@@ -170,6 +166,11 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 }
 
 func (r *ComponentDefinitionReconciler) validateRuntime(cli client.Client, rctx intctrlutil.RequestCtx,
+	cmpd *appsv1alpha1.ComponentDefinition) error {
+	return nil
+}
+
+func (r *ComponentDefinitionReconciler) validateVars(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
 	return nil
 }
@@ -201,11 +202,6 @@ func (r *ComponentDefinitionReconciler) validateServices(cli client.Client, rctx
 		return fmt.Errorf("duplicate names of component service are not allowed")
 	}
 
-	for i, svc := range cmpd.Spec.Services {
-		if len(svc.ServiceName) == 0 {
-			cmpd.Spec.Services[i].ServiceName = defaultServiceName
-		}
-	}
 	if !checkUniqueItemWithValue(cmpd.Spec.Services, "ServiceName", nil) {
 		return fmt.Errorf("duplicate service names are not allowed")
 	}
@@ -271,121 +267,6 @@ func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client
 		}
 	}
 	return nil
-}
-
-func (r *ComponentDefinitionReconciler) validateConnectionCredentials(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
-	if !checkUniqueItemWithValue(cmpd.Spec.ConnectionCredentials, "Name", nil) {
-		return fmt.Errorf("duplicate connection credential names are not allowed")
-	}
-	for _, cc := range cmpd.Spec.ConnectionCredentials {
-		if err := r.validateConnectionCredential(cli, rctx, cmpd, cc); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (r *ComponentDefinitionReconciler) validateConnectionCredential(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition, cc appsv1alpha1.ConnectionCredential) error {
-	if err := r.validateConnectionCredentialEndpoint(cmpd, cc); err != nil {
-		return err
-	}
-	if err := r.validateConnectionCredentialAccount(cmpd, cc); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (r *ComponentDefinitionReconciler) validateConnectionCredentialEndpoint(cmpd *appsv1alpha1.ComponentDefinition,
-	cc appsv1alpha1.ConnectionCredential) error {
-	if cc.Endpoint.ServiceEndpoint != nil && cc.Endpoint.PodEndpoint != nil {
-		return fmt.Errorf("service and pod endpoint cannot be specified at the same time")
-	}
-	if cc.Endpoint.ServiceEndpoint != nil {
-		return r.validateConnectionCredentialServiceEndpoint(cmpd, cc)
-	}
-	return r.validateConnectionCredentialPodEndpoint(cmpd, cc)
-}
-
-func (r *ComponentDefinitionReconciler) validateConnectionCredentialServiceEndpoint(cmpd *appsv1alpha1.ComponentDefinition,
-	cc appsv1alpha1.ConnectionCredential) error {
-	svcName := cc.Endpoint.ServiceEndpoint.ServiceName
-	if len(svcName) == 0 {
-		return fmt.Errorf("there is no component service name defined for connection credential: %s", cc.Name)
-	}
-	for _, svc := range cmpd.Spec.Services {
-		if svc.Name == svcName {
-			portName := cc.Endpoint.ServiceEndpoint.PortName
-			return validateConnectionCredentialPort(cc.Name, portName, svc.Spec.Ports, func(port corev1.ServicePort) string {
-				return port.Name
-			})
-		}
-	}
-	return fmt.Errorf("there is no matched service for connection credential: %s", cc.Name)
-}
-
-func (r *ComponentDefinitionReconciler) validateConnectionCredentialPodEndpoint(cmpd *appsv1alpha1.ComponentDefinition,
-	cc appsv1alpha1.ConnectionCredential) error {
-	if len(cmpd.Spec.Runtime.Containers) == 0 {
-		return nil
-	}
-	ep := cc.Endpoint.PodEndpoint
-	if len(ep.Container) == 0 && len(cmpd.Spec.Runtime.Containers) > 1 {
-		return fmt.Errorf("there are multiple container defined, it must be specified a container for connection credential: %s", cc.Name)
-	}
-	var container *corev1.Container
-	if len(ep.Container) == 0 {
-		container = &cmpd.Spec.Runtime.Containers[0]
-	} else {
-		for i, c := range cmpd.Spec.Runtime.Containers {
-			if c.Name == ep.Container {
-				container = &cmpd.Spec.Runtime.Containers[i]
-				break
-			}
-		}
-	}
-	if container == nil {
-		return fmt.Errorf("there is no matched container for connection credential: %s", cc.Name)
-	}
-	return validateConnectionCredentialPort(cc.Name, ep.PortName, container.Ports, func(port corev1.ContainerPort) string {
-		return port.Name
-	})
-}
-
-func validateConnectionCredentialPort[T any](credentialName, portName string, ports []T, getName func(T) string) error {
-	if len(portName) == 0 {
-		switch len(ports) {
-		case 0:
-			return fmt.Errorf("there is no port defined for connection credential: %s", credentialName)
-		case 1:
-			return nil
-		default:
-			return fmt.Errorf("there are multiple ports defined, it must be specified a port for connection credential: %s", credentialName)
-		}
-	}
-	for _, port := range ports {
-		if getName(port) == portName {
-			return nil
-		}
-	}
-	return fmt.Errorf("there is no matched port for connection credential: %s", credentialName)
-}
-
-func (r *ComponentDefinitionReconciler) validateConnectionCredentialAccount(cmpd *appsv1alpha1.ComponentDefinition,
-	cc appsv1alpha1.ConnectionCredential) error {
-	if len(cc.Account.AccountName) == 0 {
-		return nil
-	}
-	if cmpd.Spec.SystemAccounts == nil {
-		return fmt.Errorf("there is no account defined for connection credential: %s", cc.Name)
-	}
-	for _, account := range cmpd.Spec.SystemAccounts {
-		if account.Name == cc.Account.AccountName {
-			return nil
-		}
-	}
-	return fmt.Errorf("there is no matched account for connection credential: %s", cc.Name)
 }
 
 func (r *ComponentDefinitionReconciler) validateReplicaRoles(cli client.Client, reqCtx intctrlutil.RequestCtx,

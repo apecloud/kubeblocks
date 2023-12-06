@@ -22,6 +22,7 @@ package component
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -61,7 +62,8 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1
 	if err != nil {
 		return nil, err
 	}
-	builder := builder.NewComponentBuilder(cluster.Namespace, compName, clusterCompSpec.ComponentDef).
+	compBuilder := builder.NewComponentBuilder(cluster.Namespace, compName, clusterCompSpec.ComponentDef).
+		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, clusterCompSpec.Name)).
 		AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 		SetAffinity(affinities).
@@ -76,7 +78,13 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1
 		SetServiceRefs(clusterCompSpec.ServiceRefs).
 		SetClassRef(clusterCompSpec.ClassDefRef).
 		SetTLSConfig(clusterCompSpec.TLS, clusterCompSpec.Issuer)
-	return builder.GetObject(), nil
+
+	// sync cluster ignore resource constraint annotation to component
+	value, ok := cluster.GetAnnotations()[constant.IgnoreResourceConstraint]
+	if ok {
+		compBuilder.AddAnnotations(constant.IgnoreResourceConstraint, value)
+	}
+	return compBuilder.GetObject(), nil
 }
 
 func BuildComponentDefinition(clusterDef *appsv1alpha1.ClusterDefinition,

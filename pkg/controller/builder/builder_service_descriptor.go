@@ -53,6 +53,26 @@ func (builder *ServiceDescriptorBuilder) SetAuth(auth appsv1alpha1.ConnectionCre
 	return builder
 }
 
+func (builder *ServiceDescriptorBuilder) SetAuthUsername(username appsv1alpha1.CredentialVar) *ServiceDescriptorBuilder {
+	auth := builder.get().Spec.Auth
+	if auth == nil {
+		auth = &appsv1alpha1.ConnectionCredentialAuth{}
+	}
+	auth.Username = &username
+	builder.get().Spec.Auth = auth
+	return builder
+}
+
+func (builder *ServiceDescriptorBuilder) SetAuthPassword(password appsv1alpha1.CredentialVar) *ServiceDescriptorBuilder {
+	auth := builder.get().Spec.Auth
+	if auth == nil {
+		auth = &appsv1alpha1.ConnectionCredentialAuth{}
+	}
+	auth.Password = &password
+	builder.get().Spec.Auth = auth
+	return builder
+}
+
 func (builder *ServiceDescriptorBuilder) SetPort(port appsv1alpha1.CredentialVar) *ServiceDescriptorBuilder {
 	builder.get().Spec.Port = &port
 	return builder

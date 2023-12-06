@@ -54,7 +54,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -94,7 +93,7 @@ var mockLorryClient = func(mock func(*lorry.MockClientMockRecorder)) {
 
 var mockLorryClientDefault = func() {
 	mockLorryClient(func(recorder *lorry.MockClientMockRecorder) {
-		recorder.CreateUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		recorder.CreateUser(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 		recorder.GrantUserRole(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	})
 }
@@ -1141,50 +1140,193 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
-	testCompConnCredential := func(compName, compDefName string) {
-		replicas := 3
-		createClusterObjV2(compName, compDefObj.Name, func(f *testapps.MockClusterFactory) {
-			f.SetReplicas(int32(replicas))
-		})
-
-		By("check root conn credential")
-		serviceName := constant.GenerateComponentServiceName(clusterObj.Name, compName, "rw")
-		// mysql port
-		servicePort := fmt.Sprintf("%d", compDefObj.Spec.Runtime.Containers[0].Ports[0].ContainerPort)
-		serviceEndpoint := fmt.Sprintf("%s:%s", serviceName, servicePort)
-		rootSecretKey := types.NamespacedName{
-			Namespace: compObj.Namespace,
-			Name:      constant.GenerateComponentConnCredential(clusterObj.Name, compName, "root"),
-		}
-		Eventually(testapps.CheckObj(&testCtx, rootSecretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKeyWithValue("endpoint", []byte(serviceEndpoint)))
-			g.Expect(secret.Data).Should(HaveKeyWithValue("host", []byte(serviceName)))
-			g.Expect(secret.Data).Should(HaveKeyWithValue("port", []byte(servicePort)))
-			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("root")))
-			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
+	testCompVars := func(compName, compDefName string) {
+		compDefKey := client.ObjectKeyFromObject(compDefObj)
+		Eventually(testapps.GetAndChangeObj(&testCtx, compDefKey, func(compDef *appsv1alpha1.ComponentDefinition) {
+			compDef.Spec.Vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "SERVICE_HOST",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name: compDefObj.Spec.Services[0].Name,
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Host: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+				{
+					Name: "SERVICE_PORT",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name: compDefObj.Spec.Services[0].Name,
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Port: &appsv1alpha1.NamedVar{},
+							},
+						},
+					},
+				},
+				{
+					Name: "USERNAME",
+					ValueFrom: &appsv1alpha1.VarSource{
+						CredentialVarRef: &appsv1alpha1.CredentialVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name: compDefObj.Spec.SystemAccounts[0].Name,
+							},
+							CredentialVars: appsv1alpha1.CredentialVars{
+								Username: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+				{
+					Name: "PASSWORD",
+					ValueFrom: &appsv1alpha1.VarSource{
+						CredentialVarRef: &appsv1alpha1.CredentialVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name: compDefObj.Spec.SystemAccounts[0].Name,
+							},
+							CredentialVars: appsv1alpha1.CredentialVars{
+								Password: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+			}
 		})).Should(Succeed())
+		createClusterObjV2(compName, compDefObj.Name, nil)
 
-		By("check admin conn credential")
-		fqdn := func(ordinal int) string {
-			return constant.GeneratePodFQDN(clusterObj.Namespace, clusterObj.Name, compName, ordinal)
+		By("check workload template env")
+		targetEnvVars := map[string]corev1.EnvVar{
+			"SERVICE_HOST": {
+				Name:  "SERVICE_HOST",
+				Value: constant.GenerateComponentServiceName(clusterObj.Name, compName, compDefObj.Spec.Services[0].Name),
+			},
+			"SERVICE_PORT": {
+				Name:  "SERVICE_PORT",
+				Value: strconv.Itoa(int(compDefObj.Spec.Services[0].Spec.Ports[0].Port)),
+			},
+			"USERNAME": {
+				Name:  "USERNAME",
+				Value: compDefObj.Spec.SystemAccounts[0].Name,
+			},
+			// "PASSWORD": {
+			//	Name:  "PASSWORD",
+			//	Value: "",
+			// },
+			constant.KBEnvNamespace: {
+				Name:  constant.KBEnvNamespace,
+				Value: clusterObj.Namespace,
+			},
+			constant.KBEnvClusterName: {
+				Name:  constant.KBEnvClusterName,
+				Value: clusterObj.Name,
+			},
+			constant.KBEnvClusterUID: {
+				Name:  constant.KBEnvClusterUID,
+				Value: string(clusterObj.UID),
+			},
+			constant.KBEnvClusterCompName: {
+				Name:  constant.KBEnvClusterCompName,
+				Value: constant.GenerateClusterComponentName(clusterObj.Name, compName),
+			},
+			constant.KBEnvCompName: {
+				Name:  constant.KBEnvCompName,
+				Value: compName,
+			},
+			constant.KBEnvCompReplicas: {
+				Name:  constant.KBEnvCompReplicas,
+				Value: "1", // default replicas
+			},
+			constant.KBEnvPodName: {
+				Name: constant.KBEnvPodName,
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "metadata.name",
+					},
+				},
+			},
+			constant.KBEnvPodUID: {
+				Name: constant.KBEnvPodUID,
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "metadata.uid",
+					},
+				},
+			},
+			constant.KBEnvPodIP: {
+				Name: constant.KBEnvPodIP,
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "status.podIP",
+					},
+				},
+			},
+			constant.KBEnvPodIPs: {
+				Name: constant.KBEnvPodIPs,
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "status.podIPs",
+					},
+				},
+			},
+			constant.KBEnvPodFQDN: {
+				Name: constant.KBEnvPodFQDN,
+				Value: fmt.Sprintf("%s.%s-headless.%s.svc", constant.EnvPlaceHolder(constant.KBEnvPodName),
+					constant.EnvPlaceHolder(constant.KBEnvClusterCompName), constant.EnvPlaceHolder(constant.KBEnvNamespace)),
+			},
+			constant.KBEnvNodeName: {
+				Name: constant.KBEnvNodeName,
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "spec.nodeName",
+					},
+				},
+			},
+			constant.KBEnvHostIP: {
+				Name: constant.KBEnvHostIP,
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "status.hostIP",
+					},
+				},
+			},
+			constant.KBEnvServiceAccountName: {
+				Name: constant.KBEnvServiceAccountName,
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "spec.serviceAccountName",
+					},
+				},
+			},
 		}
-		podHost := fqdn(0)
-		// paxos port
-		podPort := fmt.Sprintf("%d", compDefObj.Spec.Runtime.Containers[0].Ports[1].ContainerPort)
-		endpoints := make([]string, 0)
-		for i := 0; i < replicas; i++ {
-			endpoints = append(endpoints, fmt.Sprintf("%s:%s", fqdn(i), podPort))
-		}
-		adminSecretKey := types.NamespacedName{
+		rsmKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
-			Name:      constant.GenerateComponentConnCredential(clusterObj.Name, compName, "admin"),
+			Name:      compObj.Name,
 		}
-		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKeyWithValue("endpoint", []byte(strings.Join(endpoints, ","))))
-			g.Expect(secret.Data).Should(HaveKeyWithValue("host", []byte(podHost)))
-			g.Expect(secret.Data).Should(HaveKeyWithValue("port", []byte(podPort)))
-			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
-			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
+		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+			for _, cc := range [][]corev1.Container{rsm.Spec.Template.Spec.InitContainers, rsm.Spec.Template.Spec.Containers} {
+				for _, c := range cc {
+					envValueMapping := map[string]corev1.EnvVar{}
+					for i, env := range c.Env {
+						if _, ok := targetEnvVars[env.Name]; ok {
+							envValueMapping[env.Name] = c.Env[i]
+						}
+					}
+					g.Expect(envValueMapping).Should(BeEquivalentTo(targetEnvVars))
+				}
+			}
 		})).Should(Succeed())
 	}
 
@@ -1235,29 +1377,29 @@ var _ = Describe("Component Controller", func() {
 			Name:      plan.GenerateTLSSecretName(clusterObj.Name, compName),
 		}
 		Eventually(testapps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKey(factory.CAName))
-			g.Expect(secret.Data).Should(HaveKey(factory.CertName))
-			g.Expect(secret.Data).Should(HaveKey(factory.KeyName))
+			g.Expect(secret.Data).Should(HaveKey(constant.CAName))
+			g.Expect(secret.Data).Should(HaveKey(constant.CertName))
+			g.Expect(secret.Data).Should(HaveKey(constant.KeyName))
 		})).Should(Succeed())
 
 		By("check pod's volumes and mounts")
 		targetVolume := corev1.Volume{
-			Name: factory.VolumeName,
+			Name: constant.VolumeName,
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: secretKey.Name,
 					Items: []corev1.KeyToPath{
-						{Key: factory.CAName, Path: factory.CAName},
-						{Key: factory.CertName, Path: factory.CertName},
-						{Key: factory.KeyName, Path: factory.KeyName},
+						{Key: constant.CAName, Path: constant.CAName},
+						{Key: constant.CertName, Path: constant.CertName},
+						{Key: constant.KeyName, Path: constant.KeyName},
 					},
 					Optional: func() *bool { o := false; return &o }(),
 				},
 			},
 		}
 		targetVolumeMount := corev1.VolumeMount{
-			Name:      factory.VolumeName,
-			MountPath: factory.MountPath,
+			Name:      constant.VolumeName,
+			MountPath: constant.MountPath,
 			ReadOnly:  true,
 		}
 		rsmKey := types.NamespacedName{
@@ -1804,8 +1946,8 @@ var _ = Describe("Component Controller", func() {
 			testCompSystemAccount(defaultCompName, compDefName)
 		})
 
-		It("with component conn credentials", func() {
-			testCompConnCredential(defaultCompName, compDefName)
+		It("with component vars", func() {
+			testCompVars(defaultCompName, compDefName)
 		})
 
 		It("with component roles", func() {

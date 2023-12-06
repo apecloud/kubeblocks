@@ -23,9 +23,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestManager_GetRole(t *testing.T) {
@@ -45,7 +46,6 @@ func TestManager_GetRole(t *testing.T) {
 		role, err := manager.GetReplicaRole(ctx, cluster)
 		assert.Empty(t, role)
 		assert.NotNil(t, err)
-		assert.ErrorContains(t, err, "cluster has no leader lease")
 	})
 
 	t.Run("get role successfully", func(t *testing.T) {

@@ -1,7 +1,7 @@
 ---
 title: Scale for MongoDB cluster
 description: How to vertically scale a MongoDB cluster
-keywords: [mongodb, vertical sclaing, vertially scale a mongodb cluster]
+keywords: [mongodb, vertical scaling, vertically scale a mongodb cluster]
 sidebar_position: 2
 sidebar_label: Scale
 ---
@@ -115,7 +115,7 @@ kbcli cluster list mongodb-cluster
 
 :::note
 
-Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the opsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
+Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
 
 :::
 

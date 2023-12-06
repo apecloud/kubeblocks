@@ -80,6 +80,9 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 
 			ops.Spec.VerticalScalingList = verticalScaling
 			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			// set ops phase to Pending
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
+
 			By("test save last configuration and OpsRequest phase is Running")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())

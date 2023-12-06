@@ -24,12 +24,14 @@ import (
 	"net"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/golang/mock/gomock"
 	"github.com/spf13/viper"
 	"github.com/valyala/fasthttp"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
@@ -48,9 +50,9 @@ var (
 
 func init() {
 	viper.AutomaticEnv()
-	viper.SetDefault("KB_POD_NAME", "pod-test")
-	viper.SetDefault("KB_CLUSTER_COMP_NAME", "cluster-component-test")
-	viper.SetDefault("KB_NAMESPACE", "namespace-test")
+	viper.SetDefault(constant.KBEnvPodName, "pod-test")
+	viper.SetDefault(constant.KBEnvClusterCompName, "cluster-component-test")
+	viper.SetDefault(constant.KBEnvNamespace, "namespace-test")
 }
 
 func TestLorryClient(t *testing.T) {
@@ -74,14 +76,15 @@ var _ = AfterSuite(func() {
 })
 
 func newTCPServer(port int) (net.Listener, int) {
+	var err error
 	for i := 0; i < 3; i++ {
-		tcpListener, _ = net.Listen("tcp", fmt.Sprintf(":%v", port))
-		if tcpListener != nil {
+		tcpListener, err = net.Listen("tcp", fmt.Sprintf("127.0.0.1:%v", port))
+		if err == nil {
 			break
 		}
 		port++
 	}
-	Expect(tcpListener).ShouldNot(BeNil())
+	Expect(err).Should(BeNil())
 	return tcpListener, port
 }
 

@@ -61,7 +61,7 @@ You can also view the details of this configuration file and parameters.
   </details>
 
   * Allowed Values: It defines the valid value range of this parameter.
-  * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter configuration takes effect. Currerntly, Kafka only supports static strategy, i.e. `Dynamic` is `false`. Restarting is required to make configuration effective.
+  * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter configuration takes effect. Currently, Kafka only supports static strategy, i.e. `Dynamic` is `false`. Restarting is required to make the configuration effective.
   * Description: It describes the parameter definition.
 
 ## Configure parameters

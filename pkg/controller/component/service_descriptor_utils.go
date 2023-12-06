@@ -127,7 +127,7 @@ func handleClusterTypeServiceRef(reqCtx intctrlutil.RequestCtx,
 		return err
 	}
 
-	handleSecretKey := func(secretRef *corev1.Secret, sdBuilder *builder.ServiceDescriptorBuilder, key string, setter func(appsv1alpha1.CredentialVar) *builder.ServiceDescriptorBuilder) {
+	handleSecretKey := func(key string, setter func(appsv1alpha1.CredentialVar) *builder.ServiceDescriptorBuilder) {
 		if _, ok := secretRef.Data[key]; ok {
 			setter(appsv1alpha1.CredentialVar{
 				ValueFrom: &corev1.EnvVarSource{
@@ -144,30 +144,10 @@ func handleClusterTypeServiceRef(reqCtx intctrlutil.RequestCtx,
 	sdBuilder := builder.NewServiceDescriptorBuilder(namespace, generateDefaultServiceDescriptorName(clusterName))
 	sdBuilder.SetServiceKind("")
 	sdBuilder.SetServiceVersion("")
-	handleSecretKey(secretRef, sdBuilder, constant.ServiceDescriptorEndpointKey, sdBuilder.SetEndpoint)
-	handleSecretKey(secretRef, sdBuilder, constant.ServiceDescriptorPortKey, sdBuilder.SetPort)
-	_, uOk := secretRef.Data[constant.ServiceDescriptorUsernameKey]
-	_, pOk := secretRef.Data[constant.ServiceDescriptorPasswordKey]
-	if uOk && pOk {
-		sdBuilder.SetAuth(appsv1alpha1.ConnectionCredentialAuth{
-			Username: &appsv1alpha1.CredentialVar{
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{Name: secretRef.Name},
-						Key:                  constant.ServiceDescriptorUsernameKey,
-					},
-				},
-			},
-			Password: &appsv1alpha1.CredentialVar{
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{Name: secretRef.Name},
-						Key:                  constant.ServiceDescriptorPasswordKey,
-					},
-				},
-			},
-		})
-	}
+	handleSecretKey(constant.ServiceDescriptorEndpointKey, sdBuilder.SetEndpoint)
+	handleSecretKey(constant.ServiceDescriptorPortKey, sdBuilder.SetPort)
+	handleSecretKey(constant.ServiceDescriptorUsernameKey, sdBuilder.SetAuthUsername)
+	handleSecretKey(constant.ServiceDescriptorPasswordKey, sdBuilder.SetAuthPassword)
 	serviceReferences[serviceRefDecl.Name] = sdBuilder.GetObject()
 	return nil
 }

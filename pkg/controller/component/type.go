@@ -38,9 +38,10 @@ type SynthesizedComponent struct {
 	Namespace            string                                 `json:"namespace,omitempty"`
 	ClusterName          string                                 `json:"clusterName,omitempty"`
 	ClusterUID           string                                 `json:"clusterUID,omitempty"`
-	Name                 string                                 `json:"name,omitempty"`         // the name of the component without clusterName prefix
-	FullCompName         string                                 `json:"fullCompName,omitempty"` // the full name of the component with clusterName prefix
-	CompDefName          string                                 `json:"compDefName,omitempty"`  // the name of the componentDefinition
+	Comp2CompDefs        map[string]string                      `json:"comp2CompDefs,omitempty"` // {compName: compDefName}
+	Name                 string                                 `json:"name,omitempty"`          // the name of the component without clusterName prefix
+	FullCompName         string                                 `json:"fullCompName,omitempty"`  // the full name of the component with clusterName prefix
+	CompDefName          string                                 `json:"compDefName,omitempty"`   // the name of the componentDefinition
 	Replicas             int32                                  `json:"replicas"`
 	PodSpec              *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
@@ -51,24 +52,24 @@ type SynthesizedComponent struct {
 	ScriptTemplates      []v1alpha1.ComponentTemplateSpec       `json:"scriptTemplates,omitempty"`
 	TLSConfig            *v1alpha1.TLSConfig                    `json:"tlsConfig"`
 	ServiceAccountName   string                                 `json:"serviceAccountName,omitempty"`
-	ComponentRefEnvs     []*corev1.EnvVar                       `json:"componentRefEnvs,omitempty"`
-	ServiceReferences    map[string]*v1alpha1.ServiceDescriptor `json:"serviceReferences,omitempty"`
+	// TODO: remove this later
+	ComponentRefEnvs  []corev1.EnvVar                        `json:"componentRefEnvs,omitempty"`
+	ServiceReferences map[string]*v1alpha1.ServiceDescriptor `json:"serviceReferences,omitempty"`
+	TemplateVars      map[string]any                         `json:"templateVars,omitempty"`
 
 	// The following fields were introduced with the ComponentDefinition and Component API in KubeBlocks version 0.8.0
-	Roles                 []v1alpha1.ReplicaRole              `json:"roles,omitempty"`
-	Labels                map[string]v1alpha1.BuiltInString   `json:"labels,omitempty"`
-	ConnectionCredentials []v1alpha1.ConnectionCredential     `json:"connectionCredentials,omitempty"`
-	UpdateStrategy        *v1alpha1.UpdateStrategy            `json:"updateStrategy,omitempty"`
-	PolicyRules           []rbacv1.PolicyRule                 `json:"policyRules,omitempty"`
-	LifecycleActions      *v1alpha1.ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
-	SystemAccounts        []v1alpha1.SystemAccount            `json:"systemAccounts,omitempty"`
-	RoleArbitrator        *v1alpha1.RoleArbitrator            `json:"roleArbitrator,omitempty"`
-	Volumes               []v1alpha1.ComponentVolume          `json:"volumes,omitempty"`
-	ComponentServices     []v1alpha1.Service                  `json:"componentServices,omitempty"`
+	Roles             []v1alpha1.ReplicaRole              `json:"roles,omitempty"`
+	Labels            map[string]string                   `json:"labels,omitempty"`
+	UpdateStrategy    *v1alpha1.UpdateStrategy            `json:"updateStrategy,omitempty"`
+	PolicyRules       []rbacv1.PolicyRule                 `json:"policyRules,omitempty"`
+	LifecycleActions  *v1alpha1.ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
+	SystemAccounts    []v1alpha1.SystemAccount            `json:"systemAccounts,omitempty"`
+	RoleArbitrator    *v1alpha1.RoleArbitrator            `json:"roleArbitrator,omitempty"`
+	Volumes           []v1alpha1.ComponentVolume          `json:"volumes,omitempty"`
+	ComponentServices []v1alpha1.Service                  `json:"componentServices,omitempty"`
 
 	// TODO(xingran): The following fields will be deprecated after version 0.8.0 and will be replaced with a new data structure.
 	CustomLabelSpecs    []v1alpha1.CustomLabelSpec        `json:"customLabelSpecs,omitempty"`    // The CustomLabelSpecs will be replaced with Labels in the future.
-	SwitchoverSpec      *v1alpha1.SwitchoverSpec          `json:"switchoverSpec,omitempty"`      // The SwitchoverSpec will be replaced with LifecycleActions.Switchover in the future.
 	Probes              *v1alpha1.ClusterDefinitionProbes `json:"probes,omitempty"`              // The Probes will be replaced with LifecycleActions.RoleProbe in the future.
 	VolumeTypes         []v1alpha1.VolumeTypeSpec         `json:"volumeTypes,omitempty"`         // The VolumeTypes will be replaced with Volumes in the future.
 	VolumeProtection    *v1alpha1.VolumeProtectionSpec    `json:"volumeProtection,omitempty"`    // The VolumeProtection will be replaced with Volumes in the future.

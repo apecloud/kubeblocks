@@ -64,8 +64,8 @@ You can also view the details of this configuration file and parameters.
 
   * Allowed Values: It defines the valid value range of this parameter.
   * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter configuration takes effect. There are two different configuration strategies based on the effectiveness type of modified parameters, i.e. **dynamic** and **static**.
-    * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and can be configured online. Follow the instructions in [Configure dynamic parameters](#configure-dynamic-parameters).
-    * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make configuration effective. Follow the instructions in [Configure static parameters](#configure-static-parameters).
+    * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and can be configured online.
+    * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make the configuration effective.
   * Description: It describes the parameter definition.
 
 ## Configure parameters
@@ -192,9 +192,9 @@ The example below takes configuring `max_connection` and `innodb_buffer_pool_siz
 
 ### Configure parameters with edit-config command
 
-For your convenience, KubeBlocks offers a tool `edit-config` to help you to configure parameter in a visulized way.
+For your convenience, KubeBlocks offers a tool `edit-config` to help you configure parameters in a visualized way.
 
-For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on notepad.
+For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on the notepad.
 
 The following steps take configuring MySQL Standalone as an example.
 
@@ -206,7 +206,7 @@ The following steps take configuring MySQL Standalone as an example.
 
 :::note
 
-* `--config-spec` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mysql-cluster` to view the all template names.
+* `--config-spec` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mysql-cluster` to view all template names.
 * If there are multiple components in a cluster, use `--component` to specify a component.
 
 :::

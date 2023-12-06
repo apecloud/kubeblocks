@@ -17,9 +17,12 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package component
+package constant
 
-// TODO(component)
-// func ignoreResourceConstraint(cluster *appsv1alpha1.Cluster) bool {
-//	return strings.ToLower(cluster.GetAnnotations()[constant.IgnoreResourceConstraint]) == "true"
-// }
+const (
+	VolumeName = "tls"
+	CAName     = "ca.crt"
+	CertName   = "tls.crt"
+	KeyName    = "tls.key"
+	MountPath  = "/etc/pki/tls"
+)

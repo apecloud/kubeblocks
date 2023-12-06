@@ -457,7 +457,7 @@ func setInitContainer(addon *extensionsv1alpha1.Addon, helmJobPodSpec *corev1.Po
 	if fromPath == "" {
 		fromPath = localChartsPath
 	}
-	helmJobPodSpec.InitContainers = append(helmJobPodSpec.InitContainers, corev1.Container{
+	copyChartsContainer := corev1.Container{
 		Name:    "copy-charts",
 		Image:   addon.Spec.Helm.ChartsImage,
 		Command: []string{"sh", "-c", fmt.Sprintf("cp %s/* /mnt/charts", fromPath)},
@@ -467,7 +467,9 @@ func setInitContainer(addon *extensionsv1alpha1.Addon, helmJobPodSpec *corev1.Po
 				MountPath: "/mnt/charts",
 			},
 		},
-	})
+	}
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&copyChartsContainer)
+	helmJobPodSpec.InitContainers = append(helmJobPodSpec.InitContainers, copyChartsContainer)
 }
 
 func (r *helmTypeInstallStage) Handle(ctx context.Context) {
@@ -854,6 +856,41 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 	}
 	ttlSec := int32(ttl.Seconds())
 	backoffLimit := int32(3)
+	container := corev1.Container{
+		Name:            getJobMainContainerName(addon),
+		Image:           viper.GetString(constant.KBToolsImage),
+		ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.CfgAddonJobImgPullPolicy)),
+		// TODO: need have image that is capable of following settings, current settings
+		// may expose potential security risk, as this pod is using cluster-admin clusterrole.
+		// SecurityContext: &corev1.SecurityContext{
+		//	RunAsNonRoot:             &[]bool{true}[0],
+		//	RunAsUser:                &[]int64{1001}[0],
+		//	AllowPrivilegeEscalation: &[]bool{false}[0],
+		//	Capabilities: &corev1.Capabilities{
+		//		Drop: []corev1.Capability{
+		//			"ALL",
+		//		},
+		//	},
+		// },
+		Command: []string{"helm"},
+		Env: []corev1.EnvVar{
+			{
+				Name:  "RELEASE_NAME",
+				Value: getHelmReleaseName(addon),
+			},
+			{
+				Name:  "RELEASE_NS",
+				Value: viper.GetString(constant.CfgKeyCtrlrMgrNS),
+			},
+			{
+				Name:  "CHART",
+				Value: addon.Spec.Helm.ChartLocationURL,
+			},
+		},
+		VolumeMounts: []corev1.VolumeMount{},
+	}
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
+
 	helmProtoJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
@@ -874,45 +911,11 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyNever,
 					ServiceAccountName: viper.GetString("KUBEBLOCKS_ADDON_SA_NAME"),
-					Containers: []corev1.Container{
-						{
-							Name:            getJobMainContainerName(addon),
-							Image:           viper.GetString(constant.KBToolsImage),
-							ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.CfgAddonJobImgPullPolicy)),
-							// TODO: need have image that is capable of following settings, current settings
-							// may expose potential security risk, as this pod is using cluster-admin clusterrole.
-							// SecurityContext: &corev1.SecurityContext{
-							//	RunAsNonRoot:             &[]bool{true}[0],
-							//	RunAsUser:                &[]int64{1001}[0],
-							//	AllowPrivilegeEscalation: &[]bool{false}[0],
-							//	Capabilities: &corev1.Capabilities{
-							//		Drop: []corev1.Capability{
-							//			"ALL",
-							//		},
-							//	},
-							// },
-							Command: []string{"helm"},
-							Env: []corev1.EnvVar{
-								{
-									Name:  "RELEASE_NAME",
-									Value: getHelmReleaseName(addon),
-								},
-								{
-									Name:  "RELEASE_NS",
-									Value: viper.GetString(constant.CfgKeyCtrlrMgrNS),
-								},
-								{
-									Name:  "CHART",
-									Value: addon.Spec.Helm.ChartLocationURL,
-								},
-							},
-							VolumeMounts: []corev1.VolumeMount{},
-						},
-					},
-					Volumes:      []corev1.Volume{},
-					Tolerations:  []corev1.Toleration{},
-					Affinity:     &corev1.Affinity{},
-					NodeSelector: map[string]string{},
+					Containers:         []corev1.Container{container},
+					Volumes:            []corev1.Volume{},
+					Tolerations:        []corev1.Toleration{},
+					Affinity:           &corev1.Affinity{},
+					NodeSelector:       map[string]string{},
 				},
 			},
 		},

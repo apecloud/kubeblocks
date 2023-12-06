@@ -63,6 +63,7 @@ type ComponentDefinitionRef struct {
 	Name string `json:"name"`
 
 	// the account name of the component.
+	// will inject the account username and password to KB_ACCOUNT_USERNAME and KB_ACCOUNT_PASSWORD in env of the job.
 	// +optional
 	AccountName string `json:"accountName,omitempty"`
 

@@ -2,9 +2,10 @@
 title: 支持的数据库类型
 description: KubeBlocks, kbcli, multicloud
 keywords: [kubeblocks, 简介]
-sidebar_position: 1
+sidebar_position: 2
+sidebar_label: 支持的数据库类型
 ---
-#支持的数据库类型
+# 支持的数据库类型
 
 KubeBlocks 是基于 Kubernetes 的云原生数据基础设施，可以帮助用户轻松构建关系型、NoSQL、流计算和向量型数据库服务。而这些数据库类型通常以 add-on 的形式添加到 KubeBlocks 中。
 

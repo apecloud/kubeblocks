@@ -154,7 +154,6 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 		r.validatePolicyRules,
 		r.validateLabels,
 		r.validateSystemAccounts,
-		r.validateConnectionCredentials,
 		r.validateReplicaRoles,
 		r.validateLifecycleActions,
 		r.validateComponentDefRef,
@@ -268,79 +267,6 @@ func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client
 		}
 	}
 	return nil
-}
-
-func (r *ComponentDefinitionReconciler) validateConnectionCredentials(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
-	if !checkUniqueItemWithValue(cmpd.Spec.ConnectionCredentials, "Name", nil) {
-		return fmt.Errorf("duplicate connection credential names are not allowed")
-	}
-	for _, cc := range cmpd.Spec.ConnectionCredentials {
-		if err := r.validateConnectionCredential(cli, rctx, cmpd, cc); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (r *ComponentDefinitionReconciler) validateConnectionCredential(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition, cc appsv1alpha1.ConnectionCredential) error {
-	if err := r.validateConnectionCredentialService(cmpd, cc); err != nil {
-		return err
-	}
-	if err := r.validateConnectionCredentialAccount(cmpd, cc); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (r *ComponentDefinitionReconciler) validateConnectionCredentialService(cmpd *appsv1alpha1.ComponentDefinition,
-	cc appsv1alpha1.ConnectionCredential) error {
-	if len(cc.ServiceName) == 0 {
-		return fmt.Errorf("there is no component service name defined for connection credential: %s", cc.Name)
-	}
-	for _, svc := range cmpd.Spec.Services {
-		if svc.Name == cc.ServiceName {
-			return r.validateConnectionCredentialPort(cmpd, cc, svc.Spec.Ports)
-		}
-	}
-	return fmt.Errorf("there is no matched service for connection credential: %s", cc.Name)
-}
-
-func (r *ComponentDefinitionReconciler) validateConnectionCredentialPort(cmpd *appsv1alpha1.ComponentDefinition,
-	cc appsv1alpha1.ConnectionCredential, ports []corev1.ServicePort) error {
-	if len(cc.PortName) == 0 {
-		switch len(ports) {
-		case 0:
-			return fmt.Errorf("there is no port defined for connection credential: %s", cc.Name)
-		case 1:
-			return nil
-		default:
-			return fmt.Errorf("there are multiple ports defined, it must be specified a port for connection credential: %s", cc.Name)
-		}
-	}
-	for _, port := range ports {
-		if port.Name == cc.PortName {
-			return nil
-		}
-	}
-	return fmt.Errorf("there is no matched port for connection credential: %s", cc.Name)
-}
-
-func (r *ComponentDefinitionReconciler) validateConnectionCredentialAccount(cmpd *appsv1alpha1.ComponentDefinition,
-	cc appsv1alpha1.ConnectionCredential) error {
-	if len(cc.AccountName) == 0 {
-		return nil
-	}
-	if cmpd.Spec.SystemAccounts == nil {
-		return fmt.Errorf("there is no account defined for connection credential: %s", cc.Name)
-	}
-	for _, account := range cmpd.Spec.SystemAccounts {
-		if account.Name == cc.AccountName {
-			return nil
-		}
-	}
-	return fmt.Errorf("there is no matched account for connection credential: %s", cc.Name)
 }
 
 func (r *ComponentDefinitionReconciler) validateReplicaRoles(cli client.Client, reqCtx intctrlutil.RequestCtx,

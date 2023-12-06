@@ -207,20 +207,6 @@ func (builder *ComponentDefinitionBuilder) AddSystemAccount(accountName string, 
 	return builder
 }
 
-func (builder *ComponentDefinitionBuilder) AddConnectionCredential(name, serviceName, portName, accountName string) *ComponentDefinitionBuilder {
-	credential := appsv1alpha1.ConnectionCredential{
-		Name:        name,
-		ServiceName: serviceName,
-		PortName:    portName,
-		AccountName: accountName,
-	}
-	if builder.get().Spec.ConnectionCredentials == nil {
-		builder.get().Spec.ConnectionCredentials = make([]appsv1alpha1.ConnectionCredential, 0)
-	}
-	builder.get().Spec.ConnectionCredentials = append(builder.get().Spec.ConnectionCredentials, credential)
-	return builder
-}
-
 func (builder *ComponentDefinitionBuilder) SetUpdateStrategy(strategy *appsv1alpha1.UpdateStrategy) *ComponentDefinitionBuilder {
 	builder.get().Spec.UpdateStrategy = strategy
 	return builder

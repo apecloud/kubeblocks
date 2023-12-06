@@ -137,29 +137,28 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	}
 	compDefObj := compDef.DeepCopy()
 	synthesizeComp := &SynthesizedComponent{
-		Namespace:             comp.Namespace,
-		ClusterName:           clusterName,
-		ClusterUID:            clusterUID,
-		Comp2CompDefs:         buildComp2CompDefs(cluster, clusterCompSpec),
-		Name:                  compName,
-		FullCompName:          comp.Name,
-		CompDefName:           compDef.Name,
-		PodSpec:               &compDef.Spec.Runtime,
-		LogConfigs:            compDefObj.Spec.LogConfigs,
-		ConfigTemplates:       compDefObj.Spec.Configs,
-		ScriptTemplates:       compDefObj.Spec.Scripts,
-		Labels:                compDefObj.Spec.Labels,
-		Roles:                 compDefObj.Spec.Roles,
-		ConnectionCredentials: compDefObj.Spec.ConnectionCredentials,
-		UpdateStrategy:        compDefObj.Spec.UpdateStrategy,
-		PolicyRules:           compDefObj.Spec.PolicyRules,
-		LifecycleActions:      compDefObj.Spec.LifecycleActions,
-		SystemAccounts:        compDefObj.Spec.SystemAccounts,
-		RoleArbitrator:        compDefObj.Spec.RoleArbitrator,
-		Replicas:              comp.Spec.Replicas,
-		EnabledLogs:           comp.Spec.EnabledLogs,
-		TLSConfig:             comp.Spec.TLSConfig,
-		ServiceAccountName:    comp.Spec.ServiceAccountName,
+		Namespace:          comp.Namespace,
+		ClusterName:        clusterName,
+		ClusterUID:         clusterUID,
+		Comp2CompDefs:      buildComp2CompDefs(cluster, clusterCompSpec),
+		Name:               compName,
+		FullCompName:       comp.Name,
+		CompDefName:        compDef.Name,
+		PodSpec:            &compDef.Spec.Runtime,
+		LogConfigs:         compDefObj.Spec.LogConfigs,
+		ConfigTemplates:    compDefObj.Spec.Configs,
+		ScriptTemplates:    compDefObj.Spec.Scripts,
+		Labels:             compDefObj.Spec.Labels,
+		Roles:              compDefObj.Spec.Roles,
+		UpdateStrategy:     compDefObj.Spec.UpdateStrategy,
+		PolicyRules:        compDefObj.Spec.PolicyRules,
+		LifecycleActions:   compDefObj.Spec.LifecycleActions,
+		SystemAccounts:     compDefObj.Spec.SystemAccounts,
+		RoleArbitrator:     compDefObj.Spec.RoleArbitrator,
+		Replicas:           comp.Spec.Replicas,
+		EnabledLogs:        comp.Spec.EnabledLogs,
+		TLSConfig:          comp.Spec.TLSConfig,
+		ServiceAccountName: comp.Spec.ServiceAccountName,
 	}
 
 	// build backward compatible fields, including workload, services, componentRefEnvs, clusterDefName, clusterCompDefName, and clusterCompVer, etc.
@@ -492,6 +491,7 @@ func doContainerAttrOverride(compContainer *corev1.Container, container corev1.C
 }
 
 // GetEnvReplacementMapForConnCredential gets the replacement map for connect credential
+// TODO: deprecated, will be removed later.
 func GetEnvReplacementMapForConnCredential(clusterName string) map[string]string {
 	return map[string]string{
 		constant.KBConnCredentialPlaceHolder: constant.GenerateDefaultConnCredential(clusterName),

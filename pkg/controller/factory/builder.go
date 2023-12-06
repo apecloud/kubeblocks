@@ -286,16 +286,6 @@ func BuildConnCredential4Cluster(cluster *appsv1alpha1.Cluster, name string, dat
 		GetObject()
 }
 
-func BuildConnCredential4Component(comp *component.SynthesizedComponent, name string, data map[string][]byte) *corev1.Secret {
-	secretName := constant.GenerateComponentConnCredential(comp.ClusterName, comp.Name, name)
-	labels := constant.GetComponentWellKnownLabels(comp.ClusterName, comp.Name)
-	return builder.NewSecretBuilder(comp.Namespace, secretName).
-		AddLabelsInMap(labels).
-		SetData(data).
-		SetImmutable(true).
-		GetObject()
-}
-
 func BuildPDB(synthesizedComp *component.SynthesizedComponent) *policyv1.PodDisruptionBudget {
 	var (
 		namespace   = synthesizedComp.Namespace

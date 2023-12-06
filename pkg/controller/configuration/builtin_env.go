@@ -24,13 +24,13 @@ import (
 	"strings"
 
 	"github.com/StudioSol/set"
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubectl/pkg/util/resource"
 	coreclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -202,15 +202,10 @@ func (w *envWrapper) getResourceFromLocal(key coreclient.ObjectKey, gvk schema.G
 var envPlaceHolderRegexp = regexp.MustCompile(`\$\(\w+\)`)
 
 func (w *envWrapper) checkAndReplaceEnv(value string, container *corev1.Container) (string, error) {
-	// env value replace,e.g: $(CONN_CREDENTIAL_SECRET_NAME), $(KB_CLUSTER_COMP_NAME)
+	// env value replace,e.g: $(KB_CLUSTER_COMP_NAME)
 	// - name: KB_POD_FQDN
 	//      value: $(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc
 	//
-	// - name: MYSQL_ROOT_USER
-	//      valueFrom:
-	//        secretKeyRef:
-	//          key: username
-	//          name: $(CONN_CREDENTIAL_SECRET_NAME)
 	// var := "$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc"
 	//
 	// loop reference
@@ -237,7 +232,8 @@ func (w *envWrapper) doEnvReplace(replacedVars *set.LinkedHashSetString, oldValu
 		builtInEnvMap = component.GetReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName)
 	)
 
-	builtInEnvMap[constant.KBConnCredentialPlaceHolder] = constant.GenerateDefaultConnCredential(clusterName)
+	maps.Copy(builtInEnvMap, component.GetEnvReplacementMapForConnCredential(clusterName))
+
 	kbInnerEnvReplaceFn := func(envName string, strToReplace string) string {
 		return strings.ReplaceAll(strToReplace, envName, builtInEnvMap[envName])
 	}

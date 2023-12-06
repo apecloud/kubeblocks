@@ -213,7 +213,7 @@ func (c CustomOpsHandler) buildJob(reqCtx intctrlutil.RequestCtx,
 		fullCompName := constant.GenerateClusterComponentName(clusterName, compName)
 		var env = []corev1.EnvVar{
 			{Name: constant.KBEnvClusterName, Value: opsRes.Cluster.Name},
-			{Name: constant.KBEnvComponentName, Value: compName},
+			{Name: constant.KBEnvCompName, Value: compName},
 			{Name: constant.KBEnvClusterCompName, Value: fullCompName},
 			{Name: constant.KBEnvCompReplicas, Value: strconv.Itoa(int(comp.Replicas))},
 			{Name: constant.KBEnvCompServiceVersion, Value: compDef.Spec.ServiceVersion},

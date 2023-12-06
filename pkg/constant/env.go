@@ -42,8 +42,9 @@ const (
 
 // Component
 const (
-	KBEnvCompName     = "KB_COMP_NAME"
-	KBEnvCompReplicas = "KB_COMP_REPLICAS"
+	KBEnvCompName           = "KB_COMP_NAME"
+	KBEnvCompReplicas       = "KB_COMP_REPLICAS"
+	KBEnvCompServiceVersion = "KB_COMP_SERVICE_VERSION"
 )
 
 // Pod
@@ -109,7 +110,4 @@ const (
 	KBEnvRoleProbeTimeout       = "KB_RSM_ROLE_PROBE_TIMEOUT"
 
 	KBEnvVolumeProtectionSpec = "KB_VOLUME_PROTECTION_SPEC"
-
-	KBEnvComponentName      = "KB_COMP_NAME"
-	KBEnvCompServiceVersion = "KB_COMP_SERVICE_VERSION"
 )

@@ -265,12 +265,6 @@ const (
 )
 
 const (
-	SecretEndpointKey = "endpoint"
-	SecretHostKey     = "host"
-	SecretPortKey     = "port"
-)
-
-const (
 	ComponentStatusDefaultPodName = "Unknown"
 )
 

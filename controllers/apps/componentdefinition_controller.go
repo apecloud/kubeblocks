@@ -295,25 +295,28 @@ func (r *ComponentDefinitionReconciler) validateLifecycleActionBuiltInHandlers(l
 		supportedHandlersSet[handler] = true
 	}
 
-	checkAndAddHandler := func(handler *appsv1alpha1.BuiltinActionHandlerType) error {
-		if handler == nil {
-			return nil
+	checkAndAddHandlers := func(handlers []*appsv1alpha1.BuiltinActionHandlerType) error {
+		for _, handler := range handlers {
+			if handler == nil {
+				return nil
+			}
+			if !supportedHandlersSet[*handler] {
+				return fmt.Errorf("the builtin handler %s is not supported", *handler)
+			}
+			builtInHandlerMap[*handler] = true
 		}
-		if !supportedHandlersSet[*handler] {
-			return fmt.Errorf("the builtin handler %s is not supported", *handler)
-		}
-		builtInHandlerMap[*handler] = true
 		return nil
 	}
 
-	if err := checkAndAddHandler(lifecycleActions.RoleProbe.BuiltinHandler); err != nil {
-		return err
+	targetBuiltInHandlers := make([]*appsv1alpha1.BuiltinActionHandlerType, 0)
+	if lifecycleActions.RoleProbe != nil {
+		targetBuiltInHandlers = append(targetBuiltInHandlers, lifecycleActions.RoleProbe.BuiltinHandler)
 	}
-	if err := checkAndAddHandler(lifecycleActions.PostProvision.BuiltinHandler); err != nil {
-		return err
+	if lifecycleActions.PostProvision != nil {
+		targetBuiltInHandlers = append(targetBuiltInHandlers, lifecycleActions.PostProvision.BuiltinHandler)
 	}
-	if err := checkAndAddHandler(lifecycleActions.PreTerminate.BuiltinHandler); err != nil {
-		return err
+	if lifecycleActions.PreTerminate != nil {
+		targetBuiltInHandlers = append(targetBuiltInHandlers, lifecycleActions.PreTerminate.BuiltinHandler)
 	}
 
 	actions := []*appsv1alpha1.LifecycleActionSpec{
@@ -329,10 +332,12 @@ func (r *ComponentDefinitionReconciler) validateLifecycleActionBuiltInHandlers(l
 
 	for _, action := range actions {
 		if action != nil {
-			if err := checkAndAddHandler(action.BuiltinHandler); err != nil {
-				return err
-			}
+			targetBuiltInHandlers = append(targetBuiltInHandlers, action.BuiltinHandler)
 		}
+	}
+
+	if err := checkAndAddHandlers(targetBuiltInHandlers); err != nil {
+		return err
 	}
 
 	if len(builtInHandlerMap) > 1 {

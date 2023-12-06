@@ -1159,8 +1159,9 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition,
 			}
 		}
 		compObj.Resources = corev1.ResourceRequirements{
+			// deepcopy to make requests and limits point to different resources
 			Requests: resourceList,
-			Limits:   resourceList,
+			Limits:   resourceList.DeepCopy(),
 		}
 		storageSize := getVal(&c, keyStorage, sets)
 		if storageSize != "" {

@@ -170,8 +170,8 @@ func (c *rsmRoleProbeConvertor) convert(args ...any) (any, error) {
 	// TODO(xingran): RSM Action does not support args[] yet
 	if synthesizeComp.LifecycleActions.RoleProbe.CustomHandler != nil {
 		rsmRoleProbeCmdAction := workloads.Action{
-			Image:   synthesizeComp.LifecycleActions.RoleProbe.CustomHandler.Image,
-			Command: synthesizeComp.LifecycleActions.RoleProbe.CustomHandler.Exec.Command,
+			Image:   synthesizeComp.LifecycleActions.RoleProbe.CustomHandler.Action.Image,
+			Command: synthesizeComp.LifecycleActions.RoleProbe.CustomHandler.Action.Exec.Command,
 		}
 		rsmRoleProbe.CustomHandler = []workloads.Action{rsmRoleProbeCmdAction}
 	}

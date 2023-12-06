@@ -335,24 +335,36 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 		return *synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler
 	}
 
-	actions := []struct {
-		LifeCycleActionHandlers *appsv1alpha1.LifecycleActionHandler
-	}{
-		{synthesizeComp.LifecycleActions.PostStart},
-		{synthesizeComp.LifecycleActions.PreStop},
-		{synthesizeComp.LifecycleActions.MemberJoin},
-		{synthesizeComp.LifecycleActions.MemberLeave},
-		{synthesizeComp.LifecycleActions.Readonly},
-		{synthesizeComp.LifecycleActions.Readwrite},
-		{synthesizeComp.LifecycleActions.DataPopulate},
-		{synthesizeComp.LifecycleActions.DataAssemble},
-		{synthesizeComp.LifecycleActions.Reconfigure},
-		{synthesizeComp.LifecycleActions.AccountProvision},
+	if synthesizeComp.LifecycleActions.PostProvision != nil && synthesizeComp.LifecycleActions.PostProvision.BuiltinHandler != nil {
+		return *synthesizeComp.LifecycleActions.PostProvision.BuiltinHandler
+	}
+
+	if synthesizeComp.LifecycleActions.PreTerminate != nil && synthesizeComp.LifecycleActions.PreTerminate.BuiltinHandler != nil {
+		return *synthesizeComp.LifecycleActions.PreTerminate.BuiltinHandler
+	}
+
+	getHandler := func(action *appsv1alpha1.LifecycleActionSpec) *appsv1alpha1.BuiltinActionHandlerType {
+		if action != nil {
+			return action.BuiltinHandler
+		}
+		return nil
+	}
+
+	actions := []*appsv1alpha1.LifecycleActionSpec{
+		synthesizeComp.LifecycleActions.MemberJoin,
+		synthesizeComp.LifecycleActions.MemberLeave,
+		synthesizeComp.LifecycleActions.Readonly,
+		synthesizeComp.LifecycleActions.Readwrite,
+		synthesizeComp.LifecycleActions.DataPopulate,
+		synthesizeComp.LifecycleActions.DataAssemble,
+		synthesizeComp.LifecycleActions.Reconfigure,
+		synthesizeComp.LifecycleActions.AccountProvision,
 	}
 
 	for _, action := range actions {
-		if action.LifeCycleActionHandlers != nil && action.LifeCycleActionHandlers.BuiltinHandler != nil {
-			return *action.LifeCycleActionHandlers.BuiltinHandler
+		handler := getHandler(action)
+		if handler != nil {
+			return *handler
 		}
 	}
 

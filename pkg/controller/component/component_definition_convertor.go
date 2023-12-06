@@ -527,12 +527,14 @@ func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *apps
 	if clusterCompDef.RSMSpec != nil && clusterCompDef.RSMSpec.RoleProbe != nil && len(clusterCompDef.RSMSpec.RoleProbe.CustomHandler) > 0 {
 		// TODO(xingran): RSMSpec.RoleProbe.CustomHandler support multiple images and commands, but ComponentDefinition.LifeCycleAction.RoleProbeSpec only support one image and command now.
 		return &appsv1alpha1.RoleProbeSpec{
-			LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
+			LifecycleActionSpec: appsv1alpha1.LifecycleActionSpec{
 				BuiltinHandler: nil,
-				CustomHandler: &appsv1alpha1.Action{
-					Image: clusterCompDef.RSMSpec.RoleProbe.CustomHandler[0].Image,
-					Exec: &appsv1alpha1.ExecAction{
-						Command: clusterCompDef.RSMSpec.RoleProbe.CustomHandler[0].Command,
+				CustomHandler: &appsv1alpha1.CustomHandlerSpec{
+					Action: &appsv1alpha1.Action{
+						Image: clusterCompDef.RSMSpec.RoleProbe.CustomHandler[0].Image,
+						Exec: &appsv1alpha1.ExecAction{
+							Command: clusterCompDef.RSMSpec.RoleProbe.CustomHandler[0].Command,
+						},
 					},
 				},
 			},
@@ -563,9 +565,11 @@ func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *apps
 		commands = clusterCompDefRoleProbe.Commands.Queries
 	}
 	roleProbeSpec.BuiltinHandler = nil
-	roleProbeSpec.CustomHandler = &appsv1alpha1.Action{
-		Exec: &appsv1alpha1.ExecAction{
-			Command: commands,
+	roleProbeSpec.CustomHandler = &appsv1alpha1.CustomHandlerSpec{
+		Action: &appsv1alpha1.Action{
+			Exec: &appsv1alpha1.ExecAction{
+				Command: commands,
+			},
 		},
 	}
 	return roleProbeSpec

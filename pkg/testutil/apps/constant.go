@@ -74,8 +74,8 @@ const (
 )
 
 var (
-	defaultBuiltinHandler         = appsv1alpha1.MySQLBuiltinActionHandler
-	defaultLifecycleActionHandler = &appsv1alpha1.LifecycleActionHandler{
+	defaultBuiltinHandler      = appsv1alpha1.MySQLBuiltinActionHandler
+	defaultLifecycleActionSpec = &appsv1alpha1.LifecycleActionSpec{
 		BuiltinHandler: &defaultBuiltinHandler,
 	}
 
@@ -356,23 +356,27 @@ var (
 			},
 		},
 		LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{
-			PostStart: defaultLifecycleActionHandler,
-			PreStop:   defaultLifecycleActionHandler,
+			PostProvision: &appsv1alpha1.PostProvisionSpec{
+				LifecycleActionSpec: *defaultLifecycleActionSpec,
+			},
+			PreTerminate: &appsv1alpha1.PreTerminateSpec{
+				LifecycleActionSpec: *defaultLifecycleActionSpec,
+			},
 			RoleProbe: &appsv1alpha1.RoleProbeSpec{
-				LifecycleActionHandler: *defaultLifecycleActionHandler,
-				FailureThreshold:       3,
-				PeriodSeconds:          1,
-				TimeoutSeconds:         5,
+				LifecycleActionSpec: *defaultLifecycleActionSpec,
+				FailureThreshold:    3,
+				PeriodSeconds:       1,
+				TimeoutSeconds:      5,
 			},
 			Switchover:       nil,
-			MemberJoin:       defaultLifecycleActionHandler,
-			MemberLeave:      defaultLifecycleActionHandler,
-			Readonly:         defaultLifecycleActionHandler,
-			Readwrite:        defaultLifecycleActionHandler,
-			DataPopulate:     defaultLifecycleActionHandler,
-			DataAssemble:     defaultLifecycleActionHandler,
-			Reconfigure:      defaultLifecycleActionHandler,
-			AccountProvision: defaultLifecycleActionHandler,
+			MemberJoin:       defaultLifecycleActionSpec,
+			MemberLeave:      defaultLifecycleActionSpec,
+			Readonly:         defaultLifecycleActionSpec,
+			Readwrite:        defaultLifecycleActionSpec,
+			DataPopulate:     defaultLifecycleActionSpec,
+			DataAssemble:     defaultLifecycleActionSpec,
+			Reconfigure:      defaultLifecycleActionSpec,
+			AccountProvision: defaultLifecycleActionSpec,
 		},
 	}
 

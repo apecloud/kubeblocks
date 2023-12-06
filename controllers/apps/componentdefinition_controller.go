@@ -364,36 +364,48 @@ func (r *ComponentDefinitionReconciler) validateLifecycleActionBuiltInHandlers(l
 	}
 
 	builtInHandlerMap := make(map[appsv1alpha1.BuiltinActionHandlerType]bool)
-	supportedBuiltInHandlers := getBuiltinActionHandlers()
-
-	if lifecycleActions.RoleProbe != nil && lifecycleActions.RoleProbe.BuiltinHandler != nil {
-		if !slices.Contains(supportedBuiltInHandlers, *lifecycleActions.RoleProbe.BuiltinHandler) {
-			return fmt.Errorf("the builtin handler %s is not supported", *lifecycleActions.RoleProbe.BuiltinHandler)
-		}
-		builtInHandlerMap[*lifecycleActions.RoleProbe.BuiltinHandler] = true
+	supportedHandlersSet := make(map[appsv1alpha1.BuiltinActionHandlerType]bool)
+	for _, handler := range getBuiltinActionHandlers() {
+		supportedHandlersSet[handler] = true
 	}
 
-	actions := []struct {
-		LifeCycleActionHandlers *appsv1alpha1.LifecycleActionHandler
-	}{
-		{lifecycleActions.PostStart},
-		{lifecycleActions.PreStop},
-		{lifecycleActions.MemberJoin},
-		{lifecycleActions.MemberLeave},
-		{lifecycleActions.Readonly},
-		{lifecycleActions.Readwrite},
-		{lifecycleActions.DataPopulate},
-		{lifecycleActions.DataAssemble},
-		{lifecycleActions.Reconfigure},
-		{lifecycleActions.AccountProvision},
+	checkAndAddHandler := func(handler *appsv1alpha1.BuiltinActionHandlerType) error {
+		if handler == nil {
+			return nil
+		}
+		if !supportedHandlersSet[*handler] {
+			return fmt.Errorf("the builtin handler %s is not supported", *handler)
+		}
+		builtInHandlerMap[*handler] = true
+		return nil
+	}
+
+	if err := checkAndAddHandler(lifecycleActions.RoleProbe.BuiltinHandler); err != nil {
+		return err
+	}
+	if err := checkAndAddHandler(lifecycleActions.PostProvision.BuiltinHandler); err != nil {
+		return err
+	}
+	if err := checkAndAddHandler(lifecycleActions.PreTerminate.BuiltinHandler); err != nil {
+		return err
+	}
+
+	actions := []*appsv1alpha1.LifecycleActionSpec{
+		lifecycleActions.MemberJoin,
+		lifecycleActions.MemberLeave,
+		lifecycleActions.Readonly,
+		lifecycleActions.Readwrite,
+		lifecycleActions.DataPopulate,
+		lifecycleActions.DataAssemble,
+		lifecycleActions.Reconfigure,
+		lifecycleActions.AccountProvision,
 	}
 
 	for _, action := range actions {
-		if action.LifeCycleActionHandlers != nil && action.LifeCycleActionHandlers.BuiltinHandler != nil {
-			if !slices.Contains(supportedBuiltInHandlers, *lifecycleActions.RoleProbe.BuiltinHandler) {
-				return fmt.Errorf("the builtin handler %s is not supported", *lifecycleActions.RoleProbe.BuiltinHandler)
+		if action != nil {
+			if err := checkAndAddHandler(action.BuiltinHandler); err != nil {
+				return err
 			}
-			builtInHandlerMap[*lifecycleActions.RoleProbe.BuiltinHandler] = true
 		}
 	}
 

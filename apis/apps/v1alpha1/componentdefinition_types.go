@@ -201,7 +201,7 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	LifecycleActions *ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
 
-	// serviceRefDeclarations is used to declare the service reference of the current component.
+	// ServiceRefDeclarations is used to declare the service reference of the current component.
 	// Cannot be updated.
 	// +optional
 	ServiceRefDeclarations []ServiceRefDeclaration `json:"serviceRefDeclarations,omitempty"`
@@ -468,7 +468,7 @@ const (
 	UnknownBuiltinActionHandler            BuiltinActionHandlerType = "unknown"
 )
 
-type LifecycleActionHandler struct {
+type LifecycleActionSpec struct {
 	// builtinHandler specifies the builtin action handler name to do the action.
 	// the BuiltinHandler within the same ComponentLifecycleActions should be consistent. Details can be queried through official documentation in the future.
 	// use CustomHandler to define your own actions if none of them satisfies the requirement.
@@ -477,20 +477,31 @@ type LifecycleActionHandler struct {
 
 	// customHandler defines the custom way to do action.
 	// +optional
-	CustomHandler *Action `json:"customHandler,omitempty"`
+	CustomHandler *CustomHandlerSpec `json:"customHandler,omitempty"`
+}
+
+type CustomHandlerSpec struct {
+	// action defines the custom action to take.
+	// +kubebuilder:validation:Required
+	Action *Action `json:"action,omitempty"`
+
+	// scriptSpecSelectors defines the selector of the scriptSpecs that need to be referenced.
+	// Once ScriptSpecSelectors is defined, the scripts defined in scripts can be referenced in the CustomHandler Action.
+	// +optional
+	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
 }
 
 // ComponentLifecycleActions defines a set of operational actions for interacting with component services and processes.
 type ComponentLifecycleActions struct {
-	// PostStart is called immediately after a component is created.
+	// PostProvision defines the actions to be executed and the corresponding policy when a component is created.
 	// Cannot be updated.
 	// +optional
-	PostStart *LifecycleActionHandler `json:"postStart,omitempty"`
+	PostProvision *PostProvisionSpec `json:"postProvision,omitempty"`
 
-	// PreStop is called immediately before a component is terminated due to an API request.
+	// PreTerminate defines the actions to be executed and the corresponding policy when a component is terminated due to an API request.
 	// Cannot be updated.
 	// +optional
-	PreStop *LifecycleActionHandler `json:"preStop,omitempty"`
+	PreTerminate *PreTerminateSpec `json:"preTerminate,omitempty"`
 
 	// RoleProbe defines how to probe the role of replicas.
 	// Cannot be updated.
@@ -521,7 +532,7 @@ type ComponentLifecycleActions struct {
 	// It may involve updating configuration, notifying other members, and ensuring data consistency.
 	// Cannot be updated.
 	// +optional
-	MemberJoin *LifecycleActionHandler `json:"memberJoin,omitempty"`
+	MemberJoin *LifecycleActionSpec `json:"memberJoin,omitempty"`
 
 	// MemberLeave defines how to remove a replica from the replication group.
 	// This action is typically invoked when a replica needs to be removed, such as during scale-in.
@@ -529,18 +540,18 @@ type ComponentLifecycleActions struct {
 	// but it is advisable to avoid performing data migration within this action.
 	// Cannot be updated.
 	// +optional
-	MemberLeave *LifecycleActionHandler `json:"memberLeave,omitempty"`
+	MemberLeave *LifecycleActionSpec `json:"memberLeave,omitempty"`
 
 	// Readonly defines how to set a replica service as read-only.
 	// This action is used to protect a replica in case of volume space exhaustion or excessive traffic.
 	// Cannot be updated.
 	// +optional
-	Readonly *LifecycleActionHandler `json:"readonly,omitempty"`
+	Readonly *LifecycleActionSpec `json:"readonly,omitempty"`
 
 	// Readwrite defines how to set a replica service as read-write.
 	// Cannot be updated.
 	// +optional
-	Readwrite *LifecycleActionHandler `json:"readwrite,omitempty"`
+	Readwrite *LifecycleActionSpec `json:"readwrite,omitempty"`
 
 	// DataPopulate defines how to populate the data to create new replicas.
 	// This action is typically used when a new replica needs to be constructed, such as:
@@ -550,7 +561,7 @@ type ComponentLifecycleActions struct {
 	// It should write the valid data to stdout without including any extraneous information.
 	// Cannot be updated.
 	// +optional
-	DataPopulate *LifecycleActionHandler `json:"dataPopulate,omitempty"`
+	DataPopulate *LifecycleActionSpec `json:"dataPopulate,omitempty"`
 
 	// DataAssemble defines how to assemble data synchronized from external before starting the service for a new replica.
 	// This action is typically used when creating a new replica, such as:
@@ -561,17 +572,92 @@ type ComponentLifecycleActions struct {
 	// the action must be able to guarantee idempotence to allow for retries from the beginning.
 	// Cannot be updated.
 	// +optional
-	DataAssemble *LifecycleActionHandler `json:"dataAssemble,omitempty"`
+	DataAssemble *LifecycleActionSpec `json:"dataAssemble,omitempty"`
 
 	// Reconfigure defines how to notify the replica service that there is a configuration update.
 	// Cannot be updated.
 	// +optional
-	Reconfigure *LifecycleActionHandler `json:"reconfigure,omitempty"`
+	Reconfigure *LifecycleActionSpec `json:"reconfigure,omitempty"`
 
 	// AccountProvision defines how to provision accounts.
 	// Cannot be updated.
 	// +optional
-	AccountProvision *LifecycleActionHandler `json:"accountProvision,omitempty"`
+	AccountProvision *LifecycleActionSpec `json:"accountProvision,omitempty"`
+}
+
+type PostProvisionSpec struct {
+	LifecycleActionSpec `json:",inline"`
+
+	// ExecutePolicy defines the policy for executing the action.
+	// Cannot be updated.
+	// +optional
+	ExecutePolicy *PostProvisionExecutePolicySpec `json:"executePolicy,omitempty"`
+}
+
+type PreTerminateSpec struct {
+	LifecycleActionSpec `json:",inline"`
+
+	// ExecutePolicy defines the policy for executing the action.
+	// Cannot be updated.
+	// +optional
+	ExecutePolicy *PreTerminateExecutePolicySpec `json:"executePolicy,omitempty"`
+}
+
+// ExecuteFrequencyPolicy defines the policy for executing frequency of the action.
+type ExecuteFrequencyPolicy string
+
+const (
+	OnceExecuteFrequencyPolicy   ExecuteFrequencyPolicy = "Once"
+	AlwaysExecuteFrequencyPolicy ExecuteFrequencyPolicy = "Always"
+)
+
+// PostProvisionExecuteAtType defines the type of the PostProvision action execution.
+type PostProvisionExecuteAtType string
+
+const (
+	PostProvisionImmediatelyExecuteType    PostProvisionExecuteAtType = "Immediately"
+	PostProvisionRuntimeReadyExecuteType   PostProvisionExecuteAtType = "RuntimeReady"
+	PostProvisionComponentReadyExecuteType PostProvisionExecuteAtType = "ComponentReady"
+)
+
+type PostProvisionExecutePolicySpec struct {
+	// ExecuteAt defines the time when the action will be executed.
+	// - Immediately: The PostProvision Action is executed immediately after the Component object is created,
+	// without guaranteeing the availability of the Component and its underlying resources. only after the Action is successfully executed will the Component's state turn to ready.
+	// - RuntimeReady: The PostProvision Action is executed after the Component object is created and once all underlying Runtimes are ready.
+	// only after the PostProvision is successfully executed will the Component's state turn to ready.
+	// - ComponentReady: The PostProvision Action is executed after the Component object is created and once the Component is ready.
+	// the execution process does not impact the state of the Component and the Cluster.
+	// Cannot be updated.
+	// +kubebuilder:default=ComponentReady
+	// +optional
+	ExecuteAt *PostProvisionExecuteAtType `json:"executeAt"`
+
+	// ExecuteFrequency defines the frequency of the action execution.
+	// - Once: The Action will be executed only once when the conditions of ExecuteAt are met.
+	// - Always: The Action will always be executed when the conditions of ExecuteAt are met, but only one Action task will be executed at a given time,
+	// Idempotency and correctness are ensured by the implementation of the custom action.
+	// Cannot be updated.
+	// +kubebuilder:default=Once
+	// +optional
+	ExecuteFrequency *ExecuteFrequencyPolicy `json:"executeFrequency"`
+}
+
+// PreTerminateExecuteAtType defines the type of the PostProvision action execution.
+type PreTerminateExecuteAtType string
+
+const (
+	PreTerminateImmediatelyExecuteType PreTerminateExecuteAtType = "Immediately"
+)
+
+type PreTerminateExecutePolicySpec struct {
+	// ExecuteAt defines the time when the action will be executed.
+	// - Immediately: Upon receiving a scale-down command for the Component, it is executed immediately.
+	// Only after the preTerminate action is successfully executed, the destruction of the Component and its underlying resources proceeds.
+	// Cannot be updated.
+	// +kubebuilder:default=ComponentReady
+	// +optional
+	ExecuteAt *PreTerminateExecuteAtType `json:"executeAt,omitempty"`
 }
 
 type ComponentSwitchoverSpec struct {
@@ -592,7 +678,7 @@ type ComponentSwitchoverSpec struct {
 }
 
 type RoleProbeSpec struct {
-	LifecycleActionHandler `json:",inline"`
+	LifecycleActionSpec `json:",inline"`
 
 	// Number of seconds after the container has started before liveness probes are initiated.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes

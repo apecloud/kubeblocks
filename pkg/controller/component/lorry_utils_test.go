@@ -103,7 +103,7 @@ var _ = Describe("Lorry Utils", func() {
 			defaultBuiltInHandler := appsv1alpha1.MySQLBuiltinActionHandler
 			component.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{
 				RoleProbe: &appsv1alpha1.RoleProbeSpec{
-					LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
+					LifecycleActionSpec: appsv1alpha1.LifecycleActionSpec{
 						BuiltinHandler: &defaultBuiltInHandler,
 					},
 				},
@@ -126,7 +126,7 @@ var _ = Describe("Lorry Utils", func() {
 			// all other services are disabled
 			defaultBuiltInHandler := appsv1alpha1.MySQLBuiltinActionHandler
 			component.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{
-				MemberJoin: &appsv1alpha1.LifecycleActionHandler{
+				MemberJoin: &appsv1alpha1.LifecycleActionSpec{
 					BuiltinHandler: &defaultBuiltInHandler,
 				},
 			}
@@ -156,7 +156,7 @@ var _ = Describe("Lorry Utils", func() {
 			defaultBuiltInHandler := appsv1alpha1.MySQLBuiltinActionHandler
 			component.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{
 				RoleProbe: &appsv1alpha1.RoleProbeSpec{
-					LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
+					LifecycleActionSpec: appsv1alpha1.LifecycleActionSpec{
 						BuiltinHandler: &defaultBuiltInHandler,
 					},
 				},
@@ -188,7 +188,7 @@ var _ = Describe("Lorry Utils", func() {
 			defaultBuiltInHandler := appsv1alpha1.MySQLBuiltinActionHandler
 			component.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{
 				RoleProbe: &appsv1alpha1.RoleProbeSpec{
-					LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
+					LifecycleActionSpec: appsv1alpha1.LifecycleActionSpec{
 						BuiltinHandler: &defaultBuiltInHandler,
 					},
 				},

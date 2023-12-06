@@ -739,7 +739,7 @@ var _ = Describe("Component Definition Convertor", func() {
 					return &handler
 				}
 				expectedRoleProbe := &appsv1alpha1.RoleProbeSpec{
-					LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
+					LifecycleActionSpec: appsv1alpha1.LifecycleActionSpec{
 						BuiltinHandler: wesqlBuiltinHandler(),
 					},
 					TimeoutSeconds:   clusterCompDef.Probes.RoleProbe.TimeoutSeconds,
@@ -774,8 +774,8 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(actions.RoleProbe).ShouldNot(BeNil())
 				Expect(actions.RoleProbe.BuiltinHandler).Should(BeNil())
 				Expect(actions.RoleProbe.CustomHandler).ShouldNot(BeNil())
-				Expect(actions.RoleProbe.CustomHandler.Image).Should(BeEquivalentTo("mock-rsm-role-probe-image"))
-				Expect(actions.RoleProbe.CustomHandler.Exec.Command).Should(BeEquivalentTo(mockCommand))
+				Expect(actions.RoleProbe.CustomHandler.Action.Image).Should(BeEquivalentTo("mock-rsm-role-probe-image"))
+				Expect(actions.RoleProbe.CustomHandler.Action.Exec.Command).Should(BeEquivalentTo(mockCommand))
 			})
 		})
 

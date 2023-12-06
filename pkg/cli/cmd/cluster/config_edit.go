@@ -227,7 +227,7 @@ func NewEditConfigureCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) 
 	o := &editConfigOptions{
 		configOpsOptions: configOpsOptions{
 			editMode:          true,
-			OperationsOptions: newBaseOperationsOptions(f, streams, appsv1alpha1.ReconfiguringType, false),
+			OperationsOptions: newBaseOperationsOptions(f, streams, appsv1alpha1.ReconfiguringType, true),
 		}}
 
 	cmd := &cobra.Command{

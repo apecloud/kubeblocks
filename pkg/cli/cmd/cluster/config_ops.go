@@ -35,7 +35,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/cli/printer"
 	"github.com/apecloud/kubeblocks/pkg/cli/types"
 	"github.com/apecloud/kubeblocks/pkg/cli/util"
-	"github.com/apecloud/kubeblocks/pkg/cli/util/flags"
 	"github.com/apecloud/kubeblocks/pkg/cli/util/prompt"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -79,6 +78,10 @@ func (o *configOpsOptions) Complete() error {
 		}
 	}
 
+	if len(o.ComponentNames) > 0 {
+		o.ComponentName = o.ComponentNames[0]
+	}
+
 	wrapper, err := newConfigWrapper(o.CreateOptions, o.Name, o.ComponentName, o.CfgTemplateName, o.CfgFile, o.KeyValues)
 	if err != nil {
 		return err
@@ -116,7 +119,9 @@ func (o *configOpsOptions) Validate() error {
 
 	o.CfgFile = o.wrapper.ConfigFile()
 	o.CfgTemplateName = o.wrapper.ConfigSpecName()
-	o.ComponentNames = []string{o.wrapper.ComponentName()}
+	if len(o.ComponentNames) == 0 {
+		o.ComponentNames = []string{o.wrapper.ComponentName()}
+	}
 
 	if o.editMode {
 		return nil
@@ -240,7 +245,7 @@ func (o *configOpsOptions) buildReconfigureCommonFlags(cmd *cobra.Command, f cmd
 		"For available templates and configs, refer to: 'kbcli cluster describe-config'.")
 	cmd.Flags().StringVar(&o.CfgFile, "config-file", "", "Specify the name of the configuration file to be updated (e.g. for mysql: --config-file=my.cnf). "+
 		"For available templates and configs, refer to: 'kbcli cluster describe-config'.")
-	flags.AddComponentFlag(f, cmd, &o.ComponentName, "Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.")
+	// flags.AddComponentFlag(f, cmd, &o.ComponentName, "Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.")
 	cmd.Flags().BoolVar(&o.ForceRestart, "force-restart", false, "Boolean flag to restart component. Default with false.")
 	cmd.Flags().StringVar(&o.LocalFilePath, "local-file", "", "Specify the local configuration file to be updated.")
 	cmd.Flags().BoolVar(&o.replaceFile, "replace", false, "Boolean flag to enable replacing config file. Default with false.")
@@ -250,10 +255,10 @@ func (o *configOpsOptions) buildReconfigureCommonFlags(cmd *cobra.Command, f cmd
 func NewReconfigureCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &configOpsOptions{
 		editMode:          false,
-		OperationsOptions: newBaseOperationsOptions(f, streams, appsv1alpha1.ReconfiguringType, false),
+		OperationsOptions: newBaseOperationsOptions(f, streams, appsv1alpha1.ReconfiguringType, true),
 	}
 	cmd := &cobra.Command{
-		Use:               "configure NAME --set key=value[,key=value] [--component=component-name] [--config-spec=config-spec-name] [--config-file=config-file]",
+		Use:               "configure NAME --set key=value[,key=value] [--components=component1-name,component2-name] [--config-spec=config-spec-name] [--config-file=config-file]",
 		Short:             "Configure parameters with the specified components in the cluster.",
 		Example:           createReconfigureExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),

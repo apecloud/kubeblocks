@@ -237,20 +237,6 @@ func (f *MockComponentDefinitionFactory) AddSystemAccount(accountName string, in
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) AddConnectionCredential(name, serviceName, portName, accountName string) *MockComponentDefinitionFactory {
-	credential := appsv1alpha1.ConnectionCredential{
-		Name:        name,
-		ServiceName: serviceName,
-		PortName:    portName,
-		AccountName: accountName,
-	}
-	if f.Get().Spec.ConnectionCredentials == nil {
-		f.Get().Spec.ConnectionCredentials = make([]appsv1alpha1.ConnectionCredential, 0)
-	}
-	f.Get().Spec.ConnectionCredentials = append(f.Get().Spec.ConnectionCredentials, credential)
-	return f
-}
-
 func (f *MockComponentDefinitionFactory) SetUpdateStrategy(strategy *appsv1alpha1.UpdateStrategy) *MockComponentDefinitionFactory {
 	f.Get().Spec.UpdateStrategy = strategy
 	return f

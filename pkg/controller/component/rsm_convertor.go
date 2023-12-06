@@ -198,7 +198,7 @@ func (c *rsmCredentialConvertor) convert(args ...any) (any, error) {
 		}
 	}
 	if sysInitAccount != nil {
-		secretName = constant.GenerateComponentConnCredential(cluster.Name, synthesizeComp.Name, sysInitAccount.Name)
+		secretName = constant.GenerateAccountSecretName(cluster.Name, synthesizeComp.Name, sysInitAccount.Name)
 	} else {
 		secretName = constant.GenerateDefaultConnCredential(cluster.Name)
 	}

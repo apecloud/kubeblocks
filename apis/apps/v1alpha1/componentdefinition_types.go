@@ -173,11 +173,6 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	SystemAccounts []SystemAccount `json:"systemAccounts,omitempty"`
 
-	// ConnectionCredentials defines the default connection credentials that can be used to access the component service.
-	// Cannot be updated.
-	// +optional
-	ConnectionCredentials []ConnectionCredential `json:"connectionCredentials,omitempty"`
-
 	// UpdateStrategy defines the strategy for updating the component instance.
 	// Cannot be updated.
 	// +kubebuilder:default=Serial

@@ -162,40 +162,6 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
-              connectionCredentials:
-                description: ConnectionCredentials defines the default connection
-                  credentials that can be used to access the component service. Cannot
-                  be updated.
-                items:
-                  properties:
-                    accountName:
-                      description: AccountName specifies the name of account used
-                        to access the service. If specified, the account must be defined
-                        in @SystemAccounts. Cannot be updated.
-                      type: string
-                    componentName:
-                      description: ComponentName specifies the name of component where
-                        the account defined. For cluster-level connection credential,
-                        this field is required. Cannot be updated.
-                      type: string
-                    name:
-                      description: The name of the ConnectionCredential. Cannot be
-                        updated.
-                      type: string
-                    portName:
-                      description: PortName specifies the name of the port to access
-                        the service. If the service has multiple ports, a specific
-                        port must be specified to use here. Otherwise, the unique
-                        port of the service will be used. Cannot be updated.
-                      type: string
-                    serviceName:
-                      description: ServiceName specifies the name of service to use
-                        for accessing. Cannot be updated.
-                      type: string
-                  required:
-                  - name
-                  type: object
-                type: array
               description:
                 description: Description is a brief description of the component.
                 maxLength: 256

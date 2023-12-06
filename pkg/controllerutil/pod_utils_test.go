@@ -201,17 +201,7 @@ var _ = Describe("pod utils", func() {
       "name": "log"
     }
   ],
-  "env": [
-    {
-      "name": "MYSQL_ROOT_PASSWORD",
-      "valueFrom": {
-        "secretKeyRef": {
-          "name": "$(CONN_CREDENTIAL_SECRET_NAME)",
-          "key": "password"
-        }
-      }
-    }
-  ]
+  "env": []
 }
 `
 	)

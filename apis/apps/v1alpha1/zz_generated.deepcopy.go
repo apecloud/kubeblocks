@@ -1696,11 +1696,6 @@ func (in *ComponentDefinitionSpec) DeepCopyInto(out *ComponentDefinitionSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.ConnectionCredentials != nil {
-		in, out := &in.ConnectionCredentials, &out.ConnectionCredentials
-		*out = make([]ConnectionCredential, len(*in))
-		copy(*out, *in)
-	}
 	if in.UpdateStrategy != nil {
 		in, out := &in.UpdateStrategy, &out.UpdateStrategy
 		*out = new(UpdateStrategy)

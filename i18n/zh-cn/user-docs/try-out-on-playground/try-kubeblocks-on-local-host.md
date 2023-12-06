@@ -19,9 +19,9 @@ sidebar_label: 在本地使用 KubeBlocks
   - RAM：4 GB，使用 top -d 命令查看内存。
 
 * 在电脑上已安装：
-  - Docker：v20.10.5（runc ≥ v1.0.0-rc93）或更高版本；
-  - kubectl：用于与 Kubernetes 集群进行交互；
-  - kbcli：用于 Playground 和 KubeBlocks 之间的交互。
+  - [Docker](https://docs.docker.com/get-docker/)：v20.10.5（runc ≥ v1.0.0-rc93）或更高版本；
+  - [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)：用于与 Kubernetes 集群进行交互；
+  - [kbcli](../installation/install-kbcli.md)：用于 Playground 和 KubeBlocks 之间的交互。
 
 ## 初始化 Playground
 
@@ -32,7 +32,7 @@ sidebar_label: 在本地使用 KubeBlocks
    kbcli playground init
    ```
    该命令执行以下操作：
-   1. 在使用 K3d 的容器中创建一个 Kubernetes 集群。
+   1. 在使用 [K3d](https://k3d.io/v5.4.6/) 的容器中创建一个 Kubernetes 集群。
    2. 在 K3d 集群中部署 KubeBlocks。
    3. 创建一个 MySQL 单节点集群。
 

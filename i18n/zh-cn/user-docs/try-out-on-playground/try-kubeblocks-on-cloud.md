@@ -15,7 +15,7 @@ import TabItem from '@theme/TabItem';
 
 ## 准备工作
 
-在云上部署时，通常使用 Terraform 脚本 来初始化云资源。kbcli 会自动下载并保存该脚本，然后使用 Terraform 命令来创建一个完全托管的 Kubernetes 集群，并在该集群上部署 KubeBlocks。
+在云上部署时，通常使用 [Terraform 脚本](https://github.com/apecloud/cloud-provider)来初始化云资源。kbcli 会自动下载并保存该脚本，然后使用 Terraform 命令来创建一个完全托管的 Kubernetes 集群，并在该集群上部署 KubeBlocks。
 
 <Tabs>
 <TabItem value="AWS" label="AWS" default>
@@ -23,9 +23,9 @@ import TabItem from '@theme/TabItem';
 ### 在 AWS 上使用 KubeBlocks 之前
 
 请确保已经：
-- 安装 AWS CLI。
-- 安装 kubectl。
-- 安装 kbcli。
+- [安装 AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)。
+- [安装 kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)。
+- [安装 kbcli](../installation/install-kbcli.md)。
 
 ### 配置访问密钥
 
@@ -82,8 +82,8 @@ kbcli cluster list
 
 请确保已经：
 - 拥有 Google Cloud 账户。
-- 安装 kubectl。
-- 安装 kbcli。
+- [安装 kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)。
+- [安装 kbcli](../installation/install-kbcli.md)。
 
 ### 配置 GCP 环境
 
@@ -153,8 +153,8 @@ kbcli cluster list
 
 请确保已经：
 - 拥有腾讯云账户。
-- 安装 kubectl。
-- 安装 kbcli。
+- [安装 kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)。
+- [安装 kbcli](../installation/install-kbcli.md)。
 
 ### 配置 TKE 环境
 
@@ -205,8 +205,8 @@ kbcli cluster list
 
 请确保已经：
 - 拥有阿里云账户。
-- 安装 kubectl。
-- 安装 kbcli。
+- [安装 kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)。
+- [安装 kbcli](../installation/install-kbcli.md)。
 
 ### 配置 ACK 环境
 
@@ -216,7 +216,7 @@ kbcli cluster list
 
    :::note
 
-   在中国大陆地区部署阿里云的用户，请参考相应指南。
+   在中国大陆地区部署阿里云的用户，请参考[相应指南](https://help.aliyun.com/document_detail/161387.htm?spm=a2c4g.85903.0.0.478d2246FdHMGt#task-2470091)。
 
    :::
 3. 点击 [AliyunOOSLifecycleHook4CSRole](https://ram.console.aliyun.com/role/authorize?spm=5176.2020520152.0.0.5b4716ddI6QevL&request=%7B%22ReturnUrl%22%3A%22https%3A%2F%2Fram.console.aliyun.com%22%2C%22Services%22%3A%5B%7B%22Roles%22%3A%5B%7B%22RoleName%22%3A%22AliyunOOSLifecycleHook4CSRole%22%2C%22TemplateId%22%3A%22AliyunOOSLifecycleHook4CSRole%22%7D%5D%2C%22Service%22%3A%22OOS%22%7D%5D%7D)，点击**同意授权**以创建一个 AliyunOOSLifecycleHook4CSRole 角色。

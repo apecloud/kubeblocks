@@ -495,6 +495,7 @@ get_trigger_mode() {
         case $filePath in
             i18n/zh-cn/*)
                 add_trigger_mode "[docs_cn]"
+            ;;
             docs/*)
                 add_trigger_mode "[docs]"
             ;;

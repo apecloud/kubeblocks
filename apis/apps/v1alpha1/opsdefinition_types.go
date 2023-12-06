@@ -36,11 +36,11 @@ type OpsDefinitionSpec struct {
 	// componentDefinitionRefs indicates which types of componentDefinitions are supported by the operation.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
-	// +patchMergeKey=serviceKind
+	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
-	// +listMapKey=serviceKind
-	ComponentDefinitionRefs []ComponentDefinitionRef `json:"componentDefinitionRefs" patchStrategy:"merge,retainKeys" patchMergeKey:"serviceKind"`
+	// +listMapKey=name
+	ComponentDefinitionRefs []ComponentDefinitionRef `json:"componentDefinitionRefs" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// parametersSchema describes the schema used for validation, pruning, and defaulting.
 	// +optional
@@ -57,11 +57,10 @@ type OpsDefinitionSpec struct {
 
 type ComponentDefinitionRef struct {
 
-	// ServiceKind defines what kind of well-known service that the component provides (e.g., MySQL, Redis, ETCD, case insensitive).
-	// reference componentDefinition.spec.
+	// refer to componentDefinition name.
 	// +kubebuilder:validation:MaxLength=32
 	// +kubebuilder:validation:Required
-	ServiceKind string `json:"serviceKind"`
+	Name string `json:"name"`
 
 	// the account name of the component.
 	// +optional
@@ -180,12 +179,12 @@ func init() {
 	SchemeBuilder.Register(&OpsDefinition{}, &OpsDefinitionList{})
 }
 
-func (o *OpsDefinition) GetComponentDefRef(serviceKind string) *ComponentDefinitionRef {
+func (o *OpsDefinition) GetComponentDefRef(compDefName string) *ComponentDefinitionRef {
 	if o == nil {
 		return nil
 	}
 	for _, v := range o.Spec.ComponentDefinitionRefs {
-		if serviceKind == v.ServiceKind {
+		if compDefName == v.Name {
 			return &v
 		}
 	}

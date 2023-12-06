@@ -56,10 +56,8 @@ spec:
                     accountName:
                       description: the account name of the component.
                       type: string
-                    serviceKind:
-                      description: ServiceKind defines what kind of well-known service
-                        that the component provides (e.g., MySQL, Redis, ETCD, case
-                        insensitive). reference componentDefinition.spec.
+                    name:
+                      description: refer to componentDefinition name.
                       maxLength: 32
                       type: string
                     serviceName:
@@ -69,12 +67,12 @@ spec:
                         to '_' and convert to uppercase.
                       type: string
                   required:
-                  - serviceKind
+                  - name
                   type: object
                 minItems: 1
                 type: array
                 x-kubernetes-list-map-keys:
-                - serviceKind
+                - name
                 x-kubernetes-list-type: map
               jobSpec:
                 description: jobSpec describes the job spec for the operation.

@@ -205,7 +205,7 @@ func (c CustomOpsHandler) buildJob(reqCtx intctrlutil.RequestCtx,
 		if err != nil {
 			return nil, err
 		}
-		compDefRef := opsRes.OpsDef.GetComponentDefRef(compDef.Spec.ServiceKind)
+		compDefRef := opsRes.OpsDef.GetComponentDefRef(compDef.Name)
 		if compDefRef == nil {
 			return nil, nil
 		}
@@ -381,7 +381,7 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx, cli client.Client, ops
 			}
 		}
 	}
-	// 2. validate component and serviceKind
+	// 2. validate component and componentDef
 	comp := opsRes.Cluster.Spec.GetComponentByName(customSpec.ComponentName)
 	if comp == nil {
 		return false, intctrlutil.NewNotFound(`can not found component in cluster "%s"`, opsRes.Cluster.Name)
@@ -390,15 +390,15 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx, cli client.Client, ops
 	if err != nil {
 		return false, err
 	}
-	var serviceKindMatched bool
+	var componentDefMatched bool
 	for _, v := range opsDef.Spec.ComponentDefinitionRefs {
-		if v.ServiceKind == compDef.Spec.ServiceKind {
-			serviceKindMatched = true
+		if v.Name == compDef.Name {
+			componentDefMatched = true
 			break
 		}
 	}
-	if !serviceKindMatched {
-		return false, intctrlutil.NewFatalError(fmt.Sprintf(`not supported serviceKind "%s"`, compDef.Spec.ServiceKind))
+	if !componentDefMatched {
+		return false, intctrlutil.NewFatalError(fmt.Sprintf(`not supported componnet definition "%s"`, compDef.Name))
 	}
 	return opsDef.Spec.TriggerPhaseChange, nil
 }

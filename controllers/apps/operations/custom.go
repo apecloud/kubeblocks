@@ -46,11 +46,8 @@ import (
 const (
 	kbEnvCompSVCName       = "KB_COMP_SVC_NAME"
 	kbEnvCompSVCPortPrefix = "KB_COMP_SVC_PORT_"
-	kbEnvConnectEndpoint   = "KB_CONNECT_ENDPOINT"
-	kbEnvConnectUserName   = "KB_CONNECT_USERNAME"
-	kbEnvConnectPassword   = "KB_CONNECT_PASSWORD"
-	kbEnvConnectHost       = "KB_CONNECT_HOST"
-	kbEnvConnectPort       = "KB_CONNECT_PORT"
+	kbEnvAccountUserName   = "KB_ACCOUNT_USERNAME"
+	kbEnvAccountPassword   = "KB_ACCOUNT_PASSWORD"
 )
 
 type CustomOpsHandler struct{}
@@ -223,13 +220,10 @@ func (c CustomOpsHandler) buildJob(reqCtx intctrlutil.RequestCtx,
 		}
 
 		// inject connect envs
-		if compDefRef.ConnectionCredentialName != "" {
-			connectCredentialSecretName := constant.GenerateComponentConnCredential(clusterName, compName, compDefRef.ConnectionCredentialName)
-			env = append(env, corev1.EnvVar{Name: kbEnvConnectEndpoint, ValueFrom: buildSecretKeyRef(connectCredentialSecretName, constant.SecretEndpointKey)})
-			env = append(env, corev1.EnvVar{Name: kbEnvConnectUserName, ValueFrom: buildSecretKeyRef(connectCredentialSecretName, constant.AccountNameForSecret)})
-			env = append(env, corev1.EnvVar{Name: kbEnvConnectPassword, ValueFrom: buildSecretKeyRef(connectCredentialSecretName, constant.AccountPasswdForSecret)})
-			env = append(env, corev1.EnvVar{Name: kbEnvConnectHost, ValueFrom: buildSecretKeyRef(connectCredentialSecretName, constant.SecretHostKey)})
-			env = append(env, corev1.EnvVar{Name: kbEnvConnectPort, ValueFrom: buildSecretKeyRef(connectCredentialSecretName, constant.SecretPortKey)})
+		if compDefRef.AccountName != "" {
+			accountSecretName := constant.GenerateAccountSecretName(clusterName, compName, compDefRef.AccountName)
+			env = append(env, corev1.EnvVar{Name: kbEnvAccountUserName, Value: compDefRef.AccountName})
+			env = append(env, corev1.EnvVar{Name: kbEnvAccountPassword, ValueFrom: buildSecretKeyRef(accountSecretName, constant.AccountPasswdForSecret)})
 		}
 
 		// inject SVC and SVC ports
@@ -240,7 +234,8 @@ func (c CustomOpsHandler) buildJob(reqCtx intctrlutil.RequestCtx,
 				}
 				env = append(env, corev1.EnvVar{Name: kbEnvCompSVCName, Value: fmt.Sprintf("%s-%s", fullCompName, v.ServiceName)})
 				for _, port := range v.Spec.Ports {
-					env = append(env, corev1.EnvVar{Name: kbEnvCompSVCPortPrefix + port.Name, Value: strconv.Itoa(int(port.Port))})
+					portName := strings.ReplaceAll(port.Name, "-", "_")
+					env = append(env, corev1.EnvVar{Name: kbEnvCompSVCPortPrefix + strings.ToUpper(portName), Value: strconv.Itoa(int(port.Port))})
 				}
 				break
 			}

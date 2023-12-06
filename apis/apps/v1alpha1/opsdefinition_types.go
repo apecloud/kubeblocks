@@ -63,13 +63,13 @@ type ComponentDefinitionRef struct {
 	// +kubebuilder:validation:Required
 	ServiceKind string `json:"serviceKind"`
 
-	// the data of the specified connection credential will be injected into env of the job.
-	// if not set, use the first connection credential by default.
+	// the account name of the component.
 	// +optional
-	ConnectionCredentialName string `json:"connectionCredentialName,omitempty"`
+	AccountName string `json:"accountName,omitempty"`
 
 	// reference the services[*].name.
-	// will map the service name and ports to KB_COMP_SVC_NAME and KB_COMP_SVC_PORT_<port> in env of the job.
+	// will map the service name and ports to KB_COMP_SVC_NAME and KB_COMP_SVC_PORT_<portName> in env of the job.
+	// portName will replace the characters '-' to '_' and convert to uppercase.
 	// +optional
 	ServiceName string `json:"serviceName,omitempty"`
 }

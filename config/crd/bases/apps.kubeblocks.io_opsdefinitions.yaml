@@ -53,10 +53,8 @@ spec:
                   are supported by the operation.
                 items:
                   properties:
-                    connectionCredentialName:
-                      description: the data of the specified connection credential
-                        will be injected into env of the job. if not set, use the
-                        first connection credential by default.
+                    accountName:
+                      description: the account name of the component.
                       type: string
                     serviceKind:
                       description: ServiceKind defines what kind of well-known service
@@ -66,8 +64,9 @@ spec:
                       type: string
                     serviceName:
                       description: reference the services[*].name. will map the service
-                        name and ports to KB_COMP_SVC_NAME and KB_COMP_SVC_PORT_<port>
-                        in env of the job.
+                        name and ports to KB_COMP_SVC_NAME and KB_COMP_SVC_PORT_<portName>
+                        in env of the job. portName will replace the characters '-'
+                        to '_' and convert to uppercase.
                       type: string
                   required:
                   - serviceKind

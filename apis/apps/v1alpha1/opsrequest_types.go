@@ -102,11 +102,21 @@ type OpsRequestSpec struct {
 	// +listMapKey=componentName
 	VerticalScalingList []VerticalScaling `json:"verticalScaling,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
+	// Deprecate: replace by reconfigures.
+
 	// reconfigure defines the variables that need to input when updating configuration.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.reconfigure"
 	// +kubebuilder:validation:XValidation:rule="self.configurations.size() > 0", message="Value can not be empty"
 	Reconfigure *Reconfigure `json:"reconfigure,omitempty"`
+
+	// reconfigure defines the variables that need to input when updating configuration.
+	// +optional
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	Reconfigures []Reconfigure `json:"reconfigures,omitempty"`
 
 	// expose defines services the component needs to expose.
 	// +optional
@@ -487,9 +497,15 @@ type OpsRequestStatus struct {
 	// +optional
 	CancelTimestamp metav1.Time `json:"cancelTimestamp,omitempty"`
 
+	// Deprecate: replace by ReconfiguringStatusAsComponent.
+
 	// reconfiguringStatus defines the status information of reconfiguring.
 	// +optional
 	ReconfiguringStatus *ReconfiguringStatus `json:"reconfiguringStatus,omitempty"`
+
+	// reconfiguringStatus defines the status information of reconfiguring.
+	// +optional
+	ReconfiguringStatusAsComponent map[string]*ReconfiguringStatus `json:"reconfiguringStatusAsComponent,omitempty"`
 
 	// conditions describes opsRequest detail status.
 	// +optional
@@ -594,9 +610,16 @@ type OpsRequestComponentStatus struct {
 }
 
 type ReconfiguringStatus struct {
+	// conditions describes reconfiguring detail status.
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
 	// configurationStatus describes the status of the component reconfiguring.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map

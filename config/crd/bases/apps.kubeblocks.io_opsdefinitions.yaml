@@ -8312,7 +8312,6 @@ spec:
                 description: pre-check if it meets the requirements to run the job
                   for the operation.
                 items:
-                  description: PreCheck
                   properties:
                     exec:
                       description: a job will be run to execute pre-check.

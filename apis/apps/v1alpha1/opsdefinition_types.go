@@ -89,8 +89,8 @@ type ParametersSchema struct {
 	OpenAPIV3Schema *apiextensionsv1.JSONSchemaProps `json:"openAPIV3Schema,omitempty"`
 }
 
-// PreCheck
 // +kubebuilder:validation:XValidation:rule="has(self.expression) || has(self.exec)", message="at least one exists for expression and exec."
+
 type PreCheck struct {
 
 	// expression declares how the operation can be executed.

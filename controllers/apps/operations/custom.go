@@ -78,7 +78,6 @@ func (c CustomOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, 
 	}, nil
 }
 
-// Action
 func (c CustomOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	preChecks := opsRes.OpsDef.Spec.PreChecks
 	customSpec := opsRes.OpsRequest.Spec.CustomSpec
@@ -313,7 +312,7 @@ func (c CustomOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 		// handle the job progress
 		progressDetail := appsv1alpha1.ProgressStatusDetail{ObjectKey: getProgressObjectKey(job.Kind, job.Name)}
 		handleProgress := func(expectPhase appsv1alpha1.ProgressStatus, message string) {
-			progressDetail.SetStatusAndMessage(expectPhase, fmt.Sprintf(message))
+			progressDetail.SetStatusAndMessage(expectPhase, message)
 			setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
 			opsRes.OpsRequest.Status.Components = map[string]appsv1alpha1.OpsRequestComponentStatus{
 				compName: compStatus,

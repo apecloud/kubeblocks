@@ -40,7 +40,7 @@ var _ = Describe("CustomOps", func() {
 		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
 		clusterVersionName    = "clusterversion-for-ops-" + randomStr
 		clusterName           = "cluster-for-ops-" + randomStr
-		compDefName           = "mysql-compdef"
+		compDefName           = "apecloud-mysql"
 		opsResource           *OpsResource
 		compObj               *appsv1alpha1.Component
 		opsDef                *appsv1alpha1.OpsDefinition
@@ -93,7 +93,6 @@ var _ = Describe("CustomOps", func() {
 		BeforeEach(func() {
 			By("create componentDefinition, cluster and component")
 			componentDefObj := testapps.NewComponentDefinitionFactory(compDefName).
-				WithRandomName().
 				SetDefaultSpec().
 				Create(&testCtx).
 				GetObject()

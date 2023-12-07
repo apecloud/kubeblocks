@@ -4,8 +4,8 @@ metadata:
   name: mysql-sql-executor
 spec:
   componentDefinitionRefs:
-    - serviceKind: mysql
-      connectionCredentialName: root
+    - name: apecloud-mysql
+      accountName: root
       serviceName: rw
 
   parametersSchema:

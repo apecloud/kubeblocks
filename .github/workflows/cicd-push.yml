@@ -223,3 +223,14 @@ jobs:
       WORKFLOW_ID: "deploy.yml"
       APECD_REF: "v0.1.0"
     secrets: inherit
+
+  deploy-cn-kubeblocks-io:
+    needs: trigger-mode
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docs_cn]') && (github.ref_name == 'main' || startsWith(github.ref_name, 'release')) }}
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.43
+    with:
+      GITHUB_REPO: "apecloud/cn.kubeblocks.io"
+      BRANCH_NAME: "master"
+      WORKFLOW_ID: "deploy.yml"
+      APECD_REF: "v0.1.43"
+    secrets: inherit

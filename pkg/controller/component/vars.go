@@ -38,12 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
-var (
-	referenceVarRegexp = regexp.MustCompile(`\$\(([^)]+)\)`)
-	escapedVarRegexp   = regexp.MustCompile("\\$\\$\\(+*\\)")
-	//referenceVarRegexp = regexp.MustCompile("\\$\\(+*\\)")
-)
-
 func ResolveEnvNTemplateVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	annotations map[string]string, definedVars []appsv1alpha1.EnvVar) error {
 	templateVars, credentialVars, err := resolveBuiltinNObjectRefVars(ctx, cli, synthesizedComp, definedVars)
@@ -51,10 +45,7 @@ func ResolveEnvNTemplateVars(ctx context.Context, cli client.Reader, synthesized
 		return err
 	}
 
-	newTemplateVars1, newTemplateVars2, err := resolveVarsReferenceNEscape(templateVars, credentialVars)
-	if err != nil {
-		return err
-	}
+	newTemplateVars1, newTemplateVars2 := resolveVarsReferenceNEscaping(templateVars, credentialVars)
 
 	envVars := make([]corev1.EnvVar, 0)
 	envVars = append(envVars, newTemplateVars1...)
@@ -130,7 +121,7 @@ func builtinTemplateVars(synthesizedComp *SynthesizedComponent) []corev1.EnvVar 
 	return []corev1.EnvVar{}
 }
 
-func resolveVarsReferenceNEscape(templateVars []corev1.EnvVar, credentialVars []corev1.EnvVar) ([]corev1.EnvVar, []corev1.EnvVar, error) {
+func resolveVarsReferenceNEscaping(templateVars []corev1.EnvVar, credentialVars []corev1.EnvVar) ([]corev1.EnvVar, []corev1.EnvVar) {
 	l2m := func(vars []corev1.EnvVar) map[string]corev1.EnvVar {
 		m := make(map[string]corev1.EnvVar)
 		for i, v := range vars {
@@ -141,123 +132,81 @@ func resolveVarsReferenceNEscape(templateVars []corev1.EnvVar, credentialVars []
 	templateVarsMapping := l2m(templateVars)
 	credentialVarsMapping := l2m(credentialVars)
 
-	vars1, vars2 := make([]corev1.EnvVar, len(templateVars)), make([]corev1.EnvVar, 0)
+	vars1, vars2 := make([]corev1.EnvVar, len(templateVars)), make([]corev1.EnvVar, len(templateVars))
 	for i := range templateVars {
-		var1, var2, err := resolveVarReferenceNEscape(templateVarsMapping, credentialVarsMapping, &templateVars[i])
-		if err != nil {
-			return nil, nil, err
-		}
+		var1, var2 := resolveVarReferenceNEscaping(templateVarsMapping, credentialVarsMapping, &templateVars[i])
 		vars1[i] = *var1
-		if var2 != nil {
-			vars2 = append(vars2, *var2)
-		}
+		vars2[i] = *var2
 	}
-	return vars1, vars2, nil
+	return vars1, vars2
 }
 
-func resolveVarReferenceNEscape(templateVars, credentialVars map[string]corev1.EnvVar, v *corev1.EnvVar) (*corev1.EnvVar, *corev1.EnvVar, error) {
+func resolveVarReferenceNEscaping(templateVars, credentialVars map[string]corev1.EnvVar, v *corev1.EnvVar) (*corev1.EnvVar, *corev1.EnvVar) {
 	if len(v.Value) == 0 {
-		return v, v, nil
+		return v, v
 	}
-
 	re := regexp.MustCompile(`\$\(([^)]+)\)`)
 	matches := re.FindAllStringSubmatchIndex(v.Value, -1)
 	if len(matches) == 0 {
-		return v, v, nil
+		return v, v
 	}
-
-	hasValueRef, hasValueFromRef, hasEscaped := checkReferenceValid(templateVars, *v, matches)
-	if hasValueFromRef > 1 || (hasValueFromRef == 1 && (hasValueRef > 0 || hasEscaped > 0)) {
-		return nil, nil, fmt.Errorf("")
-	}
-
-	if hasValueFromRef > 0 {
-		refVarName := v.Value[matches[0][2]:matches[0][3]]
-		v1, v2 := resolveValueFromReference(templateVars, credentialVars, *v, refVarName)
-		return v1, v2, nil
-	}
-
-	v1, v2 := resolveValueReferenceNEscape(templateVars, credentialVars, *v, matches)
-	return v1, v2, nil
+	return resolveValueReferenceNEscaping(templateVars, credentialVars, *v, matches)
 }
 
-func checkReferenceValid(vars map[string]corev1.EnvVar, v corev1.EnvVar, matches [][]int) (int, int, int) {
-	var (
-		hasValueRef     = 0
-		hasValueFromRef = 0
-		hasEscaped      = 0
-	)
-	isEscapeVar := func(idx int) bool {
-		return idx > 0 && v.Value[idx-1] == '$'
-	}
-	for _, m := range matches {
-		if isEscapeVar(m[0]) {
-			hasEscaped += 1
-			continue
-		}
-		name := v.Value[m[2]:m[3]]
-		if vv, ok := vars[name]; ok {
-			if vv.ValueFrom != nil {
-				hasValueFromRef += 1
-			} else {
-				hasValueRef += 1
-			}
-		}
-	}
-	return hasValueRef, hasValueFromRef, hasEscaped
-}
-
-func resolveValueFromReference(templateVars, credentialVars map[string]corev1.EnvVar,
-	v corev1.EnvVar, refVarName string) (*corev1.EnvVar, *corev1.EnvVar) {
-	v1 := v.DeepCopy()
-	var v2 *corev1.EnvVar = nil
-	if envVar, ok := templateVars[refVarName]; ok {
-		*v1 = envVar
-		v1.Name = v.Name
-	}
-	if envVar, ok := credentialVars[refVarName]; ok {
-		v2 = envVar.DeepCopy()
-		v2.Name = v.Name
-	}
-	return v1, v2
-}
-
-func resolveValueReferenceNEscape(templateVars, credentialVars map[string]corev1.EnvVar,
+func resolveValueReferenceNEscaping(templateVars, credentialVars map[string]corev1.EnvVar,
 	v corev1.EnvVar, matches [][]int) (*corev1.EnvVar, *corev1.EnvVar) {
-	subs := make([]func() string, 0)
-	if matches[0][0] > 0 {
-		subs = append(subs, func() string { return v.Value[0:matches[0][0]] })
+	isEscapingMatch := func(match []int) bool {
+		return match[0] > 0 && v.Value[match[0]-1] == '$'
 	}
-
-	isEscapeVar := func(idx int) bool {
-		return idx > 0 && v.Value[idx-1] == '$'
-	}
-	for _, match := range matches {
-		if isEscapeVar(match[0]) {
-			subs = append(subs, func() string { return v.Value[match[0]:match[1]] })
+	resolveValue := func(match []int, credential bool) string {
+		if isEscapingMatch(match) {
+			return v.Value[match[0]:match[1]]
 		} else {
-			subs = append(subs, func() string {
-				name := v.Value[match[2]:match[3]]
-				if vv, ok := templateVars[name]; ok {
-					return vv.Value
-				}
+			name := v.Value[match[2]:match[3]]
+			if vv, ok := templateVars[name]; ok {
+				return vv.Value
+			}
+			if credential {
 				if vv, ok := credentialVars[name]; ok {
 					return vv.Value
 				}
-				return v.Value[match[0]:match[1]]
-			})
+			}
+			return v.Value[match[0]:match[1]]
 		}
 	}
-	if matches[len(matches)-1][1] < len(v.Value)-1 {
-		subs = append(subs, func() string { return v.Value[matches[len(matches)-1][1]:] })
+
+	tokens := make([]func(bool) string, 0)
+	for idx, pos := 0, 0; pos < len(v.Value); idx++ {
+		if idx >= len(matches) {
+			lpos := pos
+			tokens = append(tokens, func(bool) string { return v.Value[lpos:len(v.Value)] })
+			break
+		}
+		match := matches[idx]
+		mpos := match[0]
+		if isEscapingMatch(match) {
+			mpos = match[0] - 1
+		}
+		if pos < mpos {
+			lpos := pos
+			tokens = append(tokens, func(bool) string { return v.Value[lpos:mpos] })
+		}
+		tokens = append(tokens, func(credential bool) string { return resolveValue(match, credential) })
+		pos = match[1]
 	}
 
-	builder := strings.Builder{}
-	for _, sub := range subs {
-		builder.WriteString(sub())
+	buildValue := func(credential bool) string {
+		builder := strings.Builder{}
+		for _, token := range tokens {
+			builder.WriteString(token(credential))
+		}
+		return builder.String()
 	}
 
-	return nil, nil
+	v1, v2 := v.DeepCopy(), v.DeepCopy()
+	v1.Value = buildValue(true)
+	v2.Value = buildValue(false)
+	return v1, v2
 }
 
 func buildDefaultEnv() []corev1.EnvVar {

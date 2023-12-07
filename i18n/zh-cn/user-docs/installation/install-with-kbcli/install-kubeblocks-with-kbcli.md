@@ -1,7 +1,17 @@
+---
+title: 用 kbcli 安装 KubeBlocks
+description: 如何用 kbcli 安装 KubeBlocksInstall KubeBlocks
+keywords: [taints, affinity, tolerance, 安装, kbcli, KubeBlocks]
+sidebar_position: 3
+sidebar_label: 安装 KubeBlocks
+---
+
 # 用 kbcli 安装 KubeBlocks
+
 创建一个新的 Kubernetes 集群，并使用 Playground 安装 KubeBlocks，这是快速入门 KubeBlocks 的一种方式。然而，在实际生产环境中，情况会复杂得多，应用程序在不同的命名空间中运行，还存在资源或权限限制。本文档将介绍如何在现有的 Kubernetes 集群上部署 KubeBlocks。
 
 ## 环境准备
+
 准备一个可访问的 Kubernetes 集群，版本要求 1.22 及以上。该集群应满足如下要求。
 
 <table>
@@ -35,39 +45,46 @@
 
 执行 `kbcli kubeblocks install` 将 KubeBlocks 安装在 `kb-system` 命名空间中，或者使用 `--namespace` 标记来指定一个命名空间。
 
-```kbcli kubeblocks install
+```bash
+kbcli kubeblocks install
 ```
 
 如果想安装 KubeBlocks 的指定版本，请按照以下步骤操作：
 
 1. 查看可用的版本。
-```
-kbcli kubeblocks list-versions
-```
-或者，你可以在 KubeBlocks Release 页面中查看可用的版本。
 
-2. 使用--version指定版本，并执行以下命令。
+    ```bash
+    kbcli kubeblocks list-versions
+    ```
 
-```
-kbcli kubeblocks install --version=x.x.x
-```
+    或者，你可以在 [KubeBlocks Release 页面](https://github.com/apecloud/kubeblocks/releases/)中查看可用的版本。
 
-  :::note
+2. 使用 `--version` 指定版本，并执行以下命令。
 
-kbcli 默认安装最新版本。在安装 KubeBlocks 时，kbcli 会安装与之匹配的版本。请确保 kbcli 和 KubeBlocks 的主版本号相匹配。
-例如，你可以安装 kbcli v0.6.1 和 KubeBlocks v0.6.3。但是，如果安装的是 kbcli v0.5.0 和 KubeBlocks v0.6.0，就可能会报错，因为它们不匹配。
-  
-  :::
+    ```bash
+    kbcli kubeblocks install --version=x.x.x
+    ```
+
+    :::note
+
+    kbcli 默认安装最新版本。在安装 KubeBlocks 时，kbcli 会安装与之匹配的版本。请确保 kbcli 和 KubeBlocks 的主版本号相匹配。
+
+    例如，你可以安装 kbcli v0.6.1 和 KubeBlocks v0.6.3。但是，如果安装的是 kbcli v0.5.0 和 KubeBlocks v0.6.0，就可能会报错，因为它们不匹配。
+
+    :::
 
 ## 检查 KubeBlocks 是否安装成功
 
 执行以下命令来检查 KubeBlocks 是否已成功安装。
 
+```bash
 kbcli kubeblocks status
-
-*结果*
-如果工作负载都已准备就绪，则表明 KubeBlocks 已成功安装。
 ```
+
+***结果***
+如果工作负载都已准备就绪，则表明 KubeBlocks 已成功安装。
+
+```bash
 KubeBlocks is deployed in namespace: kb-system,version: x.x.x
 >
 KubeBlocks Workloads:

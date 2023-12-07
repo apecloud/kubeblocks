@@ -28,10 +28,6 @@ import (
 
 // OpsDefinitionSpec defines the desired state of OpsDefinition
 type OpsDefinitionSpec struct {
-	// triggerPhaseChange indicates whether the operation will trigger a state change of the component.
-	// if true, will be queued for execution.
-	// +optional
-	TriggerPhaseChange bool `json:"triggerPhaseChange,omitempty"`
 
 	// componentDefinitionRefs indicates which types of componentDefinitions are supported by the operation.
 	// +kubebuilder:validation:Required

@@ -8472,11 +8472,6 @@ spec:
                   - message: at least one exists for expression and exec.
                     rule: has(self.expression) || has(self.exec)
                 type: array
-              triggerPhaseChange:
-                description: triggerPhaseChange indicates whether the operation will
-                  trigger a state change of the component. if true, will be queued
-                  for execution.
-                type: boolean
             required:
             - componentDefinitionRefs
             - jobSpec

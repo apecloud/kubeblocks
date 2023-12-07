@@ -57,12 +57,9 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 	}
 
 	if opsRequest.Spec.Type == appsv1alpha1.CustomType {
-		triggerPhaseChange, err := initOpsDefAndValidate(reqCtx, cli, opsRes)
+		err = initOpsDefAndValidate(reqCtx, cli, opsRes)
 		if err != nil {
 			return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
-		}
-		if triggerPhaseChange {
-			opsBehaviour.ToClusterPhase = appsv1alpha1.UpdatingClusterPhase
 		}
 	} else {
 		// validate OpsRequest.spec

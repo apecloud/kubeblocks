@@ -357,14 +357,14 @@ func (c CustomOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, c
 }
 
 // initOpsDefAndValidate inits the opsDefinition to OpsResource and validates if the opsRequest is valid.
-func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (bool, error) {
+func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	customSpec := opsRes.OpsRequest.Spec.CustomSpec
 	if customSpec == nil {
-		return false, intctrlutil.NewFatalError("spec.customSpec can not be empty if opsType is Custom.")
+		return intctrlutil.NewFatalError("spec.customSpec can not be empty if opsType is Custom.")
 	}
 	opsDef := &appsv1alpha1.OpsDefinition{}
 	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: customSpec.OpsDefinitionRef}, opsDef); err != nil {
-		return false, err
+		return err
 	}
 	opsRes.OpsDef = opsDef
 	// 1. validate OpenApV3Schema
@@ -373,22 +373,22 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx, cli client.Client, ops
 		// covert to type map[string]interface{}
 		params, err := common.CoverStringToInterfaceBySchemaType(parametersSchema.OpenAPIV3Schema, v)
 		if err != nil {
-			return false, err
+			return err
 		}
 		if parametersSchema != nil && parametersSchema.OpenAPIV3Schema != nil {
 			if err = common.ValidateDataWithSchema(parametersSchema.OpenAPIV3Schema, params); err != nil {
-				return false, err
+				return err
 			}
 		}
 	}
 	// 2. validate component and componentDef
 	comp := opsRes.Cluster.Spec.GetComponentByName(customSpec.ComponentName)
 	if comp == nil {
-		return false, intctrlutil.NewNotFound(`can not found component in cluster "%s"`, opsRes.Cluster.Name)
+		return intctrlutil.NewNotFound(`can not found component in cluster "%s"`, opsRes.Cluster.Name)
 	}
 	compDef, err := component.GetCompDefinition(reqCtx, cli, opsRes.Cluster, customSpec.ComponentName)
 	if err != nil {
-		return false, err
+		return err
 	}
 	var componentDefMatched bool
 	for _, v := range opsDef.Spec.ComponentDefinitionRefs {
@@ -398,7 +398,7 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx, cli client.Client, ops
 		}
 	}
 	if !componentDefMatched {
-		return false, intctrlutil.NewFatalError(fmt.Sprintf(`not supported componnet definition "%s"`, compDef.Name))
+		return intctrlutil.NewFatalError(fmt.Sprintf(`not supported componnet definition "%s"`, compDef.Name))
 	}
-	return opsDef.Spec.TriggerPhaseChange, nil
+	return nil
 }

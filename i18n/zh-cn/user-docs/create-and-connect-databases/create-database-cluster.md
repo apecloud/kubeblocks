@@ -1,6 +1,16 @@
+---
+title: 创建 MySQL 集群
+description: 如何创建 MySQL 集群
+keywords: [mysql, 创建 MySQL 集群]
+sidebar_position: 1
+sidebar_label: 创建 MySQL 集群
+---
+
 # 创建集群
 
-KubeBlocks 支持管理多种数据库引擎，针对每一种引擎的创建集群的命令都是一样的。但是配置细节上略有差别。本小节以创建MySQL集群为例。KubeBlocks 支持创建两种类型的 MySQL 集群：单机版（Standalone）和集群版（RaftGroup）。单机版仅支持一个副本，适用于对可用性要求较低的场景。 集群版包含三个副本，适用于对高可用性要求较高的场景。为了确保高可用性，所有的副本都默认分布在不同的节点上。
+KubeBlocks 支持管理多种数据库引擎，针对每一种引擎的创建集群的命令都是一样的。但是配置细节上略有差别。本小节以创建 MySQL 集群为例。
+
+KubeBlocks 支持创建两种类型的 MySQL 集群：单机版（Standalone）和集群版（RaftGroup）。单机版仅支持一个副本，适用于对可用性要求较低的场景。 集群版包含三个副本，适用于对高可用性要求较高的场景。为了确保高可用性，所有的副本都默认分布在不同的节点上。
 
 <Tabs>
 
@@ -74,15 +84,15 @@ KubeBlocks 实现了用 Cluster CRD 来定义集群。比如，可以通过下�
    EOF
    ```
 
-* `spec.clusterDefinitionRef` 表示用来定义集群组件的集群定义 CRD 的名称。
-* `spec.clusterVersionRef` 表示用来定义集群版本的集群版本 CRD 的名称。
-* `spec.componentSpecs` 表示用来定义集群组件的组件列表。
-* `spec.componentSpecs.componentDefRef` 表示在 ClusterDefinition 中定义的组件定义的名称。可使用 `kubectl get clusterdefinition vape cloud-MySQL -o json | jq '.spec.componentDefs[].name'` 获取组件定义的名称。
-* `spec.componentSpecs.name` 表示组件的名称。
-* `spec.componentSpecs.replicas` 表示组件的副本数。
-* `spec.componentSpecs.resources` 表示组件的资源要求。
-* `spec.componentSpecs.volumeClaimTemplates` 表示定义组件的卷声明模板列表。
-* `spec.terminationPolicy` 表示集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Halt`、`Delete` 和 `WipeOut`。`DoNotTerminate` 会阻止删除操作。`Halt` 会删除工作负载资源，如 statefulset 和 deployment 等，但是保留了 PVC 。`Delete` 在 `Halt` 的基础上进一步删除了 PVC。`WipeOut` 在 `Delete` 的基础上从备份存储的位置完全删除所有卷快照和快照数据。
+* `spec.clusterDefinitionRef` 是集群定义 CRD 的名称，用来定义集群组件。
+* `spec.clusterVersionRef` 是集群版本 CRD 的名称，用来定义集群版本。
+* `spec.componentSpecs` 是组件列表，用来定义集群组件。
+* `spec.componentSpecs.componentDefRef` 是组件定义的名称，在 ClusterDefinition 中定义。你可以使用 `kubectl get clusterdefinition vape cloud-MySQL -o json | jq '.spec.componentDefs[].name'` 获取组件定义的名称。
+* `spec.componentSpecs.name` 是组件的名称。
+* `spec.componentSpecs.replicas` 是组件的副本数。
+* `spec.componentSpecs.resources` 是组件的资源要求。
+* `spec.componentSpecs.volumeClaimTemplates` 是卷声明模板的列表，用于定义组件的卷声明模板。
+* `spec.terminationPolicy` 表示集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Halt`、`Delete` 和 `WipeOut`。`DoNotTerminate` 禁止一切删除操作。`Halt` 会删除工作负载资源，如 statefulset 和 deployment 等，但是保留 PVC。`Delete` 在 `Halt` 的基础上进一步删除了 PVC。`WipeOut` 在 `Delete` 的基础上从备份存储的位置完全删除所有卷快照和快照数据。
 
 KubeBlocks operator 监听 `Cluster` CRD，创建集群及其依赖资源。你可以使用以下命令获取该集群创建的所有资源。
 
@@ -190,7 +200,7 @@ status:
 
 
 
-你可以通过客户端界面或 kbcli 连接到数据库。如下图所示，首先你需要明确连接数据库的目的是什么。
-- 如果你想试用 KubeBlocks、测试数据库功能或进行低流量基准测试，请参阅在测试环境中连接数据库。
-- 如果你想在生产环境中连接数据库或进行高流量压力测试，请参阅在生产环境中连接数据库。
-pic
+你可以通过客户端界面或 `kbcli` 连接到数据库。如下图所示，首先你需要明确连接数据库的目的是什么。
+- 如果你想试用 KubeBlocks、测试数据库功能或进行低流量基准测试，请参阅[在测试环境中连接数据库](../create-and-connect-databases/connect-to-database-in-testing-environment.md)。
+- 如果你想在生产环境中连接数据库或进行高流量压力测试，请参阅[在生产环境中连接数据库](../create-and-connect-databases/connect-to-database-in-production-environment.md)。
+![overview](../img/../../img/create-and-connect-databases-overview.jpg)

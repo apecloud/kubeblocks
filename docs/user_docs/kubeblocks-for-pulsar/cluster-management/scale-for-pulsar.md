@@ -173,6 +173,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 ### Handle the snapshot exception
 
 If `STATUS=ConditionsError` occurs during the horizontal scaling process, you can find the cause from `cluster.status.condition.message` for troubleshooting.
+
 In the example below, a snapshot exception occurs.
 
 ```bash

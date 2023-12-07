@@ -1,63 +1,63 @@
 ---
-title: Configure cluster parameters
-description: Configure cluster parameters
-keywords: [pulsar, parameter, configuration, reconfiguration]
+title: 配置集群参数
+description: 如何配置集群参数
+keywords: [pulsar, 参数, 配置, 再配置]
 sidebar_position: 4
 ---
 
-# Configure cluster parameters
+# 配置集群参数
 
-From v0.6.0, KubeBlocks supports `kbcli cluster configure` and `kbcli cluster edit-config` to configure parameters. The difference is that KubeBlocks configures parameters automatically with `kbcli cluster configure` but `kbcli cluster edit-config` provides a visualized way for you to edit parameters directly.
+从 v0.6.0 版本开始，KubeBlocks 支持使用 `kbcli cluster configure` 和 `kbcli cluster edit-config` 两种方式来配置参数。它们的区别在于，`kbcli cluster configure `可以自动配置参数，而 `kbcli cluster edit-config` 则允许以可视化的方式直接编辑参数。
 
-There are 3 types of parameters:
+一共有 3 类参数：
 
-1. Environment parameters, such as GC-related parameters, `PULSAR_MEM`, and `PULSAR_GC`, changes will apply to all components;
-2. Configuration parameters, such as `zookeeper` or `bookies.conf` configuration files, can be changed through `env` and changes restart the pod;
-3. Dynamic parameters, such as configuration files in `brokers.conf`, `broker` supports two types of change modes:
-    a. Parameter change requires a restart, such as `zookeeperSessionExpiredPolicy`;
-    b. For parameters that support dynamic parameters, you can obtain a list of all dynamic parameters with `pulsar-admin brokers list-dynamic-config`.
+1. 环境参数，比如 GC 相关的参数，`PULSAR_MEM` 和 `PULSAR_GC`。参数变更对每个组件都适用。
+2. 配置参数，比如 `zookeeper` 或 `bookies.conf` 配置文件。可以通过 `env` 的方式做变更，变更会重启 pod。
+3. 动态参数，比如 `brokers.conf` 中的配置文件。Pulsar 的 `broker` 支持两种变更模式：
+     1. 一种是需要重启的参数变更，比如 `zookeeperSessionExpiredPolicy`。
+     2. 另外一种是支持 dynamic 的参数，可以通过 `pulsar-admin brokers list-dynamic-config` 获取所有的动态参数列表。
 
 :::note
 
-`pulsar-admin` is a management tool built in the Pulsar cluster. You can log in to the corresponding pod with `kubectl exec -it <pod-name> -- bash` (pod-name can be checked by `kubectl get pods` command, and you can choose any pod with the word `broker` in its name ), and there are corresponding commands in the `/pulsar/bin path` of the pod. For more information about pulsar-admin, please refer to the [official documentation](https://pulsar.apache.org/docs/3.0.x/admin-api-tools/
-).
+`pulsar-admin `是 Pulsar 集群自带的管理工具，可以通过 `kubectl exec -it <pod-name> -- bash` 登录到对应的 Pod 中（pod-name 可通过 `kubectl get pods` 获取，选择名字中带有 `broker` 字样的 Pod 即可）。在 Pod 中的 `/pulsar/bin path` 路径下有对应的命令。关于 pulsar-admin 的更多信息，可参考[官方文档](https://pulsar.apache.org/docs/3.0.x/admin-api-tools/)。
+
 :::
 
-## View parameter information
+## 查看参数信息
 
-View the current configuration file of a cluster.
+查看集群的当前配置文件。
 
 ```bash
 kbcli cluster describe-config pulsar  
 ```
 
-* View the details of the current configuration file.
+* 查看当前配置文件的详细信息。
 
   ```bash
   kbcli cluster describe-config pulsar --show-detail
   ```
 
-* View the parameter description.
+* 查看参数描述。
 
   ```bash
   kbcli cluster explain-config pulsar | head -n 20
   ```
 
-## Configure parameters
+## 配置参数
 
-### Configure parameters with configure command
+### 使用 configure 命令配置参数
 
-#### Configure environment parameters
+#### 配置环境参数
 
-***Steps***
+***步骤：***
 
-1. You need to specify the component name to configure parameters. Get the pulsar cluster component name.
+1. 获取 Pulsar 集群组件名称，配置参数。
 
   ```bash
   kbcli cluster list-components pulsar 
   ```
 
-  ***Example***
+  ***示例***
 
   ```bash
   kbcli cluster list-components pulsar 
@@ -70,35 +70,35 @@ kbcli cluster describe-config pulsar
   zookeeper          default     pulsar    zookeeper          docker.io/apecloud/pulsar:2.11.2
   ```
 
-2. Configure parameters.
+2. 配置参数。
 
-   We take `zookeeper` as an example.
+   下面以 `zookeeper` 为例。
 
    ```bash
    kbcli cluster configure pulsar --component=zookeeper --set PULSAR_MEM="-XX:MinRAMPercentage=50 -XX:MaxRAMPercentage=70" 
    ```
 
-3. Verify the configuration.
+3. 验证配置。
 
-   a. Check the progress of configuration:
+   a. 检查配置进度。
 
    ```bash
    kubectl get ops 
    ```
 
-   b. Check whether the configuration is done.
+   b. 检查配置是否完成。
 
    ```bash
    kubectl get pod -l app.kubernetes.io/name=pulsar
    ```
 
-#### Configure other parameters
+#### 配置其他参数
 
-The following steps take the configuration of dynamic parameter `brokerShutdownTimeoutMs` as an example.
+下面以配置动态参数 `brokerShutdownTimeoutMs` 为例。
 
-***Steps***
+***步骤：***
 
-1. Get configuration information.
+1. 获取配置信息。
 
    ```bash
    kbcli cluster desc-config pulsar --component=broker
@@ -110,7 +110,7 @@ The following steps take the configuration of dynamic parameter `brokerShutdownT
    broker-config            broker.conf            true      pulsar-broker-config-tpl   brokers-config-constraints   pulsar-broker-broker-config            broker      pulsar
    ```
 
-2. Configure parameters.
+2. 配置参数。
 
    ```bash
    kbcli cluster configure pulsar --component=broker --config-spec=broker-config --set brokerShutdownTimeoutMs=66600
@@ -121,9 +121,9 @@ The following steps take the configuration of dynamic parameter `brokerShutdownT
            kbcli cluster describe-ops pulsar-reconfiguring-qxw8s -n default
    ```
 
-3. Check the progress of configuration.
+3. 检查配置进度。
 
-   The ops name is printed with the command above.
+   使用上述命令打印的 ops name 进行检查。
 
    ```bash
    kbcli cluster describe-ops pulsar-reconfiguring-qxw8s -n default
@@ -143,13 +143,13 @@ The following steps take the configuration of dynamic parameter `brokerShutdownT
                          OBJECT-KEY   STATUS   DURATION   MESSAGE
    ```
 
-### Configure parameters with edit-config command
+### 使用 edit-config 命令配置参数
 
-For your convenience, KubeBlocks offers a tool `edit-config` to help you to configure parameter in a visualized way.
+KubeBlocks 提供了一个名为 `edit-config` 的工具，帮助以可视化的方式配置参数。
 
-For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on notepad.
+Linux 和 macOS 系统可以使用 vi 编辑器编辑配置文件，Windows 系统可以使用 notepad。
 
-1. Edit the configuration file.
+1. 编辑配置文件。
 
    ```bash
    kbcli cluster edit-config pulsar
@@ -157,17 +157,17 @@ For Linux and macOS, you can edit configuration files by vi. For Windows, you ca
 
 :::note
 
-If there are multiple components in a cluster, use `--component` to specify a component.
+如果集群中有多个组件，请使用 `--component` 参数指定一个组件。
 
 :::
 
-2. View the status of the parameter configuration.
+2. 查看参数配置状态。
 
    ```bash
    kbcli cluster describe-ops xxx -n default
    ```
 
-3. Connect to the database to verify whether the parameters are configured as expected.
+3. 连接到数据库，验证参数是否按预期配置。
 
    ```bash
    kbcli cluster connect pulsar
@@ -175,19 +175,19 @@ If there are multiple components in a cluster, use `--component` to specify a co
 
 :::note
 
-1. For the `edit-config` function, static parameters and dynamic parameters cannot be edited at the same time.
-2. Deleting a parameter will be supported later.
+1. `edit-config` 不能同时编辑静态参数和动态参数。
+2. KubeBlocks 未来将支持删除参数。
 
 :::
 
-### Configure parameters with kubectl
+### 使用 kubectl 配置参数
 
-Using kubectl to configure pulsar cluster requires modifying the configuration file.
+使用 kubectl 配置 Pulsar 集群时，需要修改配置文件。
 
-***Steps***
+***步骤：***
 
-1. Get the configmap where the configuration file is located. Take `broker` component as an example.
-
+1. 获取包含配置文件的 configMap。下面以 `broker` 组件为例。
+   
     ```bash
     kbcli cluster desc-config pulsar --component=broker
 
@@ -198,10 +198,10 @@ Using kubectl to configure pulsar cluster requires modifying the configuration f
     broker-config            broker.conf            true      pulsar-broker-config-tpl   brokers-config-constraints   pulsar-broker-broker-config            broker      pulsar
     ```
 
-    In the rendered colume of the above output, you can check the broker's configmap is `pulsar-broker-broker-config`.
+    在上述输出的 RENDERED 列中，可以看到 broker 的 configMap 名称为 `pulsar-broker-broker-config`。
 
-2. Modify the `broker.conf` file, in this case, it is `pulsar-broker-broker-config`.
-
+2. 修改 `broker.conf` 文件。在本例中，就是 `pulsar-broker-broker-config`。
+   
     ```bash
     kubectl edit cm pulsar-broker-broker-config
     ```

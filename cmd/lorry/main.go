@@ -32,6 +32,7 @@ import (
 	"go.uber.org/automaxprocs/maxprocs"
 	"google.golang.org/grpc"
 	health "google.golang.org/grpc/health/grpc_health_v1"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -74,6 +75,7 @@ func main() {
 	}
 	opts.BindFlags(flag.CommandLine)
 
+	klog.InitFlags(nil)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 	err := viper.BindPFlags(pflag.CommandLine)

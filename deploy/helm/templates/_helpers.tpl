@@ -324,3 +324,12 @@ Define default storage class name, if cloud provider is known, specify a default
 {{- "" }}
 {{- end }}
 {{- end }}
+
+
+{{- define "kubeblocks.imageRegistry" }}
+{{- if .Values.image.registry }}
+{{- .Values.image.registry }}
+{{- else }}
+{{- "infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com" }}
+{{- end}}
+{{- end}}

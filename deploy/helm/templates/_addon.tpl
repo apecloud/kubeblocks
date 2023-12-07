@@ -1,8 +1,10 @@
+{{- $addonImageRegistry := include "kubeblocks.imageRegistry" . }}
 {{/*
 Define addon Helm charts image information.
 */}}
 {{- define "kubeblocks.addonChartsImage" }}
-chartsImage: {{ .Values.addonChartsImage.registry | default "docker.io" }}/{{ .Values.addonChartsImage.repository }}:{{ .Values.addonChartsImage.tag | default .Chart.AppVersion }}
+{{- $addonImageRegistry := index . "addonImageRegistry" }}
+chartsImage: {{ .Values.addonChartsImage.registry | default $addonImageRegistry }}/{{ .Values.addonChartsImage.repository }}:{{ .Values.addonChartsImage.tag | default .Chart.AppVersion }}
 chartsPathInImage: {{ .Values.addonChartsImage.chartsPath }}
 {{- end }}
 
@@ -40,6 +42,7 @@ Parameters:
 - kbVersion: KubeBlocks version that this addon is compatible with
 */}}
 {{- define "kubeblocks.buildAddonCR" }}
+{{- $addonImageRegistry := index . "addonImageRegistry" }}
 {{- $upgrade:= or .Release.IsInstall (and .Release.IsUpgrade .Values.upgradeAddons) }}
 {{- $existingAddon := lookup "extensions.kubeblocks.io/v1alpha1" "Addon" "" .name -}}
 {{- if and (not $upgrade) $existingAddon -}}
@@ -69,7 +72,7 @@ spec:
   type: Helm
   helm:
     {{- include "kubeblocks.addonChartLocationURL" ( dict "name" .name "version" .version "values" .Values) | indent 4 }}
-    chartsImage: {{ .Values.addonChartsImage.registry | default "docker.io" }}/{{ .Values.addonChartsImage.repository }}:{{ .Values.addonChartsImage.tag | default .Chart.AppVersion }}
+    chartsImage: {{ .Values.addonChartsImage.registry | default $addonImageRegistry }}/{{ .Values.addonChartsImage.repository }}:{{ .Values.addonChartsImage.tag | default .Chart.AppVersion }}
     chartsPathInImage: {{ .Values.addonChartsImage.chartsPath }}
     installOptions:
       {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}

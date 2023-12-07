@@ -1,0 +1,46 @@
+apiVersion: storage.kubeblocks.io/v1alpha1
+kind: StorageProvider
+metadata:
+  name: ftp
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+spec:
+  datasafedConfigTemplate: |
+    [storage]
+    type = ftp
+    host = {{ `{{ .Parameters.ftpHost }}` }}
+    port = {{ `{{ if ne .Parameters.ftpPort "0" }}{{ .Parameters.ftpPort }}{{ else }}21{{ end }}` }}
+    user = {{ `{{ .Parameters.ftpUser }}` }}
+    pass.need_obscure = {{ `{{ .Parameters.ftpPassword }}` }}
+    tls = {{ `{{ .Parameters.ftpTls | default false }}` }}
+
+  parametersSchema:
+    openAPIV3Schema:
+      type: "object"
+      properties:
+        ftpHost:
+          type: string
+          description: "Host of the FTP server"
+        ftpPort:
+          type: integer
+          description: "Port of the FTP server (optional)"
+          default: 21
+        ftpUser:
+          type: string
+          description: "the FTP user"
+        ftpPassword:
+          type: string
+          description: "the password of the user"
+        ftpTls:
+          type: boolean
+          description: "enable FTP over TLS (optional)"
+          default: false
+
+      required:
+        - ftpHost
+        - ftpUser
+        - ftpPassword
+
+    credentialFields:
+      - ftpUser
+      - ftpPassword

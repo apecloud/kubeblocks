@@ -1,7 +1,7 @@
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
-  name: csi-s3
+  name: csi-driver-nfs
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
     "kubeblocks.io/provider": community
@@ -10,36 +10,30 @@ metadata:
     helm.sh/resource-policy: keep
   {{- end }}
 spec:
-  description: Container Storage Interface (CSI) driver for S3 volumes
+  description: Container Storage Interface (CSI) driver for NFS based volumes
   type: Helm
 
   helm:
-    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "csi-s3" "version" "0.7.0" "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "csi-driver-nfs" "version" "4.5.0" "values" .Values) | indent 4 }}
     {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
 
     installOptions:
       {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-      version: 0.7.0
+      version: 4.5.0
       {{- end }}
 
     installValues:
-      secretRefs:
-        - name: {{ include "kubeblocks.fullname" . }}-cloud-provider
-          key: csi-s3
-
       {{- $cloudProvider := (include "kubeblocks.cloudProvider" .) }}
       {{- if eq $cloudProvider "huaweiCloud" }}
       setValues:
-        - kubeletPath=/mnt/paas/kubernetes/kubelet
+        - kubeletDir=/mnt/paas/kubernetes/kubelet
       {{- end }}
 
     valuesMapping:
+      valueMap:
+        replicaCount: controller.replicas
       jsonMap:
-        tolerations: tolerations
-      extras:
-      - name: daemonset
-        jsonMap:
-          tolerations: daemonsetTolerations
+        tolerations: controller.tolerations
 
   defaultInstallValues:
     - enabled: true
@@ -48,11 +42,11 @@ spec:
       {{- end }}
 
   installable:
-    {{- $autoInstall := (get ( get ( .Values | toYaml | fromYaml ) "csi-s3" ) "enabled") }}
-    {{- /* auto install csi-s3 if it's required by backup repos */ -}}
+    {{- $autoInstall := false }}
+    {{- /* auto install csi-driver-nfs if it's required by backup repos */ -}}
     {{- if .Values.backupRepo.create }}
       {{- if eq .Values.backupRepo.accessMethod "Mount" }}
-        {{- if eq .Values.backupRepo.storageProvider "s3" "oss" "minio" "obs" "cos" "gcs-s3comp" }}
+        {{- if eq .Values.backupRepo.storageProvider "nfs" }}
           {{- $autoInstall = true }}
         {{- end }}
       {{- end }}

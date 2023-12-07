@@ -317,7 +317,7 @@ dataProtection:
     imagePullSecrets: []
     datasafed:
       repository: apecloud/datasafed
-      tag: "0.0.3"
+      tag: "0.0.4"
 
 ## BackupRepo settings
 ##

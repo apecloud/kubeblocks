@@ -463,7 +463,7 @@ const (
 	UnknownBuiltinActionHandler            BuiltinActionHandlerType = "unknown"
 )
 
-type LifecycleActionSpec struct {
+type LifecycleActionHandler struct {
 	// builtinHandler specifies the builtin action handler name to do the action.
 	// the BuiltinHandler within the same ComponentLifecycleActions should be consistent. Details can be queried through official documentation in the future.
 	// use CustomHandler to define your own actions if none of them satisfies the requirement.
@@ -472,10 +472,10 @@ type LifecycleActionSpec struct {
 
 	// customHandler defines the custom way to do action.
 	// +optional
-	CustomHandler *CustomHandlerSpec `json:"customHandler,omitempty"`
+	CustomHandler *CustomHandler `json:"customHandler,omitempty"`
 }
 
-type CustomHandlerSpec struct {
+type CustomHandler struct {
 	// action defines the custom action to take.
 	// +kubebuilder:validation:Required
 	Action *Action `json:"action,omitempty"`
@@ -491,17 +491,17 @@ type ComponentLifecycleActions struct {
 	// PostProvision defines the actions to be executed and the corresponding policy when a component is created.
 	// Cannot be updated.
 	// +optional
-	PostProvision *PostProvisionSpec `json:"postProvision,omitempty"`
+	PostProvision *PostProvision `json:"postProvision,omitempty"`
 
 	// PreTerminate defines the actions to be executed and the corresponding policy when a component is terminated due to an API request.
 	// Cannot be updated.
 	// +optional
-	PreTerminate *PreTerminateSpec `json:"preTerminate,omitempty"`
+	PreTerminate *PreTerminate `json:"preTerminate,omitempty"`
 
 	// RoleProbe defines how to probe the role of replicas.
 	// Cannot be updated.
 	// +optional
-	RoleProbe *RoleProbeSpec `json:"roleProbe,omitempty"`
+	RoleProbe *RoleProbe `json:"roleProbe,omitempty"`
 
 	// Switchover defines how to proactively switch the current leader to a new replica to minimize the impact on availability.
 	// This action is typically invoked when the leader is about to become unavailable due to events, such as:
@@ -520,14 +520,14 @@ type ComponentLifecycleActions struct {
 	// - KB_CONSENSUS_LEADER_POD_: The prefix of the environment variables of the original leader's Pod before switchover.
 	// Cannot be updated.
 	// +optional
-	Switchover *ComponentSwitchoverSpec `json:"switchover,omitempty"`
+	Switchover *ComponentSwitchover `json:"switchover,omitempty"`
 
 	// MemberJoin defines how to add a new replica to the replication group.
 	// This action is typically invoked when a new replica needs to be added, such as during scale-out.
 	// It may involve updating configuration, notifying other members, and ensuring data consistency.
 	// Cannot be updated.
 	// +optional
-	MemberJoin *LifecycleActionSpec `json:"memberJoin,omitempty"`
+	MemberJoin *LifecycleActionHandler `json:"memberJoin,omitempty"`
 
 	// MemberLeave defines how to remove a replica from the replication group.
 	// This action is typically invoked when a replica needs to be removed, such as during scale-in.
@@ -535,18 +535,18 @@ type ComponentLifecycleActions struct {
 	// but it is advisable to avoid performing data migration within this action.
 	// Cannot be updated.
 	// +optional
-	MemberLeave *LifecycleActionSpec `json:"memberLeave,omitempty"`
+	MemberLeave *LifecycleActionHandler `json:"memberLeave,omitempty"`
 
 	// Readonly defines how to set a replica service as read-only.
 	// This action is used to protect a replica in case of volume space exhaustion or excessive traffic.
 	// Cannot be updated.
 	// +optional
-	Readonly *LifecycleActionSpec `json:"readonly,omitempty"`
+	Readonly *LifecycleActionHandler `json:"readonly,omitempty"`
 
 	// Readwrite defines how to set a replica service as read-write.
 	// Cannot be updated.
 	// +optional
-	Readwrite *LifecycleActionSpec `json:"readwrite,omitempty"`
+	Readwrite *LifecycleActionHandler `json:"readwrite,omitempty"`
 
 	// DataPopulate defines how to populate the data to create new replicas.
 	// This action is typically used when a new replica needs to be constructed, such as:
@@ -556,7 +556,7 @@ type ComponentLifecycleActions struct {
 	// It should write the valid data to stdout without including any extraneous information.
 	// Cannot be updated.
 	// +optional
-	DataPopulate *LifecycleActionSpec `json:"dataPopulate,omitempty"`
+	DataPopulate *LifecycleActionHandler `json:"dataPopulate,omitempty"`
 
 	// DataAssemble defines how to assemble data synchronized from external before starting the service for a new replica.
 	// This action is typically used when creating a new replica, such as:
@@ -567,35 +567,35 @@ type ComponentLifecycleActions struct {
 	// the action must be able to guarantee idempotence to allow for retries from the beginning.
 	// Cannot be updated.
 	// +optional
-	DataAssemble *LifecycleActionSpec `json:"dataAssemble,omitempty"`
+	DataAssemble *LifecycleActionHandler `json:"dataAssemble,omitempty"`
 
 	// Reconfigure defines how to notify the replica service that there is a configuration update.
 	// Cannot be updated.
 	// +optional
-	Reconfigure *LifecycleActionSpec `json:"reconfigure,omitempty"`
+	Reconfigure *LifecycleActionHandler `json:"reconfigure,omitempty"`
 
 	// AccountProvision defines how to provision accounts.
 	// Cannot be updated.
 	// +optional
-	AccountProvision *LifecycleActionSpec `json:"accountProvision,omitempty"`
+	AccountProvision *LifecycleActionHandler `json:"accountProvision,omitempty"`
 }
 
-type PostProvisionSpec struct {
-	LifecycleActionSpec `json:",inline"`
+type PostProvision struct {
+	LifecycleActionHandler `json:",inline"`
 
 	// ExecutePolicy defines the policy for executing the action.
 	// Cannot be updated.
 	// +optional
-	ExecutePolicy *PostProvisionExecutePolicySpec `json:"executePolicy,omitempty"`
+	ExecutePolicy *PostProvisionExecutePolicy `json:"executePolicy,omitempty"`
 }
 
-type PreTerminateSpec struct {
-	LifecycleActionSpec `json:",inline"`
+type PreTerminate struct {
+	LifecycleActionHandler `json:",inline"`
 
 	// ExecutePolicy defines the policy for executing the action.
 	// Cannot be updated.
 	// +optional
-	ExecutePolicy *PreTerminateExecutePolicySpec `json:"executePolicy,omitempty"`
+	ExecutePolicy *PreTerminateExecutePolicy `json:"executePolicy,omitempty"`
 }
 
 // ExecuteFrequencyPolicy defines the policy for executing frequency of the action.
@@ -615,7 +615,7 @@ const (
 	PostProvisionComponentReadyExecuteType PostProvisionExecuteAtType = "ComponentReady"
 )
 
-type PostProvisionExecutePolicySpec struct {
+type PostProvisionExecutePolicy struct {
 	// ExecuteAt defines the time when the action will be executed.
 	// - Immediately: The PostProvision Action is executed immediately after the Component object is created,
 	// without guaranteeing the availability of the Component and its underlying resources. only after the Action is successfully executed will the Component's state turn to ready.
@@ -645,7 +645,7 @@ const (
 	PreTerminateImmediatelyExecuteType PreTerminateExecuteAtType = "Immediately"
 )
 
-type PreTerminateExecutePolicySpec struct {
+type PreTerminateExecutePolicy struct {
 	// ExecuteAt defines the time when the action will be executed.
 	// - Immediately: Upon receiving a scale-down command for the Component, it is executed immediately.
 	// Only after the preTerminate action is successfully executed, the destruction of the Component and its underlying resources proceeds.
@@ -655,7 +655,7 @@ type PreTerminateExecutePolicySpec struct {
 	ExecuteAt *PreTerminateExecuteAtType `json:"executeAt,omitempty"`
 }
 
-type ComponentSwitchoverSpec struct {
+type ComponentSwitchover struct {
 	// withCandidate corresponds to the switchover of the specified candidate primary or leader instance.
 	// Currently, only Action.Exec is supported, Action.HTTP is not supported.
 	// +optional
@@ -672,8 +672,8 @@ type ComponentSwitchoverSpec struct {
 	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
 }
 
-type RoleProbeSpec struct {
-	LifecycleActionSpec `json:",inline"`
+type RoleProbe struct {
+	LifecycleActionHandler `json:",inline"`
 
 	// Number of seconds after the container has started before liveness probes are initiated.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes

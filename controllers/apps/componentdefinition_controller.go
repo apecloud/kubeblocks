@@ -319,7 +319,7 @@ func (r *ComponentDefinitionReconciler) validateLifecycleActionBuiltInHandlers(l
 		targetBuiltInHandlers = append(targetBuiltInHandlers, lifecycleActions.PreTerminate.BuiltinHandler)
 	}
 
-	actions := []*appsv1alpha1.LifecycleActionSpec{
+	actions := []*appsv1alpha1.LifecycleActionHandler{
 		lifecycleActions.MemberJoin,
 		lifecycleActions.MemberLeave,
 		lifecycleActions.Readonly,

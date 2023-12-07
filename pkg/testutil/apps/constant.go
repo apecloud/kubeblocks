@@ -73,8 +73,8 @@ const (
 )
 
 var (
-	defaultBuiltinHandler      = appsv1alpha1.MySQLBuiltinActionHandler
-	defaultLifecycleActionSpec = &appsv1alpha1.LifecycleActionSpec{
+	defaultBuiltinHandler         = appsv1alpha1.MySQLBuiltinActionHandler
+	defaultLifecycleActionHandler = &appsv1alpha1.LifecycleActionHandler{
 		BuiltinHandler: &defaultBuiltinHandler,
 	}
 
@@ -333,27 +333,27 @@ var (
 			},
 		},
 		LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{
-			PostProvision: &appsv1alpha1.PostProvisionSpec{
-				LifecycleActionSpec: *defaultLifecycleActionSpec,
+			PostProvision: &appsv1alpha1.PostProvision{
+				LifecycleActionHandler: *defaultLifecycleActionHandler,
 			},
-			PreTerminate: &appsv1alpha1.PreTerminateSpec{
-				LifecycleActionSpec: *defaultLifecycleActionSpec,
+			PreTerminate: &appsv1alpha1.PreTerminate{
+				LifecycleActionHandler: *defaultLifecycleActionHandler,
 			},
-			RoleProbe: &appsv1alpha1.RoleProbeSpec{
-				LifecycleActionSpec: *defaultLifecycleActionSpec,
-				FailureThreshold:    3,
-				PeriodSeconds:       1,
-				TimeoutSeconds:      5,
+			RoleProbe: &appsv1alpha1.RoleProbe{
+				LifecycleActionHandler: *defaultLifecycleActionHandler,
+				FailureThreshold:       3,
+				PeriodSeconds:          1,
+				TimeoutSeconds:         5,
 			},
 			Switchover:       nil,
-			MemberJoin:       defaultLifecycleActionSpec,
-			MemberLeave:      defaultLifecycleActionSpec,
-			Readonly:         defaultLifecycleActionSpec,
-			Readwrite:        defaultLifecycleActionSpec,
-			DataPopulate:     defaultLifecycleActionSpec,
-			DataAssemble:     defaultLifecycleActionSpec,
-			Reconfigure:      defaultLifecycleActionSpec,
-			AccountProvision: defaultLifecycleActionSpec,
+			MemberJoin:       defaultLifecycleActionHandler,
+			MemberLeave:      defaultLifecycleActionHandler,
+			Readonly:         defaultLifecycleActionHandler,
+			Readwrite:        defaultLifecycleActionHandler,
+			DataPopulate:     defaultLifecycleActionHandler,
+			DataAssemble:     defaultLifecycleActionHandler,
+			Reconfigure:      defaultLifecycleActionHandler,
+			AccountProvision: defaultLifecycleActionHandler,
 		},
 	}
 

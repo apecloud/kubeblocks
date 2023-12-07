@@ -82,8 +82,10 @@ func BuildChartInfo(t ClusterType) (*ChartInfo, error) {
 		return nil, err
 	}
 
-	if err = c.buildClusterSchema(); err != nil {
-		return nil, err
+	if c.Schema != nil {
+		if err = c.buildClusterSchema(); err != nil {
+			return nil, err
+		}
 	}
 
 	if err = c.buildClusterDef(); err != nil {
@@ -223,7 +225,11 @@ func loadHelmChart(ci *ChartInfo, t ClusterType) error {
 	// cf references cluster config
 	cf, ok := ClusterTypeCharts[t]
 	if !ok {
-		return fmt.Errorf("failed to find the helm chart of %s", t)
+		cf = &embedConfig{
+			chartFS: defaultChart,
+			name:    fmt.Sprintf("%s-cluster.tgz", t),
+			alias:   "",
+		}
 	}
 	file, err := cf.loadChart()
 	if err != nil {

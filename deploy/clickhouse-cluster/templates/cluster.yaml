@@ -15,39 +15,37 @@ spec:
   tolerations: {{ . | toYaml | nindent 4 }}
   {{- end }}
   componentSpecs:
-    {{- $i := 0 }}
-    {{- range .Values.clickhouse }}
+    {{- range $i := until (.Values.shardCount|int) }}
     - name: shard-{{ $i }}
       componentDefRef: clickhouse
       monitor: {{ $.Values.monitor.enabled }}
-      replicas: {{ .replicaCount | default 2 }}
+      replicas: {{ $.Values.clickhouse.replicaCount | default 2 }}
       serviceAccountName: {{ include "clickhouse-cluster.serviceAccountName" $ }}
-      {{- with .tolerations }}
+      {{- with $.Values.clickhouse.tolerations }}
       tolerations: {{ .| toYaml | nindent 8 }}
       {{- end }}
-      {{- with .resources }}
+      {{- with $.Values.clickhouse.resources }}
       resources:
         limits:
-          cpu: {{ .limits.cpu | quote }}
-          memory: {{ .limits.memory | quote }}
+          cpu: {{ $.Values.clickhouse.limits.cpu | quote }}
+          memory: {{ $.Values.clickhouse.limits.memory | quote }}
         requests:
-          cpu: {{ .requests.cpu | quote }}
-          memory: {{ .requests.memory | quote }}
+          cpu: {{ $.Values.clickhouse.requests.cpu | quote }}
+          memory: {{ $.Values.clickhouse.requests.memory | quote }}
       {{- end }}
-      {{- if .persistence.enabled }}
+      {{- if $.Values.clickhouse.persistence.enabled }}
       volumeClaimTemplates:
         - name: data
           spec:
-            storageClassName: {{ .persistence.data.storageClassName }}
+            storageClassName: {{ $.Values.clickhouse.persistence.data.storageClassName }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
-                storage: {{ .persistence.data.size }}
+                storage: {{ $.Values.clickhouse.persistence.data.size }}
       {{- end }}
-      {{- $i = add1 $i }}
     {{- end }}
-    {{- if gt ( len $.Values.clickhouse ) 1 }}
+    {{- if (gt ($.Values.shardCount|int) 1) }}
     - {{- if $.Values.useClickHouseKeeper }}
       name: ch-keeper
       componentDefRef: ch-keeper

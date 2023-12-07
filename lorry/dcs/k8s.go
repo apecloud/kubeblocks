@@ -162,9 +162,14 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 		}
 	}
 
-	members, err := store.GetMembers()
-	if err != nil {
-		return nil, err
+	var members []Member
+	if store.cluster != nil && int(replicas) == len(store.cluster.Members) {
+		members = store.cluster.Members
+	} else {
+		members, err = store.GetMembers()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	leader, err := store.GetLeader()

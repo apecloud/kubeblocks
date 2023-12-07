@@ -196,10 +196,11 @@ func (p *pipeline) UpdateOpsLabel() *pipeline {
 		}
 
 		request := p.resource.OpsRequest
-		deepObject := request.DeepCopy()
+		newRequest := request.DeepCopy()
+		deepObject := client.MergeFrom(newRequest.DeepCopy())
 		formatter := p.configConstraint.Spec.FormatterConfig
-		updateOpsLabelWithReconfigure(request, p.updatedParameters, p.ConfigMapObj.Data, formatter)
-		return p.cli.Patch(p.reqCtx.Ctx, request, client.MergeFrom(deepObject))
+		updateOpsLabelWithReconfigure(newRequest, p.updatedParameters, p.ConfigMapObj.Data, formatter)
+		return p.cli.Patch(p.reqCtx.Ctx, newRequest, deepObject)
 	}
 
 	return p.Wrap(updateFn)

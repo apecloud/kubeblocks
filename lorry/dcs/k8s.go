@@ -179,7 +179,7 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 
 	haConfig, err := store.GetHaConfig()
 	if err != nil {
-		store.logger.Info("get haConfig failed", "error", err)
+		store.logger.Info("get haconfig failed", "error", err)
 	}
 
 	cluster := &Cluster{

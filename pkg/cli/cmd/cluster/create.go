@@ -205,6 +205,10 @@ const (
 // set the components volume names, key is the component type.
 var componentVolumes = map[string][]string{
 	"bookies": {"journal", "ledgers"},
+	// kafka controller
+	"controller":   {"metadata"},
+	"kafka-broker": {"metadata", "data"},
+	"kafka-server": {"metadata", "data"},
 }
 
 // UpdatableFlags is the flags that cat be updated by update command
@@ -236,16 +240,20 @@ type UpdatableFlags struct {
 
 type CreateOptions struct {
 	// ClusterDefRef reference clusterDefinition
-	ClusterDefRef     string                   `json:"clusterDefRef"`
-	ClusterVersionRef string                   `json:"clusterVersionRef"`
-	Tolerations       []interface{}            `json:"tolerations,omitempty"`
-	ComponentSpecs    []map[string]interface{} `json:"componentSpecs"`
-	Annotations       map[string]string        `json:"annotations,omitempty"`
-	SetFile           string                   `json:"-"`
-	Values            []string                 `json:"-"`
-	RBACEnabled       bool                     `json:"-"`
-	Storages          []string                 `json:"-"`
-	ServiceRef        []string                 `json:"-"`
+	ClusterDefRef       string                   `json:"clusterDefRef"`
+	ClusterVersionRef   string                   `json:"clusterVersionRef"`
+	Tolerations         []interface{}            `json:"tolerations,omitempty"`
+	ComponentSpecs      []map[string]interface{} `json:"componentSpecs"`
+	Annotations         map[string]string        `json:"annotations,omitempty"`
+	Labels              map[string]string        `json:"labels,omitempty"`
+	SetFile             string                   `json:"-"`
+	Values              []string                 `json:"-"`
+	RBACEnabled         bool                     `json:"-"`
+	Storages            []string                 `json:"-"`
+	ServiceRef          []string                 `json:"-"`
+	LabelStrs           []string                 `json:"-"`
+	CPUOversellRatio    float64                  `json:"-"`
+	MemoryOversellRatio float64                  `json:"-"`
 	// create components exclusively configured in 'set'.
 	CreateOnlySet bool `json:"-"`
 	// backup name to restore in creation
@@ -284,6 +292,9 @@ func NewCreateCmd(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.
 	cmd.Flags().BoolVar(&o.CreateOnlySet, "create-only-set", false, "Create components exclusively configured in 'set'")
 	cmd.Flags().StringArrayVar(&o.Storages, "pvc", []string{}, "Set the cluster detail persistent volume claim, each '--pvc' corresponds to a component, and will override the simple configurations about storage by --set (e.g. --pvc type=mysql,name=data,mode=ReadWriteOnce,size=20Gi --pvc type=mysql,name=log,mode=ReadWriteOnce,size=1Gi)")
 	cmd.Flags().StringArrayVar(&o.ServiceRef, "service-reference", []string{}, "Set the other KubeBlocks cluster dependencies, each '--service-reference' corresponds to a cluster service. (e.g --service-reference name=pulsarZookeeper,cluster=zookeeper,namespace=default)")
+	cmd.Flags().StringArrayVar(&o.LabelStrs, "label", []string{}, "Set labels for cluster resources")
+	cmd.Flags().Float64Var(&o.CPUOversellRatio, "cpu-oversell-ratio", 1, "Set oversell ratio of CPU, set to 10 means 10 times oversell")
+	cmd.Flags().Float64Var(&o.MemoryOversellRatio, "memory-oversell-ratio", 1, "Set oversell ratio of memory, set to 10 means 10 times oversell")
 
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 	cmd.Flags().StringVar(&o.RestoreTime, "restore-to-time", "", "Set a time for point in time recovery")
@@ -527,6 +538,23 @@ func (o *CreateOptions) Complete() error {
 	// build annotation
 	o.buildAnnotation(cls)
 
+	// build labels
+	if cls != nil && len(cls.Labels) > 0 {
+		o.Labels = cls.Labels
+	}
+	if len(o.LabelStrs) > 0 {
+		if o.Labels == nil {
+			o.Labels = make(map[string]string)
+		}
+		for _, labelStr := range o.LabelStrs {
+			kv := strings.Split(labelStr, "=")
+			if len(kv) != 2 {
+				return fmt.Errorf("label format error, should be key=value")
+			}
+			o.Labels[kv[0]] = kv[1]
+		}
+	}
+
 	// build cluster definition
 	if err := o.buildClusterDef(cls); err != nil {
 		return err
@@ -666,6 +694,22 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 		// validate component classes
 		if err = clsMgr.ValidateResources(o.ClusterDefRef, compSpec); err != nil {
 			return nil, err
+		}
+
+		// cpu oversell
+		if o.CPUOversellRatio > 1 {
+			cpuRequest := compSpec.Resources.Requests[corev1.ResourceCPU]
+			cpuStr := fmt.Sprintf("%dm", int(cpuRequest.AsApproximateFloat64()/o.CPUOversellRatio*1000))
+			cpuRequest = resource.MustParse(cpuStr)
+			compSpec.Resources.Requests[corev1.ResourceCPU] = cpuRequest
+		}
+
+		// memory oversell
+		if o.MemoryOversellRatio > 1 {
+			memoryRequest := compSpec.Resources.Requests[corev1.ResourceMemory]
+			memoryStr := fmt.Sprintf("%dMi", int(memoryRequest.AsApproximateFloat64()/o.MemoryOversellRatio/math.Pow(2, 20)))
+			memoryRequest = resource.MustParse(memoryStr)
+			compSpec.Resources.Requests[corev1.ResourceMemory] = memoryRequest
 		}
 
 		// create component dependencies
@@ -1115,8 +1159,9 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition,
 			}
 		}
 		compObj.Resources = corev1.ResourceRequirements{
+			// deepcopy to make requests and limits point to different resources
 			Requests: resourceList,
-			Limits:   resourceList,
+			Limits:   resourceList.DeepCopy(),
 		}
 		storageSize := getVal(&c, keyStorage, sets)
 		if storageSize != "" {

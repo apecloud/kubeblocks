@@ -120,24 +120,49 @@ content: {
 			}]
 		}
 		if options.type == "Reconfiguring" {
-			reconfigure: {
-				componentName: options.componentNames[0]
-				configurations: [ {
-					name: options.cfgTemplateName
-					if options.forceRestart {
-						policy: "simple"
-					}
-					keys: [{
-						key: options.cfgFile
-						if options.fileContent != "" {
-							fileContent: options.fileContent
+			if len(options.componentNames) == 1 {
+				reconfigure: {
+					componentName: options.componentNames[0]
+					configurations: [ {
+						name: options.cfgTemplateName
+						if options.forceRestart {
+							policy: "simple"
 						}
-						if options.hasPatch {
-							parameters: [ for k, v in options.keyValues {
-								key:   k
-								value: v
-							}]
+						keys: [{
+							key: options.cfgFile
+							if options.fileContent != "" {
+								fileContent: options.fileContent
+							}
+							if options.hasPatch {
+								parameters: [ for k, v in options.keyValues {
+									key:   k
+									value: v
+								}]
+							}
+						}]
+					}]
+				}
+			}
+			if len(options.componentNames) > 1 {
+				reconfigures: [ for _, cName in options.componentNames {
+					componentName: cName
+					configurations: [ {
+						name: options.cfgTemplateName
+						if options.forceRestart {
+							policy: "simple"
 						}
+						keys: [{
+							key: options.cfgFile
+							if options.fileContent != "" {
+								fileContent: options.fileContent
+							}
+							if options.hasPatch {
+								parameters: [ for k, v in options.keyValues {
+									key:   k
+									value: v
+								}]
+							}
+						}]
 					}]
 				}]
 			}

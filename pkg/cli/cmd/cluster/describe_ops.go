@@ -332,11 +332,21 @@ func (o *describeOpsOptions) getVolumeExpansionCommand(spec appsv1alpha1.OpsRequ
 
 // getReconfiguringCommand gets the command of the VolumeExpansion command.
 func (o *describeOpsOptions) getReconfiguringCommand(spec appsv1alpha1.OpsRequestSpec) []string {
-	var (
-		updatedParams = spec.Reconfigure
-		componentName = updatedParams.ComponentName
-	)
+	if spec.Reconfigure != nil {
+		return generateReconfiguringCommand(spec.ClusterRef, spec.Reconfigure, []string{spec.Reconfigure.ComponentName})
+	}
 
+	if len(spec.Reconfigures) == 0 {
+		return nil
+	}
+	components := make([]string, len(spec.Reconfigures))
+	for i, reconfigure := range spec.Reconfigures {
+		components[i] = reconfigure.ComponentName
+	}
+	return generateReconfiguringCommand(spec.ClusterRef, &spec.Reconfigures[0], components)
+}
+
+func generateReconfiguringCommand(clusterRef string, updatedParams *appsv1alpha1.Reconfigure, components []string) []string {
 	if len(updatedParams.Configurations) == 0 {
 		return nil
 	}
@@ -350,8 +360,8 @@ func (o *describeOpsOptions) getReconfiguringCommand(spec appsv1alpha1.OpsReques
 	commandArgs = append(commandArgs, "kbcli")
 	commandArgs = append(commandArgs, "cluster")
 	commandArgs = append(commandArgs, "configure")
-	commandArgs = append(commandArgs, spec.ClusterRef)
-	commandArgs = append(commandArgs, fmt.Sprintf("--components=%s", componentName))
+	commandArgs = append(commandArgs, clusterRef)
+	commandArgs = append(commandArgs, fmt.Sprintf("--components=%s", strings.Join(components, ",")))
 	commandArgs = append(commandArgs, fmt.Sprintf("--config-spec=%s", configuration.Name))
 
 	config := configuration.Keys[0]

@@ -1,9 +1,8 @@
-{{- $addonImageRegistry := include "kubeblocks.imageRegistry" . }}
 {{/*
 Define addon Helm charts image information.
 */}}
 {{- define "kubeblocks.addonChartsImage" }}
-{{- $addonImageRegistry := index . "addonImageRegistry" }}
+{{- $addonImageRegistry := include "kubeblocks.imageRegistry" . }}
 chartsImage: {{ .Values.addonChartsImage.registry | default $addonImageRegistry }}/{{ .Values.addonChartsImage.repository }}:{{ .Values.addonChartsImage.tag | default .Chart.AppVersion }}
 chartsPathInImage: {{ .Values.addonChartsImage.chartsPath }}
 {{- end }}
@@ -42,7 +41,7 @@ Parameters:
 - kbVersion: KubeBlocks version that this addon is compatible with
 */}}
 {{- define "kubeblocks.buildAddonCR" }}
-{{- $addonImageRegistry := index . "addonImageRegistry" }}
+{{- $addonImageRegistry := include "kubeblocks.imageRegistry" . }}
 {{- $upgrade:= or .Release.IsInstall (and .Release.IsUpgrade .Values.upgradeAddons) }}
 {{- $existingAddon := lookup "extensions.kubeblocks.io/v1alpha1" "Addon" "" .name -}}
 {{- if and (not $upgrade) $existingAddon -}}

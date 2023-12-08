@@ -25,12 +25,3 @@ data:
     {{- $sidecar = set $sidecar "image" $sidecarImage }}
     {{- $grafana = set $grafana "sidecar" $sidecar }}
     {{- toYaml $grafana | nindent 4 }}
-{{/*    image:*/}}
-{{/*    repository: {{ .Values.image.registry | default $grafanaImageRegistry }}/apecloud/grafana*/}}
-{{/*    # Overrides the Grafana image tag whose default is the chart appVersion*/}}
-{{/*    tag: 9.2.4*/}}
-{{/*    image:*/}}
-{{/*      registry: {{}}*/}}
-{{/*      repository: apecloud/grafana*/}}
-{{/*      # Overrides the Grafana image tag whose default is the chart appVersion*/}}
-{{/*      tag: 9.2.4*/}}

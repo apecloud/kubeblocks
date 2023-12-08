@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -34,6 +35,12 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
+var (
+	defaultShmQuantity = resource.MustParse("64Mi")
+)
+
+// BuildComponent generates a new Component object, which is a mixture of
+// component-related configs from input Cluster, ClusterDef and ClusterVersion.
 func BuildComponent(reqCtx intctrlutil.RequestCtx,
 	clsMgr *class.Manager,
 	cluster *appsv1alpha1.Cluster,
@@ -41,22 +48,7 @@ func BuildComponent(reqCtx intctrlutil.RequestCtx,
 	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
 	serviceReferences map[string]*appsv1alpha1.ServiceDescriptor,
-	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
-) (*SynthesizedComponent, error) {
-	return buildComponent(reqCtx, clsMgr, cluster, clusterDef, clusterCompDef, clusterCompSpec, serviceReferences, clusterCompVers...)
-}
-
-// buildComponent generates a new Component object, which is a mixture of
-// component-related configs from input Cluster, ClusterDef and ClusterVersion.
-func buildComponent(reqCtx intctrlutil.RequestCtx,
-	clsMgr *class.Manager,
-	cluster *appsv1alpha1.Cluster,
-	clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
-	serviceReferences map[string]*appsv1alpha1.ServiceDescriptor,
-	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
-) (*SynthesizedComponent, error) {
+	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion) (*SynthesizedComponent, error) {
 	hasSimplifiedAPI := func() bool {
 		return cluster.Spec.Replicas != nil ||
 			!cluster.Spec.Resources.CPU.IsZero() ||
@@ -293,6 +285,8 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 	fillServiceSelector()
+
+	limitSharedMemoryVolumeSize(component, clusterCompSpec)
 
 	buildMonitorConfig(clusterCompDefObj, clusterCompSpec, component)
 
@@ -548,4 +542,31 @@ func GetConfigSpecByName(component *SynthesizedComponent, configSpec string) *ap
 		}
 	}
 	return nil
+}
+
+// limitSharedMemoryVolumeSize limits the shared memory volume size to memory requests/limits.
+func limitSharedMemoryVolumeSize(synthesizeComp *SynthesizedComponent, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) {
+	shm := defaultShmQuantity
+	if clusterCompSpec.Resources.Limits != nil {
+		if clusterCompSpec.Resources.Limits.Memory().Cmp(shm) > 0 {
+			shm = *clusterCompSpec.Resources.Limits.Memory()
+		}
+	}
+	if clusterCompSpec.Resources.Requests != nil {
+		if clusterCompSpec.Resources.Requests.Memory().Cmp(shm) > 0 {
+			shm = *clusterCompSpec.Resources.Requests.Memory()
+		}
+	}
+	for i, vol := range synthesizeComp.PodSpec.Volumes {
+		if vol.EmptyDir == nil {
+			continue
+		}
+		if vol.EmptyDir.Medium != corev1.StorageMediumMemory {
+			continue
+		}
+		if vol.EmptyDir.SizeLimit != nil && !vol.EmptyDir.SizeLimit.IsZero() {
+			continue
+		}
+		synthesizeComp.PodSpec.Volumes[i].EmptyDir.SizeLimit = &shm
+	}
 }

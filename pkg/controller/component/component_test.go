@@ -42,7 +42,6 @@ import (
 var tlog = ctrl.Log.WithName("component_testing")
 
 var _ = Describe("component module", func() {
-
 	Context("has the BuildComponent function", func() {
 		const (
 			clusterDefName           = "test-clusterdef"
@@ -158,7 +157,7 @@ var _ = Describe("component module", func() {
 			cluster.Spec.ComponentSpecs = nil
 
 			By("build first component from simplified fields")
-			component, err := buildComponent(
+			component, err := BuildComponent(
 				reqCtx,
 				nil,
 				cluster,
@@ -173,7 +172,7 @@ var _ = Describe("component module", func() {
 			Expect(component.VolumeClaimTemplates[0].Spec.Resources.Requests["storage"]).Should(Equal(cluster.Spec.Storage.Size))
 
 			By("build second component will be nil")
-			component, err = buildComponent(
+			component, err = BuildComponent(
 				reqCtx,
 				nil,
 				cluster,
@@ -197,7 +196,7 @@ var _ = Describe("component module", func() {
 			By("clear cluster's component spec")
 			cluster.Spec.ComponentSpecs = nil
 			By("call build")
-			component, err := buildComponent(
+			component, err := BuildComponent(
 				reqCtx,
 				nil,
 				cluster,
@@ -227,7 +226,7 @@ var _ = Describe("component module", func() {
 			By("clear cluster's component spec")
 			cluster.Spec.ComponentSpecs = nil
 			By("call build")
-			component, err := buildComponent(
+			component, err := BuildComponent(
 				reqCtx,
 				nil,
 				cluster,
@@ -243,7 +242,7 @@ var _ = Describe("component module", func() {
 			interval2 := intstr.Parse("10s")
 			cluster.Spec.Monitor.MonitoringInterval = &interval2
 			By("call build")
-			component, err = buildComponent(
+			component, err = BuildComponent(
 				reqCtx,
 				nil,
 				cluster,
@@ -272,7 +271,7 @@ var _ = Describe("component module", func() {
 			By("clear cluster's component spec")
 			cluster.Spec.ComponentSpecs = nil
 			By("call build")
-			component, err := buildComponent(
+			component, err := BuildComponent(
 				reqCtx,
 				nil,
 				cluster,
@@ -333,7 +332,7 @@ var _ = Describe("component module", func() {
 			By("clear cluster's component spec")
 			cluster.Spec.ComponentSpecs = nil
 			By("call build")
-			component, err := buildComponent(
+			component, err := BuildComponent(
 				reqCtx,
 				nil,
 				cluster,
@@ -372,7 +371,7 @@ var _ = Describe("component module", func() {
 				testapps.NginxImage: serviceDescriptor,
 			}
 			By("call build")
-			component, err := buildComponent(
+			component, err := BuildComponent(
 				reqCtx,
 				nil,
 				cluster,
@@ -387,6 +386,103 @@ var _ = Describe("component module", func() {
 			Expect(component.ServiceReferences[testapps.NginxImage].Name).Should(Equal(name))
 			Expect(component.ServiceReferences[testapps.NginxImage].Spec.ServiceKind).Should(Equal(kind))
 			Expect(component.ServiceReferences[testapps.NginxImage].Spec.ServiceVersion).Should(Equal(version))
+		})
+
+		It("limit the shared memory volume size correctly", func() {
+			var (
+				_128m  = resource.MustParse("128Mi")
+				_512m  = resource.MustParse("512Mi")
+				_1024m = resource.MustParse("1Gi")
+				_2048m = resource.MustParse("2Gi")
+				reqCtx = intctrlutil.RequestCtx{Ctx: ctx, Log: logger}
+			)
+			for i := range clusterDef.Spec.ComponentDefs {
+				compDef := &clusterDef.Spec.ComponentDefs[i]
+				compDef.PodSpec.Volumes = append(compDef.PodSpec.Volumes, []corev1.Volume{
+					{
+						Name: "shmd-ok",
+						VolumeSource: corev1.VolumeSource{
+							EmptyDir: &corev1.EmptyDirVolumeSource{
+								Medium: corev1.StorageMediumMemory,
+							},
+						},
+					},
+					{
+						Name: "shmd-medium",
+						VolumeSource: corev1.VolumeSource{
+							EmptyDir: &corev1.EmptyDirVolumeSource{
+								Medium: corev1.StorageMediumDefault,
+							},
+						},
+					},
+					{
+						Name: "shmd-size-small",
+						VolumeSource: corev1.VolumeSource{
+							EmptyDir: &corev1.EmptyDirVolumeSource{
+								Medium:    corev1.StorageMediumMemory,
+								SizeLimit: &_128m,
+							},
+						},
+					},
+					{
+						Name: "shmd-size-large",
+						VolumeSource: corev1.VolumeSource{
+							EmptyDir: &corev1.EmptyDirVolumeSource{
+								Medium:    corev1.StorageMediumMemory,
+								SizeLimit: &_2048m,
+							},
+						},
+					},
+				}...)
+			}
+
+			By("with memory resource set")
+			if cluster.Spec.ComponentSpecs[0].Resources.Requests == nil {
+				cluster.Spec.ComponentSpecs[0].Resources.Requests = corev1.ResourceList{}
+			}
+			if cluster.Spec.ComponentSpecs[0].Resources.Limits == nil {
+				cluster.Spec.ComponentSpecs[0].Resources.Limits = corev1.ResourceList{}
+			}
+			cluster.Spec.ComponentSpecs[0].Resources.Requests[corev1.ResourceMemory] = _512m
+			cluster.Spec.ComponentSpecs[0].Resources.Limits[corev1.ResourceMemory] = _1024m
+			comp, err := BuildComponent(reqCtx, nil, cluster, clusterDef, &clusterDef.Spec.ComponentDefs[0], &cluster.Spec.ComponentSpecs[0], nil, nil)
+			Expect(err).Should(Succeed())
+			Expect(comp).ShouldNot(BeNil())
+			for _, vol := range comp.PodSpec.Volumes {
+				if vol.Name == "shmd-ok" {
+					Expect(*vol.EmptyDir.SizeLimit).Should(BeEquivalentTo(_1024m))
+				}
+				if vol.Name == "shmd-medium" {
+					Expect(vol.EmptyDir.SizeLimit).Should(BeNil())
+				}
+				if vol.Name == "shmd-size-small" {
+					Expect(*vol.EmptyDir.SizeLimit).Should(BeEquivalentTo(_128m))
+				}
+				if vol.Name == "shmd-size-large" {
+					Expect(*vol.EmptyDir.SizeLimit).Should(BeEquivalentTo(_2048m))
+				}
+			}
+
+			By("without memory resource set")
+			delete(cluster.Spec.ComponentSpecs[0].Resources.Requests, corev1.ResourceMemory)
+			delete(cluster.Spec.ComponentSpecs[0].Resources.Limits, corev1.ResourceMemory)
+			comp, err = BuildComponent(reqCtx, nil, cluster, clusterDef, &clusterDef.Spec.ComponentDefs[0], &cluster.Spec.ComponentSpecs[0], nil, nil)
+			Expect(err).Should(Succeed())
+			Expect(comp).ShouldNot(BeNil())
+			for _, vol := range comp.PodSpec.Volumes {
+				if vol.Name == "shmd-ok" {
+					Expect(*vol.EmptyDir.SizeLimit).Should(BeEquivalentTo(defaultShmQuantity))
+				}
+				if vol.Name == "shmd-medium" {
+					Expect(vol.EmptyDir.SizeLimit).Should(BeNil())
+				}
+				if vol.Name == "shmd-size-small" {
+					Expect(*vol.EmptyDir.SizeLimit).Should(BeEquivalentTo(_128m))
+				}
+				if vol.Name == "shmd-size-large" {
+					Expect(*vol.EmptyDir.SizeLimit).Should(BeEquivalentTo(_2048m))
+				}
+			}
 		})
 	})
 })

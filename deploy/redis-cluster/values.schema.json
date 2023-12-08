@@ -59,6 +59,48 @@
       "default": 20,
       "minimum": 1,
       "maximum": 10000
+    },
+    "sentinel": {
+      "title": "The sentinel Schema",
+      "type": "object",
+      "properties": {
+        "cpu": {
+          "title": "The cpu Schema",
+          "type": "number",
+          "default": 0.2
+        },
+        "memory": {
+          "title": "The memory Schema",
+          "type": "number",
+          "default": 0.2
+        },
+        "storage": {
+          "title": "The storage Schema",
+          "type": "number",
+          "default": 5
+        },
+        "replicas": {
+          "title": "The replicas Schema",
+          "type": "number",
+          "default": 3
+        },
+        "service": {
+          "title": "The service Schema",
+          "type": "object",
+          "properties": {
+            "type": {
+              "title": "The type Schema",
+              "type": "string",
+              "default": "ClusterIP"
+            },
+            "nodePortBase": {
+              "title": "The nodePortBase Schema",
+              "type": "string",
+              "default": ""
+            }
+          }
+        }
+      }
     }
   }
 }

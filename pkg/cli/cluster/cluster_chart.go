@@ -82,7 +82,7 @@ func BuildChartInfo(t ClusterType) (*ChartInfo, error) {
 		return nil, err
 	}
 
-	if c.Schema != nil {
+	if c.Chart.Schema != nil {
 		if err = c.buildClusterSchema(); err != nil {
 			return nil, err
 		}

@@ -287,9 +287,21 @@ func (r *OpsRequest) validateReconfigure(cluster *Cluster) error {
 		return nil
 	}
 	reconfigure := r.Spec.Reconfigure
-	if reconfigure == nil {
+	if reconfigure == nil && len(r.Spec.Reconfigures) == 0 {
 		return notEmptyError("spec.reconfigure")
 	}
+	if reconfigure != nil {
+		return r.validateReconfigureParams(cluster, reconfigure)
+	}
+	for _, reconfigure := range r.Spec.Reconfigures {
+		if err := r.validateReconfigureParams(cluster, &reconfigure); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *OpsRequest) validateReconfigureParams(cluster *Cluster, reconfigure *Reconfigure) error {
 	if cluster.Spec.GetComponentByName(reconfigure.ComponentName) == nil {
 		return fmt.Errorf("component %s not found", reconfigure.ComponentName)
 	}

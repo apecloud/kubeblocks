@@ -321,8 +321,7 @@ spec:
                       type: boolean
                     replicas:
                       default: 1
-                      description: Component replicas. The default value is used in
-                        ClusterDefinition spec if not specified.
+                      description: Component replicas.
                       format: int32
                       minimum: 0
                       type: integer

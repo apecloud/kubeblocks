@@ -153,6 +153,7 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 		r.validateScripts,
 		r.validatePolicyRules,
 		r.validateLabels,
+		r.validateReplicasLimit,
 		r.validateSystemAccounts,
 		r.validateReplicaRoles,
 		r.validateLifecycleActions,
@@ -244,6 +245,11 @@ func (r *ComponentDefinitionReconciler) validatePolicyRules(cli client.Client, r
 }
 
 func (r *ComponentDefinitionReconciler) validateLabels(cli client.Client, rctx intctrlutil.RequestCtx,
+	cmpd *appsv1alpha1.ComponentDefinition) error {
+	return nil
+}
+
+func (r *ComponentDefinitionReconciler) validateReplicasLimit(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
 	return nil
 }

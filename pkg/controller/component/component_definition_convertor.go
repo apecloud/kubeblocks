@@ -54,6 +54,7 @@ func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterCo
 		"scripts":                &compDefScriptsConvertor{},
 		"policyrules":            &compDefPolicyRulesConvertor{},
 		"labels":                 &compDefLabelsConvertor{},
+		"replicasLimit":          &compDefReplicasLimitConvertor{},
 		"systemaccounts":         &compDefSystemAccountsConvertor{},
 		"connectioncredentials":  &compDefConnCredentialsConvertor{},
 		"updatestrategy":         &compDefUpdateStrategyConvertor{},
@@ -292,6 +293,12 @@ func (c *compDefLabelsConvertor) convert(args ...any) (any, error) {
 		labels[customLabel.Key] = customLabel.Value
 	}
 	return labels, nil
+}
+
+type compDefReplicasLimitConvertor struct{}
+
+func (c *compDefReplicasLimitConvertor) convert(args ...any) (any, error) {
+	return nil, nil
 }
 
 // compDefSystemAccountsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.SystemAccounts.

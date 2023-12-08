@@ -335,7 +335,7 @@ type ClusterComponentSpec struct {
 	// +optional
 	EnabledLogs []string `json:"enabledLogs,omitempty"`
 
-	// Component replicas. The default value is used in ClusterDefinition spec if not specified.
+	// Component replicas.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=1

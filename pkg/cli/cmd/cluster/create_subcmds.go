@@ -42,12 +42,12 @@ type objectInfo struct {
 	obj *unstructured.Unstructured
 }
 
-type createSubCmdsOptions struct {
+type CreateSubCmdsOptions struct {
 	// clusterType is the type of the cluster to create.
 	clusterType cluster.ClusterType
 
-	// values is used to render the cluster helm chartInfo.
-	values map[string]interface{}
+	// Values is used to render the cluster helm chartInfo.
+	Values map[string]interface{}
 
 	// chartInfo is the cluster chart information, used to render the command flag
 	// and validate the values.
@@ -56,9 +56,9 @@ type createSubCmdsOptions struct {
 	*create.CreateOptions
 }
 
-func newSubCmdsOptions(createOptions *create.CreateOptions, t cluster.ClusterType) (*createSubCmdsOptions, error) {
+func NewSubCmdsOptions(createOptions *create.CreateOptions, t cluster.ClusterType) (*CreateSubCmdsOptions, error) {
 	var err error
-	o := &createSubCmdsOptions{
+	o := &CreateSubCmdsOptions{
 		CreateOptions: createOptions,
 		clusterType:   t,
 	}
@@ -73,7 +73,7 @@ func buildCreateSubCmds(createOptions *create.CreateOptions) []*cobra.Command {
 	var cmds []*cobra.Command
 
 	for _, t := range cluster.SupportedTypes() {
-		o, err := newSubCmdsOptions(createOptions, t)
+		o, err := NewSubCmdsOptions(createOptions, t)
 		if err != nil {
 			fmt.Fprintf(os.Stdout, "Failed add '%s' to 'create' sub command due to %s\n", t.String(), err.Error())
 			cluster.ClearCharts(t)
@@ -89,7 +89,7 @@ func buildCreateSubCmds(createOptions *create.CreateOptions) []*cobra.Command {
 				cmdutil.CheckErr(o.CreateOptions.Complete())
 				cmdutil.CheckErr(o.complete(cmd))
 				cmdutil.CheckErr(o.validate())
-				cmdutil.CheckErr(o.run())
+				cmdutil.CheckErr(o.Run())
 			},
 		}
 
@@ -103,7 +103,7 @@ func buildCreateSubCmds(createOptions *create.CreateOptions) []*cobra.Command {
 	return cmds
 }
 
-func (o *createSubCmdsOptions) complete(cmd *cobra.Command) error {
+func (o *CreateSubCmdsOptions) complete(cmd *cobra.Command) error {
 	var err error
 
 	// if name is not specified, generate a random cluster name
@@ -115,20 +115,20 @@ func (o *createSubCmdsOptions) complete(cmd *cobra.Command) error {
 	}
 
 	// get values from flags
-	o.values = getValuesFromFlags(cmd.LocalNonPersistentFlags())
+	o.Values = getValuesFromFlags(cmd.LocalNonPersistentFlags())
 	return nil
 }
 
-func (o *createSubCmdsOptions) validate() error {
+func (o *CreateSubCmdsOptions) validate() error {
 	if err := o.validateVersion(); err != nil {
 		return err
 	}
-	return cluster.ValidateValues(o.chartInfo, o.values)
+	return cluster.ValidateValues(o.chartInfo, o.Values)
 }
 
-func (o *createSubCmdsOptions) run() error {
+func (o *CreateSubCmdsOptions) Run() error {
 	// move values that belong to sub chart to sub map
-	values := buildHelmValues(o.chartInfo, o.values)
+	values := buildHelmValues(o.chartInfo, o.Values)
 
 	// get Kubernetes version
 	kubeVersion, err := util.GetK8sVersion(o.Client.Discovery())
@@ -220,9 +220,9 @@ func (o *createSubCmdsOptions) run() error {
 	return nil
 }
 
-func (o *createSubCmdsOptions) validateVersion() error {
+func (o *CreateSubCmdsOptions) validateVersion() error {
 	var err error
-	cv, ok := o.values[cluster.VersionSchemaProp.String()].(string)
+	cv, ok := o.Values[cluster.VersionSchemaProp.String()].(string)
 	if ok && cv != "" {
 		if err = cluster.ValidateClusterVersion(o.Dynamic, o.chartInfo.ClusterDef, cv); err != nil {
 			return fmt.Errorf("cluster version \"%s\" does not exist, run following command to get the available cluster versions\n\tkbcli cv list --cluster-definition=%s",
@@ -236,7 +236,7 @@ func (o *createSubCmdsOptions) validateVersion() error {
 		return err
 	}
 	// set cluster version
-	o.values[cluster.VersionSchemaProp.String()] = cv
+	o.Values[cluster.VersionSchemaProp.String()] = cv
 
 	dryRun, err := o.GetDryRunStrategy()
 	if err != nil {

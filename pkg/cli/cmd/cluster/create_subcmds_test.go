@@ -91,7 +91,7 @@ var _ = Describe("create cluster by cluster type", func() {
 		Expect(cmds[0].HasFlags()).Should(BeTrue())
 
 		By("create command options")
-		o, err := newSubCmdsOptions(createOptions, clusterType)
+		o, err := NewSubCmdsOptions(createOptions, clusterType)
 		Expect(err).Should(Succeed())
 		Expect(o).ShouldNot(BeNil())
 		Expect(o.chartInfo).ShouldNot(BeNil())
@@ -108,18 +108,18 @@ var _ = Describe("create cluster by cluster type", func() {
 		Expect(o.CreateOptions.Complete()).Should(Succeed())
 		Expect(o.complete(mysqlCmd)).Should(Succeed())
 		Expect(o.Name).ShouldNot(BeEmpty())
-		Expect(o.values).ShouldNot(BeNil())
+		Expect(o.Values).ShouldNot(BeNil())
 
 		By("validate")
 		o.chartInfo.ClusterDef = testing.ClusterDefName
 		Expect(o.validate()).Should(Succeed())
-		Expect(o.values[cluster.VersionSchemaProp.String()]).Should(Equal(testing.ClusterVersionName))
+		Expect(o.Values[cluster.VersionSchemaProp.String()]).Should(Equal(testing.ClusterVersionName))
 
 		By("run")
 		o.DryRun = "client"
 		o.Client = testing.FakeClientSet()
 		fakeDiscovery, _ := o.Client.Discovery().(*fakediscovery.FakeDiscovery)
 		fakeDiscovery.FakedServerVersion = &version.Info{Major: "1", Minor: "27", GitVersion: "v1.27.0"}
-		Expect(o.run()).Should(Succeed())
+		Expect(o.Run()).Should(Succeed())
 	})
 })

@@ -72,6 +72,8 @@ var (
 	llmChart embed.FS
 	//go:embed charts/xinference-cluster.tgz
 	xinferenceChart embed.FS
+	//go:embed charts
+	defaultChart embed.FS
 )
 
 func IsbuiltinCharts(chart string) bool {

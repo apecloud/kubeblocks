@@ -73,9 +73,7 @@ redis-cluster        default          redis                     redis-7.0.6     
 
    **选项 3**. 更改集群的 YAML 文件
 
-   在集群的 YAML 文件中更改 `spec.components.volumeClaimTemplates.spec.resources` 的值。
-
-   `spec.components.volumeClaimTemplates.spec.resources` 是 Pod 的存储资源信息，更改此值会触发卷扩展。
+   在集群的 YAML 文件中更改 `spec.components.volumeClaimTemplates.spec.resources` 的值。`spec.components.volumeClaimTemplates.spec.resources` 是 Pod 的存储资源信息，更改此值会触发卷扩展。
 
    ```yaml
    apiVersion: apps.kubeblocks.io/v1alpha1

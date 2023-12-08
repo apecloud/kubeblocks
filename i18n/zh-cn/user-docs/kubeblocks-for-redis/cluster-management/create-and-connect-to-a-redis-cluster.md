@@ -379,4 +379,4 @@ KubeBlocks operator 会创建一个名为 `redis-conn-credential` 的新的 Secr
 
 </Tabs>
 
-有关详细的数据库连接指南，请参考[连接数据库](./../../connect_database/overview-of-database-connection.md)。
+有关详细的数据库连接指南，请参考[连接数据库](../../create-and-connect-databases/overview-on-connect-databases.md)。

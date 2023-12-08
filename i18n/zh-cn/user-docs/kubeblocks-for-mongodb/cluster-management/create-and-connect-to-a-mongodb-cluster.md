@@ -17,8 +17,8 @@ import TabItem from '@theme/TabItem';
 
 ### 开始之前
 
-* 如果想通过 kbcli 创建和连接 MongoDB 集群，请安装 kbcli。
-* 用 kbcli 安装 KubeBlocks 或者用 Helm 安装 KubeBlocks。
+* 如果想通过 kbcli 创建和连接 MongoDB 集群，请[安装 kbcli](../../installation/install-with-kbcli/install-kbcli.md)。
+* 用 [kbcli](../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 安装 KubeBlocks 或者用 [Helm](../../installation/install-with-helm/install-kubeblocks-with-helm.md) 安装 KubeBlocks。
 * 确保 MongoDB add-on 已启用。
   
   <Tabs>
@@ -329,23 +329,23 @@ KubeBlocks operator 会创建一个名为 `mongodb-cluster-conn-credential` 的�
 
 1. 获取用于 `kubectl exec` 命令的 `username` 和 `password`。
 
-```bash
-kubectl get secrets -n demo mongodb-cluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
->
-root
+    ```bash
+    kubectl get secrets -n demo mongodb-cluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+    >
+    root
 
-kubectl get secrets -n demo mongodb-cluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
->
-svk9xzqs
-```
+    kubectl get secrets -n demo mongodb-cluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+    >
+    svk9xzqs
+    ```
 
 2. 使用用户名和密码，进入 Pod `mongodb-cluster-mongodb-0` 并连接到数据库。
 
-```bash
-kubectl exec -ti -n demo mongodb-cluster-mongodb-0 -- bash
+    ```bash
+    kubectl exec -ti -n demo mongodb-cluster-mongodb-0 -- bash
 
-root@mongodb-cluster-mongodb-0:/# mongo --username root --password svk9xzqs --authenticationDatabase admin
-```
+    root@mongodb-cluster-mongodb-0:/# mongo --username root --password svk9xzqs --authenticationDatabase admin
+    ```
 
 </TabItem>
 

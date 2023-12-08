@@ -24,8 +24,8 @@ KubeBlocks 的全盘锁定功能确保了数据库的稳定性和可用性。该
 
 ## 启用全盘锁定
 
-- 对于 MySQL 数据库，当磁盘使用量达到 highwatermark 值时，读写用户无法写入磁盘，而超级用户仍然可以写入。
-- 对于 PostgreSQL 和 MongoDB 数据库，当磁盘使用量达到 highwatermark 时，无论是读写用户还是超级用户都无法写入。
+- 对于 MySQL 数据库，当磁盘使用量达到 `highwatermark` 值时，读写用户无法写入磁盘，而超级用户仍然可以写入。
+- 对于 PostgreSQL 和 MongoDB 数据库，当磁盘使用量达到 `highwatermark` 时，无论是读写用户还是超级用户都无法写入。
 - 组件级别的高水位的默认阈值为 90，当磁盘使用量达到 90% 时将锁定磁盘。而卷级别的设置为 85，并会覆盖组件级别的阈值。
 
 在集群定义中，添加以下内容以启用全盘锁定功能。你可以根据需要进行设置。
@@ -40,10 +40,10 @@ volumeProtectionSpec:
 
 :::note
 
-推荐将 highWatermark 设置为 90。
+推荐将 `highWatermark` 设置为 90。
 
 :::
 
 ## 禁用全盘锁定
 
-从 ClusterDefinition 文件中删除 volumeProtectionSpec。
+从 ClusterDefinition 文件中删除 `volumeProtectionSpec`。

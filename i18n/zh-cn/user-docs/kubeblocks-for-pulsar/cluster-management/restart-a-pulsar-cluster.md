@@ -21,7 +21,7 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
 
 1. 重启集群。
 
-  你可以通过使用 `kbcli` 或创建 OpsRequest 来重启集群。
+    你可以通过使用 `kbcli` 或创建 OpsRequest 来重启集群。
   
    **选项 1.** (**推荐**) 使用 kbcli
 

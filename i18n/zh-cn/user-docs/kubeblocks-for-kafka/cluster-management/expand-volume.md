@@ -2,7 +2,7 @@
 title: 卷扩展
 description: 如何对 Kafka 集群进行卷扩展
 keywords: [kafka, 卷扩展, 扩容]
-sidebar_position: 3
+sidebar_position: 4
 sidebar_label: 卷扩展
 ---
 

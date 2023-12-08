@@ -64,7 +64,7 @@ sidebar_label: 使用 kbcli 迁移 MongoDB 数据
    | `--sink`     | 指定目标。上例中的 `user:123456@127.0.0.2:5432/db_test` 遵循 `${user_name}:${password}@${database connection url}/${database}` 的格式。在本文档中，连接 URL 使用的是 Kubernetes 集群内部的服务地址。 |
    | `--migration-object`  | 指定迁移对象。也就是上例中 "public.table_test_1" 和 "public.table_test_2" 中的数据，包括结构数据和库存数据，在迁移期间生成的增量数据将被迁移到目标位置。   |
 
-2. 2. （可选）通过 `--steps` 指定迁移步骤。
+2. （可选）通过 `--steps` 指定迁移步骤。
 
    默认按照预检查 -> 结构初始化 -> 数据初始化 -> 增量迁移的顺序进行迁移。你可以使用 `--steps` 参数来指定迁移步骤。例如，按照预检查 -> 数据初始化 -> 增量迁移的顺序执行任务。
 
@@ -89,7 +89,7 @@ sidebar_label: 使用 kbcli 迁移 MongoDB 数据
    有关初始化、CDC 和 CDC Metrics 有几点需要说明。
 
    * 初始化
-     * Precheck: 预检查。如果状态显示为 `Failed`，表示初始化预检查未通过。请参考[故障排除中的示例](#troubleshooting)解决问题。
+     * Precheck: 预检查。如果状态显示为 `Failed`，表示初始化预检查未通过。请参考[故障排除中的示例](#故障排除)解决问题。
      * Init-struct: 结构初始化。采用幂等处理逻辑，只有在发生严重问题（例如无法连接数据库）时才会失败。
      * Init-data: 数据初始化。如果存在大量库存数据，该步骤需要花费较长时间，请注意查看 `Status。`
    * CDC: 增量迁移。基于 init-data 步骤之前系统记录的时间戳，系统将按照最终一致性的原则开始数据迁移，并执行源库的 WAL（预写式日志）变更捕获 -> 写入到目标库。正常情况下，如果迁移链路没有被主动终止，CDC 会持续进行。

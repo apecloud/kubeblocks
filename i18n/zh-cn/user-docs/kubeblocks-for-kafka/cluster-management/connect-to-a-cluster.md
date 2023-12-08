@@ -51,13 +51,13 @@ sidebar_label: 连接
      kubectl exec -ti kafka-producer -- bash
      ```
 
-   c. 创建主题
+   c. 创建主题。
 
      ```bash
      kafka-topics.sh --create --topic quickstart-events --bootstrap-server xxx-broker:9092
      ```
 
-   d. 创建生产者
+   d. 创建生产者。
 
      ```bash
      kafka-console-producer.sh --topic quickstart-events --bootstrap-server xxx-broker:9092 

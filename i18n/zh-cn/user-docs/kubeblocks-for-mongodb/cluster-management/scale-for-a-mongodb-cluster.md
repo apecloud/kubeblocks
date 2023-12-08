@@ -1,7 +1,7 @@
 ---
 title: 集群扩缩容
 description: 如何对集群进行扩缩容操作？
-keywords: [MongoDB, 垂直扩容, 垂直扩容 MongoDB 集群]
+keywords: [mongodb, 垂直扩容, 垂直扩容 mongodb 集群]
 sidebar_position: 2
 sidebar_label: 扩缩容
 ---
@@ -49,7 +49,7 @@ kbcli cluster list mongodb-cluster
    - `--memory` 表示组件内存的请求和限制大小。
    - `--cpu` 表示组件 CPU 的请求和限制大小。
 
-   1. 使用 `kbcli cluster describe-ops mongodb-cluster-verticalscaling-thglk -n default` 命令进行验证。
+   2. 使用 `kbcli cluster describe-ops mongodb-cluster-verticalscaling-thglk -n default` 命令进行验证。
 
      :::note
 
@@ -115,11 +115,11 @@ kbcli cluster list mongodb-cluster
 
 :::note
 
-垂直扩缩容不会同步与 CPU 和内存相关的参数，需要手动调用配置的 OpsRequest 来进行更改。详情请参考[配置]。
+垂直扩缩容不会同步与 CPU 和内存相关的参数，需要手动调用配置的 OpsRequest 来进行更改。详情请参考[配置](../../kubeblocks-for-mongodb/configuration/configure-cluster-parameters.md)。
 
 :::
 
-1. 检查资源是否已经发生更改。
+3. 检查资源是否已经发生更改。
 
     ```bash
     kbcli cluster describe mongodb-cluster

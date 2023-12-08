@@ -37,5 +37,5 @@ kbcli cluster connect --show-example ${cluster-name}
 密码不包括 -p 本身。
 
 :::
-![图片](../img/../../img/connect-to-database-in-testing-env.png)
+![testing env](../img/../../img/connect-to-database-in-testing-env.png)
 

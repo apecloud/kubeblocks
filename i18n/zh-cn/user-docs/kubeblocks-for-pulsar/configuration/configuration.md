@@ -25,11 +25,11 @@ sidebar_position: 4
 
 ## 查看参数信息
 
-查看集群的当前配置文件。
+* 查看集群的当前配置文件。
 
-```bash
-kbcli cluster describe-config pulsar  
-```
+   ```bash
+   kbcli cluster describe-config pulsar  
+   ```
 
 * 查看当前配置文件的详细信息。
 
@@ -53,22 +53,22 @@ kbcli cluster describe-config pulsar
 
 1. 获取 Pulsar 集群组件名称，配置参数。
 
-  ```bash
-  kbcli cluster list-components pulsar 
-  ```
+   ```bash
+   kbcli cluster list-components pulsar 
+   ```
 
-  ***示例***
+   ***示例***
 
-  ```bash
-  kbcli cluster list-components pulsar 
+   ```bash
+   kbcli cluster list-components pulsar 
 
-  NAME               NAMESPACE   CLUSTER   TYPE               IMAGE
-  proxy              default     pulsar    pulsar-proxy       docker.io/apecloud/pulsar:2.11.2
-  broker             default     pulsar    pulsar-broker      docker.io/apecloud/pulsar:2.11.2
-  bookies-recovery   default     pulsar    bookies-recovery   docker.io/apecloud/pulsar:2.11.2
-  bookies            default     pulsar    bookies            docker.io/apecloud/pulsar:2.11.2
-  zookeeper          default     pulsar    zookeeper          docker.io/apecloud/pulsar:2.11.2
-  ```
+   NAME               NAMESPACE   CLUSTER   TYPE               IMAGE
+   proxy              default     pulsar    pulsar-proxy       docker.io/apecloud/pulsar:2.11.2
+   broker             default     pulsar    pulsar-broker      docker.io/apecloud/pulsar:2.11.2
+   bookies-recovery   default     pulsar    bookies-recovery   docker.io/apecloud/pulsar:2.11.2
+   bookies            default     pulsar    bookies            docker.io/apecloud/pulsar:2.11.2
+   zookeeper          default     pulsar    zookeeper          docker.io/apecloud/pulsar:2.11.2
+   ```
 
 2. 配置参数。
 

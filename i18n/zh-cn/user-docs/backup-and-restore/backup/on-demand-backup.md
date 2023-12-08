@@ -1,6 +1,6 @@
 ---
 title: 按需备份
-description: 如何按需备份
+description: 如何进行按需备份
 keywords: [备份, 按需备份, 快照备份, 备份工具]
 sidebar_position: 4
 sidebar_label: 按需备份

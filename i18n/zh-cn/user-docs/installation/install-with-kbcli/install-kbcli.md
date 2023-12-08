@@ -28,70 +28,70 @@ kbcli 目前支持 macOS、Windows 和 Linux 系统。
 
 - 选项 1：执行 `curl` 命令安装 kbli
 
-1. 安装 kbcli。
+  1. 安装 kbcli。
 
-  ```bash
-  curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
-  ```
+      ```bash
+      curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
+      ```
 
-  如果想安装 kbcli 的指定版本，请按照以下步骤进行操作：
-  
-  1. 在 [KubeBlocks Release 页面](https://github.com/apecloud/kubeblocks/releases/)中查看可用版本。
-  2. 使用 `-s` 指定版本，并执行以下命令。
+      如果想安装 kbcli 的指定版本，请按照以下步骤进行操作：
+      
+      1. 在 [KubeBlocks Release 页面](https://github.com/apecloud/kubeblocks/releases/)中查看可用版本。
+      2. 使用 `-s` 指定版本，并执行以下命令。
+        
+        ```bash
+        curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s x.x.x
+        ```
     
-    ```bash
-    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s x.x.x
-    ```
-  
-  :::note
+      :::note
 
-  kbcli 默认安装最新版本。在安装 KubeBlocks 时，kbcli 会安装与之匹配的版本。请确保 kbcli 和 KubeBlocks 的主版本号相匹配。
+      kbcli 默认安装最新版本。在安装 KubeBlocks 时，kbcli 会安装与之匹配的版本。请确保 kbcli 和 KubeBlocks 的主版本号相匹配。
 
-  例如，你可以安装 kbcli v0.6.1 和 KubeBlocks v0.6.3。但是，如果安装的是 kbcli v0.5.0 和 KubeBlocks v0.6.0，就可能会报错，因为它们不匹配。
+      例如，你可以安装 kbcli v0.6.1 和 KubeBlocks v0.6.3。但是，如果安装的是 kbcli v0.5.0 和 KubeBlocks v0.6.0，就可能会报错，因为它们不匹配。
 
-  :::
+      :::
 
-2. 执行 `kbcli version` 命令，检查 kbcli 版本并确保已成功安装。
+  2. 执行 `kbcli version` 命令，检查 kbcli 版本并确保已成功安装。
 
-  :::note
+      :::note
 
-  如果安装超时，请检查你的网络设置并重试。
+      如果安装超时，请检查你的网络设置并重试。
 
-  :::
+      :::
 
 - 选项 2：用 Homebrew 安装 kbcli
 
-1. 安装 ApeCloud 的 Homebrew 包（ApeCloud tap）。
-   
-  ```bash
-  brew tap apecloud/tap
-  ```
+  1. 安装 ApeCloud 的 Homebrew 包（ApeCloud tap）。
+     
+    ```bash
+    brew tap apecloud/tap
+    ```
 
-2. 安装 kbcli。
-   
-  ```bash
-  brew install kbcli
-  ```
-    
-  如果想安装 kbcli 的指定版本，执行：
+  2. 安装 kbcli。
+     
+    ```bash
+    brew install kbcli
+    ```
+      
+    如果想安装 kbcli 的指定版本，执行：
 
-  ```bash
-  # 查看可用版本 
-  brew search kbcli
+    ```bash
+    # 查看可用版本 
+    brew search kbcli
 
-  # 安装指定版本
-  brew install kbcli@x.x.x
-  ```
-   
-3. 确认 kbcli 是否已成功安装。
+    # 安装指定版本
+    brew install kbcli@x.x.x
+    ```
+     
+  3. 确认 kbcli 是否已成功安装。
 
-  ```bash
-  kbcli -h
-  ```
+    ```bash
+    kbcli -h
+    ```
 
-</TabItem>
+  </TabItem>
 
-<TabItem value="Windows" label="Windows">
+  <TabItem value="Windows" label="Windows">
 
 有两种方法可以在 Windows 上安装 kbcli。
 
@@ -138,9 +138,9 @@ kbcli 目前支持 macOS、Windows 和 Linux 系统。
 
 1. 安装 kbcli。
 
-  ```bash
-  curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
-  ```
+    ```bash
+    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
+    ```
 
 2. 执行 `kbcli version` 命令，检查 `kbcli` 版本并确保已成功安装。
 

@@ -128,4 +128,4 @@ KubeBlocks 可以通过良好的抽象快速集成新引擎，并支持 Pulsar �
     kubectl get cluster pulsar
     ```
 
-    当状态显示为 Running 时，表示集群已成功创建。
+    当状态显示为 `Running` 时，表示集群已成功创建。

@@ -9,7 +9,9 @@ sidebar_label: 配置 BackupRepo
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# 概述
+# 配置 BackupRepo
+
+## 概述
 
 BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象存储），S3（亚马逊对象存储），COS（腾讯云对象存储），GCS（谷歌云对象存储），OBS（华为云对象存储），MinIo 等兼容 S3 协议的对象存储作为备份仓库，同时支持 k8s 原生的 PVC 作为备份仓库。
 

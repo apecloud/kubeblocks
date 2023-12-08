@@ -255,7 +255,7 @@ jobs:
       WORKFLOW_ID: "e2e-kbcli.yml"
       APECD_REF: "v0.1.35"
       VERSION: "${{ needs.send-message.outputs.tag-name }}"
-      EXTRA_ARGS: "TEST_TYPE=${{ matrix.test-type }}"
+      EXTRA_ARGS: "TEST_TYPE=${{ matrix.test-type }}#CLOUD_PROVIDER=${{ vars.CLOUD_PROVIDER }}"
     secrets: inherit
 
   delete-cache:

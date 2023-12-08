@@ -212,11 +212,11 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 	selector := labels.SelectorFromSet(labelsMap)
 	store.logger.Info(fmt.Sprintf("pod selector: %s", selector.String()))
 	podList, err := store.clientset.CoreV1().Pods(store.namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
-	//listOpts := metav1.ListOptions{
-	//	LabelSelector:   selector.String(),
-	//	ResourceVersion: "0",
-	//}
-	//podList, err := store.clientset.CoreV1().Pods(store.namespace).List(context.TODO(), listOpts)
+	// listOpts := metav1.ListOptions{
+	// 	LabelSelector:   selector.String(),
+	// 	ResourceVersion: "0",
+	// }
+	// podList, err := store.clientset.CoreV1().Pods(store.namespace).List(context.TODO(), listOpts)
 	if err != nil {
 		return nil, err
 	}

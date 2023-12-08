@@ -69,11 +69,11 @@ func (r *OpsDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	// check go template of the expression.
-	for _, v := range opsDef.Spec.PreChecks {
-		if v.Expression == nil {
+	for _, v := range opsDef.Spec.PreConditions {
+		if v.Rule == nil {
 			continue
 		}
-		if _, err = template.New("opsDefTemplate").Parse(v.Expression.Rule); err != nil {
+		if _, err = template.New("opsDefTemplate").Parse(v.Rule.Expression); err != nil {
 			if patchErr := r.updateStatusUnavailable(reqCtx, opsDef, err); patchErr != nil {
 				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 			}

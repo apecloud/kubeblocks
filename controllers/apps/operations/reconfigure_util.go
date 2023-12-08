@@ -29,6 +29,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type reconfiguringResult struct {
@@ -290,7 +291,7 @@ func processMergedFailed(resource *OpsResource, isInvalid bool, err error) error
 	// if failed to validate configure, set opsRequest to failed and return
 	failedCondition := appsv1alpha1.NewReconfigureFailedCondition(resource.OpsRequest, err)
 	resource.OpsRequest.SetStatusCondition(*failedCondition)
-	return &FastFailError{message: err.Error()}
+	return intctrlutil.NewFatalError(err.Error())
 }
 
 func formatConfigPatchToMessage(configPatch *core.ConfigPatchInfo, execStatus *core.PolicyExecStatus) string {

@@ -65,9 +65,18 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 		return nil
 	}
 
+	lifecycleActions := transCtx.CompDef.Spec.LifecycleActions
+	if lifecycleActions == nil || lifecycleActions.AccountProvision == nil {
+		return nil
+	}
+	// TODO: support custom handler for account
+	// TODO: build lorry client if accountProvision is built-in
 	lorryCli, err := t.buildLorryClient(transCtx)
 	if err != nil {
 		return err
+	}
+	if lorryCli == nil {
+		return nil
 	}
 	for _, account := range transCtx.SynthesizeComponent.SystemAccounts {
 		if t.isAccountProvisioned(cond, account) {
@@ -164,7 +173,7 @@ func (t *componentAccountProvisionTransformer) buildLorryClient(transCtx *compon
 		}
 	}
 	if roleName == "" {
-		return nil, fmt.Errorf("unable to find appropriate pods to create accounts")
+		return nil, nil
 	}
 
 	podList, err := component.GetComponentPodListWithRole(transCtx.Context, transCtx.Client, *transCtx.Cluster, synthesizedComp.Name, roleName)

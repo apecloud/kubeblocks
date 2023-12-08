@@ -92,7 +92,7 @@ var _ = Describe("object rbac transformer test.", func() {
 			Ctx: ctx,
 			Log: logger,
 		}
-		synthesizedComponent, err := component.BuildSynthesizedComponent(reqCtx, k8sClient, compDefObj, compObj)
+		synthesizedComponent, err := component.BuildSynthesizedComponent(reqCtx, k8sClient, cluster, compDefObj, compObj)
 		Expect(err).Should(Succeed())
 
 		transCtx = &componentTransformContext{

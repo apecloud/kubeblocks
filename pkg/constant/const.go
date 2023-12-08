@@ -152,6 +152,7 @@ const (
 	DBComponentDefinitionFinalizerName = "componentdefinition.kubeblocks.io/finalizer"
 	ConfigurationTemplateFinalizerName = "config.kubeblocks.io/finalizer"
 	ServiceDescriptorFinalizerName     = "servicedescriptor.kubeblocks.io/finalizer"
+	OpsRequestFinalizerName            = "opsrequest.kubeblocks.io/finalizer"
 
 	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"

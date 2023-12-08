@@ -42,6 +42,7 @@ const (
 	ConditionTypeExpose             = "Exposing"
 	ConditionTypeDataScript         = "ExecuteDataScript"
 	ConditionTypeBackup             = "Backup"
+	ConditionTypeCustomOperation    = "CustomOperation"
 
 	// condition and event reasons
 

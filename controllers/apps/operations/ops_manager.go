@@ -56,13 +56,23 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 		return &ctrl.Result{}, PatchOpsHandlerNotSupported(reqCtx.Ctx, cli, opsRes)
 	}
 
-	// validate OpsRequest.spec
-	// if the operation will create a new cluster, don't validate the cluster
-	if err = opsRequest.Validate(reqCtx.Ctx, cli, opsRes.Cluster, !opsBehaviour.IsClusterCreation); err != nil {
-		return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
+	if opsRequest.Spec.Type == appsv1alpha1.CustomType {
+		err = initOpsDefAndValidate(reqCtx, cli, opsRes)
+		if err != nil {
+			return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
+		}
+	} else {
+		// validate OpsRequest.spec
+		// if the operation will create a new cluster, don't validate the cluster
+		if err = opsRequest.Validate(reqCtx.Ctx, cli, opsRes.Cluster, !opsBehaviour.IsClusterCreation); err != nil {
+			return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
+		}
 	}
 
 	if opsRequest.Status.Phase == appsv1alpha1.OpsPendingPhase {
+		if opsRequest.Spec.Cancel {
+			return &ctrl.Result{}, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, appsv1alpha1.OpsCancelledPhase)
+		}
 		// validate entry condition for OpsRequest, check if the cluster is in the right phase
 		if err = validateOpsWaitingPhase(opsRes.Cluster, opsRequest, opsBehaviour); err != nil {
 			// check if the error is caused by WaitForClusterPhaseErr  error
@@ -95,9 +105,12 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 	}
 
 	if err = opsBehaviour.OpsHandler.Action(reqCtx, cli, opsRes); err != nil {
-		// patch the status.phase to Failed when the error is FastFailError, which means the operation is failed and there is no need to retry
-		if _, ok := err.(*FastFailError); ok {
-			return &ctrl.Result{}, patchFastFailErrorCondition(reqCtx.Ctx, cli, opsRes, err)
+		// patch the status.phase to Failed when the error is Fatal, which means the operation is failed and there is no need to retry
+		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
+			return &ctrl.Result{}, patchFatalFailErrorCondition(reqCtx.Ctx, cli, opsRes, err)
+		}
+		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting) {
+			return intctrlutil.ResultToP(intctrlutil.Reconciled())
 		}
 		return nil, err
 	}

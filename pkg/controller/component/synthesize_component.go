@@ -44,9 +44,10 @@ var (
 // BuildSynthesizedComponent builds a new SynthesizedComponent object, which is a mixture of component-related configs from ComponentDefinition and Component.
 func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
+	cluster *appsv1alpha1.Cluster,
 	compDef *appsv1alpha1.ComponentDefinition,
 	comp *appsv1alpha1.Component) (*SynthesizedComponent, error) {
-	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil, nil)
+	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, cluster, nil)
 }
 
 // BuildSynthesizedComponent4Generated builds SynthesizedComponent for generated Component which w/o ComponentDefinition.

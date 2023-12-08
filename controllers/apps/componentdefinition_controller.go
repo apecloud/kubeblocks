@@ -250,10 +250,11 @@ func (r *ComponentDefinitionReconciler) validateLabels(cli client.Client, rctx i
 
 func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
-	if len(cmpd.Spec.SystemAccounts) != 0 && (cmpd.Spec.LifecycleActions == nil || cmpd.Spec.LifecycleActions.AccountProvision == nil) {
-		return fmt.Errorf("the AccountProvision action is needed to provision system accounts")
+	for _, v := range cmpd.Spec.SystemAccounts {
+		if v.SecretRef == nil && (cmpd.Spec.LifecycleActions == nil || cmpd.Spec.LifecycleActions.AccountProvision == nil) {
+			return fmt.Errorf(`the AccountProvision action is needed to provision system account %s`, v.Name)
+		}
 	}
-
 	if !checkUniqueItemWithValue(cmpd.Spec.SystemAccounts, "Name", nil) {
 		return fmt.Errorf("duplicate system accounts are not allowed")
 	}

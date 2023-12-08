@@ -110,16 +110,18 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	reqCtx.Log.V(1).Info("reconcile", "component", req.NamespacedName)
 
+	planBuilder := NewComponentPlanBuilder(reqCtx, r.Client, req)
+	if err := planBuilder.Init(); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
 	requeueError := func(err error) (ctrl.Result, error) {
 		if re, ok := err.(intctrlutil.RequeueError); ok {
 			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
 		}
+		c := planBuilder.(*componentPlanBuilder)
+		sendWarningEventWithError(r.Recorder, c.transCtx.Component, corev1.EventTypeWarning, err)
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
-	}
-
-	planBuilder := NewComponentPlanBuilder(reqCtx, r.Client, req)
-	if err := planBuilder.Init(); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
 	plan, errBuild := planBuilder.

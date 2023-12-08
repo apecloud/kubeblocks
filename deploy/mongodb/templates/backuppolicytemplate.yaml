@@ -42,15 +42,15 @@ spec:
           - names: [mongodb-6.0]
             mappingValue: "6.0"
     schedules:
+    - backupMethod: dump
+      enabled: false
+      cronExpression: "0 18 * * *"
+      retentionPeriod: 7d
     - backupMethod: datafile
       enabled: false
       cronExpression: "0 18 * * *"
       retentionPeriod: 7d
     - backupMethod: volume-snapshot
-      enabled: false
-      cronExpression: "0 18 * * *"
-      retentionPeriod: 7d
-    - backupMethod: dump
       enabled: false
       cronExpression: "0 18 * * *"
       retentionPeriod: 7d

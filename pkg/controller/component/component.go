@@ -190,12 +190,22 @@ func getCompLabelValue(comp *appsv1alpha1.Component, label string) (string, erro
 	return val, nil
 }
 
+// GetComponentDefName gets the name of referenced component definition.
+func GetComponentDefName(cluster *appsv1alpha1.Cluster, componentName string) string {
+	for _, component := range cluster.Spec.ComponentSpecs {
+		if componentName == component.Name {
+			return component.ComponentDef
+		}
+	}
+	return ""
+}
+
 // GetCompDefinition gets the component definition by component name.
 func GetCompDefinition(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	compName string) (*appsv1alpha1.ComponentDefinition, error) {
-	compDefName := cluster.Spec.GetComponentDefName(compName)
+	compDefName := GetComponentDefName(cluster, compName)
 	if len(compDefName) == 0 {
 		return nil, intctrlutil.NewNotFound(`can not found component definition by the component name "%s"`, compName)
 	}

@@ -8307,13 +8307,14 @@ spec:
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                 type: object
-              preChecks:
-                description: pre-check if it meets the requirements to run the job
-                  for the operation.
+              preConditions:
+                description: preCondition if it meets the requirements to run the
+                  job for the operation.
                 items:
                   properties:
                     exec:
-                      description: a job will be run to execute pre-check.
+                      description: a job will be run to execute preCondition. and
+                        the operation will be executed when the exec job is succeed.
                       properties:
                         args:
                           description: container args.
@@ -8450,27 +8451,27 @@ spec:
                       required:
                       - image
                       type: object
-                    expression:
-                      description: expression declares how the operation can be executed.
+                    rule:
+                      description: condition declares how the operation can be executed.
                       properties:
+                        expression:
+                          description: 'expression declares how the operation can
+                            be executed using go template expression. it should return
+                            "true" or "false", built-in objects: - "params" are input
+                            parameters. - "cluster" is referenced cluster object.
+                            - "component" is referenced the component Object.'
+                          type: string
                         message:
                           description: report the message if the rule is not matched.
                           type: string
-                        rule:
-                          description: 'validation rule declares how the operation
-                            can be executed using go template expression. it should
-                            return "true" or "false", built-in objects: - "params"
-                            are input parameters. - "cluster" is referenced cluster
-                            object. - "component" is referenced the component Object.'
-                          type: string
                       required:
+                      - expression
                       - message
-                      - rule
                       type: object
                   type: object
                   x-kubernetes-validations:
-                  - message: at least one exists for expression and exec.
-                    rule: has(self.expression) || has(self.exec)
+                  - message: at least one exists for rule and exec.
+                    rule: has(self.rule) || has(self.exec)
                 type: array
             required:
             - componentDefinitionRefs

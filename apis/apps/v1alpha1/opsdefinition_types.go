@@ -46,9 +46,9 @@ type OpsDefinitionSpec struct {
 	// +kubebuilder:validation:Required
 	JobSpec batchv1.JobSpec `json:"jobSpec"`
 
-	// pre-check if it meets the requirements to run the job for the operation.
+	// preCondition if it meets the requirements to run the job for the operation.
 	// +optional
-	PreChecks []PreCheck `json:"preChecks,omitempty"`
+	PreConditions []PreCondition `json:"preConditions,omitempty"`
 }
 
 type ComponentDefinitionRef struct {
@@ -85,33 +85,34 @@ type ParametersSchema struct {
 	OpenAPIV3Schema *apiextensionsv1.JSONSchemaProps `json:"openAPIV3Schema,omitempty"`
 }
 
-// +kubebuilder:validation:XValidation:rule="has(self.expression) || has(self.exec)", message="at least one exists for expression and exec."
+// +kubebuilder:validation:XValidation:rule="has(self.rule) || has(self.exec)", message="at least one exists for rule and exec."
 
-type PreCheck struct {
+type PreCondition struct {
 
-	// expression declares how the operation can be executed.
-	Expression *Expression `json:"expression,omitempty"`
+	// condition declares how the operation can be executed.
+	Rule *Rule `json:"rule,omitempty"`
 
-	// a job will be run to execute pre-check.
+	// a job will be run to execute preCondition.
+	// and the operation will be executed when the exec job is succeed.
 	// +optional
-	Exec *PreCheckExec `json:"exec,omitempty"`
+	Exec *PreConditionExec `json:"exec,omitempty"`
 }
 
-type Expression struct {
-	// validation rule declares how the operation can be executed using go template expression.
+type Rule struct {
+	// expression declares how the operation can be executed using go template expression.
 	// it should return "true" or "false", built-in objects:
 	// - "params" are input parameters.
 	// - "cluster" is referenced cluster object.
 	// - "component" is referenced the component Object.
 	// +kubebuilder:validation:Required
-	Rule string `json:"rule"`
+	Expression string `json:"expression"`
 
 	// report the message if the rule is not matched.
 	// +kubebuilder:validation:Required
 	Message string `json:"message"`
 }
 
-type PreCheckExec struct {
+type PreConditionExec struct {
 	// image name.
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`

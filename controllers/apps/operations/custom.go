@@ -44,10 +44,11 @@ import (
 )
 
 const (
-	kbEnvCompSVCName       = "KB_COMP_SVC_NAME"
-	kbEnvCompSVCPortPrefix = "KB_COMP_SVC_PORT_"
-	kbEnvAccountUserName   = "KB_ACCOUNT_USERNAME"
-	kbEnvAccountPassword   = "KB_ACCOUNT_PASSWORD"
+	kbEnvCompHeadlessSVCName = "KB_COMP_HEADLESS_SVC_NAME"
+	kbEnvCompSVCName         = "KB_COMP_SVC_NAME"
+	kbEnvCompSVCPortPrefix   = "KB_COMP_SVC_PORT_"
+	kbEnvAccountUserName     = "KB_ACCOUNT_USERNAME"
+	kbEnvAccountPassword     = "KB_ACCOUNT_PASSWORD"
 )
 
 type CustomOpsHandler struct{}
@@ -76,12 +77,12 @@ func (c CustomOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, 
 }
 
 func (c CustomOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	preChecks := opsRes.OpsDef.Spec.PreChecks
+	preConditions := opsRes.OpsDef.Spec.PreConditions
 	customSpec := opsRes.OpsRequest.Spec.CustomSpec
 	// 1. do preChecks
-	for _, v := range preChecks {
-		if v.Expression != nil {
-			if err := c.checkExpression(reqCtx, cli, opsRes, v.Expression, customSpec.ComponentName); err != nil {
+	for _, v := range preConditions {
+		if v.Rule != nil {
+			if err := c.checkExpression(reqCtx, cli, opsRes, v.Rule, customSpec.ComponentName); err != nil {
 				return intctrlutil.NewFatalError(err.Error())
 			}
 		} else if v.Exec != nil {
@@ -110,7 +111,7 @@ func (c CustomOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
-	expression *appsv1alpha1.Expression,
+	rule *appsv1alpha1.Rule,
 	compName string) error {
 	opsSpec := opsRes.OpsRequest.Spec
 	componentObjName := constant.GenerateClusterComponentName(opsSpec.ClusterRef, compName)
@@ -139,7 +140,7 @@ func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return err
 	}
-	tmpl, err := template.New("opsDefTemplate").Parse(expression.Rule)
+	tmpl, err := template.New("opsDefTemplate").Parse(rule.Expression)
 	if err != nil {
 		return err
 	}
@@ -148,12 +149,12 @@ func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,
 		return err
 	}
 	if buf.String() == "false" {
-		return fmt.Errorf(expression.Message)
+		return fmt.Errorf(rule.Message)
 	}
 	return nil
 }
 
-func (c CustomOpsHandler) checkExecAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, exec *appsv1alpha1.PreCheckExec) error {
+func (c CustomOpsHandler) checkExecAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, exec *appsv1alpha1.PreConditionExec) error {
 	// TODO: implement it
 	// TODO: return needWaitingError to wait for job successfully.
 	return nil
@@ -217,6 +218,7 @@ func (c CustomOpsHandler) buildJob(reqCtx intctrlutil.RequestCtx,
 			{Name: constant.KBEnvClusterCompName, Value: fullCompName},
 			{Name: constant.KBEnvCompReplicas, Value: strconv.Itoa(int(comp.Replicas))},
 			{Name: constant.KBEnvCompServiceVersion, Value: compDef.Spec.ServiceVersion},
+			{Name: kbEnvCompHeadlessSVCName, Value: constant.GenerateDefaultComponentHeadlessServiceName(clusterName, compName)},
 		}
 
 		// inject connect envs
@@ -232,7 +234,7 @@ func (c CustomOpsHandler) buildJob(reqCtx intctrlutil.RequestCtx,
 				if v.Name != compDefRef.ServiceName {
 					continue
 				}
-				env = append(env, corev1.EnvVar{Name: kbEnvCompSVCName, Value: fmt.Sprintf("%s-%s", fullCompName, v.ServiceName)})
+				env = append(env, corev1.EnvVar{Name: kbEnvCompSVCName, Value: constant.GenerateComponentServiceName(clusterName, compName, v.ServiceName)})
 				for _, port := range v.Spec.Ports {
 					portName := strings.ReplaceAll(port.Name, "-", "_")
 					env = append(env, corev1.EnvVar{Name: kbEnvCompSVCPortPrefix + strings.ToUpper(portName), Value: strconv.Itoa(int(port.Port))})
@@ -266,8 +268,8 @@ func (c CustomOpsHandler) buildJob(reqCtx intctrlutil.RequestCtx,
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
 				constant.OpsRequestNameLabelKey: opsName,
-				constant.AppInstanceLabelKey:    clusterName,
 				constant.KBAppComponentLabelKey: compName,
+				constant.AppManagedByLabelKey:   constant.AppName,
 			},
 			Name:      fmt.Sprintf("%s-%d", c.getJobNamePrefix(opsName, compName), index),
 			Namespace: opsRes.OpsRequest.Namespace,

@@ -868,16 +868,6 @@ func (r ClusterSpec) GetComponentDefRefName(componentName string) string {
 	return ""
 }
 
-// GetComponentDefName gets the name of referenced component definition.
-func (r ClusterSpec) GetComponentDefName(componentName string) string {
-	for _, component := range r.ComponentSpecs {
-		if componentName == component.Name {
-			return component.ComponentDef
-		}
-	}
-	return ""
-}
-
 // ValidateEnabledLogs validates enabledLogs config in cluster.yaml, and returns metav1.Condition when detecting invalid values.
 func (r ClusterSpec) ValidateEnabledLogs(cd *ClusterDefinition) error {
 	message := make([]string, 0)

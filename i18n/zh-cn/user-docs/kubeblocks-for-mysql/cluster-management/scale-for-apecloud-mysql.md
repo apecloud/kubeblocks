@@ -126,7 +126,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
 :::note
 
-垂直扩容不会同步与 CPU 和内存相关的参数，需要手动调用配置的 OpsRequest 来进行更改。详情请参考[配置]（链接）。
+垂直扩容不会同步与 CPU 和内存相关的参数，需要手动调用配置的 OpsRequest 来进行更改。详情请参考[配置](../../kubeblocks-for-mysql/configuration/configuration.md)。
 
 :::
 

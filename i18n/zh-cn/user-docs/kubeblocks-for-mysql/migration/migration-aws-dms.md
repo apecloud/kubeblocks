@@ -26,7 +26,7 @@ sidebar_label: 通过 AWS DMS 迁移
 ***开始之前***
 
 * [安装 kbcli](./../../installation/install-with-kbcli/install-kbcli.md)
-* [安装 KubeBlocks](链接): 你可以用 kbcli 或 Helm 来安装 KubeBlocks。
+*  安装 KubeBlocks: 你可以用 [kbcli](../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](../../installation/install-with-helm/install-kubeblocks-with-helm.md) 来安装 KubeBlocks。
 * 开启 AWS Load Balancer Controller 插件。
 
    ```bash
@@ -39,11 +39,11 @@ sidebar_label: 通过 AWS DMS 迁移
 
    负载均衡器插件依赖于 EKS 环境，如果负载均衡器未成功开启，可能与环境有关。
 
-   检查 EKS 环境并重新启用此插件。详情请参阅[启用插件](链接)。
+   检查 EKS 环境并重新启用此插件。详情请参阅[启用插件](../../overview/database-engines-supported.md)。
 
 ***步骤***
 
-1. 在 AWS 上创建 ApeCloud MySQL 集群。详情请参阅[创建 ApeCloud MySQL 集群](链接)。
+1. 在 AWS 上创建 ApeCloud MySQL 集群。详情请参阅[创建 ApeCloud MySQL 集群](../../kubeblocks-for-mysql/cluster-management/create-and-connect-a-mysql-cluster.md)。
 2. 填写集群名称，并执行以下命令暴露集群的外部 IP。
 
    ```bash
@@ -52,7 +52,6 @@ sidebar_label: 通过 AWS DMS 迁移
 
    :::note
 
-   For the above `kbcli cluster expose` command, the available value for `--type` are `vpc` and `internet`. Use `--type=vpc` for access within the same VPC and `--type=internet` for cross VPC access under the public network.
    在 `kbcli cluster expose` 命令中，`--type` 的可用值为 `vpc` 和 `internet`。对于同一 VPC 内的访问，请使用 `--type=vpc`；如果是公共网络下的跨 VPC 访问，请使用 `--type=internet`。
 
    :::
@@ -250,7 +249,7 @@ sidebar_label: 通过 AWS DMS 迁移
 
 1. 创建迁移用Replication Instance
 
-   Go to **DMS** -> **Replication Instance** and click **Create replication instance**.点击 **DMS** ->  **Replication Instance**，**创建复制实例**。
+   点击 **DMS** ->  **Replication Instance**，**创建复制实例**。
 
    :::caution
 
@@ -288,9 +287,6 @@ sidebar_label: 通过 AWS DMS 迁移
 
      AWS DMS 提供三种迁移类型：
 
-     * Migrate existing data: AWS DMS migrates only your existing data. Changes to your source data aren’t captured and applied to your target.
-     * Migrate existing data and replicate ongoing changes: AWS DMS migrates both existing data and ongoing data changes, i.e. the existing data before the migration task and the data changes during the migration task will be synchronized to the target instance.
-     * Replicate data changes only: AWS DMS only migrates the ongoing data changes. If you select this type, you can use **CDC start mode for source transactions** to specify a location and migrate the data changes.
      * Migrate existing data：只迁移存量数据，即任务运行后源实例发生的变更不会迁移到目标实例
      * Migrate existing data and replicate ongoing changes：迁移存量+增量数据，即任务运行前的存量数据和任务运行中的增量数据都会被同步到目标实例
      * Replicate data changes only：只迁移增量数据，可以配合后面的“CDC start mode for source transactions”配置指定位点迁移增量数据
@@ -340,7 +336,7 @@ sidebar_label: 通过 AWS DMS 迁移
 
 1. 确保传输任务正常运行。
 
-   Pay attention to **Status**, **Last updated in Table statistics**, and **CDC latency target** in **CloudWatch metrics**.重点关注表统计数据中的**任务状态**和**最后更新时间**，以及 CloudWatch 指标中的 **CDCLatencyTarget**。
+   重点关注表统计数据中的**任务状态**和**最后更新时间**，以及 CloudWatch 指标中的 **CDCLatencyTarget**。
 
    你还可以参考[此文档](https://repost.aws/zh-Hans/knowledge-center/dms-stuck-task-progress)来检查迁移任务。
 

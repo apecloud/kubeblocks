@@ -20,8 +20,8 @@ sidebar_label: 迁移
 
 ### 启用 kbcli migration 功能
 
-1. 安装 KubeBlocks：用 [kbcli](链接) 安装 KubeBlocks。
-2. [开启迁移引擎](链接)。
+1. 安装 KubeBlocks：用 [kbcli](../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](../../installation/install-with-helm/install-kubeblocks-with-helm.md) 安装 KubeBlocks。
+2. [开启迁移引擎](../../overview/database-engines-supported.md)。
 
    ```bash
    kbcli addon list

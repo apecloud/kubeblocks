@@ -17,8 +17,8 @@ import TabItem from '@theme/TabItem';
 
 ### 开始之前
 
-* 如果想通过 kbcli 创建和连接 MySQL 集群，请安装 kbcli。
-* 用 kucli 安装 KubeBlocks 或者 用 Helm 安装 KubeBlocks。
+* 如果想通过 kbcli 创建和连接 MySQL 集群，请[安装 kbcli](../../installation/install-with-kbcli/install-kbcli.md)。
+* 用 [kbcli](../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 安装 KubeBlocks 或者 用 [Helm](../../installation/install-with-helm/install-kubeblocks-with-helm.md) 安装 KubeBlocks。
 * 确保 ApeCloud MySQL add-on 已启用。
   
   <Tabs>
@@ -345,4 +345,4 @@ KubeBlocks operator 会创建一个名为 `mysql-cluster-conn-credential` 的新
 
 </Tabs>
 
-有关详细的数据库连接指南，请参考连接数据库。
+有关详细的数据库连接指南，请参考[连接数据库](../../create-and-connect-databases/overview-on-connect-databases.md)。

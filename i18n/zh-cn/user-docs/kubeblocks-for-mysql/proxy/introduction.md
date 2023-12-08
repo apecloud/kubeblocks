@@ -12,7 +12,7 @@ sidebar_label: Introduction
 
 ApeCloud MySQL 代理是一个专为与 MySQL 高度兼容而设计的数据库代理。它支持 MySQL 传输协议、读写分离、连接池和透明的故障切换。本节介绍 ApeCloud MySQL 代理的架构、功能和主要优势。
 
-## Architecture
+## 架构
 
 ApeCloud MySQL 代理是 Vitess 项目的一个分支。为了提供更好的 SQL 兼容性，例如更好的子查询、公共表表达式（CTE）和表达式评估，它移除了对分片的支持。下图展示了代理集群的架构。
 

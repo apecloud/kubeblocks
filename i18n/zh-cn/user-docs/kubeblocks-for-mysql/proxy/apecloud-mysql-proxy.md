@@ -13,10 +13,10 @@ import TabItem from '@theme/TabItem';
 
 ## 开始之前
 
-1. [安装 kbcli](./../../installation/install-kbcli.md).
-2. Install KubeBlocks.
+1. [安装 kbcli](../../installation/install-with-kbcli/install-kbcli.md).
+2. 安装 KubeBlocks。
 
-   可以执行 kbcli playground init 安装 k3d 集群和 KubeBlocks。详情请参考[在本地使用 KubeBlocks](链接) 或[在云上使用 KubeBlocks](链接)。
+   可以执行 `kbcli playground init` 安装 k3d 集群和 KubeBlocks。详情请参考[在本地使用 KubeBlocks](../../try-out-on-playground/try-kubeblocks-on-local-host.md) 或[在云上使用 KubeBlocks](../../try-out-on-playground/try-kubeblocks-on-cloud.md)。
 
    ```bash
    kbcli playground init
@@ -25,8 +25,8 @@ import TabItem from '@theme/TabItem';
    kbcli playground init --version='0.6.0'
    ```
 
-   如果已经有 Kubernetes 集群，可以选择用 [Helm](链接) 或 [kbcli](链接) 安装 KubeBlocks。
-3. 准备一个名为 mycluster 的 ApeCloud MySQL 三节点集群，用于演示如何为现有集群启用代理功能。详情请参考[创建 MySQL 集群](链接)。
+   如果已经有 Kubernetes 集群，可以选择用 [Helm](../../installation/install-with-helm/install-kubeblocks-with-helm.md) 或 [kbcli](../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 安装 KubeBlocks。
+3. 准备一个名为 mycluster 的 ApeCloud MySQL 三节点集群，用于演示如何为现有集群启用代理功能。详情请参考[创建 MySQL 集群](../../kubeblocks-for-mysql/cluster-management/create-and-connect-a-mysql-cluster.md)。
 
 ## 创建代理集群
 
@@ -287,7 +287,7 @@ kubectl get pod <vtgate-pod-name> -w
 
 :::note
 
-关于参数配置的更多信息，请参考[配置](链接)。
+关于参数配置的更多信息，请参考[配置](../../kubeblocks-for-postgresql/configuration/configuration.md)。
 
 :::
 
@@ -358,7 +358,7 @@ ls /vtdataroot
 
 :::note
 
-在生产环境安装 KubeBlocks 时，所有监控插件默认处于禁用状态。你可以自行启用这些插件，但强烈建议你构建自己的监控系统或购买第三方监控服务。详情请参考[监控](链接)。
+在生产环境安装 KubeBlocks 时，所有监控插件默认处于禁用状态。你可以自行启用这些插件，但强烈建议你构建自己的监控系统或购买第三方监控服务。详情请参考[监控](../../observability/monitor-database.md)。
 
 :::
 
@@ -402,7 +402,7 @@ kbcli cluster configure myproxy --component vtgate --set=read_write_splitting_po
 kbcli cluster configure myproxy --component vtgate --set=read_write_splitting_ratio=70
 ```
 
-此外，你还可以[使用 Grafana](monitoring链接) 或执行 `show workload` 来查看流量分布。
+此外，你还可以[使用 Grafana](#监控) 或执行 `show workload` 来查看流量分布。
 
 ```bash
 show workload;

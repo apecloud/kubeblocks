@@ -8,22 +8,21 @@ sidebar_label: 停止/启动
 
 # 停止/启动集群
 
-You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. Start this cluster again if you want to restore the cluster resources by snapshots.
 您可以停止/启动集群以释放计算资源。当集群停止时，其计算资源将被释放，也就是说 Kubernetes 的 Pod 将被释放，但其存储资源仍将被保留。如果你想恢复集群资源，可通过快照重新启动集群。
 
-## Stop a cluster
+## 停止集群
 
-### Option 1. (Recommended) Use kbcli
+### 选项 1. (推荐) 使用 kbcli
 
-Configure the name of your cluster and run the command below to stop this cluster.
+配置集群名称，并执行以下命令来停止该集群。
 
 ```bash
 kbcli cluster stop mysql-cluster
 ```
 
-### Option 2. Create an OpsRequest
+### 选项 2. 创建 OpsRequest
 
-Run the command below to stop a cluster.
+执行以下命令来停止集群。
 
 ```bash
 kubectl apply -f - <<EOF
@@ -39,9 +38,9 @@ spec:
 EOF
 ```
 
-### Option 3. Change the YAML file of the cluster
+### 选项 3. 更改 YAML 文件
 
-Configure replicas as 0 to delete pods.
+将副本数设置为 0，删除 Pod。 
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -68,19 +67,19 @@ spec:
             storage: 1Gi
 ```
 
-## Start a cluster
+## 启动集群
   
-### Option 1. (Recommended) Use kbcli
+### 选项 1. (推荐) 使用 kbcli
 
-Configure the name of your cluster and run the command below to start this cluster.
+配置集群名称，并执行以下命令来启动该集群。
 
 ```bash
 kbcli cluster start mysql-cluster
 ```
 
-### Option 2. Create an OpsRequest
+### 选项 2. 创建 OpsRequest
 
-Run the command below to start a cluster.
+执行以下命令，启动集群。
 
 ```bash
 kubectl apply -f - <<EOF
@@ -96,9 +95,9 @@ spec:
 EOF 
 ```
 
-### Option 3. Change the YAML file of the cluster
+### 选项 3. 更改 YAML 文件
 
-Change replicas back to the original amount to start this cluster again.
+将副本数改为原始数量，重新启动该集群。
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1

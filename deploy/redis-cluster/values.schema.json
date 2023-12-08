@@ -65,38 +65,52 @@
       "type": "object",
       "properties": {
         "cpu": {
-          "title": "The cpu Schema",
+          "title": "sentinel component cpu cores",
+          "description": "sentinel component cpu cores.",
           "type": "number",
           "default": 0.2
         },
         "memory": {
-          "title": "The memory Schema",
+          "title": "sentinel component memory",
+          "description": "sentinel component memory size, the unit is Gi.",
           "type": "number",
           "default": 0.2
         },
         "storage": {
-          "title": "The storage Schema",
+          "title": "sentinel component storage",
+          "description": "sentinel component storage size, the unit is Gi.",
           "type": "number",
           "default": 5
         },
         "replicas": {
-          "title": "The replicas Schema",
+          "title": "sentinel component replicas",
+          "description": "The number of sentinel component replicas. Default is 3",
           "type": "number",
           "default": 3
         },
         "service": {
-          "title": "The service Schema",
+          "title": "sentinel service Schema",
           "type": "object",
           "properties": {
             "type": {
-              "title": "The type Schema",
+              "title": "sentinel service type",
+              "description": "sentinel service type",
               "type": "string",
-              "default": "ClusterIP"
+              "default": "ClusterIP",
+              "enum": [
+                "ClusterIP",
+                "NodePort"
+              ]
             },
             "nodePortBase": {
-              "title": "The nodePortBase Schema",
-              "type": "string",
-              "default": ""
+              "title": "sentinel service nodePortBase",
+              "description": "sentinel service nodePortBase",
+              "type": [
+                "number",
+                "string"
+              ],
+              "minimum": 30000,
+              "maximum": 32767
             }
           }
         }

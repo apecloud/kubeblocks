@@ -1,100 +1,80 @@
+---
+title: 定时备份
+description: 如何进行定时备份
+keywords: [备份恢复, 定时, 自动备份, 定时备份]
+sidebar_position: 3
+sidebar_label: 定时备份
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # 定时备份
 
-## 按计划备份
-你可以通过修改相关参数来自定义备份计划。
-
-:::caution
-由 kbcli 或 kubectl 创建的备份会被永久保存。如果想删除备份，请手动删除。
-:::
+KubeBlocks 支持为集群配置自动备份。
 
 <Tabs>
 
 <TabItem value="kbcli" label="kbcli" default>
 
+使用 kbcli 命令配置集群自动备份的命令如下：
+
+```bash
+kbcli cluster update mysql-cluster --backup-enabled=true \
+--backup-method=xtrabackup --backup-repo-name=my-repo \
+--backup-retention-period=7d --backup-cron-expression="0 18 * * *"
 ```
-kbcli cluster edit-backup-policy mysql-cluster-mysql-backup-policy
->
-spec:
-  ...
-  schedule:
-    datafile:
-      # UTC 时区，下面的示例代表每周一凌晨 2 点
-      cronExpression: "0 18 * * 0"
-      # 启用功能
-      enable: true
-```
+
+- `--backup-enabled` 表示是否开启自动备份。
+- `--backup-method` 指定备份方法。支持的备份方法可以执行 `kbcli cluster describe-backup-policy mysql-cluster` 命令查看。
+- `--backup-repo-name` 指定备份仓库的名称。
+- `--backup-retention-period` 指定备份保留时长。以上示例中为 7 天。
+- `--backup-cron-expression` 指定自动备份的备份周期。表达式格式与 linux 系统中的定时任务保持一致，时区为 UTC，参考 [Cron](https://en.wikipedia.org/wiki/Cron)。 
+
 </TabItem>
 
 <TabItem value="kubectl" label="kubectl">
 
-```
+用 kubectl 命令修改 Cluster 中的 backup 字段，命令如下：
+
+```bash
 kubectl edit cluster -n default mysql-cluster
 >
 spec:
   ...
   backup:
-    # 启动自动备份
+    # 开启自动备份
     enabled: true
-    # UTC 时区，下面的示例代表每周一凌晨 2 点
+    # UTC 时区, 下面示例是每周一凌晨 2 点
     cronExpression: 0 18 * * *
-    # 指定备份方法。下面是 backupTool 的示例。如果支持快照存储，可以将其更改为 snapshot
-    method: backupTool
-    # 禁用 PITR。如果启用，自动备份也会相应启用
-    pitrEnabled: false
+    # 使用 xtrabackup 进行备份，如果存储支持快照，可以指定为 volume-snapshot
+    method: xtrabackup
     # 备份集保留时长
-    retentionPeriod: 1d
+    retentionPeriod: 7d
+    # 备份仓库
+    repoName: my-repo
 ```
+
 </TabItem>
 
 </Tabs>
+  
+开启自动备份后，可以执行如下命令查看是否有 CronJob 对象被创建：
 
-## 自动日志备份
-KubeBlocks 仅支持自动日志备份。
-
-### 在开始之前
-
-以 MySQL 为例，准备一个用于测试备份和恢复功能的集群。
-
-1. 创建集群。
-```
-kbcli cluster create mysql mysql-cluster
-```
-2. 查看备份策略。
-```
-kbcli cluster list-backup-policy mysql-cluster
-```
-默认情况下，所有备份都存储在默认的全局仓库中。你可以通过[编辑 BackupPolicy 资源](./backup-repo.md#optional-change-the-backup-repository-for-a-cluster)来指定新的仓库。
-
-
-### 创建备份
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-目前，KubeBlocks 仅支持自动日志备份。
-1. 执行以下命令启用自动日志备份。
-```
-kbcli cluster edit-backup-policy mysql-cluster-mysql-backup-policy --set schedule.logfile.enable=true
-```
-2. 检查备份是否成功。
-```
-kbcli cluster list-backups
-```
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
-在集群的 yaml 配置文件中将 pitrEnabled 设置为 true，启用自动日志备份。
-```
-kubectl edit cluster -n default mysql-cluster
+```bash
+kubectl get cronjob
 >
-spec:
-  ...
-  backup:
-    ...
-    # 如果值为 true，将自动启用日志备份
-    pitrEnabled: true
+NAME                                        SCHEDULE     SUSPEND   ACTIVE   LAST SCHEDULE   AGE
+96523399-mysql-cluster-default-xtrabackup   0 18 * * *   False     0        <none>          57m
 ```
-</TabItem>
-</Tabs>
 
+也可以执行如下命令，查看集群信息，其中 `Data Protection:` 部分会显示自动备份的配置信息。
+
+```bash
+kbcli cluster describe mysql-cluster
+>
+...
+Data Protection:
+BACKUP-REPO   AUTO-BACKUP   BACKUP-SCHEDULE   BACKUP-METHOD   BACKUP-RETENTION
+my-repo       Enabled       0 18 * * *        xtrabackup      7d
+```

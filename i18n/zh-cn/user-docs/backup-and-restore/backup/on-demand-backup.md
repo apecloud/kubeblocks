@@ -1,45 +1,46 @@
+---
+title: 按需备份
+description: 如何按需备份
+keywords: [备份, 按需备份, 快照备份, 备份工具]
+sidebar_position: 4
+sidebar_label: 按需备份
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # 按需备份
 
-## 在开始之前
+KubeBlocks 支持按需备份。你可以通过指定 `--method` 来自定义备份方法。本文档以使用备份工具和卷快照为例。
 
-以 MySQL 为例，首先准备一个用于测试备份恢复功能的集群。
+## 备份工具
 
-1. 创建集群。
-```
-kbcli cluster create mysql mysql-cluster
-```
-2. 查看备份策略。
-```
-kbcli cluster list-backup-policy mysql-cluster
-```
-默认情况下，所有备份都存储在默认的全局仓库中。你可以通过[编辑 BackupPolicy 资源](./backup-repo.md#optional-change-the-backup-repository-for-a-cluster)来指定新的仓库。
+下面使用 `xtrabackup` 备份方法，创建名为 `mybackup` 的备份。
 
-## 创建备份
-KubeBlocks 支持两种备份选项：备份工具备份和快照备份。
-
-### 备份工具备份
-KubeBlocks 同时支持 kbcli 和 kubectl。
 <Tabs>
 
 <TabItem value="kbcli" label="kbcli" default>
 
-1. 查看集群，确保处于 Running 的状态。
+```bash
+# 创建备份
+kbcli cluster backup mysql-cluster --name mybackup --method xtrabackup
+>
+Backup mybackup created successfully, you can view the progress:
+        kbcli cluster list-backups --name=mybackup -n default
+        
+# 查看备份
+kbcli cluster list-backups --name=mybackup -n default
+>
+NAME       NAMESPACE   SOURCE-CLUSTER   METHOD       STATUS      TOTAL-SIZE   DURATION   CREATE-TIME                  COMPLETION-TIME              EXPIRATION
+mybackup   default     mysql-cluster    xtrabackup   Completed   4426858      2m8s       Oct 30,2023 15:19 UTC+0800   Oct 30,2023 15:21 UTC+0800
 ```
-kbcli cluster list mysql-cluster
-```  
-2. 创建备份。
-```
-kbcli cluster backup mysql-cluster --type=datafile
-```
-3. 查看备份集。
-```
-kbcli cluster list-backups mysql-cluster
-```
+
 </TabItem>
 
 <TabItem value="kubectl" label="kubectl">
-执行以下命令来创建名为 mybackup 的备份。
-```
+
+```bash
+# 创建备份
 kubectl apply -f - <<-'EOF'
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: Backup
@@ -47,52 +48,75 @@ metadata:
   name: mybackup
   namespace: default
 spec:
-  backupPolicyName: mycluster-mysql-backup-policy
-  backupType: datafile
+  backupMethod: xtrabackup
+  backupPolicyName: mysql-cluster-mysql-backup-policy
 EOF
+
+# 查看备份
+kubectl get backup mybackup
+>
+NAME       POLICY                              METHOD       REPO      STATUS      TOTAL-SIZE   DURATION   CREATION-TIME          COMPLETION-TIME        EXPIRATION-TIME
+mybackup   mysql-cluster-mysql-backup-policy   xtrabackup   my-repo   Completed   4426858      2m8s       2023-10-30T07:19:21Z   2023-10-30T07:21:28Z
 ```
+
 </TabItem>
 
 </Tabs>
 
-### 快照备份
-KubeBlocks 同时支持 kbcli 和 kubectl。
+## 卷快照备份
+
+使用云盘快照创建备份的方式与以上命令类似，只需将对应 YAML 中的 `backupMethod` 或者 kbcli 命令中的 `--method` 参数设置为 `volume-snapshot` 即可。
 
 <Tabs>
 
 <TabItem value="kbcli" label="kbcli" default>
 
-1. 查看集群，确保处于 Running 的状态。
-```
-kbcli cluster list mysql-cluster
-```
-2. 创建快照备份。
-```
-kbcli cluster backup mysql-cluster --type=snapshot
-```
-3. 查看备份集，检查备份是否成功。
-```
-kbcli cluster list-backups mysql-cluster
+```bash
+# 创建备份
+kbcli cluster backup mysql-cluster --name mybackup --method volume-snapshot
+>
+Backup mybackup created successfully, you can view the progress:
+        kbcli cluster list-backups --name=mybackup -n default
+        
+# 查看备份
+kbcli cluster list-backups --name=mybackup -n default
+>
+NAME       NAMESPACE   SOURCE-CLUSTER   METHOD            STATUS      TOTAL-SIZE   DURATION   CREATE-TIME                  COMPLETION-TIME              EXPIRATION
+mybackup   default     mysql-cluster    volume-snapshot   Completed   4426858      2m8s       Oct 30,2023 15:19 UTC+0800   Oct 30,2023 15:21 UTC+0800
 ```
 
 </TabItem>
 
 <TabItem value="kubectl" label="kubectl">
 
-执行以下命令来创建名为 mysnapshot 的快照备份。
-```
+```bash
+# 创建备份
 kubectl apply -f - <<-'EOF'
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: Backup
 metadata:
-  name: mysnapshot
+  name: mybackup
   namespace: default
 spec:
-  backupPolicyName: mycluster-mysql-backup-policy
-  backupType: snapshot
+  backupMethod: volume-snapshot
+  backupPolicyName: mysql-cluster-mysql-backup-policy
 EOF
+
+# 查看备份
+kubectl get backup mybackup
+>
+NAME       POLICY                              METHOD            REPO      STATUS      TOTAL-SIZE   DURATION   CREATION-TIME          COMPLETION-TIME        EXPIRATION-TIME
+mybackup   mysql-cluster-mysql-backup-policy   volume-snapshot   my-repo   Completed   4426858      2m8s       2023-10-30T07:19:21Z   2023-10-30T07:21:28Z
 ```
+
 </TabItem>
 
 </Tabs>
 
+:::caution
+
+1. 使用云盘快照创建备份时，请确保使用的存储支持快照功能，否则会导致备份失败。
+
+2. 通过 kubectl 或者 kbcli 手动创建的备份，不会自动删除，需要用户手动删除。
+
+:::

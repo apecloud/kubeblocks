@@ -144,7 +144,7 @@ func composeTLSVolume(clusterName string, synthesizeComp component.SynthesizedCo
 					{Key: cert, Path: constant.CertName},
 					{Key: key, Path: constant.KeyName},
 				},
-				Optional: func() *bool { o := false; return &o }(),
+				Optional:    func() *bool { o := false; return &o }(),
 				DefaultMode: &mode,
 			},
 		},

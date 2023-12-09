@@ -294,6 +294,7 @@ func composeTLSVolume(clusterName string, component component.SynthesizedCompone
 		cert = component.Issuer.SecretRef.Cert
 		key = component.Issuer.SecretRef.Key
 	}
+	mode := int32(0600)
 	volume := corev1.Volume{
 		Name: factory.VolumeName,
 		VolumeSource: corev1.VolumeSource{
@@ -304,7 +305,8 @@ func composeTLSVolume(clusterName string, component component.SynthesizedCompone
 					{Key: cert, Path: factory.CertName},
 					{Key: key, Path: factory.KeyName},
 				},
-				Optional: func() *bool { o := false; return &o }(),
+				Optional:    func() *bool { o := false; return &o }(),
+				DefaultMode: &mode,
 			},
 		},
 	}

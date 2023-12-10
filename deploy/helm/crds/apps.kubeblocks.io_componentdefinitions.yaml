@@ -3791,6 +3791,29 @@ spec:
                 description: Provider is the name of the component provider.
                 maxLength: 32
                 type: string
+              replicasLimit:
+                description: ReplicasLimit defines the limit of valid replicas supported.
+                  Cannot be updated.
+                properties:
+                  maxReplicas:
+                    description: The maximum limit of replicas.
+                    format: int32
+                    type: integer
+                  minReplicas:
+                    description: The minimum limit of replicas.
+                    format: int32
+                    type: integer
+                required:
+                - maxReplicas
+                - minReplicas
+                type: object
+                x-kubernetes-validations:
+                - message: the minimum and maximum limit of replicas should be in
+                    the range of [0, 128]
+                  rule: self.minReplicas >= 0 && self.maxReplicas <= 128
+                - message: the minimum replicas limit should be no greater than the
+                    maximum
+                  rule: self.minReplicas <= self.maxReplicas
               roleArbitrator:
                 default: External
                 description: RoleArbitrator defines the strategy for electing the

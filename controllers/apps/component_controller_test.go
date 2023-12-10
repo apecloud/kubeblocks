@@ -263,7 +263,7 @@ var _ = Describe("Component Controller", func() {
 		}
 	}
 
-	createClusterObjVx := func(compName, compDefName string, v2 bool, processor func(*testapps.MockClusterFactory)) {
+	createClusterObjVx := func(compName, compDefName string, v2 bool, processor func(*testapps.MockClusterFactory), phase appsv1alpha1.ClusterPhase) {
 		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
 			WithRandomName()
 		if !v2 {
@@ -277,37 +277,48 @@ var _ = Describe("Component Controller", func() {
 		clusterObj = factory.Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-		By("Waiting for the cluster enter Creating phase")
+		By("Waiting for the cluster enter expected phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-		if clusterObj.Spec.ComponentSpecs[0].Replicas == 0 {
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StoppedClusterPhase))
+		if len(phase) != 0 {
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(phase))
 		} else {
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
+			if clusterObj.Spec.ComponentSpecs[0].Replicas == 0 {
+				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StoppedClusterPhase))
+			} else {
+				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
+			}
 		}
 
-		By("Waiting for the component enter Creating phase")
+		By("Waiting for the component enter expected phase")
 		compKey = types.NamespacedName{
 			Namespace: clusterObj.Namespace,
 			Name:      component.FullName(clusterObj.Name, compName),
 		}
 		compObj = &appsv1alpha1.Component{}
 		Eventually(testapps.CheckObjExists(&testCtx, compKey, compObj, true)).Should(Succeed())
-		Eventually(testapps.GetComponentObservedGeneration(&testCtx, compKey)).Should(BeEquivalentTo(1))
-		if compObj.Spec.Replicas == 0 {
-			Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(appsv1alpha1.StoppedClusterCompPhase))
-		} else {
-			Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
+		if len(phase) == 0 {
+			Eventually(testapps.GetComponentObservedGeneration(&testCtx, compKey)).Should(BeEquivalentTo(1))
+			if compObj.Spec.Replicas == 0 {
+				Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(appsv1alpha1.StoppedClusterCompPhase))
+			} else {
+				Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
+			}
 		}
 	}
 
 	createClusterObj := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster")
-		createClusterObjVx(compName, compDefName, false, processor)
+		createClusterObjVx(compName, compDefName, false, processor, "")
 	}
 
 	createClusterObjV2 := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster with new component definition")
-		createClusterObjVx(compName, compDefName, true, processor)
+		createClusterObjVx(compName, compDefName, true, processor, "")
+	}
+
+	createClusterObjV2WithPhase := func(compName, compDefName string, processor func(*testapps.MockClusterFactory), phase appsv1alpha1.ClusterPhase) {
+		By("Creating a cluster with new component definition")
+		createClusterObjVx(compName, compDefName, true, processor, phase)
 	}
 
 	mockCompRunning := func(compName string) {
@@ -1330,6 +1341,63 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
+	testCompReplicasLimit := func(compName, compDefName string) {
+		replicasLimit := &appsv1alpha1.ReplicasLimit{
+			MinReplicas: 4,
+			MaxReplicas: 16,
+		}
+		By("create component w/o replicas limit set")
+		createClusterObjV2(compName, compDefObj.Name, func(f *testapps.MockClusterFactory) {
+			f.SetReplicas(replicasLimit.MaxReplicas * 2)
+		})
+		rsmKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      compObj.Name,
+		}
+		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+			g.Expect(*rsm.Spec.Replicas).Should(BeEquivalentTo(replicasLimit.MaxReplicas * 2))
+		})).Should(Succeed())
+
+		By("set replicas limit")
+		compDefKey := client.ObjectKeyFromObject(compDefObj)
+		Eventually(testapps.GetAndChangeObj(&testCtx, compDefKey, func(compDef *appsv1alpha1.ComponentDefinition) {
+			compDef.Spec.ReplicasLimit = replicasLimit
+		})).Should(Succeed())
+
+		By("create component w/ replicas limit set - out-of-limit")
+		for _, replicas := range []int32{replicasLimit.MinReplicas / 2, replicasLimit.MaxReplicas * 2} {
+			createClusterObjV2WithPhase(compName, compDefObj.Name, func(f *testapps.MockClusterFactory) {
+				f.SetReplicas(replicas)
+			}, appsv1alpha1.AbnormalClusterPhase)
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
+				g.Expect(comp.Spec.Replicas).Should(BeEquivalentTo(replicas))
+				g.Expect(comp.Status.Conditions).Should(HaveLen(1))
+				g.Expect(comp.Status.Conditions[0].Type).Should(BeEquivalentTo(appsv1alpha1.ConditionTypeProvisioningStarted))
+				g.Expect(comp.Status.Conditions[0].Status).Should(BeEquivalentTo(metav1.ConditionFalse))
+				g.Expect(comp.Status.Conditions[0].Message).Should(ContainSubstring(replicasOutOfLimitError(replicas, *replicasLimit).Error()))
+			})).Should(Succeed())
+			rsmKey := types.NamespacedName{
+				Namespace: compObj.Namespace,
+				Name:      compObj.Name,
+			}
+			Consistently(testapps.CheckObjExists(&testCtx, rsmKey, &workloads.ReplicatedStateMachine{}, false)).Should(Succeed())
+		}
+
+		By("create component w/ replicas limit set - ok")
+		for _, replicas := range []int32{replicasLimit.MinReplicas, (replicasLimit.MinReplicas + replicasLimit.MaxReplicas) / 2, replicasLimit.MaxReplicas} {
+			createClusterObjV2(compName, compDefObj.Name, func(f *testapps.MockClusterFactory) {
+				f.SetReplicas(replicas)
+			})
+			rsmKey := types.NamespacedName{
+				Namespace: compObj.Namespace,
+				Name:      compObj.Name,
+			}
+			Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+				g.Expect(*rsm.Spec.Replicas).Should(BeEquivalentTo(replicas))
+			})).Should(Succeed())
+		}
+	}
+
 	testCompRole := func(compName, compDefName string) {
 		createClusterObjV2(compName, compDefObj.Name, nil)
 
@@ -1948,6 +2016,10 @@ var _ = Describe("Component Controller", func() {
 
 		It("with component vars", func() {
 			testCompVars(defaultCompName, compDefName)
+		})
+
+		It("with component replicas limit", func() {
+			testCompReplicasLimit(defaultCompName, compDefName)
 		})
 
 		It("with component roles", func() {

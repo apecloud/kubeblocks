@@ -194,6 +194,14 @@ func (builder *ComponentDefinitionBuilder) SetLabels(labels map[string]string) *
 	return builder
 }
 
+func (builder *ComponentDefinitionBuilder) SetReplicasLimit(minReplicas, maxReplicas int32) *ComponentDefinitionBuilder {
+	builder.get().Spec.ReplicasLimit = &appsv1alpha1.ReplicasLimit{
+		MinReplicas: minReplicas,
+		MaxReplicas: maxReplicas,
+	}
+	return builder
+}
+
 func (builder *ComponentDefinitionBuilder) AddSystemAccount(accountName string, isSystemInitAccount bool, statement string) *ComponentDefinitionBuilder {
 	account := appsv1alpha1.SystemAccount{
 		Name:        accountName,

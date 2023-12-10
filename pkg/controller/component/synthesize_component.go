@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -36,12 +37,17 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
+var (
+	defaultShmQuantity = resource.MustParse("64Mi")
+)
+
 // BuildSynthesizedComponent builds a new SynthesizedComponent object, which is a mixture of component-related configs from ComponentDefinition and Component.
 func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
+	cluster *appsv1alpha1.Cluster,
 	compDef *appsv1alpha1.ComponentDefinition,
 	comp *appsv1alpha1.Component) (*SynthesizedComponent, error) {
-	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil, nil)
+	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, cluster, nil)
 }
 
 // BuildSynthesizedComponent4Generated builds SynthesizedComponent for generated Component which w/o ComponentDefinition.
@@ -186,6 +192,8 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	// build volumeClaimTemplates
 	buildVolumeClaimTemplates(synthesizeComp, comp)
 
+	limitSharedMemoryVolumeSize(synthesizeComp, comp)
+
 	// build componentService
 	buildComponentServices(synthesizeComp, compDefObj)
 
@@ -247,10 +255,36 @@ func buildAffinitiesAndTolerations(comp *appsv1alpha1.Component, synthesizeComp 
 	return nil
 }
 
-// buildVolumeClaimTemplates builds volumeClaimTemplates for component.
 func buildVolumeClaimTemplates(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) {
 	if comp.Spec.VolumeClaimTemplates != nil {
 		synthesizeComp.VolumeClaimTemplates = toVolumeClaimTemplates(&comp.Spec)
+	}
+}
+
+// limitSharedMemoryVolumeSize limits the shared memory volume size to memory requests/limits.
+func limitSharedMemoryVolumeSize(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) {
+	shm := defaultShmQuantity
+	if comp.Spec.Resources.Limits != nil {
+		if comp.Spec.Resources.Limits.Memory().Cmp(shm) > 0 {
+			shm = *comp.Spec.Resources.Limits.Memory()
+		}
+	}
+	if comp.Spec.Resources.Requests != nil {
+		if comp.Spec.Resources.Requests.Memory().Cmp(shm) > 0 {
+			shm = *comp.Spec.Resources.Requests.Memory()
+		}
+	}
+	for i, vol := range synthesizeComp.PodSpec.Volumes {
+		if vol.EmptyDir == nil {
+			continue
+		}
+		if vol.EmptyDir.Medium != corev1.StorageMediumMemory {
+			continue
+		}
+		if vol.EmptyDir.SizeLimit != nil && !vol.EmptyDir.SizeLimit.IsZero() {
+			continue
+		}
+		synthesizeComp.PodSpec.Volumes[i].EmptyDir.SizeLimit = &shm
 	}
 }
 

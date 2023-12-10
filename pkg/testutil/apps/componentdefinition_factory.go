@@ -224,6 +224,14 @@ func (f *MockComponentDefinitionFactory) SetLabels(labels map[string]string) *Mo
 	return f
 }
 
+func (f *MockComponentDefinitionFactory) SetReplicasLimit(minReplicas, maxReplicas int32) *MockComponentDefinitionFactory {
+	f.Get().Spec.ReplicasLimit = &appsv1alpha1.ReplicasLimit{
+		MinReplicas: minReplicas,
+		MaxReplicas: maxReplicas,
+	}
+	return f
+}
+
 func (f *MockComponentDefinitionFactory) AddSystemAccount(accountName string, initAccount bool, statement string) *MockComponentDefinitionFactory {
 	account := appsv1alpha1.SystemAccount{
 		Name:        accountName,

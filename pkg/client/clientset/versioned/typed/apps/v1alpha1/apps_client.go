@@ -37,6 +37,7 @@ type AppsV1alpha1Interface interface {
 	ComponentDefinitionsGetter
 	ComponentResourceConstraintsGetter
 	ConfigConstraintsGetter
+	OpsDefinitionsGetter
 	OpsRequestsGetter
 	ServiceDescriptorsGetter
 }
@@ -80,6 +81,10 @@ func (c *AppsV1alpha1Client) ComponentResourceConstraints() ComponentResourceCon
 
 func (c *AppsV1alpha1Client) ConfigConstraints() ConfigConstraintInterface {
 	return newConfigConstraints(c)
+}
+
+func (c *AppsV1alpha1Client) OpsDefinitions() OpsDefinitionInterface {
+	return newOpsDefinitions(c)
 }
 
 func (c *AppsV1alpha1Client) OpsRequests(namespace string) OpsRequestInterface {

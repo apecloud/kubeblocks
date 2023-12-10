@@ -167,6 +167,11 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 
+	// ReplicasLimit defines the limit of valid replicas supported.
+	// Cannot be updated.
+	// +optional
+	ReplicasLimit *ReplicasLimit `json:"replicasLimit,omitempty"`
+
 	// SystemAccounts defines the pre-defined system accounts required to manage the component.
 	// TODO(component): accounts KB required
 	// Cannot be updated.
@@ -243,6 +248,19 @@ type ComponentVolume struct {
 	// +kubebuilder:default=0
 	// +optional
 	HighWatermark int `json:"highWatermark,omitempty"`
+}
+
+// ReplicasLimit defines the limit of valid replicas supported.
+// +kubebuilder:validation:XValidation:rule="self.minReplicas >= 0 && self.maxReplicas <= 128",message="the minimum and maximum limit of replicas should be in the range of [0, 128]"
+// +kubebuilder:validation:XValidation:rule="self.minReplicas <= self.maxReplicas",message="the minimum replicas limit should be no greater than the maximum"
+type ReplicasLimit struct {
+	// The minimum limit of replicas.
+	// +required
+	MinReplicas int32 `json:"minReplicas"`
+
+	// The maximum limit of replicas.
+	// +required
+	MaxReplicas int32 `json:"maxReplicas"`
 }
 
 type SystemAccount struct {

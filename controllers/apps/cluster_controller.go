@@ -94,6 +94,13 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	reqCtx.Log.V(1).Info("reconcile", "cluster", req.NamespacedName)
 
+	// the cluster reconciliation loop is a 3-stage model: plan Init, plan Build and plan Execute
+	// Init stage
+	planBuilder := NewClusterPlanBuilder(reqCtx, r.Client)
+	if err := planBuilder.Init(); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
 	requeueError := func(err error) (ctrl.Result, error) {
 		if re, ok := err.(intctrlutil.RequeueError); ok {
 			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
@@ -101,14 +108,9 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if apierrors.IsConflict(err) {
 			return intctrlutil.Requeue(reqCtx.Log, err.Error())
 		}
+		c := planBuilder.(*clusterPlanBuilder)
+		sendWarningEventWithError(r.Recorder, c.transCtx.Cluster, corev1.EventTypeWarning, err)
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
-	}
-
-	// the cluster reconciliation loop is a 3-stage model: plan Init, plan Build and plan Execute
-	// Init stage
-	planBuilder := NewClusterPlanBuilder(reqCtx, r.Client)
-	if err := planBuilder.Init(); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
 	// Build stage

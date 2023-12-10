@@ -35,10 +35,15 @@ func (t *componentValidationTransformer) Transform(ctx graph.TransformContext, d
 	transCtx, _ := ctx.(*componentTransformContext)
 	comp := transCtx.Component
 
-	err := validateEnabledLogs(comp, transCtx.CompDef)
+	var err error
+	defer func() {
+		setProvisioningStartedCondition(&comp.Status.Conditions, comp.Name, comp.Generation, err)
+	}()
 
-	setProvisioningStartedCondition(&comp.Status.Conditions, comp.Name, comp.Generation, err)
-	if err != nil {
+	if err = validateEnabledLogs(comp, transCtx.CompDef); err != nil {
+		return newRequeueError(requeueDuration, err.Error())
+	}
+	if err = validateCompReplicas(comp, transCtx.CompDef); err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
 	return nil
@@ -47,8 +52,7 @@ func (t *componentValidationTransformer) Transform(ctx graph.TransformContext, d
 func validateEnabledLogs(comp *appsv1alpha1.Component, compDef *appsv1alpha1.ComponentDefinition) error {
 	invalidLogNames := validateEnabledLogConfigs(compDef, comp.Spec.EnabledLogs)
 	if len(invalidLogNames) > 0 {
-		return fmt.Errorf(fmt.Sprintf("EnabledLogs: %s are not defined in Component: %s of the ComponentDefinition",
-			invalidLogNames, comp.Name))
+		return fmt.Errorf("EnabledLogs: %s are not defined in Component: %s of the ComponentDefinition", invalidLogNames, comp.Name)
 	}
 	return nil
 }
@@ -71,4 +75,20 @@ func validateEnabledLogConfigs(compDef *appsv1alpha1.ComponentDefinition, enable
 		}
 	}
 	return invalidLogNames
+}
+
+func validateCompReplicas(comp *appsv1alpha1.Component, compDef *appsv1alpha1.ComponentDefinition) error {
+	if compDef.Spec.ReplicasLimit == nil {
+		return nil
+	}
+	replicas := comp.Spec.Replicas
+	replicasLimit := compDef.Spec.ReplicasLimit
+	if replicas >= replicasLimit.MinReplicas && replicas <= replicasLimit.MaxReplicas {
+		return nil
+	}
+	return replicasOutOfLimitError(replicas, *replicasLimit)
+}
+
+func replicasOutOfLimitError(replicas int32, replicasLimit appsv1alpha1.ReplicasLimit) error {
+	return fmt.Errorf("replicas %d out-of-limit [%d, %d]", replicas, replicasLimit.MinReplicas, replicasLimit.MaxReplicas)
 }

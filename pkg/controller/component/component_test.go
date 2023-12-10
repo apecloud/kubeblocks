@@ -291,6 +291,103 @@ var _ = Describe("Component", func() {
 			Expect(synthesizeComp.ServiceReferences[testapps.NginxImage].Spec.ServiceVersion).Should(Equal(version))
 			Expect(serviceReferenceMap).Should(BeEmpty()) // for test failed
 		})
+
+		It("limit the shared memory volume size correctly", func() {
+			var (
+				_128m  = resource.MustParse("128Mi")
+				_512m  = resource.MustParse("512Mi")
+				_1024m = resource.MustParse("1Gi")
+				_2048m = resource.MustParse("2Gi")
+				reqCtx = intctrlutil.RequestCtx{Ctx: ctx, Log: logger}
+			)
+			for i := range clusterDef.Spec.ComponentDefs {
+				compDef := &clusterDef.Spec.ComponentDefs[i]
+				compDef.PodSpec.Volumes = append(compDef.PodSpec.Volumes, []corev1.Volume{
+					{
+						Name: "shmd-ok",
+						VolumeSource: corev1.VolumeSource{
+							EmptyDir: &corev1.EmptyDirVolumeSource{
+								Medium: corev1.StorageMediumMemory,
+							},
+						},
+					},
+					{
+						Name: "shmd-medium",
+						VolumeSource: corev1.VolumeSource{
+							EmptyDir: &corev1.EmptyDirVolumeSource{
+								Medium: corev1.StorageMediumDefault,
+							},
+						},
+					},
+					{
+						Name: "shmd-size-small",
+						VolumeSource: corev1.VolumeSource{
+							EmptyDir: &corev1.EmptyDirVolumeSource{
+								Medium:    corev1.StorageMediumMemory,
+								SizeLimit: &_128m,
+							},
+						},
+					},
+					{
+						Name: "shmd-size-large",
+						VolumeSource: corev1.VolumeSource{
+							EmptyDir: &corev1.EmptyDirVolumeSource{
+								Medium:    corev1.StorageMediumMemory,
+								SizeLimit: &_2048m,
+							},
+						},
+					},
+				}...)
+			}
+
+			By("with memory resource set")
+			if cluster.Spec.ComponentSpecs[0].Resources.Requests == nil {
+				cluster.Spec.ComponentSpecs[0].Resources.Requests = corev1.ResourceList{}
+			}
+			if cluster.Spec.ComponentSpecs[0].Resources.Limits == nil {
+				cluster.Spec.ComponentSpecs[0].Resources.Limits = corev1.ResourceList{}
+			}
+			cluster.Spec.ComponentSpecs[0].Resources.Requests[corev1.ResourceMemory] = _512m
+			cluster.Spec.ComponentSpecs[0].Resources.Limits[corev1.ResourceMemory] = _1024m
+			comp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
+			Expect(err).Should(Succeed())
+			Expect(comp).ShouldNot(BeNil())
+			for _, vol := range comp.PodSpec.Volumes {
+				if vol.Name == "shmd-ok" {
+					Expect(*vol.EmptyDir.SizeLimit).Should(BeEquivalentTo(_1024m))
+				}
+				if vol.Name == "shmd-medium" {
+					Expect(vol.EmptyDir.SizeLimit).Should(BeNil())
+				}
+				if vol.Name == "shmd-size-small" {
+					Expect(*vol.EmptyDir.SizeLimit).Should(BeEquivalentTo(_128m))
+				}
+				if vol.Name == "shmd-size-large" {
+					Expect(*vol.EmptyDir.SizeLimit).Should(BeEquivalentTo(_2048m))
+				}
+			}
+
+			By("without memory resource set")
+			delete(cluster.Spec.ComponentSpecs[0].Resources.Requests, corev1.ResourceMemory)
+			delete(cluster.Spec.ComponentSpecs[0].Resources.Limits, corev1.ResourceMemory)
+			comp, err = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
+			Expect(err).Should(Succeed())
+			Expect(comp).ShouldNot(BeNil())
+			for _, vol := range comp.PodSpec.Volumes {
+				if vol.Name == "shmd-ok" {
+					Expect(*vol.EmptyDir.SizeLimit).Should(BeEquivalentTo(defaultShmQuantity))
+				}
+				if vol.Name == "shmd-medium" {
+					Expect(vol.EmptyDir.SizeLimit).Should(BeNil())
+				}
+				if vol.Name == "shmd-size-small" {
+					Expect(*vol.EmptyDir.SizeLimit).Should(BeEquivalentTo(_128m))
+				}
+				if vol.Name == "shmd-size-large" {
+					Expect(*vol.EmptyDir.SizeLimit).Should(BeEquivalentTo(_2048m))
+				}
+			}
+		})
 	})
 })
 

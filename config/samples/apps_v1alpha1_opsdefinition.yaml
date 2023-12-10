@@ -1,0 +1,6 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsDefinition
+metadata:
+  name: opsdefinition-sample
+spec:
+  # TODO(user): Add fields here

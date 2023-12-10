@@ -833,5 +833,171 @@ var _ = Describe("vars", func() {
 			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("service-host", svcName))
 			checkEnvVarExist(synthesizedComp, "service-host", svcName)
 		})
+
+		It("vars reference and escaping", func() {
+			By("reference")
+			vars := []appsv1alpha1.EnvVar{
+				{
+					Name:  "aa",
+					Value: "~",
+				},
+				{
+					Name:  "ab",
+					Value: "$(aa)",
+				},
+				{
+					Name:  "ac",
+					Value: "abc$(aa)xyz",
+				},
+			}
+			Expect(ResolveEnvNTemplateVars(testCtx.Ctx, nil, synthesizedComp, nil, vars)).Should(Succeed())
+			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("ab", "~"))
+			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("ac", "abc~xyz"))
+			checkEnvVarExist(synthesizedComp, "ab", "~")
+			checkEnvVarExist(synthesizedComp, "ac", "abc~xyz")
+
+			By("reference not defined")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name:  "ba",
+					Value: "~",
+				},
+				{
+					Name:  "bb",
+					Value: "$(x)",
+				},
+				{
+					Name:  "bc",
+					Value: "abc$(x)xyz",
+				},
+			}
+
+			Expect(ResolveEnvNTemplateVars(testCtx.Ctx, nil, synthesizedComp, nil, vars)).Should(Succeed())
+			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("bb", "$(x)"))
+			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("bc", "abc$(x)xyz"))
+			checkEnvVarExist(synthesizedComp, "bb", "$(x)")
+			checkEnvVarExist(synthesizedComp, "bc", "abc$(x)xyz")
+
+			By("reference credential var")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name:  "ca",
+					Value: "~",
+				},
+				{
+					Name:  "cb",
+					Value: "$(credential-username)",
+				},
+				{
+					Name: "credential-username",
+					ValueFrom: &appsv1alpha1.VarSource{
+						CredentialVarRef: &appsv1alpha1.CredentialVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name:     "credential",
+								Optional: optional(),
+							},
+							CredentialVars: appsv1alpha1.CredentialVars{
+								Username: &appsv1alpha1.VarOptional,
+							},
+						},
+					},
+				},
+			}
+			reader := &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Secret{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      constant.GenerateAccountSecretName(synthesizedComp.ClusterName, synthesizedComp.Name, "credential"),
+						},
+						Data: map[string][]byte{
+							constant.AccountNameForSecret:   []byte("username"),
+							constant.AccountPasswdForSecret: []byte("password"),
+						},
+					},
+				},
+			}
+			Expect(ResolveEnvNTemplateVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)).Should(Succeed())
+			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("cb", "$(credential-username)"))
+			checkEnvVarExist(synthesizedComp, "cb", "username")
+
+			By("escaping")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name:  "da",
+					Value: "~",
+				},
+				{
+					Name:  "db",
+					Value: "$$(da)",
+				},
+				{
+					Name:  "dc",
+					Value: "abc$$(da)xyz",
+				},
+			}
+			Expect(ResolveEnvNTemplateVars(testCtx.Ctx, nil, synthesizedComp, nil, vars)).Should(Succeed())
+			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("db", "$(da)"))
+			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("dc", "abc$(da)xyz"))
+			checkEnvVarExist(synthesizedComp, "db", "$(da)")
+			checkEnvVarExist(synthesizedComp, "dc", "abc$(da)xyz")
+
+			By("reference and escaping")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name:  "ea",
+					Value: "~",
+				},
+				{
+					Name:  "eb",
+					Value: "$(ea)$$(ea)$$(ea)$(ea)$(ea)$$(ea)",
+				},
+				{
+					Name:  "ec",
+					Value: "abc$(ea)xyz$$(ea)",
+				},
+				{
+					Name:  "ed",
+					Value: "$$(x)$(x)",
+				},
+			}
+			Expect(ResolveEnvNTemplateVars(testCtx.Ctx, nil, synthesizedComp, nil, vars)).Should(Succeed())
+			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("eb", "~$(ea)$(ea)~~$(ea)"))
+			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("ec", "abc~xyz$(ea)"))
+			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("ed", "$(x)$(x)"))
+			checkEnvVarExist(synthesizedComp, "eb", "~$(ea)$(ea)~~$(ea)")
+			checkEnvVarExist(synthesizedComp, "ec", "abc~xyz$(ea)")
+			checkEnvVarExist(synthesizedComp, "ed", "$(x)$(x)")
+
+			By("all in one")
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name:  "fa",
+					Value: "~",
+				},
+				{
+					Name:  "fb",
+					Value: "abc$(fa)$$(fa)$$(fa)$(credential-username)$(fa)$(x)$$(x)xyz",
+				},
+				{
+					Name: "credential-username",
+					ValueFrom: &appsv1alpha1.VarSource{
+						CredentialVarRef: &appsv1alpha1.CredentialVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name:     "credential",
+								Optional: optional(),
+							},
+							CredentialVars: appsv1alpha1.CredentialVars{
+								Username: &appsv1alpha1.VarOptional,
+							},
+						},
+					},
+				},
+			}
+			Expect(ResolveEnvNTemplateVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)).Should(Succeed())
+			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("fb", "abc~$(fa)$(fa)$(credential-username)~$(x)$(x)xyz"))
+			checkEnvVarExist(synthesizedComp, "fb", "abc~$(fa)$(fa)username~$(x)$(x)xyz")
+		})
 	})
 })

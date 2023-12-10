@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -44,8 +45,10 @@ func ResolveEnvNTemplateVars(ctx context.Context, cli client.Reader, synthesized
 		return err
 	}
 
+	newTemplateVars1, newTemplateVars2 := resolveVarsReferenceNEscaping(templateVars, credentialVars)
+
 	envVars := make([]corev1.EnvVar, 0)
-	envVars = append(envVars, templateVars...)
+	envVars = append(envVars, newTemplateVars1...)
 	envVars = append(envVars, credentialVars...)
 	envVars = append(envVars, buildDefaultEnv()...)
 	envVars = append(envVars, buildEnv4TLS(synthesizedComp)...)
@@ -57,7 +60,7 @@ func ResolveEnvNTemplateVars(ctx context.Context, cli client.Reader, synthesized
 	// TODO: remove this later
 	envVars = append(envVars, synthesizedComp.ComponentRefEnvs...)
 
-	setEnvNTemplateVars(templateVars, envVars, synthesizedComp)
+	setEnvNTemplateVars(newTemplateVars2, envVars, synthesizedComp)
 
 	return nil
 }
@@ -116,6 +119,94 @@ func builtinTemplateVars(synthesizedComp *SynthesizedComponent) []corev1.EnvVar 
 		}
 	}
 	return []corev1.EnvVar{}
+}
+
+func resolveVarsReferenceNEscaping(templateVars []corev1.EnvVar, credentialVars []corev1.EnvVar) ([]corev1.EnvVar, []corev1.EnvVar) {
+	l2m := func(vars []corev1.EnvVar) map[string]corev1.EnvVar {
+		m := make(map[string]corev1.EnvVar)
+		for i, v := range vars {
+			m[v.Name] = vars[i]
+		}
+		return m
+	}
+	templateVarsMapping := l2m(templateVars)
+	credentialVarsMapping := l2m(credentialVars)
+
+	vars1, vars2 := make([]corev1.EnvVar, len(templateVars)), make([]corev1.EnvVar, len(templateVars))
+	for i := range templateVars {
+		var1, var2 := resolveVarReferenceNEscaping(templateVarsMapping, credentialVarsMapping, &templateVars[i])
+		vars1[i] = *var1
+		vars2[i] = *var2
+	}
+	return vars1, vars2
+}
+
+func resolveVarReferenceNEscaping(templateVars, credentialVars map[string]corev1.EnvVar, v *corev1.EnvVar) (*corev1.EnvVar, *corev1.EnvVar) {
+	if len(v.Value) == 0 {
+		return v, v
+	}
+	re := regexp.MustCompile(`\$\(([^)]+)\)`)
+	matches := re.FindAllStringSubmatchIndex(v.Value, -1)
+	if len(matches) == 0 {
+		return v, v
+	}
+	return resolveValueReferenceNEscaping(templateVars, credentialVars, *v, matches)
+}
+
+func resolveValueReferenceNEscaping(templateVars, credentialVars map[string]corev1.EnvVar,
+	v corev1.EnvVar, matches [][]int) (*corev1.EnvVar, *corev1.EnvVar) {
+	isEscapingMatch := func(match []int) bool {
+		return match[0] > 0 && v.Value[match[0]-1] == '$'
+	}
+	resolveValue := func(match []int, credential bool) string {
+		if isEscapingMatch(match) {
+			return v.Value[match[0]:match[1]]
+		} else {
+			name := v.Value[match[2]:match[3]]
+			if vv, ok := templateVars[name]; ok {
+				return vv.Value
+			}
+			if credential {
+				if vv, ok := credentialVars[name]; ok {
+					return vv.Value
+				}
+			}
+			return v.Value[match[0]:match[1]]
+		}
+	}
+
+	tokens := make([]func(bool) string, 0)
+	for idx, pos := 0, 0; pos < len(v.Value); idx++ {
+		if idx >= len(matches) {
+			lpos := pos
+			tokens = append(tokens, func(bool) string { return v.Value[lpos:len(v.Value)] })
+			break
+		}
+		match := matches[idx]
+		mpos := match[0]
+		if isEscapingMatch(match) {
+			mpos = match[0] - 1
+		}
+		if pos < mpos {
+			lpos := pos
+			tokens = append(tokens, func(bool) string { return v.Value[lpos:mpos] })
+		}
+		tokens = append(tokens, func(credential bool) string { return resolveValue(match, credential) })
+		pos = match[1]
+	}
+
+	buildValue := func(credential bool) string {
+		builder := strings.Builder{}
+		for _, token := range tokens {
+			builder.WriteString(token(credential))
+		}
+		return builder.String()
+	}
+
+	v1, v2 := v.DeepCopy(), v.DeepCopy()
+	v1.Value = buildValue(true)
+	v2.Value = buildValue(false)
+	return v1, v2
 }
 
 func buildDefaultEnv() []corev1.EnvVar {

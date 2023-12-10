@@ -27,7 +27,7 @@ import (
 // OpsRequestSpec defines the desired state of OpsRequest
 // +kubebuilder:validation:XValidation:rule="has(self.cancel) && self.cancel ? (self.type in ['VerticalScaling', 'HorizontalScaling']) : true",message="forbidden to cancel the opsRequest which type not in ['VerticalScaling','HorizontalScaling']"
 type OpsRequestSpec struct {
-	// clusterRef references clusterDefinition.
+	// clusterRef references cluster object.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
 	ClusterRef string `json:"clusterRef"`
@@ -149,6 +149,8 @@ type OpsRequestSpec struct {
 	// restoreSpec defines how to restore the cluster.
 	// +optional
 	RestoreSpec *RestoreSpec `json:"restoreSpec,omitempty"`
+
+	CustomSpec *CustomOpsSpec `json:"customSpec,omitempty"`
 }
 
 // ComponentOps defines the common variables of component scope operations.
@@ -274,6 +276,23 @@ type ConfigurationItem struct {
 	// +listType=map
 	// +listMapKey=key
 	Keys []ParameterConfig `json:"keys" patchStrategy:"merge,retainKeys" patchMergeKey:"key"`
+}
+
+type CustomOpsSpec struct {
+	// +kubebuilder:validation:Required
+	// cluster component name.
+	ComponentName string `json:"componentName"`
+
+	// +kubebuilder:validation:Required
+	// reference a opsDefinition
+	OpsDefinitionRef string `json:"opsDefinitionRef"`
+
+	// the input for this operation declared in the opsDefinition.spec.parametersSchema.
+	// will create corresponding jobs for each array element.
+	// if the param type is array, the format must be "v1,v2,v3".
+	// +kubebuilder:validation:MaxItem=10
+	// +optional
+	Params []map[string]string `json:"params,omitempty"`
 }
 
 type ParameterPair struct {

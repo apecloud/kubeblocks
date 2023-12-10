@@ -42,8 +42,9 @@ const (
 
 // Component
 const (
-	KBEnvCompName     = "KB_COMP_NAME"
-	KBEnvCompReplicas = "KB_COMP_REPLICAS"
+	KBEnvCompName           = "KB_COMP_NAME"
+	KBEnvCompReplicas       = "KB_COMP_REPLICAS"
+	KBEnvCompServiceVersion = "KB_COMP_SERVICE_VERSION"
 )
 
 // Pod

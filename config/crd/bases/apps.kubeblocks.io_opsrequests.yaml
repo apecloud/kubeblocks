@@ -107,11 +107,32 @@ spec:
                   modifying this property again will not take effect.'
                 type: boolean
               clusterRef:
-                description: clusterRef references clusterDefinition.
+                description: clusterRef references cluster object.
                 type: string
                 x-kubernetes-validations:
                 - message: forbidden to update spec.clusterRef
                   rule: self == oldSelf
+              customSpec:
+                properties:
+                  componentName:
+                    description: cluster component name.
+                    type: string
+                  opsDefinitionRef:
+                    description: reference a opsDefinition
+                    type: string
+                  params:
+                    description: the input for this operation declared in the opsDefinition.spec.parametersSchema.
+                      will create corresponding jobs for each array element. if the
+                      param type is array, the format must be "v1,v2,v3".
+                    items:
+                      additionalProperties:
+                        type: string
+                      type: object
+                    type: array
+                required:
+                - componentName
+                - opsDefinitionRef
+                type: object
               expose:
                 description: expose defines services the component needs to expose.
                 items:
@@ -664,6 +685,7 @@ spec:
                 - DataScript
                 - Backup
                 - Restore
+                - Custom
                 type: string
                 x-kubernetes-validations:
                 - message: forbidden to update spec.type

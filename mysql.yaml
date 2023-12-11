@@ -1,0 +1,36 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  deletionGracePeriodSeconds: 0
+  generateName: mysql-
+  generation: 2
+  labels:
+    clusterdefinition.kubeblocks.io/name: mysql
+    clusterversion.kubeblocks.io/name: mysql-8.0.33
+  namespace: default
+spec:
+  clusterDefinitionRef: mysql
+  clusterVersionRef: mysql-8.0.33
+  componentSpecs:
+  - componentDefRef: mysql
+    monitor: false
+    name: mysql
+    noCreatePDB: false
+    replicas: 2
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 50m
+        memory: 0.5Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 2Gi
+        storageClassName: local-path
+  terminationPolicy: WipeOut

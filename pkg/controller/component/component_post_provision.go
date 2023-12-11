@@ -119,11 +119,9 @@ func needDoPostProvision(ctx context.Context, cli client.Client,
 				return false, nil
 			}
 		}
-	} else {
-		// if the PreCondition is not set, the default is ComponentReady
-		if comp.Status.Phase != appsv1alpha1.RunningClusterCompPhase {
-			return false, nil
-		}
+	} else if comp.Status.Phase != appsv1alpha1.RunningClusterCompPhase {
+		// if the PreCondition is not set, the default preCondition is ComponentReady
+		return false, nil
 	}
 
 	if comp.Annotations == nil {

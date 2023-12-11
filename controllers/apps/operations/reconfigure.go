@@ -188,14 +188,6 @@ func syncReconfigureForOps(reqCtx intctrlutil.RequestCtx, cli client.Client, res
 }
 
 func (r *reconfigureAction) doSyncReconfigureStatus(params reconfigureParams) (appsv1alpha1.OpsPhase, error) {
-	if isNoChange(params.configurationStatus.Conditions) {
-		params.reqCtx.Log.
-			WithValues("clusterName", params.clusterName).
-			WithValues("componentName", params.configurationItem.Name).
-			Info("the reconfiguring operation has no change!")
-		return appsv1alpha1.OpsSucceedPhase, nil
-	}
-
 	configSpec := params.configurationItem
 	resource, err := r.syncDependResources(params.reqCtx,
 		params.cli, params.resource, configSpec, params.componentName)
@@ -317,15 +309,6 @@ func reconfiguringPhase(resource *intctrlutil.Fetcher,
 func isExpectedPhase(condition metav1.Condition, expectedTypes []string, expectedStatus metav1.ConditionStatus) bool {
 	for _, t := range expectedTypes {
 		if t == condition.Type && condition.Status == expectedStatus {
-			return true
-		}
-	}
-	return false
-}
-
-func isNoChange(conditions []metav1.Condition) bool {
-	for i := len(conditions); i > 0; i-- {
-		if isExpectedPhase(conditions[i-1], []string{appsv1alpha1.ReasonReconfigureNoChanged}, metav1.ConditionTrue) {
 			return true
 		}
 	}

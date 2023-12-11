@@ -86,12 +86,13 @@ func ReconcileCompPostProvision(ctx context.Context,
 	}
 
 	// job executed successfully, add the annotation to indicate that the postProvision has been executed and delete the job
-	if err := setPostProvisionDoneAnnotation(cli, *comp, dag); err != nil {
+	compOrig := comp.DeepCopy()
+	if err := setPostProvisionDoneAnnotation(cli, comp, dag); err != nil {
 		return err
 	}
 
 	// clean up the postProvision job
-	if err := cleanPostProvisionJob(ctx, cli, cluster, comp, synthesizeComp, dag, job.Name); err != nil {
+	if err := cleanPostProvisionJob(ctx, cli, cluster, *compOrig, *synthesizeComp, job.Name); err != nil {
 		return err
 	}
 
@@ -130,7 +131,7 @@ func needDoPostProvision(ctx context.Context, cli client.Client,
 
 	// determine whether the component has undergone postProvision by examining the annotation
 	jobExist := checkPostProvisionJobExist(ctx, cli, cluster, genPostProvisionJobName(cluster.Name, synthesizeComp.Name))
-	finishAnnotationExist := checkPostProvisionDoneAnnotationExist(cluster, comp, synthesizeComp)
+	finishAnnotationExist := checkPostProvisionDoneAnnotationExist(*cluster, *comp, *synthesizeComp)
 	if finishAnnotationExist && !jobExist {
 		// if the annotation has been set and the job does not exist, it means that the postProvision has finished, so skip it
 		return false, nil
@@ -366,7 +367,7 @@ func getComponentPodList(ctx context.Context, cli client.Client, cluster appsv1a
 
 // setPostProvisionDoneAnnotation sets the postProvision done annotation to the component object.
 func setPostProvisionDoneAnnotation(cli client.Client,
-	comp appsv1alpha1.Component,
+	comp *appsv1alpha1.Component,
 	dag *graph.DAG) error {
 	graphCli := model.NewGraphClient(cli)
 	if comp.Annotations == nil {
@@ -376,49 +377,39 @@ func setPostProvisionDoneAnnotation(cli client.Client,
 	if ok {
 		return nil
 	}
+	// If there is component pending update in the DAG, the object will be used to perform the update.
+	for _, obj := range graphCli.FindAll(dag, &appsv1alpha1.Component{}) {
+		if graphCli.IsAction(dag, obj, model.ActionUpdatePtr()) {
+			comp = obj.(*appsv1alpha1.Component)
+		}
+	}
 	compObj := comp.DeepCopy()
 	timeStr := time.Now().Format(time.RFC3339Nano)
 	comp.Annotations[kbCompPostProvisionDoneKey] = timeStr
-	graphCli.Update(dag, compObj, &comp)
+	graphCli.Update(dag, compObj, comp, model.ReplaceIfExistingOption)
 	return nil
 }
 
 func cleanPostProvisionJob(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	comp *appsv1alpha1.Component,
-	synthesizeComp *SynthesizedComponent,
-	dag *graph.DAG,
+	comp appsv1alpha1.Component,
+	synthesizeComp SynthesizedComponent,
 	jobName string) error {
 	if cluster.Annotations == nil || comp.Annotations == nil {
 		return errors.New("cluster or component annotations not found")
 	}
 
-	graphCli := model.NewGraphClient(cli)
-	compIsUpdating := func() bool {
-		for _, obj := range graphCli.FindAll(dag, &appsv1alpha1.Component{}) {
-			if graphCli.IsAction(dag, obj, model.ActionUpdatePtr()) {
-				return true
-			}
-		}
-		return false
-	}
-
-	// check whether the component is being updated
-	if compIsUpdating() {
-		return errors.New("component is updating, skip clean postProvision job")
-	}
-
 	// check post-provision done annotation has been set
-	if !checkPostProvisionDoneAnnotationExist(cluster, comp, synthesizeComp) {
+	if !checkPostProvisionDoneAnnotationExist(*cluster, comp, synthesizeComp) {
 		return errors.New("cluster post-provision done annotation has not been set")
 	}
 	return CleanJobByName(ctx, cli, cluster, jobName)
 }
 
-func checkPostProvisionDoneAnnotationExist(cluster *appsv1alpha1.Cluster,
-	comp *appsv1alpha1.Component,
-	synthesizeComp *SynthesizedComponent) bool {
+func checkPostProvisionDoneAnnotationExist(cluster appsv1alpha1.Cluster,
+	comp appsv1alpha1.Component,
+	synthesizeComp SynthesizedComponent) bool {
 	// TODO(xingran): for backward compatibility before KubeBlocks v0.8.0, check the annotation of the cluster object first, it will be deprecated in the future
 	compPostStartDoneKey := fmt.Sprintf(kbCompPostStartDoneKeyPattern, fmt.Sprintf("%s-%s", cluster.Name, synthesizeComp.Name))
 	_, ok := cluster.Annotations[compPostStartDoneKey]

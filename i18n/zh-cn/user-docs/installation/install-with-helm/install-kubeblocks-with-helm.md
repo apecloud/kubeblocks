@@ -2,7 +2,7 @@
 title: 用 Helm 安装 KubeBlocks
 description: 如何用 Helm 安装 KubeBlocks
 keywords: [taints, affinity, tolerance, 安装, helm, KubeBlocks]
-sidebar_position: 3
+sidebar_position: 1
 sidebar_label: 安装 KubeBlocks
 ---
 

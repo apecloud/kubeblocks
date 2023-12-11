@@ -2,7 +2,7 @@
 title: 用 kbcli 安装 KubeBlocks
 description: 如何用 kbcli 安装 KubeBlocksInstall KubeBlocks
 keywords: [taints, affinity, tolerance, 安装, kbcli, KubeBlocks]
-sidebar_position: 3
+sidebar_position: 2
 sidebar_label: 安装 KubeBlocks
 ---
 

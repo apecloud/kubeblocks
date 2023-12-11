@@ -2,7 +2,7 @@
 title: 配置集群参数
 description: 如何配置集群参数
 keywords: [pulsar, 参数, 配置, 再配置]
-sidebar_position: 4
+sidebar_position: 1
 ---
 
 # 配置集群参数

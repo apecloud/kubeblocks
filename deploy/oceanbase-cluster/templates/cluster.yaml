@@ -2,19 +2,24 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: {{ include "oceanbase.fullname" . }}
-  labels: 
+  labels:
     {{- include "oceanbase.labels" . | nindent 4 }}
+  annotations:
+    {{ include "oceanbase-cluster.annotations.extra-envs" . | nindent 4 }}
 spec:
   clusterDefinitionRef: oceanbase
   clusterVersionRef: oceanbase-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
   terminationPolicy: {{ .Values.terminationPolicy }}
+  {{- include "kblib.affinity" . | indent 2 }}
   componentSpecs:
-    - name: ob-bundle
+  {{- range $i, $e := until (int .Values.obClusters) }}
+    - name: ob-bundle-{{ $i }}
       componentDefRef: ob-bundle
-      serviceAccountName: {{ .Values.clusterName }}-observer-sa
-      replicas: {{ .Values.replicas | default 1 }}
+      serviceAccountName: {{ include "kblib.serviceAccountName" $ }}
+      replicas: {{ $.Values.replicas | default 3 }}
+      {{- include "kblib.componentResources" $ | indent 6 }}
       volumeClaimTemplates:
-        {{- range $key, $val := .Values.resources.storages }}
+        {{- range $key, $val := $.Values.resources.storages }}
         - name: {{ $key }}
           spec:
             accessModes:
@@ -23,3 +28,4 @@ spec:
               requests:
                 storage: {{ $val | quote }}
         {{- end }}
+  {{- end }}

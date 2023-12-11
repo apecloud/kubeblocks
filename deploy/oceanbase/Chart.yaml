@@ -4,6 +4,11 @@ description: "Unlimited scalable distributed database for data-intensive transac
 
 type: application
 
-version: 0.0.1-alpha1
+version: 0.7.0
 
 appVersion: "4.2.0.0-100010032023083021"
+
+annotations:
+  addon.kubeblocks.io/kubeblocks-version: ">=0.7.0"
+  addon.kubeblocks.io/model: "RDBMS"
+  addon.kubeblocks.io/provider: "community"

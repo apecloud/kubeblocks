@@ -60,7 +60,7 @@ Options:
 
 ## 选项 2. 使用 YAML 文件
 
-你可以在集群规范或组件规范中配置 Pod 亲和性和容忍度。
+你可以在集群配置文件或组件配置文件中配置 Pod 亲和性和容忍度。
 
 集群级配置是所有组件的默认配置；如果组件中存在 Pod 亲和性配置，组件级配置将生效，并覆盖默认的集群级配置。
 
@@ -96,9 +96,9 @@ spec:
   Pod 亲和性配置可以应用于集群或组件，组件级配置将覆盖集群级配置。
 
 * 容忍度
-  与容忍度相关的参数位于集群 CR YAML 文件的 `spec.tolerations` 对象下，使用 Kubernetes 的原生语义。有关容忍度参数配置，请参考 Kubernetes 官方文档 [Taints and Tolerations](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/)。
+  与容忍度相关的参数位于集群 CR YAML 文件的 `spec.tolerations` 对象下，使用 Kubernetes 的原生语义。有关容忍度参数配置，请参考 Kubernetes 官方文档 [污点和容忍度](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/)。
 
-  与亲和性配置类似，容忍度也支持组件级和集群级配置。集群级配置是默认配置，组件级配置会覆盖集群级配置。
+  与亲和性配置类似，容忍度也支持组件级和集群级配置。默认使用集群级配置，组件级别的配置会覆盖集群级别的配置。
 
 | **参数**   | **值**                                    | **描述**  |
 | :--             | :--                                          | :--              |
@@ -115,17 +115,17 @@ spec:
 
 无需使用亲和性参数。
 
-### 尽可能均匀分布
+### 尽量打散
 
-如果你希望集群的 Pod 部署在不同的拓扑域，但不希望由于无法满足分布要求而导致部署失败，可以将 Pod 亲和性配置为“Preferred”。
+如果你希望集群的 Pod 部署在不同的拓扑域，但是不希望在节点资源充足的时候，因为不满足分布条件而部署失败，那么可以配置尽量打散，可以将 Pod 亲和性配置为“Preferred”。
 
-下面的示例创建了一个尽可能均匀部署在节点上的集群。
+下面的示例创建了一个尽可能跨节点的集群。
 
 ```bash
 kbcli cluster create --topology-keys kubernetes.io/hostname --pod-anti-affinity Preferred
 ```
 
-### 强制均匀分布
+### 强制打散
 
 如果集群的 Pod 必须部署在不同的拓扑域，以确保集群能够跨拓扑域具备容灾能力，你可以将 Pod 亲和性配置为“Required”。
 
@@ -135,7 +135,7 @@ kbcli cluster create --topology-keys kubernetes.io/hostname --pod-anti-affinity 
 kbcli cluster create --topology-keys kubernetes.io/hostname --pod-anti-affinity Required
 ```
 
-### 在指定节点上部署 Pod
+### 在指定节点上部署
 
 可以通过节点标签在指定的节点上部署集群。
 
@@ -145,19 +145,19 @@ kbcli cluster create --topology-keys kubernetes.io/hostname --pod-anti-affinity 
 kbcli cluster create --node-labels '"topology.kubernetes.io/zone=us-east-1a"'
 ```
 
-### 在专用节点上部署 Pod 
+### 独享主机组
 
-如果想通过污点和节点标签来管理节点组，并且需要将集群部署在专用主机组上，可以设置容忍度并指定一个节点标签。
+如果想通过污点和节点标签来管理节点分组，并且需要将集群部署在独享的主机分组中，可以设置容忍度并指定一个节点标签。
 
-例如，如果有一个用于部署数据库集群的主机组，并且该主机添加了一个名为 `database=true:NoSchedule` 的污点和一个名为 `database=true` 的标签，那么可以按照以下命令创建一个集群。
+例如，如果有一个用于部署数据库集群的主机分组，并且该主机添加了一个名为 `database=true:NoSchedule` 的污点和一个名为 `database=true` 的标签，那么可以按照以下命令创建一个集群。
 
 ```bash
 kbcli cluster create --node-labels '"databa=true"' --tolerations '"key=database,value=true,operator=Equal,effect=NoSchedule"
 ```
 
-### 一个 Pod，一个节点
+### 集群 Pod 独占一个节点
 
-如果需要一个仅用于在线核心业务的集群，并且需要确保该集群的每个 Pod 都有自己的节点以避免受到集群中其他 Pod 的影响，你可以将 `tenancy` 设置为“DedicatedNode”。
+如果需要一个仅用于线上核心业务的集群，并且需要确保该集群的每个 Pod 都有自己的节点以避免受到集群中其他 Pod 的影响，你可以将 `tenancy` 设置为“DedicatedNode”。
 
 ```bash
 kbcli cluster create --tenancy=DedicatedNode
@@ -165,6 +165,6 @@ kbcli cluster create --tenancy=DedicatedNode
 
 :::note
 
-只有为这些节点添加污点之后，命令才能成功执行。否则，未由 KubeBlocks 管理的业务仍然可以部署在这些节点上。
+只有为这些节点添加污点之后，命令才能成功执行。否则，未由 KubeBlocks 托管的业务仍然可以部署在这些节点上。
 
 :::

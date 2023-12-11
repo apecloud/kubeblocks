@@ -9,27 +9,31 @@ sidebar_position: 3
 
 为简化用户排查问题的复杂度，KubeBlocks 的命令行工具 kbcli 支持查看运行在 KubeBlocks 上的数据引擎生成的各种日志，例如慢日志、错误日志、审计日志和容器运行日志（Stdout 和 Stderr）等。对于 Redis 数据库，仅支持查看运行日志。以上称为日志增强功能。
 
-KubeBlocks 日志增强功能使用类似 `kubectl exec` 和 `kubectl logs` 的方法，确保自包含和轻量级。
+KubeBlocks 日志增强功能使用类似 `kubectl exec` 和 `kubectl logs` 的方法，确保自闭环和轻量化。
 
 # 开始之前
 
 - 容器镜像支持 `tail` 和 `xargs` 命令。
 - 安装 KubeBlocks：你可以通过 [kbcli](../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](../installation/install-with-helm/install-kubeblocks-with-helm.md) 安装 KubeBlocks。
-- 在本指南中，我们以 MySQL 引擎为例。对于其他所有数据库引擎，操作是相同的。
+- 在本指南中，我们以 MySQL 引擎为例。其他数据库引擎操作相同。
 
 ## 步骤
+
 1. 启用日志增强功能。
+
    - 在创建集群时启用此功能。
      - 如果你通过执行 `kbcli cluster create` 命令创建集群，请添加 `--enable-all-logs=true` 启用日志增强功能。当此选项为 `true` 时，`ClusterDefinition` 中 `spec.componentDefs.logConfigs` 定义的所有日志类型将自动启用。
-        
+
         ```bash
         kbcli cluster create mysql --enable-all-logs=true mycluster
         ```
+
    - 如果在创建集群时未启用该功能，请更新该集群。
-      
+
       ```bash
       kbcli cluster update mycluster --enable-all-logs=true -n <namespace>
       ```
+
       :::note
 
       创建集群时的默认命名空间是 `default`。如果在创建集群时指定了命名空间，请将 `<namespace>` 填写为你自定义的命名空间。
@@ -38,19 +42,22 @@ KubeBlocks 日志增强功能使用类似 `kubectl exec` 和 `kubectl logs` 的�
 
 2. 查看支持的日志。
   执行 `kbcli cluster list-logs` 命令，查看目标集群中已开启日志增强功能的日志类型和日志文件的详细信息，展示集群中的每个节点实例。
+
     ***示例***
+
     ```bash
     kbcli cluster list-logs mycluster
     >
-    INSTANCE                     LOG-TYPE        FILE-PATH                                   SIZE        LAST-WRITTEN                          COMPONENT
+    INSTANCE                 LOG-TYPE        FILE-PATH                                   SIZE        LAST-WRITTEN                          COMPONENT
     mycluster-mysql-0        error           /data/mysql/log/mysqld-error.log            6.4K        Feb 06, 2023 09:13 (UTC+00:00)        mysql
     mycluster-mysql-0        general         /data/mysql/log/mysqld.log                  5.9M        Feb 06, 2023 09:13 (UTC+00:00)        mysql
     mycluster-mysql-0        slow            /data/mysql/log/mysqld-slowquery.log        794         Feb 06, 2023 09:13 (UTC+00:00)        mysql       
     ```
 
 3. 访问集群日志文件。
-  执行 `kbcli cluster logs` 命令，查看目标集群上目标节点生成的日志文件的详细信息。你可以使用不同的方法来查看所需要的日志文件。
-  你还可以执行 `kbcli cluster logs -h` 查看示例和方法。
+   执行 `kbcli cluster logs` 命令，查看目标集群上目标节点生成的日志文件的详细信息。你可以使用不同的方法来查看所需要的日志文件。
+  
+   还可以执行 `kbcli cluster logs -h` 查看示例和方法。
 
     ```bash
     kbcli cluster logs -h
@@ -60,7 +67,7 @@ KubeBlocks 日志增强功能使用类似 `kubectl exec` 和 `kubectl logs` 的�
 
     <summary>输出</summary>
 
-    ```
+    ```bash
     Access cluster log file
 
     Examples:
@@ -88,6 +95,7 @@ KubeBlocks 日志增强功能使用类似 `kubectl exec` 和 `kubectl logs` 的�
     # 返回集群 mycluster 中指定实例 my-instance-0 和指定容器 my-container 的指定文件日志
     kbcli cluster logs mycluster --instance my-instance-0 -c my-container --file-path=/var/log/yum.log
     ```
+
     </details>
 
 4. （可选）故障排除。

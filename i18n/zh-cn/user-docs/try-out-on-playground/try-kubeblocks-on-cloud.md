@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # 在云上使用 KubeBlocks
 
-本指南将引导你快速入门 KubeBlocks，并演示如何通过命令创建演示环境（Playground）。
+本指南将引导你快速上手 KubeBlocks，并演示如何通过命令创建演示环境（Playground）。
 
 ## 准备工作
 
@@ -23,6 +23,7 @@ import TabItem from '@theme/TabItem';
 ### 在 AWS 上使用 KubeBlocks 之前
 
 请确保已经：
+
 - [安装 AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)。
 - [安装 kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)。
 - [安装 kbcli](./../installation/install-with-kbcli/install-kbcli.md)。

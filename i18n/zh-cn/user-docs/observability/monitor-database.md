@@ -11,15 +11,16 @@ KubeBlocks 提供了强大的可观测性能力。你可以实时观察数据库
 
 ## Playground 演示场景
 
-KubeBlocks 以 add-on 形式集成了许多开源监控组件，如 Prometheus、AlertManager 和 Grafana，并采用定制的 `apecloud-otel-collector` 组件收集数据库和宿主机的监控指标。在部署 KubeBlocks Playground 时，所有监控组件都会默认启用。
+KubeBlocks 以引擎形式集成了许多开源监控组件，如 Prometheus、AlertManager 和 Grafana，并采用定制的 `apecloud-otel-collector` 组件收集数据库和宿主机的监控指标。在部署 KubeBlocks Playground 时，所有监控组件都会默认启用。
 
 KubeBlocks Playground 内置了三个监控组件：
+
 - `prometheus`：包括 Prometheus 和 AlertManager 两个监控组件。
 - `grafana`：包括 Grafana 的监控组件。
 - `alertmanager-webhook-adaptor`：包括消息通知扩展组件，用于扩展 AlertManager 的通知能力。目前已经支持飞书、钉钉和企业微信的自定义机器人。
 - `apecloud-otel-collector`：用于采集数据库和宿主机的指标。
 
-1. 查看所有支持的 add-on，确保监控 add-on 已启用。
+1. 查看所有支持的引擎，确保监控引擎已启用。
 
     ```bash
     # 查看内置支持的所有 add-on
@@ -30,7 +31,9 @@ KubeBlocks Playground 内置了三个监控组件：
     prometheus                     Helm   Enabled    alertmanager   true 
     ...
     ```
+
 2. 查看仪表盘列表。
+
     ```bash
     kbcli dashboard list
     >
@@ -52,7 +55,7 @@ KubeBlocks Playground 内置了三个监控组件：
 
 ### 启用监控功能
 
-KubeBlocks 提供了一个名为 `victoria-metrics-agent` 的 add-on，可以将监控数据推送到与 Prometheus Remote Write 协议兼容的第三方监控系统。与原生的 Prometheus 相比，[vmagent](https://docs.victoriametrics.com/vmagent.html) 更轻量且支持水平扩展。
+KubeBlocks 提供了一个名为 `victoria-metrics-agent` 的引擎，可以将监控数据推送到与 Prometheus Remote Write 协议兼容的第三方监控系统。与原生的 Prometheus 相比，[vmagent](https://docs.victoriametrics.com/vmagent.html) 更轻量且支持水平扩展。
 
 1. 启用数据推送。
 
@@ -83,11 +86,12 @@ KubeBlocks 提供了一个名为 `victoria-metrics-agent` 的 add-on，可以将
 
 2. （可选）水平扩容 `victoria-metrics-agent`。
 
-    当数据库实例不断增多时，单节点 vmagent 多少有点力不从心。此时可以选择通过扩容 vmagent 来解决这个问题。多节点 vmagent 内部会根据哈希策略自动划分数据采集的任务。
+    当数据库实例不断增多时，单节点 vmagent 会成为瓶颈。此时可以选择通过扩容 vmagent 来解决这个问题。多节点 vmagent 内部会根据哈希策略自动划分数据采集的任务。
 
     ```bash
     kbcli addon enable victoria-metrics-agent --replicas <replica count> --set remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}
     ```
+
 3. （可选）禁用 `victoria-metrics-agent` 插件。
 
     ```bash
@@ -102,9 +106,10 @@ Kubeblocks 提供了主流引擎的 Grafana 仪表盘和 Prometheus 告警规则
 
 ## 启用数据库的监控功能
 
-在创建数据库时，KubeBlocks 默认启用监控功能，启用后会注入开源或定制的采集组件。该采集组件会被 Prometheus 服务器自动发现并定期抓取监控指标。你可以将 mysql 更改为 `postgresql`、`mongodb` 或 `redis` 以创建其他数据库引擎的集群。
+在创建数据库时，KubeBlocks 默认启用监控功能，启用后会注入开源或定制的采集组件。该采集组件会被 Prometheus 服务器自动发现并定期抓取监控指标。你可以将 `mysql` 更改为 `postgresql`、`mongodb` 或 `redis` 以创建其他数据库引擎的集群。
 
 - 对于新集群，请执行以下命令创建数据库集群。
+
     ```bash
     # 查询集群定义
     kbcli clusterdefinition list 
@@ -112,6 +117,7 @@ Kubeblocks 提供了主流引擎的 Grafana 仪表盘和 Prometheus 告警规则
     # 创建集群
     kbcli cluster create mysql <clustername> 
     ```
+
 :::note
 
 你可以将 `--monitoring-interval` 设置为 `0` 以关闭监控功能（不建议关闭）。
@@ -129,5 +135,3 @@ kbcli cluster create mysql mycluster --monitoring-interval=0
     ```
 
 你可以通过 Grafana Web Console 查看相应集群的仪表盘。更多信息请参阅 [Grafana 仪表盘文档](https://grafana.com/docs/grafana/latest/dashboards/)。
-
-

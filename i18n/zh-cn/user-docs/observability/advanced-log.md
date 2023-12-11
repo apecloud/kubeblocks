@@ -10,19 +10,20 @@ sidebar_label: 高级日志
 
 目前，KubeBlocks 支持通过 `kbcli cluster logs` 查看集群的运行日志、错误日志和慢日志。这种方法具有轻量级的优点，只需依赖于目标容器中的日志文件和 `tail` 命令即可，无需在集群或客户端中安装任何软件或插件。这种方法也被称为 `cluster logs` 功能。
 
-然而，它也有明显的缺点。它强烈依赖于容器和日志文件的当前状态。如果容器异常或日志文件被删除，该方法就无法按预期实现。
+然而，它也有明显的缺点。它强依赖容器的存活和当前日志文件状态。如果容器已经处于异常或日志文件被删除，该方法就无法按预期实现。
 
-而 `advanced logs` 功能可以更好地保留问题现场的日志线索，支持日志数据的长期远程备份，并便于与外部系统集成。
+而 `advanced logs` 功能可以更好地保留问题现场的日志线索，支持日志数据的长期远端备份，并便于与外部系统集成。
 
 该功能支持将日志数据存储到集群中的 Loki 服务器和远程的 AWS S3 服务中。存储在 Loki 中的数据可以通过 `logcli` 客户端和 Grafana 控制台访问和显示。存储在 S3 中的数据支持导入和与其他系统的集成，以便进行进一步处理和分析。
 
 ## Add-on 介绍
 
-KubeBlocks 以 add-on 的形式统一管理 Agamotto、Loki、Prometheus 等与可观测性相关的组件。每个 add-on 都有其特色。
-- Agamotto 是一个负责收集性能数据和日志的 add-on。
-- Loki 是一个用于存储日志数据的 add-on。
-- Grafana 是一个用于在前端展示观测数据的 add-on。
-- Logcli 是一个前端搜索 add-on，提供原生的 LogQL 查询功能。它通过 `kbcli plugin` 安装。
+KubeBlocks 以引擎的形式统一管理 Agamotto、Loki、Prometheus 等与可观测性相关的组件。每个引擎都有其特色。
+
+- Agamotto 负责收集性能、日志等数据，属于采集引擎。
+- Loki 负责存储日志类数据，属于存储引擎。
+- Grafana 负责页面展示可观测数据，属于前端展示引擎。
+- Logcli 通过 kbcli plugin 形式安装，提供原生的 LogQL 查询能力，属于前端查询引擎。
 
 ## 开始之前
 
@@ -49,7 +50,7 @@ Loki add-on 用于存储日志数据，并接受来自前端的搜索请求。�
 
 2. 如果未启用，请执行以下命令以启用 add-on。
 
-    此命令以 statefulset 模式运行 Loki。KubeBlocks 将部署单一二进制类型的单节点 Loki，即配置中的 target 是 all，使用一个 10GB 的 PV 来存储数据，并启动一个 loki-gateway 服务来接收数据。
+    此命令以 `statefulset` 模式运行 Loki。KubeBlocks 将默认部署 single binary 类型的单节点 Loki，即配置中的 target 是 all，使用一个 10 GB 的 PV 来存储数据，并启动一个 loki-gateway 服务来接收数据。
 
     ```bash
     kbcli addon enable loki
@@ -57,24 +58,27 @@ Loki add-on 用于存储日志数据，并接受来自前端的搜索请求。�
     NAME                           TYPE   PROVIDER    STATUS     AUTO-INSTALL   AUTO-INSTALLABLE-SELECTOR   
     loki                           Helm   apecloud    Enabled    false   
     ```
+
     检查该 Pod 是否正在运行。
-    ```
+
+    ```bash
     kubectl get pods | grep loki
     >
     NAME                                            READY   STATUS    RESTARTS   AGE
     kb-addon-loki-0                                 1/1     Running   0          47h
     loki-gateway-5f4895c7b-5khv7                    1/1     Running   0          47h
     ```
+
 3. 运行 Grafana ，查看 Loki 的状态。
    ![Loki in Grafana](../../img/observability-loki-in-grafana.png)
 
-4. （可选）禁用 Agamotto add-on。
+4. （可选）禁用 Loki add-on。
 
     ```bash
     kbcli disabled loki
     ```
 
-默认情况下，Loki 保存近 3 天的日志数据，超过 72 小时的数据将被自动删除。你可以使用以下命令来调整存储策略。在调整策略时，请注意主机的磁盘资源和 Loki PVC。目前，Loki 不支持基于大小的保留策略。
+默认情况下，Loki 保存近 3 天的日志数据，超过 72 小时的数据将被自动删除。你可以使用以下命令来调整存储策略。在调整策略时，请注意主机的磁盘资源和 Loki PVC。目前，Loki 不支持 size-based retention。
 
 ```bash
 # 新的 retention_period 必须是 24 的整数倍
@@ -112,9 +116,10 @@ pvc-ed20ec94-9a58-46e4-9c28-b692cba70e79   8Gi        RWO            Delete     
     ```
 
 ### 启用 Agamotto
-启用日志收集功能后，Agamotto 会检测两个本地文件夹，即 `/var/log/pods` 和 `/var/log/kubeblocks`。所有符合以下模式的文件都将被收集：
-- `/var/log/pods` 目录：用于存储存储容器的标准输出和错误日志。文件路径为 `/var/log/pods/**/**/*.log`。
-- `/var/log/kubeblocks` 目录：可以自定义日志文件的存储位置。默认情况下，KubeBlocks 存储数据库引擎的日志，如错误日志和慢日志。文件路径为 `/var/log/kubeblocks/**/**/*.log`。
+启用日志收集功能后，Agamotto 会检测两个本地文件夹，即 `/var/log/pods` 和 `/var/log/kubeblocks`。所有符合以下模式的文件都将被采集：
+
+- `/var/log/pods` 目录：用于存储存储容器的标准输出和错误日志。文件模式为 `/var/log/pods/**/**/*.log`。
+- `/var/log/kubeblocks` 目录：可以自定义日志文件的存储位置。默认情况下，KubeBlocks 存储数据库引擎的日志，如错误日志和慢日志。文件模式为 `/var/log/kubeblocks/**/**/*.log`。
 
 1. 查看 `Agamotto add-on` 的状态，检查其是否已启用。
 
@@ -160,7 +165,7 @@ pvc-ed20ec94-9a58-46e4-9c28-b692cba70e79   8Gi        RWO            Delete     
 
 :::note
 
-在生产环境中安装 KubeBlocks 时，默认禁用所有监控 add-on，包括 Grafana，你可以自行启用 Grafana。但出于安全和稳定性考虑，强烈建议你构建自己的监控系统或购买第三方监控服务。关于集成第三方监控服务，请参考[集成第三方监控服务](../obeservability/monitor-database.md#生产环境)。
+在生产环境中安装 KubeBlocks 时，默认禁用所有监控引擎，包括 Grafana，你可以自行启用 Grafana。但出于安全和稳定性考虑，强烈建议你构建自己的监控系统或购买第三方监控服务。关于集成第三方监控服务，请参考[集成第三方监控服务](./monitor-database.md#生产环境)。
 
 :::
 
@@ -237,7 +242,7 @@ kbcli 支持 LogCLI add-on，方便你通过命令行查询日志。
 
 ### MySQL 慢日志和错误日志
 
-默认情况下，在 MySQL 的 `ClusterDefinition` 中，mysql component 的 podSpec 定义中有一个名为 `metrics` 的 `sidecar` 容器。
+默认情况下，在 MySQL 的 `ClusterDefinition` 中，`mysql component` 的 podSpec 定义中有一个名为 `metrics` 的 `sidecar` 容器。
 
 该 `metrics` 容器实时检测 MySQL 输出的错误日志和慢日志，并将日志转储到主机的 `/var/log/KubeBlocks` 目录中。为了防止占用过多的主机磁盘空间，每个文件的默认大小为 10 MB，并且最多可以保存 2 个文件。
 

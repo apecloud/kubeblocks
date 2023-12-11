@@ -407,6 +407,25 @@ spec:
                               RoleSelector, any replica which has the same role with
                               matchingKey will be chosen. Cannot be updated.
                             type: string
+                          preCondition:
+                            description: 'PreCondition defines the condition when
+                              the action will be executed. - Immediately: The Action
+                              is executed immediately after the Component object is
+                              created, without guaranteeing the availability of the
+                              Component and its underlying resources. only after the
+                              action is successfully executed will the Component''s
+                              state turn to ready. - RuntimeReady: The Action is executed
+                              after the Component object is created and once all underlying
+                              Runtimes are ready. only after the action is successfully
+                              executed will the Component''s state turn to ready.
+                              - ComponentReady: The Action is executed after the Component
+                              object is created and once the Component is ready. the
+                              execution process does not impact the state of the Component
+                              and the Cluster. - ClusterReady: The Action is executed
+                              after the Cluster object is created and once the Cluster
+                              is ready. the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated.'
+                            type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
                               the action in case of failure. Cannot be updated.
@@ -675,6 +694,25 @@ spec:
                               RoleSelector, any replica which has the same role with
                               matchingKey will be chosen. Cannot be updated.
                             type: string
+                          preCondition:
+                            description: 'PreCondition defines the condition when
+                              the action will be executed. - Immediately: The Action
+                              is executed immediately after the Component object is
+                              created, without guaranteeing the availability of the
+                              Component and its underlying resources. only after the
+                              action is successfully executed will the Component''s
+                              state turn to ready. - RuntimeReady: The Action is executed
+                              after the Component object is created and once all underlying
+                              Runtimes are ready. only after the action is successfully
+                              executed will the Component''s state turn to ready.
+                              - ComponentReady: The Action is executed after the Component
+                              object is created and once the Component is ready. the
+                              execution process does not impact the state of the Component
+                              and the Cluster. - ClusterReady: The Action is executed
+                              after the Cluster object is created and once the Cluster
+                              is ready. the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated.'
+                            type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
                               the action in case of failure. Cannot be updated.
@@ -941,6 +979,25 @@ spec:
                               RoleSelector, any replica which has the same role with
                               matchingKey will be chosen. Cannot be updated.
                             type: string
+                          preCondition:
+                            description: 'PreCondition defines the condition when
+                              the action will be executed. - Immediately: The Action
+                              is executed immediately after the Component object is
+                              created, without guaranteeing the availability of the
+                              Component and its underlying resources. only after the
+                              action is successfully executed will the Component''s
+                              state turn to ready. - RuntimeReady: The Action is executed
+                              after the Component object is created and once all underlying
+                              Runtimes are ready. only after the action is successfully
+                              executed will the Component''s state turn to ready.
+                              - ComponentReady: The Action is executed after the Component
+                              object is created and once the Component is ready. the
+                              execution process does not impact the state of the Component
+                              and the Cluster. - ClusterReady: The Action is executed
+                              after the Cluster object is created and once the Cluster
+                              is ready. the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated.'
+                            type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
                               the action in case of failure. Cannot be updated.
@@ -1206,6 +1263,25 @@ spec:
                               the matchingKey will be ignored. If the selector is
                               RoleSelector, any replica which has the same role with
                               matchingKey will be chosen. Cannot be updated.
+                            type: string
+                          preCondition:
+                            description: 'PreCondition defines the condition when
+                              the action will be executed. - Immediately: The Action
+                              is executed immediately after the Component object is
+                              created, without guaranteeing the availability of the
+                              Component and its underlying resources. only after the
+                              action is successfully executed will the Component''s
+                              state turn to ready. - RuntimeReady: The Action is executed
+                              after the Component object is created and once all underlying
+                              Runtimes are ready. only after the action is successfully
+                              executed will the Component''s state turn to ready.
+                              - ComponentReady: The Action is executed after the Component
+                              object is created and once the Component is ready. the
+                              execution process does not impact the state of the Component
+                              and the Cluster. - ClusterReady: The Action is executed
+                              after the Cluster object is created and once the Cluster
+                              is ready. the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated.'
                             type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
@@ -1474,6 +1550,25 @@ spec:
                               RoleSelector, any replica which has the same role with
                               matchingKey will be chosen. Cannot be updated.
                             type: string
+                          preCondition:
+                            description: 'PreCondition defines the condition when
+                              the action will be executed. - Immediately: The Action
+                              is executed immediately after the Component object is
+                              created, without guaranteeing the availability of the
+                              Component and its underlying resources. only after the
+                              action is successfully executed will the Component''s
+                              state turn to ready. - RuntimeReady: The Action is executed
+                              after the Component object is created and once all underlying
+                              Runtimes are ready. only after the action is successfully
+                              executed will the Component''s state turn to ready.
+                              - ComponentReady: The Action is executed after the Component
+                              object is created and once the Component is ready. the
+                              execution process does not impact the state of the Component
+                              and the Cluster. - ClusterReady: The Action is executed
+                              after the Cluster object is created and once the Cluster
+                              is ready. the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated.'
+                            type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
                               the action in case of failure. Cannot be updated.
@@ -1509,9 +1604,13 @@ spec:
                             type: integer
                         type: object
                     type: object
-                  postStart:
-                    description: PostStart is called immediately after a component
-                      is created. Cannot be updated.
+                  postProvision:
+                    description: PostProvision defines the actions to be executed
+                      and the corresponding policy when a component is created. You
+                      can define the preCondition for executing PostProvision using
+                      Action.PreCondition. The default PostProvision action preCondition
+                      is ComponentReady. The PostProvision Action will be executed
+                      only once. Cannot be updated.
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler
@@ -1737,6 +1836,25 @@ spec:
                               RoleSelector, any replica which has the same role with
                               matchingKey will be chosen. Cannot be updated.
                             type: string
+                          preCondition:
+                            description: 'PreCondition defines the condition when
+                              the action will be executed. - Immediately: The Action
+                              is executed immediately after the Component object is
+                              created, without guaranteeing the availability of the
+                              Component and its underlying resources. only after the
+                              action is successfully executed will the Component''s
+                              state turn to ready. - RuntimeReady: The Action is executed
+                              after the Component object is created and once all underlying
+                              Runtimes are ready. only after the action is successfully
+                              executed will the Component''s state turn to ready.
+                              - ComponentReady: The Action is executed after the Component
+                              object is created and once the Component is ready. the
+                              execution process does not impact the state of the Component
+                              and the Cluster. - ClusterReady: The Action is executed
+                              after the Cluster object is created and once the Cluster
+                              is ready. the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated.'
+                            type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
                               the action in case of failure. Cannot be updated.
@@ -1772,9 +1890,14 @@ spec:
                             type: integer
                         type: object
                     type: object
-                  preStop:
-                    description: PreStop is called immediately before a component
-                      is terminated due to an API request. Cannot be updated.
+                  preTerminate:
+                    description: PreTerminate defines the actions to be executed when
+                      a component is terminated due to an API request. The PreTerminate
+                      Action will be executed only once. Upon receiving a scale-down
+                      command for the Component, it is executed immediately. Only
+                      after the preTerminate action is successfully executed, the
+                      destruction of the Component and its underlying resources proceeds.
+                      Cannot be updated.
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler
@@ -1999,6 +2122,25 @@ spec:
                               the matchingKey will be ignored. If the selector is
                               RoleSelector, any replica which has the same role with
                               matchingKey will be chosen. Cannot be updated.
+                            type: string
+                          preCondition:
+                            description: 'PreCondition defines the condition when
+                              the action will be executed. - Immediately: The Action
+                              is executed immediately after the Component object is
+                              created, without guaranteeing the availability of the
+                              Component and its underlying resources. only after the
+                              action is successfully executed will the Component''s
+                              state turn to ready. - RuntimeReady: The Action is executed
+                              after the Component object is created and once all underlying
+                              Runtimes are ready. only after the action is successfully
+                              executed will the Component''s state turn to ready.
+                              - ComponentReady: The Action is executed after the Component
+                              object is created and once the Component is ready. the
+                              execution process does not impact the state of the Component
+                              and the Cluster. - ClusterReady: The Action is executed
+                              after the Cluster object is created and once the Cluster
+                              is ready. the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated.'
                             type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
@@ -2264,6 +2406,25 @@ spec:
                               RoleSelector, any replica which has the same role with
                               matchingKey will be chosen. Cannot be updated.
                             type: string
+                          preCondition:
+                            description: 'PreCondition defines the condition when
+                              the action will be executed. - Immediately: The Action
+                              is executed immediately after the Component object is
+                              created, without guaranteeing the availability of the
+                              Component and its underlying resources. only after the
+                              action is successfully executed will the Component''s
+                              state turn to ready. - RuntimeReady: The Action is executed
+                              after the Component object is created and once all underlying
+                              Runtimes are ready. only after the action is successfully
+                              executed will the Component''s state turn to ready.
+                              - ComponentReady: The Action is executed after the Component
+                              object is created and once the Component is ready. the
+                              execution process does not impact the state of the Component
+                              and the Cluster. - ClusterReady: The Action is executed
+                              after the Cluster object is created and once the Cluster
+                              is ready. the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated.'
+                            type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
                               the action in case of failure. Cannot be updated.
@@ -2526,6 +2687,25 @@ spec:
                               the matchingKey will be ignored. If the selector is
                               RoleSelector, any replica which has the same role with
                               matchingKey will be chosen. Cannot be updated.
+                            type: string
+                          preCondition:
+                            description: 'PreCondition defines the condition when
+                              the action will be executed. - Immediately: The Action
+                              is executed immediately after the Component object is
+                              created, without guaranteeing the availability of the
+                              Component and its underlying resources. only after the
+                              action is successfully executed will the Component''s
+                              state turn to ready. - RuntimeReady: The Action is executed
+                              after the Component object is created and once all underlying
+                              Runtimes are ready. only after the action is successfully
+                              executed will the Component''s state turn to ready.
+                              - ComponentReady: The Action is executed after the Component
+                              object is created and once the Component is ready. the
+                              execution process does not impact the state of the Component
+                              and the Cluster. - ClusterReady: The Action is executed
+                              after the Cluster object is created and once the Cluster
+                              is ready. the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated.'
                             type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
@@ -2790,6 +2970,25 @@ spec:
                               RoleSelector, any replica which has the same role with
                               matchingKey will be chosen. Cannot be updated.
                             type: string
+                          preCondition:
+                            description: 'PreCondition defines the condition when
+                              the action will be executed. - Immediately: The Action
+                              is executed immediately after the Component object is
+                              created, without guaranteeing the availability of the
+                              Component and its underlying resources. only after the
+                              action is successfully executed will the Component''s
+                              state turn to ready. - RuntimeReady: The Action is executed
+                              after the Component object is created and once all underlying
+                              Runtimes are ready. only after the action is successfully
+                              executed will the Component''s state turn to ready.
+                              - ComponentReady: The Action is executed after the Component
+                              object is created and once the Component is ready. the
+                              execution process does not impact the state of the Component
+                              and the Cluster. - ClusterReady: The Action is executed
+                              after the Cluster object is created and once the Cluster
+                              is ready. the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated.'
+                            type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
                               the action in case of failure. Cannot be updated.
@@ -3052,6 +3251,25 @@ spec:
                               the matchingKey will be ignored. If the selector is
                               RoleSelector, any replica which has the same role with
                               matchingKey will be chosen. Cannot be updated.
+                            type: string
+                          preCondition:
+                            description: 'PreCondition defines the condition when
+                              the action will be executed. - Immediately: The Action
+                              is executed immediately after the Component object is
+                              created, without guaranteeing the availability of the
+                              Component and its underlying resources. only after the
+                              action is successfully executed will the Component''s
+                              state turn to ready. - RuntimeReady: The Action is executed
+                              after the Component object is created and once all underlying
+                              Runtimes are ready. only after the action is successfully
+                              executed will the Component''s state turn to ready.
+                              - ComponentReady: The Action is executed after the Component
+                              object is created and once the Component is ready. the
+                              execution process does not impact the state of the Component
+                              and the Cluster. - ClusterReady: The Action is executed
+                              after the Cluster object is created and once the Cluster
+                              is ready. the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated.'
                             type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
@@ -3388,6 +3606,25 @@ spec:
                               RoleSelector, any replica which has the same role with
                               matchingKey will be chosen. Cannot be updated.
                             type: string
+                          preCondition:
+                            description: 'PreCondition defines the condition when
+                              the action will be executed. - Immediately: The Action
+                              is executed immediately after the Component object is
+                              created, without guaranteeing the availability of the
+                              Component and its underlying resources. only after the
+                              action is successfully executed will the Component''s
+                              state turn to ready. - RuntimeReady: The Action is executed
+                              after the Component object is created and once all underlying
+                              Runtimes are ready. only after the action is successfully
+                              executed will the Component''s state turn to ready.
+                              - ComponentReady: The Action is executed after the Component
+                              object is created and once the Component is ready. the
+                              execution process does not impact the state of the Component
+                              and the Cluster. - ClusterReady: The Action is executed
+                              after the Cluster object is created and once the Cluster
+                              is ready. the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated.'
+                            type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
                               the action in case of failure. Cannot be updated.
@@ -3640,6 +3877,25 @@ spec:
                               the matchingKey will be ignored. If the selector is
                               RoleSelector, any replica which has the same role with
                               matchingKey will be chosen. Cannot be updated.
+                            type: string
+                          preCondition:
+                            description: 'PreCondition defines the condition when
+                              the action will be executed. - Immediately: The Action
+                              is executed immediately after the Component object is
+                              created, without guaranteeing the availability of the
+                              Component and its underlying resources. only after the
+                              action is successfully executed will the Component''s
+                              state turn to ready. - RuntimeReady: The Action is executed
+                              after the Component object is created and once all underlying
+                              Runtimes are ready. only after the action is successfully
+                              executed will the Component''s state turn to ready.
+                              - ComponentReady: The Action is executed after the Component
+                              object is created and once the Component is ready. the
+                              execution process does not impact the state of the Component
+                              and the Cluster. - ClusterReady: The Action is executed
+                              after the Cluster object is created and once the Cluster
+                              is ready. the execution process does not impact the
+                              state of the Component and the Cluster. Cannot be updated.'
                             type: string
                           retryPolicy:
                             description: RetryPolicy defines the strategy for retrying
@@ -11152,7 +11408,7 @@ spec:
                 maxLength: 32
                 type: string
               serviceRefDeclarations:
-                description: serviceRefDeclarations is used to declare the service
+                description: ServiceRefDeclarations is used to declare the service
                   reference of the current component. Cannot be updated.
                 items:
                   properties:

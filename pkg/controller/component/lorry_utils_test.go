@@ -86,7 +86,7 @@ var _ = Describe("Lorry Utils", func() {
 				RoleProbe:    &appsv1alpha1.ClusterDefinitionProbe{},
 			}
 			component.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{
-				RoleProbe: &appsv1alpha1.RoleProbeSpec{},
+				RoleProbe: &appsv1alpha1.RoleProbe{},
 			}
 			component.PodSpec = &corev1.PodSpec{
 				Containers: []corev1.Container{},
@@ -102,7 +102,7 @@ var _ = Describe("Lorry Utils", func() {
 			}
 			defaultBuiltInHandler := appsv1alpha1.MySQLBuiltinActionHandler
 			component.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{
-				RoleProbe: &appsv1alpha1.RoleProbeSpec{
+				RoleProbe: &appsv1alpha1.RoleProbe{
 					LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
 						BuiltinHandler: &defaultBuiltInHandler,
 					},
@@ -155,7 +155,7 @@ var _ = Describe("Lorry Utils", func() {
 			}
 			defaultBuiltInHandler := appsv1alpha1.MySQLBuiltinActionHandler
 			component.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{
-				RoleProbe: &appsv1alpha1.RoleProbeSpec{
+				RoleProbe: &appsv1alpha1.RoleProbe{
 					LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
 						BuiltinHandler: &defaultBuiltInHandler,
 					},
@@ -187,7 +187,7 @@ var _ = Describe("Lorry Utils", func() {
 			}
 			defaultBuiltInHandler := appsv1alpha1.MySQLBuiltinActionHandler
 			component.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{
-				RoleProbe: &appsv1alpha1.RoleProbeSpec{
+				RoleProbe: &appsv1alpha1.RoleProbe{
 					LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
 						BuiltinHandler: &defaultBuiltInHandler,
 					},

@@ -80,7 +80,7 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 	lorrySvcGRPCPort := viper.GetInt("PROBE_SERVICE_GRPC_PORT")
 
 	// inject role probe container
-	var compRoleProbe *appsv1alpha1.RoleProbeSpec
+	var compRoleProbe *appsv1alpha1.RoleProbe
 	if synthesizeComp.LifecycleActions != nil {
 		compRoleProbe = synthesizeComp.LifecycleActions.RoleProbe
 	}
@@ -280,7 +280,7 @@ func buildWeSyncerContainer(weSyncerContainer *corev1.Container, probeSvcHTTPPor
 	weSyncerContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
-func buildRoleProbeContainer(roleChangedContainer *corev1.Container, roleProbe *appsv1alpha1.RoleProbeSpec, probeSvcHTTPPort int) {
+func buildRoleProbeContainer(roleChangedContainer *corev1.Container, roleProbe *appsv1alpha1.RoleProbe, probeSvcHTTPPort int) {
 	roleChangedContainer.Name = constant.RoleProbeContainerName
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = checkRoleURIFormat
@@ -338,8 +338,8 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 	actions := []struct {
 		LifeCycleActionHandlers *appsv1alpha1.LifecycleActionHandler
 	}{
-		{synthesizeComp.LifecycleActions.PostStart},
-		{synthesizeComp.LifecycleActions.PreStop},
+		{synthesizeComp.LifecycleActions.PostProvision},
+		{synthesizeComp.LifecycleActions.PreTerminate},
 		{synthesizeComp.LifecycleActions.MemberJoin},
 		{synthesizeComp.LifecycleActions.MemberLeave},
 		{synthesizeComp.LifecycleActions.Readonly},

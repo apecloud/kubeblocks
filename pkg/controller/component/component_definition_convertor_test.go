@@ -738,7 +738,7 @@ var _ = Describe("Component Definition Convertor", func() {
 					handler := appsv1alpha1.WeSQLBuiltinActionHandler
 					return &handler
 				}
-				expectedRoleProbe := &appsv1alpha1.RoleProbeSpec{
+				expectedRoleProbe := &appsv1alpha1.RoleProbe{
 					LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
 						BuiltinHandler: wesqlBuiltinHandler(),
 					},

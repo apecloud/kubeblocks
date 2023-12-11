@@ -234,7 +234,7 @@ func renderSwitchoverCmdJob(ctx context.Context,
 		return volumes, volumeMounts
 	}
 
-	renderJob := func(switchoverSpec *appsv1alpha1.ComponentSwitchoverSpec, switchoverEnvs []corev1.EnvVar) (*batchv1.Job, error) {
+	renderJob := func(switchoverSpec *appsv1alpha1.ComponentSwitchover, switchoverEnvs []corev1.EnvVar) (*batchv1.Job, error) {
 		var (
 			cmdExecutorConfig   *appsv1alpha1.Action
 			scriptSpecSelectors []appsv1alpha1.ScriptSpecSelector
@@ -386,7 +386,7 @@ func buildSwitchoverEnvs(ctx context.Context,
 }
 
 // replaceSwitchoverConnCredentialEnv replaces the connection credential environment variables for the switchover job.
-func replaceSwitchoverConnCredentialEnv(switchoverSpec *appsv1alpha1.ComponentSwitchoverSpec, clusterName, componentName string) {
+func replaceSwitchoverConnCredentialEnv(switchoverSpec *appsv1alpha1.ComponentSwitchover, clusterName, componentName string) {
 	if switchoverSpec == nil {
 		return
 	}

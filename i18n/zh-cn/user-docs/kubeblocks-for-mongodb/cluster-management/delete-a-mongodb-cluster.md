@@ -9,7 +9,7 @@ sidebar_label: 删除保护
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# 删除 MongoDB 集群
+# 删除集群
 
 ## 终止策略
 

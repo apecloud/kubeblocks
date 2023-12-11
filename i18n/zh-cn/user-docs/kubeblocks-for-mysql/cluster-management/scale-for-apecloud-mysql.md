@@ -1,14 +1,14 @@
 ---
 title: 集群扩缩容
 description: 如何对集群进行扩缩容操作？
-keywords: [mysql, horizontal scaling, vertical scaling]
+keywords: [mysql, 水平扩缩容, 垂直扩缩容]
 sidebar_position: 2
-sidebar_label: Scale
+sidebar_label: 扩缩容
 ---
 
-# Scale for an ApeCloud MySQL cluster
+# MySQL 集群扩缩容
 
-你可以对 MySQL 集群进行垂直扩缩容和水平扩缩容。
+KubeBlocks 支持对 MySQL 集群进行垂直扩缩容和水平扩缩容。
 
 ## 垂直扩缩容
 
@@ -45,7 +45,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    --memory="4Gi" --cpu="2" \
    ```
 
-   - `--components` 表示可进行垂直扩展的组件名称。
+   - `--components` 表示可进行垂直扩容的组件名称。
    - `--memory` 表示组件请求和限制的内存大小。
    - `--cpu` 表示组件请求和限制的CPU大小。
 
@@ -136,9 +136,9 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
     kbcli cluster describe mysql-cluster
     ```
 
-## 水平扩容
+## 水平扩缩容
 
-水平扩容会改变 Pod 的数量。例如，你可以应用水平扩容将 Pod 的数量从三个增加到五个。扩容过程包括数据的备份和恢复。
+水平扩缩容会改变 Pod 的数量。例如，你可以应用水平扩容将 Pod 的数量从三个增加到五个。扩容过程包括数据的备份和恢复。
 
 ### 开始之前
 
@@ -221,7 +221,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
 2. 验证水平扩容。
 
-   检查集群状态， 确定水平扩容的情况。
+   检查集群状态，确定水平扩容的情况。
 
    ```bash
    kbcli cluster list mysql-cluster

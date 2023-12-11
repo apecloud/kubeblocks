@@ -1,7 +1,7 @@
 ---
 title: 创建并连接到 PostgreSQL 集群
 description: 如何创建并连接到 PostgreSQL 集群
-keywords: [postgresql, 创建 PostgreSQL 汲取, 连接到 PostgreSQL 集群]
+keywords: [postgresql, 创建 PostgreSQL 集群, 连接到 PostgreSQL 集群]
 sidebar_position: 1
 sidebar_label: 创建并连接
 ---
@@ -9,7 +9,7 @@ sidebar_label: 创建并连接
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# 创建并连接到 PostgreSQL 集群
+# 创建并连接 PostgreSQL 集群
 
 本文档展示如何创建并连接到一个 PostgreSQL 集群。
 

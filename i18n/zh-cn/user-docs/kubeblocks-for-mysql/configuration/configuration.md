@@ -7,10 +7,6 @@ sidebar_position: 1
 
 # 配置集群参数
 
-The KubeBlocks configuration function provides a set of consistent default configuration generation strategies for all the databases running on KubeBlocks and also provides a unified parameter configuration interface to facilitate managing parameter configuration, searching the parameter user guide, and validating parameter effectiveness.
-
-From v0.6.0, KubeBlocks supports both `kbcli cluster configure` and `kbcli cluster edit-config` to configure parameters. The difference is that KubeBlocks configures parameters automatically with `kbcli cluster configure` but `kbcli cluster edit-config` provides a visualized way for you to edit parameters directly.
-
 KubeBlocks 提供了一套统一的默认配置生成策略，适用于在 KubeBlocks 上运行的所有数据库，并提供了统一的参数配置接口，便于管理参数配置、搜索参数使用文档和验证参数有效性等。
 
 从 v0.6.0 版本开始，KubeBlocks 支持使用 `kbcli cluster configure` 和 `kbcli cluster edit-config` 两种方式来配置参数。它们的区别在于，`kbcli cluster configure` 可以自动配置参数，而 `kbcli cluster edit-config` 则提供了以可视化的方式，可直接编辑参数。
@@ -128,41 +124,41 @@ KubeBlocks 提供了一套统一的默认配置生成策略，适用于在 KubeB
 
 3.  查看参数配置状态。
 
-   `Status.Progress` 展示参数配置的整体状态，而 `Conditions` 展示详细信息。
+    `Status.Progress` 展示参数配置的整体状态，而 `Conditions` 展示详细信息。
 
-   ```bash
-   kbcli cluster describe-ops mysql-cluster-reconfiguring-z2wvn -n default
-   ```
-
-   <details>
-
-   <summary>输出</summary>
-
-   ```bash
-   Spec:
-     Name: mysql-cluster-reconfiguring-z2wvn        NameSpace: default        Cluster: mysql-cluster        Type: Reconfiguring
-
-    Command:
-      kbcli cluster configure mysql-cluster --component-names=mysql --template-name=mysql-consensusset-config --config-file=my.cnf --set innodb_buffer_pool_size=512M --set max_connections=600
-
-    Status:
-      Start Time:         Mar 13,2023 02:55 UTC+0800
-      Completion Time:    Mar 13,2023 02:55 UTC+0800
-      Duration:           1s
-      Status:             Succeed
-      Progress:           1/1
-
-    Conditions:
-    LAST-TRANSITION-TIME         TYPE                 REASON                            STATUS   MESSAGE
-    Mar 13,2023 02:55 UTC+0800   Progressing          OpsRequestProgressingStarted      True     Start to process the OpsRequest: mysql-cluster-reconfiguring-z2wvn in Cluster: mysql-cluster
-    Mar 13,2023 02:55 UTC+0800   Validated            ValidateOpsRequestPassed          True     OpsRequest: mysql-cluster-reconfiguring-z2wvn is validated
-    Mar 13,2023 02:55 UTC+0800   Reconfigure          ReconfigureStarted                True     Start to reconfigure in Cluster: mysql-cluster, Component: mysql
-    Mar 13,2023 02:55 UTC+0800   ReconfigureMerged    ReconfigureMerged                 True     Reconfiguring in Cluster: mysql-cluster, Component: mysql, ConfigTpl: mysql-consensusset-config, info: updated: map[my.cnf:{"mysqld":{"innodb_buffer_pool_size":"512M","max_connections":"600"}}], added: map[], deleted:map[]
-    Mar 13,2023 02:55 UTC+0800   ReconfigureSucceed   ReconfigureSucceed                True     Reconfiguring in Cluster: mysql-cluster, Component: mysql, ConfigTpl: mysql-consensusset-config, info: updated policy: <autoReload>, updated: map[my.cnf:{"mysqld":{"innodb_buffer_pool_size":"512M","max_connections":"600"}}], added: map[], deleted:map[]
-    Mar 13,2023 02:55 UTC+0800   Succeed              OpsRequestProcessedSuccessfully   True     Successfully processed the OpsRequest: mysql-cluster-reconfiguring-z2wvn in Cluster: mysql-cluster
+    ```bash
+    kbcli cluster describe-ops mysql-cluster-reconfiguring-z2wvn -n default
     ```
 
-    </details>
+    <details>
+
+    <summary>输出</summary>
+
+    ```bash
+    Spec:
+      Name: mysql-cluster-reconfiguring-z2wvn        NameSpace: default        Cluster: mysql-cluster        Type: Reconfiguring
+
+      Command:
+        kbcli cluster configure mysql-cluster --component-names=mysql --template-name=mysql-consensusset-config --config-file=my.cnf --set innodb_buffer_pool_size=512M --set max_connections=600
+
+      Status:
+        Start Time:         Mar 13,2023 02:55 UTC+0800
+        Completion Time:    Mar 13,2023 02:55 UTC+0800
+        Duration:           1s
+        Status:             Succeed
+        Progress:           1/1
+
+      Conditions:
+      LAST-TRANSITION-TIME         TYPE                 REASON                            STATUS   MESSAGE
+      Mar 13,2023 02:55 UTC+0800   Progressing          OpsRequestProgressingStarted      True     Start to process the OpsRequest: mysql-cluster-reconfiguring-z2wvn in Cluster: mysql-cluster
+      Mar 13,2023 02:55 UTC+0800   Validated            ValidateOpsRequestPassed          True     OpsRequest: mysql-cluster-reconfiguring-z2wvn is validated
+      Mar 13,2023 02:55 UTC+0800   Reconfigure          ReconfigureStarted                True     Start to reconfigure in Cluster: mysql-cluster, Component: mysql
+      Mar 13,2023 02:55 UTC+0800   ReconfigureMerged    ReconfigureMerged                 True     Reconfiguring in Cluster: mysql-cluster, Component: mysql, ConfigTpl: mysql-consensusset-config, info: updated: map[my.cnf:{"mysqld":{"innodb_buffer_pool_size":"512M","max_connections":"600"}}], added: map[], deleted:map[]
+      Mar 13,2023 02:55 UTC+0800   ReconfigureSucceed   ReconfigureSucceed                True     Reconfiguring in Cluster: mysql-cluster, Component: mysql, ConfigTpl: mysql-consensusset-config, info: updated policy: <autoReload>, updated: map[my.cnf:{"mysqld":{"innodb_buffer_pool_size":"512M","max_connections":"600"}}], added: map[], deleted:map[]
+      Mar 13,2023 02:55 UTC+0800   Succeed              OpsRequestProcessedSuccessfully   True     Successfully processed the OpsRequest: mysql-cluster-reconfiguring-z2wvn in Cluster: mysql-cluster
+      ```
+
+      </details>
 
 4. 连接到数据库，验证参数是否按预期配置。
 

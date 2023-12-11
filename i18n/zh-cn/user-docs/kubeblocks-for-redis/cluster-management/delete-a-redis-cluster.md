@@ -1,6 +1,6 @@
 ---
-title: 删除 Redis 集群
-description: 如何删除 Redis 集群
+title: 删除集群
+description: 如何删除集群
 keywords: [redis, 删除集群, 删除保护]
 sidebar_position: 6
 sidebar_label: 删除保护
@@ -9,7 +9,7 @@ sidebar_label: 删除保护
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# 删除 Redis 集群
+# 删除集群
 
 ## 终止策略
 

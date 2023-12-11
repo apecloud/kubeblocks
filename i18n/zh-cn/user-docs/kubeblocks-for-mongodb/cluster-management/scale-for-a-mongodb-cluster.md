@@ -1,18 +1,18 @@
 ---
 title: 集群扩缩容
 description: 如何对集群进行扩缩容操作？
-keywords: [mongodb, 垂直扩容, 垂直扩容 mongodb 集群]
+keywords: [mongodb, 垂直扩容, 垂直扩容 MongoDB 集群]
 sidebar_position: 2
 sidebar_label: 扩缩容
 ---
 
-# 扩缩容 MongoDB 集群
+# MongoDB 集群扩缩容
 
-KubeBlocks 支持垂直扩缩容 MongoDB 集群。
+KubeBlocks 支持对 MongoDB 集群进行垂直扩缩容。
 
 ## 垂直扩缩容
 
-你可以通过更改资源需求和限制（CPU 和存储）对集群进行垂直扩缩容。例如，如果你需要将资源从 1C2G 更改为 2C4G，就需要进行垂直扩缩容。
+你可以通过更改资源需求和限制（CPU 和存储）来垂直扩展集群。例如，如果你需要将资源类别从 1C2G 更改为 2C4G，就需要进行垂直扩容。
 
 :::note
 
@@ -30,7 +30,7 @@ kbcli cluster list mongodb-cluster
 
 ### 步骤
 
-1. 更改配置。共有 3 种方式进行垂直扩缩容。
+1. 更改配置。共有 3 种方式进行垂直扩容。
 
    **选项 1.** (**推荐**) 使用 kbcli
 
@@ -45,9 +45,9 @@ kbcli cluster list mongodb-cluster
              kbcli cluster describe-ops mongodb-cluster-verticalscaling-thglk -n default
       ```
 
-   - `--components` 表示准备进行垂直扩缩容的组件名称。
-   - `--memory` 表示组件内存的请求和限制大小。
-   - `--cpu` 表示组件 CPU 的请求和限制大小。
+   - `--components` 表示可进行垂直扩容的组件名称。
+   - `--memory` 表示组件请求和限制的内存大小。
+   - `--cpu` 表示组件请求和限制的 CPU 大小。
 
    2. 使用 `kbcli cluster describe-ops mongodb-cluster-verticalscaling-thglk -n default` 命令进行验证。
 
@@ -59,7 +59,7 @@ kbcli cluster list mongodb-cluster
   
    **选项 2.** 修改集群的 YAML 文件
 
-   修改 YAML 文件中 `spec.componentSpecs.resources` 的配置。`spec.componentSpecs.resources` 控制资源需求和相关限制，更改配置将触发垂直扩缩容。
+   修改 YAML 文件中 `spec.componentSpecs.resources` 的配置。`spec.componentSpecs.resources` 控制资源需求和相关限制，更改配置将触发垂直扩容。
 
    ***示例***
 
@@ -76,7 +76,7 @@ kbcli cluster list mongodb-cluster
      - name: mongodb
        componentDefRef: mongodb
        replicas: 1
-       resources: # 更改资源值
+       resources: # Change the values of resources.
          requests:
            memory: "2Gi"
            cpu: "1000m"
@@ -94,7 +94,7 @@ kbcli cluster list mongodb-cluster
      terminationPolicy: Halt
    ```
 
-2. 验证垂直扩缩容。
+2. 验证垂直扩容。
 
     ```bash
     kbcli cluster list mongodb-cluster
@@ -103,19 +103,15 @@ kbcli cluster list mongodb-cluster
     mongodb-cluster   default     mongodb              mongodb-5.0   WipeOut              Running   Apr 26,2023 11:50 UTC+0800  
     ```
 
-   - STATUS=VerticalScaling 表示正在进行垂直扩缩容。
-   - STATUS=Running 表示垂直扩缩容已完成。
-   - STATUS=Abnormal 表示垂直扩缩容异常。原因可能是正常实例的数量少于总实例数，或者 Leader 实例正常运行而其他实例异常。
+   - STATUS=VerticalScaling 表示正在进行垂直扩容。
+   - STATUS=Running 表示垂直扩容已完成。
+   - STATUS=Abnormal 表示垂直扩容异常。原因可能是正常实例的数量少于总实例数，或者 Leader 实例正常运行而其他实例异常。
+     > 你可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者你也可以创建足够的资源，并使用 `kubectl describe` 命令进行故障排除。
 
-  :::note
-
-  你可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者你也可以创建足够的资源，并使用 kubectl describe 命令进行故障排除。
-  
-  :::
 
 :::note
 
-垂直扩缩容不会同步与 CPU 和内存相关的参数，需要手动调用配置的 OpsRequest 来进行更改。详情请参考[配置](../../kubeblocks-for-mongodb/configuration/configure-cluster-parameters.md)。
+垂直扩容不会同步与 CPU 和内存相关的参数，需要手动调用配置的 OpsRequest 来进行更改。详情请参考[配置](../../kubeblocks-for-mongodb/configuration/configure-cluster-parameters.md)。
 
 :::
 

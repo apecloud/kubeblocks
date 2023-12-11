@@ -1,7 +1,7 @@
 ---
 title: 创建并连接到 MongoDB 集群
 description: 如何创建并连接到 MongoDB 集群
-keywords: [mongodb, 创建 mongodb 集群, 连接 mongodb 集群]
+keywords: [mongodb, 创建 MongoDB 集群, 连接 MongoDB 集群]
 sidebar_position: 1
 sidebar_label: 创建并连接
 ---
@@ -66,6 +66,7 @@ import TabItem from '@theme/TabItem';
   <TabItem value="kubectl" label="kubectl">
 
   查看 `mongodb` 集群定义是否可用。
+
   ```bash
   kubectl get clusterdefinitions mongodb
   >
@@ -369,4 +370,4 @@ KubeBlocks operator 会创建一个名为 `mongodb-cluster-conn-credential` 的�
 
 </Tabs>
 
-有关详细的数据库连接指南，请参考连接数据库。
+有关详细的数据库连接指南，请参考[连接数据库](../../create-and-connect-databases/overview-on-connect-databases.md)。

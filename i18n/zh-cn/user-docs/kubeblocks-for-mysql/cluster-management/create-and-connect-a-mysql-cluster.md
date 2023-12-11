@@ -3,13 +3,13 @@ title: 创建并连接到 MySQL 集群
 description: 如何创建并连接到 MySQL 集群
 keywords: [mysql, 创建 MySQL 集群, 连接 MySQL 集群]
 sidebar_position: 1
-sidebar_label: 创建并连接MySQL集群
+sidebar_label: 创建并连接
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Create and connect to a MySQL cluster
+# 创建并连接 MySQL 集群
 
 本文档展示如何创建并连接到一个 MySQL 集群。
 
@@ -165,15 +165,15 @@ KubeBlocks 实现了用 Cluster CRD 来定义集群。比如，可以通过下�
    EOF
    ```
 
-* `spec.clusterDefinitionRef` 表示用来定义集群组件的集群定义 CRD 的名称。
-* `spec.clusterVersionRef` 表示用来定义集群版本的集群版本 CRD 的名称。
-* `spec.componentSpecs` 表示用来定义集群组件的组件列表。
-* `spec.componentSpecs.componentDefRef` 表示在 ClusterDefinition 中定义的组件定义的名称。可使用 `kubectl get clusterdefinition vape cloud-MySQL -o json | jq '.spec.componentDefs[].name'` 获取组件定义的名称。
-* `spec.componentSpecs.name` 表示组件的名称。
-* `spec.componentSpecs.replicas` 表示组件的副本数。
-* `spec.componentSpecs.resources` 表示组件的资源要求。
-* `spec.componentSpecs.volumeClaimTemplates` 表示定义组件的卷声明模板列表。
-* `spec.terminationPolicy` 表示集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Halt`、`Delete` 和 `WipeOut`。`DoNotTerminate` 会阻止删除操作。`Halt` 会删除工作负载资源，如 statefulset 和 deployment 等，但是保留了 PVC 。`Delete` 在 `Halt` 的基础上进一步删除了 PVC。`WipeOut` 在 `Delete` 的基础上从备份存储的位置完全删除所有卷快照和快照数据。
+* `spec.clusterDefinitionRef` 是集群定义 CRD 的名称，用来定义集群组件。
+* `spec.clusterVersionRef` 是集群版本 CRD 的名称，用来定义集群版本。
+* `spec.componentSpecs` 是组件列表，用来定义集群组件。
+* `spec.componentSpecs.componentDefRef` 是组件定义的名称，在 ClusterDefinition 中定义。你可以使用 `kubectl get clusterdefinition vape cloud-MySQL -o json | jq '.spec.componentDefs[].name'` 获取组件定义的名称。
+* `spec.componentSpecs.name` 是组件的名称。
+* `spec.componentSpecs.replicas` 是组件的副本数。
+* `spec.componentSpecs.resources` 是组件的资源要求。
+* `spec.componentSpecs.volumeClaimTemplates` 是卷声明模板的列表，用于定义组件的卷声明模板。
+* `spec.terminationPolicy` 是集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Halt`、`Delete` 和 `WipeOut`。`DoNotTerminate` 会阻止删除操作。`Halt` 会删除工作负载资源，如 statefulset 和 deployment 等，但是保留了 PVC 。`Delete` 在 `Halt` 的基础上进一步删除了 PVC。`WipeOut` 在 `Delete` 的基础上从备份存储的位置完全删除所有卷快照和快照数据。
 
 KubeBlocks operator 监听 `Cluster` CRD，创建集群及其依赖资源。你可以使用以下命令获取该集群创建的所有资源。
 

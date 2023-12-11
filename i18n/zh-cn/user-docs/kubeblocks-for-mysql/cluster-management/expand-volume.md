@@ -17,7 +17,7 @@ KubeBlocks 支持 Pod 扩缩容。
 
 ## 开始之前
 
-确保集群处于`Running`状态，否则以下操作可能会失败。
+确保集群处于 `Running` 状态，否则以下操作可能会失败。
 
 ```bash
 kbcli cluster list mysql-cluster

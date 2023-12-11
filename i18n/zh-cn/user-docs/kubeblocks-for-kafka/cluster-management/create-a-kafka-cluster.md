@@ -1,6 +1,6 @@
 ---
 title: 创建 Kafka 集群
-description: 如何创建一个 Kafka 集群
+description: 如何创建 Kafka 集群
 keywords: [kafka, 集群, 管理]
 sidebar_position: 1
 sidebar_label: 创建
@@ -12,7 +12,7 @@ sidebar_label: 创建
 
 ## 开始之前
 
-* [安装 kbcli](../../installation/install-with-kbcli/install-kbcli.md). 
+* [安装 kbcli](../../installation/install-with-kbcli/install-kbcli.md)。
 * 安装 KubeBlocks：你可以使用 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](../../installation/install-with-helm/install-kubeblocks-with-helm.md) 安装 KubeBlocks。
 * 确保 `kbcli addon list` 已启用。
 

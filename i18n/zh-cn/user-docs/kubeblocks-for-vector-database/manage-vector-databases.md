@@ -9,7 +9,7 @@ sidebar_label: 用 KubeBlocks 管理向量数据库
 
 生成式人工智能的爆火引发了人们对向量数据库的关注。目前，KubeBlocks 支持 Qdrant、Milvus、Weaviate 等向量数据库的管理和运维。本文档以 Qdrant 为例，展示如何使用 KubeBlocks 管理向量数据库。
 
-在开始之前，请[安装 KubeBlocks](../installation/install-with-helm/install-kubeblocks-with-helm.md) 和 `kbcli`。
+在开始之前，请[安装 KubeBlocks](../installation/install-with-helm/install-kubeblocks-with-helm.md) 和 [kbcli](../../user-docs/installation/install-with-kbcli/install-kbcli.md)。
 
 ## 创建集群
 
@@ -149,7 +149,7 @@ qdrant-verticalscaling-rpw2l   VerticalScaling   qdrant    Running   1/5        
 kbcli cluster describe qdrant
 ```
 
-## 卷扩展
+## 磁盘扩容
 
 ***步骤：***
 
@@ -157,9 +157,9 @@ kbcli cluster describe qdrant
 kbcli cluster volume-expand qdrant --storage=40Gi --components=qdrant -t data
 ```
 
-这里需要等待几分钟，直到卷扩展完成。
+这里需要等待几分钟，直到磁盘扩容完成。
 
-`kbcli cluster volume-expand` 命令会打印输出 `opsname`。执行以下命令检查卷扩展进度：
+`kbcli cluster volume-expand` 命令会打印输出 `opsname`。执行以下命令检查磁盘扩容进度：
 
 ```bash
 kubectl get ops qdrant-volumeexpansion-5pbd2
@@ -168,7 +168,7 @@ NAME                           TYPE              CLUSTER   STATUS   PROGRESS   A
 qdrant-volumeexpansion-5pbd2   VolumeExpansion   qdrant    Running  -/-        67s
 ```
 
-查看卷扩展是否已经完成。
+查看磁盘扩容是否已经完成。
 
 ```bash
 kbcli cluster describe qdrant

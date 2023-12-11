@@ -1,6 +1,6 @@
 ---
 title: 磁盘扩容
-description: 如何对 PostgreSQL 进群进行磁盘扩容
+description: 如何调整集群所使用的磁盘大小
 keywords: [postgresql, 磁盘扩容]
 sidebar_position: 3
 sidebar_label: 磁盘扩容
@@ -8,7 +8,7 @@ sidebar_label: 磁盘扩容
 
 # 磁盘扩容
 
-KubeBlocks 支持对每个 Pod 的磁盘进行扩容。
+KubeBlocks 支持 Pod 扩缩容。
 
 :::note
 
@@ -35,7 +35,7 @@ pg-cluster        default          postgresql            postgresql-14.7.0      
 
 ## 步骤
 
-1. 更改配置。共有 3 种方式可以进行磁盘扩容。
+1. 更改配置。共有 3 种方式。
 
   **选项 1.** （**推荐**） 使用 kbcli
 
@@ -46,9 +46,9 @@ pg-cluster        default          postgresql            postgresql-14.7.0      
   --volume-claim-templates="data" --storage="2Gi"
   ```
 
-  - `--components` 表示用于扩容的组件名称。
+  - `--components` 表示需扩容的组件名称。
   - `--volume-claim-templates` 表示组件中的 VolumeClaimTemplate 名称。
-  - `--storage` 表示卷的存储容量大小。
+  - `--storage` 表示磁盘需扩容至的大小。
 
   **选项 2.** 创建 OpsRequest
 
@@ -101,7 +101,7 @@ pg-cluster        default          postgresql            postgresql-14.7.0      
     terminationPolicy: Halt
   ```
 
-2. 验证扩容操作。
+2. 验证扩容操作是否成功。
 
    ```bash
    kbcli cluster list <name>

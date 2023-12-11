@@ -10,7 +10,7 @@ sidebar_label: 资源描述
 
 ## Java 堆
 
-指 Kafka 服务器的 JVM 堆配置。在生产环境中，请参考官方推荐配置：
+指 Kafka 服务器的 JVM 堆配置。在生产环境中，请参考[官方推荐配置](https://kafka.apache.org/33/documentation.html#java)：
 
 ```bash
 -Xmx6g -Xms6g -XX:MetaspaceSize=96m -XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:InitiatingHeapOccupancyPercent=35 -XX:G1HeapRegionSize=16M -XX:MinMetaspaceFreeRatio=50 -XX:MaxMetaspaceFreeRatio=80 -XX:+ExplicitGCInvokesConcurrent

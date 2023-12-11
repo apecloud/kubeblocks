@@ -92,7 +92,7 @@ Redis Sentinel 是 Redis 官方推荐的主备集群高可用性解决方案，�
 
    ![Redis info replication](../../../img/redis-high-availability-status-after-exception.png)
 
-   从输出可以看到，`redis-cluster-redis-1` 是从节点。
+   从输出可以看到，`redis-cluster-redis-1` 是主节点。
 
 5. 查看集群，检查实例角色。
 

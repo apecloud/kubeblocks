@@ -3,7 +3,7 @@ title: 切换 PostgreSQL 集群
 description: 如何切换 PostgreSQL 集群
 keywords: [postgresql, 切换集群, switchover]
 sidebar_position: 6
-sidebar_label: 切换集群
+sidebar_label: 切换
 ---
 
 import Tabs from '@theme/Tabs';

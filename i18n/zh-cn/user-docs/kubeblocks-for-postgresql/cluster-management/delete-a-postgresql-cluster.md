@@ -1,6 +1,6 @@
 ---
-title: 删除 PostgreSQL 集群
-description: 如何删除 PostgreSQL 集群
+title: 删除集群
+description: 如何删除集群
 keywords: [postgresql, 删除集群]
 sidebar_position: 7
 sidebar_label: 删除保护
@@ -70,7 +70,7 @@ kbcli cluster delete pg-cluster
 
 <TabItem value="kubectl" label="kubectl">
 
-如果想删除集群和所有相关资源，可以将终止策略修改为 WipeOut，然后再删除该集群。
+如果想删除集群和所有相关资源，可以将终止策略修改为 `WipeOut`，然后再删除该集群。
 
 ```bash
 kubectl patch -n demo cluster pg-cluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"

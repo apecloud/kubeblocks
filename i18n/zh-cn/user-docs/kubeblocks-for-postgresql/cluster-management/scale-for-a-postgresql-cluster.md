@@ -1,18 +1,18 @@
 ---
-title: PostgreSQL 集群扩容
-description: 如何垂直扩容 PostgreSQL 集群
-keywords: [postgresql, 垂直扩容]
+title: 集群扩缩容
+description: 如何对集群进行扩缩容操作？
+keywords: [postgresql, 垂直扩缩容]
 sidebar_position: 2
-sidebar_label: 扩容
+sidebar_label: 扩缩容
 ---
 
-# PostgreSQL 集群扩容
+# PostgreSQL 集群扩缩容
 
-当前，KubeBlocks 仅支持垂直扩容 PostgreSQL 集群。
+KubeBlocks 支持对 PostgreSQL 集群进行垂直扩缩容。
 
-## 垂直扩容
+## 垂直扩缩容
 
-你可以通过更改资源需求和限制（CPU 和存储）对集群进行垂直扩容。例如，如果你需要将资源从 1C2G 更改为 2C4G，就需要进行垂直扩容。
+你可以通过更改资源需求和限制（CPU 和存储）来垂直扩展集群。例如，如果你需要将资源类别从 1C2G 更改为 2C4G，就需要进行垂直扩容。
 
 :::note
 
@@ -53,9 +53,9 @@ pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete
    --memory="4Gi" --cpu="2" \
    ```
 
-   - `--components` 表示准备进行垂直扩容的组件名称。
-   - `--memory` 表示组件内存的请求和限制大小。
-   - `--cpu` 表示组件 CPU 的请求和限制大小。
+   - `--components` 表示可进行垂直扩容的组件名称。
+   - `--memory` 表示组件请求和限制的内存大小。
+   - `--cpu` 表示组件请求和限制的 CPU 大小。
   
    **选项 2.** 创建 OpsRequest
   
@@ -138,7 +138,7 @@ pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete
    - STATUS=VerticalScaling：表示正在进行垂直扩容。
    - STATUS=Running：表示垂直扩容已完成。
    - STATUS=Abnormal：表示垂直扩容异常。原因可能是正常实例的数量少于总实例数，或者 Leader 实例正常运行而其他实例异常。
-     > 你可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者你也可以创建足够的资源，并使用 kubectl describe 命令进行故障排除。
+     > 你可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者你也可以创建足够的资源，并使用 `kubectl describe` 命令进行故障排除。
 
 :::note
 

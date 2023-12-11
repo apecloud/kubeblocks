@@ -6,9 +6,9 @@ sidebar_position: 4
 sidebar_label: 重启
 ---
 
-# 重启 Redis 集群
+# 重启集群
 
-KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，也可以尝试重启。
+KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，也可以尝试重启集群。
 
 :::note
 

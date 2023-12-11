@@ -1,21 +1,21 @@
 ---
 title: 连接到 Kafka 集群 
 description: 如何连接到 Kafka 集群
-keywords: [kafka, 集群, 连接, 网络]
+keywords: [kafka, 连接 Kafka 集群, 连接, 网络]
 sidebar_position: 2
 sidebar_label: 连接
 ---
 ## 概述
 
-在连接 Kafka 集群之前，请检查网络环境，并确认连接场景。一般来说，有四种连接场景：
+在连接 Kafka 集群之前，请检查网络环境，并确认连接场景。一般来说，有三种连接场景：
 
 - 在 Kubernetes 集群内连接到 Kafka 集群。
-- 在 Kubernetes 集群外但在同一个 VPC 中连接到 Kafka 集群。
+- 在 Kubernetes 集群外同一 VPC 下连接到 Kafka 集群
 - 在公共互联网连接到 Kafka 集群。
 
 ## 在 Kubernetes 集群内连接到 Kafka 集群
 
-使用 ClusterIP 服务：9092 直接连接 Kafka 集群。
+通过直连 Kafka 集群的 ClusterIP service:9092 访问。
 
 ***步骤：***
 
@@ -79,7 +79,7 @@ sidebar_label: 连接
 
 然后将得到输出 'Hello, KubeBlocks'。
 
-## 在 Kubernetes 集群外但在同一个 VPC 中连接到 Kafka 集群
+## 在 Kubernetes 集群外同一 VPC 下连接到 Kafka 集群
 
 许多使用 AWS EKS 的用户希望能从 EC2 实例访问 Kafka 集群，本节将展示具体操作步骤。
 
@@ -146,33 +146,14 @@ sidebar_label: 连接
    kubectl get svc 
    ```
 
-   image.png
+   ![gain ELB address](../../../img/connect-to-a-kafka-cluster-gain-elb-address.png)
 
    请注意：
-   - poplar50-broker 是内置的 broker advertised.listeners 的服务名称。
-   - a0e01377fa33xxx-xxx.cn-northwest-1.elb.amazonaws.com.cn 是可以从 Kubernetes 集群外部（但在同一 VPC 内）访问的 ELB 地址。
+   - a0e01377fa33xxx-xxx.cn-northwest-1.elb.amazonaws.com.cn 是 Kubernetes 外部同一 VPC 下能访问的 ELB 地址。
 
-3. 配置主机名映射。
-  
-   a. 登录到 EC2 实例。
-   b. 检查 ELB 地址的 IP 地址。
+3. 使用 ELB 地址进行连接。 
 
-     ```bash
-     nslookup a0e01377fa33xxx-xxx.cn-northwest-1.elb.amazonaws.com.cn
-     ```
-
-   image.
-   c. 配置 /etc/hosts 映射。
-  
-     ```bash
-     vi /etc/hosts
-     # at the bottom, add the address.
-     52.83.xx.xx poplar50-broker
-     ```
-
-4. 使用 ELB 地址进行连接。 
-
-在上例中，ELB 地址为 a0e01377fa33xxx-xxx.cn-northwest-1.elb.amazonaws.com.cn:9092。
+    在上例中，ELB 地址为 a0e01377fa33xxx-xxx.cn-northwest-1.elb.amazonaws.com.cn:9092。
 
 ## 在公共互联网连接到 Kafka 集群
 

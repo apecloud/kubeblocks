@@ -1,13 +1,13 @@
 ---
-title: 卷扩展
-description: 如何对 Pulsar 集群进行卷扩展
+title: 磁盘扩容
+description: 如何调整集群所使用的磁盘大小
 sidebar_position: 3
-sidebar_label: 卷扩展
+sidebar_label: 磁盘扩容
 ---
 
-# 卷扩展
+# 磁盘扩容
 
-KubeBlocks 支持对 Pod 进行卷扩展。
+KubeBlocks 支持 Pod 扩缩容。
 
 ## 开始之前
 
@@ -19,7 +19,7 @@ kbcli cluster list pulsar
 
 ## 步骤
 
-1. 更改配置。共有 3 种方式可以进行卷扩展。
+1. 更改配置。共有 3 种方式。
 
     **选项 1.** (**推荐**) 使用 kbcli
 
@@ -37,9 +37,9 @@ kbcli cluster list pulsar
      kbcli cluster volume-expand pulsar --storage=40Gi --components=bookies -t journal  
      ```
 
-     - `--components` 表示用于卷扩展的组件名称。
+     - `--components` 表示需扩容的组件名称。
      - `--volume-claim-templates` 表示组件中的 VolumeClaimTemplate 名称。
-     - `--storage` 表示卷的存储容量大小。
+     - `--storage` 表示磁盘需扩容至的大小。
 
    - 扩展 `ledger` 卷。
 
@@ -49,7 +49,7 @@ kbcli cluster list pulsar
 
     **选项 2.** 创建 OpsRequest
 
-    执行以下命令进行卷扩展，可根据需要更改 storage 的值。
+    根据需求更改 storage 的值，并执行以下命令来更改集群的存储容量。
 
     ```bash
     kubectl apply -f - <<EOF
@@ -76,17 +76,16 @@ kbcli cluster list pulsar
     kubectl edit cluster pulsar
     ```
 
-2. 验证卷扩展操作。
+2. 验证扩容操作是否成功。
 
    ```bash
    kubectl get ops  
    ```
 
-   * STATUS=VolumeExpanding 表示卷扩展正在进行中。
-   * STATUS=Running 表示卷扩展已完成。
+   * STATUS=VolumeExpanding 表示扩容正在进行中。
+   * STATUS=Running 表示扩容已完成。
 
-3. 检查资源是否已经发生更改。
-
+3. 检查资源规格是否已变更。
     ```bash
     kbcli cluster describe pulsar
     ```

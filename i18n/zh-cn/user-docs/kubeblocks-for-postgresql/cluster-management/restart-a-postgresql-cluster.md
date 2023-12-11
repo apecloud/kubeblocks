@@ -1,15 +1,15 @@
 ---
-title: 重启 PostgreSQL 集群
-description: 如何重启 PostgreSQL 集群
+title: 重启集群
+description: 如何重启集群
 keywords: [postgresql, 重启]
 sidebar_position: 4
 sidebar_label: 重启
 ---
 
 
-# 重启 PostgreSQL 集群
+# 重启集群
 
-KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，也可以尝试重启。
+KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，也可以尝试重启集群。
 
 :::note
 

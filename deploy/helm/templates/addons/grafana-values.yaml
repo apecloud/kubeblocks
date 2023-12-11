@@ -1,3 +1,4 @@
+{{- $imageRegistry := include "kubeblocks.imageRegistry" . }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,4 +11,17 @@ metadata:
   {{- end }}
 data:
   values-kubeblocks-override.yaml: |-
-    {{- .Values.grafana | toYaml | nindent 4 }}
+    {{- $grafana := get .Values "grafana" }}
+    {{- $image := get $grafana "image" }}
+    {{- if not $image.repository }}
+       {{- $image = set $image  "repository" (printf "%s/apecloud/grafana" $imageRegistry) }}
+    {{- end }}
+    {{- $grafana = set $grafana "image" $image }}
+    {{- $sidecar := get $grafana "sidecar" }}
+    {{- $sidecarImage := get $sidecar "image" }}
+    {{- if not $sidecarImage.repository }}
+       {{- $sidecarImage = set $sidecarImage  "repository"  (printf "%s/apecloud/k8s-sidecar" $imageRegistry) }}
+    {{- end }}
+    {{- $sidecar = set $sidecar "image" $sidecarImage }}
+    {{- $grafana = set $grafana "sidecar" $sidecar }}
+    {{- toYaml $grafana | nindent 4 }}

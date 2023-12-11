@@ -1,0 +1,27 @@
+{{- if and (eq .Values.mode "replication") (eq .Values.sentinel.service.type "NodePort") }}
+{{- range $i := until (int .Values.sentinel.replicas) }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ printf "%s-redis-sentinel-%d" (include "kblib.clusterName" $) $i }}
+  namespace: {{ $.Release.Namespace | quote }}
+  labels:
+    app.kubernetes.io/instance: {{ include "kblib.clusterName" $ }}
+    apps.kubeblocks.io/component-name: {{ printf "redis-sentinel" }}
+spec:
+  type: NodePort
+  ports:
+  - name: redis-sentinel
+    port: 26379
+    targetPort: redis-sentinel
+    protocol: TCP
+    {{- if $.Values.sentinel.service.nodePortBase }}
+    nodePort: {{ (add $.Values.sentinel.service.nodePortBase $i 1) }}
+    {{- end }}
+  selector:
+    app.kubernetes.io/instance: {{ include "kblib.clusterName" $ }}
+    apps.kubeblocks.io/component-name: {{ printf "redis-sentinel" }}
+    statefulset.kubernetes.io/pod-name: {{ printf "%s-redis-sentinel-%d" (include "kblib.clusterName" $) $i }}
+---
+{{- end }}
+{{- end }}

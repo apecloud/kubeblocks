@@ -82,24 +82,26 @@ func getKBObjects(dynamic dynamic.Interface, namespace string, addons []*extensi
 	crds, err := dynamic.Resource(types.CRDGVR()).List(ctx, metav1.ListOptions{})
 	appendErr(err)
 	kbObjs[types.CRDGVR()] = &unstructured.UnstructuredList{}
-	for i, crd := range crds.Items {
-		if !strings.Contains(crd.GetName(), constant.APIGroup) {
-			continue
-		}
-		crdObjs := kbObjs[types.CRDGVR()]
-		crdObjs.Items = append(crdObjs.Items, crds.Items[i])
+	if crds != nil {
+		for i, crd := range crds.Items {
+			if !strings.Contains(crd.GetName(), constant.APIGroup) {
+				continue
+			}
+			crdObjs := kbObjs[types.CRDGVR()]
+			crdObjs.Items = append(crdObjs.Items, crds.Items[i])
 
-		// get built-in CRs belonging to this CRD
-		gvr, err := getGVRByCRD(&crd)
-		if err != nil {
-			appendErr(err)
-			continue
-		}
-		if crs, err := dynamic.Resource(*gvr).List(ctx, metav1.ListOptions{}); err != nil {
-			appendErr(err)
-			continue
-		} else {
-			kbObjs[*gvr] = crs
+			// get built-in CRs belonging to this CRD
+			gvr, err := getGVRByCRD(&crd)
+			if err != nil {
+				appendErr(err)
+				continue
+			}
+			if crs, err := dynamic.Resource(*gvr).List(ctx, metav1.ListOptions{}); err != nil {
+				appendErr(err)
+				continue
+			} else {
+				kbObjs[*gvr] = crs
+			}
 		}
 	}
 

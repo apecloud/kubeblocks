@@ -12,11 +12,11 @@ sidebar_label: Scale
 
 ## 垂直扩缩容
 
-你可以通过更改资源需求和限制（CPU 和存储）来垂直扩展集群。例如，如果你需要将资源类别从 1C2G 更改为 2C4G，就需要进行垂直扩展。
+你可以通过更改资源需求和限制（CPU 和存储）来垂直扩展集群。例如，如果你需要将资源类别从 1C2G 更改为 2C4G，就需要进行垂直扩容。
 
 :::note
 
-在垂直扩展时，所有的 Pod 将按照 Learner -> Follower -> Leader 的顺序重启。重启后，主节点可能会发生变化。
+在垂直扩容时，所有的 Pod 将按照 Learner -> Follower -> Leader 的顺序重启。重启后，主节点可能会发生变化。
 
 :::
 
@@ -33,7 +33,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
 ### 步骤
 
-1. 更改配置。共有 3 种方式进行垂直扩展。
+1. 更改配置。共有 3 种方式进行垂直扩容。
 
    **选项 1.** (**推荐**) 使用 kbcli
 
@@ -49,9 +49,9 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    - `--memory` 表示组件请求和限制的内存大小。
    - `--cpu` 表示组件请求和限制的CPU大小。
 
-   **Option 2.** 创建 OpsRequest
+   **选项 2.** 创建 OpsRequest
   
-   可根据需求配置参数，将 OpsRequest 应用于指定的集群。
+   可根据需求修改参数，将 OpsRequest 应用于指定的集群。
 
    ```bash
    kubectl apply -f - <<EOF
@@ -73,7 +73,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    EOF
    ```
   
-   **Option 3.** 修改集群的 YAML 文件
+   **选项 3.** 修改集群的 YAML 文件
 
    修改 YAML 文件中 `spec.componentSpecs.resources` 的配置。`spec.componentSpecs.resources` 控制资源需求和相关限制，更改配置将触发垂直扩容。
 
@@ -130,7 +130,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
 :::
 
-1. 检查资源规格是否已变更。
+3. 检查资源规格是否已变更。
 
     ```bash
     kbcli cluster describe mysql-cluster
@@ -138,7 +138,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
 ## 水平扩容
 
-平扩展会改变 Pod 的数量。例如，你可以应用水平扩展将 Pod 的数量从三个增加到五个。扩展过程包括数据的备份和恢复。
+水平扩容会改变 Pod 的数量。例如，你可以应用水平扩容将 Pod 的数量从三个增加到五个。扩容过程包括数据的备份和恢复。
 
 ### 开始之前
 
@@ -188,7 +188,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
    **Option 3.** 修改集群的 YAML 文件
 
-   修改 YAML 文件中 `spec.componentSpecs.replicas` 的配置。`spec.componentSpecs.replicas` 控制 Pod 的数量，更改配置将触发水平扩展。
+   修改 YAML 文件中 `spec.componentSpecs.replicas` 的配置。`spec.componentSpecs.replicas` 控制 Pod 的数量，更改配置将触发水平扩容。
 
    ***示例***
 
@@ -238,7 +238,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
 ### 处理快照异常
 
-如果在水平扩展过程中出现 `STATUS=ConditionsError`，你可以从 `cluster.status.condition.message` 中找到原因并进行故障排除。如下所示，该例子中发生了快照异常。
+如果在水平扩容过程中出现 `STATUS=ConditionsError`，你可以从 `cluster.status.condition.message` 中找到原因并进行故障排除。如下所示，该例子中发生了快照异常。
 
 ```bash
 Status:
@@ -274,7 +274,7 @@ Status:
    EOF
    ```
 
-2. 删除错误的备份（volumesnapshot 由备份生成）和 volumesnapshot 资源。
+2. 删除错误的备份和 volumesnapshot 资源。
 
    ```bash
    kubectl delete backup -l app.kubernetes.io/instance=mysql-cluster

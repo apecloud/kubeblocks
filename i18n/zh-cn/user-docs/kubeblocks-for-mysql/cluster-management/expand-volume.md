@@ -17,7 +17,7 @@ KubeBlocks 支持 Pod 扩缩容。
 
 ## 开始之前
 
-Check whether the cluster status is `Running`. Otherwise, the following operations may fail.确保集群处于  态，否则以下操作可能会失败。
+确保集群处于`Running`状态，否则以下操作可能会失败。
 
 ```bash
 kbcli cluster list mysql-cluster
@@ -39,13 +39,13 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
     --volume-claim-templates="data" --storage="2Gi"
     ```
 
-    - `--components` 表示用于扩容的组件名称。
+    - `--components` 表示需扩容的组件名称。
     - `--volume-claim-templates` 表示组件中的 VolumeClaimTemplate 名称。
     - `--storage` 表示磁盘需扩容至的大小。
 
     **Option 2.** 创建 OpsRequest
 
-    根据需求更改 storage 的值，并执行以下命令来扩展集群的存储容量。
+    根据需求更改 storage 的值，并执行以下命令来更改集群的存储容量。
 
     ```bash
     kubectl apply -f - <<EOF

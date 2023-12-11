@@ -49,7 +49,7 @@ func ComposeTLSSecret(namespace, clusterName, componentName string) (*v1.Secret,
 		SetStringData(map[string]string{}).
 		GetObject()
 
-	const tpl = `{{- $cert := genSelfSignedCert "KubeBlocks" nil nil 365 }}
+	const tpl = `{{- $cert := genCA "KubeBlocks" 3650 }}
 {{ $cert.Cert }}
 {{ $cert.Key }}
 `

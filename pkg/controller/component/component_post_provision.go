@@ -41,17 +41,17 @@ import (
 
 // post-provision constants
 const (
-	KBPostProvisionJobLabelKey      = "kubeblocks.io/post-provision-job"
-	KBPostProvisionJobLabelValue    = "kb-post-provision-job"
-	KBPostProvisionJobNamePrefix    = "kb-post-provision-job"
-	KBPostProvisionJobContainerName = "kb-post-provision-job-container"
+	kbPostProvisionJobLabelKey      = "kubeblocks.io/post-provision-job"
+	kbPostProvisionJobLabelValue    = "kb-post-provision-job"
+	kbPostProvisionJobNamePrefix    = "kb-post-provision-job"
+	kbPostProvisionJobContainerName = "kb-post-provision-job-container"
 
-	// KBCompPostStartDoneKeyPattern will be deprecated after KubeBlocks v0.8.0 and use KBCompPostProvisionDoneKey instead
-	KBCompPostStartDoneKeyPattern = "kubeblocks.io/%s-poststart-done"
-	// KBCompPostProvisionDoneKey is used to mark the component postProvision job is done
-	KBCompPostProvisionDoneKey = "kubeblocks.io/post-provision-done"
+	// kbCompPostStartDoneKeyPattern will be deprecated after KubeBlocks v0.8.0 and use kbCompPostProvisionDoneKey instead
+	kbCompPostStartDoneKeyPattern = "kubeblocks.io/%s-poststart-done"
+	// kbCompPostProvisionDoneKey is used to mark the component postProvision job is done
+	kbCompPostProvisionDoneKey = "kubeblocks.io/post-provision-done"
 
-	KBPostProvisionClusterCompList = "KB_CLUSTER_COMPONENT_LIST"
+	kbPostProvisionClusterCompList = "KB_CLUSTER_COMPONENT_LIST"
 )
 
 // ReconcileCompPostProvision reconciles the component-level postProvision command.
@@ -261,7 +261,7 @@ func renderPostProvisionCmdJob(ctx context.Context,
 						RestartPolicy: corev1.RestartPolicyNever,
 						Containers: []corev1.Container{
 							{
-								Name:            KBPostProvisionJobContainerName,
+								Name:            kbPostProvisionJobContainerName,
 								Image:           postProvisionCustomHandler.Image,
 								ImagePullPolicy: corev1.PullIfNotPresent,
 								Command:         postProvisionCustomHandler.Exec.Command,
@@ -328,7 +328,7 @@ func genClusterComponentEnv(cluster *appsv1alpha1.Cluster) []corev1.EnvVar {
 	}
 	return []corev1.EnvVar{
 		{
-			Name:  KBPostProvisionClusterCompList,
+			Name:  kbPostProvisionClusterCompList,
 			Value: strings.Join(compList, ","),
 		},
 	}
@@ -336,7 +336,7 @@ func genClusterComponentEnv(cluster *appsv1alpha1.Cluster) []corev1.EnvVar {
 
 // genPostProvisionJobName generates the postProvision job name.
 func genPostProvisionJobName(clusterName, componentName string) string {
-	return fmt.Sprintf("%s-%s-%s", KBPostProvisionJobNamePrefix, clusterName, componentName)
+	return fmt.Sprintf("%s-%s-%s", kbPostProvisionJobNamePrefix, clusterName, componentName)
 }
 
 // getPostProvisionCmdJobLabel gets the labels for job that execute the postProvision commands.
@@ -345,7 +345,7 @@ func getPostProvisionCmdJobLabel(clusterName, componentName string) map[string]s
 		constant.AppInstanceLabelKey:    clusterName,
 		constant.KBAppComponentLabelKey: componentName,
 		constant.AppManagedByLabelKey:   constant.AppName,
-		KBPostProvisionJobLabelKey:      KBPostProvisionJobLabelValue,
+		kbPostProvisionJobLabelKey:      kbPostProvisionJobLabelValue,
 	}
 }
 
@@ -374,13 +374,13 @@ func setPostProvisionDoneAnnotation(cli client.Client,
 	if comp.Annotations == nil {
 		comp.Annotations = make(map[string]string)
 	}
-	_, ok := comp.Annotations[KBCompPostProvisionDoneKey]
+	_, ok := comp.Annotations[kbCompPostProvisionDoneKey]
 	if ok {
 		return nil
 	}
 	compObj := comp.DeepCopy()
 	timeStr := time.Now().Format(time.RFC3339Nano)
-	comp.Annotations[KBCompPostProvisionDoneKey] = timeStr
+	comp.Annotations[kbCompPostProvisionDoneKey] = timeStr
 	graphCli.Do(dag, compObj, &comp, model.ActionUpdatePtr(), nil)
 	return nil
 }
@@ -405,11 +405,11 @@ func checkPostProvisionDoneAnnotationExist(cluster *appsv1alpha1.Cluster,
 	comp *appsv1alpha1.Component,
 	synthesizeComp *SynthesizedComponent) bool {
 	// TODO(xingran): for backward compatibility before KubeBlocks v0.8.0, check the annotation of the cluster object first, it will be deprecated in the future
-	compPostStartDoneKey := fmt.Sprintf(KBCompPostStartDoneKeyPattern, fmt.Sprintf("%s-%s", cluster.Name, synthesizeComp.Name))
+	compPostStartDoneKey := fmt.Sprintf(kbCompPostStartDoneKeyPattern, fmt.Sprintf("%s-%s", cluster.Name, synthesizeComp.Name))
 	_, ok := cluster.Annotations[compPostStartDoneKey]
 	if ok {
 		return true
 	}
-	_, ok = comp.Annotations[KBCompPostProvisionDoneKey]
+	_, ok = comp.Annotations[kbCompPostProvisionDoneKey]
 	return ok
 }

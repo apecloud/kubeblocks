@@ -14,7 +14,7 @@ PostgreSQL 是多进程架构，它会为每个用户连接创建一个单独的
 
 ## 步骤
 
-1. 查看 PostgreSQL 集群的状态，确保为 Running。
+1. 查看 PostgreSQL 集群的状态，确保为 `Running`。
 
    ```bash
    kbcli cluster list mycluster
@@ -35,7 +35,7 @@ PostgreSQL 是多进程架构，它会为每个用户连接创建一个单独的
 
 3. 通过 PgBouncer 连接集群。
 
-   该命令会展示访问集群的方式，默认使用 5432 端口访问集群，可以将端口替换为 6432 通过 PgBouncer 访问集群。
+   该命令会展示访问集群的方式，默认使用 `5432` 端口访问集群，可以将端口替换为 `6432` 通过 PgBouncer 访问集群。
 
     ```bash
     kbcli cluster connect --client=cli --show-example mycluster

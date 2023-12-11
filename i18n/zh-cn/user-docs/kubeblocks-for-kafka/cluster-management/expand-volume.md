@@ -56,6 +56,6 @@ spec:
           - ReadWriteOnce
         resources:
           requests:
-            storage: 1Gi # Change the volume storage size.
+            storage: 1Gi # 修改磁盘容量
   terminationPolicy: Halt
 ```

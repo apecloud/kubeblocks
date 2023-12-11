@@ -100,7 +100,7 @@ redis-cluster        default          redis                     redis-7.0.6     
      - name: redis
        componentDefRef: redis
        replicas: 1
-       resources: # Change the values of resources.
+       resources: # 修改资源值
          requests:
            memory: "2Gi"
            cpu: "1"
@@ -227,7 +227,7 @@ redis-cluster        default          redis                     redis-7.0.6     
      componentSpecs:
      - name: redis
        componentDefRef: redis
-       replicas: 2 # Change the pod amount.
+       replicas: 2 # 修改 Pod 数
        volumeClaimTemplates:
        - name: data
          spec:

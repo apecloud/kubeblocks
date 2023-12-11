@@ -39,7 +39,7 @@ pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete
 
 ### 步骤
 
-1. 更改配置。共有 3 种方式进行垂直扩容。
+1. 更改配置，共有 3 种方式。
 
    **选项 1.** （**推荐**） 使用 kbcli
 
@@ -100,7 +100,7 @@ pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete
      - name: pg-replication
        componentDefRef: postgresql
        replicas: 1
-       resources: # Change the values of resources.
+       resources: # 修改资源值
          requests:
            memory: "2Gi"
            cpu: "1000m"
@@ -135,14 +135,14 @@ pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete
     pg-cluster        default          postgresql-cluster            postgresql-14.7.0      Delete               Running   Mar 03,2023 18:00 UTC+0800
     ```
 
-   - STATUS=VerticalScaling：表示正在进行垂直扩容。
-   - STATUS=Running：表示垂直扩容已完成。
-   - STATUS=Abnormal：表示垂直扩容异常。原因可能是正常实例的数量少于总实例数，或者 Leader 实例正常运行而其他实例异常。
+   - STATUS=VerticalScaling 表示正在进行垂直扩容。
+   - STATUS=Running 表示垂直扩容已完成。
+   - STATUS=Abnormal 表示垂直扩容异常。原因可能是正常实例的数量少于总实例数，或者 Leader 实例正常运行而其他实例异常。
      > 你可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者你也可以创建足够的资源，并使用 `kubectl describe` 命令进行故障排除。
 
 :::note
 
-垂直扩容不会同步与 CPU 和内存相关的参数，需要手动调用配置的 OpsRequest 来进行更改。详情请参考[配置](链接)。
+垂直扩容不会同步与 CPU 和内存相关的参数，需要手动调用配置的 OpsRequest 来进行更改。详情请参考[配置](./../configuration/configuration.md)。
 
 :::
 

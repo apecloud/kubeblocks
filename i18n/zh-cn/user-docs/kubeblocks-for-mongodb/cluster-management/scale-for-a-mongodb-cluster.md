@@ -76,7 +76,7 @@ kbcli cluster list mongodb-cluster
      - name: mongodb
        componentDefRef: mongodb
        replicas: 1
-       resources: # Change the values of resources.
+       resources: # 修改资源值
          requests:
            memory: "2Gi"
            cpu: "1000m"

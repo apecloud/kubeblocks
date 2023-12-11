@@ -92,7 +92,7 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
      - name: broker
        componentDefRef: broker
        replicas: 1
-       resources: # Change the values of resources.
+       resources: # 修改资源值
          requests:
            memory: "2Gi"
            cpu: "1000m"

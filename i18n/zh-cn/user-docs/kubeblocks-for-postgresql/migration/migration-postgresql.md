@@ -20,8 +20,8 @@ sidebar_label: 迁移
 
 ### 启用 kbcli migration 功能
 
-1. 安装 KubeBlocks：用 [kbcli](../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](../../installation/install-with-helm/install-kubeblocks-with-helm.md) 安装 KubeBlocks。
-2. [开启迁移引擎](../../overview/database-engines-supported.md)。
+1. 安装 KubeBlocks：用 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md) 进行安装。
+2. [开启迁移引擎](./../../overview/database-engines-supported.md)。
 
    ```bash
    kbcli addon list
@@ -67,7 +67,7 @@ sidebar_label: 迁移
 2. 安装 PostGIS 并导入 osm 数据。
 
    * [安装 PostGIS](https://postgis.net/install/). 如果你使用 Pigsty 安装了 PostgreSQL，PostGIS 已内置在其中，可根据需要执行 `CREATE EXTENSION` 命令。
-   * [导入 osm 数据](https://github.com/openstreetmap/osm2pgsql).
+   * [导入 osm 数据](https://github.com/openstreetmap/osm2pgsql)。
   
   :::note
 
@@ -113,7 +113,7 @@ sidebar_label: 迁移
 
    :::
 
-2. （可选）通过 --steps 指定迁移步骤。
+2. （可选）通过 `--steps` 指定迁移步骤。
 
    默认按照预检查 -> 结构初始化 -> 数据初始化 -> 增量迁移的顺序进行迁移。你可以使用 --steps 参数来指定迁移步骤。例如，按照预检查 -> 全量初始化 -> 增量迁移的顺序执行任务。
 
@@ -172,7 +172,7 @@ kbcli migration logs ${migration-task-name} --step ${step-name}
 * 出于安全考虑，需要在非高峰时段停止业务写入并切换应用程序。
 * 在切换应用程序之前，建议进行数据采样以便在切换后进行验证，确保正确性。
 * 注意 serial、sequence 和 slot 的使用。
-* 请注意 Serial 和 sequence
+* 请注意 serial 和 sequence：
 
    在切换应用程序之前，查询并记录 Sequence 的最大值，并将其设置为目标数据库 Sequence 的初始值。
 

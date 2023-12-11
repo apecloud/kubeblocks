@@ -13,13 +13,13 @@ KubeBlocks 提供了一套默认的配置生成策略，适用于在 KubeBlocks 
 
 ## 查看参数信息
 
-* 查看集群的配置文件。
+查看集群的配置文件。
 
-   ```bash
-   kbcli cluster describe-config pg-cluster 
-   ```
+```bash
+kbcli cluster describe-config pg-cluster 
+```
 
-   从元数据中可以找到 PostgreSQL 集群的配置文件。
+从元数据中可以找到 PostgreSQL 集群的配置文件。
 
 你也可以查看此配置文件和参数的详细信息。
 
@@ -60,9 +60,9 @@ KubeBlocks 提供了一套默认的配置生成策略，适用于在 KubeBlocks 
   </details>
 
   * Allowed Values：定义了参数的有效值范围。
-  * Dynamic：决定了参数配置的生效方式。根据被修改参数的生效类型，有动态和静态两种不同的配置策略。
-    * `Dynamic` 为 `true` 时，参数的生效类型是动态的，可以在线配置。
-    * `Dynamic` 为 `false` 时，参数的生效类型是静态的，需要重新启动 Pod 才能生效。
+  * Dynamic：决定了参数配置的生效方式。根据被修改参数的生效类型，有**动态**和**静态**两种不同的配置策略。
+    * `Dynamic` 为 `true` 时，参数的生效类型是**动态**的，可以在线配置。
+    * `Dynamic` 为 `false` 时，参数的生效类型是**静态**的，需要重新启动 Pod 才能生效。
   * Description：描述了参数的定义。
 
 ## 配置参数

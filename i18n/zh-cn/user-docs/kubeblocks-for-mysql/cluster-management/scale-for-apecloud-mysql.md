@@ -92,7 +92,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
      - name: mysql
        componentDefRef: mysql
        replicas: 1
-       resources: # Change the values of resources.
+       resources: # 修改资源值
          requests:
            memory: "2Gi"
            cpu: "1000m"
@@ -207,7 +207,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
      componentSpecs:
      - name: mysql
        componentDefRef: mysql
-       replicas: 1 # Change the pod amount.
+       replicas: 1 # 修改 Pod 数
        volumeClaimTemplates:
        - name: data
          spec:

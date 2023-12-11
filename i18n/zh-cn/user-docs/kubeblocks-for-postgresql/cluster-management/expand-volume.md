@@ -116,5 +116,5 @@ pg-cluster        default          postgresql            postgresql-14.7.0      
    pg-cluster        default          postgresql                postgresql-14.7.0        Delete                    VolumeExpanding        Apr 10,2023 16:27 UTC+0800
    ```
 
-   * STATUS=VolumeExpanding：表示扩容正在进行中。
-   * STATUS=Running：表示扩容已完成。
+   * STATUS=VolumeExpanding 表示扩容正在进行中。
+   * STATUS=Running 表示扩容已完成。

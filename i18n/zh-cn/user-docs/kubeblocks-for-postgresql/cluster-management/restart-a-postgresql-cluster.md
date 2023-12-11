@@ -20,10 +20,9 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
 ## 步骤
 
 1. 重启集群。
-
-  你可以通过使用 `kbcli` 或创建 OpsRequest 来重启集群。
+   你可以通过使用 `kbcli` 或创建 OpsRequest 来重启集群。
   
-   **选项n 1.** （**推荐**） 使用 kbcli
+   **选项 1.** （**推荐**）使用 kbcli
 
    配置 `--components` 和 `--ttlSecondsAfterSucceed` 的值，重启指定集群。
 
@@ -37,7 +36,7 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
 
    **选项 2.** 创建 OpsRequest
 
-   重启集群。
+   重启集群：
 
    ```bash
    kubectl apply -f - <<EOF
@@ -61,7 +60,7 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
    kbcli cluster list <name>
    ```
 
-   ***Example***
+   ***示例***
 
    ```bash
    kbcli cluster list pg-cluster
@@ -70,5 +69,5 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
    pg-cluster   default     postgresql-cluster          postgresql-14.7.0   Delete               Running   Mar 03,2023 18:28 UTC+0800
    ```
 
-   * STATUS=Restarting：表示集群正在重启中。
-   * STATUS=Running：表示集群已重启。
+   * STATUS=Restarting 表示集群正在重启中。
+   * STATUS=Running 表示集群已重启。

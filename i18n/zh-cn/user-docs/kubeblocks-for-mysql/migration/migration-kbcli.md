@@ -12,7 +12,7 @@ sidebar_label: 使用 kbcli 迁移 MySQL 数据
 
 ### 启用 kbcli migration
 
-1. 安装 KubeBlocks: 你可以用 kbcli 或者 Helm 安装 KubeBlocks。
+1. 安装 KubeBlocks: 你可以用 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md) 进行安装。
 2. [启用迁移功能](./../../overview/supported-addons.md).
 
    ```bash
@@ -55,7 +55,7 @@ sidebar_label: 使用 kbcli 迁移 MySQL 数据
 
 ### 初始化目标数据库
 
-创建一个名为 db_test 的数据库。
+创建一个名为 `db_test` 的数据库。
 
 ```bash
 create database if not exists db_test
@@ -80,7 +80,7 @@ create database if not exists db_test
 
    :paperclip: 表 1. 选项详情
 
-   | 选项        | 解释        |
+   | 选项        | 详情        |
    | :--------- | :---------- |
    | mystask    | 迁移任务的名称，可以自定义。 |
    | `--template` | 指定迁移模板。`--template apecloud-mysql2mysql` 表示此迁移任务使用由 KubeBlocks 创建的从 MySQL 到 MySQL 的模板。执行 `kbcli migration templates` 可查看所有可用的模板和支持的数据库信息。   |
@@ -88,7 +88,7 @@ create database if not exists db_test
    | `--sink`     | 指定目标。上例中的 `user:123456@127.0.0.2:5432/db_test` 遵循 $`{user_name}:${password}@${database connection url}/${database}` 的格式。在本文档中，连接 URL 使用的是 Kubernetes 集群内部的服务地址 |
    | `--migration-object`  | 指定迁移对象。也就是上例中 "public.table_test_1" 和 "public.table_test_2" 中的数据，包括结构数据和库存数据，在迁移期间生成的增量数据将被迁移到目标位置。    |
 
-2. （可选）通过 --steps 指定迁移步骤。
+2. （可选）通过 `--steps` 指定迁移步骤。
 
    默认按照预检查 -> 结构初始化 -> 数据初始化 -> 增量迁移的顺序进行迁移。你可以使用 `--steps` 参数来指定迁移步骤。例如，按照预检查 -> 数据初始化 -> 增量迁移的顺序执行任务。
 
@@ -116,7 +116,7 @@ create database if not exists db_test
      * Precheck：预检查。如果状态显示为 `Failed`，表示初始化预检查未通过。请参考[故障排除](#故障排除)中的示例解决问题。
      * Init-struct：结构初始化。采用幂等处理逻辑，只有在发生严重问题（例如无法连接数据库）时才会失败。
      * Init-data：数据初始化。如果存在大量库存数据，该步骤需要花费较长时间，请注意查看 `Status`。
-   * CDC: 增量迁移。基于 init-data 步骤之前系统记录的时间戳，系统将按照最终一致性的原则开始数据迁移，并执行源库的 WAL（预写式日志）变更捕获 -> 写入到目标库。正常情况下，如果迁移链路没有被主动终止，CDC 会持续进行。
+   * CDC：增量迁移。基于 init-data 步骤之前系统记录的时间戳，系统将按照最终一致性的原则开始数据迁移，并执行源库的 WAL（预写式日志）变更捕获 -> 写入到目标库。正常情况下，如果迁移链路没有被主动终止，CDC 会持续进行。
    * CDC Metrics：增量迁移指标。目前主要提供源库的 WAL LSN（日志序列号）和 CDC 完成“捕获 -> 写入”过程的相应时间戳（请注意时间戳显示的是 Pod 容器运行时的本地时区）。
 
      :::note
@@ -160,13 +160,13 @@ kbcli migration logs ${migration-task-name} --step ${step-name}
       kbcli migration logs ${migration-task-name} --step cdc | grep current_position
       ```
 
-      输出结果 10 秒刷新一次。
+      输出结果每 10 秒刷新一次。
 
       ![Timestamp](../../../img/pgsql-migration-timestamp.png)
 2. 将业务暂时中断，禁止新的业务数据写入源库。
-3. 再次判断传输任务状态，确认任务正常，保持至少1分钟。
+3. 再次判断传输任务状态，确认任务正常，保持至少 1 分钟。
 
-   参考第一步的方法，观察链路是否正常且位点是否符合预期。
+   参考步骤 1，观察链路是否正常且位点是否符合预期。
 4. 使用目标数据库恢复业务。
 5. 使用准备好的数据采样验证切换是否正确。
 

@@ -63,9 +63,9 @@ KubeBlocks 提供了一套统一的默认配置生成策略，适用于在 KubeB
   </details>
 
   * Allowed Values：定义了参数的有效值范围。
-  * Dynamic: 决定了参数配置的生效方式。根据被修改参数的生效类型，有动态和静态两种不同的配置策略。
-    * `Dynamic` 为 `true` 时，参数动态生效，可在线配置。
-    * `Dynamic` 为 `false` 时，参数静态生效，需要重新启动 Pod 才能生效。
+  * Dynamic: 决定了参数配置的生效方式。根据被修改参数的生效类型，有**动态**和**静态**两种不同的配置策略。
+    * `Dynamic` 为 `true` 时，参数**动态**生效，可在线配置。
+    * `Dynamic` 为 `false` 时，参数**静态**生效，需要重新启动 Pod 才能生效。
   * Description：描述了参数的定义。
 
 ## 配置参数
@@ -192,7 +192,11 @@ KubeBlocks 提供了一套统一的默认配置生成策略，适用于在 KubeB
 
 ### 使用 edit-config 命令配置参数
 
-KubeBlocks 提供了一个名为 edit-config 的工具，帮助以可视化的方式配置参数。Linux 和 macOS 系统可以使用 vi 编辑器编辑配置文件，Windows 系统可以使用 notepad。下面以配置 MySQL 单机版为例。
+KubeBlocks 提供了一个名为 `edit-config` 的工具，帮助以可视化的方式配置参数。
+
+Linux 和 macOS 系统可以使用 vi 编辑器编辑配置文件，Windows 系统可以使用 notepad。
+
+下面以配置 MySQL 单机版为例。
 
 1. 编辑配置文件。
 
@@ -203,7 +207,7 @@ KubeBlocks 提供了一个名为 edit-config 的工具，帮助以可视化的�
 :::note
 
 * ApeCloud MySQL 目前支持多个模板，你可以通过 `--config-spec` 来指定一个配置模板。执行 `kbcli cluster describe-config mysql-cluster` 查看所有模板的名称。
-* 如果集群中有多个组件，请使用 --component 参数指定一个组件。
+* 如果集群中有多个组件，请使用 `--component` 参数指定一个组件。
 
 :::
 

@@ -33,9 +33,9 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
 ### 步骤
 
-1. 更改配置。共有 3 种方式进行垂直扩容。
+1. 更改配置，共有 3 种方式。
 
-   **选项 1.** (**推荐**) 使用 kbcli
+   **选项 1.** （**推荐**）使用 kbcli
 
    配置参数 `--components`、`--memory` 和 `--cpu`，并执行以下命令。
 
@@ -126,7 +126,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
 :::note
 
-垂直扩容不会同步与 CPU 和内存相关的参数，需要手动调用配置的 OpsRequest 来进行更改。详情请参考[配置](../../kubeblocks-for-mysql/configuration/configuration.md)。
+垂直扩容不会同步与 CPU 和内存相关的参数，需要手动调用配置的 OpsRequest 来进行更改。详情请参考[配置](./../../kubeblocks-for-mysql/configuration/configuration.md)。
 
 :::
 
@@ -167,7 +167,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    - `--components` 表示准备进行水平扩容的组件名称。
    - `--replicas` 表示指定组件的副本数。
 
-   **Option 2.** 创建 OpsRequest
+   **选项 2.** 创建 OpsRequest
 
    可根据需求配置参数，将 OpsRequest 应用于指定的集群。
 
@@ -186,7 +186,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    EOF
    ```
 
-   **Option 3.** 修改集群的 YAML 文件
+   **选项 3.** 修改集群的 YAML 文件
 
    修改 YAML 文件中 `spec.componentSpecs.replicas` 的配置。`spec.componentSpecs.replicas` 控制 Pod 的数量，更改配置将触发水平扩容。
 
@@ -227,8 +227,8 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    kbcli cluster list mysql-cluster
    ```
 
-   - STATUS=HorizontalScaling：表示正在进行水平扩容。
-   - STATUS=Running：表示水平扩容已完成。
+   - STATUS=HorizontalScaling 表示正在进行水平扩容。
+   - STATUS=Running 表示水平扩容已完成。
 
 3. 检查相关资源规格是否已变更。
 

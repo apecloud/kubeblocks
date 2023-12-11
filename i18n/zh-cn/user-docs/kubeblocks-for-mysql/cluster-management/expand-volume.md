@@ -30,7 +30,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
 1. 更改配置，共有 3 种方式。
 
-    **Option 1.** (**Recommended**) 使用 kbcli
+    **选项 1.** （**推荐**）使用 kbcli
 
     配置参数 `--components`、`--volume-claim-templates` 和 `--storage`，并执行以下命令。
 
@@ -43,7 +43,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
     - `--volume-claim-templates` 表示组件中的 VolumeClaimTemplate 名称。
     - `--storage` 表示磁盘需扩容至的大小。
 
-    **Option 2.** 创建 OpsRequest
+    **选项 2.** 创建 OpsRequest
 
     根据需求更改 storage 的值，并执行以下命令来更改集群的存储容量。
 
@@ -64,7 +64,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
     EOF
     ```
 
-    **Option 3.** 更改集群的 YAML 文件
+    **选项 3.** 更改集群的 YAML 文件
 
     在集群的 YAML 文件中更改 `spec.componentSpecs.volumeClaimTemplates.spec.resources` 的值。
 
@@ -103,8 +103,8 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30          Delete                    VolumeExpanding        Jan 29,2023 14:35 UTC+0800
    ```
 
-   * STATUS=VolumeExpanding：表示扩容正在进行中。
-   * STATUS=Running：表示扩容已完成。
+   * STATUS=VolumeExpanding 表示扩容正在进行中。
+   * STATUS=Running 表示扩容已完成。
 
 3. 检查资源规格是否已变更。
 

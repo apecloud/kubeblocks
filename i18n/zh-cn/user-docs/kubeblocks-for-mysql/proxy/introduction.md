@@ -1,12 +1,14 @@
 ---
-title: 概述
-description: Introduction to ApeCloud MySQL Proxy
-keywords: [introduction, proxy]
+title: MySQL 代理简介
+description: MySQL 代理简介
+keywords: [简介, 代理]
 sidebar_position: 1
-sidebar_label: Introduction
+sidebar_label: 简介
 ---
 
-# 概述
+# MySQL 代理
+
+## 简介
 
 数据库代理是数据库开发和管理人员改善应用程序的可伸缩性、性能、安全性和弹性的重要工具。
 

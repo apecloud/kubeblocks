@@ -17,8 +17,8 @@ import TabItem from '@theme/TabItem';
 
 ### 开始之前
 
-* 如果想通过 kbcli 创建和连接 MySQL 集群，请[安装 kbcli](../../installation/install-with-kbcli/install-kbcli.md)。
-* 用 [kbcli](../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 安装 KubeBlocks 或者 用 [Helm](../../installation/install-with-helm/install-kubeblocks-with-helm.md) 安装 KubeBlocks。
+* 如果想通过 kbcli 创建和连接 MySQL 集群，请[安装 kbcli](./../../installation/install-with-kbcli/install-kbcli.md)。
+* 用 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md) 安装 KubeBlocks。
 * 确保 ApeCloud MySQL add-on 已启用。
   
   <Tabs>
@@ -64,7 +64,8 @@ import TabItem from '@theme/TabItem';
 
   <TabItem value="kubectl" label="kubectl">
   
-  使用 `kubectl get clusterdefinition apecloud-mysql` 命令确认 `apecloud-mysql` 集群定义是否已存在。
+  查看 `apecloud-mysql` 集群定义是否可用。
+
 
   ```bash
   kubectl get clusterdefinition apecloud-mysql
@@ -83,7 +84,7 @@ import TabItem from '@theme/TabItem';
 
   </Tabs>
 
-* 为保持隔离，本教程中创建一个名为 demo 的独立命名空间。
+* 为保持隔离，本教程中创建一个名为 `demo` 的独立命名空间。
 
   ```bash
   kubectl create namespace demo
@@ -97,13 +98,13 @@ KubeBlocks 支持创建两种类型的 MySQL 集群：单机版（Standalone）�
 
 <TabItem value="kbcli" label="kbcli" default>
 
-创建单机版集群。
+创建 MySQL 单机版。
 
 ```bash
 kbcli cluster create mysql <clustername>
 ```
 
-创建集群版。
+创建 MySQL 集群版。
 
 ```bash
 kbcli cluster create mysql --mode raftGroup <clustername>
@@ -130,7 +131,7 @@ kbcli cluster create mysql --mode raftGroup --availability-policy none <clustern
 
 <TabItem value="kubectl" label="kubectl">
 
-KubeBlocks 实现了用 Cluster CRD 来定义集群。比如，可以通过下面的命令创建一个集群版集群：
+KubeBlocks 实现了用 Cluster CRD 来定义集群。比如，可以通过下面的命令创建一个 MySQL 集群版：
 
    ```bash
    cat <<EOF | kubectl apply -f -
@@ -345,4 +346,4 @@ KubeBlocks operator 会创建一个名为 `mysql-cluster-conn-credential` 的新
 
 </Tabs>
 
-有关详细的数据库连接指南，请参考[连接数据库](../../create-and-connect-databases/overview-on-connect-databases.md)。
+有关详细的数据库连接指南，请参考[连接数据库](./../../create-and-connect-databases/overview-on-connect-databases.md)。

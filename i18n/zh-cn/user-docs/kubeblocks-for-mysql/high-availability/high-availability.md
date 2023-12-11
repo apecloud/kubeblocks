@@ -21,7 +21,7 @@ sidebar_position: 1
 
 ### 开始之前
 
-* 安装 KubeBlocks：可使用 [kbcli](../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](../../installation/install-with-helm/install-kubeblocks-with-helm.md) 安装 KubeBlocks。
+* 安装 KubeBlocks：可使用 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md) 安装。
 * 创建一个 ApeCloud MySQL 集群版，详情可参考[创建 MySQL 集群](./../cluster-management/create-and-connect-a-mysql-cluster.md)。
 * 执行 `kubectl get cd apecloud-mysql -o yaml` 检查 ApeCloud MySQL 集群版是否已启用 _rolechangedprobe_（默认情况下是启用的）。如果出现以下配置信息，则表明已启用：
 
@@ -37,7 +37,8 @@ sidebar_position: 1
 
 ***步骤：***
 
-1. 查看 ApeCloud MySQL 集群版，在 `Topology` 中查看 Leader 节点的名称。在这个例子中，Leader 节点为 `mysql-cluster-mysql-1`。
+1. 查看 ApeCloud MySQL 集群版。
+   在 `Topology` 中查看 Leader 节点的名称。在这个例子中，Leader 节点为 `mysql-cluster-mysql-1`。
 
     ```bash
     kbcli cluster describe mysql-cluster
@@ -51,7 +52,8 @@ sidebar_position: 1
     ```
 
     ![delete_pod](./../../../img/failure_simulation_delete_pod.png)
-3. 查看集群状态，发现 Leader 节点发生变化。这是因为 Leader 节点删除后，ApeCloud MySQL 集群版会自行选主，选出新的 Leader 为mysql-cluster-mysql-2，KubeBlocks探 测到 Leader 角色发生变化，会发出通知，更新访问链路。原先异常节点会自动重建，恢复正常三节点状态。从异常开始到恢复完成，整体耗时正常在 30 秒之内。
+3. 查看集群状态，发现 Leader 节点发生变化。
+   这是因为 Leader 节点删除后，ApeCloud MySQL 集群版会自行选主，选出新的 Leader 为 `mysql-cluster-mysql-2`，KubeBlocks 探测到 Leader 角色发生变化，会发出通知，更新访问链路。原先异常节点会自动重建，恢复正常三节点状态。从异常开始到恢复完成，整体耗时在 30 秒内。
 
     ```bash
     kbcli cluster describe mysql-cluster
@@ -67,11 +69,12 @@ sidebar_position: 1
 
     ![connect_cluster_after](./../../../img/failure_simulation_connect_cluster_after.png)
 
-### 单个 follower 节点异常
+### 单个 Follower 节点异常
 
-**步骤：**
+***步骤：***
 
-1. 查看 ApeCloud MySQL 集群版，在 Topology 中查看 Follower 节点的名称。在这个例子中，Follower 节点是 `mysql-cluster-mysql-0` 和 `mysql-cluster-mysql-1`。
+1. 查看 ApeCloud MySQL 集群版。
+   在 `Topology` 中查看 Follower 节点的名称。在这个例子中，Follower 节点是 `mysql-cluster-mysql-0` 和 `mysql-cluster-mysql-1`。
 
     ```bash
     kbcli cluster describe mysql-cluster
@@ -95,7 +98,8 @@ sidebar_position: 1
 
     ![connect_cluster](./../../../img/failure_simulation_connect_cluster_follower.png)
 
-4. 再次查看集群状态，节点角色与故障前相同。这是因为单个 Follower 节点异常不会触发角色重新选主，也不会切换访问链路，所以集群读写不受影响，Follower 异常后会自动触发重建，恢复正常，整体耗时正常 30 秒内。
+4. 再次查看集群状态，节点角色与故障前相同。
+   这是因为单个 Follower 节点异常不会触发角色重新选主，也不会切换访问链路，所以集群读写不受影响，Follower 异常后会自动触发重建，恢复正常，整体耗时在 30 秒内。
 
    ```bash
    kbcli cluster describe mysql-cluster
@@ -109,7 +113,8 @@ sidebar_position: 1
 
 ***步骤：***
 
-1. 查看 ApeCloud MySQL 集群版，在 Topology 中查看 Follower 节点的名称。在这个例子中，Follower 节点是 `mysql-cluster-mysql-0` 和 `mysql-cluster-mysql-1`。
+1. 查看 ApeCloud MySQL 集群版。
+   在 `Topology` 中查看 Follower 节点的名称。在这个例子中，Follower 节点是 `mysql-cluster-mysql-0` 和 `mysql-cluster-mysql-1`。
 
     ```bash
     kbcli cluster describe mysql-cluster
@@ -123,7 +128,8 @@ sidebar_position: 1
     ```
 
     ![delete_two_pods](./../../../img/failure_simulation_delete_two_pods.png)
-3. 查看 MySQL 集群版状态，发现集群自动选举出新的 Leader 节点。这是因为当 ApeCloud MySQL 两个节点异常时，满足多数节点不可用，导致 Leader 节点会自动降级为 Follower 节点，此时集群不可读写。待节点自动重建完成后，集群重新选出 Leader 节点恢复到可读写状态。整体耗时正常30s之内。
+3. 查看 MySQL 集群版状态，发现集群自动选举出了新的 Leader 节点。
+   这是因为当 ApeCloud MySQL 两个节点异常时，满足多数节点不可用，导致 Leader 节点会自动降级为 Follower 节点，此时集群不可读写。待节点自动重建完成后，集群重新选出 Leader 节点恢复到可读写状态。整体耗时在 30 秒内。
 
     ```bash
     kbcli cluster describe mysql-cluster
@@ -142,21 +148,23 @@ sidebar_position: 1
 
 ***步骤：***
 
-1. 查看 ApeCloud MySQL 集群版，在 Topology 中查看节点名称。
+1. 查看 ApeCloud MySQL 集群版。
+   在 `Topology` 中查看节点名称。
 
     ```bash
     kbcli cluster describe mysql-cluster
     ```
 
     ![describe_cluster](./../../../img/failure_simulation_describe_cluster.png)
-2. 删除搜有节点。
+2. 删除所有节点。
 
     ```bash
     kubectl delete pod mysql-cluster-mysql-1 mysql-cluster-mysql-0 mysql-cluster-mysql-2
     ```
 
     ![delete_three_pods](./../../../img/failure_simulation_delete_three_pods.png)
-3. 查看集群状态，发现节点角色发生改变。这是因为节点删除后，都会自动触发重建，然后 ApeCloud MySQL 会自动完成集群恢复及选主。选主完成后，Kubeblocks 会探测新 Leader，并更新访问链路，恢复可用。整体耗时正常 30 秒之内。
+3. 查看集群状态，发现节点角色发生改变。
+   这是因为节点删除后，都会自动触发重建，然后 ApeCloud MySQL 会自动完成集群恢复及选主。选主完成后，Kubeblocks 会探测新 Leader，并更新访问链路，恢复可用。整体耗时在 30 秒内。
 
     ```bash
     kbcli cluster describe mysql-cluster

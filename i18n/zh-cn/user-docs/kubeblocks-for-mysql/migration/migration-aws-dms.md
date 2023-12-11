@@ -26,7 +26,7 @@ sidebar_label: 通过 AWS DMS 迁移
 ***开始之前***
 
 * [安装 kbcli](./../../installation/install-with-kbcli/install-kbcli.md)
-*  安装 KubeBlocks: 你可以用 [kbcli](../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](../../installation/install-with-helm/install-kubeblocks-with-helm.md) 来安装 KubeBlocks。
+*  安装 KubeBlocks: 你可以用 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md) 进行安装。
 * 开启 AWS Load Balancer Controller 插件。
 
    ```bash
@@ -39,11 +39,11 @@ sidebar_label: 通过 AWS DMS 迁移
 
    负载均衡器插件依赖于 EKS 环境，如果负载均衡器未成功开启，可能与环境有关。
 
-   检查 EKS 环境并重新启用此插件。详情请参阅[启用插件](../../overview/database-engines-supported.md)。
+   检查 EKS 环境并重新启用此插件。详情请参阅[启用插件](./../../overview/database-engines-supported.md)。
 
 ***步骤***
 
-1. 在 AWS 上创建 ApeCloud MySQL 集群。详情请参阅[创建 ApeCloud MySQL 集群](../../kubeblocks-for-mysql/cluster-management/create-and-connect-a-mysql-cluster.md)。
+1. 在 AWS 上创建 ApeCloud MySQL 集群。详情请参阅[创建 并连接 MySQL 集群](./../../kubeblocks-for-mysql/cluster-management/create-and-connect-a-mysql-cluster.md)。
 2. 填写集群名称，并执行以下命令暴露集群的外部 IP。
 
    ```bash
@@ -76,9 +76,9 @@ sidebar_label: 通过 AWS DMS 迁移
 
 1. 在 EKS 集群上安装 AWS Load Balancer Controller。
 
-   安装详情请参考安装 [AWS Load Balancer Controller 附加组件](https://docs.aws.amazon.com/eks/latest/userguide/aws-load-balancer-controller.html)。
+   详情请参考 [安装 AWS Load Balancer Controller 附加组件](https://docs.aws.amazon.com/eks/latest/userguide/aws-load-balancer-controller.html)。
 
-   在集群中创建 NLB 详情请参考 [Amazon EKS 上的网络负载均衡](https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html)。
+   在集群中创建 NLB 请参考 [Amazon EKS 上的网络负载均衡](https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html)。
 2. 创建使用 NLB 的服务，暴露 ApeCloud MySQL 服务。
 
    根据实际环境配置 `metadata.name`、`metadata.annotations`、`metadata.labels` 和 `spec.selector`。
@@ -123,7 +123,7 @@ sidebar_label: 通过 AWS DMS 迁移
    apecloud-mysql-service         LoadBalancer   10.100.xx.xx     k8s-xx-xx-xx.elb.cn-northwest-1.amazonaws.com.cn   3306:xx/TCP
    ```
 
-   确保服务器正常运行并能够生成 EXTERNAL-IP。同时，通过 AWS 控制台验证 NLB 状态是否为 Active，随后即可通过 EXTERNAL-IP:Port 访问集群。
+   确保服务器正常运行并能够生成 EXTERNAL-IP。同时，通过 AWS 控制台验证 NLB 状态是否为 `Active`，随后即可通过 EXTERNAL-IP:Port 访问集群。
 
    ![NLB-active](./../../../img/mysql_migration_active.png)
 
@@ -151,17 +151,13 @@ sidebar_label: 通过 AWS DMS 迁移
   
    使用NLB暴露服务。
 
-  1. 安装Load Balancer Controller
+  1. 安装 Load Balancer Controller。
 
      安装详情请参考[安装 AWS Load Balancer Controller 附加组件](https://docs.aws.amazon.com/zh_cn/eks/latest/userguide/aws-load-balancer-controller.html)。
 
      在集群中创建 NLB 详情请参考 [Amazon EKS 上的网络负载均衡](https://docs.aws.amazon.com/zh_cn/eks/latest/userguide/network-load-balancing.html)。
 
   2. 使用 NLB 创建服务。
-
-     Make sure the value of `some.label.key` in `metadata.labels` is consistent with the value of ApeCloud MySQL you created.
-
-     Configure `port` and `targetPort` in `spec.ports` according to your current environment.
 
      确保 `metadata.labels` 中 `some.label.key` 的值与创建的 ApeCloud MySQL 的值一致。
 
@@ -206,32 +202,32 @@ sidebar_label: 通过 AWS DMS 迁移
 
 * 目标实例磁盘空间问题
   
-   由于传输工具写目标数据库时是并发写入模型，存在乱序写入的情况，可能会触发页分裂问题导致目标数据库的数据空间相比原实例的空间有些许放大。建议在分配目标数据库存储大小时可以适当多规划一些，比如至少有源数据库当前存储的1.5倍。
+   由于传输工具写目标数据库时是并发写入模型，存在乱序写入的情况，可能会触发页分裂问题导致目标数据库的数据空间相比原实例的空间有些许放大。建议在分配目标数据库存储大小时可以适当多规划一些，比如至少有源数据库当前存储的 1.5 倍。
 
-* DDL&onlineDDL问题
+* DDL&onlineDDL 问题
   
    有锁结构变更往往会影响数据迁移的速度。
 
-   而无锁结构变更，由于原理上是基于临时表rename，在迁移对象不是整库迁移的前提下会导致数据问题。
+   而无锁结构变更，由于原理上是基于临时表 rename，在迁移对象不是整库迁移的前提下会导致数据问题。
 
-   例如，如果迁移对象选择迁移db1.table1到目标，过程中在源数据库上针对db1.table1做了一次onlineDDL，那么目标数据库上的db1.table1的数据将和源数据库不一致。
+   例如，如果迁移对象选择迁移 db1.table1 到目标，过程中在源数据库上针对 db1.table1 做了一次 onlineDDL，那么目标数据库上的 db1.table1 的数据将和源数据库不一致。
 
-   需要注意的是，某些数据库管理工具发起DDL的方式默认是使用无锁变更执行的。
+   需要注意的是，某些数据库管理工具发起 DDL 的方式默认是使用无锁变更执行的。
 
-   迁移属于短期行为，为避免不必要的麻烦，建议迁移过程中尽量不要做DDL操作。
+   迁移属于短期行为，为避免不必要的麻烦，建议迁移过程中尽量不要做 DDL 操作。
 
-* binlog保存时间
+* binlog 保存时间
 
-   数据传输增量迁移的过程依赖源数据库的binlog，为避免数据传输发生较长时间中断，在恢复时因源数据库中binlog被清理导致迁移无法恢复的情况，建议将binlog的保存时间适当调长。
+   数据传输增量迁移的过程依赖源数据库的 binlog，为避免数据传输发生较长时间中断，在恢复时因源数据库中 binlog 被清理导致迁移无法恢复的情况，建议将 binlog 的保存时间适当调长。
 
    例如，在 AWS RDS 中连接到数据库并执行以下命令：
 
    ```bash
-   # View configuration
-   # Input: 
+   # 查看配置
+   # 输入: 
    call mysql.rds_show_configuration;
 
-   # Output: Pay attention to the BinLog retention hours.
+   # 输出：请注意 binlog 的保留时间
    +------------------------+-------+-----------------------------------------------------------------------------------------------------------+
    | name                   | value | description                                                                                               |
    +------------------------+-------+-----------------------------------------------------------------------------------------------------------+
@@ -240,14 +236,14 @@ sidebar_label: 通过 AWS DMS 迁移
    | target delay           | 0     | target delay specifies replication delay in seconds between current instance and its future read-replica. |
    +------------------------+-------+-----------------------------------------------------------------------------------------------------------+
 
-   # Adjust the retention hours to 72 hours
-   # Input:
+   # 将保留时间改为 72 小时
+   # 输入：
    call mysql.rds_set_configuration('binlog retention hours', 72);
    ```
 
 ***步骤：***
 
-1. 创建迁移用Replication Instance
+1. 创建迁移用的 Replication Instance。
 
    点击 **DMS** ->  **Replication Instance**，**创建复制实例**。
 
@@ -259,17 +255,17 @@ sidebar_label: 通过 AWS DMS 迁移
 
    ![Create replication instance](./../../../img/mysql_migration_replication_instance.png)
 
-2. 创建 endpoint 。
+2. 创建终端节点。
 
    点击 **DMS** -> **Endpoints**，**创建终端节点**。
 
    ![Create endpoint](./../../../img/mysql_migration_create_endpoints.png)
 
-   分别创建 source endpoint 和 target endpoint。如果目标终端是 RDS 实例，请勾选 **选择 RDS DB 实例** 进行配置。
+   分别创建 source endpoint 和 target endpoint。如果目标终端是 RDS 实例，请勾选**选择 RDS DB 实例**进行配置。
 
    ![Select RDS DB instance](./../../../img/mysql_migration_select_rds_db_instance.png)
 
-   配置完成后，可以使用指定的 Replication instance测试下连通性：
+   配置完成后，可以使用指定的 Replication instance 测试下连通性：
 
    ![Test connection](./../../../img/mysql_migration_test_connection.png)
 
@@ -287,9 +283,9 @@ sidebar_label: 通过 AWS DMS 迁移
 
      AWS DMS 提供三种迁移类型：
 
-     * Migrate existing data：只迁移存量数据，即任务运行后源实例发生的变更不会迁移到目标实例
-     * Migrate existing data and replicate ongoing changes：迁移存量+增量数据，即任务运行前的存量数据和任务运行中的增量数据都会被同步到目标实例
-     * Replicate data changes only：只迁移增量数据，可以配合后面的“CDC start mode for source transactions”配置指定位点迁移增量数据
+     * Migrate existing data：只迁移存量数据，即任务运行后源实例发生的变更不会迁移到目标实例。
+     * Migrate existing data and replicate ongoing changes：迁移存量+增量数据，即任务运行前的存量数据和任务运行中的增量数据都会被同步到目标实例。
+     * Replicate data changes only：只迁移增量数据，可以配合后面的“CDC start mode for source transactions”配置指定位点迁移增量数据。
 
     在本文的迁移场景中，使用“**Migrate existing data and replicate ongoing changes**” 即可。
 

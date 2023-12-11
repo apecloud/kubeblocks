@@ -28,6 +28,8 @@ ApeCloud MySQL 支持四种角色类型，即 **Leader**（领导者）、**Foll
 | --- | --- | --- | --- | --- |
 | 功能能力 | RW/HA | RO/HA | RO | - |
 
+![ApeCloud MySQL 角色切换](./../../../img/apecloud-mysql-intro-role-changing.jpg)
+
 ### 故障切换
 
 故障切换将重定向流量，把正在执行的任务从主节点切换到从节点。
@@ -51,4 +53,3 @@ ApeCloud MySQL 支持四种角色类型，即 **Leader**（领导者）、**Foll
 | 9 | 5 | 4 |
 | 10 | 6 | 4 |
 
-![ApeCloud MySQL 角色切换](./../../../img/apecloud-mysql-intro-role-changing.jpg)

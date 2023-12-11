@@ -39,6 +39,9 @@ type BackupSpec struct {
 	// Supported values are "Retain" and "Delete".
 	// "Retain" means that the backup can not be deleted and remains in 'Deleting' phase.
 	// "Delete" means that the backup content and its physical snapshot on backup repository are deleted.
+	// TODO: for the retain policy, we should support in the future for only deleting
+	//   the backup custom objects but retaining the backup contents in backup repository.
+	//   The current implementation only prevent accidental deletion of backup data.
 	// +kubebuilder:validation:Enum=Delete;Retain
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Delete

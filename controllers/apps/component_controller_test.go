@@ -1496,7 +1496,8 @@ var _ = Describe("Component Controller", func() {
 						{Key: constant.CertName, Path: constant.CertName},
 						{Key: constant.KeyName, Path: constant.KeyName},
 					},
-					Optional: func() *bool { o := false; return &o }(),
+					Optional:    func() *bool { o := false; return &o }(),
+					DefaultMode: func() *int32 { m := int32(0600); return &m }(),
 				},
 			},
 		}

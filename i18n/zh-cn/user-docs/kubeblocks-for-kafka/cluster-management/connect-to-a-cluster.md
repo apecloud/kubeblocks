@@ -51,13 +51,13 @@ sidebar_label: 连接
      kubectl exec -ti kafka-producer -- bash
      ```
 
-   c. 创建主题。
+   c. 创建 topic。
 
      ```bash
      kafka-topics.sh --create --topic quickstart-events --bootstrap-server xxx-broker:9092
      ```
 
-   d. 创建生产者。
+   d. 创建 producer。
 
      ```bash
      kafka-console-producer.sh --topic quickstart-events --bootstrap-server xxx-broker:9092 
@@ -71,7 +71,7 @@ sidebar_label: 连接
      kubectl exec -ti kafka-consumer -- bash
      ```
 
-   g. 创建消费者，指定消费主题和从开头开始消费消息。
+   g. 创建 consumer，指定消费 topic 和从开头开始消费消息。
 
      ```bash
      kafka-console-consumer.sh --topic quickstart-events --from-beginning --bootstrap-server xxx-broker:9092
@@ -146,12 +146,12 @@ sidebar_label: 连接
    kubectl get svc 
    ```
 
-   ![gain ELB address](../../../img/connect-to-a-kafka-cluster-gain-elb-address.png)
+   ![获取 ELB 地址](../../../img/connect-to-a-kafka-cluster-gain-elb-address.png)
 
    请注意：
    - a0e01377fa33xxx-xxx.cn-northwest-1.elb.amazonaws.com.cn 是 Kubernetes 外部同一 VPC 下能访问的 ELB 地址。
 
-3. 使用 ELB 地址进行连接。 
+3. 使用 ELB 地址进行连接。
 
     在上例中，ELB 地址为 a0e01377fa33xxx-xxx.cn-northwest-1.elb.amazonaws.com.cn:9092。
 
@@ -159,7 +159,7 @@ sidebar_label: 连接
 
 ***步骤：***
 
-1. 将 --publicly-accessible 的值设置为 true。
+1. 将 `--publicly-accessible` 的值设置为 true。
 
     <Tabs>
     <TabItem value="kbcli" label="kbcli" default>
@@ -214,3 +214,42 @@ sidebar_label: 连接
     </TabItem>
 
     </Tabs>
+
+2. 获取实例对应的 ELB 地址。
+
+   ```bash
+   kubectl get svc
+   ```
+
+   ![获取 ELB 地址](./../../../img/kafka-connect-cross-vpc.png)
+
+   请注意：
+   - xxxx-xxxx.cn-northwest-1.elb.amazonaws.com.cn 是 公网下能访问的 ELB 开公网地址。
+
+3. 配置 hostname 映射。
+   1. 登陆远程机器。
+   2. 查看 ELB 地址 IP。
+
+      ```bash
+      nslookup a96caad7bab59xxxx-xxxx.cn-northwest-1.elb.amazonaws.com.cn
+      ```
+
+   3. 获取 Broker 地址。
+
+      Broker 地址为固定格式，将下面字符串中 {clusterName} 替换成 Kafka Cluster Name 即可。
+
+      ```bash
+      {clusterName}-broker-0.{clusterName}-broker-headless.default.svc
+      ```
+
+   4. 配置 /etc/hosts 映射。
+
+       ```bash
+       vi /etc/hosts
+       # 最下方添加,注意将{clusterName}和ip地址替换成真实的值：
+       52.83.xx.xx {clusterName}-broker-0.{clusterName}-broker-headless.default.svc
+       ```
+
+4. 使用 ELB 地址进行连接。
+
+    在上例中，ELB 地址为 xxxx-xxxx.cn-northwest-1.elb.amazonaws.com.cn:9092。

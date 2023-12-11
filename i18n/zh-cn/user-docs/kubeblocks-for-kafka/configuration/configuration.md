@@ -19,7 +19,7 @@ KubeBlocks 提供了一套默认的配置生成策略，适用于在 KubeBlocks 
 kbcli cluster describe-config mykafka  
 ```
 
-从元信息中可以看到，集群 `mykafka` 有一个名为 `server.properties` 的配置文件。
+从元数据中可以看到，集群 `mykafka` 有一个名为 `server.properties` 的配置文件。
 
 你也可以查看此配置文件和参数的详细信息。
 

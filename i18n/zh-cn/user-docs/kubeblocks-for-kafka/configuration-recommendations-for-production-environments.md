@@ -8,7 +8,7 @@ sidebar_label: 资源描述
 
 # 资源描述
 
-## Java 堆
+## Java Heap
 
 指 Kafka 服务器的 JVM 堆配置。在生产环境中，请参考[官方推荐配置](https://kafka.apache.org/33/documentation.html#java)：
 

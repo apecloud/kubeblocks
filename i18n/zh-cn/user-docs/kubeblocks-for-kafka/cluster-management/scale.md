@@ -43,7 +43,7 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
     kbcli cluster vscale ivy85 --components="broker" --memory="4Gi" --cpu="2" 
    ```
 
-   - `--components` - 的值可以是 `broker` 或 `controller`。
+   - `--components` 的值可以是 `broker` 或 `controller`。
      - broker：在组合模式下表示所有节点；在分离模式下表示所有 broker 节点。
      - controller：表示在分离模式下的所有对应节点。
    - `--memory` 表示组件内存的请求和限制大小。

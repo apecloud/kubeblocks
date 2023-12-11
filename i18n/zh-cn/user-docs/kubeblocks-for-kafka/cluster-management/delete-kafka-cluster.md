@@ -41,7 +41,8 @@ kbcli cluster list kafka
 <TabItem value="kubectl" label="kubectl">
 
 ```bash
-~ kubectl -n default get cluster kafka
+kubectl -n default get cluster kafka
+>
 NAME    CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS     AGE
 kafka      kafka                                kafka-3.3.2    Delete                               Running    19m
 ```

@@ -2,7 +2,7 @@
 title: 卸载 kbcli 和 KubeBlocks
 description: 处理异常并卸载 kbcli 和 KubeBlocks
 keywords: [kbcli, kubeblocks, 异常, 卸载]
-sidebar_position: 5
+sidebar_position: 4
 sidebar_label: 卸载 KubeBlocks 和 kbcli
 ---
 

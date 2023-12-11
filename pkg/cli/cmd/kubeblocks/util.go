@@ -48,7 +48,7 @@ import (
 func getGVRByCRD(crd *unstructured.Unstructured) (*schema.GroupVersionResource, error) {
 	group, _, err := unstructured.NestedString(crd.Object, "spec", "group")
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 	return &schema.GroupVersionResource{
 		Group:    group,

@@ -91,7 +91,7 @@ func ReconcileCompPostProvision(ctx context.Context,
 	}
 
 	// clean up the postProvision job
-	if err := cleanPostProvisionJob(ctx, cli, cluster, comp, synthesizeComp, job.Name); err != nil {
+	if err := cleanPostProvisionJob(ctx, cli, cluster, comp, synthesizeComp, dag, job.Name); err != nil {
 		return err
 	}
 
@@ -381,7 +381,7 @@ func setPostProvisionDoneAnnotation(cli client.Client,
 	compObj := comp.DeepCopy()
 	timeStr := time.Now().Format(time.RFC3339Nano)
 	comp.Annotations[kbCompPostProvisionDoneKey] = timeStr
-	graphCli.Do(dag, compObj, &comp, model.ActionUpdatePtr(), nil)
+	graphCli.Update(dag, compObj, &comp)
 	return nil
 }
 
@@ -390,10 +390,27 @@ func cleanPostProvisionJob(ctx context.Context,
 	cluster *appsv1alpha1.Cluster,
 	comp *appsv1alpha1.Component,
 	synthesizeComp *SynthesizedComponent,
+	dag *graph.DAG,
 	jobName string) error {
 	if cluster.Annotations == nil || comp.Annotations == nil {
 		return errors.New("cluster or component annotations not found")
 	}
+
+	graphCli := model.NewGraphClient(cli)
+	compIsUpdating := func() bool {
+		for _, obj := range graphCli.FindAll(dag, &appsv1alpha1.Component{}) {
+			if graphCli.IsAction(dag, obj, model.ActionUpdatePtr()) {
+				return true
+			}
+		}
+		return false
+	}
+
+	// check whether the component is being updated
+	if compIsUpdating() {
+		return errors.New("component is updating, skip clean postProvision job")
+	}
+
 	// check post-provision done annotation has been set
 	if !checkPostProvisionDoneAnnotationExist(cluster, comp, synthesizeComp) {
 		return errors.New("cluster post-provision done annotation has not been set")

@@ -109,4 +109,4 @@ kubectl get backuppolicy mysql-cluster-mysql-backup-policy -o yaml
 
 </Tabs>
 
-对于 mysql 集群而言，默认支持两种备份方法：`xtrabackup` 和 `volume-snapshot`，前者使用备份工具 `xtrabackup` 将 MySQL 数据备份至对象存储中；后者则使用云存储的卷快照能力，通过快照方式对数据进行备份。创建备份时，可以指定要使用哪种备份方法进行备份。
+对于 MySQL 集群而言，默认支持两种备份方法：`xtrabackup` 和 `volume-snapshot`，前者使用备份工具 `xtrabackup` 将 MySQL 数据备份至对象存储中；后者则使用云存储的卷快照能力，通过快照方式对数据进行备份。创建备份时，可以指定要使用哪种备份方法进行备份。

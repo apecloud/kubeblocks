@@ -16,19 +16,19 @@ KubeBlocks 的全盘锁定功能确保了数据库的稳定性和可用性。该
 
 :::note
 
-1. 全盘锁定功能目前支持全局（ClusterDefinition）启用或禁用，暂不支持集群维度的控制。动态启用或禁用此功能可能会影响使用此 ClusterDefinition 的现有集群实例，并导致它们重新启动。请谨慎操作。
-2. 全盘锁定功能依赖于两个系统资源节点和 nodes/stats 的读取权限（get 和 list）。如果你通过 kbcli 创建实例，请确保为控制器授予 ClusterRoleBinding 的管理权限。
+1. 磁盘满锁功能目前支持全局（ClusterDefinition）启用或禁用，暂不支持集群维度的控制。动态启用或禁用此功能可能会影响使用此 ClusterDefinition 的现有集群实例，并导致它们重新启动。请谨慎操作。
+2. 磁盘满锁功能依赖于两个系统资源节点和 nodes/stats 的读取权限（get 和 list）。如果你通过 kbcli 创建实例，请确保为控制器授予 ClusterRoleBinding 的管理权限。
 3. KubeBlocks v0.6.0 支持的引擎：ApeCloud MySQL、PostgreSQL、MongoDB。
 
 :::
 
-## 启用全盘锁定
+## 启用磁盘满锁
 
 - 对于 MySQL 数据库，当磁盘使用量达到 `highwatermark` 值时，读写用户无法写入磁盘，而超级用户仍然可以写入。
 - 对于 PostgreSQL 和 MongoDB 数据库，当磁盘使用量达到 `highwatermark` 时，无论是读写用户还是超级用户都无法写入。
-- 组件级别的高水位的默认阈值为 90，当磁盘使用量达到 90% 时将锁定磁盘。而卷级别的设置为 85，并会覆盖组件级别的阈值。
+- 组件级别的高水位的默认阈值为 90，当磁盘使用量达到 90% 时将锁定磁盘。而卷级别的设置为 85，会覆盖组件级别的阈值。
 
-在集群定义中，添加以下内容以启用全盘锁定功能。你可以根据需要进行设置。
+在集群定义中，添加以下内容以启用磁盘满锁功能。你可以根据需要进行设置。
 
 ```yaml
 volumeProtectionSpec:

@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 ## 概述
 
-BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象存储），S3（亚马逊对象存储），COS（腾讯云对象存储），GCS（谷歌云对象存储），OBS（华为云对象存储），MinIo 等兼容 S3 协议的对象存储作为备份仓库，同时支持 K8s 原生的 PVC 作为备份仓库。
+BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象存储），S3（亚马逊对象存储），COS（腾讯云对象存储），GCS（谷歌云对象存储），OBS（华为云对象存储），MinIO 等兼容 S3 协议的对象存储作为备份仓库，同时支持 K8s 原生的 PVC 作为备份仓库。
 
 用户可以创建多个 BackupRepo 以适应不同的场景。例如，根据不同的业务需求，可以把业务 A 的数据存储在 A 仓库，把业务 B 的数据存储在 B 仓库，或者可以按地区配置多个仓库以实现异地容灾。在创建备份时，你需要指定备份仓库。你也可以创建一个默认的备份仓库，如果在创建备份时未指定具体的仓库，KubeBlocks 将使用此默认仓库来存储备份数据。
 
@@ -28,8 +28,7 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
 ## 安装 MinIO
 
-如果你没有使用云厂商的对象存储，没关系，可以在 Kubernetes 中部署开源服务 MinIO，用它来配置 BackupRepo。如果你正在使用云厂商提供的对象存储服务，可以直接跳转至[配置 BackupRepo](#configure-backuprepo)。
-
+如果你没有使用云厂商的对象存储，可在 Kubernetes 中部署开源服务 MinIO，用它来配置 BackupRepo。如果你正在使用云厂商提供的对象存储服务，可以直接跳转至[配置 BackupRepo](#配置-backuprepo)。
 
 ***步骤：***
 
@@ -67,10 +66,9 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
   :::note
 
-  安装的 MinIO 的访问地址（端点）为 `http://minio.kb-system.svc.cluster.local:9000`，用于配置 BackupRepo。在本例中，`kb-system` 是安装 MinIO 的命名空间的名称。
+  安装的 MinIO 的访问地址（端口）为 `http://minio.kb-system.svc.cluster.local:9000`，用于配置 BackupRepo。在本例中，`kb-system` 是安装 MinIO 的命名空间的名称。
 
   :::
-
 
 ## 配置 BackupRepo
 
@@ -83,8 +81,8 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
 备份和恢复任务在运行时，有两种访问远端对象存储的方式：
 
-- 使用命令行工具，通过网络直接访问远端存储。
-- 通过 CSI Driver 将远端存储映射到本地，工作进程可以像访问本地文件一样访问远端存储。
+* 使用命令行工具，通过网络直接访问远端存储。
+* 通过 CSI Driver 将远端存储映射到本地，工作进程可以像访问本地文件一样访问远端存储。
 
 我们将这两种访问方式分别命名为 “Tool” 和 “Mount” 。用户在创建 BackupRepo 时可以通过 `accessMethod` 字段指定其访问方式，创建之后不能修改。
   
@@ -120,7 +118,7 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
 :::note
 
-* 在 KubeBlocks v0.7.0 中，`storageProvider` 目前可选 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`minio`、`pvc`。 
+* 在 KubeBlocks v0.7.0 中，`storageProvider` 目前可选 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`minio`、`pvc`。
 * 不同 `storageProvider` 所需的配置信息并不统一，上面展示的 `config` 和 `secrets` 适用于 s3。
 * 执行 `kubectl get storageproviders.storage.kubeblocks.io` 命令可以查看支持的 storageProvider。
 
@@ -133,7 +131,7 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
    ```
 
    安装完成后，可以执行命令查看 BackupRepo。
-   
+
    <Tabs>
 
    <TabItem value="kbcli" label="kbcli" default>

@@ -27,7 +27,7 @@ KubeBlocks 是基于 Kubernetes 的原生应用，你可以使用 Helm 来进行
         <td colspan="2">建议创建 1 个具有 4 核 CPU、4GB 内存和 50GB 存储空间的节点。</td>
     </tr >
     <tr >
-        <td rowspan="4">Data Plane</td>
+        <td rowspan="4">数据面</td>
         <td> MySQL </td>
         <td>建议至少创建 3 个具有 2 核 CPU、4GB 内存和 50GB 存储空间的节点。 </td>
     </tr>

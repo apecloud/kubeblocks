@@ -16,10 +16,9 @@ sidebar_label: 生产环境
 参考下面的网络位置关系图。
 ![Example](../img/../../img/connect-to-database-in-production-env-network-locations.jpg)
 
+## 方案 3. 连接在同一个 Kubernetes 集群中的客户端
 
-## 步骤 3. 连接在同一个 Kubernetes 集群中的客户端
-
-你可以使用数据库的 ClusterIP 或域名进行连接。使用 `kbcli cluster describe ${cluster-name}` 检查数据库的端点。
+你可以使用数据库的 ClusterIP 或域名进行连接。使用 `kbcli cluster describe ${cluster-name}` 检查数据库的端口。
 
 ```bash
 kbcli cluster describe x
@@ -48,7 +47,7 @@ Events(last 5 warnings, see more:kbcli cluster list-events -n default x):
 TIME   TYPE   REASON   OBJECT   MESSAGE
 ```
 
-## 步骤 4. 连接在其他 VPC 或公共网络中的客户端
+## 方案 4. 连接在其他 VPC 或公共网络中的客户端
 
 你可以启用云厂商提供的外部负载均衡器。
 
@@ -74,7 +73,7 @@ kbcli cluster expose ${cluster-name} --type internet --enable=false
 
 :::
 
-## 步骤 5. 连接在 Kubernetes 集群之外但与 Kubernetes 集群位于同一 VPC 中的客户端
+## 方案 5. 连接在 Kubernetes 集群之外但与 Kubernetes 集群位于同一 VPC 中的客户端
 
 使用一个稳定的域名以实现长期连接。你可以使用云厂商提供的内部负载均衡器来实现这一目的。
 

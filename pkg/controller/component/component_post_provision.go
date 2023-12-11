@@ -48,7 +48,7 @@ const (
 
 	// KBCompPostStartDoneKeyPattern will be deprecated after KubeBlocks v0.8.0 and use KBCompPostProvisionDoneKey instead
 	KBCompPostStartDoneKeyPattern = "kubeblocks.io/%s-poststart-done"
-	// KBCompPostProvisionDoneKey is used to mark the component poststart job is done
+	// KBCompPostProvisionDoneKey is used to mark the component postProvision job is done
 	KBCompPostProvisionDoneKey = "kubeblocks.io/post-provision-done"
 
 	KBPostProvisionClusterCompList = "KB_CLUSTER_COMPONENT_LIST"
@@ -90,7 +90,7 @@ func ReconcileCompPostProvision(ctx context.Context,
 		return err
 	}
 
-	// clean up the post-start job
+	// clean up the postProvision job
 	if err := cleanPostProvisionJob(ctx, cli, cluster, comp, synthesizeComp, job.Name); err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func ReconcileCompPostProvision(ctx context.Context,
 
 func needDoPostProvision(ctx context.Context, cli client.Client,
 	cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component, synthesizeComp *SynthesizedComponent) (bool, error) {
-	// if the component does not have a custom postStart, skip it
+	// if the component does not have a custom postProvision, skip it
 	if synthesizeComp == nil || synthesizeComp.LifecycleActions == nil ||
 		synthesizeComp.LifecycleActions.PostProvision == nil || synthesizeComp.LifecycleActions.PostProvision.CustomHandler == nil {
 		return false, nil
@@ -130,17 +130,17 @@ func needDoPostProvision(ctx context.Context, cli client.Client,
 		return true, nil
 	}
 
-	// determine whether the component has undergone post-start by examining the annotation
-	jobExist := checkPostStartJobExist(ctx, cli, cluster, genPostProvisionJobName(cluster.Name, synthesizeComp.Name))
+	// determine whether the component has undergone postProvision by examining the annotation
+	jobExist := checkPostProvisionJobExist(ctx, cli, cluster, genPostProvisionJobName(cluster.Name, synthesizeComp.Name))
 	finishAnnotationExist := checkPostProvisionDoneAnnotationExist(cluster, comp, synthesizeComp)
 	if finishAnnotationExist && !jobExist {
-		// if the annotation has been set and the job does not exist, it means that the post-start has finished, so skip it
+		// if the annotation has been set and the job does not exist, it means that the postProvision has finished, so skip it
 		return false, nil
 	}
 	return true, nil
 }
 
-// createPostProvisionJobIfNotExist creates a job to execute component-level post start command, each component only has a corresponding job.
+// createPostProvisionJobIfNotExist creates a job to execute component-level postProvision command, each component only has a corresponding job.
 func createPostProvisionJobIfNotExist(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
@@ -151,12 +151,12 @@ func createPostProvisionJobIfNotExist(ctx context.Context,
 		return nil, nil
 	}
 
-	postStartJob, err := renderPostStartCmdJob(ctx, cli, cluster, synthesizeComp)
+	postProvisionJob, err := renderPostProvisionCmdJob(ctx, cli, cluster, synthesizeComp)
 	if err != nil {
 		return nil, err
 	}
-	// check the postStartJob whether exist
-	key := types.NamespacedName{Namespace: cluster.Namespace, Name: postStartJob.Name}
+
+	key := types.NamespacedName{Namespace: cluster.Namespace, Name: postProvisionJob.Name}
 	existJob := &batchv1.Job{}
 	exist, _ := intctrlutil.CheckResourceExists(ctx, cli, key, existJob)
 	if exist {
@@ -164,36 +164,36 @@ func createPostProvisionJobIfNotExist(ctx context.Context,
 	}
 
 	// set the controller reference
-	if err := intctrlutil.SetControllerReference(comp, postStartJob); err != nil {
-		return postStartJob, err
+	if err := intctrlutil.SetControllerReference(comp, postProvisionJob); err != nil {
+		return postProvisionJob, err
 	}
 
-	// create the postStartJob if not exist
-	if err := cli.Create(ctx, postStartJob); err != nil {
-		return postStartJob, err
+	// create the postProvisionJob if not exist
+	if err := cli.Create(ctx, postProvisionJob); err != nil {
+		return postProvisionJob, err
 	}
-	return postStartJob, nil
+	return postProvisionJob, nil
 }
 
-func checkPostStartJobExist(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, jobName string) bool {
+func checkPostProvisionJobExist(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, jobName string) bool {
 	key := types.NamespacedName{Namespace: cluster.Namespace, Name: jobName}
 	existJob := &batchv1.Job{}
 	exist, _ := intctrlutil.CheckResourceExists(ctx, cli, key, existJob)
 	return exist
 }
 
-// renderPostStartCmdJob renders and creates the postStart command job.
-func renderPostStartCmdJob(ctx context.Context,
+// renderPostProvisionCmdJob renders and creates the postProvision command job.
+func renderPostProvisionCmdJob(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	synthesizeComp *SynthesizedComponent) (*batchv1.Job, error) {
 	if synthesizeComp == nil || synthesizeComp.LifecycleActions == nil ||
 		synthesizeComp.LifecycleActions.PostProvision == nil || synthesizeComp.LifecycleActions.PostProvision.CustomHandler == nil {
-		return nil, errors.New("PostStart CustomHandler spec not found")
+		return nil, errors.New("postProvision CustomHandler spec not found")
 	}
 
 	if synthesizeComp.LifecycleActions.PostProvision.CustomHandler.Exec == nil {
-		return nil, errors.New("PostStart customHandler only support exec command by now, please check your customHandler spec.")
+		return nil, errors.New("postProvision customHandler only support exec command by now, please check your customHandler spec.")
 	}
 
 	podList, err := getComponentPodList(ctx, cli, *cluster, synthesizeComp.Name)
@@ -238,9 +238,9 @@ func renderPostStartCmdJob(ctx context.Context,
 		return volumes, volumeMounts
 	}
 
-	renderJob := func(postProvisionSpec *appsv1alpha1.LifecycleActionHandler, postStartEnvs []corev1.EnvVar) (*batchv1.Job, error) {
+	renderJob := func(postProvisionSpec *appsv1alpha1.LifecycleActionHandler, postProvisionEnvs []corev1.EnvVar) (*batchv1.Job, error) {
 		var (
-			postStartCustomHandler = postProvisionSpec.CustomHandler
+			postProvisionCustomHandler = postProvisionSpec.CustomHandler
 		)
 		volumes, volumeMounts := renderJobPodVolumes()
 		jobName := genPostProvisionJobName(cluster.Name, synthesizeComp.Name)
@@ -262,11 +262,11 @@ func renderPostStartCmdJob(ctx context.Context,
 						Containers: []corev1.Container{
 							{
 								Name:            KBPostProvisionJobContainerName,
-								Image:           postStartCustomHandler.Image,
+								Image:           postProvisionCustomHandler.Image,
 								ImagePullPolicy: corev1.PullIfNotPresent,
-								Command:         postStartCustomHandler.Exec.Command,
-								Args:            postStartCustomHandler.Exec.Args,
-								Env:             postStartEnvs,
+								Command:         postProvisionCustomHandler.Exec.Command,
+								Args:            postProvisionCustomHandler.Exec.Args,
+								Env:             postProvisionEnvs,
 								VolumeMounts:    volumeMounts,
 							},
 						},
@@ -280,12 +280,12 @@ func renderPostStartCmdJob(ctx context.Context,
 		return job, nil
 	}
 
-	postStartEnvs, err := buildPostProvisionEnvs(cluster, synthesizeComp, &tplPod)
+	postProvisionEnvs, err := buildPostProvisionEnvs(cluster, synthesizeComp, &tplPod)
 	if err != nil {
 		return nil, err
 	}
 
-	job, err := renderJob(synthesizeComp.LifecycleActions.PostProvision, postStartEnvs)
+	job, err := renderJob(synthesizeComp.LifecycleActions.PostProvision, postProvisionEnvs)
 	if err != nil {
 		return nil, err
 	}

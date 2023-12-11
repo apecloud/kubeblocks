@@ -2,6 +2,12 @@ apiVersion: v2
 name: oceanbase-cluster
 description: A oceanbase cluster Helm chart for KubeBlocks.
 
+dependencies:
+  - name: kblib
+    version: 0.1.0
+    repository: file://../kblib
+    alias: extra
+
 type: application
 
 version: 0.0.1-alpha1

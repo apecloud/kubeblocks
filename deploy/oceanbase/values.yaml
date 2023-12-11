@@ -9,8 +9,6 @@ images:
     repository: oceanbase-chart
     tag: 4.2.0.0-100010032023083021
 
-zoneCount: 3
-
 nameOverride: ""
 fullnameOverride: ""
 clusterVersionOverride: "4.2.0.0-100010032023083021"

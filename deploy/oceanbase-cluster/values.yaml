@@ -9,14 +9,29 @@ clusterVersionOverride: "4.2.0.0-100010032023083021"
 
 terminationPolicy: "Delete"
 
-clusterName: obcluster
+# how many clusters to create with-in one ob cluster, set to 2 when creating a primary and secondary oceanbae cluster
+obClusters: 2
+# zone count
+zoneCount: 1
+# replicas, it should be larger than zoneCount
+replicas: 1
 
-replicas: 3
+tenant:
+  name: "alice"
+  max_cpu: 2
+  memory_size: 2
+  log_disk_size: 5
 
+# resources
+cpu: 6
+memory: 10
 resources:
-  cpu: 2.2
-  memory: 11Gi
   storages:
     data-file: 50Gi
     data-log: 50Gi
     log: 20Gi
+storageClassName: "openebs-hostpath"
+
+## customized default values to override kblib chart's values
+extra:
+  podAntiAffinity: Required

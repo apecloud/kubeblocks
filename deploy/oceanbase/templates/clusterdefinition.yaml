@@ -23,15 +23,20 @@ spec:
           - name: rpc
             port: 2882
             targetPort: 2882
-      statefulSpec:
-        minReadySeconds: 30
+      scriptSpecs:
+        - name: oceanbase-scripts
+          templateRef: oceanbase-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 0555
       podSpec:
         containers:
           - name: observer-container
             command:
               - bash
               - -c
-              - "./scripts/entrypoint.sh"
+              - |
+                /scripts/entrypoint.sh
             ports:
               - containerPort: 2881
                 name: sql
@@ -48,13 +53,6 @@ spec:
                 command:
                   - cat
                   - /tmp/ready
-            resources:
-              limits:
-                cpu: "2"
-                memory: 10Gi
-              requests:
-                cpu: "2"
-                memory: 10Gi
             volumeMounts:
               - mountPath: /home/admin/data-file
                 name: data-file
@@ -62,12 +60,12 @@ spec:
                 name: data-log
               - mountPath: /home/admin/log
                 name: log
+              - name: scripts
+                mountPath: /scripts
             workingDir: /home/admin/oceanbase
             env:
               - name: LD_LIBRARY_PATH
                 value: /home/admin/oceanbase/lib
-              - name: ZONE_COUNT
-                value: {{ .Values.zoneCount | quote }}
               - name: CLUSTER_NAME
                 value: "$(KB_CLUSTER_COMP_NAME)"
               - name: POD_IP
@@ -79,3 +77,14 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+              - name: OB_CPU_LIMIT
+                valueFrom:
+                  resourceFieldRef:
+                    containerName: observer-container
+                    resource: limits.cpu
+              - name: OB_MEM_LIMIT
+                valueFrom:
+                  resourceFieldRef:
+                    containerName: observer-container
+                    resource: limits.memory
+                    divisor: 1Mi

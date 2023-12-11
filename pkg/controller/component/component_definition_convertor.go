@@ -487,6 +487,11 @@ func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
 		lifecycleActions.Switchover = c.convertSwitchover(clusterCompDef.SwitchoverSpec, clusterCompVer)
 	}
 
+	if clusterCompDef.PostStartSpec != nil {
+		lifecycleActions.PostProvision = c.convertPostProvision(clusterCompDef.PostStartSpec)
+	}
+
+	lifecycleActions.PreTerminate = nil
 	lifecycleActions.MemberJoin = nil
 	lifecycleActions.MemberLeave = nil
 	lifecycleActions.Readonly = nil
@@ -576,6 +581,25 @@ func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *apps
 		},
 	}
 	return roleProbe
+}
+
+func (c *compDefLifecycleActionsConvertor) convertPostProvision(postStart *appsv1alpha1.PostStartAction) *appsv1alpha1.LifecycleActionHandler {
+	if postStart == nil {
+		return nil
+	}
+
+	defaultPreCondition := appsv1alpha1.ComponentReadyPreConditionType
+	return &appsv1alpha1.LifecycleActionHandler{
+		CustomHandler: &appsv1alpha1.Action{
+			Image: postStart.CmdExecutorConfig.Image,
+			Exec: &appsv1alpha1.ExecAction{
+				Command: postStart.CmdExecutorConfig.Command,
+				Args:    postStart.CmdExecutorConfig.Args,
+			},
+			Env:          postStart.CmdExecutorConfig.Env,
+			PreCondition: &defaultPreCondition,
+		},
+	}
 }
 
 func (c *compDefLifecycleActionsConvertor) convertSwitchover(switchover *appsv1alpha1.SwitchoverSpec,

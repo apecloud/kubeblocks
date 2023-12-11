@@ -29,6 +29,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
 var _ = Describe("Component Definition Convertor", func() {
@@ -48,6 +49,19 @@ var _ = Describe("Component Definition Convertor", func() {
 			runAsUser    = int64(0)
 			runAsNonRoot = false
 		)
+
+		commandExecutorEnvItem := &appsv1alpha1.CommandExecutorEnvItem{
+			Image: testapps.ApeCloudMySQLImage,
+			Env: []corev1.EnvVar{
+				{
+					Name: "user",
+				},
+			},
+		}
+		commandExecutorItem := &appsv1alpha1.CommandExecutorItem{
+			Command: []string{"echo", "hello"},
+			Args:    []string{},
+		}
 
 		BeforeEach(func() {
 			clusterCompDef = &appsv1alpha1.ClusterComponentDefinition{
@@ -725,6 +739,75 @@ var _ = Describe("Component Definition Convertor", func() {
 				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
 				expectedActions := &appsv1alpha1.ComponentLifecycleActions{}
 				Expect(*actions).Should(BeEquivalentTo(*expectedActions))
+			})
+
+			It("switchover", func() {
+				clusterCompDef.Probes.RoleProbe = nil
+				convertor := &compDefLifecycleActionsConvertor{}
+				clusterCompDef.SwitchoverSpec = &appsv1alpha1.SwitchoverSpec{
+					WithCandidate: &appsv1alpha1.SwitchoverAction{
+						CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{
+							CommandExecutorEnvItem: *commandExecutorEnvItem,
+							CommandExecutorItem:    *commandExecutorItem,
+						},
+						ScriptSpecSelectors: []appsv1alpha1.ScriptSpecSelector{
+							{
+								Name: "with-candidate",
+							},
+						},
+					},
+					WithoutCandidate: &appsv1alpha1.SwitchoverAction{
+						CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{
+							CommandExecutorEnvItem: *commandExecutorEnvItem,
+							CommandExecutorItem:    *commandExecutorItem,
+						},
+						ScriptSpecSelectors: []appsv1alpha1.ScriptSpecSelector{
+							{
+								Name: "without-candidate",
+							},
+						},
+					},
+				}
+
+				res, err := convertor.convert(clusterCompDef)
+				Expect(err).Should(Succeed())
+				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
+				Expect(actions.Switchover).ShouldNot(BeNil())
+				Expect(len(actions.Switchover.ScriptSpecSelectors)).Should(BeEquivalentTo(2))
+				Expect(actions.Switchover.WithCandidate).ShouldNot(BeNil())
+				Expect(actions.Switchover.WithCandidate.Image).Should(BeEquivalentTo(commandExecutorEnvItem.Image))
+				Expect(actions.Switchover.WithCandidate.Env).Should(BeEquivalentTo(commandExecutorEnvItem.Env))
+				Expect(actions.Switchover.WithCandidate.Exec.Command).Should(BeEquivalentTo(commandExecutorItem.Command))
+				Expect(actions.Switchover.WithCandidate.Exec.Args).Should(BeEquivalentTo(commandExecutorItem.Args))
+				Expect(actions.Switchover.WithoutCandidate).ShouldNot(BeNil())
+			})
+
+			It("post provision", func() {
+				clusterCompDef.Probes.RoleProbe = nil
+				clusterCompDef.SwitchoverSpec = nil
+				convertor := &compDefLifecycleActionsConvertor{}
+				clusterCompDef.PostStartSpec = &appsv1alpha1.PostStartAction{
+					CmdExecutorConfig: appsv1alpha1.CmdExecutorConfig{
+						CommandExecutorEnvItem: *commandExecutorEnvItem,
+						CommandExecutorItem:    *commandExecutorItem,
+					},
+					ScriptSpecSelectors: []appsv1alpha1.ScriptSpecSelector{
+						{
+							Name: "post-start",
+						},
+					},
+				}
+				res, err := convertor.convert(clusterCompDef)
+				Expect(err).Should(Succeed())
+
+				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
+				Expect(actions.PostProvision).ShouldNot(BeNil())
+				Expect(actions.PostProvision.CustomHandler).ShouldNot(BeNil())
+				Expect(actions.PostProvision.CustomHandler.Image).Should(BeEquivalentTo(commandExecutorEnvItem.Image))
+				Expect(actions.PostProvision.CustomHandler.Env).Should(BeEquivalentTo(commandExecutorEnvItem.Env))
+				Expect(actions.PostProvision.CustomHandler.Exec.Command).Should(BeEquivalentTo(commandExecutorItem.Command))
+				Expect(actions.PostProvision.CustomHandler.Exec.Args).Should(BeEquivalentTo(commandExecutorItem.Args))
+				Expect(*actions.PostProvision.CustomHandler.PreCondition).Should(BeEquivalentTo(appsv1alpha1.ComponentReadyPreConditionType))
 			})
 
 			It("role probe", func() {

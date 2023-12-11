@@ -1605,12 +1605,14 @@ spec:
                         type: object
                     type: object
                   postProvision:
-                    description: PostProvision defines the actions to be executed
+                    description: 'PostProvision defines the actions to be executed
                       and the corresponding policy when a component is created. You
                       can define the preCondition for executing PostProvision using
                       Action.PreCondition. The default PostProvision action preCondition
                       is ComponentReady. The PostProvision Action will be executed
-                      only once. Cannot be updated.
+                      only once. Dedicated env vars for the action: - KB_CLUSTER_COMPONENT_LIST:
+                      The list of all components in the cluster, joined by '','' (e.g.,
+                      "comp1,comp2"). Cannot be updated.'
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler

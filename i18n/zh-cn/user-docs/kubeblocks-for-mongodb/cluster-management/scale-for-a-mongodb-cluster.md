@@ -30,7 +30,7 @@ kbcli cluster list mongodb-cluster
 
 ### 步骤
 
-1. 更改配置。共有 3 种方式进行垂直扩容。
+1. 更改配置，共有 3 种方式。
 
    **选项 1.** (**推荐**) 使用 kbcli
 
@@ -49,7 +49,7 @@ kbcli cluster list mongodb-cluster
    - `--memory` 表示组件请求和限制的内存大小。
    - `--cpu` 表示组件请求和限制的 CPU 大小。
 
-   2. 使用 `kbcli cluster describe-ops mongodb-cluster-verticalscaling-thglk -n default` 命令进行验证。
+   1. 使用 `kbcli cluster describe-ops mongodb-cluster-verticalscaling-thglk -n default` 命令进行验证。
 
      :::note
 
@@ -111,11 +111,11 @@ kbcli cluster list mongodb-cluster
 
 :::note
 
-垂直扩容不会同步与 CPU 和内存相关的参数，需要手动调用配置的 OpsRequest 来进行更改。详情请参考[配置](../../kubeblocks-for-mongodb/configuration/configure-cluster-parameters.md)。
+垂直扩容不会同步与 CPU 和内存相关的参数，需要手动调用配置的 OpsRequest 来进行更改。详情请参考[配置](./../../kubeblocks-for-mongodb/configuration/configure-cluster-parameters.md)。
 
 :::
 
-3. 检查资源是否已经发生更改。
+3. 检查资源规格是否已变更。
 
     ```bash
     kbcli cluster describe mongodb-cluster

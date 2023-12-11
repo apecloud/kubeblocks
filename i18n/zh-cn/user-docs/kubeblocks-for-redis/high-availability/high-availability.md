@@ -15,8 +15,8 @@ Redis Sentinel 是 Redis 官方推荐的主备集群高可用性解决方案，�
 
 ## 开始之前
 
-* 安装 KubeBlocks：可使用 [kbcli](../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](../../installation/install-with-helm/install-kubeblocks-with-helm.md) 安装 KubeBlocks。
-* [创建 Redis 主备版集群](../../kubeblocks-for-redis/cluster-management/create-and-connect-to-a-redis-cluster.md#创建集群)。
+* 安装 KubeBlocks：可使用 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md) 进行安装。
+* [创建 Redis 主备版集群](./../../kubeblocks-for-redis/cluster-management/create-and-connect-to-a-redis-cluster.md#创建集群)。
 * 检查切换策略和角色探测参数。
   * 检查切换策略是否为 `Noop`。
 
@@ -51,7 +51,7 @@ Redis Sentinel 是 Redis 官方推荐的主备集群高可用性解决方案，�
    kbcli cluster describe redis-cluster
    ```
 
-   ![Redis cluster original status](../../img/../../img/redis-high-availability-initial-status.png)
+   ![Redis cluster original status](./../../../img/redis-high-availability-initial-status.png)
 
    当前 `redis-cluster-redis-0` 是主节点，`redis-cluster-redis-1` 是从节点。
 
@@ -90,7 +90,7 @@ Redis Sentinel 是 Redis 官方推荐的主备集群高可用性解决方案，�
    127.0.0.1:6379> info replication
    ```
 
-   ![Redis info replication](../../../img/redis-high-availability-status-after-exception.png)
+   ![Redis info replication](./../../../img/redis-high-availability-status-after-exception.png)
 
    从输出可以看到，`redis-cluster-redis-1` 是主节点。
 
@@ -100,6 +100,6 @@ Redis Sentinel 是 Redis 官方推荐的主备集群高可用性解决方案，�
    kbcli cluster describe redis-cluster
    ```
 
-   ![Redis cluster status after HA](../../../img/redis-high-availability-role.png)
+   ![Redis cluster status after HA](./../../../img/redis-high-availability-role.png)
 
    故障切换后，`redis-cluster-redis-0` 变成了从节点，`redis-cluster-redis-1` 变成了主节点。

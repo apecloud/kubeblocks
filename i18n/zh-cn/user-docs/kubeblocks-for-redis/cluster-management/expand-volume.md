@@ -37,7 +37,7 @@ redis-cluster        default          redis                     redis-7.0.6     
 
 1. 更改配置，共有 3 种方式。
 
-   **选项 1**. (**推荐**) 使用 kbcli
+   **选项 1**.（**推荐**） 使用 kbcli
 
    配置参数 `--components`、`--volume-claim-templates` 和 `--storage`，并执行以下命令。
 

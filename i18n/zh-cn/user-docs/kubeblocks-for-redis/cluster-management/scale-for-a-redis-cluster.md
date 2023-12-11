@@ -39,9 +39,9 @@ redis-cluster        default          redis                     redis-7.0.6     
 
 ### 步骤
 
-1. 更改配置。共有 3 种方式进行垂直扩容。
+1. 更改配置，共有 3 种方式。
 
-   **选项 1.** (**推荐**) 使用 kbcli
+   **选项 1.** （**推荐**）使用 kbcli
 
    配置参数 `--components`、`--memory` 和 `--cpu`，并执行以下命令。
 
@@ -142,7 +142,7 @@ redis-cluster        default          redis                     redis-7.0.6     
 
 :::note
 
-垂直扩容不会同步与 CPU 和内存相关的参数，需要手动调用配置的 OpsRequest 来进行更改。详情请参考[配置](../../kubeblocks-for-redis/configuration/configure-cluster-parameters.md)。
+垂直扩容不会同步与 CPU 和内存相关的参数，需要手动调用配置的 OpsRequest 来进行更改。详情请参考[配置](./../../kubeblocks-for-redis/configuration/configure-cluster-parameters.md)。
 
 :::
 

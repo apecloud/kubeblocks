@@ -119,6 +119,8 @@ func needDoPostProvision(ctx context.Context, cli client.Client,
 			if cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
 				return false, nil
 			}
+		default:
+			return false, nil
 		}
 	} else if comp.Status.Phase != appsv1alpha1.RunningClusterCompPhase {
 		// if the PreCondition is not set, the default preCondition is ComponentReady
@@ -381,6 +383,9 @@ func setPostProvisionDoneAnnotation(cli client.Client,
 	for _, obj := range graphCli.FindAll(dag, &appsv1alpha1.Component{}) {
 		if graphCli.IsAction(dag, obj, model.ActionUpdatePtr()) {
 			comp = obj.(*appsv1alpha1.Component)
+			if comp.Annotations == nil {
+				comp.Annotations = make(map[string]string)
+			}
 		}
 	}
 	compObj := comp.DeepCopy()

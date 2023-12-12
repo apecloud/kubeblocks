@@ -24,3 +24,12 @@ Selector labels
 {{- define "bytebase.selectorLabels" -}}
 app: bytebase
 {{- end }}
+
+
+{{- define "bytebase.imageRegistry" }}
+{{- if not .Values.images. }}
+{{- "infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com" }}
+{{- else }}
+{{- .Values.images.registry }}
+{{- end}}
+{{- end}}

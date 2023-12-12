@@ -2,13 +2,16 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 images:
+  registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
   bytebase:
-    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+    # if the value of images.bytebase.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
+    registry: ""
     repository: apecloud/bytebase
     tag: beta1
     pullPolicy: IfNotPresent
   python:
-    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+    # if the value of images.python.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
+    registry: ""
     repository: apecloud/python11-tools
     tag: stable
     pullPolicy: ""

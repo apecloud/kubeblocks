@@ -7,6 +7,7 @@
 {{- $version := .Values.bytebase.version -}}
 {{- $registryMirrorHost := .Values.bytebase.registryMirrorHost -}}
 {{- $disable_sample := index .Values.bytebase.option "disable-sample" -}}
+{{- $imageRegistry := include "bytebase.imageRegistry" . }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -27,7 +28,7 @@ spec:
     spec:
       containers:
         - name: bytebase
-          image: {{ .Values.images.bytebase.registry  }}/{{ .Values.images.bytebase.repository }}:{{ .Values.images.bytebase.tag }}
+          image: "{{ .Values.images.bytebase.registry | default $imageRegistry  }}/{{ .Values.images.bytebase.repository }}:{{ .Values.images.bytebase.tag }}"
           imagePullPolicy: {{.Values.images.bytebase.pullPolicy}}
           env:
             - name: PG_URL
@@ -89,7 +90,7 @@ spec:
         {{ else }}
         # If user disable persistence, use an emptyDir volume.
         - name: bytebase-volume
-          emptyDir: {}
+          emptyDir: { }
         {{ end }}
 
 ---

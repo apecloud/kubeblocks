@@ -10,20 +10,20 @@ spec:
     - componentDefRef: datanode
       versionsContext:
         containers:
-        - name: datanode
-          image: {{ .Values.images.greptimedb.registry | default .Values.images.registry }}/{{ .Values.images.greptimedb.repository }}:{{ default .Chart.AppVersion .Values.images.greptimedb.tag }}
+          - name: datanode
+            image: {{ .Values.images.greptimedb.repository }}:{{ default .Chart.AppVersion .Values.images.greptimedb.tag }}
     - componentDefRef: etcd
       versionsContext:
         containers:
           - name: etcd
-            image: {{ .Values.images.etcd.registry | default .Values.images.registry }}/{{ .Values.images.etcd.repository }}:{{ default .Chart.AppVersion .Values.images.etcd.tag }}
+            image: {{ .Values.images.etcd.repository }}:{{ default .Chart.AppVersion .Values.images.etcd.tag }}
     - componentDefRef: meta
       versionsContext:
         containers:
           - name: meta
-            image: {{ .Values.images.greptimedb.registry | default .Values.images.registry }}/{{ .Values.images.greptimedb.repository }}:{{ default .Chart.AppVersion .Values.images.greptimedb.tag }}
+            image: {{ .Values.images.greptimedb.repository }}:{{ default .Chart.AppVersion .Values.images.greptimedb.tag }}
     - componentDefRef: frontend
       versionsContext:
         containers:
           - name: frontend
-            image: {{ .Values.images.greptimedb.registry | default .Values.images.registry }}/{{ .Values.images.greptimedb.repository }}:{{ default .Chart.AppVersion .Values.images.greptimedb.tag }}
+            image: {{ .Values.images.greptimedb.repository }}:{{ default .Chart.AppVersion .Values.images.greptimedb.tag }}

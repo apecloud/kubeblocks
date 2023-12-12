@@ -34,3 +34,21 @@ data:
     else
       /bin/agamotto --config=/opt/agamotto/agamotto-config-with-proxy.yaml
     fi 
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql8.0-reload-script
+  labels:
+    {{- include "mysql.labels" . | nindent 4 }}
+data:
+  reload.tpl: |-
+    {{- .Files.Get "config/mysql-reload.tpl" | nindent 4 }}
+  reload.yaml: |-
+    scripts: reload.tpl
+    fileRegex: my.cnf
+    formatterConfig:
+      format: ini
+      iniConfig:
+        sectionName: mysqld

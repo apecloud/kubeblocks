@@ -89,9 +89,9 @@ kbcli 目前支持 macOS、Windows 和 Linux 系统。
     kbcli -h
     ```
 
-  </TabItem>
+</TabItem>
 
-  <TabItem value="Windows" label="Windows">
+<TabItem value="Windows" label="Windows">
 
 有两种方法可以在 Windows 上安装 kbcli。
 

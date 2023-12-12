@@ -16,7 +16,7 @@ sidebar_label: 高级日志
 
 该功能支持将日志数据存储到集群中的 Loki 服务器和远程的 AWS S3 服务中。存储在 Loki 中的数据可以通过 `logcli` 客户端和 Grafana 控制台访问和显示。存储在 S3 中的数据支持导入和与其他系统的集成，以便进行进一步处理和分析。
 
-## Add-on 介绍
+## 引擎介绍
 
 KubeBlocks 以引擎的形式统一管理 Agamotto、Loki、Prometheus 等与可观测性相关的组件。每个引擎都有其特色。
 
@@ -34,7 +34,7 @@ KubeBlocks 以引擎的形式统一管理 Agamotto、Loki、Prometheus 等与可
 
 ### 启用 Loki
 
-Loki add-on 用于存储日志数据，并接受来自前端的搜索请求。详情请参考 [Loki 官方文档](https://grafana.com/docs/loki/latest/)。
+Loki 引擎用于存储日志数据，并接受来自前端的搜索请求。详情请参考 [Loki 官方文档](https://grafana.com/docs/loki/latest/)。
 
 :::caution
 
@@ -42,13 +42,13 @@ Loki add-on 用于存储日志数据，并接受来自前端的搜索请求。�
 
 :::
 
-1. 查看 Loki add-on 的状态，检查其是否已启用。
+1. 查看 Loki 引擎的状态，检查其是否已启用。
 
     ```bash
     kbcli addon list | grep loki
     ```
 
-2. 如果未启用，请执行以下命令以启用 add-on。
+2. 如果未启用，请执行以下命令以启用引擎。
 
     此命令以 `statefulset` 模式运行 Loki。KubeBlocks 将默认部署 single binary 类型的单节点 Loki，即配置中的 target 是 all，使用一个 10 GB 的 PV 来存储数据，并启动一个 loki-gateway 服务来接收数据。
 
@@ -72,7 +72,7 @@ Loki add-on 用于存储日志数据，并接受来自前端的搜索请求。�
 3. 运行 Grafana ，查看 Loki 的状态。
    ![Loki in Grafana](../../img/observability-loki-in-grafana.png)
 
-4. （可选）禁用 Loki add-on。
+4. （可选）禁用 Loki 引擎。
 
     ```bash
     kbcli disabled loki
@@ -156,7 +156,7 @@ pvc-ed20ec94-9a58-46e4-9c28-b692cba70e79   8Gi        RWO            Delete     
     kbcli addon enable agamotto --set log.enabled=true,log.s3.enabled=true,log.s3.accessKey=user_ak,log.s3.secretKey=user_sk,log.s3.region=user_region,log.s3.bucket=user_bucket
     ```
     远程 S3 的目标存储桶会创建一个以文件名命名的目录，用于存储对应日志的实时数据分区（按照每 5 分钟或每 5 MB 进行分区）。
-5. （可选）禁用 Agamotto add-on。
+5. （可选）禁用 Agamotto 引擎。
     ```bash
     kbcli addon disable agamotto
     ```
@@ -184,9 +184,9 @@ pvc-ed20ec94-9a58-46e4-9c28-b692cba70e79   8Gi        RWO            Delete     
     或者可以转到 **Explore** 页面，并选择 **Loki** 来搜索日志。
     ![Loki on Explore page](../../img/obervability-advanced-logs-loki-grafana.png)
 
-
 ### 启用 LogCLI
-kbcli 支持 LogCLI add-on，方便你通过命令行查询日志。
+
+kbcli 支持 LogCLI 引擎，方便你通过命令行查询日志。
 
 :::note
 

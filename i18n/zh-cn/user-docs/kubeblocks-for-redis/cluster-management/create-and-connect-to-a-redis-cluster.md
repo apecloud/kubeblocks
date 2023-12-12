@@ -21,7 +21,7 @@ KubeBlocks 支持 Redis 单机版和 Redis 主备版集群。为了提供更好�
 
 * 如果想通过 kbcli 创建和连接 MySQL 集群，请[安装 kbcli](./../../installation/install-with-kbcli/install-kbcli.md)。
 * 用 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md) 安装 KubeBlocks。
-* 确保 Redis add-on 已启用。
+* 确保 Redis 引擎已启用。
   
   <Tabs>
 

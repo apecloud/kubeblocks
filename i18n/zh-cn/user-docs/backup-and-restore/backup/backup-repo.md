@@ -163,7 +163,7 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
     <TabItem value="kbcli" label="kbcli" default>
 
     ```bash
-    # 启用 CSI-S3 add-on
+    # 启用 CSI-S3 引擎
     kbcli addon enable csi-s3
 
     # 如需控制 addon 的安装，则添加其他参数

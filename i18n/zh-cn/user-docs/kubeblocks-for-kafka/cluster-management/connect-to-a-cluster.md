@@ -236,7 +236,7 @@ sidebar_label: 连接
 
    3. 获取 Broker 地址。
 
-      Broker 地址为固定格式，将下面字符串中 {clusterName} 替换成 Kafka Cluster Name 即可。
+      Broker 地址为固定格式，将下面字符串中 `{clusterName}` 替换成 Kafka Cluster Name 即可。
 
       ```bash
       {clusterName}-broker-0.{clusterName}-broker-headless.default.svc

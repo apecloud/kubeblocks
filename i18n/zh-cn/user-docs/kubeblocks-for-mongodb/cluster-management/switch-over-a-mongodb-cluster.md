@@ -6,6 +6,9 @@ sidebar_position: 6
 sidebar_label: 切换
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # 切换 MongoDB 集群
 
 你可以通过执行 kbcli 或 kubectl 命令来切换 MongoDB 主备版。切换后，KubeBlocks 将修改实例角色。

@@ -23,7 +23,7 @@ KubeBlocks Playground 内置了三个监控组件：
 1. 查看所有支持的引擎，确保监控引擎已启用。
 
     ```bash
-    # 查看内置支持的所有 add-on
+    # 查看内置支持的所有引擎
     kbcli addon list
     ...
     grafana                        Helm   Enabled                   true                                                                                    

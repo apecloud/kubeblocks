@@ -15,31 +15,20 @@ commonLabels: {}
 ## @param application images
 ##
 images:
-  registry: docker.io
   pullPolicy: IfNotPresent
   minio:
-    # if the value of images.minio.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
-    registry: ""
-    repository: minio/minio
+    repository: docker.io/minio/minio
     tag: RELEASE.2022-03-17T06-34-49Z
   etcd:
-    # if the value of images.etcd.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
-    registry: ""
     repository: docker.io/milvusdb/etcd
     tag: 3.5.5-r2
   shell_tools:
-    # if the value of images.shell_tools.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
-    registry: ""
     repository: bitnami/os-shell
     tag: 11-debian-11-r90
   milvus_init:
-    # if the value of images.milvus_init.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
-    registry: ""
     repository: docker.io/milvusdb/milvus-operator
     tag: v0.7.8
   milvus:
-    # if the value of images.milvus.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
-    registry: ""
     repository: docker.io/milvusdb/milvus
     tag: v2.2.4
 

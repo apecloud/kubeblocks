@@ -113,7 +113,6 @@ func CheckJobSucceed(ctx context.Context,
 		default:
 			return intctrlutil.NewErrorf(intctrlutil.ErrorWaitCacheRefresh, "requeue to waiting for job %s finished.", key.Name)
 		}
-	} else {
-		return intctrlutil.NewErrorf(intctrlutil.ErrorWaitCacheRefresh, "requeue to waiting for job %s finished.", key.Name)
 	}
+	return intctrlutil.NewErrorf(intctrlutil.ErrorWaitCacheRefresh, "requeue to waiting for job %s finished.", key.Name)
 }

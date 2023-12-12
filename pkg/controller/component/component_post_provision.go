@@ -102,8 +102,7 @@ func ReconcileCompPostProvision(ctx context.Context,
 func needDoPostProvision(ctx context.Context, cli client.Client,
 	cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component, synthesizeComp *SynthesizedComponent) (bool, error) {
 	// if the component does not have a custom postProvision, skip it
-	if synthesizeComp == nil || synthesizeComp.LifecycleActions == nil ||
-		synthesizeComp.LifecycleActions.PostProvision == nil || synthesizeComp.LifecycleActions.PostProvision.CustomHandler == nil {
+	if !checkPostProvisionAction(synthesizeComp) {
 		return false, nil
 	}
 
@@ -147,8 +146,7 @@ func createPostProvisionJobIfNotExist(ctx context.Context,
 	cluster *appsv1alpha1.Cluster,
 	comp *appsv1alpha1.Component,
 	synthesizeComp *SynthesizedComponent) (*batchv1.Job, error) {
-	if synthesizeComp == nil || synthesizeComp.LifecycleActions == nil ||
-		synthesizeComp.LifecycleActions.PostProvision == nil || synthesizeComp.LifecycleActions.PostProvision.CustomHandler == nil {
+	if !checkPostProvisionAction(synthesizeComp) {
 		return nil, nil
 	}
 
@@ -188,8 +186,7 @@ func renderPostProvisionCmdJob(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	synthesizeComp *SynthesizedComponent) (*batchv1.Job, error) {
-	if synthesizeComp == nil || synthesizeComp.LifecycleActions == nil ||
-		synthesizeComp.LifecycleActions.PostProvision == nil || synthesizeComp.LifecycleActions.PostProvision.CustomHandler == nil {
+	if !checkPostProvisionAction(synthesizeComp) {
 		return nil, errors.New("postProvision CustomHandler spec not found")
 	}
 
@@ -197,7 +194,7 @@ func renderPostProvisionCmdJob(ctx context.Context,
 		return nil, errors.New("postProvision customHandler only support exec command by now, please check your customHandler spec.")
 	}
 
-	podList, err := getComponentPodList(ctx, cli, *cluster, synthesizeComp.Name)
+	podList, err := GetComponentPodList(ctx, cli, *cluster, synthesizeComp.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -359,14 +356,6 @@ func getComponentMatchLabels(clusterName, componentName string) map[string]strin
 	}
 }
 
-// getComponentPodList gets the pod list by cluster and componentName
-func getComponentPodList(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, componentName string) (*corev1.PodList, error) {
-	podList := &corev1.PodList{}
-	err := cli.List(ctx, podList, client.InNamespace(cluster.Namespace),
-		client.MatchingLabels(getComponentMatchLabels(cluster.Name, componentName)))
-	return podList, err
-}
-
 // setPostProvisionDoneAnnotation sets the postProvision done annotation to the component object.
 func setPostProvisionDoneAnnotation(cli client.Client,
 	comp *appsv1alpha1.Component,
@@ -378,15 +367,6 @@ func setPostProvisionDoneAnnotation(cli client.Client,
 	_, ok := comp.Annotations[kbCompPostProvisionDoneKey]
 	if ok {
 		return nil
-	}
-	// If there is component pending update in the DAG, the object will be used to perform the update.
-	for _, obj := range graphCli.FindAll(dag, &appsv1alpha1.Component{}) {
-		if graphCli.IsAction(dag, obj, model.ActionUpdatePtr()) {
-			comp = obj.(*appsv1alpha1.Component)
-			if comp.Annotations == nil {
-				comp.Annotations = make(map[string]string)
-			}
-		}
 	}
 	compObj := comp.DeepCopy()
 	timeStr := time.Now().Format(time.RFC3339Nano)
@@ -423,4 +403,12 @@ func checkPostProvisionDoneAnnotationExist(cluster appsv1alpha1.Cluster,
 	}
 	_, ok = comp.Annotations[kbCompPostProvisionDoneKey]
 	return ok
+}
+
+func checkPostProvisionAction(synthesizeComp *SynthesizedComponent) bool {
+	if synthesizeComp == nil || synthesizeComp.LifecycleActions == nil ||
+		synthesizeComp.LifecycleActions.PostProvision == nil || synthesizeComp.LifecycleActions.PostProvision.CustomHandler == nil {
+		return false
+	}
+	return true
 }

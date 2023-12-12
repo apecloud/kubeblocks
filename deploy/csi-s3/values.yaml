@@ -1,8 +1,7 @@
 ---
 images:
-  defaultImage:
-    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
-    pullPolicy: IfNotPresent
+  registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+  pullPolicy: IfNotPresent
   # Source: quay.io/k8scsi/csi-attacher:v3.0.1
   attacher:
     registry: ""

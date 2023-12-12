@@ -47,7 +47,7 @@ jobs:
     secrets: inherit
 
   release-addons-chart:
-    needs: release-version
+    needs: release-chart
     uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.40
     with:
       GITHUB_REPO: "apecloud/kubeblocks-addons"

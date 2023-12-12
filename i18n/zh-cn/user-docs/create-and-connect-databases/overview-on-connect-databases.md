@@ -3,15 +3,15 @@ title: 连接数据库
 description: 如何连接数据库
 keywords: [连接数据库]
 sidebar_position: 1
-sidebar_label: 概述
+sidebar_label: 简介
 ---
 
-# 创建与连接数据库
+# 简介
 
 在部署完 KubeBlocks 并创建集群之后，数据库在 Kubernetes 上以 Pod 的形式运行。
 
-在 KubeBlocks 上创建数据库只需运行以下命令。在本章节中，会以创建一个 MySQL cluster 为例。创建其他数据库引擎的操作是类似的，细节上的差别请参加各引擎文档。
-
+在 KubeBlocks 上创建数据库只需运行以下命令（本章节以创建一个 MySQL 集群为例进行演示。创建其他数据库引擎的操作是类似的，细节上的差别请参加各引擎文档）。
+    
   ```bash
   kbcli cluster create 
   ```

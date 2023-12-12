@@ -11,16 +11,17 @@ import TabItem from '@theme/TabItem';
 
 # 在云上使用 KubeBlocks
 
-本指南将引导你快速上手 KubeBlocks，并演示如何通过命令创建演示环境（Playground）。
+本文档将引导你快速上手 KubeBlocks，并演示如何通过命令创建演示环境（Playground）。
 
 ## 准备工作
 
-在云上部署时，通常使用 [Terraform 脚本](https://github.com/apecloud/cloud-provider)来初始化云资源。kbcli 会自动下载并保存该脚本，然后使用 Terraform 命令来创建一个完全托管的 Kubernetes 集群，并在该集群上部署 KubeBlocks。
+在云上部署需要使用 [Terraform 脚本](https://github.com/apecloud/cloud-provider)来初始化云资源。`kbcli` 会自动下载并保存该脚本，然后使用 Terraform 命令来创建一个完全托管的 Kubernetes 集群，并在该集群上部署 KubeBlocks。
+
 
 <Tabs>
 <TabItem value="AWS" label="AWS" default>
 
-### 在 AWS 上使用 KubeBlocks 之前
+### 开始之前
 
 请确保已经：
 
@@ -58,7 +59,7 @@ kbcli playground init --cloud-provider aws --region us-west-2
 - `region` 用于指定部署 Kubernetes 集群的地区。
   你可以在[官方网站](https://aws.amazon.com/about-aws/global-infrastructure/regional-product-services/?nc1=h_ls)上找到地区列表。
 
-在初始化过程中，`kbcli` 将 [GitHub 仓库](https://github.com/apecloud/cloud-provider)克隆到 `~/.kbcli/playground` 目录，安装 KubeBlocks，并创建一个 MySQL 集群。执行 `kbcli playground init` 命令后，kbcli 会自动将 kubeconfig 的 context 切换到新的 Kubernetes 集群。
+在初始化过程中，`kbcli` 会将 [GitHub 仓库](https://github.com/apecloud/cloud-provider)克隆到 `~/.kbcli/playground` 目录，安装 KubeBlocks，并创建一个 MySQL 集群。执行 `kbcli playground init` 命令后，kbcli 会自动将 kubeconfig 的 context 切换到新的 Kubernetes 集群。
 
 执行以下命令以查看创建的集群。
 
@@ -79,7 +80,7 @@ kbcli cluster list
 </TabItem>
 <TabItem value="GCP" label="GCP">
 
-###  在 GCP 上使用 KubeBlocks 之前
+###  开始之前
 
 请确保已经：
 - 拥有 Google Cloud 账户。
@@ -112,7 +113,7 @@ kbcli cluster list
    gcloud auth application-default login
    ```
 
-4. GOOGLE_PROJECT 环境变量，`kbcli playground` 会在该项目中创建 GKE 集群。
+4. 配置 GOOGLE_PROJECT 环境变量，`kbcli playground` 会在该项目中创建 GKE 集群。
 
    ```bash
    export GOOGLE_PROJECT=<project-name>
@@ -120,7 +121,7 @@ kbcli cluster list
 
 ### 初始化 Playground
 
-执行以下命令，在 GCP 的 us-central1 地区部署一个 GKE 服务，并安装 KubeBlocks。
+执行以下命令，在 GCP 的 `us-central1` 地区部署一个 GKE 服务，并安装 KubeBlocks。
 
 ```bash
 kbcli playground init --cloud-provider gcp --region us-central1
@@ -129,7 +130,7 @@ kbcli playground init --cloud-provider gcp --region us-central1
 * `cloud-provider` 用于指定云服务商。
 * `region` 用于指定部署 Kubernetes 集群的地区。
 
-在初始化过程中，`kbcli` 将 [GitHub 仓库](https://github.com/apecloud/cloud-provider)克隆到目录 `~/.kbcli/playground`，安装 KubeBlocks，并创建一个 MySQL 集群。执行 kbcli playground init 命令后，kbcli 会自动将 kubeconfig 的 context 切换到新的 Kubernetes 集群。
+在初始化过程中，`kbcli` 会将 [GitHub 仓库](https://github.com/apecloud/cloud-provider)克隆到目录 `~/.kbcli/playground`，安装 KubeBlocks，并创建一个 MySQL 集群。执行 kbcli playground init 命令后，kbcli 会自动将 kubeconfig 的 context 切换到新的 Kubernetes 集群。
 
 执行以下命令以查看创建的集群。
 
@@ -148,9 +149,9 @@ kbcli cluster list
 :::
 
 </TabItem> 
-<TabItem value="Tencent Cloud" label="Tencent Cloud">
+<TabItem value="腾讯云" label="腾讯云">
 
-### 在腾讯云上使用 KubeBlocks 之前
+### 开始之前
 
 请确保已经：
 - 拥有腾讯云账户。
@@ -181,7 +182,7 @@ kbcli playground init --cloud-provider tencentcloud --region ap-chengdu
 - `cloud-provider` 用于指定云服务商。
 - `region` 用于指定部署 Kubernetes 集群的地区。
 
-在初始化过程中，`kbcli` 将 [GitHub 仓库](https://github.com/apecloud/cloud-provider)克隆到目录`~/.kbcli/playground`，安装 KubeBlocks，并创建一个 MySQL 集群。执行 `kbcli playground init` 命令后，kbcli 会自动将 kubeconfig 的 context 切换到新的 Kubernetes 集群。
+在初始化过程中，`kbcli` 会将 [GitHub 仓库](https://github.com/apecloud/cloud-provider)克隆到目录`~/.kbcli/playground`，安装 KubeBlocks，并创建一个 MySQL 集群。执行 `kbcli playground init` 命令后，kbcli 会自动将 kubeconfig 的 context 切换到新的 Kubernetes 集群。
 
 执行以下命令以查看创建的集群。
 
@@ -200,9 +201,9 @@ kbcli cluster list
 :::
 
 </TabItem>
-<TabItem value="Alibaba Cloud" label="Alibaba Cloud">
+<TabItem value="阿里云" label="阿里云">
 
-### 在阿里云上使用 KubeBlocks 之前
+### 开始之前
 
 请确保已经：
 - 拥有阿里云账户。
@@ -222,10 +223,10 @@ kbcli cluster list
    :::
 3. 点击 [AliyunOOSLifecycleHook4CSRole](https://ram.console.aliyun.com/role/authorize?spm=5176.2020520152.0.0.5b4716ddI6QevL&request=%7B%22ReturnUrl%22%3A%22https%3A%2F%2Fram.console.aliyun.com%22%2C%22Services%22%3A%5B%7B%22Roles%22%3A%5B%7B%22RoleName%22%3A%22AliyunOOSLifecycleHook4CSRole%22%2C%22TemplateId%22%3A%22AliyunOOSLifecycleHook4CSRole%22%7D%5D%2C%22Service%22%3A%22OOS%22%7D%5D%7D)，点击**同意授权**以创建一个 AliyunOOSLifecycleHook4CSRole 角色。
 
-   创建 ACK 集群时，需要创建和管理节点池，因此需要创建 AliyunOOSLifecycleHook4CSRole 角色，为 OOS 运维编排服务授权以访问其他云产品中的资源，步骤如下（详情请参考[官方文档](https://www.alibabacloud.com/help/zh/container-service-for-kubernetes/latest/scale-up-and-down-node-pools)）。
+   创建 ACK 集群时，需要创建和管理节点池，因此需要创建 AliyunOOSLifecycleHook4CSRole 角色，为 OOS 运维编排服务授权以访问其他云产品中的资源（详情请参考[官方文档](https://www.alibabacloud.com/help/zh/container-service-for-kubernetes/latest/scale-up-and-down-node-pools)）。
 4. 创建 AccessKey ID 和对应的 AccessKey 密钥。
    
-   1. 进入[阿里云管理控制台](https://homenew.console.aliyun.com/home/dashboard/ProductAndService)。将鼠标悬停在账户中心处，点击 AccessKey 管理。
+   1. 进入[阿里云管理控制台](https://homenew.console.aliyun.com/home/dashboard/ProductAndService)。将鼠标悬停在账户中心处，点击 **AccessKey 管理**。
        ![AccessKey Management](../../img/try-kb-on-cloud-accesskey-management.png)
    2. 点击**创建 AccessKey**，创建 AccessKey ID 和对应的 AccessKey 密钥。
    3. 将 AccessKey ID 和 AccessKey 密钥添加到环境变量中，以配置身份授权信息。
@@ -251,7 +252,7 @@ kbcli playground init --cloud-provider alicloud --region cn-hangzhou
 - `cloud-provider` 用于指定云服务商。
 - `region` 用于指定部署 Kubernetes 集群的地区。
 
-在初始化过程中，kbcli 将 [GitHub 仓库](https://github.com/apecloud/cloud-provider)克隆到目录`~/.kbcli/playground`，安装 KubeBlocks，并创建一个 MySQL 集群。执行 `kbcli playground init` 命令后，kbcli 会自动将 kubeconfig 的当前 context 切换到新的 Kubernetes 集群。
+在初始化过程中，`kbcli` 会将 [GitHub 仓库](https://github.com/apecloud/cloud-provider)克隆到目录`~/.kbcli/playground`，安装 KubeBlocks，并创建一个 MySQL 集群。执行 `kbcli playground init` 命令后，kbcli 会自动将 kubeconfig 的当前 context 切换到新的 Kubernetes 集群。
 
 执行以下命令以查看创建的集群。
 
@@ -306,7 +307,7 @@ kbcli cluster connect mycluster
 
 ***步骤：***
 
-1. 获取 Credentials。
+1. 获取连接凭证。
 
    ```bash
    kbcli cluster connect --show-example --client=cli mycluster
@@ -368,17 +369,17 @@ KubeBlocks 具备完整的可观测性能力，下面主要演示其中的监控
 
 下面通过简单的故障模拟，展示 MySQL 的故障恢复能力。
 
-#### 删除 MySQL 单节点集群
+#### 删除 MySQL 单机版
 
-首先删除 MySQL 单节点集群。
+首先删除 MySQL 单机版。
 
 ```bash
 kbcli cluster delete mycluster
 ```
 
-#### 创建 MySQL 三节点集群
+#### 创建 MySQL 集群版
 
-使用 kbcli 创建一个三节点集群。使用默认配置创建的示例如下。
+使用 `kbcli` 创建一个 MySQL 集群版，下面使用默认配置创建：
 
 ```bash
 kbcli cluster create --cluster-definition='apecloud-mysql' --set replicas=3
@@ -435,7 +436,7 @@ kbcli cluster create --cluster-definition='apecloud-mysql' --set replicas=3
    pod "maple05-mysql-1" deleted
    ```
 
-4. 连接三节点集群，只需几秒就可成功。
+4. 连接 MySQL 集群版，只需几秒就可成功。
 
    ```bash
    kbcli cluster connect maple05
@@ -465,11 +466,11 @@ kbcli cluster create --cluster-definition='apecloud-mysql' --set replicas=3
    kbcli cluster list -A
 
    # 删除一个集群
-   # 需要进行二次确认，或者你可以添加 --auto-approve 自动确认
+   # 需要进行二次确认，或者可以添加 --auto-approve 自动确认
    kbcli cluster delete <name>
 
    # 卸载 KubeBlocks
-   # 需要进行二次确认，或者你可以添加 --auto-approve 自动确认
+   # 需要进行二次确认，或者可以添加 --auto-approve 自动确认
    kbcli kubeblocks uninstall --remove-pvcs --remove-pvs
    ```
 

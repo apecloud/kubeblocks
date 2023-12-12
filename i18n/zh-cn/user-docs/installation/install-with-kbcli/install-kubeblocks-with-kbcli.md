@@ -3,12 +3,12 @@ title: 用 kbcli 安装 KubeBlocks
 description: 如何用 kbcli 安装 KubeBlocksInstall KubeBlocks
 keywords: [taints, affinity, tolerance, 安装, kbcli, KubeBlocks]
 sidebar_position: 2
-sidebar_label: 安装 KubeBlocks
+sidebar_label: 用 kbcli 安装 KubeBlocks
 ---
 
 # 用 kbcli 安装 KubeBlocks
 
-快速上手 KubeBlocks 的方式是使用 Playground 创建一个新的 Kubernetes 集群，并安装 KubeBlocks。然而，在实际生产环境中，情况会复杂得多，应用程序在不同的命名空间中运行，还存在资源或权限限制。本文档将介绍如何在现有的 Kubernetes 集群上部署 KubeBlocks。
+使用 Playground 创建一个新的 Kubernetes 集群并安装 KubeBlocks，是快速上手的一种方法。然而，在实际生产环境中，情况会复杂得多，应用程序在不同的命名空间中运行，还存在资源或权限限制。本文档将介绍如何在现有的 Kubernetes 集群上部署 KubeBlocks。
 
 ## 环境准备
 
@@ -73,7 +73,7 @@ kbcli kubeblocks install
 
     :::
 
-## 检查 KubeBlocks 是否安装成功
+## 验证 KubeBlocks 安装
 
 执行以下命令来检查 KubeBlocks 是否已成功安装。
 
@@ -82,6 +82,7 @@ kbcli kubeblocks status
 ```
 
 ***结果***
+
 如果工作负载都显示已准备就绪，则表明已成功安装 KubeBlocks。
 
 ```bash

@@ -1,15 +1,15 @@
 ---
-title: 配置 BackupPolicy
+title: BackupPolicy
 description: 如何配置 BackupPolicy
 keywords: [备份, 备份策略]
 sidebar_position: 2
-sidebar_label: 配置 BackupPolicy
+sidebar_label: BackupPolicy
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# 配置 BackupPolicy
+# BackupPolicy
 
 ## 配置加密密钥
 

@@ -96,7 +96,7 @@ spec:
   Pod 亲和性配置可以应用于集群或组件，组件级配置将覆盖集群级配置。
 
 * 容忍度
-  与容忍度相关的参数位于集群 CR YAML 文件的 `spec.tolerations` 对象下，使用 Kubernetes 的原生语义。有关容忍度参数配置，请参考 Kubernetes 官方文档 [污点和容忍度](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/)。
+  与容忍度相关的参数位于集群 CR YAML 文件的 `spec.tolerations` 对象下，使用 Kubernetes 的原生语义。有关容忍度参数配置，请参考 Kubernetes 官方文档[污点和容忍度](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/)。
 
   与亲和性配置类似，容忍度也支持组件级和集群级配置。默认使用集群级配置，组件级别的配置会覆盖集群级别的配置。
 

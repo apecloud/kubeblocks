@@ -39,11 +39,11 @@ sidebar_label: 通过 AWS DMS 迁移
 
    负载均衡器插件依赖于 EKS 环境，如果负载均衡器未成功开启，可能与环境有关。
 
-   检查 EKS 环境并重新启用此插件。详情请参阅[启用插件](./../../overview/database-engines-supported.md)。
+   检查 EKS 环境并重新启用此插件。详情请参阅[启用引擎](./../../overview/database-engines-supported.md)。
 
 ***步骤***
 
-1. 在 AWS 上创建 ApeCloud MySQL 集群。详情请参阅[创建 并连接 MySQL 集群](./../../kubeblocks-for-mysql/cluster-management/create-and-connect-a-mysql-cluster.md)。
+1. 在 AWS 上创建 ApeCloud MySQL 集群。详情请参阅[创建并连接 MySQL 集群](./../../kubeblocks-for-mysql/cluster-management/create-and-connect-a-mysql-cluster.md)。
 2. 填写集群名称，并执行以下命令暴露集群的外部 IP。
 
    ```bash
@@ -204,7 +204,7 @@ sidebar_label: 通过 AWS DMS 迁移
   
    由于传输工具写目标数据库时是并发写入模型，存在乱序写入的情况，可能会触发页分裂问题导致目标数据库的数据空间相比原实例的空间有些许放大。建议在分配目标数据库存储大小时可以适当多规划一些，比如至少有源数据库当前存储的 1.5 倍。
 
-* DDL&onlineDDL 问题
+* DDL & onlineDDL 问题
   
    有锁结构变更往往会影响数据迁移的速度。
 

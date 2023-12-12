@@ -11,10 +11,10 @@ sidebar_position: 3
 
 KubeBlocks 日志增强功能使用类似 `kubectl exec` 和 `kubectl logs` 的方法，确保自闭环和轻量化。
 
-# 开始之前
+## 开始之前
 
 - 容器镜像支持 `tail` 和 `xargs` 命令。
-- 安装 KubeBlocks：你可以通过 [kbcli](../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](../installation/install-with-helm/install-kubeblocks-with-helm.md) 安装 KubeBlocks。
+- 安装 KubeBlocks：你可以通过 [kbcli](../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](../installation/install-with-helm/install-kubeblocks-with-helm.md) 进行安装。
 - 在本指南中，我们以 MySQL 引擎为例。其他数据库引擎操作相同。
 
 ## 步骤
@@ -41,6 +41,7 @@ KubeBlocks 日志增强功能使用类似 `kubectl exec` 和 `kubectl logs` 的�
       :::
 
 2. 查看支持的日志。
+
   执行 `kbcli cluster list-logs` 命令，查看目标集群中已开启日志增强功能的日志类型和日志文件的详细信息，展示集群中的每个节点实例。
 
     ***示例***
@@ -55,9 +56,8 @@ KubeBlocks 日志增强功能使用类似 `kubectl exec` 和 `kubectl logs` 的�
     ```
 
 3. 访问集群日志文件。
-   执行 `kbcli cluster logs` 命令，查看目标集群上目标节点生成的日志文件的详细信息。你可以使用不同的方法来查看所需要的日志文件。
-  
-   还可以执行 `kbcli cluster logs -h` 查看示例和方法。
+
+   执行 `kbcli cluster logs` 命令，查看目标集群上目标节点生成的日志文件的详细信息。你可以使用不同的方法来查看所需要的日志文件。还可以执行 `kbcli cluster logs -h` 查看示例和方法。
 
     ```bash
     kbcli cluster logs -h
@@ -98,7 +98,7 @@ KubeBlocks 日志增强功能使用类似 `kubectl exec` 和 `kubectl logs` 的�
 
     </details>
 
-4. （可选）故障排除。
+2. （可选）故障排除。
 
     日志增强功能不会影响 KubeBlocks 的核心流程。如果发生配置异常，你将收到告警信息，方便排查问题。 `warning` 信息记录在目标数据引擎集群的 `event` 和 `status.Conditions` 中。
 
@@ -113,7 +113,7 @@ KubeBlocks 日志增强功能使用类似 `kubectl exec` 和 `kubectl logs` 的�
         kbcli cluster list-events mycluster
         ```
 
-      -  执行 `kubectl describe cluster <cluster-name>` 查看警告信息。
+      -  执行 `kubectl describe cluster <cluster-name>` 查看告警信息。
 
           ```bash
           kubectl describe cluster mycluster

@@ -3,7 +3,7 @@ title: 用 Helm 安装 KubeBlocks
 description: 如何用 Helm 安装 KubeBlocks
 keywords: [taints, affinity, tolerance, 安装, helm, KubeBlocks]
 sidebar_position: 1
-sidebar_label: 安装 KubeBlocks
+sidebar_label: 用 Helm 安装 KubeBlocks
 ---
 
 # 用 Helm 安装 KubeBlocks
@@ -86,7 +86,7 @@ helm install kubeblocks kubeblocks/kubeblocks \
 
     :::
 
-## 检查 KubeBlocks 是否安装成功
+## 验证 KubeBlocks 安装
 
 执行以下命令来检查 KubeBlocks 是否已成功安装。
 
@@ -95,6 +95,7 @@ kbcli kubeblocks status
 ```
 
 ***结果***
+
 如果工作负载都已准备就绪，则表明 KubeBlocks 已成功安装。
 
 ```bash

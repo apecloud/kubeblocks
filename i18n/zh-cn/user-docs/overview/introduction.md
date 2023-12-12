@@ -5,7 +5,7 @@ keywords: [kubeblocks, 简介]
 sidebar_position: 1
 ---
 
-# 简介
+# KubeBlocks 简介
 
 ## KubeBlocks 是什么？
 
@@ -23,11 +23,12 @@ Kubernetes 已经成为容器编排的事实标准。它利用 ReplicaSet 提供
 
 ## 主要功能
 
-- 支持多云，与 AWS、GCP、Azure、阿里云等云平台兼容
-- 支持 MySQL、PostgreSQL、Redis、MongoDB、Kafka 等 15 个主流数据库和流计算引擎
-- 提供生产级性能、弹性、可扩展性和可观察性
-- 简化 day-2 操作，例如升级、扩展、监控、备份和恢复
-- 包含强大且直观的命令行工具
+- 支持多云，与 AWS、GCP、Azure、阿里云等云平台兼容。
+- 支持 MySQL、PostgreSQL、Redis、MongoDB、Kafka 等 32 个主流数据库和流计算引擎。
+- 提供生产级性能、弹性、可扩展性和可观察性。
+- 简化 day-2 操作，例如升级、扩展、监控、备份和恢复。
+- 包含强大且直观的命令行工具。
 - 仅需几分钟，即可建立一个适用于生产环境的完整数据基础设施。
 
+## 架构
 ![KubeBlocks 架构图](./../../img/kubeblocks-architecture.png)

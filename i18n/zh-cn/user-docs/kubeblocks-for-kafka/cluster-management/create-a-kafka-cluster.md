@@ -6,6 +6,9 @@ sidebar_position: 1
 sidebar_label: 创建
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # 创建 Kafka 集群
 
 本文档展示如何创建一个 Kafka 集群。

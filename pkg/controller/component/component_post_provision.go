@@ -347,15 +347,6 @@ func getPostProvisionCmdJobLabel(clusterName, componentName string) map[string]s
 	}
 }
 
-// getComponentMatchLabels gets the labels for matching the cluster component
-func getComponentMatchLabels(clusterName, componentName string) map[string]string {
-	return client.MatchingLabels{
-		constant.AppInstanceLabelKey:    clusterName,
-		constant.KBAppComponentLabelKey: componentName,
-		constant.AppManagedByLabelKey:   constant.AppName,
-	}
-}
-
 // setPostProvisionDoneAnnotation sets the postProvision done annotation to the component object.
 func setPostProvisionDoneAnnotation(cli client.Client,
 	comp *appsv1alpha1.Component,

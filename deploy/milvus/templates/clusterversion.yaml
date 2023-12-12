@@ -1,4 +1,4 @@
-apiVersion: apps.kubeblocks.io/v1alpha1
+  apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
   name: milvus-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
@@ -10,19 +10,19 @@ spec:
     - componentDefRef: minio
       versionsContext:
         initContainers:
-          - name: volume-permissions
-            image: {{ .Values.images.shell_tools.repository }}:{{ default .Chart.AppVersion .Values.images.shell_tools.tag }}
+        - name: volume-permissions
+          image: {{ .Values.images.shell_tools.repository }}:{{ default .Chart.AppVersion .Values.images.shell_tools.tag }}
         containers:
-          - name: minio
-            image: {{ .Values.images.minio.repository }}:{{ default .Chart.AppVersion .Values.images.minio.tag }}
+        - name: minio
+          image: {{ .Values.images.minio.repository }}:{{ default .Chart.AppVersion .Values.images.minio.tag }}
     - componentDefRef: etcd
       versionsContext:
         initContainers:
-          - name: volume-permissions
-            image: {{ .Values.images.shell_tools.repository }}:{{ default .Chart.AppVersion .Values.images.shell_tools.tag }}
+        - name: volume-permissions
+          image: {{ .Values.images.shell_tools.repository }}:{{ default .Chart.AppVersion .Values.images.shell_tools.tag }}
         containers:
-          - name: etcd
-            image: {{ .Values.images.etcd.repository }}:{{ default .Chart.AppVersion .Values.images.etcd.tag }}
+        - name: etcd
+          image: {{ .Values.images.etcd.repository }}:{{ default .Chart.AppVersion .Values.images.etcd.tag }}
     - componentDefRef: milvus
       versionsContext:
         initContainers:

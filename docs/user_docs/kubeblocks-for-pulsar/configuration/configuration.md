@@ -20,7 +20,7 @@ There are 3 types of parameters:
 :::note
 
 `pulsar-admin` is a management tool built in the Pulsar cluster. You can log in to the corresponding pod with `kubectl exec -it <pod-name> -- bash` (pod-name can be checked by `kubectl get pods` command, and you can choose any pod with the word `broker` in its name ), and there are corresponding commands in the `/pulsar/bin path` of the pod. For more information about pulsar-admin, please refer to the [official documentation](https://pulsar.apache.org/docs/3.0.x/admin-api-tools/
-)
+).
 :::
 
 ## View parameter information
@@ -86,7 +86,7 @@ kbcli cluster describe-config pulsar
    kubectl get ops 
    ```
 
-   b.Check whether the configuration is done.
+   b. Check whether the configuration is done.
 
    ```bash
    kubectl get pod -l app.kubernetes.io/name=pulsar
@@ -145,7 +145,7 @@ The following steps take the configuration of dynamic parameter `brokerShutdownT
 
 ### Configure parameters with edit-config command
 
-For your convenience, KubeBlocks offers a tool `edit-config` to help you to configure parameter in a visulized way.
+For your convenience, KubeBlocks offers a tool `edit-config` to help you to configure parameter in a visualized way.
 
 For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on notepad.
 

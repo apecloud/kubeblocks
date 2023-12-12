@@ -35,7 +35,7 @@ sidebar_label: 创建
 ## 创建 Kafka 集群
 
 <Tabs>
-<TabItem value="using kbcli" label="Using kbcli" default>
+<TabItem value="kbcli" label="kbcli" default>
 
 使用 `kbcli cluster create` 命令创建集群。你还可以使用 `--set` 参数自定义集群资源。
 
@@ -70,7 +70,7 @@ kbcli cluster create kafka
 | --sasl-enable=false                                                       | 表示是否启用 SASL/PLAIN 进行 Kafka 身份验证。 <br /> -server: admin/kubeblocks <br /> -client: client/kubeblocks  <br /> 内置的 jaas 文件存储在 /tools/client-ssl.properties 中。                                                                                                                                                                                                                                                              |
 </TabItem>
 
-<TabItem value="using kubectl" label="Using kubectl" default>
+<TabItem value="kubectl" label="kubectl" default>
 
 * 创建组合模式的 Kafka 集群。
 

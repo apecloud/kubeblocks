@@ -13,7 +13,7 @@ sidebar_label: 使用 kbcli 迁移 MongoDB 数据
 ### 启用 kbcli migration
 
 1. 安装 KubeBlocks: 你可以用 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或者 [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md) 进行安装。
-2. [启用迁移功能](./../../overview/supported-addons.md)。
+2. [启用迁移功能](./../../overview/database-engines-supported.md)。
 
    ```bash
    kbcli addon list
@@ -32,10 +32,8 @@ sidebar_label: 使用 kbcli 迁移 MongoDB 数据
 
 确保源账号和目标账号满足以下权限要求。
 
-* 源账号
-  源端迁移对象的读权限，包括 admin 和 local 的读权限。
-* 目标账号
-  目标数据库的读写权限，以及 admin 和 local 的读权限。
+* 源账号：待迁移库、admin、local的读权限。
+* 目标账号：待迁移库的读写权限，admin、local的读权限
 
 ### 准备数据采样
 

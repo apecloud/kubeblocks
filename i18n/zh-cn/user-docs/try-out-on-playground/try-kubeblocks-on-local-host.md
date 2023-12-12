@@ -8,7 +8,7 @@ sidebar_label: 在本地使用 KubeBlocks
 
 # 在本地使用 KubeBlocks
 
-本指南将引导你快速入门 KubeBlocks，并演示如何通过命令创建演示环境（Playground）。
+本文档将引导你快速入门 KubeBlocks，并演示如何通过命令创建演示环境（Playground）。
 
 ## 准备工作
 
@@ -16,8 +16,8 @@ sidebar_label: 在本地使用 KubeBlocks
 
 * 系统最低要求：
 
-  * CPU：4 核，可使用 sysctl hw.physicalcpu 命令查看 CPU；
-  * RAM：4 GB，使用 top -d 命令查看内存。
+  * CPU：4 核，可使用 `sysctl hw.physicalcpu` 命令查看 CPU；
+  * RAM：4 GB，使用 `top -d` 命令查看内存。
 
 * 在电脑上已安装：
   * [Docker](https://docs.docker.com/get-docker/)：v20.10.5（runc ≥ v1.0.0-rc93）或更高版本；
@@ -37,18 +37,18 @@ sidebar_label: 在本地使用 KubeBlocks
    该命令执行以下操作：
    1. 在使用 [K3d](https://k3d.io/v5.4.6/) 的容器中创建一个 Kubernetes 集群。
    2. 在 K3d 集群中部署 KubeBlocks。
-   3. 创建一个 MySQL 单节点集群。
+   3. 创建 MySQL 单机版集群。
 
 :::note
 
-* 如果你之前执行过 `kbcli playground init` 但是失败了，再次执行该命令可能会导致报错。请先执行 `kbcli playground destroy` 清理环境，再执行 `kbcli playground init`。
-* 如果你在 Windows 上执行 Playground 并报以下错误，这是由 Windows 11 的安全策略导致的。你操作的 kbcli.exe 可能经过第三方篡改（或者在你在 Windows 上通过 source build 出的 kbcli）。
+* 如果之前执行过 `kbcli playground init` 但是失败了，再次执行该命令可能会导致报错。请先执行 `kbcli playground destroy` 清理环境，再执行 `kbcli playground init`。
+* 如果在 Windows 上执行 Playground 并报以下错误，这是因为受到了 Windows 11 的安全策略的影响。你操作的 `kbcli.exe` 可能经过第三方篡改（或者是你在 Windows 上通过 source build 出的 kbcli）。
   
   ```bash
   error: failed to set up k3d cluster: failed to create k3d cluster kb-playground: Failed Cluster Start: Failed to start server k3d-kb-playground-server-0: Node k3d-kb-playground-server-0 failed to get ready: error waiting for log line `k3s is up and running` from node 'k3d-kb-playground-server-0': stopped returning log lines
   ```
 
-   解决方案是：
+   解决方案：
    1. 卸载或删除当前的 `kbcli.exe` 文件。
    2. 使用 `winget` 下载最新的 kbcli，或者访问 KubeBlocks 的 [GitHub 发布页面](https://github.com/apecloud/kubeblocks/releases)重新下载 kbcli。
 :::
@@ -61,11 +61,11 @@ sidebar_label: 在本地使用 KubeBlocks
 
    ***结果***
 
-   你刚刚在默认命名空间中创建了一个名为 `mycluster` 的集群。你可以在安装成功的提示语下可以看到用户指南。执行 `kbcli playground init -h` 可以再次查看此指南。
+   在默认命名空间中创建了一个名为 `mycluster` 的集群，你可以在安装成功的提示语下可以看到用户指南。执行 `kbcli playground init -h` 可以再次查看此指南。
 
 ## 在 Playground 中使用 KubeBlocks
 
-现在就可以开启你的 KubeBlocks 之旅了。你可以尝试 KubeBlocks的基本功能，包括[查看 MySQL 集群](#查看-mysql-集群)、[访问 MySQL 集群](#访问-mysql-集群)、[观测 MySQL 集群](#观测-mysql-集群)和[MySQL 的高可用性](#mysql-的高可用性)等等。
+现在就可以开启你的 KubeBlocks 之旅了。你可以尝试 KubeBlocks的基本功能，包括[查看 MySQL 集群](#查看-mysql-集群)、[访问 MySQL 集群](#访问-mysql-集群)、[观测 MySQL 集群](#观测-mysql-集群)和 [MySQL 的高可用性](#mysql-的高可用性)等等。
 
 ### 查看 MySQL 集群
 
@@ -87,7 +87,7 @@ sidebar_label: 在本地使用 KubeBlocks
 
 **选项 1.** 通过容器网络连接数据库
 
-等待该集群的状态变为 Running，然后执行kbcli cluster connect 来访问指定的数据库集群。例如，
+等待该集群的状态变为 `Running`，然后执行 `kbcli cluster connect` 来访问指定的数据库集群。例如，
 
 ```bash
 kbcli cluster connect mycluster
@@ -147,28 +147,29 @@ KubeBlocks 具备完整的可观测性能力，下面主要演示其中的监控
    ```
 
    **结果：**
+
    命令执行后，将自动加载出 Grafana 网站的监控页面。
 
 2. 点击左侧栏的仪表盘图标，页面上会显示两个监控面板。
    ![Dashboards](../../img/try-kb-on-local-dashboard.png)
-3. 点击 General -> MySQL，监控 MySQL 集群的状态。
+3. 点击 **General** -> **MySQL**，监控 MySQL 集群的状态。
    ![MySQL_panel](../../img/try-kb-on-local-mysql-panel.png)
 
 ### MySQL 的高可用性
 
 下面通过简单的故障模拟，展示 MySQL 的故障恢复能力。
 
-#### 删除 MySQL 单节点集群
+#### 删除 MySQL 单机版
 
-首先删除 MySQL 单节点集群。
+首先删除 MySQL 单机版。
 
 ```bash
 kbcli cluster delete mycluster
 ```
 
-#### 创建 MySQL 三节点集群
+#### 创建 MySQL 集群版
 
-使用 `kbcli` 创建一个三节点集群。使用默认配置创建的示例如下。
+使用 `kbcli` 创建一个 MySQL 集群版，下面使用默认配置创建：
 
 ```bash
 kbcli cluster create --cluster-definition='apecloud-mysql' --set replicas=3
@@ -225,7 +226,7 @@ kbcli cluster create --cluster-definition='apecloud-mysql' --set replicas=3
    pod "maple05-mysql-1" deleted
    ```
 
-4. 连接三节点集群，只需几秒就可成功。
+4. 连接 MySQL 集群版，只需几秒就可成功。
 
    ```bash
    kbcli cluster connect maple05
@@ -282,7 +283,7 @@ kbcli cluster create --cluster-definition='apecloud-mysql' --set replicas=3
    kbcli dashboard open kubeblocks-nyancat
    ```
 
-4. 在另一个终端选项卡中删除 Leader Pod，然后通过 NYAN CAT 页面查看对 MySQL 三节点集群的影响。
+4. 在另一个终端选项卡中删除 Leader Pod，然后通过 NYAN CAT 页面查看对集群的影响。
 
    ```bash
    kubectl delete pod maple05-mysql-1

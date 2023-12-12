@@ -56,6 +56,7 @@ AlertManager 集成了一组通知渠道，例如电子邮件和 Slack。KubeBlo
 下面以配置飞书为例。
 
 **开始之前**
+
 首先，部署监控组件并启用集群监控。更多信息请参阅[监控数据库](./monitor-database.md)。
 
 **步骤**
@@ -67,12 +68,12 @@ AlertManager 集成了一组通知渠道，例如电子邮件和 Slack。KubeBlo
      - [企业微信自定义机器人](https://developer.work.weixin.qq.com/document/path/91770)
      - [Slack](https://api.slack.com/messaging/webhooks)
 
-:::note
+    :::note
 
-- 每个通知渠道都有接口调用量和频率限制。超过限制后该渠道将会被限流，导致无法接收到告警。
-- 每个渠道的服务级别协议（SLA）也无法确保告警一定会成功发送。因此，建议配置多个渠道以确保可用性。
+    - 每个通知渠道都有接口调用量和频率限制。超过限制后该渠道将会被限流，导致无法接收到告警。
+    - 每个渠道的服务级别协议（SLA）也无法确保告警一定会成功发送。因此，建议配置多个渠道以确保可用性。
 
-:::
+    :::
 
 2. 配置接收者。
 
@@ -105,25 +106,25 @@ AlertManager 集成了一组通知渠道，例如电子邮件和 Slack。KubeBlo
       --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo' --cluster=mysql-cluster --severity=critical
       ```
 
-:::note
+      :::note
 
-如需查看详细的命令，请执行 `kbcli alert add-receiver -h`.
+      如需查看详细的命令，请执行 `kbcli alert add-receiver -h`.
 
-:::
+      :::
 
    2. 查看接收者列表，验证新接收者是否已添加。
 
-      还可以通过此命令查看通知配置。
+        还可以通过此命令查看通知配置。
 
-      ```bash
-      kbcli alert list-receivers
-      ```
+        ```bash
+        kbcli alert list-receivers
+        ```
 
    3. （可选）如果要禁用告警功能，可以删除通知渠道和接收者。
 
-      ```bash
-      kbcli alert delete-receiver <receiver-name>
-      ```
+        ```bash
+        kbcli alert delete-receiver <receiver-name>
+        ```
 
 ## IM 告警故障排除
 

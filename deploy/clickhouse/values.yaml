@@ -16,20 +16,17 @@ logConfigs: {}
 
 
 image:
-  registry: docker.io
-  repository: bitnami/clickhouse
+  repository: docker.io/bitnami/clickhouse
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: 22.9.4-debian-11-r1
 
 zookeeper:
   image:
-    # if the value of zookeeper.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
-    registry: ""
-    repository: bitnami/zookeeper
+    repository: docker.io/bitnami/zookeeper
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
-    tag: 3.8.0-debian-11-r47   
+    tag: 3.8.0-debian-11-r47
 
   logConfigs: {}
   roleProbe:

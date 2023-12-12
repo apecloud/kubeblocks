@@ -1,4 +1,3 @@
-{{- $imageRegistry := include "clickhouse.imageRegistry" . }}
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
@@ -18,18 +17,18 @@ spec:
       versionsContext:
         containers:
           - name: clickhouse
-            image: "{{ .Values.image.registry | default $imageRegistry  }}/{{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}"
+            image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.image.pullPolicy }}
     - componentDefRef: ch-keeper
       versionsContext:
         containers:
           - name: clickhouse
-            image: "{{ .Values.image.registry | default $imageRegistry  }}/{{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}"
+            image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.image.pullPolicy }}
     - componentDefRef: zookeeper
       versionsContext:
         containers:
           - name: zookeeper
-            image: "{{ .Values.zookeeper.image.registry | default $imageRegistry  }}/{{ .Values.zookeeper.image.repository }}:{{ .Values.zookeeper.image.tag }}"
+            image: {{ .Values.zookeeper.image.repository }}:{{ .Values.zookeeper.image.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.zookeeper.image.pullPolicy }}
   

@@ -15,6 +15,10 @@ spec:
       - name: mysql
         image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
         imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+        command:
+          - bash 
+          - -c
+          - "mkdir -p /var/lib/mysql/{log,binlog};chown mysql:root /var/lib/mysql/{log,binlog}; docker-entrypoint.sh mysqld --server-id $(( ${KB_POD_NAME##*-} + 1)) --ignore-db-dir=lost+found"
     systemAccountSpec:
       cmdExecutorConfig:
         image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}

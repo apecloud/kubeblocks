@@ -85,18 +85,19 @@ datadir={{ $data_root }}/data
 log_statements_unsafe_for_binlog=OFF
 log_error_verbosity=2
 log_output=FILE
+{{- $data_root := getVolumePathByName ( index $.podSpec.containers 0 ) "data" }}
 {{- if hasKey $.component "enabledLogs" }}
 {{- if mustHas "error" $.component.enabledLogs }}
-log_error=/data/mysql/log/mysqld-error.log
+log_error={{ $data_root }}/log/mysqld-error.log
 {{- end }}
 {{- if mustHas "slow" $.component.enabledLogs }}
 slow_query_log=ON
 long_query_time=5
-slow_query_log_file=/data/mysql/log/mysqld-slowquery.log
+slow_query_log_file={{ $data_root }}/log/mysqld-slowquery.log
 {{- end }}
 {{- if mustHas "general" $.component.enabledLogs }}
 general_log=ON
-general_log_file=/data/mysql/log/mysqld.log
+general_log_file={{ $data_root }}/log/mysqld.log
 {{- end }}
 {{- end }}
 {{ end }}
@@ -153,7 +154,6 @@ binlog_order_commits=ON
 log-bin={{ $data_root }}/binlog/mysql-bin
 log_bin_index={{ $data_root }}/binlog/mysql-bin.index
 binlog_expire_logs_seconds=604800
-binlog_purge_size=102400M
 max_binlog_size=134217728
 log_replica_updates=1
 # binlog_rows_query_log_events=ON #AWS not set

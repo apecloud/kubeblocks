@@ -58,7 +58,7 @@ spec:
             command:
               - bash 
               - -c
-              - "docker-entrypoint.sh mysqld --server-id $(( ${KB_POD_NAME##*-} + 1))"
+              - "mkdir -p /var/lib/mysql/{log,binlog}; chown mysql:root /var/lib/mysql/{log,binlog}; docker-entrypoint.sh mysqld --server-id $(( ${KB_POD_NAME##*-} + 1))"
             volumeMounts:
               - mountPath: /var/lib/mysql
                 name: data

@@ -15,8 +15,8 @@ commonAnnotations: {}
 debugEnabled: false
 
 ## Default Pulsar image
-##
-defaultPulsarImage:
+image:
+  ## image.registry is the top level registry config
   registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
   repository: apecloud/pulsar
   pullPolicy: IfNotPresent

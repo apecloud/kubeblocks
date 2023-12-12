@@ -40,3 +40,11 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
+
+{{- define "clickhouse.imageRegistry" }}
+{{- if not .Values.image.registry }}
+{{- "docker.io" }}
+{{- else }}
+{{- .Values.image.registry }}
+{{- end}}
+{{- end}}

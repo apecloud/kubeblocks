@@ -118,5 +118,5 @@ FoxLake Configration Environment Variables
 - name: MY_POD_RPC_SERVICE_NAME
   value: "$(KB_CLUSTER_NAME)-foxlake-server"
 - name: MPP_WORKER_CONTAINER_IMAGE
-  value: {{ .Values.images.foxlake.repository }}:{{ .Values.images.foxlake.tag }}
+  value: {{ .Values.images.foxlake.registry | default .Values.images.registry }}/{{ .Values.images.foxlake.repository }}:{{ .Values.images.foxlake.tag }}
 {{- end}}

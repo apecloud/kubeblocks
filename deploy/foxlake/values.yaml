@@ -12,12 +12,17 @@ clusterVersionOverride: ""
 ## @param application images
 ##
 images:
+  registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
   pullPolicy: IfNotPresent
   foxlake:
+    # if the value of images.foxlake.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
+    registry: ""
     repository: apecloud/foxlake
     pullPolicy: IfNotPresent
     tag: "main"
   mysql:
+    # if the value of images.mysql.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
+    registry: ""
     repository: mysql
     pullPolicy: IfNotPresent
     tag: "8.0.30"

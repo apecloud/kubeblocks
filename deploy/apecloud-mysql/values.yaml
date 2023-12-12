@@ -112,7 +112,8 @@ backupTool:
 wesqlscale:
   cell: "zone1"
   image:
-    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+    # if the value of wesqlscale.image.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
+    registry: ""
     repository: apecloud/apecloud-mysql-scale
     tag: "0.1.1"
     pullPolicy: IfNotPresent

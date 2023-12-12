@@ -177,3 +177,12 @@ Backup Tool image
 {{- define "apecloud-mysql.bakcupToolImage" -}}
 {{ .Values.backupTool.image.registry }}/{{ .Values.backupTool.image.repository}}:{{ .Values.backupTool.image.tag }}
 {{- end }}
+
+{{/*all resource image registry*/}}
+{{- define "kubeblocks.imageRegistry" }}
+{{- if not .Values.image.registry }}
+{{- "infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com" }}
+{{- else }}
+{{- .Values.image.registry }}
+{{- end}}
+{{- end}}

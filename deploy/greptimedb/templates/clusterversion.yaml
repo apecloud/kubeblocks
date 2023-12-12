@@ -10,8 +10,8 @@ spec:
     - componentDefRef: datanode
       versionsContext:
         containers:
-          - name: datanode
-            image: {{ .Values.images.greptimedb.repository }}:{{ default .Chart.AppVersion .Values.images.greptimedb.tag }}
+        - name: datanode
+          image: {{ .Values.images.greptimedb.repository }}:{{ default .Chart.AppVersion .Values.images.greptimedb.tag }}
     - componentDefRef: etcd
       versionsContext:
         containers:

@@ -15,22 +15,15 @@ commonLabels: {}
 ##
 images:
   pullPolicy: IfNotPresent
-  registry: docker.io
   kafka:
-    # if the value of images.kafka.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
-    registry: ""
-    repository: bitnami/kafka
-#    tag: 3.4.0-debian-11-r22
+    repository: docker.io/bitnami/kafka
+    #    tag: 3.4.0-debian-11-r22
     tag: 3.3.2-debian-11-r54
   kafkaExporter:
-    # if the value of images.kafkaExporter.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
-    registry: ""
-    repository: bitnami/kafka-exporter
+    repository: docker.io/bitnami/kafka-exporter
     tag: 1.6.0-debian-11-r67
   jmxExporter:
-    # if the value of images.jmxExporter.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
-    registry: ""
-    repository: bitnami/jmx-exporter
+    repository: docker.io/bitnami/jmx-exporter
     tag: 0.18.0-debian-11-r20
 
 

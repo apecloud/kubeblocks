@@ -17,14 +17,14 @@ spec:
       versionsContext:
         containers:
           - name: kafka
-            image: {{ .Values.images.kafka.registry | default .Values.images.registry }}/{{ .Values.images.kafka.repository }}:{{ default .Chart.AppVersion .Values.images.kafka.tag }}
+            image: {{ .Values.images.kafka.repository }}:{{ default .Chart.AppVersion .Values.images.kafka.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
             securityContext:
               allowPrivilegeEscalation: false
               runAsNonRoot: true
               runAsUser: 1001
           - name: jmx-exporter
-            image: {{ .Values.images.jmxExporter.registry | default .Values.images.registry }}/{{ .Values.images.jmxExporter.repository }}:{{ .Values.images.jmxExporter.tag }}
+            image: {{ .Values.images.jmxExporter.repository }}:{{ .Values.images.jmxExporter.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
             securityContext:
               runAsNonRoot: true
@@ -33,14 +33,14 @@ spec:
       versionsContext:
         containers:
           - name: kafka
-            image: {{ .Values.images.kafka.registry | default .Values.images.registry }}/{{ .Values.images.kafka.repository }}:{{ default .Chart.AppVersion .Values.images.kafka.tag }}
+            image: {{ .Values.images.kafka.repository }}:{{ default .Chart.AppVersion .Values.images.kafka.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
             securityContext:
               allowPrivilegeEscalation: false
               runAsNonRoot: true
               runAsUser: 1001
           - name: jmx-exporter
-            image: {{ .Values.images.jmxExporter.registry | default .Values.images.registry }}/{{ .Values.images.jmxExporter.repository }}:{{ .Values.images.jmxExporter.tag }}
+            image: {{ .Values.images.jmxExporter.repository }}:{{ .Values.images.jmxExporter.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
             securityContext:
               runAsNonRoot: true
@@ -49,14 +49,14 @@ spec:
       versionsContext:
         containers:
           - name: kafka
-            image:{{ .Values.images.kafka.registry | default .Values.images.registry }}/{{ .Values.images.kafka.repository }}:{{ default .Chart.AppVersion .Values.images.kafka.tag }}
+            image: {{ .Values.images.kafka.repository }}:{{ default .Chart.AppVersion .Values.images.kafka.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
             securityContext:
               allowPrivilegeEscalation: false
               runAsNonRoot: true
               runAsUser: 1001
           - name: jmx-exporter
-            image: {{ .Values.images.jmxExporter.registry | default .Values.images.registry }}/{{ .Values.images.jmxExporter.repository }}:{{ .Values.images.jmxExporter.tag }}
+            image: {{ .Values.images.jmxExporter.repository }}:{{ .Values.images.jmxExporter.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
             securityContext:
               runAsNonRoot: true
@@ -65,7 +65,7 @@ spec:
       versionsContext:
         containers:
           - name: kafka-exporter
-            image: {{ .Values.images.kafkaExporter.registry | default .Values.images.registry }}/{{ .Values.images.kafkaExporter.repository }}:{{ .Values.images.kafkaExporter.tag }}
+            image: {{ .Values.images.kafkaExporter.repository }}:{{ .Values.images.kafkaExporter.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
             securityContext:
               runAsNonRoot: true

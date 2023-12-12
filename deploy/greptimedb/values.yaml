@@ -11,12 +11,17 @@ clusterDomain: ".cluster.local"
 ## @param application images
 ##
 images:
+  registry: docker.io
   pullPolicy: IfNotPresent
   greptimedb:
-    repository: docker.io/greptime/greptimedb
+    # if the value of image.greptimedb.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
+    registry: ""
+    repository: greptime/greptimedb
     tag: 0.3.2
   etcd:
-    repository: docker.io/greptime/etcd
+    # if the value of image.etcd.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
+    registry: ""
+    repository: greptime/etcd
     tag: v3.5.5
 
 ## @param metasrv config

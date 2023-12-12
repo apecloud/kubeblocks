@@ -14,7 +14,7 @@ spec:
     preBackup: []
     postBackup: []
     backupData:
-      image: {{ .Values.images.registry | default "docker.io" }}/{{ .Values.images.tools.repository}}:{{ .Values.images.tools.tag | default "latest" }}
+      image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository}}:{{ .Values.image.tools.tag | default "latest" }}
       runOnTargetPodNode: false
       command:
       # no bash available in the image
@@ -27,7 +27,7 @@ spec:
         intervalSeconds: 5
   restore:
     prepareData:
-      image: {{ .Values.images.registry | default "docker.io" }}/{{ .Values.images.repository}}:{{ include "qdrant.version" . | default .Values.images.tag }}
+      image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository}}:{{ include "qdrant.version" . | default .Values.image.tag }}
       command:
       - bash
       - -c

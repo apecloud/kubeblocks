@@ -11,11 +11,11 @@ spec:
       versionsContext:
         initContainers:
           - name: qdrant-tools
-            image: {{ .Values.images.registry | default "docker.io" }}/{{ .Values.images.tools.repository }}:{{ .Values.images.tools.tag | default "latest" }}
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tools.tag | default "latest" }}
         containers:
           - name: qdrant
-            image: {{ .Values.images.registry | default "docker.io" }}/{{ .Values.images.repository}}:{{ include "qdrant.version" . | default .Values.images.tag }}
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository}}:{{ include "qdrant.version" . | default .Values.image.tag }}
           - name: web-ui
-            image: {{ .Values.images.registry | default "docker.io" }}/{{ .Values.images.web_ui.repository}}:{{ .Values.images.web_ui.tag | default "latest" }}
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.web_ui.repository}}:{{ .Values.image.web_ui.tag | default "latest" }}
 
 

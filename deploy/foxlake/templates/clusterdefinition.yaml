@@ -61,32 +61,32 @@ spec:
               {{- include "foxlake.env" . | nindent 14 }}
       systemAccounts:
         cmdExecutorConfig:
-          image: {{ .Values.image.mysql.registry | default .Values.image.registry  }}/{{ .Values.image.mysql.repository }}:{{ .Values.image.mysql.tag }}
+          image: {{ .Values.images.mysql.repository }}:{{ .Values.images.mysql.tag }}
           command:
-          - mysql
+            - mysql
           args:
-          - -u$(MYSQL_ROOT_USER)
-          - -p$(MYSQL_ROOT_PASSWORD)
-          - -h$(KB_ACCOUNT_ENDPOINT)
-          - -P$(SVC_PORT)
-          - -e
-          - "$(KB_ACCOUNT_STATEMENT)"
+            - -u$(MYSQL_ROOT_USER)
+            - -p$(MYSQL_ROOT_PASSWORD)
+            - -h$(KB_ACCOUNT_ENDPOINT)
+            - -P$(SVC_PORT)
+            - -e
+            - "$(KB_ACCOUNT_STATEMENT)"
           env:
-          - name: MYSQL_ROOT_USER
-            valueFrom:
-              secretKeyRef:
-                name: $(CONN_CREDENTIAL_SECRET_NAME)
-                key: username
-          - name: MYSQL_ROOT_PASSWORD
-            valueFrom:
-              secretKeyRef:
-                name: $(CONN_CREDENTIAL_SECRET_NAME)
-                key: password
-          - name: SVC_PORT
-            valueFrom:
-              secretKeyRef:
-                name: $(CONN_CREDENTIAL_SECRET_NAME)
-                key: port
+            - name: MYSQL_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: username
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: password
+            - name: SVC_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: port
         passwordConfig:
           length: 10
           numDigits: 5
@@ -119,9 +119,9 @@ spec:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: metaDbPasswd
             args:
-            - "--max_connections=2048"
-            - "--max_allowed_packet=1G"
-            - "--transaction-isolation=READ-COMMITTED"
+              - "--max_connections=2048"
+              - "--max_allowed_packet=1G"
+              - "--transaction-isolation=READ-COMMITTED"
             ports:
               - containerPort: 3306
                 name: mysql

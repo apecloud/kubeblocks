@@ -5333,7 +5333,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: cert-manager-cainjector
-          image: {{ .Values.images.defaultImage.registry }}/{{ .Values.images.cainjector.repository }}:{{ .Values.images.defaultImage.tag }}
+          image: {{ .Values.images.registry }}/{{ .Values.images.cainjector.repository }}:{{ .Values.images.defaultImage.tag }}
           imagePullPolicy: {{ .Values.images.defaultImage.pullPolicy }}
           args:
           - --v=2
@@ -5390,7 +5390,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: cert-manager-controller
-          image: {{ .Values.images.defaultImage.registry }}/{{ .Values.images.controller.repository }}:{{ .Values.images.defaultImage.tag }}
+          image: {{ .Values.images.registry }}/{{ .Values.images.controller.repository }}:{{ .Values.images.defaultImage.tag }}
           imagePullPolicy: {{ .Values.images.defaultImage.pullPolicy }}
           args:
           - --v=2
@@ -5453,7 +5453,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: cert-manager-webhook
-          image: {{ .Values.images.defaultImage.registry }}/{{ .Values.images.webhook.repository }}:{{ .Values.images.defaultImage.tag }}
+          image: {{ .Values.images.registry }}/{{ .Values.images.webhook.repository }}:{{ .Values.images.defaultImage.tag }}
           imagePullPolicy:  {{ .Values.images.defaultImage.pullPolicy }}
           args:
           - --v=2

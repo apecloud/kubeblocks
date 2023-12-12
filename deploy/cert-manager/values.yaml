@@ -1,8 +1,8 @@
 version: "v1.12.3"
 
 images:
+  registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
   defaultImage:
-    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
     pullPolicy: IfNotPresent
     tag: v1.12.3
   cainjector:

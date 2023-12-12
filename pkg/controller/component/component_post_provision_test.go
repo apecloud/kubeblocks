@@ -48,7 +48,6 @@ var _ = Describe("Component PostProvision Test", func() {
 			clusterName        = "test-cluster"
 			mysqlCompDefName   = "replicasets"
 			mysqlCompName      = "mysql"
-			mockScriptSelector = "mock-script-selecotr"
 		)
 
 		var (
@@ -120,11 +119,11 @@ var _ = Describe("Component PostProvision Test", func() {
 				&cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).ShouldNot(BeNil())
-			Expect(synthesizeComp.LifecycleActions).Should(BeNil())
-			Expect(synthesizeComp.LifecycleActions.PostProvision).ShouldNot(BeNil())
-			Expect(synthesizeComp.LifecycleActions.PostProvision.CustomHandler).ShouldNot(BeNil())
+			Expect(synthesizeComp.LifecycleActions).ShouldNot(BeNil())
+			Expect(synthesizeComp.LifecycleActions.PostProvision).Should(BeNil())
 
 			comp, err := BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0])
+			comp.UID = cluster.UID
 			Expect(err).Should(Succeed())
 			Expect(comp).ShouldNot(BeNil())
 
@@ -147,6 +146,17 @@ var _ = Describe("Component PostProvision Test", func() {
 				},
 			}
 			synthesizeComp.LifecycleActions.PostProvision = &postProvision
+			need, err := needDoPostProvision(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp)
+			Expect(err).Should(Succeed())
+			Expect(need).Should(BeFalse())
+			err = ReconcileCompPostProvision(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp, dag)
+			Expect(err).Should(Succeed())
+
+			By("mock component status ready, should do postProvision action")
+			comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+			need, err = needDoPostProvision(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp)
+			Expect(err).Should(Succeed())
+			Expect(need).Should(BeTrue())
 			err = ReconcileCompPostProvision(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp, dag)
 			Expect(err).ShouldNot(Succeed())
 
@@ -168,10 +178,6 @@ var _ = Describe("Component PostProvision Test", func() {
 			err = CheckJobSucceed(testCtx.Ctx, testCtx.Cli, cluster, jobName)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("requeue to waiting for job"))
-
-			By("test setPostProvisionDoneAnnotation without error")
-			err = setPostProvisionDoneAnnotation(testCtx.Cli, comp, dag)
-			Expect(err).Should(Succeed())
 		})
 	})
 })

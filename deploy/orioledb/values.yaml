@@ -1,7 +1,7 @@
 ## @section OrioleDB common parameters
 
 image:
-#  registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+#  image.registry is the highest level registry config when the addon have different registry option
   registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
   repository: apecloud/orioledb
   tag: beta1
@@ -73,7 +73,8 @@ metrics:
   ## @param metrics.image.pullSecrets Specify image pull secrets
   ##
   image:
-    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+    # if the value of metrics.image.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
+    registry: ""
     repository: apecloud/agamotto
     tag: 0.1.0-beta.5
     pullPolicy: IfNotPresent
@@ -84,7 +85,8 @@ metrics:
 pgbouncer:
   image:
     # refer: https://hub.docker.com/r/bitnami/pgbouncer
-    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+    # if the value of pgbouncer.image.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
+    registry: ""
     repository: apecloud/pgbouncer
     tag: 1.19.0
     pullPolicy: IfNotPresent

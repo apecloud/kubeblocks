@@ -1,16 +1,16 @@
 # Default values for bytebase.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
-images:
+image:
   registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
   bytebase:
-    # if the value of images.bytebase.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
+    # if the value of image.bytebase.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
     registry: ""
     repository: apecloud/bytebase
     tag: beta1
     pullPolicy: IfNotPresent
   python:
-    # if the value of images.python.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
+    # if the value of image.python.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
     registry: ""
     repository: apecloud/python11-tools
     tag: stable

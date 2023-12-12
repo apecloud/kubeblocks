@@ -11,15 +11,15 @@ spec:
       versionsContext:
         containers:
           - name: foxlake
-            image: {{ .Values.images.foxlake.registry | default .Values.images.registry  }}/{{ .Values.images.foxlake.repository }}:{{ .Values.images.foxlake.tag }}
-            imagePullPolicy: {{ default "IfNotPresent" .Values.images.foxlake.pullPolicy }}
+            image: {{ .Values.image.foxlake.registry | default .Values.image.registry  }}/{{ .Values.image.foxlake.repository }}:{{ .Values.image.foxlake.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.image.foxlake.pullPolicy }}
         initContainers:
           - name: foxlake-gms-initializer
-            image: {{ .Values.images.foxlake.registry | default .Values.images.registry  }}/{{ .Values.images.foxlake.repository }}:{{ .Values.images.foxlake.tag }}
-            imagePullPolicy: {{ default "IfNotPresent" .Values.images.foxlake.pullPolicy }}
+            image: {{ .Values.image.foxlake.registry | default .Values.image.registry  }}/{{ .Values.image.foxlake.repository }}:{{ .Values.image.foxlake.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.image.foxlake.pullPolicy }}
     - componentDefRef: foxlake-metadb
       versionsContext:
         containers:
           - name: mysql
-            image: {{ .Values.images.mysql.registry | default .Values.images.registry  }}/{{ .Values.images.mysql.repository }}:{{ .Values.images.mysql.tag }}
-            imagePullPolicy: {{ default "IfNotPresent" .Values.images.mysql.pullPolicy }}
+            image: {{ .Values.image.mysql.registry | default .Values.image.registry  }}/{{ .Values.image.mysql.repository }}:{{ .Values.image.mysql.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.image.mysql.pullPolicy }}

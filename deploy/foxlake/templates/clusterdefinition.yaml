@@ -61,7 +61,7 @@ spec:
               {{- include "foxlake.env" . | nindent 14 }}
       systemAccounts:
         cmdExecutorConfig:
-          image: {{ .Values.images.mysql.registry | default .Values.images.registry  }}/{{ .Values.images.mysql.repository }}:{{ .Values.images.mysql.tag }}
+          image: {{ .Values.image.mysql.registry | default .Values.image.registry  }}/{{ .Values.image.mysql.repository }}:{{ .Values.image.mysql.tag }}
           command:
           - mysql
           args:

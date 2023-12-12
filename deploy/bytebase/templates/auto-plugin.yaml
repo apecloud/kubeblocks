@@ -9,7 +9,7 @@ spec:
       serviceAccountName: kubeblocks
       containers:
         - name: bytebase-python-script
-          image: "{{ .Values.images.python.registry | default $imageRegistry }}/{{ .Values.images.python.repository }}:{{ .Values.images.python.tag }}"
+          image: "{{ .Values.image.python.registry | default $imageRegistry }}/{{ .Values.image.python.repository }}:{{ .Values.image.python.tag }}"
           command:
             - /bin/sh
             - -c

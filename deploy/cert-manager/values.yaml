@@ -1,6 +1,6 @@
 version: "v1.12.3"
 
-images:
+image:
   registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
   defaultImage:
     pullPolicy: IfNotPresent

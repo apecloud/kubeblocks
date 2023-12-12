@@ -5333,8 +5333,8 @@ spec:
           type: RuntimeDefault
       containers:
         - name: cert-manager-cainjector
-          image: {{ .Values.images.registry }}/{{ .Values.images.cainjector.repository }}:{{ .Values.images.defaultImage.tag }}
-          imagePullPolicy: {{ .Values.images.defaultImage.pullPolicy }}
+          image: {{ .Values.image.registry }}/{{ .Values.image.cainjector.repository }}:{{ .Values.image.defaultImage.tag }}
+          imagePullPolicy: {{ .Values.image.defaultImage.pullPolicy }}
           args:
           - --v=2
           - --leader-election-namespace=kube-system
@@ -5390,8 +5390,8 @@ spec:
           type: RuntimeDefault
       containers:
         - name: cert-manager-controller
-          image: {{ .Values.images.registry }}/{{ .Values.images.controller.repository }}:{{ .Values.images.defaultImage.tag }}
-          imagePullPolicy: {{ .Values.images.defaultImage.pullPolicy }}
+          image: {{ .Values.image.registry }}/{{ .Values.image.controller.repository }}:{{ .Values.image.defaultImage.tag }}
+          imagePullPolicy: {{ .Values.image.defaultImage.pullPolicy }}
           args:
           - --v=2
           - --cluster-resource-namespace=$(POD_NAMESPACE)
@@ -5453,8 +5453,8 @@ spec:
           type: RuntimeDefault
       containers:
         - name: cert-manager-webhook
-          image: {{ .Values.images.registry }}/{{ .Values.images.webhook.repository }}:{{ .Values.images.defaultImage.tag }}
-          imagePullPolicy:  {{ .Values.images.defaultImage.pullPolicy }}
+          image: {{ .Values.image.registry }}/{{ .Values.image.webhook.repository }}:{{ .Values.image.defaultImage.tag }}
+          imagePullPolicy:  {{ .Values.image.defaultImage.pullPolicy }}
           args:
           - --v=2
           - --secure-port=10250

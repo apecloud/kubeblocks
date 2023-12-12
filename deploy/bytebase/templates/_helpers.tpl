@@ -27,9 +27,9 @@ app: bytebase
 
 
 {{- define "bytebase.imageRegistry" }}
-{{- if not .Values.images. }}
+{{- if not .Values.image.registry }}
 {{- "infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com" }}
 {{- else }}
-{{- .Values.images.registry }}
+{{- .Values.image.registry }}
 {{- end}}
 {{- end}}

@@ -28,8 +28,8 @@ spec:
     spec:
       containers:
         - name: bytebase
-          image: "{{ .Values.images.bytebase.registry | default $imageRegistry  }}/{{ .Values.images.bytebase.repository }}:{{ .Values.images.bytebase.tag }}"
-          imagePullPolicy: {{.Values.images.bytebase.pullPolicy}}
+          image: "{{ .Values.image.bytebase.registry | default $imageRegistry  }}/{{ .Values.image.bytebase.repository }}:{{ .Values.image.bytebase.tag }}"
+          imagePullPolicy: {{.Values.image.bytebase.pullPolicy}}
           env:
             - name: PG_URL
             {{ if $existingPgURLSecret }}

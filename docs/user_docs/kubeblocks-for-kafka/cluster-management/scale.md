@@ -144,7 +144,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 
 - Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
 - You are not recommended to perform horizontal scaling on the controller node, including the controller node both in combined mode and separated node.
-- When scaling in horizontally, you must know the topic partition storage, if the topic has only one replication, data loss may caused when you scale in broker.
+- When scaling in horizontally, you must know the topic partition storage. If the topic has only one replication, data loss may caused when you scale in broker.
 
  ```bash
 kbcli cluster list
@@ -245,6 +245,7 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
 ### Handle the snapshot exception
 
 If `STATUS=ConditionsError` occurs during the horizontal scaling process, you can find the cause from `cluster.status.condition.message` for troubleshooting.
+
 In the example below, a snapshot exception occurs.
 
 ```bash

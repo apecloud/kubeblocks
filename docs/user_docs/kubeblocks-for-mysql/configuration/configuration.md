@@ -3,6 +3,7 @@ title: Configure cluster parameters
 description: Configure cluster parameters
 keywords: [mysql, parameter, configuration, reconfiguration]
 sidebar_position: 1
+sidebar_label: Configuration
 ---
 
 # Configure cluster parameters

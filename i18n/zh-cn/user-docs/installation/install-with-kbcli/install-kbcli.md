@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # 安装 kbcli
 
-你可以将 `kbcli` 安装在你的笔记本电脑上，或者在云上的虚拟机上进行安装。
+你可以将 `kbcli` 安装在笔记本电脑或者云上的虚拟机上。
 
 ## 环境准备
 
@@ -26,7 +26,7 @@ kbcli 目前支持 macOS、Windows 和 Linux 系统。
 
 使用 `curl` 或 `brew` 安装 kbcli。
 
-- 选项 1：执行 `curl` 命令安装 kbli
+- 选项 1：执行 `curl` 命令安装 kbcli
 
   1. 安装 kbcli。
 
@@ -39,9 +39,9 @@ kbcli 目前支持 macOS、Windows 和 Linux 系统。
       1. 在 [KubeBlocks Release 页面](https://github.com/apecloud/kubeblocks/releases/)中查看可用版本。
       2. 使用 `-s` 指定版本，并执行以下命令。
         
-        ```bash
-        curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s x.x.x
-        ```
+          ```bash
+          curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s x.x.x
+          ```
     
       :::note
 
@@ -63,31 +63,31 @@ kbcli 目前支持 macOS、Windows 和 Linux 系统。
 
   1. 安装 ApeCloud 的 Homebrew 包（ApeCloud tap）。
      
-    ```bash
-    brew tap apecloud/tap
-    ```
+      ```bash
+      brew tap apecloud/tap
+      ```
 
   2. 安装 kbcli。
      
-    ```bash
-    brew install kbcli
-    ```
+      ```bash
+      brew install kbcli
+      ```
       
-    如果想安装 kbcli 的指定版本，执行：
+      如果想安装 kbcli 的指定版本，执行：
 
-    ```bash
-    # 查看可用版本 
-    brew search kbcli
+      ```bash
+      # 查看可用版本 
+      brew search kbcli
 
-    # 安装指定版本
-    brew install kbcli@x.x.x
-    ```
+      # 安装指定版本
+      brew install kbcli@x.x.x
+      ```
      
   3. 确认 kbcli 是否已成功安装。
 
-    ```bash
-    kbcli -h
-    ```
+      ```bash
+      kbcli -h
+      ```
 
 </TabItem>
 
@@ -162,7 +162,7 @@ kbcli 目前支持 macOS、Windows 和 Linux 系统。
 kbcli completion SHELL-TYPE -h
 ```
 
-举个例子，如果想要启用 zsh 的 kbcli 自动补全功能。
+举个例子，如果想要启用 zsh 的 kbcli 自动补全功能：
 
 ***步骤：***
 
@@ -172,13 +172,13 @@ kbcli completion SHELL-TYPE -h
    kbcli completion zsh -h
    ```
 
-2. 首先启用终端的补全功能。
+2. 启用终端的补全功能。
 
    ```bash
    echo "autoload -U compinit; compinit" >> ~/.zshrc
    ```
 
-3. 启用 kbcli 的自动补全功能。
+3. 启用 `kbcli` 的自动补全功能。
 
    ```bash
    echo "source <(kbcli completion zsh); compdef _kbcli kbcli" >> ~/.zshrc

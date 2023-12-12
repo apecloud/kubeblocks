@@ -2,16 +2,16 @@
 title: 在生产环境中连接数据库
 description: 如何在生产环境中连接数据库
 keywords: [生产环境, 连接数据库]
-sidebar_position: 3
+sidebar_position: 4
 sidebar_label: 生产环境
 ---
 
 # 在生产环境中连接数据库
 
 在生产环境中，使用 CLI 和 SDK 客户端连接数据库是很常见的。主要有以下三种场景：
-- 场景 1：Client1 和数据库位于同一个 Kubernetes 集群中。如果要连接 Client1 和数据库，请参考[步骤 3](#步骤-3-连接在同一个-kubernetes-集群中的客户端)。
-- 场景 2：Client2 在 Kubernetes 集群之外，但与数据库位于同一个 VPC 中。如果要连接 Client2 和数据库，请参考[步骤 5](#步骤-5-连接在-kubernetes-集群之外但与-kubernetes-集群位于同一-vpc-中的客户端)。
-- 场景 3：Client3 和数据库位于不同的 VPC，例如其他 VPC 或公共网络。如果要连接 Client3 和数据库，请参考[步骤 4](#步骤-4-连接在其他-vpc-或公共网络中的客户端)。
+- 场景 1：Client1 和数据库位于同一个 Kubernetes 集群中。如果要连接 Client1 和数据库，请参考[方案 3](#方案-3-连接在同一个-kubernetes-集群中的客户端)。
+- 场景 2：Client2 在 Kubernetes 集群之外，但与数据库位于同一个 VPC 中。如果要连接 Client2 和数据库，请参考[方案 5](#方案-5-连接在-kubernetes-集群之外但与-kubernetes-集群位于同一-vpc-中的客户端)。
+- 场景 3：Client3 和数据库位于不同的 VPC，例如其他 VPC 或公共网络。如果要连接 Client3 和数据库，请参考[方案 4](#方案-4-连接在其他-vpc-或公共网络中的客户端)。
 
 参考下面的网络位置关系图。
 ![Example](../img/../../img/connect-to-database-in-production-env-network-locations.jpg)

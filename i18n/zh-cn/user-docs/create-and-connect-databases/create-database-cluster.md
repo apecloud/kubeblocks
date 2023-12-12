@@ -2,11 +2,14 @@
 title: 创建 MySQL 集群
 description: 如何创建 MySQL 集群
 keywords: [mysql, 创建 MySQL 集群]
-sidebar_position: 1
+sidebar_position: 2
 sidebar_label: 创建 MySQL 集群
 ---
 
-# 创建集群
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# 创建 MySQL 集群
 
 KubeBlocks 支持管理多种数据库引擎，针对每一种引擎的创建集群的命令都是一样的。但是配置细节上略有差别。本小节以创建 MySQL 集群为例。
 
@@ -16,19 +19,19 @@ KubeBlocks 支持创建两种类型的 MySQL 集群：单机版（Standalone）�
 
 <TabItem value="kbcli" label="kbcli" default>
 
-创建单机版集群。
+创建 MySQL 单机版。
 
 ```bash
 kbcli cluster create mysql <clustername>
 ```
 
-创建集群版。
+创建 MySQL 集群版。
 
 ```bash
 kbcli cluster create mysql --mode raftGroup <clustername>
 ```
 
-如果只有一个节点用于部署三节点集群，请在创建集群时将 `availability-policy` 设置为 `none`。
+如果只有一个节点用于部署 MySQL 集群版，请在创建集群时将 `availability-policy` 设置为 `none`。
 
 ```bash
 kbcli cluster create mysql --mode raftGroup --availability-policy none <clustername>
@@ -49,7 +52,7 @@ kbcli cluster create mysql --mode raftGroup --availability-policy none <clustern
 
 <TabItem value="kubectl" label="kubectl">
 
-KubeBlocks 实现了用 Cluster CRD 来定义集群。比如，可以通过下面的命令创建一个集群版集群：
+KubeBlocks 实现了用 `Cluster` CRD 来定义集群。比如，可以通过下面的命令创建 MySQL 集群版：
 
    ```bash
    cat <<EOF | kubectl apply -f -

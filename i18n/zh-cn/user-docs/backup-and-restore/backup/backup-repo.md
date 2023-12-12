@@ -1,15 +1,15 @@
 ---
-title: 配置 BackupRepo
+title: BackupRepo
 description: 如何配置 BackupRepo
 keywords: [introduction, 备份, 恢复]
 sidebar_position: 1
-sidebar_label: 配置 BackupRepo
+sidebar_label: BackupRepo
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# 配置 BackupRepo
+# BackupRepo
 
 ## 概述
 
@@ -21,10 +21,10 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
 请确保你已经：
 
-* [安装 kbcli](./../../installation/install-with-kbcli/install-kbcli.md)
-* [安装 kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
-* [安装 Helm](https://helm.sh/docs/intro/install/)
-* 使用 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md) 安装 KubeBlocks
+* [安装 kbcli](./../../installation/install-with-kbcli/install-kbcli.md)。
+* [安装 kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)。
+* [安装 Helm](https://helm.sh/docs/intro/install/)。
+* 使用 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md) 安装 KubeBlocks。
 
 ## 安装 MinIO
 
@@ -64,11 +64,11 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
    ![backup-and-restore-backup-repo-2](../../../img/backup-and-restore-backup-repo-2.png)
    ![backup-and-restore-backup-repo3](../../../img/backup-and-restore-backup-repo-3.png)
 
-  :::note
+    :::note
 
-  安装的 MinIO 的访问地址（端口）为 `http://minio.kb-system.svc.cluster.local:9000`，用于配置 BackupRepo。在本例中，`kb-system` 是安装 MinIO 的命名空间的名称。
+    安装的 MinIO 的访问地址（端口）为 `http://minio.kb-system.svc.cluster.local:9000`，用于配置 BackupRepo。在本例中，`kb-system` 是安装 MinIO 的命名空间的名称。
 
-  :::
+    :::
 
 ## 配置 BackupRepo
 
@@ -90,7 +90,7 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
 不过，由于备份和恢复任务需要运行在数据库集群所在的 namespace 下，在 “Tool” 方式下，我们会自动将访问远端存储所需的密钥以 secret 资源的形式同步到这些 namespace 中，以供我们的数据传输工具使用。在多租户隔离的情况下，如果你认为这种同步 secret 的做法会带来安全隐患，可以选择使用 “Mount”。
 
-### 安装 KubeBlocks 时配置 BackupRepo
+### 自动配置 BackupRepo
 
 安装 KubeBlocks 时，可以通过配置文件指定 BackupRepo 相关信息，KubeBlocks 会根据配置信息创建 BackupRepo 并自动安装必要的 CSI Driver。
 
@@ -120,7 +120,7 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
 * 在 KubeBlocks v0.7.0 中，`storageProvider` 目前可选 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`minio`、`pvc`。
 * 不同 `storageProvider` 所需的配置信息并不统一，上面展示的 `config` 和 `secrets` 适用于 s3。
-* 执行 `kubectl get storageproviders.storage.kubeblocks.io` 命令可以查看支持的 storageProvider。
+* 执行 `kubectl get storageproviders.storage.kubeblocks.io` 命令可以查看支持的 `storageProvider`。
 
 :::
 
@@ -315,21 +315,21 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
       * `--default` 表示该仓库是默认仓库。全局只能有一个默认仓库，如果系统中存在多个默认仓库，KubeBlocks 无法选出应该使用哪个仓库（这个行为跟 k8s 的 default StorageClass 类似），会导致备份失败。使用 kbcli 创建 BackupRepo 能避免出现这种情况，因为 kbcli 在创建时会确保当前没有第二个默认仓库。
       * `--provider` 参数对应后端存储类型，即 `storageProvider`，可选值为 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss` 和 `minio`。不同存储所需的命令行参数不同，可以通过 `kbcli backuprepo create --provider STORAGE-PROVIDER-NAME -h` 命令查看参数信息（注意 `--provider` 参数是必需的）。
 
-      `kbcli backuprepo create` 命令执行成功后，就会在系统中创建一个类型为 BackupRepo 的 k8s 资源，可以通过修改该资源的 annotation 来调整默认仓库。
+        `kbcli backuprepo create` 命令执行成功后，就会在系统中创建一个类型为 BackupRepo 的 k8s 资源，可以通过修改该资源的 annotation 来调整默认仓库。
 
-      ```bash
-      # 取消默认仓库
-      kubectl annotate backuprepo old-default-repo \
-        --overwrite=true \
-        dataprotection.kubeblocks.io/is-default-repo=false
-      ```
+        ```bash
+        # 取消默认仓库
+        kubectl annotate backuprepo old-default-repo \
+          --overwrite=true \
+          dataprotection.kubeblocks.io/is-default-repo=false
+        ```
 
-      ```bash
-      # 设置新的默认仓库
-      kubectl annotate backuprepo backuprepo-4qms6 \
-        --overwrite=true \
-        dataprotection.kubeblocks.io/is-default-repo=true
-      ```
+        ```bash
+        # 设置新的默认仓库
+        kubectl annotate backuprepo backuprepo-4qms6 \
+          --overwrite=true \
+          dataprotection.kubeblocks.io/is-default-repo=true
+        ```
 
     </TabItem>
 

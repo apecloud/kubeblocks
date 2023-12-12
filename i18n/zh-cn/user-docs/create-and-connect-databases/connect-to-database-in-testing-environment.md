@@ -2,7 +2,7 @@
 title: 在测试环境中连接数据库
 description: 如何在测试环境中连接数据库
 keywords: [连接数据库, 测试环境]
-sidebar_position: 2
+sidebar_position: 3
 sidebar_label: 测试环境
 ---
 

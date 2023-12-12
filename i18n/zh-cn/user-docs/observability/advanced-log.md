@@ -28,7 +28,7 @@ KubeBlocks 以引擎的形式统一管理 Agamotto、Loki、Prometheus 等与可
 ## 开始之前
 
 - [安装 kubectl](https://kubernetes.io/docs/tasks/tools/)。
-- 用 [kbcli](../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 安装 KubeBlocks 或者 用 [Helm](../installation/install-with-helm/install-kubeblocks-with-helm.md) 安装 KubeBlocks。
+- 用 [kbcli](../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 安装 KubeBlocks 或 [Helm](../installation/install-with-helm/install-kubeblocks-with-helm.md) 进行安装。
 
 ## 启用高级日志功能
 
@@ -50,7 +50,7 @@ Loki 引擎用于存储日志数据，并接受来自前端的搜索请求。详
 
 2. 如果未启用，请执行以下命令以启用引擎。
 
-    此命令以 `statefulset` 模式运行 Loki。KubeBlocks 将默认部署 single binary 类型的单节点 Loki，即配置中的 target 是 all，使用一个 10 GB 的 PV 来存储数据，并启动一个 loki-gateway 服务来接收数据。
+    此命令以 `statefulset` 模式运行 Loki。KubeBlocks 将默认部署 single binary 类型的单节点 Loki，即配置中的 `target` 是 `all`，使用一个 10 GB 的 PV 来存储数据，并启动一个 `loki-gateway` 服务来接收数据。
 
     ```bash
     kbcli addon enable loki
@@ -150,8 +150,10 @@ pvc-ed20ec94-9a58-46e4-9c28-b692cba70e79   8Gi        RWO            Delete     
     ```
 
 4. 将日志上传到 S3。
-默认情况下，日志功能仅恢复当前 Kubernetes 集群中 Loki 服务器上的日志数据，而并不将日志数据上传到远程的 S3 服务器。
-执行以下命令（包含 Access Key、Secret Key、region 和 bucket 信息），将日志数据上传到 S3。
+   
+   默认情况下，日志功能仅恢复当前 Kubernetes 集群中 Loki 服务器上的日志数据，而并不将日志数据上传到远程的 S3 服务器。
+   
+   执行以下命令（包含 Access Key、Secret Key、region 和 bucket 信息），将日志数据上传到 S3。
     ```bash
     kbcli addon enable agamotto --set log.enabled=true,log.s3.enabled=true,log.s3.accessKey=user_ak,log.s3.secretKey=user_sk,log.s3.region=user_region,log.s3.bucket=user_bucket
     ```
@@ -199,7 +201,7 @@ kbcli 支持 LogCLI 引擎，方便你通过命令行查询日志。
       ```bash
       export PATH="${KBCLI_ROOT:-$HOME/.kbcli}/plugins/bin:$PATH"
       ```
-   2.  将 Apecloud 的 block-index 设置为krew index。
+   2.  将 Apecloud 的 `block-index` 设置为 `krew index`。
         ```bash
         kbcli plugin index add default https://github.com/apecloud/block-index.git
         ```
@@ -226,7 +228,7 @@ kbcli 支持 LogCLI 引擎，方便你通过命令行查询日志。
       export LOKI_ADDR=http://localhost:3100
       ```
    2. 将 Loki 服务导出到本地主机。
-   注意port/namespace 应与系统中的设置相同。例如：
+   注意 `port/namespace` 应与系统中的设置相同。例如：
       ```bash
       kubectl port-forward svc/loki-gateway 3100:80 -n kb-system
       ```

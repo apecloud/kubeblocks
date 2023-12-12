@@ -61,10 +61,10 @@ KubeBlocks 提供了多种服务增强数据库集群的可用性、易用性和
 
   :::
 
-| 数据库     | 隐藏账户                            |
-|------------|-------------------------------------|
-| MySQL      | root <br />kb* <br />Localhost = '' |
-| PostgreSQL | Postgres <br />kb*                  |
+  | 数据库     | 隐藏账户                            |
+  |------------|-------------------------------------|
+  | MySQL      | root <br />kb* <br />Localhost = '' |
+  | PostgreSQL | Postgres <br />kb*                  |
 
 - 删除账户。
 

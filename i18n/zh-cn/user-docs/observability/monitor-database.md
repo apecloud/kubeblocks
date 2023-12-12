@@ -13,7 +13,7 @@ KubeBlocks 提供了强大的可观测性能力。你可以实时观察数据库
 
 KubeBlocks 以引擎形式集成了许多开源监控组件，如 Prometheus、AlertManager 和 Grafana，并采用定制的 `apecloud-otel-collector` 组件收集数据库和宿主机的监控指标。在部署 KubeBlocks Playground 时，所有监控组件都会默认启用。
 
-KubeBlocks Playground 内置了三个监控组件：
+KubeBlocks Playground 内置以下几个监控组件：
 
 - `prometheus`：包括 Prometheus 和 AlertManager 两个监控组件。
 - `grafana`：包括 Grafana 的监控组件。
@@ -92,7 +92,7 @@ KubeBlocks 提供了一个名为 `victoria-metrics-agent` 的引擎，可以将�
     kbcli addon enable victoria-metrics-agent --replicas <replica count> --set remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}
     ```
 
-3. （可选）禁用 `victoria-metrics-agent` 插件。
+3. （可选）禁用 `victoria-metrics-agent`。
 
     ```bash
     kbcli addon disable victoria-metrics-agent
@@ -128,7 +128,7 @@ kbcli cluster create mysql mycluster --monitoring-interval=0
 
 :::
 
-- 对于已禁用监控功能的集群，可以使用 update 子命令启用监控功能。
+- 对于已禁用监控功能的集群，可以使用 `update` 子命令启用监控功能。
 
     ```bash
     kbcli cluster update mycluster --monitoring-interval=15s

@@ -5,6 +5,12 @@ keywords: [kafka, 连接 Kafka 集群, 连接, 网络]
 sidebar_position: 2
 sidebar_label: 连接
 ---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# 连接到 Kafka 集群
+
 ## 概述
 
 在连接 Kafka 集群之前，请检查网络环境，并确认连接场景。一般来说，有三种连接场景：

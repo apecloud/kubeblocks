@@ -113,11 +113,11 @@ kbcli cluster list mongodb-cluster
     
     :::
 
-:::note
+    :::note
 
-Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
+    Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
 
-:::
+    :::
 
 3. Check whether the corresponding resources change.
 

@@ -205,12 +205,12 @@ The following steps take configuring MySQL Standalone as an example.
    kbcli cluster edit-config mysql-cluster --config-spec=mysql-consensusset-config
    ```
 
-    :::note
+   :::note
 
-    * `--config-spec` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mysql-cluster` to view all template names.
-    * If there are multiple components in a cluster, use `--component` to specify a component.
+   * `--config-spec` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mysql-cluster` to view all template names.
+   * If there are multiple components in a cluster, use `--component` to specify a component.
 
-    :::
+   :::
 
 2. View the status of the parameter configuration.
 
@@ -224,12 +224,12 @@ The following steps take configuring MySQL Standalone as an example.
    kbcli cluster connect mysql-cluster
    ```
 
-    :::note
+   :::note
 
-    1. For the `edit-config` function, static parameters and dynamic parameters cannot be edited at the same time.
-    2. Deleting a parameter will be supported later.
+   1. For the `edit-config` function, static parameters and dynamic parameters cannot be edited at the same time.
+   2. Deleting a parameter will be supported later.
 
-    :::
+   :::
 
 ## View history and compare differences
 

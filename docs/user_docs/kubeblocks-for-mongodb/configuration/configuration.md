@@ -93,11 +93,11 @@ For Linux and macOS, you can edit configuration files by vi. For Windows, you ca
    kbcli cluster edit-config mongodb-cluster
    ```
 
-      :::note
+    :::note
 
-      If there are multiple components in a cluster, use `--component` to specify a component.
+    If there are multiple components in a cluster, use `--component` to specify a component.
 
-      :::
+    :::
 
 2. View the status of the parameter configuration.
 
@@ -111,9 +111,9 @@ For Linux and macOS, you can edit configuration files by vi. For Windows, you ca
    kbcli cluster connect mongodb-cluster
    ```
 
-      :::note
+    :::note
 
-      1. For the `edit-config` function, static parameters and dynamic parameters cannot be edited at the same time.
-      2. Deleting a parameter will be supported later.
+    1. For the `edit-config` function, static parameters and dynamic parameters cannot be edited at the same time.
+    2. Deleting a parameter will be supported later.
 
-      :::
+    :::

@@ -115,13 +115,13 @@ You can specify the BackupRepo information in a YAML configuration file when ins
     * `secretAccessKey`: specifies the Secret Key of AWS.
     * `storageProvider`：specifies the object storage provider, which is S3 in this case.
 
-    :::note
+ :::note
 
-    * For KubeBlocks v0.7.0, the available `storageProvider` options are `s3`, `cos`, `gcs-s3comp`, `obs`, `oss`, `minio`, and `pvc`.
-    * For different `storageProvider`, the configuration may differ. `config` and `secrets` in the above example are applied to S3.
-    * Execute the command `kubectl get storageproviders.storage.kubeblocks.io` to view the supported `storageProvider` options.
+ * For KubeBlocks v0.7.0, the available `storageProvider` options are `s3`, `cos`, `gcs-s3comp`, `obs`, `oss`, `minio`, and `pvc`.
+ * For different `storageProvider`, the configuration may differ. `config` and `secrets` in the above example are applied to S3.
+ * Execute the command `kubectl get storageproviders.storage.kubeblocks.io` to view the supported `storageProvider` options.
 
-    :::
+ :::
 
 2. Specify the configuration file when installing KubeBlocks.
 

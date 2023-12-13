@@ -155,11 +155,11 @@ Linux 和 macOS 系统可以使用 vi 编辑器编辑配置文件，Windows 系�
    kbcli cluster edit-config pulsar
    ```
 
-:::note
+   :::note
 
-如果集群中有多个组件，请使用 `--component` 参数指定一个组件。
+   如果集群中有多个组件，请使用 `--component` 参数指定一个组件。
 
-:::
+   :::
 
 2. 查看参数配置状态。
 
@@ -173,12 +173,12 @@ Linux 和 macOS 系统可以使用 vi 编辑器编辑配置文件，Windows 系�
    kbcli cluster connect pulsar
    ```
 
-:::note
+   :::note
 
-1. `edit-config` 不能同时编辑静态参数和动态参数。
-2. KubeBlocks 未来将支持删除参数。
+   1. `edit-config` 不能同时编辑静态参数和动态参数。
+   2. KubeBlocks 未来将支持删除参数。
 
-:::
+   :::
 
 ### 使用 kubectl 配置参数
 

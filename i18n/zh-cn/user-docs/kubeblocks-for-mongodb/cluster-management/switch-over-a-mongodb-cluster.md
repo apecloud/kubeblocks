@@ -108,4 +108,4 @@ kbcli cluster list-instances
 
 ## 处理异常情况
 
-如果报错，请参考 [异常处理](./../../handle-an-exception/handle-a-cluster-exception.md) 排查问题。
+如果报错，请参考[异常处理](./../../handle-an-exception/handle-a-cluster-exception.md)排查问题。

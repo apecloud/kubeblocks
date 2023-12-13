@@ -39,19 +39,19 @@ sidebar_label: 在本地使用 KubeBlocks
    2. 在 K3d 集群中部署 KubeBlocks。
    3. 创建 MySQL 单机版集群。
 
-:::note
+   :::note
 
-* 如果之前执行过 `kbcli playground init` 但是失败了，再次执行该命令可能会导致报错。请先执行 `kbcli playground destroy` 清理环境，再执行 `kbcli playground init`。
-* 如果在 Windows 上执行 Playground 并报以下错误，这是因为受到了 Windows 11 的安全策略的影响。你操作的 `kbcli.exe` 可能经过第三方篡改（或者是你在 Windows 上通过 source build 出的 kbcli）。
-  
-  ```bash
-  error: failed to set up k3d cluster: failed to create k3d cluster kb-playground: Failed Cluster Start: Failed to start server k3d-kb-playground-server-0: Node k3d-kb-playground-server-0 failed to get ready: error waiting for log line `k3s is up and running` from node 'k3d-kb-playground-server-0': stopped returning log lines
-  ```
+   * 如果之前执行过 `kbcli playground init` 但是失败了，再次执行该命令可能会导致报错。请先执行 `kbcli playground destroy` 清理环境，再执行 `kbcli playground init`。
+   * 如果在 Windows 上执行 Playground 并报以下错误，这是因为受到了 Windows 11 的安全策略的影响。你操作的 `kbcli.exe` 可能经过第三方篡改（或者是你在 Windows 上通过 source build 出的 kbcli）。
+   
+   ```bash
+   error: failed to set up k3d cluster: failed to create k3d cluster kb-playground: Failed Cluster Start: Failed to start server k3d-kb-playground-server-0: Node k3d-kb-playground-server-0 failed to get ready: error waiting for log line `k3s is up and running` from node 'k3d-kb-playground-server-0': stopped returning log lines
+   ```
 
-   解决方案：
-   1. 卸载或删除当前的 `kbcli.exe` 文件。
-   2. 使用 `winget` 下载最新的 kbcli，或者访问 KubeBlocks 的 [GitHub 发布页面](https://github.com/apecloud/kubeblocks/releases)重新下载 kbcli。
-:::
+      解决方案：
+      1. 卸载或删除当前的 `kbcli.exe` 文件。
+      2. 使用 `winget` 下载最新的 kbcli，或者访问 KubeBlocks 的 [GitHub 发布页面](https://github.com/apecloud/kubeblocks/releases)重新下载 kbcli。
+   :::
 
 2. 反复检查 MySQL 集群，直到状态变为 `Running`。
 

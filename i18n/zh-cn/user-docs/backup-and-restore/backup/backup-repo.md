@@ -116,13 +116,13 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
     * `secretAccessKey` 表示 AWS 的 Secret Key。
     * `storageProvider` 表示对象存储提供者，该示例中为 s3。
 
-:::note
+    :::note
 
-* 在 KubeBlocks v0.7.0 中，`storageProvider` 目前可选 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`minio`、`pvc`。
-* 不同 `storageProvider` 所需的配置信息并不统一，上面展示的 `config` 和 `secrets` 适用于 s3。
-* 执行 `kubectl get storageproviders.storage.kubeblocks.io` 命令可以查看支持的 `storageProvider`。
+    * 在 KubeBlocks v0.7.0 中，`storageProvider` 目前可选 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`minio`、`pvc`。
+    * 不同 `storageProvider` 所需的配置信息并不统一，上面展示的 `config` 和 `secrets` 适用于 s3。
+    * 执行 `kubectl get storageproviders.storage.kubeblocks.io` 命令可以查看支持的 `storageProvider`。
 
-:::
+    :::
 
 2. 安装 KubeBlocks 时指定配置文件。
 
@@ -312,10 +312,10 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
       以上命令创建了一个名为 `my-repo` 的默认备份仓库。
 
       * `my-repo` 为仓库名，可以留空不填，此时 kbcli 会使用形如 `backuprepo-xxxxx` 的随机名字。
-      * `--default` 表示该仓库是默认仓库。全局只能有一个默认仓库，如果系统中存在多个默认仓库，KubeBlocks 无法选出应该使用哪个仓库（这个行为跟 k8s 的 default StorageClass 类似），会导致备份失败。使用 kbcli 创建 BackupRepo 能避免出现这种情况，因为 kbcli 在创建时会确保当前没有第二个默认仓库。
+      * `--default` 表示该仓库是默认仓库。全局只能有一个默认仓库，如果系统中存在多个默认仓库，KubeBlocks 无法选出应该使用哪个仓库（这个行为跟 K8s 的 default StorageClass 类似），会导致备份失败。使用 kbcli 创建 BackupRepo 能避免出现这种情况，因为 kbcli 在创建时会确保当前没有第二个默认仓库。
       * `--provider` 参数对应后端存储类型，即 `storageProvider`，可选值为 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss` 和 `minio`。不同存储所需的命令行参数不同，可以通过 `kbcli backuprepo create --provider STORAGE-PROVIDER-NAME -h` 命令查看参数信息（注意 `--provider` 参数是必需的）。
 
-        `kbcli backuprepo create` 命令执行成功后，就会在系统中创建一个类型为 BackupRepo 的 k8s 资源，可以通过修改该资源的 annotation 来调整默认仓库。
+        `kbcli backuprepo create` 命令执行成功后，就会在系统中创建一个类型为 BackupRepo 的 K8s 资源，可以通过修改该资源的 annotation 来调整默认仓库。
 
         ```bash
         # 取消默认仓库

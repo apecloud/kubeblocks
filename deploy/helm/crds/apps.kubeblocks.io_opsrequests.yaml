@@ -459,7 +459,7 @@ spec:
                     description: restoreTime point in time to restore
                     type: string
                   volumeRestorePolicy:
-                    default: Serial
+                    default: Parallel
                     description: 'the volume claim restore policy, support values:
                       [Serial, Parallel]'
                     enum:

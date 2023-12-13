@@ -169,8 +169,9 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 	// if pod selection strategy is Any, always return first pod
 	switch strategy {
 	case dpv1alpha1.PodSelectionStrategyAny:
-		if len(pods.Items) > 0 {
-			targetPods = append(targetPods, &pods.Items[0])
+		pod := dputils.GetFirstIndexRunningPod(pods)
+		if pod != nil {
+			targetPods = append(targetPods, pod)
 		}
 	case dpv1alpha1.PodSelectionStrategyAll:
 		for i := range pods.Items {

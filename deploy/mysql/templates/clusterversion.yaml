@@ -10,6 +10,12 @@ spec:
   clusterDefinitionRef: mysql
   componentVersions:
   - componentDefRef: mysql
+    configSpecs:
+      - name: mysql-replication-config
+        templateRef: oracle-mysql5.7-config-template
+        constraintRef: oracle-mysql8.0-config-constraints
+        volumeName: mysql-config
+        namespace: {{ .Release.Namespace }}
     versionsContext:
       containers:
       - name: mysql

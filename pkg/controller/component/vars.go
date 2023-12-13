@@ -81,7 +81,9 @@ func setEnvNTemplateVars(templateVars []corev1.EnvVar, envVars []corev1.EnvVar, 
 			// have injected variables placed at the front of the slice
 			c := &(*cc)[i]
 			if c.Env == nil {
-				c.Env = envVars
+				newEnv := make([]corev1.EnvVar, len(envVars))
+				copy(newEnv, envVars)
+				c.Env = newEnv
 			} else {
 				newEnv := make([]corev1.EnvVar, len(envVars), len(envVars)+len(c.Env))
 				copy(newEnv, envVars)

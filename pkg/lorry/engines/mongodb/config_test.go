@@ -33,8 +33,8 @@ func TestGetMongoDBMetadata(t *testing.T) {
 
 		metadata, err := NewConfig(properties)
 		assert.Nil(t, err)
-		assert.Equal(t, properties[host], metadata.hosts[0])
-		assert.Equal(t, adminDatabase, metadata.databaseName)
+		assert.Equal(t, properties[host], metadata.Hosts[0])
+		assert.Equal(t, adminDatabase, metadata.DatabaseName)
 	})
 
 	t.Run("With custom values", func(t *testing.T) {
@@ -47,10 +47,10 @@ func TestGetMongoDBMetadata(t *testing.T) {
 
 		metadata, err := NewConfig(properties)
 		assert.Nil(t, err)
-		assert.Equal(t, properties[host], metadata.hosts[0])
-		assert.Equal(t, properties[databaseName], metadata.databaseName)
-		assert.Equal(t, properties[username], metadata.username)
-		assert.Equal(t, properties[password], metadata.password)
+		assert.Equal(t, properties[host], metadata.Hosts[0])
+		assert.Equal(t, properties[databaseName], metadata.DatabaseName)
+		assert.Equal(t, properties[username], metadata.Username)
+		assert.Equal(t, properties[password], metadata.Password)
 	})
 
 	t.Run("Missing hosts", func(t *testing.T) {

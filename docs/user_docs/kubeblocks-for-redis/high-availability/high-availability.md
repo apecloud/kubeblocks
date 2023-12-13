@@ -92,7 +92,7 @@ In the RedisReplication Cluster provided by KubeBlocks, Sentinel is deployed as 
 
    ![Redis info replication](../../../img/redis-ha-info-replication.png)
 
-   From the output, `redis-cluster-redis-1` has been assigned as the secondary's pod.
+   From the output, `redis-cluster-redis-1` has been assigned as the primary's pod.
 
 5. Describe the cluster and check the instance role.
 

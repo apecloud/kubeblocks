@@ -1,5 +1,5 @@
 ---
-title: Scale for PostgreSQL
+title: Scale for a PostgreSQL cluster
 description: How to vertically scale a PostgreSQL cluster
 keywords: [postgresql, vertical scale]
 sidebar_position: 2

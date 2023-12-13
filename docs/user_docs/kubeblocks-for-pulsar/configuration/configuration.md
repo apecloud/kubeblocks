@@ -198,7 +198,7 @@ Using kubectl to configure pulsar cluster requires modifying the configuration f
     broker-config            broker.conf            true      pulsar-broker-config-tpl   brokers-config-constraints   pulsar-broker-broker-config            broker      pulsar
     ```
 
-    In the rendered colume of the above output, you can check the broker's configmap is `pulsar-broker-broker-config`.
+    In the rendered column of the above output, you can check the broker's configmap is `pulsar-broker-broker-config`.
 
 2. Modify the `broker.conf` file, in this case, it is `pulsar-broker-broker-config`.
 

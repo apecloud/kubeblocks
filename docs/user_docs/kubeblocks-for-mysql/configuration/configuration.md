@@ -73,9 +73,9 @@ You can also view the details of this configuration file and parameters.
 
 ### Configure parameters with configure command
 
-The example below takes configuring `max_connection` and `innodb_buffer_pool_size` as an example.
+The example below takes configuring `max_connections` and `innodb_buffer_pool_size` as an example.
 
-1. View the current values of `max_connection` and `innodb_buffer_pool_size`.
+1. View the current values of `max_connections` and `innodb_buffer_pool_size`.
 
    ```bash
    kbcli cluster connect mysql-cluster

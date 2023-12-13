@@ -32,10 +32,8 @@ Modify the configuration of the source to support CDC.
 
 Make sure both the source and sink account meet the following permissions.
 
-* The source account
-  The read permission of the repository to be migrated, admin, and local.
-* The sink account
-  The read and write permission of the repository to be migrated and the read permission of admin and local.
+* The source account: The read permission of the repository to be migrated, admin, and local.
+* The sink account: The read and write permission of the repository to be migrated, and the read permission of admin and local.
 
 ### Prepare data sampling
 

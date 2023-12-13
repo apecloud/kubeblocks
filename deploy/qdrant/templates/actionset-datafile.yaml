@@ -26,11 +26,12 @@ spec:
         enabled: true
         intervalSeconds: 5
   restore:
-    prepareData:
-      image: {{ .Values.images.registry | default "docker.io" }}/{{ .Values.images.repository}}:{{ include "qdrant.version" . | default .Values.images.tag }}
-      command:
-      - bash
-      - -c
-      - |
-        {{- .Files.Get "scripts/qdrant-restore.sh" | nindent 8 }}
-    postReady: []
+    postReady:
+      - job:
+          image: {{ .Values.images.registry | default "docker.io" }}/{{ .Values.images.tools.repository }}:{{ .Values.images.tools.tag | default "latest" }}
+          runOnTargetPodNode: false
+          command:
+            - sh
+            - -c
+            - |
+              {{- .Files.Get "scripts/qdrant-restore.sh" | nindent 10 }}

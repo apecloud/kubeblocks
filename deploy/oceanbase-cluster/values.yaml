@@ -29,7 +29,7 @@ resources:
   storages:
     data-file: 50Gi
     data-log: 50Gi
-    log: 20Gi
+    log: 10Gi
 storageClassName: "openebs-hostpath"
 
 ## customized default values to override kblib chart's values

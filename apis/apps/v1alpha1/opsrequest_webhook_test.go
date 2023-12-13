@@ -520,7 +520,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[1]}
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("switchover.instanceName"))
 
-		By("By testing switchover - componentDefinition has no ComponentSwitchoverSpec and do not support switchover")
+		By("By testing switchover - componentDefinition has no ComponentSwitchover and do not support switchover")
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
 		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[3]}
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("does not support switchover"))
@@ -544,7 +544,7 @@ var _ = Describe("OpsRequest webhook", func() {
 			},
 		}
 		lifeCycleAction := &ComponentLifecycleActions{
-			Switchover: &ComponentSwitchoverSpec{
+			Switchover: &ComponentSwitchover{
 				WithCandidate: &Action{
 					Image: commandExecutorEnvItem.Image,
 					Env:   commandExecutorEnvItem.Env,

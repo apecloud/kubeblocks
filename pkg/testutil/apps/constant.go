@@ -333,9 +333,9 @@ var (
 			},
 		},
 		LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{
-			PostStart: defaultLifecycleActionHandler,
-			PreStop:   defaultLifecycleActionHandler,
-			RoleProbe: &appsv1alpha1.RoleProbeSpec{
+			PostProvision: defaultLifecycleActionHandler,
+			PreTerminate:  defaultLifecycleActionHandler,
+			RoleProbe: &appsv1alpha1.RoleProbe{
 				LifecycleActionHandler: *defaultLifecycleActionHandler,
 				FailureThreshold:       3,
 				PeriodSeconds:          1,

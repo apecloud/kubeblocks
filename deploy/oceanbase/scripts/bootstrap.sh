@@ -106,14 +106,28 @@ function prepare_dirs {
 function start_observer {
   echo "Start observer process as normal server..."
   # if debug mode is enabled, set log level to debug
-  local loglevel="warn"
+  local loglevel="INFO"
   if [ "$OB_DEBUG" = "true" ]; then
-    loglevel="info"
+    loglevel="DEBUG"
   fi
+
+  # parse the config file
+  default_configs='cpu_count=4,memory_limit=8G,system_memory=1G,__min_full_resource_pool_memory=1073741824,datafile_size=40G,log_disk_size=40G,net_thread_count=2,stack_size=512K,cache_wash_threshold=1G,schema_history_expire_time=1d,enable_separate_sys_clog=false,enable_merge_by_turn=false,enable_syslog_recycle=true,enable_syslog_wf=false,max_syslog_file_count=4'
+
+  # check if file exists
+  if [ -f "/kb-config/oceanbase.conf" ]; then
+    echo "observer.conf.bin exists, start observer with existing configs"
+    customized_config=$(cat "/kb-config/oceanbase.conf" | sed 's/ \+/ /g' | tr '\n' ',')
+    # remove all spaces and the last comma
+    customized_config=$(echo "$customized_config"  | sed 's/,$//' | sed 's/^,//')
+    echo "customized_config: $customized_config"
+    default_configs=$customized_config
+  fi
+
   /home/admin/oceanbase/bin/observer --appname ${KB_CLUSTER_COMP_NAME} \
     --cluster_id 1 --zone $ZONE_NAME --devname eth0 \
     -p 2881 -P 2882 -d /home/admin/oceanbase/store/ \
-    -l ${loglevel} -o config_additional_dir=/home/admin/oceanbase/store/etc,cpu_count=${OB_CPU_LIMIT},memory_limit=${OB_MEM_LIMIT}M,system_memory=1G,__min_full_resource_pool_memory=1073741824,datafile_size=50G,net_thread_count=2,stack_size=512K,cache_wash_threshold=1G,schema_history_expire_time=1d,enable_separate_sys_clog=false,enable_merge_by_turn=false,enable_syslog_recycle=true,enable_syslog_wf=false,max_syslog_file_count=4
+    -l ${loglevel} -o config_additional_dir=/home/admin/oceanbase/store/etc,${default_configs}
 }
 
 function clean_dirs {

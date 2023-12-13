@@ -23,6 +23,12 @@ spec:
           - name: rpc
             port: 2882
             targetPort: 2882
+      configSpecs:
+        - name: oceanbase-config
+          templateRef: oceanbase-configuration
+          volumeName: oceanbase-config
+          namespace: {{ .Release.Namespace }}
+          defaultMode: 0555
       scriptSpecs:
         - name: oceanbase-scripts
           templateRef: oceanbase-scripts
@@ -62,6 +68,8 @@ spec:
                 name: log
               - name: scripts
                 mountPath: /scripts
+              - name: oceanbase-config
+                mountPath: /kb-config
             workingDir: /home/admin/oceanbase
             env:
               - name: LD_LIBRARY_PATH

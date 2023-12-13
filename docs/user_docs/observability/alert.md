@@ -72,12 +72,12 @@ To receive alerts, you need to deploy monitoring add-ons and enable cluster moni
    * [WeChat Enterprise custom bot](https://developer.work.weixin.qq.com/document/path/91770)
    * [Slack](https://api.slack.com/messaging/webhooks)
 
-       :::note
+   :::note
 
-       * Each notification channel has its interface call volume and frequency limits and when the limits are reached, the channel will limit traffic and you cannot receive alerts.
-       * The SLA of the service provided by a single channel cannot guarantee the alerts are sent successfully. Therefore, it is recommended to configure multiple notification channels to ensure availability.
+   * Each notification channel has its interface call volume and frequency limits and when the limits are reached, the channel will limit traffic and you cannot receive alerts.
+   * The SLA of the service provided by a single channel cannot guarantee the alerts are sent successfully. Therefore, it is recommended to configure multiple notification channels to ensure availability.
 
-       :::
+   :::
 
 2. Configure the receiver.
 

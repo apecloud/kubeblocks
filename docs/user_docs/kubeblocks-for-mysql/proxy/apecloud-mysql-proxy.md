@@ -285,11 +285,11 @@ VTGate, VTConsensus, and VTTablet support parameter configuration. You can confi
    kbcli cluster describe-ops myproxy -reconfiguring-lth8d -n default
    ```
 
-    :::note
+   :::note
 
-    For more information about parameter configuration, refer to [Configuration](./../configuration/configuration.md).
+   For more information about parameter configuration, refer to [Configuration](./../configuration/configuration.md).
 
-    :::
+   :::
 
 ## Log
 

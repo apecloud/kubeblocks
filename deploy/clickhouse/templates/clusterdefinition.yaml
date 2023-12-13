@@ -39,6 +39,11 @@ spec:
           templateRef: clickhouse-tpl
           volumeName: config
           namespace: {{ .Release.Namespace }}
+        - name: clickhouse-user-tpl
+          templateRef: clickhouse-user-tpl
+          volumeName: user-config
+          namespace: {{ .Release.Namespace }}
+          constraintRef: clickhouse-constraints
       service:
         ports:
           - name: http
@@ -97,9 +102,15 @@ spec:
               - name: CLICKHOUSE_METRICS_PORT
                 value: "8001"
               - name: CLICKHOUSE_ADMIN_USER
-                value: "default"
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
               - name: CLICKHOUSE_SHARD_ID
                 value: "$(KB_COMP_NAME)"
+              - name: SERVICE_PORT
+                value: "$(CLICKHOUSE_METRICS_PORT)"
               - name: CLICKHOUSE_REPLICA_ID
                 valueFrom:
                   fieldRef:
@@ -140,6 +151,8 @@ spec:
                 mountPath: /bitnami/clickhouse
               - name: config
                 mountPath: /bitnami/clickhouse/etc/conf.d/default
+              - name: user-config
+                mountPath: /bitnami/clickhouse/etc/users.d/default
 
     - name: ch-keeper
       workloadType: Stateful # Consensus
@@ -197,6 +210,8 @@ spec:
                 value: "9181"
               - name: CLICKHOUSE_METRICS_PORT
                 value: "8001"
+              - name: SERVICE_PORT
+                value: "$(CLICKHOUSE_METRICS_PORT)"
             ports:
               - name: tcp
                 containerPort: 2181
@@ -339,6 +354,8 @@ spec:
                 value: "$(KB_POD_NAME)"
               - name: POD_NAMESPACE
                 value: "$(KB_NAMESPACE)"
+              - name: SERVICE_PORT
+                value: "$(ZOO_PROMETHEUS_METRICS_PORT_NUMBER)"
               # TODO: using componentDefRef to inject zookeeper or keeper env
             ports:
               - name: client

@@ -41,7 +41,7 @@ func NewCommands() engines.ClusterCommands {
 			Client:      "gsql",
 			PasswordEnv: "$GS_PASSWORD",
 			UserEnv:     "$GS_USERNAME",
-			Database:    "$GS_DATABASE",
+			Database:    "$GS_DB",
 		},
 		examples: map[models.ClientType]engines.BuildConnectExample{
 			models.CLI: func(info *engines.ConnectionInfo) string {

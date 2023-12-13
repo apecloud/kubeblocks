@@ -99,7 +99,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 			ccSpec: &appsv1alpha1.ConfigConstraintSpec{},
 			diff:   newCfgDiffMeta(`null`, nil, nil),
 		},
-		want:    false,
+		want:    true,
 		wantErr: false,
 	}, {
 		name: "test",
@@ -183,6 +183,18 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 			diff: newCfgDiffMeta(`{"a":"b"}`, nil, nil),
 		},
 		want:    false,
+		wantErr: false,
+	}, {
+		name: "empty-test",
+		// dynamic/static parameters not contains
+		args: args{
+			ccSpec: &appsv1alpha1.ConfigConstraintSpec{
+				DynamicParameters: []string{},
+				StaticParameters:  []string{},
+			},
+			diff: newCfgDiffMeta(`{}`, nil, nil),
+		},
+		want:    true,
 		wantErr: false,
 	}}
 	for _, tt := range tests {

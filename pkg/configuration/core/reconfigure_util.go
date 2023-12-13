@@ -99,16 +99,19 @@ func IsUpdateDynamicParameters(cc *appsv1alpha1.ConfigConstraintSpec, cfg *Confi
 		return false, nil
 	}
 
-	params, err := getUpdateParameterList(cfg, NestedPrefixField(cc.FormatterConfig))
+	updatedParams, err := getUpdateParameterList(cfg, NestedPrefixField(cc.FormatterConfig))
 	if err != nil {
 		return false, err
 	}
-	updateParams := util.NewSet(params...)
+	if len(updatedParams) == 0 {
+		return true, nil
+	}
+	updatedParamsSet := util.NewSet(updatedParams...)
 
 	// if ConfigConstraint has StaticParameters, check updated parameter
 	if len(cc.StaticParameters) > 0 {
 		staticParams := util.NewSet(cc.StaticParameters...)
-		union := util.Union(staticParams, updateParams)
+		union := util.Union(staticParams, updatedParamsSet)
 		if union.Length() > 0 {
 			return false, nil
 		}
@@ -121,7 +124,7 @@ func IsUpdateDynamicParameters(cc *appsv1alpha1.ConfigConstraintSpec, cfg *Confi
 	// if ConfigConstraint has DynamicParameter, and all updated params are dynamic
 	if len(cc.DynamicParameters) > 0 {
 		dynamicParams := util.NewSet(cc.DynamicParameters...)
-		diff := util.Difference(updateParams, dynamicParams)
+		diff := util.Difference(updatedParamsSet, dynamicParams)
 		return diff.Length() == 0, nil
 	}
 

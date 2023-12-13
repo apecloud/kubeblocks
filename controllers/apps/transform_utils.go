@@ -24,6 +24,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -31,6 +32,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -155,4 +157,26 @@ func isVolumeClaimTemplatesEqual(a, b []appsv1alpha1.ClusterComponentVolumeClaim
 		}
 	}
 	return true
+}
+
+// TODO[ziang]: is it possible to filter by service type?
+func listAllNodePortServices(ctx graph.TransformContext) (map[int32]*corev1.Service, error) {
+	svcList := &corev1.ServiceList{}
+	if err := ctx.GetClient().List(ctx.GetContext(), svcList, client.InNamespace(v1.NamespaceAll)); err != nil {
+		return nil, err
+	}
+
+	services := make(map[int32]*corev1.Service)
+	for _, svc := range svcList.Items {
+		if !isExternalService(&svc.Spec) {
+			continue
+		}
+		for _, port := range svc.Spec.Ports {
+			if port.NodePort == 0 {
+				continue
+			}
+			services[port.NodePort] = &svc
+		}
+	}
+	return services, nil
 }

@@ -37,8 +37,15 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
+const (
+	// TODO[ziang]: get the node port range from the controller-manager
+	NodePortMin = 30000
+	NodePortMax = 32767
+)
+
 // clusterServiceTransformer handles cluster services.
-type clusterServiceTransformer struct{}
+type clusterServiceTransformer struct {
+}
 
 var _ graph.Transformer = &clusterServiceTransformer{}
 
@@ -56,12 +63,18 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 		return err
 	}
 
+	npServices, err := listAllNodePortServices(transCtx)
+	if err != nil {
+		return err
+	}
+	npAllocator := NewPortAllocator(NodePortMin, NodePortMax, npServices)
+
 	for _, svc := range cluster.Spec.Services {
 		service, err := t.buildService(transCtx, cluster, &svc)
 		if err != nil {
 			return err
 		}
-		if err = createOrUpdateService(ctx, dag, graphCli, service); err != nil {
+		if err = createOrUpdateService(ctx, dag, graphCli, service, npAllocator); err != nil {
 			return err
 		}
 		delete(services, service.Name)
@@ -160,7 +173,7 @@ func (t *clusterServiceTransformer) listOwnedClusterServices(transCtx *clusterTr
 	return services, nil
 }
 
-func createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG, graphCli model.GraphClient, service *corev1.Service) error {
+func createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG, graphCli model.GraphClient, service *corev1.Service, npAllocator *PortAllocator) error {
 	key := types.NamespacedName{
 		Namespace: service.Namespace,
 		Name:      service.Name,
@@ -168,6 +181,9 @@ func createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG, graphCli 
 	obj := &corev1.Service{}
 	if err := ctx.GetClient().Get(ctx.GetContext(), key, obj); err != nil {
 		if apierrors.IsNotFound(err) {
+			if err := resolveNodePortForSvc(service, npAllocator); err != nil {
+				return err
+			}
 			graphCli.Create(dag, service)
 			return nil
 		}
@@ -177,6 +193,10 @@ func createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG, graphCli 
 	objCopy.Spec = service.Spec
 
 	resolveServiceDefaultFields(&obj.Spec, &objCopy.Spec)
+
+	if err := resolveNodePortForSvc(objCopy, npAllocator); err != nil {
+		return err
+	}
 
 	if !reflect.DeepEqual(obj, objCopy) {
 		graphCli.Update(dag, obj, objCopy)
@@ -213,4 +233,89 @@ func resolveServiceDefaultFields(obj, objCopy *corev1.ServiceSpec) {
 	if objCopy.InternalTrafficPolicy == nil {
 		objCopy.InternalTrafficPolicy = obj.InternalTrafficPolicy
 	}
+}
+
+func resolveNodePortForSvc(obj *corev1.Service, npAllocator *PortAllocator) error {
+	if !isExternalService(&obj.Spec) {
+		return nil
+	}
+
+	getKey := func(svc *corev1.Service) types.NamespacedName {
+		return types.NamespacedName{
+			Namespace: svc.Namespace,
+			Name:      svc.Name,
+		}
+	}
+
+	for _, item := range obj.Spec.Ports {
+		if item.NodePort != 0 {
+			svc, inUse := npAllocator.InUse(item.NodePort)
+			if !inUse || getKey(svc) == getKey(obj) {
+				continue
+			}
+			return fmt.Errorf("node port %d is already in use by service %s", item.NodePort, svc.Name)
+		}
+		port, err := npAllocator.AllocatePort(obj)
+		if err != nil {
+			return err
+		}
+		item.NodePort = port
+	}
+	return nil
+}
+
+// TODO[ziang]: may be we can use a configmap to record the ports allocated
+type PortAllocator struct {
+	min    int32
+	max    int32
+	cursor int32
+	used   map[int32]*corev1.Service
+}
+
+func NewPortAllocator(min, max int32, used map[int32]*corev1.Service) *PortAllocator {
+	return &PortAllocator{
+		min:    min,
+		max:    max,
+		used:   used,
+		cursor: min,
+	}
+}
+
+func (p *PortAllocator) AllocatePort(obj *corev1.Service) (int32, error) {
+	result, err := p.AllocatePorts(obj, 1)
+	if err != nil {
+		return 0, err
+	}
+	return result[0], nil
+}
+
+func (p *PortAllocator) AllocatePorts(obj *corev1.Service, count int32) ([]int32, error) {
+	cursor := p.cursor
+	result := make([]int32, count)
+	for ; cursor <= p.max && int32(len(result)) < count; {
+		if _, ok := p.used[cursor]; ok {
+			continue
+		}
+		result = append(result, cursor)
+	}
+
+	if int32(len(result)) != count {
+		return nil, fmt.Errorf("not enough node ports")
+	}
+
+	p.cursor = cursor
+	for _, port := range result {
+		p.used[port] = obj
+	}
+
+	return result, nil
+}
+
+func (p *PortAllocator) InUse(port int32) (*corev1.Service, bool) {
+	svc, ok := p.used[port]
+	return svc, ok
+}
+
+func isExternalService(obj *corev1.ServiceSpec) bool {
+	return obj.Type == corev1.ServiceTypeNodePort || obj.Type == corev1.ServiceTypeLoadBalancer
 }

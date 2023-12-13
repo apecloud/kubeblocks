@@ -45,6 +45,11 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
+	npServices, err := listAllNodePortServices(transCtx)
+	if err != nil {
+		return err
+	}
+	npAllocator := NewPortAllocator(NodePortMin, NodePortMax, npServices)
 	synthesizeComp := transCtx.SynthesizeComponent
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for _, service := range synthesizeComp.ComponentServices {
@@ -56,7 +61,7 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 		if err != nil {
 			return err
 		}
-		if err = createOrUpdateService(ctx, dag, graphCli, svc); err != nil {
+		if err = createOrUpdateService(ctx, dag, graphCli, svc, npAllocator); err != nil {
 			return err
 		}
 	}

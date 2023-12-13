@@ -1,0 +1,162 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "type": "object",
+    "properties": {
+        "obClusters": {
+            "title": "ObClusters",
+            "description": "OceanBase Clusters, for standalone mode, set to 1, for primary-secondary mode, set to 2.",
+            "type": [
+                "integer"
+            ],
+            "default": 2,
+            "minimum": 1,
+            "maximum": 2
+        },
+        "zoneCount": {
+            "title": "ZontCount",
+            "description": "OceanBase Zones.",
+            "type": [
+              "integer"
+          ],
+            "default": 1,
+            "minimum": 1,
+            "maximum": 3
+        },
+        "replicas": {
+            "title": "Replicas",
+            "description": "The number of replicas, no less than zoneCount.",
+            "type": [
+              "integer"
+          ],
+            "default": { "$data": "/zoneCount" },
+            "minimum": 1,
+            "maximum": 6
+        },
+        "cpu": {
+            "title": "CPU",
+            "description": "CPU cores.",
+            "type": [
+                "number",
+                "string"
+            ],
+            "default": 8,
+            "minimum": 4,
+            "maximum": 128,
+            "multipleOf": 0.5
+        },
+        "memory": {
+            "title": "Memory(Gi)",
+            "description": "Memory, the unit is Gi.",
+            "type": [
+                "number",
+                "string"
+            ],
+            "default": 16,
+            "minimum": 4,
+            "maximum": 1024
+        },
+        "tenant": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "title": "Tenant Name",
+                    "description": "Tenant Name.",
+                    "type": "string",
+                    "minLength": 4,
+                    "maxLength": 32
+                },
+                "max_cpu": {
+                    "title": "Tenant CPU",
+                    "description": "Tenant CPU cores.",
+                    "type": [
+                        "number",
+                        "string"
+                    ],
+                    "default": 2,
+                    "minimum": 2,
+                    "maximum": 64,
+                    "multipleOf": 0.5
+                },
+                "memory_size": {
+                    "title": "Tenant Max Memory(Gi)",
+                    "description": "Memory, the unit is Gi.",
+                    "type": [
+                        "number",
+                        "string"
+                    ],
+                    "default": 2,
+                    "minimum": 2,
+                    "maximum": 1024
+                },
+                "log_disk_size": {
+                    "title": "Tenant Log Disk Size(Gi)",
+                    "description": "Log Disk Size, the unit is Gi.",
+                    "type": [
+                        "number",
+                        "string"
+                    ],
+                    "default": 5,
+                    "minimum": 2,
+                    "maximum": 10000
+                }
+            },
+            "required": [
+                "name",
+                "max_cpu",
+                "memory_size",
+                "log_disk_size"
+            ]
+        },
+        "storage": {
+            "type": "object",
+            "properties": {
+                "data-file": {
+                    "title": "Data file Storage(Gi)",
+                    "description": "Data file Storage size, the unit is Gi.",
+                    "type": [
+                        "number",
+                        "string"
+                    ],
+                    "default": 50,
+                    "minimum": 20,
+                    "maximum": 10000
+                },
+                "data-log": {
+                    "title": "Data log Storage(Gi)",
+                    "description": "Data log Storage size, the unit is Gi.",
+                    "type": [
+                        "number",
+                        "string"
+                    ],
+                    "default": 50,
+                    "minimum": 20,
+                    "maximum": 10000
+                },
+                "log": {
+                    "title": "Log Storage(Gi)",
+                    "description": "Log Storage size, the unit is Gi.",
+                    "type": [
+                        "number",
+                        "string"
+                    ],
+                    "default": 20,
+                    "minimum": 10,
+                    "maximum": 100
+                }
+            },
+            "required": [
+                "data-file",
+                "data-log",
+                "log"
+            ]
+        }
+    },
+    "required": [
+        "obClusters",
+        "zoneCount",
+        "replicas",
+        "cpu",
+        "memory",
+        "storages"
+    ]
+}

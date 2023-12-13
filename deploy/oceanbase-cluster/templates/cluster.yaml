@@ -16,10 +16,10 @@ spec:
     - name: ob-bundle-{{ $i }}
       componentDefRef: ob-bundle
       serviceAccountName: {{ include "kblib.serviceAccountName" $ }}
-      replicas: {{ $.Values.replicas | default 3 }}
+      replicas: {{ max $.Values.zoneCount $.Values.replicas}}
       {{- include "kblib.componentResources" $ | indent 6 }}
       volumeClaimTemplates:
-        {{- range $key, $val := $.Values.resources.storages }}
+        {{- range $key, $val := $.Values.storages }}
         - name: {{ $key }}
           spec:
             accessModes:

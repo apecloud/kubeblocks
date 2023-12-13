@@ -18,18 +18,17 @@ replicas: 1
 
 tenant:
   name: "alice"
-  max_cpu: 2
-  memory_size: 2
+  max_cpu: 4
+  memory_size: 8
   log_disk_size: 5
 
 # resources
-cpu: 6
-memory: 10
-resources:
-  storages:
-    data-file: 50Gi
-    data-log: 50Gi
-    log: 10Gi
+cpu: 8
+memory: 16
+storages:
+  data-file: 50Gi
+  data-log: 50Gi
+  log: 20Gi
 storageClassName: "openebs-hostpath"
 
 ## customized default values to override kblib chart's values

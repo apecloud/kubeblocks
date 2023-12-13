@@ -69,9 +69,9 @@ Create extra env
 {
 {{- if .Values.tenant -}}
 "TENANT_NAME": "{{ .Values.tenant.name | default "tenant1" }}",
-"TENANT_CPU": "{{ .Values.tenant.max_cpu | default "2" }}",
-"TENANT_MEMORY": "{{ print .Values.tenant.memory_size "G" | default "2G" }}",
-"TENANT_DISK": "{{ print .Values.tenant.log_disk_size "G" | default "5G" }}",
+"TENANT_CPU": "{{ min (sub .Values.cpu 1) .Values.tenant.max_cpu }}",
+"TENANT_MEMORY": "{{ print (min (sub .Values.memory  2) .Values.tenant.memory_size) "G" }}",
+"TENANT_DISK": "{{ print (.Values.tenant.log_disk_size | default 5) "G" }}",
 {{- end -}}
 "ZONE_COUNT": "{{ .Values.zoneCount | default "1" }}",
 "OB_CLUSTERS_COUNT": "{{ .Values.obClusters | default "1" }}"

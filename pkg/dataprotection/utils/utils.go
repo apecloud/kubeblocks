@@ -24,6 +24,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -262,4 +263,20 @@ func PrependSpaces(content string, spaces int) string {
 		}
 	}
 	return w.String()
+}
+
+// GetFirstIndexRunningPod gets the first running pod with index.
+func GetFirstIndexRunningPod(podList *corev1.PodList) *corev1.Pod {
+	if podList == nil {
+		return nil
+	}
+	sort.Slice(podList.Items, func(i, j int) bool {
+		return podList.Items[i].Name < podList.Items[j].Name
+	})
+	for _, v := range podList.Items {
+		if intctrlutil.IsAvailable(&v, 0) {
+			return &v
+		}
+	}
+	return nil
 }

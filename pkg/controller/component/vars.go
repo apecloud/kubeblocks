@@ -83,7 +83,10 @@ func setEnvNTemplateVars(templateVars []corev1.EnvVar, envVars []corev1.EnvVar, 
 			if c.Env == nil {
 				c.Env = envVars
 			} else {
-				c.Env = append(envVars, c.Env...)
+				newEnv := make([]corev1.EnvVar, len(envVars), len(envVars)+len(c.Env))
+				copy(newEnv, envVars)
+				newEnv = append(newEnv, c.Env...)
+				c.Env = newEnv
 			}
 		}
 	}

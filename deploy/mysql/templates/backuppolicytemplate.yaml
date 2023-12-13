@@ -1,0 +1,40 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: BackupPolicyTemplate
+metadata:
+  name: mysql-backup-policy-template
+  labels:
+    {{- include "mysql.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: mysql
+  backupPolicies:
+  - componentDefRef: mysql
+    backupMethods:
+    - name: xtrabackup
+      snapshotVolumes: false
+      actionSetName: mysql-xtrabackup
+      envMapping:
+        - key: IMAGE_TAG
+          valueFrom:
+            clusterVersionRef:
+            - names: [mysql-8.0.33]
+              mappingValue: "8.0.33-28"
+            - names: [mysql-5.7.42]
+              mappingValue: "2.4"
+      targetVolumes:
+        volumeMounts:
+        - name: data
+          mountPath: {{ .Values.dataMountPath }}
+    - name: volume-snapshot
+      snapshotVolumes: true
+      targetVolumes:
+        volumes:
+        - data
+    schedules:
+    - backupMethod: xtrabackup
+      enabled: false
+      cronExpression: "0 18 * * 0"
+      retentionPeriod: 7d
+    - backupMethod: volume-snapshot
+      enabled: false
+      cronExpression: "0 18 * * 0"
+      retentionPeriod: 7d

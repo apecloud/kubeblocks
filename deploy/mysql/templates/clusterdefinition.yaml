@@ -60,7 +60,7 @@ spec:
               - -c
               - "docker-entrypoint.sh mysqld --server-id $(( ${KB_POD_NAME##*-} + 1))"
             volumeMounts:
-              - mountPath: /var/lib/mysql
+              - mountPath: {{ .Values.dataMountPath }}
                 name: data
               - mountPath: /etc/mysql/conf.d
                 name: mysql-config

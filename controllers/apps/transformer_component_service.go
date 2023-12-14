@@ -78,8 +78,8 @@ func (t *componentServiceTransformer) buildService(comp *appsv1alpha1.Component,
 		SetSpec(&service.Spec).
 		AddSelectorsInMap(t.builtinSelector(comp)).
 		Optimize4ExternalTraffic()
-
-	if len(service.RoleSelector) > 0 {
+	// if replicas is 1 or 0, ignore the role selector
+	if len(service.RoleSelector) > 0 && synthesizeComp.Replicas > int32(1) {
 		if err := t.checkRoleSelector(synthesizeComp, service.Name, service.RoleSelector); err != nil {
 			return nil, err
 		}

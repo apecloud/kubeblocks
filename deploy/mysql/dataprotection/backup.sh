@@ -16,7 +16,7 @@ function handle_exit() {
 }
 trap handle_exit EXIT
 
-xtrabackup --backup --safe-slave-backup --slave-info --stream=xbstream \
+xtrabackup --backup --compress --safe-slave-backup --slave-info --stream=xbstream \
   --host=${DP_DB_HOST} --user=${DP_DB_USER} --password=${DP_DB_PASSWORD} --datadir=${DATA_DIR} | datasafed push - "/${DP_BACKUP_NAME}.xbstream"
 TOTAL_SIZE=$(datasafed stat / | grep TotalSize | awk '{print $2}')
 echo "{\"totalSize\":\"$TOTAL_SIZE\"}" >"${DP_BACKUP_INFO_FILE}"

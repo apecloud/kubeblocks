@@ -615,10 +615,10 @@ func (mgr *Manager) isRecoveryConfOutdate(ctx context.Context, leader string) bo
 		return true
 	}
 
-	ioError := rowMap.GetString("Last_IO_Error")
-	sqlError := rowMap.GetString("Last_SQL_Error")
-	if ioError != "" || sqlError != "" {
-		mgr.Logger.Error(nil, fmt.Sprintf("slave status error, sqlError: %s, ioError: %s", sqlError, ioError))
+	ioRunning := rowMap.GetString("Slave_IO_Running")
+	sqlRunning := rowMap.GetString("Slave_SQL_Running")
+	if ioRunning == "No" || sqlRunning == "No" {
+		mgr.Logger.Error(nil, fmt.Sprintf("slave status error, %v", rowMap))
 		return true
 	}
 

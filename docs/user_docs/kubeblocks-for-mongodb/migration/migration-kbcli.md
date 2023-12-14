@@ -32,10 +32,8 @@ Modify the configuration of the source to support CDC.
 
 Make sure both the source and sink account meet the following permissions.
 
-* The source account
-  The read permission of the repository to be migrated, admin, and local.
-* The sink account
-  The read and write permission of the repository to be migrated and the read permission of admin and local.
+* The source account: The read permission of the repository to be migrated, admin, and local.
+* The sink account: The read and write permission of the repository to be migrated, and the read permission of admin and local.
 
 ### Prepare data sampling
 
@@ -66,7 +64,7 @@ It is recommended to prepare data sampling for verification after the migration 
 
 2. (Optional) Specify migration steps by the flag `--steps`.
 
-   The default steps follow the order precheck -> structure initialization -> data initialization -> incremental migration. You can use `--steps` to specify migration steps. For example, perform tasks in the order of precheck -> structure initialization -> data initialization -> incremental migration.
+   The default steps follow the order precheck -> structure initialization -> data initialization -> incremental migration. You can use `--steps` to specify migration steps. For example, perform tasks in the order of precheck -> data initialization -> incremental migration.
 
    ```bash
    kbcli migration create mytask --template apecloud-mysql2mysql \

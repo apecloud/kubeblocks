@@ -16,7 +16,7 @@ KubeBlocks 采用物理备份的方式，将数据库中的物理文件作为备
   - 快照备份：如果你的数据存储在支持快照的云盘中，你可以通过快照创建数据备份。快照备份通常比备份工具备份更快，因此推荐使用。
 - [定时备份](../backup-and-restore/backup/scheduled-backup.md)：可指定保留时间、备份方法、时间等参数来[自定义备份](../backup-and-restore/backup/scheduled-backup.md)。或者你可以通过[日志自动备份](../backup-and-restore/backup/scheduled-backup.md)。日志备份使用备份数据库生成的增量日志文件，如 MySQL BinLog 和 PostgreSQL WAL，因此也被称为增量备份。基于时间点的恢复（PITR）依赖于日志备份。
 
-至于恢复功能，KubeBlocks 支持从备份集和 PITR 中恢复数据。
+至于恢复功能，KubeBlocks 支持从备份集中恢复数据。
 - 恢复
   - [从备份集中恢复数据](../backup-and-restore/restore/restore-data-from-backup-set.md)
 

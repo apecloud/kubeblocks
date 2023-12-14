@@ -16,7 +16,7 @@ import TabItem from '@theme/TabItem';
 ## 开始之前
 
 * [安装 kbcli](./../../installation/install-with-kbcli/install-kbcli.md)。
-* 安装 KubeBlocks：你可以使用 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](../../installation/install-with-helm/install-kubeblocks-with-helm.md) 安装 KubeBlocks。
+* 安装 KubeBlocks：你可以使用 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](../../installation/install-with-helm/install-kubeblocks-with-helm.md) 进行安装。
 * 确保 `kbcli addon list` 已启用。
 
   ```bash

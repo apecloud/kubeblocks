@@ -46,9 +46,9 @@ pg-cluster        default          postgresql            postgresql-14.7.0      
   --volume-claim-templates="data" --storage="2Gi"
   ```
 
-  - `--components` describes the component name for volume expansion.
-  - `--volume-claim-templates` describes the VolumeClaimTemplate names in components.
-  - `--storage` describes the volume storage size.
+   - `--components` describes the component name for volume expansion.
+   - `--volume-claim-templates` describes the VolumeClaimTemplate names in components.
+   - `--storage` describes the volume storage size.
 
   **Option 2.** Create an OpsRequest
 

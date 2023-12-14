@@ -4078,7 +4078,6 @@ spec:
                   component's active role. Cannot be updated.
                 enum:
                 - External
-                - KubeBlocks
                 - Lorry
                 type: string
               roles:

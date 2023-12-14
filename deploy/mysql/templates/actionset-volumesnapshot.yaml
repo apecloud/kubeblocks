@@ -1,0 +1,19 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: ActionSet
+metadata:
+  name: mysql-volumesnapshot
+  labels:
+    {{- include "mysql.labels" . | nindent 4 }}
+spec:
+  backupType: Full
+  env:
+  - name: DATA_DIR
+    value: "{{ .Values.dataMountPath }}/data"
+  restore:
+    prepareData:
+      image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.xtraBackupRepository }}:8.0.32
+      command:
+      - bash
+      - -c
+      - |
+        rm -rf ${DATA_DIR}/auto.cnf

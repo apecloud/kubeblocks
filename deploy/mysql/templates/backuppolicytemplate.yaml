@@ -26,9 +26,13 @@ spec:
           mountPath: {{ .Values.dataMountPath }}
     - name: volume-snapshot
       snapshotVolumes: true
+      actionSetName: mysql-volumesnapshot
       targetVolumes:
         volumes:
-        - data
+          - data
+        volumeMounts:
+          - name: data
+            mountPath: {{ .Values.dataMountPath }}
     schedules:
     - backupMethod: xtrabackup
       enabled: false

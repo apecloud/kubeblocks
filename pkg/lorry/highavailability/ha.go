@@ -74,7 +74,7 @@ func GetHa() *Ha {
 func (ha *Ha) RunCycle() {
 	cluster, err := ha.dcs.GetCluster()
 	if err != nil {
-		ha.logger.Error(err, "Get Cluster err")
+		ha.logger.Error(err, "Get Cluster failed")
 		return
 	}
 
@@ -191,17 +191,25 @@ func (ha *Ha) RunCycle() {
 		// currentMemberIsLeader, _ := ha.dbManager.IsLeader(context.TODO(), cluster)
 		// if lockOwnerIsLeader && currentMemberIsLeader {
 		// ha.logger.Info("Lock owner is real Leader, demote myself and follow the real leader")
-		_ = ha.dbManager.Demote(ha.ctx)
-		_ = ha.dbManager.Follow(ha.ctx, cluster)
+		err = ha.dbManager.Demote(ha.ctx)
+		if err != nil {
+			ha.logger.Info("promote failed", "error", err)
+		}
+
+		err = ha.dbManager.Follow(ha.ctx, cluster)
+		if err != nil {
+			ha.logger.Info("follow failed", "error", err)
+		}
 	}
 }
 
 func (ha *Ha) Start() {
 	ha.logger.Info("HA starting")
 	cluster, err := ha.dcs.GetCluster()
-	if cluster == nil {
-		ha.logger.Error(err, "Get Cluster error, so HA exists.", "cluster-name", ha.dcs.GetClusterName())
-		return
+	for cluster == nil {
+		ha.logger.Error(err, "Get Cluster failed.", "cluster-name", ha.dcs.GetClusterName())
+		time.Sleep(10 * time.Second)
+		cluster, err = ha.dcs.GetCluster()
 	}
 
 	// isPodReady, err := ha.IsPodReady()
@@ -261,8 +269,12 @@ func (ha *Ha) Start() {
 	}
 
 	for {
+		startAt := time.Now()
 		ha.RunCycle()
-		time.Sleep(10 * time.Second)
+		duration := time.Since(startAt)
+		if duration < 10*time.Second {
+			time.Sleep(10*time.Second - duration)
+		}
 	}
 }
 

@@ -422,6 +422,10 @@ func (mgr *Manager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string
 
 // IsClusterInitialized is a method to check if cluster is initialized or not
 func (mgr *Manager) IsClusterInitialized(ctx context.Context, _ *dcs.Cluster) (bool, error) {
+	err := mgr.EnableSemiSyncIfNeed(ctx)
+	if err != nil {
+		return false, err
+	}
 	return mgr.EnsureServerID(ctx)
 }
 
@@ -446,6 +450,53 @@ func (mgr *Manager) EnsureServerID(ctx context.Context) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (mgr *Manager) EnableSemiSyncIfNeed(ctx context.Context) error {
+	var status string
+	err := mgr.DB.QueryRowContext(ctx, "SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS "+
+		"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").Scan(&status)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil
+		}
+		mgr.Logger.Error(err, "Get rpl_semi_sync_source plugin status failed: %v")
+		return err
+	}
+
+	// In MySQL 8.0, semi-sync configuration options should not be specified in my.cnf,
+	// as this may cause the database initialization process to fail:
+	//    [Warning] [MY-013501] [Server] Ignoring --plugin-load[_add] list as the server is running with --initialize(-insecure).
+	//    [ERROR] [MY-000067] [Server] unknown variable 'rpl_semi_sync_master_enabled=1'.
+	if status == "ACTIVE" {
+		setSourceEnable := "SET GLOBAL rpl_semi_sync_source_enabled = 1;" +
+			"SET GLOBAL rpl_semi_sync_source_timeout = 1000;"
+		_, err = mgr.DB.Exec(setSourceEnable)
+		if err != nil {
+			mgr.Logger.Error(err, setSourceEnable+" execute failed")
+			return err
+		}
+	}
+
+	err = mgr.DB.QueryRowContext(ctx, "SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS "+
+		"WHERE PLUGIN_NAME ='rpl_semi_sync_replica';").Scan(&status)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil
+		}
+		mgr.Logger.Error(err, "Get rpl_semi_sync_replica plugin status failed: %v")
+		return err
+	}
+
+	if status == "ACTIVE" {
+		setSourceEnable := "SET GLOBAL rpl_semi_sync_replica_enabled = 1;"
+		_, err = mgr.DB.Exec(setSourceEnable)
+		if err != nil {
+			mgr.Logger.Error(err, setSourceEnable+" execute failed")
+			return err
+		}
+	}
+	return nil
 }
 
 func (mgr *Manager) Promote(context.Context, *dcs.Cluster) error {
@@ -493,8 +544,10 @@ func (mgr *Manager) Follow(_ context.Context, cluster *dcs.Cluster) error {
 	}
 
 	stopSlave := `stop slave;`
+	// MySQL 5.7 has a limitation where the length of the master_host cannot exceed 60 characters.
+	masterHost := cluster.GetMemberShortAddr(*leaderMember)
 	changeMaster := fmt.Sprintf(`change master to master_host='%s',master_user='%s',master_password='%s',master_port=%s,master_auto_position=1;`,
-		cluster.GetMemberAddr(*leaderMember), config.username, config.password, leaderMember.DBPort)
+		masterHost, config.username, config.password, leaderMember.DBPort)
 	startSlave := `start slave;`
 
 	_, err := mgr.DB.Exec(stopSlave + changeMaster + startSlave)
@@ -514,10 +567,10 @@ func (mgr *Manager) isRecoveryConfOutdated(leader string) bool {
 		return true
 	}
 
-	ioError := rowMap.GetString("Last_IO_Error")
-	sqlError := rowMap.GetString("Last_SQL_Error")
-	if ioError != "" || sqlError != "" {
-		mgr.Logger.Error(nil, fmt.Sprintf("slave status error, sqlError: %s, ioError: %s", sqlError, ioError))
+	ioRunning := rowMap.GetString("Slave_IO_Running")
+	sqlRunning := rowMap.GetString("Slave_SQL_Running")
+	if ioRunning == "No" || sqlRunning == "No" {
+		mgr.Logger.Error(nil, fmt.Sprintf("slave status error, %v", rowMap))
 		return true
 	}
 

@@ -150,7 +150,7 @@ You can also view the details of this configuration file and parameters.
 
 ### Configure parameters with edit-config command
 
-For your convenience, KubeBlocks offers a tool `edit-config` to help you to configure parameter in a visulized way.
+For your convenience, KubeBlocks offers a tool `edit-config` to help you to configure parameter in a visualized way.
 
 For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on notepad.
 
@@ -160,11 +160,11 @@ For Linux and macOS, you can edit configuration files by vi. For Windows, you ca
    kbcli cluster edit-config mykafka
    ```
 
-:::note
+   :::note
 
-If there are multiple components in a cluster, use `--component` to specify a component.
+   If there are multiple components in a cluster, use `--component` to specify a component.
 
-:::
+   :::
 
 2. View the status of the parameter configuration.
 
@@ -178,12 +178,12 @@ If there are multiple components in a cluster, use `--component` to specify a co
    kbcli cluster connect mykafka
    ```
 
-:::note
+   :::note
 
-1. For the `edit-config` function, static parameters and dynamic parameters cannot be edited at the same time.
-2. Deleting a parameter will be supported later.
+   1. For the `edit-config` function, static parameters and dynamic parameters cannot be edited at the same time.
+   2. Deleting a parameter will be supported later.
 
-:::
+   :::
 
 ## View history and compare differences
 

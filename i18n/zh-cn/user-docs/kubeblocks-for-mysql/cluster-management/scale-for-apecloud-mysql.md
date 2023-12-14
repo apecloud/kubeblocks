@@ -35,7 +35,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
 1. 更改配置，共有 3 种方式。
 
-   **选项 1.** （**推荐**）使用 kbcli
+   **选项 1.**（**推荐**）使用 kbcli
 
    配置参数 `--components`、`--memory` 和 `--cpu`，并执行以下命令。
 
@@ -119,16 +119,16 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
     mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    VerticalScaling        Jan 29,2023 14:29 UTC+0800
     ```
 
-   - STATUS=VerticalScaling：表示正在进行垂直扩容。
-   - STATUS=Running：表示垂直扩容已完成。
-   - STATUS=Abnormal：表示垂直扩容异常。原因可能是正常实例的数量少于总实例数，或者 Leader 实例正常运行而其他实例异常。
+   - STATUS=VerticalScaling 表示正在进行垂直扩容。
+   - STATUS=Running 表示垂直扩容已完成。
+   - STATUS=Abnormal 表示垂直扩容异常。原因可能是正常实例的数量少于总实例数，或者 Leader 实例正常运行而其他实例异常。
      > 你可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者你也可以创建足够的资源，并使用 `kubectl describe` 命令进行故障排除。
 
-:::note
+    :::note
 
-垂直扩容不会同步与 CPU 和内存相关的参数，需要手动调用配置的 OpsRequest 来进行更改。详情请参考[配置](./../../kubeblocks-for-mysql/configuration/configuration.md)。
+    垂直扩容不会同步与 CPU 和内存相关的参数，需要手动调用配置的 OpsRequest 来进行更改。详情请参考[配置](./../../kubeblocks-for-mysql/configuration/configuration.md)。
 
-:::
+    :::
 
 3. 检查资源规格是否已变更。
 

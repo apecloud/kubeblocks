@@ -13,22 +13,22 @@ KubeBlocks 提供了一套默认的配置生成策略，适用于在 KubeBlocks 
 
 ## 查看参数信息
 
-* 查看集群的配置文件。
+查看集群的配置文件。
 
-   ```bash
-   kbcli cluster describe-config mongodb-cluster
-   >
-   ConfigSpecs Meta:
-   CONFIG-SPEC-NAME         FILE                  ENABLED   TEMPLATE                     CONSTRAINT                   RENDERED                                            COMPONENT    CLUSTER           
-   mongodb-config           keyfile               false     mongodb5.0-config-template   mongodb-config-constraints   mongodb-cluster-replicaset-mongodb-config           replicaset   mongodb-cluster   
-   mongodb-config           mongodb.conf          true      mongodb5.0-config-template   mongodb-config-constraints   mongodb-cluster-replicaset-mongodb-config           replicaset   mongodb-cluster   
-   mongodb-metrics-config   metrics-config.yaml   false     mongodb-metrics-config                                    mongodb-cluster-replicaset-mongodb-metrics-config   replicaset   mongodb-cluster   
+```bash
+kbcli cluster describe-config mongodb-cluster
+>
+ConfigSpecs Meta:
+CONFIG-SPEC-NAME         FILE                  ENABLED   TEMPLATE                     CONSTRAINT                   RENDERED                                            COMPONENT    CLUSTER           
+mongodb-config           keyfile               false     mongodb5.0-config-template   mongodb-config-constraints   mongodb-cluster-replicaset-mongodb-config           replicaset   mongodb-cluster   
+mongodb-config           mongodb.conf          true      mongodb5.0-config-template   mongodb-config-constraints   mongodb-cluster-replicaset-mongodb-config           replicaset   mongodb-cluster   
+mongodb-metrics-config   metrics-config.yaml   false     mongodb-metrics-config                                    mongodb-cluster-replicaset-mongodb-metrics-config   replicaset   mongodb-cluster   
 
-   History modifications:
-   OPS-NAME   CLUSTER   COMPONENT   CONFIG-SPEC-NAME   FILE   STATUS   POLICY   PROGRESS   CREATED-TIME   VALID-UPDATED 
-   ```
+History modifications:
+OPS-NAME   CLUSTER   COMPONENT   CONFIG-SPEC-NAME   FILE   STATUS   POLICY   PROGRESS   CREATED-TIME   VALID-UPDATED 
+```
 
-   从元信息中可以看到，集群 `mongodb-cluster` 有一个名为 `mongodb.conf` 的配置文件。
+从元信息中可以看到，集群 `mongodb-cluster` 有一个名为 `mongodb.conf` 的配置文件。
 
 你也可以查看此配置文件和参数的详细信息。
 
@@ -44,7 +44,7 @@ KubeBlocks 提供了一套默认的配置生成策略，适用于在 KubeBlocks 
 
 下面展示如何将 systemLog.verbosity 配置为 1。
 
-1. 将 `systemLog.verbosity` 设置为1。
+1. 将 `systemLog.verbosity` 设置为 1。
 
    ```bash
    kbcli cluster configure mongodb-cluster --component mongodb --config-spec mongodb-config --config-file mongodb.conf --set systemLog.verbosity=1
@@ -93,11 +93,11 @@ Linux 和 macOS 系统可以使用 vi 编辑器编辑配置文件，Windows 系�
    kbcli cluster edit-config mongodb-cluster
    ```
 
-:::note
+      :::note
 
-如果集群中有多个组件，请使用 `--component` 参数指定一个组件。
-  
-:::
+      如果集群中有多个组件，请使用 `--component` 参数指定一个组件。
+      
+      :::
 
 2. 查看参数配置状态。
 
@@ -111,9 +111,9 @@ Linux 和 macOS 系统可以使用 vi 编辑器编辑配置文件，Windows 系�
    kbcli cluster connect mongodb-cluster
    ```
 
-:::note
+      :::note
 
-1. `edit-config` 不能同时编辑静态参数和动态参数。
-2. KubeBlocks 未来将支持删除参数。
+      1. `edit-config` 不能同时编辑静态参数和动态参数。
+      2. KubeBlocks 未来将支持删除参数。
 
-:::
+      :::

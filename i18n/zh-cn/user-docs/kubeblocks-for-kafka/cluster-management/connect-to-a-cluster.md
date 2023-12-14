@@ -230,7 +230,7 @@ import TabItem from '@theme/TabItem';
    ![获取 ELB 地址](./../../../img/kafka-connect-cross-vpc.png)
 
    请注意：
-   - xxxx-xxxx.cn-northwest-1.elb.amazonaws.com.cn 是 公网下能访问的 ELB 开公网地址。
+   - xxxx-xxxx.cn-northwest-1.elb.amazonaws.com.cn 是公网下能访问的 ELB 地址。
 
 3. 配置 hostname 映射。
    1. 登陆远程机器。

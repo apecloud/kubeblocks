@@ -25,7 +25,7 @@ sidebar_label: 通过 AWS DMS 迁移
 
 ***开始之前***
 
-* [安装 kbcli](./../../installation/install-with-kbcli/install-kbcli.md)
+* [安装 kbcli](./../../installation/install-with-kbcli/install-kbcli.md)。
 *  安装 KubeBlocks: 你可以用 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md) 进行安装。
 * 开启 AWS Load Balancer Controller 插件。
 
@@ -39,7 +39,7 @@ sidebar_label: 通过 AWS DMS 迁移
 
    负载均衡器插件依赖于 EKS 环境，如果负载均衡器未成功开启，可能与环境有关。
 
-   检查 EKS 环境并重新启用此插件。详情请参阅[启用引擎](./../../overview/database-engines-supported.md)。
+   检查 EKS 环境并重新启用此插件。详情请参阅[引擎文档](./../../overview/database-engines-supported.md)。
 
 ***步骤***
 
@@ -133,9 +133,9 @@ sidebar_label: 通过 AWS DMS 迁移
 
 * 阿里云 RDS
   
-   使用公网。参考[该文档](https://help.aliyun.com/zh/rds/apsaradb-rds-for-mysql/apply-for-or-release-a-public-endpoint-for-an-apsaradb-rds-for-mysql-instance)开放公网访问，在AWS DMS创建Endpoint即可
+   使用公网。参考[该文档](https://help.aliyun.com/zh/rds/apsaradb-rds-for-mysql/apply-for-or-release-a-public-endpoint-for-an-apsaradb-rds-for-mysql-instance)开放公网访问，在 AWS DMS 创建 Endpoint 即可。
 
-* AWS同一VPC下RDS
+* AWS 同一 VPC 下 RDS
   
    在创建 DMS 终端节点时，只需指定一个 RDS，无需进行额外操作。
 

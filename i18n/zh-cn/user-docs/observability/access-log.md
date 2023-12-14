@@ -42,18 +42,18 @@ KubeBlocks 日志增强功能使用类似 `kubectl exec` 和 `kubectl logs` 的�
 
 2. 查看支持的日志。
 
-  执行 `kbcli cluster list-logs` 命令，查看目标集群中已开启日志增强功能的日志类型和日志文件的详细信息，展示集群中的每个节点实例。
+    执行 `kbcli cluster list-logs` 命令，查看目标集群中已开启日志增强功能的日志类型和日志文件的详细信息，展示集群中的每个节点实例。
 
-    ***示例***
+      ***示例***
 
-    ```bash
-    kbcli cluster list-logs mycluster
-    >
-    INSTANCE                 LOG-TYPE        FILE-PATH                                   SIZE        LAST-WRITTEN                          COMPONENT
-    mycluster-mysql-0        error           /data/mysql/log/mysqld-error.log            6.4K        Feb 06, 2023 09:13 (UTC+00:00)        mysql
-    mycluster-mysql-0        general         /data/mysql/log/mysqld.log                  5.9M        Feb 06, 2023 09:13 (UTC+00:00)        mysql
-    mycluster-mysql-0        slow            /data/mysql/log/mysqld-slowquery.log        794         Feb 06, 2023 09:13 (UTC+00:00)        mysql       
-    ```
+      ```bash
+      kbcli cluster list-logs mycluster
+      >
+      INSTANCE                 LOG-TYPE        FILE-PATH                                   SIZE        LAST-WRITTEN                          COMPONENT
+      mycluster-mysql-0        error           /data/mysql/log/mysqld-error.log            6.4K        Feb 06, 2023 09:13 (UTC+00:00)        mysql
+      mycluster-mysql-0        general         /data/mysql/log/mysqld.log                  5.9M        Feb 06, 2023 09:13 (UTC+00:00)        mysql
+      mycluster-mysql-0        slow            /data/mysql/log/mysqld-slowquery.log        794         Feb 06, 2023 09:13 (UTC+00:00)        mysql       
+      ```
 
 3. 访问集群日志文件。
 

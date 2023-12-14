@@ -167,7 +167,8 @@ func listAllNodePortServices(ctx graph.TransformContext) (map[int32]*corev1.Serv
 	}
 
 	services := make(map[int32]*corev1.Service)
-	for _, svc := range svcList.Items {
+	for idx := range svcList.Items {
+		svc := svcList.Items[idx]
 		if !isExternalService(&svc.Spec) {
 			continue
 		}

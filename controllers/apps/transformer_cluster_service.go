@@ -251,6 +251,7 @@ func resolveNodePortForSvc(obj *corev1.Service, npAllocator *PortAllocator) erro
 		if item.NodePort != 0 {
 			svc, inUse := npAllocator.InUse(item.NodePort)
 			if !inUse || getKey(svc) == getKey(obj) {
+				npAllocator.UsePort(item.NodePort, obj)
 				continue
 			}
 			return fmt.Errorf("node port %d is already in use by service %s", item.NodePort, svc.Name)
@@ -314,6 +315,10 @@ func (p *PortAllocator) AllocatePorts(obj *corev1.Service, count int32) ([]int32
 func (p *PortAllocator) InUse(port int32) (*corev1.Service, bool) {
 	svc, ok := p.used[port]
 	return svc, ok
+}
+
+func (p *PortAllocator) UsePort(port int32, obj *corev1.Service) {
+	p.used[port] = obj
 }
 
 func isExternalService(obj *corev1.ServiceSpec) bool {

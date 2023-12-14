@@ -30,7 +30,7 @@ spec:
       versionsContext:
         containers:
           - name: ggml
-            image: {{ .Values.imageDev.registry | default "docker.io" }}/{{ .Values.imageDev.repository}}:{{ default .Chart.AppVersion .Values.imageDev.tagNew }}
+            image: {{ .Values.imageDev.registry | default .Values.image.registry }}/{{ .Values.imageDev.repository}}:{{ default .Chart.AppVersion .Values.imageDev.tagNew }}
             env:
               - name: MODEL
                 value: /app/model.gguf
@@ -55,7 +55,7 @@ spec:
                 mountPath: /models-target
         containers:
           - name: ggml
-            image: {{ .Values.imageDev.registry | default "docker.io" }}/{{ .Values.imageDev.repository}}:{{ default .Chart.AppVersion .Values.imageDev.tag }}
+            image: {{ .Values.imageDev.registry | default .Values.image.registry }}/{{ .Values.imageDev.repository}}:{{ default .Chart.AppVersion .Values.imageDev.tag }}
             env:
               - name: MODEL
                 value: /models/baichuan-llama-7b.ggmlv3.q4_0.bin
@@ -85,7 +85,7 @@ spec:
                 mountPath: /models-target
         containers:
           - name: ggml
-            image: {{ .Values.imageDev.registry | default "docker.io" }}/{{ .Values.imageDev.repository}}:{{ default .Chart.AppVersion .Values.imageDev.tagNew }}
+            image: {{ .Values.imageDev.registry | default .Values.image.registry }}/{{ .Values.imageDev.repository}}:{{ default .Chart.AppVersion .Values.imageDev.tagNew }}
             env:
               - name: MODEL
                 value: /models/ggml-model-q4.gguf
@@ -115,7 +115,7 @@ spec:
                 mountPath: /models-target
         containers:
           - name: ggml
-            image: {{ .Values.imageDev.registry | default "docker.io" }}/{{ .Values.imageDev.repository}}:{{ default .Chart.AppVersion .Values.imageDev.tagNew }}
+            image: {{ .Values.imageDev.registry | default .Values.image.registry }}/{{ .Values.imageDev.repository}}:{{ default .Chart.AppVersion .Values.imageDev.tagNew }}
             env:
               - name: MODEL
                 value: /models/ggml-model-f16.gguf
@@ -145,7 +145,7 @@ spec:
                 mountPath: /models-target
         containers:
           - name: ggml
-            image: {{ .Values.imageDev.registry | default "docker.io" }}/{{ .Values.imageDev.repository}}:{{ default .Chart.AppVersion .Values.imageDev.tagCodeShell }}
+            image: {{ .Values.imageDev.registry | default .Values.image.registry }}/{{ .Values.imageDev.repository}}:{{ default .Chart.AppVersion .Values.imageDev.tagCodeShell }}
             env:
               - name: MODEL
                 value: /models/codeshell-chat-q4_0.gguf
@@ -168,14 +168,14 @@ spec:
       versionsContext:
         initContainers:
           - name: download
-            image: {{ .Values.model.registry | default "docker.io" }}/{{ .Values.model.baichuan2_7b.ggml.repository}}:{{ default .Chart.AppVersion .Values.model.baichuan2_7b.ggml.version }}
+            image: {{ .Values.model.registry | default .Values.image.registry }}/{{ .Values.model.baichuan2_7b.ggml.repository}}:{{ default .Chart.AppVersion .Values.model.baichuan2_7b.ggml.version }}
             command: ["sh", "-c", "cp /models/ggml-model-q4.gguf /models-target/"]
             volumeMounts:
               - name: models
                 mountPath: /models-target
         containers:
           - name: ggml
-            image: {{ .Values.imageDev.registry | default "docker.io" }}/{{ .Values.imageDev.repository}}:{{ default .Chart.AppVersion .Values.imageDev.tagNew }}
+            image: {{ .Values.imageDev.registry | default .Values.image.registry }}/{{ .Values.imageDev.repository}}:{{ default .Chart.AppVersion .Values.imageDev.tagNew }}
             env:
                 - name: MODEL
                   value: /models/ggml-model-q4.gguf
@@ -198,14 +198,14 @@ spec:
       versionsContext:
         initContainers:
           - name: download
-            image: {{ .Values.imageDev.registry | default "docker.io" }}/apecloud/zephyr-7b-beta-gguf:q4_0
+            image: {{ .Values.imageDev.registry | default .Values.image.registry }}/apecloud/zephyr-7b-beta-gguf:q4_0
             command: ["sh", "-c", "cp /models/ggml-model-q4.gguf /models-target/"]
             volumeMounts:
               - name: models
                 mountPath: /models-target
         containers:
           - name: ggml
-            image: {{ .Values.imageDev.registry | default "docker.io" }}/{{ .Values.imageDev.repository}}:{{ default .Chart.AppVersion .Values.imageDev.tagNew }}
+            image: {{ .Values.imageDev.registry | default .Values.image.registry }}/{{ .Values.imageDev.repository}}:{{ default .Chart.AppVersion .Values.imageDev.tagNew }}
             env:
                 - name: MODEL
                   value: /models/ggml-model-q4.gguf

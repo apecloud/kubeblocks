@@ -3,11 +3,11 @@ helm_chart:
   tag: 0.31.3
 requirements:
   k8s_version: ">=1.13"
-images:
-  - full: "images.defaultImage.registry/images.attacher.repository:images.attacher.tag"
-  - full: "images.defaultImage.registry/images.registrar.repository:images.registrar.tag"
-  - full: "images.defaultImage.registry/images.attacher.provisioner:images.provisioner.tag"
-  - full: "images.defaultImage.registry/images.csi:images.csi.tag"
+image:
+  - full: "image.registry/image.attacher.repository:image.attacher.tag"
+  - full: "image.registry/image.registrar.repository:image.registrar.tag"
+  - full: "image.registry/image.attacher.provisioner:image.provisioner.tag"
+  - full: "image.registry/image.csi:image.csi.tag"
 user_values:
   - name: storageClass.create
     title:

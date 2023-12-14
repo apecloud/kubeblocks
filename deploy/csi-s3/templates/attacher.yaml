@@ -87,14 +87,14 @@ spec:
       {{- end }}
       containers:
         - name: csi-attacher
-          image: "{{ template "csi-s3.imageFullName" (dict "image" .Values.images.attacher "root" .) }}"
+          image: "{{ template "csi-s3.imageFullName" (dict "image" .Values.image.attacher "root" .) }}"
           args:
             - "--v=4"
             - "--csi-address=$(ADDRESS)"
           env:
             - name: ADDRESS
               value: {{ .Values.kubeletPath }}/plugins/ru.yandex.s3.csi/csi.sock
-          imagePullPolicy: "{{ template "csi-s3.imagePullPolicy" (dict "image" .Values.images.attacher "root" .) }}"
+          imagePullPolicy: "{{ template "csi-s3.imagePullPolicy" (dict "image" .Values.image.attacher "root" .) }}"
           volumeMounts:
             - name: socket-dir
               mountPath: {{ .Values.kubeletPath }}/plugins/ru.yandex.s3.csi

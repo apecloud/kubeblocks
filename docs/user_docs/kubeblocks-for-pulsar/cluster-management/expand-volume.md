@@ -25,11 +25,11 @@ kbcli cluster list pulsar
 
     Configure the values of `--components`, `--volume-claim-templates`, and `--storage`, and run the command below to expand the volume.
 
-      :::note
+     :::note
 
-      Expand volume for `journal` first. `ledger` volume expansion must be performed after the `journal` volume expansion.
+     Expand volume for `journal` first. `ledger` volume expansion must be performed after the `journal` volume expansion.
 
-      :::
+     :::
 
    - Expand volume for `journal`.
 

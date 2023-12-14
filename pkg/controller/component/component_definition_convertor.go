@@ -451,7 +451,7 @@ func (c *compDefRoleArbitratorConvertor) convert(args ...any) (any, error) {
 
 	// TODO(xingran): it is hacky, should be refactored
 	if clusterCompDef.WorkloadType == appsv1alpha1.Replication && clusterCompDef.CharacterType == constant.RedisCharacterType {
-		roleArbitrator := appsv1alpha1.KubeBlocksRoleArbitrator
+		roleArbitrator := appsv1alpha1.LorryRoleArbitrator
 		return &roleArbitrator, nil
 	}
 

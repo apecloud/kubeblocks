@@ -299,9 +299,8 @@ type SystemAccount struct {
 type RoleArbitrator string
 
 const (
-	ExternalRoleArbitrator   RoleArbitrator = "External"
-	KubeBlocksRoleArbitrator RoleArbitrator = "KubeBlocks"
-	LorryRoleArbitrator      RoleArbitrator = "Lorry"
+	ExternalRoleArbitrator RoleArbitrator = "External"
+	LorryRoleArbitrator    RoleArbitrator = "Lorry"
 )
 
 // ReplicaRole represents a role that can be assumed by a component instance.

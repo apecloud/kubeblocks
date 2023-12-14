@@ -26,7 +26,6 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 12931,
   "graphTooltip": 0,
-  "id": 9,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -687,8 +686,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -786,8 +784,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -885,8 +882,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -984,8 +980,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1097,8 +1092,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1598,7 +1592,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(kafka_brokers, namespace)",
+        "definition": "label_values(kafka_server_kafkaserver_total_brokerstate_value, namespace)",
         "hide": 0,
         "includeAll": false,
         "label": "Namespace",
@@ -1606,7 +1600,7 @@
         "name": "namespace",
         "options": [],
         "query": {
-          "query": "label_values(kafka_brokers, namespace)",
+          "query": "label_values(kafka_server_kafkaserver_total_brokerstate_value, namespace)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -1621,14 +1615,14 @@
       {
         "current": {
           "selected": false,
-          "text": "kafka-cluster",
-          "value": "kafka-cluster"
+          "text": "kafka",
+          "value": "kafka"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(kafka_brokers, app_kubernetes_io_instance)",
+        "definition": "label_values(kafka_server_kafkaserver_total_brokerstate_value, app_kubernetes_io_instance)",
         "hide": 0,
         "includeAll": false,
         "label": "Cluster",
@@ -1636,7 +1630,7 @@
         "name": "cluster",
         "options": [],
         "query": {
-          "query": "label_values(kafka_brokers, app_kubernetes_io_instance)",
+          "query": "label_values(kafka_server_kafkaserver_total_brokerstate_value, app_kubernetes_io_instance)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -1671,7 +1665,7 @@
         "options": [],
         "query": {
           "query": "label_values(kafka_topic_partition_current_offset{instance='$instance',topic!='__consumer_offsets',topic!='--kafka'}, topic)",
-          "refId": "Prometheus-topic-Variable-Query"
+          "refId": "StandardVariableQuery"
         },
         "refresh": 1,
         "regex": "",
@@ -1748,6 +1742,6 @@
   "timezone": "browser",
   "title": "Kafka",
   "uid": "kafka",
-  "version": 5,
+  "version": 1,
   "weekStart": ""
 }

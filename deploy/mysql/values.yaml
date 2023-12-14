@@ -9,6 +9,7 @@ image:
   # Overrides the image tag whose default is the chart appVersion.
   #tag: 8.0.33
   tag: 5.7
+  xtraBackupRepository: perconalab/percona-xtrabackup
 
 ## MySQL Cluster parameters
 cluster:
@@ -78,3 +79,6 @@ metrics:
 
   service:
     port: 9104
+
+dataMountPath: /var/lib/mysql
+

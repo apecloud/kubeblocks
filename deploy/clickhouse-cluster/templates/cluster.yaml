@@ -6,7 +6,7 @@ metadata:
 spec:
   clusterDefinitionRef: clickhouse  # ref clusterdefinition.name
   clusterVersionRef: clickhouse-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name
-  terminationPolicy: {{ $.Values.terminationPolicy }}
+  terminationPolicy: {{ $.Values.extra.terminationPolicy }}
   affinity:
     {{- with $.Values.topologyKeys }}
     topologyKeys: {{ . | toYaml | nindent 6 }}

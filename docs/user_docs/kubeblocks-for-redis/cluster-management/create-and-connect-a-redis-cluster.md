@@ -139,7 +139,7 @@ kbcli cluster create redis --mode replication --availability-policy none <cluste
 
 <TabItem value="kubectl" label="kubectl">
 
-KubeBlocks implements a `Cluster` CRD to define a cluster. BHere is an example of creating a Standalone.
+KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Standalone.
 
   ```bash
   cat <<EOF | kubectl apply -f -

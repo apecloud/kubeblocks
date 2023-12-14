@@ -52,7 +52,7 @@ The Kubernetes ClusterIP of ApeCloud MySQL is exposed by default in the EKS envi
 
    :::note
 
-   For the above `kbcli cluster expose` command, the available value for `--type` are `vpc` and `internet`. Use `--type=vpc` for access within the same VPC and `--type=internet` for cross VPC access under the public network.
+   For the above `kbcli cluster expose` command, the available value for `--type` are `vpc` and `internet`. Use `--type=vpc` for access within the same VPC and `--type=internet` for cross-VPC access under the public network.
 
    :::
 

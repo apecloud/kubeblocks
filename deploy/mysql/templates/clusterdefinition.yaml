@@ -33,8 +33,8 @@ spec:
           scrapePort: {{ .Values.metrics.service.port }}
       configSpecs:
         - name: mysql-replication-config
-          templateRef: mysql8.0.33-config-template
-          constraintRef: mysql8.0.33-config-constraints
+          templateRef: oracle-mysql8.0-config-template
+          constraintRef: oracle-mysql8.0-config-constraints
           volumeName: mysql-config
           namespace: {{ .Release.Namespace }}
         - name: agamotto-configuration
@@ -58,9 +58,9 @@ spec:
             command:
               - bash 
               - -c
-              - "docker-entrypoint.sh mysqld --server-id $(( ${KB_POD_NAME##*-} + 1))"
+              - "mkdir -p /var/lib/mysql/{log,binlog}; chown mysql:root /var/lib/mysql/{log,binlog}; docker-entrypoint.sh mysqld --server-id $(( ${KB_POD_NAME##*-} + 1))"
             volumeMounts:
-              - mountPath: /var/lib/mysql
+              - mountPath: {{ .Values.dataMountPath }}
                 name: data
               - mountPath: /etc/mysql/conf.d
                 name: mysql-config

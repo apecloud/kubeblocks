@@ -45,7 +45,6 @@
   </zookeeper>
   {{- end }}
 {{- end }}
-{{- if $.component.monitor.enable }}
   <!-- Prometheus metrics -->
   <prometheus>
     <endpoint>/metrics</endpoint>
@@ -54,5 +53,4 @@
     <events>true</events>
     <asynchronous_metrics>true</asynchronous_metrics>
   </prometheus>
-{{- end }}
 </clickhouse>

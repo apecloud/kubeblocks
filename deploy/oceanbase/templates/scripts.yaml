@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oceanbase-scripts
+  labels:
+    {{- include "oceanbase.labels" . | nindent 4 }}
+data:
+  {{- include "oceanbase.extend.scripts" . | nindent 2 }}

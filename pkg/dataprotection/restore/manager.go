@@ -398,7 +398,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 		return nil, err
 	}
 	actionSpec := backupSet.ActionSet.Spec.Restore.PostReady[step]
-	getTargetPodList := func(labelSelector metav1.LabelSelector, msgKey string) ([]corev1.Pod, error) {
+	getTargetPodList := func(labelSelector metav1.LabelSelector, msgKey string) (*corev1.PodList, error) {
 		targetPodList, err := utils.GetPodListByLabelSelector(reqCtx, cli, labelSelector)
 		if err != nil {
 			return nil, err
@@ -406,7 +406,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 		if len(targetPodList.Items) == 0 {
 			return nil, fmt.Errorf("can not found any pod by spec.readyConfig.%s.target.podSelector", msgKey)
 		}
-		return targetPodList.Items, nil
+		return targetPodList, nil
 	}
 
 	jobBuilder := newRestoreJobBuilder(r.Restore, backupSet, backupRepo, dpv1alpha1.PostReady).addCommonEnv()
@@ -425,7 +425,10 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 		if err != nil {
 			return nil, err
 		}
-		targetPod := targetPodList[0]
+		targetPod := utils.GetFirstIndexRunningPod(targetPodList)
+		if targetPod == nil {
+			return nil, fmt.Errorf("can not found any running pod by spec.readyConfig.jobAction.target.podSelector")
+		}
 		if boolptr.IsSetToTrue(actionSpec.Job.RunOnTargetPodNode) {
 			jobBuilder.setNodeNameToNodeSelector(targetPod.Spec.NodeName)
 			// mount the targe pod's volumes when RunOnTargetPodNode is true
@@ -443,7 +446,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 			attachBackupRepo().
 			setCommand(actionSpec.Job.Command).
 			setToleration(targetPod.Spec.Tolerations).
-			addTargetPodAndCredentialEnv(&targetPod, r.Restore.Spec.ReadyConfig.ConnectionCredential).
+			addTargetPodAndCredentialEnv(targetPod, r.Restore.Spec.ReadyConfig.ConnectionCredential).
 			build()
 		return []*batchv1.Job{job}, nil
 	}
@@ -458,15 +461,15 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 			return nil, err
 		}
 		var restoreJobs []*batchv1.Job
-		for i := range targetPodList {
+		for i := range targetPodList.Items {
 			containerName := actionSpec.Exec.Container
 			if containerName == "" {
-				containerName = targetPodList[i].Spec.Containers[0].Name
+				containerName = targetPodList.Items[i].Spec.Containers[0].Name
 			}
-			args := append([]string{"-n", targetPodList[i].Namespace, "exec", targetPodList[i].Name, "-c", containerName, "--"}, actionSpec.Exec.Command...)
+			args := append([]string{"-n", targetPodList.Items[i].Namespace, "exec", targetPodList.Items[i].Name, "-c", containerName, "--"}, actionSpec.Exec.Command...)
 			jobBuilder.setImage(viper.GetString(constant.KBToolsImage)).setCommand([]string{"kubectl"}).setArgs(args).
 				setJobName(buildJobName(i)).
-				setToleration(targetPodList[i].Spec.Tolerations)
+				setToleration(targetPodList.Items[i].Spec.Tolerations)
 			job := jobBuilder.build()
 			// create exec job in kubeblocks namespace for security
 			kbInstalledNamespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)

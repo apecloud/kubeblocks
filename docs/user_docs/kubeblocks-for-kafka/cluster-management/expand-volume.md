@@ -2,7 +2,7 @@
 title: Expand volume
 description: How to expand the volume of a kafka cluster
 keywords: [kafka, expand volume, volume expansion]
-sidebar_position: 3
+sidebar_position: 4
 sidebar_label: Expand volume
 ---
 

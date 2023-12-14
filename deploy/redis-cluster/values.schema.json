@@ -87,32 +87,6 @@
           "description": "The number of sentinel component replicas. Default is 3",
           "type": "number",
           "default": 3
-        },
-        "service": {
-          "title": "sentinel service Schema",
-          "type": "object",
-          "properties": {
-            "type": {
-              "title": "sentinel service type",
-              "description": "sentinel service type",
-              "type": "string",
-              "default": "ClusterIP",
-              "enum": [
-                "ClusterIP",
-                "NodePort"
-              ]
-            },
-            "nodePortBase": {
-              "title": "sentinel service nodePortBase",
-              "description": "sentinel service nodePortBase",
-              "type": [
-                "number",
-                "string"
-              ],
-              "minimum": 30000,
-              "maximum": 32767
-            }
-          }
         }
       }
     }

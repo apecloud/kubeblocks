@@ -51,7 +51,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{- define "clustername" -}}
-{{ include "clickhouse-cluster.fullname" .}}
+{{ .Release.Name }}
 {{- end}}
 
 {{/*

@@ -1,0 +1,36 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: ActionSet
+metadata:
+  name: mysql-xtrabackup
+  labels:
+    {{- include "mysql.labels" . | nindent 4 }}
+spec:
+  backupType: Full
+  env:
+  - name: DATA_DIR
+    value: "{{ .Values.dataMountPath }}/data"
+  - name: IMAGE_TAG
+    value: 8.0.32
+  backup:
+    preBackup: []
+    postBackup: []
+    backupData:
+      image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.xtraBackupRepository }}:$(IMAGE_TAG)
+      runOnTargetPodNode: true
+      command:
+      - bash
+      - -c
+      - |
+        {{- .Files.Get "dataprotection/backup.sh" | nindent 8 }}
+      syncProgress:
+        enabled: true
+        intervalSeconds: 5
+  restore:
+    prepareData:
+      image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.xtraBackupRepository }}:$(IMAGE_TAG)
+      command:
+      - bash
+      - -c
+      - |
+        {{- .Files.Get "dataprotection/restore.sh" | nindent 8 }}
+    postReady: []

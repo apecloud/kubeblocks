@@ -73,7 +73,7 @@ Before enabling the advanced logs function, deploy a Loki node first and then ap
 
    ![Loki in Grafana](./../../img/observability-loki-dashboard.png)
 
-4. (Optional) Disable the Agamotto add-on.
+4. (Optional) Disable the Loki add-on.
 
    ```bash
    kbcli disabled loki

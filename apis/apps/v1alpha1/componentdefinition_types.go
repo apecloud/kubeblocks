@@ -295,7 +295,7 @@ type SystemAccount struct {
 
 // RoleArbitrator defines how to arbitrate the role of replicas.
 // +enum
-// +kubebuilder:validation:Enum={External,Lorry}
+// +kubebuilder:validation:Enum={External,KubeBlocks,Lorry}
 type RoleArbitrator string
 
 const (

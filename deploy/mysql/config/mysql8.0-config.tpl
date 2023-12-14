@@ -180,6 +180,8 @@ default_tmp_storage_engine=innodb
 collation_server = utf8mb4_unicode_520_ci
 character_set_server = utf8mb4
 
+plugin-load = "rpl_semi_sync_source=semisync_source.so;rpl_semi_sync_replica=semisync_replica.so"
+
 [mysql]
 default-character-set=utf8mb4
 

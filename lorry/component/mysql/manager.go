@@ -471,6 +471,10 @@ func (mgr *Manager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string
 
 // IsClusterInitialized is a method to check if cluster is initailized or not
 func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
+	err := mgr.EnableSemiSyncIfNeed(ctx)
+	if err != nil {
+		return false, err
+	}
 	return mgr.EnsureServerID(ctx)
 }
 
@@ -495,6 +499,53 @@ func (mgr *Manager) EnsureServerID(ctx context.Context) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (mgr *Manager) EnableSemiSyncIfNeed(ctx context.Context) error {
+	var status string
+	err := mgr.DB.QueryRowContext(ctx, "SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS "+
+		"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").Scan(&status)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil
+		}
+		mgr.Logger.Error(err, "Get rpl_semi_sync_source plugin status failed: %v")
+		return err
+	}
+
+	// In MySQL 8.0, semi-sync configuration options should not be specified in my.cnf,
+	// as this may cause the database initialization process to fail:
+	//    [Warning] [MY-013501] [Server] Ignoring --plugin-load[_add] list as the server is running with --initialize(-insecure).
+	//    [ERROR] [MY-000067] [Server] unknown variable 'rpl_semi_sync_master_enabled=1'.
+	if status == "ACTIVE" {
+		setSourceEnable := "SET GLOBAL rpl_semi_sync_source_enabled = 1;" +
+			"SET GLOBAL rpl_semi_sync_source_timeout = 1000;"
+		_, err = mgr.DB.Exec(setSourceEnable)
+		if err != nil {
+			mgr.Logger.Error(err, setSourceEnable+" execute failed")
+			return err
+		}
+	}
+
+	err = mgr.DB.QueryRowContext(ctx, "SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS "+
+		"WHERE PLUGIN_NAME ='rpl_semi_sync_replica';").Scan(&status)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil
+		}
+		mgr.Logger.Error(err, "Get rpl_semi_sync_replica plugin status failed: %v")
+		return err
+	}
+
+	if status == "ACTIVE" {
+		setSourceEnable := "SET GLOBAL rpl_semi_sync_replica_enabled = 1;"
+		_, err = mgr.DB.Exec(setSourceEnable)
+		if err != nil {
+			mgr.Logger.Error(err, setSourceEnable+" execute failed")
+			return err
+		}
+	}
+	return nil
 }
 
 func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {

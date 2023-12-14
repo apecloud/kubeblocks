@@ -660,25 +660,25 @@ type ConnectionCredential struct {
 // Note: Dynamic variables have values that may change at runtime, so exercise caution when using them.
 //
 // TODO: resources.
-// ----------------------------------------------------------------------------
-// | Object    | Attribute | Variable             | Template | Env  | Dynamic |
-// ----------------------------------------------------------------------------
-// | Namespace |           | KB_NAMESPACE         |          |      |         |
-// | Cluster   | Name      | KB_CLUSTER_NAME      |          |      |         |
-// |           | UID       | KB_CLUSTER_UID       |          |      |         |
-// |           | Component | KB_CLUSTER_COMP_NAME |          |      |         |
-// | Component | Name      | KB_COMP_NAME         |          |      |         |
-// |           | Replicas  | KB_COMP_REPLICAS     |          |      |         |
-// | Pod       | Name      | KB_POD_NAME          |     x    |      |    ✓    |
-// |           | UID       | KB_POD_UID           |     x    |      |    ✓    |
-// |           | IP        | KB_POD_IP            |     x    |      |    ✓    |
-// |           | IPs       | KB_POD_IPS           |     x    |      |    ✓    |
-// |           | FQDN      | KB_POD_FQDN          |     x    |      |         |
-// |           | Ordinal   | KB_POD_ORDINAL       |     x    |      |         |
-// | Host      | Name      | KB_NODENAME          |     x    |      |    ✓    |
-// |           | IP        | KB_HOST_IP           |     x    |      |    ✓    |
-// | SA        | Name      | KB_SA_NAME           |     x    |      |         |
-// ----------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------
+// | Object    | Attribute | Variable             | Template | Env  | Dynamic | Provided |
+// ---------------------------------------------------------------------------------------
+// | Namespace |           | KB_NAMESPACE         |          |      |         |          |
+// | Cluster   | Name      | KB_CLUSTER_NAME      |          |      |         |          |
+// |           | UID       | KB_CLUSTER_UID       |          |      |         |          |
+// |           | Component | KB_CLUSTER_COMP_NAME |          |      |         |          |
+// | Component | Name      | KB_COMP_NAME         |          |      |         |          |
+// |           | Replicas  | KB_COMP_REPLICAS     |          |      |    ✓    |    N     |
+// | Pod       | Name      | KB_POD_NAME          |     x    |      |    ✓    |          |
+// |           | UID       | KB_POD_UID           |     x    |      |    ✓    |          |
+// |           | IP        | KB_POD_IP            |     x    |      |    ✓    |          |
+// |           | IPs       | KB_POD_IPS           |     x    |      |    ✓    |          |
+// |           | FQDN      | KB_POD_FQDN          |     x    |      |         |          |
+// |           | Ordinal   | KB_POD_ORDINAL       |     x    |      |         |          |
+// | Host      | Name      | KB_NODENAME          |     x    |      |    ✓    |          |
+// |           | IP        | KB_HOST_IP           |     x    |      |    ✓    |          |
+// | SA        | Name      | KB_SA_NAME           |     x    |      |         |          |
+// ---------------------------------------------------------------------------------------
 
 // EnvVar represents a variable present in the env of Pod/Action or the template of config/script.
 type EnvVar struct {

@@ -1249,10 +1249,10 @@ var _ = Describe("Component Controller", func() {
 				Name:  constant.KBEnvCompName,
 				Value: compName,
 			},
-			constant.KBEnvCompReplicas: {
-				Name:  constant.KBEnvCompReplicas,
-				Value: "1", // default replicas
-			},
+			// constant.KBEnvCompReplicas: {
+			//	Name:  constant.KBEnvCompReplicas,
+			//	Value: "1", // default replicas
+			// },
 			constant.KBEnvPodName: {
 				Name: constant.KBEnvPodName,
 				ValueFrom: &corev1.EnvVarSource{

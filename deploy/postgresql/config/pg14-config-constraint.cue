@@ -1102,6 +1102,9 @@
 	// If set to on (the default), this option causes new WAL files to be filled with zeroes. On some file systems, this ensures that space is allocated before we need to write WAL records. However, Copy-On-Write (COW) file systems may not benefit from this technique, so the option is given to skip the unnecessary work. If set to off, only the final byte is written when the file is created so that it has the expected size.
 	wal_init_zero?: string & "on" | "off"
 
+	// Sets the level of information written to the WAL. replica writes enough data to support WAL archiving and replication, including running read-only queries on a standby server. minimal removes all logging except the information required to recover from a crash or immediate shutdown. Finally, logical adds information necessary to support logical decoding
+  wal_level?: string & "minimal" | "replica" | "logical"
+
 	// Sets how binary values are to be encoded in XML.
 	xmlbinary?: string & "base64" | "hex"
 

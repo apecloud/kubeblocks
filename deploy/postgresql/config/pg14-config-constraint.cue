@@ -1103,7 +1103,7 @@
 	wal_init_zero?: string & "on" | "off"
 
 	// Sets the level of information written to the WAL. replica writes enough data to support WAL archiving and replication, including running read-only queries on a standby server. minimal removes all logging except the information required to recover from a crash or immediate shutdown. Finally, logical adds information necessary to support logical decoding
-  wal_level?: string & "minimal" | "replica" | "logical"
+	wal_level?: string & "minimal" | "replica" | "logical"
 
 	// Sets how binary values are to be encoded in XML.
 	xmlbinary?: string & "base64" | "hex"

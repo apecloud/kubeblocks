@@ -204,8 +204,14 @@ func (ha *Ha) RunCycle() {
 		// currentMemberIsLeader, _ := ha.dbManager.IsLeader(context.TODO(), cluster)
 		// if lockOwnerIsLeader && currentMemberIsLeader {
 		// ha.logger.Infof("Lock owner is real Leader, demote myself and follow the real leader")
-		_ = ha.dbManager.Demote(ha.ctx)
-		_ = ha.dbManager.Follow(ha.ctx, cluster)
+		err := ha.dbManager.Demote(ha.ctx)
+		if err != nil {
+			ha.logger.Info("promote failed", "error", err)
+		}
+		err = ha.dbManager.Follow(ha.ctx, cluster)
+		if err != nil {
+			ha.logger.Info("follow failed", "error", err)
+		}
 	}
 }
 

@@ -200,16 +200,21 @@ func getRoleName(pod corev1.Pod) string {
 	return strings.ToLower(pod.Labels[constant.RoleLabelKey])
 }
 
-func ownedKinds() []client.ObjectList {
-	return []client.ObjectList{
-		&appsv1.StatefulSetList{},
+func ownedKinds(policy workloads.RsmTransformPolicy) []client.ObjectList {
+	kinds := []client.ObjectList{
 		&corev1.ServiceList{},
 		&corev1.ConfigMapList{},
 	}
+	if policy == workloads.ToPod {
+		kinds = append(kinds, &corev1.PodList{})
+	} else {
+		kinds = append(kinds, &appsv1.StatefulSetList{})
+	}
+	return kinds
 }
 
-func deletionKinds() []client.ObjectList {
-	kinds := ownedKinds()
+func deletionKinds(policy workloads.RsmTransformPolicy) []client.ObjectList {
+	kinds := ownedKinds(policy)
 	kinds = append(kinds, &batchv1.JobList{})
 	return kinds
 }
@@ -639,9 +644,13 @@ func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
 		return false
 	}
 	// check whether latest spec has been sent to the underlying workload(sts)
-	if rsm.Status.ObservedGeneration != rsm.Generation ||
-		rsm.Status.CurrentGeneration != rsm.Generation {
+	if rsm.Status.ObservedGeneration != rsm.Generation {
 		return false
+	}
+	if rsm.Spec.RsmTransformPolicy != workloads.ToPod {
+		if rsm.Status.CurrentGeneration != rsm.Generation {
+			return false
+		}
 	}
 	// check whether the underlying workload(sts) is ready
 	if rsm.Spec.Replicas == nil {

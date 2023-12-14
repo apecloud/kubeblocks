@@ -42,7 +42,7 @@ func (t *ObjectDeletionTransformer) Transform(ctx graph.TransformContext, dag *g
 	// ignore the problem currently
 	// TODO: GC the leaked objects
 	ml := getLabels(obj)
-	snapshot, err := model.ReadCacheSnapshot(transCtx, obj, ml, deletionKinds()...)
+	snapshot, err := model.ReadCacheSnapshot(transCtx, obj, ml, deletionKinds(transCtx.rsm.Spec.RsmTransformPolicy)...)
 	if err != nil {
 		return err
 	}

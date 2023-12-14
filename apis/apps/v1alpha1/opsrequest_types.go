@@ -229,14 +229,14 @@ type HorizontalScaling struct {
 	Replicas int32 `json:"replicas"`
 
 	// Nodes defines the list of nodes that pods can schedule when scale up
-	// If the RsmToStsPolicy is specified as OneToMul and expected replicas is more than current replicas,,the list of
+	// If the RsmTransformPolicy is specified as ToPod and expected replicas is more than current replicas,the list of
 	// Nodes will be used. If the list of Nodes is empty, no specific node will be assigned. However, if the list of Nodes
 	// is filled, all pods will be evenly scheduled across the Nodes in the list when scale up.
 	// +optional
 	Nodes []types.NodeName `json:"nodes,omitempty"`
 
 	// Instances defines the name of instance that rsm scale down priorly.
-	// If the RsmToStsPolicy is specified as OneToMul and expected replicas is less than current replicas, the list of
+	// If the RsmTransformPolicy is specified as ToPod and expected replicas is less than current replicas, the list of
 	// Instances will be used.
 	// current replicas - expected replicas > len(Instances): Scale down from the list of Instances priorly, the others
 	//	will select from NodeAssignment.

@@ -215,6 +215,12 @@ spec:
                   type: string
                 type: array
                 x-kubernetes-list-type: set
+              instances:
+                description: Instances defines the list of instance to be deleted
+                  priorly
+                items:
+                  type: string
+                type: array
               monitor:
                 default: false
                 description: monitor is a switch to enable monitoring and is set as
@@ -223,6 +229,36 @@ spec:
                   or manually from servers in component and export metrics to Time
                   Series Database.
                 type: boolean
+              nodes:
+                description: Nodes defines the list of nodes that pods can schedule
+                  If the RsmTransformPolicy is specified as OneToMul,the list of nodes
+                  will be used. If the list of nodes is empty, no specific node will
+                  be assigned. However, if the list of node is filled, all pods will
+                  be evenly scheduled across the nodes in the list.
+                items:
+                  description: "NodeName is a type that holds a api.Node's Name identifier.
+                    Being a type captures intent and helps make sure that the node
+                    name is not confused with similar concepts (the hostname, the
+                    cloud provider id, the cloud provider name etc) \n To clarify
+                    the various types: \n - Node.Name is the Name field of the Node
+                    in the API.  This should be stored in a NodeName. Unfortunately,
+                    because Name is part of ObjectMeta, we can't store it as a NodeName
+                    at the API level. \n - Hostname is the hostname of the local machine
+                    (from uname -n). However, some components allow the user to pass
+                    in a --hostname-override flag, which will override this in most
+                    places. In the absence of anything more meaningful, kubelet will
+                    use Hostname as the Node.Name when it creates the Node. \n * The
+                    cloudproviders have the own names: GCE has InstanceName, AWS has
+                    InstanceId. \n For GCE, InstanceName is the Name of an Instance
+                    object in the GCE API.  On GCE, Instance.Name becomes the Hostname,
+                    and thus it makes sense also to use it as the Node.Name.  But
+                    that is GCE specific, and it is up to the cloudprovider how to
+                    do this mapping. \n For AWS, the InstanceID is not yet suitable
+                    for use as a Node.Name, so we actually use the PrivateDnsName
+                    for the Node.Name.  And this is _not_ always the same as the hostname:
+                    if we are using a custom DHCP domain it won't be."
+                  type: string
+                type: array
               replicas:
                 default: 1
                 description: Component replicas. The default value is used in ClusterDefinition
@@ -279,6 +315,15 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-preserve-unknown-fields: true
+              rsmTransformPolicy:
+                default: ToSts
+                description: 'RsmTransformPolicy defines the policy generate sts using
+                  rsm. ToSts: rsm transform to statefulSet ToPod: rsm transform to
+                  pods'
+                enum:
+                - ToPod
+                - ToSts
+                type: string
               serviceAccountName:
                 description: serviceAccountName is the name of the ServiceAccount
                   that running component depends on.

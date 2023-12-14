@@ -30,15 +30,15 @@ const (
 	ReplicatedStateMachineKind = "ReplicatedStateMachine"
 )
 
-// RsmToStsPolicy defines RsmToStsPolicy type
-// OneToMul and OneToOne is supported
+// RsmTransformPolicy defines rsm transform type
+// ToSts and ToPod is supported
 // +enum
-// +kubebuilder:validation:Enum={OneToMul,OneToOne}
-type RsmToStsPolicy string
+// +kubebuilder:validation:Enum={ToPod,ToSts}
+type RsmTransformPolicy string
 
 const (
-	OneToMul RsmToStsPolicy = "OneToMul"
-	OneToOne RsmToStsPolicy = "OneToOne"
+	ToSts RsmTransformPolicy = "ToSts"
+	ToPod RsmTransformPolicy = "ToPod"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -137,13 +137,13 @@ type ReplicatedStateMachineSpec struct {
 	// +optional
 	Credential *Credential `json:"credential,omitempty"`
 
-	// RsmToStsPolicy defines the policy generate sts using rsm. Passed from cluster.
-	// OneToOne: one rsm corresponds to one sts
-	// OneToMul: one rsm corresponds to multiple sts
+	// RsmTransformPolicy defines the policy generate sts using rsm. Passed from cluster.
+	// ToSts: rsm transform to statefulSet
+	// ToPod: rsm transform to pod
 	// +kubebuilder:validation:Required
-	// +kubebuilder:default=OneToOne
+	// +kubebuilder:default=ToSts
 	// +optional
-	RsmToStsPolicy RsmToStsPolicy `json:"rsmToStsPolicy,omitempty"`
+	RsmTransformPolicy RsmTransformPolicy `json:"rsmTransformPolicy,omitempty"`
 
 	// NodeAssignment defines the expected assignment of nodes.
 	// +optional

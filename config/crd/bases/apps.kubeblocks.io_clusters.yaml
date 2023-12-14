@@ -257,6 +257,13 @@ spec:
                         type: string
                       type: array
                       x-kubernetes-list-type: set
+                    instances:
+                      description: Instances defines the list of instance to be deleted
+                        priorly If the RsmTransformPolicy is specified as ToPod,the
+                        list of instances will be used.
+                      items:
+                        type: string
+                      type: array
                     issuer:
                       description: issuer defines provider context for TLS certs.
                         required when TLS enabled
@@ -321,7 +328,7 @@ spec:
                       type: boolean
                     nodes:
                       description: Nodes defines the list of nodes that pods can schedule
-                        If the RsmToStsPolicy is specified as OneToMul,the list of
+                        If the RsmTransformPolicy is specified as ToPod,the list of
                         nodes will be used. If the list of nodes is empty, no specific
                         node will be assigned. However, if the list of node is filled,
                         all pods will be evenly scheduled across the nodes in the
@@ -408,14 +415,14 @@ spec:
                           type: object
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
-                    rsmToStsPolicy:
-                      default: OneToOne
-                      description: 'RsmToStsPolicy defines the policy generate sts
-                        using rsm. OneToOne: one rsm corresponds to one sts OneToMul:
-                        one rsm corresponds to multiple sts'
+                    rsmTransformPolicy:
+                      default: ToSts
+                      description: 'RsmTransformPolicy defines the policy generate
+                        sts using rsm. ToSts: rsm transforms to statefulSet ToPod:
+                        rsm transforms to pods'
                       enum:
-                      - OneToMul
-                      - OneToOne
+                      - ToPod
+                      - ToSts
                       type: string
                     serviceAccountName:
                       description: serviceAccountName is the name of the ServiceAccount

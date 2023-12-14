@@ -22,10 +22,9 @@ package rsm
 import (
 	"context"
 
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/golang/mock/gomock"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -57,6 +56,40 @@ var _ = Describe("object generation transformer test.", func() {
 			Logger:        logger,
 			rsmOrig:       rsm.DeepCopy(),
 			rsm:           rsm,
+		}
+
+		nodeAssignment := []workloads.NodeAssignment{
+			{
+				Name: name + "1",
+			},
+			{
+				Name: name + "2",
+			},
+			{
+				Name: name + "3",
+			},
+		}
+		rsmForPods = builder.NewReplicatedStateMachineBuilder(namespace, name).
+			SetUID(uid).
+			AddLabels(constant.AppComponentLabelKey, name).
+			SetReplicas(3).
+			AddMatchLabelsInMap(selectors).
+			SetServiceName(headlessSvcName).
+			SetNodeAssignment(nodeAssignment).
+			SetRsmTransformPolicy(workloads.ToPod).
+			SetService(service).
+			SetCredential(credential).
+			SetTemplate(template).
+			SetCustomHandler(observeActions).
+			GetObject()
+
+		transCtxForPods = &rsmTransformContext{
+			Context:       ctx,
+			Client:        graphCli,
+			EventRecorder: nil,
+			Logger:        logger,
+			rsmOrig:       rsmForPods.DeepCopy(),
+			rsm:           rsmForPods,
 		}
 
 		transformer = &ObjectGenerationTransformer{}
@@ -118,6 +151,48 @@ var _ = Describe("object generation transformer test.", func() {
 				}).Times(1)
 			dag = mockDAG()
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
+		})
+	})
+
+	Context("Transform function for rsm managing pods", func() {
+		It("should work well", func() {
+			pods := mockUnderlyingPods(*rsmForPods)
+			headlessSvc := builder.NewHeadlessServiceBuilder(name, getHeadlessSvcName(*rsmForPods)).GetObject()
+			svc := builder.NewServiceBuilder(name, name).GetObject()
+			env := builder.NewConfigMapBuilder(name, name+"-rsm-env").GetObject()
+			k8sMock.EXPECT().
+				List(gomock.Any(), &corev1.PodList{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, list *corev1.PodList, _ ...client.ListOption) error {
+					return nil
+				}).Times(1)
+			k8sMock.EXPECT().
+				List(gomock.Any(), &corev1.ServiceList{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, list *corev1.ServiceList, _ ...client.ListOption) error {
+					return nil
+				}).Times(1)
+			k8sMock.EXPECT().
+				List(gomock.Any(), &corev1.ConfigMapList{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, list *corev1.ConfigMapList, _ ...client.ListOption) error {
+					return nil
+				}).Times(1)
+
+			dagExpected := mockDAGForPods()
+			for i := range pods {
+				graphCli.Create(dagExpected, &pods[i])
+			}
+			graphCli.Create(dagExpected, headlessSvc)
+			graphCli.Create(dagExpected, svc)
+			graphCli.Create(dagExpected, env)
+			for i := range pods {
+				graphCli.DependOn(dagExpected, &pods[i], headlessSvc, svc, env)
+			}
+
+			// do Transform
+			dag := mockDAGForPods()
+			Expect(transformer.Transform(transCtxForPods, dag)).Should(Succeed())
+
+			// compare DAGs
+			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
 		})
 	})
 

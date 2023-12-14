@@ -392,20 +392,25 @@ type ClusterComponentSpec struct {
 	// +optional
 	UserResourceRefs *UserResourceRefs `json:"userResourceRefs,omitempty"`
 
-	// RsmToStsPolicy defines the policy generate sts using rsm.
-	// OneToOne: one rsm corresponds to one sts
-	// OneToMul: one rsm corresponds to multiple sts
+	// RsmTransformPolicy defines the policy generate sts using rsm.
+	// ToSts: rsm transforms to statefulSet
+	// ToPod: rsm transforms to pods
 	// +kubebuilder:validation:Required
-	// +kubebuilder:default=OneToOne
+	// +kubebuilder:default=ToSts
 	// +optional
-	RsmToStsPolicy workloads.RsmToStsPolicy `json:"rsmToStsPolicy,omitempty"`
+	RsmTransformPolicy workloads.RsmTransformPolicy `json:"rsmTransformPolicy,omitempty"`
 
 	// Nodes defines the list of nodes that pods can schedule
-	// If the RsmToStsPolicy is specified as OneToMul,the list of nodes will be used. If the list of nodes is empty,
+	// If the RsmTransformPolicy is specified as ToPod,the list of nodes will be used. If the list of nodes is empty,
 	// no specific node will be assigned. However, if the list of node is filled, all pods will be evenly scheduled
 	// across the nodes in the list.
 	// +optional
 	Nodes []types.NodeName `json:"nodes,omitempty"`
+
+	// Instances defines the list of instance to be deleted priorly
+	// If the RsmTransformPolicy is specified as ToPod,the list of instances will be used.
+	// +optional
+	Instances []string `json:"instances,omitempty"`
 }
 
 // GetMinAvailable wraps the 'prefer' value return. As for component replicaCount <= 1, it will return 0,

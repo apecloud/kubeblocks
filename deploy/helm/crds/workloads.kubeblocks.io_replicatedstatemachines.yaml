@@ -1093,14 +1093,14 @@ spec:
                   - name
                   type: object
                 type: array
-              rsmToStsPolicy:
-                default: OneToOne
-                description: 'RsmToStsPolicy defines the policy generate sts using
-                  rsm. Passed from cluster. OneToOne: one rsm corresponds to one sts
-                  OneToMul: one rsm corresponds to multiple sts'
+              rsmTransformPolicy:
+                default: ToSts
+                description: 'RsmTransformPolicy defines the policy generate sts using
+                  rsm. Passed from cluster. ToSts: rsm transform to statefulSet ToPod:
+                  rsm transform to pod'
                 enum:
-                - OneToMul
-                - OneToOne
+                - ToPod
+                - ToSts
                 type: string
               selector:
                 description: 'selector is a label query over pods that should match

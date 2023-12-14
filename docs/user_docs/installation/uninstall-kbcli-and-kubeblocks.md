@@ -39,6 +39,8 @@ kbcli kubeblocks uninstall
 
 <TabItem value="Helm" label="Helm" default>
 
+Delete all the clusters and resources created before performing the following command, otherwise the uninstallation may not be successful.
+
 ```bash
 helm uninstall kubeblocks --namespace kb-system
 ```

@@ -25,11 +25,11 @@ kbcli cluster list pulsar
 
     Configure the values of `--components`, `--volume-claim-templates`, and `--storage`, and run the command below to expand the volume.
 
-    :::note
+:::note
 
-    Expand volume for `journal` first. `ledger` volume expansion must be performed after the `journal` volume expansion.
+Expand volume for `journal` first. `ledger` volume expansion must be performed after the `journal` volume expansion.
 
-    :::
+:::
 
    - Expand volume for `journal`.
 
@@ -76,7 +76,7 @@ kbcli cluster list pulsar
   kubectl edit cluster pulsar
   ```
 
-2. Validate the volume expansion operation.
+1. Validate the volume expansion operation.
 
    ```bash
    kubectl get ops  
@@ -85,7 +85,7 @@ kbcli cluster list pulsar
    * STATUS=VolumeExpanding: it means the volume expansion is in progress.
    * STATUS=Running: it means the volume expansion operation has been applied.
 
-3. Check whether the corresponding resources change.
+2. Check whether the corresponding resources change.
 
     ```bash
     kbcli cluster describe pulsar

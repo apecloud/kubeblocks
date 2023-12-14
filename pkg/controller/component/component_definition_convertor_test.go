@@ -591,13 +591,6 @@ var _ = Describe("Component Definition Convertor", func() {
 			})
 		})
 
-		It("connection credentials", func() {
-			convertor := &compDefConnCredentialsConvertor{}
-			res, err := convertor.convert(clusterCompDef)
-			Expect(err).Should(Succeed())
-			Expect(res).Should(BeNil())
-		})
-
 		Context("update strategy", func() {
 			It("w/o workload spec", func() {
 				clusterCompDef.ConsensusSpec = nil

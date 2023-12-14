@@ -622,37 +622,6 @@ type Service struct {
 	RoleSelector string `json:"roleSelector,omitempty"`
 }
 
-type ConnectionCredential struct {
-	// The name of the ConnectionCredential.
-	// Cannot be updated.
-	// +required
-	Name string `json:"name"`
-
-	// ServiceName specifies the name of service to use for accessing.
-	// Cannot be updated.
-	// +optional
-	ServiceName string `json:"serviceName,omitempty"`
-
-	// PortName specifies the name of the port to access the service.
-	// If the service has multiple ports, a specific port must be specified to use here.
-	// Otherwise, the unique port of the service will be used.
-	// Cannot be updated.
-	// +optional
-	PortName string `json:"portName,omitempty"`
-
-	// ComponentName specifies the name of component where the account defined.
-	// For cluster-level connection credential, this field is required.
-	// Cannot be updated.
-	// +optional
-	ComponentName string `json:"componentName,omitempty"`
-
-	// AccountName specifies the name of account used to access the service.
-	// If specified, the account must be defined in @SystemAccounts.
-	// Cannot be updated.
-	// +optional
-	AccountName string `json:"accountName,omitempty"`
-}
-
 // List of all the built-in variables provided by KubeBlocks.
 // These variables are automatically available when building environment variables for Pods and Actions, as well as
 // rendering templates for config and script. Users can directly use these variables without explicit declaration.

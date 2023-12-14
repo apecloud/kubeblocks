@@ -147,7 +147,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// update cluster components' status
 			&clusterComponentStatusTransformer{},
 			// create default cluster connection credential secret object
-			&clusterCredentialTransformer{},
+			&clusterConnCredentialTransformer{},
 			// build backuppolicy and backupschedule from backupPolicyTemplate
 			&clusterBackupPolicyTransformer{},
 			// add our finalizer to all objects

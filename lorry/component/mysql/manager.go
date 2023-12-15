@@ -562,6 +562,8 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 		return err
 	}
 
+	// fresh db state
+	mgr.GetDBState(ctx, cluster)
 	mgr.Logger.Info(fmt.Sprintf("promote success, resp:%v", resp))
 	return nil
 }
@@ -604,6 +606,8 @@ func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 		mgr.Logger.Error(err, "sql query failed, err")
 	}
 
+	// fresh db state
+	mgr.GetDBState(ctx, cluster)
 	mgr.Logger.Info("successfully follow new leader", "leader-name", leaderMember.Name)
 	return nil
 }

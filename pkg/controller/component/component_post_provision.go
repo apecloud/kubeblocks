@@ -275,6 +275,9 @@ func renderPostProvisionCmdJob(ctx context.Context,
 		if len(cluster.Spec.Tolerations) > 0 {
 			job.Spec.Template.Spec.Tolerations = cluster.Spec.Tolerations
 		}
+		for i := range job.Spec.Template.Spec.Containers {
+			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&job.Spec.Template.Spec.Containers[i])
+		}
 		return job, nil
 	}
 

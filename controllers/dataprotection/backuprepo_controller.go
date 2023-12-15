@@ -748,6 +748,9 @@ func (r *BackupRepoReconciler) runPreCheckJobForMounting(reconCtx *reconcileCont
 			},
 			BackoffLimit: pointer.Int32(2),
 		}
+		for i := range job.Spec.Template.Spec.Containers {
+			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&job.Spec.Template.Spec.Containers[i])
+		}
 		job.Labels = map[string]string{
 			dataProtectionBackupRepoKey: reconCtx.repo.Name,
 		}
@@ -812,6 +815,9 @@ echo "pre-check" | datasafed push - /precheck.txt`,
 		}
 		job.Annotations = map[string]string{
 			dataProtectionBackupRepoDigestAnnotationKey: reconCtx.getDigest(),
+		}
+		for i := range job.Spec.Template.Spec.Containers {
+			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&job.Spec.Template.Spec.Containers[i])
 		}
 		utils.InjectDatasafedWithConfig(&job.Spec.Template.Spec, secretName, "")
 		return controllerutil.SetControllerReference(reconCtx.repo, job, r.Scheme)

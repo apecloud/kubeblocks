@@ -468,7 +468,6 @@ func (r *Request) InjectSyncProgressContainer(podSpec *corev1.PodSpec,
 			Value: fmt.Sprintf("%d", checkIntervalSeconds)},
 	)
 	container.Args = []string{command}
-	intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
 	podSpec.Containers = append(podSpec.Containers, *container)
 }
 

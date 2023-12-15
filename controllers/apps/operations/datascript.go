@@ -323,7 +323,7 @@ func buildDataScriptJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, clust
 				Namespace: cluster.Namespace,
 			},
 		}
-
+		intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 		// set backoff limit to 0, so that the job will not be restarted
 		job.Spec.BackoffLimit = pointer.Int32(0)
 		job.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever

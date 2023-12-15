@@ -20,6 +20,10 @@ trap handle_exit EXIT
 endpoint=http://${DP_DB_HOST}:6333
 collectionRes=$(curl ${endpoint}/collections)
 collections=$(echo ${collectionRes}  | jq -r '.result.collections[].name')
+if [ -z $collections ]; then
+   echo "{\"totalSize\":\"0\"}" >"${DP_BACKUP_INFO_FILE}"
+   exit 0
+fi
 # snapshot all collections
 for c in ${collections}; do
   echo "INFO: start to snapshot collection ${c}..."

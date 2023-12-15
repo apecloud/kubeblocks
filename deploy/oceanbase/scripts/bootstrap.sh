@@ -20,10 +20,11 @@ WAIT_K8S_DNS_READY_TIME="${WAIT_K8S_DNS_READY_TIME:-10}"
 SVC_NAME="${KB_CLUSTER_COMP_NAME}-headless.${KB_NAMESPACE}.svc"
 HOSTNAME=$(hostname)
 REP_USER=${REP_USER:-rep_user}
-REP_PASSWD=${REP_PASSWD:-123456}
+REP_PASSWD=${REP_PASSWD:-rep_user}
 OB_DEBUG=${OB_DEBUG:-true}
+OB_HOME_DIR=${OB_HOME_DIR:-/home/admin/oceanbase}
 
-ORDINAL_INDEX=$(echo $HOSTNAME | awk -F '-' '{print $(NF)}')
+ORDINAL_INDEX=$(echo $KB_POD_NAME | awk -F '-' '{print $(NF)}')
 ZONE_NAME="zone$((${ORDINAL_INDEX}%${ZONE_COUNT}))"
 echo "ORDINAL_INDEX: $ORDINAL_INDEX"
 echo "ZONE_NAME: $ZONE_NAME"
@@ -84,23 +85,35 @@ function get_pod_ip_list {
 }
 
 function prepare_dirs {
+  # log dir
   mkdir -p /home/admin/log/log
-  ln -sf /home/admin/log/log /home/admin/oceanbase/log
-  mkdir -p /home/admin/oceanbase/store
-  mkdir -p /home/admin/data-log/clog
-  ln -sf /home/admin/data-log/clog /home/admin/oceanbase/store/clog
-  mkdir -p /home/admin/data-log/ilog
-  ln -sf /home/admin/data-log/ilog /home/admin/oceanbase/store/ilog
-  mkdir -p /home/admin/data-file/slog
-  ln -sf /home/admin/data-file/slog /home/admin/oceanbase/store/slog
-  mkdir -p /home/admin/data-file/etc
-  ln -sf /home/admin/data-file/etc /home/admin/oceanbase/store/etc
-  mkdir -p /home/admin/data-file/sort_dir
+  ln -sf /home/admin/log/log ${OB_HOME_DIR}/log
 
-  ln -sf /home/admin/data-file/sort_dir /home/admin/oceanbase/store/sort_dir
+  mkdir -p  ${OB_HOME_DIR}/store
+  # data log dir
+  mkdir -p /home/admin/data-log/clog
+
+  ln -sf /home/admin/data-log/clog ${OB_HOME_DIR}/store/clog
+  mkdir -p /home/admin/data-log/ilog
+  ln -sf /home/admin/data-log/ilog ${OB_HOME_DIR}/store/ilog
+
+  mkdir -p /home/admin/data-file/slog
+  ln -sf /home/admin/data-file/slog ${OB_HOME_DIR}/store/slog
+  mkdir -p /home/admin/data-file/etc
+  ln -sf /home/admin/data-file/etc ${OB_HOME_DIR}/store/etc
+  mkdir -p /home/admin/data-file/sort_dir
+  ln -sf /home/admin/data-file/sort_dir ${OB_HOME_DIR}/store/sort_dir
   mkdir -p /home/admin/data-file/sstable
-  ln -sf /home/admin/data-file/sstable /home/admin/oceanbase/store/sstable
-  chown -R root:root /home/admin/oceanbase
+  ln -sf /home/admin/data-file/sstable ${OB_HOME_DIR}/store/sstable
+  chown -R root:root ${OB_HOME_DIR}
+}
+
+function clean_dirs {
+  rm -rf ${OB_HOME_DIR}/etc
+  rm -rf ${OB_HOME_DIR}/store/*
+  rm -rf /home/admin/data-log/*
+  rm -rf /home/admin/data-file/*
+  rm -rf /home/admin/log/log
 }
 
 function start_observer {
@@ -110,7 +123,6 @@ function start_observer {
   if [ "$OB_DEBUG" = "true" ]; then
     loglevel="DEBUG"
   fi
-
   # parse the config file
   default_configs='cpu_count=4,memory_limit=8G,system_memory=1G,__min_full_resource_pool_memory=1073741824,datafile_size=40G,log_disk_size=40G,net_thread_count=2,stack_size=512K,cache_wash_threshold=1G,schema_history_expire_time=1d,enable_separate_sys_clog=false,enable_merge_by_turn=false,enable_syslog_recycle=true,enable_syslog_wf=false,max_syslog_file_count=4'
 
@@ -125,16 +137,15 @@ function start_observer {
   fi
 
   /home/admin/oceanbase/bin/observer --appname ${KB_CLUSTER_COMP_NAME} \
-    --cluster_id 1 --zone $ZONE_NAME --devname eth0 \
-    -p 2881 -P 2882 -d /home/admin/oceanbase/store/ \
-    -l ${loglevel} -o config_additional_dir=/home/admin/oceanbase/store/etc,${default_configs}
+    --cluster_id 1 --zone $ZONE_NAME \
+    -I ${KB_POD_IP} \
+    -p 2881 -P 2882 -d ${OB_HOME_DIR}/store/ \
+    -l ${loglevel} -o config_additional_dir=${OB_HOME_DIR}/store/etc,${default_configs}
 }
 
-function clean_dirs {
-  rm -rf /home/admin/oceanbase/store/*
-  rm -rf /home/admin/data-log/*
-  rm -rf /home/admin/data-file/*
-  rm -rf /home/admin/log/log
+function start_observer_with_exsting_configs {
+  # Start observer w/o any flags
+  /home/admin/oceanbase/bin/observer
 }
 
 function is_recovering {
@@ -256,9 +267,7 @@ function add_server {
 }
 
 function check_if_ip_changed {
-  echo "check_if_ip_changed"
-  echo "IP_LIST: ${IP_LIST[*]}"
-  if [ -z "$(cat /home/admin/oceanbase/store/etc/observer.conf.bin | grep \"${KB_POD_IP}\")" ]; then
+  if [ -z "$(cat /home/admin/data-file/etc/observer.conf.bin | grep ${KB_POD_IP})" ]; then
     echo "Changed"
   else
     echo "Not Changed"
@@ -268,6 +277,9 @@ function check_if_ip_changed {
 function delete_inactive_servers {
   echo "delete inactive server"
   echo "IP_LIST: ${IP_LIST[*]}"
+  echo "sleep for a while before fetch INACTIVE servers"
+  ## default lease time is 10s, so sleep 20s to make sure the server is inactive
+  sleep 20
   for i in $(seq 0 $(($KB_REPLICA_COUNT-1))); do
     if [ $i -eq $ORDINAL_INDEX ]; then
       continue
@@ -275,7 +287,7 @@ function delete_inactive_servers {
     inactive_ips=($(conn_remote_batch ${IP_LIST[$i]} "SELECT SVR_IP FROM DBA_OB_SERVERS WHERE STATUS = 'INACTIVE'" | tail -n +2))
     if [ ${#inactive_ips[@]} -eq 0 ]; then
       echo "No inactive servers"
-      break
+      continue
     fi
     echo "Inactive IPs: ${inactive_ips[*]}"
     for ip in ${inactive_ips[*]}; do
@@ -288,10 +300,6 @@ function delete_inactive_servers {
   echo "Finish deleting inactive servers"
 }
 
-function start_observer_with_exsting_configs {
-  # Start observer w/o any flags
-  /home/admin/oceanbase/bin/observer
-}
 
 function create_ready_flag {
   touch /tmp/ready
@@ -304,7 +312,7 @@ function create_primary_secondry_tenants {
   fi
 
   # get ordinal of current pod, start from 0
-  ordinal_index=$(echo $HOSTNAME | awk -F '-' '{print $(NF-1)}')
+  ordinal_index=$(echo $KB_POD_NAME | awk -F '-' '{print $(NF-1)}')
   # if not equal to 0, create secondary tenant
   if [ $ordinal_index -ne 0 ]; then
     return

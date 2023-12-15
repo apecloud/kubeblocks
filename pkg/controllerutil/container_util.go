@@ -38,17 +38,14 @@ func InjectZeroResourcesLimitsIfEmpty(c *corev1.Container) {
 	if c.Resources.Limits == nil {
 		c.Resources.Limits = corev1.ResourceList{}
 	}
-	if c.Resources.Requests == nil {
-		c.Resources.Requests = corev1.ResourceList{}
-	}
 
-	safeResourceValue := func(resource corev1.ResourceList, name corev1.ResourceName) {
-		if _, ok := resource[name]; !ok {
-			resource[name] = zeroValue
+	safeSetLimitValue := func(name corev1.ResourceName) {
+		if _, ok := c.Resources.Requests[name]; !ok {
+			if _, ok = c.Resources.Limits[name]; !ok {
+				c.Resources.Limits[name] = zeroValue
+			}
 		}
 	}
-	safeResourceValue(c.Resources.Requests, corev1.ResourceCPU)
-	safeResourceValue(c.Resources.Requests, corev1.ResourceMemory)
-	safeResourceValue(c.Resources.Limits, corev1.ResourceCPU)
-	safeResourceValue(c.Resources.Limits, corev1.ResourceMemory)
+	safeSetLimitValue(corev1.ResourceCPU)
+	safeSetLimitValue(corev1.ResourceMemory)
 }

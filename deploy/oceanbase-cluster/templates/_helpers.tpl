@@ -67,14 +67,15 @@ Create extra env
 */}}
 {{- define "oceanbase-cluster.extra-envs" }}
 {
-{{- if .Values.tenant -}}
-"TENANT_NAME": "{{ .Values.tenant.name | default "tenant1" }}",
+{{- if .Values.tenant }}
+"TENANT_NAME": "{{ .Values.tenant.name }}",
 "TENANT_CPU": "{{ min (sub .Values.cpu 1) .Values.tenant.max_cpu }}",
 "TENANT_MEMORY": "{{ print (min (sub .Values.memory  2) .Values.tenant.memory_size) "G" }}",
 "TENANT_DISK": "{{ print (.Values.tenant.log_disk_size | default 5) "G" }}",
-{{- end -}}
+{{- end }}
 "ZONE_COUNT": "{{ .Values.zoneCount | default "1" }}",
-"OB_CLUSTERS_COUNT": "{{ .Values.obClusters | default "1" }}"
+"OB_CLUSTERS_COUNT": "{{ .Values.obClusters | default "1" }}",
+"OB_DEBUG": "{{ .Values.debug | default "false" }}"
 }
 {{- end }}
 
@@ -83,4 +84,26 @@ Create extra envs annotations
 */}}
 {{- define "oceanbase-cluster.annotations.extra-envs" }}
 "kubeblocks.io/extra-env": {{ include "oceanbase-cluster.extra-envs" . | nospace  | quote }}
+{{- end }}
+
+
+
+{{- define "oceanbase-cluster.clusterdef" }}
+{{- if eq .Values.hostnetwork "enabled" }}
+{{- "oceanbase-host-network" | quote}}
+{{- else }}
+{{- "oceanbase" | quote }}
+{{- end -}}
+{{- end }}
+
+{{- define "oceanbase-cluster.default-version" }}
+{{- default .Chart.AppVersion .Values.clusterVersionOverrid }}
+{{- end }}
+
+{{- define "oceanbase-cluster.clusterver" }}
+{{- if eq .Values.hostnetwork "enabled" }}
+{{- include "oceanbase-cluster.default-version" . | printf "oceanbase-host-network-%s"  | quote}}
+{{- else }}
+{{- include "oceanbase-cluster.default-version" . | printf "oceanbase-%s"  | quote}}
+{{- end -}}
 {{- end }}

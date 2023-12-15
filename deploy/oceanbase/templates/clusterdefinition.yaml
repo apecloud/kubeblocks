@@ -36,6 +36,7 @@ spec:
           volumeName: scripts
           defaultMode: 0555
       podSpec:
+        terminationGracePeriodSeconds: 60
         containers:
           - name: observer-container
             command:
@@ -66,11 +67,13 @@ spec:
                 name: data-log
               - mountPath: /home/admin/log
                 name: log
+              - mountPath: /home/admin/workdir
+                name: workdir
               - name: scripts
                 mountPath: /scripts
               - name: oceanbase-config
                 mountPath: /kb-config
-            workingDir: /home/admin/oceanbase
+            workingDir: /home/admin/workdir
             env:
               - name: LD_LIBRARY_PATH
                 value: /home/admin/oceanbase/lib
@@ -85,14 +88,100 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
-              - name: OB_CPU_LIMIT
+              - name: OB_HOME_DIR
+                value: "/home/admin/workdir"
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: oceanbase-host-network
+  labels:
+    {{- include "oceanbase.labels" . | nindent 4 }}
+spec:
+  connectionCredential:
+    username: root
+    password: ""
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_sql)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_sql)"
+  componentDefs:
+    - name: ob-bundle
+      characterType: oceanbase
+      workloadType: Stateful
+      service:
+        ports:
+          - name: sql
+            port: 2881
+            targetPort: 2881
+          - name: rpc
+            port: 2882
+            targetPort: 2882
+      configSpecs:
+        - name: oceanbase-config
+          templateRef: oceanbase-configuration
+          volumeName: oceanbase-config
+          namespace: {{ .Release.Namespace }}
+          defaultMode: 0555
+      scriptSpecs:
+        - name: oceanbase-scripts
+          templateRef: oceanbase-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 0555
+      podSpec:
+        terminationGracePeriodSeconds: 60
+        hostNetwork: true
+        dnsPolicy: ClusterFirstWithHostNet
+        containers:
+          - name: observer-container
+            command:
+              - bash
+              - -c
+              - |
+                /scripts/entrypoint.sh
+            ports:
+              - containerPort: 2881
+                name: sql
+                protocol: TCP
+              - containerPort: 2882
+                name: rpc
+                protocol: TCP
+            readinessProbe:
+              failureThreshold: 10
+              initialDelaySeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              exec:
+                command:
+                  - cat
+                  - /tmp/ready
+            volumeMounts:
+              - mountPath: /home/admin/data-file
+                name: data-file
+              - mountPath: /home/admin/data-log
+                name: data-log
+              - mountPath: /home/admin/log
+                name: log
+              - mountPath: /home/admin/workdir
+                name: workdir
+              - name: scripts
+                mountPath: /scripts
+              - name: oceanbase-config
+                mountPath: /kb-config
+            workingDir: /home/admin/workdir
+            env:
+              - name: LD_LIBRARY_PATH
+                value: /home/admin/oceanbase/lib
+              - name: CLUSTER_NAME
+                value: "$(KB_CLUSTER_COMP_NAME)"
+              - name: POD_IP
                 valueFrom:
-                  resourceFieldRef:
-                    containerName: observer-container
-                    resource: limits.cpu
-              - name: OB_MEM_LIMIT
+                  fieldRef:
+                    fieldPath: status.podIP
+              - name: DB_ROOT_PASSWORD
                 valueFrom:
-                  resourceFieldRef:
-                    containerName: observer-container
-                    resource: limits.memory
-                    divisor: 1Mi
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+              - name: OB_HOME_DIR
+                value: "/home/admin/workdir"

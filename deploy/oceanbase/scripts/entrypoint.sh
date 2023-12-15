@@ -25,10 +25,12 @@ function wait_for_observer_ready {
   done
 }
 
+ip_changed="false"
 # If the server is recovering from crash
 if [ $RECOVERING = "True" ]; then
   # If the IP of recovering server changed
   if [ "$(check_if_ip_changed)" = "Changed" ]; then
+    ip_changed="true"
     echo "IP changed, need to rejoin the cluster"
     clean_dirs
     echo "Prepare config folders"
@@ -36,6 +38,7 @@ if [ $RECOVERING = "True" ]; then
     echo "Start server"
     start_observer
   else
+    ip_changed="false"
     echo "IP not changed, use existing configs to start server"
     start_observer_with_exsting_configs
   fi
@@ -48,6 +51,24 @@ else
 fi
 
 wait_for_observer_ready
+
+echo "ip_changed:" ${ip_changed}
+if [ "${ip_changed}" = "false" ] && [ "$RECOVERING" = "True" ]; then
+  echo "IP not changed, start recovering"
+  echo "Check DB Status"
+      # If at least one server is up, return True
+  until conn_local_obdb "SELECT * FROM DBA_OB_SERVERS\g"; do
+    echo "the server is not ready yet, wait for it..."
+    sleep 10
+  done
+
+    until [ -n "$(conn_local_obdb "SELECT * FROM DBA_OB_SERVERS WHERE SVR_IP = '${KB_POD_IP}' and STATUS = 'ACTIVE' and START_SERVICE_TIME IS NOT NULL")" ]; do
+    echo "Wait for the server to be ready..."
+    sleep 10
+  done
+  create_ready_flag
+  sleep 3600000000
+fi
 
 if [ $RECOVERING = "True" ]; then
   echo "Resolving other servers' IPs"

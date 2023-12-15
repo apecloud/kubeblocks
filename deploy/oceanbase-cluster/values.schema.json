@@ -40,7 +40,7 @@
                 "string"
             ],
             "default": 8,
-            "minimum": 4,
+            "minimum": 2,
             "maximum": 128,
             "multipleOf": 0.5
         },
@@ -52,7 +52,7 @@
                 "string"
             ],
             "default": 16,
-            "minimum": 4,
+            "minimum": 2,
             "maximum": 1024
         },
         "tenant": {
@@ -62,7 +62,6 @@
                     "title": "Tenant Name",
                     "description": "Tenant Name.",
                     "type": "string",
-                    "minLength": 4,
                     "maxLength": 32
                 },
                 "max_cpu": {
@@ -107,56 +106,54 @@
                 "log_disk_size"
             ]
         },
-        "storage": {
-            "type": "object",
-            "properties": {
-                "data-file": {
-                    "title": "Data file Storage(Gi)",
-                    "description": "Data file Storage size, the unit is Gi.",
-                    "type": [
-                        "number",
-                        "string"
-                    ],
-                    "default": 50,
-                    "minimum": 20,
-                    "maximum": 10000
-                },
-                "data-log": {
-                    "title": "Data log Storage(Gi)",
-                    "description": "Data log Storage size, the unit is Gi.",
-                    "type": [
-                        "number",
-                        "string"
-                    ],
-                    "default": 50,
-                    "minimum": 20,
-                    "maximum": 10000
-                },
-                "log": {
-                    "title": "Log Storage(Gi)",
-                    "description": "Log Storage size, the unit is Gi.",
-                    "type": [
-                        "number",
-                        "string"
-                    ],
-                    "default": 20,
-                    "minimum": 10,
-                    "maximum": 100
-                }
-            },
-            "required": [
-                "data-file",
-                "data-log",
-                "log"
+
+        "datafile": {
+            "title": "Data file Storage(Gi)",
+            "description": "Data file Storage size, the unit is Gi.",
+            "type": [
+                "number",
+                "string"
+            ],
+            "default": 50,
+            "minimum": 20,
+            "maximum": 10000
+        },
+        "datalog": {
+            "title": "Data log Storage(Gi)",
+            "description": "Data log Storage size, the unit is Gi.",
+            "type": [
+                "number",
+                "string"
+            ],
+            "default": 50,
+            "minimum": 20,
+            "maximum": 10000
+        },
+        "log": {
+            "title": "Log Storage(Gi)",
+            "description": "Log Storage size, the unit is Gi.",
+            "type": [
+                "number",
+                "string"
+            ],
+            "default": 20,
+            "minimum": 10,
+            "maximum": 100
+        },
+        "hostnetwork": {
+            "title": "Host Network",
+            "description": "Enable or Disable Pod Host Network.",
+            "type": "string",
+            "default": "enabled",
+            "enum": [
+                "enabled",
+                "disabled"
             ]
         }
     },
     "required": [
         "obClusters",
         "zoneCount",
-        "replicas",
-        "cpu",
-        "memory",
-        "storages"
+        "replicas"
     ]
 }

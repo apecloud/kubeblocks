@@ -1,15 +1,15 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: {{ include "oceanbase.fullname" . }}
+  name: {{ include "kblib.clusterName" . }}
   labels:
     {{- include "oceanbase.labels" . | nindent 4 }}
   annotations:
     {{ include "oceanbase-cluster.annotations.extra-envs" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: oceanbase
-  clusterVersionRef: oceanbase-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
-  terminationPolicy: {{ .Values.terminationPolicy }}
+  clusterDefinitionRef: {{ include "oceanbase-cluster.clusterdef" .}}
+  clusterVersionRef: {{ include "oceanbase-cluster.clusterver" .}}
+  terminationPolicy: {{ .Values.extra.terminationPolicy }}
   {{- include "kblib.affinity" . | indent 2 }}
   componentSpecs:
   {{- range $i, $e := until (int .Values.obClusters) }}
@@ -19,13 +19,36 @@ spec:
       replicas: {{ max $.Values.zoneCount $.Values.replicas}}
       {{- include "kblib.componentResources" $ | indent 6 }}
       volumeClaimTemplates:
-        {{- range $key, $val := $.Values.storages }}
-        - name: {{ $key }}
+        - name: data-file
           spec:
+            storageClassName: {{ $.Values.storageClassName }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
-                storage: {{ $val | quote }}
-        {{- end }}
+                storage: {{ print $.Values.datafile "Gi" }}
+        - name: data-log
+          spec:
+            storageClassName: {{ $.Values.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ print $.Values.datalog "Gi" }}
+        - name: log
+          spec:
+            storageClassName: {{ $.Values.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ print $.Values.log "Gi" }}
+        - name: workdir
+          spec:
+            storageClassName: {{ $.Values.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: "100Mi"
   {{- end }}

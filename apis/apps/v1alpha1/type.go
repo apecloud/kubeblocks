@@ -598,10 +598,12 @@ type Service struct {
 	// +required
 	Name string `json:"name"`
 
-	// ServiceName defines the name of the underlying service object.
+	// ServiceName defines the name or namePrefix of the underlying service object.
+	// if GeneratePodOrdinalService set to true, the ServiceName indicates the namePrefix of the underlying service object. otherwise, it indicates the name of the underlying service object.
 	// If not specified, the default service name with different patterns will be used:
 	//  - <CLUSTER_NAME>: for cluster-level services
 	//  - <CLUSTER_NAME>-<COMPONENT_NAME>: for component-level services
+	//  - <CLUSTER_NAME>-<COMPONENT_NAME>-<POD_ORDINAL>: for pod-level services when GeneratePodOrdinalService set to true
 	// Only one default service name is allowed.
 	// Cannot be updated.
 	// +optional
@@ -614,12 +616,33 @@ type Service struct {
 
 	// ComponentSelector extends the ServiceSpec.Selector by allowing you to specify a component as selectors for the service.
 	// For component-level services, a default component selector with the component name will be added automatically.
+	// if GeneratePodOrdinalService set to true, ComponentSelector must be specified.
 	// +optional
 	ComponentSelector string `json:"componentSelector,omitempty"`
 
 	// RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined role as selector for the service.
+	// if GeneratePodOrdinalService set to true, RoleSelector will be ignored.
 	// +optional
 	RoleSelector string `json:"roleSelector,omitempty"`
+
+	// GeneratePodOrdinalService indicates whether to create a corresponding Service for each Pod of the selected Component.
+	// If set to true, a set of Service will be automatically generated for each Pod. and ComponentSelector must be specified.
+	// They can be referred to by adding the PodOrdinal to the defined ServiceName with named pattern <Service.ServiceName>-<PodOrdinal>.
+	// For example, a Service might be defined as follows:
+	// - name: my-service
+	//   serviceName: my-service
+	//   generatePodOrdinalService: true
+	//   componentSelector: my-component
+	//   spec:
+	//     type: NodePort
+	//     ports:
+	//     - name: http
+	//       port: 80
+	//       targetPort: 8080
+	// Assuming that the Component has 3 replicas, then three services would be generated: my-service-0, my-service-1, and my-service-2, each pointing to its respective Pod.
+	// +kubebuilder:default=false
+	// +optional
+	GeneratePodOrdinalService bool `json:"generatePodOrdinalService,omitempty"`
 }
 
 // List of all the built-in variables provided by KubeBlocks.
@@ -756,14 +779,15 @@ type ServiceVarSelector struct {
 	// - name: MY_SERVICE_PORT
 	//   valueFrom:
 	//     serviceVarRef:
-	//       compDef: mysql
-	//       name: mysql-service
+	//       compDef: my-component-definition
+	//       name: my-service
 	//       optional: true
 	//       generatePodOrdinalServiceVar: true
 	//       port:
 	//         name: redis-sentinel
-	// Assuming that the Component has 3 replicas, then you can reference the port of existing services named mysql-service-0, mysql-service-1,
-	// and mysql-service-2 with $MY_SERVICE_PORT_0, $MY_SERVICE_PORT_1, and $MY_SERVICE_PORT_2, respectively.
+	// Assuming that the Component has 3 replicas, then you can reference the port of existing services named my-service-0, my-service-1,
+	// and my-service-2 with $MY_SERVICE_PORT_0, $MY_SERVICE_PORT_1, and $MY_SERVICE_PORT_2, respectively.
+	// It should be used in conjunction with Service.GeneratePodOrdinalService.
 	// +kubebuilder:default=false
 	// +optional
 	GeneratePodOrdinalServiceVar bool `json:"generatePodOrdinalServiceVar,omitempty"`

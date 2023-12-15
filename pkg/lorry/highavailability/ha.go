@@ -125,18 +125,24 @@ func (ha *Ha) RunCycle() {
 
 	case !cluster.IsLocked():
 		ha.logger.Info("Cluster has no leader, attempt to take the leader")
-		if ha.IsHealthiestMember(ha.ctx, cluster) {
-			cluster.Leader.DBState = DBState
-			if ha.dcs.AttemptAcquireLease() == nil {
-				err = ha.dbManager.Promote(ha.ctx, cluster)
-				if err != nil {
-					ha.logger.Error(err, "Take the leader failed")
-					_ = ha.dcs.ReleaseLease()
-				} else {
-					ha.logger.Info("Take the leader success!")
-				}
-			}
+		if !ha.IsHealthiestMember(ha.ctx, cluster) {
+			break
 		}
+
+		cluster.Leader.DBState = DBState
+		if ha.dcs.AttemptAcquireLease() != nil {
+			break
+		}
+
+		err := ha.dbManager.Promote(ha.ctx, cluster)
+		if err != nil {
+			ha.logger.Error(err, "Take the leader failed")
+			_ = ha.dcs.ReleaseLease()
+			break
+		}
+
+		ha.logger.Info("Take the leader success!")
+		fallthrough
 
 	case ha.dcs.HasLease():
 		ha.logger.Info("This member is Cluster's leader")

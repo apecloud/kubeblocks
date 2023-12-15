@@ -499,7 +499,7 @@ func (mgr *Manager) EnableSemiSyncIfNeed(ctx context.Context) error {
 	return nil
 }
 
-func (mgr *Manager) Promote(context.Context, *dcs.Cluster) error {
+func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 	if (mgr.globalState["super_read_only"] == "0" && mgr.globalState["read_only"] == "0") &&
 		(len(mgr.slaveStatus) == 0 || (mgr.slaveStatus.GetString("Slave_IO_Running") == "No" &&
 			mgr.slaveStatus.GetString("Slave_SQL_Running") == "No")) {
@@ -513,6 +513,8 @@ func (mgr *Manager) Promote(context.Context, *dcs.Cluster) error {
 		return err
 	}
 
+	// fresh db state
+	mgr.GetDBState(ctx, cluster)
 	mgr.Logger.Info(fmt.Sprintf("promote success, resp:%v", resp))
 	return nil
 }
@@ -528,7 +530,7 @@ func (mgr *Manager) Demote(context.Context) error {
 	return nil
 }
 
-func (mgr *Manager) Follow(_ context.Context, cluster *dcs.Cluster) error {
+func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
 		return fmt.Errorf("cluster has no leader")
@@ -556,6 +558,8 @@ func (mgr *Manager) Follow(_ context.Context, cluster *dcs.Cluster) error {
 		return err
 	}
 
+	// fresh db state
+	mgr.GetDBState(ctx, cluster)
 	mgr.Logger.Info("successfully follow new leader", "leader-name", leaderMember.Name)
 	return nil
 }

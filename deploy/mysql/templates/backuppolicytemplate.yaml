@@ -8,6 +8,8 @@ spec:
   clusterDefinitionRef: mysql
   backupPolicies:
   - componentDefRef: mysql
+    target:
+      role: primary
     backupMethods:
     - name: xtrabackup
       snapshotVolumes: false

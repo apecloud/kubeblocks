@@ -91,7 +91,7 @@ func (ha *Ha) RunCycle() {
 	}
 
 	if !ha.dbManager.IsRunning() {
-		ha.logger.Info("DB Service is not running,  wait for lorryCtl to start it")
+		ha.logger.Info("DB Service is not running,  wait for hypervisor to start it")
 		if ha.dcs.HasLease() {
 			_ = ha.dcs.ReleaseLease()
 		}
@@ -218,12 +218,12 @@ func (ha *Ha) Start() {
 		cluster, err = ha.dcs.GetCluster()
 	}
 
-	// isPodReady, err := ha.IsPodReady()
-	// for err != nil || !isPodReady {
-	//	ha.logger.Info("Waiting for dns resolution to be ready")
-	//	time.Sleep(3 * time.Second)
-	//	isPodReady, err = ha.IsPodReady()
-	// }
+	isPodReady, err := ha.IsPodReady()
+	for err != nil || !isPodReady {
+		ha.logger.Info("Waiting for dns resolution to be ready")
+		time.Sleep(3 * time.Second)
+		isPodReady, err = ha.IsPodReady()
+	}
 	ha.logger.Info("dns resolution is ready")
 
 	ha.logger.Info(fmt.Sprintf("cluster: %v", cluster))

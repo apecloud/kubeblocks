@@ -638,7 +638,7 @@ func getDBPort(pod *corev1.Pod) string {
 func getLorryPort(pod *corev1.Pod) string {
 	for _, container := range pod.Spec.Containers {
 		for _, port := range container.Ports {
-			if port.Name == "probe-http-port" {
+			if port.Name == constant.LorryHTTPPortName {
 				return strconv.Itoa(int(port.ContainerPort))
 			}
 		}

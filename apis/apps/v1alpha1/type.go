@@ -748,6 +748,25 @@ type ServiceVarSelector struct {
 	ClusterObjectReference `json:",inline"`
 
 	ServiceVars `json:",inline"`
+
+	// GeneratePodOrdinalServiceVar indicates whether to create a corresponding ServiceVars reference variable for each Pod.
+	// If set to true, a set of ServiceVars that can be referenced will be automatically generated for each Pod Ordinal.
+	// They can be referred to by adding the PodOrdinal to the defined name template with named pattern $<Vars[x].Name>_<PodOrdinal>.
+	// For example, a ServiceVarRef might be defined as follows:
+	// - name: MY_SERVICE_PORT
+	//   valueFrom:
+	//     serviceVarRef:
+	//       compDef: mysql
+	//       name: mysql-service
+	//       optional: true
+	//       generatePodOrdinalServiceVar: true
+	//       port:
+	//         name: redis-sentinel
+	// Assuming that the Component has 3 replicas, then you can reference the port of existing services named mysql-service-0, mysql-service-1,
+	// and mysql-service-2 with $MY_SERVICE_PORT_0, $MY_SERVICE_PORT_1, and $MY_SERVICE_PORT_2, respectively.
+	// +kubebuilder:default=false
+	// +optional
+	GeneratePodOrdinalServiceVar bool `json:"generatePodOrdinalServiceVar,omitempty"`
 }
 
 // CredentialVarSelector selects a var from a Credential (SystemAccount).

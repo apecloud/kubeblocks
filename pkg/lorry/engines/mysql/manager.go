@@ -97,11 +97,11 @@ func (mgr *Manager) IsRunning() bool {
 		if errors.As(err, &driverErr) {
 			// Now the error number is accessible directly
 			if driverErr.Number == 1040 {
-				mgr.Logger.Error(err, "Too many connections")
+				mgr.Logger.Info("connect failed: Too many connections")
 				return true
 			}
 		}
-		mgr.Logger.Error(err, "DB is not ready")
+		mgr.Logger.Info("DB is not ready", "error", err)
 		return false
 	}
 
@@ -118,7 +118,7 @@ func (mgr *Manager) IsDBStartupReady() bool {
 	// test if db is ready to connect or not
 	err := mgr.DB.PingContext(ctx)
 	if err != nil {
-		mgr.Logger.Error(err, "DB is not ready")
+		mgr.Logger.Info("DB is not ready", "error", err)
 		return false
 	}
 
@@ -212,13 +212,13 @@ func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, m
 
 	db, err := mgr.GetMemberConnection(cluster, member)
 	if err != nil {
-		mgr.Logger.Error(err, "Get Member conn failed")
+		mgr.Logger.Info("Get Member conn failed", "error", err)
 		return false, 0
 	}
 
 	opTimestamp, err := mgr.GetOpTimestamp(ctx, db)
 	if err != nil {
-		mgr.Logger.Error(err, "get op timestamp failed")
+		mgr.Logger.Info("get op timestamp failed", "error", err)
 		return false, 0
 	}
 
@@ -232,7 +232,7 @@ func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, m
 func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
 	db, err := mgr.GetMemberConnection(cluster, member)
 	if err != nil {
-		mgr.Logger.Error(err, "Get Member conn failed")
+		mgr.Logger.Info("Get Member conn failed", "error", err)
 		return false
 	}
 
@@ -253,25 +253,25 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 
 	globalState, err := mgr.GetGlobalState(ctx, mgr.DB)
 	if err != nil {
-		mgr.Logger.Error(err, "select global failed")
+		mgr.Logger.Info("select global failed", "error", err)
 		return nil
 	}
 
 	masterStatus, err := mgr.GetMasterStatus(ctx, mgr.DB)
 	if err != nil {
-		mgr.Logger.Error(err, "show master status failed")
+		mgr.Logger.Info("show master status failed", "error", err)
 		return nil
 	}
 
 	slaveStatus, err := mgr.GetSlaveStatus(ctx, mgr.DB)
 	if err != nil {
-		mgr.Logger.Error(err, "show slave status failed")
+		mgr.Logger.Info("show slave status failed", "error", err)
 		return nil
 	}
 
 	opTimestamp, err := mgr.GetOpTimestamp(ctx, mgr.DB)
 	if err != nil {
-		mgr.Logger.Error(err, "get op timestamp failed")
+		mgr.Logger.Info("get op timestamp failed", "error", err)
 		return nil
 	}
 
@@ -336,7 +336,7 @@ func (mgr *Manager) ReadCheck(ctx context.Context, db *sql.DB) bool {
 			// no healthy database, return true
 			return true
 		}
-		mgr.Logger.Error(err, "Read check failed")
+		mgr.Logger.Info("Read check failed", "error", err)
 		return false
 	}
 

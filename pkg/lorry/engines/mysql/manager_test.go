@@ -507,6 +507,8 @@ func TestManager_IsClusterInitialized(t *testing.T) {
 	manager.serverID = 1
 
 	t.Run("query server id failed", func(t *testing.T) {
+		mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
+			"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}))
 		mock.ExpectQuery("select @@global.server_id").
 			WillReturnError(fmt.Errorf("some error"))
 
@@ -517,6 +519,8 @@ func TestManager_IsClusterInitialized(t *testing.T) {
 	})
 
 	t.Run("server id equal to manager's server id", func(t *testing.T) {
+		mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
+			"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}))
 		mock.ExpectQuery("select @@global.server_id").
 			WillReturnRows(sqlmock.NewRows([]string{"@@global.server_id"}).AddRow(1))
 
@@ -526,6 +530,8 @@ func TestManager_IsClusterInitialized(t *testing.T) {
 	})
 
 	t.Run("set server id failed", func(t *testing.T) {
+		mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
+			"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}))
 		mock.ExpectQuery("select @@global.server_id").
 			WillReturnRows(sqlmock.NewRows([]string{"@@global.server_id"}).AddRow(2))
 		mock.ExpectExec("set global server_id").
@@ -538,6 +544,8 @@ func TestManager_IsClusterInitialized(t *testing.T) {
 	})
 
 	t.Run("set server id successfully", func(t *testing.T) {
+		mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
+			"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}))
 		mock.ExpectQuery("select @@global.server_id").
 			WillReturnRows(sqlmock.NewRows([]string{"@@global.server_id"}).AddRow(2))
 		mock.ExpectExec("set global server_id").

@@ -449,7 +449,7 @@ type RestoreSpec struct {
 
 	// the volume claim restore policy, support values: [Serial, Parallel]
 	// +kubebuilder:validation:Enum=Serial;Parallel
-	// +kubebuilder:default=Serial
+	// +kubebuilder:default=Parallel
 	VolumeRestorePolicy string `json:"volumeRestorePolicy,omitempty"`
 }
 

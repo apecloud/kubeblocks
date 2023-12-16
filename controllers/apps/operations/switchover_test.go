@@ -216,7 +216,7 @@ var _ = Describe("", func() {
 			By("do reconcile switchoverAction failed because switchover job status failed")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("job check conditions status failed"))
+			Expect(err.Error()).Should(ContainSubstring("requeue to waiting for job"))
 
 			By("mock job status to success.")
 			jobName := fmt.Sprintf("%s-%s-%s-%d", KBSwitchoverJobNamePrefix, opsRes.Cluster.Name, consensusComp, opsRes.Cluster.Generation)

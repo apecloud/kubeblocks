@@ -309,8 +309,8 @@ func (r *ComponentDefinitionReconciler) validateLifecycleActionBuiltInHandlers(l
 	actions := []struct {
 		LifeCycleActionHandlers *appsv1alpha1.LifecycleActionHandler
 	}{
-		{lifecycleActions.PostStart},
-		{lifecycleActions.PreStop},
+		{lifecycleActions.PostProvision},
+		{lifecycleActions.PreTerminate},
 		{lifecycleActions.MemberJoin},
 		{lifecycleActions.MemberLeave},
 		{lifecycleActions.Readonly},

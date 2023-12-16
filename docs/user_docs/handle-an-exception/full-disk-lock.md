@@ -29,7 +29,7 @@ When the space water level of all configured volumes falls below the defined thr
 
 - For MySQL database, the read/write user cannot write to the disk when the disk usage reaches the `highwatermark` value, while the superuser can still write.
 - For PostgreSQL and MongoDB, both the read/write user and the superuser cannot write when the disk usage reaches `highwatermark`.
-- `90` is the default value setting for the high watermark at the component level which means the disk is locked when the disk usage reaches 90%, while `85` is used for the volumes setting which overwrites the component's threshold value.
+- `90` is the default value setting for the high watermark at the component level which means the disk is locked when the disk usage reaches 90%, while `85` is used for the volumes which overwrites the component's threshold value.
 
 In the cluster definition, add the following content to enable the full disk lock function. You can set the value according to your need.
 

@@ -90,11 +90,11 @@ kbcli cluster list pulsar
    - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be that the number of the normal instances is less than that of the total instance or the leader instance is running properly while others are abnormal.
      > To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
 
-:::note
+    :::note
 
-Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
+    Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
 
-:::
+    :::
 
 3. Check whether the corresponding resources change.
 
@@ -173,6 +173,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 ### Handle the snapshot exception
 
 If `STATUS=ConditionsError` occurs during the horizontal scaling process, you can find the cause from `cluster.status.condition.message` for troubleshooting.
+
 In the example below, a snapshot exception occurs.
 
 ```bash

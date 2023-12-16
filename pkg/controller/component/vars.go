@@ -81,9 +81,14 @@ func setEnvNTemplateVars(templateVars []corev1.EnvVar, envVars []corev1.EnvVar, 
 			// have injected variables placed at the front of the slice
 			c := &(*cc)[i]
 			if c.Env == nil {
-				c.Env = envVars
+				newEnv := make([]corev1.EnvVar, len(envVars))
+				copy(newEnv, envVars)
+				c.Env = newEnv
 			} else {
-				c.Env = append(envVars, c.Env...)
+				newEnv := make([]corev1.EnvVar, len(envVars), len(envVars)+len(c.Env))
+				copy(newEnv, envVars)
+				newEnv = append(newEnv, c.Env...)
+				c.Env = newEnv
 			}
 		}
 	}
@@ -114,7 +119,7 @@ func builtinTemplateVars(synthesizedComp *SynthesizedComponent) []corev1.EnvVar 
 			{Name: constant.KBEnvClusterUID, Value: synthesizedComp.ClusterUID},
 			{Name: constant.KBEnvClusterCompName, Value: constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name)},
 			{Name: constant.KBEnvCompName, Value: synthesizedComp.Name},
-			{Name: constant.KBEnvCompReplicas, Value: strconv.Itoa(int(synthesizedComp.Replicas))},
+			// {Name: constant.KBEnvCompReplicas, Value: strconv.Itoa(int(synthesizedComp.Replicas))},
 			{Name: constant.KBEnvClusterUIDPostfix8Deprecated, Value: kbClusterPostfix8},
 		}
 	}

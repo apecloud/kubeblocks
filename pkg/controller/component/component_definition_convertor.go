@@ -451,7 +451,7 @@ func (c *compDefRoleArbitratorConvertor) convert(args ...any) (any, error) {
 
 	// TODO(xingran): it is hacky, should be refactored
 	if clusterCompDef.WorkloadType == appsv1alpha1.Replication && clusterCompDef.CharacterType == constant.RedisCharacterType {
-		roleArbitrator := appsv1alpha1.KubeBlocksRoleArbitrator
+		roleArbitrator := appsv1alpha1.LorryRoleArbitrator
 		return &roleArbitrator, nil
 	}
 
@@ -487,6 +487,11 @@ func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
 		lifecycleActions.Switchover = c.convertSwitchover(clusterCompDef.SwitchoverSpec, clusterCompVer)
 	}
 
+	if clusterCompDef.PostStartSpec != nil {
+		lifecycleActions.PostProvision = c.convertPostProvision(clusterCompDef.PostStartSpec)
+	}
+
+	lifecycleActions.PreTerminate = nil
 	lifecycleActions.MemberJoin = nil
 	lifecycleActions.MemberLeave = nil
 	lifecycleActions.Readonly = nil
@@ -529,11 +534,11 @@ func (c *compDefLifecycleActionsConvertor) convertBuiltinActionHandler(clusterCo
 	}
 }
 
-func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) *appsv1alpha1.RoleProbeSpec {
+func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) *appsv1alpha1.RoleProbe {
 	// if RSMSpec has role probe CustomHandler, use it first.
 	if clusterCompDef.RSMSpec != nil && clusterCompDef.RSMSpec.RoleProbe != nil && len(clusterCompDef.RSMSpec.RoleProbe.CustomHandler) > 0 {
-		// TODO(xingran): RSMSpec.RoleProbe.CustomHandler support multiple images and commands, but ComponentDefinition.LifeCycleAction.RoleProbeSpec only support one image and command now.
-		return &appsv1alpha1.RoleProbeSpec{
+		// TODO(xingran): RSMSpec.RoleProbe.CustomHandler support multiple images and commands, but ComponentDefinition.LifeCycleAction.RoleProbe only support one image and command now.
+		return &appsv1alpha1.RoleProbe{
 			LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
 				BuiltinHandler: nil,
 				CustomHandler: &appsv1alpha1.Action{
@@ -551,7 +556,7 @@ func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *apps
 	}
 
 	clusterCompDefRoleProbe := clusterCompDef.Probes.RoleProbe
-	roleProbeSpec := &appsv1alpha1.RoleProbeSpec{
+	roleProbe := &appsv1alpha1.RoleProbe{
 		TimeoutSeconds:   clusterCompDefRoleProbe.TimeoutSeconds,
 		PeriodSeconds:    clusterCompDefRoleProbe.PeriodSeconds,
 		SuccessThreshold: 1, // default non-zero value
@@ -560,26 +565,45 @@ func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *apps
 
 	if clusterCompDefRoleProbe.Commands == nil || len(clusterCompDefRoleProbe.Commands.Writes) == 0 || len(clusterCompDefRoleProbe.Commands.Queries) == 0 {
 		builtinHandler := c.convertBuiltinActionHandler(clusterCompDef)
-		roleProbeSpec.BuiltinHandler = &builtinHandler
-		roleProbeSpec.CustomHandler = nil
-		return roleProbeSpec
+		roleProbe.BuiltinHandler = &builtinHandler
+		roleProbe.CustomHandler = nil
+		return roleProbe
 	}
 
 	commands := clusterCompDefRoleProbe.Commands.Writes
 	if len(clusterCompDefRoleProbe.Commands.Writes) == 0 {
 		commands = clusterCompDefRoleProbe.Commands.Queries
 	}
-	roleProbeSpec.BuiltinHandler = nil
-	roleProbeSpec.CustomHandler = &appsv1alpha1.Action{
+	roleProbe.BuiltinHandler = nil
+	roleProbe.CustomHandler = &appsv1alpha1.Action{
 		Exec: &appsv1alpha1.ExecAction{
 			Command: commands,
 		},
 	}
-	return roleProbeSpec
+	return roleProbe
+}
+
+func (c *compDefLifecycleActionsConvertor) convertPostProvision(postStart *appsv1alpha1.PostStartAction) *appsv1alpha1.LifecycleActionHandler {
+	if postStart == nil {
+		return nil
+	}
+
+	defaultPreCondition := appsv1alpha1.ComponentReadyPreConditionType
+	return &appsv1alpha1.LifecycleActionHandler{
+		CustomHandler: &appsv1alpha1.Action{
+			Image: postStart.CmdExecutorConfig.Image,
+			Exec: &appsv1alpha1.ExecAction{
+				Command: postStart.CmdExecutorConfig.Command,
+				Args:    postStart.CmdExecutorConfig.Args,
+			},
+			Env:          postStart.CmdExecutorConfig.Env,
+			PreCondition: &defaultPreCondition,
+		},
+	}
 }
 
 func (c *compDefLifecycleActionsConvertor) convertSwitchover(switchover *appsv1alpha1.SwitchoverSpec,
-	clusterCompVer *appsv1alpha1.ClusterComponentVersion) *appsv1alpha1.ComponentSwitchoverSpec {
+	clusterCompVer *appsv1alpha1.ClusterComponentVersion) *appsv1alpha1.ComponentSwitchover {
 	spec := *switchover
 	if clusterCompVer != nil {
 		overrideSwitchoverSpecAttr(&spec, clusterCompVer.SwitchoverSpec)
@@ -630,7 +654,7 @@ func (c *compDefLifecycleActionsConvertor) convertSwitchover(switchover *appsv1a
 		return scriptSpecList
 	}
 
-	return &appsv1alpha1.ComponentSwitchoverSpec{
+	return &appsv1alpha1.ComponentSwitchover{
 		WithCandidate:       withCandidateAction,
 		WithoutCandidate:    withoutCandidateAction,
 		ScriptSpecSelectors: mergeScriptSpec(),

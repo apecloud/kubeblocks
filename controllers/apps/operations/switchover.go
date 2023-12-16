@@ -195,7 +195,7 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 			ObjectKey: getProgressObjectKey(KBSwitchoverCheckJobKey, jobName),
 			Status:    appsv1alpha1.ProcessingProgressStatus,
 		}
-		if err = checkJobSucceed(reqCtx.Ctx, cli, opsRes.Cluster, jobName); err != nil {
+		if err = component.CheckJobSucceed(reqCtx.Ctx, cli, opsRes.Cluster, jobName); err != nil {
 			checkJobProcessDetail.Message = fmt.Sprintf("switchover job %s is not succeed", jobName)
 			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.UpdatingClusterCompPhase, checkJobProcessDetail, switchover.ComponentName)
 			continue
@@ -261,7 +261,7 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 
 	if completedCount == expectCount {
 		for _, jobName := range succeedJobs {
-			if err := cleanJobByName(reqCtx.Ctx, cli, opsRes.Cluster, jobName); err != nil {
+			if err := component.CleanJobByName(reqCtx.Ctx, cli, opsRes.Cluster, jobName); err != nil {
 				reqCtx.Log.Error(err, "clean switchover job failed", "jobName", jobName)
 				return expectCount, completedCount, err
 			}

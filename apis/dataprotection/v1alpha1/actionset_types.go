@@ -192,6 +192,7 @@ type JobActionSpec struct {
 }
 
 // ActionErrorMode defines how should treat an error from an action.
+// TODO: now, only support Fail mode, will support Continue mode in the future.
 // +kubebuilder:validation:Enum=Continue;Fail
 type ActionErrorMode string
 

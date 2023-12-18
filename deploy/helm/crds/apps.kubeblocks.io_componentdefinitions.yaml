@@ -12127,6 +12127,18 @@ spec:
                             name:
                               description: Name of the referent object.
                               type: string
+                            nodePort:
+                              properties:
+                                name:
+                                  type: string
+                                option:
+                                  description: VarOption defines whether a variable
+                                    is required or optional.
+                                  enum:
+                                  - Required
+                                  - Optional
+                                  type: string
+                              type: object
                             optional:
                               description: Specify whether the object must be defined.
                               type: boolean

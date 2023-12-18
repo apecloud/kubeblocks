@@ -488,6 +488,69 @@ var _ = Describe("vars", func() {
 			checkEnvVarExist(synthesizedComp, "service-host", svcName)
 			checkEnvVarExist(synthesizedComp, "service-port", strconv.Itoa(svcPort))
 			checkEnvVarExist(synthesizedComp, "service-port-wo-name", strconv.Itoa(svcPort+1))
+
+			By("service var ref with pod ordinal")
+			svcNameRefPrefix := "service-node-port"
+			vars = []appsv1alpha1.EnvVar{
+				{
+					Name: "service-node-port",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name:     svcNameRefPrefix,
+								Optional: required(),
+							},
+							ServiceVars: appsv1alpha1.ServiceVars{
+								Port: &appsv1alpha1.NamedVar{
+									Name:   "default",
+									Option: &appsv1alpha1.VarRequired,
+								},
+							},
+							GeneratePodOrdinalServiceVar: true,
+						},
+					},
+				},
+			}
+			svcName0 := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "service-node-port-0")
+			svcName1 := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "service-node-port-1")
+			reader = &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      svcName0,
+						},
+						Spec: corev1.ServiceSpec{
+							Ports: []corev1.ServicePort{
+								{
+									Name: "default",
+									Port: int32(svcPort),
+								},
+							},
+						},
+					},
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      svcName1,
+						},
+						Spec: corev1.ServiceSpec{
+							Ports: []corev1.ServicePort{
+								{
+									Port: int32(svcPort + 1),
+								},
+							},
+						},
+					},
+				},
+			}
+			synthesizedComp.Replicas = 2
+			err := ResolveEnvNTemplateVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("the name and compDef of ServiceVarRef is required"))
+			vars[0].ValueFrom.ServiceVarRef.ClusterObjectReference.CompDef = synthesizedComp.CompDefName
+			Expect(ResolveEnvNTemplateVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)).Should(Succeed())
 		})
 
 		It("credential vars", func() {

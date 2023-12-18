@@ -435,10 +435,15 @@ func resolveServiceVarRef(ctx context.Context, cli client.Reader, synthesizedCom
 	}
 
 	var resolveFunc func(context.Context, client.Reader, *SynthesizedComponent, string, appsv1alpha1.ServiceVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error)
-	if selector.Host != nil {
+	switch {
+	case selector.Host != nil:
 		resolveFunc = resolveServiceHostRef
-	} else if selector.Port != nil {
+	case selector.Port != nil:
 		resolveFunc = resolveServicePortRef
+	case selector.NodePort != nil:
+		resolveFunc = resolveServiceNodePortRef
+	default:
+		return nil, nil, nil
 	}
 
 	var1, var2, err := resolveFunc(ctx, cli, synthesizedComp, defineKey, selector)
@@ -467,6 +472,8 @@ func resolveServiceVarRefWithPodOrdinal(ctx context.Context, cli client.Reader, 
 			resolver = resolveServiceHostRef
 		case serviceSelector.Port != nil:
 			resolver = resolveServicePortRef
+		case serviceSelector.NodePort != nil:
+			resolver = resolveServiceNodePortRef
 		default:
 			return nil
 		}
@@ -527,6 +534,32 @@ func resolveServicePortRef(ctx context.Context, cli client.Reader, synthesizedCo
 			return &corev1.EnvVar{
 				Name:  defineKey,
 				Value: strconv.Itoa(int(svc.Spec.Ports[0].Port)),
+			}, nil
+		}
+		return nil, nil
+	}
+	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.Port.Option, resolvePort)
+}
+
+func resolveServiceNodePortRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1alpha1.ServiceVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error) {
+	resolvePort := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
+		svc := obj.(*corev1.Service)
+		if svc.Spec.Type != corev1.ServiceTypeNodePort {
+			return nil, nil
+		}
+		for _, svcPort := range svc.Spec.Ports {
+			if svcPort.Name == selector.NodePort.Name {
+				return &corev1.EnvVar{
+					Name:  defineKey,
+					Value: strconv.Itoa(int(svcPort.NodePort)),
+				}, nil
+			}
+		}
+		if len(svc.Spec.Ports) == 1 && (len(svc.Spec.Ports[0].Name) == 0 || len(selector.Port.Name) == 0) {
+			return &corev1.EnvVar{
+				Name:  defineKey,
+				Value: strconv.Itoa(int(svc.Spec.Ports[0].NodePort)),
 			}, nil
 		}
 		return nil, nil

@@ -743,6 +743,9 @@ type ServiceVars struct {
 
 	// +optional
 	Port *NamedVar `json:"port,omitempty"`
+
+	// +optional
+	NodePort *NamedVar `json:"nodePort,omitempty"`
 }
 
 // CredentialVars defines the vars can be referenced from a Credential (SystemAccount).

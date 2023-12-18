@@ -383,7 +383,7 @@ type ProvisionScope string
 const (
 	// AllPods will create accounts for all pods belong to the component.
 	AllPods ProvisionScope = "AllPods"
-	// AndyPods will only create accounts on one pod.
+	// AnyPods will only create accounts on one pod.
 	AnyPods ProvisionScope = "AnyPods"
 )
 
@@ -592,14 +592,16 @@ type StatefulSetWorkload interface {
 }
 
 type Service struct {
-	// The name of the service.
+	// Name defines the name or namePrefix of the service.
+	// if GeneratePodOrdinalService sets to true, the Name indicates the namePrefix of the service and the fullName will be generated with named pattern <Service.Name>-<PodOrdinal>.
+	// otherwise, it indicates the name of the service.
 	// Others can refer to this service by its name. (e.g., connection credential)
 	// Cannot be updated.
 	// +required
 	Name string `json:"name"`
 
 	// ServiceName defines the name or namePrefix of the underlying service object.
-	// if GeneratePodOrdinalService set to true, the ServiceName indicates the namePrefix of the underlying service object. otherwise, it indicates the name of the underlying service object.
+	// if GeneratePodOrdinalService sets to true, the ServiceName indicates the namePrefix of the underlying service object. otherwise, it indicates the name of the underlying service object.
 	// If not specified, the default service name with different patterns will be used:
 	//  - <CLUSTER_NAME>: for cluster-level services
 	//  - <CLUSTER_NAME>-<COMPONENT_NAME>: for component-level services
@@ -621,12 +623,12 @@ type Service struct {
 	ComponentSelector string `json:"componentSelector,omitempty"`
 
 	// RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined role as selector for the service.
-	// if GeneratePodOrdinalService set to true, RoleSelector will be ignored.
+	// if GeneratePodOrdinalService sets to true, RoleSelector will be ignored.
 	// +optional
 	RoleSelector string `json:"roleSelector,omitempty"`
 
 	// GeneratePodOrdinalService indicates whether to create a corresponding Service for each Pod of the selected Component.
-	// If set to true, a set of Service will be automatically generated for each Pod. and ComponentSelector must be specified.
+	// If sets to true, a set of Service will be automatically generated for each Pod. and ComponentSelector must be specified.
 	// They can be referred to by adding the PodOrdinal to the defined ServiceName with named pattern <Service.ServiceName>-<PodOrdinal>.
 	// For example, a Service might be defined as follows:
 	// - name: my-service

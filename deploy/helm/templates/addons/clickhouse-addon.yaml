@@ -17,7 +17,7 @@ spec:
   type: Helm
 
   helm:
-    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "risingwave" "version" (default .Chart.Version .Values.versionOverride) "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "clickhouse" "version" (default .Chart.Version .Values.versionOverride) "values" .Values) | indent 4 }}
     {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
 
     installOptions:

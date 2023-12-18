@@ -958,7 +958,7 @@ spec:
                         by allowing you to specify a component as selectors for the
                         service. For component-level services, a default component
                         selector with the component name will be added automatically.
-                        if GeneratePodOrdinalService set to true, ComponentSelector
+                        if GeneratePodOrdinalService sets to true, ComponentSelector
                         must be specified.
                       type: string
                     generatePodOrdinalService:

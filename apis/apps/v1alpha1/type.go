@@ -618,7 +618,7 @@ type Service struct {
 
 	// ComponentSelector extends the ServiceSpec.Selector by allowing you to specify a component as selectors for the service.
 	// For component-level services, a default component selector with the component name will be added automatically.
-	// if GeneratePodOrdinalService set to true, ComponentSelector must be specified.
+	// if GeneratePodOrdinalService sets to true, ComponentSelector must be specified.
 	// +optional
 	ComponentSelector string `json:"componentSelector,omitempty"`
 

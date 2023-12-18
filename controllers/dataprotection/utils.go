@@ -138,8 +138,10 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 	existPodSelector := func(selector *dpv1alpha1.PodSelector) bool {
 		return selector != nil && selector.LabelSelector != nil
 	}
-	selector := backupMethod.Target.PodSelector
-	if !existPodSelector(selector) {
+	var selector *dpv1alpha1.PodSelector
+	if backupMethod.Target != nil && existPodSelector(backupMethod.Target.PodSelector) {
+		selector = backupMethod.Target.PodSelector
+	} else {
 		// using global target policy.
 		selector = backupPolicy.Spec.Target.PodSelector
 	}

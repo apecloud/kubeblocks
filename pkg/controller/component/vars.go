@@ -543,7 +543,7 @@ func resolveServicePortRef(ctx context.Context, cli client.Reader, synthesizedCo
 
 func resolveServiceNodePortRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	defineKey string, selector appsv1alpha1.ServiceVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error) {
-	resolvePort := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
+	resolveNodePort := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
 		svc := obj.(*corev1.Service)
 		if svc.Spec.Type != corev1.ServiceTypeNodePort {
 			return nil, nil
@@ -564,7 +564,7 @@ func resolveServiceNodePortRef(ctx context.Context, cli client.Reader, synthesiz
 		}
 		return nil, nil
 	}
-	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.Port.Option, resolvePort)
+	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.NodePort.Option, resolveNodePort)
 }
 
 func resolveCredentialVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,

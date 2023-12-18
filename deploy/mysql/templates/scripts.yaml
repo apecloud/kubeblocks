@@ -39,7 +39,7 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: oracle-mysql-reload-script
+  name: oracle-mysql8.0-reload-script
   labels:
     {{- include "mysql.labels" . | nindent 4 }}
 data:

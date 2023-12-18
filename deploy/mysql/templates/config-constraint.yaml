@@ -11,7 +11,7 @@ spec:
   reloadOptions:
     tplScriptTrigger:
       sync: true
-      scriptConfigMapRef: oracle-mysql-reload-script
+      scriptConfigMapRef: oracle-mysql8.0-reload-script
       namespace: {{ .Release.Namespace }}
 
   # top level mysql configuration type

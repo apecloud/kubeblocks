@@ -190,6 +190,7 @@ func NewFakeCluster(testCtx *testutil.TestContext) *BackupClusterInfo {
 	volume2 := corev1.Volume{Name: DataVolumeName, VolumeSource: corev1.VolumeSource{
 		PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvc1.Name}}}
 	pod1 := podFactory(podName + "-1").
+		AddRoleLabel("follower").
 		AddVolume(volume2).
 		Create(testCtx).GetObject()
 	Expect(testapps.ChangeObjStatus(testCtx, pod1, func() {

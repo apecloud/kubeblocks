@@ -144,9 +144,9 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 	} else {
 		// using global target policy.
 		selector = backupPolicy.Spec.Target.PodSelector
-	}
-	if !existPodSelector(selector) {
-		return nil, nil
+		if !existPodSelector(selector) {
+			return nil, nil
+		}
 	}
 	labelSelector, err := metav1.LabelSelectorAsSelector(selector.LabelSelector)
 	if err != nil {

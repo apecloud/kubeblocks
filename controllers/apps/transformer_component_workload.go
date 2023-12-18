@@ -924,6 +924,7 @@ func calculateDeletePods(pods []*corev1.Pod, policy workloads.RsmTransformPolicy
 					if _, exist := deletePodNames[instance]; !exist {
 						deletePodList = append(deletePodList, pods[podIdx])
 						deltaReplicas--
+						break
 					}
 				}
 			}
@@ -935,6 +936,7 @@ func calculateDeletePods(pods []*corev1.Pod, policy workloads.RsmTransformPolicy
 			for delPodIdx := range deletePodList {
 				if deletePodList[delPodIdx].Name == pods[podIdx].Name {
 					isDelete = true
+					break
 				}
 			}
 			if !isDelete {

@@ -96,6 +96,7 @@ rules:
   resources:
   - pods
   verbs:
+  - create
   - get
   - list
   - patch

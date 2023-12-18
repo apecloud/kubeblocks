@@ -1,5 +1,7 @@
+{{- $selectorLabels := include "kubeblocks.selectorLabels" . }}
 {{- include "kubeblocks.buildAddonCR" (merge (dict
   "kbVersion" ">=0.7.0"
+  "selectorLabels" $selectorLabels
   "name" "llm"
   "version" "0.7.0"
   "model" "LLM"

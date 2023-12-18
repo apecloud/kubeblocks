@@ -26,6 +26,7 @@ import (
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -75,27 +76,27 @@ func (e *ExecAction) validate() error {
 }
 
 func (e *ExecAction) buildPodSpec() *corev1.PodSpec {
+	container := &corev1.Container{
+		Name:            e.Name,
+		Image:           viper.GetString(constant.KBToolsImage),
+		ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)),
+		Command:         []string{"kubectl"},
+		Args: append([]string{
+			"-n",
+			e.Namespace,
+			"exec",
+			e.PodName,
+			"-c",
+			e.Container,
+			"--",
+		}, e.Command...),
+	}
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
 	return &corev1.PodSpec{
 		RestartPolicy:      corev1.RestartPolicyNever,
 		ServiceAccountName: e.ServiceAccountName,
-		Containers: []corev1.Container{
-			{
-				Name:            e.Name,
-				Image:           viper.GetString(constant.KBToolsImage),
-				ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)),
-				Command:         []string{"kubectl"},
-				Args: append([]string{
-					"-n",
-					e.Namespace,
-					"exec",
-					e.PodName,
-					"-c",
-					e.Container,
-					"--",
-				}, e.Command...),
-			},
-		},
-		Volumes: []corev1.Volume{},
+		Containers:         []corev1.Container{*container},
+		Volumes:            []corev1.Volume{},
 		// tolerate all taints
 		Tolerations: []corev1.Toleration{
 			{

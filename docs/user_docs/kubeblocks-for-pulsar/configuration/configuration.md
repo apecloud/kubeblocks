@@ -20,7 +20,7 @@ There are 3 types of parameters:
 :::note
 
 `pulsar-admin` is a management tool built in the Pulsar cluster. You can log in to the corresponding pod with `kubectl exec -it <pod-name> -- bash` (pod-name can be checked by `kubectl get pods` command, and you can choose any pod with the word `broker` in its name ), and there are corresponding commands in the `/pulsar/bin path` of the pod. For more information about pulsar-admin, please refer to the [official documentation](https://pulsar.apache.org/docs/3.0.x/admin-api-tools/
-)
+).
 :::
 
 ## View parameter information
@@ -86,7 +86,7 @@ kbcli cluster describe-config pulsar
    kubectl get ops 
    ```
 
-   b.Check whether the configuration is done.
+   b. Check whether the configuration is done.
 
    ```bash
    kubectl get pod -l app.kubernetes.io/name=pulsar
@@ -145,7 +145,7 @@ The following steps take the configuration of dynamic parameter `brokerShutdownT
 
 ### Configure parameters with edit-config command
 
-For your convenience, KubeBlocks offers a tool `edit-config` to help you to configure parameter in a visulized way.
+For your convenience, KubeBlocks offers a tool `edit-config` to help you to configure parameter in a visualized way.
 
 For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on notepad.
 
@@ -155,11 +155,11 @@ For Linux and macOS, you can edit configuration files by vi. For Windows, you ca
    kbcli cluster edit-config pulsar
    ```
 
-:::note
+   :::note
 
-If there are multiple components in a cluster, use `--component` to specify a component.
+   If there are multiple components in a cluster, use `--component` to specify a component.
 
-:::
+   :::
 
 2. View the status of the parameter configuration.
 
@@ -173,12 +173,12 @@ If there are multiple components in a cluster, use `--component` to specify a co
    kbcli cluster connect pulsar
    ```
 
-:::note
+   :::note
 
-1. For the `edit-config` function, static parameters and dynamic parameters cannot be edited at the same time.
-2. Deleting a parameter will be supported later.
+   1. For the `edit-config` function, static parameters and dynamic parameters cannot be edited at the same time.
+   2. Deleting a parameter will be supported later.
 
-:::
+   :::
 
 ### Configure parameters with kubectl
 
@@ -198,7 +198,7 @@ Using kubectl to configure pulsar cluster requires modifying the configuration f
     broker-config            broker.conf            true      pulsar-broker-config-tpl   brokers-config-constraints   pulsar-broker-broker-config            broker      pulsar
     ```
 
-    In the rendered colume of the above output, you can check the broker's configmap is `pulsar-broker-broker-config`.
+    In the rendered column of the above output, you can check the broker's configmap is `pulsar-broker-broker-config`.
 
 2. Modify the `broker.conf` file, in this case, it is `pulsar-broker-broker-config`.
 

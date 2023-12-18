@@ -1,0 +1,59 @@
+{{- $cc := .Files.Get "config/mysql8-config-effect-scope.yaml" | fromYaml }}
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: oracle-mysql8.0-config-constraints
+  labels:
+    {{- include "mysql.labels" . | nindent 4 }}
+spec:
+  # configmap reference
+  # tplRef: mysql-3node-tpl-8.0
+  reloadOptions:
+    tplScriptTrigger:
+      sync: true
+      scriptConfigMapRef: oracle-mysql8.0-reload-script
+      namespace: {{ .Release.Namespace }}
+
+  # top level mysql configuration type
+  cfgSchemaTopLevelName: MysqlParameter
+
+  # ConfigurationSchema that impose restrictions on engine parameter's rule
+  configurationSchema:
+    # schema: auto generate from mmmcue scripts
+    # example: ../../pkg/configuration/testdata/mysql_openapi.json
+    cue: |-
+      {{- .Files.Get "config/mysql8-config-constraint.cue" | nindent 6 }}
+
+  ## define static parameter list
+  {{- if hasKey $cc "staticParameters" }}
+  staticParameters:
+    {{- $params := get $cc "staticParameters" }}
+    {{- range $params }}
+    - {{ . }}
+    {{- end }}
+  {{- end}}
+
+  ## define dynamic parameter list
+  {{- if hasKey $cc "dynamicParameters" }}
+  dynamicParameters:
+   {{- $params := get $cc "dynamicParameters" }}
+   {{- range $params }}
+    - {{ . }}
+   {{- end }}
+ {{- end}}
+
+ ## define immutable parameter list, this feature is not currently supported.
+ {{- if hasKey $cc "immutableParameters" }}
+  immutableParameters:
+   {{- $params := get $cc "immutableParameters" }}
+   {{- range $params }}
+    - {{ . }}
+   {{- end }}
+ {{- end}}
+
+
+  # mysql configuration file format
+  formatterConfig:
+    format: ini
+    iniConfig:
+      sectionName: mysqld

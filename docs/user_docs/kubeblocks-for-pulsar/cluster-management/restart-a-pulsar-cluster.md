@@ -35,23 +35,23 @@ Restarting a Kafka cluster triggers a concurrent restart and the leader may chan
    - `components` describes the component name that needs to be restarted.
    - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
 
-   **Option 2.** Create an OpsRequest
+  **Option 2.** Create an OpsRequest
 
-   Run the command below to apply the restarting to a cluster.
+  Run the command below to apply the restarting to a cluster.
 
-   ```bash
-   kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     name: ops-restart
-   spec:
-     clusterRef: pulsar
-     type: Restart 
-     restart:
-     - componentName: pulsar
-   EOF
-   ```
+  ```bash
+  kubectl apply -f - <<EOF
+  apiVersion: apps.kubeblocks.io/v1alpha1
+  kind: OpsRequest
+  metadata:
+    name: ops-restart
+  spec:
+    clusterRef: pulsar
+    type: Restart 
+    restart:
+    - componentName: pulsar
+  EOF
+  ```
 
 2. Validate the restarting.
 

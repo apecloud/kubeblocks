@@ -237,7 +237,7 @@ spec:
                     key: password
                     optional: false
           - name: pgbouncer
-            image: {{ .Values.pgbouncer.image.registry | default "docker.io" }}/{{ .Values.pgbouncer.image.repository }}:{{ default .Values.pgbouncer.image.tag }}
+            image: {{ .Values.pgbouncer.image.registry | default .Values.image.registry }}/{{ .Values.pgbouncer.image.repository }}:{{ default .Values.pgbouncer.image.tag }}
             imagePullPolicy: {{ .Values.pgbouncer.image.pullPolicy | quote }}
             securityContext:
               runAsUser: 0
@@ -294,7 +294,7 @@ spec:
               - name: PGBOUNCER_BIND_ADDRESS
                 value: "0.0.0.0"
           - name: metrics
-            image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            image:  {{ .Values.metrics.image.registry | default .Values.image.registry }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
             securityContext:
               runAsUser: 0

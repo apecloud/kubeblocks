@@ -7,13 +7,15 @@ image:
 imageDev:
   repository: apecloud/llama-cpp-python
   pullPolicy: IfNotPresent
-  registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+  # if the value of imageDev.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
+  registry: ""
   # Overrides the image tag whose default is the chart appVersion.
   tag: latest
   tagNew: latest-new
   tagCodeShell: latest-codeshell
 model:
-  registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+  # if the value of model.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
+  registry: ""
   baichuan2_7b:
       ggml:
         repository: apecloud/baichuan2-7b-gguf

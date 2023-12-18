@@ -40,7 +40,8 @@ dataMountPath: /data/mongodb
 
 metrics:
   image:
-    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+    # if the value of metrics.image.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
+    registry: ""
     repository: apecloud/agamotto
     tag: 0.1.2-beta.1
     pullPolicy: IfNotPresent

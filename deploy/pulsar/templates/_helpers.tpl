@@ -55,14 +55,14 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 Create full image name
 */}}
 {{- define "pulsar.imageFullName" -}}
-{{- printf "%s/%s:%s" ( .image.registry | default .root.Values.defaultPulsarImage.registry ) ( .image.repository | default .root.Values.defaultPulsarImage.repository ) ( .image.tag | default .root.Values.defaultPulsarImage.tag | default .root.Chart.AppVersion ) -}}
+{{- printf "%s/%s:%s" ( .image.registry | default .root.Values.image.registry ) ( .image.repository | default .root.Values.image.repository ) ( .image.tag | default .root.Values.image.tag | default .root.Chart.AppVersion ) -}}
 {{- end -}}
 
 {{/*
 Create image pull policy
 */}}
 {{- define "pulsar.imagePullPolicy" -}}
-{{- printf "%s" ( .image.pullPolicy | default .root.Values.defaultPulsarImage.pullPolicy | default "IfNotPresent" ) -}}
+{{- printf "%s" ( .image.pullPolicy | default .root.Values.image.pullPolicy | default "IfNotPresent" ) -}}
 {{- end -}}
 
 {{/*

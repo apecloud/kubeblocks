@@ -65,6 +65,11 @@ func (in *Affinity) DeepCopy() *Affinity {
 func (in *BackupMethod) DeepCopyInto(out *BackupMethod) {
 	*out = *in
 	in.BackupMethod.DeepCopyInto(&out.BackupMethod)
+	if in.Target != nil {
+		in, out := &in.Target, &out.Target
+		*out = new(TargetInstance)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.EnvMapping != nil {
 		in, out := &in.EnvMapping, &out.EnvMapping
 		*out = make([]EnvMappingVar, len(*in))

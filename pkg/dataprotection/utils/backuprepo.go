@@ -26,6 +26,7 @@ import (
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -118,7 +119,7 @@ func injectDatasafedInstaller(podSpec *corev1.PodSpec) {
 		Command:         []string{"/bin/sh", "-c", fmt.Sprintf("/scripts/install-datasafed.sh %s", datasafedBinMountPath)},
 		VolumeMounts:    []corev1.VolumeMount{sharedVolumeMount},
 	}
-
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&initContainer)
 	podSpec.InitContainers = append(podSpec.InitContainers, initContainer)
 	injectElements(podSpec, toSlice(sharedVolume), toSlice(sharedVolumeMount), toSlice(env))
 }

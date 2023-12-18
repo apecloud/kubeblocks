@@ -82,9 +82,9 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 
 func (t *clusterServiceTransformer) genMultiServicesIfNeed(transCtx *clusterTransformContext,
 	cluster *appsv1alpha1.Cluster, service *appsv1alpha1.Service) ([]*appsv1alpha1.Service, error) {
-	serviceName := constant.GenerateClusterServiceName(cluster.Name, service.ServiceName)
-	service.ServiceName = serviceName
 	if !service.GeneratePodOrdinalService {
+		serviceName := constant.GenerateClusterServiceName(cluster.Name, service.ServiceName)
+		service.ServiceName = serviceName
 		return []*appsv1alpha1.Service{service}, nil
 	}
 
@@ -110,7 +110,12 @@ func (t *clusterServiceTransformer) genMultiServicesIfNeed(transCtx *clusterTran
 	for i := int32(0); i < compReplicas; i++ {
 		svc := service.DeepCopy()
 		svc.Name = fmt.Sprintf("%s-%d", service.Name, i)
-		svc.ServiceName = fmt.Sprintf("%s-%d", service.ServiceName, i)
+		if len(service.ServiceName) == 0 {
+			serviceName := constant.GenerateClusterServiceName(cluster.Name, compName)
+			svc.ServiceName = fmt.Sprintf("%s-%d", serviceName, i)
+		} else {
+			svc.ServiceName = fmt.Sprintf("%s-%d", service.ServiceName, i)
+		}
 		if svc.Spec.Selector == nil {
 			svc.Spec.Selector = make(map[string]string)
 		}

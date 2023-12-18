@@ -391,7 +391,7 @@ func createConfigPatch(cfg *corev1.ConfigMap, formatter *appsv1alpha1.FormatterC
 
 func updateConfigSchema(cc *appsv1alpha1.ConfigConstraint, cli client.Client, ctx context.Context) error {
 	schema := cc.Spec.ConfigurationSchema
-	if schema == nil || schema.CUE == "" || schema.Schema != nil {
+	if schema == nil || schema.CUE == "" {
 		return nil
 	}
 
@@ -401,6 +401,9 @@ func updateConfigSchema(cc *appsv1alpha1.ConfigConstraint, cli client.Client, ct
 		return err
 	}
 	if openAPISchema == nil {
+		return nil
+	}
+	if reflect.DeepEqual(openAPISchema, schema.Schema) {
 		return nil
 	}
 

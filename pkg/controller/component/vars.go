@@ -315,7 +315,7 @@ func resolveClusterObjectRefVars(ctx context.Context, cli client.Reader, synthes
 			}
 			if len(val2) > 0 {
 				for i := range val2 {
-					vars1 = append(vars1, *val2[i])
+					vars2 = append(vars2, *val2[i])
 				}
 			}
 		default:

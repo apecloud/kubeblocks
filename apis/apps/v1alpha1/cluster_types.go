@@ -72,10 +72,14 @@ type ClusterSpec struct {
 	// +optional
 	Services []Service `json:"services,omitempty"`
 
-	// connectionCredentials defines the credentials used to access a cluster.
+	// affinity is a group of affinity scheduling rules.
+	// +optional
+	Affinity *Affinity `json:"affinity,omitempty"`
+
+	// tolerations are attached to tolerate any taint that matches the triple `key,value,effect` using the matching operator `operator`.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
-	ConnectionCredentials []ConnectionCredential `json:"connectionCredentials,omitempty"`
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
 	// tenancy describes how pods are distributed across node.
 	// SharedNode means multiple pods may share the same node.
@@ -86,15 +90,6 @@ type ClusterSpec struct {
 	// availabilityPolicy describes the availability policy, including zone, node, and none.
 	// +optional
 	AvailabilityPolicy AvailabilityPolicyType `json:"availabilityPolicy,omitempty"`
-
-	// affinity is a group of affinity scheduling rules.
-	// +optional
-	Affinity *Affinity `json:"affinity,omitempty"`
-
-	// tolerations are attached to tolerate any taint that matches the triple `key,value,effect` using the matching operator `operator`.
-	// +kubebuilder:pruning:PreserveUnknownFields
-	// +optional
-	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
 	// replicas specifies the replicas of the first componentSpec, if the replicas of the first componentSpec is specified, this value will be ignored.
 	// +optional

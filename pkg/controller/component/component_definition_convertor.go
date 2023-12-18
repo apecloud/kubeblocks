@@ -56,7 +56,6 @@ func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterCo
 		"labels":                 &compDefLabelsConvertor{},
 		"replicasLimit":          &compDefReplicasLimitConvertor{},
 		"systemaccounts":         &compDefSystemAccountsConvertor{},
-		"connectioncredentials":  &compDefConnCredentialsConvertor{},
 		"updatestrategy":         &compDefUpdateStrategyConvertor{},
 		"roles":                  &compDefRolesConvertor{},
 		"rolearbitrator":         &compDefRoleArbitratorConvertor{},
@@ -322,13 +321,6 @@ func (c *compDefSystemAccountsConvertor) convert(args ...any) (any, error) {
 		}
 	}
 	return accounts, nil
-}
-
-// compDefConnCredentialsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.ConnectionCredentials.
-type compDefConnCredentialsConvertor struct{}
-
-func (c *compDefConnCredentialsConvertor) convert(args ...any) (any, error) {
-	return nil, nil
 }
 
 // compDefUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.UpdateStrategy.

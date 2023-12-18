@@ -319,9 +319,6 @@ var _ = Describe("Cluster Controller", func() {
 		})).Should(Succeed())
 	}
 
-	testClusterCredential := func(compName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory))) {
-	}
-
 	testClusterAffinityNToleration := func(compName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory))) {
 		const (
 			clusterTopologyKey     = "testClusterTopologyKey"
@@ -750,10 +747,6 @@ var _ = Describe("Cluster Controller", func() {
 
 			It("with cluster service set", func() {
 				testClusterService(consensusCompName, compDefName, createObj)
-			})
-
-			It("with cluster credential set", func() {
-				testClusterCredential(consensusCompName, compDefName, createObj)
 			})
 
 			It("with cluster affinity and toleration set", func() {

@@ -72,6 +72,10 @@ type BackupPolicy struct {
 type BackupMethod struct {
 	dpv1alpha1.BackupMethod `json:",inline"`
 
+	// target instance for backup.
+	// +optional
+	Target *TargetInstance `json:"target"`
+
 	// envMapping defines the variables of cluster mapped to env values' keys.
 	// +optional
 	EnvMapping []EnvMappingVar `json:"envMapping,omitempty"`
@@ -154,6 +158,13 @@ type TargetInstance struct {
 	// which created by spec.ConnectionCredential of the ClusterDefinition.
 	// it will be ignored when "account" is set.
 	ConnectionCredentialKey ConnectionCredentialKey `json:"connectionCredentialKey,omitempty"`
+
+	// selectionStrategy specifies the strategy to select the target pod when multiple pods
+	// are selected.
+	// Valid values are:
+	// - Any: select any one pod that match the labelsSelector.
+	// - All: selects all pods that match the labelsSelector.
+	SelectionStrategy dpv1alpha1.PodSelectionStrategy `json:"selectionStrategy,omitempty"`
 }
 
 type ConnectionCredentialKey struct {
@@ -171,7 +182,6 @@ type ConnectionCredentialKey struct {
 	HostKey *string `json:"hostKey,omitempty"`
 
 	// portKey specifies the map key of the port in the connection credential secret.
-	// +kubebuilder:default=port
 	PortKey *string `json:"portKey,omitempty"`
 }
 

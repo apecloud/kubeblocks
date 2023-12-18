@@ -512,6 +512,7 @@ spec:
                               labelsSelector.'
                             enum:
                             - Any
+                            - All
                             type: string
                         type: object
                         x-kubernetes-map-type: atomic
@@ -783,6 +784,7 @@ spec:
                           are: - Any: select any one pod that match the labelsSelector.'
                         enum:
                         - Any
+                        - All
                         type: string
                     type: object
                     x-kubernetes-map-type: atomic

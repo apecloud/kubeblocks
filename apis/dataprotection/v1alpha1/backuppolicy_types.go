@@ -84,7 +84,7 @@ type PodSelector struct {
 
 // PodSelectionStrategy specifies the strategy to select when multiple pods are
 // selected for backup target
-// +kubebuilder:validation:Enum=Any
+// +kubebuilder:validation:Enum={Any,All}
 type PodSelectionStrategy string
 
 const (

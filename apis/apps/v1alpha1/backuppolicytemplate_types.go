@@ -72,6 +72,10 @@ type BackupPolicy struct {
 type BackupMethod struct {
 	dpv1alpha1.BackupMethod `json:",inline"`
 
+	// target instance for backup.
+	// +optional
+	Target *TargetInstance `json:"target"`
+
 	// envMapping defines the variables of cluster mapped to env values' keys.
 	// +optional
 	EnvMapping []EnvMappingVar `json:"envMapping,omitempty"`
@@ -171,7 +175,6 @@ type ConnectionCredentialKey struct {
 	HostKey *string `json:"hostKey,omitempty"`
 
 	// portKey specifies the map key of the port in the connection credential secret.
-	// +kubebuilder:default=port
 	PortKey *string `json:"portKey,omitempty"`
 }
 

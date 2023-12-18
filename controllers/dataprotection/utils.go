@@ -129,12 +129,25 @@ func HandleBackupRepo(request *dpbackup.Request) error {
 // pods which are selected by BackupPolicy selector and strategy.
 func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 	cli client.Client, podName string,
-	backupPolicy *dpv1alpha1.BackupPolicy) ([]*corev1.Pod, error) {
-	selector := backupPolicy.Spec.Target.PodSelector
-	if selector == nil || selector.LabelSelector == nil {
+	backupMethod *dpv1alpha1.BackupMethod,
+	backupPolicy *dpv1alpha1.BackupPolicy,
+) ([]*corev1.Pod, error) {
+	if backupMethod == nil {
 		return nil, nil
 	}
-
+	existPodSelector := func(selector *dpv1alpha1.PodSelector) bool {
+		return selector != nil && selector.LabelSelector != nil
+	}
+	var selector *dpv1alpha1.PodSelector
+	if backupMethod.Target != nil && existPodSelector(backupMethod.Target.PodSelector) {
+		selector = backupMethod.Target.PodSelector
+	} else {
+		// using global target policy.
+		selector = backupPolicy.Spec.Target.PodSelector
+		if !existPodSelector(selector) {
+			return nil, nil
+		}
+	}
 	labelSelector, err := metav1.LabelSelectorAsSelector(selector.LabelSelector)
 	if err != nil {
 		return nil, err

@@ -158,13 +158,6 @@ type TargetInstance struct {
 	// which created by spec.ConnectionCredential of the ClusterDefinition.
 	// it will be ignored when "account" is set.
 	ConnectionCredentialKey ConnectionCredentialKey `json:"connectionCredentialKey,omitempty"`
-
-	// selectionStrategy specifies the strategy to select the target pod when multiple pods
-	// are selected.
-	// Valid values are:
-	// - Any: select any one pod that match the labelsSelector.
-	// - All: selects all pods that match the labelsSelector.
-	SelectionStrategy dpv1alpha1.PodSelectionStrategy `json:"selectionStrategy,omitempty"`
 }
 
 type ConnectionCredentialKey struct {

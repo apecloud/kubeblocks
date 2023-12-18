@@ -439,9 +439,6 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(targetTpl appsv1alpha
 		ConnectionCredential: &cc,
 		ServiceAccountName:   getSAName(),
 	}
-	if targetTpl.SelectionStrategy != "" {
-		target.PodSelector.Strategy = targetTpl.SelectionStrategy
-	}
 	return target
 }
 

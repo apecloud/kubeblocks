@@ -74,7 +74,7 @@ func GetHa() *Ha {
 func (ha *Ha) RunCycle() {
 	cluster, err := ha.dcs.GetCluster()
 	if err != nil {
-		ha.logger.Error(err, "Get Cluster err")
+		ha.logger.Error(err, "Get Cluster failed")
 		return
 	}
 
@@ -91,7 +91,7 @@ func (ha *Ha) RunCycle() {
 	}
 
 	if !ha.dbManager.IsRunning() {
-		ha.logger.Info("DB Service is not running,  wait for lorryCtl to start it")
+		ha.logger.Info("DB Service is not running,  wait for hypervisor to start it")
 		if ha.dcs.HasLease() {
 			_ = ha.dcs.ReleaseLease()
 		}
@@ -125,18 +125,24 @@ func (ha *Ha) RunCycle() {
 
 	case !cluster.IsLocked():
 		ha.logger.Info("Cluster has no leader, attempt to take the leader")
-		if ha.IsHealthiestMember(ha.ctx, cluster) {
-			cluster.Leader.DBState = DBState
-			if ha.dcs.AttemptAcquireLease() == nil {
-				err = ha.dbManager.Promote(ha.ctx, cluster)
-				if err != nil {
-					ha.logger.Error(err, "Take the leader failed")
-					_ = ha.dcs.ReleaseLease()
-				} else {
-					ha.logger.Info("Take the leader success!")
-				}
-			}
+		if !ha.IsHealthiestMember(ha.ctx, cluster) {
+			break
 		}
+
+		cluster.Leader.DBState = DBState
+		if ha.dcs.AttemptAcquireLease() != nil {
+			break
+		}
+
+		err := ha.dbManager.Promote(ha.ctx, cluster)
+		if err != nil {
+			ha.logger.Error(err, "Take the leader failed")
+			_ = ha.dcs.ReleaseLease()
+			break
+		}
+
+		ha.logger.Info("Take the leader success!")
+		fallthrough
 
 	case ha.dcs.HasLease():
 		ha.logger.Info("This member is Cluster's leader")
@@ -191,25 +197,33 @@ func (ha *Ha) RunCycle() {
 		// currentMemberIsLeader, _ := ha.dbManager.IsLeader(context.TODO(), cluster)
 		// if lockOwnerIsLeader && currentMemberIsLeader {
 		// ha.logger.Info("Lock owner is real Leader, demote myself and follow the real leader")
-		_ = ha.dbManager.Demote(ha.ctx)
-		_ = ha.dbManager.Follow(ha.ctx, cluster)
+		err = ha.dbManager.Demote(ha.ctx)
+		if err != nil {
+			ha.logger.Info("promote failed", "error", err)
+		}
+
+		err = ha.dbManager.Follow(ha.ctx, cluster)
+		if err != nil {
+			ha.logger.Info("follow failed", "error", err)
+		}
 	}
 }
 
 func (ha *Ha) Start() {
 	ha.logger.Info("HA starting")
 	cluster, err := ha.dcs.GetCluster()
-	if cluster == nil {
-		ha.logger.Error(err, "Get Cluster error, so HA exists.", "cluster-name", ha.dcs.GetClusterName())
-		return
+	for cluster == nil {
+		ha.logger.Error(err, "Get Cluster failed.", "cluster-name", ha.dcs.GetClusterName())
+		time.Sleep(10 * time.Second)
+		cluster, err = ha.dcs.GetCluster()
 	}
 
-	// isPodReady, err := ha.IsPodReady()
-	// for err != nil || !isPodReady {
-	//	ha.logger.Info("Waiting for dns resolution to be ready")
-	//	time.Sleep(3 * time.Second)
-	//	isPodReady, err = ha.IsPodReady()
-	// }
+	isPodReady, err := ha.IsPodReady()
+	for err != nil || !isPodReady {
+		ha.logger.Info("Waiting for dns resolution to be ready")
+		time.Sleep(3 * time.Second)
+		isPodReady, err = ha.IsPodReady()
+	}
 	ha.logger.Info("dns resolution is ready")
 
 	ha.logger.Info(fmt.Sprintf("cluster: %v", cluster))
@@ -261,8 +275,12 @@ func (ha *Ha) Start() {
 	}
 
 	for {
+		startAt := time.Now()
 		ha.RunCycle()
-		time.Sleep(10 * time.Second)
+		duration := time.Since(startAt)
+		if duration < 10*time.Second {
+			time.Sleep(10*time.Second - duration)
+		}
 	}
 }
 

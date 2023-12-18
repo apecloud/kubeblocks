@@ -100,5 +100,4 @@ NAME                                            READY   STATUS    RESTARTS      
 kb-addon-snapshot-controller-649f8b9949-2wzzk   1/1     Running   2 (24m ago)   147d
 kubeblocks-dataprotection-f6dbdbf7f-5fdr9       1/1     Running   2 (24m ago)   147d
 kubeblocks-6497f7947-mc7vc                      1/1     Running   2 (24m ago)   147d
-crystaljccz@CrystalJCCZdeMacBook-Pro ~ % 
 ```

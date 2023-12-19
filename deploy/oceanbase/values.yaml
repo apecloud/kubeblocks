@@ -3,12 +3,12 @@
 # Declare variables to be passed into your templates.
 
 images:
-  registry: oceanbasedev
+  registry: docker.io
   pullPolicy: IfNotPresent
   observer:
-    repository: oceanbase-chart
+    repository: oceanbasedev/oceanbase-chart
     tag: 4.2.0.0-100010032023083021
 
 nameOverride: ""
 fullnameOverride: ""
-clusterVersionOverride: "4.2.0.0-100010032023083021"
+clusterVersionOverride: ""

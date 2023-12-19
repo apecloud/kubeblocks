@@ -21,7 +21,6 @@ package apps
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -39,10 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
-)
-
-var (
-	errReqClusterObj = errors.New("required arg *appsv1alpha1.Cluster is nil")
 )
 
 // GetClusterByObject gets cluster by related k8s workloads.

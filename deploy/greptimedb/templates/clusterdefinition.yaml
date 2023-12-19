@@ -56,7 +56,7 @@ spec:
       podSpec:
         initContainers:
           - name: wait-datanode
-            image: busybox:1.28
+            image: busybox:1.35
             imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
             command:
               - bin/sh
@@ -191,7 +191,7 @@ spec:
         dnsPolicy: ClusterFirst
         initContainers:
           - name: wait-meta
-            image: busybox:1.28
+            image: busybox:1.35
             imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
             command:
               - bin/sh
@@ -264,7 +264,7 @@ spec:
       podSpec:
         initContainers:
           - name: wait-etcd
-            image: busybox:1.28
+            image: busybox:1.35
             imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
             command:
               - bin/sh
@@ -352,7 +352,7 @@ spec:
       podSpec:
         initContainers:
           - name: volume-permissions
-            image: busybox:1.28
+            image: busybox:1.35
             imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
             command:
               - /bin/sh

@@ -106,7 +106,7 @@ backupTool:
   image:
     registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
     repository: apecloud/apecloud-xtrabackup
-    tag: latest
+    tag: 8.0
     pullPolicy: IfNotPresent
 
 wesqlscale:

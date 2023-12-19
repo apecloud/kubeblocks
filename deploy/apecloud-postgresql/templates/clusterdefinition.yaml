@@ -57,7 +57,7 @@ spec:
       podSpec:
         initContainers:
           - name: init-permissions
-            image: busybox
+            image: busybox:1.35
             securityContext:
               runAsUser: 0
             command: [ "chmod", "a+w", "/postgresql" ]

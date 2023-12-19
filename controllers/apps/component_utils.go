@@ -95,48 +95,6 @@ func getClusterComponentSpecByName(cluster appsv1alpha1.Cluster, compSpecName st
 	return nil
 }
 
-// initClusterComponentStatusIfNeed Initialize the state of the corresponding component in cluster.status.components
-func initClusterComponentStatusIfNeed(
-	cluster *appsv1alpha1.Cluster,
-	componentName string,
-	workloadType appsv1alpha1.WorkloadType) error {
-	if cluster == nil {
-		return errReqClusterObj
-	}
-
-	// REVIEW: should have following removed
-	// if _, ok := cluster.Status.Components[componentName]; !ok {
-	// 	cluster.Status.SetComponentStatus(componentName, appsv1alpha1.ClusterComponentStatus{
-	// 		Phase: cluster.Status.Phase,
-	// 	})
-	// }
-	componentStatus := cluster.Status.Components[componentName]
-	switch workloadType {
-	case appsv1alpha1.Consensus:
-		if componentStatus.ConsensusSetStatus != nil {
-			break
-		}
-		componentStatus.ConsensusSetStatus = &appsv1alpha1.ConsensusSetStatus{
-			Leader: appsv1alpha1.ConsensusMemberStatus{
-				Pod:        constant.ComponentStatusDefaultPodName,
-				AccessMode: appsv1alpha1.None,
-				Name:       "",
-			},
-		}
-	case appsv1alpha1.Replication:
-		if componentStatus.ReplicationSetStatus != nil {
-			break
-		}
-		componentStatus.ReplicationSetStatus = &appsv1alpha1.ReplicationSetStatus{
-			Primary: appsv1alpha1.ReplicationMemberStatus{
-				Pod: constant.ComponentStatusDefaultPodName,
-			},
-		}
-	}
-	cluster.Status.SetComponentStatus(componentName, componentStatus)
-	return nil
-}
-
 // getCompRelatedObjectList gets the related pods and workloads of the component
 func getCompRelatedObjectList(ctx context.Context,
 	cli client.Client,

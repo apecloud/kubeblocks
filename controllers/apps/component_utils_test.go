@@ -104,18 +104,6 @@ var _ = Describe("Component Utils", func() {
 			newCluster, _ := GetClusterByObject(ctx, k8sClient, sts)
 			Expect(newCluster != nil).Should(BeTrue())
 
-			By("test consensusSet initClusterComponentStatusIfNeed function")
-			err := initClusterComponentStatusIfNeed(cluster, consensusCompName, appsv1alpha1.Consensus)
-			Expect(err).Should(Succeed())
-			Expect(cluster.Status.Components[consensusCompName].ConsensusSetStatus).ShouldNot(BeNil())
-			Expect(cluster.Status.Components[consensusCompName].ConsensusSetStatus.Leader.Pod).Should(Equal(constant.ComponentStatusDefaultPodName))
-
-			By("test replicationSet initClusterComponentStatusIfNeed function")
-			err = initClusterComponentStatusIfNeed(cluster, consensusCompName, appsv1alpha1.Replication)
-			Expect(err).Should(Succeed())
-			Expect(cluster.Status.Components[consensusCompName].ReplicationSetStatus).ShouldNot(BeNil())
-			Expect(cluster.Status.Components[consensusCompName].ReplicationSetStatus.Primary.Pod).Should(Equal(constant.ComponentStatusDefaultPodName))
-
 			By("test getObjectListByComponentName function")
 			stsList := &appsv1.StatefulSetList{}
 			_ = component.GetObjectListByComponentName(ctx, k8sClient, *cluster, stsList, consensusCompName)

@@ -217,9 +217,6 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 
 	copyAndMergePod := func(oldPod, newPod *corev1.Pod) client.Object {
-		//oldPod.Annotations = mergeMetadataMap(oldPod.Annotations, newPod.Annotations)
-		//oldPod.Labels = mergeMetadataMap(oldPod.Labels, newPod.Labels)
-
 		oldPod.Spec.ActiveDeadlineSeconds = newPod.Spec.ActiveDeadlineSeconds
 		for idx := range oldPod.Spec.Containers {
 			oldPod.Spec.Containers[idx].Image = newPod.Spec.Containers[idx].Image

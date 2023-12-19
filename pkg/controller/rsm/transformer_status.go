@@ -67,20 +67,7 @@ func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *gra
 			rsm.Status.ReadyReplicas = int32(readyReplicasCount)
 			rsm.Status.AvailableReplicas = int32(availableReplicasCount)
 			rsm.Status.UpdatedReplicas = rsm.Status.Replicas
-			//if len(pods.Items) > 0 {
-			//	for idx := range pods.Items {
-			//		pod := pods.Items[idx]
-			//		if currentGenerationLabel, ok := pod.Labels[rsmGenerationLabelKey]; ok {
-			//			currentGeneration, err := strconv.ParseInt(currentGenerationLabel, 10, 64)
-			//			if err != nil {
-			//				return err
-			//			}
-			//			if rsm.Status.CurrentGeneration < currentGeneration {
-			//				rsm.Status.CurrentGeneration = currentGeneration
-			//			}
-			//		}
-			//	}
-			//}
+
 			// update role fields
 			setMembersStatus(rsm, pods.Items)
 		} else {

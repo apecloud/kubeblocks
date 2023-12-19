@@ -17,27 +17,30 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package operations
+package replica
 
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
+	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
+	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type Switchover struct {
-	Base
+	operations.Base
 	dcsStore dcs.DCS
 }
 
-var switchover Operation = &Switchover{}
+var switchover operations.Operation = &Switchover{}
 
 func init() {
-	err := Register("switchover", switchover)
+	err := operations.Register(strings.ToLower(string(util.SwitchoverOperation)), switchover)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -52,7 +55,7 @@ func (s *Switchover) Init(_ context.Context) error {
 	return nil
 }
 
-func (s *Switchover) PreCheck(ctx context.Context, req *OpsRequest) error {
+func (s *Switchover) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
 	primary := req.GetString("primary")
 	candidate := req.GetString("candidate")
 	if primary == "" && candidate == "" {
@@ -62,6 +65,10 @@ func (s *Switchover) PreCheck(ctx context.Context, req *OpsRequest) error {
 	cluster, err := s.dcsStore.GetCluster()
 	if cluster == nil {
 		return errors.Wrap(err, "get cluster failed")
+	}
+
+	if cluster.HaConfig == nil || !cluster.HaConfig.IsEnable() {
+		return errors.New("cluster's ha is disabled")
 	}
 
 	manager, err := register.GetDBManager()
@@ -100,7 +107,7 @@ func (s *Switchover) PreCheck(ctx context.Context, req *OpsRequest) error {
 	return nil
 }
 
-func (s *Switchover) Do(_ context.Context, req *OpsRequest) (*OpsResponse, error) {
+func (s *Switchover) Do(_ context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
 	primary := req.GetString("primary")
 	candidate := req.GetString("candidate")
 	err := s.dcsStore.CreateSwitchover(primary, candidate)

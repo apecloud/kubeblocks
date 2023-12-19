@@ -58,9 +58,26 @@ func NewClient(characterType string, pod corev1.Pod) (Client, error) {
 		// As the service does not run as a pod in the Kubernetes cluster,
 		// it is unable to call the lorry service running as a pod using the pod's IP address.
 		// In this scenario, it is recommended to use an k8s exec client instead.
-		return NewK8sExecClientWithPod(&pod)
+		execClient, err := NewK8sExecClientWithPod(&pod)
+		if err != nil {
+			return nil, err
+		}
+		if execClient != nil {
+			return execClient, nil
+		}
+		return nil, nil
 	}
-	return NewHTTPClientWithPod(&pod)
+
+	httpClient, err := NewHTTPClientWithPod(&pod)
+	if err != nil {
+		return nil, err
+	}
+	if httpClient != nil {
+		return httpClient, nil
+	}
+
+	// return Client as nil explicitly to indicate that Client interface is nil
+	return nil, nil
 }
 
 type Requester interface {

@@ -11,8 +11,8 @@
 {{- end }}
 {{- $etcd_server := "" }}
 {{- if $orioledb_etcd_from_service_ref }}
-  {{- if and (index $orioledb_etcd_from_service_ref.spec "endpoint") (index $orioledb_etcd_from_service_ref.spec "port") }}
-     {{- $etcd_server = printf "%s:%s" $orioledb_etcd_from_service_ref.spec.endpoint.value $orioledb_etcd_from_service_ref.spec.port.value }}
+  {{- if (index $orioledb_etcd_from_service_ref.spec "endpoint") }}
+     {{- $etcd_server = printf "%s" $orioledb_etcd_from_service_ref.spec.endpoint.value }}
   {{- end }}
 {{- end }}
 export PATRONI_ETCD3_HOST={{ $etcd_server }}

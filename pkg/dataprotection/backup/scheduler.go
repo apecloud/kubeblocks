@@ -126,7 +126,6 @@ func (s *Scheduler) buildCronJob(
 			Labels:    map[string]string{},
 		},
 		Spec: batchv1.CronJobSpec{
-			Schedule:                   schedulePolicy.CronExpression,
 			SuccessfulJobsHistoryLimit: &successfulJobsHistoryLimit,
 			FailedJobsHistoryLimit:     &failedJobsHistoryLimit,
 			ConcurrencyPolicy:          batchv1.ForbidConcurrent,
@@ -139,6 +138,22 @@ func (s *Scheduler) buildCronJob(
 				},
 			},
 		},
+	}
+
+	// Get kubernetes version, and set the schedule time zone by kubernetes version
+	// For kubernetes version >= 1.25, the timeZone field is supported.
+	// Ref https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones
+	//
+	// For kubernetes version < 1.25 and greater than 1.21, the timeZone field is not
+	// supported, so we need to set the CRON_TZ environment variable.
+	// Ref https://github.com/kubernetes/kubernetes/issues/47202#issuecomment-901294870
+	timeZone := "UTC"
+	major, minor, _ := dputils.GetKubeVersion()
+	if major >= 1 && minor >= 25 {
+		cronjob.Spec.Schedule = schedulePolicy.CronExpression
+		cronjob.Spec.TimeZone = &timeZone
+	} else {
+		cronjob.Spec.Schedule = fmt.Sprintf("CRON_TZ=%s %s", timeZone, schedulePolicy.CronExpression)
 	}
 
 	controllerutil.AddFinalizer(cronjob, dptypes.DataProtectionFinalizerName)

@@ -9,7 +9,7 @@ spec:
   backupPolicies:
   - componentDefRef: mysql
     target:
-      role: primary
+      role: secondary
     backupMethods:
     - name: xtrabackup
       snapshotVolumes: false
@@ -31,10 +31,10 @@ spec:
       actionSetName: mysql-volumesnapshot
       targetVolumes:
         volumes:
-          - data
+        - data
         volumeMounts:
-          - name: data
-            mountPath: {{ .Values.dataMountPath }}
+        - name: data
+          mountPath: {{ .Values.dataMountPath }}
     schedules:
     - backupMethod: xtrabackup
       enabled: false

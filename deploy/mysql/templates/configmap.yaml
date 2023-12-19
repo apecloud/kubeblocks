@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql8.0.33-config-template
+  labels:
+    {{- include "mysql.labels" . | nindent 4 }}
+data:
+  my.cnf: |-
+    {{- .Files.Get "config/mysql-config.tpl" | nindent 4 }}

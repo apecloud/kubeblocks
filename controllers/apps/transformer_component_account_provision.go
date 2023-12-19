@@ -33,6 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
 	lorryModel "github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 )
@@ -75,7 +76,7 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 	if err != nil {
 		return err
 	}
-	if lorryCli == nil {
+	if controllerutil.IsNil(lorryCli) {
 		return nil
 	}
 	for _, account := range transCtx.SynthesizeComponent.SystemAccounts {
@@ -205,12 +206,8 @@ func (t *componentAccountProvisionTransformer) provisionAccount(transCtx *compon
 		return nil
 	}
 
-	if err = lorryCli.CreateUser(transCtx.Context, string(username), string(password), ""); err != nil {
-		return err
-	}
-
 	// TODO: re-define the role
-	return lorryCli.GrantUserRole(transCtx.Context, string(username), string(lorryModel.SuperUserRole))
+	return lorryCli.CreateUser(transCtx.Context, string(username), string(password), string(lorryModel.SuperUserRole))
 }
 
 func (t *componentAccountProvisionTransformer) getAccountSecret(ctx graph.TransformContext,

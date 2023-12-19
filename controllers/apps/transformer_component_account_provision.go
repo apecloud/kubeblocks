@@ -185,7 +185,7 @@ func (t *componentAccountProvisionTransformer) buildLorryClient(transCtx *compon
 		return nil, fmt.Errorf("unable to find appropriate pods to create accounts")
 	}
 
-	lorryCli, err := lorry.NewClient("", podList.Items[0])
+	lorryCli, err := lorry.NewClient(podList.Items[0])
 	if err != nil {
 		return nil, err
 	}

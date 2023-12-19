@@ -48,7 +48,7 @@ func GetMockClient() Client {
 	return mockClient
 }
 
-func NewClient(characterType string, pod corev1.Pod) (Client, error) {
+func NewClient(pod corev1.Pod) (Client, error) {
 	if mockClient != nil || mockClientError != nil {
 		return mockClient, mockClientError
 	}

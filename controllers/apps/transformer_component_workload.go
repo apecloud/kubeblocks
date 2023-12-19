@@ -493,7 +493,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		} else if int32(ordinal) < r.synthesizeComp.Replicas {
 			continue
 		}
-		lorryCli, err1 := lorry.NewClient(r.synthesizeComp.CharacterType, *pod)
+		lorryCli, err1 := lorry.NewClient(*pod)
 		if err1 != nil {
 			if err == nil {
 				err = err1

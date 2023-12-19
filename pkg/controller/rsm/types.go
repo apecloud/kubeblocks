@@ -84,7 +84,7 @@ const (
 	roleProbeGRPCPortName         = "probe-grpc-port"
 	grpcHealthProbeBinaryPath     = "/bin/grpc_health_probe"
 	grpcHealthProbeArgsFormat     = "-addr=:%d"
-	defaultActionImage            = "busybox:latest"
+	defaultActionImage            = "busybox:1.35"
 	usernameCredentialVarName     = "KB_RSM_USERNAME"
 	passwordCredentialVarName     = "KB_RSM_PASSWORD"
 	servicePortVarName            = "KB_RSM_SERVICE_PORT"

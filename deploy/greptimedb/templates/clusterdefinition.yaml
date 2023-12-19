@@ -120,7 +120,6 @@ spec:
                 containerPort: 4003
               - name: opentsdb
                 containerPort: 4242
-        serviceAccountName: greptimedb-cluster
         terminationGracePeriodSeconds: 10
         dnsPolicy: ClusterFirst
         restartPolicy: Always
@@ -231,7 +230,6 @@ spec:
                 name: config
               - mountPath: /etc/greptimedb-init
                 name: datanode-config
-        serviceAccountName: greptimedb-cluster
         terminationGracePeriodSeconds: 10
         volumes:
           - emptyDir: {}
@@ -320,7 +318,6 @@ spec:
             env:
               - name: GREPTIMEDB_METASRV__DISABLE_REGION_FAILOVER
                 value: {{ .Values.meta.disableRegionFailover | quote}}
-        serviceAccountName: greptimedb-cluster
         terminationGracePeriodSeconds: 10
         dnsPolicy: ClusterFirst
         restartPolicy: Always
@@ -401,7 +398,7 @@ spec:
                 --listen-client-urls http://0.0.0.0:2379 \
                 --advertise-client-urls http://${MY_PEER}:2379 \
                 --initial-advertise-peer-urls http://${MY_PEER}:2380 \
-                --initial-cluster-token greptimedb-cluster \
+                --initial-cluster-token ${KB_CLUSTER_NAME} \
                 --initial-cluster ${PEERS} \
                 --initial-cluster-state new \
                 --data-dir /var/lib/etcd

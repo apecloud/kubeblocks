@@ -24,6 +24,7 @@ import (
 
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -64,6 +65,9 @@ func (t *clusterComponentStatusTransformer) reconcileComponentsStatus(transCtx *
 		}
 		comp := &appsv1alpha1.Component{}
 		if err := transCtx.Client.Get(transCtx.Context, compKey, comp); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
 			return err
 		}
 		cluster.Status.Components[compSpec.Name] = t.buildClusterCompStatus(transCtx, comp, compSpec.Name)

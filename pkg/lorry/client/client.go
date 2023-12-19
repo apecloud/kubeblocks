@@ -25,6 +25,7 @@ import (
 	"net/http"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/rest"
 
 	. "github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
@@ -50,6 +51,14 @@ func GetMockClient() Client {
 func NewClient(characterType string, pod corev1.Pod) (Client, error) {
 	if mockClient != nil || mockClientError != nil {
 		return mockClient, mockClientError
+	}
+
+	_, err := rest.InClusterConfig()
+	if err != nil {
+		// As the service does not run as a pod in the Kubernetes cluster,
+		// it is unable to call the lorry service running as a pod using the pod's IP address.
+		// In this scenario, it is recommended to use an k8s exec client instead.
+		return NewK8sExecClientWithPod(&pod)
 	}
 	return NewHTTPClientWithPod(&pod)
 }

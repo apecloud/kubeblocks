@@ -132,6 +132,10 @@ func (c *HaConfig) IsEnable() bool {
 	return c.enable
 }
 
+func (c *HaConfig) SetEnable(enable bool) {
+	c.enable = enable
+}
+
 func (c *HaConfig) GetMaxLagOnSwitchover() int64 {
 	return c.maxLagOnSwitchover
 }

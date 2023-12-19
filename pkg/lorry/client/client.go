@@ -135,6 +135,16 @@ func (cli *lorryClient) RevokeUserRole(ctx context.Context, userName, roleName s
 	return err
 }
 
+func (cli *lorryClient) Switchover(ctx context.Context, primary, candidate string) error {
+	parameters := map[string]any{
+		"primary":   primary,
+		"candidate": candidate,
+	}
+	req := map[string]any{"parameters": parameters}
+	_, err := cli.Request(ctx, string(SwitchoverOperation), http.MethodPost, req)
+	return err
+}
+
 // ListUsers lists all normal users created
 func (cli *lorryClient) ListUsers(ctx context.Context) ([]map[string]any, error) {
 	resp, err := cli.Request(ctx, string(ListUsersOp), http.MethodGet, nil)

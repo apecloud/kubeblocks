@@ -2,8 +2,6 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
   name: mysql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
-  annotations:
-    kubeblocks.io/is-default-cluster-version: "true"
   labels:
     {{- include "mysql.labels" . | nindent 4 }}
 spec:
@@ -16,6 +14,11 @@ spec:
         constraintRef: oracle-mysql8.0-config-constraints
         volumeName: mysql-config
         namespace: {{ .Release.Namespace }}
+      - name: agamotto-configuration
+        templateRef: mysql-agamotto-configuration
+        namespace: {{ .Release.Namespace }}
+        volumeName: agamotto-configuration
+        defaultMode: 0444
     versionsContext:
       containers:
       - name: mysql
@@ -34,6 +37,8 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
   name: mysql-8.0.33
+  annotations:
+    kubeblocks.io/is-default-cluster-version: "true"
   annotations:
     kubeblocks.io/is-default-cluster-version: "false"
   labels:

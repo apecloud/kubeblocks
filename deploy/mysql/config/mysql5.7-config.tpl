@@ -122,6 +122,7 @@ binlog_row_image=FULL
 binlog_order_commits=ON
 log-bin={{ $data_root }}/binlog/mysql-bin
 log_bin_index={{ $data_root }}/binlog/mysql-bin.index
+expire_logs_days=7
 max_binlog_size=134217728
 # binlog_rows_query_log_events=ON #AWS not set
 # binlog_transaction_dependency_tracking=WRITESET    #Default Commit Order, Aws not set

@@ -61,9 +61,9 @@ fullnameOverride: ""
 clusterVersionOverride: ""
 
 logConfigs:
-  error: /data/mysql/log/mysqld-error.log
-  slow: /data/mysql/log/mysqld-slowquery.log
-  general: /data/mysql/log/mysqld.log
+  error: /var/lib/mysql/log/mysqld-error.log
+  slow: /var/lib/mysql/log/mysqld-slowquery.log
+  # general: /var/lib/mysql/log/mysqld.log
 
 roleProbe:
   failureThreshold: 2
@@ -81,4 +81,3 @@ metrics:
     port: 9104
 
 dataMountPath: /var/lib/mysql
-

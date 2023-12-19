@@ -31,6 +31,11 @@ spec:
         exporterConfig:
           scrapePath: /metrics
           scrapePort: {{ .Values.metrics.service.port }}
+      logConfigs:
+        {{- range $name,$pattern := .Values.logConfigs }}
+        - name: {{ $name }}
+          filePathPattern: {{ $pattern }}
+        {{- end }}
       configSpecs:
         - name: mysql-replication-config
           templateRef: oracle-mysql8.0-config-template
@@ -51,6 +56,9 @@ spec:
       volumeTypes:
         - name: data
           type: data
+      horizontalScalePolicy:
+        type: CloneVolume
+        backupPolicyTemplateName: mysql-backup-policy-template
       podSpec:
         containers:
           - name: mysql

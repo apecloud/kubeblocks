@@ -1,0 +1,10 @@
+{{- $selectorLabels := include "kubeblocks.selectorLabels" . }}
+{{- include "kubeblocks.buildAddonCR" (merge (dict
+  "kbVersion" ">=0.7.0"
+  "selectorLabels" $selectorLabels
+  "name" "clickhouse"
+  "version" "0.7.0"
+  "model" "RDBMS"
+  "provider" "community"
+  "description" "ClickHouse is an open-source column-oriented OLAP database management system. Use it to boost your database performance while providing linear scalability and hardware efficiency."
+  "autoInstall" false) . ) -}}

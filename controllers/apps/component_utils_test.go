@@ -115,10 +115,6 @@ var _ = Describe("Component Utils", func() {
 			_ = getObjectListByCustomLabels(ctx, k8sClient, *cluster, stsList, client.MatchingLabels(matchLabel))
 			Expect(len(stsList.Items) > 0).Should(BeTrue())
 
-			By("test getClusterComponentSpecByName function")
-			clusterComp := getClusterComponentSpecByName(*cluster, consensusCompName)
-			Expect(clusterComp).ShouldNot(BeNil())
-
 			By("test GetComponentStsMinReadySeconds")
 			minReadySeconds, _ := component.GetComponentWorkloadMinReadySeconds(ctx, k8sClient, *cluster,
 				appsv1alpha1.Stateless, statelessCompName)
@@ -126,11 +122,6 @@ var _ = Describe("Component Utils", func() {
 			minReadySeconds, _ = component.GetComponentWorkloadMinReadySeconds(ctx, k8sClient, *cluster,
 				appsv1alpha1.Consensus, statelessCompName)
 			Expect(minReadySeconds).To(Equal(int32(0)))
-
-			By("test getCompRelatedObjectList function")
-			stsList = &appsv1.StatefulSetList{}
-			podList, _ := getCompRelatedObjectList(ctx, k8sClient, *cluster, consensusCompName, stsList)
-			Expect(len(stsList.Items) > 0 && len(podList.Items) > 0).Should(BeTrue())
 		})
 	})
 

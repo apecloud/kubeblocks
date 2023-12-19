@@ -80,33 +80,6 @@ func getObjectListByCustomLabels(ctx context.Context, cli client.Client, cluster
 	return cli.List(ctx, objectList, matchLabels, inNamespace)
 }
 
-// getClusterComponentSpecByName gets componentSpec from cluster with compSpecName.
-func getClusterComponentSpecByName(cluster appsv1alpha1.Cluster, compSpecName string) *appsv1alpha1.ClusterComponentSpec {
-	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		if compSpec.Name == compSpecName {
-			return &compSpec
-		}
-	}
-	return nil
-}
-
-// getCompRelatedObjectList gets the related pods and workloads of the component
-func getCompRelatedObjectList(ctx context.Context,
-	cli client.Client,
-	cluster appsv1alpha1.Cluster,
-	compName string,
-	relatedWorkloads client.ObjectList) (*corev1.PodList, error) {
-	podList, err := intctrlcomp.GetComponentPodList(ctx, cli, cluster, compName)
-	if err != nil {
-		return nil, err
-	}
-	if err = intctrlcomp.GetObjectListByComponentName(ctx,
-		cli, cluster, relatedWorkloads, compName); err != nil {
-		return nil, err
-	}
-	return podList, nil
-}
-
 // parseCustomLabelPattern parses the custom label pattern to GroupVersionKind.
 func parseCustomLabelPattern(pattern string) (schema.GroupVersionKind, error) {
 	patterns := strings.Split(pattern, "/")

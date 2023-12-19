@@ -110,7 +110,7 @@ func GetDBManager() (engines.DBManager, error) {
 
 func NewClusterCommands(typeName string) (engines.ClusterCommands, error) {
 	newFunc, ok := engines.NewCommandFuncs[typeName]
-	if !ok {
+	if !ok || newFunc == nil {
 		return nil, fmt.Errorf("unsupported engine type: %s", typeName)
 	}
 

@@ -26,4 +26,5 @@ const (
 	CfgKeyClusterDefaultCPU         = "CLUSTER_DEFAULT_CPU"
 	CfgKeyClusterDefaultMemory      = "CLUSTER_DEFAULT_MEMORY"
 	CfgKeyHelmRepoURL               = "HELM_REPO_URL"
+	CfgKeyImageRegistry             = "IMAGE_REGISTRY"
 )

@@ -203,6 +203,9 @@ const (
 
 	// AddonReleasePrefix is the prefix of addon release name
 	AddonReleasePrefix = "kb-addon"
+
+	// ImageRegistryKey is the image registry key in KB resource helm chart values.yaml
+	ImageRegistryKey = "image.registry"
 )
 
 var (

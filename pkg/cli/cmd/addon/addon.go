@@ -696,6 +696,19 @@ func (o *addonCmdOpts) buildHelmPatch(result map[string]interface{}) error {
 		helmSpec = *o.addon.Spec.Helm
 		helmSpec.InstallValues.SetValues = o.addonEnableFlags.SetValues
 	}
+
+	// use default KB registry source
+	declared := false
+	for _, s := range helmSpec.InstallValues.SetValues {
+		if split := strings.Split(s, "="); len(split) == 2 && split[0] == types.ImageRegistryKey {
+			declared = true
+			break
+		}
+	}
+
+	if defaultRegistry := viper.GetString(types.CfgKeyImageRegistry); !declared && len(defaultRegistry) > 0 {
+		helmSpec.InstallValues.SetValues = append(helmSpec.InstallValues.SetValues, fmt.Sprintf("%s=%s", types.ImageRegistryKey, defaultRegistry))
+	}
 	b, err := json.Marshal(&helmSpec)
 	if err != nil {
 		return err

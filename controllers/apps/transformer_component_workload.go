@@ -100,6 +100,10 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	if err != nil {
 		return err
 	}
+	if runningRSM != nil {
+		*protoRSM.Spec.Selector = *runningRSM.Spec.Selector
+		protoRSM.Spec.Template.Labels = runningRSM.Spec.Template.Labels
+	}
 	transCtx.ProtoWorkload = protoRSM
 
 	// build configuration template annotations to rsm workload

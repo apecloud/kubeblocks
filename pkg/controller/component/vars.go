@@ -434,19 +434,7 @@ func resolveServiceVarRef(ctx context.Context, cli client.Reader, synthesizedCom
 		return resolveServiceVarRefWithPodOrdinal(ctx, cli, synthesizedComp, defineKey, selector)
 	}
 
-	var resolveFunc func(context.Context, client.Reader, *SynthesizedComponent, string, appsv1alpha1.ServiceVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error)
-	switch {
-	case selector.Host != nil:
-		resolveFunc = resolveServiceHostRef
-	case selector.Port != nil:
-		resolveFunc = resolveServicePortRef
-	case selector.NodePort != nil:
-		resolveFunc = resolveServiceNodePortRef
-	default:
-		return nil, nil, nil
-	}
-
-	var1, var2, err := resolveFunc(ctx, cli, synthesizedComp, defineKey, selector)
+	var1, var2, err := resolveServiceVarRefWithSelector(ctx, cli, synthesizedComp, defineKey, selector)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -466,19 +454,7 @@ func resolveServiceVarRefWithPodOrdinal(ctx context.Context, cli client.Reader, 
 
 	vars1, vars2 := make([]*corev1.EnvVar, 0, synthesizedComp.Replicas), make([]*corev1.EnvVar, 0, synthesizedComp.Replicas)
 	resolveAndAppend := func(defineKey string, serviceSelector appsv1alpha1.ServiceVarSelector) error {
-		var resolver func(context.Context, client.Reader, *SynthesizedComponent, string, appsv1alpha1.ServiceVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error)
-		switch {
-		case serviceSelector.Host != nil:
-			resolver = resolveServiceHostRef
-		case serviceSelector.Port != nil:
-			resolver = resolveServicePortRef
-		case serviceSelector.NodePort != nil:
-			resolver = resolveServiceNodePortRef
-		default:
-			return nil
-		}
-
-		var1, var2, err := resolver(ctx, cli, synthesizedComp, defineKey, serviceSelector)
+		var1, var2, err := resolveServiceVarRefWithSelector(ctx, cli, synthesizedComp, defineKey, serviceSelector)
 		if err != nil {
 			return err
 		}
@@ -504,6 +480,22 @@ func resolveServiceVarRefWithPodOrdinal(ctx context.Context, cli client.Reader, 
 	}
 
 	return vars1, vars2, nil
+}
+
+func resolveServiceVarRefWithSelector(ctx context.Context, cli client.Reader,
+	synthesizedComp *SynthesizedComponent, defineKey string, selector appsv1alpha1.ServiceVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error) {
+	var resolveFunc func(context.Context, client.Reader, *SynthesizedComponent, string, appsv1alpha1.ServiceVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error)
+	switch {
+	case selector.Host != nil:
+		resolveFunc = resolveServiceHostRef
+	case selector.Port != nil:
+		resolveFunc = resolveServicePortRef
+	case selector.NodePort != nil:
+		resolveFunc = resolveServiceNodePortRef
+	default:
+		return nil, nil, nil
+	}
+	return resolveFunc(ctx, cli, synthesizedComp, defineKey, selector)
 }
 
 func resolveServiceHostRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,

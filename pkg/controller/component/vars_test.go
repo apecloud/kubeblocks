@@ -501,7 +501,7 @@ var _ = Describe("vars", func() {
 								Optional: required(),
 							},
 							ServiceVars: appsv1alpha1.ServiceVars{
-								Port: &appsv1alpha1.NamedVar{
+								NodePort: &appsv1alpha1.NamedVar{
 									Name:   "default",
 									Option: &appsv1alpha1.VarRequired,
 								},
@@ -522,10 +522,12 @@ var _ = Describe("vars", func() {
 							Name:      svcName0,
 						},
 						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeNodePort,
 							Ports: []corev1.ServicePort{
 								{
-									Name: "default",
-									Port: int32(svcPort),
+									Name:     "default",
+									Port:     int32(svcPort),
+									NodePort: 300001,
 								},
 							},
 						},
@@ -536,9 +538,11 @@ var _ = Describe("vars", func() {
 							Name:      svcName1,
 						},
 						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeNodePort,
 							Ports: []corev1.ServicePort{
 								{
-									Port: int32(svcPort + 1),
+									Port:     int32(svcPort + 1),
+									NodePort: 300002,
 								},
 							},
 						},
@@ -551,6 +555,8 @@ var _ = Describe("vars", func() {
 			Expect(err.Error()).Should(ContainSubstring("the name and compDef of ServiceVarRef is required"))
 			vars[0].ValueFrom.ServiceVarRef.ClusterObjectReference.CompDef = synthesizedComp.CompDefName
 			Expect(ResolveEnvNTemplateVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)).Should(Succeed())
+			checkEnvVarExist(synthesizedComp, "service-node-port_0", "300001")
+			checkEnvVarExist(synthesizedComp, "service-node-port_1", "300002")
 		})
 
 		It("credential vars", func() {

@@ -76,7 +76,8 @@ func NewClient(characterType string, pod corev1.Pod) (Client, error) {
 		return httpClient, nil
 	}
 
-	// return Client as nil explicitly to indicate that Client interface is nil
+	// return Client as nil explicitly to indicate that Client interface is nil,
+	// or Client will be a non-nil interface value even newclient returns nil.
 	return nil, nil
 }
 

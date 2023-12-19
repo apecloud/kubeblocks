@@ -152,18 +152,6 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 		Scheme:  *r.Scheme,
 	}
 
-	if viper.GetBool(rsm.FeatureGateRSMCompatibilityMode) && viper.GetBool(rsm.FeatureGateRSMToPod) {
-		nameLabels := []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
-		delegatorFinder := handler.NewDelegatorFinder(&workloads.ReplicatedStateMachine{}, nameLabels)
-		jobHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
-		podHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
-		return ctrl.NewControllerManagedBy(mgr).
-			For(&workloads.ReplicatedStateMachine{}).
-			Watches(&batchv1.Job{}, jobHandler).
-			Watches(&corev1.Pod{}, podHandler).
-			Complete(r)
-	}
-
 	if viper.GetBool(rsm.FeatureGateRSMCompatibilityMode) {
 		nameLabels := []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
 		delegatorFinder := handler.NewDelegatorFinder(&workloads.ReplicatedStateMachine{}, nameLabels)
@@ -175,6 +163,19 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 		return ctrl.NewControllerManagedBy(mgr).
 			For(&workloads.ReplicatedStateMachine{}).
 			Watches(&appsv1.StatefulSet{}, stsHandler).
+			Watches(&batchv1.Job{}, jobHandler).
+			Watches(&corev1.Pod{}, podHandler).
+			Owns(&corev1.Pod{}).
+			Complete(r)
+	}
+
+	if viper.GetBool(rsm.FeatureGateRSMToPod) {
+		nameLabels := []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
+		delegatorFinder := handler.NewDelegatorFinder(&workloads.ReplicatedStateMachine{}, nameLabels)
+		jobHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
+		podHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
+		return ctrl.NewControllerManagedBy(mgr).
+			For(&workloads.ReplicatedStateMachine{}).
 			Watches(&batchv1.Job{}, jobHandler).
 			Watches(&corev1.Pod{}, podHandler).
 			Complete(r)

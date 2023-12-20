@@ -486,6 +486,37 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 	if err != nil {
 		return err
 	}
+	tryToSwitchover := func(lorryCli lorry.Client, pod *corev1.Pod) error {
+		if pod == nil || len(pod.Labels) == 0 {
+			return nil
+		}
+		// if pod is not leader/primary, no need to switchover
+		isLeader := func() bool {
+			roleName, ok := pod.Labels[constant.RoleLabelKey]
+			if !ok {
+				return false
+			}
+
+			for _, replicaRole := range r.runningRSM.Spec.Roles {
+				if roleName == replicaRole.Name && replicaRole.IsLeader {
+					return true
+				}
+			}
+			return false
+		}
+		if !isLeader() {
+			return nil
+		}
+		// if HA functionality is not enabled, no need to switchover
+		err := lorryCli.Switchover(r.reqCtx.Ctx, pod.Name, "")
+		if err == nil {
+			return fmt.Errorf("switchover succeed, wait role label to be updated")
+		}
+		if strings.Contains(err.Error(), "cluster's ha is disabled") {
+			return nil
+		}
+		return err
+	}
 	for _, pod := range pods {
 		subs := strings.Split(pod.Name, "-")
 		if ordinal, err := strconv.ParseInt(subs[len(subs)-1], 10, 32); err != nil {
@@ -504,6 +535,11 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		if intctrlutil.IsNil(lorryCli) {
 			// no lorry in the pod
 			continue
+		}
+
+		// switchover if the leaving pod is leader
+		if switchoverErr := tryToSwitchover(lorryCli, pod); switchoverErr != nil {
+			return switchoverErr
 		}
 
 		if err2 := lorryCli.LeaveMember(r.reqCtx.Ctx); err2 != nil {

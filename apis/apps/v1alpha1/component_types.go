@@ -20,8 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // ComponentSpec defines the desired state of Component
@@ -96,6 +98,25 @@ type ComponentSpec struct {
 
 	// +optional
 	TLSConfig *TLSConfig `json:"tlsConfig,omitempty"`
+
+	// RsmTransformPolicy defines the policy generate sts using rsm.
+	// ToSts: rsm transform to statefulSet
+	// ToPod: rsm transform to pods
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=ToSts
+	// +optional
+	RsmTransformPolicy workloads.RsmTransformPolicy `json:"rsmTransformPolicy,omitempty"`
+
+	// Nodes defines the list of nodes that pods can schedule
+	// If the RsmTransformPolicy is specified as OneToMul,the list of nodes will be used. If the list of nodes is empty,
+	// no specific node will be assigned. However, if the list of node is filled, all pods will be evenly scheduled
+	// across the nodes in the list.
+	// +optional
+	Nodes []types.NodeName `json:"nodes,omitempty"`
+
+	// Instances defines the list of instance to be deleted priorly
+	// +optional
+	Instances []string `json:"instances,omitempty"`
 }
 
 // ComponentStatus defines the observed state of Component

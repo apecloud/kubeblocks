@@ -27,6 +27,14 @@ spec:
       {{- if eq $cloudProvider "huaweiCloud" }}
       setValues:
         - kubeletDir=/mnt/paas/kubernetes/kubelet
+      {{- else if eq $cloudProvider "gcp" }}
+      # In GKE, the system-node-critical and system-cluster-critical priority classes
+      # can't be used for non-system pods, but csi-driver-nfs uses "system-cluster-critical"
+      # by default, so override them here.
+      setValues:
+        - controller.priorityClassName=""
+        - node.priorityClassName=""
+        - externalSnapshotter.priorityClassName=""
       {{- end }}
 
     valuesMapping:

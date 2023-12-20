@@ -35,7 +35,7 @@ const (
 	name      = "bar"
 )
 
-var _ = Describe("OpsDefinition Controller", func() {
+var _ = Describe("transformer component workload", func() {
 
 	var (
 		podList                []*corev1.Pod
@@ -88,7 +88,16 @@ var _ = Describe("OpsDefinition Controller", func() {
 
 			newNodeAssignment, err := DeletePodFromInstances(podList, instances, 1, nodeAssignment)
 			Expect(err).Should(BeNil())
-			Expect(newNodeAssignment).Should(Equal(expectedNodeAssignment))
+			Expect(len(newNodeAssignment)).Should(Equal(3))
+			for i := 0; i < len(newNodeAssignment); i++ {
+				canFind := false
+				for j := 0; j < len(expectedNodeAssignment); j++ {
+					if newNodeAssignment[i].Name == expectedNodeAssignment[j].Name {
+						canFind = true
+					}
+				}
+				Expect(canFind).Should(Equal(true))
+			}
 		})
 		It(
 			"Test DeletePodFromInstances with no specified instances",

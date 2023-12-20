@@ -442,7 +442,7 @@ func (r *SystemAccountReconciler) getEngineFacts(reqCtx intctrlutil.RequestCtx, 
 		return appsv1alpha1.KBAccountInvalid, fmt.Errorf("no pod is running for cluster: %s, component %s", key.clusterName, key.componentName)
 	}
 
-	lorryClient, err := lorry.NewHTTPClientWithPod(target)
+	lorryClient, err := lorry.NewClient(*target)
 	if err != nil {
 		return appsv1alpha1.KBAccountInvalid, err
 	}

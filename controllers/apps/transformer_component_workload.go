@@ -20,8 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -34,6 +36,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -96,6 +100,13 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	buildPodSpecVolumeMounts(synthesizeComp)
 
 	// build rsm workload
+	if synthesizeComp.RsmTransformPolicy == workloads.ToPod {
+		err = BuildNodesAssignment(transCtx.Context, t.Client, synthesizeComp, runningRSM, cluster)
+		if err != nil {
+			return err
+		}
+	}
+
 	protoRSM, err := factory.BuildRSM(cluster, synthesizeComp)
 	if err != nil {
 		return err
@@ -288,6 +299,7 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, cluster *
 	rsmObjCopy.Spec.MembershipReconfiguration = rsmProto.Spec.MembershipReconfiguration
 	rsmObjCopy.Spec.MemberUpdateStrategy = rsmProto.Spec.MemberUpdateStrategy
 	rsmObjCopy.Spec.Credential = rsmProto.Spec.Credential
+	rsmObjCopy.Spec.NodeAssignment = rsmProto.Spec.NodeAssignment
 
 	ResolvePodSpecDefaultFields(oldRsm.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
 	DelayUpdatePodSpecSystemFields(oldRsm.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
@@ -353,8 +365,10 @@ func (r *componentWorkloadOps) horizontalScale() error {
 		}
 	}
 
-	if err := r.updatePodReplicaLabel4Scaling(r.synthesizeComp.Replicas); err != nil {
-		return err
+	if r.synthesizeComp.RsmTransformPolicy != workloads.ToPod {
+		if err := r.updatePodReplicaLabel4Scaling(r.synthesizeComp.Replicas); err != nil {
+			return err
+		}
 	}
 
 	r.reqCtx.Recorder.Eventf(r.cluster,
@@ -410,7 +424,7 @@ func (r *componentWorkloadOps) scaleIn(stsObj *apps.StatefulSet) error {
 		return nil
 	}
 	// TODO: check the component definition to determine whether we need to call leave member before deleting replicas.
-	err := r.leaveMember4ScaleIn()
+	err := r.leaveMember4ScaleIn(stsObj)
 	if err != nil {
 		r.reqCtx.Log.Info(fmt.Sprintf("leave member at scaling-in error, retry later: %s", err.Error()))
 		return err
@@ -481,7 +495,7 @@ func (r *componentWorkloadOps) updatePodReplicaLabel4Scaling(replicas int32) err
 	return nil
 }
 
-func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
+func (r *componentWorkloadOps) leaveMember4ScaleIn(stsObj *apps.StatefulSet) error {
 	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name))
 	if err != nil {
 		return err
@@ -517,14 +531,13 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		}
 		return err
 	}
-	for _, pod := range pods {
-		subs := strings.Split(pod.Name, "-")
-		if ordinal, err := strconv.ParseInt(subs[len(subs)-1], 10, 32); err != nil {
-			return err
-		} else if int32(ordinal) < r.synthesizeComp.Replicas {
-			continue
-		}
-		lorryCli, err1 := lorry.NewClient(r.synthesizeComp.CharacterType, *pod)
+	deletePodList, err := calculateDeletePods(pods, r.synthesizeComp.RsmTransformPolicy, *stsObj.Spec.Replicas-r.synthesizeComp.Replicas,
+		r.synthesizeComp.Replicas, r.synthesizeComp.Instances)
+	if err != nil {
+		return err
+	}
+	for _, pod := range deletePodList {
+		lorryCli, err1 := lorry.NewClient(*pod)
 		if err1 != nil {
 			if err == nil {
 				err = err1
@@ -866,4 +879,135 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 		protoRSM:       protoRSM,
 		dag:            dag,
 	}
+}
+
+func BuildNodesAssignment(ctx context.Context, cli client.Client, synthesizeComp *component.SynthesizedComponent, rsm *workloads.ReplicatedStateMachine, cluster *appsv1alpha1.Cluster) error {
+	currentNodesAssignment := make([]workloads.NodeAssignment, 0)
+	if rsm != nil {
+		currentNodesAssignment = rsm.Spec.NodeAssignment
+	}
+	instances := synthesizeComp.Instances
+	nodes := synthesizeComp.Nodes
+	expectedReplicas := synthesizeComp.Replicas
+
+	currentReplicas := int32(len(currentNodesAssignment))
+	if currentReplicas > expectedReplicas {
+		var err error
+		pods, err := component.ListPodOwnedByComponent(ctx, cli, cluster.Namespace, constant.GetComponentWellKnownLabels(cluster.Name, synthesizeComp.Name))
+		if err != nil {
+			return err
+		}
+		currentNodesAssignment, err = DeletePodFromInstances(pods, instances, currentReplicas-expectedReplicas, currentNodesAssignment)
+		if err != nil {
+			return err
+		}
+	} else if currentReplicas < expectedReplicas {
+		res := AllocateNodesForPod(nodes, expectedReplicas-currentReplicas, synthesizeComp.ClusterName, synthesizeComp.Name)
+		currentNodesAssignment = append(currentNodesAssignment, res...)
+	}
+	synthesizeComp.NodesAssignment = currentNodesAssignment
+	return nil
+}
+
+func calculateDeletePods(pods []*corev1.Pod, policy workloads.RsmTransformPolicy, deltaReplicas, expectReplicas int32, instances []string) ([]*corev1.Pod, error) {
+	if deltaReplicas < 0 {
+		return nil, fmt.Errorf("unexpect deltaReplicas: %d", deltaReplicas)
+	}
+	deletePodList := make([]*corev1.Pod, 0)
+	deletePodNames := make(map[string]struct{})
+	if policy == workloads.ToPod {
+		// select delete pods from instances
+		for idx := range instances {
+			instance := instances[idx]
+			for podIdx := range pods {
+				if pods[podIdx].Name == instance && deltaReplicas > 0 {
+					if _, exist := deletePodNames[instance]; !exist {
+						deletePodList = append(deletePodList, pods[podIdx])
+						deltaReplicas--
+						break
+					}
+				}
+			}
+		}
+		// calculate rest pod
+		restPods := make([]*corev1.Pod, 0)
+		for podIdx := range pods {
+			isDelete := false
+			for delPodIdx := range deletePodList {
+				if deletePodList[delPodIdx].Name == pods[podIdx].Name {
+					isDelete = true
+					break
+				}
+			}
+			if !isDelete {
+				restPods = append(restPods, pods[podIdx])
+			}
+		}
+		pods = restPods
+		if deltaReplicas > 0 {
+			var activePods podutils.ActivePods = pods
+			sort.Sort(activePods)
+			deletePodList = append(deletePodList, activePods[:deltaReplicas]...)
+		}
+	} else {
+		for _, pod := range pods {
+			subs := strings.Split(pod.Name, "-")
+			if ordinal, err := strconv.ParseInt(subs[len(subs)-1], 10, 32); err != nil {
+				return nil, err
+			} else if int32(ordinal) < expectReplicas {
+				continue
+			}
+			deletePodList = append(deletePodList, pod)
+		}
+	}
+	return deletePodList, nil
+}
+
+func DeletePodFromInstances(pods []*corev1.Pod, instances []string, replicas int32, currentNodesAssignment []workloads.NodeAssignment) ([]workloads.NodeAssignment, error) {
+	currentNodesAssignmentMap := make(map[string]workloads.NodeAssignment, 0)
+
+	deletedPods, err := calculateDeletePods(pods, workloads.ToPod, replicas, -1, instances)
+	if err != nil {
+		return nil, err
+	}
+	for i := 0; i < len(currentNodesAssignment); i++ {
+		currentNodeAssignment := currentNodesAssignment[i]
+		currentNodesAssignmentMap[currentNodeAssignment.Name] = currentNodeAssignment
+	}
+	for idx := range deletedPods {
+		deletedPod := deletedPods[idx]
+		delete(currentNodesAssignmentMap, deletedPod.Name)
+	}
+	nodesAssignment := make([]workloads.NodeAssignment, 0)
+	for _, val := range currentNodesAssignmentMap {
+		nodesAssignment = append(nodesAssignment, val)
+	}
+	return nodesAssignment, nil
+}
+
+func AllocateNodesForPod(nodes []types.NodeName, replicas int32, clusterName, componentName string) []workloads.NodeAssignment {
+	nodesAssignment := make([]workloads.NodeAssignment, 0)
+	simpleNameGenerator := names.SimpleNameGenerator
+	nodesLen := len(nodes)
+	if nodesLen == 0 {
+		for i := replicas; i > 0; i-- {
+			podName := simpleNameGenerator.GenerateName(clusterName + "-" + componentName + "-")
+			nodeAssignment := workloads.NodeAssignment{
+				Name: podName,
+			}
+			nodesAssignment = append(nodesAssignment, nodeAssignment)
+		}
+	} else {
+		for i := 0; i < int(replicas); i++ {
+			podName := simpleNameGenerator.GenerateName(clusterName + "-" + componentName + "-")
+			nodeAssignment := workloads.NodeAssignment{
+				Name: podName,
+				NodeSpec: workloads.NodeSpec{
+					NodeName: nodes[i%nodesLen],
+				},
+			}
+			nodesAssignment = append(nodesAssignment, nodeAssignment)
+		}
+	}
+	return nodesAssignment
 }

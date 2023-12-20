@@ -39,7 +39,7 @@ spec:
     env_auth = false
     access_key_id = {{ `{{ index .Parameters "accessKeyId" }}` }}
     secret_access_key = {{ `{{ index .Parameters "secretAccessKey" }}` }}
-    endpoint = {{ `{{- printf "oss-%s.aliyuncs.com" .Parameters.region) }}` }}
+    endpoint = {{ `{{- printf "oss-%s.aliyuncs.com" .Parameters.region }}` }}
     root = {{ `{{ index .Parameters "bucket" }}` }}
     chunk_size = 50Mi
 

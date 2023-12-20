@@ -22,9 +22,11 @@ package component
 import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
 type MonitorConfig struct {
@@ -56,6 +58,12 @@ type SynthesizedComponent struct {
 	ComponentRefEnvs  []corev1.EnvVar                        `json:"componentRefEnvs,omitempty"`
 	ServiceReferences map[string]*v1alpha1.ServiceDescriptor `json:"serviceReferences,omitempty"`
 	TemplateVars      map[string]any                         `json:"templateVars,omitempty"`
+
+	RsmTransformPolicy workloads.RsmTransformPolicy `json:"rsmTransformPolicy,omitempty"`
+	Nodes              []types.NodeName             `json:"nodes,omitempty"`
+	Instances          []string                     `json:"instances,omitempty"`
+
+	NodesAssignment []workloads.NodeAssignment `json:"nodesAssignment,omitempty"`
 
 	// The following fields were introduced with the ComponentDefinition and Component API in KubeBlocks version 0.8.0
 	Roles             []v1alpha1.ReplicaRole              `json:"roles,omitempty"`

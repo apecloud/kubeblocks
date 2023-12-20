@@ -66,6 +66,8 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 		}
 		r := horizontalScaling.Replicas
 		opsRes.Cluster.Spec.ComponentSpecs[index].Replicas = r
+		opsRes.Cluster.Spec.ComponentSpecs[index].Instances = horizontalScaling.Instances
+		opsRes.Cluster.Spec.ComponentSpecs[index].Nodes = horizontalScaling.Nodes
 	}
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }

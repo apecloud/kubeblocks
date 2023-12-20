@@ -57,28 +57,27 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	// generate objects by current spec
-	svc := buildSvc(*rsm)
-	altSvs := buildAlternativeSvs(*rsm)
-	headLessSvc := buildHeadlessSvc(*rsm)
-	envConfig := buildEnvConfigMap(*rsm)
-	objects := []client.Object{headLessSvc, envConfig}
-	var pods []*corev1.Pod
-	var sts *apps.StatefulSet
+	var objects []client.Object
 	if rsm.Spec.RsmTransformPolicy == workloads.ToPod {
-		pods = buildPods(*rsm)
+		pods := buildPods(*rsm)
 		for idx := range pods {
 			pod := pods[idx]
 			objects = append(objects, pod)
 		}
 	} else {
-		sts = buildSts(*rsm, headLessSvc.Name, *envConfig)
+		svc := buildSvc(*rsm)
+		altSvs := buildAlternativeSvs(*rsm)
+		headLessSvc := buildHeadlessSvc(*rsm)
+		envConfig := buildEnvConfigMap(*rsm)
+		sts := buildSts(*rsm, headLessSvc.Name, *envConfig)
 		objects = append(objects, sts)
-	}
-	if svc != nil {
-		objects = append(objects, svc)
-	}
-	for _, s := range altSvs {
-		objects = append(objects, s)
+		objects = append(objects, headLessSvc, envConfig)
+		if svc != nil {
+			objects = append(objects, svc)
+		}
+		for _, s := range altSvs {
+			objects = append(objects, s)
+		}
 	}
 
 	for _, object := range objects {
@@ -139,19 +138,8 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		}
 	}
 	handleDependencies := func() {
-		if rsm.Spec.RsmTransformPolicy == workloads.ToPod {
-			for idx := range pods {
-				pod := pods[idx]
-				cli.DependOn(dag, pod, headLessSvc, envConfig)
-				if svc != nil {
-					cli.DependOn(dag, pod, svc)
-				}
-			}
-		} else {
-			cli.DependOn(dag, sts, headLessSvc, envConfig)
-			if svc != nil {
-				cli.DependOn(dag, sts, svc)
-			}
+		if rsm.Spec.RsmTransformPolicy == workloads.ToSts {
+			cli.DependOn(dag, objects[0], objects[1:]...)
 		}
 	}
 

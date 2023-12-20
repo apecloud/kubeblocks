@@ -24,7 +24,6 @@ import (
 	"reflect"
 	"strings"
 
-	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -159,13 +158,8 @@ func (t *clusterServiceTransformer) buildService(transCtx *clusterTransformConte
 
 func (t *clusterServiceTransformer) builtinSelector(cluster *appsv1alpha1.Cluster) map[string]string {
 	selectors := map[string]string{
-		constant.AppManagedByLabelKey: "",
-		constant.AppInstanceLabelKey:  "",
-	}
-	for _, key := range maps.Keys(selectors) {
-		if val, ok := cluster.Labels[key]; ok {
-			selectors[key] = val
-		}
+		constant.AppManagedByLabelKey: constant.AppName,
+		constant.AppInstanceLabelKey:  cluster.Name,
 	}
 	return selectors
 }

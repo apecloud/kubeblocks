@@ -396,7 +396,7 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 		if synthesizeComp.CompDefName == "" {
 			synthesizeComp.CompDefName = clusterCompDef.Name
 		}
-		// TLS is a backward compatible field, which to be used in configuration rendering before version 0.8.0.
+		// TLS is a backward compatible field, which is used in configuration rendering before version 0.8.0.
 		if synthesizeComp.TLSConfig != nil {
 			synthesizeComp.TLS = true
 		}

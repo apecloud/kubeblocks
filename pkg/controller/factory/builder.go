@@ -24,6 +24,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -79,6 +80,10 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synthesi
 		vcts = append(vcts, vctToPVC(vct))
 	}
 	rsmBuilder.SetVolumeClaimTemplates(vcts...)
+
+	if common.IsCompactMode(cluster.Annotations) {
+		rsmBuilder.AddAnnotations(constant.FeatureReconciliationInCompactModeAnnotationKey, cluster.Annotations[constant.FeatureReconciliationInCompactModeAnnotationKey])
+	}
 
 	// convert componentDef attributes to rsm attributes. including service, credential, roles, roleProbe, membershipReconfiguration, memberUpdateStrategy, etc.
 	rsmObj, err := component.BuildRSMFrom(cluster, synthesizedComp, rsmBuilder.GetObject())

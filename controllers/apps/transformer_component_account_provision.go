@@ -21,6 +21,8 @@ package apps
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/common"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
 
 	"golang.org/x/exp/slices"
@@ -52,6 +54,11 @@ var _ graph.Transformer = &componentAccountProvisionTransformer{}
 func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
 	if model.IsObjectDeleting(transCtx.ComponentOrig) {
+		return nil
+	}
+	if common.IsCompactMode(transCtx.ComponentOrig.Annotations) {
+		transCtx.V(1).Info("Component is in compact mode, no need to create component account related objects",
+			"component", client.ObjectKeyFromObject(transCtx.ComponentOrig))
 		return nil
 	}
 

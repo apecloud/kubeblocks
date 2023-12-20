@@ -22,6 +22,7 @@ package component
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"strconv"
 	"strings"
 
@@ -84,6 +85,10 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1
 	value, ok := cluster.GetAnnotations()[constant.IgnoreResourceConstraint]
 	if ok {
 		compBuilder.AddAnnotations(constant.IgnoreResourceConstraint, value)
+	}
+	if common.IsCompactMode(cluster.GetAnnotations()) {
+		compBuilder.AddAnnotations(constant.FeatureReconciliationInCompactModeAnnotationKey,
+			cluster.GetAnnotations()[constant.FeatureReconciliationInCompactModeAnnotationKey])
 	}
 	return compBuilder.GetObject(), nil
 }

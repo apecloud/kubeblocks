@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"reflect"
 
 	policyv1 "k8s.io/api/policy/v1"
@@ -40,6 +41,10 @@ var _ graph.Transformer = &componentPDBTransformer{}
 func (t *componentPDBTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
 	if model.IsObjectDeleting(transCtx.ComponentOrig) {
+		return nil
+	}
+	if common.IsCompactMode(transCtx.ComponentOrig.Annotations) {
+		transCtx.V(1).Info("Component is in compact mode, no need to create pdb related objects", "component", client.ObjectKeyFromObject(transCtx.ComponentOrig))
 		return nil
 	}
 

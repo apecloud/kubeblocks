@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -48,6 +49,11 @@ var _ graph.Transformer = &componentRBACTransformer{}
 func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
 	if model.IsObjectDeleting(transCtx.ComponentOrig) {
+		return nil
+	}
+	if common.IsCompactMode(transCtx.ComponentOrig.Annotations) {
+		transCtx.V(1).Info("Component is in compact mode, no need to create rbac related objects",
+			"component", client.ObjectKeyFromObject(transCtx.ComponentOrig))
 		return nil
 	}
 

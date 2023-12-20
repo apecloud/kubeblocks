@@ -22,6 +22,7 @@ package apps
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -159,6 +160,11 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	// wait till the cluster is running
 	if cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
 		reqCtx.Log.V(1).Info("Cluster is not ready yet", "cluster", req.NamespacedName)
+		return intctrlutil.Reconciled()
+	}
+
+	if common.IsCompactMode(cluster.Annotations) {
+		reqCtx.Log.V(1).Info("Cluster is in compact mode, no need to create accounts related secrets", "cluster", req.NamespacedName)
 		return intctrlutil.Reconciled()
 	}
 

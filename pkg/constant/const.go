@@ -175,6 +175,10 @@ const (
 
 	RBACRoleName        = "kubeblocks-cluster-pod-role"
 	RBACClusterRoleName = "kubeblocks-volume-protection-pod-role"
+
+	// FeatureReconciliationInCompactModeAnnotationKey indicates that the controller should run in compact mode,
+	// means to try the best to cutoff useless objects.
+	FeatureReconciliationInCompactModeAnnotationKey = "kubeblocks.io/compact-mode"
 )
 
 const (

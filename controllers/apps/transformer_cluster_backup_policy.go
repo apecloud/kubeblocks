@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/common"
 
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
@@ -58,6 +59,11 @@ var _ graph.Transformer = &clusterBackupPolicyTransformer{}
 func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	r.clusterTransformContext = ctx.(*clusterTransformContext)
 	if model.IsObjectDeleting(r.clusterTransformContext.OrigCluster) {
+		return nil
+	}
+	if common.IsCompactMode(r.clusterTransformContext.OrigCluster.Annotations) {
+		r.clusterTransformContext.V(1).Info("Cluster is in compact mode, no need to create backup related objects",
+			"cluster", client.ObjectKeyFromObject(r.clusterTransformContext.OrigCluster))
 		return nil
 	}
 

@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -195,7 +196,7 @@ func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
 	nonNamespacedKindsPlus := []client.ObjectList{
 		&rbacv1.ClusterRoleBindingList{},
 	}
-	namespacedKindsPlus = append(namespacedKindsPlus, &workloads.ReplicatedStateMachineList{})
+	namespacedKindsPlus = append(namespacedKindsPlus, &workloads.ReplicatedStateMachineList{}, &appsv1.StatefulSetList{})
 
 	return append(namespacedKinds, namespacedKindsPlus...), append(nonNamespacedKinds, nonNamespacedKindsPlus...)
 }

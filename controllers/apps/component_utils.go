@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -265,7 +266,7 @@ func UpdateComponentInfoToPods(
 	cluster *appsv1alpha1.Cluster,
 	component *intctrlcomp.SynthesizedComponent,
 	dag *graph.DAG) error {
-	if cluster == nil || component == nil {
+	if cluster == nil || component == nil || component.RsmTransformPolicy == v1alpha1.ToPod {
 		return nil
 	}
 	ml := client.MatchingLabels{

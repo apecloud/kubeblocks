@@ -72,6 +72,8 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synthesi
 		AddMatchLabelsInMap(labels).
 		SetServiceName(constant.GenerateRSMServiceNamePattern(rsmName)).
 		SetReplicas(synthesizedComp.Replicas).
+		SetRsmTransformPolicy(synthesizedComp.RsmTransformPolicy).
+		SetNodeAssignment(synthesizedComp.NodesAssignment).
 		SetTemplate(template)
 
 	var vcts []corev1.PersistentVolumeClaim

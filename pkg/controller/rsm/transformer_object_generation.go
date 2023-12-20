@@ -61,8 +61,19 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	altSvs := buildAlternativeSvs(*rsm)
 	headLessSvc := buildHeadlessSvc(*rsm)
 	envConfig := buildEnvConfigMap(*rsm)
-	sts := buildSts(*rsm, headLessSvc.Name, *envConfig)
-	objects := []client.Object{headLessSvc, envConfig, sts}
+	objects := []client.Object{headLessSvc, envConfig}
+	var pods []*corev1.Pod
+	var sts *apps.StatefulSet
+	if rsm.Spec.RsmTransformPolicy == workloads.ToPod {
+		pods = buildPods(*rsm)
+		for idx := range pods {
+			pod := pods[idx]
+			objects = append(objects, pod)
+		}
+	} else {
+		sts = buildSts(*rsm, headLessSvc.Name, *envConfig)
+		objects = append(objects, sts)
+	}
 	if svc != nil {
 		objects = append(objects, svc)
 	}
@@ -78,7 +89,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 
 	// read cache snapshot
 	ml := getLabels(rsm)
-	oldSnapshot, err := model.ReadCacheSnapshot(ctx, rsm, ml, ownedKinds()...)
+	oldSnapshot, err := model.ReadCacheSnapshot(ctx, rsm, ml, ownedKinds(rsm.Spec.RsmTransformPolicy)...)
 	if err != nil {
 		return err
 	}
@@ -110,6 +121,9 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		for name := range updateSet {
 			oldObj := oldSnapshot[name]
 			newObj := copyAndMerge(oldObj, newSnapshot[name])
+			if reflect.DeepEqual(oldObj, newObj) {
+				continue
+			}
 			cli.Update(dag, oldObj, newObj)
 		}
 	}
@@ -125,9 +139,19 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		}
 	}
 	handleDependencies := func() {
-		cli.DependOn(dag, sts, headLessSvc, envConfig)
-		if svc != nil {
-			cli.DependOn(dag, sts, svc)
+		if rsm.Spec.RsmTransformPolicy == workloads.ToPod {
+			for idx := range pods {
+				pod := pods[idx]
+				cli.DependOn(dag, pod, headLessSvc, envConfig)
+				if svc != nil {
+					cli.DependOn(dag, pod, svc)
+				}
+			}
+		} else {
+			cli.DependOn(dag, sts, headLessSvc, envConfig)
+			if svc != nil {
+				cli.DependOn(dag, sts, svc)
+			}
 		}
 	}
 
@@ -152,26 +176,27 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 
 	// mergeAnnotations keeps the original annotations.
-	mergeMetadataMap := func(originalMap map[string]string, targetMap *map[string]string) {
+	mergeMetadataMap := func(originalMap map[string]string, targetMap map[string]string) map[string]string {
 		if targetMap == nil || originalMap == nil {
-			return
+			return nil
 		}
-		if *targetMap == nil {
-			*targetMap = map[string]string{}
+		if targetMap == nil {
+			targetMap = map[string]string{}
 		}
 		for k, v := range originalMap {
 			// if the annotation not exist in targetAnnotations, copy it from original.
-			if _, ok := (*targetMap)[k]; !ok {
-				(*targetMap)[k] = v
+			if _, ok := (targetMap)[k]; !ok {
+				(targetMap)[k] = v
 			}
 		}
+		return targetMap
 	}
 
 	copyAndMergeSts := func(oldSts, newSts *apps.StatefulSet) client.Object {
-		mergeMetadataMap(oldSts.Labels, &newSts.Labels)
+		oldSts.Labels = mergeMetadataMap(oldSts.Labels, newSts.Labels)
 		oldSts.Labels = newSts.Labels
 		// if annotations exist and are replaced, the StatefulSet will be updated.
-		mergeMetadataMap(oldSts.Spec.Template.Annotations, &newSts.Spec.Template.Annotations)
+		oldSts.Annotations = mergeMetadataMap(oldSts.Spec.Template.Annotations, newSts.Spec.Template.Annotations)
 		oldSts.Spec.Template = newSts.Spec.Template
 		oldSts.Spec.Replicas = newSts.Spec.Replicas
 		oldSts.Spec.UpdateStrategy = newSts.Spec.UpdateStrategy
@@ -179,7 +204,7 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 
 	copyAndMergeSvc := func(oldSvc *corev1.Service, newSvc *corev1.Service) client.Object {
-		mergeMetadataMap(oldSvc.Annotations, &newSvc.Annotations)
+		oldSvc.Annotations = mergeMetadataMap(oldSvc.Annotations, newSvc.Annotations)
 		oldSvc.Annotations = newSvc.Annotations
 		oldSvc.Spec = newSvc.Spec
 		return oldSvc
@@ -191,6 +216,18 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return oldCm
 	}
 
+	copyAndMergePod := func(oldPod, newPod *corev1.Pod) client.Object {
+		oldPod.Spec.ActiveDeadlineSeconds = newPod.Spec.ActiveDeadlineSeconds
+		for idx := range oldPod.Spec.Containers {
+			oldPod.Spec.Containers[idx].Image = newPod.Spec.Containers[idx].Image
+		}
+		for idx := range oldPod.Spec.InitContainers {
+			oldPod.Spec.InitContainers[idx].Image = newPod.Spec.InitContainers[idx].Image
+		}
+		// TODO `spec.tolerations` (only additions to existing tolerations),`spec.terminationGracePeriodSeconds` (allow it to be set to 1 if it was previously negative)
+		return oldPod
+	}
+
 	targetObj := oldObj.DeepCopyObject()
 	switch o := newObj.(type) {
 	case *apps.StatefulSet:
@@ -199,6 +236,8 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return copyAndMergeSvc(targetObj.(*corev1.Service), o)
 	case *corev1.ConfigMap:
 		return copyAndMergeCm(targetObj.(*corev1.ConfigMap), o)
+	case *corev1.Pod:
+		return copyAndMergePod(targetObj.(*corev1.Pod), o)
 	default:
 		return newObj
 	}

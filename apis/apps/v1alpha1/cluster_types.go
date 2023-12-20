@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -390,6 +391,26 @@ type ClusterComponentSpec struct {
 	// userResourceRefs defines the user-defined volumes.
 	// +optional
 	UserResourceRefs *UserResourceRefs `json:"userResourceRefs,omitempty"`
+
+	// RsmTransformPolicy defines the policy generate sts using rsm.
+	// ToSts: rsm transforms to statefulSet
+	// ToPod: rsm transforms to pods
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=ToSts
+	// +optional
+	RsmTransformPolicy workloads.RsmTransformPolicy `json:"rsmTransformPolicy,omitempty"`
+
+	// Nodes defines the list of nodes that pods can schedule
+	// If the RsmTransformPolicy is specified as ToPod,the list of nodes will be used. If the list of nodes is empty,
+	// no specific node will be assigned. However, if the list of node is filled, all pods will be evenly scheduled
+	// across the nodes in the list.
+	// +optional
+	Nodes []types.NodeName `json:"nodes,omitempty"`
+
+	// Instances defines the list of instance to be deleted priorly
+	// If the RsmTransformPolicy is specified as ToPod,the list of instances will be used.
+	// +optional
+	Instances []string `json:"instances,omitempty"`
 }
 
 // GetMinAvailable wraps the 'prefer' value return. As for component replicaCount <= 1, it will return 0,

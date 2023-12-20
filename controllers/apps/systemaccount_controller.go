@@ -22,7 +22,6 @@ package apps
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/pkg/common"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -43,6 +42,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"

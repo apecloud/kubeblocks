@@ -138,7 +138,9 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		}
 	}
 	handleDependencies := func() {
-		if rsm.Spec.RsmTransformPolicy == workloads.ToSts {
+		// RsmTransformPolicy might be "", treat empty as ToSts for backward compatibility
+		if rsm.Spec.RsmTransformPolicy != workloads.ToPod {
+			// objects[0] is the sts object
 			cli.DependOn(dag, objects[0], objects[1:]...)
 		}
 	}

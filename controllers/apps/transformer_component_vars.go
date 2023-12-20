@@ -21,11 +21,11 @@ package apps
 
 import (
 	"context"
-	"github.com/apecloud/kubeblocks/pkg/common"
 	"reflect"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"

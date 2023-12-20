@@ -20,11 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package common
 
 import (
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"strings"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // ToCamelCase transforms k8s resource Name with camel case, for examples:

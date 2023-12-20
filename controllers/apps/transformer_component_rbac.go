@@ -21,7 +21,6 @@ package apps
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/pkg/common"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -32,6 +31,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"

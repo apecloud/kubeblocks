@@ -123,8 +123,6 @@ func FilterActivePods(pods []corev1.Pod) []*corev1.Pod {
 	for _, p := range pods {
 		if IsPodActive(&p) {
 			result = append(result, &p)
-		} else {
-			// TODO print ("Ignoring inactive pod %v/%v in state %v, deletion time %v", p.Namespace, p.Name, p.Status.Phase, p.DeletionTimestamp)
 		}
 	}
 	return result

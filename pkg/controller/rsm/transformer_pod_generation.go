@@ -15,11 +15,9 @@ func buildPod(rsm workloads.ReplicatedStateMachine, podName string, nodeName typ
 	labels := getLabels(&rsm)
 	delete(labels, rsmGenerationLabelKey)
 	return builder.NewPodBuilder(rsm.Namespace, podName).
-		SetNodeName(nodeName).
-		SetContainers(rsm.Spec.Template.Spec.Containers).
-		SetInitContainers(rsm.Spec.Template.Spec.InitContainers).
+		SetPodSpec(rsm.Spec.Template.Spec).
 		SetFinalizers().
-		AddVolumes(rsm.Spec.Template.Spec.Volumes...).
+		SetNodeName(nodeName).
 		AddAnnotationsInMap(annotations).
 		AddLabelsInMap(labels).
 		GetObject()

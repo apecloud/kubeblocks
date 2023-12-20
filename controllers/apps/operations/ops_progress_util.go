@@ -175,7 +175,6 @@ func handleComponentStatusProgress(
 		podList             *corev1.PodList
 		clusterComponentDef = pgRes.clusterComponentDef
 		clusterComponent    = pgRes.clusterComponent
-		policy              = clusterComponent.RsmTransformPolicy
 	)
 	if clusterComponent == nil || clusterComponentDef == nil {
 		return
@@ -185,6 +184,7 @@ func handleComponentStatusProgress(
 	}
 	switch clusterComponentDef.WorkloadType {
 	case appsv1alpha1.Stateless:
+		policy := clusterComponent.RsmTransformPolicy
 		completedCount, err = handleStatelessProgress(reqCtx, cli, opsRes, podList, pgRes, compStatus, policy)
 	default:
 		completedCount, err = handleStatefulSetProgress(reqCtx, cli, opsRes, podList, pgRes, compStatus)

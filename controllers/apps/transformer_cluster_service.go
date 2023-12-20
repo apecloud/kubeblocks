@@ -102,7 +102,7 @@ func (t *clusterServiceTransformer) genMultiServicesIfNeed(transCtx *clusterTran
 	}
 
 	if len(compName) == 0 {
-		return nil, fmt.Errorf("the componentSelector is not exist, service: %s, componentSelector: %s", service.Name, service.ComponentSelector)
+		return nil, fmt.Errorf("the componentSelector does not exist, service: %s, componentSelector: %s", service.Name, service.ComponentSelector)
 	}
 
 	podOrdinalServices := make([]*appsv1alpha1.Service, 0, compReplicas)

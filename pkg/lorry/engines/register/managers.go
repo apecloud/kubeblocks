@@ -70,7 +70,7 @@ func init() {
 	RegisterEngine(models.Nebula, "", nil, nebula.NewCommands)
 	RegisterEngine(models.PulsarProxy, "", nil, pulsar.NewProxyCommands)
 	RegisterEngine(models.PulsarBroker, "", nil, pulsar.NewBrokerCommands)
-	RegisterEngine(models.Oceanbase, "", nil, oceanbase.NewCommands)
+	RegisterEngine(models.Oceanbase, "", oceanbase.NewManager, oceanbase.NewCommands)
 
 	// support component definition without workloadType
 	RegisterEngine(models.WeSQL, "", wesql.NewManager, mysql.NewCommands)

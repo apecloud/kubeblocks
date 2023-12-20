@@ -186,28 +186,28 @@ var _ = Describe("Component PostProvision Test", func() {
 			Expect(len(renderJob.Spec.Template.Spec.Containers[0].Env) == 5).Should(BeTrue())
 			compListExist := false
 			compPodNameListExist := false
-			compPodIpListExist := false
+			compPodIPListExist := false
 			compPodHostNameListExist := false
-			compPodHostIpListExist := false
+			compPodHostIPListExist := false
 			for _, env := range renderJob.Spec.Template.Spec.Containers[0].Env {
 				switch env.Name {
 				case kbPostProvisionClusterCompList:
 					compListExist = true
-				case kbPostProvisionClusterCompPodHostIpList:
-					compPodHostIpListExist = true
+				case kbPostProvisionClusterCompPodHostIPList:
+					compPodHostIPListExist = true
 				case kbPostProvisionClusterCompPodHostNameList:
 					compPodHostNameListExist = true
-				case kbPostProvisionClusterCompPodIpList:
-					compPodIpListExist = true
+				case kbPostProvisionClusterCompPodIPList:
+					compPodIPListExist = true
 				case kbPostProvisionClusterCompPodNameList:
 					compPodNameListExist = true
 				}
 			}
 			Expect(compListExist).Should(BeTrue())
 			Expect(compPodNameListExist).Should(BeTrue())
-			Expect(compPodIpListExist).Should(BeTrue())
+			Expect(compPodIPListExist).Should(BeTrue())
 			Expect(compPodHostNameListExist).Should(BeTrue())
-			Expect(compPodHostIpListExist).Should(BeTrue())
+			Expect(compPodHostIPListExist).Should(BeTrue())
 		})
 	})
 })

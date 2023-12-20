@@ -53,9 +53,9 @@ const (
 
 	kbPostProvisionClusterCompList            = "KB_CLUSTER_COMPONENT_LIST"
 	kbPostProvisionClusterCompPodNameList     = "KB_CLUSTER_COMPONENT_POD_NAME_LIST"
-	kbPostProvisionClusterCompPodIpList       = "KB_CLUSTER_COMPONENT_POD_IP_LIST"
+	kbPostProvisionClusterCompPodIPList       = "KB_CLUSTER_COMPONENT_POD_IP_LIST"
 	kbPostProvisionClusterCompPodHostNameList = "KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST"
-	kbPostProvisionClusterCompPodHostIpList   = "KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST"
+	kbPostProvisionClusterCompPodHostIPList   = "KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST"
 )
 
 // ReconcileCompPostProvision reconciles the component-level postProvision command.
@@ -356,7 +356,7 @@ func genClusterComponentEnv(cluster *appsv1alpha1.Cluster, pods []corev1.Pod) []
 			Value: strings.Join(compPodNameList, ","),
 		},
 		{
-			Name:  kbPostProvisionClusterCompPodIpList,
+			Name:  kbPostProvisionClusterCompPodIPList,
 			Value: strings.Join(compPodIpList, ","),
 		},
 		{
@@ -364,7 +364,7 @@ func genClusterComponentEnv(cluster *appsv1alpha1.Cluster, pods []corev1.Pod) []
 			Value: strings.Join(compHostNameList, ","),
 		},
 		{
-			Name:  kbPostProvisionClusterCompPodHostIpList,
+			Name:  kbPostProvisionClusterCompPodHostIPList,
 			Value: strings.Join(compHostIpList, ","),
 		}}...)
 

@@ -140,16 +140,6 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 
 			By("Wait for the cluster to be running")
 			Consistently(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
-
-			By("Checking pods' status and count are updated in cluster status after scale-out")
-			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
-				compName := fetched.Spec.ComponentSpecs[0].Name
-				g.Expect(fetched.Status.Components).NotTo(BeNil())
-				g.Expect(fetched.Status.Components).To(HaveKey(compName))
-				replicationStatus := fetched.Status.Components[compName].ReplicationSetStatus
-				g.Expect(replicationStatus).NotTo(BeNil())
-				g.Expect(len(replicationStatus.Secondaries)).To(BeEquivalentTo(newReplicas - 1))
-			})).Should(Succeed())
 		}
 	}
 

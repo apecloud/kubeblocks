@@ -308,7 +308,8 @@ build-kbcli-embed-chart: helmtool create-kbcli-embed-charts-dir \
 	build-single-kbcli-embed-chart.clickhouse-cluster \
 	build-single-kbcli-embed-chart.milvus-cluster \
 	build-single-kbcli-embed-chart.qdrant-cluster \
-	build-single-kbcli-embed-chart.weaviate-cluster
+	build-single-kbcli-embed-chart.weaviate-cluster \
+	build-single-kbcli-embed-chart.oceanbase-cluster
 
 .PHONY: kbcli
 kbcli: test-go-generate build-checks kbcli-fast ## Build bin/kbcli.

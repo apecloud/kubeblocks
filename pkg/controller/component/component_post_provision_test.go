@@ -178,36 +178,6 @@ var _ = Describe("Component PostProvision Test", func() {
 			err = CheckJobSucceed(testCtx.Ctx, testCtx.Cli, cluster, jobName)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("requeue to waiting for job"))
-
-			By("check built-in envs of cluster component available in postProvision job")
-			renderJob, err := renderPostProvisionCmdJob(testCtx.Ctx, testCtx.Cli, cluster, synthesizeComp)
-			Expect(err).Should(Succeed())
-			Expect(renderJob).ShouldNot(BeNil())
-			Expect(len(renderJob.Spec.Template.Spec.Containers[0].Env) == 5).Should(BeTrue())
-			compListExist := false
-			compPodNameListExist := false
-			compPodIpListExist := false
-			compPodHostNameListExist := false
-			compPodHostIpListExist := false
-			for _, env := range renderJob.Spec.Template.Spec.Containers[0].Env {
-				switch env.Name {
-				case kbPostProvisionClusterCompList:
-					compListExist = true
-				case kbPostProvisionClusterCompPodHostIpList:
-					compPodHostIpListExist = true
-				case kbPostProvisionClusterCompPodHostNameList:
-					compPodHostNameListExist = true
-				case kbPostProvisionClusterCompPodIpList:
-					compPodIpListExist = true
-				case kbPostProvisionClusterCompPodNameList:
-					compPodNameListExist = true
-				}
-			}
-			Expect(compListExist).Should(BeTrue())
-			Expect(compPodNameListExist).Should(BeTrue())
-			Expect(compPodIpListExist).Should(BeTrue())
-			Expect(compPodHostNameListExist).Should(BeTrue())
-			Expect(compPodHostIpListExist).Should(BeTrue())
 		})
 	})
 })

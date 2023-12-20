@@ -1612,18 +1612,7 @@ spec:
                       is ComponentReady. The PostProvision Action will be executed
                       only once. Dedicated env vars for the action: - KB_CLUSTER_COMPONENT_LIST:
                       The list of all components in the cluster, joined by '','' (e.g.,
-                      "comp1,comp2"). - KB_CLUSTER_COMPONENT_POD_NAME_LIST: The list
-                      of all pods name in this component, joined by '','' (e.g., "pod1,pod2").
-                      - KB_CLUSTER_COMPONENT_POD_IP_LIST: The list of pod IPs where
-                      each pod resides in this component, corresponding one-to-one
-                      with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. joined
-                      by '','' (e.g., "podIp1,podIp2"). - KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST:
-                      The list of hostName where each pod resides in this component,
-                      corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST.
-                      joined by '','' (e.g., "hostName1,hostName2"). - KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST:
-                      The list of host IPs where each pod resides in this component,
-                      corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST.
-                      joined by '','' (e.g., "hostIp1,hostIp2"). Cannot be updated.'
+                      "comp1,comp2"). Cannot be updated.'
                     properties:
                       builtinHandler:
                         description: builtinHandler specifies the builtin action handler

@@ -332,9 +332,9 @@ func genClusterComponentEnv(cluster *appsv1alpha1.Cluster, pods []corev1.Pod) []
 	compEnvs := make([]corev1.EnvVar, 0)
 	compList := make([]string, 0, len(cluster.Spec.ComponentSpecs))
 	compPodNameList := make([]string, 0, len(pods))
-	compPodIpList := make([]string, 0, len(pods))
+	compPodIPList := make([]string, 0, len(pods))
 	compHostNameList := make([]string, 0, len(pods))
-	compHostIpList := make([]string, 0, len(pods))
+	compHostIPList := make([]string, 0, len(pods))
 
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		compList = append(compList, compSpec.Name)
@@ -346,9 +346,9 @@ func genClusterComponentEnv(cluster *appsv1alpha1.Cluster, pods []corev1.Pod) []
 
 	for _, pod := range pods {
 		compPodNameList = append(compPodNameList, pod.Name)
-		compPodIpList = append(compPodIpList, pod.Status.PodIP)
+		compPodIPList = append(compPodIPList, pod.Status.PodIP)
 		compHostNameList = append(compHostNameList, pod.Spec.NodeName)
-		compHostIpList = append(compHostIpList, pod.Status.HostIP)
+		compHostIPList = append(compHostIPList, pod.Status.HostIP)
 	}
 	compEnvs = append(compEnvs, []corev1.EnvVar{
 		{
@@ -357,7 +357,7 @@ func genClusterComponentEnv(cluster *appsv1alpha1.Cluster, pods []corev1.Pod) []
 		},
 		{
 			Name:  kbPostProvisionClusterCompPodIPList,
-			Value: strings.Join(compPodIpList, ","),
+			Value: strings.Join(compPodIPList, ","),
 		},
 		{
 			Name:  kbPostProvisionClusterCompPodHostNameList,
@@ -365,7 +365,7 @@ func genClusterComponentEnv(cluster *appsv1alpha1.Cluster, pods []corev1.Pod) []
 		},
 		{
 			Name:  kbPostProvisionClusterCompPodHostIPList,
-			Value: strings.Join(compHostIpList, ","),
+			Value: strings.Join(compHostIPList, ","),
 		}}...)
 
 	return compEnvs

@@ -80,14 +80,13 @@ const (
 	shell2httpImage              = "msoap/shell2http:1.16.0"
 	shell2httpBinaryPath         = "/app/shell2http"
 	shell2httpServePath          = "/role"
-	defaultRoleProbeAgentImage   = "apecloud/kubeblocks-tools:latest"
 	defaultRoleProbeDaemonPort   = 7373
 	defaultRoleProbeGRPCPort     = 50101
 	roleProbeGRPCPortName        = "probe-grpc-port"
 	httpRoleProbePath            = "/v1.0/checkrole"
 	grpcHealthProbeBinaryPath    = "/bin/grpc_health_probe"
 	grpcHealthProbeArgsFormat    = "-addr=:%d"
-	defaultActionImage           = "busybox:latest"
+	defaultActionImage           = "busybox:1.35"
 	usernameCredentialVarName    = "KB_RSM_USERNAME"
 	passwordCredentialVarName    = "KB_RSM_PASSWORD"
 	servicePortVarName           = "KB_RSM_SERVICE_PORT"

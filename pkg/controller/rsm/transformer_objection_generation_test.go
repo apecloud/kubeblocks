@@ -185,6 +185,12 @@ var _ = Describe("object generation transformer test.", func() {
 			templateCopy.Spec.Containers = append(templateCopy.Spec.Containers, corev1.Container{
 				Name:  constant.RoleProbeContainerName,
 				Image: "bar",
+				Ports: []corev1.ContainerPort{
+					{
+						Name:          constant.LorryGRPCPortName,
+						ContainerPort: defaultRoleProbeGRPCPort,
+					},
+				},
 			})
 			injectRoleProbeBaseContainer(*rsm, templateCopy, "", nil)
 			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
@@ -220,7 +226,12 @@ var _ = Describe("object generation transformer test.", func() {
 			templateCopy.Spec.Containers = append(templateCopy.Spec.Containers, corev1.Container{
 				Name:  constant.RoleProbeContainerName,
 				Image: "bar",
-				Ports: nil,
+				Ports: []corev1.ContainerPort{
+					{
+						Name:          constant.LorryGRPCPortName,
+						ContainerPort: defaultRoleProbeGRPCPort,
+					},
+				},
 			})
 			injectRoleProbeBaseContainer(*rsm, templateCopy, "", nil)
 			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
@@ -238,7 +249,7 @@ var _ = Describe("object generation transformer test.", func() {
 				Ports: []corev1.ContainerPort{
 					{
 						Name:          constant.LorryGRPCPortName,
-						ContainerPort: -9999,
+						ContainerPort: defaultRoleProbeGRPCPort,
 					},
 				},
 			})

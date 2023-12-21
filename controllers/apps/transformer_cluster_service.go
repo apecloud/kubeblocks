@@ -24,7 +24,6 @@ import (
 	"reflect"
 	"strings"
 
-	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -57,14 +56,20 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 	}
 
 	for _, svc := range cluster.Spec.Services {
-		service, err := t.buildService(transCtx, cluster, &svc)
+		genServices, err := t.genMultiServicesIfNeed(transCtx, cluster, &svc)
 		if err != nil {
 			return err
 		}
-		if err = createOrUpdateService(ctx, dag, graphCli, service); err != nil {
-			return err
+		for _, genSvc := range genServices {
+			service, err := t.buildService(transCtx, cluster, genSvc)
+			if err != nil {
+				return err
+			}
+			if err = createOrUpdateService(ctx, dag, graphCli, service); err != nil {
+				return err
+			}
+			delete(services, service.Name)
 		}
-		delete(services, service.Name)
 	}
 
 	for svc := range services {
@@ -74,6 +79,53 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 	return nil
 }
 
+func (t *clusterServiceTransformer) genMultiServicesIfNeed(transCtx *clusterTransformContext,
+	cluster *appsv1alpha1.Cluster, service *appsv1alpha1.Service) ([]*appsv1alpha1.Service, error) {
+	if !service.GeneratePodOrdinalService {
+		serviceName := constant.GenerateClusterServiceName(cluster.Name, service.ServiceName)
+		service.ServiceName = serviceName
+		return []*appsv1alpha1.Service{service}, nil
+	}
+
+	if len(service.ComponentSelector) == 0 {
+		return nil, fmt.Errorf("the componentSelector of service is required when generatePodOrdinalService is true, service: %s", service.Name)
+	}
+
+	compName := ""
+	compReplicas := int32(0)
+	for _, compSpec := range transCtx.ComponentSpecs {
+		if compSpec.Name == service.ComponentSelector {
+			compName = service.ComponentSelector
+			compReplicas = compSpec.Replicas
+			break
+		}
+	}
+
+	if len(compName) == 0 {
+		return nil, fmt.Errorf("the componentSelector does not exist, service: %s, componentSelector: %s", service.Name, service.ComponentSelector)
+	}
+
+	podOrdinalServices := make([]*appsv1alpha1.Service, 0, compReplicas)
+	for i := int32(0); i < compReplicas; i++ {
+		svc := service.DeepCopy()
+		svc.Name = fmt.Sprintf("%s-%d", service.Name, i)
+		serviceNamePrefix := constant.GenerateClusterComponentName(cluster.Name, compName)
+		if len(service.ServiceName) == 0 {
+			svc.ServiceName = fmt.Sprintf("%s-%d", serviceNamePrefix, i)
+		} else {
+			svc.ServiceName = fmt.Sprintf("%s-%s-%d", serviceNamePrefix, service.ServiceName, i)
+		}
+		if svc.Spec.Selector == nil {
+			svc.Spec.Selector = make(map[string]string)
+		}
+		// TODO(xingran): use StatefulSet's podName as default selector to select unique pod
+		svc.Spec.Selector[constant.StatefulSetPodNameLabelKey] = constant.GeneratePodName(cluster.Name, compName, int(i))
+		podOrdinalServices = append(podOrdinalServices, svc)
+	}
+
+	return podOrdinalServices, nil
+}
+
 func (t *clusterServiceTransformer) buildService(transCtx *clusterTransformContext,
 	cluster *appsv1alpha1.Cluster, service *appsv1alpha1.Service) (*corev1.Service, error) {
 	var (
@@ -81,8 +133,7 @@ func (t *clusterServiceTransformer) buildService(transCtx *clusterTransformConte
 		clusterName = cluster.Name
 	)
 
-	serviceName := constant.GenerateClusterServiceName(clusterName, service.ServiceName)
-	builder := builder.NewServiceBuilder(namespace, serviceName).
+	builder := builder.NewServiceBuilder(namespace, service.ServiceName).
 		AddLabelsInMap(constant.GetClusterWellKnownLabels(clusterName)).
 		SetSpec(&service.Spec).
 		AddSelectorsInMap(t.builtinSelector(cluster)).
@@ -95,7 +146,7 @@ func (t *clusterServiceTransformer) buildService(transCtx *clusterTransformConte
 		}
 		builder.AddSelector(constant.KBAppComponentLabelKey, service.ComponentSelector)
 
-		if len(service.RoleSelector) > 0 {
+		if len(service.RoleSelector) > 0 && !service.GeneratePodOrdinalService {
 			if err := t.checkComponentRoles(compDef, service); err != nil {
 				return nil, err
 			}
@@ -107,13 +158,8 @@ func (t *clusterServiceTransformer) buildService(transCtx *clusterTransformConte
 
 func (t *clusterServiceTransformer) builtinSelector(cluster *appsv1alpha1.Cluster) map[string]string {
 	selectors := map[string]string{
-		constant.AppManagedByLabelKey: "",
-		constant.AppInstanceLabelKey:  "",
-	}
-	for _, key := range maps.Keys(selectors) {
-		if val, ok := cluster.Labels[key]; ok {
-			selectors[key] = val
-		}
+		constant.AppManagedByLabelKey: constant.AppName,
+		constant.AppInstanceLabelKey:  cluster.Name,
 	}
 	return selectors
 }

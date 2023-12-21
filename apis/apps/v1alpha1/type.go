@@ -382,7 +382,7 @@ type ProvisionScope string
 const (
 	// AllPods will create accounts for all pods belong to the component.
 	AllPods ProvisionScope = "AllPods"
-	// AndyPods will only create accounts on one pod.
+	// AnyPods will only create accounts on one pod.
 	AnyPods ProvisionScope = "AnyPods"
 )
 
@@ -591,16 +591,20 @@ type StatefulSetWorkload interface {
 }
 
 type Service struct {
-	// The name of the service.
+	// Name defines the name or namePrefix of the service.
+	// if GeneratePodOrdinalService sets to true, the Name indicates the namePrefix of the service and the fullName will be generated with named pattern <Service.Name>-<PodOrdinal>.
+	// otherwise, it indicates the name of the service.
 	// Others can refer to this service by its name. (e.g., connection credential)
 	// Cannot be updated.
 	// +required
 	Name string `json:"name"`
 
-	// ServiceName defines the name of the underlying service object.
+	// ServiceName defines the name or namePrefix of the underlying service object.
+	// if GeneratePodOrdinalService sets to true, the ServiceName indicates the namePrefix of the underlying service object. otherwise, it indicates the name of the underlying service object.
 	// If not specified, the default service name with different patterns will be used:
 	//  - <CLUSTER_NAME>: for cluster-level services
 	//  - <CLUSTER_NAME>-<COMPONENT_NAME>: for component-level services
+	//  - <CLUSTER_NAME>-<COMPONENT_NAME>-<POD_ORDINAL>: for pod-level services when GeneratePodOrdinalService set to true
 	// Only one default service name is allowed.
 	// Cannot be updated.
 	// +optional
@@ -613,12 +617,33 @@ type Service struct {
 
 	// ComponentSelector extends the ServiceSpec.Selector by allowing you to specify a component as selectors for the service.
 	// For component-level services, a default component selector with the component name will be added automatically.
+	// if GeneratePodOrdinalService sets to true, ComponentSelector must be specified.
 	// +optional
 	ComponentSelector string `json:"componentSelector,omitempty"`
 
 	// RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined role as selector for the service.
+	// if GeneratePodOrdinalService sets to true, RoleSelector will be ignored.
 	// +optional
 	RoleSelector string `json:"roleSelector,omitempty"`
+
+	// GeneratePodOrdinalService indicates whether to create a corresponding Service for each Pod of the selected Component.
+	// If sets to true, a set of Service will be automatically generated for each Pod. and ComponentSelector must be specified.
+	// They can be referred to by adding the PodOrdinal to the defined ServiceName with named pattern <Service.ServiceName>-<PodOrdinal>.
+	// For example, a Service might be defined as follows:
+	// - name: my-service
+	//   serviceName: my-service
+	//   generatePodOrdinalService: true
+	//   componentSelector: my-component
+	//   spec:
+	//     type: NodePort
+	//     ports:
+	//     - name: http
+	//       port: 80
+	//       targetPort: 8080
+	// Assuming that the Component has 3 replicas, then three services would be generated: my-service-0, my-service-1, and my-service-2, each pointing to its respective Pod.
+	// +kubebuilder:default=false
+	// +optional
+	GeneratePodOrdinalService bool `json:"generatePodOrdinalService,omitempty"`
 }
 
 // List of all the built-in variables provided by KubeBlocks.
@@ -717,6 +742,9 @@ type ServiceVars struct {
 
 	// +optional
 	Port *NamedVar `json:"port,omitempty"`
+
+	// +optional
+	NodePort *NamedVar `json:"nodePort,omitempty"`
 }
 
 // CredentialVars defines the vars can be referenced from a Credential (SystemAccount).
@@ -747,6 +775,26 @@ type ServiceVarSelector struct {
 	ClusterObjectReference `json:",inline"`
 
 	ServiceVars `json:",inline"`
+
+	// GeneratePodOrdinalServiceVar indicates whether to create a corresponding ServiceVars reference variable for each Pod.
+	// If set to true, a set of ServiceVars that can be referenced will be automatically generated for each Pod Ordinal.
+	// They can be referred to by adding the PodOrdinal to the defined name template with named pattern $<Vars[x].Name>_<PodOrdinal>.
+	// For example, a ServiceVarRef might be defined as follows:
+	// - name: MY_SERVICE_PORT
+	//   valueFrom:
+	//     serviceVarRef:
+	//       compDef: my-component-definition
+	//       name: my-service
+	//       optional: true
+	//       generatePodOrdinalServiceVar: true
+	//       port:
+	//         name: redis-sentinel
+	// Assuming that the Component has 3 replicas, then you can reference the port of existing services named my-service-0, my-service-1,
+	// and my-service-2 with $MY_SERVICE_PORT_0, $MY_SERVICE_PORT_1, and $MY_SERVICE_PORT_2, respectively.
+	// It should be used in conjunction with Service.GeneratePodOrdinalService.
+	// +kubebuilder:default=false
+	// +optional
+	GeneratePodOrdinalServiceVar bool `json:"generatePodOrdinalServiceVar,omitempty"`
 }
 
 // CredentialVarSelector selects a var from a Credential (SystemAccount).

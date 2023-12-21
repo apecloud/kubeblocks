@@ -60,6 +60,15 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 			return err
 		}
 	}
+
+	// synthesizeComp.Services is the legacy service definition just for backward compatibility purpose.
+	// synthesizeComp.Services is used to expose load balancer which needs to be removed in the future.
+	for _, legacyService := range synthesizeComp.Services {
+		if err := createOrUpdateService(ctx, dag, graphCli, &legacyService); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

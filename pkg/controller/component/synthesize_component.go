@@ -420,6 +420,17 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 				synthesizeComp.Services = append(synthesizeComp.Services, service)
 			}
 		}
+
+		for i, service := range synthesizeComp.Services {
+			selector := service.Spec.Selector
+			if selector == nil {
+				selector = make(map[string]string, 0)
+			}
+			selector[constant.AppManagedByLabelKey] = constant.AppName
+			selector[constant.AppInstanceLabelKey] = cluster.Name
+			selector[constant.KBAppComponentLabelKey] = synthesizeComp.Name
+			synthesizeComp.Services[i].Spec.Selector = selector
+		}
 	}
 
 	mergeClusterCompVersion := func() {

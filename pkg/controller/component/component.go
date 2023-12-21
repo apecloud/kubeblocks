@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -86,6 +87,10 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1
 	value, ok := cluster.GetAnnotations()[constant.IgnoreResourceConstraint]
 	if ok {
 		compBuilder.AddAnnotations(constant.IgnoreResourceConstraint, value)
+	}
+	if common.IsCompactMode(cluster.GetAnnotations()) {
+		compBuilder.AddAnnotations(constant.FeatureReconciliationInCompactModeAnnotationKey,
+			cluster.GetAnnotations()[constant.FeatureReconciliationInCompactModeAnnotationKey])
 	}
 	return compBuilder.GetObject(), nil
 }

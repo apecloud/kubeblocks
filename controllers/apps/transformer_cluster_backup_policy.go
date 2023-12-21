@@ -30,6 +30,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -58,6 +59,11 @@ var _ graph.Transformer = &clusterBackupPolicyTransformer{}
 func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	r.clusterTransformContext = ctx.(*clusterTransformContext)
 	if model.IsObjectDeleting(r.clusterTransformContext.OrigCluster) {
+		return nil
+	}
+	if common.IsCompactMode(r.clusterTransformContext.OrigCluster.Annotations) {
+		r.clusterTransformContext.V(1).Info("Cluster is in compact mode, no need to create backup related objects",
+			"cluster", client.ObjectKeyFromObject(r.clusterTransformContext.OrigCluster))
 		return nil
 	}
 

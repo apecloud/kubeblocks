@@ -31,6 +31,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -48,6 +49,11 @@ var _ graph.Transformer = &componentRBACTransformer{}
 func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
 	if model.IsObjectDeleting(transCtx.ComponentOrig) {
+		return nil
+	}
+	if common.IsCompactMode(transCtx.ComponentOrig.Annotations) {
+		transCtx.V(1).Info("Component is in compact mode, no need to create rbac related objects",
+			"component", client.ObjectKeyFromObject(transCtx.ComponentOrig))
 		return nil
 	}
 

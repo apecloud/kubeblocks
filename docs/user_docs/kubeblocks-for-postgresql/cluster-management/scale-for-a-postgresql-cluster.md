@@ -6,7 +6,7 @@ sidebar_position: 2
 sidebar_label: Scale
 ---
 
-# Scale for PostgreSQL
+# Scale for a PostgreSQL cluster
 
 Currently, only vertical scaling for PostgreSQL is supported.
 

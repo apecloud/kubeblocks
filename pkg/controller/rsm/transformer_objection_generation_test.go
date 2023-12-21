@@ -157,9 +157,6 @@ var _ = Describe("object generation transformer test.", func() {
 	Context("Transform function for rsm managing pods", func() {
 		It("should work well", func() {
 			pods := mockUnderlyingPods(*rsmForPods)
-			headlessSvc := builder.NewHeadlessServiceBuilder(name, getHeadlessSvcName(*rsmForPods)).GetObject()
-			svc := builder.NewServiceBuilder(name, name).GetObject()
-			env := builder.NewConfigMapBuilder(name, name+"-rsm-env").GetObject()
 			k8sMock.EXPECT().
 				List(gomock.Any(), &corev1.PodList{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, list *corev1.PodList, _ ...client.ListOption) error {
@@ -179,12 +176,6 @@ var _ = Describe("object generation transformer test.", func() {
 			dagExpected := mockDAGForPods()
 			for i := range pods {
 				graphCli.Create(dagExpected, &pods[i])
-			}
-			graphCli.Create(dagExpected, headlessSvc)
-			graphCli.Create(dagExpected, svc)
-			graphCli.Create(dagExpected, env)
-			for i := range pods {
-				graphCli.DependOn(dagExpected, &pods[i], headlessSvc, svc, env)
 			}
 
 			// do Transform

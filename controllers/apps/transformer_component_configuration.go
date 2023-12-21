@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"github.com/apecloud/kubeblocks/pkg/common"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -45,6 +46,11 @@ func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext
 	synthesizeComp := transCtx.SynthesizeComponent
 
 	if model.IsObjectDeleting(compOrig) {
+		return nil
+	}
+	if common.IsCompactMode(compOrig.Annotations) {
+		transCtx.V(1).Info("Component is in compact mode, no need to create configuration related objects",
+			"component", client.ObjectKeyFromObject(transCtx.ComponentOrig))
 		return nil
 	}
 

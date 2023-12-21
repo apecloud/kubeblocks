@@ -118,6 +118,10 @@ const (
 	OpsRequestNameLabelKey                   = "ops.kubeblocks.io/ops-name"
 	ServiceDescriptorNameLabelKey            = "servicedescriptor.kubeblocks.io/name"
 	RestoreForHScaleLabelKey                 = "apps.kubeblocks.io/restore-for-hscale"
+	ResourceConstraintProviderLabelKey       = "resourceconstraint.kubeblocks.io/provider"
+
+	// StatefulSetPodNameLabelKey is used to mark the pod name of the StatefulSet
+	StatefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
 
 	// kubeblocks.io annotations
 	ClusterSnapshotAnnotationKey                = "kubeblocks.io/cluster-snapshot"           // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
@@ -144,7 +148,6 @@ const (
 	KubeBlocksGenerationKey                     = "kubeblocks.io/generation"
 	ExtraEnvAnnotationKey                       = "kubeblocks.io/extra-env"
 	LastRoleSnapshotVersionAnnotationKey        = "apps.kubeblocks.io/last-role-snapshot-version"
-	ResourceConstraintProviderLabelKey          = "resourceconstraint.kubeblocks.io/provider"
 
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName             = "cluster.kubeblocks.io/finalizer"

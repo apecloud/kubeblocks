@@ -191,6 +191,7 @@ func (r *ComponentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&policyv1.PodDisruptionBudget{}).
 		Owns(&batchv1.Job{}).
+		Owns(&appsv1alpha1.Configuration{}).
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources))
 
 	if viper.GetBool(constant.EnableRBACManager) {

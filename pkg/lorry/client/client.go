@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package client
 
 import (
-	context "context"
+	"context"
 	"errors"
 	"net/http"
 
@@ -53,12 +53,12 @@ func NewClient(pod corev1.Pod) (Client, error) {
 		return mockClient, mockClientError
 	}
 
-	_, err := rest.InClusterConfig()
+	config, err := rest.InClusterConfig()
 	if err != nil {
 		// As the service does not run as a pod in the Kubernetes cluster,
 		// it is unable to call the lorry service running as a pod using the pod's IP address.
 		// In this scenario, it is recommended to use an k8s exec client instead.
-		execClient, err := NewK8sExecClientWithPod(&pod)
+		execClient, err := NewK8sExecClientWithPod(config, &pod)
 		if err != nil {
 			return nil, err
 		}

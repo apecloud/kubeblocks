@@ -407,7 +407,6 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 		if clusterCompDef.Service != nil {
 			service := corev1.Service{Spec: clusterCompDef.Service.ToSVCSpec()}
 			service.Spec.Type = corev1.ServiceTypeClusterIP
-			synthesizeComp.Services = append(synthesizeComp.Services, service)
 			for _, item := range clusterCompSpec.Services {
 				service = corev1.Service{
 					ObjectMeta: metav1.ObjectMeta{

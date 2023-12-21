@@ -23,13 +23,13 @@ kbcli cluster list mongodb-cluster
 Use `kbcli cluster volume-expand` command, configure the resources required and enter the cluster name again to expand the volume.
 
 ```bash
-kbcli cluster volume-expand --storage=30G --component-names=mongodb --volume-claim-templates=data mongodb-cluster
+kbcli cluster volume-expand --storage=30G --components=mongodb --volume-claim-templates=data mongodb-cluster
 >
 OpsRequest mongodb-cluster-volumeexpansion-gcfzp created successfully, you can view the progress:
         kbcli cluster describe-ops mongodb-cluster-volumeexpansion-gcfzp -n default
 ```
 
-- `--component-names` describes the component name for volume expansion.
+- `--components` describes the component name for volume expansion.
 - `--volume-claim-templates` describes the VolumeClaimTemplate names in components.
 - `--storage` describes the volume storage size.
 

@@ -97,7 +97,7 @@ For Linux and macOS, you can edit configuration files by vi. For Windows, you ca
 
    If there are multiple components in a cluster, use `--component` to specify a component.
 
-   ::
+   :::
 
 2. View the status of the parameter configuration.
 

@@ -12,7 +12,7 @@ KubeBlocks is kubernetes-native, you can use Helm to install it.
 :::note
 
 If you install KubeBlocks with Helm, to uninstall it, you have to use Helm too.
-
+Make sure you have [kubectl](https://kubernetes.io/docs/tasks/tools/) and [Helm](https://helm.sh/docs/intro/install/) installed.
 :::
 
 
@@ -46,17 +46,20 @@ If you install KubeBlocks with Helm, to uninstall it, you have to use Helm too.
 </table>
 
 ## Installation steps
+
 **Use Helm to install KubeBlocks**
 
 Run the following command:
+
 ```bash
 helm repo add kubeblocks https://apecloud.github.io/helm-charts
 helm repo update
 helm install kubeblocks kubeblocks/kubeblocks \
     --namespace kb-system --create-namespace
-````
+```
 
 If you want to install KubeBlocks with custom tolerations, you can use the following command:
+
 ```bash
 helm install kubeblocks kubeblocks/kubeblocks \
     --namespace kb-system --create-namespace \
@@ -64,21 +67,37 @@ helm install kubeblocks kubeblocks/kubeblocks \
     --set-json 'dataPlane.tolerations=[{ "key": "data-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]'
 ```
 
+If you want to install KubeBlocks with a specified version, follow the steps below.
+
+1. View the available versions in [KubeBlocks Release](https://github.com/apecloud/kubeblocks/releases/).
+2. Specify a version with `--version` and run the command below.
+
+   ```bash
+   helm install kubeblocks kubeblocks/kubeblocks \
+    --namespace kb-system --create-namespace --version="x.x.x"
+   ```
+
+  :::note
+
+  By default, the latest release version is installed.
+
+  :::
+
 ## Verify KubeBlocks installation
 
 Run the following command to check whether KubeBlocks is installed successfully.
 
 ```bash
-kubectl get pods --all-namespaces -l "app.kubernetes.io/instance=kubeblocks" -w
-
-NAME                                                     READY   STATUS      RESTARTS   AGE
-kubeblocks-846b8878d9-q8g2w                              1/1     Running     0          98s
+kubectl -n kb-system get pods
 ```
 
-If the operator pods are all `Running`, KubeBlocks has been installed successfully. You can cancel the above command by typing `Ctrl+C`.
+***Result***
 
-:::note
+If the KubeBlocks Workloads are all ready, KubeBlocks has been installed successfully.
 
-Clusters installed through `helm` need to be deleted using `helm` to avoid resource residue.
-
-:::
+```bash
+NAME                                            READY   STATUS    RESTARTS      AGE
+kb-addon-snapshot-controller-649f8b9949-2wzzk   1/1     Running   2 (24m ago)   147d
+kubeblocks-dataprotection-f6dbdbf7f-5fdr9       1/1     Running   2 (24m ago)   147d
+kubeblocks-6497f7947-mc7vc                      1/1     Running   2 (24m ago)   147d
+```

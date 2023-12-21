@@ -6,7 +6,7 @@ sidebar_position: 3
 sidebar_label: Scale
 ---
 
-# Scale a Kafka cluster
+# Scale for a Kafka cluster
 
 You can scale a Kafka cluster in two ways, vertical scaling and horizontal scaling.
 
@@ -146,12 +146,12 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 - You are not recommended to perform horizontal scaling on the controller node, including the controller node both in combined mode and separated node.
 - When scaling in horizontally, you must know the topic partition storage. If the topic has only one replication, data loss may caused when you scale in broker.
 
- ```bash
-kbcli cluster list
->
-NAME    NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME                 
-ivy85   default     kafka                kafka-3.3.2   Delete               Running   Jul 19,2023 18:01 UTC+0800   
-```
+  ```bash
+  kbcli cluster list
+  >
+  NAME    NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME                 
+  ivy85   default     kafka                kafka-3.3.2   Delete               Running   Jul 19,2023 18:01 UTC+0800   
+  ```
 
 ### Steps
 

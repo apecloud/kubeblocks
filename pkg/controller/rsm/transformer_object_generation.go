@@ -437,9 +437,9 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 	}
 	credential := rsm.Spec.Credential
 	image := viper.GetString(constant.KBToolsImage)
-	probeDaemonPort := viper.GetInt("ROLE_PROBE_SERVICE_PORT")
-	if probeDaemonPort == 0 {
-		probeDaemonPort = defaultRoleProbeDaemonPort
+	probeHTTPPort := viper.GetInt("ROLE_SERVICE_HTTP_PORT")
+	if probeHTTPPort == 0 {
+		probeHTTPPort = defaultRoleProbeDaemonPort
 	}
 	probeGRPCPort := viper.GetInt("ROLE_PROBE_GRPC_PORT")
 	if probeGRPCPort == 0 {
@@ -575,7 +575,7 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 	} else {
 		readinessProbe.HTTPGet = &corev1.HTTPGetAction{
 			Path: httpRoleProbePath,
-			Port: intstr.FromInt(probeDaemonPort),
+			Port: intstr.FromInt(probeHTTPPort),
 		}
 	}
 
@@ -610,50 +610,27 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 	if container := tryToGetRoleProbeContainer(); container != nil {
 		if roleProbe.RoleUpdateMechanism == workloads.ReadinessProbeEventUpdate {
 			port := tryToGetLorryGrpcPort(container)
-			var portNum int
-			if port == nil {
-				portNum = probeGRPCPort
-				grpcPort := corev1.ContainerPort{
-					Name:          roleProbeGRPCPortName,
-					ContainerPort: int32(portNum),
-					Protocol:      "TCP",
+			if port != nil && port.ContainerPort != int32(probeGRPCPort) {
+				readinessProbe.Exec.Command = []string{
+					grpcHealthProbeBinaryPath,
+					fmt.Sprintf(grpcHealthProbeArgsFormat, port.ContainerPort),
 				}
-				container.Ports = append(container.Ports, grpcPort)
-			} else {
-				// if containerPort is invalid, adjust it
-				if port.ContainerPort < 0 || port.ContainerPort > 65536 {
-					port.ContainerPort = int32(probeGRPCPort)
-				}
-				portNum = int(port.ContainerPort)
-			}
-			readinessProbe.Exec.Command = []string{
-				grpcHealthProbeBinaryPath,
-				fmt.Sprintf(grpcHealthProbeArgsFormat, portNum),
 			}
 		} else {
 			port := tryToGetLorryHTTPPort(container)
-			var portNum int
-			if port == nil {
-				portNum = probeDaemonPort
-				httpPort := corev1.ContainerPort{
-					Name:          constant.LorryHTTPPortName,
-					ContainerPort: int32(portNum),
-					Protocol:      "TCP",
+			if port != nil && port.ContainerPort != int32(probeHTTPPort) {
+				readinessProbe.HTTPGet = &corev1.HTTPGetAction{
+					Path: httpRoleProbePath,
+					Port: intstr.FromInt(int(port.ContainerPort)),
 				}
-				container.Ports = append(container.Ports, httpPort)
-			} else {
-				// if containerPort is invalid, adjust it
-				if port.ContainerPort < 0 || port.ContainerPort > 65536 {
-					port.ContainerPort = int32(probeDaemonPort)
-				}
-				portNum = int(port.ContainerPort)
-			}
-			readinessProbe.HTTPGet = &corev1.HTTPGetAction{
-				Path: httpRoleProbePath,
-				Port: intstr.FromInt(portNum),
 			}
 		}
-		container.ReadinessProbe = readinessProbe
+
+		if !reflect.DeepEqual(container.ReadinessProbe, readinessProbe) {
+			container.ReadinessProbe = readinessProbe
+			container.Image = image
+		}
+
 		for _, e := range env {
 			if slices.IndexFunc(container.Env, func(v corev1.EnvVar) bool {
 				return v.Name == e.Name
@@ -672,13 +649,13 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddCommands([]string{
 			roleProbeBinaryName,
-			"--port", strconv.Itoa(probeDaemonPort),
+			"--port", strconv.Itoa(probeHTTPPort),
 			"--grpcport", strconv.Itoa(probeGRPCPort),
 		}...).
 		AddEnv(env...).
 		AddPorts(
 			corev1.ContainerPort{
-				ContainerPort: int32(probeDaemonPort),
+				ContainerPort: int32(probeHTTPPort),
 				Name:          roleProbeContainerName,
 				Protocol:      "TCP",
 			},

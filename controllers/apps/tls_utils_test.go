@@ -324,13 +324,6 @@ var _ = Describe("TLS self-signed cert function", func() {
 				clusterObj.Spec.ComponentSpecs[0].TLS = true
 				clusterObj.Spec.ComponentSpecs[0].Issuer = &appsv1alpha1.Issuer{Name: appsv1alpha1.IssuerKubeBlocks}
 				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
-
-				conf := &appsv1alpha1.Configuration{}
-				confKey := client.ObjectKey{Namespace: sts.Namespace, Name: cfgcore.GenerateComponentConfigurationName(clusterObj.Name, clusterObj.Spec.ComponentSpecs[0].Name)}
-				Expect(k8sClient.Get(ctx, confKey, conf)).Should(Succeed())
-				patch2 := client.MergeFrom(conf.DeepCopy())
-				conf.Spec.ConfigItemDetails[0].Version = "v1"
-				Expect(k8sClient.Patch(ctx, conf, patch2)).Should(Succeed())
 				Eventually(hasTLSSettings).Should(BeTrue())
 
 				By("update tls to disabled")
@@ -338,12 +331,6 @@ var _ = Describe("TLS self-signed cert function", func() {
 				clusterObj.Spec.ComponentSpecs[0].TLS = false
 				clusterObj.Spec.ComponentSpecs[0].Issuer = nil
 				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
-
-				Expect(k8sClient.Get(ctx, confKey, conf)).Should(Succeed())
-				patch2 = client.MergeFrom(conf.DeepCopy())
-				conf.Spec.ConfigItemDetails[0].Version = "v2"
-				Expect(k8sClient.Patch(ctx, conf, patch2)).Should(Succeed())
-
 				Eventually(hasTLSSettings).Should(BeFalse())
 			})
 		})

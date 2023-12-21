@@ -30,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -45,7 +44,7 @@ import (
 func GetComponentPods(params reconfigureParams) ([]corev1.Pod, error) {
 	componentPods := make([]corev1.Pod, 0)
 	for i := range params.ComponentUnits {
-		pods, err := common.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, &params.ComponentUnits[i])
+		pods, err := intctrlutil.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, &params.ComponentUnits[i])
 		if err != nil {
 			return nil, err
 		}

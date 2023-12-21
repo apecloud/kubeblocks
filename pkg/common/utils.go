@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package common
 
 import (
+	"math"
 	"strings"
 
 	"golang.org/x/text/cases"
@@ -49,4 +50,14 @@ func IsCompactMode(annotations map[string]string) bool {
 	}
 	_, ok := annotations[constant.FeatureReconciliationInCompactModeAnnotationKey]
 	return ok
+}
+
+func SafeAddInt(a, b int) int {
+	if a > 0 && b > math.MaxInt-a {
+		panic("integer overflow")
+	}
+	if a < 0 && b < math.MinInt-a {
+		panic("integer underflow")
+	}
+	return a + b
 }

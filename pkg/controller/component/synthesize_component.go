@@ -411,6 +411,7 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 				service = corev1.Service{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:        item.Name,
+						Namespace:   synthesizeComp.Namespace,
 						Annotations: item.Annotations,
 					},
 					Spec: service.Spec,

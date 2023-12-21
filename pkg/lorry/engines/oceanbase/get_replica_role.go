@@ -29,6 +29,19 @@ import (
 )
 
 func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string, error) {
+	var zoneCount int
+	zoneSQL := "select count(distinct(zone)) from oceanbase.__all_zone where zone!=''"
+	err := mgr.DB.QueryRowContext(ctx, zoneSQL).Scan(&zoneCount)
+	if err != nil {
+		mgr.Logger.Info("query zone info failed", "error", err)
+		return "", err
+	}
+
+	if zoneCount > 1 {
+		mgr.Logger.Info("zone count is more than 1, return no role", "zone count", zoneCount)
+		return "", nil
+	}
+
 	sql := "SELECT TENANT_ROLE FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME='alice'"
 
 	rows, err := mgr.DB.QueryContext(ctx, sql)

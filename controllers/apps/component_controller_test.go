@@ -51,7 +51,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
@@ -1680,7 +1679,7 @@ var _ = Describe("Component Controller", func() {
 
 		By("Checking pods' role are changed accordingly")
 		Eventually(func(g Gomega) {
-			pods, err := common.GetPodListByStatefulSet(ctx, k8sClient, sts)
+			pods, err := intctrlutil.GetPodListByStatefulSet(ctx, k8sClient, sts)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			// should have 3 pods
 			g.Expect(pods).Should(HaveLen(3))
@@ -1705,7 +1704,7 @@ var _ = Describe("Component Controller", func() {
 		})()).Should(Succeed())
 		By("Checking pods' annotations")
 		Eventually(func(g Gomega) {
-			pods, err := common.GetPodListByStatefulSet(ctx, k8sClient, sts)
+			pods, err := intctrlutil.GetPodListByStatefulSet(ctx, k8sClient, sts)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(pods).Should(HaveLen(int(*sts.Spec.Replicas)))
 			for _, pod := range pods {
@@ -1716,7 +1715,7 @@ var _ = Describe("Component Controller", func() {
 		rsmPatch := client.MergeFrom(rsm.DeepCopy())
 		By("Updating RSM's status")
 		rsm.Status.UpdateRevision = "mock-version"
-		pods, err := common.GetPodListByStatefulSet(ctx, k8sClient, sts)
+		pods, err := intctrlutil.GetPodListByStatefulSet(ctx, k8sClient, sts)
 		Expect(err).Should(BeNil())
 		var podList []*corev1.Pod
 		for i := range pods {

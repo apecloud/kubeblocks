@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package common
+package controllerutil
 
 import (
 	"context"
@@ -28,8 +28,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // DescendingOrdinalSts is a sort.Interface that Sorts a list of StatefulSet based on the ordinals extracted from the statefulSet.
@@ -40,7 +38,7 @@ var statefulSetRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 
 // getParentName gets the name of pod's parent StatefulSet. If pod has not parent, the empty string is returned.
 func getParentName(pod *corev1.Pod) string {
-	parent, _ := intctrlutil.GetParentNameAndOrdinal(pod)
+	parent, _ := GetParentNameAndOrdinal(pod)
 	return parent
 }
 

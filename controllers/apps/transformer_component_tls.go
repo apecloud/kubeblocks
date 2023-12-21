@@ -102,7 +102,7 @@ func checkAndTriggerReRender(ctx context.Context, cli roclient.ReadonlyClient, s
 			return client.IgnoreNotFound(err)
 		}
 		confCopy := conf.DeepCopy()
-		confCopy.Spec.ConfigItemDetails[0].Version = fmt.Sprint(time.Now().Unix())
+		confCopy.Spec.ConfigItemDetails[0].Version = fmt.Sprint(time.Now().UnixMilli())
 		graphCli, _ := cli.(model.GraphClient)
 		graphCli.Update(dag, conf, confCopy)
 	}

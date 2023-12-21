@@ -22,10 +22,15 @@ package apps
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -51,6 +56,55 @@ func (t *componentTLSTransformer) Transform(ctx graph.TransformContext, dag *gra
 	// build tls cert
 	if err := buildTLSCert(transCtx.Context, transCtx.Client, *synthesizedComp, dag); err != nil {
 		return err
+	}
+
+	if err := checkAndTriggerReRender(transCtx.Context, transCtx.Client, *synthesizedComp, dag); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// a hack way to notify the configuration controller to re-render config
+func checkAndTriggerReRender(ctx context.Context, cli roclient.ReadonlyClient, synthesizedComp component.SynthesizedComponent, dag *graph.DAG) error {
+	cm := &corev1.ConfigMap{}
+	if len(synthesizedComp.ConfigTemplates) == 0 {
+		return nil
+	}
+
+	tlsKeyword := plan.GetTLSKeyWord(synthesizedComp.CharacterType)
+	if tlsKeyword == "unsupported-character-type" {
+		return nil
+	}
+
+	// we assume the database config is always the first item of configSpecs, this is true for now
+	cmName := cfgcore.GetComponentCfgName(synthesizedComp.ClusterName, synthesizedComp.Name, synthesizedComp.ConfigTemplates[0].Name)
+	if err := cli.Get(ctx, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: cmName}, cm); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+
+	tlsEnabledInCM := false
+	// search all config files
+	for _, configData := range cm.Data {
+		if strings.Index(configData, tlsKeyword) > 0 {
+			tlsEnabledInCM = true
+			break
+		}
+	}
+
+	tls := synthesizedComp.TLSConfig
+	if ((tls == nil || !tls.Enable) && tlsEnabledInCM) ||
+		(tls != nil && tls.Enable && !tlsEnabledInCM) {
+		// tls config changed
+		conf := &appsv1alpha1.Configuration{}
+		confKey := types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: cfgcore.GenerateComponentConfigurationName(synthesizedComp.ClusterName, synthesizedComp.Name)}
+		if err := cli.Get(ctx, confKey, conf); err != nil {
+			return client.IgnoreNotFound(err)
+		}
+		confCopy := conf.DeepCopy()
+		confCopy.Spec.ConfigItemDetails[0].Version = fmt.Sprint(time.Now().Unix())
+		graphCli, _ := cli.(model.GraphClient)
+		graphCli.Update(dag, conf, confCopy)
 	}
 
 	return nil

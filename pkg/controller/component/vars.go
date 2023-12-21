@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
@@ -85,7 +86,7 @@ func setEnvNTemplateVars(templateVars []corev1.EnvVar, envVars []corev1.EnvVar, 
 				copy(newEnv, envVars)
 				c.Env = newEnv
 			} else {
-				newEnv := make([]corev1.EnvVar, len(envVars), len(envVars)+len(c.Env))
+				newEnv := make([]corev1.EnvVar, len(envVars), common.SafeAddInt(len(c.Env), len(envVars)))
 				copy(newEnv, envVars)
 				newEnv = append(newEnv, c.Env...)
 				c.Env = newEnv

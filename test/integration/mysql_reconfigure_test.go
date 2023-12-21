@@ -27,8 +27,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -151,7 +151,7 @@ var _ = Describe("MySQL Reconfigure function", func() {
 
 		By("Checking pods' role label")
 		sts := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey).Items[0]
-		pods, err := common.GetPodListByStatefulSet(testCtx.Ctx, k8sClient, &sts)
+		pods, err := controllerutil.GetPodListByStatefulSet(testCtx.Ctx, k8sClient, &sts)
 		Expect(err).To(Succeed())
 		Expect(len(pods)).Should(Equal(3))
 

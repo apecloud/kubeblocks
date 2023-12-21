@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package common
 
 import (
+	"math"
 	"strings"
 
 	"golang.org/x/text/cases"
@@ -38,4 +39,14 @@ func ToCamelCase(input string) string {
 		words[i] = titleCase.String(word)
 	}
 	return strings.Join(words, "")
+}
+
+func SafeAddInt(a, b int) int {
+	if a > 0 && b > math.MaxInt-a {
+		panic("integer overflow")
+	}
+	if a < 0 && b < math.MinInt-a {
+		panic("integer underflow")
+	}
+	return a + b
 }

@@ -17,27 +17,26 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package common
+package controllerutil
 
 import (
 	"testing"
 
 	apps "k8s.io/api/apps/v1"
 
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
 func TestGetParentNameAndOrdinal(t *testing.T) {
 	set := testk8s.NewFakeStatefulSet("foo", 3)
 	pod := testk8s.NewFakeStatefulSetPod(set, 1)
-	if parent, ordinal := intctrlutil.GetParentNameAndOrdinal(pod); parent != set.Name {
+	if parent, ordinal := GetParentNameAndOrdinal(pod); parent != set.Name {
 		t.Errorf("Extracted the wrong parent name expected %s found %s", set.Name, parent)
 	} else if ordinal != 1 {
 		t.Errorf("Extracted the wrong ordinal expected %d found %d", 1, ordinal)
 	}
 	pod.Name = "1-bar"
-	if parent, ordinal := intctrlutil.GetParentNameAndOrdinal(pod); parent != "" {
+	if parent, ordinal := GetParentNameAndOrdinal(pod); parent != "" {
 		t.Error("Expected empty string for non-member Pod parent")
 	} else if ordinal != -1 {
 		t.Error("Expected -1 for non member Pod ordinal")

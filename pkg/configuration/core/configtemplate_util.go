@@ -21,6 +21,7 @@ package core
 
 import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 )
 
 type ComponentsType interface {
@@ -87,7 +88,7 @@ func MergeConfigTemplates(cvConfigSpecs []appsv1alpha1.ComponentConfigSpec,
 		return cvConfigSpecs
 	}
 
-	mergedCfgTpl := make([]appsv1alpha1.ComponentConfigSpec, 0, len(cvConfigSpecs)+len(cdConfigSpecs))
+	mergedCfgTpl := make([]appsv1alpha1.ComponentConfigSpec, 0, common.SafeAddInt(len(cvConfigSpecs), len(cdConfigSpecs)))
 	mergedTplMap := make(map[string]struct{}, cap(mergedCfgTpl))
 
 	for _, configSpec := range cvConfigSpecs {

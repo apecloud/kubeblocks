@@ -407,11 +407,11 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 		if clusterCompDef.Service != nil {
 			service := corev1.Service{Spec: clusterCompDef.Service.ToSVCSpec()}
 			service.Spec.Type = corev1.ServiceTypeClusterIP
+			synthesizeComp.Services = append(synthesizeComp.Services, service)
 			for _, item := range clusterCompSpec.Services {
 				service = corev1.Service{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:        item.Name,
-						Namespace:   synthesizeComp.Namespace,
 						Annotations: item.Annotations,
 					},
 					Spec: service.Spec,
@@ -419,17 +419,6 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 				service.Spec.Type = item.ServiceType
 				synthesizeComp.Services = append(synthesizeComp.Services, service)
 			}
-		}
-
-		for i, service := range synthesizeComp.Services {
-			selector := service.Spec.Selector
-			if selector == nil {
-				selector = make(map[string]string, 0)
-			}
-			selector[constant.AppManagedByLabelKey] = constant.AppName
-			selector[constant.AppInstanceLabelKey] = cluster.Name
-			selector[constant.KBAppComponentLabelKey] = synthesizeComp.Name
-			synthesizeComp.Services[i].Spec.Selector = selector
 		}
 	}
 

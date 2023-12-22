@@ -11484,6 +11484,12 @@ spec:
                   {clusterName}-{componentName}-headless. Cannot be updated.
                 items:
                   properties:
+                    annotations:
+                      additionalProperties:
+                        type: string
+                      description: 'If ServiceType is LoadBalancer, cloud provider
+                        related parameters can be put here More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.'
+                      type: object
                     componentSelector:
                       description: ComponentSelector extends the ServiceSpec.Selector
                         by allowing you to specify a component as selectors for the

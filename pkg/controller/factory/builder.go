@@ -166,7 +166,7 @@ func randomString(length int) string {
 }
 
 func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent) *corev1.Secret {
+	synthesizedComp *component.SynthesizedComponent) *corev1.Secret {
 	wellKnownLabels := constant.GetKBWellKnownLabels(clusterDefinition.Name, cluster.Name, "")
 	delete(wellKnownLabels, constant.KBAppComponentLabelKey)
 	credentialBuilder := builder.NewSecretBuilder(cluster.Namespace, constant.GenerateDefaultConnCredential(cluster.Name)).
@@ -224,7 +224,7 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 		if err != nil {
 			return ""
 		}
-		backupSource, ok := backupMap[component.Name]
+		backupSource, ok := backupMap[synthesizedComp.Name]
 		if !ok {
 			return ""
 		}
@@ -258,12 +258,12 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 		"$(UUID_B64)":      uuidB64,
 		"$(UUID_STR_B64)":  uuidStrB64,
 		"$(UUID_HEX)":      uuidHex,
-		"$(SVC_FQDN)":      constant.GenerateDefaultComponentServiceName(cluster.Name, component.Name),
-		constant.EnvPlaceHolder(constant.KBEnvClusterCompName): constant.GenerateClusterComponentName(cluster.Name, component.Name),
-		"$(HEADLESS_SVC_FQDN)":                                 constant.GenerateDefaultComponentHeadlessServiceName(cluster.Name, component.Name),
+		"$(SVC_FQDN)":      constant.GenerateDefaultComponentServiceName(cluster.Name, synthesizedComp.Name),
+		constant.EnvPlaceHolder(constant.KBEnvClusterCompName): constant.GenerateClusterComponentName(cluster.Name, synthesizedComp.Name),
+		"$(HEADLESS_SVC_FQDN)":                                 constant.GenerateDefaultComponentHeadlessServiceName(cluster.Name, synthesizedComp.Name),
 	}
-	if len(component.Services) > 0 {
-		for _, p := range component.Services[0].Spec.Ports {
+	if len(synthesizedComp.Services) > 0 {
+		for _, p := range synthesizedComp.Services[0].Spec.Ports {
 			m[fmt.Sprintf("$(SVC_PORT_%s)", p.Name)] = strconv.Itoa(int(p.Port))
 		}
 	}

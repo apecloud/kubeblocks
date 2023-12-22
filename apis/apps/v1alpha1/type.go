@@ -644,6 +644,11 @@ type Service struct {
 	// +kubebuilder:default=false
 	// +optional
 	GeneratePodOrdinalService bool `json:"generatePodOrdinalService,omitempty"`
+
+	// If ServiceType is LoadBalancer, cloud provider related parameters can be put here
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // List of all the built-in variables provided by KubeBlocks.

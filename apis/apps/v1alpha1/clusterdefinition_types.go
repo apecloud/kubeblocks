@@ -591,7 +591,7 @@ type ServiceSpec struct {
 	// NOTES: name also need to be key
 }
 
-func (r *ServiceSpec) toSVCPorts() []corev1.ServicePort {
+func (r *ServiceSpec) ToSVCPorts() []corev1.ServicePort {
 	ports := make([]corev1.ServicePort, 0, len(r.Ports))
 	for _, p := range r.Ports {
 		ports = append(ports, p.toSVCPort())
@@ -601,7 +601,7 @@ func (r *ServiceSpec) toSVCPorts() []corev1.ServicePort {
 
 func (r ServiceSpec) ToSVCSpec() corev1.ServiceSpec {
 	return corev1.ServiceSpec{
-		Ports: r.toSVCPorts(),
+		Ports: r.ToSVCPorts(),
 	}
 }
 

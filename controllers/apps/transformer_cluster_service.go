@@ -122,13 +122,14 @@ func (t *clusterServiceTransformer) convertLegacyClusterCompSpecServices(transCt
 		defaultLegacyServicePorts := clusterCompDef.Service.ToSVCPorts()
 
 		for _, item := range clusterCompSpec.Services {
-			legacyServiceExist, err := checkLegacyServiceExist(transCtx, item.Name, cluster.Namespace)
+			legacyServiceName := constant.GenerateComponentServiceName(cluster.Name, clusterCompSpec.Name, item.Name)
+			legacyServiceExist, err := checkLegacyServiceExist(transCtx, legacyServiceName, cluster.Namespace)
 			if err != nil {
 				return nil, nil, err
 			}
 			// the generation converted service name is different with the exist legacy service name, if the legacy service exist, skip it
 			if legacyServiceExist {
-				existLegacyServices = append(existLegacyServices, item.Name)
+				existLegacyServices = append(existLegacyServices, legacyServiceName)
 				continue
 			}
 			legacyService := &appsv1alpha1.Service{

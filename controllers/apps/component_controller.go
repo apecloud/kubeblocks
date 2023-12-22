@@ -191,7 +191,7 @@ func (r *ComponentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&policyv1.PodDisruptionBudget{}).
 		Owns(&batchv1.Job{}).
-		Owns(&appsv1alpha1.Configuration{}).
+		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler)).
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources))
 
 	if viper.GetBool(constant.EnableRBACManager) {
@@ -224,6 +224,21 @@ func (r *ComponentReconciler) filterComponentResources(ctx context.Context, obj 
 			NamespacedName: types.NamespacedName{
 				Namespace: obj.GetNamespace(),
 				Name:      fullCompName,
+			},
+		},
+	}
+}
+
+func (r *ComponentReconciler) configurationEventHandler(ctx context.Context, obj client.Object) []reconcile.Request {
+	if _, ok := obj.(*appsv1alpha1.Configuration); !ok {
+		return []reconcile.Request{}
+	}
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Namespace: obj.GetNamespace(),
+				// hack: depends on that the name of configuration object is same as Component, check GenerateComponentConfigurationName for reference.
+				Name: obj.GetName(),
 			},
 		},
 	}

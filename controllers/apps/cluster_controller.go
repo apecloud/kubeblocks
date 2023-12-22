@@ -140,8 +140,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&ClusterAPINormalizationTransformer{},
 			// handle cluster services
 			&clusterServiceTransformer{},
-			// handle restore before clusterComponentTransformer
-			&clusterRestoreTransformer{Client: r.Client},
 			// create all cluster components objects
 			&clusterComponentTransformer{},
 			// update cluster components' status

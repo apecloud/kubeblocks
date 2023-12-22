@@ -78,7 +78,7 @@ func NewRestoreManager(ctx context.Context,
 	}
 }
 
-func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent) error {
+func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent, compObj *appsv1alpha1.Component) error {
 	backupObj, err := r.initFromAnnotation(comp)
 	if err != nil {
 		return err
@@ -92,7 +92,7 @@ func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent) error {
 	if err = r.DoPrepareData(comp, backupObj); err != nil {
 		return err
 	}
-	if err = r.DoPostReady(comp, backupObj); err != nil {
+	if err = r.DoPostReady(comp, compObj, backupObj); err != nil {
 		return err
 	}
 	// do clean up
@@ -186,12 +186,13 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 	return restore, nil
 }
 
-func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent, backupObj *dpv1alpha1.Backup) error {
-	compStatus := r.Cluster.Status.Components[comp.Name]
-	if compStatus.Phase != appsv1alpha1.RunningClusterCompPhase {
+func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
+	compObj *appsv1alpha1.Component,
+	backupObj *dpv1alpha1.Backup) error {
+	if compObj.Status.Phase != appsv1alpha1.RunningClusterCompPhase {
 		return nil
 	}
-	jobActionLabels := constant.GetKBWellKnownLabels(comp.ClusterDefName, r.Cluster.Name, comp.Name)
+	jobActionLabels := constant.GetComponentWellKnownLabels(r.Cluster.Name, comp.Name)
 	if comp.WorkloadType == appsv1alpha1.Consensus || comp.WorkloadType == appsv1alpha1.Replication {
 		// TODO: use rsm constant
 		rsmAccessModeLabelKey := "rsm.workloads.kubeblocks.io/access-mode"

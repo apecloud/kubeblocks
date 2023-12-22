@@ -133,7 +133,7 @@ func (t *clusterServiceTransformer) convertLegacyClusterCompSpecServices(transCt
 			if err != nil {
 				return nil, err
 			}
-			// the generation converted service name is different with the exist legacy service name, if the legacy service exist, skip it
+			// the generation converted service name is different with the exist legacy service name, if the legacy service exist, we should use the legacy service name
 			if legacyServiceExist {
 				legacyService.Name = legacyServiceName
 				legacyService.ServiceName = legacyServiceName

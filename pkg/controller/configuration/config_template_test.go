@@ -197,7 +197,7 @@ single_thread_memory = 294912
 						Namespace: "default",
 					},
 				},
-				nil, nil)
+				nil, nil, nil)
 
 			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, nil)).Should(BeNil())
 
@@ -224,7 +224,7 @@ single_thread_memory = 294912
 						Namespace: "default",
 					},
 				},
-				nil, nil,
+				nil, nil, nil,
 			)
 
 			viper.Set(constant.KubernetesClusterDomainEnv, "test-domain")
@@ -293,7 +293,7 @@ single_thread_memory = 294912
 						Namespace: "default",
 					},
 				},
-				nil, nil,
+				nil, nil, nil,
 			)
 
 			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, nil)).Should(BeNil())

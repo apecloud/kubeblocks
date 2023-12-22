@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -35,7 +36,7 @@ import (
 
 const (
 	tenantName  = "alice"
-	repUser     = "rep_user1"
+	repUser     = "rep_user"
 	repPassword = "rep_user"
 )
 
@@ -86,17 +87,35 @@ func (mgr *Manager) Switchover(ctx context.Context, cluster *dcs.Cluster, primar
 		return err
 	}
 
-	err = mgr.createUser(ctx, candidatedb)
+	mysqlConfig, err := mysql.ParseDSN("root:@tcp(127.0.0.1:3306)/mysql?multiStatements=true")
 	if err != nil {
+		return errors.Wrapf(err, "illegal Data Source Name (DNS) specified by %s", candidateAddr)
+	}
+	mysqlConfig.User = "root@" + tenantName
+	mysqlConfig.DBName = "oceanbase"
+	mysqlConfig.Addr = candidateAddr
+	//db, err := GetDBConnection(mysqlConfig.FormatDSN())
+	dsn := mysqlConfig.FormatDSN()
+	tenantdb, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return errors.Wrap(err, "get DB connection failed")
+	}
+
+	err = mgr.createUser(ctx, tenantdb)
+	if err != nil {
+		mgr.Logger.Info("create user failed", "error", err)
 		return err
 	}
 
-	mgr.setLogSource(ctx, primarydb, candidateMember)
+	err = mgr.setLogSource(ctx, primarydb, candidateMember)
+	if err != nil {
+		mgr.Logger.Info("set log source failed", "error", err)
+	}
 	return nil
 }
 
 func (mgr *Manager) setLogSource(ctx context.Context, db *sql.DB, candidateMember dcs.Member) error {
-	sourceAddr := candidateMember.PodIP + ":2882"
+	sourceAddr := candidateMember.PodIP + ":2881"
 
 	sql := fmt.Sprintf("ALTER SYSTEM SET LOG_RESTORE_SOURCE = 'SERVICE=%s USER=%s@%s PASSWORD=%s' TENANT = %s", sourceAddr, repUser, tenantName, repPassword, tenantName)
 	_, err := db.Exec(sql)
@@ -107,7 +126,7 @@ func (mgr *Manager) setLogSource(ctx context.Context, db *sql.DB, candidateMembe
 
 	time.Sleep(time.Second)
 	var scn int64
-	queryTenant := "SELECT RECOVERY_UNTIL_SCN FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME=" + tenantName
+	queryTenant := fmt.Sprintf("SELECT RECOVERY_UNTIL_SCN FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME='%s'", tenantName)
 	for {
 		err := db.QueryRowContext(ctx, queryTenant).Scan(&scn)
 		if err != nil {

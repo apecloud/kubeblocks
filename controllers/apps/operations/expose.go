@@ -155,7 +155,6 @@ func (e ExposeOpsHandler) handleComponentServices(reqCtx intctrlutil.RequestCtx,
 	)
 
 	for _, item := range expose.Services {
-		// review this logic
 		service, ok := svcMap[getSvcName(opsRes.Cluster.Name, "", item.Name)]
 		if !ok {
 			continue

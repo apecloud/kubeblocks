@@ -122,14 +122,16 @@ func (e ExposeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 func (e ExposeOpsHandler) handleComponentServices(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, expose appsv1alpha1.Expose) (int, int, error) {
 	svcList := &corev1.ServiceList{}
 	if err := cli.List(reqCtx.Ctx, svcList, client.MatchingLabels{
-		constant.AppInstanceLabelKey:    opsRes.Cluster.Name,
-		constant.KBAppComponentLabelKey: expose.ComponentName,
+		constant.AppInstanceLabelKey: opsRes.Cluster.Name,
 	}, client.InNamespace(opsRes.Cluster.Namespace)); err != nil {
 		return 0, 0, err
 	}
 
 	getSvcName := func(clusterName string, componentName string, name string) string {
-		parts := []string{clusterName, componentName}
+		parts := []string{clusterName}
+		if componentName != "" {
+			parts = append(parts, componentName)
+		}
 		if name != "" {
 			parts = append(parts, name)
 		}
@@ -153,7 +155,8 @@ func (e ExposeOpsHandler) handleComponentServices(reqCtx intctrlutil.RequestCtx,
 	)
 
 	for _, item := range expose.Services {
-		service, ok := svcMap[getSvcName(opsRes.Cluster.Name, expose.ComponentName, item.Name)]
+		// review this logic
+		service, ok := svcMap[getSvcName(opsRes.Cluster.Name, "", item.Name)]
 		if !ok {
 			continue
 		}

@@ -55,12 +55,24 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 		return err
 	}
 
-	existLegacyServices, err := t.convertLegacyClusterCompSpecServices(transCtx, cluster)
+	convertedServices, existLegacyServices, err := t.convertLegacyClusterCompSpecServices(transCtx, cluster)
 	if err != nil {
 		return err
 	}
 	for _, legacySVCName := range existLegacyServices {
 		delete(services, legacySVCName)
+	}
+
+	handleServiceFunc := func(svc *appsv1alpha1.Service) error {
+		service, err := t.buildService(transCtx, cluster, svc)
+		if err != nil {
+			return err
+		}
+		if err = createOrUpdateService(ctx, dag, graphCli, service); err != nil {
+			return err
+		}
+		delete(services, service.Name)
+		return nil
 	}
 
 	for _, svc := range cluster.Spec.Services {
@@ -69,14 +81,15 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 			return err
 		}
 		for _, genSvc := range genServices {
-			service, err := t.buildService(transCtx, cluster, genSvc)
-			if err != nil {
+			if err = handleServiceFunc(genSvc); err != nil {
 				return err
 			}
-			if err = createOrUpdateService(ctx, dag, graphCli, service); err != nil {
-				return err
-			}
-			delete(services, service.Name)
+		}
+	}
+
+	for _, svc := range convertedServices {
+		if err = handleServiceFunc(&svc); err != nil {
+			return err
 		}
 	}
 
@@ -88,8 +101,9 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 }
 
 // convertLegacyClusterCompSpecServices converts legacy services defined in Cluster.Spec.ComponentSpecs[x].Services to Cluster.Spec.Services.
-func (t *clusterServiceTransformer) convertLegacyClusterCompSpecServices(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) ([]string, error) {
+func (t *clusterServiceTransformer) convertLegacyClusterCompSpecServices(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) ([]appsv1alpha1.Service, []string, error) {
 	existLegacyServices := make([]string, 0)
+	convertedServices := make([]appsv1alpha1.Service, 0)
 	for _, clusterCompSpec := range transCtx.ComponentSpecs {
 		if len(clusterCompSpec.Services) == 0 {
 			continue
@@ -110,7 +124,7 @@ func (t *clusterServiceTransformer) convertLegacyClusterCompSpecServices(transCt
 		for _, item := range clusterCompSpec.Services {
 			legacyServiceExist, err := checkLegacyServiceExist(transCtx, item.Name, cluster.Namespace)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			// the generation converted service name is different with the exist legacy service name, if the legacy service exist, skip it
 			if legacyServiceExist {
@@ -118,8 +132,8 @@ func (t *clusterServiceTransformer) convertLegacyClusterCompSpecServices(transCt
 				continue
 			}
 			legacyService := &appsv1alpha1.Service{
-				Name:              item.Name,
-				ServiceName:       item.Name,
+				Name:              constant.GenerateClusterServiceName(cluster.Name, item.Name),
+				ServiceName:       constant.GenerateClusterServiceName(cluster.Name, item.Name),
 				ComponentSelector: clusterCompSpec.Name,
 				Annotations:       item.Annotations,
 				Spec: corev1.ServiceSpec{
@@ -127,10 +141,16 @@ func (t *clusterServiceTransformer) convertLegacyClusterCompSpecServices(transCt
 					Type:  item.ServiceType,
 				},
 			}
-			cluster.Spec.Services = append(cluster.Spec.Services, *legacyService)
+			switch clusterCompDef.WorkloadType {
+			case appsv1alpha1.Replication:
+				legacyService.RoleSelector = constant.Primary
+			case appsv1alpha1.Consensus:
+				legacyService.RoleSelector = constant.Leader
+			}
+			convertedServices = append(convertedServices, *legacyService)
 		}
 	}
-	return existLegacyServices, nil
+	return convertedServices, existLegacyServices, nil
 }
 
 func (t *clusterServiceTransformer) genMultiServicesIfNeed(transCtx *clusterTransformContext,

@@ -82,6 +82,13 @@ func NewK8sExecClientWithPod(restConfig *rest.Config, pod *corev1.Pod) (*K8sExec
 		Namespace:     pod.Namespace,
 	}
 
+	if restConfig == nil {
+		restConfig, err = ctrl.GetConfig()
+		if err != nil {
+			return nil, errors.Wrap(err, "get k8s config failed")
+		}
+	}
+
 	restConfig.GroupVersion = &schema.GroupVersion{Group: "", Version: "v1"}
 	restConfig.APIPath = "/api"
 	restConfig.NegotiatedSerializer = scheme.Codecs.WithoutConversion()

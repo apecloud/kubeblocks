@@ -53,12 +53,12 @@ func NewClient(pod corev1.Pod) (Client, error) {
 		return mockClient, mockClientError
 	}
 
-	config, err := rest.InClusterConfig()
+	_, err := rest.InClusterConfig()
 	if err != nil {
 		// As the service does not run as a pod in the Kubernetes cluster,
 		// it is unable to call the lorry service running as a pod using the pod's IP address.
 		// In this scenario, it is recommended to use an k8s exec client instead.
-		execClient, err := NewK8sExecClientWithPod(config, &pod)
+		execClient, err := NewK8sExecClientWithPod(nil, &pod)
 		if err != nil {
 			return nil, err
 		}

@@ -35,8 +35,8 @@ import (
 
 const (
 	tenantName  = "alice"
-	repUser     = "rep-user"
-	repPassword = "rep-user"
+	repUser     = "rep_user1"
+	repPassword = "rep_user"
 )
 
 func (mgr *Manager) Switchover(ctx context.Context, cluster *dcs.Cluster, primary, candidate string) error {
@@ -64,7 +64,8 @@ func (mgr *Manager) Switchover(ctx context.Context, cluster *dcs.Cluster, primar
 		return errors.Errorf("candidate member's role is %s, not %s", candidateCluster.Members[0].Role, STANDBY)
 	}
 
-	primaryAddr := primaryCluster.GetMemberAddrWithPort(primaryMember)
+	//primaryAddr := primaryCluster.GetMemberAddrWithPort(primaryMember)
+	primaryAddr := fmt.Sprintf("%s:%s", primaryMember.PodIP, primaryMember.DBPort)
 	primarydb, err := config.GetDBConnWithAddr(primaryAddr)
 	if err != nil {
 		mgr.Logger.Info("new primarydb connection failed", "error", err)
@@ -72,7 +73,8 @@ func (mgr *Manager) Switchover(ctx context.Context, cluster *dcs.Cluster, primar
 	}
 	mgr.standbyTenant(ctx, primarydb)
 
-	candidateAddr := candidateCluster.GetMemberAddrWithPort(candidateMember)
+	//candidateAddr := candidateCluster.GetMemberAddrWithPort(candidateMember)
+	candidateAddr := fmt.Sprintf("%s:%s", candidateMember.PodIP, candidateMember.DBPort)
 	candidatedb, err := config.GetDBConnWithAddr(candidateAddr)
 	if err != nil {
 		mgr.Logger.Info("new candidatedb connection failed", "error", err)
@@ -96,7 +98,7 @@ func (mgr *Manager) Switchover(ctx context.Context, cluster *dcs.Cluster, primar
 func (mgr *Manager) setLogSource(ctx context.Context, db *sql.DB, candidateMember dcs.Member) error {
 	sourceAddr := candidateMember.PodIP + ":2882"
 
-	sql := fmt.Sprintf("ALTER SYSTEM SET LOG_RESTORE_SOURCE = 'SERVICE=%s USER=%s@%s PASSWORD=%s';", sourceAddr, repUser, tenantName, repPassword)
+	sql := fmt.Sprintf("ALTER SYSTEM SET LOG_RESTORE_SOURCE = 'SERVICE=%s USER=%s@%s PASSWORD=%s' TENANT = %s", sourceAddr, repUser, tenantName, repPassword, tenantName)
 	_, err := db.Exec(sql)
 	if err != nil {
 		mgr.Logger.Info(sql+" failed", "error", err)
@@ -122,7 +124,7 @@ func (mgr *Manager) setLogSource(ctx context.Context, db *sql.DB, candidateMembe
 }
 
 func (mgr *Manager) createUser(ctx context.Context, db *sql.DB) error {
-	queryUser := "SELECT count(*) FROM mysql.user WHERE user= " + repUser
+	queryUser := fmt.Sprintf("SELECT count(*) FROM mysql.user WHERE user='%s'", repUser)
 	var userCount int
 	err := db.QueryRowContext(ctx, queryUser).Scan(&userCount)
 	if err != nil {
@@ -155,7 +157,7 @@ func (mgr *Manager) primaryTenant(ctx context.Context, db *sql.DB) error {
 	}
 
 	var tenantRole, roleStatus string
-	queryTenant := "SELECT TENANT_ROLE, SWITCHOVER_STATUS FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME=" + tenantName
+	queryTenant := fmt.Sprintf("SELECT TENANT_ROLE, SWITCHOVER_STATUS FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME='%s'", tenantName)
 	for {
 		err := db.QueryRowContext(ctx, queryTenant).Scan(&tenantRole, &roleStatus)
 		if err != nil {
@@ -181,7 +183,7 @@ func (mgr *Manager) standbyTenant(ctx context.Context, db *sql.DB) error {
 	}
 
 	var tenantRole, roleStatus string
-	queryTenant := "SELECT TENANT_ROLE, SWITCHOVER_STATUS FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME=" + tenantName
+	queryTenant := fmt.Sprintf("SELECT TENANT_ROLE, SWITCHOVER_STATUS FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME='%s'", tenantName)
 	for {
 		err := db.QueryRowContext(ctx, queryTenant).Scan(&tenantRole, &roleStatus)
 		if err != nil {

@@ -87,20 +87,10 @@ func (mgr *Manager) Switchover(ctx context.Context, cluster *dcs.Cluster, primar
 		return err
 	}
 
-	mysqlConfig, err := mysql.ParseDSN("root:@tcp(127.0.0.1:3306)/mysql?multiStatements=true")
-	if err != nil {
-		return errors.Wrapf(err, "illegal Data Source Name (DNS) specified by %s", candidateAddr)
-	}
-	mysqlConfig.User = "root@" + tenantName
-	mysqlConfig.DBName = "oceanbase"
-	mysqlConfig.Addr = candidateAddr
-	//db, err := GetDBConnection(mysqlConfig.FormatDSN())
-	dsn := mysqlConfig.FormatDSN()
-	tenantdb, err := sql.Open("mysql", dsn)
+	tenantdb, err := mgr.getTenantConn(candidateMember)
 	if err != nil {
 		return errors.Wrap(err, "get DB connection failed")
 	}
-
 	err = mgr.createUser(ctx, tenantdb)
 	if err != nil {
 		mgr.Logger.Info("create user failed", "error", err)
@@ -112,6 +102,21 @@ func (mgr *Manager) Switchover(ctx context.Context, cluster *dcs.Cluster, primar
 		mgr.Logger.Info("set log source failed", "error", err)
 	}
 	return nil
+}
+
+func (mgr *Manager) getTenantConn(member dcs.Member) (*sql.DB, error) {
+	// "root@alice@tcp(10.1.0.47:2881)/oceanbase?multiStatements=true"
+	dsn := fmt.Sprintf("root@%s@tcp(%s:%s)/oceanbase?multiStatements=true", tenantName, member.PodIP, member.DBPort)
+	_, err := mysql.ParseDSN(dsn)
+	if err != nil {
+		return nil, errors.Wrapf(err, "illegal Data Source Name (DNS): %s", dsn)
+	}
+
+	tenantdb, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return nil, errors.Wrap(err, "get DB connection failed")
+	}
+	return tenantdb, nil
 }
 
 func (mgr *Manager) setLogSource(ctx context.Context, db *sql.DB, candidateMember dcs.Member) error {

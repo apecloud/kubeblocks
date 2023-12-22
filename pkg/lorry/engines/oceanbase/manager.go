@@ -34,6 +34,7 @@ const (
 	Role          = "ROLE"
 	CurrentLeader = "CURRENT_LEADER"
 	PRIMARY       = "PRIMARY"
+	STANDBY       = "STANDBY"
 )
 
 type Manager struct {

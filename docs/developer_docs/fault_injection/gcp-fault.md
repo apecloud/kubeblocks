@@ -10,8 +10,8 @@ sidebar_label: Simulate GCP faults
 By creating a GCPChaos experiment, you can simulate fault scenarios of the specified GCP instance. Currently, GCPChaos supports the following fault types:
 
 * Node Stop: stops the specified GCP instance.
-* Node Reset: reboots the specified GCP instance.
-* Detach Volume: uninstalls the storage volume from the specified instance.
+* Node Restart: reboots the specified GCP instance.
+* Disk Loss: uninstalls the storage volume from the specified instance.
 
 ## Before you start
 
@@ -38,7 +38,7 @@ By creating a GCPChaos experiment, you can simulate fault scenarios of the speci
 
 ### Stop
 
-Chaos Mesh injects the `node-stop` fault into the specified GCP instance so that the GCP instance will be unavailable in 3 minutes.
+The command below injects the `node-stop` fault into the specified GCP instance so that the GCP instance will be unavailable in 3 minutes.
 
 ```bash
 kbcli fault node stop [node1] [node2] -c=gcp --region=us-central1-c --duration=3m
@@ -54,7 +54,7 @@ When changing the cluster permissions, updating the key, or changing the cluster
 
 ### Restart
 
-Chaos Mesh inject an `instance-restart` fault into the specified GCP instance so that this instance will be restarted.
+The command below injects an `node-restart` fault into the specified GCP instance so that this instance will be restarted.
 
 ```bash
 kbcli fault node restart [node1] [node2] -c=gcp --region=us-central1-c
@@ -62,7 +62,7 @@ kbcli fault node restart [node1] [node2] -c=gcp --region=us-central1-c
 
 ### Detach volume
 
-Chaos Mesh injects a `detach-volume` fault into the specified GCP instance so that this instance is detached from the specified storage volume within 3 minutes.
+The command below injects a `detach-volume` fault into the specified GCP instance so that this instance is detached from the specified storage volume within 3 minutes.
 
 ```bash
 kbcli fault node detach-volume [node1] -c=gcp --region=us-central1-c --device-name=/dev/sdb
@@ -72,7 +72,7 @@ kbcli fault node detach-volume [node1] -c=gcp --region=us-central1-c --device-na
 
 ### GCP-stop example
 
-1. Write the experiment configuration to the `aws-detach-volume.yaml` file.
+1. Write the experiment configuration to the `gcp-stop.yaml` file.
 
    In the following example, Chaos Mesh injects the `node-stop` fault into the specified GCP instance so that the GCP instance will be unavailable in 3 minutes.
 
@@ -100,9 +100,9 @@ kbcli fault node detach-volume [node1] -c=gcp --region=us-central1-c --device-na
 
 ### GCP-restart example
 
-1. Write the experiment configuration to the `aws-detach-volume.yaml` file.
+1. Write the experiment configuration to the `gcp-restart.yaml` file.
 
-   In the following example, Chaos Mesh inject an `instance-restart` fault into the specified GCP instance so that this instance will be restarted.
+   In the following example, Chaos Mesh injects an `node-reset` fault into the specified GCP instance so that this instance will be restarted.
 
    ```yaml
    apiVersion: chaos-mesh.org/v1alpha1
@@ -128,9 +128,9 @@ kbcli fault node detach-volume [node1] -c=gcp --region=us-central1-c --device-na
 
 ### GCP-detach-volume example
 
-1. Write the experiment configuration to the `aws-detach-volume.yaml` file.
+1. Write the experiment configuration to the `gcp-detach-volume.yaml` file.
 
-   In the following example, Chaos Mesh injects a `detach-volume` fault into the specified GCP instance so that this instance is detached from the specified storage volume within 3 minutes.
+   In the following example, Chaos Mesh injects a `disk-loss` fault into the specified GCP instance so that this instance is detached from the specified storage volume within 3 minutes.
 
    ```yaml
    apiVersion: chaos-mesh.org/v1alpha1
@@ -160,7 +160,7 @@ kbcli fault node detach-volume [node1] -c=gcp --region=us-central1-c --device-na
 
 The following table shows the fields in the YAML configuration file.
 
-| Parameter | Type | Descpription | Default value | Required |
+| Parameter | Type | Description | Default value | Required |
 | :--- | :--- | :--- | :--- | :--- |
 | action | string | It indicates the specific type of faults. The available fault types include `node-stop`, `node-reset`, and `disk-loss`. | `node-stop` | Yes |
 | mode | string | It indicates the mode of the experiment. The mode options include `one` (selecting a Pod at random), `all` (selecting all eligible Pods), `fixed` (selecting a specified number of eligible Pods), `fixed-percent` (selecting a specified percentage of the eligible Pods), and `random-max-percent` (selecting the maximum percentage of the eligible Pods). | None | Yes |

@@ -25,9 +25,9 @@ Make sure that the Pod status is `Running`.
 
 2. The chaos DNS service runs CoreDNS with the [k8s_dns_chaos](https://github.com/chaos-mesh/k8s_dns_chaos) plugin. If the CoreDNS service in your Kubernetes cluster contains some special configurations, you can edit configMap `dns-server-config` to make the configuration of the chaos DNS service consistent with that of the K8s CoreDNS service using the following command:
 
-```bash
-kubectl edit configmap dns-server-config -n chaos-mesh
-```
+    ```bash
+    kubectl edit configmap dns-server-config -n chaos-mesh
+    ```
 
 ## Simulate fault injections by kbcli
 
@@ -87,7 +87,7 @@ This section introduces the YAML configuration file examples. You can view the Y
 
 ### DNS-error example
 
-1. Write the experiment configuration to the `network-partition.yaml` file.
+1. Write the experiment configuration to the `dns-error.yaml` file.
 
     In the following example, Chaos Mesh injects DNS faults into all Pods in the default namespace, which means an error will be returned when a DNS request is sent to the specified domains.
 

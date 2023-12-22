@@ -610,6 +610,11 @@ type Service struct {
 	// +optional
 	ServiceName string `json:"serviceName,omitempty"`
 
+	// If ServiceType is LoadBalancer, cloud provider related parameters can be put here
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
 	// Spec defines the behavior of a service.
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional

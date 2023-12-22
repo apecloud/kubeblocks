@@ -60,20 +60,38 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 		return err
 	}
 
+	convertedServices, err := t.convertLegacyClusterCompSpecServices(transCtx, cluster)
+	if err != nil {
+		return err
+	}
+
+	handleServiceFunc := func(svc *appsv1alpha1.Service) error {
+		service, err := t.buildService(transCtx, cluster, svc)
+		if err != nil {
+			return err
+		}
+		if err = createOrUpdateService(ctx, dag, graphCli, service); err != nil {
+			return err
+		}
+		delete(services, service.Name)
+		return nil
+	}
+
 	for _, svc := range cluster.Spec.Services {
 		genServices, err := t.genMultiServicesIfNeed(transCtx, cluster, &svc)
 		if err != nil {
 			return err
 		}
 		for _, genSvc := range genServices {
-			service, err := t.buildService(transCtx, cluster, genSvc)
-			if err != nil {
+			if err = handleServiceFunc(genSvc); err != nil {
 				return err
 			}
-			if err = createOrUpdateService(ctx, dag, graphCli, service); err != nil {
-				return err
-			}
-			delete(services, service.Name)
+		}
+	}
+
+	for _, svc := range convertedServices {
+		if err = handleServiceFunc(&svc); err != nil {
+			return err
 		}
 	}
 
@@ -82,6 +100,59 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 	}
 
 	return nil
+}
+
+// convertLegacyClusterCompSpecServices converts legacy services defined in Cluster.Spec.ComponentSpecs[x].Services to Cluster.Spec.Services.
+func (t *clusterServiceTransformer) convertLegacyClusterCompSpecServices(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) ([]appsv1alpha1.Service, error) {
+	convertedServices := make([]appsv1alpha1.Service, 0)
+	for _, clusterCompSpec := range transCtx.ComponentSpecs {
+		if len(clusterCompSpec.Services) == 0 {
+			continue
+		}
+
+		// TODO(xingran): We only handle services defined based on Cluster.Spec.ComponentSpecs[x].Services prior to version 0.8.0 of kubeblocks.
+		// Requirements after kubeblocks 0.8.0 should be defined via Cluster.Spec.Services, and the corresponding expose OpsRequest should be refactored to adapt.
+		if transCtx.ClusterDef == nil || len(clusterCompSpec.ComponentDefRef) == 0 {
+			continue
+		}
+
+		clusterCompDef := transCtx.ClusterDef.GetComponentDefByName(clusterCompSpec.ComponentDefRef)
+		if clusterCompDef == nil {
+			continue
+		}
+		defaultLegacyServicePorts := clusterCompDef.Service.ToSVCPorts()
+
+		for _, item := range clusterCompSpec.Services {
+			legacyService := &appsv1alpha1.Service{
+				Name:              constant.GenerateClusterServiceName(cluster.Name, item.Name),
+				ServiceName:       constant.GenerateClusterServiceName(cluster.Name, item.Name),
+				ComponentSelector: clusterCompSpec.Name,
+				Annotations:       item.Annotations,
+				Spec: corev1.ServiceSpec{
+					Ports: defaultLegacyServicePorts,
+					Type:  item.ServiceType,
+				},
+			}
+			legacyServiceName := constant.GenerateComponentServiceName(cluster.Name, clusterCompSpec.Name, item.Name)
+			legacyServiceExist, err := checkLegacyServiceExist(transCtx, legacyServiceName, cluster.Namespace)
+			if err != nil {
+				return nil, err
+			}
+			// the generation converted service name is different with the exist legacy service name, if the legacy service exist, we should use the legacy service name
+			if legacyServiceExist {
+				legacyService.Name = legacyServiceName
+				legacyService.ServiceName = legacyServiceName
+			}
+			switch clusterCompDef.WorkloadType {
+			case appsv1alpha1.Replication:
+				legacyService.RoleSelector = constant.Primary
+			case appsv1alpha1.Consensus:
+				legacyService.RoleSelector = constant.Leader
+			}
+			convertedServices = append(convertedServices, *legacyService)
+		}
+	}
+	return convertedServices, nil
 }
 
 func (t *clusterServiceTransformer) genMultiServicesIfNeed(transCtx *clusterTransformContext,
@@ -140,6 +211,7 @@ func (t *clusterServiceTransformer) buildService(transCtx *clusterTransformConte
 
 	builder := builder.NewServiceBuilder(namespace, service.ServiceName).
 		AddLabelsInMap(constant.GetClusterWellKnownLabels(clusterName)).
+		AddAnnotationsInMap(service.Annotations).
 		SetSpec(&service.Spec).
 		AddSelectorsInMap(t.builtinSelector(cluster)).
 		Optimize4ExternalTraffic()
@@ -264,4 +336,19 @@ func resolveServiceDefaultFields(obj, objCopy *corev1.ServiceSpec) {
 	if objCopy.InternalTrafficPolicy == nil {
 		objCopy.InternalTrafficPolicy = obj.InternalTrafficPolicy
 	}
+}
+
+func checkLegacyServiceExist(ctx graph.TransformContext, serviceName, namespace string) (bool, error) {
+	key := types.NamespacedName{
+		Namespace: namespace,
+		Name:      serviceName,
+	}
+	obj := &corev1.Service{}
+	if err := ctx.GetClient().Get(ctx.GetContext(), key, obj); err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }

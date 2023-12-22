@@ -107,6 +107,7 @@ func (t *componentLoadResourcesTransformer) transformForGeneratedComponent(trans
 	}
 	transCtx.CompDef = compDef
 	transCtx.SynthesizeComponent = synthesizedComp
+
 	return nil
 }
 

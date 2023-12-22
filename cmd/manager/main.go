@@ -277,6 +277,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := intctrlutil.InitHostPortManager(mgr.GetClient()); err != nil {
+		setupLog.Error(err, "unable to init port manager")
+		os.Exit(1)
+	}
+
 	if viper.GetBool(appsFlagKey.viperName()) {
 		if err = (&appscontrollers.ClusterReconciler{
 			Client:   mgr.GetClient(),

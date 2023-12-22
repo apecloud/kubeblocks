@@ -258,7 +258,7 @@ func (s *Scheduler) reconcileCronJob(schedulePolicy *dpv1alpha1.SchedulePolicy) 
 	cronJob.Spec.StartingDeadlineSeconds = cronjobProto.Spec.StartingDeadlineSeconds
 	cronJob.Spec.JobTemplate.Spec.BackoffLimit = s.BackupPolicy.Spec.BackoffLimit
 	cronJob.Spec.JobTemplate.Spec.Template = cronjobProto.Spec.JobTemplate.Spec.Template
-	cronJob.Spec.Schedule = schedulePolicy.CronExpression
+	cronJob.Spec.Schedule = cronjobProto.Spec.Schedule
 	return s.Client.Patch(s.Ctx, cronJob, patch)
 }
 

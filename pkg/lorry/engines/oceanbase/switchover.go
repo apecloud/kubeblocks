@@ -65,16 +65,17 @@ func (mgr *Manager) Switchover(ctx context.Context, cluster *dcs.Cluster, primar
 		return errors.Errorf("candidate member's role is %s, not %s", candidateCluster.Members[0].Role, STANDBY)
 	}
 
-	//primaryAddr := primaryCluster.GetMemberAddrWithPort(primaryMember)
 	primaryAddr := fmt.Sprintf("%s:%s", primaryMember.PodIP, primaryMember.DBPort)
 	primaryDB, err := config.GetDBConnWithAddr(primaryAddr)
 	if err != nil {
 		mgr.Logger.Info("new primarydb connection failed", "error", err)
 		return err
 	}
-	mgr.standbyTenant(ctx, primaryDB)
+	err = mgr.standbyTenant(ctx, primaryDB)
+	if err != nil {
+		return err
+	}
 
-	//candidateAddr := candidateCluster.GetMemberAddrWithPort(candidateMember)
 	candidateAddr := fmt.Sprintf("%s:%s", candidateMember.PodIP, candidateMember.DBPort)
 	candidateDB, err := config.GetDBConnWithAddr(candidateAddr)
 	if err != nil {
@@ -161,7 +162,7 @@ func (mgr *Manager) createUser(ctx context.Context, db *sql.DB) error {
 
 	createUser := fmt.Sprintf("CREATE USER %s IDENTIFIED BY '%s';"+
 		"GRANT SELECT ON oceanbase.* TO %s;", repUser, repPassword, repUser)
-	createUser = createUser + "SET GLOBAL ob_tcp_invited_nodes='%';"
+	createUser += "SET GLOBAL ob_tcp_invited_nodes='%';"
 
 	_, err = db.Exec(createUser)
 	if err != nil {

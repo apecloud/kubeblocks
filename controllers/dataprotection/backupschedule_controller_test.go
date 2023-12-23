@@ -141,9 +141,13 @@ var _ = Describe("Backup Schedule Controller", func() {
 				By("checking cronjob, should exist one cronjob to create backup")
 				Eventually(testapps.CheckObj(&testCtx, getCronjobKey(backupSchedule, testdp.BackupMethodName), func(g Gomega, fetched *batchv1.CronJob) {
 					schedulePolicy := dpbackup.GetSchedulePolicyByMethod(backupSchedule, testdp.BackupMethodName)
+					timeZone, cronExpr := dpbackup.BuildCronJobSchedule(schedulePolicy.CronExpression)
 					g.Expect(fetched.Labels[constant.AppManagedByLabelKey]).Should(Equal(dptypes.AppName))
 					g.Expect(boolptr.IsSetToTrue(schedulePolicy.Enabled)).To(BeTrue())
-					g.Expect(fetched.Spec.Schedule).To(Equal(schedulePolicy.CronExpression))
+					g.Expect(fetched.Spec.Schedule).To(Equal(cronExpr))
+					if timeZone != nil {
+						g.Expect(fetched.Spec.TimeZone).To(Equal(timeZone))
+					}
 					g.Expect(fetched.Spec.StartingDeadlineSeconds).ShouldNot(BeNil())
 					g.Expect(*fetched.Spec.StartingDeadlineSeconds).To(Equal(getStartingDeadlineSeconds(backupSchedule)))
 				})).Should(Succeed())

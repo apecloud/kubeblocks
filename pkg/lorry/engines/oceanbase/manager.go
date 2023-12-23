@@ -44,7 +44,7 @@ type Manager struct {
 var _ engines.DBManager = &Manager{}
 
 func NewManager(properties engines.Properties) (engines.DBManager, error) {
-	logger := ctrl.Log.WithName("WeSQL")
+	logger := ctrl.Log.WithName("Oceanbase")
 	_, err := NewConfig(properties)
 	if err != nil {
 		return nil, err

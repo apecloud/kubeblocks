@@ -58,17 +58,17 @@ func buildContainerHostPorts(synthesizeComp *component.SynthesizedComponent, com
 				err  error
 				port int32
 			)
-			if item.ContainerPort != 0 {
-				if err = pm.UsePort(portKey, item.ContainerPort); err != nil {
-					return err
-				}
-				port = item.ContainerPort
-			} else {
+			if pm.IsPrivilegedPort(item.ContainerPort) {
 				port, err = pm.AllocatePort(portKey)
 				if err != nil {
 					return err
 				}
 				synthesizeComp.PodSpec.Containers[i].Ports[j].ContainerPort = port
+			} else {
+				if err = pm.UsePort(portKey, item.ContainerPort); err != nil {
+					return err
+				}
+				port = item.ContainerPort
 			}
 			comp.Annotations[portKey] = fmt.Sprintf("%d", port)
 		}

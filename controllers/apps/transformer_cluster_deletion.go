@@ -21,6 +21,7 @@ package apps
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -39,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // clusterDeletionTransformer handles cluster deletion
@@ -171,6 +173,16 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		graphCli.Status(dag, cluster, transCtx.Cluster)
 		// requeue since pvc isn't owned by cluster, and deleting it won't trigger event
 		return newRequeueError(time.Second*1, "not all sub-resources deleted")
+	}
+
+	// release the allocated host ports
+	// TODO release ports if scale in the components
+	// TODO release ports one by one without using prefix
+	pm := intctrlutil.GetPortManager()
+	for _, comp := range transCtx.Cluster.Spec.ComponentSpecs {
+		if err = pm.ReleaseByPrefix(fmt.Sprintf("%s-%s", transCtx.Cluster.Name, comp.Name)); err != nil {
+			return newRequeueError(time.Second*1, "release host ports failed")
+		}
 	}
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly

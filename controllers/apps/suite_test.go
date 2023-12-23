@@ -150,6 +150,9 @@ var _ = BeforeSuite(func() {
 	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
 	viper.SetDefault(constant.EnableRBACManager, true)
 
+	err = intctrlutil.InitHostPortManager(k8sClient)
+	Expect(err).ToNot(HaveOccurred())
+
 	clusterRecorder = k8sManager.GetEventRecorderFor("cluster-controller")
 	err = (&ClusterReconciler{
 		Client:   k8sManager.GetClient(),

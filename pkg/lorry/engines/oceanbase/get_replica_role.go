@@ -30,7 +30,7 @@ import (
 
 func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string, error) {
 	var zoneCount int
-	zoneSQL := "select count(distinct(zone)) from oceanbase.__all_zone where zone!=''"
+	zoneSQL := `select count(distinct(zone)) from oceanbase.__all_zone where zone!=''`
 	err := mgr.DB.QueryRowContext(ctx, zoneSQL).Scan(&zoneCount)
 	if err != nil {
 		mgr.Logger.Info("query zone info failed", "error", err)

@@ -63,6 +63,8 @@ func TestGetRole(t *testing.T) {
 	manager, mock, _ := mockDatabase(t)
 
 	t.Run("error executing sql", func(t *testing.T) {
+		mock.ExpectQuery(`select count\(distinct\(zone\)\) as count from oceanbase.__all_zone where zone!=''`).
+			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 		mock.ExpectQuery("SELECT TENANT_ROLE FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME='alice'").
 			WillReturnError(fmt.Errorf("some error"))
 
@@ -73,6 +75,8 @@ func TestGetRole(t *testing.T) {
 	})
 
 	t.Run("scan rows failed", func(t *testing.T) {
+		mock.ExpectQuery(`select count\(distinct\(zone\)\) as count from oceanbase.__all_zone where zone!=''`).
+			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 		mock.ExpectQuery("SELECT TENANT_ROLE FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME='alice'").
 			WillReturnRows(sqlmock.NewRows([]string{"TENANT_ROLE"}).AddRow(PRIMARY))
 
@@ -82,6 +86,8 @@ func TestGetRole(t *testing.T) {
 	})
 
 	t.Run("no data returned", func(t *testing.T) {
+		mock.ExpectQuery(`select count\(distinct\(zone\)\) as count from oceanbase.__all_zone where zone!=''`).
+			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 		mock.ExpectQuery("SELECT TENANT_ROLE FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME='alice'").
 			WillReturnRows(sqlmock.NewRows([]string{"ROLE"}))
 

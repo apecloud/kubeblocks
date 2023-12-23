@@ -58,7 +58,7 @@ func buildContainerHostPorts(synthesizeComp *component.SynthesizedComponent, com
 				err  error
 				port int32
 			)
-			if pm.IsPrivilegedPort(item.ContainerPort) {
+			if pm.NeedAllocate(item.ContainerPort) {
 				port, err = pm.AllocatePort(portKey)
 				if err != nil {
 					return err

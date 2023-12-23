@@ -290,7 +290,7 @@ const (
 	// The TCP/IP port numbers below 1024 are special in that normal users are not allowed to run servers on them.
 	// This is a security feaure, in that if you connect to a service on one of these ports you can be fairly sure
 	// that you have the real thing, and not a fake which some hacker has put up for you.
-	hostPortMin                = int32(1024)
+	hostPortMin                = int32(1025)
 	hostPortMax                = int32(65536)
 	hostPortConfigMapName      = "kubeblocks-host-ports"
 	hostPortConfigMapNamespace = "default"
@@ -428,6 +428,6 @@ func (pm *PortManager) ReleaseByPrefix(prefix string) error {
 	return nil
 }
 
-func (pm *PortManager) IsPrivilegedPort(port int32) bool {
-	return port < hostPortMin
+func (pm *PortManager) NeedAllocate(port int32) bool {
+	return port <= 100
 }

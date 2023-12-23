@@ -67,37 +67,37 @@ func (mgr *Manager) Switchover(ctx context.Context, cluster *dcs.Cluster, primar
 
 	//primaryAddr := primaryCluster.GetMemberAddrWithPort(primaryMember)
 	primaryAddr := fmt.Sprintf("%s:%s", primaryMember.PodIP, primaryMember.DBPort)
-	primarydb, err := config.GetDBConnWithAddr(primaryAddr)
+	primaryDB, err := config.GetDBConnWithAddr(primaryAddr)
 	if err != nil {
 		mgr.Logger.Info("new primarydb connection failed", "error", err)
 		return err
 	}
-	mgr.standbyTenant(ctx, primarydb)
+	mgr.standbyTenant(ctx, primaryDB)
 
 	//candidateAddr := candidateCluster.GetMemberAddrWithPort(candidateMember)
 	candidateAddr := fmt.Sprintf("%s:%s", candidateMember.PodIP, candidateMember.DBPort)
-	candidatedb, err := config.GetDBConnWithAddr(candidateAddr)
+	candidateDB, err := config.GetDBConnWithAddr(candidateAddr)
 	if err != nil {
 		mgr.Logger.Info("new candidatedb connection failed", "error", err)
 		return err
 	}
 
-	err = mgr.primaryTenant(ctx, candidatedb)
+	err = mgr.primaryTenant(ctx, candidateDB)
 	if err != nil {
 		return err
 	}
 
-	tenantdb, err := mgr.getTenantConn(candidateMember)
+	tenantDB, err := mgr.getTenantConn(candidateMember)
 	if err != nil {
 		return errors.Wrap(err, "get DB connection failed")
 	}
-	err = mgr.createUser(ctx, tenantdb)
+	err = mgr.createUser(ctx, tenantDB)
 	if err != nil {
 		mgr.Logger.Info("create user failed", "error", err)
 		return err
 	}
 
-	err = mgr.setLogSource(ctx, primarydb, candidateMember)
+	err = mgr.setLogSource(ctx, primaryDB, candidateMember)
 	if err != nil {
 		mgr.Logger.Info("set log source failed", "error", err)
 	}

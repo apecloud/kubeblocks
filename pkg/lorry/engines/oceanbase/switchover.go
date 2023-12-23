@@ -120,7 +120,7 @@ func (mgr *Manager) getTenantConn(member dcs.Member) (*sql.DB, error) {
 }
 
 func (mgr *Manager) setLogSource(ctx context.Context, db *sql.DB, candidateMember dcs.Member) error {
-	sourceAddr := candidateMember.PodIP + ":2881"
+	sourceAddr := candidateMember.PodIP + ":" + candidateMember.DBPort
 
 	sql := fmt.Sprintf("ALTER SYSTEM SET LOG_RESTORE_SOURCE = 'SERVICE=%s USER=%s@%s PASSWORD=%s' TENANT = %s", sourceAddr, repUser, tenantName, repPassword, tenantName)
 	_, err := db.Exec(sql)

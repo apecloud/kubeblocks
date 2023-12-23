@@ -43,7 +43,7 @@ var _ = Describe("TemplateWrapperTest", func() {
 	var clusterComponent *component.SynthesizedComponent
 
 	mockTemplateWrapper := func() renderWrapper {
-		mockConfigTemplater := newTemplateBuilder(clusterName, testCtx.DefaultNamespace, clusterObj, ctx, mockK8sCli.Client())
+		mockConfigTemplater := newTemplateBuilder(clusterName, testCtx.DefaultNamespace, clusterObj, ctx, mockK8sCli.Client(), nil)
 		Expect(mockConfigTemplater.injectBuiltInObjectsAndFunctions(&corev1.PodSpec{}, clusterComponent.ConfigTemplates, clusterComponent, nil)).Should(Succeed())
 		return newTemplateRenderWrapper(mockConfigTemplater, clusterObj, ctx, mockK8sCli.Client())
 	}

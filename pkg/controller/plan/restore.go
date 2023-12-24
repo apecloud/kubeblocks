@@ -342,6 +342,7 @@ func (r *RestoreManager) createRestoreAndWait(restore *dpv1alpha1.Restore, compO
 }
 
 func (r *RestoreManager) cleanupClusterAnnotations() error {
+	// TODO: Waiting for all component recovery jobs to be completed
 	if r.Cluster.Status.Phase == appsv1alpha1.RunningClusterPhase && r.Cluster.Annotations != nil {
 		cluster := r.Cluster
 		patch := client.MergeFrom(cluster.DeepCopy())

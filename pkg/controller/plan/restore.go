@@ -89,7 +89,7 @@ func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent, compObj
 	if backupObj.Status.BackupMethod == nil {
 		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed, `status.backupMethod of backup "%s" can not be empty`, backupObj.Name)
 	}
-	if err = r.DoPrepareData(comp, backupObj); err != nil {
+	if err = r.DoPrepareData(comp, compObj, backupObj); err != nil {
 		return err
 	}
 	if err = r.DoPostReady(comp, compObj, backupObj); err != nil {
@@ -102,12 +102,14 @@ func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent, compObj
 	return r.cleanupRestores(comp)
 }
 
-func (r *RestoreManager) DoPrepareData(comp *component.SynthesizedComponent, backupObj *dpv1alpha1.Backup) error {
+func (r *RestoreManager) DoPrepareData(comp *component.SynthesizedComponent,
+	compObj *appsv1alpha1.Component,
+	backupObj *dpv1alpha1.Backup) error {
 	restore, err := r.BuildPrepareDataRestore(comp, backupObj)
 	if err != nil {
 		return err
 	}
-	return r.createRestoreAndWait(restore)
+	return r.createRestoreAndWait(restore, compObj)
 }
 
 func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComponent, backupObj *dpv1alpha1.Backup) (*dpv1alpha1.Restore, error) {
@@ -225,7 +227,7 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 			},
 		},
 	}
-	return r.createRestoreAndWait(restore)
+	return r.createRestoreAndWait(restore, compObj)
 }
 
 func (r *RestoreManager) buildSchedulingSpec(comp *component.SynthesizedComponent) (dpv1alpha1.SchedulingSpec, error) {
@@ -313,12 +315,12 @@ func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.Synt
 }
 
 // createRestoreAndWait create the restore CR and wait for completion.
-func (r *RestoreManager) createRestoreAndWait(restore *dpv1alpha1.Restore) error {
+func (r *RestoreManager) createRestoreAndWait(restore *dpv1alpha1.Restore, compObj *appsv1alpha1.Component) error {
 	if restore == nil {
 		return nil
 	}
 	if r.Scheme != nil {
-		_ = controllerutil.SetControllerReference(r.Cluster, restore, r.Scheme)
+		_ = controllerutil.SetControllerReference(compObj, restore, r.Scheme)
 	}
 	if err := r.Client.Get(r.Ctx, client.ObjectKeyFromObject(restore), restore); err != nil {
 		if !apierrors.IsNotFound(err) {

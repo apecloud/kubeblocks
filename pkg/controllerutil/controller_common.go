@@ -408,6 +408,10 @@ func (pm *PortManager) update(key string, port int32) error {
 }
 
 func (pm *PortManager) delete(keys []string) error {
+	if pm.cm.Data == nil {
+		return nil
+	}
+
 	var err error
 	defer func() {
 		if apierrors.IsConflict(err) {
@@ -433,7 +437,6 @@ func (pm *PortManager) delete(keys []string) error {
 	if err != nil {
 		return err
 	}
-
 	pm.cm = cm
 	for _, port := range ports {
 		delete(pm.used, port)

@@ -63,6 +63,7 @@ const (
 
 type Config struct {
 	url             string
+	port            string
 	username        string
 	password        string
 	pemPath         string
@@ -91,6 +92,10 @@ func NewConfig(properties map[string]string) (*Config, error) {
 
 	if viper.IsSet(constant.KBEnvServicePassword) {
 		config.password = viper.GetString(constant.KBEnvServicePassword)
+	}
+
+	if viper.IsSet(constant.KBEnvServicePort) {
+		config.port = viper.GetString(constant.KBEnvServicePort)
 	}
 
 	if val, ok := properties[pemPathKey]; ok {
@@ -148,6 +153,9 @@ func (config *Config) GetLocalDBConn() (*sql.DB, error) {
 	}
 	mysqlConfig.User = config.username
 	mysqlConfig.Passwd = config.password
+	if config.port != "" {
+		mysqlConfig.Addr = "127.0.0.1:" + config.port
+	}
 	db, err := GetDBConnection(mysqlConfig.FormatDSN())
 	if err != nil {
 		return nil, errors.Wrap(err, "get DB connection failed")

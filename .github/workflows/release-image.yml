@@ -1,4 +1,4 @@
-name: RELEASE-IMAGE
+name: Release Images
 
 on:
   schedule:

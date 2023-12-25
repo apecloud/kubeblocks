@@ -15,7 +15,7 @@ env:
 
 jobs:
   create-jihulab-release:
-    name: Create Release Kbcli
+    name: Create Release KubeBlocks Jihulab
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

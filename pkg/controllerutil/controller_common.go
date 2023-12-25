@@ -324,22 +324,39 @@ func BuildHostPortName(clusterName, compName, containerName, portName string) st
 
 type PortManager struct {
 	sync.Mutex
-	cli       client.Client
-	min       int32
-	max       int32
-	portsUsed map[int32]bool
-	cm        *corev1.ConfigMap
+	cli  client.Client
+	min  int32
+	max  int32
+	used map[int32]string
+	cm   *corev1.ConfigMap
 }
 
 // NewPortManager creates a new PortManager
 // TODO[ziang] Putting all the port information in one configmap may have performance issues and is not secure enough.
 // There is a risk of accidental deletion leading to the loss of cluster port information.
 func NewPortManager(min, max int32, cli client.Client) (*PortManager, error) {
-	pm := &PortManager{min: min, max: max, cli: cli, portsUsed: make(map[int32]bool)}
+	pm := &PortManager{
+		min:  min,
+		max:  max,
+		cli:  cli,
+		used: make(map[int32]string),
+	}
 	if err := pm.sync(); err != nil {
 		return nil, err
 	}
 	return pm, nil
+}
+
+func (pm *PortManager) parsePort(port string) (int32, error) {
+	port = strings.TrimSpace(port)
+	if port == "" {
+		return 0, fmt.Errorf("port is empty")
+	}
+	p, err := strconv.ParseInt(port, 10, 32)
+	if err != nil {
+		return 0, err
+	}
+	return int32(p), nil
 }
 
 func (pm *PortManager) sync() error {
@@ -354,64 +371,109 @@ func (pm *PortManager) sync() error {
 	if cm.Data == nil {
 		cm.Data = make(map[string]string)
 	}
-	portsUsed := make(map[int32]bool)
-	for _, item := range cm.Data {
-		port, err := strconv.ParseInt(strings.TrimSpace(item), 10, 32)
+	used := make(map[int32]string)
+	for key, item := range cm.Data {
+		port, err := pm.parsePort(item)
 		if err != nil {
 			continue
 		}
-		portsUsed[int32(port)] = true
+		used[port] = key
 	}
+
 	pm.cm = cm
-	pm.portsUsed = portsUsed
+	pm.used = used
 	return nil
 }
 
-func (pm *PortManager) update() error {
+func (pm *PortManager) update(key string, port int32) error {
 	var err error
 	defer func() {
 		if apierrors.IsConflict(err) {
 			_ = pm.sync()
 		}
 	}()
-	err = pm.cli.Update(context.Background(), pm.cm)
-	return err
+	cm := pm.cm.DeepCopy()
+	if cm.Data == nil {
+		cm.Data = make(map[string]string)
+	}
+	cm.Data[key] = fmt.Sprintf("%d", port)
+	err = pm.cli.Update(context.Background(), cm)
+	if err != nil {
+		return err
+	}
+
+	pm.cm = cm
+	pm.used[port] = key
+	return nil
+}
+
+func (pm *PortManager) delete(keys []string) error {
+	var err error
+	defer func() {
+		if apierrors.IsConflict(err) {
+			_ = pm.sync()
+		}
+	}()
+
+	cm := pm.cm.DeepCopy()
+	var ports []int32
+	for _, key := range keys {
+		value, ok := cm.Data[key]
+		if !ok {
+			continue
+		}
+		port, err := pm.parsePort(value)
+		if err != nil {
+			return err
+		}
+		ports = append(ports, port)
+		delete(cm.Data, key)
+	}
+	err = pm.cli.Update(context.Background(), cm)
+	if err != nil {
+		return err
+	}
+
+	pm.cm = cm
+	for _, port := range ports {
+		delete(pm.used, port)
+	}
+	return nil
 }
 
 func (pm *PortManager) UsePort(key string, port int32) error {
 	pm.Lock()
 	defer pm.Unlock()
-	pm.cm.Data[key] = fmt.Sprintf("%d", port)
-	if err := pm.update(); err != nil {
+	if k, ok := pm.used[port]; ok && k != key {
+		return fmt.Errorf("port %d is used by %s", port, k)
+	}
+	if err := pm.update(key, port); err != nil {
 		return err
 	}
-	pm.portsUsed[port] = true
 	return nil
 }
 
 func (pm *PortManager) AllocatePort(key string) (int32, error) {
 	pm.Lock()
 	defer pm.Unlock()
-	value, ok := pm.cm.Data[key]
-	if ok {
-		port, err := strconv.ParseInt(strings.TrimSpace(value), 10, 32)
+
+	if value, ok := pm.cm.Data[key]; ok {
+		port, err := pm.parsePort(value)
 		if err != nil {
 			return 0, err
 		}
-		return int32(port), nil
+		return port, nil
 	}
 
 	// allocate a new port randomly in range [hostPortMin, hostPortMax)
 	for i := 0; i < 10; i++ {
 		port := int32(rand.Int63nRange(int64(hostPortMin), int64(hostPortMax)))
-		if _, ok := pm.portsUsed[port]; ok {
+		if _, ok := pm.used[port]; ok {
 			continue
 		}
-		pm.cm.Data[key] = fmt.Sprintf("%d", port)
-		if err := pm.update(); err != nil {
+		if err := pm.update(key, port); err != nil {
 			return 0, err
 		}
-		pm.portsUsed[port] = true
 		return port, nil
 	}
 	return 0, fmt.Errorf("failed to allocate port")
@@ -425,10 +487,9 @@ func (pm *PortManager) ReleasePorts(keys []string) error {
 	pm.Lock()
 	defer pm.Unlock()
 	for _, key := range keys {
-		delete(pm.cm.Data, key)
-	}
-	if err := pm.update(); err != nil {
-		return err
+		if err := pm.delete([]string{key}); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -439,12 +500,14 @@ func (pm *PortManager) ReleaseByPrefix(prefix string) error {
 	}
 	pm.Lock()
 	defer pm.Unlock()
+
+	var keys []string
 	for key := range pm.cm.Data {
 		if strings.HasPrefix(key, prefix) {
-			delete(pm.cm.Data, key)
+			keys = append(keys, key)
 		}
 	}
-	if err := pm.update(); err != nil {
+	if err := pm.delete(keys); err != nil {
 		return err
 	}
 	return nil

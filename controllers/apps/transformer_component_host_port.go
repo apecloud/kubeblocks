@@ -3,6 +3,7 @@ package apps
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -10,6 +11,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 type componentHostPortTransformer struct {
@@ -34,6 +37,10 @@ func (t *componentHostPortTransformer) Transform(ctx graph.TransformContext, dag
 	}
 	if reflect.DeepEqual(comp, compObj) {
 		return nil
+	}
+
+	if err := updateLorrySpecAfterPortsChanged(synthesizeComp); err != nil {
+		return err
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
@@ -74,4 +81,98 @@ func buildContainerHostPorts(synthesizeComp *component.SynthesizedComponent, com
 		}
 	}
 	return nil
+}
+
+func updateLorrySpecAfterPortsChanged(synthesizeComp *component.SynthesizedComponent) error {
+	lorryContainer := GetLorryContainer(synthesizeComp.PodSpec.Containers)
+	if lorryContainer == nil {
+		return nil
+	}
+
+	lorryHTTPPort := GetLorryHTTPPort(lorryContainer)
+	lorryGRPCPort := GetLorryGRPCPort(lorryContainer)
+	if err := updateLorry(synthesizeComp, lorryContainer, lorryHTTPPort, lorryGRPCPort); err != nil {
+		return err
+	}
+
+	if err := updateReadinessProbe(synthesizeComp, lorryHTTPPort); err != nil {
+		return err
+	}
+	return nil
+}
+
+func updateLorry(synthesizeComp *component.SynthesizedComponent, container *corev1.Container, httpPort, grpcPort int) error {
+	container.Command = []string{"lorry",
+		"--port", strconv.Itoa(httpPort),
+		"--config-path", "/config/lorry/components/",
+		"--grpcport", strconv.Itoa(grpcPort),
+	}
+
+	for i := range container.Env {
+		if container.Env[i].Name != constant.KBEnvServicePort {
+			continue
+		}
+		if len(synthesizeComp.PodSpec.Containers) > 0 {
+			mainContainer := synthesizeComp.PodSpec.Containers[0]
+			if len(mainContainer.Ports) > 0 {
+				port := mainContainer.Ports[0]
+				dbPort := port.ContainerPort
+				container.Env[i] = corev1.EnvVar{
+					Name:      constant.KBEnvServicePort,
+					Value:     strconv.Itoa(int(dbPort)),
+					ValueFrom: nil,
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func updateReadinessProbe(synthesizeComp *component.SynthesizedComponent, lorryHTTPPort int) error {
+	var container *corev1.Container
+	for i := range synthesizeComp.PodSpec.Containers {
+		container = &synthesizeComp.PodSpec.Containers[i]
+		if container.ReadinessProbe == nil {
+			continue
+		}
+		if container.ReadinessProbe.HTTPGet == nil {
+			return nil
+		}
+		if container.ReadinessProbe.HTTPGet.Path == constant.LorryRoleProbePath ||
+			container.ReadinessProbe.HTTPGet.Path == constant.LorryVolumeProtectPath {
+			container.ReadinessProbe.HTTPGet.Port = intstr.FromInt(lorryHTTPPort)
+		}
+	}
+	return nil
+}
+
+func GetLorryContainer(containers []corev1.Container) *corev1.Container {
+	var container *corev1.Container
+	for i := range containers {
+		container = &containers[i]
+		for _, port := range container.Ports {
+			if port.Name == constant.LorryHTTPPortName {
+				return container
+			}
+		}
+	}
+	return nil
+}
+
+func GetLorryHTTPPort(container *corev1.Container) int {
+	for _, port := range container.Ports {
+		if port.Name == constant.LorryHTTPPortName {
+			return int(port.ContainerPort)
+		}
+	}
+	return 0
+}
+
+func GetLorryGRPCPort(container *corev1.Container) int {
+	for _, port := range container.Ports {
+		if port.Name == constant.LorryGRPCPortName {
+			return int(port.ContainerPort)
+		}
+	}
+	return 0
 }

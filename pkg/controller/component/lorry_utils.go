@@ -36,13 +36,6 @@ import (
 )
 
 const (
-	// http://localhost:<port>/v1.0/bindings/<binding_type>
-	// checkRoleURIFormat        = "/v1.0/bindings/%s?operation=checkRole&workloadType=%s"
-	checkRoleURIFormat        = "/v1.0/checkrole"
-	checkRunningURIFormat     = "/v1.0/bindings/%s?operation=checkRunning"
-	checkStatusURIFormat      = "/v1.0/bindings/%s?operation=checkStatus"
-	volumeProtectionURIFormat = "/v1.0/bindings/%s?operation=volumeProtection"
-
 	dataVolume = "data"
 )
 
@@ -71,13 +64,25 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 	if viper.IsSet("LORRY_SERVICE_HTTP_PORT") {
 		lorrySvcHTTPPort = viper.GetInt32("LORRY_SERVICE_HTTP_PORT")
 	}
-	availablePorts, err := getAvailableContainerPorts(synthesizeComp.PodSpec.Containers, []int32{lorrySvcHTTPPort})
-	lorrySvcHTTPPort = availablePorts[0]
+	lorrySvcGRPCPort := viper.GetInt32("PROBE_SERVICE_GRPC_PORT")
+	if synthesizeComp.PodSpec.HostNetwork {
+		lorrySvcHTTPPort = 51
+		lorrySvcGRPCPort = 61
+	}
+
+	availablePorts, err := getAvailableContainerPorts(synthesizeComp.PodSpec.Containers, []int32{lorrySvcHTTPPort, lorrySvcGRPCPort})
 	if err != nil {
 		reqCtx.Log.Info("get lorry container port failed", "error", err)
 		return err
 	}
-	lorrySvcGRPCPort := viper.GetInt("PROBE_SERVICE_GRPC_PORT")
+	lorrySvcHTTPPort = availablePorts[0]
+	lorrySvcGRPCPort = availablePorts[1]
+	if synthesizeComp.PodSpec.HostNetwork {
+		if lorrySvcGRPCPort >= 100 || lorrySvcHTTPPort >= 100 {
+			return fmt.Errorf("port numbers need to be less than 100 when using the host network! "+
+				"lorry http port: %d, lorry grpc port: %d", lorrySvcHTTPPort, lorrySvcGRPCPort)
+		}
+	}
 
 	// inject role probe container
 	var compRoleProbe *appsv1alpha1.RoleProbe
@@ -111,7 +116,7 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 		return nil
 	}
 
-	buildLorryServiceContainer(synthesizeComp, &lorryContainers[0], int(lorrySvcHTTPPort), lorrySvcGRPCPort)
+	buildLorryServiceContainer(synthesizeComp, &lorryContainers[0], int(lorrySvcHTTPPort), int(lorrySvcGRPCPort))
 
 	reqCtx.Log.V(1).Info("lorry", "containers", lorryContainers)
 	synthesizeComp.PodSpec.Containers = append(synthesizeComp.PodSpec.Containers, lorryContainers...)
@@ -283,7 +288,7 @@ func buildWeSyncerContainer(weSyncerContainer *corev1.Container, probeSvcHTTPPor
 func buildRoleProbeContainer(roleChangedContainer *corev1.Container, roleProbe *appsv1alpha1.RoleProbe, probeSvcHTTPPort int) {
 	roleChangedContainer.Name = constant.RoleProbeContainerName
 	httpGet := &corev1.HTTPGetAction{}
-	httpGet.Path = checkRoleURIFormat
+	httpGet.Path = constant.LorryRoleProbePath
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
 	probe := &corev1.Probe{}
 	probe.Exec = nil
@@ -303,7 +308,7 @@ func buildVolumeProtectionProbeContainer(characterType string, c *corev1.Contain
 	c.Name = constant.VolumeProtectionProbeContainerName
 	probe := &corev1.Probe{}
 	httpGet := &corev1.HTTPGetAction{}
-	httpGet.Path = fmt.Sprintf(volumeProtectionURIFormat, characterType)
+	httpGet.Path = constant.LorryVolumeProtectPath
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
 	probe.HTTPGet = httpGet
 	probe.PeriodSeconds = defaultVolumeProtectionProbe.PeriodSeconds

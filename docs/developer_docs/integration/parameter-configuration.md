@@ -230,7 +230,7 @@ This example illustrates the configuration for verifying MySQL parameter values.
  }
 ```
 
-For example, the example above defines some constraints for the parameter `performance_schem` in MySQL.
+For example, the example above defines some constraints for the parameter `performance_schema` in MySQL.
 
 - Type: string
 - Available values: ON, OFF, 0, 1

@@ -136,6 +136,11 @@ func (store *KubernetesStore) GetClusterName() string {
 	return store.clusterName
 }
 
+func (store *KubernetesStore) SetCompName(componentName string) {
+	store.componentName = componentName
+	store.clusterCompName = store.clusterName + "-" + componentName
+}
+
 func (store *KubernetesStore) GetClusterFromCache() *Cluster {
 	if store.cluster != nil {
 		return store.cluster

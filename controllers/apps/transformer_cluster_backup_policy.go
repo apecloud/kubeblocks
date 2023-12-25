@@ -103,8 +103,7 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 					return err
 				}
 				if compDef == nil {
-					return intctrlutil.NewNotFound("componentDefinition %s not found ",
-						bp.ComponentDefRef, clusterDefName)
+					return intctrlutil.NewNotFound("componentDefinition %s not found ", bp.ComponentDef)
 				}
 				r.existRoleProbe = len(compDef.Spec.Roles) > 0
 			}

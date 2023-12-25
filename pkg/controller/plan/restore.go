@@ -348,9 +348,8 @@ func (r *RestoreManager) cleanupClusterAnnotations(compName string) error {
 		if restoreInfo == "" {
 			return nil
 		}
-		restoreInfoMap := map[string]string{}
-
-		if err := json.Unmarshal([]byte(restoreInfo), restoreInfoMap); err != nil {
+		restoreInfoMap := map[string]any{}
+		if err := json.Unmarshal([]byte(restoreInfo), &restoreInfoMap); err != nil {
 			return err
 		}
 		delete(restoreInfoMap, compName)

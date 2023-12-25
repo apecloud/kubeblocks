@@ -186,13 +186,13 @@ func (r *ComponentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	b := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.Component{}).
-		Owns(&workloads.ReplicatedStateMachine{}).
+		Watches(&workloads.ReplicatedStateMachine{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&dpv1alpha1.Backup{}).
 		Owns(&dpv1alpha1.Restore{}).
-		Owns(&corev1.PersistentVolumeClaim{}).
+		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Owns(&policyv1.PodDisruptionBudget{}).
 		Owns(&batchv1.Job{}).
 		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler)).

@@ -191,7 +191,7 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 		return phase == "" || phase == appsv1alpha1.CreatingClusterCompPhase
 	}()
 
-	r.reqCtx.Log.V(1).Info(
+	r.reqCtx.Log.Info(
 		fmt.Sprintf("component status conditions, isRSMRunning: %v, isAllConfigSynced: %v, hasRunningVolumeExpansion: %v, hasFailure: %v,  isInCreatingPhase: %v, isComponentAvailable: %v",
 			isRSMRunning, isAllConfigSynced, hasRunningVolumeExpansion, hasFailure, isInCreatingPhase, isComponentAvailable))
 

@@ -48,10 +48,9 @@ type clusterBackupPolicyTransformer struct {
 	tplIdentifier     string
 	isDefaultTemplate string
 
-	backupPolicyTpl  *appsv1alpha1.BackupPolicyTemplate
-	backupPolicy     *appsv1alpha1.BackupPolicy
-	compWorkloadType appsv1alpha1.WorkloadType
-	existRoleProbe   bool
+	backupPolicyTpl *appsv1alpha1.BackupPolicyTemplate
+	backupPolicy    *appsv1alpha1.BackupPolicy
+	existRoleProbe  bool
 }
 
 var _ graph.Transformer = &clusterBackupPolicyTransformer{}
@@ -101,9 +100,6 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 				compDef := &appsv1alpha1.ComponentDefinition{}
 				if err := r.Client.Get(r.Context, client.ObjectKey{Name: bp.ComponentDef}, compDef); err != nil {
 					return err
-				}
-				if compDef == nil {
-					return intctrlutil.NewNotFound("componentDefinition %s not found ", bp.ComponentDef)
 				}
 				r.existRoleProbe = len(compDef.Spec.Roles) > 0
 			}

@@ -462,6 +462,9 @@ type RestoreSpec struct {
 	// +kubebuilder:validation:Required
 	BackupName string `json:"backupName"`
 
+	// effectiveCommonComponentDef describes this backup will be restored for all components which refer to common ComponentDefinition.
+	EffectiveCommonComponentDef bool `json:"effectiveCommonComponentDef,omitempty"`
+
 	// restoreTime point in time to restore
 	RestoreTimeStr string `json:"restoreTimeStr,omitempty"`
 

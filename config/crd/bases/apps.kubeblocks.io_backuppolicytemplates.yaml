@@ -53,6 +53,13 @@ spec:
                   the specified componentDefinition.
                 items:
                   properties:
+                    backoffLimit:
+                      description: Specifies the number of retries before marking
+                        the backup failed.
+                      format: int32
+                      maximum: 10
+                      minimum: 0
+                      type: integer
                     backupMethods:
                       description: backupMethods defines the backup methods.
                       items:
@@ -578,6 +585,12 @@ spec:
                         - name
                         type: object
                       type: array
+                    componentDef:
+                      description: componentDef references componentDefinition. Need
+                        to comply with IANA Service Naming rule.
+                      maxLength: 22
+                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
+                      type: string
                     componentDefRef:
                       description: componentDefRef references componentDef defined
                         in ClusterDefinition spec. Need to comply with IANA Service
@@ -665,13 +678,9 @@ spec:
                       type: object
                   required:
                   - backupMethods
-                  - componentDefRef
                   type: object
                 minItems: 1
                 type: array
-                x-kubernetes-list-map-keys:
-                - componentDefRef
-                x-kubernetes-list-type: map
               clusterDefinitionRef:
                 description: clusterDefinitionRef references ClusterDefinition name,
                   this is an immutable attribute.

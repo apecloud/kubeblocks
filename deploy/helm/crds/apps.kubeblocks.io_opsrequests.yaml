@@ -502,6 +502,10 @@ spec:
                   backupName:
                     description: backupName is the name of the backup.
                     type: string
+                  effectiveCommonComponentDef:
+                    description: effectiveCommonComponentDef describes this backup
+                      will be restored for all components which refer to common ComponentDefinition.
+                    type: boolean
                   restoreTimeStr:
                     description: restoreTime point in time to restore
                     type: string

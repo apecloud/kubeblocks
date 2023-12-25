@@ -141,6 +141,9 @@ type BackupStatus struct {
 	// volumeSnapshots records the volume snapshot status for the action.
 	// +optional
 	VolumeSnapshots []VolumeSnapshotStatus `json:"volumeSnapshots,omitempty"`
+
+	// extra records the extra info for the backup.
+	Extras []map[string]string `json:"extras,omitempty"`
 }
 
 // BackupTimeRange records the time range of backed up data, for PITR, this is the

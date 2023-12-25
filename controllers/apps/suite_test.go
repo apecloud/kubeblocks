@@ -148,6 +148,7 @@ var _ = BeforeSuite(func() {
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
 	viper.SetDefault("PROBE_SERVICE_PORT", 3501)
 	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
+	viper.SetDefault("CM_NAMESPACE", "default")
 	viper.SetDefault(constant.EnableRBACManager, true)
 
 	err = intctrlutil.InitHostPortManager(k8sClient)

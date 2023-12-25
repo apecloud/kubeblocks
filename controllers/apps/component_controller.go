@@ -132,10 +132,10 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentMetaTransformer{},
 			// validate referenced componentDefinition objects, and build synthesized component
 			&componentLoadResourcesTransformer{Client: r.Client},
-			// allocate port for hostNetwork component
-			&componentHostPortTransformer{},
 			// do validation for the spec & definition consistency
 			&componentValidationTransformer{},
+			// allocate port for hostNetwork component
+			&componentHostPortTransformer{},
 			// handle component PDB
 			&componentPDBTransformer{},
 			// handle component services

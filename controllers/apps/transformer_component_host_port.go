@@ -51,6 +51,7 @@ func buildContainerHostPorts(synthesizeComp *component.SynthesizedComponent, com
 		comp.Annotations = make(map[string]string)
 	}
 	comp.Annotations[constant.HostPortAnnotationKey] = "true"
+	portMapping := make(map[int32]int32)
 	for i, container := range synthesizeComp.PodSpec.Containers {
 		for j, item := range container.Ports {
 			portKey := intctrlutil.BuildHostPortName(synthesizeComp.ClusterName, synthesizeComp.Name, container.Name, item.Name)
@@ -71,7 +72,17 @@ func buildContainerHostPorts(synthesizeComp *component.SynthesizedComponent, com
 				port = item.ContainerPort
 			}
 			comp.Annotations[portKey] = fmt.Sprintf("%d", port)
+			portMapping[item.ContainerPort] = port
 		}
+	}
+
+	// update monitor scrape port
+	if synthesizeComp.Monitor.Enable {
+		newScrapePort, ok := portMapping[synthesizeComp.Monitor.ScrapePort]
+		if !ok {
+			return fmt.Errorf("monitor scrape port %d not found", synthesizeComp.Monitor.ScrapePort)
+		}
+		synthesizeComp.Monitor.ScrapePort = newScrapePort
 	}
 	return nil
 }

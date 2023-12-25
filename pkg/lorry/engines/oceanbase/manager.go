@@ -39,6 +39,7 @@ const (
 
 type Manager struct {
 	mysql.Manager
+	ReplicaTenant string
 }
 
 var _ engines.DBManager = &Manager{}

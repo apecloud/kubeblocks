@@ -380,6 +380,7 @@ func getBuiltinActionHandlers() []appsv1alpha1.BuiltinActionHandlerType {
 	return []appsv1alpha1.BuiltinActionHandlerType{
 		appsv1alpha1.MySQLBuiltinActionHandler,
 		appsv1alpha1.WeSQLBuiltinActionHandler,
+		appsv1alpha1.OceanbaseBuiltinActionHandler,
 		appsv1alpha1.RedisBuiltinActionHandler,
 		appsv1alpha1.MongoDBBuiltinActionHandler,
 		appsv1alpha1.ETCDBuiltinActionHandler,

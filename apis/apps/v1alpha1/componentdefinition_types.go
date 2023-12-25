@@ -493,6 +493,7 @@ type BuiltinActionHandlerType string
 const (
 	MySQLBuiltinActionHandler              BuiltinActionHandlerType = "mysql"
 	WeSQLBuiltinActionHandler              BuiltinActionHandlerType = "wesql"
+	OceanbaseBuiltinActionHandler          BuiltinActionHandlerType = "oceanbase"
 	RedisBuiltinActionHandler              BuiltinActionHandlerType = "redis"
 	MongoDBBuiltinActionHandler            BuiltinActionHandlerType = "mongodb"
 	ETCDBuiltinActionHandler               BuiltinActionHandlerType = "etcd"

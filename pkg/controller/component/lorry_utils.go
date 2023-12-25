@@ -50,7 +50,7 @@ var (
 
 // buildLorryContainers builds lorry containers for component.
 // In the new ComponentDefinition API, StatusProbe and RunningProbe have been removed.
-func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *SynthesizedComponent) error {
+func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *SynthesizedComponent, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) error {
 	// If it's not a built-in handler supported by Lorry, LorryContainers are not injected by default.
 	builtinHandler := getBuiltinActionHandler(synthesizeComp)
 	if builtinHandler == appsv1alpha1.UnknownBuiltinActionHandler {
@@ -116,7 +116,7 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 		return nil
 	}
 
-	buildLorryServiceContainer(synthesizeComp, &lorryContainers[0], int(lorrySvcHTTPPort), int(lorrySvcGRPCPort))
+	buildLorryServiceContainer(synthesizeComp, &lorryContainers[0], int(lorrySvcHTTPPort), int(lorrySvcGRPCPort), clusterCompSpec)
 
 	reqCtx.Log.V(1).Info("lorry", "containers", lorryContainers)
 	synthesizeComp.PodSpec.Containers = append(synthesizeComp.PodSpec.Containers, lorryContainers...)
@@ -124,46 +124,10 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 }
 
 func buildBasicContainer(synthesizeComp *SynthesizedComponent) *corev1.Container {
-	var (
-		secretName     string
-		sysInitAccount *appsv1alpha1.SystemAccount
-	)
-
-	// TODO(lorry): use the buildIn kbprobe system account as the default credential
-	for index, sysAccount := range synthesizeComp.SystemAccounts {
-		if sysAccount.InitAccount {
-			sysInitAccount = &synthesizeComp.SystemAccounts[index]
-			break
-		}
-	}
-	if sysInitAccount != nil {
-		secretName = constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
-	} else {
-		secretName = constant.GenerateDefaultConnCredential(synthesizeComp.ClusterName)
-	}
 	return builder.NewContainerBuilder("string").
 		SetImage("infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/google_containers/pause:3.6").
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddCommands("/pause").
-		AddEnv(corev1.EnvVar{
-			Name: constant.KBEnvServiceUser,
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					Key: constant.AccountNameForSecret,
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: secretName,
-					}},
-			}},
-			corev1.EnvVar{
-				Name: constant.KBEnvServicePassword,
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						Key: constant.AccountPasswdForSecret,
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: secretName,
-						}},
-				},
-			}).
 		SetStartupProbe(corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(3501)},
@@ -171,7 +135,7 @@ func buildBasicContainer(synthesizeComp *SynthesizedComponent) *corev1.Container
 		GetObject()
 }
 
-func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container *corev1.Container, lorrySvcHTTPPort, lorrySvcGRPCPort int) {
+func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container *corev1.Container, lorrySvcHTTPPort, lorrySvcGRPCPort int, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) {
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	container.Command = []string{"lorry",
@@ -225,8 +189,10 @@ func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container 
 			break
 		}
 	}
-	if sysInitAccount != nil {
-		secretName = constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
+	if clusterCompSpec == nil || clusterCompSpec.ComponentDef != "" {
+		if sysInitAccount != nil {
+			secretName = constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
+		}
 	} else {
 		secretName = constant.GenerateDefaultConnCredential(synthesizeComp.ClusterName)
 	}
@@ -236,29 +202,32 @@ func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container 
 			Name:      constant.KBEnvBuiltinHandler,
 			Value:     string(getBuiltinActionHandler(synthesizeComp)),
 			ValueFrom: nil,
-		},
-		corev1.EnvVar{
-			Name: constant.KBEnvServiceUser,
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: secretName,
-					},
-					Key: constant.AccountNameForSecret,
-				},
-			},
-		},
-		corev1.EnvVar{
-			Name: constant.KBEnvServicePassword,
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: secretName,
-					},
-					Key: constant.AccountPasswdForSecret,
-				},
-			},
 		})
+	if secretName != "" {
+		container.Env = append(container.Env,
+			corev1.EnvVar{
+				Name: constant.KBEnvServiceUser,
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: secretName,
+						},
+						Key: constant.AccountNameForSecret,
+					},
+				},
+			},
+			corev1.EnvVar{
+				Name: constant.KBEnvServicePassword,
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: secretName,
+						},
+						Key: constant.AccountPasswdForSecret,
+					},
+				},
+			})
+	}
 
 	container.Ports = []corev1.ContainerPort{
 		{

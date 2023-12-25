@@ -549,7 +549,7 @@ func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 	// MySQL 5.7 has a limitation where the length of the master_host cannot exceed 60 characters.
 	masterHost := cluster.GetMemberShortAddr(*leaderMember)
 	changeMaster := fmt.Sprintf(`change master to master_host='%s',master_user='%s',master_password='%s',master_port=%s,master_auto_position=1;`,
-		masterHost, config.username, config.password, leaderMember.DBPort)
+		masterHost, config.Username, config.password, leaderMember.DBPort)
 	startSlave := `start slave;`
 
 	_, err := mgr.DB.Exec(stopSlave + changeMaster + startSlave)

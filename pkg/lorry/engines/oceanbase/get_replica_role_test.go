@@ -39,7 +39,7 @@ const (
 
 func mockDatabase(t *testing.T) (*Manager, sqlmock.Sqlmock, error) {
 	manager := &Manager{
-		mysql.Manager{
+		Manager: mysql.Manager{
 			DBManagerBase: engines.DBManagerBase{
 				CurrentMemberName: fakePodName,
 				ClusterCompName:   fakeClusterCompName,

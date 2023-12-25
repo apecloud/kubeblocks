@@ -6,3 +6,5 @@ spec:
       value: "root:@tcp(127.0.0.1:2881)/mysql?multiStatements=true"
     - name: maxOpenConns
       value: "5"
+    - name: username
+      value: "root"

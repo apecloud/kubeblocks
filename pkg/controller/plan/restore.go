@@ -96,7 +96,7 @@ func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent, compObj
 		return err
 	}
 	// do clean up
-	if err = r.cleanupClusterAnnotations(); err != nil {
+	if err = r.cleanupClusterAnnotations(comp.Name); err != nil {
 		return err
 	}
 	return r.cleanupRestores(comp)
@@ -341,12 +341,30 @@ func (r *RestoreManager) createRestoreAndWait(restore *dpv1alpha1.Restore, compO
 	}
 }
 
-func (r *RestoreManager) cleanupClusterAnnotations() error {
+func (r *RestoreManager) cleanupClusterAnnotations(compName string) error {
 	// TODO: Waiting for all component recovery jobs to be completed
 	if r.Cluster.Status.Phase == appsv1alpha1.RunningClusterPhase && r.Cluster.Annotations != nil {
+		restoreInfo := r.Cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
+		if restoreInfo == "" {
+			return nil
+		}
+		restoreInfoMap := map[string]string{}
+
+		if err := json.Unmarshal([]byte(restoreInfo), restoreInfoMap); err != nil {
+			return err
+		}
+		delete(restoreInfoMap, compName)
 		cluster := r.Cluster
 		patch := client.MergeFrom(cluster.DeepCopy())
-		delete(cluster.Annotations, constant.RestoreFromBackupAnnotationKey)
+		if len(restoreInfoMap) == 0 {
+			delete(cluster.Annotations, constant.RestoreFromBackupAnnotationKey)
+		} else {
+			restoreInfoBytes, err := json.Marshal(restoreInfoMap)
+			if err != nil {
+				return err
+			}
+			cluster.Annotations[constant.RestoreFromBackupAnnotationKey] = string(restoreInfoBytes)
+		}
 		return r.Client.Patch(r.Ctx, cluster, patch)
 	}
 	return nil

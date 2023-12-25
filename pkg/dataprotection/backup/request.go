@@ -317,6 +317,16 @@ func (r *Request) BuildJobActionPodSpec(name string,
 		if r.ActionSet != nil {
 			envVars = append(envVars, r.ActionSet.Spec.Env...)
 		}
+		// build envs for kb cluster
+		setKBClusterEnv := func(labelKey, envName string) {
+			if v, ok := r.Backup.Labels[labelKey]; ok {
+				envVars = append(envVars, corev1.EnvVar{Name: envName, Value: v})
+			}
+		}
+		setKBClusterEnv(dptypes.ClusterUIDLabelKey, constant.KBEnvClusterUID)
+		setKBClusterEnv(constant.AppInstanceLabelKey, constant.KBEnvClusterName)
+		setKBClusterEnv(constant.KBAppComponentLabelKey, constant.KBEnvCompName)
+		envVars = append(envVars, corev1.EnvVar{Name: constant.KBEnvNamespace, Value: r.Namespace})
 		return utils.MergeEnv(envVars, r.BackupMethod.Env)
 	}
 
@@ -435,7 +445,8 @@ function update_backup_stauts() {
   echo backupInfo:${backup_info}
   local namespace="$3"
   local backup_name="$4"
-  eval kubectl -n "$namespace" patch backup "$backup_name" --subresource=status --type=merge --patch '{\"status\":${backup_info}}'
+  status="{\"status\":${backup_info}}"
+  kubectl -n "$namespace" patch backup "$backup_name" --subresource=status --type=merge --patch "${status}"
 }
 update_backup_stauts ${%s} ${%s} %s %s
 `, dptypes.DPBackupInfoFile, dptypes.DPCheckInterval, r.Backup.Namespace, r.Backup.Name)

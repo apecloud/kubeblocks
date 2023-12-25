@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package restore
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -32,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -276,28 +278,52 @@ func isTimeInRange(t time.Time, start time.Time, end time.Time) bool {
 	return !t.Before(start) && !t.After(end)
 }
 
-func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, volumeRestorePolicy string, compSpecsCount int, firstCompName string, restoreTime string) (string, error) {
+func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, compSpecs []appsv1alpha1.ClusterComponentSpec, volumeRestorePolicy, restoreTime string, effectiveCommonComponentDef bool) (string, error) {
 	componentName := backup.Labels[constant.KBAppComponentLabelKey]
 	if len(componentName) == 0 {
-		if compSpecsCount != 1 {
+		if len(compSpecs) != 1 {
 			return "", fmt.Errorf("unable to obtain the name of the component to be recovered, please ensure that Backup.status.componentName exists")
 		}
-		componentName = firstCompName
+		componentName = compSpecs[0].Name
 	}
-	backupNameString := fmt.Sprintf(`"%s":"%s"`, constant.BackupNameKeyForRestore, backup.Name)
-	backupNamespaceString := fmt.Sprintf(`"%s":"%s"`, constant.BackupNamespaceKeyForRestore, backup.Namespace)
-	volumeRestorePolicyString := fmt.Sprintf(`"%s":"%s"`, constant.VolumeRestorePolicyKeyForRestore, volumeRestorePolicy)
-	var restoreTimeString string
+	restoreInfoMap := map[string]string{}
+	restoreInfoMap[constant.BackupNameKeyForRestore] = backup.Name
+	restoreInfoMap[constant.BackupNamespaceKeyForRestore] = backup.Namespace
+	restoreInfoMap[constant.VolumeRestorePolicyKeyForRestore] = volumeRestorePolicy
 	if restoreTime != "" {
-		restoreTimeString = fmt.Sprintf(`,"%s":"%s"`, constant.RestoreTimeKeyForRestore, restoreTime)
+		restoreInfoMap[constant.RestoreTimeKeyForRestore] = restoreTime
 	}
-
-	var passwordString string
 	connectionPassword := backup.Annotations[dptypes.ConnectionPasswordKey]
 	if connectionPassword != "" {
-		passwordString = fmt.Sprintf(`,"%s":"%s"`, constant.ConnectionPassword, connectionPassword)
+		restoreInfoMap[constant.ConnectionPassword] = connectionPassword
 	}
-
-	restoreFromBackupAnnotation := fmt.Sprintf(`{"%s":{%s,%s,%s%s%s}}`, componentName, backupNameString, backupNamespaceString, volumeRestorePolicyString, restoreTimeString, passwordString)
-	return restoreFromBackupAnnotation, nil
+	restoreForClusterMap := map[string]map[string]string{}
+	restoreForClusterMap[componentName] = restoreInfoMap
+	if effectiveCommonComponentDef {
+		getCompDefOfCompSpec := func(compSpec appsv1alpha1.ClusterComponentSpec) string {
+			if compSpec.ComponentDef != "" {
+				return compSpec.ComponentDef
+			}
+			return compSpec.ComponentDefRef
+		}
+		getCompDef := func() string {
+			for i := range compSpecs {
+				if compSpecs[i].Name == componentName {
+					return getCompDefOfCompSpec(compSpecs[i])
+				}
+			}
+			return ""
+		}
+		backupCompDef := getCompDef()
+		for i := range compSpecs {
+			if getCompDefOfCompSpec(compSpecs[i]) == backupCompDef {
+				restoreForClusterMap[compSpecs[i].Name] = restoreInfoMap
+			}
+		}
+	}
+	bytes, err := json.Marshal(restoreForClusterMap)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
 }

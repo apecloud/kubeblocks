@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -221,4 +222,26 @@ func GetCompDefinition(reqCtx intctrlutil.RequestCtx,
 		return nil, err
 	}
 	return compDef, nil
+}
+
+// CheckAndGetClusterComponents checks if all components have created and gets the created components.
+func CheckAndGetClusterComponents(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) ([]client.Object, error) {
+	compList := &appsv1alpha1.ComponentList{}
+	if err := cli.List(ctx, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels{constant.AppInstanceLabelKey: cluster.Name}); err != nil {
+		return nil, err
+	}
+	compMap := map[string]client.Object{}
+	for i := range compList.Items {
+		compMap[compList.Items[i].Name] = &compList.Items[i]
+	}
+	var components []client.Object
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		compName := constant.GenerateClusterComponentName(cluster.Name, compSpec.Name)
+		v, ok := compMap[compName]
+		if !ok {
+			return nil, intctrlutil.NewRequeueError(time.Second, "waiting for all component creations to be completed")
+		}
+		components = append(components, v)
+	}
+	return components, nil
 }

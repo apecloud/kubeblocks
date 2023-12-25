@@ -23,7 +23,9 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -32,6 +34,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -40,6 +44,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // ResultToP converts a Result object to a pointer.
@@ -275,4 +280,176 @@ func CheckResourceExists(
 	}
 	// if found, return true
 	return true, nil
+}
+
+var (
+	portManager *PortManager
+)
+
+const (
+	// https://www.w3.org/Daemon/User/Installation/PrivilegedPorts.html
+	// The TCP/IP port numbers below 1024 are special in that normal users are not allowed to run servers on them.
+	// This is a security feaure, in that if you connect to a service on one of these ports you can be fairly sure
+	// that you have the real thing, and not a fake which some hacker has put up for you.
+	hostPortMin           = int32(1025)
+	hostPortMax           = int32(65536)
+	hostPortConfigMapName = "kubeblocks-host-ports"
+)
+
+func InitHostPortManager(cli client.Client) error {
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      hostPortConfigMapName,
+			Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
+		},
+		Data: make(map[string]string),
+	}
+	var err error
+	if err = cli.Create(context.Background(), cm); err != nil {
+		if !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+	}
+	portManager, err = NewPortManager(hostPortMin, hostPortMax, cli)
+	return err
+}
+
+func GetPortManager() *PortManager {
+	return portManager
+}
+
+func BuildHostPortName(clusterName, compName, containerName, portName string) string {
+	return fmt.Sprintf("%s-%s-%s-%s", clusterName, compName, containerName, portName)
+}
+
+type PortManager struct {
+	sync.Mutex
+	cli       client.Client
+	min       int32
+	max       int32
+	portsUsed map[int32]bool
+	cm        *corev1.ConfigMap
+}
+
+// NewPortManager creates a new PortManager
+// TODO[ziang] Putting all the port information in one configmap may have performance issues and is not secure enough.
+// There is a risk of accidental deletion leading to the loss of cluster port information.
+func NewPortManager(min, max int32, cli client.Client) (*PortManager, error) {
+	pm := &PortManager{min: min, max: max, cli: cli, portsUsed: make(map[int32]bool)}
+	if err := pm.sync(); err != nil {
+		return nil, err
+	}
+	return pm, nil
+}
+
+func (pm *PortManager) sync() error {
+	cm := &corev1.ConfigMap{}
+	objKey := types.NamespacedName{
+		Name:      hostPortConfigMapName,
+		Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
+	}
+	if err := pm.cli.Get(context.Background(), objKey, cm); err != nil {
+		return err
+	}
+	if cm.Data == nil {
+		cm.Data = make(map[string]string)
+	}
+	portsUsed := make(map[int32]bool)
+	for _, item := range cm.Data {
+		port, err := strconv.ParseInt(strings.TrimSpace(item), 10, 32)
+		if err != nil {
+			continue
+		}
+		portsUsed[int32(port)] = true
+	}
+	pm.cm = cm
+	pm.portsUsed = portsUsed
+	return nil
+}
+
+func (pm *PortManager) update() error {
+	var err error
+	defer func() {
+		if apierrors.IsConflict(err) {
+			_ = pm.sync()
+		}
+	}()
+	err = pm.cli.Update(context.Background(), pm.cm)
+	return err
+}
+
+func (pm *PortManager) UsePort(key string, port int32) error {
+	pm.Lock()
+	defer pm.Unlock()
+	pm.cm.Data[key] = fmt.Sprintf("%d", port)
+	if err := pm.update(); err != nil {
+		return err
+	}
+	pm.portsUsed[port] = true
+	return nil
+}
+
+func (pm *PortManager) AllocatePort(key string) (int32, error) {
+	pm.Lock()
+	defer pm.Unlock()
+	value, ok := pm.cm.Data[key]
+	if ok {
+		port, err := strconv.ParseInt(strings.TrimSpace(value), 10, 32)
+		if err != nil {
+			return 0, err
+		}
+		return int32(port), nil
+	}
+
+	// allocate a new port randomly in range [hostPortMin, hostPortMax)
+	for i := 0; i < 10; i++ {
+		port := int32(rand.Int63nRange(int64(hostPortMin), int64(hostPortMax)))
+		if _, ok := pm.portsUsed[port]; ok {
+			continue
+		}
+		pm.cm.Data[key] = fmt.Sprintf("%d", port)
+		if err := pm.update(); err != nil {
+			return 0, err
+		}
+		pm.portsUsed[port] = true
+		return port, nil
+	}
+	return 0, fmt.Errorf("failed to allocate port")
+}
+
+func (pm *PortManager) ReleasePort(key string) error {
+	return pm.ReleasePorts([]string{key})
+}
+
+func (pm *PortManager) ReleasePorts(keys []string) error {
+	pm.Lock()
+	defer pm.Unlock()
+	for _, key := range keys {
+		delete(pm.cm.Data, key)
+	}
+	if err := pm.update(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (pm *PortManager) ReleaseByPrefix(prefix string) error {
+	if prefix == "" {
+		return nil
+	}
+	pm.Lock()
+	defer pm.Unlock()
+	for key := range pm.cm.Data {
+		if strings.HasPrefix(key, prefix) {
+			delete(pm.cm.Data, key)
+		}
+	}
+	if err := pm.update(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (pm *PortManager) NeedAllocate(port int32) bool {
+	return port <= 100
 }

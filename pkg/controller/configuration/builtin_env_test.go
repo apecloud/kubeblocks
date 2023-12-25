@@ -236,6 +236,7 @@ bootstrap:
 					},
 				},
 				ctx, mockClient.Client(),
+				nil,
 			)
 
 			localObjs := []coreclient.Object{

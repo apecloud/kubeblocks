@@ -394,7 +394,7 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 		// The old implementation relies on ClusterCompDef for environmental variables and sets them in labels on the rsm and pod.
 		// All places relying on the `app.kubernetes.io/component` label need to be refactored.
 		if synthesizeComp.CompDefName == "" {
-			synthesizeComp.CompDefName = clusterCompDef.Name
+			synthesizeComp.CompDefName = fmt.Sprintf("%s-%s", clusterDef.Name, clusterCompDef.Name)
 		}
 		// TLS is a backward compatible field, which is used in configuration rendering before version 0.8.0.
 		if synthesizeComp.TLSConfig != nil {

@@ -31,10 +31,6 @@ type BackupPolicyTemplateSpec struct {
 	ClusterDefRef string `json:"clusterDefinitionRef"`
 
 	// backupPolicies is a list of backup policy template for the specified componentDefinition.
-	// +patchMergeKey=componentDefRef
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=componentDefRef
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	BackupPolicies []BackupPolicy `json:"backupPolicies"`
@@ -51,10 +47,17 @@ type BackupPolicyTemplateSpec struct {
 type BackupPolicy struct {
 	// componentDefRef references componentDef defined in ClusterDefinition spec. Need to
 	// comply with IANA Service Naming rule.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
-	ComponentDefRef string `json:"componentDefRef"`
+	// +optional
+	ComponentDefRef string `json:"componentDefRef,omitempty"`
+
+	// componentDef references componentDefinition. Need to
+	// comply with IANA Service Naming rule.
+	// +kubebuilder:validation:MaxLength=22
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	// +optional
+	ComponentDef string `json:"componentDef,omitempty"`
 
 	// target instance for backup.
 	// +optional
@@ -67,6 +70,12 @@ type BackupPolicy struct {
 	// backupMethods defines the backup methods.
 	// +kubebuilder:validation:Required
 	BackupMethods []BackupMethod `json:"backupMethods"`
+
+	// Specifies the number of retries before marking the backup failed.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=10
+	BackoffLimit *int32 `json:"backoffLimit,omitempty"`
 }
 
 type BackupMethod struct {

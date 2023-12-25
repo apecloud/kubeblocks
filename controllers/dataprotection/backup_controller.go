@@ -597,6 +597,11 @@ func getClusterObjectString(cluster *appsv1alpha1.Cluster) (*string, error) {
 		},
 		TypeMeta: cluster.TypeMeta,
 	}
+	if v, ok := cluster.Annotations[constant.ExtraEnvAnnotationKey]; ok {
+		newCluster.Annotations = map[string]string{
+			constant.ExtraEnvAnnotationKey: v,
+		}
+	}
 	clusterBytes, err := json.Marshal(newCluster)
 	if err != nil {
 		return nil, err

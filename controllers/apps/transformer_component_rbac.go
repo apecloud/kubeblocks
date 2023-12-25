@@ -105,12 +105,18 @@ func isProbesEnabled(compDef *appsv1alpha1.ComponentDefinition) bool {
 	return compDef.Spec.LifecycleActions != nil && compDef.Spec.LifecycleActions.RoleProbe != nil
 }
 
-func isDataProtectionEnabled(backupTpl *appsv1alpha1.BackupPolicyTemplate, comp *appsv1alpha1.Component) bool {
+func isDataProtectionEnabled(backupTpl *appsv1alpha1.BackupPolicyTemplate, cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) bool {
 	if backupTpl != nil {
 		for _, policy := range backupTpl.Spec.BackupPolicies {
 			// TODO(component): the definition of component referenced by backup policy.
 			if policy.ComponentDefRef == comp.Spec.CompDef {
 				return true
+			}
+			// TODO: Compatibility handling, remove it if the clusterDefinition is removed.
+			for _, v := range cluster.Spec.ComponentSpecs {
+				if v.ComponentDefRef == policy.ComponentDefRef {
+					return true
+				}
 			}
 		}
 	}
@@ -253,7 +259,7 @@ func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAc
 
 	serviceAccountName := comp.Spec.ServiceAccountName
 	volumeProtectionEnable := isVolumeProtectionEnabled(compDef)
-	dataProtectionEnable := isDataProtectionEnabled(backupPolicyTPL, comp)
+	dataProtectionEnable := isDataProtectionEnabled(backupPolicyTPL, cluster, comp)
 	if serviceAccountName == "" {
 		// If probe, volume protection, and data protection are disabled at the same tme, then do not create a service account.
 		if !isProbesEnabled(compDef) && !volumeProtectionEnable && !dataProtectionEnable {

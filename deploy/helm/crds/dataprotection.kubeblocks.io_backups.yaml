@@ -666,6 +666,13 @@ spec:
                   manual.
                 format: date-time
                 type: string
+              extras:
+                description: extra records the extra info for the backup.
+                items:
+                  additionalProperties:
+                    type: string
+                  type: object
+                type: array
               failureReason:
                 description: failureReason is an error that caused the backup to fail.
                 type: string

@@ -300,7 +300,11 @@ func (r *restoreJobBuilder) build() *batchv1.Job {
 	job.Spec.Template.ObjectMeta = metav1.ObjectMeta{
 		Labels: r.labels,
 	}
-	job.Spec.BackoffLimit = &defaultBackoffLimit
+	if r.restore.Spec.BackoffLimit != nil {
+		job.Spec.BackoffLimit = r.restore.Spec.BackoffLimit
+	} else {
+		job.Spec.BackoffLimit = &defaultBackoffLimit
+	}
 
 	// 2. set restore container
 	r.specificVolumeMounts = append(r.specificVolumeMounts, r.commonVolumeMounts...)

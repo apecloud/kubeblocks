@@ -443,7 +443,8 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(targetTpl appsv1alpha
 		cc.SecretName = constant.GenerateAccountSecretName(clusterName, comp.Name, targetTpl.Account)
 		cc.PasswordKey = constant.AccountPasswdForSecret
 		cc.PasswordKey = constant.AccountNameForSecret
-	} else if r.backupPolicy.ComponentDefRef != "" {
+	} else if r.backupPolicy.ComponentDef == "" {
+		// TODO: remove HACK code in version 0.9
 		cc.SecretName = constant.GenerateDefaultConnCredential(clusterName)
 		ccKey := targetTpl.ConnectionCredentialKey
 		if ccKey.PasswordKey != nil {

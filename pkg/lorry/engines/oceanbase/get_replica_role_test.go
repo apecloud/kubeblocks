@@ -27,6 +27,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/mysql"
+	"github.com/apecloud/kubeblocks/pkg/viperx"
 	"github.com/stretchr/testify/assert"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -49,6 +50,7 @@ func mockDatabase(t *testing.T) (*Manager, sqlmock.Sqlmock, error) {
 		},
 	}
 
+	manager.ReplicaTenant = viperx.GetString("TENANT_NAME")
 	db, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
@@ -60,6 +62,7 @@ func mockDatabase(t *testing.T) (*Manager, sqlmock.Sqlmock, error) {
 
 func TestGetRole(t *testing.T) {
 	ctx := context.TODO()
+	viperx.SetDefault("TENANT_NAME", "alice")
 	manager, mock, _ := mockDatabase(t)
 
 	t.Run("error executing sql", func(t *testing.T) {

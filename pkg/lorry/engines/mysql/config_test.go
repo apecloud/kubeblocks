@@ -82,7 +82,7 @@ func TestNewConfig(t *testing.T) {
 		assert.Equal(t, 4, fakeConfig.maxIdleConns)
 		assert.Equal(t, time.Minute*10, fakeConfig.connMaxLifetime)
 		assert.Equal(t, time.Second*500, fakeConfig.connMaxIdletime)
-		assert.Equal(t, fakeUser, fakeConfig.username)
+		assert.Equal(t, fakeUser, fakeConfig.Username)
 		assert.Equal(t, fakePassword, fakeConfig.password)
 	})
 

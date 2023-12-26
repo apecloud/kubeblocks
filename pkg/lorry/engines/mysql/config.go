@@ -64,7 +64,7 @@ const (
 type Config struct {
 	url             string
 	port            string
-	username        string
+	Username        string
 	password        string
 	pemPath         string
 	maxIdleConns    int
@@ -87,7 +87,9 @@ func NewConfig(properties map[string]string) (*Config, error) {
 	}
 
 	if viper.IsSet(constant.KBEnvServiceUser) {
-		config.username = viper.GetString(constant.KBEnvServiceUser)
+		config.Username = viper.GetString(constant.KBEnvServiceUser)
+	} else if username, ok := properties["username"]; ok {
+		config.Username = username
 	}
 
 	if viper.IsSet(constant.KBEnvServicePassword) {
@@ -151,7 +153,7 @@ func (config *Config) GetLocalDBConn() (*sql.DB, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "illegal Data Source Name (DNS) specified by %s", connectionURLKey)
 	}
-	mysqlConfig.User = config.username
+	mysqlConfig.User = config.Username
 	mysqlConfig.Passwd = config.password
 	if config.port != "" {
 		mysqlConfig.Addr = "127.0.0.1:" + config.port
@@ -169,7 +171,7 @@ func (config *Config) GetDBConnWithAddr(addr string) (*sql.DB, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "illegal Data Source Name (DNS) specified by %s", connectionURLKey)
 	}
-	mysqlConfig.User = config.username
+	mysqlConfig.User = config.Username
 	mysqlConfig.Passwd = config.password
 	mysqlConfig.Addr = addr
 	db, err := GetDBConnection(mysqlConfig.FormatDSN())

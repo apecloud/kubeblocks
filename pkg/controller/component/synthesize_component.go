@@ -207,7 +207,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	buildServiceAccountName(synthesizeComp)
 
 	// build lorryContainer
-	if err := buildLorryContainers(reqCtx, synthesizeComp); err != nil {
+	if err := buildLorryContainers(reqCtx, synthesizeComp, clusterCompSpec); err != nil {
 		reqCtx.Log.Error(err, "build probe container failed.")
 		return nil, err
 	}

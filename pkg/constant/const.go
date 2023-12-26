@@ -232,6 +232,8 @@ const (
 	// Container port name
 	LorryHTTPPortName                  = "lorry-http-port"
 	LorryGRPCPortName                  = "lorry-grpc-port"
+	LorryRoleProbePath                 = "/v1.0/checkrole"
+	LorryVolumeProtectPath             = "/v1.0/volumeprotection"
 	ProbeInitContainerName             = "kb-initprobe"
 	WeSyncerContainerName              = "kb-we-syncer"
 	RoleProbeContainerName             = "kb-checkrole"

@@ -34,6 +34,10 @@ func NewConfig(properties map[string]string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	if mysqlConfig.Username == "" {
+		mysqlConfig.Username = "root"
+	}
+
 	config = &Config{
 		Config: mysqlConfig,
 	}

@@ -455,12 +455,12 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 		// for compatibility with old probe env var names
 		env = append(env,
 			corev1.EnvVar{
-				Name:      "KB_SERVICE_USER",
+				Name:      constant.KBEnvServiceUser,
 				Value:     credential.Username.Value,
 				ValueFrom: credential.Username.ValueFrom,
 			},
 			corev1.EnvVar{
-				Name:      "KB_SERVICE_PASSWORD",
+				Name:      constant.KBEnvServicePassword,
 				Value:     credential.Password.Value,
 				ValueFrom: credential.Password.ValueFrom,
 			})
@@ -633,7 +633,8 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 
 		for _, e := range env {
 			if slices.IndexFunc(container.Env, func(v corev1.EnvVar) bool {
-				return v.Name == e.Name
+				return v.Name == e.Name || e.Name == constant.KBEnvServiceUser ||
+					e.Name == constant.KBEnvServicePassword || e.Name == usernameCredentialVarName || e.Name == passwordCredentialVarName
 			}) >= 0 {
 				continue
 			}

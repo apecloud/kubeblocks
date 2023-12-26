@@ -120,6 +120,10 @@ func updateLorry(synthesizeComp *component.SynthesizedComponent, container *core
 		"--grpcport", strconv.Itoa(grpcPort),
 	}
 
+	if container.StartupProbe != nil && container.StartupProbe.HTTPGet != nil {
+		container.StartupProbe.HTTPGet.Port = intstr.FromInt(httpPort)
+	}
+
 	for i := range container.Env {
 		if container.Env[i].Name != constant.KBEnvServicePort {
 			continue

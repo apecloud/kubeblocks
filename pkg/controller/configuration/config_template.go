@@ -250,7 +250,7 @@ func (c *configTemplateBuilder) buildDynamicCompInfos(podSpec *corev1.PodSpec, s
 				generatePortName := fmt.Sprintf("%s-%s-%s", comp.Name, container.Name, p.Name)
 				if hostPort, ok := comp.Annotations[generatePortName]; ok {
 					// replace the hostPort with auto-allocation port
-					hostPortInt, _ := strconv.Atoi(hostPort)
+					hostPortInt, _ := strconv.ParseInt(hostPort, 10, 32)
 					p.HostPort = int32(hostPortInt)
 					ports = append(ports, p)
 				}

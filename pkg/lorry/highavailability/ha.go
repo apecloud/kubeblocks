@@ -140,6 +140,7 @@ func (ha *Ha) RunCycle() {
 			_ = ha.dcs.ReleaseLease()
 			break
 		}
+		cluster.Leader.Name = ha.dbManager.GetCurrentMemberName()
 
 		ha.logger.Info("Take the leader success!")
 		fallthrough

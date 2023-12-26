@@ -34,6 +34,7 @@ import (
 	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -156,6 +157,13 @@ func commonStopContainerWithPod(pod *corev1.Pod, ctx context.Context, containerN
 
 func cfgManagerGrpcURL(pod *corev1.Pod) (string, error) {
 	podPort := viper.GetInt(constant.ConfigManagerGPRCPortEnv)
+	if pod.Spec.HostNetwork {
+		containerPort, err := configuration.GetConfigManagerGRPCPort(pod.Spec.Containers)
+		if err != nil {
+			return "", err
+		}
+		podPort = int(containerPort)
+	}
 	return getURLFromPod(pod, podPort)
 }
 

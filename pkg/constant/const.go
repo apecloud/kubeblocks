@@ -256,6 +256,8 @@ const (
 	ReconfigureManagerSource  = "manager"
 	ReconfigureUserSource     = "ops"
 	ReconfigureTemplateSource = "external-template"
+
+	ConfigManagerPortName = "config-manager"
 )
 
 const (

@@ -205,6 +205,15 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 		Cluster:                   cluster,
 		ConfigSpecsBuildParams:    configSpecBuildParams,
 		ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),
+		ContainerPort:             viper.GetInt32(constant.ConfigManagerGPRCPortEnv),
+	}
+
+	if podSpec.HostNetwork {
+		containerPort, err := GetConfigManagerGRPCPort(podSpec.Containers)
+		if err != nil {
+			return nil, err
+		}
+		cfgManagerParams.ContainerPort = containerPort
 	}
 
 	if err := cfgcm.BuildConfigManagerContainerParams(cli, ctx, cfgManagerParams, volumeDirs); err != nil {
@@ -214,4 +223,22 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 		return nil, err
 	}
 	return cfgManagerParams, nil
+}
+
+func GetConfigManagerGRPCPort(containers []corev1.Container) (int32, error) {
+	for _, container := range containers {
+		if found := foundPortByConfigManagerPortName(container); found != nil {
+			return found.ContainerPort, nil
+		}
+	}
+	return -1, core.MakeError("failed to find config manager grpc port, please add named config-manager port")
+}
+
+func foundPortByConfigManagerPortName(container corev1.Container) *corev1.ContainerPort {
+	for _, port := range container.Ports {
+		if port.Name == constant.ConfigManagerPortName {
+			return &port
+		}
+	}
+	return nil
 }

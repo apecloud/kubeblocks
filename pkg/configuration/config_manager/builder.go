@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strconv"
 
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
@@ -166,7 +167,7 @@ func buildDownwardAPIVolumes(params *CfgManagerBuildParams) []corev1.VolumeMount
 func buildConfigManagerArgs(params *CfgManagerBuildParams, volumeDirs []corev1.VolumeMount, cli client.Client, ctx context.Context) error {
 	args := buildConfigManagerCommonArgs(volumeDirs)
 	args = append(args, "--operator-update-enable")
-	args = append(args, "--tcp", viper.GetString(constant.ConfigManagerGPRCPortEnv))
+	args = append(args, "--tcp", strconv.Itoa(int(params.ContainerPort)))
 
 	if err := createOrUpdateConfigMap(fromConfigSpecMeta(params.ConfigSpecsBuildParams), params, cli, ctx); err != nil {
 		return err

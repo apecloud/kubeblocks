@@ -227,6 +227,10 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 			},
 		},
 	}
+	backupMethod := backupObj.Status.BackupMethod
+	if backupMethod.TargetVolumes != nil {
+		restore.Spec.ReadyConfig.JobAction.Target.VolumeMounts = backupMethod.TargetVolumes.VolumeMounts
+	}
 	return r.createRestoreAndWait(restore, compObj)
 }
 

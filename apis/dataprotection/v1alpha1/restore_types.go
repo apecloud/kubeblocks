@@ -71,7 +71,7 @@ type RestoreSpec struct {
 	// +optional
 	ContainerResources corev1.ResourceRequirements `json:"containerResources,omitempty"`
 
-	// Specifies the number of retries before marking the backup failed.
+	// Specifies the number of retries before marking the restore failed.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=10

@@ -53,6 +53,10 @@ import (
 // BuildRSM builds a ReplicatedStateMachine object based on Cluster, SynthesizedComponent.
 func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
 	labels := constant.GetKBWellKnownLabelsWithCompDef(synthesizedComp.CompDefName, cluster.Name, synthesizedComp.Name)
+	if len(synthesizedComp.ClusterDefName) > 0 {
+		// TODO(xingran): for backward compatibility in kUbeBlocks version 0.8.0, it will be removed in the future.
+		labels = constant.GetKBWellKnownLabels(synthesizedComp.ClusterDefName, cluster.Name, synthesizedComp.Name)
+	}
 
 	// TODO(xingran): Need to review how to set pod labels based on the new ComponentDefinition API. workloadType label has been removed.
 	podBuilder := builder.NewPodBuilder("", "").

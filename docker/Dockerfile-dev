@@ -1,8 +1,8 @@
 # Based on https://github.com/microsoft/vscode-dev-containers/tree/v0.245.2/containers/go/.devcontainer/base.Dockerfile
 
 # [Choice] Go version: 1, 1.19, 1.18, etc
-ARG GOVERSION=1.21
-FROM golang:${GOVERSION}-bullseye
+ARG GOVERSION=1.21-alpine
+FROM golang:${GOVERSION}
 
 # Copy library scripts to execute
 COPY library-scripts/*.sh library-scripts/*.env /tmp/library-scripts/

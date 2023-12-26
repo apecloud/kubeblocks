@@ -194,7 +194,7 @@ func (c CustomOpsHandler) buildJob(reqCtx intctrlutil.RequestCtx,
 	buildJobSpec := func() (*batchv1.JobSpec, error) {
 		jobSpec := opsRes.OpsDef.Spec.JobSpec
 		if jobSpec.BackoffLimit == nil {
-			jobSpec.BackoffLimit = pointer.Int32(3)
+			jobSpec.BackoffLimit = pointer.Int32(2)
 		}
 
 		comp := opsRes.Cluster.Spec.GetComponentByName(compName)

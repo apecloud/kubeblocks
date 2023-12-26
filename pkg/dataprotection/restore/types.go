@@ -68,4 +68,4 @@ const (
 // Restore constant
 const Restore = "restore"
 
-var defaultBackoffLimit int32 = 3
+var defaultBackoffLimit int32 = 2

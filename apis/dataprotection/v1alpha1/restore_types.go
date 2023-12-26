@@ -70,6 +70,12 @@ type RestoreSpec struct {
 	// specified the required resources of restore job's container.
 	// +optional
 	ContainerResources corev1.ResourceRequirements `json:"containerResources,omitempty"`
+
+	// Specifies the number of retries before marking the restore failed.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=10
+	BackoffLimit *int32 `json:"backoffLimit,omitempty"`
 }
 
 // BackupRef describes the backup name and namespace.

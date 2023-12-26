@@ -21,5 +21,5 @@ package types
 
 var (
 	// DefaultBackOffLimit is the default backoff limit for jobs.
-	DefaultBackOffLimit = int32(3)
+	DefaultBackOffLimit = int32(2)
 )

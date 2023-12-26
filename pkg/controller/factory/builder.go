@@ -54,7 +54,7 @@ import (
 func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
 	labels := constant.GetKBWellKnownLabelsWithCompDef(synthesizedComp.CompDefName, cluster.Name, synthesizedComp.Name)
 	if len(synthesizedComp.ClusterDefName) > 0 {
-		// TODO(xingran): for backward compatibility in kUbeBlocks version 0.8.0, it will be removed in the future.
+		// TODO(xingran): for backward compatibility in kubeBlocks version 0.8.0, it will be removed in the future.
 		labels = constant.GetKBWellKnownLabels(synthesizedComp.ClusterDefName, cluster.Name, synthesizedComp.Name)
 	}
 

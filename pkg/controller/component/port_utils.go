@@ -26,7 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-const minAvailPort = 1024
+const minAvailPort = 1
 const maxAvailPort = 65535
 
 func getAllContainerPorts(containers []corev1.Container) (map[int32]bool, error) {

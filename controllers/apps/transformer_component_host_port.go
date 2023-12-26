@@ -35,12 +35,13 @@ func (t *componentHostPortTransformer) Transform(ctx graph.TransformContext, dag
 	if err := buildContainerHostPorts(synthesizeComp, comp); err != nil {
 		return err
 	}
-	if reflect.DeepEqual(comp, compObj) {
-		return nil
-	}
 
 	if err := updateLorrySpecAfterPortsChanged(synthesizeComp); err != nil {
 		return err
+	}
+
+	if reflect.DeepEqual(comp, compObj) {
+		return nil
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)

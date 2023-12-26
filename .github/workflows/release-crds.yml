@@ -1,0 +1,68 @@
+name: Release Crds
+
+on:
+  release:
+    types:
+      - published
+
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  RELEASE_VERSION: ${{ github.ref_name }}
+  JIHULAB_KUBEBLOCKS_PROJECT_ID: 98723
+  JIHULAB_ACCESS_TOKEN: ${{ secrets.GITLAB_ACCESS_TOKEN }}
+  KUBEBLOCKS_CRDS: "kubeblocks_crds.yaml"
+
+jobs:
+  create-jihulab-release:
+    name: Create Release KubeBlocks Jihulab
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: create jihulab release
+        run: |
+          bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
+            --type 1 \
+            --project-id ${{ env.JIHULAB_KUBEBLOCKS_PROJECT_ID }} \
+            --tag-name "${{ env.RELEASE_VERSION }}" \
+            --access-token ${{ env.JIHULAB_ACCESS_TOKEN }}
+
+  upload-kubeblocks-crds:
+    needs: [ create-jihulab-release ]
+    name: Upload KubeBlocks crds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: merge KubeBlocks crds
+        run: |
+          crds_path="deploy/helm/crds"
+          KUBEBLOCKS_CRDS=${{ env.KUBEBLOCKS_CRDS }}
+          touch $KUBEBLOCKS_CRDS
+          crds_list=$(ls $crds_path)
+          for crd in $(echo $crds_list); do
+              echo "---" >> $KUBEBLOCKS_CRDS
+              cat $crds_path/$crd >> $KUBEBLOCKS_CRDS
+          done
+
+      - name: upload KubeBlocks crds to jihulab
+        run: |
+          echo "Processing file: ${{ env.KUBEBLOCKS_CRDS }}"
+          bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
+              --type 2 \
+              --project-id ${{ env.JIHULAB_KUBEBLOCKS_PROJECT_ID }} \
+              --tag-name "${{ env.RELEASE_VERSION }}" \
+              --asset-path ${{ github.workspace }}/${{ env.KUBEBLOCKS_CRDS }} \
+              --asset-name ${{ env.KUBEBLOCKS_CRDS }} \
+              --access-token ${{ env.JIHULAB_ACCESS_TOKEN }}
+
+      - name: Get release
+        id: get_release
+        uses: bruceadams/get-release@v1.3.2
+
+      - name: upload KubeBlocks crds to github
+        uses: actions/upload-release-asset@main
+        with:
+          upload_url: ${{ steps.get_release.outputs.upload_url }}
+          asset_path: ${{ github.workspace }}/${{ env.KUBEBLOCKS_CRDS }}
+          asset_name: ${{ env.KUBEBLOCKS_CRDS }}
+          asset_content_type: application/yaml

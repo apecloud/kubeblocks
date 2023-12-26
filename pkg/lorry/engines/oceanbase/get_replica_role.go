@@ -29,6 +29,11 @@ import (
 )
 
 func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string, error) {
+	if mgr.ReplicaTenant == "" {
+		mgr.Logger.V(1).Info("the cluster has no replica tenant set")
+		return "", nil
+	}
+
 	var zoneCount int
 	zoneSQL := `select count(distinct(zone)) as count from oceanbase.__all_zone where zone!=''`
 	err := mgr.DB.QueryRowContext(ctx, zoneSQL).Scan(&zoneCount)
@@ -42,7 +47,7 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string,
 		return "", nil
 	}
 
-	sql := "SELECT TENANT_ROLE FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME='alice'"
+	sql := fmt.Sprintf("SELECT TENANT_ROLE FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME='%s'", mgr.ReplicaTenant)
 
 	rows, err := mgr.DB.QueryContext(ctx, sql)
 	if err != nil {

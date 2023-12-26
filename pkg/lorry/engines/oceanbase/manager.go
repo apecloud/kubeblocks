@@ -28,6 +28,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/mysql"
+	"github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (
@@ -39,6 +40,7 @@ const (
 
 type Manager struct {
 	mysql.Manager
+	ReplicaTenant string
 }
 
 var _ engines.DBManager = &Manager{}
@@ -60,6 +62,7 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 	}
 
 	mgr.SetLogger(logger)
+	mgr.ReplicaTenant = viperx.GetString("TENANT_NAME")
 	return mgr, nil
 }
 

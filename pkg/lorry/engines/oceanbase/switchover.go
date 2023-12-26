@@ -35,12 +35,15 @@ import (
 )
 
 const (
-	tenantName  = "alice"
 	repUser     = "rep_user"
 	repPassword = "rep_user"
 )
 
 func (mgr *Manager) Switchover(ctx context.Context, cluster *dcs.Cluster, primary, candidate string) error {
+	if mgr.ReplicaTenant == "" {
+		return errors.New("the cluster has no replica tenant set")
+	}
+
 	primaryComponentName := getCompnentName(primary)
 	candidateComponentName := getCompnentName(candidate)
 	primaryStore, _ := dcs.NewKubernetesStore()
@@ -107,7 +110,7 @@ func (mgr *Manager) Switchover(ctx context.Context, cluster *dcs.Cluster, primar
 
 func (mgr *Manager) getTenantConn(member dcs.Member) (*sql.DB, error) {
 	// "root@alice@tcp(10.1.0.47:2881)/oceanbase?multiStatements=true"
-	dsn := fmt.Sprintf("root@%s@tcp(%s:%s)/oceanbase?multiStatements=true", tenantName, member.PodIP, member.DBPort)
+	dsn := fmt.Sprintf("root@%s@tcp(%s:%s)/oceanbase?multiStatements=true", mgr.ReplicaTenant, member.PodIP, member.DBPort)
 	_, err := mysql.ParseDSN(dsn)
 	if err != nil {
 		return nil, errors.Wrapf(err, "illegal Data Source Name (DNS): %s", dsn)
@@ -123,7 +126,8 @@ func (mgr *Manager) getTenantConn(member dcs.Member) (*sql.DB, error) {
 func (mgr *Manager) setLogSource(ctx context.Context, db *sql.DB, candidateMember dcs.Member) error {
 	sourceAddr := candidateMember.PodIP + ":" + candidateMember.DBPort
 
-	sql := fmt.Sprintf("ALTER SYSTEM SET LOG_RESTORE_SOURCE = 'SERVICE=%s USER=%s@%s PASSWORD=%s' TENANT = %s", sourceAddr, repUser, tenantName, repPassword, tenantName)
+	sql := fmt.Sprintf("ALTER SYSTEM SET LOG_RESTORE_SOURCE = 'SERVICE=%s USER=%s@%s PASSWORD=%s' TENANT = %s",
+		sourceAddr, repUser, mgr.ReplicaTenant, repPassword, mgr.ReplicaTenant)
 	_, err := db.Exec(sql)
 	if err != nil {
 		mgr.Logger.Info(sql+" failed", "error", err)
@@ -132,7 +136,7 @@ func (mgr *Manager) setLogSource(ctx context.Context, db *sql.DB, candidateMembe
 
 	time.Sleep(time.Second)
 	var scn int64
-	queryTenant := fmt.Sprintf("SELECT RECOVERY_UNTIL_SCN FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME='%s'", tenantName)
+	queryTenant := fmt.Sprintf("SELECT RECOVERY_UNTIL_SCN FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME='%s'", mgr.ReplicaTenant)
 	for {
 		err := db.QueryRowContext(ctx, queryTenant).Scan(&scn)
 		if err != nil {
@@ -174,7 +178,7 @@ func (mgr *Manager) createUser(ctx context.Context, db *sql.DB) error {
 }
 
 func (mgr *Manager) primaryTenant(ctx context.Context, db *sql.DB) error {
-	primaryTenant := "ALTER SYSTEM SWITCHOVER TO PRIMARY TENANT = " + tenantName
+	primaryTenant := "ALTER SYSTEM SWITCHOVER TO PRIMARY TENANT = " + mgr.ReplicaTenant
 	_, err := db.Exec(primaryTenant)
 	if err != nil {
 		mgr.Logger.Info("primary standby tenant failed", "error", err)
@@ -182,7 +186,7 @@ func (mgr *Manager) primaryTenant(ctx context.Context, db *sql.DB) error {
 	}
 
 	var tenantRole, roleStatus string
-	queryTenant := fmt.Sprintf("SELECT TENANT_ROLE, SWITCHOVER_STATUS FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME='%s'", tenantName)
+	queryTenant := fmt.Sprintf("SELECT TENANT_ROLE, SWITCHOVER_STATUS FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME='%s'", mgr.ReplicaTenant)
 	for {
 		err := db.QueryRowContext(ctx, queryTenant).Scan(&tenantRole, &roleStatus)
 		if err != nil {
@@ -200,7 +204,7 @@ func (mgr *Manager) primaryTenant(ctx context.Context, db *sql.DB) error {
 }
 
 func (mgr *Manager) standbyTenant(ctx context.Context, db *sql.DB) error {
-	standbyTenant := "ALTER SYSTEM SWITCHOVER TO STANDBY TENANT = " + tenantName
+	standbyTenant := "ALTER SYSTEM SWITCHOVER TO STANDBY TENANT = " + mgr.ReplicaTenant
 	_, err := db.Exec(standbyTenant)
 	if err != nil {
 		mgr.Logger.Info("standby primary tenant failed", "error", err)
@@ -208,7 +212,7 @@ func (mgr *Manager) standbyTenant(ctx context.Context, db *sql.DB) error {
 	}
 
 	var tenantRole, roleStatus string
-	queryTenant := fmt.Sprintf("SELECT TENANT_ROLE, SWITCHOVER_STATUS FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME='%s'", tenantName)
+	queryTenant := fmt.Sprintf("SELECT TENANT_ROLE, SWITCHOVER_STATUS FROM oceanbase.DBA_OB_TENANTS where TENANT_NAME='%s'", mgr.ReplicaTenant)
 	for {
 		err := db.QueryRowContext(ctx, queryTenant).Scan(&tenantRole, &roleStatus)
 		if err != nil {

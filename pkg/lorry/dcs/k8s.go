@@ -386,7 +386,6 @@ func (store *KubernetesStore) AttemptAcquireLease() error {
 	}
 
 	store.cluster.Leader.Resource = cm
-	store.cluster.Leader.Name = leaderName
 	store.cluster.Leader.AcquireTime = timestamp
 	store.cluster.Leader.RenewTime = timestamp
 	return nil

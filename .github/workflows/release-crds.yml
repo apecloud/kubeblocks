@@ -29,11 +29,11 @@ jobs:
       - name: Get Release Version
         id: get_release_version
         run: |
-          RELASE_VERSION="${{ inputs.RELEASE_VERSION }}"
-          if [[ -z "$RELASE_VERSION" ]]; then
-              RELASE_VERSION="${{ github.ref_name }}"
+          RELEASE_VERSION="${{ inputs.RELEASE_VERSION }}"
+          if [[ -z "$RELEASE_VERSION" ]]; then
+              RELEASE_VERSION="${{ github.ref_name }}"
           fi
-          echo release-version=$RELASE_VERSION >> $GITHUB_OUTPUT
+          echo release-version=$RELEASE_VERSION >> $GITHUB_OUTPUT
 
   create-jihulab-release:
     name: Create Release KubeBlocks Jihulab

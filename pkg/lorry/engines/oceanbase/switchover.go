@@ -199,7 +199,7 @@ func (mgr *Manager) primaryTenant(ctx context.Context, db *sql.DB) error {
 			return err
 		}
 
-		if tenantRole == PRIMARY && roleStatus == "normalSTATUS" {
+		if tenantRole == PRIMARY && roleStatus == normalStatus {
 			break
 		}
 		time.Sleep(time.Second)
@@ -225,7 +225,7 @@ func (mgr *Manager) standbyTenant(ctx context.Context, db *sql.DB) error {
 			return err
 		}
 
-		if tenantRole == STANDBY && roleStatus == "normalSTATUS" {
+		if tenantRole == STANDBY && roleStatus == normalStatus {
 			break
 		}
 		time.Sleep(time.Second)

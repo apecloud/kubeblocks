@@ -96,7 +96,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// the cluster reconciliation loop is a 3-stage model: plan Init, plan Build and plan Execute
 	// Init stage
-	planBuilder := NewClusterPlanBuilder(reqCtx, r.Client)
+	planBuilder := newClusterPlanBuilder(reqCtx, r.Client)
 	if err := planBuilder.Init(); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}

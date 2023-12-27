@@ -79,7 +79,7 @@ var _ = Describe("graph client test.", func() {
 
 			By("replace an existing object")
 			newObj1 := builder.NewPodBuilder(namespace, name+"1").GetObject()
-			graphCli.Update(dag, nil, newObj1, ReplaceIfExistingOption)
+			graphCli.Update(dag, nil, newObj1, &ReplaceIfExistingOption{})
 			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeTrue())
 			podList := graphCli.FindAll(dag, &corev1.Pod{})
 			Expect(podList).Should(HaveLen(3))
@@ -115,7 +115,7 @@ var _ = Describe("graph client test.", func() {
 			Expect(graphCli.FindAll(dag, &appsv1.Deployment{})).Should(HaveLen(0))
 
 			By("find objects different with the given type")
-			newPodList := graphCli.FindAll(dag, &appsv1.StatefulSet{}, HaveDifferentTypeWithOption)
+			newPodList := graphCli.FindAll(dag, &appsv1.StatefulSet{}, &HaveDifferentTypeWithOption{})
 			Expect(newPodList).Should(HaveLen(3))
 			// should have same result as podList
 			for _, object := range podList {
@@ -128,7 +128,7 @@ var _ = Describe("graph client test.", func() {
 			Expect(graphCli.FindAll(dag, nil)).Should(HaveLen(0))
 
 			By("find all objects")
-			objectList := graphCli.FindAll(dag, nil, HaveDifferentTypeWithOption)
+			objectList := graphCli.FindAll(dag, nil, &HaveDifferentTypeWithOption{})
 			Expect(objectList).Should(HaveLen(4))
 			allObjects := podList
 			allObjects = append(allObjects, root)

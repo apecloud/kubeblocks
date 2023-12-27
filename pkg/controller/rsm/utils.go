@@ -44,6 +44,7 @@ import (
 	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -770,4 +771,31 @@ func IsOwnedByRsm(obj client.Object) bool {
 		}
 	}
 	return false
+}
+
+// func placement(rsm workloads.ReplicatedStateMachine) string {
+//	if rsm.Annotations == nil {
+//		return ""
+//	}
+//	return rsm.Annotations[constant.KBAppMultiClusterPlacementKey]
+// }
+//
+// func inLocalContext() model.GraphOption {
+//	return model.WithClientOption(multicluster.InLocalContext())
+// }
+//
+// func inLocalContextOneshot() model.GraphOption {
+//	return model.WithClientOption(multicluster.InLocalContextOneshot())
+// }
+
+func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
+	// if v.ClientOpt != nil {
+	//	opt, ok := v.ClientOpt.(*multicluster.ClientOption)
+	//	if ok {
+	//		return opt
+	//	}
+	//	panic(fmt.Sprintf("unknown client option: %T", v.ClientOpt))
+	// }
+	// return multicluster.InGlobalContext()
+	return nil
 }

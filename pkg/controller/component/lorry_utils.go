@@ -127,8 +127,7 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 func updateEnv(synthesizeComp *SynthesizedComponent, lorryHTTPPort int) {
 	for i := range synthesizeComp.PodSpec.Containers {
 		container := &synthesizeComp.PodSpec.Containers[i]
-		index := -1
-		index = slices.IndexFunc(container.Env, func(env corev1.EnvVar) bool {
+		index := slices.IndexFunc(container.Env, func(env corev1.EnvVar) bool {
 			return env.Name == constant.KBEnvLorryHTTPPort
 		})
 

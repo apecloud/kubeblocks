@@ -32,7 +32,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -66,7 +65,7 @@ func (t *componentTLSTransformer) Transform(ctx graph.TransformContext, dag *gra
 }
 
 // a hack way to notify the configuration controller to re-render config
-func checkAndTriggerReRender(ctx context.Context, cli roclient.ReadonlyClient, synthesizedComp component.SynthesizedComponent, dag *graph.DAG) error {
+func checkAndTriggerReRender(ctx context.Context, cli client.Reader, synthesizedComp component.SynthesizedComponent, dag *graph.DAG) error {
 	cm := &corev1.ConfigMap{}
 	if len(synthesizedComp.ConfigTemplates) == 0 {
 		return nil
@@ -110,7 +109,7 @@ func checkAndTriggerReRender(ctx context.Context, cli roclient.ReadonlyClient, s
 	return nil
 }
 
-func buildTLSCert(ctx context.Context, cli roclient.ReadonlyClient, synthesizedComp component.SynthesizedComponent, dag *graph.DAG) error {
+func buildTLSCert(ctx context.Context, cli client.Reader, synthesizedComp component.SynthesizedComponent, dag *graph.DAG) error {
 	tls := synthesizedComp.TLSConfig
 	if tls == nil || !tls.Enable {
 		return nil

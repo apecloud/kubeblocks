@@ -280,8 +280,8 @@ type ClusterStatus struct {
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDefRef) || has(self.componentDefRef)", message="componentDefRef is required once set"
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDef) || has(self.componentDef)", message="componentDef is required once set"
 type ClusterComponentSpec struct {
-	// name defines cluster's component name, this name is also part of Service DNS name, so this name will
-	// comply with IANA Service Naming rule.
+	// if Shards is not set, name defines cluster's component name. otherwise, name defines the prefix of cluster's component name.
+	// component name is also part of Service DNS name, so this name will comply with IANA Service Naming rule.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
@@ -331,7 +331,16 @@ type ClusterComponentSpec struct {
 	// +optional
 	EnabledLogs []string `json:"enabledLogs,omitempty"`
 
-	// Component replicas.
+	// shards indicates the number of component.
+	// if shards is not set, the number of component defaults to 1.
+	// if shards=0, it means the number of component is scaled down to 0, and the Component object and underlying resources will be deleted synchronously.
+	// if shards>0, it means there are shards number of components. The first component's name is ClusterComponentSpec.Name,
+	// and the rest of components follow the named pattern ClusterComponentSpec.Name-{shard index}, where shard index is greater than or equal to 1.
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	Shards int32 `json:"shards"`
+
+	// replicas defines the number of replicas for a single Component.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=1

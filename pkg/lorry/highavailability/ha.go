@@ -39,16 +39,17 @@ import (
 )
 
 type Ha struct {
-	ctx        context.Context
-	dbManager  engines.DBManager
-	dcs        dcs3.DCS
-	logger     logr.Logger
-	deleteLock sync.Mutex
+	ctx               context.Context
+	dbManager         engines.DBManager
+	dcs               dcs3.DCS
+	logger            logr.Logger
+	deleteLock        sync.Mutex
+	disableDNSChecker bool
 }
 
 var ha *Ha
 
-func NewHa() *Ha {
+func NewHa(disableDNSChecker bool) *Ha {
 	logger := ctrl.Log.WithName("HA")
 
 	dcs := dcs3.GetStore()
@@ -59,10 +60,11 @@ func NewHa() *Ha {
 	}
 
 	ha = &Ha{
-		ctx:       context.Background(),
-		dcs:       dcs,
-		logger:    logger,
-		dbManager: manager,
+		ctx:               context.Background(),
+		dcs:               dcs,
+		logger:            logger,
+		dbManager:         manager,
+		disableDNSChecker: disableDNSChecker,
 	}
 	return ha
 }
@@ -219,13 +221,15 @@ func (ha *Ha) Start() {
 		cluster, err = ha.dcs.GetCluster()
 	}
 
-	isPodReady, err := ha.IsPodReady()
-	for err != nil || !isPodReady {
-		ha.logger.Info("Waiting for dns resolution to be ready")
-		time.Sleep(3 * time.Second)
-		isPodReady, err = ha.IsPodReady()
+	if !ha.disableDNSChecker {
+		isPodReady, err := ha.IsPodReady()
+		for err != nil || !isPodReady {
+			ha.logger.Info("Waiting for dns resolution to be ready")
+			time.Sleep(3 * time.Second)
+			isPodReady, err = ha.IsPodReady()
+		}
+		ha.logger.Info("dns resolution is ready")
 	}
-	ha.logger.Info("dns resolution is ready")
 
 	ha.logger.Info(fmt.Sprintf("cluster: %v", cluster))
 	isInitialized, err := ha.dbManager.IsClusterInitialized(context.TODO(), cluster)

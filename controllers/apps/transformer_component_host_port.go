@@ -120,8 +120,8 @@ func updateLorry(synthesizeComp *component.SynthesizedComponent, container *core
 		"--grpcport", strconv.Itoa(grpcPort),
 	}
 
-	if container.StartupProbe != nil && container.StartupProbe.HTTPGet != nil {
-		container.StartupProbe.HTTPGet.Port = intstr.FromInt(httpPort)
+	if container.StartupProbe != nil && container.StartupProbe.TCPSocket != nil {
+		container.StartupProbe.TCPSocket.Port = intstr.FromInt(httpPort)
 	}
 
 	for i := range container.Env {

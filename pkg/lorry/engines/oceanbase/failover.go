@@ -74,7 +74,7 @@ func (mgr *Manager) activeTenant(ctx context.Context, db *sql.DB) error {
 			return err
 		}
 
-		if tenantRole == PRIMARY && roleStatus == "NORMAL" {
+		if tenantRole == PRIMARY && roleStatus == "normalSTATUS" {
 			break
 		}
 		time.Sleep(time.Second)

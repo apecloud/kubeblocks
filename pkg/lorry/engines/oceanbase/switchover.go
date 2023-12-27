@@ -49,14 +49,26 @@ func (mgr *Manager) Switchover(ctx context.Context, cluster *dcs.Cluster, primar
 		return mgr.Failover(ctx, cluster, candidate)
 	}
 
-	primaryComponentName := getCompnentName(primary)
-	candidateComponentName := getCompnentName(candidate)
+	primaryComponentName, err := getCompnentName(primary)
+	if err != nil {
+		return err
+	}
+	candidateComponentName, err := getCompnentName(candidate)
+	if err != nil {
+		return err
+	}
 	primaryStore, _ := dcs.NewKubernetesStore()
 	primaryStore.SetCompName(primaryComponentName)
 	candidateStore, _ := dcs.NewKubernetesStore()
 	candidateStore.SetCompName(candidateComponentName)
-	primaryCluster, _ := primaryStore.GetCluster()
-	candidateCluster, _ := candidateStore.GetCluster()
+	primaryCluster, err := primaryStore.GetCluster()
+	if err != nil {
+		return err
+	}
+	candidateCluster, err := candidateStore.GetCluster()
+	if err != nil {
+		return err
+	}
 
 	if len(primaryCluster.Members) != 1 || len(candidateCluster.Members) != 1 {
 		return errors.Errorf("primary component has %d replicas, candidate component has %d replicas, "+
@@ -234,9 +246,13 @@ func (mgr *Manager) standbyTenant(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
-func getCompnentName(memberName string) string {
+func getCompnentName(memberName string) (string, error) {
 	clusterName := os.Getenv(constant.KBEnvClusterName)
 	componentName := strings.TrimPrefix(memberName, clusterName+"-")
-	componentName = componentName[:strings.LastIndex(componentName, "-")]
-	return componentName
+	i := strings.LastIndex(componentName, "-")
+	if i < 0 {
+		return "", errors.Errorf("replica name is in an incorrect format %s", memberName)
+	}
+	componentName = componentName[:i]
+	return componentName, nil
 }

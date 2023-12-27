@@ -22,6 +22,7 @@ package ctl
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -50,6 +51,7 @@ lorryctl switchover  --primary xxx --candidate xxx
 		}
 
 		lorryClient, err := client.NewHTTPClientWithURL(switchOptions.lorryAddr)
+		lorryClient.ReconcileTimeout = 100 * time.Second
 		if err != nil {
 			fmt.Printf("new lorry http client failed: %v\n", err)
 			return

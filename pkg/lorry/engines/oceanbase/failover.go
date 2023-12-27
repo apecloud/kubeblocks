@@ -35,10 +35,21 @@ func (mgr *Manager) Failover(ctx context.Context, cluster *dcs.Cluster, candidat
 		return errors.New("the cluster has no replica tenant set")
 	}
 
-	candidateComponentName := getCompnentName(candidate)
+	candidateComponentName, err := getCompnentName(candidate)
+	if err != nil {
+		return err
+	}
 	candidateStore, _ := dcs.NewKubernetesStore()
 	candidateStore.SetCompName(candidateComponentName)
-	candidateCluster, _ := candidateStore.GetCluster()
+	candidateCluster, err := candidateStore.GetCluster()
+	if err != nil {
+		return err
+	}
+
+	if len(candidateCluster.Members) != 1 {
+		return errors.Errorf("candidate component has %d replicas, "+
+			"the replicas count need to be 1", len(candidateCluster.Members))
+	}
 
 	candidateMember := candidateCluster.Members[0]
 
@@ -58,7 +69,7 @@ func (mgr *Manager) Failover(ctx context.Context, cluster *dcs.Cluster, candidat
 }
 
 func (mgr *Manager) activeTenant(ctx context.Context, db *sql.DB) error {
-	primaryTenant := "ALTER SYSTEM ACTIVATE PRIMARY TENANT = " + mgr.ReplicaTenant
+	primaryTenant := "ALTER SYSTEM ACTIVATE STANDBY TENANT = " + mgr.ReplicaTenant
 	_, err := db.Exec(primaryTenant)
 	if err != nil {
 		mgr.Logger.Info("activate standby tenant failed", "error", err)

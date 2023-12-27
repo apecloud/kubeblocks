@@ -35,12 +35,13 @@ func (t *componentHostPortTransformer) Transform(ctx graph.TransformContext, dag
 	if err := buildContainerHostPorts(synthesizeComp, comp); err != nil {
 		return err
 	}
-	if reflect.DeepEqual(comp, compObj) {
-		return nil
-	}
 
 	if err := updateLorrySpecAfterPortsChanged(synthesizeComp); err != nil {
 		return err
+	}
+
+	if reflect.DeepEqual(comp, compObj) {
+		return nil
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
@@ -117,6 +118,10 @@ func updateLorry(synthesizeComp *component.SynthesizedComponent, container *core
 		"--port", strconv.Itoa(httpPort),
 		"--config-path", "/config/lorry/components/",
 		"--grpcport", strconv.Itoa(grpcPort),
+	}
+
+	if container.StartupProbe != nil && container.StartupProbe.TCPSocket != nil {
+		container.StartupProbe.TCPSocket.Port = intstr.FromInt(httpPort)
 	}
 
 	for i := range container.Env {

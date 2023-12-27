@@ -46,10 +46,12 @@ import (
 )
 
 var configDir string
+var disableDNSChecker bool
 
 func init() {
 	viper.AutomaticEnv()
 	pflag.StringVar(&configDir, "config-path", "/config/lorry/components/", "Lorry default config directory for builtin type")
+	pflag.BoolVar(&disableDNSChecker, "disable-dns-checker", false, "disable dns checker, for test&dev")
 }
 
 func main() {
@@ -95,7 +97,7 @@ func main() {
 	}
 	workloadType := viper.GetString(constant.KBEnvWorkloadType)
 	if highavailability.IsHAAvailable(characterType, workloadType) {
-		ha := highavailability.NewHa()
+		ha := highavailability.NewHa(disableDNSChecker)
 		if ha != nil {
 			defer ha.ShutdownWithWait()
 			go ha.Start()

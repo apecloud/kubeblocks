@@ -39,7 +39,7 @@ func (c *secretTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 
 	var secrets, noneClusterObjects []client.Object
 	secrets = graphCli.FindAll(dag, &corev1.Secret{})
-	noneClusterObjects = graphCli.FindAll(dag, &appsv1alpha1.Cluster{}, model.HaveDifferentTypeWithOption)
+	noneClusterObjects = graphCli.FindAll(dag, &appsv1alpha1.Cluster{}, &model.HaveDifferentTypeWithOption{})
 	for _, secret := range secrets {
 		if graphCli.IsAction(dag, secret, model.ActionUpdatePtr()) {
 			graphCli.Noop(dag, secret)

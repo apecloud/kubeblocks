@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -58,10 +59,9 @@ type renderWrapper struct {
 
 func newTemplateRenderWrapper(templateBuilder *configTemplateBuilder, cluster *appsv1alpha1.Cluster, ctx context.Context, cli client.Client) renderWrapper {
 	return renderWrapper{
-		ctx:     ctx,
-		cli:     cli,
-		cluster: cluster,
-
+		ctx:                 ctx,
+		cli:                 cli,
+		cluster:             cluster,
 		templateBuilder:     templateBuilder,
 		templateAnnotations: make(map[string]string),
 		volumes:             make(map[string]appsv1alpha1.ComponentTemplateSpec),
@@ -82,7 +82,7 @@ func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, localO
 		}
 	}
 
-	cmErr := wrapper.cli.Get(wrapper.ctx, cmKey, cmObj)
+	cmErr := wrapper.cli.Get(wrapper.ctx, cmKey, cmObj, multicluster.InLocalContext())
 	if cmErr != nil && !apierrors.IsNotFound(cmErr) {
 		// An unexpected error occurs
 		return nil, cmErr
@@ -345,8 +345,7 @@ func generateConfigMapFromTpl(cluster *appsv1alpha1.Cluster,
 }
 
 // renderConfigMapTemplate renders config file using template engine
-func renderConfigMapTemplate(
-	templateBuilder *configTemplateBuilder,
+func renderConfigMapTemplate(templateBuilder *configTemplateBuilder,
 	templateSpec appsv1alpha1.ComponentTemplateSpec,
 	ctx context.Context,
 	cli client.Client) (map[string]string, error) {

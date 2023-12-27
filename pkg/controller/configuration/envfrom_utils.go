@@ -33,11 +33,13 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
-func injectTemplateEnvFrom(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, podSpec *corev1.PodSpec, cli client.Client, ctx context.Context, localObjs []client.Object) error {
+func injectTemplateEnvFrom(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent,
+	podSpec *corev1.PodSpec, cli client.Client, ctx context.Context, localObjs []client.Object) error {
 	var err error
 	var cm *corev1.ConfigMap
 
@@ -120,19 +122,20 @@ func fetchConfigmap(localObjs []client.Object, cmName, namespace string, cli cli
 	if localObject != nil {
 		return localObject.(*corev1.ConfigMap), nil
 	}
-	if err := cli.Get(ctx, cmKey, cmObj); err != nil {
+	if err := cli.Get(ctx, cmKey, cmObj, multicluster.InLocalContext()); err != nil {
 		return nil, err
 	}
 	return cmObj, nil
 }
 
-func createEnvFromConfigmap(cluster *appsv1alpha1.Cluster, componentName string, template appsv1alpha1.ComponentConfigSpec, originKey client.ObjectKey, envMap map[string]string, ctx context.Context, cli client.Client) (*corev1.ConfigMap, error) {
+func createEnvFromConfigmap(cluster *appsv1alpha1.Cluster, compName string, template appsv1alpha1.ComponentConfigSpec,
+	originKey client.ObjectKey, envMap map[string]string, ctx context.Context, cli client.Client) (*corev1.ConfigMap, error) {
 	cmKey := client.ObjectKey{
 		Name:      core.GenerateEnvFromName(originKey.Name),
 		Namespace: originKey.Namespace,
 	}
 	cm := &corev1.ConfigMap{}
-	err := cli.Get(ctx, cmKey, cm)
+	err := cli.Get(ctx, cmKey, cm, multicluster.InLocalContext())
 	if err == nil {
 		return cm, nil
 	}
@@ -142,11 +145,11 @@ func createEnvFromConfigmap(cluster *appsv1alpha1.Cluster, componentName string,
 	cm.Name = cmKey.Name
 	cm.Namespace = cmKey.Namespace
 	cm.Data = envMap
-	cm.Labels = constant.GetKBConfigMapWellKnownLabels(template.Name, cluster.Spec.ClusterDefRef, cluster.Name, componentName)
+	cm.Labels = constant.GetKBConfigMapWellKnownLabels(template.Name, cluster.Spec.ClusterDefRef, cluster.Name, compName)
 	if err := intctrlutil.SetOwnerReference(cluster, cm); err != nil {
 		return nil, err
 	}
-	return cm, cli.Create(ctx, cm)
+	return cm, cli.Create(ctx, cm, multicluster.InLocalContext())
 }
 
 func CheckEnvFrom(container *corev1.Container, cmName string) bool {
@@ -210,6 +213,7 @@ func SyncEnvConfigmap(configSpec appsv1alpha1.ComponentConfigSpec, cmObj *corev1
 	return updateEnvFromConfigmap(client.ObjectKeyFromObject(cmObj), envMap, cli, ctx)
 }
 
+// TODO(leon)
 func updateEnvFromConfigmap(origObj client.ObjectKey, envMap map[string]string, cli client.Client, ctx context.Context) error {
 	cmKey := client.ObjectKey{
 		Name:      core.GenerateEnvFromName(origObj.Name),

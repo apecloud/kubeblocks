@@ -17,10 +17,27 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package client
+package multicluster
 
-import "sigs.k8s.io/controller-runtime/pkg/client"
+import (
+	"context"
+)
 
-type ReadonlyClient interface {
-	client.Reader
+func IntoContext(ctx context.Context, placement string) context.Context {
+	return context.WithValue(ctx, placementKey{}, placement)
+}
+
+func FromContext(ctx context.Context) (string, error) {
+	if v, ok := ctx.Value(placementKey{}).(string); ok {
+		return v, nil
+	}
+	return "", placementNotFoundError{}
+}
+
+type placementKey struct{}
+
+type placementNotFoundError struct{}
+
+func (placementNotFoundError) Error() string {
+	return "no placement was present"
 }

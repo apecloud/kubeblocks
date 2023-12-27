@@ -163,7 +163,7 @@ var _ = Describe("Component Utils", func() {
 
 				dag := graph.NewDAG()
 				dag.AddVertex(&model.ObjectVertex{Obj: pods[0], Action: model.ActionUpdatePtr()})
-				Expect(UpdateCustomLabelToPods(testCtx.Ctx, k8sClient, cluster, comp, dag)).Should(Succeed())
+				Expect(updateCustomLabelToPods(testCtx.Ctx, k8sClient, cluster, comp, dag)).Should(Succeed())
 				graphCli := model.NewGraphClient(k8sClient)
 				podList := graphCli.FindAll(dag, &corev1.Pod{})
 				Expect(podList).Should(HaveLen(3))

@@ -31,10 +31,12 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -185,11 +187,17 @@ func (r *ConfigurationReconciler) runTasks(taskCtx TaskContext, tasks []Task) (e
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ConfigurationReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+func (r *ConfigurationReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
+	b := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.Configuration{}).
-		Owns(&corev1.ConfigMap{}).
-		Complete(r)
+		Owns(&corev1.ConfigMap{})
+
+	if multiClusterMgr != nil {
+		eventHandler := handler.EnqueueRequestForOwner(r.Scheme, r.Client.RESTMapper(), &appsv1alpha1.Configuration{}, handler.OnlyControllerOwner())
+		multiClusterMgr.Watch(b, &corev1.ConfigMap{}, eventHandler)
+	}
+
+	return b.Complete(r)
 }
 
 func fromItemStatus(ctx intctrlutil.RequestCtx, status *appsv1alpha1.ConfigurationStatus, item appsv1alpha1.ConfigurationItemDetail) *appsv1alpha1.ConfigurationItemDetailStatus {

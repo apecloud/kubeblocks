@@ -33,7 +33,6 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
-	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -322,7 +321,7 @@ func buildAndUpdateResources(reqCtx intctrlutil.RequestCtx, cli client.Reader, s
 }
 
 // buildServiceReferences builds serviceReferences for component.
-func buildServiceReferences(reqCtx intctrlutil.RequestCtx, cli roclient.ReadonlyClient,
+func buildServiceReferences(reqCtx intctrlutil.RequestCtx, cli client.Reader,
 	synthesizeComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) error {
 	serviceReferences, err := GenServiceReferences(reqCtx, cli, synthesizeComp.Namespace, synthesizeComp.ClusterName, compDef, comp)
 	if err != nil {

@@ -304,3 +304,7 @@ const (
 	RestoreTimeKeyForRestore         = "restoreTime"
 	ConnectionPassword               = "connectionPassword"
 )
+
+const (
+	KBAppPlacementKey = "apps.kubeblocks.io/placement"
+)

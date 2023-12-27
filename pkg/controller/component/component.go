@@ -67,6 +67,7 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1
 	}
 	compBuilder := builder.NewComponentBuilder(cluster.Namespace, compName, clusterCompSpec.ComponentDef).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
+		AddAnnotations(constant.KBAppPlacementKey, cluster.Annotations[constant.KBAppPlacementKey]).
 		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, clusterCompSpec.Name)).
 		AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 		SetAffinity(affinities).
@@ -85,8 +86,7 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1
 		SetInstances(clusterCompSpec.Instances).
 		SetTransformPolicy(clusterCompSpec.RsmTransformPolicy)
 	// sync cluster ignore resource constraint annotation to component
-	value, ok := cluster.GetAnnotations()[constant.IgnoreResourceConstraint]
-	if ok {
+	if value, ok := cluster.GetAnnotations()[constant.IgnoreResourceConstraint]; ok {
 		compBuilder.AddAnnotations(constant.IgnoreResourceConstraint, value)
 	}
 	if common.IsCompactMode(cluster.GetAnnotations()) {

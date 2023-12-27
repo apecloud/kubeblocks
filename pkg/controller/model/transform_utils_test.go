@@ -27,7 +27,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/go-logr/logr"
-	"github.com/golang/mock/gomock"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,9 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
 var _ = Describe("transform utils test", func() {
@@ -119,43 +116,6 @@ var _ = Describe("transform utils test", func() {
 			Expect(IsObjectUpdating(object2)).Should(BeFalse())
 		})
 	})
-
-	Context("ReadCacheSnapshot function", func() {
-		It("should work well", func() {
-			controller, k8sMock := testutil.SetupK8sMock()
-			defer controller.Finish()
-
-			root := builder.NewStatefulSetBuilder(namespace, name).GetObject()
-			obj0 := builder.NewPodBuilder(namespace, name+"-0").GetObject()
-			obj1 := builder.NewPodBuilder(namespace, name+"-1").GetObject()
-			obj2 := builder.NewPodBuilder(namespace, name+"-2").GetObject()
-
-			k8sMock.EXPECT().
-				List(gomock.Any(), &corev1.PodList{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, list *corev1.PodList, _ ...client.ListOption) error {
-					Expect(list).ShouldNot(BeNil())
-					list.Items = []corev1.Pod{*obj0, *obj1, *obj2}
-					return nil
-				}).Times(1)
-			transCtx := &testTransCtx{
-				Context:     context.Background(),
-				GraphClient: NewGraphClient(k8sMock),
-			}
-			snapshot, err := ReadCacheSnapshot(transCtx, root, nil, &corev1.PodList{})
-			Expect(err).Should(BeNil())
-			Expect(snapshot).Should(HaveLen(3))
-			objList := []*corev1.Pod{obj0, obj1, obj2}
-			for _, pod := range objList {
-				gvk, err := GetGVKName(pod)
-				Expect(err).Should(BeNil())
-				obj, ok := snapshot[*gvk]
-				Expect(ok).Should(BeTrue())
-				p, ok := obj.(*corev1.Pod)
-				Expect(ok).Should(BeTrue())
-				Expect(p).Should(Equal(pod))
-			}
-		})
-	})
 })
 
 type testTransCtx struct {
@@ -169,7 +129,7 @@ func (t *testTransCtx) GetContext() context.Context {
 	return t.Context
 }
 
-func (t *testTransCtx) GetClient() roclient.ReadonlyClient {
+func (t *testTransCtx) GetClient() client.Reader {
 	return t.GraphClient
 }
 

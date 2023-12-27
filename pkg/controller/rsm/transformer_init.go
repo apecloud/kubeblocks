@@ -23,6 +23,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 )
 
 type initTransformer struct {
@@ -45,6 +46,9 @@ func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 
 	// init dag
 	graphCli.Root(dag, transCtx.rsmOrig, transCtx.rsm, model.ActionStatusPtr())
+
+	// init placement
+	transCtx.Context = multicluster.IntoContext(transCtx.Context, placement(*transCtx.rsm))
 
 	return nil
 }

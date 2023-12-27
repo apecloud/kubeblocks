@@ -24,9 +24,9 @@ import (
 
 	"github.com/go-logr/logr"
 	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
@@ -105,7 +105,7 @@ const (
 
 type rsmTransformContext struct {
 	context.Context
-	Client roclient.ReadonlyClient
+	Client client.Reader
 	record.EventRecorder
 	logr.Logger
 	rsm     *workloads.ReplicatedStateMachine
@@ -116,7 +116,7 @@ func (c *rsmTransformContext) GetContext() context.Context {
 	return c.Context
 }
 
-func (c *rsmTransformContext) GetClient() roclient.ReadonlyClient {
+func (c *rsmTransformContext) GetClient() client.Reader {
 	return c.Client
 }
 

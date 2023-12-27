@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -204,12 +205,12 @@ func createOrUpdateConfigMap(configInfo []ConfigSpecInfo, manager *CfgManagerBui
 		if err := controllerutil.SetOwnerReference(manager.Cluster, cmObj, scheme); err != nil {
 			return err
 		}
-		return cli.Create(ctx, cmObj)
+		return cli.Create(ctx, cmObj, multicluster.InLocalContext())
 	}
 	updateConfigCM := func(cm *corev1.ConfigMap, newConfig string) error {
 		patch := client.MergeFrom(cm.DeepCopy())
 		cm.Data[configManagerConfig] = newConfig
-		return cli.Patch(ctx, cm, patch)
+		return cli.Patch(ctx, cm, patch, multicluster.InLocalContext())
 	}
 
 	config, err := cfgutil.ToYamlConfig(configInfo)
@@ -221,7 +222,7 @@ func createOrUpdateConfigMap(configInfo []ConfigSpecInfo, manager *CfgManagerBui
 		Namespace: manager.Cluster.GetNamespace(),
 		Name:      fmt.Sprintf("%s%s-%s-config-manager-config", configManagerCMPrefix, manager.Cluster.GetName(), manager.ComponentName),
 	}
-	err = cli.Get(ctx, cmKey, cmObj)
+	err = cli.Get(ctx, cmKey, cmObj, multicluster.InLocalContext())
 	switch {
 	default:
 		return err
@@ -345,7 +346,8 @@ func buildLazyRenderedConfigVolume(cmName string, manager *CfgManagerBuildParams
 	manager.ConfigLazyRenderedVolumes[configSpec.VolumeName] = manager.Volumes[n]
 }
 
-func checkOrCreateConfigMap(referenceCM client.ObjectKey, scriptCMKey client.ObjectKey, cli client.Client, ctx context.Context, cluster *appsv1alpha1.Cluster, fn func(cm *corev1.ConfigMap) error) error {
+func checkOrCreateConfigMap(referenceCM client.ObjectKey, scriptCMKey client.ObjectKey,
+	cli client.Client, ctx context.Context, cluster *appsv1alpha1.Cluster, fn func(cm *corev1.ConfigMap) error) error {
 	var (
 		err error
 
@@ -356,7 +358,7 @@ func checkOrCreateConfigMap(referenceCM client.ObjectKey, scriptCMKey client.Obj
 	if err = cli.Get(ctx, referenceCM, &refCM); err != nil {
 		return err
 	}
-	if err = cli.Get(ctx, scriptCMKey, &sidecarCM); err != nil {
+	if err = cli.Get(ctx, scriptCMKey, &sidecarCM, multicluster.InLocalContext()); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -375,7 +377,7 @@ func checkOrCreateConfigMap(referenceCM client.ObjectKey, scriptCMKey client.Obj
 		if err := controllerutil.SetOwnerReference(cluster, &sidecarCM, scheme); err != nil {
 			return err
 		}
-		if err := cli.Create(ctx, &sidecarCM); err != nil {
+		if err := cli.Create(ctx, &sidecarCM, multicluster.InLocalContext()); err != nil {
 			return err
 		}
 	}
@@ -408,7 +410,8 @@ func checkAndUpdateReloadYaml(data map[string]string, reloadConfig string, forma
 	return data, nil
 }
 
-func buildCfgManagerScripts(options appsv1alpha1.ScriptConfig, manager *CfgManagerBuildParams, cli client.Client, ctx context.Context, configSpec appsv1alpha1.ComponentConfigSpec) error {
+func buildCfgManagerScripts(options appsv1alpha1.ScriptConfig, manager *CfgManagerBuildParams,
+	cli client.Client, ctx context.Context, configSpec appsv1alpha1.ComponentConfigSpec) error {
 	mountPoint := filepath.Join(KBScriptVolumePath, configSpec.Name)
 	referenceCMKey := client.ObjectKey{
 		Namespace: options.Namespace,

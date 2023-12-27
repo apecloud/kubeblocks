@@ -34,6 +34,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -88,7 +89,7 @@ func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Reque
 		event.Annotations = make(map[string]string, 0)
 	}
 	event.Annotations[roleChangedAnnotKey] = count
-	return cli.Patch(reqCtx.Ctx, event, patch)
+	return cli.Patch(reqCtx.Ctx, event, patch, multicluster.InLocalContextUnknown())
 }
 
 // handleRoleChangedEvent handles role changed event and return role.
@@ -115,7 +116,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 		}
 		// get pod
 		pod := &corev1.Pod{}
-		if err := cli.Get(reqCtx.Ctx, podName, pod); err != nil {
+		if err := cli.Get(reqCtx.Ctx, podName, pod, multicluster.InLocalContextUnknown()); err != nil {
 			return pair.RoleName, err
 		}
 		// event belongs to old pod with the same name, ignore it
@@ -134,12 +135,14 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 			}
 		}
 
-		name, _ := intctrlutil.GetParentNameAndOrdinal(pod)
+		// TODO(leon): sts name
+		// name, _ := intctrlutil.GetParentNameAndOrdinal(pod)
+		name := strings.Join([]string{pod.Labels[constant.AppInstanceLabelKey], pod.Labels[constant.KBAppComponentLabelKey]}, "-")
 		rsm := &workloads.ReplicatedStateMachine{}
 		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pod.Namespace, Name: name}, rsm); err != nil {
 			return "", err
 		}
-		reqCtx.Log.V(1).Info("handle role change event", "pod", pod.Name, "role", role, "originalRole", message.OriginalRole)
+		reqCtx.Log.Info("handle role change event", "pod", pod.Name, "role", role, "originalRole", message.OriginalRole)
 
 		if err := updatePodRoleLabel(cli, reqCtx, *rsm, pod, pair.RoleName, snapshot.Version); err != nil {
 			return "", err

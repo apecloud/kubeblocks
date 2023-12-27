@@ -32,7 +32,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -42,7 +41,7 @@ import (
 // componentTransformContext a graph.TransformContext implementation for Cluster reconciliation
 type componentTransformContext struct {
 	context.Context
-	Client roclient.ReadonlyClient
+	Client client.Reader
 	record.EventRecorder
 	logr.Logger
 	Cluster             *appsv1alpha1.Cluster
@@ -58,7 +57,7 @@ func (c *componentTransformContext) GetContext() context.Context {
 	return c.Context
 }
 
-func (c *componentTransformContext) GetClient() roclient.ReadonlyClient {
+func (c *componentTransformContext) GetClient() client.Reader {
 	return c.Client
 }
 
@@ -82,7 +81,6 @@ type componentPlanBuilder struct {
 type componentPlan struct {
 	dag      *graph.DAG
 	walkFunc graph.WalkFunc
-	cli      client.Client
 	transCtx *componentTransformContext
 }
 
@@ -98,10 +96,8 @@ func (c *componentPlanBuilder) Init() error {
 
 	c.transCtx.Component = comp
 	c.transCtx.ComponentOrig = comp.DeepCopy()
-	c.transformers = append(c.transformers, &componentInitTransformer{
-		Component:     c.transCtx.Component,
-		ComponentOrig: c.transCtx.ComponentOrig,
-	})
+	c.transformers = append(c.transformers, &componentInitTransformer{})
+
 	return nil
 }
 
@@ -127,7 +123,6 @@ func (c *componentPlanBuilder) Build() (graph.Plan, error) {
 	plan := &componentPlan{
 		dag:      dag,
 		walkFunc: c.defaultWalkFuncWithLogging,
-		cli:      c.cli,
 		transCtx: c.transCtx,
 	}
 	return plan, err
@@ -141,10 +136,10 @@ func (p *componentPlan) Execute() error {
 	return err
 }
 
-// NewComponentPlanBuilder returns a componentPlanBuilder powered PlanBuilder
-func NewComponentPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.Request) graph.PlanBuilder {
+// newComponentPlanBuilder returns a componentPlanBuilder powered PlanBuilder
+func newComponentPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client) graph.PlanBuilder {
 	return &componentPlanBuilder{
-		req: req,
+		req: ctx.Req,
 		cli: cli,
 		transCtx: &componentTransformContext{
 			Context:       ctx.Ctx,
@@ -183,40 +178,64 @@ func (c *componentPlanBuilder) defaultWalkFunc(v graph.Vertex) error {
 	if vertex.Action == nil {
 		return fmt.Errorf("vertex action can't be nil")
 	}
+
+	ctx := c.transCtx.Context
 	switch *vertex.Action {
 	case model.CREATE:
-		err := c.cli.Create(c.transCtx.Context, vertex.Obj)
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return err
-		}
+		return c.reconcileCreateObject(ctx, vertex)
 	case model.UPDATE:
-		err := c.cli.Update(c.transCtx.Context, vertex.Obj)
+		return c.reconcileUpdateObject(ctx, vertex)
+	case model.PATCH:
+		return c.reconcilePatchObject(ctx, vertex)
+	case model.DELETE:
+		return c.reconcileDeleteObject(ctx, vertex)
+	case model.STATUS:
+		return c.reconcileStatusObject(ctx, vertex)
+	}
+	return nil
+}
+
+func (c *componentPlanBuilder) reconcileCreateObject(ctx context.Context, vertex *model.ObjectVertex) error {
+	err := c.cli.Create(ctx, vertex.Obj, clientOption(vertex))
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+	return nil
+}
+
+func (c *componentPlanBuilder) reconcileUpdateObject(ctx context.Context, vertex *model.ObjectVertex) error {
+	err := c.cli.Update(ctx, vertex.Obj, clientOption(vertex))
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
+func (c *componentPlanBuilder) reconcilePatchObject(ctx context.Context, vertex *model.ObjectVertex) error {
+	patch := client.MergeFrom(vertex.OriObj)
+	err := c.cli.Patch(ctx, vertex.Obj, patch, clientOption(vertex))
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
+func (c *componentPlanBuilder) reconcileDeleteObject(ctx context.Context, vertex *model.ObjectVertex) error {
+	if controllerutil.RemoveFinalizer(vertex.Obj, constant.DBClusterFinalizerName) {
+		err := c.cli.Update(ctx, vertex.Obj, clientOption(vertex))
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
-	case model.PATCH:
-		patch := client.MergeFrom(vertex.OriObj)
-		if err := c.cli.Patch(c.transCtx.Context, vertex.Obj, patch); err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-	case model.DELETE:
-		// if controllerutil.RemoveFinalizer(vertex.Obj, constant.DBComponentFinalizerName) {
-		if controllerutil.RemoveFinalizer(vertex.Obj, constant.DBClusterFinalizerName) {
-			err := c.cli.Update(c.transCtx.Context, vertex.Obj)
-			if err != nil && !apierrors.IsNotFound(err) {
-				return err
-			}
-		}
-		if !model.IsObjectDeleting(vertex.Obj) {
-			err := c.cli.Delete(c.transCtx.Context, vertex.Obj)
-			if err != nil && !apierrors.IsNotFound(err) {
-				return err
-			}
-		}
-	case model.STATUS:
-		if err := c.cli.Status().Update(c.transCtx.Context, vertex.Obj); err != nil {
+	}
+	if !model.IsObjectDeleting(vertex.Obj) {
+		err := c.cli.Delete(ctx, vertex.Obj, clientOption(vertex))
+		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 	}
 	return nil
+}
+
+func (c *componentPlanBuilder) reconcileStatusObject(ctx context.Context, vertex *model.ObjectVertex) error {
+	return c.cli.Status().Update(ctx, vertex.Obj, clientOption(vertex))
 }

@@ -31,6 +31,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	lorryutil "github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
@@ -134,15 +135,15 @@ func getEventInvolvedObject(ctx context.Context, cli client.Client, event *corev
 	switch event.InvolvedObject.Kind {
 	case constant.PodKind:
 		pod := &corev1.Pod{}
-		err = cli.Get(ctx, objectKey, pod)
+		err = cli.Get(ctx, objectKey, pod, multicluster.InLocalContextUnknown())
 		return pod, err
 	case constant.StatefulSetKind:
 		sts := &appsv1.StatefulSet{}
-		err = cli.Get(ctx, objectKey, sts)
+		err = cli.Get(ctx, objectKey, sts, multicluster.InLocalContextUnknown())
 		return sts, err
 	case constant.DeploymentKind:
 		deployment := &appsv1.Deployment{}
-		err = cli.Get(ctx, objectKey, deployment)
+		err = cli.Get(ctx, objectKey, deployment, multicluster.InLocalContextUnknown())
 		return deployment, err
 	}
 	return nil, err

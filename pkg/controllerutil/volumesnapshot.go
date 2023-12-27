@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -40,7 +40,7 @@ func InVolumeSnapshotV1Beta1() bool {
 // VolumeSnapshotCompatClient client is compatible with VolumeSnapshot v1 and v1beta1
 type VolumeSnapshotCompatClient struct {
 	client.Client
-	roclient.ReadonlyClient
+	client.Reader
 	Ctx context.Context
 }
 
@@ -56,12 +56,12 @@ func (c *VolumeSnapshotCompatClient) Create(obj client.Object, opts ...client.Cr
 }
 
 func (c *VolumeSnapshotCompatClient) Get(key client.ObjectKey, snapshot client.Object, opts ...client.GetOption) error {
-	if c.ReadonlyClient == nil {
-		c.ReadonlyClient = c.Client
+	if c.Reader == nil {
+		c.Reader = c.Client
 	}
 	if InVolumeSnapshotV1Beta1() {
 		snapshotV1Beta1 := typeofV1Beta1(snapshot).(client.Object)
-		err := c.ReadonlyClient.Get(c.Ctx, key, snapshotV1Beta1, opts...)
+		err := c.Reader.Get(c.Ctx, key, snapshotV1Beta1, opts...)
 		if err != nil {
 			return err
 		}
@@ -70,7 +70,7 @@ func (c *VolumeSnapshotCompatClient) Get(key client.ObjectKey, snapshot client.O
 		}
 		return nil
 	}
-	return c.ReadonlyClient.Get(c.Ctx, key, snapshot, opts...)
+	return c.Reader.Get(c.Ctx, key, snapshot, opts...)
 }
 
 func (c *VolumeSnapshotCompatClient) Delete(snapshot client.Object) error {
@@ -102,12 +102,12 @@ func (c *VolumeSnapshotCompatClient) Patch(snapshot client.Object, deepCopy clie
 }
 
 func (c *VolumeSnapshotCompatClient) List(objList client.ObjectList, opts ...client.ListOption) error {
-	if c.ReadonlyClient == nil {
-		c.ReadonlyClient = c.Client
+	if c.Reader == nil {
+		c.Reader = c.Client
 	}
 	if InVolumeSnapshotV1Beta1() {
 		objV1Beta1List := typeofV1Beta1(objList).(client.ObjectList)
-		err := c.ReadonlyClient.List(c.Ctx, objV1Beta1List, opts...)
+		err := c.Reader.List(c.Ctx, objV1Beta1List, opts...)
 		if err != nil {
 			return err
 		}
@@ -116,7 +116,7 @@ func (c *VolumeSnapshotCompatClient) List(objList client.ObjectList, opts ...cli
 		}
 		return nil
 	}
-	return c.ReadonlyClient.List(c.Ctx, objList, opts...)
+	return c.Reader.List(c.Ctx, objList, opts...)
 }
 
 // CheckResourceExists checks whether resource exist or not.
@@ -170,7 +170,7 @@ func IsVolumeSnapshotEnabled(ctx context.Context, cli client.Client, pvName stri
 		return false, nil
 	}
 	pv := &corev1.PersistentVolume{}
-	if err := cli.Get(ctx, types.NamespacedName{Name: pvName}, pv); err != nil {
+	if err := cli.Get(ctx, types.NamespacedName{Name: pvName}, pv, multicluster.InLocalContext()); err != nil {
 		return false, err
 	}
 	if pv.Spec.CSI == nil {
@@ -181,7 +181,7 @@ func IsVolumeSnapshotEnabled(ctx context.Context, cli client.Client, pvName stri
 		Ctx:    ctx,
 	}
 	vscList := snapshotv1.VolumeSnapshotClassList{}
-	if err := vsCli.List(&vscList); err != nil {
+	if err := vsCli.List(&vscList, multicluster.InLocalContext()); err != nil {
 		return false, err
 	}
 	for _, vsc := range vscList.Items {

@@ -23,7 +23,6 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -32,9 +31,7 @@ import (
 )
 
 // componentLoadResourcesTransformer handles referenced resources validation and load them into context
-type componentLoadResourcesTransformer struct {
-	client.Client
-}
+type componentLoadResourcesTransformer struct{}
 
 var _ graph.Transformer = &componentLoadResourcesTransformer{}
 
@@ -66,9 +63,14 @@ func (t *componentLoadResourcesTransformer) Transform(ctx graph.TransformContext
 	}
 
 	if isGenerated {
-		return t.transformForGeneratedComponent(transCtx)
+		err = t.transformForGeneratedComponent(transCtx)
+	} else {
+		err = t.transformForNativeComponent(transCtx)
 	}
-	return t.transformForNativeComponent(transCtx)
+	if err != nil {
+		return newRequeueError(requeueDuration, err.Error())
+	}
+	return nil
 }
 
 func (t *componentLoadResourcesTransformer) isGeneratedComponent(cluster *appsv1alpha1.Cluster,

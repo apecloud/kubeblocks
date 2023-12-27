@@ -77,7 +77,7 @@ func (t *clusterConnCredentialTransformer) buildClusterConnCredential(transCtx *
 		return err
 	}
 	if apierrors.IsNotFound(err) {
-		graphCli.Create(dag, secret)
+		graphCli.Create(dag, secret, inUniversalContext())
 	}
 	return nil
 }

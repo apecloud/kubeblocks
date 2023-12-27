@@ -120,6 +120,6 @@ func (r *ConfigConstraintReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.ConfigConstraint{}).
 		// for other resource
-		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.ConfigMap{}). // TODO(leon)
 		Complete(r)
 }

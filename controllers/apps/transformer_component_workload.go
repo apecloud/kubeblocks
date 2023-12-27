@@ -49,6 +49,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -117,6 +118,8 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	}
 	transCtx.ProtoWorkload = protoRSM
 
+	buildRSMPlacementAnnotation(transCtx.Component, protoRSM)
+
 	// build configuration template annotations to rsm workload
 	buildRSMConfigTplAnnotations(protoRSM, synthesizeComp)
 
@@ -152,8 +155,12 @@ func (t *componentWorkloadTransformer) runningRSMObject(ctx graph.TransformConte
 	return rsm, nil
 }
 
-func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG,
-	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, runningRSM, protoRSM *workloads.ReplicatedStateMachine) error {
+func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx,
+	cli model.GraphClient,
+	dag *graph.DAG,
+	cluster *appsv1alpha1.Cluster,
+	synthesizeComp *component.SynthesizedComponent,
+	runningRSM, protoRSM *workloads.ReplicatedStateMachine) error {
 	// TODO(xingran): Some RSM workload operations should be moved down to Lorry implementation. Subsequent operations such as horizontal scaling will be removed from the component controller
 	if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, runningRSM, protoRSM); err != nil {
 		return err
@@ -161,7 +168,7 @@ func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 
 	objCopy := copyAndMergeRSM(runningRSM, protoRSM, cluster)
 	if objCopy != nil && !cli.IsAction(dag, objCopy, model.ActionNoopPtr()) {
-		cli.Update(dag, nil, objCopy, model.ReplaceIfExistingOption)
+		cli.Update(dag, nil, objCopy, &model.ReplaceIfExistingOption{})
 	}
 
 	// to work around that the scaled PVC will be deleted at object action.
@@ -171,8 +178,11 @@ func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 	return nil
 }
 
-func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.RequestCtx, dag *graph.DAG,
-	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, rsm *workloads.ReplicatedStateMachine) error {
+func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.RequestCtx,
+	dag *graph.DAG,
+	cluster *appsv1alpha1.Cluster,
+	synthesizeComp *component.SynthesizedComponent,
+	obj, rsm *workloads.ReplicatedStateMachine) error {
 	cwo := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, obj, rsm, dag)
 
 	// handle rsm expand volume
@@ -467,12 +477,15 @@ func (r *componentWorkloadOps) scaleOut(stsObj *apps.StatefulSet) error {
 	} else {
 		graphCli.Noop(r.dag, r.protoRSM)
 		// update objs will trigger reconcile, no need to requeue error
-		objs, err := d.CloneData(d)
+		objs1, objs2, err := d.CloneData(d)
 		if err != nil {
 			return err
 		}
-		for _, obj := range objs {
+		for _, obj := range objs1 {
 			graphCli.Do(r.dag, nil, obj, model.ActionCreatePtr(), nil)
+		}
+		for _, obj := range objs2 {
+			graphCli.Do(r.dag, nil, obj, model.ActionCreatePtr(), nil, inLocalContext())
 		}
 		return nil
 	}
@@ -480,7 +493,8 @@ func (r *componentWorkloadOps) scaleOut(stsObj *apps.StatefulSet) error {
 
 func (r *componentWorkloadOps) updatePodReplicaLabel4Scaling(replicas int32) error {
 	graphCli := model.NewGraphClient(r.cli)
-	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name))
+	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace,
+		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), multicluster.InLocalContext())
 	if err != nil {
 		return err
 	}
@@ -490,13 +504,14 @@ func (r *componentWorkloadOps) updatePodReplicaLabel4Scaling(replicas int32) err
 			obj.Annotations = make(map[string]string)
 		}
 		obj.Annotations[constant.ComponentReplicasAnnotationKey] = strconv.Itoa(int(replicas))
-		graphCli.Update(r.dag, nil, obj)
+		graphCli.Update(r.dag, nil, obj, inLocalContext())
 	}
 	return nil
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn(stsObj *apps.StatefulSet) error {
-	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name))
+	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace,
+		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), multicluster.InLocalContext())
 	if err != nil {
 		return err
 	}
@@ -573,14 +588,14 @@ func (r *componentWorkloadOps) deletePVCs4ScaleIn(stsObj *apps.StatefulSet) erro
 				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
 			}
 			pvc := corev1.PersistentVolumeClaim{}
-			if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, &pvc); err != nil {
+			if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, &pvc, multicluster.InLocalContext()); err != nil {
 				return err
 			}
 			// Since there are no order guarantee between updating STS and deleting PVCs, if there is any error occurred
 			// after updating STS and before deleting PVCs, the PVCs intended to scale-in will be leaked.
 			// For simplicity, the updating dependency is added between them to guarantee that the PVCs to scale-in
 			// will be deleted or the scaling-in operation will be failed.
-			graphCli.Delete(r.dag, &pvc)
+			graphCli.Delete(r.dag, &pvc, inLocalContext())
 		}
 	}
 	return nil
@@ -591,10 +606,11 @@ func (r *componentWorkloadOps) expandVolumes(vctName string, proto *corev1.Persi
 		pvc := &corev1.PersistentVolumeClaim{}
 		pvcKey := types.NamespacedName{
 			Namespace: r.cluster.Namespace,
-			Name:      fmt.Sprintf("%s-%s-%d", vctName, r.runningRSM.Name, i),
+			// TODO(leon): sts name
+			Name: fmt.Sprintf("%s-%s-%d-%d", vctName, r.runningRSM.Name, i, 0),
 		}
 		pvcNotFound := false
-		if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, pvc); err != nil {
+		if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, pvc, multicluster.InLocalContext()); err != nil {
 			if apierrors.IsNotFound(err) {
 				pvcNotFound = true
 			} else {
@@ -638,7 +654,7 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 			constant.PVCNameLabelKey: pvcKey.Name,
 		}
 		pvList := corev1.PersistentVolumeList{}
-		if err := r.cli.List(r.reqCtx.Ctx, &pvList, ml); err != nil {
+		if err := r.cli.List(r.reqCtx.Ctx, &pvList, ml, multicluster.InLocalContext()); err != nil {
 			return err
 		}
 		for _, pv := range pvList.Items {
@@ -665,7 +681,7 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 		Namespace: pvcKey.Namespace,
 		Name:      newPVC.Spec.VolumeName,
 	}
-	if err := r.cli.Get(r.reqCtx.Ctx, pvKey, pv); err != nil {
+	if err := r.cli.Get(r.reqCtx.Ctx, pvKey, pv, multicluster.InLocalContext()); err != nil {
 		if apierrors.IsNotFound(err) {
 			pvNotFound = true
 		} else {
@@ -698,14 +714,14 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 			}
 			retainPV.Annotations[constant.PVLastClaimPolicyAnnotationKey] = string(pv.Spec.PersistentVolumeReclaimPolicy)
 			retainPV.Spec.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimRetain
-			return graphCli.Do(r.dag, pv, retainPV, model.ActionPatchPtr(), fromVertex)
+			return graphCli.Do(r.dag, pv, retainPV, model.ActionPatchPtr(), fromVertex, inLocalContext())
 		},
 		deletePVCStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 2: delete pvc, this will not delete pv because policy is 'retain'
 			removeFinalizerPVC := pvc.DeepCopy()
 			removeFinalizerPVC.SetFinalizers([]string{})
-			removeFinalizerPVCVertex := graphCli.Do(r.dag, pvc, removeFinalizerPVC, model.ActionPatchPtr(), fromVertex)
-			return graphCli.Do(r.dag, nil, removeFinalizerPVC, model.ActionDeletePtr(), removeFinalizerPVCVertex)
+			removeFinalizerPVCVertex := graphCli.Do(r.dag, pvc, removeFinalizerPVC, model.ActionPatchPtr(), fromVertex, inLocalContext())
+			return graphCli.Do(r.dag, nil, removeFinalizerPVC, model.ActionDeletePtr(), removeFinalizerPVCVertex, inLocalContext())
 		},
 		removePVClaimRefStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 3: remove claimRef in pv
@@ -714,12 +730,12 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 				removeClaimRefPV.Spec.ClaimRef.UID = ""
 				removeClaimRefPV.Spec.ClaimRef.ResourceVersion = ""
 			}
-			return graphCli.Do(r.dag, pv, removeClaimRefPV, model.ActionPatchPtr(), fromVertex)
+			return graphCli.Do(r.dag, pv, removeClaimRefPV, model.ActionPatchPtr(), fromVertex, inLocalContext())
 		},
 		createPVCStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 4: create new pvc
 			newPVC.SetResourceVersion("")
-			return graphCli.Do(r.dag, nil, newPVC, model.ActionCreatePtr(), fromVertex)
+			return graphCli.Do(r.dag, nil, newPVC, model.ActionCreatePtr(), fromVertex, inLocalContext())
 		},
 		pvRestorePolicyStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 5: restore to previous pv policy
@@ -729,7 +745,7 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 				policy = corev1.PersistentVolumeReclaimDelete
 			}
 			restorePV.Spec.PersistentVolumeReclaimPolicy = policy
-			return graphCli.Do(r.dag, pv, restorePV, model.ActionPatchPtr(), fromVertex)
+			return graphCli.Do(r.dag, pv, restorePV, model.ActionPatchPtr(), fromVertex, inLocalContext())
 		},
 	}
 
@@ -764,7 +780,7 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 	}
 	if pvcQuantity := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; pvcQuantity.Cmp(vctProto.Spec.Resources.Requests[corev1.ResourceStorage]) != 0 {
 		// use pvc's update without anything extra
-		graphCli.Update(r.dag, nil, newPVC)
+		graphCli.Update(r.dag, nil, newPVC, inLocalContext())
 		return nil
 	}
 	// all the else means no need to update
@@ -787,8 +803,9 @@ func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeC
 	rsmObj *workloads.ReplicatedStateMachine, dag *graph.DAG) error {
 	graphCli := model.NewGraphClient(cli)
 	getRunningVolumes := func(vctName string) ([]*corev1.PersistentVolumeClaim, error) {
-		pvcs, err := component.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.PersistentVolumeClaimSignature,
-			rsmObj.Namespace, constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name))
+		labels := constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
+		pvcs, err := component.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli,
+			generics.PersistentVolumeClaimSignature, rsmObj.Namespace, labels, multicluster.InLocalContext())
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return nil, nil
@@ -824,6 +841,13 @@ func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeC
 		}
 	}
 	return nil
+}
+
+func buildRSMPlacementAnnotation(comp *appsv1alpha1.Component, rsm *workloads.ReplicatedStateMachine) {
+	if rsm.Annotations == nil {
+		rsm.Annotations = make(map[string]string)
+	}
+	rsm.Annotations[constant.KBAppPlacementKey] = placement(comp)
 }
 
 // buildRSMConfigTplAnnotations builds config tpl annotations for rsm
@@ -881,7 +905,8 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 	}
 }
 
-func BuildNodesAssignment(ctx context.Context, cli client.Client, synthesizeComp *component.SynthesizedComponent, rsm *workloads.ReplicatedStateMachine, cluster *appsv1alpha1.Cluster) error {
+func BuildNodesAssignment(ctx context.Context, cli client.Client, synthesizeComp *component.SynthesizedComponent,
+	rsm *workloads.ReplicatedStateMachine, cluster *appsv1alpha1.Cluster) error {
 	currentNodesAssignment := make([]workloads.NodeAssignment, 0)
 	if rsm != nil {
 		currentNodesAssignment = rsm.Spec.NodeAssignment
@@ -893,7 +918,8 @@ func BuildNodesAssignment(ctx context.Context, cli client.Client, synthesizeComp
 	currentReplicas := int32(len(currentNodesAssignment))
 	if currentReplicas > expectedReplicas {
 		var err error
-		pods, err := component.ListPodOwnedByComponent(ctx, cli, cluster.Namespace, constant.GetComponentWellKnownLabels(cluster.Name, synthesizeComp.Name))
+		pods, err := component.ListPodOwnedByComponent(ctx, cli, cluster.Namespace,
+			constant.GetComponentWellKnownLabels(cluster.Name, synthesizeComp.Name), multicluster.InLocalContext())
 		if err != nil {
 			return err
 		}

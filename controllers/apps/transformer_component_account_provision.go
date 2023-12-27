@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
 	lorryModel "github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
@@ -184,7 +185,7 @@ func (t *componentAccountProvisionTransformer) buildLorryClient(transCtx *compon
 		return nil, nil
 	}
 
-	podList, err := component.GetComponentPodListWithRole(transCtx.Context, transCtx.Client, *transCtx.Cluster, synthesizedComp.Name, roleName)
+	podList, err := t.componentPodsWithRole(transCtx, *transCtx.Cluster, synthesizedComp.Name, roleName)
 	if err != nil {
 		return nil, err
 	}
@@ -197,6 +198,18 @@ func (t *componentAccountProvisionTransformer) buildLorryClient(transCtx *compon
 		return nil, err
 	}
 	return lorryCli, nil
+}
+
+func (t *componentAccountProvisionTransformer) componentPodsWithRole(transCtx *componentTransformContext,
+	cluster appsv1alpha1.Cluster, compSpecName, role string) (*corev1.PodList, error) {
+	podList := &corev1.PodList{}
+	labels := constant.GetComponentWellKnownLabels(cluster.Name, compSpecName)
+	labels[constant.RoleLabelKey] = role
+	if err := transCtx.Client.List(transCtx.Context, podList,
+		client.InNamespace(cluster.Namespace), client.MatchingLabels(labels), multicluster.InLocalContext()); err != nil {
+		return nil, err
+	}
+	return podList, nil
 }
 
 func (t *componentAccountProvisionTransformer) provisionAccount(transCtx *componentTransformContext,

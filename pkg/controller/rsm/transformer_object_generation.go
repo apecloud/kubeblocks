@@ -58,6 +58,8 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 
 	// generate objects by current spec
 	var objects []client.Object
+	// TODO(leon)
+	var stsObjects []client.Object
 	if rsm.Spec.RsmTransformPolicy == workloads.ToPod {
 		pods := buildPods(*rsm)
 		for idx := range pods {
@@ -69,8 +71,12 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		altSvs := buildAlternativeSvs(*rsm)
 		headLessSvc := buildHeadlessSvc(*rsm)
 		envConfig := buildEnvConfigMap(*rsm)
-		sts := buildSts(*rsm, headLessSvc.Name, *envConfig)
-		objects = append(objects, sts)
+		if len(placement(*rsm)) == 0 {
+			stsObjects = append(stsObjects, buildSts(*rsm, headLessSvc.Name, *envConfig))
+		} else {
+			stsObjects = buildStsByReplicas(*rsm, headLessSvc.Name, *envConfig)
+		}
+		objects = append(objects, stsObjects...)
 		objects = append(objects, headLessSvc, envConfig)
 		if svc != nil {
 			objects = append(objects, svc)
@@ -88,7 +94,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 
 	// read cache snapshot
 	ml := getLabels(rsm)
-	oldSnapshot, err := model.ReadCacheSnapshot(ctx, rsm, ml, ownedKinds(rsm.Spec.RsmTransformPolicy)...)
+	oldSnapshot, err := readCacheSnapshot(transCtx, rsm, ml, ownedKinds(rsm.Spec.RsmTransformPolicy)...)
 	if err != nil {
 		return err
 	}
@@ -113,7 +119,8 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 
 	createNewObjects := func() {
 		for name := range createSet {
-			cli.Create(dag, newSnapshot[name])
+			obj := newSnapshot[name]
+			cli.Create(dag, obj, inLocalContext())
 		}
 	}
 	updateObjects := func() {
@@ -123,25 +130,33 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 			if reflect.DeepEqual(oldObj, newObj) {
 				continue
 			}
-			cli.Update(dag, oldObj, newObj)
+			// TODO(leon): update service
+			if _, ok := oldObj.(*corev1.Service); ok {
+				continue
+			}
+			cli.Update(dag, oldObj, newObj, inLocalContext())
 		}
 	}
 	deleteOrphanObjects := func() {
 		for name := range deleteSet {
+			oldObj := oldSnapshot[name]
 			if viper.GetBool(FeatureGateRSMCompatibilityMode) {
 				// filter non-env configmaps
-				if _, ok := oldSnapshot[name].(*corev1.ConfigMap); ok {
+				if _, ok := oldObj.(*corev1.ConfigMap); ok {
 					continue
 				}
 			}
-			cli.Delete(dag, oldSnapshot[name])
+			cli.Delete(dag, oldObj, inLocalContext())
 		}
 	}
 	handleDependencies := func() {
 		// RsmTransformPolicy might be "", treat empty as ToSts for backward compatibility
 		if rsm.Spec.RsmTransformPolicy != workloads.ToPod {
-			// objects[0] is the sts object
-			cli.DependOn(dag, objects[0], objects[1:]...)
+			//// objects[0] is the sts object
+			// cli.DependOn(dag, objects[0], objects[1:]...)
+			for i := range stsObjects {
+				cli.DependOn(dag, stsObjects[i], objects[len(stsObjects):]...)
+			}
 		}
 	}
 
@@ -167,7 +182,7 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 
 	// mergeAnnotations keeps the original annotations.
 	mergeMetadataMap := func(originalMap map[string]string, targetMap map[string]string) map[string]string {
-		if targetMap == nil || originalMap == nil {
+		if targetMap == nil && originalMap == nil {
 			return nil
 		}
 		if targetMap == nil {
@@ -186,7 +201,7 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		oldSts.Labels = mergeMetadataMap(oldSts.Labels, newSts.Labels)
 		oldSts.Labels = newSts.Labels
 		// if annotations exist and are replaced, the StatefulSet will be updated.
-		oldSts.Annotations = mergeMetadataMap(oldSts.Spec.Template.Annotations, newSts.Spec.Template.Annotations)
+		oldSts.Annotations = mergeMetadataMap(oldSts.Annotations, newSts.Annotations)
 		oldSts.Spec.Template = newSts.Spec.Template
 		oldSts.Spec.Replicas = newSts.Spec.Replicas
 		oldSts.Spec.UpdateStrategy = newSts.Spec.UpdateStrategy
@@ -326,6 +341,35 @@ func buildSts(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envC
 		SetTemplate(*template).
 		SetUpdateStrategy(rsm.Spec.UpdateStrategy).
 		GetObject()
+}
+
+func buildStsByReplicas(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envConfig corev1.ConfigMap) []client.Object {
+	clusters := strings.Split(placement(rsm), ",")
+	template := buildStsPodTemplate(rsm, envConfig)
+	annotations := ParseAnnotationsOfScope(RootScope, rsm.Annotations)
+	labels := getLabels(&rsm)
+	objs := make([]client.Object, 0)
+	for i := int32(0); i < *rsm.Spec.Replicas; i++ {
+		sts := builder.NewStatefulSetBuilder(rsm.Namespace, fmt.Sprintf("%s-%d", rsm.Name, i)).
+			AddLabelsInMap(labels).
+			AddLabels(rsmGenerationLabelKey, strconv.FormatInt(rsm.Generation, 10)).
+			AddAnnotationsInMap(annotations).
+			AddAnnotations(constant.KBAppPlacementKey, clusters[i]).
+			SetSelector(rsm.Spec.Selector).
+			SetServiceName(headlessSvcName).
+			SetReplicas(1).
+			SetPodManagementPolicy(rsm.Spec.PodManagementPolicy).
+			SetVolumeClaimTemplates(rsm.Spec.VolumeClaimTemplates...).
+			SetTemplate(*template).
+			SetUpdateStrategy(rsm.Spec.UpdateStrategy).
+			GetObject()
+		if sts.Spec.Template.Annotations == nil {
+			sts.Spec.Template.Annotations = make(map[string]string)
+		}
+		sts.Spec.Template.Annotations[constant.KBAppPlacementKey] = clusters[i]
+		objs = append(objs, sts)
+	}
+	return objs
 }
 
 func buildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
@@ -737,11 +781,22 @@ func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string 
 	svcName := getHeadlessSvcName(set)
 	uid := string(set.UID)
 	strReplicas := strconv.Itoa(int(*set.Spec.Replicas))
-	generateReplicaEnv := func(prefix string) {
+	generateReplicaEnv := func(prefix string, withDef bool) {
+		hostNameTplValue := func(i int) string {
+			if !withDef || len(placement(set)) == 0 {
+				return fmt.Sprintf("%s.%s", set.Name+"-"+strconv.Itoa(i), svcName)
+			}
+			hostMapping := map[string]string{
+				"worker-0": "192.168.0.215",
+				"worker-1": "192.168.0.216",
+				"worker-2": "192.168.0.217",
+			}
+			clusters := strings.Split(placement(set), ",")
+			return hostMapping[clusters[i]]
+		}
 		for i := 0; i < int(*set.Spec.Replicas); i++ {
 			hostNameTplKey := prefix + strconv.Itoa(i) + "_HOSTNAME"
-			hostNameTplValue := set.Name + "-" + strconv.Itoa(i)
-			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
+			envData[hostNameTplKey] = hostNameTplValue(i)
 		}
 	}
 	// build member related envs from set.Status.MembersStatus
@@ -768,7 +823,7 @@ func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string 
 
 	prefix := constant.KBPrefix + "_RSM_"
 	envData[prefix+"N"] = strReplicas
-	generateReplicaEnv(prefix)
+	generateReplicaEnv(prefix, false)
 	generateMemberEnv(prefix)
 	// set owner uid to let pod know if the owner is recreated
 	envData[prefix+"OWNER_UID"] = uid
@@ -777,7 +832,7 @@ func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string 
 	// have backward compatible handling for env generated in version prior 0.6.0
 	prefix = constant.KBPrefix + "_"
 	envData[prefix+"REPLICA_COUNT"] = strReplicas
-	generateReplicaEnv(prefix)
+	generateReplicaEnv(prefix, true)
 	generateMemberEnv(prefix)
 	envData[prefix+"CLUSTER_UID"] = uid
 
@@ -786,7 +841,7 @@ func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string 
 	componentDefName := set.Labels[constant.AppComponentLabelKey]
 	prefixWithCompDefName := prefix + strings.ToUpper(componentDefName) + "_"
 	envData[prefixWithCompDefName+"N"] = strReplicas
-	generateReplicaEnv(prefixWithCompDefName)
+	generateReplicaEnv(prefixWithCompDefName, true)
 	generateMemberEnv(prefixWithCompDefName)
 	envData[prefixWithCompDefName+"CLUSTER_UID"] = uid
 

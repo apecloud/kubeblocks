@@ -23,21 +23,18 @@ import (
 	"context"
 	"time"
 
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -75,8 +72,9 @@ import (
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Scheme          *runtime.Scheme
+	Recorder        record.EventRecorder
+	MultiClusterMgr multicluster.Manager
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -96,7 +94,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// the cluster reconciliation loop is a 3-stage model: plan Init, plan Build and plan Execute
 	// Init stage
-	planBuilder := NewClusterPlanBuilder(reqCtx, r.Client)
+	planBuilder := newClusterPlanBuilder(reqCtx, r.Client)
 	if err := planBuilder.Init(); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -138,6 +136,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&clusterLoadRefResourcesTransformer{},
 			// normalize the cluster and component API
 			&ClusterAPINormalizationTransformer{},
+			// placement replicas across clusters
+			&clusterPlacementTransformer{multiClusterMgr: r.MultiClusterMgr},
 			// handle cluster services
 			&clusterServiceTransformer{},
 			// create all cluster components objects
@@ -181,31 +181,31 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&appsv1alpha1.Cluster{}).
 		Owns(&appsv1alpha1.Component{}).
 		Owns(&corev1.Service{}).
-		Owns(&corev1.Secret{}).
-		Owns(&corev1.ConfigMap{}).
+		// Owns(&corev1.Secret{}).    // TODO(leon): remove it?
+		// Owns(&corev1.ConfigMap{}). // TODO(leon): remove it?
 		Owns(&dpv1alpha1.BackupPolicy{}).
 		Owns(&dpv1alpha1.BackupSchedule{}).
-		Owns(&dpv1alpha1.Restore{}).
-		Owns(&batchv1.Job{}).
-		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources))
+		Owns(&dpv1alpha1.Restore{})
+	// Owns(&batchv1.Job{}).                // TODO(leon): remove it?
+	// Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources))
 
 	return b.Complete(r)
 }
 
-func (r *ClusterReconciler) filterClusterResources(ctx context.Context, obj client.Object) []reconcile.Request {
-	labels := obj.GetLabels()
-	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
-		return []reconcile.Request{}
-	}
-	if _, ok := labels[constant.AppInstanceLabelKey]; !ok {
-		return []reconcile.Request{}
-	}
-	return []reconcile.Request{
-		{
-			NamespacedName: types.NamespacedName{
-				Namespace: obj.GetNamespace(),
-				Name:      labels[constant.AppInstanceLabelKey],
-			},
-		},
-	}
-}
+// func (r *ClusterReconciler) filterClusterResources(ctx context.Context, obj client.Object) []reconcile.Request {
+//	labels := obj.GetLabels()
+//	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
+//		return []reconcile.Request{}
+//	}
+//	if _, ok := labels[constant.AppInstanceLabelKey]; !ok {
+//		return []reconcile.Request{}
+//	}
+//	return []reconcile.Request{
+//		{
+//			NamespacedName: types.NamespacedName{
+//				Namespace: obj.GetNamespace(),
+//				Name:      labels[constant.AppInstanceLabelKey],
+//			},
+//		},
+//	}
+// }

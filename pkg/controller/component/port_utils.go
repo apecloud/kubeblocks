@@ -54,6 +54,7 @@ func getAvailableContainerPorts(containers []corev1.Container, containerPorts []
 	iterAvailPort := func(p int32) (int32, error) {
 		// The TCP/IP port numbers below 1024 are privileged ports, which are special
 		// in that normal users are not allowed to run servers on them.
+		// Ports below 1024 can be allocated, as the port manager will automatically reallocate ports under 100.
 		if p < minAvailPort || p > maxAvailPort {
 			p = minAvailPort
 		}

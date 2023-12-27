@@ -33,7 +33,7 @@ func TestGetAvailableContainerPorts(t *testing.T) {
 		outputPort int32
 	}{{
 		inputPort:  80, // 80 is a privileged port
-		outputPort: minAvailPort,
+		outputPort: 80,
 	}, {
 		inputPort:  65536, // 65536 is an invalid port
 		outputPort: minAvailPort,

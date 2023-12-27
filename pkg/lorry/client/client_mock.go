@@ -200,15 +200,15 @@ func (mr *MockClientMockRecorder) RevokeUserRole(arg0, arg1, arg2 interface{}) *
 }
 
 // Switchover mocks base method.
-func (m *MockClient) Switchover(arg0 context.Context, arg1, arg2 string) error {
+func (m *MockClient) Switchover(arg0 context.Context, arg1, arg2 string, arg3 bool) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Switchover", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "Switchover", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Switchover indicates an expected call of Switchover.
-func (mr *MockClientMockRecorder) Switchover(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) Switchover(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Switchover", reflect.TypeOf((*MockClient)(nil).Switchover), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Switchover", reflect.TypeOf((*MockClient)(nil).Switchover), arg0, arg1, arg2, arg3)
 }

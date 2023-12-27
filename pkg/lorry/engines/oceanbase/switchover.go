@@ -39,9 +39,13 @@ const (
 	repPassword = "rep_user"
 )
 
-func (mgr *Manager) Switchover(ctx context.Context, cluster *dcs.Cluster, primary, candidate string) error {
+func (mgr *Manager) Switchover(ctx context.Context, cluster *dcs.Cluster, primary, candidate string, force bool) error {
 	if mgr.ReplicaTenant == "" {
 		return errors.New("the cluster has no replica tenant set")
+	}
+
+	if force {
+		return mgr.Failover(ctx, cluster, candidate)
 	}
 
 	primaryComponentName := getCompnentName(primary)

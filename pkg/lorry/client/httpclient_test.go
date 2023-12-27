@@ -434,7 +434,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 			}
 			clusterTemp.HaConfig.SetEnable(false)
 			mockDCSStore.EXPECT().GetCluster().Return(clusterTemp, nil)
-			err := lorryClient.Switchover(context.TODO(), "pod-0", "pod-1")
+			err := lorryClient.Switchover(context.TODO(), "pod-0", "pod-1", false)
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("cluster's ha is disabled"))
 		})
@@ -446,23 +446,23 @@ var _ = Describe("Lorry HTTP Client", func() {
 			}
 			clusterTemp.HaConfig.SetEnable(true)
 			mockDCSStore.EXPECT().GetCluster().Return(clusterTemp, nil).AnyTimes()
-			err := lorryClient.Switchover(context.TODO(), "pod-a", "pod-b")
+			err := lorryClient.Switchover(context.TODO(), "pod-a", "pod-b", false)
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("primary pod-a not exists"))
 
 			mockDBManager.EXPECT().IsLeaderMember(gomock.Any(), gomock.Any(), gomock.Any()).Return(false, nil).Times(1)
-			err = lorryClient.Switchover(context.TODO(), "pod-0", "pod-1")
+			err = lorryClient.Switchover(context.TODO(), "pod-0", "pod-1", false)
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("pod-0 is not the primary"))
 
 			mockDBManager.EXPECT().IsLeaderMember(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).Times(1)
-			err = lorryClient.Switchover(context.TODO(), "pod-0", "pod-b")
+			err = lorryClient.Switchover(context.TODO(), "pod-0", "pod-b", false)
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("candidate pod-b not exists"))
 
 			mockDBManager.EXPECT().IsLeaderMember(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).Times(1)
 			mockDBManager.EXPECT().IsMemberHealthy(gomock.Any(), gomock.Any(), gomock.Any()).Return(false).Times(1)
-			err = lorryClient.Switchover(context.TODO(), "pod-0", "pod-1")
+			err = lorryClient.Switchover(context.TODO(), "pod-0", "pod-1", false)
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("candidate pod-1 is unhealthy"))
 		})
@@ -477,7 +477,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 			mockDCSStore.EXPECT().CreateSwitchover(gomock.Any(), gomock.Any()).Return(nil)
 			mockDBManager.EXPECT().IsLeaderMember(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).Times(1)
 			mockDBManager.EXPECT().HasOtherHealthyMembers(gomock.Any(), gomock.Any(), gomock.Any()).Return([]*dcs.Member{{}, {}}).Times(1)
-			err := lorryClient.Switchover(context.TODO(), "pod-0", "")
+			err := lorryClient.Switchover(context.TODO(), "pod-0", "", false)
 			Expect(err).Should(BeNil())
 		})
 
@@ -490,7 +490,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 			mockDCSStore.EXPECT().GetCluster().Return(clusterTemp, nil).AnyTimes()
 			mockDCSStore.EXPECT().CreateSwitchover(gomock.Any(), gomock.Any()).Return(nil)
 			mockDBManager.EXPECT().IsMemberHealthy(gomock.Any(), gomock.Any(), gomock.Any()).Return(true).Times(1)
-			err := lorryClient.Switchover(context.TODO(), "", "pod-1")
+			err := lorryClient.Switchover(context.TODO(), "", "pod-1", false)
 			Expect(err).Should(BeNil())
 		})
 
@@ -504,7 +504,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 			mockDCSStore.EXPECT().CreateSwitchover(gomock.Any(), gomock.Any()).Return(nil)
 			mockDBManager.EXPECT().IsLeaderMember(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).Times(1)
 			mockDBManager.EXPECT().IsMemberHealthy(gomock.Any(), gomock.Any(), gomock.Any()).Return(true).Times(1)
-			err := lorryClient.Switchover(context.TODO(), "pod-0", "pod-1")
+			err := lorryClient.Switchover(context.TODO(), "pod-0", "pod-1", false)
 			Expect(err).Should(BeNil())
 		})
 	})

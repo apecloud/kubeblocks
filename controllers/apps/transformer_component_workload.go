@@ -522,7 +522,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn(stsObj *apps.StatefulSet) err
 			return nil
 		}
 		// if HA functionality is not enabled, no need to switchover
-		err := lorryCli.Switchover(r.reqCtx.Ctx, pod.Name, "")
+		err := lorryCli.Switchover(r.reqCtx.Ctx, pod.Name, "", false)
 		if err == nil {
 			return fmt.Errorf("switchover succeed, wait role label to be updated")
 		}

@@ -123,7 +123,7 @@ var mockLorryClient4HScale = func(clusterKey types.NamespacedName, compName stri
 			}
 			return nil
 		}).AnyTimes()
-		recorder.Switchover(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		recorder.Switchover(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	})
 }
 

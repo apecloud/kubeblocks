@@ -177,14 +177,14 @@ func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) 
 		if !intctrlutil.PodIsReadyWithLabel(pod) {
 			continue
 		}
-		readyWithoutPrimary := true
+		readyWithoutPrimary := false
 		roleName := getRoleName(pod)
 		role, ok := roleMap[roleName]
 		if !ok {
 			continue
 		}
-		if value, ok := pod.Labels[constant.ReadyWithoutPrimaryKey]; ok && value == "false" {
-			readyWithoutPrimary = false
+		if value, ok := pod.Labels[constant.ReadyWithoutPrimaryKey]; ok && value == "true" {
+			readyWithoutPrimary = true
 		}
 		memberStatus := workloads.MemberStatus{
 			PodName:             pod.Name,
@@ -684,7 +684,7 @@ func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
 	}
 	hasLeader := false
 	for _, status := range membersStatus {
-		if !status.ReadyWithoutPrimary {
+		if status.ReadyWithoutPrimary {
 			return true
 		}
 		if status.IsLeader {

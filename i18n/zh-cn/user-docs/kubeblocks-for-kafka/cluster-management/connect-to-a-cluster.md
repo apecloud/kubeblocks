@@ -83,7 +83,7 @@ import TabItem from '@theme/TabItem';
      kafka-console-consumer.sh --topic quickstart-events --from-beginning --bootstrap-server xxx-broker:9092
      ```
 
-然后将得到输出 'Hello, KubeBlocks'。
+    然后将得到输出 'Hello, KubeBlocks'。
 
 ## 在 Kubernetes 集群外同一 VPC 下连接到 Kafka 集群
 
@@ -91,7 +91,7 @@ import TabItem from '@theme/TabItem';
 
 ***步骤：***
 
-1. 将 host-network-accessible 的值设置为 true。
+1. 将 `host-network-accessible` 的值设置为 true。
 
     <Tabs>
     <TabItem value="kbcli" label="kbcli" default>
@@ -154,14 +154,23 @@ import TabItem from '@theme/TabItem';
 
    ![获取 ELB 地址](../../../img/connect-to-a-kafka-cluster-gain-elb-address.png)
 
-   请注意：
-   - a0e01377fa33xxx-xxx.cn-northwest-1.elb.amazonaws.com.cn 是 Kubernetes 外部同一 VPC 下能访问的 ELB 地址。
+    :::note
+
+    xxxxxx-xxx.cn-northwest-1.elb.amazonaws.com.cn 是 K8s 外部同一 VPC 下能访问的 ELB 地址。
+
+    :::
 
 3. 使用 ELB 地址进行连接。
 
     在上例中，ELB 地址为 a0e01377fa33xxx-xxx.cn-northwest-1.elb.amazonaws.com.cn:9092。
 
 ## 在公共互联网连接到 Kafka 集群
+
+:::caution
+
+限制条件：目前版本只支持 Kafka broker 单 replica（combined: --replicas=1 或 separated: --broker-replicas=1）使用以下方案。
+
+:::
 
 ***步骤：***
 
@@ -229,11 +238,14 @@ import TabItem from '@theme/TabItem';
 
    ![获取 ELB 地址](./../../../img/kafka-connect-cross-vpc.png)
 
-   请注意：
-   - xxxx-xxxx.cn-northwest-1.elb.amazonaws.com.cn 是公网下能访问的 ELB 地址。
+    :::note
+
+    xxxx-xxxx.cn-northwest-1.elb.amazonaws.com.cn 是公网下能访问的 ELB 地址。
+
+    :::
 
 3. 配置 hostname 映射。
-   1. 登陆远程机器。
+   1. 登录远程机器。
    2. 查看 ELB 地址 IP。
 
       ```bash

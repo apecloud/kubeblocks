@@ -70,7 +70,7 @@ You can also add multiple containers. For example, run the command below to kill
 kbcli fault pod kill-container --container=mysql --container=config-manager
 ```
 
-## Simulate fault injections by YAML
+## Simulate fault injections by YAML file
 
 This section introduces the YAML configuration file examples. You can view the YAML file by adding `--dry-run` at the end of the above kbcli commands. Meanwhile, you can also refer to the [Chaos Mesh official docs](https://chaos-mesh.org/docs/next/simulate-pod-chaos-on-kubernetes/#create-experiments-using-yaml-configuration-files) for details.
 
@@ -107,9 +107,9 @@ This section introduces the YAML configuration file examples. You can view the Y
 
 ### Pod-failure example
 
-1. Write the experiment configuration to the `pod-kill.yaml` file.
+1. Write the experiment configuration to the `pod-failure.yaml` file.
 
-    In the following example, Chaos Mesh injects `pod-kill` into the specified Pod and kills the Pod once.
+    In the following example, Chaos Mesh injects `pod-failure` into the specified Pod and kills the Pod once.
 
     ```yaml
     apiVersion: chaos-mesh.org/v1alpha1
@@ -119,8 +119,8 @@ This section introduces the YAML configuration file examples. You can view the Y
       generateName: pod-chaos-
       namespace: default
     spec:
-      action: pod-kill
-      duration: 10s
+      action: pod-failure
+      duration: 30s
       mode: fixed-percent
       selector:
         namespaces:
@@ -133,14 +133,14 @@ This section introduces the YAML configuration file examples. You can view the Y
 2. Run `kubectl` to start an experiment.
 
    ```bash
-   kubectl apply -f ./pod-kill.yaml
+   kubectl apply -f ./pod-failure.yaml
    ```
 
 ### Container-kill example
 
-1. Write the experiment configuration to the `pod-kill.yaml` file.
+1. Write the experiment configuration to the `container-kill.yaml` file.
 
-    In the following example, Chaos Mesh injects `pod-kill` into the specified Pod and kills the Pod once.
+    In the following example, Chaos Mesh injects `container-kill` into the specified Pod and kills the Pod once.
 
     ```yaml
     apiVersion: chaos-mesh.org/v1alpha1
@@ -150,7 +150,7 @@ This section introduces the YAML configuration file examples. You can view the Y
       generateName: pod-chaos-
       namespace: default
     spec:
-      action: pod-kill
+      action: container-kill
       duration: 10s
       mode: fixed-percent
       selector:
@@ -164,7 +164,7 @@ This section introduces the YAML configuration file examples. You can view the Y
 2. Run `kubectl` to start an experiment.
 
    ```bash
-   kubectl apply -f ./pod-kill.yaml
+   kubectl apply -f ./container-kill.yaml
    ```
 
 ### Field description

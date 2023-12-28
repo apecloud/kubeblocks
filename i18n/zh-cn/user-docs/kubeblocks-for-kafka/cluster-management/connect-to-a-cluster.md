@@ -264,7 +264,7 @@ import TabItem from '@theme/TabItem';
 
        ```bash
        vi /etc/hosts
-       # 最下方添加,注意将{clusterName}和ip地址替换成真实的值：
+       # 最下方添加,注意将 {clusterName} 和 IP 地址替换成真实的值：
        52.83.xx.xx {clusterName}-broker-0.{clusterName}-broker-headless.default.svc
        ```
 

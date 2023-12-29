@@ -54,10 +54,8 @@ type BackupPolicy struct {
 
 	// componentDef references componentDefinition. Need to
 	// comply with IANA Service Naming rule.
-	// +kubebuilder:validation:MaxLength=22
-	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	// +optional
-	ComponentDef string `json:"componentDef,omitempty"`
+	ComponentDefs []string `json:"componentDefs,omitempty"`
 
 	// target instance for backup.
 	// +optional
@@ -102,11 +100,15 @@ type EnvMappingVar struct {
 
 type ValueFrom struct {
 	// mapped ClusterVersionRef to env value.
-	// +kubebuilder:validation:Required
-	ClusterVersionRef []ClusterVersionMapping `json:"clusterVersionRef"`
+	// +optional
+	ClusterVersionRef []ValueMapping `json:"clusterVersionRef,omitempty"`
+
+	// mapped ComponentDefinition to env value.
+	// +optional
+	ComponentDef []ValueMapping `json:"componentDef,omitempty"`
 }
 
-type ClusterVersionMapping struct {
+type ValueMapping struct {
 	// the array of ClusterVersion name which can be mapped to the env value.
 	// +kubebuilder:validation:Required
 	Names []string `json:"names"`

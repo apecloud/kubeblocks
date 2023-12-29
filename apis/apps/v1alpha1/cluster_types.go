@@ -71,7 +71,7 @@ type ClusterSpec struct {
 	// services defines the services to access a cluster.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
-	Services []Service `json:"services,omitempty"`
+	Services []ClusterService `json:"services,omitempty"`
 
 	// affinity is a group of affinity scheduling rules.
 	// +optional
@@ -304,6 +304,10 @@ type ClusterComponentSpec struct {
 	// +optional
 	ComponentDef string `json:"componentDef,omitempty"`
 
+	// componentDefFeatureGate defines the feature gate of ComponentDefinition.
+	// +optional
+	ComponentDefFeatureGate *ComponentDefFeatureGate `json:"componentDefFeatureGate,omitempty"`
+
 	// classDefRef references the class defined in ComponentClassDefinition.
 	// +optional
 	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
@@ -411,6 +415,25 @@ type ClusterComponentSpec struct {
 	// If the RsmTransformPolicy is specified as ToPod,the list of instances will be used.
 	// +optional
 	Instances []string `json:"instances,omitempty"`
+}
+
+type ComponentDefFeatureGate struct {
+	// nodePort defines the feature gate of NodePort Service defined in ComponentDefinition.Spec.Services.
+	// If NodePort is set to true, then all services of type NodePort defined in ComponentDefinition will be created; otherwise, they will be ignored.
+	// +kubebuilder:default=false
+	// +optional
+	NodePort bool `json:"nodePort,omitempty"`
+
+	// podOrdinalService defines the feature gate of PodOrdinal Service defined in ComponentDefinition.Spec.Services.
+	// If PodOrdinalService is set to true, then all Services defined in the ComponentDefinition with the GeneratePodOrdinalService attribute set to true will be created; otherwise, they will be ignored.
+	// This can generate a corresponding Service for each Pod, which can be used in certain specific scenarios: for example, creating a dedicated access service for each read-only Pod.
+	// +kubebuilder:default=false
+	PodOrdinalService bool `json:"podOrdinalService,omitempty"`
+
+	// hostNetwork defines the feature gate of HostNetwork defined in PodSpec.
+	// +kubebuilder:default=false
+	// +optional
+	HostNetWork bool `json:"hostNetwork,omitempty"`
 }
 
 // GetMinAvailable wraps the 'prefer' value return. As for component replicaCount <= 1, it will return 0,

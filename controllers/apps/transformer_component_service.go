@@ -51,26 +51,97 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
+	cluster := transCtx.Cluster
 	synthesizeComp := transCtx.SynthesizeComponent
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for _, service := range synthesizeComp.ComponentServices {
 		// component controller does not handle the default headless service; the default headless service is managed by the RSM.
-		if t.isDefaultHeadlessSvc(synthesizeComp, &service) {
+		if t.skipDefaultHeadlessSvc(synthesizeComp, &service) {
 			continue
 		}
-		svc, err := t.buildService(transCtx.Component, synthesizeComp, &service)
+		// component controller does not handle the nodeport service if the feature gate is not enabled.
+		if t.skipNodePortService(synthesizeComp, &service) {
+			continue
+		}
+		// component controller does not handle the pod ordinal service if the feature gate is not enabled.
+		if t.skipPodOrdinalService(synthesizeComp, &service) {
+			continue
+		}
+
+		genServices, err := t.genMultiServicesIfNeed(cluster, synthesizeComp, &service)
 		if err != nil {
 			return err
 		}
-		if err = createOrUpdateService(ctx, dag, graphCli, svc); err != nil {
-			return err
+		for _, genService := range genServices {
+			svc, err := t.buildService(transCtx.Component, synthesizeComp, genService)
+			if err != nil {
+				return err
+			}
+			if err = createOrUpdateService(ctx, dag, graphCli, svc); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
+func (t *componentServiceTransformer) genMultiServicesIfNeed(cluster *appsv1alpha1.Cluster,
+	synthesizeComp *component.SynthesizedComponent, compService *appsv1alpha1.ComponentService) ([]*appsv1alpha1.ComponentService, error) {
+	if !compService.GeneratePodOrdinalService {
+		serviceName := constant.GenerateClusterServiceName(cluster.Name, compService.ServiceName)
+		compService.ServiceName = serviceName
+		return []*appsv1alpha1.ComponentService{compService}, nil
+	}
+
+	podOrdinalServices := make([]*appsv1alpha1.ComponentService, 0, synthesizeComp.Replicas)
+	for i := int32(0); i < synthesizeComp.Replicas; i++ {
+		svc := compService.DeepCopy()
+		svc.Name = fmt.Sprintf("%s-%d", compService.Name, i)
+		serviceNamePrefix := constant.GenerateClusterComponentName(cluster.Name, synthesizeComp.Name)
+		if len(compService.ServiceName) == 0 {
+			svc.ServiceName = fmt.Sprintf("%s-%d", serviceNamePrefix, i)
+		} else {
+			svc.ServiceName = fmt.Sprintf("%s-%s-%d", serviceNamePrefix, compService.ServiceName, i)
+		}
+		if svc.Spec.Selector == nil {
+			svc.Spec.Selector = make(map[string]string)
+		}
+		// TODO(xingran): use StatefulSet's podName as default selector to select unique pod
+		svc.Spec.Selector[constant.StatefulSetPodNameLabelKey] = constant.GeneratePodName(cluster.Name, synthesizeComp.Name, int(i))
+		podOrdinalServices = append(podOrdinalServices, svc)
+	}
+
+	return podOrdinalServices, nil
+}
+
+func (t *componentServiceTransformer) skipNodePortService(synthesizeComp *component.SynthesizedComponent, compService *appsv1alpha1.ComponentService) bool {
+	if compService == nil {
+		return true
+	}
+	if compService.Spec.Type != corev1.ServiceTypeNodePort {
+		return false
+	}
+	if synthesizeComp.ComponentDefFeatureGate == nil || !synthesizeComp.ComponentDefFeatureGate.NodePort {
+		return true
+	}
+	return false
+}
+
+func (t *componentServiceTransformer) skipPodOrdinalService(synthesizeComp *component.SynthesizedComponent, compService *appsv1alpha1.ComponentService) bool {
+	if compService == nil {
+		return true
+	}
+	if !compService.GeneratePodOrdinalService {
+		return false
+	}
+	if synthesizeComp.ComponentDefFeatureGate == nil || !synthesizeComp.ComponentDefFeatureGate.PodOrdinalService {
+		return true
+	}
+	return false
+}
+
 func (t *componentServiceTransformer) buildService(comp *appsv1alpha1.Component,
-	synthesizeComp *component.SynthesizedComponent, service *appsv1alpha1.Service) (*corev1.Service, error) {
+	synthesizeComp *component.SynthesizedComponent, service *appsv1alpha1.ComponentService) (*corev1.Service, error) {
 	var (
 		namespace   = synthesizeComp.Namespace
 		clusterName = synthesizeComp.ClusterName
@@ -120,7 +191,7 @@ func (t *componentServiceTransformer) checkRoleSelector(synthesizeComp *componen
 	return nil
 }
 
-func (t *componentServiceTransformer) isDefaultHeadlessSvc(synthesizeComp *component.SynthesizedComponent, service *appsv1alpha1.Service) bool {
+func (t *componentServiceTransformer) skipDefaultHeadlessSvc(synthesizeComp *component.SynthesizedComponent, service *appsv1alpha1.ComponentService) bool {
 	svcName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, service.ServiceName)
 	defaultHeadlessSvcName := constant.GenerateDefaultComponentHeadlessServiceName(synthesizeComp.ClusterName, synthesizeComp.Name)
 	return svcName == defaultHeadlessSvcName

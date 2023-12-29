@@ -11490,25 +11490,16 @@ spec:
                       description: 'If ServiceType is LoadBalancer, cloud provider
                         related parameters can be put here More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.'
                       type: object
-                    componentSelector:
-                      description: ComponentSelector extends the ServiceSpec.Selector
-                        by allowing you to specify a component as selectors for the
-                        service. For component-level services, a default component
-                        selector with the component name will be added automatically.
-                        if GeneratePodOrdinalService sets to true, ComponentSelector
-                        must be specified.
-                      type: string
                     generatePodOrdinalService:
                       default: false
                       description: 'GeneratePodOrdinalService indicates whether to
                         create a corresponding Service for each Pod of the selected
                         Component. If sets to true, a set of Service will be automatically
-                        generated for each Pod. and ComponentSelector must be specified.
-                        They can be referred to by adding the PodOrdinal to the defined
-                        ServiceName with named pattern <Service.ServiceName>-<PodOrdinal>.
-                        For example, a Service might be defined as follows: - name:
-                        my-service serviceName: my-service generatePodOrdinalService:
-                        true componentSelector: my-component spec: type: NodePort
+                        generated for each Pod. They can be referred to by adding
+                        the PodOrdinal to the defined ServiceName with named pattern
+                        <Service.ServiceName>-<PodOrdinal>. For example, a Service
+                        might be defined as follows: - name: my-service serviceName:
+                        my-service generatePodOrdinalService: true spec: type: NodePort
                         ports: - name: http port: 80 targetPort: 8080 Assuming that
                         the Component has 3 replicas, then three services would be
                         generated: my-service-0, my-service-1, and my-service-2, each
@@ -11538,9 +11529,9 @@ spec:
                         default service name with different patterns will be used:
                         - <CLUSTER_NAME>: for cluster-level services - <CLUSTER_NAME>-<COMPONENT_NAME>:
                         for component-level services - <CLUSTER_NAME>-<COMPONENT_NAME>-<POD_ORDINAL>:
-                        for pod-level services when GeneratePodOrdinalService set
-                        to true Only one default service name is allowed. Cannot be
-                        updated.'
+                        for component-level services when GeneratePodOrdinalService
+                        set to true Only one default service name is allowed. Cannot
+                        be updated.'
                       type: string
                     spec:
                       description: Spec defines the behavior of a service. https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status

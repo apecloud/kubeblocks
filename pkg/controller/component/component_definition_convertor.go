@@ -188,18 +188,22 @@ func (c *compDefServicesConvertor) convert(args ...any) (any, error) {
 	}
 	headlessSvc := c.removeDuplicatePorts(headlessSvcBuilder.GetObject())
 
-	services := []appsv1alpha1.Service{
+	services := []appsv1alpha1.ComponentService{
 		{
-			Name:         "default",
-			ServiceName:  "",
-			Spec:         svc.Spec,
-			RoleSelector: c.roleSelector(clusterCompDef),
+			Service: appsv1alpha1.Service{
+				Name:         "default",
+				ServiceName:  "",
+				Spec:         svc.Spec,
+				RoleSelector: c.roleSelector(clusterCompDef),
+			},
 		},
 		{
-			Name:         "headless",
-			ServiceName:  "headless",
-			Spec:         headlessSvc.Spec,
-			RoleSelector: c.roleSelector(clusterCompDef),
+			Service: appsv1alpha1.Service{
+				Name:         "headless",
+				ServiceName:  "headless",
+				Spec:         headlessSvc.Spec,
+				RoleSelector: c.roleSelector(clusterCompDef),
+			},
 		},
 	}
 	return services, nil

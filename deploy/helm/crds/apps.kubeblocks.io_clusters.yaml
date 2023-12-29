@@ -238,6 +238,36 @@ spec:
                       x-kubernetes-validations:
                       - message: componentDef is immutable
                         rule: self == oldSelf
+                    componentDefFeatureGate:
+                      description: componentDefFeatureGate defines the feature gate
+                        of ComponentDefinition.
+                      properties:
+                        hostNetwork:
+                          default: false
+                          description: hostNetwork defines the feature gate of HostNetwork
+                            defined in PodSpec.
+                          type: boolean
+                        nodePort:
+                          default: false
+                          description: nodePort defines the feature gate of NodePort
+                            Service defined in ComponentDefinition.Spec.Services.
+                            If NodePort is set to true, then all services of type
+                            NodePort defined in ComponentDefinition will be created;
+                            otherwise, they will be ignored.
+                          type: boolean
+                        podOrdinalService:
+                          default: false
+                          description: 'podOrdinalService defines the feature gate
+                            of PodOrdinal Service defined in ComponentDefinition.Spec.Services.
+                            If PodOrdinalService is set to true, then all Services
+                            defined in the ComponentDefinition with the GeneratePodOrdinalService
+                            attribute set to true will be created; otherwise, they
+                            will be ignored. This can generate a corresponding Service
+                            for each Pod, which can be used in certain specific scenarios:
+                            for example, creating a dedicated access service for each
+                            read-only Pod.'
+                          type: boolean
+                      type: object
                     componentDefRef:
                       description: componentDefRef references componentDef defined
                         in ClusterDefinition spec. Need to comply with IANA Service
@@ -1011,27 +1041,8 @@ spec:
                     componentSelector:
                       description: ComponentSelector extends the ServiceSpec.Selector
                         by allowing you to specify a component as selectors for the
-                        service. For component-level services, a default component
-                        selector with the component name will be added automatically.
-                        if GeneratePodOrdinalService sets to true, ComponentSelector
-                        must be specified.
+                        service.
                       type: string
-                    generatePodOrdinalService:
-                      default: false
-                      description: 'GeneratePodOrdinalService indicates whether to
-                        create a corresponding Service for each Pod of the selected
-                        Component. If sets to true, a set of Service will be automatically
-                        generated for each Pod. and ComponentSelector must be specified.
-                        They can be referred to by adding the PodOrdinal to the defined
-                        ServiceName with named pattern <Service.ServiceName>-<PodOrdinal>.
-                        For example, a Service might be defined as follows: - name:
-                        my-service serviceName: my-service generatePodOrdinalService:
-                        true componentSelector: my-component spec: type: NodePort
-                        ports: - name: http port: 80 targetPort: 8080 Assuming that
-                        the Component has 3 replicas, then three services would be
-                        generated: my-service-0, my-service-1, and my-service-2, each
-                        pointing to its respective Pod.'
-                      type: boolean
                     name:
                       description: Name defines the name or namePrefix of the service.
                         if GeneratePodOrdinalService sets to true, the Name indicates
@@ -1056,9 +1067,9 @@ spec:
                         default service name with different patterns will be used:
                         - <CLUSTER_NAME>: for cluster-level services - <CLUSTER_NAME>-<COMPONENT_NAME>:
                         for component-level services - <CLUSTER_NAME>-<COMPONENT_NAME>-<POD_ORDINAL>:
-                        for pod-level services when GeneratePodOrdinalService set
-                        to true Only one default service name is allowed. Cannot be
-                        updated.'
+                        for component-level services when GeneratePodOrdinalService
+                        set to true Only one default service name is allowed. Cannot
+                        be updated.'
                       type: string
                     spec:
                       description: Spec defines the behavior of a service. https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status

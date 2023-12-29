@@ -88,7 +88,7 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 func (t *componentServiceTransformer) genMultiServicesIfNeed(cluster *appsv1alpha1.Cluster,
 	synthesizeComp *component.SynthesizedComponent, compService *appsv1alpha1.ComponentService) ([]*appsv1alpha1.ComponentService, error) {
 	if !compService.GeneratePodOrdinalService {
-		serviceName := constant.GenerateClusterServiceName(cluster.Name, compService.ServiceName)
+		serviceName := constant.GenerateComponentServiceName(cluster.Name, synthesizeComp.Name, compService.ServiceName)
 		compService.ServiceName = serviceName
 		return []*appsv1alpha1.ComponentService{compService}, nil
 	}
@@ -148,15 +148,14 @@ func (t *componentServiceTransformer) buildService(comp *appsv1alpha1.Component,
 		compName    = synthesizeComp.Name
 	)
 
-	serviceName := constant.GenerateComponentServiceName(clusterName, synthesizeComp.Name, service.ServiceName)
 	labels := constant.GetComponentWellKnownLabels(clusterName, compName)
-	builder := builder.NewServiceBuilder(namespace, serviceName).
+	builder := builder.NewServiceBuilder(namespace, service.ServiceName).
 		AddLabelsInMap(labels).
 		SetSpec(&service.Spec).
 		AddSelectorsInMap(t.builtinSelector(comp)).
 		Optimize4ExternalTraffic()
 
-	if len(service.RoleSelector) > 0 {
+	if len(service.RoleSelector) > 0 && !service.GeneratePodOrdinalService {
 		if err := t.checkRoleSelector(synthesizeComp, service.Name, service.RoleSelector); err != nil {
 			return nil, err
 		}

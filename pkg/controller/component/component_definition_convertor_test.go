@@ -431,7 +431,7 @@ var _ = Describe("Component Definition Convertor", func() {
 				res, err := convertor.convert(clusterCompDef, clusterName)
 				Expect(err).Should(Succeed())
 
-				services, ok := res.([]appsv1alpha1.Service)
+				services, ok := res.([]appsv1alpha1.ComponentService)
 				Expect(ok).Should(BeTrue())
 				Expect(services).Should(HaveLen(2))
 

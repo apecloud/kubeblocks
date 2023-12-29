@@ -140,3 +140,8 @@ func (builder *ComponentBuilder) SetUpdateStrategy(updateStrategy *appsv1alpha1.
 	builder.get().Spec.UpdateStrategy = updateStrategy
 	return builder
 }
+
+func (builder *ComponentBuilder) SetCompDefFeatureGate(compDefFeatureGate *appsv1alpha1.ComponentDefFeatureGate) *ComponentBuilder {
+	builder.get().Spec.ComponentDefFeatureGate = compDefFeatureGate
+	return builder
+}

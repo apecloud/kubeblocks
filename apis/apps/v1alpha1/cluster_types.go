@@ -429,11 +429,6 @@ type ComponentDefFeatureGate struct {
 	// This can generate a corresponding Service for each Pod, which can be used in certain specific scenarios: for example, creating a dedicated access service for each read-only Pod.
 	// +kubebuilder:default=false
 	PodOrdinalService bool `json:"podOrdinalService,omitempty"`
-
-	// hostNetwork defines the feature gate of HostNetwork defined in PodSpec.
-	// +kubebuilder:default=false
-	// +optional
-	HostNetWork bool `json:"hostNetwork,omitempty"`
 }
 
 // GetMinAvailable wraps the 'prefer' value return. As for component replicaCount <= 1, it will return 0,

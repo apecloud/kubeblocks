@@ -242,11 +242,6 @@ spec:
                       description: componentDefFeatureGate defines the feature gate
                         of ComponentDefinition.
                       properties:
-                        hostNetwork:
-                          default: false
-                          description: hostNetwork defines the feature gate of HostNetwork
-                            defined in PodSpec.
-                          type: boolean
                         nodePort:
                           default: false
                           description: nodePort defines the feature gate of NodePort
@@ -1044,10 +1039,7 @@ spec:
                         service.
                       type: string
                     name:
-                      description: Name defines the name or namePrefix of the service.
-                        if GeneratePodOrdinalService sets to true, the Name indicates
-                        the namePrefix of the service and the fullName will be generated
-                        with named pattern <Service.Name>-<PodOrdinal>. otherwise,
+                      description: Name defines the name of the service. otherwise,
                         it indicates the name of the service. Others can refer to
                         this service by its name. (e.g., connection credential) Cannot
                         be updated.
@@ -1059,13 +1051,10 @@ spec:
                         be ignored.
                       type: string
                     serviceName:
-                      description: 'ServiceName defines the name or namePrefix of
-                        the underlying service object. if GeneratePodOrdinalService
-                        sets to true, the ServiceName indicates the namePrefix of
-                        the underlying service object. otherwise, it indicates the
-                        name of the underlying service object. If not specified, the
-                        default service name with different patterns will be used:
-                        - <CLUSTER_NAME>: for cluster-level services - <CLUSTER_NAME>-<COMPONENT_NAME>:
+                      description: 'ServiceName defines the name of the underlying
+                        service object. If not specified, the default service name
+                        with different patterns will be used: - <CLUSTER_NAME>: for
+                        cluster-level services - <CLUSTER_NAME>-<COMPONENT_NAME>:
                         for component-level services - <CLUSTER_NAME>-<COMPONENT_NAME>-<POD_ORDINAL>:
                         for component-level services when GeneratePodOrdinalService
                         set to true Only one default service name is allowed. Cannot

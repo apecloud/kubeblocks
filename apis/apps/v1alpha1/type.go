@@ -604,6 +604,7 @@ type ComponentService struct {
 	// GeneratePodOrdinalService indicates whether to create a corresponding Service for each Pod of the selected Component.
 	// If sets to true, a set of Service will be automatically generated for each Pod.
 	// They can be referred to by adding the PodOrdinal to the defined ServiceName with named pattern <Service.ServiceName>-<PodOrdinal>.
+	// And the Service.Name will also be generated with named pattern <Service.Name>-<PodOrdinal>.
 	// For example, a Service might be defined as follows:
 	// - name: my-service
 	//   serviceName: my-service
@@ -621,16 +622,14 @@ type ComponentService struct {
 }
 
 type Service struct {
-	// Name defines the name or namePrefix of the service.
-	// if GeneratePodOrdinalService sets to true, the Name indicates the namePrefix of the service and the fullName will be generated with named pattern <Service.Name>-<PodOrdinal>.
+	// Name defines the name of the service.
 	// otherwise, it indicates the name of the service.
 	// Others can refer to this service by its name. (e.g., connection credential)
 	// Cannot be updated.
 	// +required
 	Name string `json:"name"`
 
-	// ServiceName defines the name or namePrefix of the underlying service object.
-	// if GeneratePodOrdinalService sets to true, the ServiceName indicates the namePrefix of the underlying service object. otherwise, it indicates the name of the underlying service object.
+	// ServiceName defines the name of the underlying service object.
 	// If not specified, the default service name with different patterns will be used:
 	//  - <CLUSTER_NAME>: for cluster-level services
 	//  - <CLUSTER_NAME>-<COMPONENT_NAME>: for component-level services

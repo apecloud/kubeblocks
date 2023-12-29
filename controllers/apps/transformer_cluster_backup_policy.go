@@ -573,10 +573,6 @@ func buildBackupPathPrefix(cluster *appsv1alpha1.Cluster, compName string) strin
 	return fmt.Sprintf("/%s-%s/%s", cluster.Name, cluster.UID, compName)
 }
 
-func workloadHasRoleLabel(workloadType appsv1alpha1.WorkloadType) bool {
-	return slices.Contains([]appsv1alpha1.WorkloadType{appsv1alpha1.Replication, appsv1alpha1.Consensus}, workloadType)
-}
-
 func mergeSchedulePolicy(src *dpv1alpha1.SchedulePolicy, dst *dpv1alpha1.SchedulePolicy) {
 	if src.Enabled != nil {
 		dst.Enabled = src.Enabled

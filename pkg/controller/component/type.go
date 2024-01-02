@@ -82,6 +82,7 @@ type SynthesizedComponent struct {
 	VolumeTypes      []v1alpha1.VolumeTypeSpec         `json:"volumeTypes,omitempty"`      // The VolumeTypes will be replaced with Volumes in the future.
 	VolumeProtection *v1alpha1.VolumeProtectionSpec    `json:"volumeProtection,omitempty"` // The VolumeProtection will be replaced with Volumes in the future.
 	Services         []corev1.Service                  `json:"services,omitempty"`         // The Services will be replaced with ComponentServices in the future.
+	TLS              bool                              `json:"tls"`                        // The TLS will be replaced with TLSConfig in the future.
 
 	// TODO(xingran): The following fields will be deprecated after KubeBlocks version 0.8.0
 	ClusterDefName        string                          `json:"clusterDefName,omitempty"`     // the name of the clusterDefinition

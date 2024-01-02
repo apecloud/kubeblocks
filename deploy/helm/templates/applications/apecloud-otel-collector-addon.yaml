@@ -4,7 +4,8 @@ metadata:
   name: apecloud-otel-collector
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
-    "kubeblocks.io/provider": apecloud
+    "addon.kubeblocks.io/provider": apecloud
+    "addon.kubeblocks.io/version": "0.1.2-beta.3"
   {{- if .Values.keepAddons }}
   annotations:
     helm.sh/resource-policy: keep

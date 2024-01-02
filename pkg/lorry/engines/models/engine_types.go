@@ -37,5 +37,6 @@ const (
 	FoxLake            EngineType = "foxlake"
 	Oceanbase          EngineType = "oceanbase"
 	Oracle             EngineType = "oracle"
+	OpenGauss          EngineType = "opengauss"
 	Custom             EngineType = "custom"
 )

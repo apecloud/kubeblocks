@@ -40,6 +40,7 @@ type SynthesizedComponent struct {
 	Namespace            string                                 `json:"namespace,omitempty"`
 	ClusterName          string                                 `json:"clusterName,omitempty"`
 	ClusterUID           string                                 `json:"clusterUID,omitempty"`
+	ClusterGeneration    string                                 `json:"clusterGeneration,omitempty"`
 	Comp2CompDefs        map[string]string                      `json:"comp2CompDefs,omitempty"` // {compName: compDefName}
 	Name                 string                                 `json:"name,omitempty"`          // the name of the component without clusterName prefix
 	FullCompName         string                                 `json:"fullCompName,omitempty"`  // the full name of the component with clusterName prefix

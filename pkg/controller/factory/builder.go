@@ -52,28 +52,35 @@ import (
 
 // BuildRSM builds a ReplicatedStateMachine object based on Cluster, SynthesizedComponent.
 func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
-	labels := constant.GetKBWellKnownLabelsWithCompDef(synthesizedComp.CompDefName, cluster.Name, synthesizedComp.Name)
-	if len(synthesizedComp.ClusterDefName) > 0 {
+	var (
+		clusterDefName = synthesizedComp.ClusterDefName
+		compDefName    = synthesizedComp.CompDefName
+		namespace      = synthesizedComp.Namespace
+		clusterName    = synthesizedComp.ClusterName
+		compName       = synthesizedComp.Name
+	)
+	labels := constant.GetKBWellKnownLabelsWithCompDef(compDefName, clusterName, compName)
+	if len(clusterDefName) > 0 {
 		// TODO(xingran): for backward compatibility in kubeBlocks version 0.8.0, it will be removed in the future.
-		labels = constant.GetKBWellKnownLabels(synthesizedComp.ClusterDefName, cluster.Name, synthesizedComp.Name)
+		labels = constant.GetKBWellKnownLabels(clusterDefName, clusterName, compName)
 	}
 
 	// TODO(xingran): Need to review how to set pod labels based on the new ComponentDefinition API. workloadType label has been removed.
 	podBuilder := builder.NewPodBuilder("", "").
 		AddLabelsInMap(labels).
-		AddLabelsInMap(constant.GetComponentDefLabel(synthesizedComp.CompDefName)).
-		AddLabelsInMap(constant.GetAppVersionLabel(synthesizedComp.CompDefName))
+		AddLabelsInMap(constant.GetComponentDefLabel(compDefName)).
+		AddLabelsInMap(constant.GetAppVersionLabel(compDefName))
 	template := corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
 		Spec:       *synthesizedComp.PodSpec.DeepCopy(),
 	}
 
-	rsmName := constant.GenerateRSMNamePattern(cluster.Name, synthesizedComp.Name)
-	rsmBuilder := builder.NewReplicatedStateMachineBuilder(cluster.Namespace, rsmName).
-		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
+	rsmName := constant.GenerateRSMNamePattern(clusterName, compName)
+	rsmBuilder := builder.NewReplicatedStateMachineBuilder(namespace, rsmName).
+		AddAnnotations(constant.KubeBlocksGenerationKey, synthesizedComp.ClusterGeneration).
 		AddAnnotationsInMap(getMonitorAnnotations(synthesizedComp)).
 		AddLabelsInMap(labels).
-		AddLabelsInMap(constant.GetComponentDefLabel(synthesizedComp.CompDefName)).
+		AddLabelsInMap(constant.GetComponentDefLabel(compDefName)).
 		AddMatchLabelsInMap(labels).
 		SetServiceName(constant.GenerateRSMServiceNamePattern(rsmName)).
 		SetReplicas(synthesizedComp.Replicas).
@@ -92,7 +99,7 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synthesi
 	}
 
 	// convert componentDef attributes to rsm attributes. including service, credential, roles, roleProbe, membershipReconfiguration, memberUpdateStrategy, etc.
-	rsmObj, err := component.BuildRSMFrom(cluster, synthesizedComp, rsmBuilder.GetObject())
+	rsmObj, err := component.BuildRSMFrom(synthesizedComp, rsmBuilder.GetObject())
 	if err != nil {
 		return nil, err
 	}

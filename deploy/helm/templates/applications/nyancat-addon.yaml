@@ -4,7 +4,8 @@ metadata:
   name: nyancat
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
-    "kubeblocks.io/provider": apecloud
+    "addon.kubeblocks.io/provider": apecloud
+    "addon.kubeblocks.io/version": "0.7.0"
   {{- if .Values.keepAddons }}
   annotations:
     helm.sh/resource-policy: keep

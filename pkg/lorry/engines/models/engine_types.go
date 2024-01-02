@@ -36,5 +36,6 @@ const (
 	PulsarProxy        EngineType = "pulsar-proxy"
 	FoxLake            EngineType = "foxlake"
 	Oceanbase          EngineType = "oceanbase"
+	OpenGauss          EngineType = "opengauss"
 	Custom             EngineType = "custom"
 )

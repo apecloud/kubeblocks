@@ -259,6 +259,10 @@ func createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG, graphCli 
 func resolveServiceDefaultFields(obj, objCopy *corev1.ServiceSpec) {
 	// TODO: how about the order changed?
 	for i, port := range objCopy.Ports {
+		// if the service type is NodePort or LoadBalancer, and the nodeport is not set, we should use the nodeport of the exist service
+		if (objCopy.Type == corev1.ServiceTypeNodePort || objCopy.Type == corev1.ServiceTypeLoadBalancer) && port.NodePort == 0 && obj.Ports[i].NodePort != 0 {
+			objCopy.Ports[i].NodePort = obj.Ports[i].NodePort
+		}
 		if port.TargetPort.IntVal != 0 {
 			continue
 		}
@@ -273,6 +277,9 @@ func resolveServiceDefaultFields(obj, objCopy *corev1.ServiceSpec) {
 	if len(objCopy.ClusterIPs) == 0 {
 		objCopy.ClusterIPs = obj.ClusterIPs
 	}
+	if len(objCopy.Type) == 0 {
+		objCopy.Type = obj.Type
+	}
 	if len(objCopy.SessionAffinity) == 0 {
 		objCopy.SessionAffinity = obj.SessionAffinity
 	}
@@ -284,6 +291,9 @@ func resolveServiceDefaultFields(obj, objCopy *corev1.ServiceSpec) {
 	}
 	if objCopy.InternalTrafficPolicy == nil {
 		objCopy.InternalTrafficPolicy = obj.InternalTrafficPolicy
+	}
+	if objCopy.ExternalTrafficPolicy == "" && obj.ExternalTrafficPolicy != "" {
+		objCopy.ExternalTrafficPolicy = obj.ExternalTrafficPolicy
 	}
 }
 

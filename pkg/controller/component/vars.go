@@ -542,18 +542,15 @@ func resolveServiceNodePortRef(ctx context.Context, cli client.Reader, synthesiz
 			return nil, nil
 		}
 		for _, svcPort := range svc.Spec.Ports {
+			if svcPort.NodePort == 0 {
+				continue
+			}
 			if svcPort.Name == selector.NodePort.Name {
 				return &corev1.EnvVar{
 					Name:  defineKey,
 					Value: strconv.Itoa(int(svcPort.NodePort)),
 				}, nil
 			}
-		}
-		if len(svc.Spec.Ports) == 1 && (len(svc.Spec.Ports[0].Name) == 0 || len(selector.Port.Name) == 0) {
-			return &corev1.EnvVar{
-				Name:  defineKey,
-				Value: strconv.Itoa(int(svc.Spec.Ports[0].NodePort)),
-			}, nil
 		}
 		return nil, nil
 	}

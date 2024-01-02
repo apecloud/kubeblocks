@@ -66,18 +66,24 @@ var _ = Describe("Lorry Utils", func() {
 					}},
 				},
 			})
-			component.ConsensusSpec = &appsv1alpha1.ConsensusSetSpec{
-				Leader: appsv1alpha1.ConsensusMember{
-					Name:       "leader",
-					AccessMode: appsv1alpha1.ReadWrite,
+			component.Roles = []appsv1alpha1.ReplicaRole{
+				{
+					Name:        "leader",
+					Serviceable: true,
+					Writable:    true,
+					Votable:     true,
 				},
-				Followers: []appsv1alpha1.ConsensusMember{{
-					Name:       "follower",
-					AccessMode: appsv1alpha1.Readonly,
-				}},
-				Learner: &appsv1alpha1.ConsensusMember{
-					Name:       "learner",
-					AccessMode: appsv1alpha1.Readonly,
+				{
+					Name:        "follower",
+					Serviceable: true,
+					Writable:    false,
+					Votable:     true,
+				},
+				{
+					Name:        "learner",
+					Serviceable: true,
+					Writable:    false,
+					Votable:     false,
 				},
 			}
 			component.Probes = &appsv1alpha1.ClusterDefinitionProbes{

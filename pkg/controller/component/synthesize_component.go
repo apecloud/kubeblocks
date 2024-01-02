@@ -392,11 +392,6 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 		synthesizeComp.WorkloadType = clusterCompDef.WorkloadType
 		synthesizeComp.CharacterType = clusterCompDef.CharacterType
 		synthesizeComp.HorizontalScalePolicy = clusterCompDef.HorizontalScalePolicy
-		synthesizeComp.StatelessSpec = clusterCompDef.StatelessSpec
-		synthesizeComp.StatefulSpec = clusterCompDef.StatefulSpec
-		synthesizeComp.ConsensusSpec = clusterCompDef.ConsensusSpec
-		synthesizeComp.ReplicationSpec = clusterCompDef.ReplicationSpec
-		synthesizeComp.RSMSpec = clusterCompDef.RSMSpec
 		synthesizeComp.StatefulSetWorkload = clusterCompDef.GetStatefulSetWorkload()
 		synthesizeComp.Probes = clusterCompDef.Probes
 		synthesizeComp.VolumeTypes = clusterCompDef.VolumeTypes
@@ -407,10 +402,6 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 		// All places relying on the `app.kubernetes.io/component` label need to be refactored.
 		if synthesizeComp.CompDefName == "" {
 			synthesizeComp.CompDefName = clusterCompDef.Name
-		}
-		// TLS is a backward compatible field, which is used in configuration rendering before version 0.8.0.
-		if synthesizeComp.TLSConfig != nil {
-			synthesizeComp.TLS = true
 		}
 	}
 

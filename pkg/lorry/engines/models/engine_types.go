@@ -36,5 +36,6 @@ const (
 	PulsarProxy        EngineType = "pulsar-proxy"
 	FoxLake            EngineType = "foxlake"
 	Oceanbase          EngineType = "oceanbase"
+	Oracle             EngineType = "oracle"
 	Custom             EngineType = "custom"
 )

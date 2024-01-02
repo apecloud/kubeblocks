@@ -11,7 +11,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -111,7 +110,6 @@ func updateLorrySpecAfterPortsChanged(synthesizeComp *component.SynthesizedCompo
 	if err := updateReadinessProbe(synthesizeComp, lorryHTTPPort); err != nil {
 		return err
 	}
-	updateEnv(synthesizeComp, lorryHTTPPort)
 	return nil
 }
 
@@ -162,18 +160,6 @@ func updateReadinessProbe(synthesizeComp *component.SynthesizedComponent, lorryH
 		}
 	}
 	return nil
-}
-
-func updateEnv(synthesizeComp *component.SynthesizedComponent, lorryHTTPPort int) {
-	for i := range synthesizeComp.PodSpec.Containers {
-		container := &synthesizeComp.PodSpec.Containers[i]
-		index := slices.IndexFunc(container.Env, func(env corev1.EnvVar) bool {
-			return env.Name == constant.KBEnvLorryHTTPPort
-		})
-		if index >= 0 {
-			container.Env[index].Value = strconv.Itoa(lorryHTTPPort)
-		}
-	}
 }
 
 func GetLorryContainer(containers []corev1.Container) *corev1.Container {

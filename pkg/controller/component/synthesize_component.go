@@ -397,7 +397,6 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 		synthesizeComp.ConsensusSpec = clusterCompDef.ConsensusSpec
 		synthesizeComp.ReplicationSpec = clusterCompDef.ReplicationSpec
 		synthesizeComp.RSMSpec = clusterCompDef.RSMSpec
-		synthesizeComp.StatefulSetWorkload = clusterCompDef.GetStatefulSetWorkload()
 		synthesizeComp.Probes = clusterCompDef.Probes
 		synthesizeComp.VolumeTypes = clusterCompDef.VolumeTypes
 		synthesizeComp.VolumeProtection = clusterCompDef.VolumeProtectionSpec

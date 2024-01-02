@@ -4,7 +4,8 @@ metadata:
   name: fault-chaos-mesh
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
-    "kubeblocks.io/provider": community
+    "addon.kubeblocks.io/provider": apecloud
+    "addon.kubeblocks.io/version": "2.5.2"
   {{- if .Values.keepAddons }}
   annotations:
     helm.sh/resource-policy: keep

@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/nebula"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/oceanbase"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/opengauss"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/oracle"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/polardbx"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/postgres"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/postgres/apecloudpostgres"
@@ -72,6 +73,7 @@ func init() {
 	RegisterEngine(models.PulsarProxy, "", nil, pulsar.NewProxyCommands)
 	RegisterEngine(models.PulsarBroker, "", nil, pulsar.NewBrokerCommands)
 	RegisterEngine(models.Oceanbase, "", oceanbase.NewManager, oceanbase.NewCommands)
+	RegisterEngine(models.Oracle, "", nil, oracle.NewCommands)
 	RegisterEngine(models.OpenGauss, "", nil, opengauss.NewCommands)
 
 	// support component definition without workloadType

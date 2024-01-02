@@ -791,7 +791,7 @@ func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string 
 	generateMemberEnv(prefixWithCompDefName)
 	envData[prefixWithCompDefName+"CLUSTER_UID"] = uid
 
-	lorryHTTPPort, err := controllerutil.GetLorryGRPCPortFromContainers(set.Spec.Template.Spec.Containers)
+	lorryHTTPPort, err := controllerutil.GetLorryHTTPPortFromContainers(set.Spec.Template.Spec.Containers)
 	if err == nil {
 		envData[constant.KBEnvLorryHTTPPort] = strconv.Itoa(int(lorryHTTPPort))
 

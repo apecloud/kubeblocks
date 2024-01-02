@@ -154,7 +154,6 @@ const (
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName             = "cluster.kubeblocks.io/finalizer"
 	DBComponentFinalizerName           = "component.kubeblocks.io/finalizer"
-	DBComponentDefinitionFinalizerName = "componentdefinition.kubeblocks.io/finalizer"
 	ConfigurationTemplateFinalizerName = "config.kubeblocks.io/finalizer"
 	ServiceDescriptorFinalizerName     = "servicedescriptor.kubeblocks.io/finalizer"
 	OpsRequestFinalizerName            = "opsrequest.kubeblocks.io/finalizer"

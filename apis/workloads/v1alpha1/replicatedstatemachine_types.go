@@ -413,6 +413,10 @@ type MemberStatus struct {
 	PodName string `json:"podName"`
 
 	ReplicaRole `json:"role"`
+
+	// Is it required for rsm to have at least one primary pod to be ready.
+	// +optional
+	ReadyWithoutPrimary bool `json:"readyWithoutPrimary"`
 }
 
 func init() {

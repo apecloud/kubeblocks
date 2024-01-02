@@ -87,6 +87,7 @@ const (
 	BackupProtectionLabelKey                 = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
 	AddonProviderLabelKey                    = "kubeblocks.io/provider"          // AddonProviderLabelKey marks the addon provider
 	RoleLabelKey                             = "kubeblocks.io/role"              // RoleLabelKey consensusSet and replicationSet role label key
+	ReadyWithoutPrimaryKey                   = "kubeblocks.io/ready-without-primary"
 	VolumeTypeLabelKey                       = "kubeblocks.io/volume-type"
 	ClusterAccountLabelKey                   = "account.kubeblocks.io/name"
 	KBAppClusterUIDLabelKey                  = "apps.kubeblocks.io/cluster-uid"

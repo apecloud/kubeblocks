@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 type RestoreOpsHandler struct{}
@@ -144,7 +145,8 @@ func restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 	}
 
 	// check if the backup is completed
-	if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
+	backupType := backup.Labels[dptypes.BackupTypeLabelKey]
+	if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted && backupType != string(dpv1alpha1.BackupTypeContinuous) {
 		return nil, fmt.Errorf("backup %s status is %s, only completed backup can be used to restore", backupName, backup.Status.Phase)
 	}
 

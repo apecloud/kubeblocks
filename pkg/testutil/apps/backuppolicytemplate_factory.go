@@ -105,7 +105,7 @@ func (f *MockBackupPolicyTemplateFactory) AddBackupMethod(name string,
 			{
 				Key: EnvKeyImageTag,
 				ValueFrom: appsv1alpha1.ValueFrom{
-					ClusterVersionRef: []appsv1alpha1.ClusterVersionMapping{
+					ClusterVersionRef: []appsv1alpha1.ValueMapping{
 						{
 							Names:        mappingEnvWithClusterVersion,
 							MappingValue: DefaultImageTag,

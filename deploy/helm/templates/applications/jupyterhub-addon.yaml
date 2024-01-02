@@ -4,7 +4,8 @@ metadata:
   name: jupyter-hub
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
-    "kubeblocks.io/provider": community
+    "addon.kubeblocks.io/provider": community
+    "addon.kubeblocks.io/version": "0.1.0"
   {{- if .Values.keepAddons }}
   annotations:
     helm.sh/resource-policy: keep

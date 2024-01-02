@@ -87,6 +87,8 @@ var _ = BeforeSuite(func() {
 		logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true), func(o *zap.Options) {
 			o.TimeEncoder = zapcore.ISO8601TimeEncoder
 		}))
+	} else {
+		logf.SetLogger(logr.New(logf.NullLogSink{}))
 	}
 
 	viper.SetDefault(constant.CfgKeyCtrlrReconcileRetryDurationMS, 10)

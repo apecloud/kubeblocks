@@ -22,6 +22,7 @@ package component
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -150,6 +151,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		Name:                    compName,
 		FullCompName:            comp.Name,
 		CompDefName:             compDef.Name,
+		ClusterGeneration:       clusterGeneration(cluster, comp),
 		PodSpec:                 &compDef.Spec.Runtime,
 		LogConfigs:              compDefObj.Spec.LogConfigs,
 		ConfigTemplates:         compDefObj.Spec.Configs,
@@ -223,6 +225,16 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForConnCredential(synthesizeComp.ClusterName))
 
 	return synthesizeComp, nil
+}
+
+func clusterGeneration(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) string {
+	if comp != nil && comp.Annotations != nil {
+		if generation, ok := comp.Annotations[constant.KubeBlocksGenerationKey]; ok {
+			return generation
+		}
+	}
+	// back-off to use cluster.Generation
+	return strconv.FormatInt(cluster.Generation, 10)
 }
 
 func buildComp2CompDefs(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) map[string]string {
@@ -386,7 +398,6 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 		synthesizeComp.ConsensusSpec = clusterCompDef.ConsensusSpec
 		synthesizeComp.ReplicationSpec = clusterCompDef.ReplicationSpec
 		synthesizeComp.RSMSpec = clusterCompDef.RSMSpec
-		synthesizeComp.StatefulSetWorkload = clusterCompDef.GetStatefulSetWorkload()
 		synthesizeComp.Probes = clusterCompDef.Probes
 		synthesizeComp.VolumeTypes = clusterCompDef.VolumeTypes
 		synthesizeComp.VolumeProtection = clusterCompDef.VolumeProtectionSpec

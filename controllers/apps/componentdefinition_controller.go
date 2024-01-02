@@ -81,7 +81,7 @@ func (r *ComponentDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error
 
 func (r *ComponentDefinitionReconciler) reconcile(rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) (ctrl.Result, error) {
-	res, err := intctrlutil.HandleCRDeletion(rctx, r, cmpd, constant.DBComponentDefinitionFinalizerName, r.deletionHandler(rctx, cmpd))
+	res, err := intctrlutil.HandleCRDeletion(rctx, r, cmpd, componentDefinitionFinalizerName, r.deletionHandler(rctx, cmpd))
 	if res != nil {
 		return *res, err
 	}

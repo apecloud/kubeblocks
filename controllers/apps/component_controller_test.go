@@ -1961,6 +1961,7 @@ var _ = Describe("Component Controller", func() {
 						newImageCnt += 1
 					}
 				}
+				g.Expect(oldImageCnt + newImageCnt).Should(Equal(oldImageCntExpected + newImageCntExpected))
 				g.Expect(oldImageCnt).Should(Equal(oldImageCntExpected))
 				g.Expect(newImageCnt).Should(Equal(newImageCntExpected))
 			}).Should(Succeed())
@@ -2135,13 +2136,11 @@ var _ = Describe("Component Controller", func() {
 			cleanEnv()
 		})
 
-		for compName, compDefName := range compNameNDef {
+		for key := range compNameNDef {
+			compName := key
+			compDefName := compNameNDef[key]
 			It(fmt.Sprintf("[comp: %s] should create/delete pods to match the desired replica number if updating cluster's replica number to a valid value", compName), func() {
 				testChangeReplicas(compName, compDefName)
-			})
-
-			It(fmt.Sprintf("[comp: %s] update kubeblocks-tools image", compName), func() {
-				testUpdateKubeBlocksToolsImage(compName, compDefName)
 			})
 		}
 	})
@@ -2163,7 +2162,16 @@ var _ = Describe("Component Controller", func() {
 			mockStorageClass = testk8s.CreateMockStorageClass(&testCtx, testk8s.DefaultStorageClassName)
 		})
 
-		for compName, compDefName := range compNameNDef {
+		for key := range compNameNDef {
+			compName := key
+			compDefName := compNameNDef[key]
+
+			Context(fmt.Sprintf("[comp: %s] update kubeblocks-tools image ", compName), func() {
+				It(fmt.Sprintf("[comp: %s] update kubeblocks-tools image", compName), func() {
+					testUpdateKubeBlocksToolsImage(compName, compDefName)
+				})
+			})
+
 			Context(fmt.Sprintf("[comp: %s] volume expansion", compName), func() {
 				It("should update PVC request storage size accordingly", func() {
 					testVolumeExpansion(compName, compDefName, mockStorageClass)

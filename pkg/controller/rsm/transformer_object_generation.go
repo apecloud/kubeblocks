@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -789,6 +790,12 @@ func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string 
 	generateReplicaEnv(prefixWithCompDefName)
 	generateMemberEnv(prefixWithCompDefName)
 	envData[prefixWithCompDefName+"CLUSTER_UID"] = uid
+
+	lorryHTTPPort, err := controllerutil.GetLorryGRPCPortFromContainers(set.Spec.Template.Spec.Containers)
+	if err == nil {
+		envData[constant.KBEnvLorryHTTPPort] = strconv.Itoa(int(lorryHTTPPort))
+
+	}
 
 	return envData
 }

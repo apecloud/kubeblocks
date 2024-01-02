@@ -337,8 +337,8 @@ func GetIntOrPercentValue(intOrStr *metautil.IntOrString) (int, bool, error) {
 }
 
 // GetPortByPortName gets the Port from pod by name
-func GetPortByPortName(pod *corev1.Pod, portName string) (int32, error) {
-	for _, container := range pod.Spec.Containers {
+func GetPortByPortName(containers []corev1.Container, portName string) (int32, error) {
+	for _, container := range containers {
 		for _, port := range container.Ports {
 			if port.Name == portName {
 				return port.ContainerPort, nil
@@ -349,11 +349,19 @@ func GetPortByPortName(pod *corev1.Pod, portName string) (int32, error) {
 }
 
 func GetLorryGRPCPort(pod *corev1.Pod) (int32, error) {
-	return GetPortByPortName(pod, constant.LorryGRPCPortName)
+	return GetLorryGRPCPortFromContainers(pod.Spec.Containers)
+}
+
+func GetLorryGRPCPortFromContainers(containers []corev1.Container) (int32, error) {
+	return GetPortByPortName(containers, constant.LorryGRPCPortName)
 }
 
 func GetLorryHTTPPort(pod *corev1.Pod) (int32, error) {
-	return GetPortByPortName(pod, constant.LorryHTTPPortName)
+	return GetLorryHTTPPortFromContainers(pod.Spec.Containers)
+}
+
+func GetLorryHTTPPortFromContainers(containers []corev1.Container) (int32, error) {
+	return GetPortByPortName(containers, constant.LorryHTTPPortName)
 }
 
 // GuessLorryHTTPPort guesses lorry container and serving port.

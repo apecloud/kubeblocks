@@ -71,12 +71,13 @@ func (t *clusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 func (t *clusterStatusTransformer) reconcileClusterPhase(cluster *appsv1alpha1.Cluster) {
 	var (
-		isAllComponentCreating = true
-		isAllComponentRunning  = true
-		isAllComponentWorking  = true
-		hasComponentStopping   = false
-		isAllComponentStopped  = true
-		isAllComponentFailed   = true
+		isAllComponentCreating       = true
+		isAllComponentRunning        = true
+		isAllComponentWorking        = true
+		hasComponentStopping         = false
+		isAllComponentStopped        = true
+		isAllComponentFailed         = true
+		hasComponentAbnormalOrFailed = false
 	)
 	isPhaseIn := func(phase appsv1alpha1.ClusterComponentPhase, phases ...appsv1alpha1.ClusterComponentPhase) bool {
 		for _, p := range phases {
@@ -108,6 +109,9 @@ func (t *clusterStatusTransformer) reconcileClusterPhase(cluster *appsv1alpha1.C
 		if !isPhaseIn(phase, appsv1alpha1.FailedClusterCompPhase) {
 			isAllComponentFailed = false
 		}
+		if isPhaseIn(phase, appsv1alpha1.AbnormalClusterCompPhase, appsv1alpha1.FailedClusterCompPhase) {
+			hasComponentAbnormalOrFailed = true
+		}
 	}
 
 	switch {
@@ -127,8 +131,10 @@ func (t *clusterStatusTransformer) reconcileClusterPhase(cluster *appsv1alpha1.C
 		cluster.Status.Phase = appsv1alpha1.StoppingClusterPhase
 	case isAllComponentFailed:
 		cluster.Status.Phase = appsv1alpha1.FailedClusterPhase
-	default:
+	case hasComponentAbnormalOrFailed:
 		cluster.Status.Phase = appsv1alpha1.AbnormalClusterPhase
+	default:
+		// nothing
 	}
 }
 

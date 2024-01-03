@@ -32,10 +32,6 @@ type ComponentSpec struct {
 	// +kubebuilder:validation:Required
 	CompDef string `json:"compDef"`
 
-	// componentDefFeatureGate defines the feature gate of ComponentDefinition.
-	// +optional
-	ComponentDefFeatureGate *ComponentDefFeatureGate `json:"componentDefFeatureGate,omitempty"`
-
 	// classDefRef references the class defined in ComponentClassDefinition.
 	// +optional
 	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`

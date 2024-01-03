@@ -60,11 +60,11 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 			continue
 		}
 		// component controller does not handle the nodeport service if the feature gate is not enabled.
-		if t.skipNodePortService(synthesizeComp, &service) {
+		if t.skipNodePortService(cluster, synthesizeComp, &service) {
 			continue
 		}
 		// component controller does not handle the pod ordinal service if the feature gate is not enabled.
-		if t.skipPodOrdinalService(synthesizeComp, &service) {
+		if t.skipPodOrdinalService(cluster, synthesizeComp, &service) {
 			continue
 		}
 
@@ -114,30 +114,42 @@ func (t *componentServiceTransformer) genMultiServicesIfNeed(cluster *appsv1alph
 	return podOrdinalServices, nil
 }
 
-func (t *componentServiceTransformer) skipNodePortService(synthesizeComp *component.SynthesizedComponent, compService *appsv1alpha1.ComponentService) bool {
-	if compService == nil {
+func (t *componentServiceTransformer) skipNodePortService(cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, compService *appsv1alpha1.ComponentService) bool {
+	if compService == nil || cluster == nil || cluster.Annotations == nil {
 		return true
 	}
 	if compService.Spec.Type != corev1.ServiceTypeNodePort {
 		return false
 	}
-	if synthesizeComp.ComponentDefFeatureGate == nil || !synthesizeComp.ComponentDefFeatureGate.NodePort {
+	enableNodePortSvcCompList, ok := cluster.Annotations[constant.NodePortSvcAnnotationKey]
+	if !ok {
 		return true
 	}
-	return false
+	for _, compName := range strings.Split(enableNodePortSvcCompList, ",") {
+		if compName == synthesizeComp.Name {
+			return false
+		}
+	}
+	return true
 }
 
-func (t *componentServiceTransformer) skipPodOrdinalService(synthesizeComp *component.SynthesizedComponent, compService *appsv1alpha1.ComponentService) bool {
-	if compService == nil {
+func (t *componentServiceTransformer) skipPodOrdinalService(cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, compService *appsv1alpha1.ComponentService) bool {
+	if compService == nil || cluster == nil || cluster.Annotations == nil {
 		return true
 	}
 	if !compService.GeneratePodOrdinalService {
 		return false
 	}
-	if synthesizeComp.ComponentDefFeatureGate == nil || !synthesizeComp.ComponentDefFeatureGate.PodOrdinalService {
+	enablePodOrdinalSvcCompList, ok := cluster.Annotations[constant.PodOrdinalSvcAnnotationKey]
+	if !ok {
 		return true
 	}
-	return false
+	for _, compName := range strings.Split(enablePodOrdinalSvcCompList, ",") {
+		if compName == synthesizeComp.Name {
+			return false
+		}
+	}
+	return true
 }
 
 func (t *componentServiceTransformer) buildService(comp *appsv1alpha1.Component,

@@ -109,28 +109,6 @@ spec:
               compDef:
                 description: compDef is the name of the referenced componentDefinition.
                 type: string
-              componentDefFeatureGate:
-                description: componentDefFeatureGate defines the feature gate of ComponentDefinition.
-                properties:
-                  nodePort:
-                    default: false
-                    description: nodePort defines the feature gate of NodePort Service
-                      defined in ComponentDefinition.Spec.Services. If NodePort is
-                      set to true, then all services of type NodePort defined in ComponentDefinition
-                      will be created; otherwise, they will be ignored.
-                    type: boolean
-                  podOrdinalService:
-                    default: false
-                    description: 'podOrdinalService defines the feature gate of PodOrdinal
-                      Service defined in ComponentDefinition.Spec.Services. If PodOrdinalService
-                      is set to true, then all Services defined in the ComponentDefinition
-                      with the GeneratePodOrdinalService attribute set to true will
-                      be created; otherwise, they will be ignored. This can generate
-                      a corresponding Service for each Pod, which can be used in certain
-                      specific scenarios: for example, creating a dedicated access
-                      service for each read-only Pod.'
-                    type: boolean
-                type: object
               configs:
                 items:
                   properties:

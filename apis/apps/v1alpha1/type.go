@@ -633,7 +633,6 @@ type Service struct {
 	// If not specified, the default service name with different patterns will be used:
 	//  - <CLUSTER_NAME>: for cluster-level services
 	//  - <CLUSTER_NAME>-<COMPONENT_NAME>: for component-level services
-	//  - <CLUSTER_NAME>-<COMPONENT_NAME>-<POD_ORDINAL>: for component-level services when GeneratePodOrdinalService set to true
 	// Only one default service name is allowed.
 	// Cannot be updated.
 	// +optional

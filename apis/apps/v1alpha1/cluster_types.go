@@ -71,7 +71,7 @@ type ClusterSpec struct {
 	// services defines the services to access a cluster.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
-	Services []Service `json:"services,omitempty"`
+	Services []ClusterService `json:"services,omitempty"`
 
 	// affinity is a group of affinity scheduling rules.
 	// +optional

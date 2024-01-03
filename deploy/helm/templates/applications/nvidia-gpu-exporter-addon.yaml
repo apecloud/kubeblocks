@@ -25,6 +25,11 @@ spec:
 
   installable:
     autoInstall: false
+    selectors:
+    - key: KubeGitVersion
+      operator: Contains
+      values:
+      - eks
 
   defaultInstallValues:
   - enabled: true

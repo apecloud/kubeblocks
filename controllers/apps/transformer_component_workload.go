@@ -306,7 +306,7 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, synthesiz
 
 	isSpecUpdated := !reflect.DeepEqual(&oldRsm.Spec, &rsmObjCopy.Spec)
 	if isSpecUpdated {
-		UpdatePodSpecSystemFields(&rsmObjCopy.Spec.Template.Spec)
+		UpdatePodSpecSystemFields(&rsmProto.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
 	}
 
 	isLabelsUpdated := !reflect.DeepEqual(oldRsm.Labels, rsmObjCopy.Labels)

@@ -120,26 +120,7 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 
 	reqCtx.Log.V(1).Info("lorry", "containers", lorryContainers)
 	synthesizeComp.PodSpec.Containers = append(synthesizeComp.PodSpec.Containers, lorryContainers...)
-	updateEnv(synthesizeComp, int(lorryHTTPPort))
 	return nil
-}
-
-func updateEnv(synthesizeComp *SynthesizedComponent, lorryHTTPPort int) {
-	for i := range synthesizeComp.PodSpec.Containers {
-		container := &synthesizeComp.PodSpec.Containers[i]
-		index := slices.IndexFunc(container.Env, func(env corev1.EnvVar) bool {
-			return env.Name == constant.KBEnvLorryHTTPPort
-		})
-
-		if index >= 0 {
-			container.Env[index].Value = strconv.Itoa(lorryHTTPPort)
-		} else {
-			container.Env = append(container.Env, corev1.EnvVar{
-				Name:  constant.KBEnvLorryHTTPPort,
-				Value: strconv.Itoa(lorryHTTPPort),
-			})
-		}
-	}
 }
 
 func buildBasicContainer(synthesizeComp *SynthesizedComponent) *corev1.Container {

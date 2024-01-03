@@ -11,7 +11,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -97,7 +96,7 @@ func buildContainerHostPorts(synthesizeComp *component.SynthesizedComponent, com
 }
 
 func updateLorrySpecAfterPortsChanged(synthesizeComp *component.SynthesizedComponent) error {
-	lorryContainer := GetLorryContainer(synthesizeComp.PodSpec.Containers)
+	lorryContainer := intctrlutil.GetLorryContainer(synthesizeComp.PodSpec.Containers)
 	if lorryContainer == nil {
 		return nil
 	}
@@ -111,7 +110,6 @@ func updateLorrySpecAfterPortsChanged(synthesizeComp *component.SynthesizedCompo
 	if err := updateReadinessProbe(synthesizeComp, lorryHTTPPort); err != nil {
 		return err
 	}
-	updateEnv(synthesizeComp, lorryHTTPPort)
 	return nil
 }
 
@@ -159,31 +157,6 @@ func updateReadinessProbe(synthesizeComp *component.SynthesizedComponent, lorryH
 		if container.ReadinessProbe.HTTPGet.Path == constant.LorryRoleProbePath ||
 			container.ReadinessProbe.HTTPGet.Path == constant.LorryVolumeProtectPath {
 			container.ReadinessProbe.HTTPGet.Port = intstr.FromInt(lorryHTTPPort)
-		}
-	}
-	return nil
-}
-
-func updateEnv(synthesizeComp *component.SynthesizedComponent, lorryHTTPPort int) {
-	for i := range synthesizeComp.PodSpec.Containers {
-		container := &synthesizeComp.PodSpec.Containers[i]
-		index := slices.IndexFunc(container.Env, func(env corev1.EnvVar) bool {
-			return env.Name == constant.KBEnvLorryHTTPPort
-		})
-		if index >= 0 {
-			container.Env[index].Value = strconv.Itoa(lorryHTTPPort)
-		}
-	}
-}
-
-func GetLorryContainer(containers []corev1.Container) *corev1.Container {
-	var container *corev1.Container
-	for i := range containers {
-		container = &containers[i]
-		for _, port := range container.Ports {
-			if port.Name == constant.LorryHTTPPortName {
-				return container
-			}
 		}
 	}
 	return nil

@@ -472,7 +472,7 @@ var _ = Describe("Component Definition Convertor", func() {
 					},
 				}
 				res2, _ := convertor.convert(clusterCompDef, clusterName)
-				services2, ok2 := res2.([]appsv1alpha1.Service)
+				services2, ok2 := res2.([]appsv1alpha1.ComponentService)
 				Expect(ok2).Should(BeTrue())
 				Expect(services2).Should(HaveLen(2))
 				Expect(services2[0].RoleSelector).Should(BeEquivalentTo(constant.Primary))

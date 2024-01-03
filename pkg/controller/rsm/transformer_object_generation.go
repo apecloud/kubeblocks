@@ -580,15 +580,6 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 		}
 	}
 
-	tryToGetRoleProbeContainer := func() *corev1.Container {
-		for i, container := range template.Spec.Containers {
-			if container.Name == constant.RoleProbeContainerName {
-				return &template.Spec.Containers[i]
-			}
-		}
-		return nil
-	}
-
 	tryToGetLorryGrpcPort := func(container *corev1.Container) *corev1.ContainerPort {
 		for i, port := range container.Ports {
 			if port.Name == constant.LorryGRPCPortName {
@@ -608,7 +599,7 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 	}
 
 	// if role probe container exists, update the readiness probe, env and serving container port
-	if container := tryToGetRoleProbeContainer(); container != nil {
+	if container := controllerutil.GetLorryContainer(template.Spec.Containers); container != nil {
 		if roleProbe.RoleUpdateMechanism == workloads.ReadinessProbeEventUpdate {
 			port := tryToGetLorryGrpcPort(container)
 			if port != nil && port.ContainerPort != int32(probeGRPCPort) {

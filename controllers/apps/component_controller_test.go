@@ -263,7 +263,7 @@ var _ = Describe("Component Controller", func() {
 		}
 	}
 
-	createClusterObjVx := func(compName, compDefName string, v2 bool, processor func(*testapps.MockClusterFactory), phase appsv1alpha1.ClusterPhase) {
+	createClusterObjVx := func(compName, compDefName string, v2 bool, processor func(*testapps.MockClusterFactory), phase *appsv1alpha1.ClusterPhase) {
 		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
 			WithRandomName()
 		if !v2 {
@@ -279,14 +279,14 @@ var _ = Describe("Component Controller", func() {
 
 		By("Waiting for the cluster enter expected phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-		if len(phase) != 0 {
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(phase))
-		} else {
+		if phase == nil {
 			if clusterObj.Spec.ComponentSpecs[0].Replicas == 0 {
 				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StoppedClusterPhase))
 			} else {
 				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 			}
+		} else {
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(*phase))
 		}
 
 		By("Waiting for the component enter expected phase")
@@ -296,7 +296,7 @@ var _ = Describe("Component Controller", func() {
 		}
 		compObj = &appsv1alpha1.Component{}
 		Eventually(testapps.CheckObjExists(&testCtx, compKey, compObj, true)).Should(Succeed())
-		if len(phase) == 0 {
+		if phase == nil {
 			Eventually(testapps.GetComponentObservedGeneration(&testCtx, compKey)).Should(BeEquivalentTo(1))
 			if compObj.Spec.Replicas == 0 {
 				Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(appsv1alpha1.StoppedClusterCompPhase))
@@ -308,17 +308,17 @@ var _ = Describe("Component Controller", func() {
 
 	createClusterObj := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster")
-		createClusterObjVx(compName, compDefName, false, processor, "")
+		createClusterObjVx(compName, compDefName, false, processor, nil)
 	}
 
 	createClusterObjV2 := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster with new component definition")
-		createClusterObjVx(compName, compDefName, true, processor, "")
+		createClusterObjVx(compName, compDefName, true, processor, nil)
 	}
 
 	createClusterObjV2WithPhase := func(compName, compDefName string, processor func(*testapps.MockClusterFactory), phase appsv1alpha1.ClusterPhase) {
 		By("Creating a cluster with new component definition")
-		createClusterObjVx(compName, compDefName, true, processor, phase)
+		createClusterObjVx(compName, compDefName, true, processor, &phase)
 	}
 
 	mockCompRunning := func(compName string) {
@@ -1368,7 +1368,7 @@ var _ = Describe("Component Controller", func() {
 		for _, replicas := range []int32{replicasLimit.MinReplicas / 2, replicasLimit.MaxReplicas * 2} {
 			createClusterObjV2WithPhase(compName, compDefObj.Name, func(f *testapps.MockClusterFactory) {
 				f.SetReplicas(replicas)
-			}, appsv1alpha1.AbnormalClusterPhase)
+			}, "")
 			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
 				g.Expect(comp.Spec.Replicas).Should(BeEquivalentTo(replicas))
 				g.Expect(comp.Status.Conditions).Should(HaveLen(1))

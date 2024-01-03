@@ -29,6 +29,7 @@ import (
 
 	"github.com/StudioSol/set"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -144,6 +145,78 @@ func TestIsRerender(t *testing.T) {
 			item: v1alpha1.ConfigurationItemDetail{
 				Name:    "test",
 				Version: "v1",
+			},
+		},
+		want: false,
+	}, {
+		name: "import-template-test",
+		args: args{
+			cm: builder.NewConfigMapBuilder("default", "test").
+				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, "").
+				GetObject(),
+			item: v1alpha1.ConfigurationItemDetail{
+				Name: "test",
+				ImportTemplateRef: &v1alpha1.ConfigTemplateExtension{
+					TemplateRef: "contig-test-template",
+					Namespace:   "default",
+					Policy:      v1alpha1.PatchPolicy,
+				},
+			},
+		},
+		want: true,
+	}, {
+		name: "import-template-test",
+		args: args{
+			cm: builder.NewConfigMapBuilder("default", "test").
+				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, `
+{
+  "importTemplateRef": {
+    "templateRef": "contig-test-template",
+    "namespace": "default",
+    "policy": "patch"
+  }
+}
+`).
+				GetObject(),
+			item: v1alpha1.ConfigurationItemDetail{
+				Name: "test",
+				ImportTemplateRef: &v1alpha1.ConfigTemplateExtension{
+					TemplateRef: "contig-test-template",
+					Namespace:   "default",
+					Policy:      v1alpha1.PatchPolicy,
+				},
+			},
+		},
+		want: false,
+	}, {
+		name: "payload-test",
+		args: args{
+			cm: builder.NewConfigMapBuilder("default", "test").
+				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, "").
+				GetObject(),
+			item: v1alpha1.ConfigurationItemDetail{
+				Name: "test",
+				Payload: v1alpha1.Payload{
+					Data: map[string]any{
+						"key": "value",
+					},
+				},
+			},
+		},
+		want: true,
+	}, {
+		name: "payload-test",
+		args: args{
+			cm: builder.NewConfigMapBuilder("default", "test").
+				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, ` {"payload":{"key":"value"}} `).
+				GetObject(),
+			item: v1alpha1.ConfigurationItemDetail{
+				Name: "test",
+				Payload: v1alpha1.Payload{
+					Data: map[string]any{
+						"key": "value",
+					},
+				},
 			},
 		},
 		want: false,
@@ -326,3 +399,84 @@ var _ = Describe("config_util", func() {
 	})
 
 })
+
+func TestCheckAndPatchPayload(t *testing.T) {
+	type args struct {
+		item      *v1alpha1.ConfigurationItemDetail
+		payloadID string
+		payload   interface{}
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    bool
+		wantErr bool
+	}{{
+		name: "test",
+		args: args{
+			item:      &v1alpha1.ConfigurationItemDetail{},
+			payloadID: constant.BinaryVersionPayload,
+			payload:   "md5-12912uy1232o9y2",
+		},
+		want: true,
+	}, {
+		name: "invalid-item-test",
+		args: args{
+			payloadID: constant.BinaryVersionPayload,
+			payload:   "md5-12912uy1232o9y2",
+		},
+		want: false,
+	}, {
+		name: "test-delete-payload",
+		args: args{
+			item: &v1alpha1.ConfigurationItemDetail{
+				Payload: v1alpha1.Payload{
+					Data: map[string]any{
+						constant.BinaryVersionPayload: "md5-12912uy1232o9y2",
+					},
+				},
+			},
+			payloadID: constant.BinaryVersionPayload,
+			payload:   nil,
+		},
+		want: true,
+	}, {
+		name: "test-update-payload",
+		args: args{
+			item: &v1alpha1.ConfigurationItemDetail{
+				Payload: v1alpha1.Payload{
+					Data: map[string]any{
+						constant.BinaryVersionPayload: "md5-12912uy1232o9y2",
+						constant.ComponentResourcePayload: map[string]any{
+							"limit": map[string]string{
+								"cpu":    "100m",
+								"memory": "100Mi",
+							},
+						},
+					},
+				},
+			},
+			payloadID: constant.ComponentResourcePayload,
+			payload: corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU:    resource.MustParse("200m"),
+					corev1.ResourceMemory: resource.MustParse("200m"),
+				},
+			},
+		},
+		want: true,
+	},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := CheckAndPatchPayload(tt.args.item, tt.args.payloadID, tt.args.payload)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CheckAndPatchPayload() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("CheckAndPatchPayload() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -158,7 +158,8 @@ func (t *clusterServiceTransformer) buildService(transCtx *clusterTransformConte
 		clusterName = cluster.Name
 	)
 
-	builder := builder.NewServiceBuilder(namespace, clusterService.ServiceName).
+	serviceName := constant.GenerateClusterServiceName(cluster.Name, clusterService.ServiceName)
+	builder := builder.NewServiceBuilder(namespace, serviceName).
 		AddLabelsInMap(constant.GetClusterWellKnownLabels(clusterName)).
 		AddAnnotationsInMap(clusterService.Annotations).
 		SetSpec(&clusterService.Spec).

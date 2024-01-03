@@ -115,11 +115,16 @@ func (t *componentServiceTransformer) genMultiServicesIfNeed(cluster *appsv1alph
 }
 
 func (t *componentServiceTransformer) skipNodePortService(cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, compService *appsv1alpha1.ComponentService) bool {
-	if compService == nil || cluster == nil || cluster.Annotations == nil {
+	if compService == nil {
 		return true
 	}
+	// if Service type is not NodePort, it should not be skipped.
 	if compService.Spec.Type != corev1.ServiceTypeNodePort {
 		return false
+	}
+	// if Service type is NodePort, but the feature gate annotation is not enabled, it should be skipped.
+	if cluster == nil || cluster.Annotations == nil {
+		return true
 	}
 	enableNodePortSvcCompList, ok := cluster.Annotations[constant.NodePortSvcAnnotationKey]
 	if !ok {
@@ -134,11 +139,16 @@ func (t *componentServiceTransformer) skipNodePortService(cluster *appsv1alpha1.
 }
 
 func (t *componentServiceTransformer) skipPodOrdinalService(cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, compService *appsv1alpha1.ComponentService) bool {
-	if compService == nil || cluster == nil || cluster.Annotations == nil {
+	if compService == nil {
 		return true
 	}
+	// if ComponentService GeneratePodOrdinalService field is not true, it should not be skipped.
 	if !compService.GeneratePodOrdinalService {
 		return false
+	}
+	// if ComponentService GeneratePodOrdinalService field is true, but the feature gate annotation is not enabled, it should be skipped.
+	if cluster == nil || cluster.Annotations == nil {
+		return true
 	}
 	enablePodOrdinalSvcCompList, ok := cluster.Annotations[constant.PodOrdinalSvcAnnotationKey]
 	if !ok {

@@ -118,7 +118,7 @@ type ComponentDefinitionSpec struct {
 	// In addition, a reserved headless service will be created by default, with the name pattern {clusterName}-{componentName}-headless.
 	// Cannot be updated.
 	// +optional
-	Services []Service `json:"services,omitempty"`
+	Services []ComponentService `json:"services,omitempty"`
 
 	// The configs field provided by provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.

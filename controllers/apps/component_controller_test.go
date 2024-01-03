@@ -1735,7 +1735,7 @@ var _ = Describe("Component Controller", func() {
 		sts.Status.ObservedGeneration = sts.Generation
 		Expect(k8sClient.Status().Patch(ctx, sts, stsPatch)).Should(Succeed())
 
-		By("Checking consensus set pods' role are updated in cluster status")
+		By("Checking pods' role are updated in cluster status")
 		Eventually(func(g Gomega) {
 			fetched := &appsv1alpha1.Cluster{}
 			g.Expect(k8sClient.Get(ctx, clusterKey, fetched)).To(Succeed())
@@ -1744,23 +1744,6 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(fetched.Status.Components).To(HaveKey(compName))
 			_, ok := fetched.Status.Components[compName]
 			g.Expect(ok).Should(BeTrue())
-			// TODO(component): workload status
-			// getStsPodsName := func(sts *appsv1.StatefulSet) []string {
-			//	pods, err := common.GetPodListByStatefulSet(ctx, k8sClient, sts)
-			//	Expect(err).To(Succeed())
-			//
-			//	names := make([]string, 0)
-			//	for _, pod := range pods {
-			//		names = append(names, pod.Name)
-			//	}
-			//	return names
-			// }
-			// consensusStatus := compStatus.ConsensusSetStatus
-			// g.Expect(consensusStatus != nil).To(BeTrue())
-			// g.Expect(consensusStatus.Leader.Pod).To(BeElementOf(getStsPodsName(sts)))
-			// g.Expect(consensusStatus.Followers).Should(HaveLen(2))
-			// g.Expect(consensusStatus.Followers[0].Pod).To(BeElementOf(getStsPodsName(sts)))
-			// g.Expect(consensusStatus.Followers[1].Pod).To(BeElementOf(getStsPodsName(sts)))
 		}).Should(Succeed())
 
 		By("Waiting the component be running")

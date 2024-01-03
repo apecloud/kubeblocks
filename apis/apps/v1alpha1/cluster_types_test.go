@@ -165,12 +165,10 @@ var _ = Describe("", func() {
 		compName := "test-comp"
 		r.Components = map[string]ClusterComponentStatus{
 			compName: {
-				Phase:                "",
-				Message:              nil,
-				PodsReady:            nil,
-				PodsReadyTime:        nil,
-				ConsensusSetStatus:   nil,
-				ReplicationSetStatus: nil,
+				Phase:         "",
+				Message:       nil,
+				PodsReady:     nil,
+				PodsReadyTime: nil,
 			},
 		}
 		r.SetComponentStatus(compName, status)

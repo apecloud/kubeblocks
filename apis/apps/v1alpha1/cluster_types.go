@@ -458,67 +458,9 @@ type ClusterComponentStatus struct {
 	// +optional
 	PodsReadyTime *metav1.Time `json:"podsReadyTime,omitempty"`
 
-	// consensusSetStatus specifies the mapping of role and pod name.
-	// +optional
-	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use MembersStatus instead."
-	ConsensusSetStatus *ConsensusSetStatus `json:"consensusSetStatus,omitempty"`
-
-	// replicationSetStatus specifies the mapping of role and pod name.
-	// +optional
-	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use MembersStatus instead."
-	ReplicationSetStatus *ReplicationSetStatus `json:"replicationSetStatus,omitempty"`
-
 	// members' status.
 	// +optional
 	MembersStatus []workloads.MemberStatus `json:"membersStatus,omitempty"`
-}
-
-type ConsensusSetStatus struct {
-	// Leader status.
-	// +kubebuilder:validation:Required
-	Leader ConsensusMemberStatus `json:"leader"`
-
-	// Followers status.
-	// +optional
-	Followers []ConsensusMemberStatus `json:"followers,omitempty"`
-
-	// Learner status.
-	// +optional
-	Learner *ConsensusMemberStatus `json:"learner,omitempty"`
-}
-
-type ConsensusMemberStatus struct {
-	// Defines the role name.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=leader
-	Name string `json:"name"`
-
-	// accessMode defines what service this pod provides.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=ReadWrite
-	AccessMode AccessMode `json:"accessMode"`
-
-	// Pod name.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=Unknown
-	Pod string `json:"pod"`
-}
-
-type ReplicationSetStatus struct {
-	// Primary status.
-	// +kubebuilder:validation:Required
-	Primary ReplicationMemberStatus `json:"primary"`
-
-	// Secondaries status.
-	// +optional
-	Secondaries []ReplicationMemberStatus `json:"secondaries,omitempty"`
-}
-
-type ReplicationMemberStatus struct {
-	// Pod name.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=Unknown
-	Pod string `json:"pod"`
 }
 
 type ClusterSwitchPolicy struct {

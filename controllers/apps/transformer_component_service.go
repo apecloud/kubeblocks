@@ -88,8 +88,6 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 func (t *componentServiceTransformer) genMultiServicesIfNeed(cluster *appsv1alpha1.Cluster,
 	synthesizeComp *component.SynthesizedComponent, compService *appsv1alpha1.ComponentService) ([]*appsv1alpha1.ComponentService, error) {
 	if !compService.GeneratePodOrdinalService {
-		serviceName := constant.GenerateComponentServiceName(cluster.Name, synthesizeComp.Name, compService.ServiceName)
-		compService.ServiceName = serviceName
 		return []*appsv1alpha1.ComponentService{compService}, nil
 	}
 
@@ -97,11 +95,10 @@ func (t *componentServiceTransformer) genMultiServicesIfNeed(cluster *appsv1alph
 	for i := int32(0); i < synthesizeComp.Replicas; i++ {
 		svc := compService.DeepCopy()
 		svc.Name = fmt.Sprintf("%s-%d", compService.Name, i)
-		serviceNamePrefix := constant.GenerateClusterComponentName(cluster.Name, synthesizeComp.Name)
 		if len(compService.ServiceName) == 0 {
-			svc.ServiceName = fmt.Sprintf("%s-%d", serviceNamePrefix, i)
+			svc.ServiceName = fmt.Sprintf("%d", i)
 		} else {
-			svc.ServiceName = fmt.Sprintf("%s-%s-%d", serviceNamePrefix, compService.ServiceName, i)
+			svc.ServiceName = fmt.Sprintf("%s-%d", compService.ServiceName, i)
 		}
 		if svc.Spec.Selector == nil {
 			svc.Spec.Selector = make(map[string]string)
@@ -170,8 +167,9 @@ func (t *componentServiceTransformer) buildService(comp *appsv1alpha1.Component,
 		compName    = synthesizeComp.Name
 	)
 
+	serviceFullName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, service.ServiceName)
 	labels := constant.GetComponentWellKnownLabels(clusterName, compName)
-	builder := builder.NewServiceBuilder(namespace, service.ServiceName).
+	builder := builder.NewServiceBuilder(namespace, serviceFullName).
 		AddLabelsInMap(labels).
 		SetSpec(&service.Spec).
 		AddSelectorsInMap(t.builtinSelector(comp)).

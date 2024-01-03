@@ -602,9 +602,10 @@ type ComponentService struct {
 	Service `json:",inline"`
 
 	// GeneratePodOrdinalService indicates whether to create a corresponding Service for each Pod of the selected Component.
-	// If sets to true, a set of Service will be automatically generated for each Pod.
+	// If sets to true, a set of Service will be automatically generated for each Pod. And Service.RoleSelector will be ignored.
 	// They can be referred to by adding the PodOrdinal to the defined ServiceName with named pattern <Service.ServiceName>-<PodOrdinal>.
 	// And the Service.Name will also be generated with named pattern <Service.Name>-<PodOrdinal>.
+	// The PodOrdinal is zero-based, and the number of generated Services is equal to the number of replicas of the Component.
 	// For example, a Service might be defined as follows:
 	// - name: my-service
 	//   serviceName: my-service

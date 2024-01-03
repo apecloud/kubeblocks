@@ -78,6 +78,7 @@ type PodSelector struct {
 	// are selected.
 	// Valid values are:
 	// - Any: select any one pod that match the labelsSelector.
+	// - All: select all pods that match the labelsSelector.
 	// +kubebuilder:default=Any
 	Strategy PodSelectionStrategy `json:"strategy,omitempty"`
 }

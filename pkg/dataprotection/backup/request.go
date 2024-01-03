@@ -93,15 +93,21 @@ func (r *Request) BuildActions() ([]action.Action, error) {
 	}
 
 	// build backup data action
-	backupDataAction, err := r.buildBackupDataAction()
-	if err != nil {
-		return nil, err
+	for i := range r.TargetPods {
+		backupDataAction, err := r.buildBackupDataAction(r.TargetPods[i], fmt.Sprintf("%s-%d", BackupDataJobNamePrefix, i))
+		if err != nil {
+			return nil, err
+		}
+		appendIgnoreNil(backupDataAction)
 	}
 
 	// build create volume snapshot action
-	createVolumeSnapshotAction, err := r.buildCreateVolumeSnapshotAction()
-	if err != nil {
-		return nil, err
+	for i := range r.TargetPods {
+		createVolumeSnapshotAction, err := r.buildCreateVolumeSnapshotAction(r.TargetPods[i], fmt.Sprintf("createVolumeSnapshot-%d", i))
+		if err != nil {
+			return nil, err
+		}
+		appendIgnoreNil(createVolumeSnapshotAction)
 	}
 
 	// build backup kubernetes resources action
@@ -117,7 +123,7 @@ func (r *Request) BuildActions() ([]action.Action, error) {
 	}
 
 	appendIgnoreNil(preBackupActions...)
-	appendIgnoreNil(backupDataAction, createVolumeSnapshotAction, backupKubeResourcesAction)
+	appendIgnoreNil(backupKubeResourcesAction)
 	appendIgnoreNil(postBackupActions...)
 	return actions, nil
 }
@@ -130,11 +136,13 @@ func (r *Request) buildPreBackupActions() ([]action.Action, error) {
 
 	var actions []action.Action
 	for i, preBackup := range r.ActionSet.Spec.Backup.PreBackup {
-		a, err := r.buildAction(fmt.Sprintf("%s-%d", prebackupJobNamePrefix, i), &preBackup)
-		if err != nil {
-			return nil, err
+		for j := range r.TargetPods {
+			a, err := r.buildAction(r.TargetPods[j], fmt.Sprintf("%s-%d-%d", prebackupJobNamePrefix, i, j), &preBackup)
+			if err != nil {
+				return nil, err
+			}
+			actions = append(actions, a)
 		}
-		actions = append(actions, a)
 	}
 	return actions, nil
 }
@@ -147,23 +155,25 @@ func (r *Request) buildPostBackupActions() ([]action.Action, error) {
 
 	var actions []action.Action
 	for i, postBackup := range r.ActionSet.Spec.Backup.PostBackup {
-		a, err := r.buildAction(fmt.Sprintf("%s-%d", postbackupJobNamePrefix, i), &postBackup)
-		if err != nil {
-			return nil, err
+		for j := range r.TargetPods {
+			a, err := r.buildAction(r.TargetPods[j], fmt.Sprintf("%s-%d-%d", postbackupJobNamePrefix, i, j), &postBackup)
+			if err != nil {
+				return nil, err
+			}
+			actions = append(actions, a)
 		}
-		actions = append(actions, a)
 	}
 	return actions, nil
 }
 
-func (r *Request) buildBackupDataAction() (action.Action, error) {
+func (r *Request) buildBackupDataAction(targetPod *corev1.Pod, name string) (action.Action, error) {
 	if !r.backupActionSetExists() ||
 		r.ActionSet.Spec.Backup.BackupData == nil {
 		return nil, nil
 	}
 
 	backupDataAct := r.ActionSet.Spec.Backup.BackupData
-	podSpec, err := r.BuildJobActionPodSpec(BackupDataContainerName, &backupDataAct.JobActionSpec)
+	podSpec, err := r.BuildJobActionPodSpec(targetPod, BackupDataContainerName, &backupDataAct.JobActionSpec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build job action pod spec: %w", err)
 	}
@@ -174,8 +184,8 @@ func (r *Request) buildBackupDataAction() (action.Action, error) {
 
 	if r.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeFull {
 		return &action.JobAction{
-			Name:         BackupDataJobNamePrefix,
-			ObjectMeta:   *buildBackupJobObjMeta(r.Backup, BackupDataJobNamePrefix),
+			Name:         name,
+			ObjectMeta:   *buildBackupJobObjMeta(r.Backup, name),
 			Owner:        r.Backup,
 			PodSpec:      podSpec,
 			BackOffLimit: r.BackupPolicy.Spec.BackoffLimit,
@@ -184,8 +194,7 @@ func (r *Request) buildBackupDataAction() (action.Action, error) {
 	return nil, fmt.Errorf("unsupported backup type %s", r.ActionSet.Spec.BackupType)
 }
 
-func (r *Request) buildCreateVolumeSnapshotAction() (action.Action, error) {
-	targetPod := r.TargetPods[0]
+func (r *Request) buildCreateVolumeSnapshotAction(targetPod *corev1.Pod, name string) (action.Action, error) {
 	if r.BackupMethod == nil ||
 		!boolptr.IsSetToTrue(r.BackupMethod.SnapshotVolumes) {
 		return nil, nil
@@ -211,7 +220,7 @@ func (r *Request) buildCreateVolumeSnapshotAction() (action.Action, error) {
 	}
 
 	return &action.CreateVolumeSnapshotAction{
-		Name: "createVolumeSnapshot",
+		Name: name,
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: r.Backup.Namespace,
 			Name:      r.Backup.Name,
@@ -227,7 +236,9 @@ func (r *Request) buildBackupKubeResourcesAction() (action.Action, error) {
 	return nil, nil
 }
 
-func (r *Request) buildAction(name string, act *dpv1alpha1.ActionSpec) (action.Action, error) {
+func (r *Request) buildAction(targetPod *corev1.Pod,
+	name string,
+	act *dpv1alpha1.ActionSpec) (action.Action, error) {
 	if act.Exec == nil && act.Job == nil {
 		return nil, fmt.Errorf("action %s has no exec or job", name)
 	}
@@ -236,15 +247,16 @@ func (r *Request) buildAction(name string, act *dpv1alpha1.ActionSpec) (action.A
 	}
 	switch {
 	case act.Exec != nil:
-		return r.buildExecAction(name, act.Exec), nil
+		return r.buildExecAction(targetPod, name, act.Exec), nil
 	case act.Job != nil:
-		return r.buildJobAction(name, act.Job)
+		return r.buildJobAction(targetPod, name, act.Job)
 	}
 	return nil, nil
 }
 
-func (r *Request) buildExecAction(name string, exec *dpv1alpha1.ExecActionSpec) action.Action {
-	targetPod := r.TargetPods[0]
+func (r *Request) buildExecAction(targetPod *corev1.Pod,
+	name string,
+	exec *dpv1alpha1.ExecActionSpec) action.Action {
 	objectMeta := *buildBackupJobObjMeta(r.Backup, name)
 	objectMeta.Labels[dptypes.BackupNamespaceLabelKey] = r.Namespace
 	// create exec job in kubeblocks namespace for security
@@ -269,8 +281,10 @@ func (r *Request) buildExecAction(name string, exec *dpv1alpha1.ExecActionSpec) 
 	}
 }
 
-func (r *Request) buildJobAction(name string, job *dpv1alpha1.JobActionSpec) (action.Action, error) {
-	podSpec, err := r.BuildJobActionPodSpec(name, job)
+func (r *Request) buildJobAction(targetPod *corev1.Pod,
+	name string,
+	job *dpv1alpha1.JobActionSpec) (action.Action, error) {
+	podSpec, err := r.BuildJobActionPodSpec(targetPod, name, job)
 	if err != nil {
 		return nil, err
 	}
@@ -283,9 +297,9 @@ func (r *Request) buildJobAction(name string, job *dpv1alpha1.JobActionSpec) (ac
 	}, nil
 }
 
-func (r *Request) BuildJobActionPodSpec(name string,
+func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
+	name string,
 	job *dpv1alpha1.JobActionSpec) (*corev1.PodSpec, error) {
-	targetPod := r.TargetPods[0]
 
 	// build environment variables, include built-in envs, envs from backupMethod
 	// and envs from actionSet. Latter will override former for the same name.

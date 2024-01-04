@@ -32,12 +32,11 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 func GenServiceReferencesLegacy(reqCtx intctrlutil.RequestCtx,
-	cli roclient.ReadonlyClient,
+	cli client.Reader,
 	clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterVer *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster,
@@ -57,7 +56,7 @@ func GenServiceReferencesLegacy(reqCtx intctrlutil.RequestCtx,
 }
 
 func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
-	cli roclient.ReadonlyClient,
+	cli client.Reader,
 	namespace, clusterName string,
 	compDef *appsv1alpha1.ComponentDefinition,
 	comp *appsv1alpha1.Component) (map[string]*appsv1alpha1.ServiceDescriptor, error) {
@@ -107,7 +106,7 @@ func GenServiceReferences(reqCtx intctrlutil.RequestCtx,
 
 // handleClusterTypeServiceRef handles the service reference is another KubeBlocks Cluster.
 func handleClusterTypeServiceRef(reqCtx intctrlutil.RequestCtx,
-	cli roclient.ReadonlyClient,
+	cli client.Reader,
 	namespace, clusterName string,
 	serviceRef appsv1alpha1.ServiceRef,
 	serviceRefDecl appsv1alpha1.ServiceRefDeclaration,
@@ -154,7 +153,7 @@ func handleClusterTypeServiceRef(reqCtx intctrlutil.RequestCtx,
 
 // handleServiceDescriptorTypeServiceRef handles the service reference is provided by external ServiceDescriptor object.
 func handleServiceDescriptorTypeServiceRef(reqCtx intctrlutil.RequestCtx,
-	cli roclient.ReadonlyClient,
+	cli client.Reader,
 	namespace string,
 	serviceRef appsv1alpha1.ServiceRef,
 	serviceRefDecl appsv1alpha1.ServiceRefDeclaration,

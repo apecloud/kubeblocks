@@ -32,7 +32,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -42,7 +41,7 @@ import (
 // componentTransformContext a graph.TransformContext implementation for Cluster reconciliation
 type componentTransformContext struct {
 	context.Context
-	Client roclient.ReadonlyClient
+	Client client.Reader
 	record.EventRecorder
 	logr.Logger
 	Cluster             *appsv1alpha1.Cluster
@@ -58,7 +57,7 @@ func (c *componentTransformContext) GetContext() context.Context {
 	return c.Context
 }
 
-func (c *componentTransformContext) GetClient() roclient.ReadonlyClient {
+func (c *componentTransformContext) GetClient() client.Reader {
 	return c.Client
 }
 

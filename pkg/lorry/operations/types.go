@@ -32,15 +32,25 @@ type OpsRequest struct {
 }
 
 func (r *OpsRequest) GetString(key string) string {
-	if r.Parameters[key] == nil {
-		return ""
+	value, ok := r.Parameters[key]
+	if ok {
+		val, ok := value.(string)
+		if ok {
+			return val
+		}
 	}
+	return ""
+}
 
-	if value, ok := r.Parameters[key].(string); ok {
-		return value
-	} else {
-		return ""
+func (r *OpsRequest) GetBool(key string) bool {
+	value, ok := r.Parameters[key]
+	if ok {
+		val, ok := value.(bool)
+		if ok {
+			return val
+		}
 	}
+	return false
 }
 
 // OpsResponse is the response for Operation

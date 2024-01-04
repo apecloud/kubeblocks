@@ -1478,90 +1478,6 @@ spec:
                 additionalProperties:
                   description: ClusterComponentStatus records components status.
                   properties:
-                    consensusSetStatus:
-                      description: consensusSetStatus specifies the mapping of role
-                        and pod name.
-                      properties:
-                        followers:
-                          description: Followers status.
-                          items:
-                            properties:
-                              accessMode:
-                                default: ReadWrite
-                                description: accessMode defines what service this
-                                  pod provides.
-                                enum:
-                                - None
-                                - Readonly
-                                - ReadWrite
-                                type: string
-                              name:
-                                default: leader
-                                description: Defines the role name.
-                                type: string
-                              pod:
-                                default: Unknown
-                                description: Pod name.
-                                type: string
-                            required:
-                            - accessMode
-                            - name
-                            - pod
-                            type: object
-                          type: array
-                        leader:
-                          description: Leader status.
-                          properties:
-                            accessMode:
-                              default: ReadWrite
-                              description: accessMode defines what service this pod
-                                provides.
-                              enum:
-                              - None
-                              - Readonly
-                              - ReadWrite
-                              type: string
-                            name:
-                              default: leader
-                              description: Defines the role name.
-                              type: string
-                            pod:
-                              default: Unknown
-                              description: Pod name.
-                              type: string
-                          required:
-                          - accessMode
-                          - name
-                          - pod
-                          type: object
-                        learner:
-                          description: Learner status.
-                          properties:
-                            accessMode:
-                              default: ReadWrite
-                              description: accessMode defines what service this pod
-                                provides.
-                              enum:
-                              - None
-                              - Readonly
-                              - ReadWrite
-                              type: string
-                            name:
-                              default: leader
-                              description: Defines the role name.
-                              type: string
-                            pod:
-                              default: Unknown
-                              description: Pod name.
-                              type: string
-                          required:
-                          - accessMode
-                          - name
-                          - pod
-                          type: object
-                      required:
-                      - leader
-                      type: object
                     membersStatus:
                       description: members' status.
                       items:
@@ -1649,35 +1565,6 @@ spec:
                         pod.
                       format: date-time
                       type: string
-                    replicationSetStatus:
-                      description: replicationSetStatus specifies the mapping of role
-                        and pod name.
-                      properties:
-                        primary:
-                          description: Primary status.
-                          properties:
-                            pod:
-                              default: Unknown
-                              description: Pod name.
-                              type: string
-                          required:
-                          - pod
-                          type: object
-                        secondaries:
-                          description: Secondaries status.
-                          items:
-                            properties:
-                              pod:
-                                default: Unknown
-                                description: Pod name.
-                                type: string
-                            required:
-                            - pod
-                            type: object
-                          type: array
-                      required:
-                      - primary
-                      type: object
                   type: object
                 description: components record the current status information of all
                   components of the cluster.

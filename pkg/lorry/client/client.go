@@ -162,10 +162,11 @@ func (cli *lorryClient) RevokeUserRole(ctx context.Context, userName, roleName s
 	return err
 }
 
-func (cli *lorryClient) Switchover(ctx context.Context, primary, candidate string) error {
+func (cli *lorryClient) Switchover(ctx context.Context, primary, candidate string, force bool) error {
 	parameters := map[string]any{
 		"primary":   primary,
 		"candidate": candidate,
+		"force":     force,
 	}
 	req := map[string]any{"parameters": parameters}
 	_, err := cli.Request(ctx, string(SwitchoverOperation), http.MethodPost, req)

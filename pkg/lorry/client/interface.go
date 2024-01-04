@@ -40,5 +40,5 @@ type Client interface {
 	// LeaveMember sends a Leave member operation request to Lorry, located on the target pod that is about to leave.
 	LeaveMember(ctx context.Context) error
 
-	Switchover(ctx context.Context, primary, candidate string) error
+	Switchover(ctx context.Context, primary, candidate string, force bool) error
 }

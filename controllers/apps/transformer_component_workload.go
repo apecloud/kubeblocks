@@ -522,7 +522,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn(stsObj *apps.StatefulSet) err
 			return nil
 		}
 		// if HA functionality is not enabled, no need to switchover
-		err := lorryCli.Switchover(r.reqCtx.Ctx, pod.Name, "")
+		err := lorryCli.Switchover(r.reqCtx.Ctx, pod.Name, "", false)
 		if err == lorry.NotImplemented {
 			// For the purpose of upgrade compatibility, if the version of Lorry is 0.7 and
 			// the version of KB is upgraded to 0.8 or newer, lorry client will return an NotImplemented error,

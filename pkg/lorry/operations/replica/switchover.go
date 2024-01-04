@@ -38,7 +38,7 @@ type Switchover struct {
 }
 
 type SwitchoverManager interface {
-	Switchover(ctx context.Context, cluster *dcs.Cluster, primary, candidate string) error
+	Switchover(ctx context.Context, cluster *dcs.Cluster, primary, candidate string, force bool) error
 }
 
 var switchover operations.Operation = &Switchover{}
@@ -118,6 +118,7 @@ func (s *Switchover) PreCheck(ctx context.Context, req *operations.OpsRequest) e
 func (s *Switchover) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
 	primary := req.GetString("primary")
 	candidate := req.GetString("candidate")
+	force := req.GetBool("force")
 	manager, err := register.GetDBManager()
 	if err != nil {
 		return nil, errors.Wrap(err, "get manager failed")
@@ -129,7 +130,7 @@ func (s *Switchover) Do(ctx context.Context, req *operations.OpsRequest) (*opera
 			return nil, errors.Wrap(err, "get cluster failed")
 		}
 
-		err = swManager.Switchover(ctx, cluster, primary, candidate)
+		err = swManager.Switchover(ctx, cluster, primary, candidate, force)
 		return nil, err
 	}
 

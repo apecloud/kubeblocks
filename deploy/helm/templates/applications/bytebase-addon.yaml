@@ -4,7 +4,8 @@ metadata:
   name: bytebase
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
-    "kubeblocks.io/provider": community
+    "addon.kubeblocks.io/provider": community
+    "addon.kubeblocks.io/version": "0.7.0"
   {{- if .Values.keepAddons }}
   annotations:
     helm.sh/resource-policy: keep
@@ -25,5 +26,5 @@ spec:
     autoInstall: false
 
   defaultInstallValues:
-    - enabled: true
+  - enabled: true
 

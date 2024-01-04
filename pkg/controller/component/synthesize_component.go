@@ -22,6 +22,7 @@ package component
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -33,7 +34,6 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
-	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -150,6 +150,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		Name:               compName,
 		FullCompName:       comp.Name,
 		CompDefName:        compDef.Name,
+		ClusterGeneration:  clusterGeneration(cluster, comp),
 		PodSpec:            &compDef.Spec.Runtime,
 		LogConfigs:         compDefObj.Spec.LogConfigs,
 		ConfigTemplates:    compDefObj.Spec.Configs,
@@ -222,6 +223,16 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForConnCredential(synthesizeComp.ClusterName))
 
 	return synthesizeComp, nil
+}
+
+func clusterGeneration(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) string {
+	if comp != nil && comp.Annotations != nil {
+		if generation, ok := comp.Annotations[constant.KubeBlocksGenerationKey]; ok {
+			return generation
+		}
+	}
+	// back-off to use cluster.Generation
+	return strconv.FormatInt(cluster.Generation, 10)
 }
 
 func buildComp2CompDefs(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) map[string]string {
@@ -322,7 +333,7 @@ func buildAndUpdateResources(reqCtx intctrlutil.RequestCtx, cli client.Reader, s
 }
 
 // buildServiceReferences builds serviceReferences for component.
-func buildServiceReferences(reqCtx intctrlutil.RequestCtx, cli roclient.ReadonlyClient,
+func buildServiceReferences(reqCtx intctrlutil.RequestCtx, cli client.Reader,
 	synthesizeComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) error {
 	serviceReferences, err := GenServiceReferences(reqCtx, cli, synthesizeComp.Namespace, synthesizeComp.ClusterName, compDef, comp)
 	if err != nil {
@@ -380,12 +391,6 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 		synthesizeComp.WorkloadType = clusterCompDef.WorkloadType
 		synthesizeComp.CharacterType = clusterCompDef.CharacterType
 		synthesizeComp.HorizontalScalePolicy = clusterCompDef.HorizontalScalePolicy
-		synthesizeComp.StatelessSpec = clusterCompDef.StatelessSpec
-		synthesizeComp.StatefulSpec = clusterCompDef.StatefulSpec
-		synthesizeComp.ConsensusSpec = clusterCompDef.ConsensusSpec
-		synthesizeComp.ReplicationSpec = clusterCompDef.ReplicationSpec
-		synthesizeComp.RSMSpec = clusterCompDef.RSMSpec
-		synthesizeComp.StatefulSetWorkload = clusterCompDef.GetStatefulSetWorkload()
 		synthesizeComp.Probes = clusterCompDef.Probes
 		synthesizeComp.VolumeTypes = clusterCompDef.VolumeTypes
 		synthesizeComp.VolumeProtection = clusterCompDef.VolumeProtectionSpec

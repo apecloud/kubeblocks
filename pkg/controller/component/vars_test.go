@@ -541,6 +541,7 @@ var _ = Describe("vars", func() {
 							Type: corev1.ServiceTypeNodePort,
 							Ports: []corev1.ServicePort{
 								{
+									Name:     "default",
 									Port:     int32(svcPort + 1),
 									NodePort: 300002,
 								},

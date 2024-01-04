@@ -254,40 +254,44 @@ var (
 				NeedSnapshot: true,
 			},
 		},
-		Services: []appsv1alpha1.Service{
+		Services: []appsv1alpha1.ComponentService{
 			{
-				Name:        "rw",
-				ServiceName: "rw",
-				Spec: corev1.ServiceSpec{
-					Ports: []corev1.ServicePort{
-						{
-							Protocol: corev1.ProtocolTCP,
-							Port:     3306,
-							TargetPort: intstr.IntOrString{
-								Type:   intstr.String,
-								StrVal: "mysql",
+				Service: appsv1alpha1.Service{
+					Name:        "rw",
+					ServiceName: "rw",
+					Spec: corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{
+							{
+								Protocol: corev1.ProtocolTCP,
+								Port:     3306,
+								TargetPort: intstr.IntOrString{
+									Type:   intstr.String,
+									StrVal: "mysql",
+								},
 							},
 						},
 					},
+					RoleSelector: "leader",
 				},
-				RoleSelector: "leader",
 			},
 			{
-				Name:        "ro",
-				ServiceName: "ro",
-				Spec: corev1.ServiceSpec{
-					Ports: []corev1.ServicePort{
-						{
-							Protocol: corev1.ProtocolTCP,
-							Port:     3306,
-							TargetPort: intstr.IntOrString{
-								Type:   intstr.String,
-								StrVal: "mysql",
+				Service: appsv1alpha1.Service{
+					Name:        "ro",
+					ServiceName: "ro",
+					Spec: corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{
+							{
+								Protocol: corev1.ProtocolTCP,
+								Port:     3306,
+								TargetPort: intstr.IntOrString{
+									Type:   intstr.String,
+									StrVal: "mysql",
+								},
 							},
 						},
 					},
+					RoleSelector: "follower",
 				},
-				RoleSelector: "follower",
 			},
 		},
 		SystemAccounts: []appsv1alpha1.SystemAccount{

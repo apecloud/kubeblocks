@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -32,11 +31,11 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // componentTLSTransformer handles component configuration render
@@ -66,7 +65,7 @@ func (t *componentTLSTransformer) Transform(ctx graph.TransformContext, dag *gra
 }
 
 // a hack way to notify the configuration controller to re-render config
-func checkAndTriggerReRender(ctx context.Context, cli roclient.ReadonlyClient, synthesizedComp component.SynthesizedComponent, dag *graph.DAG) error {
+func checkAndTriggerReRender(ctx context.Context, cli client.Reader, synthesizedComp component.SynthesizedComponent, dag *graph.DAG) error {
 	cm := &corev1.ConfigMap{}
 	if len(synthesizedComp.ConfigTemplates) == 0 {
 		return nil
@@ -85,6 +84,7 @@ func checkAndTriggerReRender(ctx context.Context, cli roclient.ReadonlyClient, s
 
 	tlsEnabledInCM := false
 	// search all config files
+	// NODE: The check logic may have bugs and the parameters may be commented.
 	for _, configData := range cm.Data {
 		if strings.Index(configData, tlsKeyword) > 0 {
 			tlsEnabledInCM = true
@@ -101,8 +101,26 @@ func checkAndTriggerReRender(ctx context.Context, cli roclient.ReadonlyClient, s
 		if err := cli.Get(ctx, confKey, conf); err != nil {
 			return client.IgnoreNotFound(err)
 		}
+		// update payload for tls
 		confCopy := conf.DeepCopy()
-		confCopy.Spec.ConfigItemDetails[0].Version = fmt.Sprint(time.Now().UnixMilli())
+		// confCopy.Spec.ConfigItemDetails[0].Version = fmt.Sprint(time.Now().UnixMilli())
+		updated, err := intctrlutil.CheckAndPatchPayload(&confCopy.Spec.ConfigItemDetails[0], constant.TLSPayload, tls)
+		if err != nil {
+			return err
+		}
+		if !updated {
+			return nil
+		}
+
+		// NODE: The check logic may have bugs, the configuration requires that it can only be updated through patch
+		// bad case:
+		// thread1: fetch latest configuration(id: 1000)  // e.g cluster reconcile thread
+		// thread2: fetch latest configuration(id: 1000), // e.g reconfiguring operation
+		// thread1: update payload without submit
+		// thread2: update configuration.Spec.ConfigItemDetails[*].configFileParams[*]
+		// thread2: patch configuration(id: 1001)
+		// thread1: submit configuration
+		// result: thread2's update will be lost
 		graphCli, _ := cli.(model.GraphClient)
 		graphCli.Update(dag, conf, confCopy)
 	}
@@ -110,7 +128,7 @@ func checkAndTriggerReRender(ctx context.Context, cli roclient.ReadonlyClient, s
 	return nil
 }
 
-func buildTLSCert(ctx context.Context, cli roclient.ReadonlyClient, synthesizedComp component.SynthesizedComponent, dag *graph.DAG) error {
+func buildTLSCert(ctx context.Context, cli client.Reader, synthesizedComp component.SynthesizedComponent, dag *graph.DAG) error {
 	tls := synthesizedComp.TLSConfig
 	if tls == nil || !tls.Enable {
 		return nil

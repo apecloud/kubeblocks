@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -332,9 +333,6 @@ func buildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
 	envData := buildEnvConfigData(rsm)
 	annotations := ParseAnnotationsOfScope(ConfigMapScope, rsm.Annotations)
 	labels := getLabels(&rsm)
-	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
-		labels[constant.AppConfigTypeLabelKey] = "kubeblocks-env"
-	}
 	return builder.NewConfigMapBuilder(rsm.Namespace, getEnvConfigMapName(rsm.Name)).
 		AddAnnotationsInMap(annotations).
 		AddLabelsInMap(labels).
@@ -579,15 +577,6 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 		}
 	}
 
-	tryToGetRoleProbeContainer := func() *corev1.Container {
-		for i, container := range template.Spec.Containers {
-			if container.Name == constant.RoleProbeContainerName {
-				return &template.Spec.Containers[i]
-			}
-		}
-		return nil
-	}
-
 	tryToGetLorryGrpcPort := func(container *corev1.Container) *corev1.ContainerPort {
 		for i, port := range container.Ports {
 			if port.Name == constant.LorryGRPCPortName {
@@ -607,8 +596,9 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 	}
 
 	// if role probe container exists, update the readiness probe, env and serving container port
-	if container := tryToGetRoleProbeContainer(); container != nil {
-		if roleProbe.RoleUpdateMechanism == workloads.ReadinessProbeEventUpdate {
+	if container := controllerutil.GetLorryContainer(template.Spec.Containers); container != nil {
+		switch {
+		case roleProbe.RoleUpdateMechanism == workloads.ReadinessProbeEventUpdate:
 			port := tryToGetLorryGrpcPort(container)
 			if port != nil && port.ContainerPort != int32(probeGRPCPort) {
 				readinessProbe.Exec.Command = []string{
@@ -616,7 +606,20 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 					fmt.Sprintf(grpcHealthProbeArgsFormat, port.ContainerPort),
 				}
 			}
-		} else {
+		case container.ReadinessProbe != nil && container.ReadinessProbe.HTTPGet != nil &&
+			strings.HasPrefix(container.ReadinessProbe.HTTPGet.Path, "/v1.0/bindings"):
+			// for compatibility when upgrading from 0.7 to 0.8
+			port := tryToGetLorryGrpcPort(container)
+			readinessProbe.ProbeHandler = corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						grpcHealthProbeBinaryPath,
+						fmt.Sprintf(grpcHealthProbeArgsFormat, port.ContainerPort),
+					},
+				},
+			}
+			readinessProbe.HTTPGet = nil
+		default:
 			port := tryToGetLorryHTTPPort(container)
 			if port != nil && port.ContainerPort != int32(probeHTTPPort) {
 				readinessProbe.HTTPGet = &corev1.HTTPGetAction{
@@ -789,6 +792,12 @@ func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string 
 	generateReplicaEnv(prefixWithCompDefName)
 	generateMemberEnv(prefixWithCompDefName)
 	envData[prefixWithCompDefName+"CLUSTER_UID"] = uid
+
+	lorryHTTPPort, err := controllerutil.GetLorryHTTPPortFromContainers(set.Spec.Template.Spec.Containers)
+	if err == nil {
+		envData[constant.KBEnvLorryHTTPPort] = strconv.Itoa(int(lorryHTTPPort))
+
+	}
 
 	return envData
 }

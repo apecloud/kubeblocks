@@ -96,7 +96,7 @@ func buildContainerHostPorts(synthesizeComp *component.SynthesizedComponent, com
 }
 
 func updateLorrySpecAfterPortsChanged(synthesizeComp *component.SynthesizedComponent) error {
-	lorryContainer := GetLorryContainer(synthesizeComp.PodSpec.Containers)
+	lorryContainer := intctrlutil.GetLorryContainer(synthesizeComp.PodSpec.Containers)
 	if lorryContainer == nil {
 		return nil
 	}
@@ -157,19 +157,6 @@ func updateReadinessProbe(synthesizeComp *component.SynthesizedComponent, lorryH
 		if container.ReadinessProbe.HTTPGet.Path == constant.LorryRoleProbePath ||
 			container.ReadinessProbe.HTTPGet.Path == constant.LorryVolumeProtectPath {
 			container.ReadinessProbe.HTTPGet.Port = intstr.FromInt(lorryHTTPPort)
-		}
-	}
-	return nil
-}
-
-func GetLorryContainer(containers []corev1.Container) *corev1.Container {
-	var container *corev1.Container
-	for i := range containers {
-		container = &containers[i]
-		for _, port := range container.Ports {
-			if port.Name == constant.LorryHTTPPortName {
-				return container
-			}
 		}
 	}
 	return nil

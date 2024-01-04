@@ -201,8 +201,13 @@ spec:
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
+                    payload:
+                      description: Payload holds the configuration-related rerender.
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
                     version:
-                      description: version is the version of configuration template.
+                      description: 'Deprecated: Please use payload instead. version
+                        is the version of configuration template.'
                       type: string
                   required:
                   - name

@@ -57,6 +57,7 @@ lorryctl switchover  --primary xxx --candidate xxx
 			return
 		}
 
+		lorryClient.ReconcileTimeout = 30 * time.Second
 		err = lorryClient.Switchover(context.TODO(), switchOptions.primary, switchOptions.candidate, switchOptions.force)
 		if err != nil {
 			fmt.Printf("switchover failed: %v\n", err)

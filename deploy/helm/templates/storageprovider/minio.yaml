@@ -16,7 +16,7 @@ spec:
     parameters:
       mounter: geesefs
       # you can set mount options here, for example limit memory cache size (recommended)
-      options: {{ `{{ printf "--memory-limit 1000 --dir-mode 0777 --file-mode 0666 %s" (index .Parameters "mountOptions") }}` }}
+      options: {{ `{{ printf "--memory-limit 64 --dir-mode 0777 --file-mode 0666 %s" (index .Parameters "mountOptions") }}` }}
       bucket: {{ `{{ index .Parameters "bucket" }}` }}
       csi.storage.k8s.io/provisioner-secret-name: {{ `{{ .CSIDriverSecretRef.Name }}` }}
       csi.storage.k8s.io/provisioner-secret-namespace: {{ `{{ .CSIDriverSecretRef.Namespace }}` }}

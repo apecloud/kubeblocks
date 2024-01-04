@@ -4,7 +4,8 @@ metadata:
   name: {{ include "addon.alertmanager-webhook-adaptor.name" . }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
-    "kubeblocks.io/provider": apecloud
+    "addon.kubeblocks.io/provider": apecloud
+    "addon.kubeblocks.io/version": "0.1.4"
   {{- if .Values.keepAddons }}
   annotations:
     helm.sh/resource-policy: keep

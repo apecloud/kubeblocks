@@ -43,6 +43,8 @@ const (
 	urlTemplate = "http://%s:%d/v1.0/"
 )
 
+var NotImplemented = errors.New("NotImplemented")
+
 type HTTPClient struct {
 	lorryClient
 	Client           *http.Client
@@ -154,7 +156,15 @@ func (cli *HTTPClient) Request(ctx context.Context, operation, method string, re
 
 	switch resp.StatusCode {
 	case http.StatusOK, http.StatusUnavailableForLegalReasons:
-		return parseBody(resp.Body)
+		result, err := parseBody(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		if event, ok := result["event"]; ok && event.(string) == "NotImplemented" {
+			return nil, NotImplemented
+		}
+		return result, nil
+
 	case http.StatusNoContent:
 		return nil, nil
 	case http.StatusNotImplemented, http.StatusInternalServerError:

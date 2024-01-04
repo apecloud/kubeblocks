@@ -38,6 +38,7 @@ import (
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -217,13 +218,26 @@ func DelayUpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	for i := range pobj.Containers {
 		delayUpdateKubeBlocksToolsImage(obj.Containers, &pobj.Containers[i])
 	}
+	updateKubeBlocksReadinessProbe(obj.Containers, pobj.Containers)
 }
 
 // UpdatePodSpecSystemFields to update system fields in pod spec.
-func UpdatePodSpecSystemFields(pobj *corev1.PodSpec) {
+func UpdatePodSpecSystemFields(obj *corev1.PodSpec, pobj *corev1.PodSpec) {
 	for i := range pobj.Containers {
 		updateKubeBlocksToolsImage(&pobj.Containers[i])
 	}
+
+	updateKubeBlocksReadinessProbe(obj.Containers, pobj.Containers)
+}
+
+func updateKubeBlocksReadinessProbe(containers []corev1.Container, pcontainers []corev1.Container) {
+	oldLorryContainer := controllerutil.GetLorryContainer(containers)
+	newLorryContainer := controllerutil.GetLorryContainer(pcontainers)
+	if oldLorryContainer == nil || newLorryContainer == nil {
+		return
+	}
+	newLorryContainer.ReadinessProbe = oldLorryContainer.ReadinessProbe
+
 }
 
 func delayUpdateKubeBlocksToolsImage(containers []corev1.Container, pc *corev1.Container) {

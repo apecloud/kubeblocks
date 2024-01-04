@@ -600,7 +600,9 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 
 	// if role probe container exists, update the readiness probe, env and serving container port
 	if container := controllerutil.GetLorryContainer(template.Spec.Containers); container != nil {
-		if roleProbe.RoleUpdateMechanism == workloads.ReadinessProbeEventUpdate {
+		if roleProbe.RoleUpdateMechanism == workloads.ReadinessProbeEventUpdate ||
+			(container.ReadinessProbe != nil && container.ReadinessProbe.HTTPGet != nil &&
+				strings.HasPrefix(container.ReadinessProbe.HTTPGet.Path, "/v1.0/bindings")) {
 			port := tryToGetLorryGrpcPort(container)
 			if port != nil && port.ContainerPort != int32(probeGRPCPort) {
 				readinessProbe.Exec.Command = []string{

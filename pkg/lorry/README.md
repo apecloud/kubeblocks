@@ -28,12 +28,12 @@ $ go build -o probe main.go
 ## 2.2 Configure
 
 Probe read some configurations from env variables, Now there are:
-KB_CHECK_FAILED_THRESHOLD: The number of continuously checks failed aggregated in one event, in case of too many events sent. minimum 10, maximum 60 and default 10.
-KB_ROLE_UNCHANGED_THRESHOLD: the count of consecutive role unchanged checks emit one event. minimum 10, maximum 60 and default 60.
-KB_SERVICE_PORT: The port of service to probe, eg. 3306.
-KB_SERVICE_USER: The user name of service used to connect, eg. root.
-KB_SERVICE_PASSWORD: The user password of service used to connect.
-KB_SERVICE_ROLES: The mapping of roles and accessmode, eg. {"follower":"Readonly","leader":"ReadWrite"}.
+* KB_CHECK_FAILED_THRESHOLD: The number of failed continuous checks aggregated in one event, for preventing events flooding. minimum 10, maximum 60 and default 10.
+* KB_ROLE_UNCHANGED_THRESHOLD: The count of consecutive role unchanged checks to trigger one event. minimum 10, maximum 60 and default 60.
+* KB_SERVICE_PORT: The port of service to probe, eg. 3306.
+* KB_SERVICE_USER: The user name of service used to connect, eg. root.
+* KB_SERVICE_PASSWORD: The user password of service used to connect.
+* KB_SERVICE_ROLES: The mapping of roles and accessmode, eg. {"follower":"Readonly","leader":"ReadWrite"}.
 
 ## 2.3 Run
 

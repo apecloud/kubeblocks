@@ -597,9 +597,8 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 
 	// if role probe container exists, update the readiness probe, env and serving container port
 	if container := controllerutil.GetLorryContainer(template.Spec.Containers); container != nil {
-		if roleProbe.RoleUpdateMechanism == workloads.ReadinessProbeEventUpdate ||
-			(container.ReadinessProbe != nil && container.ReadinessProbe.HTTPGet != nil &&
-				strings.HasPrefix(container.ReadinessProbe.HTTPGet.Path, "/v1.0/bindings")) {
+		switch {
+		case roleProbe.RoleUpdateMechanism == workloads.ReadinessProbeEventUpdate:
 			port := tryToGetLorryGrpcPort(container)
 			if port != nil && port.ContainerPort != int32(probeGRPCPort) {
 				readinessProbe.Exec.Command = []string{
@@ -607,7 +606,20 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 					fmt.Sprintf(grpcHealthProbeArgsFormat, port.ContainerPort),
 				}
 			}
-		} else {
+		case container.ReadinessProbe != nil && container.ReadinessProbe.HTTPGet != nil &&
+			strings.HasPrefix(container.ReadinessProbe.HTTPGet.Path, "/v1.0/bindings"):
+			// for compatibility when upgrading from 0.7 to 0.8
+			port := tryToGetLorryGrpcPort(container)
+			readinessProbe.ProbeHandler = corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						grpcHealthProbeBinaryPath,
+						fmt.Sprintf(grpcHealthProbeArgsFormat, port.ContainerPort),
+					},
+				},
+			}
+			readinessProbe.HTTPGet = nil
+		default:
 			port := tryToGetLorryHTTPPort(container)
 			if port != nil && port.ContainerPort != int32(probeHTTPPort) {
 				readinessProbe.HTTPGet = &corev1.HTTPGetAction{

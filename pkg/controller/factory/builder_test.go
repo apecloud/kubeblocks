@@ -151,7 +151,9 @@ var _ = Describe("builder", func() {
 		Expect(err).Should(Succeed())
 		Expect(synthesizeComp).ShouldNot(BeNil())
 		// to resolve and inject env vars
-		Expect(component.ResolveEnvNTemplateVars(reqCtx.Ctx, testCtx.Cli, synthesizeComp, cluster.Annotations, nil)).Should(Succeed())
+		templateVars, envVars, err := component.ResolveTemplateNEnvVars(reqCtx.Ctx, testCtx.Cli, synthesizeComp, cluster.Annotations, nil)
+		Expect(err).Should(Succeed())
+		component.SetTemplateNEnvVars(synthesizeComp, templateVars, envVars)
 		return synthesizeComp
 	}
 	newClusterObjs := func(clusterDefObj *appsv1alpha1.ClusterDefinition) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.Cluster, *component.SynthesizedComponent) {

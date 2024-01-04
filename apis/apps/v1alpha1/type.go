@@ -670,7 +670,7 @@ type Service struct {
 // |           | UID       | KB_CLUSTER_UID       |          |      |         |          |
 // |           | Component | KB_CLUSTER_COMP_NAME |          |      |         |          |
 // | Component | Name      | KB_COMP_NAME         |          |      |         |          |
-// |           | Replicas  | KB_COMP_REPLICAS     |          |      |    ✓    |    N     |
+// |           | Replicas  | KB_COMP_REPLICAS     |          |      |    ✓    |          |
 // | Pod       | Name      | KB_POD_NAME          |     x    |      |    ✓    |          |
 // |           | UID       | KB_POD_UID           |     x    |      |    ✓    |          |
 // |           | IP        | KB_POD_IP            |     x    |      |    ✓    |          |

@@ -387,7 +387,7 @@ type OpsService struct {
 	// +listMapKey=port
 	// +listMapKey=protocol
 	// +optional
-	Ports []ServicePort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"port" protobuf:"bytes,1,rep,name=ports"`
+	Ports []corev1.ServicePort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"port" protobuf:"bytes,1,rep,name=ports"`
 
 	// RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined role as selector for the service.
 	// +optional

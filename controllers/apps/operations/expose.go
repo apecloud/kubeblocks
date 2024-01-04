@@ -56,115 +56,27 @@ func (e ExposeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 	var (
 		exposeMap = opsRes.OpsRequest.Spec.ToExposeListToMap()
 	)
-
+	reqCtx.Log.Info("cluster service before action", "clusterService", opsRes.Cluster.Spec.Services)
 	for _, clusterCompSpec := range opsRes.Cluster.Spec.ComponentSpecs {
 		expose, ok := exposeMap[clusterCompSpec.Name]
 		if !ok {
 			continue
 		}
-		if err := e.buildClusterServices(reqCtx, cli, opsRes.Cluster, &clusterCompSpec, expose.Services); err != nil {
-			return err
+		switch expose.Switch {
+		case appsv1alpha1.EnableExposeSwitch:
+			if err := e.buildClusterServices(reqCtx, cli, opsRes.Cluster, &clusterCompSpec, expose.Services); err != nil {
+				return err
+			}
+		case appsv1alpha1.DisableExposeSwitch:
+			if err := e.removeClusterServices(opsRes.Cluster, &clusterCompSpec, expose.Services); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("invalid expose switch: %s", expose.Switch)
 		}
 	}
+	reqCtx.Log.Info("cluster service to be updated", "clusterService", opsRes.Cluster.Spec.Services)
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
-}
-
-func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
-	exposeServices []appsv1alpha1.OpsService) error {
-	if cluster == nil || clusterCompSpec == nil || len(exposeServices) == 0 {
-		return nil
-	}
-
-	checkServiceExist := func(exposeService appsv1alpha1.OpsService) bool {
-		if len(cluster.Spec.Services) == 0 {
-			return false
-		}
-		for _, clusterService := range cluster.Spec.Services {
-			if clusterService.ComponentSelector != clusterCompSpec.Name {
-				continue
-			}
-			if clusterService.Name == exposeService.Name {
-				return true
-			}
-		}
-		return false
-	}
-
-	convertDefaultCompDefServicePorts := func(compServices []appsv1alpha1.ComponentService) ([]corev1.ServicePort, error) {
-		if len(compServices) == 0 {
-			return nil, fmt.Errorf("component service is not defined, expose operation is not supported, cluster: %s, component: %s", cluster.Name, clusterCompSpec.Name)
-		}
-		defaultServicePorts := make([]corev1.ServicePort, 0, len(compServices))
-		for _, compService := range compServices {
-			if compService.Spec.Type == corev1.ServiceTypeLoadBalancer || compService.Spec.Type == corev1.ServiceTypeNodePort {
-				continue
-			}
-			for _, p := range compService.Spec.Ports {
-				genServicePort := corev1.ServicePort{
-					Name:        p.Name,
-					Protocol:    p.Protocol,
-					AppProtocol: p.AppProtocol,
-					Port:        p.Port,
-					TargetPort:  p.TargetPort,
-				}
-				defaultServicePorts = append(defaultServicePorts, genServicePort)
-			}
-		}
-		if len(defaultServicePorts) == 0 {
-			return nil, fmt.Errorf("component does not define an available service, expose operation is not supported, cluster: %s, component: %s", cluster.Name, clusterCompSpec.Name)
-		}
-		return defaultServicePorts, nil
-	}
-
-	defaultServicePortsFunc := func() ([]corev1.ServicePort, error) {
-		if clusterCompSpec.ComponentDef != "" {
-			compDef, err := component.GetCompDefinition(reqCtx, cli, cluster, clusterCompSpec.Name)
-			if err != nil {
-				return nil, err
-			}
-			return convertDefaultCompDefServicePorts(compDef.Spec.Services)
-		}
-		if cluster.Spec.ClusterDefRef != "" && clusterCompSpec.ComponentDefRef != "" {
-			clusterDef, err := getClusterDefByName(reqCtx.Ctx, cli, cluster.Spec.ClusterDefRef)
-			if err != nil {
-				return nil, err
-			}
-			clusterCompDef := clusterDef.GetComponentDefByName(clusterCompSpec.ComponentDefRef)
-			if clusterCompDef == nil || clusterCompDef.Service == nil {
-				return nil, fmt.Errorf("referenced cluster component definition or services is not defined: %s", clusterCompSpec.ComponentDefRef)
-			}
-			return clusterCompDef.Service.ToSVCPorts(), nil
-		}
-		return nil, fmt.Errorf("component definition is not defined, cluster: %s, component: %s", cluster.Name, clusterCompSpec.Name)
-	}
-
-	for _, exposeService := range exposeServices {
-		if checkServiceExist(exposeService) {
-			return fmt.Errorf("service %s already exists, cluster: %s, component: %s", exposeService.Name, cluster.Name, clusterCompSpec.Name)
-		}
-		defaultServicePorts, err := defaultServicePortsFunc()
-		if err != nil {
-			return err
-		}
-		genServiceName := fmt.Sprintf("%s-%s", clusterCompSpec.Name, exposeService.Name)
-		clusterService := appsv1alpha1.ClusterService{
-			Service: appsv1alpha1.Service{
-				Name:        genServiceName,
-				ServiceName: genServiceName,
-				Annotations: exposeService.Annotations,
-				Spec: corev1.ServiceSpec{
-					Ports: defaultServicePorts,
-					Type:  exposeService.ServiceType,
-				},
-			},
-			ComponentSelector: clusterCompSpec.Name,
-		}
-		cluster.Spec.Services = append(cluster.Spec.Services, clusterService)
-	}
-	return nil
 }
 
 func (e ExposeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
@@ -289,5 +201,182 @@ func (e ExposeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, c
 		}
 	}
 	opsResource.OpsRequest.Status.LastConfiguration.Components = lastComponentInfo
+	return nil
+}
+
+func (e ExposeOpsHandler) removeClusterServices(cluster *appsv1alpha1.Cluster,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
+	exposeServices []appsv1alpha1.OpsService) error {
+	if cluster == nil || clusterCompSpec == nil || len(exposeServices) == 0 {
+		return nil
+	}
+	for _, exposeService := range exposeServices {
+		genServiceName := fmt.Sprintf("%s-%s", clusterCompSpec.Name, exposeService.Name)
+		for i, clusterService := range cluster.Spec.Services {
+			// remove service from cluster
+			if clusterService.Name == genServiceName && clusterService.ComponentSelector == clusterCompSpec.Name {
+				cluster.Spec.Services = append(cluster.Spec.Services[:i], cluster.Spec.Services[i+1:]...)
+				break
+			}
+		}
+	}
+	return nil
+}
+
+func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
+	exposeServices []appsv1alpha1.OpsService) error {
+	if cluster == nil || clusterCompSpec == nil || len(exposeServices) == 0 {
+		return nil
+	}
+
+	checkServiceExist := func(exposeService appsv1alpha1.OpsService) bool {
+		if len(cluster.Spec.Services) == 0 {
+			return false
+		}
+		for _, clusterService := range cluster.Spec.Services {
+			if clusterService.ComponentSelector != clusterCompSpec.Name {
+				continue
+			}
+			genServiceName := fmt.Sprintf("%s-%s", clusterCompSpec.Name, exposeService.Name)
+			if clusterService.Name == genServiceName {
+				return true
+			}
+		}
+		return false
+	}
+
+	convertDefaultCompDefServicePorts := func(compServices []appsv1alpha1.ComponentService) ([]corev1.ServicePort, error) {
+		if len(compServices) == 0 {
+			return nil, fmt.Errorf("component service is not defined, expose operation is not supported, cluster: %s, component: %s", cluster.Name, clusterCompSpec.Name)
+		}
+		defaultServicePorts := make([]corev1.ServicePort, 0, len(compServices))
+		for _, compService := range compServices {
+			if compService.Spec.Type == corev1.ServiceTypeLoadBalancer || compService.Spec.Type == corev1.ServiceTypeNodePort {
+				continue
+			}
+			for _, p := range compService.Spec.Ports {
+				genServicePort := corev1.ServicePort{
+					Name:        p.Name,
+					Protocol:    p.Protocol,
+					AppProtocol: p.AppProtocol,
+					Port:        p.Port,
+					TargetPort:  p.TargetPort,
+				}
+				defaultServicePorts = append(defaultServicePorts, genServicePort)
+			}
+		}
+		if len(defaultServicePorts) == 0 {
+			return nil, fmt.Errorf("component does not define an available service, expose operation is not supported, cluster: %s, component: %s", cluster.Name, clusterCompSpec.Name)
+		}
+		return defaultServicePorts, nil
+	}
+
+	defaultServicePortsFunc := func() ([]corev1.ServicePort, error) {
+		if clusterCompSpec.ComponentDef != "" {
+			compDef, err := component.GetCompDefinition(reqCtx, cli, cluster, clusterCompSpec.Name)
+			if err != nil {
+				return nil, err
+			}
+			return convertDefaultCompDefServicePorts(compDef.Spec.Services)
+		}
+		if cluster.Spec.ClusterDefRef != "" && clusterCompSpec.ComponentDefRef != "" {
+			clusterDef, err := getClusterDefByName(reqCtx.Ctx, cli, cluster.Spec.ClusterDefRef)
+			if err != nil {
+				return nil, err
+			}
+			clusterCompDef := clusterDef.GetComponentDefByName(clusterCompSpec.ComponentDefRef)
+			if clusterCompDef == nil || clusterCompDef.Service == nil {
+				return nil, fmt.Errorf("referenced cluster component definition or services is not defined: %s", clusterCompSpec.ComponentDefRef)
+			}
+			return clusterCompDef.Service.ToSVCPorts(), nil
+		}
+		return nil, fmt.Errorf("component definition is not defined, cluster: %s, component: %s", cluster.Name, clusterCompSpec.Name)
+	}
+
+	defaultRoleSelectorFunc := func() (string, error) {
+		if clusterCompSpec.ComponentDef != "" {
+			compDef, err := component.GetCompDefinition(reqCtx, cli, cluster, clusterCompSpec.Name)
+			if err != nil {
+				return "", err
+			}
+			if len(compDef.Spec.Roles) == 0 {
+				return "", nil
+			}
+			for _, role := range compDef.Spec.Roles {
+				if role.Writable && role.Serviceable {
+					return role.Name, nil
+				}
+			}
+			return "", nil
+		}
+		if cluster.Spec.ClusterDefRef != "" && clusterCompSpec.ComponentDefRef != "" {
+			clusterDef, err := getClusterDefByName(reqCtx.Ctx, cli, cluster.Spec.ClusterDefRef)
+			if err != nil {
+				return "", err
+			}
+			clusterCompDef := clusterDef.GetComponentDefByName(clusterCompSpec.ComponentDefRef)
+			if clusterCompDef == nil {
+				return "", fmt.Errorf("referenced cluster component definition is not defined: %s", clusterCompSpec.ComponentDefRef)
+			}
+			switch clusterCompDef.WorkloadType {
+			case appsv1alpha1.Replication:
+				return constant.Primary, nil
+			case appsv1alpha1.Consensus:
+				return constant.Leader, nil
+			}
+		}
+		return "", nil
+	}
+
+	for _, exposeService := range exposeServices {
+		if checkServiceExist(exposeService) {
+			return fmt.Errorf("service %s already exists, cluster: %s, component: %s", exposeService.Name, cluster.Name, clusterCompSpec.Name)
+		}
+		genServiceName := fmt.Sprintf("%s-%s", clusterCompSpec.Name, exposeService.Name)
+		clusterService := appsv1alpha1.ClusterService{
+			Service: appsv1alpha1.Service{
+				Name:        genServiceName,
+				ServiceName: genServiceName,
+				Annotations: exposeService.Annotations,
+				Spec: corev1.ServiceSpec{
+					Type: exposeService.ServiceType,
+				},
+			},
+			ComponentSelector: clusterCompSpec.Name,
+		}
+
+		// set service selector
+		if exposeService.Selector != nil {
+			clusterService.Spec.Selector = exposeService.Selector
+		}
+
+		// set service ports
+		if len(exposeService.Ports) != 0 {
+			clusterService.Spec.Ports = exposeService.Ports
+		} else {
+			defaultServicePorts, err := defaultServicePortsFunc()
+			if err != nil {
+				return err
+			}
+			clusterService.Spec.Ports = defaultServicePorts
+		}
+
+		// set role selector
+		if len(exposeService.RoleSelector) != 0 {
+			clusterService.RoleSelector = exposeService.RoleSelector
+		} else {
+			defaultRoleSelector, err := defaultRoleSelectorFunc()
+			if err != nil {
+				return err
+			}
+			if defaultRoleSelector != "" {
+				clusterService.RoleSelector = defaultRoleSelector
+			}
+		}
+		cluster.Spec.Services = append(cluster.Spec.Services, clusterService)
+	}
 	return nil
 }

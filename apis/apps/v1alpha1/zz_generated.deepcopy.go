@@ -3894,7 +3894,7 @@ func (in *OpsService) DeepCopyInto(out *OpsService) {
 	}
 	if in.Ports != nil {
 		in, out := &in.Ports, &out.Ports
-		*out = make([]ServicePort, len(*in))
+		*out = make([]v1.ServicePort, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

@@ -74,7 +74,7 @@ kbcli fault pod kill-container --container=mysql --container=config-manager
 
 本节介绍如何使用 YAML 文件模拟故障注入。你可以在上述 kbcli 命令的末尾添加 `--dry-run` 命令来查看 YAML 文件，还可以参考 [Chaos Mesh 官方文档](https://chaos-mesh.org/zh/docs/next/simulate-pod-chaos-on-kubernetes/#使用-yaml-配置文件创建实验)获取更详细的信息。
 
-### Pod-kill 示例
+### Pod kill 示例
 
 1. 将实验配置写入到 `pod-kill.yaml` 文件中。
 
@@ -105,7 +105,7 @@ kbcli fault pod kill-container --container=mysql --container=config-manager
    kubectl apply -f ./pod-kill.yaml
    ```
 
-### Pod-failure 示例
+### Pod failure 示例
 
 1. 将实验配置写入到 `pod-failure.yaml` 文件中。
 
@@ -136,7 +136,7 @@ kbcli fault pod kill-container --container=mysql --container=config-manager
    kubectl apply -f ./pod-kill.yaml
    ```
 
-### Container-kill 示例
+### Container kill 示例
 
 1. 将实验配置写入到 `container-kill.yaml` 文件中。
 

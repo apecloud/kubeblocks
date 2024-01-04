@@ -1,43 +1,43 @@
 ---
-title: Simulate DNS faults
-description: Simulate DNS faults
+title: 模拟 DNS 故障
+description: 模拟 DNS 故障
 sidebar_position: 5
-sidebar_label: Simulate DNS faults
+sidebar_label: 模拟 DNS 故障
 ---
 
-# Simulate DNS faults
+# 模拟 DNS 故障
 
-DNSChaos is used to simulate wrong DNS responses. For example, DNSChaos can return an error or return a random IP address when receiving a DNS request.
+DNSChaos 用于模拟错误的 DNS 响应。例如，DNSChaos 可以在接收到 DNS 请求时返回错误，或随机的 IP 地址。
 
-## Deploy Chaos DNS server
+## 部署 Chaos DNS server
 
-Check whether Chaos DNS Server is deployed by running the following command:
+执行以下命令，检查 DNS 服务的状态是否正常：
 
 ```bash
 kubectl get pods -n chaos-mesh -l app.kubernetes.io/component=chaos-dns-server
 ```
 
-Make sure that the Pod status is `Running`.
+请确保 Pod 的状态为 `Running`。
 
-## Notes
+## 注意事项
 
-1. Currently, DNSChaos only supports record types `A` and `AAAA`.
+1. 目前 DNSChaos 只支持 DNS 记录类型 `A` 和 `AAAA`。
 
-2. The chaos DNS service runs CoreDNS with the [k8s_dns_chaos](https://github.com/chaos-mesh/k8s_dns_chaos) plugin. If the CoreDNS service in your Kubernetes cluster contains some special configurations, you can edit configMap `dns-server-config` to make the configuration of the chaos DNS service consistent with that of the K8s CoreDNS service using the following command:
+2. Chaos DNS 服务运行带有 [k8s_dns_chaos](https://github.com/chaos-mesh/k8s_dns_chaos) 插件的 CoreDNS。如果 Kubernetes 集群本身的 CoreDNS 服务包含一些特殊配置，请执行以下命令编辑 configMap `dns-server-config`，使 Chaos DNS 服务配置与 K8s CoreDNS 服务配置一致：
 
     ```bash
     kubectl edit configmap dns-server-config -n chaos-mesh
     ```
 
-## Simulate fault injections by kbcli
+## 使用 kbcli 模拟故障注入
 
-DNS faults can be simulated as `random` and `error`. You can select one type for DNS fault injection.
+DNS 故障可分为 `random` 和 `error` 两种类型。你可以选择其中一种进行 DNS 故障注入。
 
-`--pattern` selects a domain template that matches faults and it is required. Placeholder `?` and wildcard `*` are supported.
+`--pattern` 用于选择与故障匹配的域名模板，是必需的，支持使用占位符 `?` 和通配符 `*`。
 
 ### DNS random
 
-Run the command below to inject DNS faults into all Pods in the default namespace, which means a random IP address will be returned when a DNS request is sent to the specified domains.
+执行以下命令，向默认命名空间中的所有 Pod 注入 DNS 故障。当发送 DNS 请求到指定的域名时，将返回一个随机的 IP 地址。
 
 ```bash
 kbcli fault network dns random --patterns=google.com --duration=1m
@@ -45,21 +45,21 @@ kbcli fault network dns random --patterns=google.com --duration=1m
 
 ### DNS error
 
-Run the command below to inject DNS faults into all Pods in the default namespace, which means an error will be returned when a DNS request is sent to the specified domains.
+执行以下命令，向默认命名空间中的所有 Pod 注入 DNS 故障。当发送 DNS 请求到指定的域名时，将返回一个错误。
 
 ```bash
 kbcli fault network dns error --patterns=google.com --duration=1m
 ```
 
-## Simulate fault injections by YAML file
+## 使用 YAML 文件模拟故障注入
 
-This section introduces the YAML configuration file examples. You can view the YAML file by adding `--dry-run` at the end of the above kbcli commands. Meanwhile, you can also refer to the [Chaos Mesh official docs](https://chaos-mesh.org/docs/next/simulate-dns-chaos-on-kubernetes/#create-experiments-using-the-yaml-file) for details.
+本节介绍如何使用 YAML 文件模拟故障注入。你可以在上述 kbcli 命令的末尾添加 `--dry-run` 命令来查看 YAML 文件，还可以参考 [Chaos Mesh 官方文档](https://chaos-mesh.org/zh/docs/next/simulate-dns-chaos-on-kubernetes/#使用-yaml-方式创建实验)获取更详细的信息。
 
-### DNS-random example
+### DNS random 示例
 
-1. Write the experiment configuration to the `dns-random.yaml` file.
+1. 将实验配置写入到 `dns-random.yaml` 文件中。
 
-    In the following example, Chaos Mesh injects DNS faults into all Pods in the default namespace, which means an IP address will be returned when a DNS request is sent to the specified domains.
+    在下例中，Chaos Mesh 向默认命名空间中的所有 Pod 注入 DNS 故障。当发送 DNS 请求到指定的域名时，将返回一个 IP 地址。
 
     ```yaml
     apiVersion: chaos-mesh.org/v1alpha1
@@ -79,17 +79,17 @@ This section introduces the YAML configuration file examples. You can view the Y
         - default
     ```
 
-2. Run `kubectl` to start an experiment.
+2. 使用 `kubectl` 创建实验。
 
    ```bash
    kubectl apply -f ./dns-random.yaml
    ```
 
-### DNS-error example
+### DNS error 示例
 
-1. Write the experiment configuration to the `dns-error.yaml` file.
+1. 将实验配置写入到 `dns-error.yaml` 文件中。
 
-    In the following example, Chaos Mesh injects DNS faults into all Pods in the default namespace, which means an error will be returned when a DNS request is sent to the specified domains.
+    在下例中，Chaos Mesh 向默认命名空间中的所有 Pod 注入 DNS 故障。当发送 DNS 请求到指定的域名时，将返回一个错误。
 
     ```yaml
     apiVersion: chaos-mesh.org/v1alpha1
@@ -109,18 +109,18 @@ This section introduces the YAML configuration file examples. You can view the Y
         - default
     ```
 
-2. Run `kubectl` to start an experiment.
+2. 使用 `kubectl` 创建实验。
 
    ```bash
    kubectl apply -f ./network-partition.yaml
    ```
 
-### Field description
+### 字段说明
 
-| Parameter | Type | Description | Default value | Required | Example |
+| 参数 | 类型 | 说明 | 默认值 | 是否必填 | 示例 |
 | :-- | :-- | :-- | :-- | :-- | :-- |
-| `action` | string | Defines the behavior of DNS fault. Optional values: `random` or `error`. When the value is `random`, DNS service returns a random IP address; when the value is `error`, DNS service returns an error. | None | Yes | `random` or `error` |
-| `patterns` | String array | Selects a domain template that matches faults. Placeholder `?` and wildcard `*` are supported.  | [] | No | `google.com`, `chaos-mesh.org`, `github.com` |
-| `mode` | string | Specifies the mode of the experiment. The mode options include `one` (selecting a random Pod), `all` (selecting all eligible Pods), `fixed` (selecting a specified number of eligible Pods), `fixed-percent` (selecting a specified percentage of Pods from the eligible Pods), and `random-max-percent` (selecting the maximum percentage of Pods from the eligible Pods). | None | Yes | `one` |
-| `value` | string | Provides parameters for the `mode` configuration, depending on `mode`. For example, when `mode` is set to `fixed-percent`, `value` specifies the percentage of Pods. | None | No | `1` |
-| `selector` | struct | Specifies the target Pod. | None | Yes |  |
+| `action` | string | 定义 DNS 故障的行为，可选值为 `random` 或 `error`。当值为 `random` 时， DNS 服务返回随机的 IP 地址；当值为 `error` 时 DNS 服务返回错误。| 无 | 是 | `random` 或 `error` |
+| `patterns` | 选择匹配故障行为的域名模版， 支持占位符 `?` 以及通配符 `*`。 | [] | 否 | `google.com`、`chaos-mesh.org`、`github.com` |
+| `mode` | string | 指定实验的运行方式，可选项包括：`one`（表示随机选出一个符合条件的 Pod）、`all`（表示选出所有符合条件的 Pod）、`fixed`（表示选出指定数量且符合条件的 Pod）、`fixed-percent`（表示选出占符合条件的 Pod 中指定百分比的 Pod）和 `random-max-percent`（表示选出占符合条件的 Pod 中不超过指定百分比的 Pod）。 | 无 | 是 | `one` |
+| `value` | string | 取决于 `mode` 的配置，为 `mode` 提供对应的参数。例如，当你将 `mode` 配置为 `fixed-percent` 时，`value` 用于指定 Pod 的百分比。 | 无 | 否 | `1` |
+| `selector` | struct | 指定目标 Pod。| 无 | 是 |  |

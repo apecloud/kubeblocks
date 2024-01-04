@@ -1,48 +1,48 @@
 ---
-title: Simulate HTTP faults
-description: Simulate HTTP faults
+title: 模拟 HTTP 故障
+description: 模拟 HTTP 故障
 sidebar_position: 6
-sidebar_label: Simulate HTTP faults
+sidebar_label: 模拟 HTTP 故障
 ---
 
-# Simulate HTTP faults
+# 模拟 HTTP 故障
 
-HTTPChaos experiments simulate the fault scenarios during the HTTP request and response processing. Currently, HTTPChaos supports simulating the following fault types:
+HTTPChaos 实验用于模拟在 HTTP 请求和响应过程中发生故障的场景。目前，HTTPChaos 支持以下几种故障类型：
 
-* Abort: blocks requests and responses.
-* Delay: injects latency into the request or response.
-* Replace: replaces part of the content in HTTP request or response messages.
-* Patch: adds additional content to the HTTP request or response messages.
+* Abort：中断请求和响应；
+* Delay：为请求或响应过程注入延迟；
+* Replace：替换 HTTP 请求或响应报文中的部分内容；
+* Patch：在 HTTP 请求或响应报文中添加额外内容。
 
-HTTP faults support combining different fault types. If you have configured multiple HTTP fault types at the same time when creating HTTPChaos experiments, the order of injecting the faults follows abort -> delay -> replace -> patch. When the abort fault causes short circuits, the connection will be directly interrupted.
+HTTPChaos 支持多种故障类型的组合。在创建 HTTPChaos 实验时，如果同时配置了多种 HTTP 故障类型，实验运行时注入故障的优先级（顺序）固定为 abort -> delay -> replace -> patch。其中 abort 故障会导致短路，直接中断此次连接。
 
-## Before you start
+## 开始之前
 
-Before injecting the faults supported by HTTPChaos, make sure the following requirements are met:
+在注入 HTTPChaos 相关故障之前，请注意以下事项：
 
-* There is no control manager of Chaos Mesh running on the target Pod.
-* The rules affect both clients and servers in the Pod. If you want to affect only one of them, refer to the [official specific side](https://chaos-mesh.org/docs/simulate-http-chaos-on-kubernetes/#specify-side) section.
-* HTTPS access should be disabled because injecting HTTPS connections is not supported currently.
-* To make HTTPChaos injection take effect, the client should avoid reusing TCP socket. This is because HTTPChaos does not affect the HTTP requests that are sent via TCP socket before the fault injection.
-* Use non-idempotent requests (such as most of the POST requests) with caution in production environments. If such requests are used, the target service may not return to normal status by repeating requests after the fault injection.
+* 确保目标 Pod 上没有运行 Chaos Mesh 的 Control Manager。
+* 默认情况下，相关命令将同时作用于 Pod 中的客户端和服务器。如果你不需要这种设置，请参考[官方文档](https://chaos-mesh.org/docs/simulate-http-chaos-on-kubernetes/#specify-side)。
+* 确保目标服务已禁用 HTTPS 访问，因为 HTTPChaos 暂不支持注入 HTTPS 连接。
+* 为使 HTTPChaos 故障注入生效，尽量避免复用客户端的 TCP socket，在注入故障前建立的 TCP socket 上进行 HTTP 请求不受 HTTPChaos 影响。
+* 请在生产环境谨慎使用非幂等语义请求（例如大多数 POST 请求）。若使用了这类请求，故障注入后可能无法通过重复请求使目标服务恢复正常状态。
 
-## Simulate fault injections by kbcli
+## 使用 kbcli 模拟故障注入
 
-This table below describes the general flags for HTTP faults.
+下表介绍所有 HTTP 故障类型的常见字段。
 
-📎 Table 1. kbcli fault network http flags description
+📎 Table 1. kbcli HTTP 故障参数说明
 
-| Option                   | Description               | Default value | Required |
+| 参数                   | 说明               | 默认值 | 是否必填 |
 | :----------------------- | :------------------------ | :------------ | :------- |
-| `--target` | It specifies whether the target of fault injection is `Request` or `Response`. The target-related fields should be configured at the same time. | Request | No |
-| `--port` | It specifies the TCP port that the target service listens on. | 80 | No |
-| `--path` | The URL path of the target request. Supports [Matching wildcards](https://www.wikiwand.com/en/Matching_wildcards). | * | No |
-| `--method` | It specifies the HTTP method that the target requests. | `GET` | No |
-| `--code` | It specifies the status code responded by the target. It is effective only when `target=response`. | 0 | No |
+| `--target` | 指定故障注入的目标过程为 `Request` 或 `Response`，需要同时配置与 target 相关的字段。 | `Request` | 否 |
+| `--port` | 指定目标服务监听的 TCP 端口。| 80 | 否 |
+| `--path` | 指定目标请求的 URL 路径，支持[通配符](https://www.wikiwand.com/en/Matching_wildcards)。 | * | 否 |
+| `--method` | 指定目标请求的 HTTP method。 | `GET` | 否 |
+| `--code` | 指定目标响应的状态码，仅当 `target=response` 时生效。 | 0 | 否 |
 
 ### Abort
 
-The command below injects one-minute abort chaos to the specified Pod.
+执行以下命令，向指定的 Pod 中注入 abort 故障 1 分钟。
 
 ```bash
 kbcli fault network http abort --duration=1m
@@ -50,7 +50,7 @@ kbcli fault network http abort --duration=1m
 
 ### Delay
 
-The command below injects a 15-second latency chaos to the specified Pod.
+执行以下命令，向指定的 Pod 中注入 delay 故障 15 秒。
 
 ```bash
 kbcli fault network http delay --delay=15s
@@ -58,7 +58,7 @@ kbcli fault network http delay --delay=15s
 
 ### Replace
 
-The command below replaces part of content in HTTP request or response messages for 1 minute.
+执行以下命令，替换 HTTP 请求或响应报文中的部分内容，持续 1 分钟。
 
 ```bash
 kbcli fault network http replace --replace-method=PUT --duration=1m
@@ -66,21 +66,21 @@ kbcli fault network http replace --replace-method=PUT --duration=1m
 
 ### Patch
 
-The command below adds additional contents to HTTP request or response messages.
+执行以下命令，在 HTTP 请求或响应报文中添加额外的内容。
 
 ```bash
 kbcli fault network http patch --body='{"key":""}' --type=JSON --duration=30s
 ```
 
-## Simulate fault injections by YAML file
+## 使用 YAML 文件模拟故障注入
 
-This section introduces the YAML configuration file examples. You can view the YAML file by adding `--dry-run` at the end of the above kbcli commands. Meanwhile, you can also refer to the [Chaos Mesh official docs](https://chaos-mesh.org/docs/next/simulate-http-chaos-on-kubernetes/#create-experiments-using-yaml-files) for details.
+本节介绍如何使用 YAML 文件模拟故障注入。你可以在上述 kbcli 命令的末尾添加 `--dry-run` 命令来查看 YAML 文件，还可以参考 [Chaos Mesh 官方文档](https://chaos-mesh.org/zh/docs/next/simulate-http-chaos-on-kubernetes/#使用-yaml-文件创建实验)获取更详细的信息。
 
-### HTTP-abort example
+### HTTP abort 示例
 
-1. Write the experiment configuration to the `http-abort.yaml` file.
+1. 将实验配置写入到 `http-abort.yaml` 文件中。
 
-    In the following example, Chaos Mesh injects 1-minute abort chaos to the specified Pod for 1 minute.
+    在下例中，Chaos Mesh 将向指定的 Pod 中注入 abort 故障 1 分钟。
 
     ```yaml
     apiVersion: chaos-mesh.org/v1alpha1
@@ -102,18 +102,17 @@ This section introduces the YAML configuration file examples. You can view the Y
       target: Request
     ```
 
-2. Run `kubectl` to start an experiment.
+2. 使用 `kubectl` 创建实验。
 
    ```bash
    kubectl apply -f ./http-abort.yaml
    ```
 
-### HTTP-delay example
+### HTTP delay 示例
 
+1. 将实验配置写入到 `http-delay.yaml` 文件中。
 
-1. Write the experiment configuration to the `http-delay.yaml` file.
-
-    In the following example, Chaos Mesh injects a 15-second latency chaos to the specified Pod.
+    在下例中，Chaos Mesh 将向指定的 Pod 中注入 delay 故障 15 秒。
 
     ```yaml
     apiVersion: chaos-mesh.org/v1alpha1
@@ -135,17 +134,17 @@ This section introduces the YAML configuration file examples. You can view the Y
       target: Request
     ```
 
-2. Run `kubectl` to start an experiment.
+2. 使用 `kubectl` 创建实验。
 
    ```bash
    kubectl apply -f ./http-delay.yaml
    ```
 
-### HTTP-replace example
+### HTTP replace 示例
 
-1. Write the experiment configuration to the `http-replace.yaml` file.
+1. 将实验配置写入到 `http-replace.yaml` 文件中。
 
-    In the following example, Chaos Mesh replaces part of content in HTTP request or response messages for 1 minute.
+    在下例中，Chaos Mesh 将替换 HTTP 请求或响应报文中的部分内容，持续 1 分钟。
 
     ```yaml
     apiVersion: chaos-mesh.org/v1alpha1
@@ -168,17 +167,17 @@ This section introduces the YAML configuration file examples. You can view the Y
       target: Request
     ```
 
-2. Run `kubectl` to start an experiment.
+2. 使用 `kubectl` 创建实验。
 
    ```bash
    kubectl apply -f ./http-replace.yaml
    ```
 
-### HTTP-patch example
+### HTTP patch 示例
 
-1. Write the experiment configuration to the `http-patch.yaml` file.
+1. 将实验配置写入到 `http-patch.yaml` 文件中。
 
-    In the following example, Chaos Mesh adds additional contents to HTTP request or response messages.
+    在下例中，Chaos Mesh 将在 HTTP 请求或响应报文中添加额外的内容。
 
     ```yaml
     apiVersion: chaos-mesh.org/v1alpha1
@@ -203,7 +202,7 @@ This section introduces the YAML configuration file examples. You can view the Y
       target: Request
     ```
 
-2. Run `kubectl` to start an experiment.
+2. 使用 `kubectl` 创建实验。
 
    ```bash
    kubectl apply -f ./http-patch.yaml

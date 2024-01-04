@@ -1,44 +1,44 @@
 ---
-title: Simulate I/O faults
-description: Simulate I/O faults
+title: 模拟 I/O 故障
+description: 模拟 I/O 故障
 sidebar_position: 7
-sidebar_label: Simulate I/O faults
+sidebar_label: 模拟 I/O 故障
 ---
 
-# Simulate I/O faults
+# 模拟 I/O 故障
 
-IOChaos experiment can simulate file system faults. I/O fault injection currently supports latency, fault, attribute override, and mistake.
+IOChaos 实验能够模拟文件系统发生故障的场景。目前，I/OChaos 实验支持以下几种故障类型：
 
-* Latency: delays file system calls.
-* Fault: returns an error for filesystem calls.
-* AttrOverride: modifies file properties.
-* Mistake: makes the file read or write a wrong value.
+* Latency：延迟文件系统调用；
+* Fault：使文件系统调用返回错误；
+* AttrOverride：修改文件属性；
+* Mistake：使文件读到或写入错误的值。
 
-## Before you start
+## 开始之前
 
-* The I/O faults injection can be performed only on Linux.
-* The experiment result can be seen inside the container and the volume mount path should be specified.
-* It is recommended to perform I/O fault injection to write and read operations.
+* I/O 故障注入只能在 Linux 上执行。
+* 实验结果需要进入容器内部查看，且要指定 volume 挂载路径。
+* 建议只对 Write 和 Read 操作注入 I/O 故障。
 
-## Simulate fault injections by kbcli
+## 使用 kbcli 模拟故障注入
 
-This table below describes the general flags for I/O faults.
+下表介绍 I/O 故障类型的常见字段。
 
-📎 Table 1. kbcli fault io flags description
+📎 Table 1. kbcli I/O 故障参数说明
 
-| Option                   | Description               | Default value | Required |
+| 参数                   | 说明               | 默认值 | 是否必填 |
 | :----------------------- | :------------------------ | :------------ | :------- |
-| `--volume-path` | It specifies the mount point of volume in the target container. It must be the root directory of the mount. | None | Yes |
-| `--path` | It specifies the valid range of fault injections. It can be either a wildcard or a single file. | * | No |
-| `--percent` | It specifies the probability of failure per operation and its unit is %. | 100 | No |
-| `--container`, `-c` | It specifies the name of the container into which the fault is injected. | None | No |
-| `--method` | It specifies the I/O operation. `read` and `write` are supported. | * | No |
+| `--volume-path` | 指定 volume 在目标容器内的挂载点，必须为挂载的根目录。 | 无 | 是 |
+| `--path` | 指定注入故障的生效范围，可以是通配符，也可以是单个文件。| * | 否 |
+| `--percent` | 指定每次操作发生故障的概率，单位为 %。 | 100 | 否 |
+| `--container`, `-c` | 指定注入故障的容器名称。| 无 | 否 |
+| `--method` | 指定 I/O 操作，支持 `read` 和 `write`。 | * | 否 |
 
 ### Latency
 
-The command below injects latency chaos into the directory `/data` to delay 10 seconds to display the file content, that is, delay the read operation.
+执行以下命令，向 `/data` 目录注入延迟故障，使该目录下的所有文件内容产生 10 秒延迟。即，延迟 Read 操作。
 
-`--delay` specifies the delay time and it is required.
+`--delay` 指定具体的延迟时长，必填。
 
 ```bash
 kbcli fault io latency --delay=10s --volume-path=/data
@@ -46,7 +46,7 @@ kbcli fault io latency --delay=10s --volume-path=/data
 
 ### Fault
 
-Common error number:
+常见的错误号：
 
 * 1: Operation not permitted
 * 2: No such file or directory
@@ -60,11 +60,11 @@ Common error number:
 * 24: Too many open files
 * 28: No space left on device
 
-You can find the full error number list [here](https://raw.githubusercontent.com/torvalds/linux/master/include/uapi/asm-generic/errno-base.h).
+点击参考[完整的错误编号列表](https://raw.githubusercontent.com/torvalds/linux/master/include/uapi/asm-generic/errno-base.h)。
 
-The command below injects a file fault into the directory `/data`, which gives a 100% probability of failure in all file system operations under this directory and returns error code 22 (invalid argument).
+执行以下命令，向 `/data` 目录注入文件错误故障，使该目录下的所有文件系统 100% 出现故障，并返回错误码 22（invalid argument）。
 
-`--errno` specifies the error number that the system returns and it is required.
+`--errno` 指定系统应该返回的错误号，必填。
 
 ```bash
 kbcli fault io errno --volume-path=/data --errno=22
@@ -72,57 +72,57 @@ kbcli fault io errno --volume-path=/data --errno=22
 
 ### Attribute override
 
-The command below injects an attrOverride fault into the `/data` directory, giving a 100% probability that all file system operations in this directory will change the target file permissions to 72 (110 in octal), which will allow files to be executed only by the owner and their group and not authorized to perform other actions.
+执行以下命令，向目录 `/data` 注入 attrOverride 故障，使得该目录下的所有文件系统操作 100% 将目标文件的权限更改为 72（即八进制中的 110）。这将导致文件只能由所有者和其所在的组执行，无权进行其他操作。
 
 ```bash
 kbcli fault io attribute --volume-path=/data --perm=72
 ```
 
-You can use the following flags to modify attributes.
+你可以使用以下参数来修改相关属性。
 
-📎 Table 2. kbcli fault io attribute flags description
+📎 Table 2. kbcli AttrOverride 参数说明
 
-| Option                   | Description               | Default value | Required |
+| 参数                   | 说明               | 默认值 | 是否必填 |
 | :----------------------- | :------------------------ | :------------ | :------- |
-| `--blocks` | Number of blocks that a file uses. | None | No |
-| `--ino` | ino number. | None | No |
-| `--nlink` | Number of hard links. | None | No |
-| `--perm` | File permissions in decimal. | None | No |
-| `--size` | File size. | None | No |
-| `--uid` | User ID of the owner. | None | No |
-| `--gid` | Group ID of the owner. | None | No |
+| `--blocks` | 文件占用块数 | 无 | 否 |
+| `--ino` | ino 号 | 无 | 否 |
+| `--nlink` | 硬链接数量 | 无 | 否 |
+| `--perm` | 文件权限的十进制表示 | 无 | 否 |
+| `--size` |文件大小 | 无 | 否 |
+| `--uid` | 所有者的用户 ID | 无 | 否 |
+| `--gid` | 所有者的组 ID | 无 | 否 |
 
 ### Mistake
 
-The command below injects read and write faults into the directory `/data`, which gives a 10% probability of failure in the read and write operations under this directory. During this process, one random position with a maximum length of 10 bytes will be replaced with 0 bytes.
+执行以下命令，向目录 `/data` 注入读写错误故障，使该目录下的读写操作有 10% 的概率发生错误。在此过程中，将随机选择一个最大长度为 10 个字节的位置，并将其替换为 0 字节。
 
 ```bash
 kbcli fault io mistake --volume-path=/data --filling=zero --max-occurrences=10 --max-length=1
 ```
 
-📎 Table 3. kbcli fault io mistake flags description
+📎 Table 3. kbcli Mistake 参数说明
 
-| Option                   | Description               | Default value | Required |
+| 参数                   | 说明               | 默认值 | 是否必填 |
 | :----------------------- | :------------------------ | :------------ | :------- |
-| `--filling` | The wrong data to be filled. Only zero (fill 0) or random (fill random bytes) are supported. | None | Yes |
-| `max-occurrences` | Maximum number of errors in each operation. | None | Yes |
-| `--max-length` | Maximum length of each error (in bytes). | None | Yes |
+| `--filling` | 错误数据的填充内容，只能为 zero（填充 0）或 random（填充随机字节）。 | 无 | 是 |
+| `max-occurrences` | 错误在每一次操作中最多出现次数。 | 无 | 是 |
+| `--max-length` | 每次错误的最大长度（单位为字节）。 | 无 |  是 |
 
 :::warning
 
-It is suggested that you only use mistake on READ and WRITE file system calls. Using mistake on other file system calls may lead to unexpected consequences, including but not limited to file system damage and program crashes.
+不建议在除了 READ 和 WRITE 之外的文件系统调用上使用 mistake 错误。这可能会导致文件系统损坏、程序崩溃等后果。
 
 :::
 
-## Simulate fault injections by YAML file
+## 使用 YAML 文件模拟故障注入
 
-This section introduces the YAML configuration file examples. You can view the YAML file by adding `--dry-run` at the end of the above kbcli commands. Meanwhile, you can also refer to the [Chaos Mesh official docs](https://chaos-mesh.org/docs/next/simulate-io-chaos-on-kubernetes/#create-experiments-using-the-yaml-files) for details.
+本节介绍如何使用 YAML 文件模拟故障注入。你可以在上述 kbcli 命令的末尾添加 `--dry-run` 命令来查看 YAML 文件，还可以参考 [Chaos Mesh 官方文档](https://chaos-mesh.org/zh/docs/next/simulate-io-chaos-on-kubernetes/#使用-yaml-文件创建实验)获取更详细的信息。
 
-### Fault-latency example
+### Fault latency 示例
 
-1. Write the experiment configuration to the `fault-latency.yaml` file.
+1. 将实验配置写入到 `fault-latency.yaml` 文件中。
 
-    In the following example, Chaos Mesh injects latency chaos into the directory `/data` to delay 10 seconds to display the file content, that is, delay the read operation.
+    在下例中，Chaos Mesh 将向 `/data` 目录注入延迟故障，使该目录下的所有文件产生 10 秒延迟。即，延迟读取操作。
 
     ```yaml
     apiVersion: chaos-mesh.org/v1alpha1
@@ -143,17 +143,17 @@ This section introduces the YAML configuration file examples. You can view the Y
       volumePath: /data
     ```
 
-2. Run `kubectl` to start an experiment.
+2. 使用 `kubectl` 创建实验。
 
    ```bash
    kubectl apply -f ./fault-latency.yaml
    ```
 
-### Fault-fault example
+### Fault fault 示例
 
-1. Write the experiment configuration to the `fault-fault.yaml` file.
+1. 将实验配置写入到 `fault-fault.yaml` 文件中。
 
-    In the following example, Chaos Mesh injects a file fault into the directory `/data`, which gives a 100% probability of failure in all file system operations under this directory and returns error code 22 (invalid argument).
+    在下例中，Chaos Mesh 将向 `/data` 目录注入文件错误故障，使该目录下的所有文件系统 100% 出现故障，并返回错误码 22（invalid argument）。
 
     ```yaml
     apiVersion: chaos-mesh.org/v1alpha1
@@ -174,17 +174,17 @@ This section introduces the YAML configuration file examples. You can view the Y
       volumePath: /data
     ```
 
-2. Run `kubectl` to start an experiment.
+2. 使用 `kubectl` 创建实验。
 
    ```bash
    kubectl apply -f ./fault-fault.yaml
    ```
 
-### Fault-attrOverride example
+### Fault attrOverride 示例
 
-1. Write the experiment configuration to the `fault-attrOverride.yaml` file.
+1. 将实验配置写入到 `fault-attrOverride.yaml` 文件中。
 
-    In the following example, Chaos Mesh injects an attrOverride fault into the `/data` directory, giving a 100% probability that all file system operations in this directory will change the target file permissions to 72 (110 in octal), which will allow files to be executed only by the owner and their group and not authorized to perform other actions.
+    在下例中，Chaos Mesh 将向目录 `/data` 注入 attrOverride 故障，使得该目录下的所有文件系统操作 100% 将目标文件的权限更改为 72（即八进制中的 110）。这将导致文件只能由所有者和其所在的组执行，无权进行其他操作。
 
     ```yaml
     apiVersion: chaos-mesh.org/v1alpha1
@@ -206,17 +206,17 @@ This section introduces the YAML configuration file examples. You can view the Y
       volumePath: /data
     ```
 
-2. Run `kubectl` to start an experiment.
+2. 使用 `kubectl` 创建实验。
 
    ```bash
    kubectl apply -f ./fault-attrOverride.yaml
    ```
 
-### Fault-mistake example
+### Fault mistake 示例
 
-1. Write the experiment configuration to the `fault-mistake.yaml` file.
+1. 将实验配置写入到 `fault-mistake.yaml` 文件中。
 
-    In the following example, Chaos Mesh injects read and write faults into the directory `/data`, which gives a 10% probability of failure in the read and write operations under this directory. During this process, one random position with a maximum length of 10 bytes will be replaced with 0 bytes.
+    在下例中，Chaos Mesh 将向目录 `/data` 注入读写错误故障，使该目录下的读写操作有 10% 的概率发生错误。在此过程中，将随机选择一个最大长度为 10 个字节的位置，将其替换为 0 字节。
 
     ```yaml
     apiVersion: chaos-mesh.org/v1alpha1
@@ -240,7 +240,7 @@ This section introduces the YAML configuration file examples. You can view the Y
       volumePath: /data
     ```
 
-2. Run `kubectl` to start an experiment.
+2. 使用 `kubectl` 创建实验。
 
    ```bash
    kubectl apply -f ./fault-mistake.yaml

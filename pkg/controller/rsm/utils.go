@@ -41,7 +41,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
@@ -225,7 +224,7 @@ func deletionKinds(policy workloads.RsmTransformPolicy) []client.ObjectList {
 	return kinds
 }
 
-func getPodsOfStatefulSet(ctx context.Context, cli roclient.ReadonlyClient, stsObj *appsv1.StatefulSet) ([]corev1.Pod, error) {
+func getPodsOfStatefulSet(ctx context.Context, cli client.Reader, stsObj *appsv1.StatefulSet) ([]corev1.Pod, error) {
 	podList := &corev1.PodList{}
 	selector, err := metav1.LabelSelectorAsMap(stsObj.Spec.Selector)
 	if err != nil {

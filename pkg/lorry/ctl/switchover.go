@@ -22,6 +22,7 @@ package ctl
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -54,6 +55,7 @@ lorryctl switchover  --primary xxx --candidate xxx
 			return
 		}
 
+		lorryClient.ReconcileTimeout = 30 * time.Second
 		err = lorryClient.Switchover(context.TODO(), switchOptions.primary, switchOptions.candidate)
 		if err != nil {
 			fmt.Printf("switchover failed: %v\n", err)

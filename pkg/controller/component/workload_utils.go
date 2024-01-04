@@ -29,7 +29,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	client2 "github.com/apecloud/kubeblocks/pkg/controller/client"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
@@ -53,7 +52,7 @@ func ListRSMOwnedByComponent(ctx context.Context, cli client.Client, namespace s
 }
 
 // GetObjectListByComponentName gets k8s workload list with component
-func GetObjectListByComponentName(ctx context.Context, cli client2.ReadonlyClient, cluster appsv1alpha1.Cluster,
+func GetObjectListByComponentName(ctx context.Context, cli client.Reader, cluster appsv1alpha1.Cluster,
 	objectList client.ObjectList, componentName string) error {
 	matchLabels := constant.GetComponentWellKnownLabels(cluster.Name, componentName)
 	inNamespace := client.InNamespace(cluster.Namespace)

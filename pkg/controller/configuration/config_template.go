@@ -31,7 +31,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	ictrlclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/gotemplate"
@@ -117,7 +116,7 @@ func newTemplateBuilder(
 	clusterName, namespace string,
 	cluster *appsv1alpha1.Cluster,
 	ctx context.Context,
-	cli ictrlclient.ReadonlyClient,
+	cli client.Reader,
 	cache []client.Object) *configTemplateBuilder {
 	return &configTemplateBuilder{
 		namespace:    namespace,

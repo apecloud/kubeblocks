@@ -263,7 +263,7 @@ var _ = Describe("Component Controller", func() {
 		}
 	}
 
-	createClusterObjVx := func(compName, compDefName string, v2 bool, processor func(*testapps.MockClusterFactory), phase appsv1alpha1.ClusterPhase) {
+	createClusterObjVx := func(compName, compDefName string, v2 bool, processor func(*testapps.MockClusterFactory), phase *appsv1alpha1.ClusterPhase) {
 		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
 			WithRandomName()
 		if !v2 {
@@ -279,14 +279,14 @@ var _ = Describe("Component Controller", func() {
 
 		By("Waiting for the cluster enter expected phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-		if len(phase) != 0 {
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(phase))
-		} else {
+		if phase == nil {
 			if clusterObj.Spec.ComponentSpecs[0].Replicas == 0 {
 				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StoppedClusterPhase))
 			} else {
 				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 			}
+		} else {
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(*phase))
 		}
 
 		By("Waiting for the component enter expected phase")
@@ -296,7 +296,7 @@ var _ = Describe("Component Controller", func() {
 		}
 		compObj = &appsv1alpha1.Component{}
 		Eventually(testapps.CheckObjExists(&testCtx, compKey, compObj, true)).Should(Succeed())
-		if len(phase) == 0 {
+		if phase == nil {
 			Eventually(testapps.GetComponentObservedGeneration(&testCtx, compKey)).Should(BeEquivalentTo(1))
 			if compObj.Spec.Replicas == 0 {
 				Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(appsv1alpha1.StoppedClusterCompPhase))
@@ -308,17 +308,17 @@ var _ = Describe("Component Controller", func() {
 
 	createClusterObj := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster")
-		createClusterObjVx(compName, compDefName, false, processor, "")
+		createClusterObjVx(compName, compDefName, false, processor, nil)
 	}
 
 	createClusterObjV2 := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster with new component definition")
-		createClusterObjVx(compName, compDefName, true, processor, "")
+		createClusterObjVx(compName, compDefName, true, processor, nil)
 	}
 
 	createClusterObjV2WithPhase := func(compName, compDefName string, processor func(*testapps.MockClusterFactory), phase appsv1alpha1.ClusterPhase) {
 		By("Creating a cluster with new component definition")
-		createClusterObjVx(compName, compDefName, true, processor, phase)
+		createClusterObjVx(compName, compDefName, true, processor, &phase)
 	}
 
 	mockCompRunning := func(compName string) {
@@ -1368,7 +1368,7 @@ var _ = Describe("Component Controller", func() {
 		for _, replicas := range []int32{replicasLimit.MinReplicas / 2, replicasLimit.MaxReplicas * 2} {
 			createClusterObjV2WithPhase(compName, compDefObj.Name, func(f *testapps.MockClusterFactory) {
 				f.SetReplicas(replicas)
-			}, appsv1alpha1.AbnormalClusterPhase)
+			}, "")
 			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
 				g.Expect(comp.Spec.Replicas).Should(BeEquivalentTo(replicas))
 				g.Expect(comp.Status.Conditions).Should(HaveLen(1))
@@ -1961,6 +1961,7 @@ var _ = Describe("Component Controller", func() {
 						newImageCnt += 1
 					}
 				}
+				g.Expect(oldImageCnt + newImageCnt).Should(Equal(oldImageCntExpected + newImageCntExpected))
 				g.Expect(oldImageCnt).Should(Equal(oldImageCntExpected))
 				g.Expect(newImageCnt).Should(Equal(newImageCntExpected))
 			}).Should(Succeed())
@@ -2120,12 +2121,9 @@ var _ = Describe("Component Controller", func() {
 
 	When("creating cluster with all workloadTypes (being Stateless|Stateful|Consensus|Replication) component", func() {
 		compNameNDef := map[string]string{
-			// The new API design no longer requires testing different workload types,
-			// and comment out those tests to reduce the chance of test failures,
-			// as it seemed the failures were being caused by a validation bug in the Kubernetes API server.
-			// statelessCompName:   statelessCompDefName,
-			// statefulCompName:    statefulCompDefName,
-			// consensusCompName:   consensusCompDefName,
+			statelessCompName:   statelessCompDefName,
+			statefulCompName:    statefulCompDefName,
+			consensusCompName:   consensusCompDefName,
 			replicationCompName: replicationCompDefName,
 		}
 
@@ -2138,16 +2136,11 @@ var _ = Describe("Component Controller", func() {
 			cleanEnv()
 		})
 
-		for compName := range compNameNDef {
-			key := compName
-			defName := compNameNDef[key]
-
-			It(fmt.Sprintf("[comp: %s] should create/delete pods to match the desired replica number if updating cluster's replica number to a valid value", key), func() {
-				testChangeReplicas(key, defName)
-			})
-
-			It(fmt.Sprintf("[comp: %s] update kubeblocks-tools image", key), func() {
-				testUpdateKubeBlocksToolsImage(key, defName)
+		for key := range compNameNDef {
+			compName := key
+			compDefName := compNameNDef[key]
+			It(fmt.Sprintf("[comp: %s] should create/delete pods to match the desired replica number if updating cluster's replica number to a valid value", compName), func() {
+				testChangeReplicas(compName, compDefName)
 			})
 		}
 	})
@@ -2169,7 +2162,16 @@ var _ = Describe("Component Controller", func() {
 			mockStorageClass = testk8s.CreateMockStorageClass(&testCtx, testk8s.DefaultStorageClassName)
 		})
 
-		for compName, compDefName := range compNameNDef {
+		for key := range compNameNDef {
+			compName := key
+			compDefName := compNameNDef[key]
+
+			Context(fmt.Sprintf("[comp: %s] update kubeblocks-tools image ", compName), func() {
+				It(fmt.Sprintf("[comp: %s] update kubeblocks-tools image", compName), func() {
+					testUpdateKubeBlocksToolsImage(compName, compDefName)
+				})
+			})
+
 			Context(fmt.Sprintf("[comp: %s] volume expansion", compName), func() {
 				It("should update PVC request storage size accordingly", func() {
 					testVolumeExpansion(compName, compDefName, mockStorageClass)

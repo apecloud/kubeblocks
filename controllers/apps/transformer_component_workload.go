@@ -306,7 +306,7 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, synthesiz
 
 	isSpecUpdated := !reflect.DeepEqual(&oldRsm.Spec, &rsmObjCopy.Spec)
 	if isSpecUpdated {
-		UpdatePodSpecSystemFields(&rsmObjCopy.Spec.Template.Spec)
+		UpdatePodSpecSystemFields(&rsmProto.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
 	}
 
 	isLabelsUpdated := !reflect.DeepEqual(oldRsm.Labels, rsmObjCopy.Labels)
@@ -523,6 +523,13 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn(stsObj *apps.StatefulSet) err
 		}
 		// if HA functionality is not enabled, no need to switchover
 		err := lorryCli.Switchover(r.reqCtx.Ctx, pod.Name, "")
+		if err == lorry.NotImplemented {
+			// For the purpose of upgrade compatibility, if the version of Lorry is 0.7 and
+			// the version of KB is upgraded to 0.8 or newer, lorry client will return an NotImplemented error,
+			// in this case, here just return success.
+			r.reqCtx.Log.Info("lorry switchover api is not implemented")
+			return nil
+		}
 		if err == nil {
 			return fmt.Errorf("switchover succeed, wait role label to be updated")
 		}
@@ -556,7 +563,12 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn(stsObj *apps.StatefulSet) err
 		}
 
 		if err2 := lorryCli.LeaveMember(r.reqCtx.Ctx); err2 != nil {
-			if err == nil {
+			// For the purpose of upgrade compatibility, if the version of Lorry is 0.7 and
+			// the version of KB is upgraded to 0.8 or newer, lorry client will return an NotImplemented error,
+			// in this case, here just ignore it.
+			if err2 == lorry.NotImplemented {
+				r.reqCtx.Log.Info("lorry leave member api is not implemented")
+			} else if err == nil {
 				err = err2
 			}
 		}

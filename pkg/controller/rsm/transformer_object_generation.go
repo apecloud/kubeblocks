@@ -193,6 +193,7 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		oldSts.Labels = mergeMetadataMap(oldSts.Labels, newSts.Labels)
 		oldSts.Labels = newSts.Labels
 
+		// for upgrade compatibility from 0.7 to 0.8
 		oldRoleProbeContainerIndex := getRoleProbeContainerIndex(oldSts.Spec.Template.Spec.Containers)
 		newRoleProbeContainerIndex := getRoleProbeContainerIndex(newSts.Spec.Template.Spec.Containers)
 		if oldRoleProbeContainerIndex >= 0 && newRoleProbeContainerIndex >= 0 {

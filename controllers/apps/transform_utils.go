@@ -104,7 +104,7 @@ func getClusterOwningObjectsWithOptions(transCtx *clusterTransformContext,
 // sendWarningEventWithError sends a warning event when occurs error.
 func sendWarningEventWithError(
 	recorder record.EventRecorder,
-	cluster *appsv1alpha1.Cluster,
+	obj client.Object,
 	reason string,
 	err error) {
 	// ignore requeue error
@@ -115,7 +115,7 @@ func sendWarningEventWithError(
 	if controllerErr != nil {
 		reason = string(controllerErr.Type)
 	}
-	recorder.Event(cluster, corev1.EventTypeWarning, reason, err.Error())
+	recorder.Event(obj, corev1.EventTypeWarning, reason, err.Error())
 }
 
 func isResourceRequirementsEqual(a, b corev1.ResourceRequirements) bool {

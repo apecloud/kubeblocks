@@ -2,7 +2,8 @@
 Define addon Helm charts image information.
 */}}
 {{- define "kubeblocks.addonChartsImage" }}
-chartsImage: {{ .Values.addonChartsImage.registry | default "docker.io" }}/{{ .Values.addonChartsImage.repository }}:{{ .Values.addonChartsImage.tag | default .Chart.AppVersion }}
+{{- $addonImageRegistry := include "kubeblocks.imageRegistry" . }}
+chartsImage: {{ .Values.addonChartsImage.registry | default $addonImageRegistry }}/{{ .Values.addonChartsImage.repository }}:{{ .Values.addonChartsImage.tag | default .Chart.AppVersion }}
 chartsPathInImage: {{ .Values.addonChartsImage.chartsPath }}
 {{- end }}
 
@@ -40,6 +41,7 @@ Parameters:
 - kbVersion: KubeBlocks version that this addon is compatible with
 */}}
 {{- define "kubeblocks.buildAddonCR" }}
+{{- $addonImageRegistry := include "kubeblocks.imageRegistry" . }}
 {{- $upgrade:= or .Release.IsInstall (and .Release.IsUpgrade .Values.upgradeAddons) }}
 {{- $existingAddon := lookup "extensions.kubeblocks.io/v1alpha1" "Addon" "" .name -}}
 {{- if and (not $upgrade) $existingAddon -}}
@@ -55,8 +57,9 @@ kind: Addon
 metadata:
   name: {{ .name }}
   labels:
-    app.kubernetes.io/name: {{ .name }}
-    app.kubernetes.io/version: {{ .version }}
+    {{- .selectorLabels | nindent 4 }}
+    addon.kubeblocks.io/version: {{ .version }}
+    addon.kubeblocks.io/name: {{ .name }}
     addon.kubeblocks.io/provider: {{ .provider }}
     addon.kubeblocks.io/model: {{ .model }}
   annotations:
@@ -69,7 +72,7 @@ spec:
   type: Helm
   helm:
     {{- include "kubeblocks.addonChartLocationURL" ( dict "name" .name "version" .version "values" .Values) | indent 4 }}
-    chartsImage: {{ .Values.addonChartsImage.registry | default "docker.io" }}/{{ .Values.addonChartsImage.repository }}:{{ .Values.addonChartsImage.tag | default .Chart.AppVersion }}
+    chartsImage: {{ .Values.addonChartsImage.registry | default $addonImageRegistry }}/{{ .Values.addonChartsImage.repository }}:{{ .Values.addonChartsImage.tag | default .Chart.AppVersion }}
     chartsPathInImage: {{ .Values.addonChartsImage.chartsPath }}
     installOptions:
       {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}

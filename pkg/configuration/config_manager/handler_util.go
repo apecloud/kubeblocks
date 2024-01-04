@@ -56,6 +56,9 @@ type CfgManagerBuildParams struct {
 	DownwardAPIVolumes        []corev1.VolumeMount
 	CMConfigVolumes           []corev1.Volume
 	ConfigLazyRenderedVolumes map[string]corev1.VolumeMount
+
+	// support host network
+	ContainerPort int32 `json:"containerPort"`
 }
 
 func IsSupportReload(reload *appsv1alpha1.ReloadOptions) bool {

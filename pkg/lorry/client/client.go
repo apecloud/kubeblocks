@@ -20,11 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package client
 
 import (
-	context "context"
+	"context"
 	"errors"
 	"net/http"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/rest"
 
 	. "github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
@@ -47,11 +48,37 @@ func GetMockClient() Client {
 	return mockClient
 }
 
-func NewClient(characterType string, pod corev1.Pod) (Client, error) {
+func NewClient(pod corev1.Pod) (Client, error) {
 	if mockClient != nil || mockClientError != nil {
 		return mockClient, mockClientError
 	}
-	return NewHTTPClientWithPod(&pod)
+
+	_, err := rest.InClusterConfig()
+	if err != nil {
+		// As the service does not run as a pod in the Kubernetes cluster,
+		// it is unable to call the lorry service running as a pod using the pod's IP address.
+		// In this scenario, it is recommended to use an k8s exec client instead.
+		execClient, err := NewK8sExecClientWithPod(nil, &pod)
+		if err != nil {
+			return nil, err
+		}
+		if execClient != nil {
+			return execClient, nil
+		}
+		return nil, nil
+	}
+
+	httpClient, err := NewHTTPClientWithPod(&pod)
+	if err != nil {
+		return nil, err
+	}
+	if httpClient != nil {
+		return httpClient, nil
+	}
+
+	// return Client as nil explicitly to indicate that Client interface is nil,
+	// or Client will be a non-nil interface value even newclient returns nil.
+	return nil, nil
 }
 
 type Requester interface {
@@ -132,6 +159,17 @@ func (cli *lorryClient) RevokeUserRole(ctx context.Context, userName, roleName s
 	}
 	req := map[string]any{"parameters": parameters}
 	_, err := cli.Request(ctx, string(RevokeUserRoleOp), http.MethodPost, req)
+	return err
+}
+
+func (cli *lorryClient) Switchover(ctx context.Context, primary, candidate string, force bool) error {
+	parameters := map[string]any{
+		"primary":   primary,
+		"candidate": candidate,
+		"force":     force,
+	}
+	req := map[string]any{"parameters": parameters}
+	_, err := cli.Request(ctx, string(SwitchoverOperation), http.MethodPost, req)
 	return err
 }
 

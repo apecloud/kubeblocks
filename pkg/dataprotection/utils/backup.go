@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package utils
 
 import (
-	"fmt"
-
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
@@ -31,7 +29,7 @@ import (
 // if backup policy is specified, search the backup policy with the name
 // if backup policy is not specified, search the default backup policy
 // if method's snapshotVolumes is true, use the method as the default backup method
-func GetBackupMethodsFromBackupPolicy(backupPolicyList *dpv1alpha1.BackupPolicyList, backupPolicyName string) (string, map[string]struct{}, error) {
+func GetBackupMethodsFromBackupPolicy(backupPolicyList *dpv1alpha1.BackupPolicyList, backupPolicyName string) (string, map[string]struct{}) {
 	var defaultBackupMethod string
 	var backupMethodsMap = make(map[string]struct{})
 	for _, policy := range backupPolicyList.Items {
@@ -53,8 +51,5 @@ func GetBackupMethodsFromBackupPolicy(backupPolicyList *dpv1alpha1.BackupPolicyL
 			backupMethodsMap[method.Name] = struct{}{}
 		}
 	}
-	if defaultBackupMethod == "" {
-		return "", nil, fmt.Errorf("failed to find default backup method which snapshotVolumes is true, please check cluster's backup policy")
-	}
-	return defaultBackupMethod, backupMethodsMap, nil
+	return defaultBackupMethod, backupMethodsMap
 }

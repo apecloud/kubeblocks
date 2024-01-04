@@ -127,11 +127,11 @@ func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *a
 		})); err != nil {
 		return nil, err
 	}
-	defaultBackupMethod, backupMethodMap, err := utils.GetBackupMethodsFromBackupPolicy(backupPolicyList, backupSpec.BackupPolicyName)
-	if err != nil {
-		return nil, err
-	}
+	defaultBackupMethod, backupMethodMap := utils.GetBackupMethodsFromBackupPolicy(backupPolicyList, backupSpec.BackupPolicyName)
 	if backupSpec.BackupMethod == "" {
+		if defaultBackupMethod == "" {
+			return nil, fmt.Errorf("failed to find default backup method, please check cluster's backup policy")
+		}
 		backupSpec.BackupMethod = defaultBackupMethod
 	}
 	if _, ok := backupMethodMap[backupSpec.BackupMethod]; !ok {

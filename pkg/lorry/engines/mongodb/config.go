@@ -46,69 +46,69 @@ const (
 )
 
 type Config struct {
-	hosts            []string
-	username         string
-	password         string
-	replSetName      string
-	databaseName     string
-	params           string
-	direct           bool
-	operationTimeout time.Duration
+	Hosts            []string
+	Username         string
+	Password         string
+	ReplSetName      string
+	DatabaseName     string
+	Params           string
+	Direct           bool
+	OperationTimeout time.Duration
 }
 
 var config *Config
 
 func NewConfig(properties map[string]string) (*Config, error) {
 	config = &Config{
-		direct:           true,
-		username:         "root",
-		operationTimeout: defaultTimeout,
+		Direct:           true,
+		Username:         "root",
+		OperationTimeout: defaultTimeout,
 	}
 
 	if val, ok := properties[host]; ok && val != "" {
-		config.hosts = []string{val}
+		config.Hosts = []string{val}
 	}
 
 	if viper.IsSet(constant.KBEnvServicePort) {
-		config.hosts = []string{"localhost:" + viper.GetString(constant.KBEnvServicePort)}
+		config.Hosts = []string{"localhost:" + viper.GetString(constant.KBEnvServicePort)}
 	}
 
-	if len(config.hosts) == 0 {
+	if len(config.Hosts) == 0 {
 		return nil, errors.New("must set 'host' in metadata or KB_SERVICE_PORT environment variable")
 	}
 
 	if val, ok := properties[username]; ok && val != "" {
-		config.username = val
+		config.Username = val
 	}
 
 	if val, ok := properties[password]; ok && val != "" {
-		config.password = val
+		config.Password = val
 	}
 
 	if viper.IsSet(constant.KBEnvServiceUser) {
-		config.username = viper.GetString(constant.KBEnvServiceUser)
+		config.Username = viper.GetString(constant.KBEnvServiceUser)
 	}
 
 	if viper.IsSet(constant.KBEnvServicePassword) {
-		config.password = viper.GetString(constant.KBEnvServicePassword)
+		config.Password = viper.GetString(constant.KBEnvServicePassword)
 	}
 
 	if viper.IsSet(constant.KBEnvClusterCompName) {
-		config.replSetName = viper.GetString(constant.KBEnvClusterCompName)
+		config.ReplSetName = viper.GetString(constant.KBEnvClusterCompName)
 	}
 
-	config.databaseName = adminDatabase
+	config.DatabaseName = adminDatabase
 	if val, ok := properties[databaseName]; ok && val != "" {
-		config.databaseName = val
+		config.DatabaseName = val
 	}
 
 	if val, ok := properties[params]; ok && val != "" {
-		config.params = val
+		config.Params = val
 	}
 
 	var err error
 	if val, ok := properties[operationTimeout]; ok && val != "" {
-		config.operationTimeout, err = time.ParseDuration(val)
+		config.OperationTimeout, err = time.ParseDuration(val)
 		if err != nil {
 			return nil, errors.New("incorrect operationTimeout field from metadata")
 		}
@@ -118,7 +118,7 @@ func NewConfig(properties map[string]string) (*Config, error) {
 }
 
 func (config *Config) GetDBPort() int {
-	_, portStr, err := net.SplitHostPort(config.hosts[0])
+	_, portStr, err := net.SplitHostPort(config.Hosts[0])
 	if err != nil {
 		return defaultDBPort
 	}

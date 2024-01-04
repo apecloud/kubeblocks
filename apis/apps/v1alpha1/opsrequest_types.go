@@ -20,6 +20,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // TODO: @wangyelei could refactor to ops group
@@ -27,7 +28,7 @@ import (
 // OpsRequestSpec defines the desired state of OpsRequest
 // +kubebuilder:validation:XValidation:rule="has(self.cancel) && self.cancel ? (self.type in ['VerticalScaling', 'HorizontalScaling']) : true",message="forbidden to cancel the opsRequest which type not in ['VerticalScaling','HorizontalScaling']"
 type OpsRequestSpec struct {
-	// clusterRef references clusterDefinition.
+	// clusterRef references cluster object.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
 	ClusterRef string `json:"clusterRef"`
@@ -149,6 +150,8 @@ type OpsRequestSpec struct {
 	// restoreSpec defines how to restore the cluster.
 	// +optional
 	RestoreSpec *RestoreSpec `json:"restoreSpec,omitempty"`
+
+	CustomSpec *CustomOpsSpec `json:"customSpec,omitempty"`
 }
 
 // ComponentOps defines the common variables of component scope operations.
@@ -224,6 +227,23 @@ type HorizontalScaling struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
 	Replicas int32 `json:"replicas"`
+
+	// Nodes defines the list of nodes that pods can schedule when scale up
+	// If the RsmTransformPolicy is specified as ToPod and expected replicas is more than current replicas,the list of
+	// Nodes will be used. If the list of Nodes is empty, no specific node will be assigned. However, if the list of Nodes
+	// is filled, all pods will be evenly scheduled across the Nodes in the list when scale up.
+	// +optional
+	Nodes []types.NodeName `json:"nodes,omitempty"`
+
+	// Instances defines the name of instance that rsm scale down priorly.
+	// If the RsmTransformPolicy is specified as ToPod and expected replicas is less than current replicas, the list of
+	// Instances will be used.
+	// current replicas - expected replicas > len(Instances): Scale down from the list of Instances priorly, the others
+	//	will select from NodeAssignment.
+	// current replicas - expected replicas < len(Instances): Scale down from the list of Instances.
+	// current replicas - expected replicas < len(Instances): Scale down from a part of Instances.
+	// +optional
+	Instances []string `json:"instances,omitempty"`
 }
 
 // Reconfigure defines the variables that need to input when updating configuration.
@@ -274,6 +294,23 @@ type ConfigurationItem struct {
 	// +listType=map
 	// +listMapKey=key
 	Keys []ParameterConfig `json:"keys" patchStrategy:"merge,retainKeys" patchMergeKey:"key"`
+}
+
+type CustomOpsSpec struct {
+	// +kubebuilder:validation:Required
+	// cluster component name.
+	ComponentName string `json:"componentName"`
+
+	// +kubebuilder:validation:Required
+	// reference a opsDefinition
+	OpsDefinitionRef string `json:"opsDefinitionRef"`
+
+	// the input for this operation declared in the opsDefinition.spec.parametersSchema.
+	// will create corresponding jobs for each array element.
+	// if the param type is array, the format must be "v1,v2,v3".
+	// +kubebuilder:validation:MaxItem=10
+	// +optional
+	Params []map[string]string `json:"params,omitempty"`
 }
 
 type ParameterPair struct {
@@ -425,12 +462,15 @@ type RestoreSpec struct {
 	// +kubebuilder:validation:Required
 	BackupName string `json:"backupName"`
 
+	// effectiveCommonComponentDef describes this backup will be restored for all components which refer to common ComponentDefinition.
+	EffectiveCommonComponentDef bool `json:"effectiveCommonComponentDef,omitempty"`
+
 	// restoreTime point in time to restore
 	RestoreTimeStr string `json:"restoreTimeStr,omitempty"`
 
 	// the volume claim restore policy, support values: [Serial, Parallel]
 	// +kubebuilder:validation:Enum=Serial;Parallel
-	// +kubebuilder:default=Serial
+	// +kubebuilder:default=Parallel
 	VolumeRestorePolicy string `json:"volumeRestorePolicy,omitempty"`
 }
 

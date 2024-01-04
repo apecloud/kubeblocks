@@ -78,7 +78,7 @@ func NewRestoreManager(ctx context.Context,
 	}
 }
 
-func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent) error {
+func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent, compObj *appsv1alpha1.Component) error {
 	backupObj, err := r.initFromAnnotation(comp)
 	if err != nil {
 		return err
@@ -89,25 +89,27 @@ func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent) error {
 	if backupObj.Status.BackupMethod == nil {
 		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed, `status.backupMethod of backup "%s" can not be empty`, backupObj.Name)
 	}
-	if err = r.DoPrepareData(comp, backupObj); err != nil {
+	if err = r.DoPrepareData(comp, compObj, backupObj); err != nil {
 		return err
 	}
-	if err = r.DoPostReady(comp, backupObj); err != nil {
+	if err = r.DoPostReady(comp, compObj, backupObj); err != nil {
 		return err
 	}
 	// do clean up
-	if err = r.cleanupClusterAnnotations(); err != nil {
+	if err = r.cleanupClusterAnnotations(comp.Name); err != nil {
 		return err
 	}
 	return r.cleanupRestores(comp)
 }
 
-func (r *RestoreManager) DoPrepareData(comp *component.SynthesizedComponent, backupObj *dpv1alpha1.Backup) error {
+func (r *RestoreManager) DoPrepareData(comp *component.SynthesizedComponent,
+	compObj *appsv1alpha1.Component,
+	backupObj *dpv1alpha1.Backup) error {
 	restore, err := r.BuildPrepareDataRestore(comp, backupObj)
 	if err != nil {
 		return err
 	}
-	return r.createRestoreAndWait(restore)
+	return r.createRestoreAndWait(restore, compObj)
 }
 
 func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComponent, backupObj *dpv1alpha1.Backup) (*dpv1alpha1.Restore, error) {
@@ -186,12 +188,13 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 	return restore, nil
 }
 
-func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent, backupObj *dpv1alpha1.Backup) error {
-	compStatus := r.Cluster.Status.Components[comp.Name]
-	if compStatus.Phase != appsv1alpha1.RunningClusterCompPhase {
+func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
+	compObj *appsv1alpha1.Component,
+	backupObj *dpv1alpha1.Backup) error {
+	if compObj.Status.Phase != appsv1alpha1.RunningClusterCompPhase {
 		return nil
 	}
-	jobActionLabels := constant.GetKBWellKnownLabels(comp.ClusterDefName, r.Cluster.Name, comp.Name)
+	jobActionLabels := constant.GetComponentWellKnownLabels(r.Cluster.Name, comp.Name)
 	if comp.WorkloadType == appsv1alpha1.Consensus || comp.WorkloadType == appsv1alpha1.Replication {
 		// TODO: use rsm constant
 		rsmAccessModeLabelKey := "rsm.workloads.kubeblocks.io/access-mode"
@@ -224,7 +227,11 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent, backu
 			},
 		},
 	}
-	return r.createRestoreAndWait(restore)
+	backupMethod := backupObj.Status.BackupMethod
+	if backupMethod.TargetVolumes != nil {
+		restore.Spec.ReadyConfig.JobAction.Target.VolumeMounts = backupMethod.TargetVolumes.VolumeMounts
+	}
+	return r.createRestoreAndWait(restore, compObj)
 }
 
 func (r *RestoreManager) buildSchedulingSpec(comp *component.SynthesizedComponent) (dpv1alpha1.SchedulingSpec, error) {
@@ -312,12 +319,12 @@ func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.Synt
 }
 
 // createRestoreAndWait create the restore CR and wait for completion.
-func (r *RestoreManager) createRestoreAndWait(restore *dpv1alpha1.Restore) error {
+func (r *RestoreManager) createRestoreAndWait(restore *dpv1alpha1.Restore, compObj *appsv1alpha1.Component) error {
 	if restore == nil {
 		return nil
 	}
 	if r.Scheme != nil {
-		_ = controllerutil.SetControllerReference(r.Cluster, restore, r.Scheme)
+		_ = controllerutil.SetControllerReference(compObj, restore, r.Scheme)
 	}
 	if err := r.Client.Get(r.Ctx, client.ObjectKeyFromObject(restore), restore); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -338,11 +345,29 @@ func (r *RestoreManager) createRestoreAndWait(restore *dpv1alpha1.Restore) error
 	}
 }
 
-func (r *RestoreManager) cleanupClusterAnnotations() error {
+func (r *RestoreManager) cleanupClusterAnnotations(compName string) error {
+	// TODO: Waiting for all component recovery jobs to be completed
 	if r.Cluster.Status.Phase == appsv1alpha1.RunningClusterPhase && r.Cluster.Annotations != nil {
+		restoreInfo := r.Cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
+		if restoreInfo == "" {
+			return nil
+		}
+		restoreInfoMap := map[string]any{}
+		if err := json.Unmarshal([]byte(restoreInfo), &restoreInfoMap); err != nil {
+			return err
+		}
+		delete(restoreInfoMap, compName)
 		cluster := r.Cluster
 		patch := client.MergeFrom(cluster.DeepCopy())
-		delete(cluster.Annotations, constant.RestoreFromBackupAnnotationKey)
+		if len(restoreInfoMap) == 0 {
+			delete(cluster.Annotations, constant.RestoreFromBackupAnnotationKey)
+		} else {
+			restoreInfoBytes, err := json.Marshal(restoreInfoMap)
+			if err != nil {
+				return err
+			}
+			cluster.Annotations[constant.RestoreFromBackupAnnotationKey] = string(restoreInfoBytes)
+		}
 		return r.Client.Patch(r.Ctx, cluster, patch)
 	}
 	return nil

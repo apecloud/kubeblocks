@@ -22,9 +22,11 @@ package component
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -32,16 +34,20 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
-	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+)
+
+var (
+	defaultShmQuantity = resource.MustParse("64Mi")
 )
 
 // BuildSynthesizedComponent builds a new SynthesizedComponent object, which is a mixture of component-related configs from ComponentDefinition and Component.
 func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
+	cluster *appsv1alpha1.Cluster,
 	compDef *appsv1alpha1.ComponentDefinition,
 	comp *appsv1alpha1.Component) (*SynthesizedComponent, error) {
-	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil, nil)
+	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, cluster, nil)
 }
 
 // BuildSynthesizedComponent4Generated builds SynthesizedComponent for generated Component which w/o ComponentDefinition.
@@ -144,6 +150,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		Name:               compName,
 		FullCompName:       comp.Name,
 		CompDefName:        compDef.Name,
+		ClusterGeneration:  clusterGeneration(cluster, comp),
 		PodSpec:            &compDef.Spec.Runtime,
 		LogConfigs:         compDefObj.Spec.LogConfigs,
 		ConfigTemplates:    compDefObj.Spec.Configs,
@@ -159,6 +166,9 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		EnabledLogs:        comp.Spec.EnabledLogs,
 		TLSConfig:          comp.Spec.TLSConfig,
 		ServiceAccountName: comp.Spec.ServiceAccountName,
+		Nodes:              comp.Spec.Nodes,
+		Instances:          comp.Spec.Instances,
+		RsmTransformPolicy: comp.Spec.RsmTransformPolicy,
 	}
 
 	// build backward compatible fields, including workload, services, componentRefEnvs, clusterDefName, clusterCompDefName, and clusterCompVer, etc.
@@ -186,6 +196,8 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	// build volumeClaimTemplates
 	buildVolumeClaimTemplates(synthesizeComp, comp)
 
+	limitSharedMemoryVolumeSize(synthesizeComp, comp)
+
 	// build componentService
 	buildComponentServices(synthesizeComp, compDefObj)
 
@@ -196,7 +208,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	buildServiceAccountName(synthesizeComp)
 
 	// build lorryContainer
-	if err := buildLorryContainers(reqCtx, synthesizeComp); err != nil {
+	if err := buildLorryContainers(reqCtx, synthesizeComp, clusterCompSpec); err != nil {
 		reqCtx.Log.Error(err, "build probe container failed.")
 		return nil, err
 	}
@@ -211,6 +223,16 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForConnCredential(synthesizeComp.ClusterName))
 
 	return synthesizeComp, nil
+}
+
+func clusterGeneration(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) string {
+	if comp != nil && comp.Annotations != nil {
+		if generation, ok := comp.Annotations[constant.KubeBlocksGenerationKey]; ok {
+			return generation
+		}
+	}
+	// back-off to use cluster.Generation
+	return strconv.FormatInt(cluster.Generation, 10)
 }
 
 func buildComp2CompDefs(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) map[string]string {
@@ -247,10 +269,36 @@ func buildAffinitiesAndTolerations(comp *appsv1alpha1.Component, synthesizeComp 
 	return nil
 }
 
-// buildVolumeClaimTemplates builds volumeClaimTemplates for component.
 func buildVolumeClaimTemplates(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) {
 	if comp.Spec.VolumeClaimTemplates != nil {
 		synthesizeComp.VolumeClaimTemplates = toVolumeClaimTemplates(&comp.Spec)
+	}
+}
+
+// limitSharedMemoryVolumeSize limits the shared memory volume size to memory requests/limits.
+func limitSharedMemoryVolumeSize(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) {
+	shm := defaultShmQuantity
+	if comp.Spec.Resources.Limits != nil {
+		if comp.Spec.Resources.Limits.Memory().Cmp(shm) > 0 {
+			shm = *comp.Spec.Resources.Limits.Memory()
+		}
+	}
+	if comp.Spec.Resources.Requests != nil {
+		if comp.Spec.Resources.Requests.Memory().Cmp(shm) > 0 {
+			shm = *comp.Spec.Resources.Requests.Memory()
+		}
+	}
+	for i, vol := range synthesizeComp.PodSpec.Volumes {
+		if vol.EmptyDir == nil {
+			continue
+		}
+		if vol.EmptyDir.Medium != corev1.StorageMediumMemory {
+			continue
+		}
+		if vol.EmptyDir.SizeLimit != nil && !vol.EmptyDir.SizeLimit.IsZero() {
+			continue
+		}
+		synthesizeComp.PodSpec.Volumes[i].EmptyDir.SizeLimit = &shm
 	}
 }
 
@@ -285,7 +333,7 @@ func buildAndUpdateResources(reqCtx intctrlutil.RequestCtx, cli client.Reader, s
 }
 
 // buildServiceReferences builds serviceReferences for component.
-func buildServiceReferences(reqCtx intctrlutil.RequestCtx, cli roclient.ReadonlyClient,
+func buildServiceReferences(reqCtx intctrlutil.RequestCtx, cli client.Reader,
 	synthesizeComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) error {
 	serviceReferences, err := GenServiceReferences(reqCtx, cli, synthesizeComp.Namespace, synthesizeComp.ClusterName, compDef, comp)
 	if err != nil {
@@ -343,12 +391,6 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 		synthesizeComp.WorkloadType = clusterCompDef.WorkloadType
 		synthesizeComp.CharacterType = clusterCompDef.CharacterType
 		synthesizeComp.HorizontalScalePolicy = clusterCompDef.HorizontalScalePolicy
-		synthesizeComp.StatelessSpec = clusterCompDef.StatelessSpec
-		synthesizeComp.StatefulSpec = clusterCompDef.StatefulSpec
-		synthesizeComp.ConsensusSpec = clusterCompDef.ConsensusSpec
-		synthesizeComp.ReplicationSpec = clusterCompDef.ReplicationSpec
-		synthesizeComp.RSMSpec = clusterCompDef.RSMSpec
-		synthesizeComp.StatefulSetWorkload = clusterCompDef.GetStatefulSetWorkload()
 		synthesizeComp.Probes = clusterCompDef.Probes
 		synthesizeComp.VolumeTypes = clusterCompDef.VolumeTypes
 		synthesizeComp.VolumeProtection = clusterCompDef.VolumeProtectionSpec
@@ -358,6 +400,10 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 		// All places relying on the `app.kubernetes.io/component` label need to be refactored.
 		if synthesizeComp.CompDefName == "" {
 			synthesizeComp.CompDefName = clusterCompDef.Name
+		}
+		// TLS is a backward compatible field, which is used in configuration rendering before version 0.8.0.
+		if synthesizeComp.TLSConfig != nil {
+			synthesizeComp.TLS = true
 		}
 	}
 

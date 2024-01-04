@@ -1,3 +1,4 @@
+{{- $imageRegistry := include "kubeblocks.imageRegistry" . }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,4 +11,46 @@ metadata:
   {{- end }}
 data:
   values-kubeblocks-override.yaml: |-
-     {{- .Values.prometheus | toYaml | nindent 4 }}
+    {{- $prometheus := get .Values "prometheus" }}
+    # set prometheus.alertmanager.image.repository
+    {{- $alertmanager := get $prometheus "alertmanager" }}
+    {{- $alertmanagerImage := get $alertmanager "image" }}
+    {{- if not $alertmanagerImage.repository }}
+       {{- $alertmanagerImage = set $alertmanagerImage  "repository" (printf "%s/apecloud/alertmanager" $imageRegistry) }}
+    {{- end }}
+    {{- $alertmanager = set $alertmanager "image" $alertmanagerImage }}
+    {{- $prometheus = set $prometheus "alertmanager" $alertmanager }}
+    # set prometheus.nodeExporter.image.repository
+    {{- $nodeExporter := get $prometheus "nodeExporter" }}
+    {{- $nodeExporterImage := get $nodeExporter "image" }}
+    {{- if not $nodeExporterImage.repository }}
+       {{- $nodeExporterImage = set $nodeExporterImage  "repository" (printf "%s/apecloud/node-exporter" $imageRegistry) }}
+    {{- end }}
+    {{- $nodeExporter = set $nodeExporter "image" $nodeExporterImage }}
+    {{- $prometheus = set $prometheus "nodeExporter" $nodeExporter }}
+    # set prometheus configmapReload prometheus and alertmanager image.repository
+    {{- $configmapReload := get $prometheus "configmapReload" }}
+    {{- $cmReloadPrometheus := get $configmapReload "prometheus" }}
+    {{- $cmPrometheusImage := get $cmReloadPrometheus "image" }}
+    {{- if not $cmPrometheusImage.repository }}
+       {{- $cmPrometheusImage = set $cmPrometheusImage  "repository" (printf "%s/apecloud/configmap-reload" $imageRegistry) }}
+    {{- end }}
+    {{- $cmReloadPrometheus = set $cmReloadPrometheus "image" $cmPrometheusImage }}
+    {{- $configmapReload = set $configmapReload "prometheus" $cmReloadPrometheus }}
+    {{- $cmReloadalertmanager := get $configmapReload "alertmanager" }}
+    {{- $cmAlertmanagerImage := get $cmReloadalertmanager "image" }}
+    {{- if not $cmAlertmanagerImage.repository }}
+       {{- $cmAlertmanagerImage = set $cmAlertmanagerImage  "repository" (printf "%s/apecloud/configmap-reload" $imageRegistry) }}
+    {{- end }}
+    {{- $cmReloadalertmanager = set $cmReloadalertmanager "image" $cmAlertmanagerImage }}
+    {{- $configmapReload = set $configmapReload "prometheus" $cmReloadalertmanager }}
+    {{- $prometheus = set $prometheus "configmapReload" $configmapReload }}
+    # set prometheus.server.image.repository
+    {{- $server := get $prometheus "server" }}
+    {{- $serverImage := get $server "image" }}
+    {{- if not $serverImage.repository }}
+       {{- $serverImage = set $serverImage  "repository" (printf "%s/apecloud/prometheus" $imageRegistry) }}
+    {{- end }}
+    {{- $server = set $server "image" $serverImage }}
+    {{- $prometheus = set $prometheus "server" $server }}
+    {{- toYaml $prometheus | nindent 4 }}

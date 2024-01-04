@@ -28,7 +28,7 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
 ## Start a cluster
   
-Configure the name of your cluster and run the command below to stop this cluster.
+Configure the name of your cluster and run the command below to start this cluster.
 
 ```bash
 kbcli cluster start mongodb-cluster

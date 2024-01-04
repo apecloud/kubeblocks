@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -194,14 +195,22 @@ func NewFakeCluster(testCtx *testutil.TestContext) *BackupClusterInfo {
 		AddRoleLabel("leader").
 		AddVolume(volume).
 		Create(testCtx).GetObject()
+	Expect(testapps.ChangeObjStatus(testCtx, pod, func() {
+		pod.Status.Phase = corev1.PodRunning
+		testk8s.MockPodAvailable(pod, metav1.Now())
+	})).Should(Succeed())
 
 	By("mocking pod 1 belonging to the statefulset")
 	volume2 := corev1.Volume{Name: DataVolumeName, VolumeSource: corev1.VolumeSource{
 		PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvc1.Name}}}
-	_ = podFactory(podName + "-1").
+	pod1 := podFactory(podName + "-1").
+		AddRoleLabel("follower").
 		AddVolume(volume2).
 		Create(testCtx).GetObject()
-
+	Expect(testapps.ChangeObjStatus(testCtx, pod1, func() {
+		pod1.Status.Phase = corev1.PodRunning
+		testk8s.MockPodAvailable(pod1, metav1.Now())
+	})).Should(Succeed())
 	return &BackupClusterInfo{
 		Cluster:   cluster,
 		TargetPod: pod,

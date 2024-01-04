@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -57,17 +58,27 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	// generate objects by current spec
-	svc := buildSvc(*rsm)
-	altSvs := buildAlternativeSvs(*rsm)
-	headLessSvc := buildHeadlessSvc(*rsm)
-	envConfig := buildEnvConfigMap(*rsm)
-	sts := buildSts(*rsm, headLessSvc.Name, *envConfig)
-	objects := []client.Object{headLessSvc, envConfig, sts}
-	if svc != nil {
-		objects = append(objects, svc)
-	}
-	for _, s := range altSvs {
-		objects = append(objects, s)
+	var objects []client.Object
+	if rsm.Spec.RsmTransformPolicy == workloads.ToPod {
+		pods := buildPods(*rsm)
+		for idx := range pods {
+			pod := pods[idx]
+			objects = append(objects, pod)
+		}
+	} else {
+		svc := buildSvc(*rsm)
+		altSvs := buildAlternativeSvs(*rsm)
+		headLessSvc := buildHeadlessSvc(*rsm)
+		envConfig := buildEnvConfigMap(*rsm)
+		sts := buildSts(*rsm, headLessSvc.Name, *envConfig)
+		objects = append(objects, sts)
+		objects = append(objects, headLessSvc, envConfig)
+		if svc != nil {
+			objects = append(objects, svc)
+		}
+		for _, s := range altSvs {
+			objects = append(objects, s)
+		}
 	}
 
 	for _, object := range objects {
@@ -78,7 +89,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 
 	// read cache snapshot
 	ml := getLabels(rsm)
-	oldSnapshot, err := model.ReadCacheSnapshot(ctx, rsm, ml, ownedKinds()...)
+	oldSnapshot, err := model.ReadCacheSnapshot(ctx, rsm, ml, ownedKinds(rsm.Spec.RsmTransformPolicy)...)
 	if err != nil {
 		return err
 	}
@@ -110,6 +121,9 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		for name := range updateSet {
 			oldObj := oldSnapshot[name]
 			newObj := copyAndMerge(oldObj, newSnapshot[name])
+			if reflect.DeepEqual(oldObj, newObj) {
+				continue
+			}
 			cli.Update(dag, oldObj, newObj)
 		}
 	}
@@ -125,9 +139,10 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 		}
 	}
 	handleDependencies := func() {
-		cli.DependOn(dag, sts, headLessSvc, envConfig)
-		if svc != nil {
-			cli.DependOn(dag, sts, svc)
+		// RsmTransformPolicy might be "", treat empty as ToSts for backward compatibility
+		if rsm.Spec.RsmTransformPolicy != workloads.ToPod {
+			// objects[0] is the sts object
+			cli.DependOn(dag, objects[0], objects[1:]...)
 		}
 	}
 
@@ -152,26 +167,27 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 
 	// mergeAnnotations keeps the original annotations.
-	mergeMetadataMap := func(originalMap map[string]string, targetMap *map[string]string) {
+	mergeMetadataMap := func(originalMap map[string]string, targetMap map[string]string) map[string]string {
 		if targetMap == nil || originalMap == nil {
-			return
+			return nil
 		}
-		if *targetMap == nil {
-			*targetMap = map[string]string{}
+		if targetMap == nil {
+			targetMap = map[string]string{}
 		}
 		for k, v := range originalMap {
 			// if the annotation not exist in targetAnnotations, copy it from original.
-			if _, ok := (*targetMap)[k]; !ok {
-				(*targetMap)[k] = v
+			if _, ok := (targetMap)[k]; !ok {
+				(targetMap)[k] = v
 			}
 		}
+		return targetMap
 	}
 
 	copyAndMergeSts := func(oldSts, newSts *apps.StatefulSet) client.Object {
-		mergeMetadataMap(oldSts.Labels, &newSts.Labels)
+		oldSts.Labels = mergeMetadataMap(oldSts.Labels, newSts.Labels)
 		oldSts.Labels = newSts.Labels
 		// if annotations exist and are replaced, the StatefulSet will be updated.
-		mergeMetadataMap(oldSts.Spec.Template.Annotations, &newSts.Spec.Template.Annotations)
+		oldSts.Annotations = mergeMetadataMap(oldSts.Spec.Template.Annotations, newSts.Spec.Template.Annotations)
 		oldSts.Spec.Template = newSts.Spec.Template
 		oldSts.Spec.Replicas = newSts.Spec.Replicas
 		oldSts.Spec.UpdateStrategy = newSts.Spec.UpdateStrategy
@@ -179,7 +195,7 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 
 	copyAndMergeSvc := func(oldSvc *corev1.Service, newSvc *corev1.Service) client.Object {
-		mergeMetadataMap(oldSvc.Annotations, &newSvc.Annotations)
+		oldSvc.Annotations = mergeMetadataMap(oldSvc.Annotations, newSvc.Annotations)
 		oldSvc.Annotations = newSvc.Annotations
 		oldSvc.Spec = newSvc.Spec
 		return oldSvc
@@ -191,6 +207,18 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return oldCm
 	}
 
+	copyAndMergePod := func(oldPod, newPod *corev1.Pod) client.Object {
+		oldPod.Spec.ActiveDeadlineSeconds = newPod.Spec.ActiveDeadlineSeconds
+		for idx := range oldPod.Spec.Containers {
+			oldPod.Spec.Containers[idx].Image = newPod.Spec.Containers[idx].Image
+		}
+		for idx := range oldPod.Spec.InitContainers {
+			oldPod.Spec.InitContainers[idx].Image = newPod.Spec.InitContainers[idx].Image
+		}
+		// TODO `spec.tolerations` (only additions to existing tolerations),`spec.terminationGracePeriodSeconds` (allow it to be set to 1 if it was previously negative)
+		return oldPod
+	}
+
 	targetObj := oldObj.DeepCopyObject()
 	switch o := newObj.(type) {
 	case *apps.StatefulSet:
@@ -199,6 +227,8 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return copyAndMergeSvc(targetObj.(*corev1.Service), o)
 	case *corev1.ConfigMap:
 		return copyAndMergeCm(targetObj.(*corev1.ConfigMap), o)
+	case *corev1.Pod:
+		return copyAndMergePod(targetObj.(*corev1.Pod), o)
 	default:
 		return newObj
 	}
@@ -303,9 +333,6 @@ func buildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
 	envData := buildEnvConfigData(rsm)
 	annotations := ParseAnnotationsOfScope(ConfigMapScope, rsm.Annotations)
 	labels := getLabels(&rsm)
-	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
-		labels[constant.AppConfigTypeLabelKey] = "kubeblocks-env"
-	}
 	return builder.NewConfigMapBuilder(rsm.Namespace, getEnvConfigMapName(rsm.Name)).
 		AddAnnotationsInMap(annotations).
 		AddLabelsInMap(labels).
@@ -408,9 +435,9 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 	}
 	credential := rsm.Spec.Credential
 	image := viper.GetString(constant.KBToolsImage)
-	probeDaemonPort := viper.GetInt("ROLE_PROBE_SERVICE_PORT")
-	if probeDaemonPort == 0 {
-		probeDaemonPort = defaultRoleProbeDaemonPort
+	probeHTTPPort := viper.GetInt("ROLE_SERVICE_HTTP_PORT")
+	if probeHTTPPort == 0 {
+		probeHTTPPort = defaultRoleProbeDaemonPort
 	}
 	probeGRPCPort := viper.GetInt("ROLE_PROBE_GRPC_PORT")
 	if probeGRPCPort == 0 {
@@ -426,12 +453,12 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 		// for compatibility with old probe env var names
 		env = append(env,
 			corev1.EnvVar{
-				Name:      "KB_SERVICE_USER",
+				Name:      constant.KBEnvServiceUser,
 				Value:     credential.Username.Value,
 				ValueFrom: credential.Username.ValueFrom,
 			},
 			corev1.EnvVar{
-				Name:      "KB_SERVICE_PASSWORD",
+				Name:      constant.KBEnvServicePassword,
 				Value:     credential.Password.Value,
 				ValueFrom: credential.Password.ValueFrom,
 			})
@@ -534,29 +561,13 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 		FailureThreshold:    roleProbe.FailureThreshold,
 	}
 
-	if roleProbe.RoleUpdateMechanism == workloads.ReadinessProbeEventUpdate {
-		readinessProbe.ProbeHandler = corev1.ProbeHandler{
-			Exec: &corev1.ExecAction{
-				Command: []string{
-					grpcHealthProbeBinaryPath,
-					fmt.Sprintf(grpcHealthProbeArgsFormat, probeGRPCPort),
-				},
+	readinessProbe.ProbeHandler = corev1.ProbeHandler{
+		Exec: &corev1.ExecAction{
+			Command: []string{
+				grpcHealthProbeBinaryPath,
+				fmt.Sprintf(grpcHealthProbeArgsFormat, probeGRPCPort),
 			},
-		}
-	} else {
-		readinessProbe.HTTPGet = &corev1.HTTPGetAction{
-			Path: httpRoleProbePath,
-			Port: intstr.FromInt(probeDaemonPort),
-		}
-	}
-
-	tryToGetRoleProbeContainer := func() *corev1.Container {
-		for i, container := range template.Spec.Containers {
-			if container.Name == constant.RoleProbeContainerName {
-				return &template.Spec.Containers[i]
-			}
-		}
-		return nil
+		},
 	}
 
 	tryToGetLorryGrpcPort := func(container *corev1.Container) *corev1.ContainerPort {
@@ -568,66 +579,26 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 		return nil
 	}
 
-	tryToGetLorryHTTPPort := func(container *corev1.Container) *corev1.ContainerPort {
-		for i, port := range container.Ports {
-			if port.Name == constant.LorryHTTPPortName {
-				return &container.Ports[i]
-			}
-		}
-		return nil
-	}
-
 	// if role probe container exists, update the readiness probe, env and serving container port
-	if container := tryToGetRoleProbeContainer(); container != nil {
-		if roleProbe.RoleUpdateMechanism == workloads.ReadinessProbeEventUpdate {
+	if container := controllerutil.GetLorryContainer(template.Spec.Containers); container != nil {
+		if roleProbe.RoleUpdateMechanism == workloads.ReadinessProbeEventUpdate ||
+			// for compatibility when upgrading from 0.7 to 0.8
+			(container.ReadinessProbe != nil && container.ReadinessProbe.HTTPGet != nil &&
+				strings.HasPrefix(container.ReadinessProbe.HTTPGet.Path, "/v1.0/bindings")) {
 			port := tryToGetLorryGrpcPort(container)
-			var portNum int
-			if port == nil {
-				portNum = probeGRPCPort
-				grpcPort := corev1.ContainerPort{
-					Name:          roleProbeGRPCPortName,
-					ContainerPort: int32(portNum),
-					Protocol:      "TCP",
+			if port != nil && port.ContainerPort != int32(probeGRPCPort) {
+				readinessProbe.Exec.Command = []string{
+					grpcHealthProbeBinaryPath,
+					fmt.Sprintf(grpcHealthProbeArgsFormat, port.ContainerPort),
 				}
-				container.Ports = append(container.Ports, grpcPort)
-			} else {
-				// if containerPort is invalid, adjust it
-				if port.ContainerPort < 0 || port.ContainerPort > 65536 {
-					port.ContainerPort = int32(probeGRPCPort)
-				}
-				portNum = int(port.ContainerPort)
 			}
-			readinessProbe.Exec.Command = []string{
-				grpcHealthProbeBinaryPath,
-				fmt.Sprintf(grpcHealthProbeArgsFormat, portNum),
-			}
-		} else {
-			port := tryToGetLorryHTTPPort(container)
-			var portNum int
-			if port == nil {
-				portNum = probeDaemonPort
-				httpPort := corev1.ContainerPort{
-					Name:          constant.LorryHTTPPortName,
-					ContainerPort: int32(portNum),
-					Protocol:      "TCP",
-				}
-				container.Ports = append(container.Ports, httpPort)
-			} else {
-				// if containerPort is invalid, adjust it
-				if port.ContainerPort < 0 || port.ContainerPort > 65536 {
-					port.ContainerPort = int32(probeDaemonPort)
-				}
-				portNum = int(port.ContainerPort)
-			}
-			readinessProbe.HTTPGet = &corev1.HTTPGetAction{
-				Path: httpRoleProbePath,
-				Port: intstr.FromInt(portNum),
-			}
+			container.ReadinessProbe = readinessProbe
 		}
-		container.ReadinessProbe = readinessProbe
+
 		for _, e := range env {
 			if slices.IndexFunc(container.Env, func(v corev1.EnvVar) bool {
-				return v.Name == e.Name
+				return v.Name == e.Name || e.Name == constant.KBEnvServiceUser ||
+					e.Name == constant.KBEnvServicePassword || e.Name == usernameCredentialVarName || e.Name == passwordCredentialVarName
 			}) >= 0 {
 				continue
 			}
@@ -643,13 +614,13 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddCommands([]string{
 			roleProbeBinaryName,
-			"--port", strconv.Itoa(probeDaemonPort),
+			"--port", strconv.Itoa(probeHTTPPort),
 			"--grpcport", strconv.Itoa(probeGRPCPort),
 		}...).
 		AddEnv(env...).
 		AddPorts(
 			corev1.ContainerPort{
-				ContainerPort: int32(probeDaemonPort),
+				ContainerPort: int32(probeHTTPPort),
 				Name:          roleProbeContainerName,
 				Protocol:      "TCP",
 			},
@@ -782,6 +753,12 @@ func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string 
 	generateReplicaEnv(prefixWithCompDefName)
 	generateMemberEnv(prefixWithCompDefName)
 	envData[prefixWithCompDefName+"CLUSTER_UID"] = uid
+
+	lorryHTTPPort, err := controllerutil.GetLorryHTTPPortFromContainers(set.Spec.Template.Spec.Containers)
+	if err == nil {
+		envData[constant.KBEnvLorryHTTPPort] = strconv.Itoa(int(lorryHTTPPort))
+
+	}
 
 	return envData
 }

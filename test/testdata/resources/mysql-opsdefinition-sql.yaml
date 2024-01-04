@@ -1,0 +1,39 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsDefinition
+metadata:
+  name: mysql-sql-executor
+spec:
+  componentDefinitionRefs:
+    - name: apecloud-mysql
+      accountName: root
+      serviceName: rw
+
+  parametersSchema:
+    openAPIV3Schema:
+      properties:
+        sql:
+          description: mysql sql.
+          type: string
+      required:
+        - sql
+      type: object
+  jobSpec:
+    backoffLimit: 3
+    template:
+      spec:
+        containers:
+          - name: mysql
+            image: docker.io/apecloud/apecloud-mysql-server:latest
+            imagePullPolicy: IfNotPresent
+            command:
+              - bash
+              - -c
+              - |
+                set -e
+                export MYSQL_PWD=${KB_CONNECT_PASSWORD}
+                mysql_command="mysql -u ${KB_CONNECT_USERNAME} -h ${KB_CONNECT_HOST} -N -e"
+                ${mysql_command} "${sql}"
+  preConditions:
+    - rule:
+        expression: '{{ eq .component.status.phase "Running" }}'
+        message: "Component is not in Running status."

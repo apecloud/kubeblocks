@@ -35,18 +35,19 @@ jobs:
 
   release-chart:
     needs: release-version
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.37
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.43
     with:
       MAKE_OPS: "bump-chart-ver"
       VERSION: "${{ needs.release-version.outputs.release-version }}"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
-      DEP_CHART_DIR: "deploy/helm/depend-charts"
-      APECD_REF: "v0.1.37"
+      APECD_REF: "v0.1.43"
+      MAKE_OPS_POST: "install"
+      GO_VERSION: "1.21"
     secrets: inherit
 
   release-addons-chart:
-    needs: release-version
+    needs: release-chart
     uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.40
     with:
       GITHUB_REPO: "apecloud/kubeblocks-addons"

@@ -126,7 +126,6 @@ func (s *Scheduler) buildCronJob(
 			Labels:    map[string]string{},
 		},
 		Spec: batchv1.CronJobSpec{
-			Schedule:                   schedulePolicy.CronExpression,
 			SuccessfulJobsHistoryLimit: &successfulJobsHistoryLimit,
 			FailedJobsHistoryLimit:     &failedJobsHistoryLimit,
 			ConcurrencyPolicy:          batchv1.ForbidConcurrent,
@@ -139,6 +138,14 @@ func (s *Scheduler) buildCronJob(
 				},
 			},
 		},
+	}
+
+	timeZone, cronExpression := BuildCronJobSchedule(schedulePolicy.CronExpression)
+	if timeZone != nil {
+		cronjob.Spec.Schedule = schedulePolicy.CronExpression
+		cronjob.Spec.TimeZone = timeZone
+	} else {
+		cronjob.Spec.Schedule = cronExpression
 	}
 
 	controllerutil.AddFinalizer(cronjob, dptypes.DataProtectionFinalizerName)
@@ -243,7 +250,7 @@ func (s *Scheduler) reconcileCronJob(schedulePolicy *dpv1alpha1.SchedulePolicy) 
 	cronJob.Spec.StartingDeadlineSeconds = cronjobProto.Spec.StartingDeadlineSeconds
 	cronJob.Spec.JobTemplate.Spec.BackoffLimit = s.BackupPolicy.Spec.BackoffLimit
 	cronJob.Spec.JobTemplate.Spec.Template = cronjobProto.Spec.JobTemplate.Spec.Template
-	cronJob.Spec.Schedule = schedulePolicy.CronExpression
+	cronJob.Spec.Schedule = cronjobProto.Spec.Schedule
 	return s.Client.Patch(s.Ctx, cronJob, patch)
 }
 

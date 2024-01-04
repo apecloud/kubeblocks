@@ -309,7 +309,8 @@ dataProtection:
   gcFrequencySeconds: 3600
 
   image:
-    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+    # if the value of dataProtection.image.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
+    registry: ""
     repository: apecloud/kubeblocks-dataprotection
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
@@ -317,7 +318,7 @@ dataProtection:
     imagePullSecrets: []
     datasafed:
       repository: apecloud/datasafed
-      tag: "0.0.3"
+      tag: "0.0.6"
 
 ## BackupRepo settings
 ##
@@ -367,7 +368,8 @@ addonChartLocationBase: file://
 ## @param addonChartsImage - addon charts image, used to copy Helm charts to the addon job container.
 ## @param addonChartsImage.chartsPath - the helm charts path in the addon charts image.
 addonChartsImage:
-  registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+  # if the value of addonChartsImage.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
+  registry: ""
   repository: apecloud/kubeblocks-charts
   pullPolicy: IfNotPresent
   tag: ""
@@ -399,7 +401,8 @@ prometheus:
     ## alertmanager container image
     ##
     image:
-      repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/alertmanager
+      # If the value of prometheus.alertmanager.image.repository is not specified using --set, it will be set to the value of '${image.registry}/apecloud/alertmanager'.
+      repository: ""
       tag: v0.24.0
 
     ## ConfigMap override where fullname is {{.Release.Name}}-{{.Values.alertmanager.configMapOverrideName}}
@@ -567,7 +570,8 @@ prometheus:
     ## node-exporter container image
     ##
     image:
-      repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/node-exporter
+      # If the value of prometheus.nodeExporter.image.repository is not specified using --set, it will be set to the value of '${image.registry}/apecloud/node-exporter'.
+      repository: ""
       tag: v1.3.1
 
   configmapReload:
@@ -575,13 +579,17 @@ prometheus:
       ## configmap-reload container image
       ##
       image:
-        repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/configmap-reload
+        # If the value of prometheus.configmapReload.prometheus.image.repository is not specified using --set,
+        # it will be set to the value of '${image.registry}/apecloud/configmap-reload'.
+        repository: ""
         tag: v0.5.0
     alertmanager:
       ## configmap-reload container image
       ##
       image:
-        repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/configmap-reload
+        # If the value of prometheus.configmapReload.alertmanager.image.repository is not specified using --set,
+        # it will be set to the value of '${image.registry}/apecloud/configmap-reload'.
+        repository: ""
         tag: v0.5.0
 
   server:
@@ -592,7 +600,9 @@ prometheus:
     ## Prometheus server container image
     ##
     image:
-      repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/prometheus
+      # If the value of prometheus.server.image.repository is not specified using --set,
+      # it will be set to the value of '${image.registry}/apecloud/prometheus'.
+      repository: ""
       tag: v2.44.0
 
     global:
@@ -782,9 +792,6 @@ prometheus:
       #   - secretName: prometheus-server-tls
       #     hosts:
       #       - prometheus.domain.com
-
-
-
 
   ## AlertManager ConfigMap Entries
   ## NOTE: Please review these carefully as thresholds and behavior may not meet
@@ -1478,7 +1485,9 @@ grafana:
   replicas: 1
 
   image:
-    repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/grafana
+    # If the value of grafana.image.repository is not specified using --set,
+    # it will be set to the value of '${image.registry}/apecloud/grafana'.
+    repository: ""
     # Overrides the Grafana image tag whose default is the chart appVersion
     tag: 9.2.4
 
@@ -1523,7 +1532,9 @@ grafana:
 
   sidecar:
     image:
-      repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/k8s-sidecar
+      # If the value of grafana.sidecar.image.repository is not specified using --set,
+      # it will be set to the value of '${image.registry}/apecloud/k8s-sidecar'.
+      repository: ""
       tag: 1.19.2
 
     dashboards:
@@ -1629,7 +1640,9 @@ snapshot-controller:
   ## @param snapshot-controller.image.repository -- Repository to pull the image from.
   ##
   image:
-    repository: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/snapshot-controller
+    # If the value of snapshot-controller.image.repository is not specified using --set,
+    # it will be set to the value of '${image.registry}/apecloud/snapshot-controller'.
+    repository: ""
     tag: v6.2.1
 
   tolerations:
@@ -1683,11 +1696,11 @@ alertmanager-webhook-adaptor:
   ## Linkage with prometheus.enabled
   ##
   # enabled: false
-
   ## Webhook-Adaptor container image
   ##
   image:
-    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+    # if the value of alertmanager-webhook-adaptor.image.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
+    registry: ""
 
   affinity:
     nodeAffinity:
@@ -1753,7 +1766,8 @@ enabledAlphaFeatureGates:
 agamotto:
   enabled: false
   image:
-    registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+    # if the value of agamotto.image.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
+    registry: ""
 
 
 provider: "" # cloud be "aws","gcp","aliyun","tencentCloud", "huaweiCloud", "azure"

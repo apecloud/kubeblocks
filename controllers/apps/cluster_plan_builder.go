@@ -43,7 +43,6 @@ import (
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -58,7 +57,7 @@ const (
 // clusterTransformContext a graph.TransformContext implementation for Cluster reconciliation
 type clusterTransformContext struct {
 	context.Context
-	Client roclient.ReadonlyClient
+	Client client.Reader
 	record.EventRecorder
 	logr.Logger
 	Cluster        *appsv1alpha1.Cluster
@@ -95,7 +94,7 @@ func (c *clusterTransformContext) GetContext() context.Context {
 	return c.Context
 }
 
-func (c *clusterTransformContext) GetClient() roclient.ReadonlyClient {
+func (c *clusterTransformContext) GetClient() client.Reader {
 	return c.Client
 }
 
@@ -209,7 +208,6 @@ func (p *clusterPlan) handlePlanExecutionError(err error) error {
 	clusterCopy := p.transCtx.OrigCluster.DeepCopy()
 	condition := newFailedApplyResourcesCondition(err)
 	meta.SetStatusCondition(&clusterCopy.Status.Conditions, condition)
-	sendWarningEventWithError(p.transCtx.GetRecorder(), clusterCopy, ReasonApplyResourcesFailed, err)
 	return p.cli.Status().Patch(p.transCtx.Context, clusterCopy, client.MergeFrom(p.transCtx.OrigCluster))
 }
 

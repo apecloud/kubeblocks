@@ -20,23 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 const (
-	maxConcurReconClusterVersionKey = "MAXCONCURRENTRECONCILES_CLUSTERVERSION"
-	maxConcurReconClusterDefKey     = "MAXCONCURRENTRECONCILES_CLUSTERDEF"
-
 	// name of our custom finalizer
-	dbClusterDefFinalizerName   = "clusterdefinition.kubeblocks.io/finalizer"
-	clusterVersionFinalizerName = "clusterversion.kubeblocks.io/finalizer"
-	opsRequestFinalizerName     = "opsrequest.kubeblocks.io/finalizer"
+	clusterDefinitionFinalizerName   = "clusterdefinition.kubeblocks.io/finalizer"
+	clusterVersionFinalizerName      = "clusterversion.kubeblocks.io/finalizer"
+	opsDefinitionFinalizerName       = "opsdefinition.kubeblocks.io/finalizer"
+	componentDefinitionFinalizerName = "componentdefinition.kubeblocks.io/finalizer"
 
 	// annotations keys
-	// lifecycleAnnotationKey = "cluster.kubeblocks.io/lifecycle"
 	// debugClusterAnnotationKey is used when one wants to debug the cluster.
 	// If debugClusterAnnotationKey = 'on',
 	// logs will be recorded in more details, and some ephemeral pods (esp. those created by jobs) will retain after execution.
 	debugClusterAnnotationKey = "cluster.kubeblocks.io/debug"
-
-	// annotations values
-	// lifecycleDeletePVCAnnotation = "delete-pvc"
 )
 
 const (

@@ -88,7 +88,7 @@ func NewReconcilePipeline(ctx ReconcileCtx, item appsv1alpha1.ConfigurationItemD
 func (p *pipeline) Prepare() *pipeline {
 	buildTemplate := func() (err error) {
 		ctx := p.ctx
-		templateBuilder := newTemplateBuilder(p.ClusterName, p.Namespace, ctx.Cluster, p.Context, p.Client)
+		templateBuilder := newTemplateBuilder(p.ClusterName, p.Namespace, ctx.Cluster, p.Context, p.Client, ctx.Cache)
 		// Prepare built-in objects and built-in functions
 		if err = templateBuilder.injectBuiltInObjectsAndFunctions(ctx.PodSpec, ctx.Component.ConfigTemplates, ctx.Component, ctx.Cache); err != nil {
 			return
@@ -209,6 +209,7 @@ func (p *pipeline) createConfiguration() *appsv1alpha1.Configuration {
 	}
 	return builder.Component(p.ComponentName).
 		ClusterRef(p.ClusterName).
+		AddLabelsInMap(constant.GetClusterWellKnownLabels(p.ClusterName)).
 		GetObject()
 }
 
@@ -255,7 +256,7 @@ func (p *updatePipeline) PrepareForTemplate() *updatePipeline {
 		if p.isDone() {
 			return
 		}
-		templateBuilder := newTemplateBuilder(p.ClusterName, p.Namespace, p.ctx.Cluster, p.Context, p.Client)
+		templateBuilder := newTemplateBuilder(p.ClusterName, p.Namespace, p.ctx.Cluster, p.Context, p.Client, p.ctx.Cache)
 		// Prepare built-in objects and built-in functions
 		if err = templateBuilder.injectBuiltInObjectsAndFunctions(p.ctx.PodSpec, []appsv1alpha1.ComponentConfigSpec{*p.configSpec}, p.ctx.Component, p.ctx.Cache); err != nil {
 			return

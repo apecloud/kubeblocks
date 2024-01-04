@@ -127,14 +127,16 @@ func (f *MockComponentDefinitionFactory) AddService(name, serviceName string, po
 }
 
 func (f *MockComponentDefinitionFactory) AddServiceExt(name, serviceName string, serviceSpec corev1.ServiceSpec, roleSelector string) *MockComponentDefinitionFactory {
-	svc := appsv1alpha1.Service{
-		Name:         name,
-		ServiceName:  serviceName,
-		Spec:         serviceSpec,
-		RoleSelector: roleSelector,
+	svc := appsv1alpha1.ComponentService{
+		Service: appsv1alpha1.Service{
+			Name:         name,
+			ServiceName:  serviceName,
+			Spec:         serviceSpec,
+			RoleSelector: roleSelector,
+		},
 	}
 	if f.Get().Spec.Services == nil {
-		f.Get().Spec.Services = make([]appsv1alpha1.Service, 0)
+		f.Get().Spec.Services = make([]appsv1alpha1.ComponentService, 0)
 	}
 	f.Get().Spec.Services = append(f.Get().Spec.Services, svc)
 	return f
@@ -221,6 +223,14 @@ func (f *MockComponentDefinitionFactory) SetPolicyRules(rules []rbacv1.PolicyRul
 
 func (f *MockComponentDefinitionFactory) SetLabels(labels map[string]string) *MockComponentDefinitionFactory {
 	f.Get().Spec.Labels = labels
+	return f
+}
+
+func (f *MockComponentDefinitionFactory) SetReplicasLimit(minReplicas, maxReplicas int32) *MockComponentDefinitionFactory {
+	f.Get().Spec.ReplicasLimit = &appsv1alpha1.ReplicasLimit{
+		MinReplicas: minReplicas,
+		MaxReplicas: maxReplicas,
+	}
 	return f
 }
 

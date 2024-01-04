@@ -27,12 +27,15 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
 	lorryModel "github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 )
@@ -53,6 +56,11 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 	if model.IsObjectDeleting(transCtx.ComponentOrig) {
 		return nil
 	}
+	if common.IsCompactMode(transCtx.ComponentOrig.Annotations) {
+		transCtx.V(1).Info("Component is in compact mode, no need to create component account related objects",
+			"component", client.ObjectKeyFromObject(transCtx.ComponentOrig))
+		return nil
+	}
 
 	if len(transCtx.SynthesizeComponent.SystemAccounts) == 0 {
 		return nil
@@ -65,9 +73,18 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 		return nil
 	}
 
+	lifecycleActions := transCtx.CompDef.Spec.LifecycleActions
+	if lifecycleActions == nil || lifecycleActions.AccountProvision == nil {
+		return nil
+	}
+	// TODO: support custom handler for account
+	// TODO: build lorry client if accountProvision is built-in
 	lorryCli, err := t.buildLorryClient(transCtx)
 	if err != nil {
 		return err
+	}
+	if controllerutil.IsNil(lorryCli) {
+		return nil
 	}
 	for _, account := range transCtx.SynthesizeComponent.SystemAccounts {
 		if t.isAccountProvisioned(cond, account) {
@@ -164,7 +181,7 @@ func (t *componentAccountProvisionTransformer) buildLorryClient(transCtx *compon
 		}
 	}
 	if roleName == "" {
-		return nil, fmt.Errorf("unable to find appropriate pods to create accounts")
+		return nil, nil
 	}
 
 	podList, err := component.GetComponentPodListWithRole(transCtx.Context, transCtx.Client, *transCtx.Cluster, synthesizedComp.Name, roleName)
@@ -175,7 +192,7 @@ func (t *componentAccountProvisionTransformer) buildLorryClient(transCtx *compon
 		return nil, fmt.Errorf("unable to find appropriate pods to create accounts")
 	}
 
-	lorryCli, err := lorry.NewClient("", podList.Items[0])
+	lorryCli, err := lorry.NewClient(podList.Items[0])
 	if err != nil {
 		return nil, err
 	}
@@ -196,12 +213,8 @@ func (t *componentAccountProvisionTransformer) provisionAccount(transCtx *compon
 		return nil
 	}
 
-	if err = lorryCli.CreateUser(transCtx.Context, string(username), string(password), ""); err != nil {
-		return err
-	}
-
 	// TODO: re-define the role
-	return lorryCli.GrantUserRole(transCtx.Context, string(username), string(lorryModel.SuperUserRole))
+	return lorryCli.CreateUser(transCtx.Context, string(username), string(password), string(lorryModel.SuperUserRole))
 }
 
 func (t *componentAccountProvisionTransformer) getAccountSecret(ctx graph.TransformContext,

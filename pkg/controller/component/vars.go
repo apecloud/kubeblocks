@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -34,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
@@ -44,8 +46,10 @@ func ResolveEnvNTemplateVars(ctx context.Context, cli client.Reader, synthesized
 		return err
 	}
 
+	newTemplateVars1, newTemplateVars2 := resolveVarsReferenceNEscaping(templateVars, credentialVars)
+
 	envVars := make([]corev1.EnvVar, 0)
-	envVars = append(envVars, templateVars...)
+	envVars = append(envVars, newTemplateVars1...)
 	envVars = append(envVars, credentialVars...)
 	envVars = append(envVars, buildDefaultEnv()...)
 	envVars = append(envVars, buildEnv4TLS(synthesizedComp)...)
@@ -57,7 +61,7 @@ func ResolveEnvNTemplateVars(ctx context.Context, cli client.Reader, synthesized
 	// TODO: remove this later
 	envVars = append(envVars, synthesizedComp.ComponentRefEnvs...)
 
-	setEnvNTemplateVars(templateVars, envVars, synthesizedComp)
+	setEnvNTemplateVars(newTemplateVars2, envVars, synthesizedComp)
 
 	return nil
 }
@@ -78,9 +82,14 @@ func setEnvNTemplateVars(templateVars []corev1.EnvVar, envVars []corev1.EnvVar, 
 			// have injected variables placed at the front of the slice
 			c := &(*cc)[i]
 			if c.Env == nil {
-				c.Env = envVars
+				newEnv := make([]corev1.EnvVar, len(envVars))
+				copy(newEnv, envVars)
+				c.Env = newEnv
 			} else {
-				c.Env = append(envVars, c.Env...)
+				newEnv := make([]corev1.EnvVar, len(envVars), common.SafeAddInt(len(c.Env), len(envVars)))
+				copy(newEnv, envVars)
+				newEnv = append(newEnv, c.Env...)
+				c.Env = newEnv
 			}
 		}
 	}
@@ -111,11 +120,99 @@ func builtinTemplateVars(synthesizedComp *SynthesizedComponent) []corev1.EnvVar 
 			{Name: constant.KBEnvClusterUID, Value: synthesizedComp.ClusterUID},
 			{Name: constant.KBEnvClusterCompName, Value: constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name)},
 			{Name: constant.KBEnvCompName, Value: synthesizedComp.Name},
-			{Name: constant.KBEnvCompReplicas, Value: strconv.Itoa(int(synthesizedComp.Replicas))},
+			// {Name: constant.KBEnvCompReplicas, Value: strconv.Itoa(int(synthesizedComp.Replicas))},
 			{Name: constant.KBEnvClusterUIDPostfix8Deprecated, Value: kbClusterPostfix8},
 		}
 	}
 	return []corev1.EnvVar{}
+}
+
+func resolveVarsReferenceNEscaping(templateVars []corev1.EnvVar, credentialVars []corev1.EnvVar) ([]corev1.EnvVar, []corev1.EnvVar) {
+	l2m := func(vars []corev1.EnvVar) map[string]corev1.EnvVar {
+		m := make(map[string]corev1.EnvVar)
+		for i, v := range vars {
+			m[v.Name] = vars[i]
+		}
+		return m
+	}
+	templateVarsMapping := l2m(templateVars)
+	credentialVarsMapping := l2m(credentialVars)
+
+	vars1, vars2 := make([]corev1.EnvVar, len(templateVars)), make([]corev1.EnvVar, len(templateVars))
+	for i := range templateVars {
+		var1, var2 := resolveVarReferenceNEscaping(templateVarsMapping, credentialVarsMapping, &templateVars[i])
+		vars1[i] = *var1
+		vars2[i] = *var2
+	}
+	return vars1, vars2
+}
+
+func resolveVarReferenceNEscaping(templateVars, credentialVars map[string]corev1.EnvVar, v *corev1.EnvVar) (*corev1.EnvVar, *corev1.EnvVar) {
+	if len(v.Value) == 0 {
+		return v, v
+	}
+	re := regexp.MustCompile(`\$\(([^)]+)\)`)
+	matches := re.FindAllStringSubmatchIndex(v.Value, -1)
+	if len(matches) == 0 {
+		return v, v
+	}
+	return resolveValueReferenceNEscaping(templateVars, credentialVars, *v, matches)
+}
+
+func resolveValueReferenceNEscaping(templateVars, credentialVars map[string]corev1.EnvVar,
+	v corev1.EnvVar, matches [][]int) (*corev1.EnvVar, *corev1.EnvVar) {
+	isEscapingMatch := func(match []int) bool {
+		return match[0] > 0 && v.Value[match[0]-1] == '$'
+	}
+	resolveValue := func(match []int, credential bool) string {
+		if isEscapingMatch(match) {
+			return v.Value[match[0]:match[1]]
+		} else {
+			name := v.Value[match[2]:match[3]]
+			if vv, ok := templateVars[name]; ok {
+				return vv.Value
+			}
+			if credential {
+				if vv, ok := credentialVars[name]; ok {
+					return vv.Value
+				}
+			}
+			return v.Value[match[0]:match[1]]
+		}
+	}
+
+	tokens := make([]func(bool) string, 0)
+	for idx, pos := 0, 0; pos < len(v.Value); idx++ {
+		if idx >= len(matches) {
+			lpos := pos
+			tokens = append(tokens, func(bool) string { return v.Value[lpos:len(v.Value)] })
+			break
+		}
+		match := matches[idx]
+		mpos := match[0]
+		if isEscapingMatch(match) {
+			mpos = match[0] - 1
+		}
+		if pos < mpos {
+			lpos := pos
+			tokens = append(tokens, func(bool) string { return v.Value[lpos:mpos] })
+		}
+		tokens = append(tokens, func(credential bool) string { return resolveValue(match, credential) })
+		pos = match[1]
+	}
+
+	buildValue := func(credential bool) string {
+		builder := strings.Builder{}
+		for _, token := range tokens {
+			builder.WriteString(token(credential))
+		}
+		return builder.String()
+	}
+
+	v1, v2 := v.DeepCopy(), v.DeepCopy()
+	v1.Value = buildValue(true)
+	v2.Value = buildValue(false)
+	return v1, v2
 }
 
 func buildDefaultEnv() []corev1.EnvVar {
@@ -208,15 +305,19 @@ func resolveClusterObjectRefVars(ctx context.Context, cli client.Reader, synthes
 		case len(v.Value) > 0:
 			vars1 = append(vars1, corev1.EnvVar{Name: v.Name, Value: v.Value})
 		case v.ValueFrom != nil:
-			val1, val2, err := resolveClusterObjectVarRef(ctx, cli, synthesizedComp, *v.ValueFrom)
+			val1, val2, err := resolveClusterObjectVarRef(ctx, cli, synthesizedComp, v.Name, *v.ValueFrom)
 			if err != nil {
 				return nil, nil, err
 			}
-			if val1 != nil {
-				vars1 = append(vars1, corev1.EnvVar{Name: v.Name, Value: val1.(string)})
+			if len(val1) > 0 {
+				for i := range val1 {
+					vars1 = append(vars1, *val1[i])
+				}
 			}
-			if val2 != nil {
-				vars2 = append(vars2, corev1.EnvVar{Name: v.Name, Value: val2.(string)})
+			if len(val2) > 0 {
+				for i := range val2 {
+					vars2 = append(vars2, *val2[i])
+				}
 			}
 		default:
 			vars1 = append(vars1, corev1.EnvVar{Name: v.Name, Value: ""})
@@ -226,54 +327,78 @@ func resolveClusterObjectRefVars(ctx context.Context, cli client.Reader, synthes
 }
 
 func resolveClusterObjectVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	source appsv1alpha1.VarSource) (any, any, error) {
+	defineKey string, source appsv1alpha1.VarSource) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	switch {
 	case source.ConfigMapKeyRef != nil:
-		return resolveConfigMapKeyRef(ctx, cli, synthesizedComp, *source.ConfigMapKeyRef)
+		return resolveConfigMapKeyRef(ctx, cli, synthesizedComp, defineKey, *source.ConfigMapKeyRef)
 	case source.SecretKeyRef != nil:
-		return resolveSecretKeyRef(ctx, cli, synthesizedComp, *source.SecretKeyRef)
+		return resolveSecretKeyRef(ctx, cli, synthesizedComp, defineKey, *source.SecretKeyRef)
 	case source.ServiceVarRef != nil:
-		return resolveServiceVarRef(ctx, cli, synthesizedComp, *source.ServiceVarRef)
+		return resolveServiceVarRef(ctx, cli, synthesizedComp, defineKey, *source.ServiceVarRef)
 	case source.CredentialVarRef != nil:
-		return resolveCredentialVarRef(ctx, cli, synthesizedComp, *source.CredentialVarRef)
+		return resolveCredentialVarRef(ctx, cli, synthesizedComp, defineKey, *source.CredentialVarRef)
 	case source.ServiceRefVarRef != nil:
-		return resolveServiceRefVarRef(synthesizedComp, *source.ServiceRefVarRef)
+		return resolveServiceRefVarRef(synthesizedComp, defineKey, *source.ServiceRefVarRef)
 	}
 	return nil, nil, nil
 }
 
 func resolveConfigMapKeyRef(ctx context.Context, cli client.Reader,
-	synthesizedComp *SynthesizedComponent, selector corev1.ConfigMapKeySelector) (any, any, error) {
-	return resolveNativeObjectKey(ctx, cli, synthesizedComp, &corev1.ConfigMap{},
-		selector.Name, selector.Key, selector.Optional, func(obj client.Object) any {
+	synthesizedComp *SynthesizedComponent, defineKey string, selector corev1.ConfigMapKeySelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	var1, var2, err := resolveNativeObjectKey(ctx, cli, synthesizedComp, &corev1.ConfigMap{},
+		selector.Name, selector.Key, selector.Optional, func(obj client.Object) *corev1.EnvVar {
 			cm := obj.(*corev1.ConfigMap)
 			if v, ok := cm.Data[selector.Key]; ok {
-				return v
+				return &corev1.EnvVar{
+					Name:  defineKey,
+					Value: v,
+				}
 			}
 			if v, ok := cm.BinaryData[selector.Key]; ok {
-				return string(v)
+				return &corev1.EnvVar{
+					Name:  defineKey,
+					Value: string(v),
+				}
 			}
 			return nil
 		})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	vars1, vars2 := checkNBuildVars(var1, var2)
+	return vars1, vars2, nil
 }
 
 func resolveSecretKeyRef(ctx context.Context, cli client.Reader,
-	synthesizedComp *SynthesizedComponent, selector corev1.SecretKeySelector) (any, any, error) {
-	return resolveNativeObjectKey(ctx, cli, synthesizedComp, &corev1.Secret{},
-		selector.Name, selector.Key, selector.Optional, func(obj client.Object) any {
+	synthesizedComp *SynthesizedComponent, defineKey string, selector corev1.SecretKeySelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	var1, var2, err := resolveNativeObjectKey(ctx, cli, synthesizedComp, &corev1.Secret{},
+		selector.Name, selector.Key, selector.Optional, func(obj client.Object) *corev1.EnvVar {
 			secret := obj.(*corev1.Secret)
 			if v, ok := secret.Data[selector.Key]; ok {
-				return string(v)
+				return &corev1.EnvVar{
+					Name:  defineKey,
+					Value: string(v),
+				}
 			}
 			if v, ok := secret.StringData[selector.Key]; ok {
-				return v
+				return &corev1.EnvVar{
+					Name:  defineKey,
+					Value: v,
+				}
 			}
 			return nil
 		})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	vars1, vars2 := checkNBuildVars(var1, var2)
+	return vars1, vars2, nil
 }
 
 func resolveNativeObjectKey(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	obj client.Object, objName, key string, optional *bool, resolve func(obj client.Object) any) (any, any, error) {
+	obj client.Object, objName, key string, optional *bool, resolve func(obj client.Object) *corev1.EnvVar) (*corev1.EnvVar, *corev1.EnvVar, error) {
 	kind := obj.GetObjectKind().GroupVersionKind().Kind
 	_optional := func() bool {
 		return optional != nil && *optional
@@ -303,60 +428,166 @@ func resolveNativeObjectKey(ctx context.Context, cli client.Reader, synthesizedC
 }
 
 func resolveServiceVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	selector appsv1alpha1.ServiceVarSelector) (any, any, error) {
-	if selector.Host != nil {
-		return resolveServiceHostRef(ctx, cli, synthesizedComp, selector)
+	defineKey string, selector appsv1alpha1.ServiceVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+
+	// if serviceVarRef is defined with podOrdinalServiceVar, generate the pod ordinal service var
+	if selector.GeneratePodOrdinalServiceVar {
+		return resolveServiceVarRefWithPodOrdinal(ctx, cli, synthesizedComp, defineKey, selector)
 	}
-	if selector.Port != nil {
-		return resolveServicePortRef(ctx, cli, synthesizedComp, selector)
+
+	var1, var2, err := resolveServiceVarRefWithSelector(ctx, cli, synthesizedComp, defineKey, selector)
+	if err != nil {
+		return nil, nil, err
 	}
-	return nil, nil, nil
+
+	vars1, vars2 := checkNBuildVars(var1, var2)
+	return vars1, vars2, nil
+}
+
+func resolveServiceVarRefWithPodOrdinal(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1alpha1.ServiceVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	if synthesizedComp == nil || synthesizedComp.Replicas == 0 {
+		return nil, nil, nil
+	}
+	if len(selector.Name) == 0 || len(selector.CompDef) == 0 {
+		return nil, nil, fmt.Errorf("the name and compDef of ServiceVarRef is required when generatePodOrdinalServiceVar is true")
+	}
+
+	vars1, vars2 := make([]*corev1.EnvVar, 0, synthesizedComp.Replicas), make([]*corev1.EnvVar, 0, synthesizedComp.Replicas)
+	resolveAndAppend := func(defineKey string, serviceSelector appsv1alpha1.ServiceVarSelector) error {
+		var1, var2, err := resolveServiceVarRefWithSelector(ctx, cli, synthesizedComp, defineKey, serviceSelector)
+		if err != nil {
+			return err
+		}
+		if var1 != nil {
+			vars1 = append(vars1, var1)
+		}
+		if var2 != nil {
+			vars2 = append(vars2, var2)
+		}
+		return nil
+	}
+
+	for i := int32(0); i < synthesizedComp.Replicas; i++ {
+		genDefineKey := fmt.Sprintf("%s_%d", defineKey, i)
+		genServiceSelector := selector.DeepCopy()
+		if len(genServiceSelector.Name) > 0 {
+			genServiceSelector.Name = fmt.Sprintf("%s-%d", genServiceSelector.Name, i)
+		}
+		err := resolveAndAppend(genDefineKey, *genServiceSelector)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return vars1, vars2, nil
+}
+
+func resolveServiceVarRefWithSelector(ctx context.Context, cli client.Reader,
+	synthesizedComp *SynthesizedComponent, defineKey string, selector appsv1alpha1.ServiceVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error) {
+	var resolveFunc func(context.Context, client.Reader, *SynthesizedComponent, string, appsv1alpha1.ServiceVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error)
+	switch {
+	case selector.Host != nil:
+		resolveFunc = resolveServiceHostRef
+	case selector.Port != nil:
+		resolveFunc = resolveServicePortRef
+	case selector.NodePort != nil:
+		resolveFunc = resolveServiceNodePortRef
+	default:
+		return nil, nil, nil
+	}
+	return resolveFunc(ctx, cli, synthesizedComp, defineKey, selector)
 }
 
 func resolveServiceHostRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	selector appsv1alpha1.ServiceVarSelector) (any, any, error) {
-	resolveHost := func(obj any) (any, any) {
+	defineKey string, selector appsv1alpha1.ServiceVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error) {
+	resolveHost := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
 		svc := obj.(*corev1.Service)
-		return svc.Name, nil
+		return &corev1.EnvVar{
+			Name:  defineKey,
+			Value: svc.Name,
+		}, nil
 	}
 	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.Host, resolveHost)
 }
 
 func resolveServicePortRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	selector appsv1alpha1.ServiceVarSelector) (any, any, error) {
-	resolvePort := func(obj any) (any, any) {
+	defineKey string, selector appsv1alpha1.ServiceVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error) {
+	resolvePort := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
 		svc := obj.(*corev1.Service)
 		for _, svcPort := range svc.Spec.Ports {
 			if svcPort.Name == selector.Port.Name {
-				return strconv.Itoa(int(svcPort.Port)), nil
+				return &corev1.EnvVar{
+					Name:  defineKey,
+					Value: strconv.Itoa(int(svcPort.Port)),
+				}, nil
 			}
 		}
 		if len(svc.Spec.Ports) == 1 && (len(svc.Spec.Ports[0].Name) == 0 || len(selector.Port.Name) == 0) {
-			return strconv.Itoa(int(svc.Spec.Ports[0].Port)), nil
+			return &corev1.EnvVar{
+				Name:  defineKey,
+				Value: strconv.Itoa(int(svc.Spec.Ports[0].Port)),
+			}, nil
 		}
 		return nil, nil
 	}
 	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.Port.Option, resolvePort)
 }
 
+func resolveServiceNodePortRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1alpha1.ServiceVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error) {
+	resolveNodePort := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
+		svc := obj.(*corev1.Service)
+		if svc.Spec.Type != corev1.ServiceTypeNodePort {
+			return nil, nil
+		}
+		for _, svcPort := range svc.Spec.Ports {
+			if svcPort.NodePort == 0 {
+				continue
+			}
+			if svcPort.Name == selector.NodePort.Name {
+				return &corev1.EnvVar{
+					Name:  defineKey,
+					Value: strconv.Itoa(int(svcPort.NodePort)),
+				}, nil
+			}
+		}
+		return nil, nil
+	}
+	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.NodePort.Option, resolveNodePort)
+}
+
 func resolveCredentialVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	selector appsv1alpha1.CredentialVarSelector) (any, any, error) {
-	if selector.Username != nil {
-		return resolveCredentialUsernameRef(ctx, cli, synthesizedComp, selector)
+	defineKey string, selector appsv1alpha1.CredentialVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	var resolveFunc func(context.Context, client.Reader, *SynthesizedComponent, string, appsv1alpha1.CredentialVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error)
+	switch {
+	case selector.Username != nil:
+		resolveFunc = resolveCredentialUsernameRef
+	case selector.Password != nil:
+		resolveFunc = resolveCredentialPasswordRef
+	default:
+		return nil, nil, nil
 	}
-	if selector.Password != nil {
-		return resolveCredentialPasswordRef(ctx, cli, synthesizedComp, selector)
+
+	var1, var2, err := resolveFunc(ctx, cli, synthesizedComp, defineKey, selector)
+	if err != nil {
+		return nil, nil, err
 	}
-	return nil, nil, nil
+
+	vars1, vars2 := checkNBuildVars(var1, var2)
+	return vars1, vars2, nil
 }
 
 func resolveCredentialUsernameRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	selector appsv1alpha1.CredentialVarSelector) (any, any, error) {
-	resolveUsername := func(obj any) (any, any) {
+	defineKey string, selector appsv1alpha1.CredentialVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error) {
+	resolveUsername := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
 		secret := obj.(*corev1.Secret)
 		if secret.Data != nil {
 			if val, ok := secret.Data[constant.AccountNameForSecret]; ok {
-				return nil, string(val)
+				return nil, &corev1.EnvVar{
+					Name:  defineKey,
+					Value: string(val),
+				}
 			}
 		}
 		return nil, nil
@@ -365,12 +596,15 @@ func resolveCredentialUsernameRef(ctx context.Context, cli client.Reader, synthe
 }
 
 func resolveCredentialPasswordRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	selector appsv1alpha1.CredentialVarSelector) (any, any, error) {
-	resolvePassword := func(obj any) (any, any) {
+	defineKey string, selector appsv1alpha1.CredentialVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error) {
+	resolvePassword := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
 		secret := obj.(*corev1.Secret)
 		if secret.Data != nil {
 			if val, ok := secret.Data[constant.AccountPasswdForSecret]; ok {
-				return nil, string(val)
+				return nil, &corev1.EnvVar{
+					Name:  defineKey,
+					Value: string(val),
+				}
 			}
 		}
 		return nil, nil
@@ -378,68 +612,88 @@ func resolveCredentialPasswordRef(ctx context.Context, cli client.Reader, synthe
 	return resolveCredentialVarRefLow(ctx, cli, synthesizedComp, selector, selector.Password, resolvePassword)
 }
 
-func resolveServiceRefVarRef(synthesizedComp *SynthesizedComponent, selector appsv1alpha1.ServiceRefVarSelector) (any, any, error) {
-	if selector.Endpoint != nil {
-		return resolveServiceRefEndpointRef(synthesizedComp, selector)
+func resolveServiceRefVarRef(synthesizedComp *SynthesizedComponent, defineKey string, selector appsv1alpha1.ServiceRefVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	var resolveFunc func(*SynthesizedComponent, string, appsv1alpha1.ServiceRefVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error)
+	switch {
+	case selector.Endpoint != nil:
+		resolveFunc = resolveServiceRefEndpointRef
+	case selector.Port != nil:
+		resolveFunc = resolveServiceRefPortRef
+	case selector.Username != nil:
+		resolveFunc = resolveServiceRefUsernameRef
+	case selector.Password != nil:
+		resolveFunc = resolveServiceRefPasswordRef
+	default:
+		return nil, nil, nil
 	}
-	if selector.Port != nil {
-		return resolveServiceRefPortRef(synthesizedComp, selector)
+
+	var1, var2, err := resolveFunc(synthesizedComp, defineKey, selector)
+	if err != nil {
+		return nil, nil, err
 	}
-	if selector.Username != nil {
-		return resolveServiceRefUsernameRef(synthesizedComp, selector)
-	}
-	if selector.Password != nil {
-		return resolveServiceRefPasswordRef(synthesizedComp, selector)
-	}
-	return nil, nil, nil
+
+	vars1, vars2 := checkNBuildVars(var1, var2)
+	return vars1, vars2, nil
 }
 
-func resolveServiceRefEndpointRef(synthesizedComp *SynthesizedComponent, selector appsv1alpha1.ServiceRefVarSelector) (any, any, error) {
-	resolveEndpoint := func(obj any) (any, any) {
+func resolveServiceRefEndpointRef(synthesizedComp *SynthesizedComponent, defineKey string, selector appsv1alpha1.ServiceRefVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error) {
+	resolveEndpoint := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
 		sd := obj.(*appsv1alpha1.ServiceDescriptor)
 		if sd.Spec.Endpoint == nil {
 			return nil, nil
 		}
-		return sd.Spec.Endpoint.Value, nil
+		return &corev1.EnvVar{
+			Name:  defineKey,
+			Value: sd.Spec.Endpoint.Value,
+		}, nil
 	}
 	return resolveServiceRefVarRefLow(synthesizedComp, selector, selector.Endpoint, resolveEndpoint)
 }
 
-func resolveServiceRefPortRef(synthesizedComp *SynthesizedComponent, selector appsv1alpha1.ServiceRefVarSelector) (any, any, error) {
-	resolvePort := func(obj any) (any, any) {
+func resolveServiceRefPortRef(synthesizedComp *SynthesizedComponent, defineKey string, selector appsv1alpha1.ServiceRefVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error) {
+	resolvePort := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
 		sd := obj.(*appsv1alpha1.ServiceDescriptor)
 		if sd.Spec.Port == nil {
 			return nil, nil
 		}
-		return sd.Spec.Port.Value, nil
+		return &corev1.EnvVar{
+			Name:  defineKey,
+			Value: sd.Spec.Port.Value,
+		}, nil
 	}
 	return resolveServiceRefVarRefLow(synthesizedComp, selector, selector.Port, resolvePort)
 }
 
-func resolveServiceRefUsernameRef(synthesizedComp *SynthesizedComponent, selector appsv1alpha1.ServiceRefVarSelector) (any, any, error) {
-	resolveUsername := func(obj any) (any, any) {
+func resolveServiceRefUsernameRef(synthesizedComp *SynthesizedComponent, defineKey string, selector appsv1alpha1.ServiceRefVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error) {
+	resolveUsername := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
 		sd := obj.(*appsv1alpha1.ServiceDescriptor)
 		if sd.Spec.Auth == nil || sd.Spec.Auth.Username == nil {
 			return nil, nil
 		}
-		return nil, sd.Spec.Auth.Username.Value
+		return nil, &corev1.EnvVar{
+			Name:  defineKey,
+			Value: sd.Spec.Auth.Username.Value,
+		}
 	}
 	return resolveServiceRefVarRefLow(synthesizedComp, selector, selector.Username, resolveUsername)
 }
 
-func resolveServiceRefPasswordRef(synthesizedComp *SynthesizedComponent, selector appsv1alpha1.ServiceRefVarSelector) (any, any, error) {
-	resolvePassword := func(obj any) (any, any) {
+func resolveServiceRefPasswordRef(synthesizedComp *SynthesizedComponent, defineKey string, selector appsv1alpha1.ServiceRefVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error) {
+	resolvePassword := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
 		sd := obj.(*appsv1alpha1.ServiceDescriptor)
 		if sd.Spec.Auth == nil || sd.Spec.Auth.Password == nil {
 			return nil, nil
 		}
-		return nil, sd.Spec.Auth.Password.Value
+		return nil, &corev1.EnvVar{
+			Name:  defineKey,
+			Value: sd.Spec.Auth.Password.Value,
+		}
 	}
 	return resolveServiceRefVarRefLow(synthesizedComp, selector, selector.Password, resolvePassword)
 }
 
 func resolveServiceVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	selector appsv1alpha1.ServiceVarSelector, option *appsv1alpha1.VarOption, resolveVar func(any) (any, any)) (any, any, error) {
+	selector appsv1alpha1.ServiceVarSelector, option *appsv1alpha1.VarOption, resolveVar func(any) (*corev1.EnvVar, *corev1.EnvVar)) (*corev1.EnvVar, *corev1.EnvVar, error) {
 	resolveObj := func() (any, error) {
 		objName := func(compName string) string {
 			svcName := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, compName, selector.Name)
@@ -454,7 +708,7 @@ func resolveServiceVarRefLow(ctx context.Context, cli client.Reader, synthesized
 }
 
 func resolveCredentialVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	selector appsv1alpha1.CredentialVarSelector, option *appsv1alpha1.VarOption, resolveVar func(any) (any, any)) (any, any, error) {
+	selector appsv1alpha1.CredentialVarSelector, option *appsv1alpha1.VarOption, resolveVar func(any) (*corev1.EnvVar, *corev1.EnvVar)) (*corev1.EnvVar, *corev1.EnvVar, error) {
 	resolveObj := func() (any, error) {
 		objName := func(compName string) string {
 			return constant.GenerateAccountSecretName(synthesizedComp.ClusterName, compName, selector.Name)
@@ -465,7 +719,7 @@ func resolveCredentialVarRefLow(ctx context.Context, cli client.Reader, synthesi
 }
 
 func resolveServiceRefVarRefLow(synthesizedComp *SynthesizedComponent, selector appsv1alpha1.ServiceRefVarSelector,
-	option *appsv1alpha1.VarOption, resolveVar func(any) (any, any)) (any, any, error) {
+	option *appsv1alpha1.VarOption, resolveVar func(any) (*corev1.EnvVar, *corev1.EnvVar)) (*corev1.EnvVar, *corev1.EnvVar, error) {
 	resolveObj := func() (any, error) {
 		if synthesizedComp.ServiceReferences == nil {
 			return nil, nil
@@ -518,7 +772,7 @@ func resolveReferentComponent(synthesizedComp *SynthesizedComponent, objRef apps
 }
 
 func resolveClusterObjectVar(kind string, objRef appsv1alpha1.ClusterObjectReference, option *appsv1alpha1.VarOption,
-	resolveObj func() (any, error), resolveVar func(any) (any, any)) (any, any, error) {
+	resolveObj func() (any, error), resolveVar func(any) (*corev1.EnvVar, *corev1.EnvVar)) (*corev1.EnvVar, *corev1.EnvVar, error) {
 	objOptional := func() bool {
 		return objRef.Optional != nil && *objRef.Optional
 	}
@@ -551,4 +805,15 @@ func resolveClusterObjectVar(kind string, objRef appsv1alpha1.ClusterObjectRefer
 		return nil, nil, fmt.Errorf("the required var is not found in %s object %s", kind, objRef.Name)
 	}
 	return val1, val2, nil
+}
+
+func checkNBuildVars(var1, var2 *corev1.EnvVar) ([]*corev1.EnvVar, []*corev1.EnvVar) {
+	vals1, vals2 := make([]*corev1.EnvVar, 0), make([]*corev1.EnvVar, 0)
+	if var1 != nil {
+		vals1 = append(vals1, var1)
+	}
+	if var2 != nil {
+		vals2 = append(vals2, var2)
+	}
+	return vals1, vals2
 }

@@ -81,7 +81,7 @@ func (r *ComponentDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error
 
 func (r *ComponentDefinitionReconciler) reconcile(rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) (ctrl.Result, error) {
-	res, err := intctrlutil.HandleCRDeletion(rctx, r, cmpd, constant.DBComponentDefinitionFinalizerName, r.deletionHandler(rctx, cmpd))
+	res, err := intctrlutil.HandleCRDeletion(rctx, r, cmpd, componentDefinitionFinalizerName, r.deletionHandler(rctx, cmpd))
 	if res != nil {
 		return *res, err
 	}
@@ -153,6 +153,7 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 		r.validateScripts,
 		r.validatePolicyRules,
 		r.validateLabels,
+		r.validateReplicasLimit,
 		r.validateSystemAccounts,
 		r.validateReplicaRoles,
 		r.validateLifecycleActions,
@@ -248,12 +249,18 @@ func (r *ComponentDefinitionReconciler) validateLabels(cli client.Client, rctx i
 	return nil
 }
 
+func (r *ComponentDefinitionReconciler) validateReplicasLimit(cli client.Client, rctx intctrlutil.RequestCtx,
+	cmpd *appsv1alpha1.ComponentDefinition) error {
+	return nil
+}
+
 func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
-	if len(cmpd.Spec.SystemAccounts) != 0 && (cmpd.Spec.LifecycleActions == nil || cmpd.Spec.LifecycleActions.AccountProvision == nil) {
-		return fmt.Errorf("the AccountProvision action is needed to provision system accounts")
+	for _, v := range cmpd.Spec.SystemAccounts {
+		if v.SecretRef == nil && (cmpd.Spec.LifecycleActions == nil || cmpd.Spec.LifecycleActions.AccountProvision == nil) {
+			return fmt.Errorf(`the AccountProvision action is needed to provision system account %s`, v.Name)
+		}
 	}
-
 	if !checkUniqueItemWithValue(cmpd.Spec.SystemAccounts, "Name", nil) {
 		return fmt.Errorf("duplicate system accounts are not allowed")
 	}
@@ -302,8 +309,8 @@ func (r *ComponentDefinitionReconciler) validateLifecycleActionBuiltInHandlers(l
 	actions := []struct {
 		LifeCycleActionHandlers *appsv1alpha1.LifecycleActionHandler
 	}{
-		{lifecycleActions.PostStart},
-		{lifecycleActions.PreStop},
+		{lifecycleActions.PostProvision},
+		{lifecycleActions.PreTerminate},
 		{lifecycleActions.MemberJoin},
 		{lifecycleActions.MemberLeave},
 		{lifecycleActions.Readonly},
@@ -373,6 +380,7 @@ func getBuiltinActionHandlers() []appsv1alpha1.BuiltinActionHandlerType {
 	return []appsv1alpha1.BuiltinActionHandlerType{
 		appsv1alpha1.MySQLBuiltinActionHandler,
 		appsv1alpha1.WeSQLBuiltinActionHandler,
+		appsv1alpha1.OceanbaseBuiltinActionHandler,
 		appsv1alpha1.RedisBuiltinActionHandler,
 		appsv1alpha1.MongoDBBuiltinActionHandler,
 		appsv1alpha1.ETCDBuiltinActionHandler,

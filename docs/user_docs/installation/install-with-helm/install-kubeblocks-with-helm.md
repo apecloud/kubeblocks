@@ -12,7 +12,7 @@ KubeBlocks is kubernetes-native, you can use Helm to install it.
 :::note
 
 If you install KubeBlocks with Helm, to uninstall it, you have to use Helm too.
-
+Make sure you have [kubectl](https://kubernetes.io/docs/tasks/tools/) and [Helm](https://helm.sh/docs/intro/install/) installed.
 :::
 
 
@@ -56,7 +56,7 @@ helm repo add kubeblocks https://apecloud.github.io/helm-charts
 helm repo update
 helm install kubeblocks kubeblocks/kubeblocks \
     --namespace kb-system --create-namespace
-````
+```
 
 If you want to install KubeBlocks with custom tolerations, you can use the following command:
 
@@ -79,9 +79,7 @@ If you want to install KubeBlocks with a specified version, follow the steps bel
 
   :::note
 
-  By default, kbcli installs the latest release version and then when installing KubeBlocks, kbcli installs the matched version. Ensure that the major versions of kbcli and KubeBlocks match.
-
-  For instance, you can install kbcli v0.6.1 and KubeBlocks v0.6.3, but mismatched versions like kbcli v0.5.0 and KubeBlocks v0.6.0 may result in errors.
+  By default, the latest release version is installed.
 
   :::
 
@@ -90,7 +88,7 @@ If you want to install KubeBlocks with a specified version, follow the steps bel
 Run the following command to check whether KubeBlocks is installed successfully.
 
 ```bash
-kbcli kubeblocks status
+kubectl -n kb-system get pods
 ```
 
 ***Result***
@@ -98,11 +96,8 @@ kbcli kubeblocks status
 If the KubeBlocks Workloads are all ready, KubeBlocks has been installed successfully.
 
 ```bash
-KubeBlocks is deployed in namespace: kb-system,version: x.x.x
->
-KubeBlocks Workloads:
-NAMESPACE   KIND         NAME                           READY PODS   CPU(CORES)   MEMORY(BYTES)   CREATED-AT
-kb-system   Deployment   kb-addon-snapshot-controller   1/1          N/A          N/A             Oct 13,2023 14:27 UTC+0800
-kb-system   Deployment   kubeblocks                     1/1          N/A          N/A             Oct 13,2023 14:26 UTC+0800
-kb-system   Deployment   kubeblocks-dataprotection      1/1          N/A          N/A             Oct 13,2023 14:26 UTC+0800
+NAME                                            READY   STATUS    RESTARTS      AGE
+kb-addon-snapshot-controller-649f8b9949-2wzzk   1/1     Running   2 (24m ago)   147d
+kubeblocks-dataprotection-f6dbdbf7f-5fdr9       1/1     Running   2 (24m ago)   147d
+kubeblocks-6497f7947-mc7vc                      1/1     Running   2 (24m ago)   147d
 ```

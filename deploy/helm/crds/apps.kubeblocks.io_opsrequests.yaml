@@ -107,11 +107,32 @@ spec:
                   modifying this property again will not take effect.'
                 type: boolean
               clusterRef:
-                description: clusterRef references clusterDefinition.
+                description: clusterRef references cluster object.
                 type: string
                 x-kubernetes-validations:
                 - message: forbidden to update spec.clusterRef
                   rule: self == oldSelf
+              customSpec:
+                properties:
+                  componentName:
+                    description: cluster component name.
+                    type: string
+                  opsDefinitionRef:
+                    description: reference a opsDefinition
+                    type: string
+                  params:
+                    description: the input for this operation declared in the opsDefinition.spec.parametersSchema.
+                      will create corresponding jobs for each array element. if the
+                      param type is array, the format must be "v1,v2,v3".
+                    items:
+                      additionalProperties:
+                        type: string
+                      type: object
+                    type: array
+                required:
+                - componentName
+                - opsDefinitionRef
+                type: object
               expose:
                 description: expose defines services the component needs to expose.
                 items:
@@ -181,6 +202,53 @@ spec:
                     componentName:
                       description: componentName cluster component name.
                       type: string
+                    instances:
+                      description: 'Instances defines the name of instance that rsm
+                        scale down priorly. If the RsmTransformPolicy is specified
+                        as ToPod and expected replicas is less than current replicas,
+                        the list of Instances will be used. current replicas - expected
+                        replicas > len(Instances): Scale down from the list of Instances
+                        priorly, the others will select from NodeAssignment. current
+                        replicas - expected replicas < len(Instances): Scale down
+                        from the list of Instances. current replicas - expected replicas
+                        < len(Instances): Scale down from a part of Instances.'
+                      items:
+                        type: string
+                      type: array
+                    nodes:
+                      description: Nodes defines the list of nodes that pods can schedule
+                        when scale up If the RsmTransformPolicy is specified as ToPod
+                        and expected replicas is more than current replicas,the list
+                        of Nodes will be used. If the list of Nodes is empty, no specific
+                        node will be assigned. However, if the list of Nodes is filled,
+                        all pods will be evenly scheduled across the Nodes in the
+                        list when scale up.
+                      items:
+                        description: "NodeName is a type that holds a api.Node's Name
+                          identifier. Being a type captures intent and helps make
+                          sure that the node name is not confused with similar concepts
+                          (the hostname, the cloud provider id, the cloud provider
+                          name etc) \n To clarify the various types: \n - Node.Name
+                          is the Name field of the Node in the API.  This should be
+                          stored in a NodeName. Unfortunately, because Name is part
+                          of ObjectMeta, we can't store it as a NodeName at the API
+                          level. \n - Hostname is the hostname of the local machine
+                          (from uname -n). However, some components allow the user
+                          to pass in a --hostname-override flag, which will override
+                          this in most places. In the absence of anything more meaningful,
+                          kubelet will use Hostname as the Node.Name when it creates
+                          the Node. \n * The cloudproviders have the own names: GCE
+                          has InstanceName, AWS has InstanceId. \n For GCE, InstanceName
+                          is the Name of an Instance object in the GCE API.  On GCE,
+                          Instance.Name becomes the Hostname, and thus it makes sense
+                          also to use it as the Node.Name.  But that is GCE specific,
+                          and it is up to the cloudprovider how to do this mapping.
+                          \n For AWS, the InstanceID is not yet suitable for use as
+                          a Node.Name, so we actually use the PrivateDnsName for the
+                          Node.Name.  And this is _not_ always the same as the hostname:
+                          if we are using a custom DHCP domain it won't be."
+                        type: string
+                      type: array
                     replicas:
                       description: replicas for the workloads.
                       format: int32
@@ -434,11 +502,15 @@ spec:
                   backupName:
                     description: backupName is the name of the backup.
                     type: string
+                  effectiveCommonComponentDef:
+                    description: effectiveCommonComponentDef describes this backup
+                      will be restored for all components which refer to common ComponentDefinition.
+                    type: boolean
                   restoreTimeStr:
                     description: restoreTime point in time to restore
                     type: string
                   volumeRestorePolicy:
-                    default: Serial
+                    default: Parallel
                     description: 'the volume claim restore policy, support values:
                       [Serial, Parallel]'
                     enum:
@@ -664,6 +736,7 @@ spec:
                 - DataScript
                 - Backup
                 - Restore
+                - Custom
                 type: string
                 x-kubernetes-validations:
                 - message: forbidden to update spec.type

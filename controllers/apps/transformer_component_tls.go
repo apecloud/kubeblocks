@@ -22,16 +22,20 @@ package apps
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // componentTLSTransformer handles component configuration render
@@ -53,10 +57,78 @@ func (t *componentTLSTransformer) Transform(ctx graph.TransformContext, dag *gra
 		return err
 	}
 
+	if err := checkAndTriggerReRender(transCtx.Context, transCtx.Client, *synthesizedComp, dag); err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func buildTLSCert(ctx context.Context, cli roclient.ReadonlyClient, synthesizedComp component.SynthesizedComponent, dag *graph.DAG) error {
+// a hack way to notify the configuration controller to re-render config
+func checkAndTriggerReRender(ctx context.Context, cli client.Reader, synthesizedComp component.SynthesizedComponent, dag *graph.DAG) error {
+	cm := &corev1.ConfigMap{}
+	if len(synthesizedComp.ConfigTemplates) == 0 {
+		return nil
+	}
+
+	tlsKeyword := plan.GetTLSKeyWord(synthesizedComp.CharacterType)
+	if tlsKeyword == "unsupported-character-type" {
+		return nil
+	}
+
+	// we assume the database config is always the first item of configSpecs, this is true for now
+	cmName := cfgcore.GetComponentCfgName(synthesizedComp.ClusterName, synthesizedComp.Name, synthesizedComp.ConfigTemplates[0].Name)
+	if err := cli.Get(ctx, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: cmName}, cm); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+
+	tlsEnabledInCM := false
+	// search all config files
+	// NODE: The check logic may have bugs and the parameters may be commented.
+	for _, configData := range cm.Data {
+		if strings.Index(configData, tlsKeyword) > 0 {
+			tlsEnabledInCM = true
+			break
+		}
+	}
+
+	tls := synthesizedComp.TLSConfig
+	if ((tls == nil || !tls.Enable) && tlsEnabledInCM) ||
+		(tls != nil && tls.Enable && !tlsEnabledInCM) {
+		// tls config changed
+		conf := &appsv1alpha1.Configuration{}
+		confKey := types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: cfgcore.GenerateComponentConfigurationName(synthesizedComp.ClusterName, synthesizedComp.Name)}
+		if err := cli.Get(ctx, confKey, conf); err != nil {
+			return client.IgnoreNotFound(err)
+		}
+		// update payload for tls
+		confCopy := conf.DeepCopy()
+		// confCopy.Spec.ConfigItemDetails[0].Version = fmt.Sprint(time.Now().UnixMilli())
+		updated, err := intctrlutil.CheckAndPatchPayload(&confCopy.Spec.ConfigItemDetails[0], constant.TLSPayload, tls)
+		if err != nil {
+			return err
+		}
+		if !updated {
+			return nil
+		}
+
+		// NODE: The check logic may have bugs, the configuration requires that it can only be updated through patch
+		// bad case:
+		// thread1: fetch latest configuration(id: 1000)  // e.g cluster reconcile thread
+		// thread2: fetch latest configuration(id: 1000), // e.g reconfiguring operation
+		// thread1: update payload without submit
+		// thread2: update configuration.Spec.ConfigItemDetails[*].configFileParams[*]
+		// thread2: patch configuration(id: 1001)
+		// thread1: submit configuration
+		// result: thread2's update will be lost
+		graphCli, _ := cli.(model.GraphClient)
+		graphCli.Update(dag, conf, confCopy)
+	}
+
+	return nil
+}
+
+func buildTLSCert(ctx context.Context, cli client.Reader, synthesizedComp component.SynthesizedComponent, dag *graph.DAG) error {
 	tls := synthesizedComp.TLSConfig
 	if tls == nil || !tls.Enable {
 		return nil
@@ -133,6 +205,7 @@ func composeTLSVolume(clusterName string, synthesizeComp component.SynthesizedCo
 		cert = tls.Issuer.SecretRef.Cert
 		key = tls.Issuer.SecretRef.Key
 	}
+	mode := int32(0600)
 	volume := corev1.Volume{
 		Name: constant.VolumeName,
 		VolumeSource: corev1.VolumeSource{
@@ -143,7 +216,8 @@ func composeTLSVolume(clusterName string, synthesizeComp component.SynthesizedCo
 					{Key: cert, Path: constant.CertName},
 					{Key: key, Path: constant.KeyName},
 				},
-				Optional: func() *bool { o := false; return &o }(),
+				Optional:    func() *bool { o := false; return &o }(),
+				DefaultMode: &mode,
 			},
 		},
 	}

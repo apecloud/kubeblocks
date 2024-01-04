@@ -113,14 +113,16 @@ func (builder *ComponentDefinitionBuilder) AddService(name, serviceName string, 
 }
 
 func (builder *ComponentDefinitionBuilder) AddServiceExt(name, serviceName string, serviceSpec corev1.ServiceSpec, roleSelector string) *ComponentDefinitionBuilder {
-	svc := appsv1alpha1.Service{
-		Name:         name,
-		ServiceName:  serviceName,
-		Spec:         serviceSpec,
-		RoleSelector: roleSelector,
+	svc := appsv1alpha1.ComponentService{
+		Service: appsv1alpha1.Service{
+			Name:         name,
+			ServiceName:  serviceName,
+			Spec:         serviceSpec,
+			RoleSelector: roleSelector,
+		},
 	}
 	if builder.get().Spec.Services == nil {
-		builder.get().Spec.Services = make([]appsv1alpha1.Service, 0)
+		builder.get().Spec.Services = make([]appsv1alpha1.ComponentService, 0)
 	}
 	builder.get().Spec.Services = append(builder.get().Spec.Services, svc)
 	return builder
@@ -191,6 +193,14 @@ func (builder *ComponentDefinitionBuilder) SetPolicyRules(rules []rbacv1.PolicyR
 
 func (builder *ComponentDefinitionBuilder) SetLabels(labels map[string]string) *ComponentDefinitionBuilder {
 	builder.get().Spec.Labels = labels
+	return builder
+}
+
+func (builder *ComponentDefinitionBuilder) SetReplicasLimit(minReplicas, maxReplicas int32) *ComponentDefinitionBuilder {
+	builder.get().Spec.ReplicasLimit = &appsv1alpha1.ReplicasLimit{
+		MinReplicas: minReplicas,
+		MaxReplicas: maxReplicas,
+	}
 	return builder
 }
 

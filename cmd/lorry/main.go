@@ -31,6 +31,7 @@ import (
 	"github.com/spf13/pflag"
 	"go.uber.org/automaxprocs/maxprocs"
 	"go.uber.org/zap"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	kzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -45,10 +46,12 @@ import (
 )
 
 var configDir string
+var disableDNSChecker bool
 
 func init() {
 	viper.AutomaticEnv()
 	pflag.StringVar(&configDir, "config-path", "/config/lorry/components/", "Lorry default config directory for builtin type")
+	pflag.BoolVar(&disableDNSChecker, "disable-dns-checker", false, "disable dns checker, for test&dev")
 }
 
 func main() {
@@ -60,6 +63,7 @@ func main() {
 		Development: true,
 	}
 	opts.BindFlags(flag.CommandLine)
+	klog.InitFlags(nil)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 	err := viper.BindPFlags(pflag.CommandLine)
@@ -93,7 +97,7 @@ func main() {
 	}
 	workloadType := viper.GetString(constant.KBEnvWorkloadType)
 	if highavailability.IsHAAvailable(characterType, workloadType) {
-		ha := highavailability.NewHa()
+		ha := highavailability.NewHa(disableDNSChecker)
 		if ha != nil {
 			defer ha.ShutdownWithWait()
 			go ha.Start()

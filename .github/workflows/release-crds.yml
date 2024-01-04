@@ -1,0 +1,94 @@
+name: Release Crds
+
+on:
+  workflow_dispatch:
+    inputs:
+      RELEASE_VERSION:
+        description: 'The version of release'
+        required: false
+        default: ''
+  release:
+    types:
+      - published
+
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+  JIHULAB_KUBEBLOCKS_PROJECT_ID: 98723
+  JIHULAB_ACCESS_TOKEN: ${{ secrets.GITLAB_ACCESS_TOKEN }}
+  KUBEBLOCKS_CRDS: "kubeblocks_crds.yaml"
+
+jobs:
+  release-version:
+    name: release version ${{ inputs.RELEASE_VERSION }}
+    runs-on: ubuntu-latest
+    outputs:
+      release-version: ${{ steps.get_release_version.outputs.release-version }}
+    steps:
+      - name: Get Release Version
+        id: get_release_version
+        run: |
+          RELEASE_VERSION="${{ inputs.RELEASE_VERSION }}"
+          if [[ -z "$RELEASE_VERSION" ]]; then
+              RELEASE_VERSION="${{ github.ref_name }}"
+          fi
+          echo release-version=$RELEASE_VERSION >> $GITHUB_OUTPUT
+
+  create-jihulab-release:
+    name: Create Release KubeBlocks Jihulab
+    needs: [ release-version ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: create jihulab release
+        run: |
+          bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
+            --type 1 \
+            --project-id ${{ env.JIHULAB_KUBEBLOCKS_PROJECT_ID }} \
+            --tag-name "${{ needs.release-version.outputs.release-version }}" \
+            --access-token ${{ env.JIHULAB_ACCESS_TOKEN }}
+
+  upload-kubeblocks-crds:
+    needs: [ release-version, create-jihulab-release ]
+    name: Upload KubeBlocks crds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: merge KubeBlocks crds
+        run: |
+          crds_path="deploy/helm/crds"
+          KUBEBLOCKS_CRDS=${{ env.KUBEBLOCKS_CRDS }}
+          touch $KUBEBLOCKS_CRDS
+          crds_list=$(ls $crds_path)
+          for crd in $(echo $crds_list); do
+              echo "---" >> $KUBEBLOCKS_CRDS
+              cat $crds_path/$crd >> $KUBEBLOCKS_CRDS
+          done
+
+      - name: upload KubeBlocks crds to jihulab
+        run: |
+          echo "Processing file: ${{ env.KUBEBLOCKS_CRDS }}"
+          bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
+              --type 2 \
+              --project-id ${{ env.JIHULAB_KUBEBLOCKS_PROJECT_ID }} \
+              --tag-name "${{ needs.release-version.outputs.release-version }}" \
+              --asset-path ${{ github.workspace }}/${{ env.KUBEBLOCKS_CRDS }} \
+              --asset-name ${{ env.KUBEBLOCKS_CRDS }} \
+              --access-token ${{ env.JIHULAB_ACCESS_TOKEN }}
+
+      - name: get KubeBlocks release upload url
+        run: |
+          echo 'UPLOAD_URL='`bash ${{ github.workspace }}/.github/utils/utils.sh \
+            --tag-name "${{ needs.release-version.outputs.release-version }}" \
+            --type 3 \
+            --github-repo ${{ github.repository }} \
+            --github-token ${{ env.GITHUB_TOKEN }}` >> $GITHUB_ENV
+
+      - name: upload KubeBlocks crds to github
+        uses: actions/upload-release-asset@main
+        with:
+          upload_url: ${{ env.UPLOAD_URL }}
+          asset_path: ${{ github.workspace }}/${{ env.KUBEBLOCKS_CRDS }}
+          asset_name: ${{ env.KUBEBLOCKS_CRDS }}
+          asset_content_type: application/yaml

@@ -24,6 +24,10 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
+	"strconv"
+	"strings"
+	"unicode"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -31,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/version"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -262,4 +267,49 @@ func PrependSpaces(content string, spaces int) string {
 		}
 	}
 	return w.String()
+}
+
+// GetFirstIndexRunningPod gets the first running pod with index.
+func GetFirstIndexRunningPod(podList *corev1.PodList) *corev1.Pod {
+	if podList == nil {
+		return nil
+	}
+	sort.Slice(podList.Items, func(i, j int) bool {
+		return podList.Items[i].Name < podList.Items[j].Name
+	})
+	for _, v := range podList.Items {
+		if intctrlutil.IsAvailable(&v, 0) {
+			return &v
+		}
+	}
+	return nil
+}
+
+// GetKubeVersion get the version of Kubernetes and return the version major and minor
+func GetKubeVersion() (int, int, error) {
+	var err error
+	verIf := viper.Get(constant.CfgKeyServerInfo)
+	ver, ok := verIf.(version.Info)
+	if !ok {
+		return 0, 0, fmt.Errorf("failed to get kubernetes version, major %s, minor %s", ver.Major, ver.Minor)
+	}
+
+	major, err := strconv.Atoi(ver.Major)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	// split the "normal" + and - for semver stuff to get the leading minor number
+	minorStrs := strings.FieldsFunc(ver.Minor, func(r rune) bool {
+		return !unicode.IsDigit(r)
+	})
+	if len(minorStrs) == 0 {
+		return 0, 0, fmt.Errorf("failed to get kubernetes version, major %s, minor %s", ver.Major, ver.Minor)
+	}
+
+	minor, err := strconv.Atoi(minorStrs[0])
+	if err != nil {
+		return 0, 0, err
+	}
+	return major, minor, nil
 }

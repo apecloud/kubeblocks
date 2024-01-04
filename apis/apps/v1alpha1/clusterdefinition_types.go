@@ -444,6 +444,10 @@ type ClusterComponentDefinition struct {
 	// +optional
 	SwitchoverSpec *SwitchoverSpec `json:"switchoverSpec,omitempty"`
 
+	// postStartSpec defines the command to be executed when the component is ready, and the command will only be executed once after the component becomes ready.
+	// +optional
+	PostStartSpec *PostStartAction `json:"postStartSpec,omitempty"`
+
 	// +optional
 	VolumeProtectionSpec *VolumeProtectionSpec `json:"volumeProtectionSpec,omitempty"`
 
@@ -587,7 +591,7 @@ type ServiceSpec struct {
 	// NOTES: name also need to be key
 }
 
-func (r *ServiceSpec) toSVCPorts() []corev1.ServicePort {
+func (r *ServiceSpec) ToSVCPorts() []corev1.ServicePort {
 	ports := make([]corev1.ServicePort, 0, len(r.Ports))
 	for _, p := range r.Ports {
 		ports = append(ports, p.toSVCPort())
@@ -597,7 +601,7 @@ func (r *ServiceSpec) toSVCPorts() []corev1.ServicePort {
 
 func (r ServiceSpec) ToSVCSpec() corev1.ServiceSpec {
 	return corev1.ServiceSpec{
-		Ports: r.toSVCPorts(),
+		Ports: r.ToSVCPorts(),
 	}
 }
 
@@ -945,6 +949,17 @@ func (r *ReplicationSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolic
 	s.Type = appsv1.OnDeleteStatefulSetStrategyType
 	s.RollingUpdate = nil
 	return appsv1.ParallelPodManagement, s
+}
+
+type PostStartAction struct {
+	// cmdExecutorConfig is the executor configuration of the post-start command.
+	// +kubebuilder:validation:Required
+	CmdExecutorConfig CmdExecutorConfig `json:"cmdExecutorConfig"`
+
+	// scriptSpecSelectors defines the selector of the scriptSpecs that need to be referenced.
+	// Once ScriptSpecSelectors is defined, the scripts defined in scriptSpecs can be referenced in the PostStartAction.CmdExecutorConfig.
+	// +optional
+	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
 }
 
 type SwitchoverSpec struct {

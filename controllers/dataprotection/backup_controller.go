@@ -303,7 +303,7 @@ func (r *BackupReconciler) prepareBackupRequest(
 	request.BackupMethod = backupMethod
 
 	targetPods, err := GetTargetPods(reqCtx, r.Client,
-		backup.Annotations[dptypes.BackupTargetPodLabelKey], backupPolicy)
+		backup.Annotations[dptypes.BackupTargetPodLabelKey], backupMethod, backupPolicy)
 	if err != nil || len(targetPods) == 0 {
 		return nil, fmt.Errorf("failed to get target pods by backup policy %s/%s",
 			backupPolicy.Namespace, backupPolicy.Name)
@@ -596,6 +596,11 @@ func getClusterObjectString(cluster *appsv1alpha1.Cluster) (*string, error) {
 			Name:      cluster.Name,
 		},
 		TypeMeta: cluster.TypeMeta,
+	}
+	if v, ok := cluster.Annotations[constant.ExtraEnvAnnotationKey]; ok {
+		newCluster.Annotations = map[string]string{
+			constant.ExtraEnvAnnotationKey: v,
+		}
 	}
 	clusterBytes, err := json.Marshal(newCluster)
 	if err != nil {

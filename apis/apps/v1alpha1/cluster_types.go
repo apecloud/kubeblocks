@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -70,12 +71,16 @@ type ClusterSpec struct {
 	// services defines the services to access a cluster.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
-	Services []Service `json:"services,omitempty"`
+	Services []ClusterService `json:"services,omitempty"`
 
-	// connectionCredentials defines the credentials used to access a cluster.
+	// affinity is a group of affinity scheduling rules.
+	// +optional
+	Affinity *Affinity `json:"affinity,omitempty"`
+
+	// tolerations are attached to tolerate any taint that matches the triple `key,value,effect` using the matching operator `operator`.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
-	ConnectionCredentials []ConnectionCredential `json:"connectionCredentials,omitempty"`
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
 	// tenancy describes how pods are distributed across node.
 	// SharedNode means multiple pods may share the same node.
@@ -86,15 +91,6 @@ type ClusterSpec struct {
 	// availabilityPolicy describes the availability policy, including zone, node, and none.
 	// +optional
 	AvailabilityPolicy AvailabilityPolicyType `json:"availabilityPolicy,omitempty"`
-
-	// affinity is a group of affinity scheduling rules.
-	// +optional
-	Affinity *Affinity `json:"affinity,omitempty"`
-
-	// tolerations are attached to tolerate any taint that matches the triple `key,value,effect` using the matching operator `operator`.
-	// +kubebuilder:pruning:PreserveUnknownFields
-	// +optional
-	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
 	// replicas specifies the replicas of the first componentSpec, if the replicas of the first componentSpec is specified, this value will be ignored.
 	// +optional
@@ -335,7 +331,7 @@ type ClusterComponentSpec struct {
 	// +optional
 	EnabledLogs []string `json:"enabledLogs,omitempty"`
 
-	// Component replicas. The default value is used in ClusterDefinition spec if not specified.
+	// Component replicas.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=1
@@ -395,6 +391,26 @@ type ClusterComponentSpec struct {
 	// userResourceRefs defines the user-defined volumes.
 	// +optional
 	UserResourceRefs *UserResourceRefs `json:"userResourceRefs,omitempty"`
+
+	// RsmTransformPolicy defines the policy generate sts using rsm.
+	// ToSts: rsm transforms to statefulSet
+	// ToPod: rsm transforms to pods
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=ToSts
+	// +optional
+	RsmTransformPolicy workloads.RsmTransformPolicy `json:"rsmTransformPolicy,omitempty"`
+
+	// Nodes defines the list of nodes that pods can schedule
+	// If the RsmTransformPolicy is specified as ToPod,the list of nodes will be used. If the list of nodes is empty,
+	// no specific node will be assigned. However, if the list of node is filled, all pods will be evenly scheduled
+	// across the nodes in the list.
+	// +optional
+	Nodes []types.NodeName `json:"nodes,omitempty"`
+
+	// Instances defines the list of instance to be deleted priorly
+	// If the RsmTransformPolicy is specified as ToPod,the list of instances will be used.
+	// +optional
+	Instances []string `json:"instances,omitempty"`
 }
 
 // GetMinAvailable wraps the 'prefer' value return. As for component replicaCount <= 1, it will return 0,
@@ -442,67 +458,9 @@ type ClusterComponentStatus struct {
 	// +optional
 	PodsReadyTime *metav1.Time `json:"podsReadyTime,omitempty"`
 
-	// consensusSetStatus specifies the mapping of role and pod name.
-	// +optional
-	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use MembersStatus instead."
-	ConsensusSetStatus *ConsensusSetStatus `json:"consensusSetStatus,omitempty"`
-
-	// replicationSetStatus specifies the mapping of role and pod name.
-	// +optional
-	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use MembersStatus instead."
-	ReplicationSetStatus *ReplicationSetStatus `json:"replicationSetStatus,omitempty"`
-
 	// members' status.
 	// +optional
 	MembersStatus []workloads.MemberStatus `json:"membersStatus,omitempty"`
-}
-
-type ConsensusSetStatus struct {
-	// Leader status.
-	// +kubebuilder:validation:Required
-	Leader ConsensusMemberStatus `json:"leader"`
-
-	// Followers status.
-	// +optional
-	Followers []ConsensusMemberStatus `json:"followers,omitempty"`
-
-	// Learner status.
-	// +optional
-	Learner *ConsensusMemberStatus `json:"learner,omitempty"`
-}
-
-type ConsensusMemberStatus struct {
-	// Defines the role name.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=leader
-	Name string `json:"name"`
-
-	// accessMode defines what service this pod provides.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=ReadWrite
-	AccessMode AccessMode `json:"accessMode"`
-
-	// Pod name.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=Unknown
-	Pod string `json:"pod"`
-}
-
-type ReplicationSetStatus struct {
-	// Primary status.
-	// +kubebuilder:validation:Required
-	Primary ReplicationMemberStatus `json:"primary"`
-
-	// Secondaries status.
-	// +optional
-	Secondaries []ReplicationMemberStatus `json:"secondaries,omitempty"`
-}
-
-type ReplicationMemberStatus struct {
-	// Pod name.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=Unknown
-	Pod string `json:"pod"`
 }
 
 type ClusterSwitchPolicy struct {

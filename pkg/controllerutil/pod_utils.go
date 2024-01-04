@@ -34,7 +34,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
@@ -337,8 +336,8 @@ func GetIntOrPercentValue(intOrStr *metautil.IntOrString) (int, bool, error) {
 }
 
 // GetPortByPortName gets the Port from pod by name
-func GetPortByPortName(pod *corev1.Pod, portName string) (int32, error) {
-	for _, container := range pod.Spec.Containers {
+func GetPortByPortName(containers []corev1.Container, portName string) (int32, error) {
+	for _, container := range containers {
 		for _, port := range container.Ports {
 			if port.Name == portName {
 				return port.ContainerPort, nil
@@ -349,36 +348,41 @@ func GetPortByPortName(pod *corev1.Pod, portName string) (int32, error) {
 }
 
 func GetLorryGRPCPort(pod *corev1.Pod) (int32, error) {
-	return GetPortByPortName(pod, constant.LorryGRPCPortName)
+	return GetLorryGRPCPortFromContainers(pod.Spec.Containers)
+}
+
+func GetLorryGRPCPortFromContainers(containers []corev1.Container) (int32, error) {
+	return GetPortByPortName(containers, constant.LorryGRPCPortName)
 }
 
 func GetLorryHTTPPort(pod *corev1.Pod) (int32, error) {
-	return GetPortByPortName(pod, constant.LorryHTTPPortName)
+	return GetLorryHTTPPortFromContainers(pod.Spec.Containers)
 }
 
-// GuessLorryHTTPPort guesses lorry container and serving port.
-// TODO(xuriwuyun): should provide a deterministic way to find the lorry serving port.
-func GuessLorryHTTPPort(pod *corev1.Pod) (int32, error) {
-	lorryImage := viper.GetString(constant.KBToolsImage)
-	for _, container := range pod.Spec.Containers {
-		if container.Image != lorryImage {
-			continue
-		}
-		if len(container.Ports) > 0 {
-			return container.Ports[0].ContainerPort, nil
-		}
-	}
-	return 0, fmt.Errorf("lorry port not found")
+func GetLorryHTTPPortFromContainers(containers []corev1.Container) (int32, error) {
+	return GetPortByPortName(containers, constant.LorryHTTPPortName)
 }
 
-// GetLorryContainerName gets the probe container from pod
+// GetLorryContainerName gets the lorry container from pod
 func GetLorryContainerName(pod *corev1.Pod) (string, error) {
-	for _, container := range pod.Spec.Containers {
-		if len(container.Command) > 0 && strings.Contains(container.Command[0], "lorry") {
-			return container.Name, nil
-		}
+	container := GetLorryContainer(pod.Spec.Containers)
+	if container != nil {
+		return container.Name, nil
 	}
 	return "", fmt.Errorf("lorry container not found")
+}
+
+func GetLorryContainer(containers []corev1.Container) *corev1.Container {
+	var container *corev1.Container
+	for i := range containers {
+		container = &containers[i]
+		for _, port := range container.Ports {
+			if port.Name == constant.LorryHTTPPortName {
+				return container
+			}
+		}
+	}
+	return nil
 }
 
 // PodIsReadyWithLabel checks if pod is ready for ConsensusSet/ReplicationSet component,

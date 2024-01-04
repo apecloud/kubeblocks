@@ -107,6 +107,7 @@ func (t *componentLoadResourcesTransformer) transformForGeneratedComponent(trans
 	}
 	transCtx.CompDef = compDef
 	transCtx.SynthesizeComponent = synthesizedComp
+
 	return nil
 }
 
@@ -123,7 +124,7 @@ func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx
 		Recorder: transCtx.EventRecorder,
 	}
 	comp := transCtx.Component
-	synthesizedComp, err := component.BuildSynthesizedComponent(reqCtx, transCtx.Client, compDef, comp)
+	synthesizedComp, err := component.BuildSynthesizedComponent(reqCtx, transCtx.Client, transCtx.Cluster, compDef, comp)
 	if err != nil {
 		message := fmt.Sprintf("build synthesized component for %s failed: %s", comp.Name, err.Error())
 		return newRequeueError(requeueDuration, message)

@@ -39,6 +39,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -51,27 +52,40 @@ import (
 
 // BuildRSM builds a ReplicatedStateMachine object based on Cluster, SynthesizedComponent.
 func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
-	labels := constant.GetKBWellKnownLabelsWithCompDef(synthesizedComp.CompDefName, cluster.Name, synthesizedComp.Name)
+	var (
+		clusterDefName = synthesizedComp.ClusterDefName
+		compDefName    = synthesizedComp.CompDefName
+		namespace      = synthesizedComp.Namespace
+		clusterName    = synthesizedComp.ClusterName
+		compName       = synthesizedComp.Name
+	)
+	labels := constant.GetKBWellKnownLabelsWithCompDef(compDefName, clusterName, compName)
+	if len(clusterDefName) > 0 {
+		// TODO(xingran): for backward compatibility in kubeBlocks version 0.8.0, it will be removed in the future.
+		labels = constant.GetKBWellKnownLabels(clusterDefName, clusterName, compName)
+	}
 
 	// TODO(xingran): Need to review how to set pod labels based on the new ComponentDefinition API. workloadType label has been removed.
 	podBuilder := builder.NewPodBuilder("", "").
 		AddLabelsInMap(labels).
-		AddLabelsInMap(constant.GetComponentDefLabel(synthesizedComp.CompDefName)).
-		AddLabelsInMap(constant.GetAppVersionLabel(synthesizedComp.CompDefName))
+		AddLabelsInMap(constant.GetComponentDefLabel(compDefName)).
+		AddLabelsInMap(constant.GetAppVersionLabel(compDefName))
 	template := corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
 		Spec:       *synthesizedComp.PodSpec.DeepCopy(),
 	}
 
-	rsmName := constant.GenerateRSMNamePattern(cluster.Name, synthesizedComp.Name)
-	rsmBuilder := builder.NewReplicatedStateMachineBuilder(cluster.Namespace, rsmName).
-		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
+	rsmName := constant.GenerateRSMNamePattern(clusterName, compName)
+	rsmBuilder := builder.NewReplicatedStateMachineBuilder(namespace, rsmName).
+		AddAnnotations(constant.KubeBlocksGenerationKey, synthesizedComp.ClusterGeneration).
 		AddAnnotationsInMap(getMonitorAnnotations(synthesizedComp)).
 		AddLabelsInMap(labels).
-		AddLabelsInMap(constant.GetComponentDefLabel(synthesizedComp.CompDefName)).
+		AddLabelsInMap(constant.GetComponentDefLabel(compDefName)).
 		AddMatchLabelsInMap(labels).
 		SetServiceName(constant.GenerateRSMServiceNamePattern(rsmName)).
 		SetReplicas(synthesizedComp.Replicas).
+		SetRsmTransformPolicy(synthesizedComp.RsmTransformPolicy).
+		SetNodeAssignment(synthesizedComp.NodesAssignment).
 		SetTemplate(template)
 
 	var vcts []corev1.PersistentVolumeClaim
@@ -80,8 +94,12 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synthesi
 	}
 	rsmBuilder.SetVolumeClaimTemplates(vcts...)
 
+	if common.IsCompactMode(cluster.Annotations) {
+		rsmBuilder.AddAnnotations(constant.FeatureReconciliationInCompactModeAnnotationKey, cluster.Annotations[constant.FeatureReconciliationInCompactModeAnnotationKey])
+	}
+
 	// convert componentDef attributes to rsm attributes. including service, credential, roles, roleProbe, membershipReconfiguration, memberUpdateStrategy, etc.
-	rsmObj, err := component.BuildRSMFrom(cluster, synthesizedComp, rsmBuilder.GetObject())
+	rsmObj, err := component.BuildRSMFrom(synthesizedComp, rsmBuilder.GetObject())
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +182,7 @@ func randomString(length int) string {
 }
 
 func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent) *corev1.Secret {
+	synthesizedComp *component.SynthesizedComponent) *corev1.Secret {
 	wellKnownLabels := constant.GetKBWellKnownLabels(clusterDefinition.Name, cluster.Name, "")
 	delete(wellKnownLabels, constant.KBAppComponentLabelKey)
 	credentialBuilder := builder.NewSecretBuilder(cluster.Namespace, constant.GenerateDefaultConnCredential(cluster.Name)).
@@ -222,7 +240,7 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 		if err != nil {
 			return ""
 		}
-		backupSource, ok := backupMap[component.Name]
+		backupSource, ok := backupMap[synthesizedComp.Name]
 		if !ok {
 			return ""
 		}
@@ -256,12 +274,12 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 		"$(UUID_B64)":      uuidB64,
 		"$(UUID_STR_B64)":  uuidStrB64,
 		"$(UUID_HEX)":      uuidHex,
-		"$(SVC_FQDN)":      constant.GenerateDefaultComponentServiceName(cluster.Name, component.Name),
-		constant.EnvPlaceHolder(constant.KBEnvClusterCompName): constant.GenerateClusterComponentName(cluster.Name, component.Name),
-		"$(HEADLESS_SVC_FQDN)":                                 constant.GenerateDefaultComponentHeadlessServiceName(cluster.Name, component.Name),
+		"$(SVC_FQDN)":      constant.GenerateDefaultComponentServiceName(cluster.Name, synthesizedComp.Name),
+		constant.EnvPlaceHolder(constant.KBEnvClusterCompName): constant.GenerateClusterComponentName(cluster.Name, synthesizedComp.Name),
+		"$(HEADLESS_SVC_FQDN)":                                 constant.GenerateDefaultComponentHeadlessServiceName(cluster.Name, synthesizedComp.Name),
 	}
-	if len(component.Services) > 0 {
-		for _, p := range component.Services[0].Spec.Ports {
+	if len(synthesizedComp.Services) > 0 {
+		for _, p := range synthesizedComp.Services[0].Spec.Ports {
 			m[fmt.Sprintf("$(SVC_PORT_%s)", p.Name)] = strconv.Itoa(int(p.Port))
 		}
 	}
@@ -274,16 +292,6 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 	}
 	replaceData(m)
 	return connCredential
-}
-
-func BuildConnCredential4Cluster(cluster *appsv1alpha1.Cluster, name string, data map[string][]byte) *corev1.Secret {
-	secretName := constant.GenerateClusterConnCredential(cluster.Name, name)
-	labels := constant.GetClusterWellKnownLabels(cluster.Name)
-	return builder.NewSecretBuilder(cluster.Namespace, secretName).
-		AddLabelsInMap(labels).
-		SetData(data).
-		SetImmutable(true).
-		GetObject()
 }
 
 func BuildPDB(synthesizedComp *component.SynthesizedComponent) *policyv1.PodDisruptionBudget {

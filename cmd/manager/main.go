@@ -54,7 +54,6 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
-	storagecontrollers "github.com/apecloud/kubeblocks/controllers/storage"
 	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
@@ -102,13 +101,14 @@ func init() {
 	viper.SetDefault("PROBE_SERVICE_GRPC_PORT", 50001)
 	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
 	viper.SetDefault("KUBEBLOCKS_SERVICEACCOUNT_NAME", "kubeblocks")
-	viper.SetDefault("CONFIG_MANAGER_GRPC_PORT", 9901)
+	viper.SetDefault(constant.ConfigManagerGPRCPortEnv, 9901)
 	viper.SetDefault("CONFIG_MANAGER_LOG_LEVEL", "info")
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 	viper.SetDefault(constant.FeatureGateReplicatedStateMachine, true)
 	viper.SetDefault(constant.KBDataScriptClientsImage, "apecloud/kubeblocks-datascript:latest")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(rsm.FeatureGateRSMCompatibilityMode, true)
+	viper.SetDefault(rsm.FeatureGateRSMToPod, true)
 }
 
 type flagName string
@@ -123,7 +123,6 @@ const (
 	appsFlagKey       flagName = "apps"
 	extensionsFlagKey flagName = "extensions"
 	workloadsFlagKey  flagName = "workloads"
-	storageFlagKey    flagName = "storage"
 )
 
 func (r flagName) String() string {
@@ -198,8 +197,6 @@ func main() {
 		"Enable the extensions controller manager. ")
 	flag.Bool(workloadsFlagKey.String(), true,
 		"Enable the workloads controller manager. ")
-	flag.Bool(storageFlagKey.String(), true,
-		"Enable the storage controller manager. ")
 
 	opts := zap.Options{
 		Development: true,
@@ -280,6 +277,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := intctrlutil.InitHostPortManager(mgr.GetClient()); err != nil {
+		setupLog.Error(err, "unable to init port manager")
+		os.Exit(1)
+	}
+
 	if viper.GetBool(appsFlagKey.viperName()) {
 		if err = (&appscontrollers.ClusterReconciler{
 			Client:   mgr.GetClient(),
@@ -323,6 +325,15 @@ func main() {
 			Recorder: mgr.GetEventRecorderFor("component-definition-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ComponentDefinition")
+			os.Exit(1)
+		}
+
+		if err = (&appscontrollers.OpsDefinitionReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("ops-definition-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "OpsDefinition")
 			os.Exit(1)
 		}
 
@@ -427,17 +438,6 @@ func main() {
 			Recorder: mgr.GetEventRecorderFor("replicated-state-machine-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ReplicatedStateMachine")
-			os.Exit(1)
-		}
-	}
-
-	if viper.GetBool(storageFlagKey.viperName()) {
-		if err = (&storagecontrollers.StorageProviderReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("storage-provider-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "StorageProvider")
 			os.Exit(1)
 		}
 	}

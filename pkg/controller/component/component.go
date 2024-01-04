@@ -24,14 +24,17 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 func FullName(clusterName, compName string) string {
@@ -77,12 +80,18 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1
 		SetEnabledLogs(clusterCompSpec.EnabledLogs).
 		SetServiceRefs(clusterCompSpec.ServiceRefs).
 		SetClassRef(clusterCompSpec.ClassDefRef).
-		SetTLSConfig(clusterCompSpec.TLS, clusterCompSpec.Issuer)
-
+		SetTLSConfig(clusterCompSpec.TLS, clusterCompSpec.Issuer).
+		SetNodes(clusterCompSpec.Nodes).
+		SetInstances(clusterCompSpec.Instances).
+		SetTransformPolicy(clusterCompSpec.RsmTransformPolicy)
 	// sync cluster ignore resource constraint annotation to component
 	value, ok := cluster.GetAnnotations()[constant.IgnoreResourceConstraint]
 	if ok {
 		compBuilder.AddAnnotations(constant.IgnoreResourceConstraint, value)
+	}
+	if common.IsCompactMode(cluster.GetAnnotations()) {
+		compBuilder.AddAnnotations(constant.FeatureReconciliationInCompactModeAnnotationKey,
+			cluster.GetAnnotations()[constant.FeatureReconciliationInCompactModeAnnotationKey])
 	}
 	return compBuilder.GetObject(), nil
 }
@@ -187,4 +196,52 @@ func getCompLabelValue(comp *appsv1alpha1.Component, label string) (string, erro
 		return "", fmt.Errorf("required label %s is not provided, component: %s", label, comp.GetName())
 	}
 	return val, nil
+}
+
+// GetComponentDefName gets the name of referenced component definition.
+func GetComponentDefName(cluster *appsv1alpha1.Cluster, componentName string) string {
+	for _, component := range cluster.Spec.ComponentSpecs {
+		if componentName == component.Name {
+			return component.ComponentDef
+		}
+	}
+	return ""
+}
+
+// GetCompDefinition gets the component definition by component name.
+func GetCompDefinition(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	compName string) (*appsv1alpha1.ComponentDefinition, error) {
+	compDefName := GetComponentDefName(cluster, compName)
+	if len(compDefName) == 0 {
+		return nil, intctrlutil.NewNotFound(`can not found component definition by the component name "%s"`, compName)
+	}
+	compDef := &appsv1alpha1.ComponentDefinition{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: compDefName}, compDef); err != nil {
+		return nil, err
+	}
+	return compDef, nil
+}
+
+// CheckAndGetClusterComponents checks if all components have created and gets the created components.
+func CheckAndGetClusterComponents(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) ([]client.Object, error) {
+	compList := &appsv1alpha1.ComponentList{}
+	if err := cli.List(ctx, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels{constant.AppInstanceLabelKey: cluster.Name}); err != nil {
+		return nil, err
+	}
+	compMap := map[string]client.Object{}
+	for i := range compList.Items {
+		compMap[compList.Items[i].Name] = &compList.Items[i]
+	}
+	var components []client.Object
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		compName := constant.GenerateClusterComponentName(cluster.Name, compSpec.Name)
+		v, ok := compMap[compName]
+		if !ok {
+			return nil, intctrlutil.NewRequeueError(time.Second, "waiting for all component creations to be completed")
+		}
+		components = append(components, v)
+	}
+	return components, nil
 }

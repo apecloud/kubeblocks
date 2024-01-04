@@ -233,6 +233,7 @@ const (
 	DataScriptType        OpsType = "DataScript" // DataScriptType the data script operation will execute the data script against the cluster.
 	BackupType            OpsType = "Backup"
 	RestoreType           OpsType = "Restore"
+	RebuildType           OpsType = "Rebuild"
 	CustomType            OpsType = "Custom" // use opsDefinition
 )
 

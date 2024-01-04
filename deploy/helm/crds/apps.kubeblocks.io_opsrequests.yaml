@@ -265,6 +265,42 @@ spec:
                 x-kubernetes-validations:
                 - message: forbidden to update spec.horizontalScaling
                   rule: self == oldSelf
+              rebuildFromBackup:
+                description: rebuild target components from backup
+                items:
+                  properties:
+                    backupName:
+                      description: backupName is the name of the backup.
+                      type: string
+                    componentName:
+                      description: componentName cluster component name.
+                      type: string
+                    effectiveCommonComponentDef:
+                      description: effectiveCommonComponentDef describes this backup
+                        will be restored for all components which refer to common
+                        ComponentDefinition.
+                      type: boolean
+                    parameters:
+                      additionalProperties:
+                        type: string
+                      description: parameters will overwrite the env of the actionSet.
+                      type: object
+                    restoreTimeStr:
+                      description: restoreTime point in time to restore
+                      type: string
+                    volumeRestorePolicy:
+                      default: Parallel
+                      description: 'the volume claim restore policy, support values:
+                        [Serial, Parallel]'
+                      enum:
+                      - Serial
+                      - Parallel
+                      type: string
+                  required:
+                  - backupName
+                  - componentName
+                  type: object
+                type: array
               reconfigure:
                 description: reconfigure defines the variables that need to input
                   when updating configuration.

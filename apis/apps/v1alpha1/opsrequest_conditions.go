@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -359,5 +360,20 @@ func NewRestoreCondition(ops *OpsRequest) *metav1.Condition {
 		Reason:             "RestoreStarted",
 		LastTransitionTime: metav1.Now(),
 		Message:            fmt.Sprintf("Start to restore the Cluster: %s", ops.Spec.ClusterRef),
+	}
+}
+
+// NewRebuildCondition creates a condition that the OpsRequest rebuild the components.
+func NewRebuildCondition(ops *OpsRequest) *metav1.Condition {
+	var componentNames []string
+	for i := range ops.Spec.RebuildFromBackup {
+		componentNames = append(componentNames, ops.Spec.RebuildFromBackup[i].ComponentName)
+	}
+	return &metav1.Condition{
+		Type:               ConditionTypeBackup,
+		Status:             metav1.ConditionTrue,
+		Reason:             "RebuildStarted",
+		LastTransitionTime: metav1.Now(),
+		Message:            fmt.Sprintf("Start to rebuild the components: %s", strings.Join(componentNames, ",")),
 	}
 }

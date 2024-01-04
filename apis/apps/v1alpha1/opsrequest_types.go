@@ -151,6 +151,9 @@ type OpsRequestSpec struct {
 	// +optional
 	RestoreSpec *RestoreSpec `json:"restoreSpec,omitempty"`
 
+	// rebuild target components from backup
+	RebuildFromBackup []RebuildSpec `json:"rebuildFromBackup,omitempty"`
+
 	CustomSpec *CustomOpsSpec `json:"customSpec,omitempty"`
 }
 
@@ -472,6 +475,16 @@ type RestoreSpec struct {
 	// +kubebuilder:validation:Enum=Serial;Parallel
 	// +kubebuilder:default=Parallel
 	VolumeRestorePolicy string `json:"volumeRestorePolicy,omitempty"`
+}
+
+type RebuildSpec struct {
+	ComponentOps `json:",inline"`
+
+	RestoreSpec `json:",inline"`
+
+	// parameters will overwrite the env of the actionSet.
+	// +optional
+	Parameters map[string]string `json:"parameters,omitempty"`
 }
 
 // ScriptSecret defines the secret to be used to execute the script.

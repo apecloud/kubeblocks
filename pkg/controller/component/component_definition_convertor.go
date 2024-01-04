@@ -56,7 +56,6 @@ func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterCo
 		"labels":                 &compDefLabelsConvertor{},
 		"replicasLimit":          &compDefReplicasLimitConvertor{},
 		"systemaccounts":         &compDefSystemAccountsConvertor{},
-		"connectioncredentials":  &compDefConnCredentialsConvertor{},
 		"updatestrategy":         &compDefUpdateStrategyConvertor{},
 		"roles":                  &compDefRolesConvertor{},
 		"rolearbitrator":         &compDefRoleArbitratorConvertor{},
@@ -189,18 +188,22 @@ func (c *compDefServicesConvertor) convert(args ...any) (any, error) {
 	}
 	headlessSvc := c.removeDuplicatePorts(headlessSvcBuilder.GetObject())
 
-	services := []appsv1alpha1.Service{
+	services := []appsv1alpha1.ComponentService{
 		{
-			Name:         "default",
-			ServiceName:  "",
-			Spec:         svc.Spec,
-			RoleSelector: c.roleSelector(clusterCompDef),
+			Service: appsv1alpha1.Service{
+				Name:         "default",
+				ServiceName:  "",
+				Spec:         svc.Spec,
+				RoleSelector: c.roleSelector(clusterCompDef),
+			},
 		},
 		{
-			Name:         "headless",
-			ServiceName:  "headless",
-			Spec:         headlessSvc.Spec,
-			RoleSelector: c.roleSelector(clusterCompDef),
+			Service: appsv1alpha1.Service{
+				Name:         "headless",
+				ServiceName:  "headless",
+				Spec:         headlessSvc.Spec,
+				RoleSelector: c.roleSelector(clusterCompDef),
+			},
 		},
 	}
 	return services, nil
@@ -324,13 +327,6 @@ func (c *compDefSystemAccountsConvertor) convert(args ...any) (any, error) {
 	return accounts, nil
 }
 
-// compDefConnCredentialsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.ConnectionCredentials.
-type compDefConnCredentialsConvertor struct{}
-
-func (c *compDefConnCredentialsConvertor) convert(args ...any) (any, error) {
-	return nil, nil
-}
-
 // compDefUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.UpdateStrategy.
 type compDefUpdateStrategyConvertor struct{}
 
@@ -451,7 +447,7 @@ func (c *compDefRoleArbitratorConvertor) convert(args ...any) (any, error) {
 
 	// TODO(xingran): it is hacky, should be refactored
 	if clusterCompDef.WorkloadType == appsv1alpha1.Replication && clusterCompDef.CharacterType == constant.RedisCharacterType {
-		roleArbitrator := appsv1alpha1.KubeBlocksRoleArbitrator
+		roleArbitrator := appsv1alpha1.LorryRoleArbitrator
 		return &roleArbitrator, nil
 	}
 

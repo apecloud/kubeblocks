@@ -15,8 +15,9 @@ kind: Addon
 metadata:
   name: {{ $name }}
   labels:
-    app.kubernetes.io/name: {{ $name }}
-    app.kubernetes.io/version: {{ $version }}
+    {{- include "kubeblocks.selectorLabels" . | nindent 4 }}
+    addon.kubeblocks.io/name: {{ $name }}
+    addon.kubeblocks.io/version: {{ $version }}
     addon.kubeblocks.io/provider: community
     addon.kubeblocks.io/model: streaming
   annotations:

@@ -22,6 +22,7 @@ package dataprotection
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"time"
 
@@ -35,6 +36,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -252,6 +254,31 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
 					g.Expect(fetched.Status.Expiration).ShouldNot(BeNil())
 				})).Should(Succeed())
+			})
+
+			It("create an backup with backupMethod's", func() {
+				By("Set backupMethod's target")
+				Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(bp *dpv1alpha1.BackupPolicy) {
+					backupPolicy.Spec.BackupMethods[0].Target = &dpv1alpha1.BackupTarget{
+						PodSelector: &dpv1alpha1.PodSelector{
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									constant.AppInstanceLabelKey:    testdp.ClusterName,
+									constant.KBAppComponentLabelKey: testdp.ComponentName,
+									constant.RoleLabelKey:           constant.Follower,
+								},
+							},
+						},
+					}
+				})).Should(Succeed())
+				By("check targets pod")
+				reqCtx := intctrlutil.RequestCtx{
+					Ctx: ctx,
+				}
+				targets, err := GetTargetPods(reqCtx, k8sClient, "", &backupPolicy.Spec.BackupMethods[0], backupPolicy)
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(targets).Should(HaveLen(1))
+				Expect(targets[0].Name).Should(Equal(testdp.ClusterName + "-" + testdp.ComponentName + "-1"))
 			})
 		})
 

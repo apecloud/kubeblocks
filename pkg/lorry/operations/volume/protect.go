@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -60,6 +61,15 @@ const (
 type volumeStatsRequester interface {
 	init(ctx context.Context) error
 	request(ctx context.Context) ([]byte, error)
+}
+
+var protection operations.Operation = &Protection{}
+
+func init() {
+	err := operations.Register(strings.ToLower(string(util.VolumeProtection)), protection)
+	if err != nil {
+		panic(err.Error())
+	}
 }
 
 type volumeExt struct {

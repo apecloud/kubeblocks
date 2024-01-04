@@ -51,7 +51,11 @@ const (
 	// kbCompPostProvisionDoneKey is used to mark the component postProvision job is done
 	kbCompPostProvisionDoneKey = "kubeblocks.io/post-provision-done"
 
-	kbPostProvisionClusterCompList = "KB_CLUSTER_COMPONENT_LIST"
+	kbPostProvisionClusterCompList            = "KB_CLUSTER_COMPONENT_LIST"
+	kbPostProvisionClusterCompPodNameList     = "KB_CLUSTER_COMPONENT_POD_NAME_LIST"
+	kbPostProvisionClusterCompPodIPList       = "KB_CLUSTER_COMPONENT_POD_IP_LIST"
+	kbPostProvisionClusterCompPodHostNameList = "KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST"
+	kbPostProvisionClusterCompPodHostIPList   = "KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST"
 )
 
 // ReconcileCompPostProvision reconciles the component-level postProvision command.
@@ -201,6 +205,7 @@ func renderPostProvisionCmdJob(ctx context.Context,
 	if podList == nil || len(podList.Items) == 0 {
 		return nil, errors.New("component pods not found")
 	}
+	pods := podList.Items
 	tplPod := podList.Items[0]
 
 	renderJobPodVolumes := func() ([]corev1.Volume, []corev1.VolumeMount) {
@@ -275,10 +280,13 @@ func renderPostProvisionCmdJob(ctx context.Context,
 		if len(cluster.Spec.Tolerations) > 0 {
 			job.Spec.Template.Spec.Tolerations = cluster.Spec.Tolerations
 		}
+		for i := range job.Spec.Template.Spec.Containers {
+			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&job.Spec.Template.Spec.Containers[i])
+		}
 		return job, nil
 	}
 
-	postProvisionEnvs, err := buildPostProvisionEnvs(cluster, synthesizeComp, &tplPod)
+	postProvisionEnvs, err := buildPostProvisionEnvs(cluster, synthesizeComp, pods, &tplPod)
 	if err != nil {
 		return nil, err
 	}
@@ -294,6 +302,7 @@ func renderPostProvisionCmdJob(ctx context.Context,
 // buildPostProvisionEnvs builds the postProvision command job envs.
 func buildPostProvisionEnvs(cluster *appsv1alpha1.Cluster,
 	synthesizeComp *SynthesizedComponent,
+	pods []corev1.Pod,
 	tplPod *corev1.Pod) ([]corev1.EnvVar, error) {
 	var workloadEnvs []corev1.EnvVar
 
@@ -307,7 +316,7 @@ func buildPostProvisionEnvs(cluster *appsv1alpha1.Cluster,
 		workloadEnvs = append(workloadEnvs, tplPod.Spec.Containers[0].Env...)
 	}
 
-	compEnvs := genClusterComponentEnv(cluster)
+	compEnvs := genClusterComponentEnv(cluster, pods)
 	if len(compEnvs) > 0 {
 		workloadEnvs = append(workloadEnvs, compEnvs...)
 	}
@@ -316,20 +325,50 @@ func buildPostProvisionEnvs(cluster *appsv1alpha1.Cluster,
 }
 
 // genClusterComponentEnv generates the cluster component relative envs.
-func genClusterComponentEnv(cluster *appsv1alpha1.Cluster) []corev1.EnvVar {
+func genClusterComponentEnv(cluster *appsv1alpha1.Cluster, pods []corev1.Pod) []corev1.EnvVar {
 	if cluster == nil || cluster.Spec.ComponentSpecs == nil {
 		return nil
 	}
+	compEnvs := make([]corev1.EnvVar, 0)
 	compList := make([]string, 0, len(cluster.Spec.ComponentSpecs))
+	compPodNameList := make([]string, 0, len(pods))
+	compPodIPList := make([]string, 0, len(pods))
+	compHostNameList := make([]string, 0, len(pods))
+	compHostIPList := make([]string, 0, len(pods))
+
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		compList = append(compList, compSpec.Name)
 	}
-	return []corev1.EnvVar{
-		{
-			Name:  kbPostProvisionClusterCompList,
-			Value: strings.Join(compList, ","),
-		},
+	compEnvs = append(compEnvs, corev1.EnvVar{
+		Name:  kbPostProvisionClusterCompList,
+		Value: strings.Join(compList, ","),
+	})
+
+	for _, pod := range pods {
+		compPodNameList = append(compPodNameList, pod.Name)
+		compPodIPList = append(compPodIPList, pod.Status.PodIP)
+		compHostNameList = append(compHostNameList, pod.Spec.NodeName)
+		compHostIPList = append(compHostIPList, pod.Status.HostIP)
 	}
+	compEnvs = append(compEnvs, []corev1.EnvVar{
+		{
+			Name:  kbPostProvisionClusterCompPodNameList,
+			Value: strings.Join(compPodNameList, ","),
+		},
+		{
+			Name:  kbPostProvisionClusterCompPodIPList,
+			Value: strings.Join(compPodIPList, ","),
+		},
+		{
+			Name:  kbPostProvisionClusterCompPodHostNameList,
+			Value: strings.Join(compHostNameList, ","),
+		},
+		{
+			Name:  kbPostProvisionClusterCompPodHostIPList,
+			Value: strings.Join(compHostIPList, ","),
+		}}...)
+
+	return compEnvs
 }
 
 // genPostProvisionJobName generates the postProvision job name.

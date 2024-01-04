@@ -151,7 +151,6 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 	)
 
 	componentLabels := map[string]string{
-		constant.AppNameLabelKey:        configMap.Labels[constant.AppNameLabelKey],
 		constant.AppInstanceLabelKey:    configMap.Labels[constant.AppInstanceLabelKey],
 		constant.KBAppComponentLabelKey: configMap.Labels[constant.KBAppComponentLabelKey],
 	}
@@ -210,7 +209,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 			configurationNotRelatedComponentMessage)
 		return updateConfigPhase(r.Client, reqCtx, configMap, appsv1alpha1.CFinishedPhase, configurationNotRelatedComponentMessage)
 	}
-	if len(reconcileContext.StatefulSets) == 0 && len(reconcileContext.Deployments) == 0 {
+	if len(reconcileContext.StatefulSets) == 0 && len(reconcileContext.Deployments) == 0 && len(reconcileContext.RSMList) == 0 {
 		reqCtx.Recorder.Eventf(configMap,
 			corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
 			"the configmap is not used by any container, skip reconfigure")

@@ -24,21 +24,23 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-type clusterRestoreTransformer struct {
+type componentRestoreTransformer struct {
 	client.Client
 }
 
-var _ graph.Transformer = &clusterRestoreTransformer{}
+var _ graph.Transformer = &componentRestoreTransformer{}
 
-func (t *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*clusterTransformContext)
+func (t *componentRestoreTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*componentTransformContext)
 	cluster := transCtx.Cluster
+	if cluster.Annotations[constant.RestoreFromBackupAnnotationKey] == "" {
+		return nil
+	}
 	reqCtx := ictrlutil.RequestCtx{
 		Ctx:      transCtx.Context,
 		Log:      transCtx.Logger,
@@ -51,18 +53,10 @@ func (t *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 		}
 		return err
 	}
-	for _, spec := range transCtx.ComponentSpecs {
-		if cluster.Annotations[constant.RestoreFromBackupAnnotationKey] == "" {
-			continue
-		}
-		synthesizeComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, t.Client, cluster, spec)
-		if err != nil {
-			return commitError(err)
-		}
-		restoreMGR := plan.NewRestoreManager(reqCtx.Ctx, t.Client, cluster, rscheme, nil, synthesizeComp.Replicas, 0)
-		if err = restoreMGR.DoRestore(synthesizeComp); err != nil {
-			return commitError(err)
-		}
+
+	restoreMGR := plan.NewRestoreManager(reqCtx.Ctx, t.Client, cluster, rscheme, nil, transCtx.SynthesizeComponent.Replicas, 0)
+	if err := restoreMGR.DoRestore(transCtx.SynthesizeComponent, transCtx.Component); err != nil {
+		return commitError(err)
 	}
 	return nil
 }

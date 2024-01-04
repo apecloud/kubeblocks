@@ -21,7 +21,6 @@ package apps
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -34,15 +33,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
-)
-
-var (
-	errReqClusterObj = errors.New("required arg *appsv1alpha1.Cluster is nil")
 )
 
 // GetClusterByObject gets cluster by related k8s workloads.
@@ -83,75 +80,6 @@ func getObjectListByCustomLabels(ctx context.Context, cli client.Client, cluster
 	objectList client.ObjectList, matchLabels client.ListOption) error {
 	inNamespace := client.InNamespace(cluster.Namespace)
 	return cli.List(ctx, objectList, matchLabels, inNamespace)
-}
-
-// getClusterComponentSpecByName gets componentSpec from cluster with compSpecName.
-func getClusterComponentSpecByName(cluster appsv1alpha1.Cluster, compSpecName string) *appsv1alpha1.ClusterComponentSpec {
-	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		if compSpec.Name == compSpecName {
-			return &compSpec
-		}
-	}
-	return nil
-}
-
-// initClusterComponentStatusIfNeed Initialize the state of the corresponding component in cluster.status.components
-func initClusterComponentStatusIfNeed(
-	cluster *appsv1alpha1.Cluster,
-	componentName string,
-	workloadType appsv1alpha1.WorkloadType) error {
-	if cluster == nil {
-		return errReqClusterObj
-	}
-
-	// REVIEW: should have following removed
-	// if _, ok := cluster.Status.Components[componentName]; !ok {
-	// 	cluster.Status.SetComponentStatus(componentName, appsv1alpha1.ClusterComponentStatus{
-	// 		Phase: cluster.Status.Phase,
-	// 	})
-	// }
-	componentStatus := cluster.Status.Components[componentName]
-	switch workloadType {
-	case appsv1alpha1.Consensus:
-		if componentStatus.ConsensusSetStatus != nil {
-			break
-		}
-		componentStatus.ConsensusSetStatus = &appsv1alpha1.ConsensusSetStatus{
-			Leader: appsv1alpha1.ConsensusMemberStatus{
-				Pod:        constant.ComponentStatusDefaultPodName,
-				AccessMode: appsv1alpha1.None,
-				Name:       "",
-			},
-		}
-	case appsv1alpha1.Replication:
-		if componentStatus.ReplicationSetStatus != nil {
-			break
-		}
-		componentStatus.ReplicationSetStatus = &appsv1alpha1.ReplicationSetStatus{
-			Primary: appsv1alpha1.ReplicationMemberStatus{
-				Pod: constant.ComponentStatusDefaultPodName,
-			},
-		}
-	}
-	cluster.Status.SetComponentStatus(componentName, componentStatus)
-	return nil
-}
-
-// getCompRelatedObjectList gets the related pods and workloads of the component
-func getCompRelatedObjectList(ctx context.Context,
-	cli client.Client,
-	cluster appsv1alpha1.Cluster,
-	compName string,
-	relatedWorkloads client.ObjectList) (*corev1.PodList, error) {
-	podList, err := intctrlcomp.GetComponentPodList(ctx, cli, cluster, compName)
-	if err != nil {
-		return nil, err
-	}
-	if err = intctrlcomp.GetObjectListByComponentName(ctx,
-		cli, cluster, relatedWorkloads, compName); err != nil {
-		return nil, err
-	}
-	return podList, nil
 }
 
 // parseCustomLabelPattern parses the custom label pattern to GroupVersionKind.
@@ -290,13 +218,26 @@ func DelayUpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	for i := range pobj.Containers {
 		delayUpdateKubeBlocksToolsImage(obj.Containers, &pobj.Containers[i])
 	}
+	updateKubeBlocksReadinessProbe(obj.Containers, pobj.Containers)
 }
 
 // UpdatePodSpecSystemFields to update system fields in pod spec.
-func UpdatePodSpecSystemFields(pobj *corev1.PodSpec) {
+func UpdatePodSpecSystemFields(obj *corev1.PodSpec, pobj *corev1.PodSpec) {
 	for i := range pobj.Containers {
 		updateKubeBlocksToolsImage(&pobj.Containers[i])
 	}
+
+	updateKubeBlocksReadinessProbe(obj.Containers, pobj.Containers)
+}
+
+func updateKubeBlocksReadinessProbe(containers []corev1.Container, pcontainers []corev1.Container) {
+	oldLorryContainer := controllerutil.GetLorryContainer(containers)
+	newLorryContainer := controllerutil.GetLorryContainer(pcontainers)
+	if oldLorryContainer == nil || newLorryContainer == nil {
+		return
+	}
+	newLorryContainer.ReadinessProbe = oldLorryContainer.ReadinessProbe
+
 }
 
 func delayUpdateKubeBlocksToolsImage(containers []corev1.Container, pc *corev1.Container) {
@@ -339,7 +280,7 @@ func UpdateComponentInfoToPods(
 	cluster *appsv1alpha1.Cluster,
 	component *intctrlcomp.SynthesizedComponent,
 	dag *graph.DAG) error {
-	if cluster == nil || component == nil {
+	if cluster == nil || component == nil || component.RsmTransformPolicy == v1alpha1.ToPod {
 		return nil
 	}
 	ml := client.MatchingLabels{

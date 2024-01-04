@@ -1,4 +1,4 @@
-name: RELEASE-IMAGE
+name: Release Images
 
 on:
   schedule:
@@ -173,3 +173,58 @@ jobs:
       CONTENT: "release image ${{ needs.release-message.outputs.release-version }} ${{ needs.release-message.outputs.content-result }}"
       APECD_REF: "v0.1.38"
     secrets: inherit
+
+  release-result:
+    if: github.event.action == 'published'
+    needs: [ release-message ]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        type: [image, chart]
+    steps:
+      - name: Restore ${{ matrix.type }} Artifact
+        id: cache-artifact-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            ${{ env.RELEASE_VERSION }}-${{ matrix.type }}
+          key: ${{ env.RELEASE_VERSION }}-${{ matrix.type }}
+
+      - name: check release result
+        run: |
+          release_result=$( cat ${{ env.RELEASE_VERSION }}-${{ matrix.type }} )
+          if [[ "$release_result" != "success" ]]; then
+              exit 1
+          fi
+
+  e2e-kbcli:
+    needs: [ release-message, release-result ]
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.35
+    strategy:
+      fail-fast: false
+      matrix:
+        test-type: [ apecloud-mysql|postgresql|redis|mongodb|kafka|pulsar|weaviate|qdrant|smartengine|mysqlscale|tidb|xinference ,
+                     greptimedb|nebula|risingwave|starrocks|etcd|oceanbase|foxlake|omysql|asmysql|openldap|milvus|clickhouse|opengauss ,
+                     polardbx|pika|opensearch|elasticsearch|tdengine|vllm|orioledb|official-pg|ggml|zookeeper|mariadb|oracle|flink ]
+    with:
+      GITHUB_REPO: "apecloud/kubeblocks"
+      BRANCH_NAME: "main"
+      WORKFLOW_ID: "e2e-kbcli.yml"
+      APECD_REF: "v0.1.35"
+      VERSION: "${{ needs.release-message.outputs.release-version }}"
+      EXTRA_ARGS: "TEST_TYPE=${{ matrix.test-type }}#CLOUD_PROVIDER=${{ vars.CLOUD_PROVIDER }}"
+    secrets: inherit
+
+  delete-cache:
+    needs: e2e-kbcli
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        type: [image, chart]
+    steps:
+      - uses: actions/checkout@v4
+      - name: delete ${{ matrix.type }} cache
+        continue-on-error: true
+        run: |
+          bash .github/utils/utils.sh --type 17 --tag-name "${{ env.RELEASE_VERSION }}-${{ matrix.type }}"
+

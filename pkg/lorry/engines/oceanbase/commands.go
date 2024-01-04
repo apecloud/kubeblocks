@@ -45,8 +45,8 @@ func NewCommands() engines.ClusterCommands {
 		examples: map[models.ClientType]engines.BuildConnectExample{
 			models.CLI: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# oceanbase client connection example
-mysql -h %s -P %s -u %s
-`, info.Host, info.Port, info.User)
+mysql -h %s -P $COMP_MYSQL_PORT -u %s
+`, info.Host, info.User)
 			},
 		},
 	}
@@ -64,9 +64,9 @@ func (r *Commands) ConnectCommand(connectInfo *engines.AuthInfo) []string {
 	var obCmd []string
 
 	if userPass != "" {
-		obCmd = []string{fmt.Sprintf("%s -h127.0.0.1 -P2881 -u%s -A -p%s", r.info.Client, userName, engines.AddSingleQuote(userPass))}
+		obCmd = []string{fmt.Sprintf("%s -h127.0.0.1 -P $OB_SERVICE_PORT -u%s -A -p%s", r.info.Client, userName, engines.AddSingleQuote(userPass))}
 	} else {
-		obCmd = []string{fmt.Sprintf("%s -h127.0.0.1 -P2881 -u%s -A", r.info.Client, userName)}
+		obCmd = []string{fmt.Sprintf("%s -h127.0.0.1 -P $OB_SERVICE_PORT -u%s -A", r.info.Client, userName)}
 	}
 
 	return []string{"bash", "-c", strings.Join(obCmd, " ")}
@@ -84,9 +84,9 @@ func (r *Commands) ExecuteCommand(scripts []string) ([]string, []corev1.EnvVar, 
 	cmd := []string{}
 	cmd = append(cmd, "/bin/bash", "-c", "-ex")
 	if engines.EnvVarMap[engines.PASSWORD] == "" {
-		cmd = append(cmd, fmt.Sprintf("%s -h127.0.0.1 -P2881 -u%s -e %s", r.info.Client, engines.EnvVarMap[engines.USER], strconv.Quote(strings.Join(scripts, " "))))
+		cmd = append(cmd, fmt.Sprintf("%s -h127.0.0.1 -P $COMP_MYSQL_PORT -u%s -e %s", r.info.Client, engines.EnvVarMap[engines.USER], strconv.Quote(strings.Join(scripts, " "))))
 	} else {
-		cmd = append(cmd, fmt.Sprintf("%s -h127.0.0.1 -P2881 -u%s -p%s -e %s", r.info.Client,
+		cmd = append(cmd, fmt.Sprintf("%s -h127.0.0.1 -P $COMP_MYSQL_PORT -u%s -p%s -e %s", r.info.Client,
 			fmt.Sprintf("$%s", engines.EnvVarMap[engines.USER]),
 			fmt.Sprintf("$%s", engines.EnvVarMap[engines.PASSWORD]),
 			strconv.Quote(strings.Join(scripts, " "))))

@@ -33,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -91,8 +90,8 @@ func needDoSwitchover(ctx context.Context,
 		if err != nil {
 			return false, err
 		}
-		podParent, _ := common.ParseParentNameAndOrdinal(pod.Name)
-		siParent, o := common.ParseParentNameAndOrdinal(switchover.InstanceName)
+		podParent, _ := intctrlutil.ParseParentNameAndOrdinal(pod.Name)
+		siParent, o := intctrlutil.ParseParentNameAndOrdinal(switchover.InstanceName)
 		if podParent != siParent || o < 0 || o >= int32(len(podList.Items)) {
 			return false, errors.New("switchover.InstanceName is invalid")
 		}
@@ -286,6 +285,9 @@ func renderSwitchoverCmdJob(ctx context.Context,
 					},
 				},
 			},
+		}
+		for i := range job.Spec.Template.Spec.Containers {
+			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&job.Spec.Template.Spec.Containers[i])
 		}
 		if len(cluster.Spec.Tolerations) > 0 {
 			job.Spec.Template.Spec.Tolerations = cluster.Spec.Tolerations

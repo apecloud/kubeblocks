@@ -151,12 +151,21 @@ func (r *ConfigurationReconciler) runTasks(taskCtx TaskContext, tasks []Task) (e
 	if err != nil {
 		return err
 	}
-
+	var dependencyObjs []client.Object
+	// HACK for hostNetwork
+	// TODO: define the api to inject dynamic info of the cluster components
+	if synthesizedComp.PodSpec.HostNetwork {
+		// if the component not uses hostNetwork, ignore it.
+		dependencyObjs, err = component.CheckAndGetClusterComponents(taskCtx.reqCtx.Ctx, r.Client, taskCtx.fetcher.ClusterObj)
+		if err != nil {
+			return err
+		}
+	}
 	// TODO manager multiple version
 	patch := client.MergeFrom(configuration.DeepCopy())
 	revision := strconv.FormatInt(configuration.GetGeneration(), 10)
 	for _, task := range tasks {
-		if err := task.Do(taskCtx.fetcher, synthesizedComp, revision); err != nil {
+		if err := task.Do(taskCtx.fetcher, synthesizedComp, dependencyObjs, revision); err != nil {
 			errs = append(errs, err)
 			continue
 		}

@@ -280,12 +280,14 @@ var _ = Describe("Cluster Controller", func() {
 			f.SetName(randClusterName).
 				AddAppManagedByLabel().
 				AddAppInstanceLabel(randClusterName).
-				AddService(appsv1alpha1.Service{
-					Name:              service.Name,
-					ServiceName:       service.Name,
-					Spec:              service.Spec,
+				AddService(appsv1alpha1.ClusterService{
+					Service: appsv1alpha1.Service{
+						Name:         service.Name,
+						ServiceName:  service.Name,
+						Spec:         service.Spec,
+						RoleSelector: constant.Follower,
+					},
 					ComponentSelector: compName,
-					RoleSelector:      constant.Follower,
 				})
 		})
 
@@ -317,9 +319,6 @@ var _ = Describe("Cluster Controller", func() {
 				g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.RoleLabelKey, constant.Leader))
 			}
 		})).Should(Succeed())
-	}
-
-	testClusterCredential := func(compName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory))) {
 	}
 
 	testClusterAffinityNToleration := func(compName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory))) {
@@ -480,17 +479,19 @@ var _ = Describe("Cluster Controller", func() {
 			testapps.ServiceInternetName: {"", corev1.ServiceTypeLoadBalancer},
 		}
 
-		services := make([]appsv1alpha1.Service, 0)
+		services := make([]appsv1alpha1.ClusterService, 0)
 		for name, svc := range expectServices {
-			services = append(services, appsv1alpha1.Service{
-				Name:        name,
-				ServiceName: name,
-				Spec: corev1.ServiceSpec{
-					Ports: []corev1.ServicePort{
-						{Port: 3306},
+			services = append(services, appsv1alpha1.ClusterService{
+				Service: appsv1alpha1.Service{
+					Name:        name,
+					ServiceName: name,
+					Spec: corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{
+							{Port: 3306},
+						},
+						Type:      svc.svcType,
+						ClusterIP: svc.clusterIP,
 					},
-					Type:      svc.svcType,
-					ClusterIP: svc.clusterIP,
 				},
 				ComponentSelector: compName,
 				// RoleSelector:      []string{"leader"},
@@ -522,7 +523,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("delete a cluster service")
 		delete(expectServices, deleteService.Name)
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
-			var svcs []appsv1alpha1.Service
+			var svcs []appsv1alpha1.ClusterService
 			for _, item := range cluster.Spec.Services {
 				if item.Name != deleteService.Name {
 					svcs = append(svcs, item)
@@ -750,10 +751,6 @@ var _ = Describe("Cluster Controller", func() {
 
 			It("with cluster service set", func() {
 				testClusterService(consensusCompName, compDefName, createObj)
-			})
-
-			It("with cluster credential set", func() {
-				testClusterCredential(consensusCompName, compDefName, createObj)
 			})
 
 			It("with cluster affinity and toleration set", func() {

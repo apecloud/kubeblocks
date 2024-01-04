@@ -4,7 +4,8 @@ metadata:
   name: csi-driver-nfs
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
-    "kubeblocks.io/provider": community
+    "addon.kubeblocks.io/provider": community
+    "addon.kubeblocks.io/version": "4.5.0"
   {{- if .Values.keepAddons }}
   annotations:
     helm.sh/resource-policy: keep
@@ -27,6 +28,14 @@ spec:
       {{- if eq $cloudProvider "huaweiCloud" }}
       setValues:
         - kubeletDir=/mnt/paas/kubernetes/kubelet
+      {{- else if eq $cloudProvider "gcp" }}
+      # In GKE, the system-node-critical and system-cluster-critical priority classes
+      # can't be used for non-system pods, but csi-driver-nfs uses "system-cluster-critical"
+      # by default, so override them here.
+      setValues:
+        - controller.priorityClassName=""
+        - node.priorityClassName=""
+        - externalSnapshotter.priorityClassName=""
       {{- end }}
 
     valuesMapping:

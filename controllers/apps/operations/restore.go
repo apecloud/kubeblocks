@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 type RestoreOpsHandler struct{}
@@ -144,7 +145,8 @@ func restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 	}
 
 	// check if the backup is completed
-	if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
+	backupType := backup.Labels[dptypes.BackupTypeLabelKey]
+	if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted && backupType != string(dpv1alpha1.BackupTypeContinuous) {
 		return nil, fmt.Errorf("backup %s status is %s, only completed backup can be used to restore", backupName, backup.Status.Phase)
 	}
 
@@ -172,9 +174,6 @@ func restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 
 func getClusterObjFromBackup(backup *dpv1alpha1.Backup, opsRequest *appsv1alpha1.OpsRequest) (*appsv1alpha1.Cluster, error) {
 	cluster := &appsv1alpha1.Cluster{}
-	volumeRestorePolicy := opsRequest.Spec.RestoreSpec.VolumeRestorePolicy
-	restoreTimeStr := opsRequest.Spec.RestoreSpec.RestoreTimeStr
-
 	// use the cluster snapshot to restore firstly
 	clusterString, ok := backup.Annotations[constant.ClusterSnapshotAnnotationKey]
 	if !ok {
@@ -183,16 +182,16 @@ func getClusterObjFromBackup(backup *dpv1alpha1.Backup, opsRequest *appsv1alpha1
 	if err := json.Unmarshal([]byte(clusterString), &cluster); err != nil {
 		return nil, err
 	}
-
+	restoreSpec := opsRequest.Spec.RestoreSpec
 	// set the restore annotation to cluster
-	restoreAnnotation, err := restore.GetRestoreFromBackupAnnotation(backup, volumeRestorePolicy, len(cluster.Spec.ComponentSpecs), cluster.Spec.ComponentSpecs[0].Name, restoreTimeStr)
+	restoreAnnotation, err := restore.GetRestoreFromBackupAnnotation(backup, cluster.Spec.ComponentSpecs, restoreSpec.VolumeRestorePolicy, restoreSpec.RestoreTimeStr, restoreSpec.EffectiveCommonComponentDef)
 	if err != nil {
 		return nil, err
 	}
-	cluster.ObjectMeta = metav1.ObjectMeta{
-		Name:        opsRequest.Spec.ClusterRef,
-		Namespace:   cluster.Namespace,
-		Annotations: map[string]string{constant.RestoreFromBackupAnnotationKey: restoreAnnotation},
+	if cluster.Annotations == nil {
+		cluster.Annotations = map[string]string{}
 	}
+	cluster.Annotations[constant.RestoreFromBackupAnnotationKey] = restoreAnnotation
+	cluster.Name = opsRequest.Spec.ClusterRef
 	return cluster, nil
 }

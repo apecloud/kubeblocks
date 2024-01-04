@@ -78,6 +78,7 @@ var _ = Describe("Restore", func() {
 		testapps.ClearResources(&testCtx, generics.BackupSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.BackupPolicySignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.RestoreSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.ComponentSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
 		//
 		// non-namespaced
@@ -105,6 +106,7 @@ var _ = Describe("Restore", func() {
 			clusterVersion          *appsv1alpha1.ClusterVersion
 			cluster                 *appsv1alpha1.Cluster
 			synthesizedComponent    *component.SynthesizedComponent
+			compObj                 *appsv1alpha1.Component
 			pvc                     *corev1.PersistentVolumeClaim
 			backup                  *dpv1alpha1.Backup
 			fullBackupActionSet     *dpv1alpha1.ActionSet
@@ -184,6 +186,14 @@ var _ = Describe("Restore", func() {
 				VolumeTypes:           []appsv1alpha1.VolumeTypeSpec{{Name: testapps.DataVolumeName, Type: appsv1alpha1.VolumeTypeData}},
 				Replicas:              1,
 			}
+			By("create component object")
+			compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, cluster.Name+"-"+synthesizedComponent.Name, "").
+				AddLabels(constant.AppInstanceLabelKey, cluster.Name).
+				AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
+				SetReplicas(1).
+				Create(&testCtx).
+				GetObject()
+
 			By("By creating remote pvc: ")
 			remotePVC := testapps.NewPersistentVolumeClaimFactory(
 				testCtx.DefaultNamespace, "remote-pvc", clusterName, mysqlCompName, "log").
@@ -222,7 +232,7 @@ var _ = Describe("Restore", func() {
 			})).Should(Succeed())
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
 			restoreMGR := NewRestoreManager(ctx, k8sClient, cluster, scheme.Scheme, nil, 3, 0)
-			err := restoreMGR.DoRestore(synthesizedComponent)
+			err := restoreMGR.DoRestore(synthesizedComponent, compObj)
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
 
 			By("mock restore of prepareData stage to Completed")
@@ -232,7 +242,7 @@ var _ = Describe("Restore", func() {
 				restore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
 			})()).ShouldNot(HaveOccurred())
 
-			By("mock cluster phase to Running")
+			By("mock component and cluster phase to Running")
 			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
 				cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
 				cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
@@ -241,10 +251,13 @@ var _ = Describe("Restore", func() {
 					},
 				}
 			})).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, compObj, func() {
+				compObj.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+			})).Should(Succeed())
 
 			By("wait for postReady restore created and mock it to Completed")
 			restoreMGR.Cluster = cluster
-			_ = restoreMGR.DoRestore(synthesizedComponent)
+			_ = restoreMGR.DoRestore(synthesizedComponent, compObj)
 
 			// check if restore CR of postReady stage is created.
 			restoreMeta = restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PostReady)
@@ -257,7 +270,7 @@ var _ = Describe("Restore", func() {
 			})()).ShouldNot(HaveOccurred())
 
 			By("clean up annotations after cluster running")
-			_ = restoreMGR.DoRestore(synthesizedComponent)
+			_ = restoreMGR.DoRestore(synthesizedComponent, compObj)
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackupAnnotationKey]).Should(BeEmpty())
 			})).Should(Succeed())
@@ -273,7 +286,7 @@ var _ = Describe("Restore", func() {
 			})).Should(Succeed())
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
 			restoreMGR := NewRestoreManager(ctx, k8sClient, cluster, scheme.Scheme, nil, 3, 0)
-			err := restoreMGR.DoRestore(synthesizedComponent)
+			err := restoreMGR.DoRestore(synthesizedComponent, compObj)
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRestoreFailed)).Should(BeTrue())
 		})
 	})

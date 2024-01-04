@@ -27,12 +27,11 @@ import (
 )
 
 const (
-	APIVersion                 = "apps.kubeblocks.io/v1alpha1"
-	ClusterVersionKind         = "ClusterVersion"
-	ClusterDefinitionKind      = "ClusterDefinition"
-	ClusterKind                = "Cluster"
-	OpsRequestKind             = "OpsRequestKind"
-	ReplicatedStateMachineKind = "ReplicatedStateMachine"
+	APIVersion            = "apps.kubeblocks.io/v1alpha1"
+	ClusterVersionKind    = "ClusterVersion"
+	ClusterDefinitionKind = "ClusterDefinition"
+	ClusterKind           = "Cluster"
+	OpsRequestKind        = "OpsRequestKind"
 )
 
 type ComponentTemplateSpec struct {
@@ -383,7 +382,7 @@ type ProvisionScope string
 const (
 	// AllPods will create accounts for all pods belong to the component.
 	AllPods ProvisionScope = "AllPods"
-	// AndyPods will only create accounts on one pod.
+	// AnyPods will only create accounts on one pod.
 	AnyPods ProvisionScope = "AnyPods"
 )
 
@@ -591,8 +590,41 @@ type StatefulSetWorkload interface {
 	GetUpdateStrategy() UpdateStrategy
 }
 
+type ClusterService struct {
+	Service `json:",inline"`
+
+	// ComponentSelector extends the ServiceSpec.Selector by allowing you to specify a component as selectors for the service.
+	// +optional
+	ComponentSelector string `json:"componentSelector,omitempty"`
+}
+
+type ComponentService struct {
+	Service `json:",inline"`
+
+	// GeneratePodOrdinalService indicates whether to create a corresponding Service for each Pod of the selected Component.
+	// If sets to true, a set of Service will be automatically generated for each Pod. And Service.RoleSelector will be ignored.
+	// They can be referred to by adding the PodOrdinal to the defined ServiceName with named pattern <Service.ServiceName>-<PodOrdinal>.
+	// And the Service.Name will also be generated with named pattern <Service.Name>-<PodOrdinal>.
+	// The PodOrdinal is zero-based, and the number of generated Services is equal to the number of replicas of the Component.
+	// For example, a Service might be defined as follows:
+	// - name: my-service
+	//   serviceName: my-service
+	//   generatePodOrdinalService: true
+	//   spec:
+	//     type: NodePort
+	//     ports:
+	//     - name: http
+	//       port: 80
+	//       targetPort: 8080
+	// Assuming that the Component has 3 replicas, then three services would be generated: my-service-0, my-service-1, and my-service-2, each pointing to its respective Pod.
+	// +kubebuilder:default=false
+	// +optional
+	GeneratePodOrdinalService bool `json:"generatePodOrdinalService,omitempty"`
+}
+
 type Service struct {
-	// The name of the service.
+	// Name defines the name of the service.
+	// otherwise, it indicates the name of the service.
 	// Others can refer to this service by its name. (e.g., connection credential)
 	// Cannot be updated.
 	// +required
@@ -607,50 +639,20 @@ type Service struct {
 	// +optional
 	ServiceName string `json:"serviceName,omitempty"`
 
+	// If ServiceType is LoadBalancer, cloud provider related parameters can be put here
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
 	// Spec defines the behavior of a service.
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Spec corev1.ServiceSpec `json:"spec,omitempty"`
 
-	// ComponentSelector extends the ServiceSpec.Selector by allowing you to specify a component as selectors for the service.
-	// For component-level services, a default component selector with the component name will be added automatically.
-	// +optional
-	ComponentSelector string `json:"componentSelector,omitempty"`
-
 	// RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined role as selector for the service.
+	// if GeneratePodOrdinalService sets to true, RoleSelector will be ignored.
 	// +optional
 	RoleSelector string `json:"roleSelector,omitempty"`
-}
-
-type ConnectionCredential struct {
-	// The name of the ConnectionCredential.
-	// Cannot be updated.
-	// +required
-	Name string `json:"name"`
-
-	// ServiceName specifies the name of service to use for accessing.
-	// Cannot be updated.
-	// +optional
-	ServiceName string `json:"serviceName,omitempty"`
-
-	// PortName specifies the name of the port to access the service.
-	// If the service has multiple ports, a specific port must be specified to use here.
-	// Otherwise, the unique port of the service will be used.
-	// Cannot be updated.
-	// +optional
-	PortName string `json:"portName,omitempty"`
-
-	// ComponentName specifies the name of component where the account defined.
-	// For cluster-level connection credential, this field is required.
-	// Cannot be updated.
-	// +optional
-	ComponentName string `json:"componentName,omitempty"`
-
-	// AccountName specifies the name of account used to access the service.
-	// If specified, the account must be defined in @SystemAccounts.
-	// Cannot be updated.
-	// +optional
-	AccountName string `json:"accountName,omitempty"`
 }
 
 // List of all the built-in variables provided by KubeBlocks.
@@ -660,25 +662,25 @@ type ConnectionCredential struct {
 // Note: Dynamic variables have values that may change at runtime, so exercise caution when using them.
 //
 // TODO: resources.
-// ----------------------------------------------------------------------------
-// | Object    | Attribute | Variable             | Template | Env  | Dynamic |
-// ----------------------------------------------------------------------------
-// | Namespace |           | KB_NAMESPACE         |          |      |         |
-// | Cluster   | Name      | KB_CLUSTER_NAME      |          |      |         |
-// |           | UID       | KB_CLUSTER_UID       |          |      |         |
-// |           | Component | KB_CLUSTER_COMP_NAME |          |      |         |
-// | Component | Name      | KB_COMP_NAME         |          |      |         |
-// |           | Replicas  | KB_COMP_REPLICAS     |          |      |         |
-// | Pod       | Name      | KB_POD_NAME          |     x    |      |    ✓    |
-// |           | UID       | KB_POD_UID           |     x    |      |    ✓    |
-// |           | IP        | KB_POD_IP            |     x    |      |    ✓    |
-// |           | IPs       | KB_POD_IPS           |     x    |      |    ✓    |
-// |           | FQDN      | KB_POD_FQDN          |     x    |      |         |
-// |           | Ordinal   | KB_POD_ORDINAL       |     x    |      |         |
-// | Host      | Name      | KB_NODENAME          |     x    |      |    ✓    |
-// |           | IP        | KB_HOST_IP           |     x    |      |    ✓    |
-// | SA        | Name      | KB_SA_NAME           |     x    |      |         |
-// ----------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------
+// | Object    | Attribute | Variable             | Template | Env  | Dynamic | Provided |
+// ---------------------------------------------------------------------------------------
+// | Namespace |           | KB_NAMESPACE         |          |      |         |          |
+// | Cluster   | Name      | KB_CLUSTER_NAME      |          |      |         |          |
+// |           | UID       | KB_CLUSTER_UID       |          |      |         |          |
+// |           | Component | KB_CLUSTER_COMP_NAME |          |      |         |          |
+// | Component | Name      | KB_COMP_NAME         |          |      |         |          |
+// |           | Replicas  | KB_COMP_REPLICAS     |          |      |    ✓    |    N     |
+// | Pod       | Name      | KB_POD_NAME          |     x    |      |    ✓    |          |
+// |           | UID       | KB_POD_UID           |     x    |      |    ✓    |          |
+// |           | IP        | KB_POD_IP            |     x    |      |    ✓    |          |
+// |           | IPs       | KB_POD_IPS           |     x    |      |    ✓    |          |
+// |           | FQDN      | KB_POD_FQDN          |     x    |      |         |          |
+// |           | Ordinal   | KB_POD_ORDINAL       |     x    |      |         |          |
+// | Host      | Name      | KB_NODENAME          |     x    |      |    ✓    |          |
+// |           | IP        | KB_HOST_IP           |     x    |      |    ✓    |          |
+// | SA        | Name      | KB_SA_NAME           |     x    |      |         |          |
+// ---------------------------------------------------------------------------------------
 
 // EnvVar represents a variable present in the env of Pod/Action or the template of config/script.
 type EnvVar struct {
@@ -749,6 +751,9 @@ type ServiceVars struct {
 
 	// +optional
 	Port *NamedVar `json:"port,omitempty"`
+
+	// +optional
+	NodePort *NamedVar `json:"nodePort,omitempty"`
 }
 
 // CredentialVars defines the vars can be referenced from a Credential (SystemAccount).
@@ -779,6 +784,26 @@ type ServiceVarSelector struct {
 	ClusterObjectReference `json:",inline"`
 
 	ServiceVars `json:",inline"`
+
+	// GeneratePodOrdinalServiceVar indicates whether to create a corresponding ServiceVars reference variable for each Pod.
+	// If set to true, a set of ServiceVars that can be referenced will be automatically generated for each Pod Ordinal.
+	// They can be referred to by adding the PodOrdinal to the defined name template with named pattern $<Vars[x].Name>_<PodOrdinal>.
+	// For example, a ServiceVarRef might be defined as follows:
+	// - name: MY_SERVICE_PORT
+	//   valueFrom:
+	//     serviceVarRef:
+	//       compDef: my-component-definition
+	//       name: my-service
+	//       optional: true
+	//       generatePodOrdinalServiceVar: true
+	//       port:
+	//         name: redis-sentinel
+	// Assuming that the Component has 3 replicas, then you can reference the port of existing services named my-service-0, my-service-1,
+	// and my-service-2 with $MY_SERVICE_PORT_0, $MY_SERVICE_PORT_1, and $MY_SERVICE_PORT_2, respectively.
+	// It should be used in conjunction with Service.GeneratePodOrdinalService.
+	// +kubebuilder:default=false
+	// +optional
+	GeneratePodOrdinalServiceVar bool `json:"generatePodOrdinalServiceVar,omitempty"`
 }
 
 // CredentialVarSelector selects a var from a Credential (SystemAccount).

@@ -5,10 +5,14 @@ keywords: [kafka, cluster, connect, network]
 sidebar_position: 2
 sidebar_label: Connect
 ---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Overview
 
 Before you connect to the Kafka cluster, you must check your network environment, and from which network you would like to connect to the cluster.
-There are four scenarios of connecting.
+There are three scenarios of connecting.
 
 * Connect to the cluster within the same Kubernetes cluster.
 * Connect to a kafka cluster from outside of the Kubernetes cluster but in the same VPC.

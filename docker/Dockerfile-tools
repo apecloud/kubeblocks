@@ -11,7 +11,7 @@
 #TARGETARCH - Architecture from --platform, e.g. arm64
 #TARGETVARIANT - used to set target ARM variant, e.g. v7
 
-ARG GO_VERSION=1.21
+ARG GO_VERSION=1.21-alpine
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} as builder
 ARG TARGETOS

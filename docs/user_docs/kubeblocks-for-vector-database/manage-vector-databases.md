@@ -9,7 +9,7 @@ sidebar_label: Manage Vector Databases with KubeBlocks
 
 The popularity of generative AI (Generative AI) has aroused widespread attention and completely ignited the vector database (Vector Database) market. KubeBlocks supports the management of vector databases, such as Qdrant, Milvus, and Weaviate.
 In this chapter, we take Qdrant as an example to show how to manage vector databases with KubeBlocks.
-Before you start, [Install KubeBlocks](./../installation/install-with-helm/) and `kbcli`.
+Before you start, [install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) and `kbcli`.
 
 ## Create a cluster
 

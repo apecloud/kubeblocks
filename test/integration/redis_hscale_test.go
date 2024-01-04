@@ -29,8 +29,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -106,7 +106,7 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 		Expect(len(stsList.Items)).Should(BeEquivalentTo(1))
 
 		By("Checking pods number and role label in StatefulSet")
-		podList, err := common.GetPodListByStatefulSet(ctx, k8sClient, &stsList.Items[0])
+		podList, err := controllerutil.GetPodListByStatefulSet(ctx, k8sClient, &stsList.Items[0])
 		Expect(err).To(Succeed())
 		Expect(len(podList)).Should(BeEquivalentTo(replicas))
 		for _, pod := range podList {
@@ -140,16 +140,6 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 
 			By("Wait for the cluster to be running")
 			Consistently(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
-
-			By("Checking pods' status and count are updated in cluster status after scale-out")
-			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
-				compName := fetched.Spec.ComponentSpecs[0].Name
-				g.Expect(fetched.Status.Components).NotTo(BeNil())
-				g.Expect(fetched.Status.Components).To(HaveKey(compName))
-				replicationStatus := fetched.Status.Components[compName].ReplicationSetStatus
-				g.Expect(replicationStatus).NotTo(BeNil())
-				g.Expect(len(replicationStatus.Secondaries)).To(BeEquivalentTo(newReplicas - 1))
-			})).Should(Succeed())
 		}
 	}
 

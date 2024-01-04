@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package restore
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -299,7 +300,11 @@ func (r *restoreJobBuilder) build() *batchv1.Job {
 	job.Spec.Template.ObjectMeta = metav1.ObjectMeta{
 		Labels: r.labels,
 	}
-	job.Spec.BackoffLimit = &defaultBackoffLimit
+	if r.restore.Spec.BackoffLimit != nil {
+		job.Spec.BackoffLimit = r.restore.Spec.BackoffLimit
+	} else {
+		job.Spec.BackoffLimit = &defaultBackoffLimit
+	}
 
 	// 2. set restore container
 	r.specificVolumeMounts = append(r.specificVolumeMounts, r.commonVolumeMounts...)
@@ -314,6 +319,41 @@ func (r *restoreJobBuilder) build() *batchv1.Job {
 		Image:           common.Expand(r.image, common.MappingFuncFor(utils.CovertEnvToMap(r.env))),
 		ImagePullPolicy: corev1.PullIfNotPresent,
 	}
+
+	buildBackupExtrasDownward := func() {
+		extras := r.backupSet.Backup.Status.Extras
+		if len(extras) == 0 {
+			return
+		}
+		volumeName := "downward-volume"
+		if job.Spec.Template.ObjectMeta.Annotations == nil {
+			job.Spec.Template.ObjectMeta.Annotations = map[string]string{}
+		}
+		data, _ := json.Marshal(extras)
+		job.Spec.Template.ObjectMeta.Annotations[DataProtectionBackupExtrasLabelKey] = string(data)
+		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: volumeName,
+			VolumeSource: corev1.VolumeSource{
+				DownwardAPI: &corev1.DownwardAPIVolumeSource{
+					Items: []corev1.DownwardAPIVolumeFile{
+						{
+							Path: "status_extras",
+							FieldRef: &corev1.ObjectFieldSelector{
+								FieldPath: "metadata.annotations['" + DataProtectionBackupExtrasLabelKey + "']",
+							},
+						},
+					},
+				},
+			},
+		})
+		container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+			Name:      volumeName,
+			MountPath: "/dp_downward/",
+		})
+	}
+	// downward backup.status.extras to volumes
+	buildBackupExtrasDownward()
+
 	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 	job.Spec.Template.Spec.Containers = []corev1.Container{container}
 	controllerutil.AddFinalizer(job, dptypes.DataProtectionFinalizerName)

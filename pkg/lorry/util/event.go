@@ -62,7 +62,9 @@ func SentEventForProbe(ctx context.Context, data map[string]any) error {
 			return err
 		}
 
-		return SendEvent(ctx, event)
+		go func() {
+			_ = SendEvent(ctx, event)
+		}()
 	default:
 		logger.Info(fmt.Sprintf("no event sent, RoleUpdateMechanism: %s", roleUpdateMechanism))
 	}
@@ -111,6 +113,7 @@ func CreateEvent(reason string, data map[string]any) (*corev1.Event, error) {
 }
 
 func SendEvent(ctx context.Context, event *corev1.Event) error {
+	ctx1 := context.Background()
 	config, err := ctlruntime.GetConfig()
 	if err != nil {
 		logger.Error(err, "get k8s client config failed")
@@ -124,7 +127,7 @@ func SendEvent(ctx context.Context, event *corev1.Event) error {
 	}
 	namespace := os.Getenv(constant.KBEnvNamespace)
 	for i := 0; i < 30; i++ {
-		_, err = clientset.CoreV1().Events(namespace).Create(ctx, event, metav1.CreateOptions{})
+		_, err = clientset.CoreV1().Events(namespace).Create(ctx1, event, metav1.CreateOptions{})
 		if err == nil {
 			break
 		}

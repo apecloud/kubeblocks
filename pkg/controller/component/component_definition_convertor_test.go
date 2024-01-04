@@ -431,7 +431,7 @@ var _ = Describe("Component Definition Convertor", func() {
 				res, err := convertor.convert(clusterCompDef, clusterName)
 				Expect(err).Should(Succeed())
 
-				services, ok := res.([]appsv1alpha1.Service)
+				services, ok := res.([]appsv1alpha1.ComponentService)
 				Expect(ok).Should(BeTrue())
 				Expect(services).Should(HaveLen(2))
 
@@ -472,7 +472,7 @@ var _ = Describe("Component Definition Convertor", func() {
 					},
 				}
 				res2, _ := convertor.convert(clusterCompDef, clusterName)
-				services2, ok2 := res2.([]appsv1alpha1.Service)
+				services2, ok2 := res2.([]appsv1alpha1.ComponentService)
 				Expect(ok2).Should(BeTrue())
 				Expect(services2).Should(HaveLen(2))
 				Expect(services2[0].RoleSelector).Should(BeEquivalentTo(constant.Primary))
@@ -589,13 +589,6 @@ var _ = Describe("Component Definition Convertor", func() {
 				}
 				Expect(res).Should(BeEquivalentTo(expectedAccounts))
 			})
-		})
-
-		It("connection credentials", func() {
-			convertor := &compDefConnCredentialsConvertor{}
-			res, err := convertor.convert(clusterCompDef)
-			Expect(err).Should(Succeed())
-			Expect(res).Should(BeNil())
 		})
 
 		Context("update strategy", func() {

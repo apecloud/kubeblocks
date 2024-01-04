@@ -104,18 +104,6 @@ var _ = Describe("Component Utils", func() {
 			newCluster, _ := GetClusterByObject(ctx, k8sClient, sts)
 			Expect(newCluster != nil).Should(BeTrue())
 
-			By("test consensusSet initClusterComponentStatusIfNeed function")
-			err := initClusterComponentStatusIfNeed(cluster, consensusCompName, appsv1alpha1.Consensus)
-			Expect(err).Should(Succeed())
-			Expect(cluster.Status.Components[consensusCompName].ConsensusSetStatus).ShouldNot(BeNil())
-			Expect(cluster.Status.Components[consensusCompName].ConsensusSetStatus.Leader.Pod).Should(Equal(constant.ComponentStatusDefaultPodName))
-
-			By("test replicationSet initClusterComponentStatusIfNeed function")
-			err = initClusterComponentStatusIfNeed(cluster, consensusCompName, appsv1alpha1.Replication)
-			Expect(err).Should(Succeed())
-			Expect(cluster.Status.Components[consensusCompName].ReplicationSetStatus).ShouldNot(BeNil())
-			Expect(cluster.Status.Components[consensusCompName].ReplicationSetStatus.Primary.Pod).Should(Equal(constant.ComponentStatusDefaultPodName))
-
 			By("test getObjectListByComponentName function")
 			stsList := &appsv1.StatefulSetList{}
 			_ = component.GetObjectListByComponentName(ctx, k8sClient, *cluster, stsList, consensusCompName)
@@ -127,10 +115,6 @@ var _ = Describe("Component Utils", func() {
 			_ = getObjectListByCustomLabels(ctx, k8sClient, *cluster, stsList, client.MatchingLabels(matchLabel))
 			Expect(len(stsList.Items) > 0).Should(BeTrue())
 
-			By("test getClusterComponentSpecByName function")
-			clusterComp := getClusterComponentSpecByName(*cluster, consensusCompName)
-			Expect(clusterComp).ShouldNot(BeNil())
-
 			By("test GetComponentStsMinReadySeconds")
 			minReadySeconds, _ := component.GetComponentWorkloadMinReadySeconds(ctx, k8sClient, *cluster,
 				appsv1alpha1.Stateless, statelessCompName)
@@ -138,11 +122,6 @@ var _ = Describe("Component Utils", func() {
 			minReadySeconds, _ = component.GetComponentWorkloadMinReadySeconds(ctx, k8sClient, *cluster,
 				appsv1alpha1.Consensus, statelessCompName)
 			Expect(minReadySeconds).To(Equal(int32(0)))
-
-			By("test getCompRelatedObjectList function")
-			stsList = &appsv1.StatefulSetList{}
-			podList, _ := getCompRelatedObjectList(ctx, k8sClient, *cluster, consensusCompName, stsList)
-			Expect(len(stsList.Items) > 0 && len(podList.Items) > 0).Should(BeTrue())
 		})
 	})
 

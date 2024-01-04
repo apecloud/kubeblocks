@@ -269,15 +269,15 @@ VTGate、VTConsensus 和 VTTablet 都支持参数配置。你可以使用 `--com
       kbcli cluster edit-config myproxy --component vtgate
       ```
 
-:::note
+    :::note
 
-执行 `vtgate` 参数配置命令后，会启动一个新的 vtgate Pod，并终止旧的 vtgate Pod。你可以执行以下命令监视旧 Pod 是否被终止。
+    执行 `vtgate` 参数配置命令后，会启动一个新的 vtgate Pod，并终止旧的 vtgate Pod。你可以执行以下命令监视旧 Pod 是否被终止。
 
-```bash
-kubectl get pod <vtgate-pod-name> -w
-```
+    ```bash
+    kubectl get pod <vtgate-pod-name> -w
+    ```
 
-:::
+    :::
 
 3. 执行以下命令查看配置状态。比如，
 
@@ -285,11 +285,11 @@ kubectl get pod <vtgate-pod-name> -w
    kbcli cluster describe-ops myproxy -reconfiguring-lth8d -n default
    ```
 
-:::note
+    :::note
 
-关于参数配置的更多信息，请参考[配置](./../../kubeblocks-for-postgresql/configuration/configuration.md)。
+    关于参数配置的更多信息，请参考[配置](./../../kubeblocks-for-postgresql/configuration/configuration.md)。
 
-:::
+    :::
 
 ## 日志
 

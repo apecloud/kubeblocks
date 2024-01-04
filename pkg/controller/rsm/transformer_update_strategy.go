@@ -42,29 +42,41 @@ func (t *UpdateStrategyTransformer) Transform(ctx graph.TransformContext, dag *g
 		return nil
 	}
 
-	// read the underlying sts
-	stsObj := &apps.StatefulSet{}
-	if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(rsm), stsObj); err != nil {
-		return err
-	}
-	// read all pods belong to the sts, hence belong to the rsm
-	pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, stsObj)
-	if err != nil {
-		return err
-	}
+	var pods []corev1.Pod
 
-	// prepare to do pods Deletion, that's the only thing we should do,
-	// the stateful_set reconciler will do the others.
-	// to simplify the process, we do pods Deletion after stateful_set reconcile done,
-	// that is stsObj.Generation == stsObj.Status.ObservedGeneration
-	if stsObj.Generation != stsObj.Status.ObservedGeneration {
-		return nil
-	}
+	if rsm.Spec.RsmTransformPolicy == workloads.ToPod {
+		podList := &corev1.PodList{}
+		ml := GetPodsLabels(rsm.Labels)
+		if err := transCtx.Client.List(transCtx, podList, client.InNamespace(rsm.Namespace), ml); err != nil {
+			return err
+		}
+		pods = podList.Items
+	} else {
+		var err error
+		// read the underlying sts
+		stsObj := &apps.StatefulSet{}
+		if err = transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(rsm), stsObj); err != nil {
+			return err
+		}
+		// read all pods belong to the sts, hence belong to the rsm
+		pods, err = getPodsOfStatefulSet(transCtx.Context, transCtx.Client, stsObj)
+		if err != nil {
+			return err
+		}
 
-	// then we wait all pods' presence, that is len(pods) == stsObj.Spec.Replicas
-	// only then, we have enough info about the previous pods before delete the current one
-	if len(pods) != int(*stsObj.Spec.Replicas) {
-		return nil
+		// prepare to do pods Deletion, that's the only thing we should do,
+		// the stateful_set reconciler will do the others.
+		// to simplify the process, we do pods Deletion after stateful_set reconcile done,
+		// that is stsObj.Generation == stsObj.Status.ObservedGeneration
+		if stsObj.Generation != stsObj.Status.ObservedGeneration {
+			return nil
+		}
+
+		// then we wait all pods' presence, that is len(pods) == stsObj.Spec.Replicas
+		// only then, we have enough info about the previous pods before delete the current one
+		if len(pods) != int(*stsObj.Spec.Replicas) {
+			return nil
+		}
 	}
 
 	// we don't check whether pod role label present: prefer stateful_set's Update done than role probing ready

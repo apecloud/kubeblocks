@@ -118,7 +118,7 @@ type ComponentDefinitionSpec struct {
 	// In addition, a reserved headless service will be created by default, with the name pattern {clusterName}-{componentName}-headless.
 	// Cannot be updated.
 	// +optional
-	Services []Service `json:"services,omitempty"`
+	Services []ComponentService `json:"services,omitempty"`
 
 	// The configs field provided by provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
@@ -299,9 +299,8 @@ type SystemAccount struct {
 type RoleArbitrator string
 
 const (
-	ExternalRoleArbitrator   RoleArbitrator = "External"
-	KubeBlocksRoleArbitrator RoleArbitrator = "KubeBlocks"
-	LorryRoleArbitrator      RoleArbitrator = "Lorry"
+	ExternalRoleArbitrator RoleArbitrator = "External"
+	LorryRoleArbitrator    RoleArbitrator = "Lorry"
 )
 
 // ReplicaRole represents a role that can be assumed by a component instance.
@@ -494,6 +493,7 @@ type BuiltinActionHandlerType string
 const (
 	MySQLBuiltinActionHandler              BuiltinActionHandlerType = "mysql"
 	WeSQLBuiltinActionHandler              BuiltinActionHandlerType = "wesql"
+	OceanbaseBuiltinActionHandler          BuiltinActionHandlerType = "oceanbase"
 	RedisBuiltinActionHandler              BuiltinActionHandlerType = "redis"
 	MongoDBBuiltinActionHandler            BuiltinActionHandlerType = "mongodb"
 	ETCDBuiltinActionHandler               BuiltinActionHandlerType = "etcd"
@@ -523,6 +523,10 @@ type ComponentLifecycleActions struct {
 	// The PostProvision Action will be executed only once.
 	// Dedicated env vars for the action:
 	// - KB_CLUSTER_COMPONENT_LIST: The list of all components in the cluster, joined by ',' (e.g., "comp1,comp2").
+	// - KB_CLUSTER_COMPONENT_POD_NAME_LIST: The list of all pods name in this component, joined by ',' (e.g., "pod1,pod2").
+	// - KB_CLUSTER_COMPONENT_POD_IP_LIST: The list of pod IPs where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. joined by ',' (e.g., "podIp1,podIp2").
+	// - KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST: The list of hostName where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. joined by ',' (e.g., "hostName1,hostName2").
+	// - KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST: The list of host IPs where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. joined by ',' (e.g., "hostIp1,hostIp2").
 	// Cannot be updated.
 	// +optional
 	PostProvision *LifecycleActionHandler `json:"postProvision,omitempty"`

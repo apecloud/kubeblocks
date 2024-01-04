@@ -31,10 +31,6 @@ type BackupPolicyTemplateSpec struct {
 	ClusterDefRef string `json:"clusterDefinitionRef"`
 
 	// backupPolicies is a list of backup policy template for the specified componentDefinition.
-	// +patchMergeKey=componentDefRef
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=componentDefRef
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	BackupPolicies []BackupPolicy `json:"backupPolicies"`
@@ -51,10 +47,15 @@ type BackupPolicyTemplateSpec struct {
 type BackupPolicy struct {
 	// componentDefRef references componentDef defined in ClusterDefinition spec. Need to
 	// comply with IANA Service Naming rule.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
-	ComponentDefRef string `json:"componentDefRef"`
+	// +optional
+	ComponentDefRef string `json:"componentDefRef,omitempty"`
+
+	// componentDef references componentDefinition. Need to
+	// comply with IANA Service Naming rule.
+	// +optional
+	ComponentDefs []string `json:"componentDefs,omitempty"`
 
 	// target instance for backup.
 	// +optional
@@ -67,10 +68,20 @@ type BackupPolicy struct {
 	// backupMethods defines the backup methods.
 	// +kubebuilder:validation:Required
 	BackupMethods []BackupMethod `json:"backupMethods"`
+
+	// Specifies the number of retries before marking the backup failed.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=10
+	BackoffLimit *int32 `json:"backoffLimit,omitempty"`
 }
 
 type BackupMethod struct {
 	dpv1alpha1.BackupMethod `json:",inline"`
+
+	// target instance for backup.
+	// +optional
+	Target *TargetInstance `json:"target"`
 
 	// envMapping defines the variables of cluster mapped to env values' keys.
 	// +optional
@@ -89,11 +100,15 @@ type EnvMappingVar struct {
 
 type ValueFrom struct {
 	// mapped ClusterVersionRef to env value.
-	// +kubebuilder:validation:Required
-	ClusterVersionRef []ClusterVersionMapping `json:"clusterVersionRef"`
+	// +optional
+	ClusterVersionRef []ValueMapping `json:"clusterVersionRef,omitempty"`
+
+	// mapped ComponentDefinition to env value.
+	// +optional
+	ComponentDef []ValueMapping `json:"componentDef,omitempty"`
 }
 
-type ClusterVersionMapping struct {
+type ValueMapping struct {
 	// the array of ClusterVersion name which can be mapped to the env value.
 	// +kubebuilder:validation:Required
 	Names []string `json:"names"`
@@ -171,7 +186,6 @@ type ConnectionCredentialKey struct {
 	HostKey *string `json:"hostKey,omitempty"`
 
 	// portKey specifies the map key of the port in the connection credential secret.
-	// +kubebuilder:default=port
 	PortKey *string `json:"portKey,omitempty"`
 }
 

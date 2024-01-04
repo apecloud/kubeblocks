@@ -13,7 +13,7 @@ sidebar_label: 使用 kbcli 迁移 MySQL 数据
 ### 启用 kbcli migration
 
 1. 安装 KubeBlocks: 你可以用 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md) 进行安装。
-2. [启用迁移功能](./../../overview/database-engines-supported.md).
+2. [启用迁移功能](./../../overview/database-engines-supported.md)。
 
    ```bash
    kbcli addon list

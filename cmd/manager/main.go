@@ -101,13 +101,14 @@ func init() {
 	viper.SetDefault("PROBE_SERVICE_GRPC_PORT", 50001)
 	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
 	viper.SetDefault("KUBEBLOCKS_SERVICEACCOUNT_NAME", "kubeblocks")
-	viper.SetDefault("CONFIG_MANAGER_GRPC_PORT", 9901)
+	viper.SetDefault(constant.ConfigManagerGPRCPortEnv, 9901)
 	viper.SetDefault("CONFIG_MANAGER_LOG_LEVEL", "info")
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 	viper.SetDefault(constant.FeatureGateReplicatedStateMachine, true)
 	viper.SetDefault(constant.KBDataScriptClientsImage, "apecloud/kubeblocks-datascript:latest")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(rsm.FeatureGateRSMCompatibilityMode, true)
+	viper.SetDefault(rsm.FeatureGateRSMToPod, true)
 }
 
 type flagName string
@@ -273,6 +274,11 @@ func main() {
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
+	}
+
+	if err := intctrlutil.InitHostPortManager(mgr.GetClient()); err != nil {
+		setupLog.Error(err, "unable to init port manager")
 		os.Exit(1)
 	}
 

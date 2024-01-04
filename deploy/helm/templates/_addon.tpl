@@ -57,8 +57,9 @@ kind: Addon
 metadata:
   name: {{ .name }}
   labels:
-    app.kubernetes.io/name: {{ .name }}
-    app.kubernetes.io/version: {{ .version }}
+    {{- .selectorLabels | nindent 4 }}
+    addon.kubeblocks.io/version: {{ .version }}
+    addon.kubeblocks.io/name: {{ .name }}
     addon.kubeblocks.io/provider: {{ .provider }}
     addon.kubeblocks.io/model: {{ .model }}
   annotations:

@@ -10,7 +10,7 @@ sidebar_label: 用 KubeBlocks 管理向量数据库
 
 生成式人工智能的爆火引发了人们对向量数据库的关注。目前，KubeBlocks 支持 Qdrant、Milvus、Weaviate 等向量数据库的管理和运维。本文档以 Qdrant 为例，展示如何使用 KubeBlocks 管理向量数据库。
 
-在开始之前，请[安装kbcli](./../installation/install-with-kbcli/install-kbcli.md) 和 [KubeBlocks](./../installation/install-with-helm/install-kubeblocks-with-helm.md)。
+在开始之前，请[安装 kbcli](./../installation/install-with-kbcli/install-kbcli.md) 和 [KubeBlocks](./../installation/install-with-helm/install-kubeblocks-with-helm.md)。
 
 ## 创建集群
 

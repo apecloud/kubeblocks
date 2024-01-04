@@ -134,6 +134,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentLoadResourcesTransformer{Client: r.Client},
 			// do validation for the spec & definition consistency
 			&componentValidationTransformer{},
+			// allocate port for hostNetwork component
+			&componentHostPortTransformer{},
 			// handle component PDB
 			&componentPDBTransformer{},
 			// handle component services
@@ -150,6 +152,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentVarsTransformer{},
 			// render component configurations
 			&componentConfigurationTransformer{Client: r.Client},
+			// handle restore before workloads transform
+			&componentRestoreTransformer{Client: r.Client},
 			// handle the component workload
 			&componentWorkloadTransformer{Client: r.Client},
 			// handle RBAC for component workloads
@@ -182,15 +186,16 @@ func (r *ComponentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	b := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.Component{}).
-		Owns(&workloads.ReplicatedStateMachine{}).
+		Watches(&workloads.ReplicatedStateMachine{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&dpv1alpha1.Backup{}).
 		Owns(&dpv1alpha1.Restore{}).
-		Owns(&corev1.PersistentVolumeClaim{}).
+		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Owns(&policyv1.PodDisruptionBudget{}).
 		Owns(&batchv1.Job{}).
+		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler)).
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources))
 
 	if viper.GetBool(constant.EnableRBACManager) {
@@ -223,6 +228,21 @@ func (r *ComponentReconciler) filterComponentResources(ctx context.Context, obj 
 			NamespacedName: types.NamespacedName{
 				Namespace: obj.GetNamespace(),
 				Name:      fullCompName,
+			},
+		},
+	}
+}
+
+func (r *ComponentReconciler) configurationEventHandler(ctx context.Context, obj client.Object) []reconcile.Request {
+	if _, ok := obj.(*appsv1alpha1.Configuration); !ok {
+		return []reconcile.Request{}
+	}
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Namespace: obj.GetNamespace(),
+				// hack: depends on that the name of configuration object is same as Component, check GenerateComponentConfigurationName for reference.
+				Name: obj.GetName(),
 			},
 		},
 	}

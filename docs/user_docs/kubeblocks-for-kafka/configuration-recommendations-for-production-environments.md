@@ -2,7 +2,7 @@
 title: Resource description
 description: Kafka resource description
 keywords: [kafka, java heap, hardware resource]
-sidebar_position: 2
+sidebar_position: 3
 sidebar_label: Resource description
 ---
 
@@ -10,7 +10,7 @@ sidebar_label: Resource description
 
 ## Java Heap
 
-Kafka Server's JVM Heap configuration, production environment can refer to the official recommended configuration:
+Kafka Server's JVM Heap configuration, production environment can refer to the [official recommended configuration](https://kafka.apache.org/33/documentation.html#java):
 
 ```bash
 -Xmx6g -Xms6g -XX:MetaspaceSize=96m -XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:InitiatingHeapOccupancyPercent=35 -XX:G1HeapRegionSize=16M -XX:MinMetaspaceFreeRatio=50 -XX:MaxMetaspaceFreeRatio=80 -XX:+ExplicitGCInvokesConcurrent

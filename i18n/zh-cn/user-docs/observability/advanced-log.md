@@ -28,7 +28,7 @@ KubeBlocks 以引擎的形式统一管理 Agamotto、Loki、Prometheus 等与可
 ## 开始之前
 
 - [安装 kubectl](https://kubernetes.io/docs/tasks/tools/)。
-- 用 [kbcli](../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 安装 KubeBlocks 或 [Helm](../installation/install-with-helm/install-kubeblocks-with-helm.md) 进行安装。
+- 用 [kbcli](../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](../installation/install-with-helm/install-kubeblocks-with-helm.md) 安装 KubeBlocks。
 
 ## 启用高级日志功能
 

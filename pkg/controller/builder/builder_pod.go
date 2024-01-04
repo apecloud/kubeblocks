@@ -19,7 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package builder
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+)
 
 type PodBuilder struct {
 	BaseBuilder[corev1.Pod, *corev1.Pod, PodBuilder]
@@ -31,8 +34,28 @@ func NewPodBuilder(namespace, name string) *PodBuilder {
 	return builder
 }
 
+func (builder *PodBuilder) SetPodSpec(podSpec corev1.PodSpec) *PodBuilder {
+	builder.get().Spec = podSpec
+	return builder
+}
+
 func (builder *PodBuilder) SetContainers(containers []corev1.Container) *PodBuilder {
 	builder.get().Spec.Containers = containers
+	return builder
+}
+
+func (builder *PodBuilder) SetInitContainers(initContainers []corev1.Container) *PodBuilder {
+	builder.get().Spec.InitContainers = initContainers
+	return builder
+}
+
+func (builder *PodBuilder) SetNodeName(nodeName types.NodeName) *PodBuilder {
+	builder.get().Spec.NodeName = string(nodeName)
+	return builder
+}
+
+func (builder *PodBuilder) SetFinalizers() *PodBuilder {
+	builder.get().Finalizers = nil
 	return builder
 }
 

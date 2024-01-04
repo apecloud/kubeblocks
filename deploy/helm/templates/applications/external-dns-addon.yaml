@@ -4,6 +4,8 @@ metadata:
   name: external-dns
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+    "addon.kubeblocks.io/provider": community
+    "addon.kubeblocks.io/version": "6.20.4"
   {{- if .Values.keepAddons }}
   annotations:
     helm.sh/resource-policy: keep

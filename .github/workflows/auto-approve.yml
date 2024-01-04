@@ -1,0 +1,19 @@
+name: Auto Approve
+on:
+  issue_comment:
+    types: [created]
+
+env:
+  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+jobs:
+  auto-approve:
+    name: Auto Approve
+    if: github.event.issue.pull_request != '' && contains(github.event.comment.body, '/approve')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Automatic Approve
+        uses: hmarr/auto-approve-action@v3
+        with:
+          github-token: ${{ env.GITHUB_TOKEN }}
+          pull-request-number: ${{ github.event.issue.number }}

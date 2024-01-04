@@ -167,19 +167,38 @@ func (e ExposeOpsHandler) handleComponentServices(reqCtx intctrlutil.RequestCtx,
 		actualCount int
 	)
 
-	for _, item := range expose.Services {
-		service, ok := svcMap[getSvcName(opsRes.Cluster.Name, "", item.Name)]
-		if !ok {
-			continue
-		}
-
-		for _, ingress := range service.Status.LoadBalancer.Ingress {
-			if ingress.Hostname == "" && ingress.IP == "" {
+	checkEnableExposeService := func() {
+		for _, item := range expose.Services {
+			service, ok := svcMap[getSvcName(opsRes.Cluster.Name, expose.ComponentName, item.Name)]
+			if !ok {
 				continue
 			}
-			actualCount += 1
-			break
+
+			for _, ingress := range service.Status.LoadBalancer.Ingress {
+				if ingress.Hostname == "" && ingress.IP == "" {
+					continue
+				}
+				actualCount += 1
+				break
+			}
 		}
+	}
+
+	checkDisableExposeService := func() {
+		for _, item := range expose.Services {
+			_, ok := svcMap[getSvcName(opsRes.Cluster.Name, expose.ComponentName, item.Name)]
+			// if service is not found, it means that the service has been removed
+			if !ok {
+				actualCount += 1
+			}
+		}
+	}
+
+	switch expose.Switch {
+	case appsv1alpha1.EnableExposeSwitch:
+		checkEnableExposeService()
+	case appsv1alpha1.DisableExposeSwitch:
+		checkDisableExposeService()
 	}
 
 	return actualCount, expectCount, nil

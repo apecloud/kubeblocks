@@ -29,14 +29,19 @@ import (
 // OpsDefinitionSpec defines the desired state of OpsDefinition
 type OpsDefinitionSpec struct {
 
-	// componentDefinitionRefs indicates which types of componentDefinitions are supported by the operation.
-	// +kubebuilder:validation:Required
+	// componentDefinitionRefs indicates which types of componentDefinitions are supported by the operation,
+	// and can refer some vars of the componentDefinition.
+	// if it is set, the component that does not meet the conditions will be intercepted.
 	// +kubebuilder:validation:MinItems=1
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	ComponentDefinitionRefs []ComponentDefinitionRef `json:"componentDefinitionRefs" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	ComponentDefinitionRefs []ComponentDefinitionRef `json:"componentDefinitionRefs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+
+	// varsRef defines the envs that need to be referenced from the target component pod, and will inject to job's containers.
+	// +optional
+	VarsRef *VarsRef `json:"varsRef,omitempty"`
 
 	// parametersSchema describes the schema used for validation, pruning, and defaulting.
 	// +optional
@@ -68,6 +73,11 @@ type ComponentDefinitionRef struct {
 	// portName will replace the characters '-' to '_' and convert to uppercase.
 	// +optional
 	ServiceName string `json:"serviceName,omitempty"`
+
+	// varsRef defines the envs that need to be referenced from the target component pod, and will inject to job's containers.
+	// if it is set, will ignore the global "varsRef".
+	// +optional
+	VarsRef *VarsRef `json:"varsRef,omitempty"`
 }
 
 type ParametersSchema struct {
@@ -83,6 +93,46 @@ type ParametersSchema struct {
 	// +k8s:conversion-gen=false
 	// +optional
 	OpenAPIV3Schema *apiextensionsv1.JSONSchemaProps `json:"openAPIV3Schema,omitempty"`
+}
+
+type VarsRef struct {
+	// podSelectionStrategy how to select the target component pod for variable references based on the strategy.
+	// - PreferredAvailable: prioritize the selection of available pod.
+	// - Available: only select available pod. if not found, terminating the operation.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=PreferredAvailable
+	PodSelectionStrategy PodSelectionStrategy `json:"podSelectionStrategy"`
+
+	// List of environment variables to set in the job's container.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	Vars []OpsEnvVar `json:"vars,omitempty"`
+}
+
+type OpsEnvVar struct {
+	// Name of the variable. Must be a C_IDENTIFIER.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Source for the variable's value. Cannot be used if value is not empty.
+	// +kubebuilder:validation:Required
+	ValueFrom *OpsVarSource `json:"valueFrom"`
+}
+
+type OpsVarSource struct {
+	// envVarRef defines which container and env that the variable references from.
+	// source: "env" or "envFrom" of the container.
+	EnvVarRef *EnvVarRef `json:"envVarRef,omitempty"`
+}
+
+type EnvVarRef struct {
+	// container name which defines in componentDefinition or is injected by kubeBlocks controller.
+	// +kubebuilder:validation:Required
+	ContainerName string `json:"containerName"`
+
+	// env name, it will .
+	// +kubebuilder:validation:Required
+	EnvName string `json:"envName"`
 }
 
 // +kubebuilder:validation:XValidation:rule="has(self.rule) || has(self.exec)", message="at least one exists for rule and exec."

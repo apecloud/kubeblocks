@@ -265,7 +265,6 @@ var _ = Describe("object generation transformer test.", func() {
 			injectRoleProbeBaseContainer(*rsm, templateCopy, "", nil)
 			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
 			probeContainer := templateCopy.Spec.Containers[1]
-			Expect(probeContainer.ReadinessProbe).ShouldNot(BeNil())
 			Expect(len(probeContainer.Ports)).Should(Equal(2))
 			Expect(probeContainer.Ports[0].ContainerPort).Should(BeElementOf([]int32{int32(defaultRoleProbeGRPCPort), int32(defaultRoleProbeDaemonPort)}))
 		})

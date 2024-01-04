@@ -114,12 +114,28 @@ var _ = Describe("vars", func() {
 		}
 	}
 
-	checkEnvVarExist := func(synthesizedComp *SynthesizedComponent, envName, envValue string) {
+	checkEnvVarWithValue := func(synthesizedComp *SynthesizedComponent, envName, envValue string) {
 		for _, cc := range [][]corev1.Container{synthesizedComp.PodSpec.InitContainers, synthesizedComp.PodSpec.Containers} {
 			for _, c := range cc {
 				envVarMapping := map[string]string{}
 				for _, env := range c.Env {
-					envVarMapping[env.Name] = env.Value
+					if env.ValueFrom == nil {
+						envVarMapping[env.Name] = env.Value
+					}
+				}
+				Expect(envVarMapping).Should(HaveKeyWithValue(envName, envValue))
+			}
+		}
+	}
+
+	checkEnvVarWithValueFrom := func(synthesizedComp *SynthesizedComponent, envName string, envValue corev1.EnvVarSource) {
+		for _, cc := range [][]corev1.Container{synthesizedComp.PodSpec.InitContainers, synthesizedComp.PodSpec.Containers} {
+			for _, c := range cc {
+				envVarMapping := map[string]corev1.EnvVarSource{}
+				for _, env := range c.Env {
+					if env.ValueFrom != nil {
+						envVarMapping[env.Name] = *env.ValueFrom
+					}
 				}
 				Expect(envVarMapping).Should(HaveKeyWithValue(envName, envValue))
 			}
@@ -282,7 +298,7 @@ var _ = Describe("vars", func() {
 			}
 			Expect(ResolveEnvNTemplateVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)).Should(Succeed())
 			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("cm-var", "cm-var-value"))
-			checkEnvVarExist(synthesizedComp, "cm-var", "cm-var-value")
+			checkEnvVarWithValue(synthesizedComp, "cm-var", "cm-var-value")
 		})
 
 		It("secret vars", func() {
@@ -305,7 +321,7 @@ var _ = Describe("vars", func() {
 			Expect(synthesizedComp.TemplateVars).ShouldNot(HaveKey("non-exist-secret-var"))
 			checkEnvVarNotExist(synthesizedComp, "non-exist-secret-var")
 
-			By("non-exist configmap with required")
+			By("non-exist secret with required")
 			vars = []appsv1alpha1.EnvVar{
 				{
 					Name: "non-exist-secret-var",
@@ -351,8 +367,15 @@ var _ = Describe("vars", func() {
 				},
 			}
 			Expect(ResolveEnvNTemplateVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)).Should(Succeed())
-			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("secret-var", "secret-var-value"))
-			checkEnvVarExist(synthesizedComp, "secret-var", "secret-var-value")
+			Expect(synthesizedComp.TemplateVars).ShouldNot(HaveKeyWithValue("secret-var", "secret-var-value"))
+			checkEnvVarWithValueFrom(synthesizedComp, "secret-var", corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "secret",
+					},
+					Key: "secret-key",
+				},
+			})
 		})
 
 		It("service vars", func() {
@@ -485,9 +508,9 @@ var _ = Describe("vars", func() {
 			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("service-host", svcName))
 			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("service-port", strconv.Itoa(svcPort)))
 			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("service-port-wo-name", strconv.Itoa(svcPort+1)))
-			checkEnvVarExist(synthesizedComp, "service-host", svcName)
-			checkEnvVarExist(synthesizedComp, "service-port", strconv.Itoa(svcPort))
-			checkEnvVarExist(synthesizedComp, "service-port-wo-name", strconv.Itoa(svcPort+1))
+			checkEnvVarWithValue(synthesizedComp, "service-host", svcName)
+			checkEnvVarWithValue(synthesizedComp, "service-port", strconv.Itoa(svcPort))
+			checkEnvVarWithValue(synthesizedComp, "service-port-wo-name", strconv.Itoa(svcPort+1))
 
 			By("service var ref with pod ordinal")
 			svcNameRefPrefix := "service-node-port"
@@ -556,8 +579,8 @@ var _ = Describe("vars", func() {
 			Expect(err.Error()).Should(ContainSubstring("the name and compDef of ServiceVarRef is required"))
 			vars[0].ValueFrom.ServiceVarRef.ClusterObjectReference.CompDef = synthesizedComp.CompDefName
 			Expect(ResolveEnvNTemplateVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)).Should(Succeed())
-			checkEnvVarExist(synthesizedComp, "service-node-port_0", "300001")
-			checkEnvVarExist(synthesizedComp, "service-node-port_1", "300002")
+			checkEnvVarWithValue(synthesizedComp, "service-node-port_0", "300001")
+			checkEnvVarWithValue(synthesizedComp, "service-node-port_1", "300002")
 		})
 
 		It("credential vars", func() {
@@ -650,8 +673,22 @@ var _ = Describe("vars", func() {
 			Expect(ResolveEnvNTemplateVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)).Should(Succeed())
 			Expect(synthesizedComp.TemplateVars).ShouldNot(HaveKey("credential-username"))
 			Expect(synthesizedComp.TemplateVars).ShouldNot(HaveKey("credential-password"))
-			checkEnvVarExist(synthesizedComp, "credential-username", "username")
-			checkEnvVarExist(synthesizedComp, "credential-password", "password")
+			checkEnvVarWithValueFrom(synthesizedComp, "credential-username", corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: reader.objs[0].GetName(),
+					},
+					Key: "username",
+				},
+			})
+			checkEnvVarWithValueFrom(synthesizedComp, "credential-password", corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: reader.objs[0].GetName(),
+					},
+					Key: "password",
+				},
+			})
 		})
 
 		It("serviceref vars", func() {
@@ -789,10 +826,10 @@ var _ = Describe("vars", func() {
 			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("serviceref-port", "port"))
 			Expect(synthesizedComp.TemplateVars).ShouldNot(HaveKey("serviceref-username"))
 			Expect(synthesizedComp.TemplateVars).ShouldNot(HaveKey("serviceref-password"))
-			checkEnvVarExist(synthesizedComp, "serviceref-endpoint", "endpoint")
-			checkEnvVarExist(synthesizedComp, "serviceref-port", "port")
-			checkEnvVarExist(synthesizedComp, "serviceref-username", "username")
-			checkEnvVarExist(synthesizedComp, "serviceref-password", "password")
+			checkEnvVarWithValue(synthesizedComp, "serviceref-endpoint", "endpoint")
+			checkEnvVarWithValue(synthesizedComp, "serviceref-port", "port")
+			checkEnvVarWithValue(synthesizedComp, "serviceref-username", "username")
+			checkEnvVarWithValue(synthesizedComp, "serviceref-password", "password")
 		})
 
 		It("referent component", func() {
@@ -901,7 +938,7 @@ var _ = Describe("vars", func() {
 			}
 			Expect(ResolveEnvNTemplateVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)).Should(Succeed())
 			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("service-host", svcName))
-			checkEnvVarExist(synthesizedComp, "service-host", svcName)
+			checkEnvVarWithValue(synthesizedComp, "service-host", svcName)
 		})
 
 		It("vars reference and escaping", func() {
@@ -923,8 +960,8 @@ var _ = Describe("vars", func() {
 			Expect(ResolveEnvNTemplateVars(testCtx.Ctx, nil, synthesizedComp, nil, vars)).Should(Succeed())
 			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("ab", "~"))
 			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("ac", "abc~xyz"))
-			checkEnvVarExist(synthesizedComp, "ab", "~")
-			checkEnvVarExist(synthesizedComp, "ac", "abc~xyz")
+			checkEnvVarWithValue(synthesizedComp, "ab", "~")
+			checkEnvVarWithValue(synthesizedComp, "ac", "abc~xyz")
 
 			By("reference not defined")
 			vars = []appsv1alpha1.EnvVar{
@@ -945,8 +982,8 @@ var _ = Describe("vars", func() {
 			Expect(ResolveEnvNTemplateVars(testCtx.Ctx, nil, synthesizedComp, nil, vars)).Should(Succeed())
 			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("bb", "$(x)"))
 			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("bc", "abc$(x)xyz"))
-			checkEnvVarExist(synthesizedComp, "bb", "$(x)")
-			checkEnvVarExist(synthesizedComp, "bc", "abc$(x)xyz")
+			checkEnvVarWithValue(synthesizedComp, "bb", "$(x)")
+			checkEnvVarWithValue(synthesizedComp, "bc", "abc$(x)xyz")
 
 			By("reference credential var")
 			vars = []appsv1alpha1.EnvVar{
@@ -990,7 +1027,14 @@ var _ = Describe("vars", func() {
 			}
 			Expect(ResolveEnvNTemplateVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)).Should(Succeed())
 			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("cb", "$(credential-username)"))
-			checkEnvVarExist(synthesizedComp, "cb", "username")
+			checkEnvVarWithValueFrom(synthesizedComp, "cb", corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: reader.objs[0].GetName(),
+					},
+					Key: "username",
+				},
+			})
 
 			By("escaping")
 			vars = []appsv1alpha1.EnvVar{
@@ -1010,8 +1054,8 @@ var _ = Describe("vars", func() {
 			Expect(ResolveEnvNTemplateVars(testCtx.Ctx, nil, synthesizedComp, nil, vars)).Should(Succeed())
 			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("db", "$(da)"))
 			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("dc", "abc$(da)xyz"))
-			checkEnvVarExist(synthesizedComp, "db", "$(da)")
-			checkEnvVarExist(synthesizedComp, "dc", "abc$(da)xyz")
+			checkEnvVarWithValue(synthesizedComp, "db", "$(da)")
+			checkEnvVarWithValue(synthesizedComp, "dc", "abc$(da)xyz")
 
 			By("reference and escaping")
 			vars = []appsv1alpha1.EnvVar{
@@ -1036,9 +1080,9 @@ var _ = Describe("vars", func() {
 			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("eb", "~$(ea)$(ea)~~$(ea)"))
 			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("ec", "abc~xyz$(ea)"))
 			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("ed", "$(x)$(x)"))
-			checkEnvVarExist(synthesizedComp, "eb", "~$(ea)$(ea)~~$(ea)")
-			checkEnvVarExist(synthesizedComp, "ec", "abc~xyz$(ea)")
-			checkEnvVarExist(synthesizedComp, "ed", "$(x)$(x)")
+			checkEnvVarWithValue(synthesizedComp, "eb", "~$(ea)$(ea)~~$(ea)")
+			checkEnvVarWithValue(synthesizedComp, "ec", "abc~xyz$(ea)")
+			checkEnvVarWithValue(synthesizedComp, "ed", "$(x)$(x)")
 
 			By("all in one")
 			vars = []appsv1alpha1.EnvVar{
@@ -1067,7 +1111,7 @@ var _ = Describe("vars", func() {
 			}
 			Expect(ResolveEnvNTemplateVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)).Should(Succeed())
 			Expect(synthesizedComp.TemplateVars).Should(HaveKeyWithValue("fb", "abc~$(fa)$(fa)$(credential-username)~$(x)$(x)xyz"))
-			checkEnvVarExist(synthesizedComp, "fb", "abc~$(fa)$(fa)username~$(x)$(x)xyz")
+			checkEnvVarWithValue(synthesizedComp, "fb", "abc~$(fa)$(fa)$(credential-username)~$(x)$(x)xyz")
 		})
 	})
 })

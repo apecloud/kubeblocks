@@ -1327,7 +1327,7 @@ var _ = Describe("Component Controller", func() {
 			Name:      compObj.Name,
 		}
 		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
-			envVars, _ := buildEnvVarsNData(targetEnvVars)
+			envVars, _ := buildEnvVarsNData(nil, targetEnvVars, false)
 			targetEnvVarsMapping := map[string]corev1.EnvVar{}
 			for i, v := range envVars {
 				targetEnvVarsMapping[v.Name] = envVars[i]
@@ -1351,7 +1351,7 @@ var _ = Describe("Component Controller", func() {
 			Name:      constant.GenerateClusterComponentEnvPattern(clusterObj.Name, compName),
 		}
 		Eventually(testapps.CheckObj(&testCtx, envCMKey, func(g Gomega, cm *corev1.ConfigMap) {
-			_, envData := buildEnvVarsNData(targetEnvVars)
+			_, envData := buildEnvVarsNData(nil, targetEnvVars, false)
 			for k, v := range envData {
 				Expect(cm.Data).Should(HaveKeyWithValue(k, v))
 			}

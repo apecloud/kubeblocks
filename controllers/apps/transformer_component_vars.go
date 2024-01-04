@@ -56,22 +56,45 @@ func (t *componentVarsTransformer) Transform(ctx graph.TransformContext, dag *gr
 	reader := &varsReader{transCtx.Client, graphCli, dag}
 	synthesizedComp := transCtx.SynthesizeComponent
 
-	templateVars, envVars, err := component.ResolveTemplateNEnvVars(transCtx.Context, reader,
-		synthesizedComp, transCtx.Cluster.Annotations, transCtx.CompDef.Spec.Vars)
+	generated, err := isGeneratedComponent(transCtx.Cluster, transCtx.ComponentOrig)
+	if err != nil {
+		return err
+	}
+
+	var templateVars map[string]any
+	var envVars []corev1.EnvVar
+	if generated {
+		templateVars, envVars, err = component.ResolveEnvVars4LegacyCluster(transCtx.Context, reader,
+			synthesizedComp, transCtx.Cluster.Annotations, transCtx.CompDef.Spec.Vars)
+	} else {
+		templateVars, envVars, err = component.ResolveTemplateNEnvVars(transCtx.Context, reader,
+			synthesizedComp, transCtx.Cluster.Annotations, transCtx.CompDef.Spec.Vars)
+	}
 	if err != nil {
 		return err
 	}
 
 	// pass all direct value env vars through CM
-	envVars2, envData := buildEnvVarsNData(envVars)
-	setTemplateNEnvVars(synthesizedComp, templateVars, envVars2)
+	envVars2, envData := buildEnvVarsNData(synthesizedComp, envVars, generated)
+	setTemplateNEnvVars(synthesizedComp, templateVars, envVars2, generated)
 
 	return createOrUpdateEnvConfigMap(ctx, dag, envData)
 }
 
-func buildEnvVarsNData(vars []corev1.EnvVar) ([]corev1.EnvVar, map[string]string) {
-	envVars := make([]corev1.EnvVar, 0)
+func buildEnvVarsNData(synthesizedComp *component.SynthesizedComponent, vars []corev1.EnvVar, legacy bool) ([]corev1.EnvVar, map[string]string) {
 	envData := make(map[string]string)
+	if synthesizedComp != nil && synthesizedComp.ComponentRefEnvs != nil {
+		for _, env := range synthesizedComp.ComponentRefEnvs {
+			envData[env.Name] = env.Value
+		}
+	}
+
+	// for legacy cluster, don't move direct values into ConfigMap
+	if legacy {
+		return vars, envData
+	}
+
+	envVars := make([]corev1.EnvVar, 0)
 	for i, v := range vars {
 		if v.ValueFrom == nil {
 			envData[v.Name] = v.Value
@@ -82,7 +105,7 @@ func buildEnvVarsNData(vars []corev1.EnvVar) ([]corev1.EnvVar, map[string]string
 	return envVars, envData
 }
 
-func setTemplateNEnvVars(synthesizedComp *component.SynthesizedComponent, templateVars map[string]any, envVars []corev1.EnvVar) {
+func setTemplateNEnvVars(synthesizedComp *component.SynthesizedComponent, templateVars map[string]any, envVars []corev1.EnvVar, legacy bool) {
 	component.SetTemplateNEnvVars(synthesizedComp, templateVars, envVars)
 
 	for _, cc := range []*[]corev1.Container{&synthesizedComp.PodSpec.InitContainers, &synthesizedComp.PodSpec.Containers} {
@@ -91,7 +114,11 @@ func setTemplateNEnvVars(synthesizedComp *component.SynthesizedComponent, templa
 			if c.EnvFrom == nil {
 				c.EnvFrom = make([]corev1.EnvFromSource, 0)
 			}
-			c.EnvFrom = append(c.EnvFrom, envConfigMapSource(synthesizedComp.ClusterName, synthesizedComp.Name))
+			envSource := envConfigMapSource(synthesizedComp.ClusterName, synthesizedComp.Name)
+			if legacy {
+				envSource.ConfigMapRef.Optional = nil
+			}
+			c.EnvFrom = append(c.EnvFrom, envSource)
 		}
 	}
 }

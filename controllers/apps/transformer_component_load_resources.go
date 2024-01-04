@@ -59,37 +59,16 @@ func (t *componentLoadResourcesTransformer) Transform(ctx graph.TransformContext
 	}
 	transCtx.Cluster = cluster
 
-	isGenerated := false
-	isGenerated, err = t.isGeneratedComponent(cluster, comp)
+	generated := false
+	generated, err = isGeneratedComponent(cluster, comp)
 	if err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
-	if isGenerated {
+	if generated {
 		return t.transformForGeneratedComponent(transCtx)
 	}
 	return t.transformForNativeComponent(transCtx)
-}
-
-func (t *componentLoadResourcesTransformer) isGeneratedComponent(cluster *appsv1alpha1.Cluster,
-	comp *appsv1alpha1.Component) (bool, error) {
-	compName, err := component.ShortName(cluster.Name, comp.Name)
-	if err != nil {
-		return false, err
-	}
-	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		if compSpec.Name == compName {
-			if len(compSpec.ComponentDef) > 0 {
-				if compSpec.ComponentDef != comp.Spec.CompDef {
-					err = fmt.Errorf("component definitions referred in cluster and component are different: %s vs %s",
-						compSpec.ComponentDef, comp.Spec.CompDef)
-				}
-				return false, err
-			}
-			return true, nil
-		}
-	}
-	return true, fmt.Errorf("component %s is not found in cluster %s", compName, cluster.Name)
 }
 
 func (t *componentLoadResourcesTransformer) transformForGeneratedComponent(transCtx *componentTransformContext) error {
@@ -147,4 +126,25 @@ func (t *componentLoadResourcesTransformer) getNCheckCompDef(transCtx *component
 		return nil, fmt.Errorf("ComponentDefinition referenced is unavailable: %s", compDef.Name)
 	}
 	return compDef, nil
+}
+
+func isGeneratedComponent(cluster *appsv1alpha1.Cluster,
+	comp *appsv1alpha1.Component) (bool, error) {
+	compName, err := component.ShortName(cluster.Name, comp.Name)
+	if err != nil {
+		return false, err
+	}
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		if compSpec.Name == compName {
+			if len(compSpec.ComponentDef) > 0 {
+				if compSpec.ComponentDef != comp.Spec.CompDef {
+					err = fmt.Errorf("component definitions referred in cluster and component are different: %s vs %s",
+						compSpec.ComponentDef, comp.Spec.CompDef)
+				}
+				return false, err
+			}
+			return true, nil
+		}
+	}
+	return true, fmt.Errorf("component %s is not found in cluster %s", compName, cluster.Name)
 }

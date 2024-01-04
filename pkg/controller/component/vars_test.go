@@ -366,7 +366,7 @@ var _ = Describe("vars", func() {
 			}
 			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
 			Expect(err).Should(Succeed())
-			Expect(templateVars).Should(HaveKeyWithValue("secret-var", "secret-var-value"))
+			Expect(templateVars).ShouldNot(HaveKeyWithValue("secret-var", "secret-var-value"))
 			checkEnvVarWithValueFrom(envVars, "secret-var", corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
@@ -1129,7 +1129,7 @@ var _ = Describe("vars", func() {
 			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
 			Expect(err).Should(Succeed())
 			Expect(templateVars).Should(HaveKeyWithValue("fb", "abc~$(fa)$(fa)$(credential-username)~$(x)$(x)xyz"))
-			checkEnvVarWithValue(envVars, "fb", "abc~$(fa)$(fa)username~$(x)$(x)xyz")
+			checkEnvVarWithValue(envVars, "fb", "abc~$(fa)$(fa)$(credential-username)~$(x)$(x)xyz")
 		})
 	})
 })

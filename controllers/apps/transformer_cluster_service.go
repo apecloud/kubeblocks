@@ -104,8 +104,8 @@ func (t *clusterServiceTransformer) convertLegacyClusterCompSpecServices(transCt
 			continue
 		}
 
-		// TODO(xingran): We only handle services defined based on Cluster.Spec.ComponentSpecs[x].Services prior to version 0.8.0 of kubeblocks.
-		// Requirements after kubeblocks 0.8.0 should be defined via Cluster.Spec.Services, and the corresponding expose OpsRequest should be refactored to adapt.
+		// We only handle legacy services defined based on Cluster.Spec.ComponentSpecs[x].Services prior to version 0.8.0 of kubeblocks.
+		// After kubeblocks 0.8.0 it should be defined via Cluster.Spec.Services.
 		if transCtx.ClusterDef == nil || len(clusterCompSpec.ComponentDefRef) == 0 {
 			continue
 		}

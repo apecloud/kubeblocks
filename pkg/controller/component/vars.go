@@ -368,12 +368,8 @@ func resolveClusterObjectRefVars(ctx context.Context, cli client.Reader, synthes
 			if err != nil {
 				return nil, nil, err
 			}
-			for i := range var1 {
-				vars1 = append(vars1, var1[i])
-			}
-			for i := range var2 {
-				vars2 = append(vars2, var2[i])
-			}
+			vars1 = append(vars1, var1...)
+			vars2 = append(vars2, var2...)
 		default:
 			vars1 = append(vars1, corev1.EnvVar{Name: v.Name, Value: ""})
 		}

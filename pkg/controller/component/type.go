@@ -78,7 +78,6 @@ type SynthesizedComponent struct {
 	ComponentServices []v1alpha1.ComponentService         `json:"componentServices,omitempty"`
 
 	// TODO(xingran): The following fields will be deprecated after version 0.8.0 and will be replaced with a new data structure.
-	CustomLabelSpecs []v1alpha1.CustomLabelSpec        `json:"customLabelSpecs,omitempty"` // The CustomLabelSpecs will be replaced with Labels in the future.
 	Probes           *v1alpha1.ClusterDefinitionProbes `json:"probes,omitempty"`           // The Probes will be replaced with LifecycleActions.RoleProbe in the future.
 	VolumeTypes      []v1alpha1.VolumeTypeSpec         `json:"volumeTypes,omitempty"`      // The VolumeTypes will be replaced with Volumes in the future.
 	VolumeProtection *v1alpha1.VolumeProtectionSpec    `json:"volumeProtection,omitempty"` // The VolumeProtection will be replaced with Volumes in the future.
@@ -90,11 +89,6 @@ type SynthesizedComponent struct {
 	ClusterCompDefName    string                          `json:"clusterCompDefName,omitempty"` // the name of the clusterDefinition.Spec.ComponentDefs[*].Name or cluster.Spec.ComponentSpecs[*].ComponentDefRef
 	CharacterType         string                          `json:"characterType,omitempty"`
 	WorkloadType          v1alpha1.WorkloadType           `json:"workloadType,omitempty"`
-	StatelessSpec         *v1alpha1.StatelessSetSpec      `json:"statelessSpec,omitempty"`
-	StatefulSpec          *v1alpha1.StatefulSetSpec       `json:"statefulSpec,omitempty"`
-	ConsensusSpec         *v1alpha1.ConsensusSetSpec      `json:"consensusSpec,omitempty"`
-	ReplicationSpec       *v1alpha1.ReplicationSetSpec    `json:"replicationSpec,omitempty"`
-	RSMSpec               *v1alpha1.RSMSpec               `json:"rsmSpec,omitempty"`
 	HorizontalScalePolicy *v1alpha1.HorizontalScalePolicy `json:"horizontalScalePolicy,omitempty"`
 	// MinAvailable is used to determine whether to create a PDB (Pod Disruption Budget) object.
 	// However, the functionality of PDB should be implemented within the RSM. Therefore, PDB objects are no longer needed in the new API, and the MinAvailable field should be deprecated.

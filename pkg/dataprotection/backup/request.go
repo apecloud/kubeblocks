@@ -91,6 +91,7 @@ func (r *Request) BuildActions() ([]action.Action, error) {
 	if err != nil {
 		return nil, err
 	}
+	appendIgnoreNil(preBackupActions...)
 
 	// build backup data action
 	for i := range r.TargetPods {
@@ -122,7 +123,6 @@ func (r *Request) BuildActions() ([]action.Action, error) {
 		return nil, err
 	}
 
-	appendIgnoreNil(preBackupActions...)
 	appendIgnoreNil(backupKubeResourcesAction)
 	appendIgnoreNil(postBackupActions...)
 	return actions, nil

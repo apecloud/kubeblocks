@@ -27,10 +27,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/golang/mock/gomock"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/sethvargo/go-password/password"
 	"golang.org/x/exp/slices"
@@ -1212,48 +1212,48 @@ var _ = Describe("Component Controller", func() {
 		createClusterObjV2(compName, compDefObj.Name, nil)
 
 		By("check workload template env")
-		targetEnvVars := map[string]corev1.EnvVar{
-			"SERVICE_HOST": {
+		targetEnvVars := []corev1.EnvVar{
+			{
 				Name:  "SERVICE_HOST",
 				Value: constant.GenerateComponentServiceName(clusterObj.Name, compName, compDefObj.Spec.Services[0].Name),
 			},
-			"SERVICE_PORT": {
+			{
 				Name:  "SERVICE_PORT",
 				Value: strconv.Itoa(int(compDefObj.Spec.Services[0].Spec.Ports[0].Port)),
 			},
-			"USERNAME": {
+			{
 				Name:  "USERNAME",
 				Value: compDefObj.Spec.SystemAccounts[0].Name,
 			},
-			// "PASSWORD": {
+			// {
 			//	Name:  "PASSWORD",
 			//	Value: "",
 			// },
-			constant.KBEnvNamespace: {
+			{
 				Name:  constant.KBEnvNamespace,
 				Value: clusterObj.Namespace,
 			},
-			constant.KBEnvClusterName: {
+			{
 				Name:  constant.KBEnvClusterName,
 				Value: clusterObj.Name,
 			},
-			constant.KBEnvClusterUID: {
+			{
 				Name:  constant.KBEnvClusterUID,
 				Value: string(clusterObj.UID),
 			},
-			constant.KBEnvClusterCompName: {
+			{
 				Name:  constant.KBEnvClusterCompName,
 				Value: constant.GenerateClusterComponentName(clusterObj.Name, compName),
 			},
-			constant.KBEnvCompName: {
+			{
 				Name:  constant.KBEnvCompName,
 				Value: compName,
 			},
-			// constant.KBEnvCompReplicas: {
-			//	Name:  constant.KBEnvCompReplicas,
-			//	Value: "1", // default replicas
-			// },
-			constant.KBEnvPodName: {
+			{
+				Name:  constant.KBEnvCompReplicas,
+				Value: "1", // default replicas
+			},
+			{
 				Name: constant.KBEnvPodName,
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{
@@ -1262,7 +1262,7 @@ var _ = Describe("Component Controller", func() {
 					},
 				},
 			},
-			constant.KBEnvPodUID: {
+			{
 				Name: constant.KBEnvPodUID,
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{
@@ -1271,7 +1271,7 @@ var _ = Describe("Component Controller", func() {
 					},
 				},
 			},
-			constant.KBEnvPodIP: {
+			{
 				Name: constant.KBEnvPodIP,
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{
@@ -1280,7 +1280,7 @@ var _ = Describe("Component Controller", func() {
 					},
 				},
 			},
-			constant.KBEnvPodIPs: {
+			{
 				Name: constant.KBEnvPodIPs,
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{
@@ -1289,12 +1289,12 @@ var _ = Describe("Component Controller", func() {
 					},
 				},
 			},
-			constant.KBEnvPodFQDN: {
+			{
 				Name: constant.KBEnvPodFQDN,
 				Value: fmt.Sprintf("%s.%s-headless.%s.svc", constant.EnvPlaceHolder(constant.KBEnvPodName),
 					constant.EnvPlaceHolder(constant.KBEnvClusterCompName), constant.EnvPlaceHolder(constant.KBEnvNamespace)),
 			},
-			constant.KBEnvNodeName: {
+			{
 				Name: constant.KBEnvNodeName,
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{
@@ -1303,7 +1303,7 @@ var _ = Describe("Component Controller", func() {
 					},
 				},
 			},
-			constant.KBEnvHostIP: {
+			{
 				Name: constant.KBEnvHostIP,
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{
@@ -1312,7 +1312,7 @@ var _ = Describe("Component Controller", func() {
 					},
 				},
 			},
-			constant.KBEnvServiceAccountName: {
+			{
 				Name: constant.KBEnvServiceAccountName,
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{
@@ -1327,16 +1327,33 @@ var _ = Describe("Component Controller", func() {
 			Name:      compObj.Name,
 		}
 		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+			envVars, _ := buildEnvVarsNData(targetEnvVars)
+			targetEnvVarsMapping := map[string]corev1.EnvVar{}
+			for i, v := range envVars {
+				targetEnvVarsMapping[v.Name] = envVars[i]
+			}
 			for _, cc := range [][]corev1.Container{rsm.Spec.Template.Spec.InitContainers, rsm.Spec.Template.Spec.Containers} {
 				for _, c := range cc {
 					envValueMapping := map[string]corev1.EnvVar{}
 					for i, env := range c.Env {
-						if _, ok := targetEnvVars[env.Name]; ok {
+						if _, ok := targetEnvVarsMapping[env.Name]; ok {
 							envValueMapping[env.Name] = c.Env[i]
 						}
 					}
-					g.Expect(envValueMapping).Should(BeEquivalentTo(targetEnvVars))
+					g.Expect(envValueMapping).Should(BeEquivalentTo(targetEnvVarsMapping))
+					// check envData source
+					g.Expect(c.EnvFrom).Should(ContainElement(envConfigMapSource(clusterObj.Name, compName)))
 				}
+			}
+		})).Should(Succeed())
+		envCMKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateClusterComponentEnvPattern(clusterObj.Name, compName),
+		}
+		Eventually(testapps.CheckObj(&testCtx, envCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			_, envData := buildEnvVarsNData(targetEnvVars)
+			for k, v := range envData {
+				Expect(cm.Data).Should(HaveKeyWithValue(k, v))
 			}
 		})).Should(Succeed())
 	}

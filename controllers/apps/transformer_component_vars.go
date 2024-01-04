@@ -23,9 +23,14 @@ import (
 	"context"
 	"reflect"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/pkg/common"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -47,21 +52,98 @@ func (t *componentVarsTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return nil
 	}
 
-	// resolve and update vars for template and Env
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	reader := &varsTransformerReader{transCtx.Client, graphCli, dag}
+	reader := &varsReader{transCtx.Client, graphCli, dag}
 	synthesizedComp := transCtx.SynthesizeComponent
-	return component.ResolveEnvNTemplateVars(transCtx.Context, reader,
+
+	templateVars, envVars, err := component.ResolveTemplateNEnvVars(transCtx.Context, reader,
 		synthesizedComp, transCtx.Cluster.Annotations, transCtx.CompDef.Spec.Vars)
+	if err != nil {
+		return err
+	}
+
+	// pass all direct value env vars through CM
+	envVars2, envData := buildEnvVarsNData(envVars)
+	setTemplateNEnvVars(synthesizedComp, templateVars, envVars2)
+
+	return createOrUpdateEnvConfigMap(ctx, dag, envData)
 }
 
-type varsTransformerReader struct {
+func buildEnvVarsNData(vars []corev1.EnvVar) ([]corev1.EnvVar, map[string]string) {
+	envVars := make([]corev1.EnvVar, 0)
+	envData := make(map[string]string)
+	for i, v := range vars {
+		if v.ValueFrom == nil {
+			envData[v.Name] = v.Value
+		} else {
+			envVars = append(envVars, vars[i])
+		}
+	}
+	return envVars, envData
+}
+
+func setTemplateNEnvVars(synthesizedComp *component.SynthesizedComponent, templateVars map[string]any, envVars []corev1.EnvVar) {
+	component.SetTemplateNEnvVars(synthesizedComp, templateVars, envVars)
+
+	for _, cc := range []*[]corev1.Container{&synthesizedComp.PodSpec.InitContainers, &synthesizedComp.PodSpec.Containers} {
+		for i := range *cc {
+			c := &(*cc)[i]
+			if c.EnvFrom == nil {
+				c.EnvFrom = make([]corev1.EnvFromSource, 0)
+			}
+			c.EnvFrom = append(c.EnvFrom, envConfigMapSource(synthesizedComp.ClusterName, synthesizedComp.Name))
+		}
+	}
+}
+
+func envConfigMapSource(clusterName, compName string) corev1.EnvFromSource {
+	return corev1.EnvFromSource{
+		ConfigMapRef: &corev1.ConfigMapEnvSource{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: constant.GenerateClusterComponentEnvPattern(clusterName, compName),
+			},
+			Optional: func() *bool { optional := false; return &optional }(),
+		},
+	}
+}
+
+func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG, data map[string]string) error {
+	var (
+		transCtx, _     = ctx.(*componentTransformContext)
+		synthesizedComp = transCtx.SynthesizeComponent
+		envKey          = types.NamespacedName{
+			Namespace: synthesizedComp.Namespace,
+			Name:      constant.GenerateClusterComponentEnvPattern(synthesizedComp.ClusterName, synthesizedComp.Name),
+		}
+	)
+	envObj := &corev1.ConfigMap{}
+	err := transCtx.Client.Get(transCtx.Context, envKey, envObj)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	if err != nil { // not-found
+		obj := builder.NewConfigMapBuilder(envKey.Namespace, envKey.Name).
+			AddLabelsInMap(constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
+			SetData(data).
+			GetObject()
+		graphCli.Create(dag, obj)
+	} else if !reflect.DeepEqual(envObj.Data, data) {
+		envObjCopy := envObj.DeepCopy()
+		envObjCopy.Data = data
+		graphCli.Update(dag, envObj, envObjCopy)
+	}
+	return nil
+}
+
+type varsReader struct {
 	cli      client.Reader
 	graphCli model.GraphClient
 	dag      *graph.DAG
 }
 
-func (r *varsTransformerReader) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+func (r *varsReader) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 	for _, val := range r.graphCli.FindAll(r.dag, obj) {
 		if client.ObjectKeyFromObject(val) == key {
 			reflect.ValueOf(obj).Elem().Set(reflect.ValueOf(val).Elem())
@@ -71,6 +153,6 @@ func (r *varsTransformerReader) Get(ctx context.Context, key client.ObjectKey, o
 	return r.cli.Get(ctx, key, obj, opts...)
 }
 
-func (r *varsTransformerReader) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+func (r *varsReader) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
 	return r.cli.List(ctx, list, opts...)
 }

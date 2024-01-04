@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"regexp"
 	"sort"
 	"strconv"
@@ -39,39 +40,40 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
-func ResolveEnvNTemplateVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	annotations map[string]string, definedVars []appsv1alpha1.EnvVar) error {
-	templateVars, credentialVars, err := resolveBuiltinNObjectRefVars(ctx, cli, synthesizedComp, definedVars)
+// ResolveTemplateNEnvVars resolves all built-in and user-defined vars for config template and Env usage.
+func ResolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	annotations map[string]string, definedVars []appsv1alpha1.EnvVar) (map[string]any, []corev1.EnvVar, error) {
+	templateVars, envVars, err := resolveTemplateNEnvVars(ctx, cli, synthesizedComp, definedVars)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
-	newTemplateVars1, newTemplateVars2 := resolveVarsReferenceNEscaping(templateVars, credentialVars)
-
-	envVars := make([]corev1.EnvVar, 0)
-	envVars = append(envVars, newTemplateVars1...)
-	envVars = append(envVars, credentialVars...)
-	envVars = append(envVars, buildDefaultEnv()...)
-	envVars = append(envVars, buildEnv4TLS(synthesizedComp)...)
-	vars, err := buildEnv4UserDefined(annotations)
+	implicitEnvVars, err := buildLegacyImplicitEnvVars(synthesizedComp, annotations)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
-	envVars = append(envVars, vars...)
-	// TODO: remove this later
-	envVars = append(envVars, synthesizedComp.ComponentRefEnvs...)
 
-	setEnvNTemplateVars(newTemplateVars2, envVars, synthesizedComp)
+	if envVars == nil {
+		envVars = implicitEnvVars
+	} else {
+		envVars = append(envVars, implicitEnvVars...)
+	}
 
-	return nil
+	formattedTemplateVars := func() map[string]any {
+		vars := make(map[string]any)
+		for _, v := range templateVars {
+			vars[v.Name] = v.Value
+		}
+		return vars
+	}
+	return formattedTemplateVars(), envVars, nil
 }
 
-func setEnvNTemplateVars(templateVars []corev1.EnvVar, envVars []corev1.EnvVar, synthesizedComp *SynthesizedComponent) {
+func SetTemplateNEnvVars(synthesizedComp *SynthesizedComponent, templateVars map[string]any, envVars []corev1.EnvVar) {
 	if synthesizedComp.TemplateVars == nil {
-		synthesizedComp.TemplateVars = make(map[string]any)
-	}
-	for _, v := range templateVars {
-		synthesizedComp.TemplateVars[v.Name] = v.Value
+		synthesizedComp.TemplateVars = templateVars
+	} else {
+		maps.Copy(synthesizedComp.TemplateVars, templateVars)
 	}
 
 	for _, cc := range []*[]corev1.Container{
@@ -93,6 +95,34 @@ func setEnvNTemplateVars(templateVars []corev1.EnvVar, envVars []corev1.EnvVar, 
 			}
 		}
 	}
+}
+
+func resolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	definedVars []appsv1alpha1.EnvVar) ([]corev1.EnvVar, []corev1.EnvVar, error) {
+	vars, credentialVars, err := resolveBuiltinNObjectRefVars(ctx, cli, synthesizedComp, definedVars)
+	if err != nil {
+		return nil, nil, err
+	}
+	envVars, templateVars := resolveVarsReferenceNEscaping(vars, credentialVars)
+	if envVars == nil {
+		return templateVars, nil, nil
+	} else {
+		return templateVars, append(envVars, credentialVars...), nil
+	}
+}
+
+func buildLegacyImplicitEnvVars(synthesizedComp *SynthesizedComponent, annotations map[string]string) ([]corev1.EnvVar, error) {
+	envVars := make([]corev1.EnvVar, 0)
+	envVars = append(envVars, buildDefaultEnv()...)
+	envVars = append(envVars, buildEnv4TLS(synthesizedComp)...)
+	userDefinedVars, err := buildEnv4UserDefined(annotations)
+	if err != nil {
+		return nil, err
+	}
+	envVars = append(envVars, userDefinedVars...)
+	// TODO: remove this later
+	envVars = append(envVars, synthesizedComp.ComponentRefEnvs...)
+	return envVars, nil
 }
 
 func resolveBuiltinNObjectRefVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
@@ -120,7 +150,7 @@ func builtinTemplateVars(synthesizedComp *SynthesizedComponent) []corev1.EnvVar 
 			{Name: constant.KBEnvClusterUID, Value: synthesizedComp.ClusterUID},
 			{Name: constant.KBEnvClusterCompName, Value: constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name)},
 			{Name: constant.KBEnvCompName, Value: synthesizedComp.Name},
-			// {Name: constant.KBEnvCompReplicas, Value: strconv.Itoa(int(synthesizedComp.Replicas))},
+			{Name: constant.KBEnvCompReplicas, Value: strconv.Itoa(int(synthesizedComp.Replicas))},
 			{Name: constant.KBEnvClusterUIDPostfix8Deprecated, Value: kbClusterPostfix8},
 		}
 	}

@@ -1,103 +1,103 @@
 ---
-title: Simulate network faults
-description: Simulate network faults
+title: 模拟网络故障
+description: 模拟网络故障
 sidebar_position: 4
-sidebar_label: Simulate network faults
+sidebar_label: 模拟网络故障
 ---
 
-# Simulate network faults
+# 模拟网络故障
 
-Network faults support partition, net emulation (including loss, delay, duplicate, and corrupt), and bandwidth.
+网络故障包括 Partition、Net Emulation（包括丢包、延迟、重复和损坏）以及 Bandwidth 几种类型。
 
-* Partition: injects network disconnection and partition.
-* Net emulation: simulates poor network conditions, such as high delays, high packet loss rate, packet reordering, and so on.
-* Bandwidth: limits the communication bandwidth between nodes.
+* Partition：网络断开或分区；
+* Net emulation：模拟网络质量较差的情况，如高延迟、高丢包率、包乱序等；
+* Bandwidth：限制节点之间通信的带宽。
 
-## Before you start
+## 开始之前
 
-* During the network injection process, make sure that the connection between Controller Manager and Chaos Daemon works. Otherwise, the NetworkChaos cannot be restored anymore.
-* If you want to simulate Net emulation fault, make sure the `NET_SCH_NETEM` module is installed in the Linux kernel. If you are using CentOS, you can install the module through the kernel-modules-extra package. Most other Linux distributions have installed the module already by default.
+* 在进行网络注入的过程中，请保证 Controller Manager 与 Chaos Daemon 之间连接通畅，否则将无法恢复。
+* 如果使用 Net Emulation 功能，请确保 Linux 内核中已安装 `NET_SCH_NETEM` 模块。如果使用的是 CentOS，可以通过 kernel-modules-extra 包安装，大部分其他 Linux 发行版已默认安装相应模块。
 
-## Simulate fault injections by kbcli
+## 使用 kbcli 模拟故障注入
 
-Common flags for all types of network faults.
+下表介绍所有网络故障类型的常见字段。
 
-📎 Table 1. kbcli fault network partition flags description
+📎 Table 1. kbcli 网络故障参数说明
 
-| Option                   | Description               | Default value | Required |
+| 参数                   | 说明               | 默认值 | 是否必填 |
 | :----------------------- | :------------------------ | :------------ | :------- |
-| `pod name`  | Specify the name of the Pod to inject the fault. For example, add the Pod name `mysql-cluster-mysql-0` to the command, and the complete command would be `kubectl fault pod kill mysql-cluster-mysql-0`.  | Default | No |
-| `--direction` | It indicates the direction of target packets. Available values include `from` (the packets from target), `to` (the packets to target), and `both` ( the packets from or to target). | `to` | No |
-| `-e`,`--external-target` | It indicates the network targets outside Kubernetes, which can be IPv4 addresses or domain names. This parameter only works with `direction: to`. | None | No |
-| `--target-mode` | It specifies the mode of the target. If a target is specified, the `target-mode` mode should be specified together. `one` (selecting a random Pod), `all` (selecting all eligible Pods), `fixed` (selecting a specified number of eligible Pods), `fixed-percent` (selecting a specified percentage of Pods from the eligible Pods), and `random-max-percent` (selecting the maximum percentage of Pods from the eligible Pods) are selectable. | None | No |
-| `--target-value` | It specifies the value of the target. | None | No |
-| `--target-label` | It specifies the label of the target. | None | No |
-| `--duration` | It defines how long the partition lasts. | None | No |
-| `--target-ns-fault` | It specifies the namespace of the target. | None | No |
+| `pod name`  | 指定注入故障的 Pod 名称。例如，<br /> 在命令中添加 Pod 名称 `mysql-cluster-mysql-0`，完整命令为  `kbcli fault pod kill mysql-cluster-mysql-0`。  | 默认 | 否 |
+| `--direction` | 指示目标数据包的方向。可用值包括 `from`（从目标发出的数据包）、`to`（发送到目标的数据包）和 `both`（全部选中）。 | `to` | 否 |
+| `-e`,`--external-target` |指示 Kubernetes 外部的网络目标，可以是 IPv4 地址或域名。该参数仅在 `direction: to` 时有效。 | 无 | 否 |
+| `--target-mode` | 指定目标的模式。如果指定了目标，则需一起指定 `target-mode`。可选项包括：`one`（表示随机选出一个符合条件的 Pod）、`all`（表示选出所有符合条件的 Pod）、`fixed`（表示选出指定数量且符合条件的 Pod）、`fixed-percent`（表示选出占符合条件的 Pod 中指定百分比的 Pod）、`random-max-percent`（表示选出占符合条件的 Pod 中不超过指定百分比的 Pod）。 | 无 | 否 |
+| `--target-value` | 指定目标的值。| 无 | 否 |
+| `--target-label` | 指定目标的标签。 | 无 | 否 |
+| `--duration` | 指定分区的持续时间。 | 无 | 否 |
+| `--target-ns-fault` | 指定目标的命名空间。| 无 | 否 |
 
-### Network partition
+### Partition
 
-Run the command below to inject `network-partition` into the Pod and to make the Pod `mycluster-mysql-1` partitioned from both the outside network and the internal network of Kubernetes.
+执行以下命令，将 `network-partition` 注入到 Pod 中，使 Pod `mycluster-mysql-1` 与 Kubernetes 的内外部网络分离。
 
 ```bash
 kbcli fault network partition mycluster-mysql-1
 ```
 
-### Network emulation
+### Net emulation
 
-Net Emulation includes poor network conditions, such as high delays, high packet loss rate, packet reordering, and so on.
+Net Emulation 模拟网络质量较差的情况，如高延迟、高丢包率、包乱序等。
 
-#### Loss
+#### 丢包
 
-The command below injects `network-loss` into the Pod `mycluster-mysql-1` and the packet loss rate is 50%.
+执行以下命令，将 `network-loss` 注入到 Pod `mycluster-mysql-1` 中，使得其与外界通信丢包率为 50%。
 
 ```bash
 kbcli fault network loss mycluster-mysql-1 -e=kubeblocks.io --loss=50
 ```
 
-📎 Table 2. kbcli fault network loss flags description
+📎 Table 2. kbcli 网络丢包故障参数说明
 
-| Option                   | Description               | Default value | Required |
+| 参数                   | 说明               | 默认值 | 是否必填 |
 | :----------------------- | :------------------------ | :------------ | :------- |
-| `--loss` | It specifies the rate of packet loss. | None | Yes |
-| `-c`, `--correlation` | It indicates the correlation between the probability of a packet error occurring and whether it occurred the previous time. Value range: [0, 100]. | None | No |
+| `--loss` | 表示丢包发生的概率。 | 无 | 是 |
+| `-c`, `--correlation` | 表示丢包发生的概率与前一次是否发生的相关性。取值范围：[0, 100]。 | 无 | 否 |
 
-#### Delay
+#### 延迟
 
-The command below injects `network-delay` into the Pod `mycluster-mysql-1` and causes a 15-second delay to the network connection of the specified Pod.
+执行以下命令，将 `network-delay` 注入到 Pod `mycluster-mysql-1` 中，使指定 Pod 的网络连接延迟 15 秒。
 
 ```bash
 kbcli fault network delay mycluster-mysql-1 --latency=15s -c=100 --jitter=0ms
 ```
 
-📎 Table 3. kbcli fault network delay flags description
+📎 Table 3. kbcli 网络延迟故障参数说明
 
-| Option                   | Description               | Default value | Required |
+| 参数                   | 说明               | 默认值 | 是否必填 |
 | :----------------------- | :------------------------ | :------------ | :------- |
-| `--latency` | It specifies the delay period.         | None          | Yes      |
-| `--jitter` | It specifies the latency change range.  | 0 ms          | No       |
-| `-c`, `--correlation` | It indicates the correlation between the probability of a packet error occurring and whether it occurred the previous time. Value range: [0, 100]. | None | No |
+| `--latency` | 表示延迟的时间长度。         | 无          | 是      |
+| `--jitter` | 表示延迟时间的变化范围。  | 0 ms          | 否       |
+| `-c`, `--correlation` | 表示延迟时间的时间长度与前一次延迟时长的相关性。取值范围：[0, 100]。| 无 | 否 |
 
-#### Duplicate
+#### 包重复
 
-The command below injects duplicate chaos into the specified Pod and this experiment lasts for 1 minute and the duplicate rate is 50%.
+执行以下命令，向指定的 Pod 注入包重复的混乱，持续时间为 1 分钟，重复率为 50%。
 
-`--duplicate` specifies the rate of duplicate packets and the value range is [0,100].
+`--duplicate` 指定了包重复包的比率，取值范围为 [0,100]。
 
 ```bash
 kbcli fault network duplicate mysql-cluster-mysql-1 --duplicate=50
 ```
 
-📎 Table 4. kbcli fault network duplicate flags description
+📎 Table 4. kbcli 包重复故障参数说明
 
-| Option                   | Description               | Default value | Required |
+| 参数                   | 说明               | 默认值 | 是否必填 |
 | :----------------------- | :------------------------ | :------------ | :------- |
-| `--duplicate`         | It indicates the probability of a packet being duplicated. Value range: [0, 100]. | None | Yes |
-| `-c`, `--correlation` | It indicates the correlation between the probability of a packet error occurring and whether it occurred the previous time. Value range: [0, 100]. | None | No |
+| `--duplicate`         | 表示包重复发生的概率。取值范围：[0, 100]。 | 无 | 是 |
+| `-c`, `--correlation` | 表示包重复发生的概率与前一次是否发生的相关性。取值范围：[0, 100]。 | 无 | 否 |
 
-#### Corrupt
+#### 包损坏
 
-The command below injects corrupt chaos into the specified Pod and this experiment lasts for 1 minute and the packet corrupt rate is 50%.
+执行以下命令，向指定的 Pod 注入包损坏的混乱，持续时间为 1 分钟，包损坏率为 50%。
 
 ```bash
 kbcli fault network corrupt mycluster-mysql-1 --corrupt=50 --correlation=100 --duration=1m
@@ -105,31 +105,31 @@ kbcli fault network corrupt mycluster-mysql-1 --corrupt=50 --correlation=100 --d
 
 ### Bandwidth
 
-The command below sets the bandwidth between the specified Pod and the outside environment as 1 Kbps and this experiment lasts for 1 minute.
+执行以下命令，设置指定 Pod 与外部环境之间的带宽为 1 Kbps，持续时间为 1 分钟。
 
 ```bash
 kbcli fault network bandwidth mycluster-mysql-1 --rate=1kbps --duration=1m
 ```
 
-📎 Table 4. kbcli fault network bandwidth flags description
+📎 Table 4. kbcli Bandwidth 故障参数说明
 
-| Option                   | Description               | Default value | Required |
+| 参数                   | 说明               | 默认值 | 是否必填 |
 | :----------------------- | :------------------------ | :------------ | :------- |
-| `--rate` | It indicates the rate of bandwidth limit. | None | Yes |
-| `--limit` | It indicates the number of bytes waiting in the queue. | 1 | No |
-| `--buffer` | It indicates the maximum number of bytes that can be sent instantaneously. | 1 | No |
-| `--prakrate` | It indicates the maximum consumption rate of `bucket`. | 0 | No |
-| `--minburst` | It indicates the size of `peakrate bucket`. | 0 | No |
+| `--rate` | 表示带宽限制的速率。 | 无 | 是 |
+| `--limit` | 表示在队列中等待的字节数。 | 1 | 否 |
+| `--buffer` | 表示能够瞬间发送的最大字节数。| 1 | 否 |
+| `--prakrate` | 表示 `bucket` 的最大消耗率。 | 0 | 否 |
+| `--minburst` | 表示 `peakrate bucket` 的大小。 | 0 | 否 |
 
-## Simulate fault injections by YAML file
+## 使用 YAML 文件模拟故障注入
 
-This section introduces the YAML configuration file examples. You can view the YAML file by adding `--dry-run` at the end of the above kbcli commands. Meanwhile, you can also refer to the [Chaos Mesh official docs](https://chaos-mesh.org/docs/next/simulate-network-chaos-on-kubernetes/#create-experiments-using-the-yaml-files) for details.
+本节介绍如何使用 YAML 文件模拟故障注入。你可以在上述 kbcli 命令的末尾添加 `--dry-run` 命令来查看 YAML 文件，还可以参考 [Chaos Mesh 官方文档](https://chaos-mesh.org/zh/docs/next/simulate-network-chaos-on-kubernetes/#使用-yaml-方式创建实验)获取更详细的信息。
 
-### Network-partition example
+### Partition 示例
 
-1. Write the experiment configuration to the `network-partition.yaml` file.
+1. 将实验配置写入到 `network-partition.yaml` 文件中。
 
-    In the following example, Chaos Mesh injects `network-partition` into the Pod and to make the Pod `mycluster-mysql-1` partitioned from both the outside network and the internal network of Kubernetes.
+    在以下示例中，Chaos Mesh 将 `network-partition` 注入到 Pod 中，使 Pod `mycluster-mysql-1` 与 Kubernetes 的内外部网络分离。
 
     ```yaml
     apiVersion: chaos-mesh.org/v1alpha1
@@ -151,19 +151,19 @@ This section introduces the YAML configuration file examples. You can view the Y
           - mycluster-mysql-1
     ```
 
-2. Run `kubectl` to start an experiment.
+2. 使用 `kubectl` 创建实验。
 
    ```bash
    kubectl apply -f ./network-partition.yaml
    ```
 
-### Network-emulation example
+### Net emulation 示例
 
-#### Network-loss example
+#### 丢包示例
 
-1. Write the experiment configuration to the `network-loss.yaml` file.
+1. 将实验配置写入到 `network-loss.yaml` 文件中。
 
-    In the following example, Chaos Mesh injects `network-loss` into the Pod `mycluster-mysql-1` and the packet loss rate is 50%.
+    在以下示例中，Chaos Mesh 将 `network-loss` 注入到 Pod `mycluster-mysql-1` 中，使得其与外界通信丢包率为 50%。
 
     ```yaml
     apiVersion: chaos-mesh.org/v1alpha1
@@ -189,17 +189,17 @@ This section introduces the YAML configuration file examples. You can view the Y
           - mycluster-mysql-1
     ```
 
-2. Run `kubectl` to start an experiment.
+2. 使用 `kubectl` 创建实验。
 
    ```bash
    kubectl apply -f ./network-loss.yaml
    ```
 
-#### Network-delay example
+#### 延迟示例
 
-1. Write the experiment configuration to the `network-delay.yaml` file.
+1. 将实验配置写入到 `network-delay.yaml` 文件中。
 
-    In the following example, Chaos Mesh injects `network-delay` into the Pod `mycluster-mysql-1` and causes a 15-second delay to the network connection of the specified Pod.
+    在以下示例中，Chaos Mesh 将 `network-delay` 注入到 Pod `mycluster-mysql-1` 中，使指定 Pod 的网络连接延迟 15 秒。
 
     ```yaml
     apiVersion: chaos-mesh.org/v1alpha1
@@ -225,17 +225,17 @@ This section introduces the YAML configuration file examples. You can view the Y
           - mycluster-mysql-1
     ```
 
-2. Run `kubectl` to start an experiment.
+2. 使用 `kubectl` 创建实验。
 
    ```bash
    kubectl apply -f ./network-delay.yaml
    ```
 
-#### Network-duplicate example
+#### 包重复示例
 
-1. Write the experiment configuration to the `network-duplicate.yaml` file.
+1. 将实验配置写入到 `network-duplicate.yaml` 文件中。
 
-    In the following example, Chaos Mesh injects duplicate chaos into the specified Pod and this experiment lasts for 1 minute and the duplicate rate is 50%.
+    在以下示例中，Chaos Mesh 向指定的 Pod 注入包重复的混乱，持续时间为 1 分钟，重复率为 50%。
 
     ```yaml
     apiVersion: chaos-mesh.org/v1alpha1
@@ -259,18 +259,17 @@ This section introduces the YAML configuration file examples. You can view the Y
           - mysql-cluster-mysql-1
     ```
 
-2. Run `kubectl` to start an experiment.
+2. 使用 `kubectl` 创建实验。
 
    ```bash
    kubectl apply -f ./network-duplicate.yaml
    ```
 
-#### Network-corrupt example
+#### 包损坏示例
 
-1. Write the experiment configuration to the `network-corrupt.yaml` file.
+1. 将实验配置写入到 `network-corrupt.yaml` 文件中。
 
-    In the following example, Chaos Mesh injects corrupt chaos into the specified Pod and this experiment lasts for 1 minute and the packet corrupt rate is 50%.
-
+    在以下示例中，Chaos Mesh 向指定的 Pod 注入包损坏的混乱，持续时间为 1 分钟，包损坏率为 50%。
 
     ```yaml
     apiVersion: chaos-mesh.org/v1alpha1
@@ -295,17 +294,17 @@ This section introduces the YAML configuration file examples. You can view the Y
         - mycluster-mysql-1
     ```
 
-2. Run `kubectl` to start an experiment.
+2. 使用 `kubectl` 创建实验。
 
    ```bash
    kubectl apply -f ./network-corrupt.yaml
    ```
 
-### Bandwidth example
+### Bandwidth 示例
 
-1. Write the experiment configuration to the `network-bandwidth.yaml` file.
+1. 将实验配置写入到 `network-bandwidth.yaml` 文件中。
 
-    In the following example, Chaos Mesh sets the bandwidth between the specified Pod and the outside as 1 Kbps and this experiment lasts for 1 minute.
+    在以下示例中，Chaos Mesh 设置指定 Pod 与外部环境之间的带宽为 1 Kbps，持续时间为 1 分钟。
 
     ```yaml
     apiVersion: chaos-mesh.org/v1alpha1
@@ -331,21 +330,21 @@ This section introduces the YAML configuration file examples. You can view the Y
           - mycluster-mysql-1
     ```
 
-2. Run `kubectl` to start an experiment.
+2. 使用 `kubectl` 创建实验。
 
    ```bash
    kubectl apply -f ./network-bandwidth.yaml
    ```
 
-### Field description
+### 字段说明
 
-This table describes the fields in the YAML file.
+下表介绍以上 YAML 配置文件中的字段。
 
-| Parameter | Type  | Description | Default value | Required | Example |
+| 参数 | 类型  | 说明 | 默认值 | 是否必填 | 示例 |
 | :---      | :---  | :---        | :---          | :---     | :---    |
-| action | string | It specifies the fault type to inject. The supported types include `partition`、`loss`、`delay`、`duplicate`、`corrupt` and `bandwidth`。| None | Yes | `bandwidth` |
-| duration | string | It specifies the duration of the experiment. | None | Yes | 10s |
-| mode | string | It specifies the mode of the experiment. The mode options include `one` (selecting a random Pod), `all` (selecting all eligible Pods), `fixed` (selecting a specified number of eligible Pods), `fixed-percent` (selecting a specified percentage of Pods from the eligible Pods), and `random-max-percent` (selecting the maximum percentage of Pods from the eligible Pods). | None | Yes | `fixed-percent` |
-| value | string | It provides parameters for the `mode` configuration, depending on `mode`. For example, when `mode` is set to `fixed-percent`, `value` specifies the percentage of Pods. | None | No | 50 |
-| selector | struct | It specifies the target Pod by defining node and labels.| None | Yes. <br /> If not specified, the system kills all pods under the default namespece. |
-| duration | string | It specifies the duration of the experiment. | None | Yes | 30s |
+| action | string | 指定故障类型。如 `partition`、`loss`、`delay`、`duplicate`、`corrupt` 和 `bandwidth`。| 无 | 是 | `bandwidth` |
+| duration | string | 指定实验的持续时间。 | 无 | 是 | 10s |
+| mode | string | 指定实验的运行方式，可选项包括：`one`（表示随机选出一个符合条件的 Pod）、`all`（表示选出所有符合条件的 Pod）、`fixed`（表示选出指定数量且符合条件的 Pod）、`fixed-percent`（表示选出占符合条件的 Pod 中指定百分比的 Pod）和 `random-max-percent`（表示选出占符合条件的 Pod 中不超过指定百分比的 Pod）。 | 无 | 是 | `fixed-percent` |
+| value | string | 取决于 `mode` 的配置，为 `mode` 提供对应的参数。例如，当你将 `mode` 配置为 `fixed-percent` `时，value` 用于指定 Pod 的百分比。 | 无 | 否 | 50 |
+| selector | struct | 通过定义节点和标签来指定目标 Pod。| 无 | 是 <br /> 如果未指定，系统将终止默认命名空间下的所有 Pod。|
+| duration | string | 指定实验的持续时间。 | 无 | 是 | 30s |

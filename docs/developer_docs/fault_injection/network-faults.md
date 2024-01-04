@@ -343,7 +343,7 @@ This table describes the fields in the YAML file.
 
 | Parameter | Type  | Description | Default value | Required | Example |
 | :---      | :---  | :---        | :---          | :---     | :---    |
-| action | string | It specifies the fault type to inject. The supported types include `partition`、`loss`、`delay`、`duplicate`、`corrupt` and `bandwidth`。| None | Yes | `bandwidth` |
+| action | string | It specifies the fault type to inject. The supported types include `partition`, `loss`, `delay`, `duplicate`, `corrupt` and `bandwidth`. | None | Yes | `bandwidth` |
 | duration | string | It specifies the duration of the experiment. | None | Yes | 10s |
 | mode | string | It specifies the mode of the experiment. The mode options include `one` (selecting a random Pod), `all` (selecting all eligible Pods), `fixed` (selecting a specified number of eligible Pods), `fixed-percent` (selecting a specified percentage of Pods from the eligible Pods), and `random-max-percent` (selecting the maximum percentage of Pods from the eligible Pods). | None | Yes | `fixed-percent` |
 | value | string | It provides parameters for the `mode` configuration, depending on `mode`. For example, when `mode` is set to `fixed-percent`, `value` specifies the percentage of Pods. | None | No | 50 |

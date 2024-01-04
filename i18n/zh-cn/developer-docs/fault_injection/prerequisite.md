@@ -39,7 +39,7 @@ kubectl auth can-i create podchaos.chaos-mesh.org -n default --as "useraccont"
 
 如果输出为 yes，则表示已具备所需的权限。
 
-如果输出为 no，请删除验证流程，解决此问题。
+如果输出为 no，请删除验证流程。
 
 ```bash
 kubectl delete validatingwebhookconfigurations.admissionregistration.k8s.io chaos-mesh-validation-auth

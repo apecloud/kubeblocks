@@ -35,7 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
@@ -169,7 +168,7 @@ func (t *testTransCtx) GetContext() context.Context {
 	return t.Context
 }
 
-func (t *testTransCtx) GetClient() roclient.ReadonlyClient {
+func (t *testTransCtx) GetClient() client.Reader {
 	return t.GraphClient
 }
 

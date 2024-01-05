@@ -59,6 +59,8 @@ type SynthesizedComponent struct {
 	ComponentRefEnvs  []corev1.EnvVar                        `json:"componentRefEnvs,omitempty"`
 	ServiceReferences map[string]*v1alpha1.ServiceDescriptor `json:"serviceReferences,omitempty"`
 	TemplateVars      map[string]any                         `json:"templateVars,omitempty"`
+	EnvVars           []corev1.EnvVar                        `json:"envVars,omitempty"`
+	EnvFromSources    []corev1.EnvFromSource                 `json:"envFromSources,omitempty"`
 
 	RsmTransformPolicy workloads.RsmTransformPolicy `json:"rsmTransformPolicy,omitempty"`
 	Nodes              []types.NodeName             `json:"nodes,omitempty"`

@@ -23,7 +23,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"regexp"
 	"sort"
 	"strconv"
@@ -51,29 +50,36 @@ func ResolveEnvVars4LegacyCluster(ctx context.Context, cli client.Reader, synthe
 	return resolveTemplateNEnvVars(ctx, cli, synthesizedComp, annotations, definedVars, true)
 }
 
-func SetTemplateNEnvVars(synthesizedComp *SynthesizedComponent, templateVars map[string]any, envVars []corev1.EnvVar) {
-	if synthesizedComp.TemplateVars == nil {
-		synthesizedComp.TemplateVars = templateVars
-	} else {
-		maps.Copy(synthesizedComp.TemplateVars, templateVars)
-	}
+func InjectEnvVars(synthesizedComp *SynthesizedComponent, envVars []corev1.EnvVar, envFromSources []corev1.EnvFromSource) {
+	InjectEnvVars4Containers(synthesizedComp, envVars, envFromSources, nil)
+}
 
-	for _, cc := range []*[]corev1.Container{
-		&synthesizedComp.PodSpec.InitContainers,
-		&synthesizedComp.PodSpec.Containers,
-	} {
+func InjectEnvVars4Containers(synthesizedComp *SynthesizedComponent, envVars []corev1.EnvVar,
+	envFromSources []corev1.EnvFromSource, filter func(container *corev1.Container) bool) {
+	for _, cc := range []*[]corev1.Container{&synthesizedComp.PodSpec.InitContainers, &synthesizedComp.PodSpec.Containers} {
 		for i := range *cc {
 			// have injected variables placed at the front of the slice
 			c := &(*cc)[i]
-			if c.Env == nil {
-				newEnv := make([]corev1.EnvVar, len(envVars))
-				copy(newEnv, envVars)
-				c.Env = newEnv
-			} else {
-				newEnv := make([]corev1.EnvVar, len(envVars), common.SafeAddInt(len(c.Env), len(envVars)))
-				copy(newEnv, envVars)
-				newEnv = append(newEnv, c.Env...)
-				c.Env = newEnv
+			if filter != nil && !filter(c) {
+				continue
+			}
+			if envVars != nil {
+				if c.Env == nil {
+					newEnv := make([]corev1.EnvVar, len(envVars))
+					copy(newEnv, envVars)
+					c.Env = newEnv
+				} else {
+					newEnv := make([]corev1.EnvVar, len(envVars), common.SafeAddInt(len(c.Env), len(envVars)))
+					copy(newEnv, envVars)
+					newEnv = append(newEnv, c.Env...)
+					c.Env = newEnv
+				}
+			}
+			if envFromSources != nil {
+				if c.EnvFrom == nil {
+					c.EnvFrom = make([]corev1.EnvFromSource, 0)
+				}
+				c.EnvFrom = append(c.EnvFrom, envFromSources...)
 			}
 		}
 	}

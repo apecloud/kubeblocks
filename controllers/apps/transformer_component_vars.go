@@ -106,21 +106,16 @@ func buildEnvVarsNData(synthesizedComp *component.SynthesizedComponent, vars []c
 }
 
 func setTemplateNEnvVars(synthesizedComp *component.SynthesizedComponent, templateVars map[string]any, envVars []corev1.EnvVar, legacy bool) {
-	component.SetTemplateNEnvVars(synthesizedComp, templateVars, envVars)
-
-	for _, cc := range []*[]corev1.Container{&synthesizedComp.PodSpec.InitContainers, &synthesizedComp.PodSpec.Containers} {
-		for i := range *cc {
-			c := &(*cc)[i]
-			if c.EnvFrom == nil {
-				c.EnvFrom = make([]corev1.EnvFromSource, 0)
-			}
-			envSource := envConfigMapSource(synthesizedComp.ClusterName, synthesizedComp.Name)
-			if legacy {
-				envSource.ConfigMapRef.Optional = nil
-			}
-			c.EnvFrom = append(c.EnvFrom, envSource)
-		}
+	envSource := envConfigMapSource(synthesizedComp.ClusterName, synthesizedComp.Name)
+	if legacy {
+		envSource.ConfigMapRef.Optional = nil
 	}
+
+	synthesizedComp.TemplateVars = templateVars
+	synthesizedComp.EnvVars = envVars
+	synthesizedComp.EnvFromSources = []corev1.EnvFromSource{envSource}
+
+	component.InjectEnvVars(synthesizedComp, envVars, []corev1.EnvFromSource{envSource})
 }
 
 func envConfigMapSource(clusterName, compName string) corev1.EnvFromSource {

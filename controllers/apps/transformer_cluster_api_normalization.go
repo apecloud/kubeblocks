@@ -60,8 +60,8 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 			if err != nil {
 				return err
 			}
-			transCtx.ComponentDefs[compDef.Name] = compDef
-			transCtx.ComponentSpecs[i].ComponentDef = compDef.Name
+			transCtx.ComponentDefs[compSpec.ComponentDefRef] = compDef
+			transCtx.ComponentSpecs[i].ComponentDef = compSpec.ComponentDefRef
 		} else {
 			// should be loaded at load resources transformer
 			if _, ok := transCtx.ComponentDefs[compSpec.ComponentDef]; !ok {

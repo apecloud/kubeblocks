@@ -291,7 +291,6 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, synthesiz
 	mergeMetadataMap(rsmObjCopy.Spec.Template.Annotations, &rsmProto.Spec.Template.Annotations)
 	rsmObjCopy.Spec.Template = rsmProto.Spec.Template
 	rsmObjCopy.Spec.Replicas = rsmProto.Spec.Replicas
-	updateUpdateStrategy(rsmObjCopy, rsmProto)
 	rsmObjCopy.Spec.Service = rsmProto.Spec.Service
 	rsmObjCopy.Spec.AlternativeServices = rsmProto.Spec.AlternativeServices
 	rsmObjCopy.Spec.Roles = rsmProto.Spec.Roles
@@ -300,6 +299,10 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, synthesiz
 	rsmObjCopy.Spec.MemberUpdateStrategy = rsmProto.Spec.MemberUpdateStrategy
 	rsmObjCopy.Spec.Credential = rsmProto.Spec.Credential
 	rsmObjCopy.Spec.NodeAssignment = rsmProto.Spec.NodeAssignment
+
+	if rsmProto.Spec.UpdateStrategy.Type != "" || rsmProto.Spec.UpdateStrategy.RollingUpdate != nil {
+		updateUpdateStrategy(rsmObjCopy, rsmProto)
+	}
 
 	ResolvePodSpecDefaultFields(oldRsm.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
 	DelayUpdatePodSpecSystemFields(oldRsm.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)

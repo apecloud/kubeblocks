@@ -22,6 +22,7 @@ package backup
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -124,13 +125,13 @@ func excludeLabelsForWorkload() []string {
 
 // BuildBackupWorkloadLabels builds the labels for workload which owned by backup.
 func BuildBackupWorkloadLabels(backup *dpv1alpha1.Backup) map[string]string {
-	labels := backup.Labels
-	if labels == nil {
-		labels = map[string]string{}
-	} else {
-		for _, v := range excludeLabelsForWorkload() {
-			delete(labels, v)
+	labels := map[string]string{}
+	excludeLabels := excludeLabelsForWorkload()
+	for k, v := range backup.Labels {
+		if slices.Contains(excludeLabels, k) {
+			continue
 		}
+		labels[k] = v
 	}
 	labels[types.BackupNameLabelKey] = backup.Name
 	return labels

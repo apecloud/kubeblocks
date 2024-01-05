@@ -20,11 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 import (
+	"fmt"
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"time"
 
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -128,7 +129,7 @@ var _ = Describe("Backup Controller test", func() {
 
 			getJobKey := func() client.ObjectKey {
 				return client.ObjectKey{
-					Name:      dpbackup.GenerateBackupJobName(backup, dpbackup.BackupDataJobNamePrefix),
+					Name:      dpbackup.GenerateBackupJobName(backup, dpbackup.BackupDataJobNamePrefix+"-0"),
 					Namespace: backup.Namespace,
 				}
 			}
@@ -220,7 +221,7 @@ var _ = Describe("Backup Controller test", func() {
 
 				getJobKey := func() client.ObjectKey {
 					return client.ObjectKey{
-						Name:      dpbackup.GenerateBackupJobName(backup, dpbackup.BackupDataJobNamePrefix),
+						Name:      dpbackup.GenerateBackupJobName(backup, dpbackup.BackupDataJobNamePrefix+"-0"),
 						Namespace: backup.Namespace,
 					}
 				}
@@ -279,6 +280,50 @@ var _ = Describe("Backup Controller test", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(targets).Should(HaveLen(1))
 				Expect(targets[0].Name).Should(Equal(testdp.ClusterName + "-" + testdp.ComponentName + "-1"))
+			})
+
+			It("create an backup with backupMethod's and podSelection strategy is All", func() {
+				By("Set backupMethod's target and podSelection strategy to All")
+				Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(bp *dpv1alpha1.BackupPolicy) {
+					backupPolicy.Spec.BackupMethods[0].Target = &dpv1alpha1.BackupTarget{
+						PodSelector: &dpv1alpha1.PodSelector{
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									constant.AppInstanceLabelKey:    testdp.ClusterName,
+									constant.KBAppComponentLabelKey: testdp.ComponentName,
+								},
+							},
+							Strategy: dpv1alpha1.PodSelectionStrategyAll,
+						},
+					}
+				})).Should(Succeed())
+				By("check targets pod")
+				reqCtx := intctrlutil.RequestCtx{
+					Ctx: ctx,
+				}
+				targets, err := GetTargetPods(reqCtx, k8sClient, "", &backupPolicy.Spec.BackupMethods[0], backupPolicy)
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(targets).Should(HaveLen(2))
+
+				By("create a backup")
+				backup := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
+					backup.Spec.RetentionPeriod = "1h"
+				})
+				getJobKey := func(index int) client.ObjectKey {
+					return client.ObjectKey{
+						Name:      dpbackup.GenerateBackupJobName(backup, fmt.Sprintf("%s-%d", dpbackup.BackupDataJobNamePrefix, index)),
+						Namespace: backup.Namespace,
+					}
+				}
+
+				By("mock jobs are completed and backup should be completed")
+				testdp.PatchK8sJobStatus(&testCtx, getJobKey(0), batchv1.JobComplete)
+				testdp.PatchK8sJobStatus(&testCtx, getJobKey(1), batchv1.JobComplete)
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
+					g.Expect(fetched.Status.CompletionTimestamp).ShouldNot(BeNil())
+					g.Expect(fetched.Status.Expiration.Second()).Should(Equal(fetched.Status.CompletionTimestamp.Add(time.Hour).Second()))
+				})).Should(Succeed())
 			})
 		})
 

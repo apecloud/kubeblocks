@@ -403,10 +403,12 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(targetTpl appsv1alpha
 		}
 		return constant.GenerateDefaultCompServiceAccountPattern(component.FullName(r.Cluster.Name, comp.Name))
 	}
-
+	if targetTpl.Strategy == "" {
+		targetTpl.Strategy = dpv1alpha1.PodSelectionStrategyAny
+	}
 	target := &dpv1alpha1.BackupTarget{
 		PodSelector: &dpv1alpha1.PodSelector{
-			Strategy: dpv1alpha1.PodSelectionStrategyAny,
+			Strategy: targetTpl.Strategy,
 			LabelSelector: &metav1.LabelSelector{
 				MatchLabels: r.buildTargetPodLabels(targetTpl, comp),
 			},

@@ -308,10 +308,6 @@ func (r *BackupReconciler) prepareBackupRequest(
 		return nil, fmt.Errorf("failed to get target pods by backup policy %s/%s",
 			backupPolicy.Namespace, backupPolicy.Name)
 	}
-
-	if len(targetPods) > 1 {
-		return nil, fmt.Errorf("do not support more than one target pods")
-	}
 	request.TargetPods = targetPods
 	return request, nil
 }

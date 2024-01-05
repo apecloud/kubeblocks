@@ -44,7 +44,8 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	transCtx.ComponentSpecs = make([]*appsv1alpha1.ClusterComponentSpec, 0)
 	cluster := transCtx.Cluster
 	for i := range cluster.Spec.ComponentSpecs {
-		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, &cluster.Spec.ComponentSpecs[i])
+		clusterComSpec := cluster.Spec.ComponentSpecs[i]
+		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, &clusterComSpec)
 	}
 	if compSpec := apiconversion.HandleSimplifiedClusterAPI(transCtx.ClusterDef, cluster); compSpec != nil {
 		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, compSpec)

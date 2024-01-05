@@ -122,6 +122,8 @@ spec:
                   key: dataProtectionEncryptionKey
             - name: KUBE_PROVIDER
               value: {{ .Values.provider | quote }}
+            - name: HOST_PORT_CM_NAME
+              value: {{ include "kubeblocks.fullname" . }}-host-ports
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}

@@ -291,15 +291,14 @@ const (
 	// The TCP/IP port numbers below 1024 are special in that normal users are not allowed to run servers on them.
 	// This is a security feaure, in that if you connect to a service on one of these ports you can be fairly sure
 	// that you have the real thing, and not a fake which some hacker has put up for you.
-	hostPortMin           = int32(1025)
-	hostPortMax           = int32(65536)
-	hostPortConfigMapName = "kubeblocks-host-ports"
+	hostPortMin = int32(1025)
+	hostPortMax = int32(65536)
 )
 
 func InitHostPortManager(cli client.Client) error {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      hostPortConfigMapName,
+			Name:      viper.GetString(constant.CfgHostPortConfigMapName),
 			Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 		},
 		Data: make(map[string]string),
@@ -362,7 +361,7 @@ func (pm *PortManager) parsePort(port string) (int32, error) {
 func (pm *PortManager) sync() error {
 	cm := &corev1.ConfigMap{}
 	objKey := types.NamespacedName{
-		Name:      hostPortConfigMapName,
+		Name:      viper.GetString(constant.CfgHostPortConfigMapName),
 		Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 	}
 	if err := pm.cli.Get(context.Background(), objKey, cm); err != nil {

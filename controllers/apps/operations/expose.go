@@ -352,7 +352,8 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 
 	for _, exposeService := range exposeServices {
 		if checkServiceExist(exposeService) {
-			return fmt.Errorf("service %s already exists, cluster: %s, component: %s", exposeService.Name, cluster.Name, clusterCompSpec.Name)
+			reqCtx.Log.Info("cluster service already exists, skip", "service", exposeService.Name)
+			continue
 		}
 		genServiceName := fmt.Sprintf("%s-%s", clusterCompSpec.Name, exposeService.Name)
 		clusterService := appsv1alpha1.ClusterService{

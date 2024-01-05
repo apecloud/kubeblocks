@@ -32,7 +32,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
@@ -401,7 +400,7 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(targetTpl appsv1alpha
 		if comp.ServiceAccountName != "" {
 			return comp.ServiceAccountName
 		}
-		return constant.GenerateDefaultCompServiceAccountPattern(component.FullName(r.Cluster.Name, comp.Name))
+		return constant.GenerateDefaultServiceAccountName(r.Cluster.Name)
 	}
 	if targetTpl.Strategy == "" {
 		targetTpl.Strategy = dpv1alpha1.PodSelectionStrategyAny

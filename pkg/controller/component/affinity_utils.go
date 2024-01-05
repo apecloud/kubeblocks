@@ -96,7 +96,7 @@ func BuildPodTopologySpreadConstraints(clusterName, compName string, compAffinit
 			LabelSelector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					constant.AppInstanceLabelKey:    clusterName,
-					constant.KBAppComponentLabelKey: FullName(clusterName, compName),
+					constant.KBAppComponentLabelKey: compName,
 				},
 			},
 		})
@@ -151,7 +151,7 @@ func buildNewAffinity(clusterName, compName string, compAffinity *appsv1alpha1.A
 			LabelSelector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					constant.AppInstanceLabelKey:    clusterName,
-					constant.KBAppComponentLabelKey: FullName(clusterName, compName),
+					constant.KBAppComponentLabelKey: compName,
 				},
 			},
 		})

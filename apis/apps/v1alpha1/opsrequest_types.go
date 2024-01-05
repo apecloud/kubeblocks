@@ -340,13 +340,87 @@ type ParameterConfig struct {
 	FileContent string `json:"fileContent,omitempty"`
 }
 
+// ExposeSwitch defines the switch of expose operation.
+// +enum
+// +kubebuilder:validation:Enum={Enable, Disable}
+type ExposeSwitch string
+
+const (
+	EnableExposeSwitch  ExposeSwitch = "Enable"
+	DisableExposeSwitch ExposeSwitch = "Disable"
+)
+
 type Expose struct {
 	ComponentOps `json:",inline"`
 
-	// Setting the list of services to be exposed.
+	// switch defines the switch of expose operation.
+	// if switch is set to Enable, the service will be exposed. if switch is set to Disable, the service will be removed.
+	// +kubebuilder:validation:Required
+	Switch ExposeSwitch `json:"switch"`
+
+	// Setting the list of services to be exposed or removed.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minitems=0
-	Services []ClusterComponentService `json:"services"`
+	Services []OpsService `json:"services"`
+}
+
+type OpsService struct {
+	// Name defines the name of the service.
+	// otherwise, it indicates the name of the service.
+	// Others can refer to this service by its name. (e.g., connection credential)
+	// Cannot be updated.
+	// +required
+	Name string `json:"name"`
+
+	// If ServiceType is LoadBalancer, cloud provider related parameters can be put here
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// The list of ports that are exposed by this service.
+	// If Ports are not provided, the default Services Ports defined in the ClusterDefinition or ComponentDefinition that are neither of NodePort nor LoadBalancer service type will be used.
+	// If there is no corresponding Service defined in the ClusterDefinition or ComponentDefinition, the expose operation will fail.
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
+	// +patchMergeKey=port
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=port
+	// +listMapKey=protocol
+	// +optional
+	Ports []corev1.ServicePort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"port" protobuf:"bytes,1,rep,name=ports"`
+
+	// RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined role as selector for the service.
+	// +optional
+	RoleSelector string `json:"roleSelector,omitempty"`
+
+	// Route service traffic to pods with label keys and values matching this
+	// selector. If empty or not present, the service is assumed to have an
+	// external process managing its endpoints, which Kubernetes will not
+	// modify. Only applies to types ClusterIP, NodePort, and LoadBalancer.
+	// Ignored if type is ExternalName.
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/
+	// +optional
+	// +mapType=atomic
+	Selector map[string]string `json:"selector,omitempty" protobuf:"bytes,2,rep,name=selector"`
+
+	// type determines how the Service is exposed. Defaults to ClusterIP. Valid
+	// options are ExternalName, ClusterIP, NodePort, and LoadBalancer.
+	// "ClusterIP" allocates a cluster-internal IP address for load-balancing
+	// to endpoints. Endpoints are determined by the selector or if that is not
+	// specified, by manual construction of an Endpoints object or
+	// EndpointSlice objects. If clusterIP is "None", no virtual IP is
+	// allocated and the endpoints are published as a set of endpoints rather
+	// than a virtual IP.
+	// "NodePort" builds on ClusterIP and allocates a port on every node which
+	// routes to the same endpoints as the clusterIP.
+	// "LoadBalancer" builds on NodePort and creates an external load-balancer
+	// (if supported in the current cloud) which routes to the same endpoints
+	// as the clusterIP.
+	// "ExternalName" aliases this service to the specified externalName.
+	// Several other fields do not apply to ExternalName services.
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
+	// +optional
+	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
 }
 
 type RestoreFromSpec struct {

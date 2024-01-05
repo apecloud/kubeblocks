@@ -50,7 +50,9 @@ spec:
             properties:
               componentDefinitionRefs:
                 description: componentDefinitionRefs indicates which types of componentDefinitions
-                  are supported by the operation.
+                  are supported by the operation, and can refer some vars of the componentDefinition.
+                  if it is set, the component that does not meet the conditions will
+                  be intercepted.
                 items:
                   properties:
                     accountName:
@@ -68,6 +70,61 @@ spec:
                         in env of the job. portName will replace the characters '-'
                         to '_' and convert to uppercase.
                       type: string
+                    varsRef:
+                      description: varsRef defines the envs that need to be referenced
+                        from the target component pod, and will inject to job's containers.
+                        if it is set, will ignore the global "varsRef".
+                      properties:
+                        podSelectionStrategy:
+                          default: PreferredAvailable
+                          description: 'podSelectionStrategy how to select the target
+                            component pod for variable references based on the strategy.
+                            - PreferredAvailable: prioritize the selection of available
+                            pod. - Available: only select available pod. if not found,
+                            terminating the operation.'
+                          enum:
+                          - Available
+                          - PreferredAvailable
+                          type: string
+                        vars:
+                          description: List of environment variables to set in the
+                            job's container.
+                          items:
+                            properties:
+                              name:
+                                description: Name of the variable. Must be a C_IDENTIFIER.
+                                type: string
+                              valueFrom:
+                                description: Source for the variable's value. Cannot
+                                  be used if value is not empty.
+                                properties:
+                                  envVarRef:
+                                    description: 'envVarRef defines which container
+                                      and env that the variable references from. source:
+                                      "env" or "envFrom" of the container.'
+                                    properties:
+                                      containerName:
+                                        description: container name which defines
+                                          in componentDefinition or is injected by
+                                          kubeBlocks controller.
+                                        type: string
+                                      envName:
+                                        description: env name, it will .
+                                        type: string
+                                    required:
+                                    - containerName
+                                    - envName
+                                    type: object
+                                type: object
+                            required:
+                            - name
+                            - valueFrom
+                            type: object
+                          minItems: 1
+                          type: array
+                      required:
+                      - podSelectionStrategy
+                      type: object
                   required:
                   - name
                   type: object
@@ -8473,8 +8530,59 @@ spec:
                   - message: at least one exists for rule and exec.
                     rule: has(self.rule) || has(self.exec)
                 type: array
+              varsRef:
+                description: varsRef defines the envs that need to be referenced from
+                  the target component pod, and will inject to job's containers.
+                properties:
+                  podSelectionStrategy:
+                    default: PreferredAvailable
+                    description: 'podSelectionStrategy how to select the target component
+                      pod for variable references based on the strategy. - PreferredAvailable:
+                      prioritize the selection of available pod. - Available: only
+                      select available pod. if not found, terminating the operation.'
+                    enum:
+                    - Available
+                    - PreferredAvailable
+                    type: string
+                  vars:
+                    description: List of environment variables to set in the job's
+                      container.
+                    items:
+                      properties:
+                        name:
+                          description: Name of the variable. Must be a C_IDENTIFIER.
+                          type: string
+                        valueFrom:
+                          description: Source for the variable's value. Cannot be
+                            used if value is not empty.
+                          properties:
+                            envVarRef:
+                              description: 'envVarRef defines which container and
+                                env that the variable references from. source: "env"
+                                or "envFrom" of the container.'
+                              properties:
+                                containerName:
+                                  description: container name which defines in componentDefinition
+                                    or is injected by kubeBlocks controller.
+                                  type: string
+                                envName:
+                                  description: env name, it will .
+                                  type: string
+                              required:
+                              - containerName
+                              - envName
+                              type: object
+                          type: object
+                      required:
+                      - name
+                      - valueFrom
+                      type: object
+                    minItems: 1
+                    type: array
+                required:
+                - podSelectionStrategy
+                type: object
             required:
-            - componentDefinitionRefs
             - jobSpec
             type: object
           status:

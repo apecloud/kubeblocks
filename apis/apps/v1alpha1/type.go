@@ -214,6 +214,16 @@ const (
 	OpsFailedPhase     OpsPhase = "Failed"
 )
 
+// PodSelectionStrategy pod selection strategy.
+// +enum
+// +kubebuilder:validation:Enum={Available,PreferredAvailable}
+type PodSelectionStrategy string
+
+const (
+	Available          PodSelectionStrategy = "Available"
+	PreferredAvailable PodSelectionStrategy = "PreferredAvailable"
+)
+
 // OpsType defines operation types.
 // +enum
 // +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose,Switchover,DataScript,Backup,Restore,Custom}

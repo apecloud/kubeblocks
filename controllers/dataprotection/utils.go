@@ -165,7 +165,7 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 	}
 
 	var targetPods []*corev1.Pod
-	if podName != "" {
+	if podName != "" && selector.Strategy == dpv1alpha1.PodSelectionStrategyAny {
 		for _, pod := range pods.Items {
 			if pod.Name == podName {
 				targetPods = append(targetPods, &pod)
@@ -176,11 +176,9 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 			return targetPods, nil
 		}
 	}
-
-	strategy := selector.Strategy
 	sort.Sort(intctrlutil.ByPodName(pods.Items))
 	// if pod selection strategy is Any, always return first pod
-	switch strategy {
+	switch selector.Strategy {
 	case dpv1alpha1.PodSelectionStrategyAny:
 		pod := dputils.GetFirstIndexRunningPod(pods)
 		if pod != nil {

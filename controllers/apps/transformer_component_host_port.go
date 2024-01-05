@@ -116,7 +116,6 @@ func updateLorrySpecAfterPortsChanged(synthesizeComp *component.SynthesizedCompo
 func updateLorry(synthesizeComp *component.SynthesizedComponent, container *corev1.Container, httpPort, grpcPort int) error {
 	container.Command = []string{"lorry",
 		"--port", strconv.Itoa(httpPort),
-		"--config-path", "/config/lorry/components/",
 		"--grpcport", strconv.Itoa(grpcPort),
 	}
 
@@ -152,7 +151,7 @@ func updateReadinessProbe(synthesizeComp *component.SynthesizedComponent, lorryH
 			continue
 		}
 		if container.ReadinessProbe.HTTPGet == nil {
-			return nil
+			continue
 		}
 		if container.ReadinessProbe.HTTPGet.Path == constant.LorryRoleProbePath ||
 			container.ReadinessProbe.HTTPGet.Path == constant.LorryVolumeProtectPath {

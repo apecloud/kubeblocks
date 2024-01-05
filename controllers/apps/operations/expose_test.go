@@ -76,7 +76,8 @@ var _ = Describe("", func() {
 			ops.Spec.ExposeList = []appsv1alpha1.Expose{
 				{
 					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusCompName},
-					Services: []appsv1alpha1.ClusterComponentService{
+					Switch:       appsv1alpha1.EnableExposeSwitch,
+					Services: []appsv1alpha1.OpsService{
 						{
 							Name:        testapps.ServiceVPCName,
 							ServiceType: corev1.ServiceTypeLoadBalancer,

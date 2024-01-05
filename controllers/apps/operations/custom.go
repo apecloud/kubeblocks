@@ -237,7 +237,7 @@ func (c CustomOpsHandler) buildJob(reqCtx intctrlutil.RequestCtx,
 			if comp.ServiceAccountName != "" {
 				return comp.ServiceAccountName
 			}
-			return constant.GenerateDefaultCompServiceAccountPattern(component.FullName(opsRes.Cluster.Name, comp.Name))
+			return constant.GenerateDefaultServiceAccountName(opsRes.Cluster.Name)
 		}
 		jobSpec.Template.Spec.ServiceAccountName = getSAName()
 		return &jobSpec, nil

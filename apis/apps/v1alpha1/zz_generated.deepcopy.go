@@ -3083,7 +3083,7 @@ func (in *Expose) DeepCopyInto(out *Expose) {
 	out.ComponentOps = in.ComponentOps
 	if in.Services != nil {
 		in, out := &in.Services, &out.Services
-		*out = make([]ClusterComponentService, len(*in))
+		*out = make([]OpsService, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

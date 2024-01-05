@@ -893,7 +893,7 @@
 	synchronize_seqscans?: bool & false | true
 
 	// Sets the current transactions synchronization level.
-	synchronous_commit?: string & "local" | "on" | "off"
+	synchronous_commit?: string & "local" | "on" | "off" | "remote_write" | "remote_apply"
 
 	// Maximum number of TCP keepalive retransmits.
 	tcp_keepalives_count?: int & >=0 & <=2147483647
@@ -1035,6 +1035,9 @@
 
 	// Sets whether XML data in implicit parsing and serialization operations is to be considered as documents or content fragments.
 	xmloption?: string & "content" | "document"
+
+	// Sets the level of information written to the WAL. replica writes enough data to support WAL archiving and replication, including running read-only queries on a standby server. minimal removes all logging except the information required to recover from a crash or immediate shutdown. Finally, logical adds information necessary to support logical decoding
+	wal_level?: string & "minimal" | "replica" | "logical"
 
 	...
 }

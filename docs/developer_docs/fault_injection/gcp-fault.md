@@ -74,7 +74,7 @@ kbcli fault node detach-volume [node1] -c=gcp --region=us-central1-c --device-na
 
 1. Write the experiment configuration to the `gcp-stop.yaml` file.
 
-   In the following example, Chaos Mesh injects the `node-stop` fault into the specified GCP instance so that the GCP instance will be unavailable in 3 minutes.
+   In the following example, Chaos Mesh injects the `node-stop` fault into the specified GCP instance so that the GCP instance will be unavailable in 30 seconds.
 
    ```yaml
    apiVersion: chaos-mesh.org/v1alpha1
@@ -130,7 +130,7 @@ kbcli fault node detach-volume [node1] -c=gcp --region=us-central1-c --device-na
 
 1. Write the experiment configuration to the `gcp-detach-volume.yaml` file.
 
-   In the following example, Chaos Mesh injects a `disk-loss` fault into the specified GCP instance so that this instance is detached from the specified storage volume within 3 minutes.
+   In the following example, Chaos Mesh injects a `disk-loss` fault into the specified GCP instance so that this instance is detached from the specified storage volume within 30 seconds.
 
    ```yaml
    apiVersion: chaos-mesh.org/v1alpha1
@@ -169,5 +169,5 @@ The following table shows the fields in the YAML configuration file.
 | project | string | It indicates the ID of GCP project. | None | Yes | real-testing-project |
 | zone | string | Indicates the region of GCP instance. | None | Yes |
 | instance | string | It indicates the name of GCP instance. | None | Yes |
-| deviceNames | []string | This is a required field when the `action` is `disk-loss`. This field specifies the machine disk ID. | None | no |
+| deviceNames | []string | This is a required field when the `action` is `disk-loss`. This field specifies the machine disk ID. | None | No |
 | duration | string | It indicates the duration of the experiment. | None | Yes |

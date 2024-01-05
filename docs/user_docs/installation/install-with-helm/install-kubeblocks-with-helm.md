@@ -12,6 +12,7 @@ KubeBlocks is kubernetes-native, you can use Helm to install it.
 :::note
 
 If you install KubeBlocks with Helm, to uninstall it, you have to use Helm too.
+
 Make sure you have [kubectl](https://kubernetes.io/docs/tasks/tools/) and [Helm](https://helm.sh/docs/intro/install/) installed.
 :::
 

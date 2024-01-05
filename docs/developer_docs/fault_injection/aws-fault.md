@@ -56,7 +56,7 @@ kbcli fault node restart [node1] -c=aws --region=cn-northwest-1 --duration=3m
 
 ### Detach volume
 
-The command below injects a `detach-volume` fault into the specified EC2 instance so that this instance is detached from the specified storage volume within 3 minutes.
+The command below injects a `detach-volume` fault into the specified EC2 instance so that this instance is detached from the specified storage volume within 1 minute.
 
 ```bash
 kbcli fault node detach-volume [node1] -c=aws --region=cn-northwest-1 --duration=1m --volume-id=vol-xxx --device-name=/dev/xvdaa
@@ -76,7 +76,7 @@ This section introduces the YAML configuration file examples. You can also refer
 
 1. Write the experiment configuration to the `aws-stop.yaml` file.
 
-   In the following example, Chaos Mesh injects an `instance-stop` fault into the specified EC2 instance so that this instance will be unavailable in 3 minutes.
+   In the following example, Chaos Mesh injects an `ec2-stop` fault into the specified EC2 instance so that this instance will be unavailable in 3 minutes.
 
    ```yaml
    apiVersion: chaos-mesh.org/v1alpha1
@@ -103,7 +103,7 @@ This section introduces the YAML configuration file examples. You can also refer
 
 1. Write the experiment configuration to the `aws-restart.yaml` file.
 
-   In the following example, Chaos Mesh injects an `instance-restart` fault into the specified EC2 instance so that this instance will be restarted.
+   In the following example, Chaos Mesh injects an `ec2-restart` fault into the specified EC2 instance so that this instance will be restarted.
 
    ```yaml
    apiVersion: chaos-mesh.org/v1alpha1
@@ -130,7 +130,7 @@ This section introduces the YAML configuration file examples. You can also refer
 
 1. Write the experiment configuration to the `aws-detach-volume.yaml` file.
 
-   In the following example, Chaos Mesh injects a `detach-volume` fault into the two specified EC2 instance so that these two instances are detached from their own storage volume within 3 minutes.
+   In the following example, Chaos Mesh injects a `detach-volume` fault into the two specified EC2 instance so that these two instances are detached from their own storage volume within 1 minute.
 
    ```yaml
    apiVersion: chaos-mesh.org/v1alpha1
@@ -177,12 +177,12 @@ The fields in the YAML configuration file are described in the following table:
 
 | Parameter | Type | Description | Default value | Required |
 | :--- | :--- | :--- | :--- | :--- |
-| action | string | It indicates the specific type of faults. Only `ec2-stop`, `ec2-restore`, and `detach-volume` are supported. | ec2-stop | Yes | `ec2-stop` |
+| action | string | It indicates the specific type of faults. Only `ec2-stop`, `ec2-restart`, and `detach-volume` are supported. | `ec2-stop` | Yes |
 | mode | string | It specifies the mode of the experiment. The mode options include `one` (selecting a random Pod), `all` (selecting all eligible Pods), `fixed` (selecting a specified number of eligible Pods), `fixed-percent` (selecting a specified percentage of Pods from the eligible Pods), and `random-max-percent` (selecting the maximum percentage of Pods from the eligible Pods). | None | Yes |
 | value | string | It provides parameters for the `mode` configuration, depending on `mode`.For example, when `mode` is set to `fixed-percent`, `value` specifies the percentage of Pods. | None | No |
 | secretName | string | It specifies the name of the Kubernetes Secret that stores the AWS authentication information. | None | No |
 | awsRegion | string | It specifies the AWS region. | None | Yes | us-east-2 |
 | ec2Instance | string | It specifies the ID of the EC2 instance. | None | Yes |
 | volumeID | string | This is a required field when the `action` is `detach-volume`. This field specifies the EBS volume ID. | None | No |
-| deviceName | string | This is a required field when the `action` is `detach-volume`. This field specifies the machine name. | None | No | /dev/sdf |
+| deviceName | string | This is a required field when the `action` is `detach-volume`. This field specifies the machine name. | None | No |
 | duration | string | It specifies the duration of the experiment. | None | Yes |

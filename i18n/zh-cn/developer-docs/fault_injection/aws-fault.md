@@ -1,23 +1,23 @@
 ---
-title: Simulate AWS faults
-description: Simulate AWS faults
+title: 模拟 AWS 故障
+description: 模拟 AWS 故障
 sidebar_position: 10
-sidebar_label: Simulate AWS faults
+sidebar_label: 模拟 AWS 故障
 ---
 
-# Simulate AWS faults
+# 模拟 AWS 故障
 
-AWSChaos simulates fault scenarios on the specified AWS instance. Currently, AWSChaos supports the following fault types:
+AWSChaos 实验能够模拟指定的 AWS 实例发生故障的场景。目前，AWSChaos 实验支持以下几种故障类型：
 
-* EC2 Stop: stops the specified instance.
-* EC2 Restart: restarts the specified instance.
-* Detach Volume: uninstalls the storage volume from the specified instance.
+* EC2 Stop：停止指定的 EC2 实例。
+* EC2 Restart：重启指定的 EC2 实例。
+* Detach Volume：从指定的 EC2 实例中卸载存储卷。
 
-## Before you start
+## 开始之前
 
-* By default, the AWS authentication information for local code has been imported. If you have not imported the authentication, follow the steps in [Prerequisite](./prerequisite.md#check-your-permission).
+* 默认已导入本地代码的 AWS 身份验证信息。如果尚未导入，请按照[前提条件](./prerequisite.md#check-your-permission)文档中的步骤进行操作。
 
-* To connect to the AWS cluster easily, you can create a Kubernetes Secret file in advance to store authentication information. A `Secret` file sample is as follows:
+* 为了方便连接到 AWS 集群，可以提前创建一个 Kubernetes Secret 文件存储身份验证信息。`Secret` 文件的示例如下：
 
     ```yaml
     apiVersion: v1
@@ -31,16 +31,16 @@ AWSChaos simulates fault scenarios on the specified AWS instance. Currently, AWS
       aws_secret_access_key: your-aws-secret-access-key
     ```
 
-  * `name` means the Kubernetes Secret object.
-  * `namespace` means the namespace of the Kubernetes Secret object.
-  * `aws_access_key_id` stores the ID of the access key to the AWS cluster.
-  * `aws_secret_access_key` stores the secret access key to the AWS cluster.
+  * `name` 表示 Kubernetes Secret 对象的名字。
+  * `namespace` 表示 Kubernetes Secret 对象的命名空间。
+  * `aws_access_key_id` 表示存储 AWS 集群的访问密钥 ID。
+  * `aws_secret_access_key` 表示存储 AWS 集群的秘密访问密钥。
 
-## Simulate fault injections by kbcli
+## 使用 kbcli 模拟故障注入
 
 ### Stop
 
-The command below injects an `instance-stop` fault into the specified EC2 instance so that this instance will be unavailable in 3 minutes.
+执行以下命令，向指定的 EC2 实例中注入 `instance-stop` 故障，使该实例在 3 分钟内不可用。
 
 ```bash
 kbcli fault node stop [node1] -c=aws --region=cn-northwest-1 --duration=3m
@@ -48,7 +48,7 @@ kbcli fault node stop [node1] -c=aws --region=cn-northwest-1 --duration=3m
 
 ### Restart
 
-The command below injects an `instance-restart` fault into the specified EC2 instance so that this instance will be restarted.
+执行以下命令，向指定的 EC2 实例中注入 `instance-restart` 故障，使得该实例重启。
 
 ```bash
 kbcli fault node restart [node1] -c=aws --region=cn-northwest-1 --duration=3m
@@ -56,27 +56,27 @@ kbcli fault node restart [node1] -c=aws --region=cn-northwest-1 --duration=3m
 
 ### Detach volume
 
-The command below injects a `detach-volume` fault into the specified EC2 instance so that this instance is detached from the specified storage volume within 3 minutes.
+执行以下命令，向两个指定的 EC2 实例中注入 `detach-volume` 故障，使这两个实例在 1 分钟内与它们的指定存储卷分离。
 
 ```bash
 kbcli fault node detach-volume [node1] -c=aws --region=cn-northwest-1 --duration=1m --volume-id=vol-xxx --device-name=/dev/xvdaa
 ```
 
-You can also add multiple nodes and their volumes. For example,
+你也可以添加多个节点及其卷，例如：
 
 ```bash
 kbcli fault node detach-volume [node1] [node2] -c=aws --region=cn-northwest-1 --duration=1m --volume-id=vol-xxx,vol-xxx --device-name=/dev/sda,/dev/sdb
 ```
 
-## Simulate fault injections by YAML file
+## 使用 YAML 文件模拟故障注入
 
-This section introduces the YAML configuration file examples. You can also refer to the [Chaos Mesh official docs](https://chaos-mesh.org/docs/next/simulate-aws-chaos/#create-experiments-using-the-yaml-file) for details.
+本节介绍如何使用 YAML 文件模拟故障注入。你可以参考 [Chaos Mesh 官方文档](https://chaos-mesh.org/zh/docs/next/simulate-aws-chaos/#使用-yaml-方式创建实验)获取更详细的信息。
 
-### AWS-stop example
+### AWS stop 示例
 
-1. Write the experiment configuration to the `aws-stop.yaml` file.
+1. 将实验配置写入到 `aws-stop.yaml` 文件中。
 
-   In the following example, Chaos Mesh injects an `instance-stop` fault into the specified EC2 instance so that this instance will be unavailable in 3 minutes.
+   在下例中，Chaos Mesh 将向指定的 EC2 实例中注入 `ec2-stop` 故障，使该实例在 3 分钟内不可用。
 
    ```yaml
    apiVersion: chaos-mesh.org/v1alpha1
@@ -93,17 +93,17 @@ This section introduces the YAML configuration file examples. You can also refer
      secretName: cloud-key-secret-aws
    ```
 
-2. Run `kubectl` to start an experiment.
+2. 使用 `kubectl` 创建实验。
 
    ```bash
    kubectl apply -f ./aws-stop.yaml
    ```
 
-### AWS-restart example
+### AWS restart 示例
 
-1. Write the experiment configuration to the `aws-restart.yaml` file.
+1. 将实验配置写入到 `aws-restart.yaml` 文件中。
 
-   In the following example, Chaos Mesh injects an `instance-restart` fault into the specified EC2 instance so that this instance will be restarted.
+   在下例中，Chaos Mesh 将向指定的 EC2 实例中注入 `ec2-restart` 故障，使得该实例重启。
 
    ```yaml
    apiVersion: chaos-mesh.org/v1alpha1
@@ -120,17 +120,17 @@ This section introduces the YAML configuration file examples. You can also refer
      secretName: cloud-key-secret-aws
    ```
 
-2. Run `kubectl` to start an experiment.
+2. 使用 `kubectl` 创建实验。
 
    ```bash
    kubectl apply -f ./aws-restart.yaml
    ```
 
-### AWS-detach-volume example
+### AWS detach volume 示例
 
-1. Write the experiment configuration to the `aws-detach-volume.yaml` file.
+1. 将实验配置写入到 `aws-detach-volume.yaml` 文件中。
 
-   In the following example, Chaos Mesh injects a `detach-volume` fault into the two specified EC2 instance so that these two instances are detached from their own storage volume within 3 minutes.
+   在下例中，Chaos Mesh 将向两个指定的 EC2 实例中注入 `detach-volume` 故障，使这两个实例在 1 分钟内与它们的指定存储卷分离。
 
    ```yaml
    apiVersion: chaos-mesh.org/v1alpha1
@@ -165,24 +165,24 @@ This section introduces the YAML configuration file examples. You can also refer
      volumeID: vol-0f1ecf66cb8d0328e
    ```
 
-2. Run `kubectl` to start an experiment.
+2. 使用 `kubectl` 创建实验。
 
    ```bash
    kubectl apply -f ./aws-detach-volume.yaml
    ```
 
-### Field description
+### 字段说明
 
-The fields in the YAML configuration file are described in the following table:
+下表介绍以上 YAML 配置文件中的字段。
 
-| Parameter | Type | Description | Default value | Required |
+| 参数 | 类型 | 说明 | 默认值 | 是否必填 |
 | :--- | :--- | :--- | :--- | :--- |
-| action | string | It indicates the specific type of faults. Only `ec2-stop`, `ec2-restore`, and `detach-volume` are supported. | ec2-stop | Yes | `ec2-stop` |
-| mode | string | It specifies the mode of the experiment. The mode options include `one` (selecting a random Pod), `all` (selecting all eligible Pods), `fixed` (selecting a specified number of eligible Pods), `fixed-percent` (selecting a specified percentage of Pods from the eligible Pods), and `random-max-percent` (selecting the maximum percentage of Pods from the eligible Pods). | None | Yes |
-| value | string | It provides parameters for the `mode` configuration, depending on `mode`.For example, when `mode` is set to `fixed-percent`, `value` specifies the percentage of Pods. | None | No |
-| secretName | string | It specifies the name of the Kubernetes Secret that stores the AWS authentication information. | None | No |
-| awsRegion | string | It specifies the AWS region. | None | Yes | us-east-2 |
-| ec2Instance | string | It specifies the ID of the EC2 instance. | None | Yes |
-| volumeID | string | This is a required field when the `action` is `detach-volume`. This field specifies the EBS volume ID. | None | No |
-| deviceName | string | This is a required field when the `action` is `detach-volume`. This field specifies the machine name. | None | No | /dev/sdf |
-| duration | string | It specifies the duration of the experiment. | None | Yes |
+| action | string | 指定要注入的故障类型，仅支持 `ec2-stop`、`ec2-restart` 和 `detach-volume`。 | `ec2-stop` | 是 |
+| mode | string | 指定实验的运行方式，可选项包括：`one`（表示随机选出一个符合条件的 Pod）、`all`（表示选出所有符合条件的 Pod）、`fixed`（表示选出指定数量且符合条件的 Pod）、`fixed-percent`（表示选出占符合条件的 Pod 中指定百分比的 Pod）和 `random-max-percent`（表示选出占符合条件的 Pod 中不超过指定百分比的 Pod）。| 无 | 是 |
+| value | string | 取决于 `mode` 的配置，为 `mode` 提供对应的参数。例如，当你将 `mode` 配置为 `fixed-percent` 时，`value` 用于指定 Pod 的百分比。 | 无 | 否 |
+| secretName | string | 指定存储 AWS 认证信息的 Kubernetes Secret 名字。 | 无 | 否 |
+| awsRegion | string | 指定 AWS 区域。 | 无 | 是 | us-east-2 |
+| ec2Instance | string | 指定 EC2 实例的 ID。 | 无 | 是 |
+| volumeID | string | 当 `action` 为 `detach-volume` 时必填，指定 EBS 卷的 ID。 | 无 | 否 |
+| deviceName | string | 当 `action` 为 `detach-volume` 时必填，指定设备名。 | 无 | 否 | 
+| duration | string | 指定实验的持续时间。| 无 | 是 |

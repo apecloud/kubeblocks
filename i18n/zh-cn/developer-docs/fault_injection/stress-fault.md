@@ -1,39 +1,39 @@
 ---
-title: Simulate stress faults
-description: Simulate stress faults
+title: 模拟压力场景
+description: 模拟压力场景
 sidebar_position: 8
-sidebar_label: Simulate stress faults
+sidebar_label: 模拟压力场景
 ---
 
-# Simulate stress faults
+# 模拟压力场景
 
-StressChaos experiments simulate stress scenarios inside containers. This document describes how to create StressChaos experiments.
+StressChaos 实验用于模拟容器内压力的场景。本文档介绍如何创建 StressChaos 实验。
 
-| Option                   | Description               | Default value | Required |
+| 参数                   | 说明               | 默认值 | 是否必填 |
 | :----------------------- | :------------------------ | :------------ | :------- |
-| `--cpu-worker` | It specifies the number of threads that exert CPU stress. One of `--cpu-worker` and `--memory-worker` must be specified. | None | No |
-| `--cpu-load` | It specifies the percentage of occupied CPU. `0` means no extra load added and `100` means full load. The total load is workers * load. | 20 | No |
-| `--memory-worker` | It specifies the number of threads that exert memory pressure. One of `--cpu-worker` and `--memory-worker` must be specified. | None | No |
-| `--memory-size` | It specifies the size of the allocated memory or the percentage of the total memory occupied, and the sum of the allocated memory is size. | None | No |
-| `--container` | It specifies a container name and multiple containers can be specified. If not specified, it defaults to the first container in the Pod. | None | No |
+| `--cpu-worker` | 指定施加 CPU 压力的线程个数。必须指定 `--cpu-worker` 或 `--memory-worker` 中的一个。| 无 | 否 |
+| `--cpu-load` | 指定占据 CPU 的百分比。`0` 表示没有增加额外负载，`100` 表示满负载。总负载为 `workers * load`。 | 20 | 否 |
+| `--memory-worker` | 指定施加内存压力的线程个数。必须指定 `--cpu-worker` 或 `--memory-worker` 中的一个。 | 无 | 否 |
+| `--memory-size` | 指定分配内存的大小或是占总内存的百分比，分配内存的总和为 `size`。| 无 | 否 |
+| `--container` | 指定容器名称，可以用于指定多个容器。如果未指定，则默认为 Pod 中的第一个容器。| 无 | 否 |
 
-## Simulate fault injections by kbcli
+## 使用 kbcli 模拟故障注入
 
-The command below creates a process in the first container of all pods in the default namespace and continuously allocates and reads and writes in CPU and memory, occupying up to 100 MB of memory for 10 seconds. During this process, 2 threads exert CPU stress and 1 thread that exerts memory stress.
+执行以下命令，在默认命名空间的所有 Pod 的第一个容器中创建进程，并持续进行 CPU 和内存的分配、读取和写入，最多占用 100MB 的内存，持续 10 秒钟。在此过程中，有 2 个线程施加 CPU 压力，1 个线程施加内存压力。
 
 ```bash
 kbcli fault stress --cpu-worker=2 --cpu-load=50 --memory-worker=1 --memory-size=100Mi
 ```
 
-## Simulate fault injections by YAML file
+## 使用 YAML 文件模拟故障注入
 
-This section introduces the YAML configuration file examples. You can view the YAML file by adding `--dry-run` at the end of the above kbcli commands. Meanwhile, you can also refer to the [Chaos Mesh official docs](https://chaos-mesh.org/docs/next/simulate-heavy-stress-on-kubernetes/#create-experiments-using-the-yaml-file) for details.
+本节介绍如何使用 YAML 文件模拟故障注入。你可以在上述 kbcli 命令的末尾添加 --dry-run 命令来查看 YAML 文件，还可以参考 [Chaos Mesh 官方文档](https://chaos-mesh.org/zh/docs/next/simulate-heavy-stress-on-kubernetes/#使用-yaml-方式创建实验)获取更详细的信息。
 
-### Stress example
+### 压力示例
 
-1. Write the experiment configuration to the `stress.yaml` file.
+1. 将实验配置写入到 `stress.yaml` 文件中。
 
-    In the following example, Chaos Mesh creates a process in the first container of all pods in the default namespace and continuously allocates and reads and writes in CPU and memory, occupying up to 100MB of memory for 10 seconds. During this process, 2 threads exert CPU stress and 1 thread that exerts memory stress.
+    在下例中，Chaos Mesh 在默认命名空间的所有 Pod 的第一个容器中创建了一个进程，并持续进行 CPU 和内存的分配、读取和写入，最多占用 100MB 的内存，持续 10 秒钟。在此过程中，有 2 个线程施加 CPU 压力，1 个线程施加内存压力。
 
     ```yaml
     apiVersion: chaos-mesh.org/v1alpha1
@@ -57,7 +57,7 @@ This section introduces the YAML configuration file examples. You can view the Y
           workers: 1
     ```
 
-2. Run `kubectl` to start an experiment.
+2. 使用 `kubectl` 创建实验。
 
    ```bash
    kubectl apply -f ./stress.yaml

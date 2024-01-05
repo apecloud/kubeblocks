@@ -120,9 +120,12 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 			return DeletionStatusUnknown, err
 		}
 	}
-
+	deleteAction, err := d.getDeleteAction(backup.Status.BackupMethod)
+	if err != nil {
+		return DeletionStatusUnknown, err
+	}
 	backupFilePath := backup.Status.Path
-	if backupFilePath == "" || !strings.Contains(backupFilePath, backup.Name) {
+	if backupFilePath == "" || (!strings.Contains(backupFilePath, backup.Name) && deleteAction == nil) {
 		// For compatibility: the FilePath field is changing from time to time,
 		// and it may not contain the backup name as a path component if the Backup object
 		// was created in a previous version. In this case, it's dangerous to execute
@@ -131,60 +134,34 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 			"backupFilePath", backupFilePath, "backup", backup.Name)
 		return DeletionStatusSucceeded, nil
 	}
-	return DeletionStatusDeleting, d.createDeleteBackupFilesJob(jobKey, backup, backupRepo, legacyPVCName, backup.Status.Path)
+	return DeletionStatusDeleting, d.createDeleteBackupFilesJob(jobKey, backup, backupRepo, deleteAction, legacyPVCName, backup.Status.Path)
 }
 
 func (d *Deleter) createDeleteBackupFilesJob(
 	jobKey types.NamespacedName,
 	backup *dpv1alpha1.Backup,
 	backupRepo *dpv1alpha1.BackupRepo,
+	deleteAction *dpv1alpha1.BaseJobActionSpec,
 	legacyPVCName string,
 	backupFilePath string) error {
 	// make sure the path has a leading slash
 	if !strings.HasPrefix(backupFilePath, "/") {
 		backupFilePath = "/" + backupFilePath
 	}
-
-	// this script first deletes the directory where the backup is located (including files
-	// in the directory), and then traverses up the path level by level to clean up empty directories.
-	deleteScript := fmt.Sprintf(`
-set -x
-export PATH="$PATH:$%s";
-targetPath="%s";
-
-echo "removing backup files in ${targetPath}";
-datasafed rm -r "${targetPath}";
-
-curr="${targetPath}";
-while true; do
-	parent=$(dirname "${curr}");
-	if [ "${parent}" == "/" ]; then
-		echo "reach to root, done";
-		break;
-	fi;
-	result=$(datasafed list "${parent}");
-	if [ -z "$result" ]; then
-		echo "${parent} is empty, removing it...";
-		datasafed rmdir "${parent}";
-	else
-		echo "${parent} is not empty, done";
-		break;
-	fi;
-	curr="${parent}";
-done
-	`, dptypes.DPDatasafedBinPath, backupFilePath)
-
 	runAsUser := int64(0)
 	container := corev1.Container{
 		Name:            backup.Name,
-		Command:         []string{"sh", "-c"},
-		Args:            []string{deleteScript},
-		Image:           viper.GetString(constant.KBToolsImage),
 		ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)),
 		SecurityContext: &corev1.SecurityContext{
 			AllowPrivilegeEscalation: boolptr.False(),
 			RunAsUser:                &runAsUser,
 		},
+	}
+	// build delete action
+	if deleteAction != nil {
+		d.buildCustomDeleteAction(&container, deleteAction, backup.Name, backupFilePath)
+	} else {
+		d.buildBuiltInDeleteAction(&container, backupFilePath)
 	}
 	ctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 
@@ -227,6 +204,58 @@ done
 	}
 	d.Log.V(1).Info("create a job to delete backup files", "job", job)
 	return client.IgnoreAlreadyExists(d.Client.Create(d.Ctx, job))
+}
+
+func (d *Deleter) buildBuiltInDeleteAction(container *corev1.Container, backupFilePath string) {
+	// this script first deletes the directory where the backup is located (including files
+	// in the directory), and then traverses up the path level by level to clean up empty directories.
+	deleteScript := fmt.Sprintf(`
+set -x
+export PATH="$PATH:$%s";
+targetPath="%s";
+
+echo "removing backup files in ${targetPath}";
+datasafed rm -r "${targetPath}";
+
+curr="${targetPath}";
+while true; do
+	parent=$(dirname "${curr}");
+	if [ "${parent}" == "/" ]; then
+		echo "reach to root, done";
+		break;
+	fi;
+	result=$(datasafed list "${parent}");
+	if [ -z "$result" ]; then
+		echo "${parent} is empty, removing it...";
+		datasafed rmdir "${parent}";
+	else
+		echo "${parent} is not empty, done";
+		break;
+	fi;
+	curr="${parent}";
+done
+	`, dptypes.DPDatasafedBinPath, backupFilePath)
+	container.Command = []string{"sh", "-c"}
+	container.Image = viper.GetString(constant.KBToolsImage)
+	container.Args = []string{deleteScript}
+}
+
+func (d *Deleter) getDeleteAction(backupMethod *dpv1alpha1.BackupMethod) (*dpv1alpha1.BaseJobActionSpec, error) {
+	if backupMethod == nil || backupMethod.ActionSetName == "" {
+		return nil, nil
+	}
+	actionSet, err := utils.GetActionSetByName(d.RequestCtx, d.Client, backupMethod.ActionSetName)
+	if err != nil {
+		return nil, err
+	}
+	return actionSet.Spec.Backup.DeleteBackup, nil
+}
+
+func (d *Deleter) buildCustomDeleteAction(container *corev1.Container, deleteAction *dpv1alpha1.BaseJobActionSpec, backupName, backupFilePath string) {
+	container.Command = deleteAction.Command
+	container.Image = deleteAction.Image
+	container.Env = append(container.Env, corev1.EnvVar{Name: dptypes.DPBackupBasePath, Value: backupFilePath})
+	container.Env = append(container.Env, corev1.EnvVar{Name: dptypes.DPBackupName, Value: backupName})
 }
 
 func (d *Deleter) DeleteVolumeSnapshots(backup *dpv1alpha1.Backup) error {

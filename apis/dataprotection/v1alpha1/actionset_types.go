@@ -88,7 +88,7 @@ const (
 type BackupActionSpec struct {
 	// backupData specifies the backup data action.
 	// +kubebuilder:validation:Required
-	BackupData *BackupDataActionSpec `json:"backupData,omitempty"`
+	BackupData *BackupDataActionSpec `json:"backupData"`
 
 	// preBackup specifies a hook that should be executed before the backup.
 	// +optional
@@ -97,6 +97,12 @@ type BackupActionSpec struct {
 	// postBackup specifies a hook that should be executed after the backup.
 	// +optional
 	PostBackup []ActionSpec `json:"postBackup,omitempty"`
+
+	// deleteBackup specifies how to clean up backup data, The backup CR will only be deleted after this job is completed.
+	// if deleteBackup is empty, using the default funtion to clean up the backup data.
+	// note that delete action job will ignore the env/envFrom.
+	// +optional
+	DeleteBackup *BaseJobActionSpec `json:"deleteBackup,omitempty"`
 }
 
 // BackupDataActionSpec defines how to back up data.
@@ -168,9 +174,7 @@ type ExecActionSpec struct {
 
 // JobActionSpec is an action that creates a Kubernetes Job to execute a command.
 type JobActionSpec struct {
-	// image specifies the image of backup container.
-	// +kubebuilder:validation:Required
-	Image string `json:"image"`
+	BaseJobActionSpec `json:",inline"`
 
 	// runOnTargetPodNode specifies whether to run the job workload on the
 	// target pod node. If backup container should mount the target pod's
@@ -180,15 +184,22 @@ type JobActionSpec struct {
 	// +kubebuilder:default=false
 	RunOnTargetPodNode *bool `json:"runOnTargetPodNode,omitempty"`
 
-	// command specifies the commands to back up the volume data.
-	// +kubebuilder:validation:Required
-	Command []string `json:"command"`
-
 	// OnError specifies how should behave if it encounters an error executing
 	// this action.
 	// +optional
 	// +kubebuilder:default=Fail
 	OnError ActionErrorMode `json:"onError,omitempty"`
+}
+
+// BaseJobActionSpec is an action that creates a Kubernetes Job to execute a command.
+type BaseJobActionSpec struct {
+	// image specifies the image of backup container.
+	// +kubebuilder:validation:Required
+	Image string `json:"image"`
+
+	// command specifies the commands to back up the volume data.
+	// +kubebuilder:validation:Required
+	Command []string `json:"command"`
 }
 
 // ActionErrorMode defines how should treat an error from an action.

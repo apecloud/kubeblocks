@@ -29,6 +29,7 @@ const (
 	CfgKeyCtrlrReconcileRetryDurationMS = "CM_RECON_RETRY_DURATION_MS"       // accept time
 	CfgRecoverVolumeExpansionFailure    = "RECOVER_VOLUME_EXPANSION_FAILURE" // refer to feature gates RecoverVolumeExpansionFailure of k8s.
 	CfgKeyProvider                      = "KUBE_PROVIDER"
+	CfgHostPortConfigMapName            = "HOST_PORT_CM_NAME"
 
 	// addon config keys
 	CfgKeyAddonJobTTL        = "ADDON_JOB_TTL"

@@ -104,6 +104,7 @@ func init() {
 	viper.SetDefault(constant.ConfigManagerGPRCPortEnv, 9901)
 	viper.SetDefault("CONFIG_MANAGER_LOG_LEVEL", "info")
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
+	viper.SetDefault(constant.CfgHostPortConfigMapName, "kubeblocks-host-ports")
 	viper.SetDefault(constant.FeatureGateReplicatedStateMachine, true)
 	viper.SetDefault(constant.KBDataScriptClientsImage, "apecloud/kubeblocks-datascript:latest")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)

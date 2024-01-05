@@ -273,6 +273,27 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, synthesiz
 		}
 	}
 
+	// be compatible with existed cluster
+	updateService := func(rsmObj, rsmProto *workloads.ReplicatedStateMachine) *corev1.Service {
+		if rsmProto.Spec.Service != nil {
+			return rsmProto.Spec.Service
+		}
+		if rsmObj.Spec.Service == nil {
+			return nil
+		}
+		defaultServiceName := rsmObj.Name
+		for _, svc := range synthesizeComp.ComponentServices {
+			if svc.GeneratePodOrdinalService {
+				continue
+			}
+			serviceName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, svc.ServiceName)
+			if defaultServiceName == serviceName {
+				return rsmObj.Spec.Service
+			}
+		}
+		return nil
+	}
+
 	rsmObjCopy := oldRsm.DeepCopy()
 	rsmProto := newRsm
 
@@ -291,7 +312,7 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, synthesiz
 	mergeMetadataMap(rsmObjCopy.Spec.Template.Annotations, &rsmProto.Spec.Template.Annotations)
 	rsmObjCopy.Spec.Template = rsmProto.Spec.Template
 	rsmObjCopy.Spec.Replicas = rsmProto.Spec.Replicas
-	rsmObjCopy.Spec.Service = rsmProto.Spec.Service
+	rsmObjCopy.Spec.Service = updateService(rsmObjCopy, rsmProto)
 	rsmObjCopy.Spec.AlternativeServices = rsmProto.Spec.AlternativeServices
 	rsmObjCopy.Spec.Roles = rsmProto.Spec.Roles
 	rsmObjCopy.Spec.RoleProbe = rsmProto.Spec.RoleProbe

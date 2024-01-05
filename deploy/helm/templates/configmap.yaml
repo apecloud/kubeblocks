@@ -16,3 +16,12 @@ data:
 
     # the default storage class name.
     DEFAULT_STORAGE_CLASS: {{ include "kubeblocks.defaultStorageClass" . | quote }}
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kubeblocks.fullname" . }}-host-ports
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+data: {}

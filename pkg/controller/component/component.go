@@ -65,6 +65,12 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1
 	if err != nil {
 		return nil, err
 	}
+	serviceAccountName := func() string {
+		if len(clusterCompSpec.ServiceAccountName) > 0 {
+			return clusterCompSpec.ServiceAccountName
+		}
+		return constant.GenerateDefaultServiceAccountName(cluster.Name)
+	}
 	compBuilder := builder.NewComponentBuilder(cluster.Namespace, compName, clusterCompSpec.ComponentDef).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, clusterCompSpec.Name)).
@@ -74,7 +80,7 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1
 		SetReplicas(clusterCompSpec.Replicas).
 		SetResources(clusterCompSpec.Resources).
 		SetMonitor(clusterCompSpec.Monitor).
-		SetServiceAccountName(clusterCompSpec.ServiceAccountName).
+		SetServiceAccountName(serviceAccountName()).
 		SetVolumeClaimTemplates(clusterCompSpec.VolumeClaimTemplates).
 		SetUpdateStrategy(clusterCompSpec.UpdateStrategy).
 		SetEnabledLogs(clusterCompSpec.EnabledLogs).

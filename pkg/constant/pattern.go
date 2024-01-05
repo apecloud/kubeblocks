@@ -86,6 +86,11 @@ func GenerateClusterComponentEnvPattern(clusterName, compName string) string {
 	return fmt.Sprintf("%s-%s-env", clusterName, compName)
 }
 
+// GenerateDefaultServiceAccountName generates default service account name for a cluster.
+func GenerateDefaultServiceAccountName(clusterName string) string {
+	return fmt.Sprintf("%s-%s", KBLowerPrefix, clusterName)
+}
+
 // GenerateDefaultCompServiceAccountPattern generates default component service account pattern
 // fullCompName is the full name of component with clusterName prefix
 func GenerateDefaultCompServiceAccountPattern(fullCompName string) string {

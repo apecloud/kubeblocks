@@ -183,9 +183,31 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return targetMap
 	}
 
+	getRoleProbeContainerIndex := func(containers []corev1.Container) int {
+		return slices.IndexFunc(containers, func(c corev1.Container) bool {
+			return c.Name == roleProbeContainerName
+		})
+	}
+
 	copyAndMergeSts := func(oldSts, newSts *apps.StatefulSet) client.Object {
 		oldSts.Labels = mergeMetadataMap(oldSts.Labels, newSts.Labels)
 		oldSts.Labels = newSts.Labels
+
+		// for upgrade compatibility from 0.7 to 0.8
+		oldRoleProbeContainerIndex := getRoleProbeContainerIndex(oldSts.Spec.Template.Spec.Containers)
+		newRoleProbeContainerIndex := getRoleProbeContainerIndex(newSts.Spec.Template.Spec.Containers)
+		if oldRoleProbeContainerIndex >= 0 && newRoleProbeContainerIndex >= 0 {
+			newCopySts := newSts.DeepCopy()
+			oldCopySts := newSts.DeepCopy()
+			oldCopySts.Spec.Template = oldSts.Spec.Template
+			oldCopySts.Spec.Replicas = oldSts.Spec.Replicas
+			oldCopySts.Spec.UpdateStrategy = oldSts.Spec.UpdateStrategy
+			newCopySts.Spec.Template.Spec.Containers[newRoleProbeContainerIndex] = *oldSts.Spec.Template.Spec.Containers[oldRoleProbeContainerIndex].DeepCopy()
+
+			if reflect.DeepEqual(newCopySts.Spec, oldCopySts.Spec) {
+				newSts = newCopySts
+			}
+		}
 		// if annotations exist and are replaced, the StatefulSet will be updated.
 		oldSts.Annotations = mergeMetadataMap(oldSts.Spec.Template.Annotations, newSts.Spec.Template.Annotations)
 		oldSts.Spec.Template = newSts.Spec.Template

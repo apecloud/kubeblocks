@@ -218,7 +218,7 @@ func DelayUpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	for i := range pobj.Containers {
 		delayUpdateKubeBlocksToolsImage(obj.Containers, &pobj.Containers[i])
 	}
-	updateKubeBlocksReadinessProbe(obj.Containers, pobj.Containers)
+	updateLorryContainer(obj.Containers, pobj.Containers)
 }
 
 // UpdatePodSpecSystemFields to update system fields in pod spec.
@@ -227,17 +227,21 @@ func UpdatePodSpecSystemFields(obj *corev1.PodSpec, pobj *corev1.PodSpec) {
 		updateKubeBlocksToolsImage(&pobj.Containers[i])
 	}
 
-	updateKubeBlocksReadinessProbe(obj.Containers, pobj.Containers)
+	updateLorryContainer(obj.Containers, pobj.Containers)
 }
 
-func updateKubeBlocksReadinessProbe(containers []corev1.Container, pcontainers []corev1.Container) {
-	oldLorryContainer := controllerutil.GetLorryContainer(containers)
-	newLorryContainer := controllerutil.GetLorryContainer(pcontainers)
-	if oldLorryContainer == nil || newLorryContainer == nil {
+func updateLorryContainer(containers []corev1.Container, pcontainers []corev1.Container) {
+	srcLorryContainer := controllerutil.GetLorryContainer(containers)
+	dstLorryContainer := controllerutil.GetLorryContainer(pcontainers)
+	if srcLorryContainer == nil || dstLorryContainer == nil {
 		return
 	}
-	newLorryContainer.ReadinessProbe = oldLorryContainer.ReadinessProbe
-
+	for i, c := range pcontainers {
+		if c.Name == dstLorryContainer.Name {
+			pcontainers[i] = *srcLorryContainer.DeepCopy()
+			return
+		}
+	}
 }
 
 func delayUpdateKubeBlocksToolsImage(containers []corev1.Container, pc *corev1.Container) {

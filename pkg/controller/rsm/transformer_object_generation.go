@@ -202,8 +202,18 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 			oldCopySts.Spec.Replicas = oldSts.Spec.Replicas
 			oldCopySts.Spec.UpdateStrategy = oldSts.Spec.UpdateStrategy
 			newCopySts.Spec.Template.Spec.Containers[newRoleProbeContainerIndex] = *oldSts.Spec.Template.Spec.Containers[oldRoleProbeContainerIndex].DeepCopy()
+			for i := range newCopySts.Spec.Template.Spec.Containers {
+				newContainer := &newCopySts.Spec.Template.Spec.Containers[i]
+				for j := range oldSts.Spec.Template.Spec.Containers {
+					oldContainer := &oldSts.Spec.Template.Spec.Containers[j]
+					if newContainer.Name == oldContainer.Name {
+						oldContainer.TerminationMessagePath = newContainer.TerminationMessagePath
+						oldContainer.TerminationMessagePolicy = newContainer.TerminationMessagePolicy
+					}
+				}
+			}
 
-			if reflect.DeepEqual(newCopySts.Spec, oldCopySts.Spec) {
+			if reflect.DeepEqual(newCopySts.Spec.Template.Spec.Containers, oldCopySts.Spec.Template.Spec.Containers) {
 				newSts = newCopySts
 			}
 		}

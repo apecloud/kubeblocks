@@ -166,16 +166,16 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return nil
 	}
 
-	// mergeAnnotations keeps the original annotations.
+	// mergeMetadataMap keeps the original elements.
 	mergeMetadataMap := func(originalMap map[string]string, targetMap map[string]string) map[string]string {
-		if targetMap == nil || originalMap == nil {
+		if targetMap == nil && originalMap == nil {
 			return nil
 		}
 		if targetMap == nil {
 			targetMap = map[string]string{}
 		}
 		for k, v := range originalMap {
-			// if the annotation not exist in targetAnnotations, copy it from original.
+			// if the element not exist in targetMap, copy it from original.
 			if _, ok := (targetMap)[k]; !ok {
 				(targetMap)[k] = v
 			}
@@ -191,7 +191,6 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 
 	copyAndMergeSts := func(oldSts, newSts *apps.StatefulSet) client.Object {
 		oldSts.Labels = mergeMetadataMap(oldSts.Labels, newSts.Labels)
-		oldSts.Labels = newSts.Labels
 
 		// for upgrade compatibility from 0.7 to 0.8
 		oldRoleProbeContainerIndex := getRoleProbeContainerIndex(oldSts.Spec.Template.Spec.Containers)
@@ -209,7 +208,7 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 			}
 		}
 		// if annotations exist and are replaced, the StatefulSet will be updated.
-		oldSts.Annotations = mergeMetadataMap(oldSts.Spec.Template.Annotations, newSts.Spec.Template.Annotations)
+		oldSts.Annotations = mergeMetadataMap(oldSts.Annotations, newSts.Annotations)
 		oldSts.Spec.Template = newSts.Spec.Template
 		oldSts.Spec.Replicas = newSts.Spec.Replicas
 		oldSts.Spec.UpdateStrategy = newSts.Spec.UpdateStrategy
@@ -218,7 +217,6 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 
 	copyAndMergeSvc := func(oldSvc *corev1.Service, newSvc *corev1.Service) client.Object {
 		oldSvc.Annotations = mergeMetadataMap(oldSvc.Annotations, newSvc.Annotations)
-		oldSvc.Annotations = newSvc.Annotations
 		oldSvc.Spec = newSvc.Spec
 		return oldSvc
 	}

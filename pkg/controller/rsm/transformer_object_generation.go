@@ -185,7 +185,7 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 
 	getRoleProbeContainerIndex := func(containers []corev1.Container) int {
 		return slices.IndexFunc(containers, func(c corev1.Container) bool {
-			return c.Name == roleProbeContainerName
+			return c.Name == roleProbeContainerName || c.Name == constant.RoleProbeContainerName
 		})
 	}
 

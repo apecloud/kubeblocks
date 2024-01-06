@@ -404,6 +404,8 @@ type Action struct {
 	// Command will be executed in Container to retrieve or process role info
 	// +kubebuilder:validation:Required
 	Command []string `json:"command"`
+
+	Args []string `json:"args,omitempty"`
 }
 
 type MemberStatus struct {

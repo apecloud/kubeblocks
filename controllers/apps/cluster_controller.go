@@ -127,8 +127,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&clusterHaltRecoveryTransformer{},
 			// update finalizer and cd&cv labels
 			&clusterAssureMetaTransformer{},
-			// validate cluster spec
-			&clusterValidationTransformer{},
 			// validate cd & cv's existence and availability
 			&clusterLoadRefResourcesTransformer{},
 			// normalize the cluster and component API

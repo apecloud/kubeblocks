@@ -43,6 +43,12 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	// build all component specs
 	transCtx.ComponentSpecs = make([]*appsv1alpha1.ClusterComponentSpec, 0)
 	cluster := transCtx.Cluster
+
+	// validate componentDef and componentDefRef
+	if err := validateComponentDefNComponentDefRef(cluster); err != nil {
+		return err
+	}
+
 	for i := range cluster.Spec.ComponentSpecs {
 		clusterComSpec := cluster.Spec.ComponentSpecs[i]
 		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, &clusterComSpec)
@@ -68,6 +74,35 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 			if _, ok := transCtx.ComponentDefs[compSpec.ComponentDef]; !ok {
 				panic(fmt.Sprintf("runtime error - expected component definition object not found: %s", compSpec.ComponentDef))
 			}
+		}
+	}
+	return nil
+}
+
+func validateComponentDefNComponentDefRef(cluster *appsv1alpha1.Cluster) error {
+	if len(cluster.Spec.ComponentSpecs) == 0 {
+		return nil
+	}
+	compDefRefMap := make(map[string]bool)
+	compDefMap := make(map[string]bool)
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		if len(compSpec.ComponentDefRef) == 0 && len(compSpec.ComponentDef) == 0 {
+			return fmt.Errorf("componentDef and componentDefRef cannot be both empty")
+		}
+		if compSpec.ComponentDefRef == compSpec.ComponentDef {
+			return fmt.Errorf("componentDef and componentDefRef cannot be the same in ComponentSpec: %s", compSpec.Name)
+		}
+		if len(compSpec.ComponentDef) != 0 {
+			if _, ok := compDefRefMap[compSpec.ComponentDef]; ok {
+				return fmt.Errorf("componentDef and componentDefRef cannot be the same in different ComponentSpecs")
+			}
+			compDefMap[compSpec.ComponentDef] = true
+		}
+		if len(compSpec.ComponentDefRef) != 0 {
+			if _, ok := compDefMap[compSpec.ComponentDefRef]; ok {
+				return fmt.Errorf("componentDef and componentDefRef cannot be the same in different ComponentSpecs")
+			}
+			compDefRefMap[compSpec.ComponentDefRef] = true
 		}
 	}
 	return nil

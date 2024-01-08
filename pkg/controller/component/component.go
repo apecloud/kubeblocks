@@ -65,7 +65,13 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1
 	if err != nil {
 		return nil, err
 	}
-	compBuilder := builder.NewComponentBuilder(cluster.Namespace, compName, clusterCompSpec.ComponentDef).
+	compDefName := func() string {
+		if strings.HasPrefix(clusterCompSpec.ComponentDef, constant.KBGeneratedVirtualCompDefPrefix) {
+			return ""
+		}
+		return clusterCompSpec.ComponentDef
+	}
+	compBuilder := builder.NewComponentBuilder(cluster.Namespace, compName, compDefName()).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, clusterCompSpec.Name)).
 		AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).

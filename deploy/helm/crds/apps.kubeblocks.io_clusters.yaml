@@ -230,8 +230,8 @@ spec:
                       type: object
                     componentDef:
                       description: componentDef references the name of the ComponentDefinition.
-                        componentDefRef and componentDef cannot be mixed within the
-                        same cluster.
+                        If both componentDefRef and componentDef are provided, the
+                        componentDef will take precedence over componentDefRef.
                       maxLength: 22
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
@@ -241,8 +241,7 @@ spec:
                     componentDefRef:
                       description: componentDefRef references componentDef defined
                         in ClusterDefinition spec. Need to comply with IANA Service
-                        Naming rule. componentDefRef and componentDef cannot be mixed
-                        within the same cluster.
+                        Naming rule.
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string

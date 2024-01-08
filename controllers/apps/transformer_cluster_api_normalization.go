@@ -85,20 +85,16 @@ func validateComponentDefNComponentDefRef(cluster *appsv1alpha1.Cluster) error {
 	if len(cluster.Spec.ComponentSpecs) == 0 {
 		return nil
 	}
-	compDefRefMap := make(map[string]bool)
-	compDefMap := make(map[string]bool)
+	hasCompDef := false
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		if len(compSpec.ComponentDefRef) == 0 && len(compSpec.ComponentDef) == 0 {
 			return fmt.Errorf("componentDef and componentDefRef cannot be both empty")
 		}
-		if len(compDefRefMap) > 0 && len(compDefMap) > 0 {
-			return fmt.Errorf("componentDef and componentDefRef cannot be mixed within the same cluster")
-		}
-		if len(compSpec.ComponentDefRef) > 0 {
-			compDefRefMap[compSpec.ComponentDefRef] = true
+		if len(compSpec.ComponentDef) == 0 && hasCompDef {
+			return fmt.Errorf("all componentSpecs in the same cluster must either specify ComponentDef or omit ComponentDef simultaneously")
 		}
 		if len(compSpec.ComponentDef) > 0 {
-			compDefMap[compSpec.ComponentDef] = true
+			hasCompDef = true
 		}
 	}
 	return nil

@@ -339,9 +339,9 @@ func (c *compDefUpdateStrategyConvertor) convert(args ...any) (any, error) {
 			strategy = &clusterCompDef.ConsensusSpec.UpdateStrategy
 		}
 	case appsv1alpha1.Replication:
-		if clusterCompDef.ReplicationSpec != nil {
-			strategy = &clusterCompDef.ReplicationSpec.UpdateStrategy
-		}
+		// be compatible with the behaviour of RSM in 0.7, set SerialStrategy for Replication workloads by default.
+		serialStrategy := appsv1alpha1.SerialStrategy
+		strategy = &serialStrategy
 	// be compatible with the behaviour of RSM in 0.7, don't set update strategy for Stateful and Stateless workloads.
 	case appsv1alpha1.Stateful:
 		// do nothing

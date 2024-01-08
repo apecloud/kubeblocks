@@ -116,3 +116,8 @@ func GeneratePodFQDN(namespace, clusterName, compName string, ordinal int) strin
 	return fmt.Sprintf("%s.%s.%s.svc",
 		GeneratePodName(clusterName, compName, ordinal), GeneratePodSubDomain(clusterName, compName), namespace)
 }
+
+// GenerateVirtualComponentDefinition generates the virtual component definition name.
+func GenerateVirtualComponentDefinition(compDefSuffix string) string {
+	return fmt.Sprintf("%s-%s", KBGeneratedVirtualCompDefPrefix, compDefSuffix)
+}

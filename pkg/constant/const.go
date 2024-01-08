@@ -288,10 +288,6 @@ const (
 )
 
 const (
-	ComponentStatusDefaultPodName = "Unknown"
-)
-
-const (
 	FeatureGateReplicatedStateMachine = "REPLICATED_STATE_MACHINE" // enable rsm
 )
 
@@ -313,4 +309,8 @@ const (
 	VolumeRestorePolicyKeyForRestore = "volumeRestorePolicy"
 	RestoreTimeKeyForRestore         = "restoreTime"
 	ConnectionPassword               = "connectionPassword"
+)
+
+const (
+	KBGeneratedVirtualCompDefPrefix = "KB_GENERATED_VIRTUAL_COMP_DEF"
 )

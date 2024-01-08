@@ -332,9 +332,7 @@ type compDefUpdateStrategyConvertor struct{}
 
 func (c *compDefUpdateStrategyConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	defaultUpdateStrategy := appsv1alpha1.SerialStrategy
-	strategy := &defaultUpdateStrategy
-
+	var strategy *appsv1alpha1.UpdateStrategy
 	switch clusterCompDef.WorkloadType {
 	case appsv1alpha1.Consensus:
 		if clusterCompDef.ConsensusSpec != nil {
@@ -344,10 +342,9 @@ func (c *compDefUpdateStrategyConvertor) convert(args ...any) (any, error) {
 		if clusterCompDef.ReplicationSpec != nil {
 			strategy = &clusterCompDef.ReplicationSpec.UpdateStrategy
 		}
+	// be compatible with the behaviour of RSM in 0.7, don't set update strategy for Stateful and Stateless workloads.
 	case appsv1alpha1.Stateful:
-		if clusterCompDef.StatefulSpec != nil {
-			strategy = &clusterCompDef.StatefulSpec.UpdateStrategy
-		}
+		// do nothing
 	case appsv1alpha1.Stateless:
 		// do nothing
 	default:
@@ -380,7 +377,7 @@ func (c *compDefRolesConvertor) convert(args ...any) (any, error) {
 			},
 			{
 				Name:        constant.Secondary,
-				Serviceable: false,
+				Serviceable: true,
 				Writable:    false,
 				Votable:     true,
 			},

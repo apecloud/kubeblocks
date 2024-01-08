@@ -98,7 +98,7 @@ jobs:
     secrets: inherit
 
   release-version:
-    needs: [ release-addons-version, release-kbcli-version ]
+    needs: [ release-addons-version ]
     runs-on: ubuntu-latest
     steps:
       - name: checkout branch ${{ github.ref_name }}
@@ -167,7 +167,7 @@ jobs:
           tag_prefix: ""
 
   send-message:
-    needs: [ release-version, release-addons-version, release-kbcli-version ]
+    needs: [ release-version, release-addons-version ]
     if: ${{ failure() || cancelled() }}
     uses: apecloud/apecloud-cd/.github/workflows/feishui-message.yml@v0.1.38
     with:

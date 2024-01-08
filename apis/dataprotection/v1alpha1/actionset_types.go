@@ -102,7 +102,7 @@ type BackupActionSpec struct {
 	// if deleteBackup is empty, using the default function to clean up the backup data.
 	// note that delete action job will ignore the env/envFrom.
 	// +optional
-	DeleteBackup *BaseJobActionSpec `json:"deleteBackup,omitempty"`
+	PreDeleteBackup *BaseJobActionSpec `json:"preDelete,omitempty"`
 }
 
 // BackupDataActionSpec defines how to back up data.

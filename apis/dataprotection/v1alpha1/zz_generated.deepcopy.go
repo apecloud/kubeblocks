@@ -260,8 +260,8 @@ func (in *BackupActionSpec) DeepCopyInto(out *BackupActionSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.DeleteBackup != nil {
-		in, out := &in.DeleteBackup, &out.DeleteBackup
+	if in.PreDeleteBackup != nil {
+		in, out := &in.PreDeleteBackup, &out.PreDeleteBackup
 		*out = new(BaseJobActionSpec)
 		(*in).DeepCopyInto(*out)
 	}

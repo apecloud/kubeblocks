@@ -100,26 +100,6 @@ spec:
                     - command
                     - image
                     type: object
-                  deleteBackup:
-                    description: deleteBackup specifies how to clean up backup data,
-                      The backup CR will only be deleted after this job is completed.
-                      if deleteBackup is empty, using the default function to clean
-                      up the backup data. note that delete action job will ignore
-                      the env/envFrom.
-                    properties:
-                      command:
-                        description: command specifies the commands to back up the
-                          volume data.
-                        items:
-                          type: string
-                        type: array
-                      image:
-                        description: image specifies the image of backup container.
-                        type: string
-                    required:
-                    - command
-                    - image
-                    type: object
                   postBackup:
                     description: postBackup specifies a hook that should be executed
                       after the backup.
@@ -268,6 +248,26 @@ spec:
                           type: object
                       type: object
                     type: array
+                  preDelete:
+                    description: deleteBackup specifies how to clean up backup data,
+                      The backup CR will only be deleted after this job is completed.
+                      if deleteBackup is empty, using the default function to clean
+                      up the backup data. note that delete action job will ignore
+                      the env/envFrom.
+                    properties:
+                      command:
+                        description: command specifies the commands to back up the
+                          volume data.
+                        items:
+                          type: string
+                        type: array
+                      image:
+                        description: image specifies the image of backup container.
+                        type: string
+                    required:
+                    - command
+                    - image
+                    type: object
                 required:
                 - backupData
                 type: object

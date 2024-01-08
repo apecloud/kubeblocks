@@ -832,6 +832,11 @@ spec:
                       to start log syncing previous none-nil action's Image will be
                       used if not configured
                     properties:
+                      args:
+                        description: args is used to perform statements.
+                        items:
+                          type: string
+                        type: array
                       command:
                         description: Command will be executed in Container to retrieve
                           or process role info
@@ -849,6 +854,11 @@ spec:
                     description: MemberJoinAction specifies how to add member previous
                       none-nil action's Image will be used if not configured
                     properties:
+                      args:
+                        description: args is used to perform statements.
+                        items:
+                          type: string
+                        type: array
                       command:
                         description: Command will be executed in Container to retrieve
                           or process role info
@@ -866,6 +876,11 @@ spec:
                     description: MemberLeaveAction specifies how to remove member
                       previous none-nil action's Image will be used if not configured
                     properties:
+                      args:
+                        description: args is used to perform statements.
+                        items:
+                          type: string
+                        type: array
                       command:
                         description: Command will be executed in Container to retrieve
                           or process role info
@@ -884,6 +899,11 @@ spec:
                       the new member can join voting now previous none-nil action's
                       Image will be used if not configured
                     properties:
+                      args:
+                        description: args is used to perform statements.
+                        items:
+                          type: string
+                        type: array
                       command:
                         description: Command will be executed in Container to retrieve
                           or process role info
@@ -902,6 +922,11 @@ spec:
                       [BusyBox](https://busybox.net/) image will be used if Image
                       not configured
                     properties:
+                      args:
+                        description: args is used to perform statements.
+                        items:
+                          type: string
+                        type: array
                       command:
                         description: Command will be executed in Container to retrieve
                           or process role info
@@ -1004,6 +1029,11 @@ spec:
                       password part of credential"
                     items:
                       properties:
+                        args:
+                          description: args is used to perform statements.
+                          items:
+                            type: string
+                          type: array
                         command:
                           description: Command will be executed in Container to retrieve
                             or process role info

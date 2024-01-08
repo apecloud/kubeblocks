@@ -288,8 +288,8 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	Name string `json:"name"`
 
-	// componentDefRef references componentDef defined in ClusterDefinition spec. Need to
-	// comply with IANA Service Naming rule.
+	// componentDefRef references componentDef defined in ClusterDefinition spec. Need to comply with IANA Service Naming rule.
+	// componentDefRef and componentDef cannot be mixed within the same cluster.
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDefRef is immutable"
@@ -297,7 +297,7 @@ type ClusterComponentSpec struct {
 	ComponentDefRef string `json:"componentDefRef,omitempty"`
 
 	// componentDef references the name of the ComponentDefinition.
-	// If both componentDefRef and componentDef are provided, the componentDef will take precedence over componentDefRef.
+	// componentDefRef and componentDef cannot be mixed within the same cluster.
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDef is immutable"

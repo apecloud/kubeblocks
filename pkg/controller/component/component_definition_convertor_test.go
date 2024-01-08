@@ -600,8 +600,7 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(err).Should(Succeed())
 
 				strategy := res.(*appsv1alpha1.UpdateStrategy)
-				// default update strategy
-				Expect(*strategy).Should(BeEquivalentTo(appsv1alpha1.SerialStrategy))
+				Expect(strategy).Should(BeNil())
 			})
 
 			It("ok", func() {

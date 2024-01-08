@@ -87,8 +87,8 @@ func GenerateClusterComponentEnvPattern(clusterName, compName string) string {
 }
 
 // GenerateDefaultServiceAccountName generates default service account name for a cluster.
-func GenerateDefaultServiceAccountName(clusterName string) string {
-	return fmt.Sprintf("%s-%s", KBLowerPrefix, clusterName)
+func GenerateDefaultServiceAccountName(name string) string {
+	return fmt.Sprintf("%s-%s", KBLowerPrefix, name)
 }
 
 // GenerateRSMNamePattern generates rsm name pattern

@@ -1222,13 +1222,27 @@ var _ = Describe("Component Controller", func() {
 				Value: strconv.Itoa(int(compDefObj.Spec.Services[0].Spec.Ports[0].Port)),
 			},
 			{
-				Name:  "USERNAME",
-				Value: compDefObj.Spec.SystemAccounts[0].Name,
+				Name: "USERNAME",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: constant.GenerateAccountSecretName(clusterObj.Name, compName, compDefObj.Spec.SystemAccounts[0].Name),
+						},
+						Key: constant.AccountNameForSecret,
+					},
+				},
 			},
-			// {
-			//	Name:  "PASSWORD",
-			//	Value: "",
-			// },
+			{
+				Name: "PASSWORD",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: constant.GenerateAccountSecretName(clusterObj.Name, compName, compDefObj.Spec.SystemAccounts[0].Name),
+						},
+						Key: constant.AccountPasswdForSecret,
+					},
+				},
+			},
 			{
 				Name:  constant.KBEnvNamespace,
 				Value: clusterObj.Namespace,

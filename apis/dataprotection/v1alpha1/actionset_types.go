@@ -99,7 +99,7 @@ type BackupActionSpec struct {
 	PostBackup []ActionSpec `json:"postBackup,omitempty"`
 
 	// deleteBackup specifies how to clean up backup data, The backup CR will only be deleted after this job is completed.
-	// if deleteBackup is empty, using the default funtion to clean up the backup data.
+	// if deleteBackup is empty, using the default function to clean up the backup data.
 	// note that delete action job will ignore the env/envFrom.
 	// +optional
 	DeleteBackup *BaseJobActionSpec `json:"deleteBackup,omitempty"`

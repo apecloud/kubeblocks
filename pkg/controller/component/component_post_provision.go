@@ -401,7 +401,7 @@ func setPostProvisionDoneAnnotation(cli client.Client,
 	compObj := comp.DeepCopy()
 	timeStr := time.Now().Format(time.RFC3339Nano)
 	comp.Annotations[kbCompPostProvisionDoneKey] = timeStr
-	graphCli.Update(dag, compObj, comp, model.ReplaceIfExistingOption)
+	graphCli.Update(dag, compObj, comp, &model.ReplaceIfExistingOption{})
 	return nil
 }
 

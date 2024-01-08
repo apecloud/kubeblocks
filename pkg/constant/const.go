@@ -314,3 +314,7 @@ const (
 	RestoreTimeKeyForRestore         = "restoreTime"
 	ConnectionPassword               = "connectionPassword"
 )
+
+const (
+	KBAppMultiClusterPlacementKey = "apps.kubeblocks.io/multi-cluster-placement"
+)

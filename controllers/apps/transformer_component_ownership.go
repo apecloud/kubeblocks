@@ -41,7 +41,7 @@ func (f *componentOwnershipTransformer) Transform(ctx graph.TransformContext, da
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	comp := transCtx.Component
 
-	objects := graphCli.FindAll(dag, &appsv1alpha1.Component{}, model.HaveDifferentTypeWithOption)
+	objects := graphCli.FindAll(dag, &appsv1alpha1.Component{}, &model.HaveDifferentTypeWithOption{})
 	// controllerutil.AddFinalizer(comp, constant.DBComponentFinalizerName)
 	controllerutil.AddFinalizer(comp, constant.DBClusterFinalizerName)
 

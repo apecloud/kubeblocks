@@ -28,16 +28,16 @@ Before injecting the faults supported by HTTPChaos, make sure the following requ
 
 ## Simulate fault injections by kbcli
 
-This table below describes the general flags for network faults.
+This table below describes the general flags for HTTP faults.
 
 📎 Table 1. kbcli fault network http flags description
 
 | Option                   | Description               | Default value | Required |
 | :----------------------- | :------------------------ | :------------ | :------- |
-| `--target` | It specifies whether the target of fault injuection is Request or Response. The target-related fields should be configured at the same time. | Request | No |
-| `--port` | It specifies the TCP port that the target service listens. | 80 | No |
+| `--target` | It specifies whether the target of fault injection is `Request` or `Response`. The target-related fields should be configured at the same time. | Request | No |
+| `--port` | It specifies the TCP port that the target service listens on. | 80 | No |
 | `--path` | The URL path of the target request. Supports [Matching wildcards](https://www.wikiwand.com/en/Matching_wildcards). | * | No |
-| `--method` | It specifies the URL that the target requests. | `GET` | No |
+| `--method` | It specifies the HTTP method that the target requests. | `GET` | No |
 | `--code` | It specifies the status code responded by the target. It is effective only when `target=response`. | 0 | No |
 
 ### Abort

@@ -16,7 +16,7 @@ KubeBlocks provides two major types of fault injection.
   * [NetworkChaos](./network-faults.md): simulates network faults, such as network delay, network packet loss, packet disorder, and various network partitions.
   * [DNSChaos](./dns-faults.md): simulates DNS faults, such as random DNS domain names and returning the wrong IP address.
   * [HTTPChaos](./http-fault.md): simulates HTTP communication faults, such as HTTP communication delays.
-  * [StressChao](./stress-fault.md): simulates CPU or memory stress.
+  * [StressChaos](./stress-fault.md): simulates CPU or memory stress.
   * [IOChaos](./io-faults.md): simulates the file I/O fault of a specific application, such as I/O delay, read and write failure.
   * [TimeChaos](./time-fault.md): simulates abnormal time offset.
 

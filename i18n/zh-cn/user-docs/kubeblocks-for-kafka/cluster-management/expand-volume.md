@@ -23,7 +23,7 @@ kbcli cluster list kafka
 使用 `kbcli cluster volume-expand` 命令配置所需资源，然后再次输入集群名称进行磁盘扩容。
 
 ```bash
-kbcli cluster volume-expand --storage=30G --component-names=kafka --volume-claim-templates=data kafka
+kbcli cluster volume-expand --storage=30G --components=kafka --volume-claim-templates=data kafka
 ```
 
 - `--component-names` 表示需扩容的组件名称。

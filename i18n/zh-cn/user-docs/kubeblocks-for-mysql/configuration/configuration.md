@@ -139,7 +139,7 @@ KubeBlocks 提供了一套统一的默认配置生成策略，适用于在 KubeB
       Name: mysql-cluster-reconfiguring-z2wvn        NameSpace: default        Cluster: mysql-cluster        Type: Reconfiguring
 
       Command:
-        kbcli cluster configure mysql-cluster --component-names=mysql --template-name=mysql-consensusset-config --config-file=my.cnf --set innodb_buffer_pool_size=512M --set max_connections=600
+        kbcli cluster configure mysql-cluster --components=mysql --template-name=mysql-consensusset-config --config-file=my.cnf --set innodb_buffer_pool_size=512M --set max_connections=600
 
       Status:
         Start Time:         Mar 13,2023 02:55 UTC+0800

@@ -49,7 +49,7 @@ If you don't have an object storage service from a cloud provider, you can deplo
 
 2. Generate credentials.
 
-   Access the login page by running `kubectl port-forward --namespace default svc/minio 9001:9001` and then accessing `127.0.0.1:9001`.
+   Access the login page by running `kubectl port-forward --namespace kb-system svc/minio 9001:9001` and then accessing `127.0.0.1:9001`.
 
    Once you are logged in to the dashboard, you can generate an `access key` and `secret key`.
 

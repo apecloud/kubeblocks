@@ -445,3 +445,110 @@ func BuildPodHostDNS(pod *corev1.Pod) string {
 	}
 	return pod.Status.PodIP
 }
+
+// ResolvePodSpecDefaultFields set default value for some known fields of proto PodSpec @pobj.
+func ResolvePodSpecDefaultFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
+	resolveVolume := func(v corev1.Volume, vv *corev1.Volume) {
+		if vv.DownwardAPI != nil && v.DownwardAPI != nil {
+			for i := range vv.DownwardAPI.Items {
+				vf := v.DownwardAPI.Items[i]
+				if vf.FieldRef == nil {
+					continue
+				}
+				vvf := &vv.DownwardAPI.Items[i]
+				if vvf.FieldRef != nil && len(vvf.FieldRef.APIVersion) == 0 {
+					vvf.FieldRef.APIVersion = vf.FieldRef.APIVersion
+				}
+			}
+			if vv.DownwardAPI.DefaultMode == nil {
+				vv.DownwardAPI.DefaultMode = v.DownwardAPI.DefaultMode
+			}
+		}
+		if vv.ConfigMap != nil && v.ConfigMap != nil {
+			if vv.ConfigMap.DefaultMode == nil {
+				vv.ConfigMap.DefaultMode = v.ConfigMap.DefaultMode
+			}
+		}
+	}
+	for i := 0; i < min(len(obj.Volumes), len(pobj.Volumes)); i++ {
+		resolveVolume(obj.Volumes[i], &pobj.Volumes[i])
+	}
+	for i := 0; i < min(len(obj.InitContainers), len(pobj.InitContainers)); i++ {
+		ResolveContainerDefaultFields(obj.InitContainers[i], &pobj.InitContainers[i])
+	}
+	for i := 0; i < min(len(obj.Containers), len(pobj.Containers)); i++ {
+		ResolveContainerDefaultFields(obj.Containers[i], &pobj.Containers[i])
+	}
+	if len(pobj.RestartPolicy) == 0 {
+		pobj.RestartPolicy = obj.RestartPolicy
+	}
+	if pobj.TerminationGracePeriodSeconds == nil {
+		pobj.TerminationGracePeriodSeconds = obj.TerminationGracePeriodSeconds
+	}
+	if len(pobj.DNSPolicy) == 0 {
+		pobj.DNSPolicy = obj.DNSPolicy
+	}
+	if len(pobj.DeprecatedServiceAccount) == 0 {
+		pobj.DeprecatedServiceAccount = obj.DeprecatedServiceAccount
+	}
+	if pobj.SecurityContext == nil {
+		pobj.SecurityContext = obj.SecurityContext
+	}
+	if len(pobj.SchedulerName) == 0 {
+		pobj.SchedulerName = obj.SchedulerName
+	}
+	if len(pobj.Tolerations) == 0 {
+		pobj.Tolerations = obj.Tolerations
+	}
+	if pobj.Priority == nil {
+		pobj.Priority = obj.Priority
+	}
+	if pobj.EnableServiceLinks == nil {
+		pobj.EnableServiceLinks = obj.EnableServiceLinks
+	}
+	if pobj.PreemptionPolicy == nil {
+		pobj.PreemptionPolicy = obj.PreemptionPolicy
+	}
+}
+
+// ResolveContainerDefaultFields set default value for some known fields of proto Container @pcontainer.
+func ResolveContainerDefaultFields(container corev1.Container, pcontainer *corev1.Container) {
+	if len(pcontainer.TerminationMessagePath) == 0 {
+		pcontainer.TerminationMessagePath = container.TerminationMessagePath
+	}
+	if len(pcontainer.TerminationMessagePolicy) == 0 {
+		pcontainer.TerminationMessagePolicy = container.TerminationMessagePolicy
+	}
+	if len(pcontainer.ImagePullPolicy) == 0 {
+		pcontainer.ImagePullPolicy = container.ImagePullPolicy
+	}
+
+	resolveContainerProbe := func(p corev1.Probe, pp *corev1.Probe) {
+		if pp.TimeoutSeconds == 0 {
+			pp.TimeoutSeconds = p.TimeoutSeconds
+		}
+		if pp.PeriodSeconds == 0 {
+			pp.PeriodSeconds = p.PeriodSeconds
+		}
+		if pp.SuccessThreshold == 0 {
+			pp.SuccessThreshold = p.SuccessThreshold
+		}
+		if pp.FailureThreshold == 0 {
+			pp.FailureThreshold = p.FailureThreshold
+		}
+		if pp.HTTPGet != nil && len(pp.HTTPGet.Scheme) == 0 {
+			if p.HTTPGet != nil {
+				pp.HTTPGet.Scheme = p.HTTPGet.Scheme
+			}
+		}
+	}
+	if pcontainer.LivenessProbe != nil && container.LivenessProbe != nil {
+		resolveContainerProbe(*container.LivenessProbe, pcontainer.LivenessProbe)
+	}
+	if pcontainer.ReadinessProbe != nil && container.ReadinessProbe != nil {
+		resolveContainerProbe(*container.ReadinessProbe, pcontainer.ReadinessProbe)
+	}
+	if pcontainer.StartupProbe != nil && container.StartupProbe != nil {
+		resolveContainerProbe(*container.StartupProbe, pcontainer.StartupProbe)
+	}
+}

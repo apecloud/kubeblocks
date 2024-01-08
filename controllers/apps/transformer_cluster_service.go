@@ -70,7 +70,7 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 		if err != nil {
 			return err
 		}
-		if err = createOrUpdateService(ctx, dag, graphCli, service); err != nil {
+		if err = createOrUpdateService(ctx, dag, graphCli, service, nil); err != nil {
 			return err
 		}
 		delete(services, service.Name)
@@ -233,7 +233,7 @@ func (t *clusterServiceTransformer) listOwnedClusterServices(transCtx *clusterTr
 	return services, nil
 }
 
-func createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG, graphCli model.GraphClient, service *corev1.Service) error {
+func createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG, graphCli model.GraphClient, service *corev1.Service, owner client.Object) error {
 	key := types.NamespacedName{
 		Namespace: service.Namespace,
 		Name:      service.Name,
@@ -246,6 +246,12 @@ func createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG, graphCli 
 		}
 		return err
 	}
+
+	// don't update service not owned by the owner, to keep compatible with existed cluster
+	if owner != nil && !model.IsOwnerOf(owner, obj) {
+		return nil
+	}
+
 	objCopy := obj.DeepCopy()
 	objCopy.Spec = service.Spec
 

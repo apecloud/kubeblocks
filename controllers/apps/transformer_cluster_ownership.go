@@ -40,7 +40,7 @@ func (f *clusterOwnershipTransformer) Transform(ctx graph.TransformContext, dag 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	cluster := transCtx.Cluster
 
-	objects := graphCli.FindAll(dag, &appsv1alpha1.Cluster{}, model.HaveDifferentTypeWithOption)
+	objects := graphCli.FindAll(dag, &appsv1alpha1.Cluster{}, &model.HaveDifferentTypeWithOption{})
 
 	controllerutil.AddFinalizer(cluster, constant.DBClusterFinalizerName)
 	for _, object := range objects {

@@ -161,7 +161,7 @@ func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 
 	objCopy := copyAndMergeRSM(runningRSM, protoRSM, synthesizeComp)
 	if objCopy != nil && !cli.IsAction(dag, objCopy, model.ActionNoopPtr()) {
-		cli.Update(dag, nil, objCopy, model.ReplaceIfExistingOption)
+		cli.Update(dag, nil, objCopy, &model.ReplaceIfExistingOption{})
 	}
 
 	// to work around that the scaled PVC will be deleted at object action.
@@ -273,6 +273,27 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, synthesiz
 		}
 	}
 
+	// be compatible with existed cluster
+	updateService := func(rsmObj, rsmProto *workloads.ReplicatedStateMachine) *corev1.Service {
+		if rsmProto.Spec.Service != nil {
+			return rsmProto.Spec.Service
+		}
+		if rsmObj.Spec.Service == nil {
+			return nil
+		}
+		defaultServiceName := rsmObj.Name
+		for _, svc := range synthesizeComp.ComponentServices {
+			if svc.GeneratePodOrdinalService {
+				continue
+			}
+			serviceName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, svc.ServiceName)
+			if defaultServiceName == serviceName {
+				return rsmObj.Spec.Service
+			}
+		}
+		return nil
+	}
+
 	rsmObjCopy := oldRsm.DeepCopy()
 	rsmProto := newRsm
 
@@ -291,7 +312,7 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, synthesiz
 	mergeMetadataMap(rsmObjCopy.Spec.Template.Annotations, &rsmProto.Spec.Template.Annotations)
 	rsmObjCopy.Spec.Template = rsmProto.Spec.Template
 	rsmObjCopy.Spec.Replicas = rsmProto.Spec.Replicas
-	rsmObjCopy.Spec.Service = rsmProto.Spec.Service
+	rsmObjCopy.Spec.Service = updateService(rsmObjCopy, rsmProto)
 	rsmObjCopy.Spec.AlternativeServices = rsmProto.Spec.AlternativeServices
 	rsmObjCopy.Spec.Roles = rsmProto.Spec.Roles
 	rsmObjCopy.Spec.RoleProbe = rsmProto.Spec.RoleProbe
@@ -304,7 +325,7 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, synthesiz
 		updateUpdateStrategy(rsmObjCopy, rsmProto)
 	}
 
-	ResolvePodSpecDefaultFields(oldRsm.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
+	intctrlutil.ResolvePodSpecDefaultFields(oldRsm.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
 	DelayUpdatePodSpecSystemFields(oldRsm.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
 
 	isSpecUpdated := !reflect.DeepEqual(&oldRsm.Spec, &rsmObjCopy.Spec)

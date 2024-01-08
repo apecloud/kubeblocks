@@ -14,6 +14,9 @@ KubeBlocks 是基于 Kubernetes 的原生应用，你可以使用 Helm 来进行
 
 如果使用 Helm 安装 KubeBlocks，那么卸载也需要使用 Helm。
 
+请确保已安装 [kubectl](https://kubernetes.io/zh-cn/docs/tasks/tools/) 和 [Helm](https://helm.sh/zh/docs/intro/install/)。
+
+
 :::
 
 ## 环境准备
@@ -80,9 +83,7 @@ helm install kubeblocks kubeblocks/kubeblocks \
 
     :::note
 
-    kbcli 默认安装最新版本。在安装 KubeBlocks 时，kbcli 会安装与之匹配的版本。请确保 kbcli 和 KubeBlocks 的主版本号相匹配。
-
-    例如，你可以安装 kbcli v0.6.1 和 KubeBlocks v0.6.3。但是，如果安装的是 kbcli v0.5.0 和 KubeBlocks v0.6.0，就可能会报错，因为它们不匹配。
+    默认安装最新版本。
 
     :::
 
@@ -99,11 +100,8 @@ kbcli kubeblocks status
 如果工作负载都已准备就绪，则表明 KubeBlocks 已成功安装。
 
 ```bash
-KubeBlocks is deployed in namespace: kb-system,version: x.x.x
->
-KubeBlocks Workloads:
-NAMESPACE   KIND         NAME                           READY PODS   CPU(CORES)   MEMORY(BYTES)   CREATED-AT
-kb-system   Deployment   kb-addon-snapshot-controller   1/1          N/A          N/A             Oct 13,2023 14:27 UTC+0800
-kb-system   Deployment   kubeblocks                     1/1          N/A          N/A             Oct 13,2023 14:26 UTC+0800
-kb-system   Deployment   kubeblocks-dataprotection      1/1          N/A          N/A             Oct 13,2023 14:26 UTC+0800
+NAME                                            READY   STATUS    RESTARTS      AGE
+kb-addon-snapshot-controller-649f8b9949-2wzzk   1/1     Running   2 (24m ago)   147d
+kubeblocks-dataprotection-f6dbdbf7f-5fdr9       1/1     Running   2 (24m ago)   147d
+kubeblocks-6497f7947-mc7vc                      1/1     Running   2 (24m ago)   147d
 ```

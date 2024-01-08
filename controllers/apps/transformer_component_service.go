@@ -77,7 +77,7 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 			if err != nil {
 				return err
 			}
-			if err = createOrUpdateService(ctx, dag, graphCli, svc); err != nil {
+			if err = createOrUpdateService(ctx, dag, graphCli, svc, transCtx.ComponentOrig); err != nil {
 				return err
 			}
 		}

@@ -140,7 +140,6 @@ func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container 
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	container.Command = []string{"lorry",
 		"--port", strconv.Itoa(lorryHTTPPort),
-		"--config-path", "/config/lorry/components/",
 		"--grpcport", strconv.Itoa(lorryGRPCPort),
 	}
 

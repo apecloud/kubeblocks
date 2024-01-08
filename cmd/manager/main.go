@@ -56,6 +56,7 @@ import (
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
 	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -66,6 +67,18 @@ import (
 
 const (
 	appName = "kubeblocks"
+
+	probeAddrFlagKey     flagName = "health-probe-bind-address"
+	metricsAddrFlagKey   flagName = "metrics-bind-address"
+	leaderElectFlagKey   flagName = "leader-elect"
+	leaderElectIDFlagKey flagName = "leader-elect-id"
+
+	// switch flags key for API groups
+	appsFlagKey       flagName = "apps"
+	extensionsFlagKey flagName = "extensions"
+	workloadsFlagKey  flagName = "workloads"
+
+	kubeContextsFlagKey flagName = "kube-contexts"
 )
 
 var (
@@ -114,24 +127,61 @@ func init() {
 
 type flagName string
 
-const (
-	probeAddrFlagKey     flagName = "health-probe-bind-address"
-	metricsAddrFlagKey   flagName = "metrics-bind-address"
-	leaderElectFlagKey   flagName = "leader-elect"
-	leaderElectIDFlagKey flagName = "leader-elect-id"
-
-	// switch flags key for API groups
-	appsFlagKey       flagName = "apps"
-	extensionsFlagKey flagName = "extensions"
-	workloadsFlagKey  flagName = "workloads"
-)
-
 func (r flagName) String() string {
 	return string(r)
 }
 
 func (r flagName) viperName() string {
 	return strings.ReplaceAll(r.String(), "-", "_")
+}
+
+func setupFlags() {
+	flag.String(metricsAddrFlagKey.String(), ":8080", "The address the metric endpoint binds to.")
+	flag.String(probeAddrFlagKey.String(), ":8081", "The address the probe endpoint binds to.")
+	flag.Bool(leaderElectFlagKey.String(), false,
+		"Enable leader election for controller manager. "+
+			"Enabling this will ensure there is only one active controller manager.")
+
+	flag.String(leaderElectIDFlagKey.String(), "001c317f",
+		"The leader election ID prefix for controller manager. "+
+			"This ID must be unique to controller manager.")
+
+	flag.Bool(appsFlagKey.String(), true,
+		"Enable the apps controller manager.")
+	flag.Bool(extensionsFlagKey.String(), true,
+		"Enable the extensions controller manager.")
+	flag.Bool(workloadsFlagKey.String(), true,
+		"Enable the workloads controller manager.")
+
+	flag.String(kubeContextsFlagKey.String(), "", "Kube contexts the manager will talk to.")
+
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
+
+	// set normalizeFunc to replace flag name to viper name
+	normalizeFunc := pflag.CommandLine.GetNormalizeFunc()
+	pflag.CommandLine.SetNormalizeFunc(func(fs *pflag.FlagSet, name string) pflag.NormalizedName {
+		result := normalizeFunc(fs, name)
+		name = strings.ReplaceAll(string(result), "-", "_")
+		return pflag.NormalizedName(name)
+	})
+
+	if err := viper.BindPFlags(pflag.CommandLine); err != nil {
+		setupLog.Error(err, "unable to bind flags")
+		os.Exit(1)
+	}
+}
+
+func setupLogger() {
+	opts := zap.Options{
+		Development: false,
+	}
+	opts.BindFlags(flag.CommandLine)
+
+	// NOTES:
+	// zap is "Blazing fast, structured, leveled logging in Go.", DON'T event try
+	// to refactor this logging lib to anything else. Check FAQ - https://github.com/uber-go/zap/blob/master/FAQ.md
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 }
 
 func validateRequiredToParseConfigs() error {
@@ -178,51 +228,18 @@ func validateRequiredToParseConfigs() error {
 }
 
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var enableLeaderElectionID string
-	var probeAddr string
-	flag.String(metricsAddrFlagKey.String(), ":8080", "The address the metric endpoint binds to.")
-	flag.String(probeAddrFlagKey.String(), ":8081", "The address the probe endpoint binds to.")
-	flag.Bool(leaderElectFlagKey.String(), false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
+	var (
+		metricsAddr            string
+		probeAddr              string
+		enableLeaderElection   bool
+		enableLeaderElectionID string
+		kubeContexts           string
+		err                    error
+	)
 
-	flag.String(leaderElectIDFlagKey.String(), "001c317f",
-		"The leader election ID prefix for controller manager. "+
-			"This ID must be unique to controller manager.")
+	setupFlags()
 
-	flag.Bool(appsFlagKey.String(), true,
-		"Enable the apps controller manager.")
-	flag.Bool(extensionsFlagKey.String(), true,
-		"Enable the extensions controller manager. ")
-	flag.Bool(workloadsFlagKey.String(), true,
-		"Enable the workloads controller manager. ")
-
-	opts := zap.Options{
-		Development: true,
-	}
-	opts.BindFlags(flag.CommandLine)
-	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
-	pflag.Parse()
-
-	// set normalizeFunc to replace flag name to viper name
-	normalizeFunc := pflag.CommandLine.GetNormalizeFunc()
-	pflag.CommandLine.SetNormalizeFunc(func(fs *pflag.FlagSet, name string) pflag.NormalizedName {
-		result := normalizeFunc(fs, name)
-		name = strings.ReplaceAll(string(result), "-", "_")
-		return pflag.NormalizedName(name)
-	})
-
-	if err := viper.BindPFlags(pflag.CommandLine); err != nil {
-		setupLog.Error(err, "unable to bind flags")
-		os.Exit(1)
-	}
-
-	// NOTES:
-	// zap is "Blazing fast, structured, leveled logging in Go.", DON'T event try
-	// to refactor this logging lib to anything else. Check FAQ - https://github.com/uber-go/zap/blob/master/FAQ.md
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	setupLogger()
 
 	// Find and read the config file
 	if err := viper.ReadInConfig(); err != nil { // Handle errors reading the config file
@@ -234,16 +251,17 @@ func main() {
 	})
 	viper.WatchConfig()
 
-	metricsAddr = viper.GetString(metricsAddrFlagKey.viperName())
-	probeAddr = viper.GetString(probeAddrFlagKey.viperName())
-	enableLeaderElection = viper.GetBool(leaderElectFlagKey.viperName())
-	enableLeaderElectionID = viper.GetString(leaderElectIDFlagKey.viperName())
-
 	setupLog.Info(fmt.Sprintf("config settings: %v", viper.AllSettings()))
 	if err := validateRequiredToParseConfigs(); err != nil {
 		setupLog.Error(err, "config value error")
 		os.Exit(1)
 	}
+
+	metricsAddr = viper.GetString(metricsAddrFlagKey.viperName())
+	probeAddr = viper.GetString(probeAddrFlagKey.viperName())
+	enableLeaderElection = viper.GetBool(leaderElectFlagKey.viperName())
+	enableLeaderElectionID = viper.GetString(leaderElectIDFlagKey.viperName())
+	kubeContexts = viper.GetString(kubeContextsFlagKey.viperName())
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
@@ -278,6 +296,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	// multi-cluster manager for all worker k8s
+	multiClusterMgr, err := multicluster.Setup(mgr.GetScheme(), mgr.GetClient(), kubeContexts)
+	if err != nil {
+		setupLog.Error(err, "unable to setup multi-cluster manager")
+		os.Exit(1)
+	}
+
+	client := mgr.GetClient()
+	if multiClusterMgr != nil {
+		client = multiClusterMgr.GetClient()
+	}
+
 	if err := intctrlutil.InitHostPortManager(mgr.GetClient()); err != nil {
 		setupLog.Error(err, "unable to init port manager")
 		os.Exit(1)
@@ -285,7 +315,7 @@ func main() {
 
 	if viper.GetBool(appsFlagKey.viperName()) {
 		if err = (&appscontrollers.ClusterReconciler{
-			Client:   mgr.GetClient(),
+			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("cluster-controller"),
 		}).SetupWithManager(mgr); err != nil {
@@ -312,7 +342,7 @@ func main() {
 		}
 
 		if err = (&appscontrollers.ComponentReconciler{
-			Client:   mgr.GetClient(),
+			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("component-controller"),
 		}).SetupWithManager(mgr); err != nil {
@@ -357,7 +387,7 @@ func main() {
 		}
 
 		if err = (&configuration.ReconfigureReconciler{
-			Client:   mgr.GetClient(),
+			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
 		}).SetupWithManager(mgr); err != nil {
@@ -366,7 +396,7 @@ func main() {
 		}
 
 		if err = (&configuration.ConfigurationReconciler{
-			Client:   mgr.GetClient(),
+			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("configuration-controller"),
 		}).SetupWithManager(mgr); err != nil {
@@ -384,7 +414,7 @@ func main() {
 		}
 
 		if err = (&k8scorecontrollers.EventReconciler{
-			Client:   mgr.GetClient(),
+			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("event-controller"),
 		}).SetupWithManager(mgr); err != nil {
@@ -434,7 +464,7 @@ func main() {
 
 	if viper.GetBool(workloadsFlagKey.viperName()) {
 		if err = (&workloadscontrollers.ReplicatedStateMachineReconciler{
-			Client:   mgr.GetClient(),
+			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("replicated-state-machine-controller"),
 		}).SetupWithManager(mgr); err != nil {
@@ -445,7 +475,6 @@ func main() {
 	// +kubebuilder:scaffold:builder
 
 	if viper.GetBool("enable_webhooks") {
-
 		appsv1alpha1.RegisterWebhookManager(mgr)
 
 		if err = (&appsv1alpha1.Cluster{}).SetupWebhookWithManager(mgr); err != nil {
@@ -498,13 +527,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	cli, err := discoverycli.NewDiscoveryClientForConfig(mgr.GetConfig())
+	discoveryClient, err := discoverycli.NewDiscoveryClientForConfig(mgr.GetConfig())
 	if err != nil {
 		setupLog.Error(err, "unable to create discovery client")
 		os.Exit(1)
 	}
 
-	ver, err := cli.ServerVersion()
+	ver, err := discoveryClient.ServerVersion()
 	if err != nil {
 		setupLog.Error(err, "unable to discover version info")
 		os.Exit(1)
@@ -512,6 +541,12 @@ func main() {
 	viper.SetDefault(constant.CfgKeyServerInfo, *ver)
 
 	setupLog.Info("starting manager")
+	if multiClusterMgr != nil {
+		if err := multiClusterMgr.Bind(mgr); err != nil {
+			setupLog.Error(err, "failed to bind multi-cluster manager to manager")
+			os.Exit(1)
+		}
+	}
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)

@@ -185,7 +185,7 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 
 	getRoleProbeContainerIndex := func(containers []corev1.Container) int {
 		return slices.IndexFunc(containers, func(c corev1.Container) bool {
-			return c.Name == roleProbeContainerName
+			return c.Name == roleProbeContainerName || c.Name == constant.RoleProbeContainerName
 		})
 	}
 
@@ -197,13 +197,30 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		newRoleProbeContainerIndex := getRoleProbeContainerIndex(newSts.Spec.Template.Spec.Containers)
 		if oldRoleProbeContainerIndex >= 0 && newRoleProbeContainerIndex >= 0 {
 			newCopySts := newSts.DeepCopy()
-			oldCopySts := newSts.DeepCopy()
-			oldCopySts.Spec.Template = oldSts.Spec.Template
-			oldCopySts.Spec.Replicas = oldSts.Spec.Replicas
-			oldCopySts.Spec.UpdateStrategy = oldSts.Spec.UpdateStrategy
 			newCopySts.Spec.Template.Spec.Containers[newRoleProbeContainerIndex] = *oldSts.Spec.Template.Spec.Containers[oldRoleProbeContainerIndex].DeepCopy()
+			for i := range newCopySts.Spec.Template.Spec.Containers {
+				newContainer := &newCopySts.Spec.Template.Spec.Containers[i]
+				for j := range oldSts.Spec.Template.Spec.Containers {
+					oldContainer := oldSts.Spec.Template.Spec.Containers[j]
+					if newContainer.Name == oldContainer.Name {
+						controllerutil.ResolveContainerDefaultFields(oldContainer, newContainer)
+						break
+					}
+				}
+			}
+			for i := range newCopySts.Spec.Template.Spec.InitContainers {
+				newContainer := &newCopySts.Spec.Template.Spec.InitContainers[i]
+				for j := range oldSts.Spec.Template.Spec.InitContainers {
+					oldContainer := oldSts.Spec.Template.Spec.InitContainers[j]
+					if newContainer.Name == oldContainer.Name {
+						controllerutil.ResolveContainerDefaultFields(oldContainer, newContainer)
+						break
+					}
+				}
+			}
 
-			if reflect.DeepEqual(newCopySts.Spec, oldCopySts.Spec) {
+			if reflect.DeepEqual(newCopySts.Spec.Template.Spec.Containers, oldSts.Spec.Template.Spec.Containers) &&
+				reflect.DeepEqual(newCopySts.Spec.Template.Spec.InitContainers, oldSts.Spec.Template.Spec.InitContainers) {
 				newSts = newCopySts
 			}
 		}

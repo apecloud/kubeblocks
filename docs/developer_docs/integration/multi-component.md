@@ -89,15 +89,15 @@ spec:
           image: ...
 ```
 
-The above YAML file provides an outline of the ClusterDefinition and ClusterVersion for NebulaGraph. Corresponding to Figure 1., four components (including the client) and their version information are specified.
+The above YAML file provides an outline of the ClusterDefinition and ClusterVersion for NebulaGraph. Corresponding to the first figure, four components (including the client) and their version information are specified.
 
-If each component can be started independently, the information provided in Figure 2. would be sufficient.
+If each component can be started independently, the information provided in the above YAML file would be sufficient.
 
 However, it can be observed that in a multi-component cluster, there are often inter-component references. So, how to specify the references thereof?
 
 ## Configure inter-component references
 
-As discovered, components may refer to each other and Figure 3. shows the inter-component references in a NebulaGraph cluster. For example,
+As discovered, components may refer to each other and the figure below shows the inter-component references in a NebulaGraph cluster. For example,
 
 1. Nebula-Console needs to know the port number and service name of Nebula-Graphd.
 2. Nebula-Graphd needs to know the DNS of each Pod of Nebula-Metad. 
@@ -169,9 +169,9 @@ Case 2: Nebula-Graphd needs to configure the DNS of all PODs of Nebula-Metad.
                 format: $(POD_FQDN):9559    # Optional, specify value format
 ```
 
-- Specify the component that is being referenced to as nebula-metad.
-- The name of the injected environment variable is NEBULA_METAD_SVC.
-- The value type of the variable is HeadlessServiceRef.
+- Specify the component that is being referenced to as `nebula-metad`.
+- The name of the injected environment variable is `NEBULA_METAD_SVC`.
+- The value type of the variable is `HeadlessServiceRef`.
   - It indicates that the value comes from the FQDN of all Pods of the referenced component, and multiple values are connected with , by default.
   - If the default FQDN format does not meet your needs, customize the format through format (as shown in Line 9).
 
@@ -224,7 +224,7 @@ Therefore, in `fieldPath`, you can use `$.componentDef.service.ports[?(@.name ==
 
 This tutorial takes NebulaGraph as an example and introduces several types and solutions of inter-component references.
 
-In addition to NebulaGraph, engines like GreptimDB, Pulsar, RisingWave and StarRocks also adopt `componentDefRef` API to deal with component references. You can also refer to their solutions.
+In addition to NebulaGraph, engines like GreptimeDB, Pulsar, RisingWave and StarRocks also adopt `componentDefRef` API to deal with component references. You can also refer to their solutions.
 
 For more information about the `componentDefRef`, refer to [ComponentDefRef API](https://kubeblocks.io/docs/release-0.6/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1alpha1.ComponentDefRef).
 

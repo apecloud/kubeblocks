@@ -300,7 +300,7 @@ Refer to the data protection policies of KubeBlocks via [Termination Policy](./.
 
 ### A.2 Monitor backup progress
 
-In [Step 4](#step-4-how-to-back-uprestore-a-cluster), you have created a backup using the backup subcommand.
+In [Step 4](#step-4-back-up-and-restore-a-cluster), you have created a backup using the backup subcommand.
 
 ```bash
 kbcli cluster backup mycluster  --type snapshot

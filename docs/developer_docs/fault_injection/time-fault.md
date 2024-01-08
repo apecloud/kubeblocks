@@ -15,9 +15,9 @@ TimeChaos only affects the PID `1` process in the PID namespace of the container
 
 :::
 
-| Option                   | short | Description               | Default value | Required |
+| Option                   | Short | Description               | Default value | Required |
 | :----------------------- | :------- | :------------------------ | :------------ | :------- |
-| `--time-offset` | None | It specifies the length of time offset. | None | No |
+| `--time-offset` | None | It specifies the length of time offset. | None | Yes |
 | `--clock-id` | None | It specifies the ID of clock that will be offset. See the [clock_gettime documentation](https://man7.org/linux/man-pages/man2/clock_gettime.2.html) for details. | CLOCK_REALTIME | No |
 | `--container` | -c | It specifies a container name for fault injection. | None | No |
 

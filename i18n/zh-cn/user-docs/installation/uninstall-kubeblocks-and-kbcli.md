@@ -37,6 +37,8 @@ kbcli kubeblocks uninstall
 
 <TabItem value="Helm" label="Helm" default>
 
+在执行以下命令前，请删除之前创建的所有集群和资源，否则卸载可能无法成功。
+
 ```bash
 helm uninstall kubeblocks --namespace kb-system
 ```

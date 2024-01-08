@@ -10,7 +10,7 @@ sidebar_label: Environment variables and placeholders
 
 ## Environment variables
 
-### Automatic pod's container environment variables
+### Pod container environment variables
 
 The following variables are injected by KubeBlocks into each pod.
 
@@ -51,7 +51,7 @@ The following variables are injected by KubeBlocks into each pod.
 | UUID_B64 | Generate a random UUID v4 BASE64 encoded string. |
 | UUID_STR_B64 | Generate a random UUID v4 string then BASE64 encoded. |
 | UUID_HEX | Generate a random UUID v4 HEX representation. |
-| HEADLESS_SVC_FQDN | Headless service FQDN placeholder, value pattern - `$(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc`, where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute; |
-| SVC_FQDN | Service FQDN  placeholder, value pattern - `$(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc`, where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute; |
+| HEADLESS_SVC_FQDN | Headless service FQDN placeholder, value pattern - `$(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc`, where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute. |
+| SVC_FQDN | Service FQDN  placeholder, value pattern - `$(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc`, where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute. |
 | SVC_PORT_{PORT_NAME} | A ServicePort's port value with specified port name, i.e, a servicePort JSON struct: <br /> `{"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306}`, and "$(SVC_PORT_mysql)" in the connection credential value is 3306. |
 | RANDOM_PASSWD | Random 8 characters |

@@ -23,13 +23,13 @@ kbcli cluster list mongodb-cluster
 使用 `kbcli cluster volume-expand` 命令配置所需资源，然后再次输入集群名称进行磁盘扩容。
 
 ```bash
-kbcli cluster volume-expand --storage=30G --component-names=mongodb --volume-claim-templates=data mongodb-cluster
+kbcli cluster volume-expand --storage=30G --components=mongodb --volume-claim-templates=data mongodb-cluster
 >
 OpsRequest mongodb-cluster-volumeexpansion-gcfzp created successfully, you can view the progress:
         kbcli cluster describe-ops mongodb-cluster-volumeexpansion-gcfzp -n default
 ```
 
-- `--component-names` 表示需扩容的组件名称。
+- `--components` 表示需扩容的组件名称。
 - `--volume-claim-templates` 表示组件中的 VolumeClaimTemplate 名称。
 - `--storage` 表示磁盘需扩容至的大小。
 

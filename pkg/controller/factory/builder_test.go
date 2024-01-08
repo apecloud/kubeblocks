@@ -272,6 +272,11 @@ var _ = Describe("builder", func() {
 
 			By("set workload type to Replication")
 			clusterDef.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Replication
+			clusterDef.Spec.ComponentDefs[0].ReplicationSpec = &appsv1alpha1.ReplicationSetSpec{
+				StatefulSetSpec: appsv1alpha1.StatefulSetSpec{
+					UpdateStrategy: appsv1alpha1.SerialStrategy,
+				},
+			}
 			cluster.Spec.ComponentSpecs[0].Replicas = 2
 			replComponent := newAllFieldsComponent(clusterDef, nil, cluster)
 			rsm, err = BuildRSM(cluster, replComponent)

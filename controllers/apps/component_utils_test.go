@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -216,7 +217,7 @@ var _ = Describe("Component Utils", func() {
 					},
 				}).
 				GetObject()
-			ResolvePodSpecDefaultFields(pod.Spec, &ppod.Spec)
+			controllerutil.ResolvePodSpecDefaultFields(pod.Spec, &ppod.Spec)
 			Expect(reflect.DeepEqual(pod.Spec, ppod.Spec)).Should(BeTrue())
 		})
 	})

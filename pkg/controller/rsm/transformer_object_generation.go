@@ -203,15 +203,26 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 			for i := range newCopySts.Spec.Template.Spec.Containers {
 				newContainer := &newCopySts.Spec.Template.Spec.Containers[i]
 				for j := range oldCopySts.Spec.Template.Spec.Containers {
-					oldContainer := &oldCopySts.Spec.Template.Spec.Containers[j]
+					oldContainer := oldCopySts.Spec.Template.Spec.Containers[j]
 					if newContainer.Name == oldContainer.Name {
-						oldContainer.TerminationMessagePath = newContainer.TerminationMessagePath
-						oldContainer.TerminationMessagePolicy = newContainer.TerminationMessagePolicy
+						controllerutil.ResolveContainerDefaultFields(oldContainer, newContainer)
+						break
+					}
+				}
+			}
+			for i := range newCopySts.Spec.Template.Spec.InitContainers {
+				newContainer := &newCopySts.Spec.Template.Spec.InitContainers[i]
+				for j := range oldCopySts.Spec.Template.Spec.InitContainers {
+					oldContainer := oldCopySts.Spec.Template.Spec.InitContainers[j]
+					if newContainer.Name == oldContainer.Name {
+						controllerutil.ResolveContainerDefaultFields(oldContainer, newContainer)
+						break
 					}
 				}
 			}
 
-			if reflect.DeepEqual(newCopySts.Spec.Template.Spec.Containers, oldCopySts.Spec.Template.Spec.Containers) {
+			if reflect.DeepEqual(newCopySts.Spec.Template.Spec.Containers, oldCopySts.Spec.Template.Spec.Containers) &&
+				reflect.DeepEqual(newCopySts.Spec.Template.Spec.InitContainers, oldCopySts.Spec.Template.Spec.InitContainers) {
 				newSts = newCopySts
 			}
 		}

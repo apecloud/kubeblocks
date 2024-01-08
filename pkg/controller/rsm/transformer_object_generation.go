@@ -197,13 +197,11 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		newRoleProbeContainerIndex := getRoleProbeContainerIndex(newSts.Spec.Template.Spec.Containers)
 		if oldRoleProbeContainerIndex >= 0 && newRoleProbeContainerIndex >= 0 {
 			newCopySts := newSts.DeepCopy()
-			oldCopySts := newSts.DeepCopy()
-			oldCopySts.Spec.Template = oldSts.Spec.Template
 			newCopySts.Spec.Template.Spec.Containers[newRoleProbeContainerIndex] = *oldSts.Spec.Template.Spec.Containers[oldRoleProbeContainerIndex].DeepCopy()
 			for i := range newCopySts.Spec.Template.Spec.Containers {
 				newContainer := &newCopySts.Spec.Template.Spec.Containers[i]
-				for j := range oldCopySts.Spec.Template.Spec.Containers {
-					oldContainer := oldCopySts.Spec.Template.Spec.Containers[j]
+				for j := range oldSts.Spec.Template.Spec.Containers {
+					oldContainer := oldSts.Spec.Template.Spec.Containers[j]
 					if newContainer.Name == oldContainer.Name {
 						controllerutil.ResolveContainerDefaultFields(oldContainer, newContainer)
 						break
@@ -212,8 +210,8 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 			}
 			for i := range newCopySts.Spec.Template.Spec.InitContainers {
 				newContainer := &newCopySts.Spec.Template.Spec.InitContainers[i]
-				for j := range oldCopySts.Spec.Template.Spec.InitContainers {
-					oldContainer := oldCopySts.Spec.Template.Spec.InitContainers[j]
+				for j := range oldSts.Spec.Template.Spec.InitContainers {
+					oldContainer := oldSts.Spec.Template.Spec.InitContainers[j]
 					if newContainer.Name == oldContainer.Name {
 						controllerutil.ResolveContainerDefaultFields(oldContainer, newContainer)
 						break
@@ -221,8 +219,8 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 				}
 			}
 
-			if reflect.DeepEqual(newCopySts.Spec.Template.Spec.Containers, oldCopySts.Spec.Template.Spec.Containers) &&
-				reflect.DeepEqual(newCopySts.Spec.Template.Spec.InitContainers, oldCopySts.Spec.Template.Spec.InitContainers) {
+			if reflect.DeepEqual(newCopySts.Spec.Template.Spec.Containers, oldSts.Spec.Template.Spec.Containers) &&
+				reflect.DeepEqual(newCopySts.Spec.Template.Spec.InitContainers, oldSts.Spec.Template.Spec.InitContainers) {
 				newSts = newCopySts
 			}
 		}

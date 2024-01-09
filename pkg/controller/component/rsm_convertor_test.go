@@ -29,11 +29,9 @@ import (
 var _ = Describe("Test RSM Convertor", func() {
 	Context("rsm convertors", func() {
 		var (
-			// compDef *appsv1alpha1.ComponentDefinition
 			synComp *SynthesizedComponent
 		)
 		command := []string{"foo", "bar"}
-		// command1 := []string{"abc", "def"}
 		args := []string{"zoo", "boo"}
 
 		BeforeEach(func() {

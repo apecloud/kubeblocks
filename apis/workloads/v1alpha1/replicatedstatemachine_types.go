@@ -405,7 +405,7 @@ type Action struct {
 	// +kubebuilder:validation:Required
 	Command []string `json:"command"`
 
-	// args is used to perform statements.
+	// Args is used to perform statements.
 	// +optional
 	Args []string `json:"args,omitempty"`
 }

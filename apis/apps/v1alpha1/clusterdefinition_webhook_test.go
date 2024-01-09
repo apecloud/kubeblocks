@@ -93,7 +93,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 				},
 				CommandExecutorItem: CommandExecutorItem{
 					Command: []string{"mysql"},
-					Args:    []string{"-e $(KB_ACCOUNT_STATEMENT)"},
+					Args:    []string{"-e", "$(KB_ACCOUNT_STATEMENT)"},
 				},
 			}
 			By("By creating a new clusterDefinition with duplicated accounts")

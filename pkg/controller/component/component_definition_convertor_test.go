@@ -59,8 +59,8 @@ var _ = Describe("Component Definition Convertor", func() {
 			},
 		}
 		commandExecutorItem := &appsv1alpha1.CommandExecutorItem{
-			Command: []string{"echo", "hello"},
-			Args:    []string{},
+			Command: []string{"foo", "bar"},
+			Args:    []string{"zoo", "boo"},
 		}
 
 		BeforeEach(func() {
@@ -833,12 +833,16 @@ var _ = Describe("Component Definition Convertor", func() {
 				mockCommand := []string{
 					"mock-rsm-role-probe-command",
 				}
+				mockArgs := []string{
+					"mock-rsm-role-probe-args",
+				}
 				clusterCompDef.RSMSpec = &appsv1alpha1.RSMSpec{
 					RoleProbe: &workloads.RoleProbe{
 						CustomHandler: []workloads.Action{
 							{
 								Image:   "mock-rsm-role-probe-image",
 								Command: mockCommand,
+								Args:    mockArgs,
 							},
 						},
 					},
@@ -852,6 +856,7 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(actions.RoleProbe.CustomHandler).ShouldNot(BeNil())
 				Expect(actions.RoleProbe.CustomHandler.Image).Should(BeEquivalentTo("mock-rsm-role-probe-image"))
 				Expect(actions.RoleProbe.CustomHandler.Exec.Command).Should(BeEquivalentTo(mockCommand))
+				Expect(actions.RoleProbe.CustomHandler.Exec.Args).Should(BeEquivalentTo(mockArgs))
 			})
 		})
 

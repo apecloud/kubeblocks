@@ -34,7 +34,7 @@ jobs:
           echo release_version_bump=$RELEASE_VERSION_BUMP >> $GITHUB_OUTPUT
 
   release-chart:
-    needs: release-version
+    needs: [ release-version ]
     uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.43
     with:
       MAKE_OPS: "bump-chart-ver"
@@ -47,7 +47,7 @@ jobs:
     secrets: inherit
 
   release-addons-chart:
-    needs: release-chart
+    needs: [ release-chart ]
     uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.52
     with:
       GITHUB_REPO: "apecloud/kubeblocks-addons"
@@ -58,7 +58,6 @@ jobs:
     secrets: inherit
 
   release-addons-chart-jihu:
-    needs: [ release-addons-chart ]
     strategy:
       fail-fast: false
       matrix:
@@ -84,7 +83,7 @@ jobs:
     secrets: inherit
 
   release-charts-image:
-    needs: [ release-version, release-chart, release-addons-chart ]
+    needs: [ release-version, release-addons-chart-jihu ]
     uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.24
     with:
       MAKE_OPS_PRE: "helm-package VERSION=${{ needs.release-version.outputs.release-version-bump }}"
@@ -97,7 +96,7 @@ jobs:
 
   release-message:
     runs-on: ubuntu-latest
-    needs: release-charts-image
+    needs: [ release-chart, release-charts-image ]
     outputs:
       content-result: ${{ steps.release_message.outputs.content_result }}
       release-version: ${{ steps.release_message.outputs.release_version }}

@@ -60,7 +60,7 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 			continue
 		}
 		// component controller does not handle the nodeport service if the feature gate is not enabled.
-		if t.skipNodePortService(cluster, synthesizeComp, &service) {
+		if t.skipNodePortService(cluster, transCtx.CompDef, synthesizeComp, &service) {
 			continue
 		}
 		// component controller does not handle the pod ordinal service if the feature gate is not enabled.
@@ -111,7 +111,8 @@ func (t *componentServiceTransformer) genMultiServicesIfNeed(cluster *appsv1alph
 	return podOrdinalServices, nil
 }
 
-func (t *componentServiceTransformer) skipNodePortService(cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, compService *appsv1alpha1.ComponentService) bool {
+func (t *componentServiceTransformer) skipNodePortService(cluster *appsv1alpha1.Cluster, compDef *appsv1alpha1.ComponentDefinition,
+	synthesizeComp *component.SynthesizedComponent, compService *appsv1alpha1.ComponentService) bool {
 	if compService == nil {
 		return true
 	}
@@ -129,6 +130,13 @@ func (t *componentServiceTransformer) skipNodePortService(cluster *appsv1alpha1.
 	}
 	for _, compName := range strings.Split(enableNodePortSvcCompList, ",") {
 		if compName == synthesizeComp.Name {
+			// set NodePort service vars definition obj optional to false
+			for i, v := range compDef.Spec.Vars {
+				if v.ValueFrom != nil && v.ValueFrom.ServiceVarRef != nil && v.ValueFrom.ServiceVarRef.NodePort != nil {
+					nodePortOptional := false
+					compDef.Spec.Vars[i].ValueFrom.ServiceVarRef.Optional = &nodePortOptional
+				}
+			}
 			return false
 		}
 	}

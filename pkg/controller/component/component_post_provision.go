@@ -241,7 +241,7 @@ func renderPostProvisionCmdJob(ctx context.Context,
 		return volumes, volumeMounts
 	}
 
-	renderJob := func(postProvisionSpec *appsv1alpha1.LifecycleActionHandler, postProvisionEnvs []corev1.EnvVar) (*batchv1.Job, error) {
+	renderJob := func(postProvisionSpec *appsv1alpha1.LifecycleActionHandler, envs []corev1.EnvVar, envFroms []corev1.EnvFromSource) (*batchv1.Job, error) {
 		var (
 			postProvisionCustomHandler = postProvisionSpec.CustomHandler
 		)
@@ -269,7 +269,8 @@ func renderPostProvisionCmdJob(ctx context.Context,
 								ImagePullPolicy: corev1.PullIfNotPresent,
 								Command:         postProvisionCustomHandler.Exec.Command,
 								Args:            postProvisionCustomHandler.Exec.Args,
-								Env:             postProvisionEnvs,
+								Env:             envs,
+								EnvFrom:         envFroms,
 								VolumeMounts:    volumeMounts,
 							},
 						},
@@ -286,12 +287,12 @@ func renderPostProvisionCmdJob(ctx context.Context,
 		return job, nil
 	}
 
-	postProvisionEnvs, err := buildPostProvisionEnvs(cluster, synthesizeComp, pods, &tplPod)
+	envs, envFroms, err := buildPostProvisionEnvs(cluster, synthesizeComp, pods, &tplPod)
 	if err != nil {
 		return nil, err
 	}
 
-	job, err := renderJob(synthesizeComp.LifecycleActions.PostProvision, postProvisionEnvs)
+	job, err := renderJob(synthesizeComp.LifecycleActions.PostProvision, envs, envFroms)
 	if err != nil {
 		return nil, err
 	}
@@ -303,8 +304,9 @@ func renderPostProvisionCmdJob(ctx context.Context,
 func buildPostProvisionEnvs(cluster *appsv1alpha1.Cluster,
 	synthesizeComp *SynthesizedComponent,
 	pods []corev1.Pod,
-	tplPod *corev1.Pod) ([]corev1.EnvVar, error) {
+	tplPod *corev1.Pod) ([]corev1.EnvVar, []corev1.EnvFromSource, error) {
 	var workloadEnvs []corev1.EnvVar
+	var workloadEnvFroms []corev1.EnvFromSource
 
 	if synthesizeComp != nil && synthesizeComp.LifecycleActions != nil &&
 		synthesizeComp.LifecycleActions.PostProvision != nil && synthesizeComp.LifecycleActions.PostProvision.CustomHandler != nil {
@@ -314,6 +316,7 @@ func buildPostProvisionEnvs(cluster *appsv1alpha1.Cluster,
 	if tplPod != nil && len(tplPod.Spec.Containers) > 0 {
 		// add tht first container's environment variables of the template pod
 		workloadEnvs = append(workloadEnvs, tplPod.Spec.Containers[0].Env...)
+		workloadEnvFroms = append(workloadEnvFroms, tplPod.Spec.Containers[0].EnvFrom...)
 	}
 
 	compEnvs := genClusterComponentEnv(cluster, pods)
@@ -321,7 +324,7 @@ func buildPostProvisionEnvs(cluster *appsv1alpha1.Cluster,
 		workloadEnvs = append(workloadEnvs, compEnvs...)
 	}
 
-	return workloadEnvs, nil
+	return workloadEnvs, workloadEnvFroms, nil
 }
 
 // genClusterComponentEnv generates the cluster component relative envs.

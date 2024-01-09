@@ -27,8 +27,6 @@ spec:
             candidate instance name(pod Name). if candidate is not empty, will promote it to primary. 
             otherwise promote a randomly selected pod to primary.
           type: string
-      required:
-        - primary
       type: object
   jobSpec:
     backoffLimit: 0

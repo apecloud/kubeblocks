@@ -33,7 +33,7 @@ sidebar_label: 添加数据库引擎
 
 | 术语              | 设置                                                                                                     |
 |-------------------|--------------------------------------------------------------------------------------------------------------|
-| CLusterDefinition | 启动脚本：默认。<br /> 配置文件：默认。<br /> 服务端口：3306。<br /> Component 个数：1，即 MySQL。 |
+| ClusterDefinition | 启动脚本：默认。<br /> 配置文件：默认。<br /> 服务端口：3306。<br /> Component 个数：1，即 MySQL。 |
 | ClusterVersion    | Image: docker.io/mysql:8.0.34                                                                                |
 | Cluster.yaml      | 由用户创建时指定。                                                           |
 

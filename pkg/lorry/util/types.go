@@ -46,6 +46,7 @@ const (
 	ExecOperation         OperationKind = "exec"
 	QueryOperation        OperationKind = "query"
 	CloseOperation        OperationKind = "close"
+	ReconfigureOperation  OperationKind = "reconfigure"
 
 	LockOperation    OperationKind = "lockInstance"
 	UnlockOperation  OperationKind = "unlockInstance"

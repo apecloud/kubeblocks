@@ -33,7 +33,7 @@ Cluster Format: Deploying a MySQL 8.0 Standalone.
 
 | Term              | Settings                                                                                                     |
 |-------------------|--------------------------------------------------------------------------------------------------------------|
-| CLusterDefinition | Startup Scripts: Default <br > Configuration Files: Default <br >Service Port: 3306 <br >Number of Components: 1, i.e. MySQL |
+| CLusterDefinition | Startup Scripts: Default <br /> Configuration Files: Default <br />Service Port: 3306 <br />Number of Components: 1, i.e. MySQL |
 | ClusterVersion    | Image: docker.io/mysql:8.0.34                                                                                |
 | Cluster.yaml      | Specified by the user during creation                                                                        |
 

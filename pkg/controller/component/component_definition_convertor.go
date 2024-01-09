@@ -335,6 +335,12 @@ func (c *compDefUpdateStrategyConvertor) convert(args ...any) (any, error) {
 	var strategy *appsv1alpha1.UpdateStrategy
 	switch clusterCompDef.WorkloadType {
 	case appsv1alpha1.Consensus:
+		if clusterCompDef.RSMSpec != nil && clusterCompDef.RSMSpec.MemberUpdateStrategy != nil {
+			strategy = func() *appsv1alpha1.UpdateStrategy {
+				s := appsv1alpha1.UpdateStrategy(*clusterCompDef.RSMSpec.MemberUpdateStrategy)
+				return &s
+			}()
+		}
 		if clusterCompDef.ConsensusSpec != nil {
 			strategy = &clusterCompDef.ConsensusSpec.UpdateStrategy
 		}

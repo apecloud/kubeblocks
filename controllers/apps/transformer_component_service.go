@@ -51,41 +51,139 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
+	cluster := transCtx.Cluster
 	synthesizeComp := transCtx.SynthesizeComponent
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for _, service := range synthesizeComp.ComponentServices {
 		// component controller does not handle the default headless service; the default headless service is managed by the RSM.
-		if t.isDefaultHeadlessSvc(synthesizeComp, &service) {
+		if t.skipDefaultHeadlessSvc(synthesizeComp, &service) {
 			continue
 		}
-		svc, err := t.buildService(transCtx.Component, synthesizeComp, &service)
+		// component controller does not handle the nodeport service if the feature gate is not enabled.
+		if t.skipNodePortService(cluster, transCtx.CompDef, synthesizeComp, &service) {
+			continue
+		}
+		// component controller does not handle the pod ordinal service if the feature gate is not enabled.
+		if t.skipPodOrdinalService(cluster, synthesizeComp, &service) {
+			continue
+		}
+
+		genServices, err := t.genMultiServicesIfNeed(cluster, synthesizeComp, &service)
 		if err != nil {
 			return err
 		}
-		if err = createOrUpdateService(ctx, dag, graphCli, svc); err != nil {
-			return err
+		for _, genService := range genServices {
+			svc, err := t.buildService(transCtx.Component, synthesizeComp, genService)
+			if err != nil {
+				return err
+			}
+			if err = createOrUpdateService(ctx, dag, graphCli, svc, transCtx.ComponentOrig); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
+func (t *componentServiceTransformer) genMultiServicesIfNeed(cluster *appsv1alpha1.Cluster,
+	synthesizeComp *component.SynthesizedComponent, compService *appsv1alpha1.ComponentService) ([]*appsv1alpha1.ComponentService, error) {
+	if !compService.GeneratePodOrdinalService {
+		return []*appsv1alpha1.ComponentService{compService}, nil
+	}
+
+	podOrdinalServices := make([]*appsv1alpha1.ComponentService, 0, synthesizeComp.Replicas)
+	for i := int32(0); i < synthesizeComp.Replicas; i++ {
+		svc := compService.DeepCopy()
+		svc.Name = fmt.Sprintf("%s-%d", compService.Name, i)
+		if len(compService.ServiceName) == 0 {
+			svc.ServiceName = fmt.Sprintf("%d", i)
+		} else {
+			svc.ServiceName = fmt.Sprintf("%s-%d", compService.ServiceName, i)
+		}
+		if svc.Spec.Selector == nil {
+			svc.Spec.Selector = make(map[string]string)
+		}
+		// TODO(xingran): use StatefulSet's podName as default selector to select unique pod
+		svc.Spec.Selector[constant.StatefulSetPodNameLabelKey] = constant.GeneratePodName(cluster.Name, synthesizeComp.Name, int(i))
+		podOrdinalServices = append(podOrdinalServices, svc)
+	}
+
+	return podOrdinalServices, nil
+}
+
+func (t *componentServiceTransformer) skipNodePortService(cluster *appsv1alpha1.Cluster, compDef *appsv1alpha1.ComponentDefinition,
+	synthesizeComp *component.SynthesizedComponent, compService *appsv1alpha1.ComponentService) bool {
+	if compService == nil {
+		return true
+	}
+	// if Service type is not NodePort, it should not be skipped.
+	if compService.Spec.Type != corev1.ServiceTypeNodePort {
+		return false
+	}
+	// if Service type is NodePort, but the feature gate annotation is not enabled, it should be skipped.
+	if cluster == nil || cluster.Annotations == nil {
+		return true
+	}
+	enableNodePortSvcCompList, ok := cluster.Annotations[constant.NodePortSvcAnnotationKey]
+	if !ok {
+		return true
+	}
+	for _, compName := range strings.Split(enableNodePortSvcCompList, ",") {
+		if compName == synthesizeComp.Name {
+			// set NodePort service vars definition obj optional to false
+			for i, v := range compDef.Spec.Vars {
+				if v.ValueFrom != nil && v.ValueFrom.ServiceVarRef != nil && v.ValueFrom.ServiceVarRef.NodePort != nil {
+					nodePortOptional := false
+					compDef.Spec.Vars[i].ValueFrom.ServiceVarRef.Optional = &nodePortOptional
+				}
+			}
+			return false
+		}
+	}
+	return true
+}
+
+func (t *componentServiceTransformer) skipPodOrdinalService(cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, compService *appsv1alpha1.ComponentService) bool {
+	if compService == nil {
+		return true
+	}
+	// if ComponentService GeneratePodOrdinalService field is not true, it should not be skipped.
+	if !compService.GeneratePodOrdinalService {
+		return false
+	}
+	// if ComponentService GeneratePodOrdinalService field is true, but the feature gate annotation is not enabled, it should be skipped.
+	if cluster == nil || cluster.Annotations == nil {
+		return true
+	}
+	enablePodOrdinalSvcCompList, ok := cluster.Annotations[constant.PodOrdinalSvcAnnotationKey]
+	if !ok {
+		return true
+	}
+	for _, compName := range strings.Split(enablePodOrdinalSvcCompList, ",") {
+		if compName == synthesizeComp.Name {
+			return false
+		}
+	}
+	return true
+}
+
 func (t *componentServiceTransformer) buildService(comp *appsv1alpha1.Component,
-	synthesizeComp *component.SynthesizedComponent, service *appsv1alpha1.Service) (*corev1.Service, error) {
+	synthesizeComp *component.SynthesizedComponent, service *appsv1alpha1.ComponentService) (*corev1.Service, error) {
 	var (
 		namespace   = synthesizeComp.Namespace
 		clusterName = synthesizeComp.ClusterName
 		compName    = synthesizeComp.Name
 	)
 
-	serviceName := constant.GenerateComponentServiceName(clusterName, synthesizeComp.Name, service.ServiceName)
+	serviceFullName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, service.ServiceName)
 	labels := constant.GetComponentWellKnownLabels(clusterName, compName)
-	builder := builder.NewServiceBuilder(namespace, serviceName).
+	builder := builder.NewServiceBuilder(namespace, serviceFullName).
 		AddLabelsInMap(labels).
 		SetSpec(&service.Spec).
 		AddSelectorsInMap(t.builtinSelector(comp)).
 		Optimize4ExternalTraffic()
 
-	if len(service.RoleSelector) > 0 {
+	if len(service.RoleSelector) > 0 && !service.GeneratePodOrdinalService {
 		if err := t.checkRoleSelector(synthesizeComp, service.Name, service.RoleSelector); err != nil {
 			return nil, err
 		}
@@ -120,7 +218,7 @@ func (t *componentServiceTransformer) checkRoleSelector(synthesizeComp *componen
 	return nil
 }
 
-func (t *componentServiceTransformer) isDefaultHeadlessSvc(synthesizeComp *component.SynthesizedComponent, service *appsv1alpha1.Service) bool {
+func (t *componentServiceTransformer) skipDefaultHeadlessSvc(synthesizeComp *component.SynthesizedComponent, service *appsv1alpha1.ComponentService) bool {
 	svcName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, service.ServiceName)
 	defaultHeadlessSvcName := constant.GenerateDefaultComponentHeadlessServiceName(synthesizeComp.ClusterName, synthesizeComp.Name)
 	return svcName == defaultHeadlessSvcName

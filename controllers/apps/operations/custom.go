@@ -180,23 +180,11 @@ func (c CustomOpsHandler) buildJob(reqCtx intctrlutil.RequestCtx,
 		opsName     = opsRes.OpsRequest.Name
 	)
 
-	buildSecretKeyRef := func(secretName, key string) *corev1.EnvVarSource {
-		return &corev1.EnvVarSource{
-			SecretKeyRef: &corev1.SecretKeySelector{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: secretName,
-				},
-				Key: key,
-			},
-		}
-	}
-
 	buildJobSpec := func() (*batchv1.JobSpec, error) {
 		jobSpec := opsRes.OpsDef.Spec.JobSpec
 		if jobSpec.BackoffLimit == nil {
 			jobSpec.BackoffLimit = pointer.Int32(2)
 		}
-
 		comp := opsRes.Cluster.Spec.GetComponentByName(compName)
 		if comp == nil {
 			return nil, nil
@@ -206,13 +194,10 @@ func (c CustomOpsHandler) buildJob(reqCtx intctrlutil.RequestCtx,
 		if err != nil {
 			return nil, err
 		}
-		compDefRef := opsRes.OpsDef.GetComponentDefRef(compDef.Name)
-		if compDefRef == nil {
-			return nil, nil
-		}
+
 		// inject built-in env
 		fullCompName := constant.GenerateClusterComponentName(clusterName, compName)
-		var env = []corev1.EnvVar{
+		env := []corev1.EnvVar{
 			{Name: constant.KBEnvClusterName, Value: opsRes.Cluster.Name},
 			{Name: constant.KBEnvCompName, Value: compName},
 			{Name: constant.KBEnvClusterCompName, Value: fullCompName},
@@ -220,28 +205,19 @@ func (c CustomOpsHandler) buildJob(reqCtx intctrlutil.RequestCtx,
 			{Name: constant.KBEnvCompServiceVersion, Value: compDef.Spec.ServiceVersion},
 			{Name: kbEnvCompHeadlessSVCName, Value: constant.GenerateDefaultComponentHeadlessServiceName(clusterName, compName)},
 		}
-
-		// inject connect envs
-		if compDefRef.AccountName != "" {
-			accountSecretName := constant.GenerateAccountSecretName(clusterName, compName, compDefRef.AccountName)
-			env = append(env, corev1.EnvVar{Name: kbEnvAccountUserName, Value: compDefRef.AccountName})
-			env = append(env, corev1.EnvVar{Name: kbEnvAccountPassword, ValueFrom: buildSecretKeyRef(accountSecretName, constant.AccountPasswdForSecret)})
+		varsRef := opsRes.OpsDef.Spec.VarsRef
+		if compVarsRef, err := c.buildComponentDefEnvs(opsRes, &env, compDef, compName); err != nil {
+			return nil, err
+		} else if compVarsRef != nil {
+			varsRef = compVarsRef
 		}
 
-		// inject SVC and SVC ports
-		if compDefRef.ServiceName != "" {
-			for _, v := range compDef.Spec.Services {
-				if v.Name != compDefRef.ServiceName {
-					continue
-				}
-				env = append(env, corev1.EnvVar{Name: kbEnvCompSVCName, Value: constant.GenerateComponentServiceName(clusterName, compName, v.ServiceName)})
-				for _, port := range v.Spec.Ports {
-					portName := strings.ReplaceAll(port.Name, "-", "_")
-					env = append(env, corev1.EnvVar{Name: kbEnvCompSVCPortPrefix + strings.ToUpper(portName), Value: strconv.Itoa(int(port.Port))})
-				}
-				break
-			}
+		// inject vars
+		envVars, err := c.buildEnvVars(reqCtx, cli, varsRef, opsRes, compName)
+		if err != nil {
+			return nil, err
 		}
+		env = append(env, envVars...)
 
 		// inject params env
 		for k, v := range param {
@@ -257,6 +233,13 @@ func (c CustomOpsHandler) buildJob(reqCtx intctrlutil.RequestCtx,
 		if len(jobSpec.Template.Spec.Tolerations) == 0 {
 			jobSpec.Template.Spec.Tolerations = comp.Tolerations
 		}
+		getSAName := func() string {
+			if comp.ServiceAccountName != "" {
+				return comp.ServiceAccountName
+			}
+			return constant.GenerateDefaultServiceAccountName(opsRes.Cluster.Name)
+		}
+		jobSpec.Template.Spec.ServiceAccountName = getSAName()
 		return &jobSpec, nil
 	}
 
@@ -358,6 +341,188 @@ func (c CustomOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, c
 	return nil
 }
 
+func (c CustomOpsHandler) buildComponentDefEnvs(opsRes *OpsResource, env *[]corev1.EnvVar, compDef *appsv1alpha1.ComponentDefinition, compName string) (*appsv1alpha1.VarsRef, error) {
+	if len(opsRes.OpsDef.Spec.ComponentDefinitionRefs) == 0 {
+		return nil, nil
+	}
+	compDefRef := opsRes.OpsDef.GetComponentDefRef(compDef.Name)
+	if compDefRef == nil {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`componentDefinition "%s" is not support for this operations`, compDef.Name))
+	}
+
+	buildSecretKeyRef := func(secretName, key string) *corev1.EnvVarSource {
+		return &corev1.EnvVarSource{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: secretName,
+				},
+				Key: key,
+			},
+		}
+	}
+	// inject connect envs
+	if compDefRef.AccountName != "" {
+		accountSecretName := constant.GenerateAccountSecretName(opsRes.Cluster.Name, compName, compDefRef.AccountName)
+		*env = append(*env, corev1.EnvVar{Name: kbEnvAccountUserName, Value: compDefRef.AccountName})
+		*env = append(*env, corev1.EnvVar{Name: kbEnvAccountPassword, ValueFrom: buildSecretKeyRef(accountSecretName, constant.AccountPasswdForSecret)})
+	}
+
+	// inject SVC and SVC ports
+	if compDefRef.ServiceName != "" {
+		for _, v := range compDef.Spec.Services {
+			if v.Name != compDefRef.ServiceName {
+				continue
+			}
+			*env = append(*env, corev1.EnvVar{Name: kbEnvCompSVCName, Value: constant.GenerateComponentServiceName(opsRes.Cluster.Name, compName, v.ServiceName)})
+			for _, port := range v.Spec.Ports {
+				portName := strings.ReplaceAll(port.Name, "-", "_")
+				*env = append(*env, corev1.EnvVar{Name: kbEnvCompSVCPortPrefix + strings.ToUpper(portName), Value: strconv.Itoa(int(port.Port))})
+			}
+			break
+		}
+	}
+	return compDefRef.VarsRef, nil
+}
+
+func (c CustomOpsHandler) getTargetPod(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	varsRef *appsv1alpha1.VarsRef,
+	opsRes *OpsResource,
+	compName string) (*corev1.Pod, error) {
+	podList, err := component.GetComponentPodList(reqCtx.Ctx, cli, *opsRes.Cluster, compName)
+	if err != nil {
+		return nil, err
+	}
+	if len(podList.Items) == 0 {
+		return nil, intctrlutil.NewFatalError("can not find any pod for the component " + compName)
+	}
+	var availablePod *corev1.Pod
+	for _, v := range podList.Items {
+		if intctrlutil.IsAvailable(&v, 0) {
+			availablePod = &v
+			break
+		}
+	}
+	if availablePod == nil && varsRef.PodSelectionStrategy == appsv1alpha1.PreferredAvailable {
+		if varsRef.PodSelectionStrategy == appsv1alpha1.Available {
+			return nil, intctrlutil.NewFatalError("can not find any available pod for the component " + compName)
+		}
+		availablePod = &podList.Items[0]
+	}
+	return availablePod, nil
+}
+
+func (c CustomOpsHandler) buildEnvVars(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	varsRef *appsv1alpha1.VarsRef,
+	opsRes *OpsResource,
+	compName string) ([]corev1.EnvVar, error) {
+	if varsRef == nil {
+		return nil, nil
+	}
+	targetPod, err := c.getTargetPod(reqCtx, cli, varsRef, opsRes, compName)
+	if err != nil {
+		return nil, err
+	}
+	containerEnvMap := map[string]map[string]corev1.EnvVar{}
+	for i := range targetPod.Spec.Containers {
+		envMap := map[string]corev1.EnvVar{}
+		container := targetPod.Spec.Containers[i]
+		for j := range container.Env {
+			envMap[container.Env[j].Name] = container.Env[j]
+		}
+		containerEnvMap[container.Name] = envMap
+	}
+
+	getContainer := func(containerName string) *corev1.Container {
+		for i := range targetPod.Spec.Containers {
+			container := targetPod.Spec.Containers[i]
+			if container.Name == containerName {
+				return &container
+			}
+		}
+		return nil
+	}
+
+	getVarWithEnv := func(container *corev1.Container, envName string) *corev1.EnvVar {
+		for i := range container.Env {
+			env := container.Env[i]
+			if env.Name != envName {
+				continue
+			}
+			if env.ValueFrom != nil && env.ValueFrom.FieldRef != nil {
+				// handle fieldRef
+				value, _ := common.GetFieldRef(targetPod, env.ValueFrom)
+				return &corev1.EnvVar{Name: envName, Value: value}
+			}
+			return &env
+		}
+		return nil
+	}
+
+	envFromMap := map[string]map[string]*corev1.EnvVar{}
+	getVarWithEnvFrom := func(container *corev1.Container, envName string) (*corev1.EnvVar, error) {
+		envMap := envFromMap[container.Name]
+		if envMap != nil {
+			return envMap[envName], nil
+		}
+		envMap = map[string]*corev1.EnvVar{}
+		for _, env := range container.EnvFrom {
+			prefix := env.Prefix
+			if env.ConfigMapRef != nil {
+				configMap := &corev1.ConfigMap{}
+				if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: env.ConfigMapRef.Name, Namespace: targetPod.Namespace}, configMap); err != nil {
+					return nil, err
+				}
+				for k, v := range configMap.Data {
+					name := prefix + k
+					envMap[name] = &corev1.EnvVar{Name: name, Value: v}
+				}
+			} else if env.SecretRef != nil {
+				secret := &corev1.Secret{}
+				if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: env.SecretRef.Name, Namespace: targetPod.Namespace}, secret); err != nil {
+					return nil, err
+				}
+				for k := range secret.Data {
+					name := prefix + k
+					envMap[name] = &corev1.EnvVar{Name: name, ValueFrom: &corev1.EnvVarSource{SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{Name: env.SecretRef.Name},
+						Key:                  k,
+					}}}
+				}
+			}
+		}
+		envFromMap[container.Name] = envMap
+		return envMap[envName], nil
+	}
+
+	// build vars
+	existsEnvVarMap := map[string]struct{}{}
+	var envVars []corev1.EnvVar
+	for i := range varsRef.Vars {
+		envVarRef := varsRef.Vars[i].ValueFrom.EnvVarRef
+		container := getContainer(envVarRef.ContainerName)
+		if container == nil {
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not find container "%s" in the component "%s"`, envVarRef.ContainerName, compName))
+		}
+		envVar := getVarWithEnv(container, envVarRef.EnvName)
+		if envVar == nil {
+			// if the var not found in container.env, try to find from container.envFrom.
+			envVar, err = getVarWithEnvFrom(container, envVarRef.EnvName)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if envVar == nil {
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not find the env "%s" in the container "%s"`, envVarRef.EnvName, envVarRef.ContainerName))
+		}
+		envVar.Name = varsRef.Vars[i].Name
+		envVars = append(envVars, *envVar)
+		existsEnvVarMap[envVar.Name] = struct{}{}
+	}
+	return envVars, nil
+}
+
 // initOpsDefAndValidate inits the opsDefinition to OpsResource and validates if the opsRequest is valid.
 func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	customSpec := opsRes.OpsRequest.Spec.CustomSpec
@@ -386,21 +551,23 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx, cli client.Client, ops
 	// 2. validate component and componentDef
 	comp := opsRes.Cluster.Spec.GetComponentByName(customSpec.ComponentName)
 	if comp == nil {
-		return intctrlutil.NewNotFound(`can not found component in cluster "%s"`, opsRes.Cluster.Name)
+		return intctrlutil.NewNotFound(`can not found component "%s" in cluster "%s"`, customSpec.ComponentName, opsRes.Cluster.Name)
 	}
 	compDef, err := component.GetCompDefinition(reqCtx, cli, opsRes.Cluster, customSpec.ComponentName)
 	if err != nil {
 		return err
 	}
-	var componentDefMatched bool
-	for _, v := range opsDef.Spec.ComponentDefinitionRefs {
-		if v.Name == compDef.Name {
-			componentDefMatched = true
-			break
+	if len(opsDef.Spec.ComponentDefinitionRefs) > 0 {
+		var componentDefMatched bool
+		for _, v := range opsDef.Spec.ComponentDefinitionRefs {
+			if v.Name == compDef.Name {
+				componentDefMatched = true
+				break
+			}
 		}
-	}
-	if !componentDefMatched {
-		return intctrlutil.NewFatalError(fmt.Sprintf(`not supported componnet definition "%s"`, compDef.Name))
+		if !componentDefMatched {
+			return intctrlutil.NewFatalError(fmt.Sprintf(`not supported componnet definition "%s"`, compDef.Name))
+		}
 	}
 	return nil
 }

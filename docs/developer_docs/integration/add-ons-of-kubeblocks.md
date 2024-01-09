@@ -26,4 +26,5 @@ Adding an add-on to KubeBlocks is easy, you can just follow this guide to add th
 2. Knowledge about Helm (e.g. What is Helm and Helm chart).
 3. Have tried K8s (e.g., You should know what a pod is, or have installed an operator on K8s with Helm).
 4. Grasp basic concepts of KubeBlocks, such as ClusterDefinition, ClusterVersion and Cluster.
+
 If you have any question, you can join our [slack channel](https://join.slack.com/t/kubeblocks/shared_invite/zt-22cx2f84x-BPZvnLRqBOGdZ_XSjELh4Q) to ask.

@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -165,16 +166,16 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return nil
 	}
 
-	// mergeAnnotations keeps the original annotations.
+	// mergeMetadataMap keeps the original elements.
 	mergeMetadataMap := func(originalMap map[string]string, targetMap map[string]string) map[string]string {
-		if targetMap == nil || originalMap == nil {
+		if targetMap == nil && originalMap == nil {
 			return nil
 		}
 		if targetMap == nil {
 			targetMap = map[string]string{}
 		}
 		for k, v := range originalMap {
-			// if the annotation not exist in targetAnnotations, copy it from original.
+			// if the element not exist in targetMap, copy it from original.
 			if _, ok := (targetMap)[k]; !ok {
 				(targetMap)[k] = v
 			}
@@ -182,11 +183,49 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return targetMap
 	}
 
+	getRoleProbeContainerIndex := func(containers []corev1.Container) int {
+		return slices.IndexFunc(containers, func(c corev1.Container) bool {
+			return c.Name == roleProbeContainerName || c.Name == constant.RoleProbeContainerName
+		})
+	}
+
 	copyAndMergeSts := func(oldSts, newSts *apps.StatefulSet) client.Object {
 		oldSts.Labels = mergeMetadataMap(oldSts.Labels, newSts.Labels)
-		oldSts.Labels = newSts.Labels
+
+		// for upgrade compatibility from 0.7 to 0.8
+		oldRoleProbeContainerIndex := getRoleProbeContainerIndex(oldSts.Spec.Template.Spec.Containers)
+		newRoleProbeContainerIndex := getRoleProbeContainerIndex(newSts.Spec.Template.Spec.Containers)
+		if oldRoleProbeContainerIndex >= 0 && newRoleProbeContainerIndex >= 0 {
+			newCopySts := newSts.DeepCopy()
+			newCopySts.Spec.Template.Spec.Containers[newRoleProbeContainerIndex] = *oldSts.Spec.Template.Spec.Containers[oldRoleProbeContainerIndex].DeepCopy()
+			for i := range newCopySts.Spec.Template.Spec.Containers {
+				newContainer := &newCopySts.Spec.Template.Spec.Containers[i]
+				for j := range oldSts.Spec.Template.Spec.Containers {
+					oldContainer := oldSts.Spec.Template.Spec.Containers[j]
+					if newContainer.Name == oldContainer.Name {
+						controllerutil.ResolveContainerDefaultFields(oldContainer, newContainer)
+						break
+					}
+				}
+			}
+			for i := range newCopySts.Spec.Template.Spec.InitContainers {
+				newContainer := &newCopySts.Spec.Template.Spec.InitContainers[i]
+				for j := range oldSts.Spec.Template.Spec.InitContainers {
+					oldContainer := oldSts.Spec.Template.Spec.InitContainers[j]
+					if newContainer.Name == oldContainer.Name {
+						controllerutil.ResolveContainerDefaultFields(oldContainer, newContainer)
+						break
+					}
+				}
+			}
+
+			if reflect.DeepEqual(newCopySts.Spec.Template.Spec.Containers, oldSts.Spec.Template.Spec.Containers) &&
+				reflect.DeepEqual(newCopySts.Spec.Template.Spec.InitContainers, oldSts.Spec.Template.Spec.InitContainers) {
+				newSts = newCopySts
+			}
+		}
 		// if annotations exist and are replaced, the StatefulSet will be updated.
-		oldSts.Annotations = mergeMetadataMap(oldSts.Spec.Template.Annotations, newSts.Spec.Template.Annotations)
+		oldSts.Annotations = mergeMetadataMap(oldSts.Annotations, newSts.Annotations)
 		oldSts.Spec.Template = newSts.Spec.Template
 		oldSts.Spec.Replicas = newSts.Spec.Replicas
 		oldSts.Spec.UpdateStrategy = newSts.Spec.UpdateStrategy
@@ -195,7 +234,6 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 
 	copyAndMergeSvc := func(oldSvc *corev1.Service, newSvc *corev1.Service) client.Object {
 		oldSvc.Annotations = mergeMetadataMap(oldSvc.Annotations, newSvc.Annotations)
-		oldSvc.Annotations = newSvc.Annotations
 		oldSvc.Spec = newSvc.Spec
 		return oldSvc
 	}
@@ -332,9 +370,6 @@ func buildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
 	envData := buildEnvConfigData(rsm)
 	annotations := ParseAnnotationsOfScope(ConfigMapScope, rsm.Annotations)
 	labels := getLabels(&rsm)
-	if viper.GetBool(FeatureGateRSMCompatibilityMode) {
-		labels[constant.AppConfigTypeLabelKey] = "kubeblocks-env"
-	}
 	return builder.NewConfigMapBuilder(rsm.Namespace, getEnvConfigMapName(rsm.Name)).
 		AddAnnotationsInMap(annotations).
 		AddLabelsInMap(labels).
@@ -563,29 +598,13 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 		FailureThreshold:    roleProbe.FailureThreshold,
 	}
 
-	if roleProbe.RoleUpdateMechanism == workloads.ReadinessProbeEventUpdate {
-		readinessProbe.ProbeHandler = corev1.ProbeHandler{
-			Exec: &corev1.ExecAction{
-				Command: []string{
-					grpcHealthProbeBinaryPath,
-					fmt.Sprintf(grpcHealthProbeArgsFormat, probeGRPCPort),
-				},
+	readinessProbe.ProbeHandler = corev1.ProbeHandler{
+		Exec: &corev1.ExecAction{
+			Command: []string{
+				grpcHealthProbeBinaryPath,
+				fmt.Sprintf(grpcHealthProbeArgsFormat, probeGRPCPort),
 			},
-		}
-	} else {
-		readinessProbe.HTTPGet = &corev1.HTTPGetAction{
-			Path: httpRoleProbePath,
-			Port: intstr.FromInt(probeHTTPPort),
-		}
-	}
-
-	tryToGetRoleProbeContainer := func() *corev1.Container {
-		for i, container := range template.Spec.Containers {
-			if container.Name == constant.RoleProbeContainerName {
-				return &template.Spec.Containers[i]
-			}
-		}
-		return nil
+		},
 	}
 
 	tryToGetLorryGrpcPort := func(container *corev1.Container) *corev1.ContainerPort {
@@ -597,18 +616,12 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 		return nil
 	}
 
-	tryToGetLorryHTTPPort := func(container *corev1.Container) *corev1.ContainerPort {
-		for i, port := range container.Ports {
-			if port.Name == constant.LorryHTTPPortName {
-				return &container.Ports[i]
-			}
-		}
-		return nil
-	}
-
 	// if role probe container exists, update the readiness probe, env and serving container port
-	if container := tryToGetRoleProbeContainer(); container != nil {
-		if roleProbe.RoleUpdateMechanism == workloads.ReadinessProbeEventUpdate {
+	if container := controllerutil.GetLorryContainer(template.Spec.Containers); container != nil {
+		if roleProbe.RoleUpdateMechanism == workloads.ReadinessProbeEventUpdate ||
+			// for compatibility when upgrading from 0.7 to 0.8
+			(container.ReadinessProbe != nil && container.ReadinessProbe.HTTPGet != nil &&
+				strings.HasPrefix(container.ReadinessProbe.HTTPGet.Path, "/v1.0/bindings")) {
 			port := tryToGetLorryGrpcPort(container)
 			if port != nil && port.ContainerPort != int32(probeGRPCPort) {
 				readinessProbe.Exec.Command = []string{
@@ -616,19 +629,7 @@ func injectRoleProbeBaseContainer(rsm workloads.ReplicatedStateMachine, template
 					fmt.Sprintf(grpcHealthProbeArgsFormat, port.ContainerPort),
 				}
 			}
-		} else {
-			port := tryToGetLorryHTTPPort(container)
-			if port != nil && port.ContainerPort != int32(probeHTTPPort) {
-				readinessProbe.HTTPGet = &corev1.HTTPGetAction{
-					Path: httpRoleProbePath,
-					Port: intstr.FromInt(int(port.ContainerPort)),
-				}
-			}
-		}
-
-		if !reflect.DeepEqual(container.ReadinessProbe, readinessProbe) {
 			container.ReadinessProbe = readinessProbe
-			container.Image = image
 		}
 
 		for _, e := range env {
@@ -789,6 +790,12 @@ func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string 
 	generateReplicaEnv(prefixWithCompDefName)
 	generateMemberEnv(prefixWithCompDefName)
 	envData[prefixWithCompDefName+"CLUSTER_UID"] = uid
+
+	lorryHTTPPort, err := controllerutil.GetLorryHTTPPortFromContainers(set.Spec.Template.Spec.Containers)
+	if err == nil {
+		envData[constant.KBEnvLorryHTTPPort] = strconv.Itoa(int(lorryHTTPPort))
+
+	}
 
 	return envData
 }

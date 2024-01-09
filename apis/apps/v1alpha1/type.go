@@ -214,6 +214,16 @@ const (
 	OpsFailedPhase     OpsPhase = "Failed"
 )
 
+// PodSelectionStrategy pod selection strategy.
+// +enum
+// +kubebuilder:validation:Enum={Available,PreferredAvailable}
+type PodSelectionStrategy string
+
+const (
+	Available          PodSelectionStrategy = "Available"
+	PreferredAvailable PodSelectionStrategy = "PreferredAvailable"
+)
+
 // OpsType defines operation types.
 // +enum
 // +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose,Switchover,DataScript,Backup,Restore,Custom}
@@ -590,21 +600,50 @@ type StatefulSetWorkload interface {
 	GetUpdateStrategy() UpdateStrategy
 }
 
+type ClusterService struct {
+	Service `json:",inline"`
+
+	// ComponentSelector extends the ServiceSpec.Selector by allowing you to specify a component as selectors for the service.
+	// +optional
+	ComponentSelector string `json:"componentSelector,omitempty"`
+}
+
+type ComponentService struct {
+	Service `json:",inline"`
+
+	// GeneratePodOrdinalService indicates whether to create a corresponding Service for each Pod of the selected Component.
+	// If sets to true, a set of Service will be automatically generated for each Pod. And Service.RoleSelector will be ignored.
+	// They can be referred to by adding the PodOrdinal to the defined ServiceName with named pattern <Service.ServiceName>-<PodOrdinal>.
+	// And the Service.Name will also be generated with named pattern <Service.Name>-<PodOrdinal>.
+	// The PodOrdinal is zero-based, and the number of generated Services is equal to the number of replicas of the Component.
+	// For example, a Service might be defined as follows:
+	// - name: my-service
+	//   serviceName: my-service
+	//   generatePodOrdinalService: true
+	//   spec:
+	//     type: NodePort
+	//     ports:
+	//     - name: http
+	//       port: 80
+	//       targetPort: 8080
+	// Assuming that the Component has 3 replicas, then three services would be generated: my-service-0, my-service-1, and my-service-2, each pointing to its respective Pod.
+	// +kubebuilder:default=false
+	// +optional
+	GeneratePodOrdinalService bool `json:"generatePodOrdinalService,omitempty"`
+}
+
 type Service struct {
-	// Name defines the name or namePrefix of the service.
-	// if GeneratePodOrdinalService sets to true, the Name indicates the namePrefix of the service and the fullName will be generated with named pattern <Service.Name>-<PodOrdinal>.
+	// Name defines the name of the service.
 	// otherwise, it indicates the name of the service.
 	// Others can refer to this service by its name. (e.g., connection credential)
 	// Cannot be updated.
 	// +required
 	Name string `json:"name"`
 
-	// ServiceName defines the name or namePrefix of the underlying service object.
-	// if GeneratePodOrdinalService sets to true, the ServiceName indicates the namePrefix of the underlying service object. otherwise, it indicates the name of the underlying service object.
+	// ServiceName defines the name of the underlying service object.
 	// If not specified, the default service name with different patterns will be used:
 	//  - <CLUSTER_NAME>: for cluster-level services
 	//  - <CLUSTER_NAME>-<COMPONENT_NAME>: for component-level services
-	//  - <CLUSTER_NAME>-<COMPONENT_NAME>-<POD_ORDINAL>: for pod-level services when GeneratePodOrdinalService set to true
 	// Only one default service name is allowed.
 	// Cannot be updated.
 	// +optional
@@ -620,35 +659,10 @@ type Service struct {
 	// +optional
 	Spec corev1.ServiceSpec `json:"spec,omitempty"`
 
-	// ComponentSelector extends the ServiceSpec.Selector by allowing you to specify a component as selectors for the service.
-	// For component-level services, a default component selector with the component name will be added automatically.
-	// if GeneratePodOrdinalService sets to true, ComponentSelector must be specified.
-	// +optional
-	ComponentSelector string `json:"componentSelector,omitempty"`
-
 	// RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined role as selector for the service.
 	// if GeneratePodOrdinalService sets to true, RoleSelector will be ignored.
 	// +optional
 	RoleSelector string `json:"roleSelector,omitempty"`
-
-	// GeneratePodOrdinalService indicates whether to create a corresponding Service for each Pod of the selected Component.
-	// If sets to true, a set of Service will be automatically generated for each Pod. and ComponentSelector must be specified.
-	// They can be referred to by adding the PodOrdinal to the defined ServiceName with named pattern <Service.ServiceName>-<PodOrdinal>.
-	// For example, a Service might be defined as follows:
-	// - name: my-service
-	//   serviceName: my-service
-	//   generatePodOrdinalService: true
-	//   componentSelector: my-component
-	//   spec:
-	//     type: NodePort
-	//     ports:
-	//     - name: http
-	//       port: 80
-	//       targetPort: 8080
-	// Assuming that the Component has 3 replicas, then three services would be generated: my-service-0, my-service-1, and my-service-2, each pointing to its respective Pod.
-	// +kubebuilder:default=false
-	// +optional
-	GeneratePodOrdinalService bool `json:"generatePodOrdinalService,omitempty"`
 }
 
 // List of all the built-in variables provided by KubeBlocks.
@@ -666,7 +680,7 @@ type Service struct {
 // |           | UID       | KB_CLUSTER_UID       |          |      |         |          |
 // |           | Component | KB_CLUSTER_COMP_NAME |          |      |         |          |
 // | Component | Name      | KB_COMP_NAME         |          |      |         |          |
-// |           | Replicas  | KB_COMP_REPLICAS     |          |      |    ✓    |    N     |
+// |           | Replicas  | KB_COMP_REPLICAS     |          |      |    ✓    |          |
 // | Pod       | Name      | KB_POD_NAME          |     x    |      |    ✓    |          |
 // |           | UID       | KB_POD_UID           |     x    |      |    ✓    |          |
 // |           | IP        | KB_POD_IP            |     x    |      |    ✓    |          |

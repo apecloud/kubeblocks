@@ -22,6 +22,7 @@ package ctl
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -32,6 +33,7 @@ type SwitchOptions struct {
 	primary   string
 	candidate string
 	lorryAddr string
+	force     bool
 }
 
 var switchOptions = &SwitchOptions{}
@@ -54,7 +56,8 @@ lorryctl switchover  --primary xxx --candidate xxx
 			return
 		}
 
-		err = lorryClient.Switchover(context.TODO(), switchOptions.primary, switchOptions.candidate)
+		lorryClient.ReconcileTimeout = 30 * time.Second
+		err = lorryClient.Switchover(context.TODO(), switchOptions.primary, switchOptions.candidate, switchOptions.force)
 		if err != nil {
 			fmt.Printf("switchover failed: %v\n", err)
 			return
@@ -66,6 +69,7 @@ lorryctl switchover  --primary xxx --candidate xxx
 func init() {
 	SwitchCmd.Flags().StringVarP(&switchOptions.primary, "primary", "p", "", "The primary pod name")
 	SwitchCmd.Flags().StringVarP(&switchOptions.candidate, "candidate", "c", "", "The candidate pod name")
+	SwitchCmd.Flags().BoolVarP(&switchOptions.force, "force", "f", false, "force to swithover if failed")
 	SwitchCmd.Flags().StringVarP(&switchOptions.lorryAddr, "lorry-addr", "", "http://localhost:3501/v1.0/", "The addr of lorry to request")
 	SwitchCmd.Flags().BoolP("help", "h", false, "Print this help message")
 

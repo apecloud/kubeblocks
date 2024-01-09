@@ -41,9 +41,9 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -177,14 +177,19 @@ func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) 
 		if !intctrlutil.PodIsReadyWithLabel(pod) {
 			continue
 		}
+		readyWithoutPrimary := false
 		roleName := getRoleName(pod)
 		role, ok := roleMap[roleName]
 		if !ok {
 			continue
 		}
+		if value, ok := pod.Labels[constant.ReadyWithoutPrimaryKey]; ok && value == "true" {
+			readyWithoutPrimary = true
+		}
 		memberStatus := workloads.MemberStatus{
-			PodName:     pod.Name,
-			ReplicaRole: role,
+			PodName:             pod.Name,
+			ReplicaRole:         role,
+			ReadyWithoutPrimary: readyWithoutPrimary,
 		}
 		newMembersStatus = append(newMembersStatus, memberStatus)
 	}
@@ -219,7 +224,7 @@ func deletionKinds(policy workloads.RsmTransformPolicy) []client.ObjectList {
 	return kinds
 }
 
-func getPodsOfStatefulSet(ctx context.Context, cli roclient.ReadonlyClient, stsObj *appsv1.StatefulSet) ([]corev1.Pod, error) {
+func getPodsOfStatefulSet(ctx context.Context, cli client.Reader, stsObj *appsv1.StatefulSet) ([]corev1.Pod, error) {
 	podList := &corev1.PodList{}
 	selector, err := metav1.LabelSelectorAsMap(stsObj.Spec.Selector)
 	if err != nil {
@@ -679,6 +684,9 @@ func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
 	}
 	hasLeader := false
 	for _, status := range membersStatus {
+		if status.ReadyWithoutPrimary {
+			return true
+		}
 		if status.IsLeader {
 			hasLeader = true
 			break
@@ -770,4 +778,31 @@ func IsOwnedByRsm(obj client.Object) bool {
 		}
 	}
 	return false
+}
+
+// func placement(rsm workloads.ReplicatedStateMachine) string {
+//	if rsm.Annotations == nil {
+//		return ""
+//	}
+//	return rsm.Annotations[constant.KBAppMultiClusterPlacementKey]
+// }
+//
+// func inLocalContext() model.GraphOption {
+//	return model.WithClientOption(multicluster.InLocalContext())
+// }
+//
+// func inLocalContextOneshot() model.GraphOption {
+//	return model.WithClientOption(multicluster.InLocalContextOneshot())
+// }
+
+func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
+	// if v.ClientOpt != nil {
+	//	opt, ok := v.ClientOpt.(*multicluster.ClientOption)
+	//	if ok {
+	//		return opt
+	//	}
+	//	panic(fmt.Sprintf("unknown client option: %T", v.ClientOpt))
+	// }
+	// return multicluster.InGlobalContext()
+	return nil
 }

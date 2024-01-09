@@ -27,10 +27,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/golang/mock/gomock"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/sethvargo/go-password/password"
 	"golang.org/x/exp/slices"
@@ -123,7 +123,7 @@ var mockLorryClient4HScale = func(clusterKey types.NamespacedName, compName stri
 			}
 			return nil
 		}).AnyTimes()
-		recorder.Switchover(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		recorder.Switchover(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	})
 }
 
@@ -263,7 +263,7 @@ var _ = Describe("Component Controller", func() {
 		}
 	}
 
-	createClusterObjVx := func(compName, compDefName string, v2 bool, processor func(*testapps.MockClusterFactory), phase appsv1alpha1.ClusterPhase) {
+	createClusterObjVx := func(compName, compDefName string, v2 bool, processor func(*testapps.MockClusterFactory), phase *appsv1alpha1.ClusterPhase) {
 		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
 			WithRandomName()
 		if !v2 {
@@ -279,14 +279,14 @@ var _ = Describe("Component Controller", func() {
 
 		By("Waiting for the cluster enter expected phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-		if len(phase) != 0 {
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(phase))
-		} else {
+		if phase == nil {
 			if clusterObj.Spec.ComponentSpecs[0].Replicas == 0 {
 				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.StoppedClusterPhase))
 			} else {
 				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 			}
+		} else {
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(*phase))
 		}
 
 		By("Waiting for the component enter expected phase")
@@ -296,7 +296,7 @@ var _ = Describe("Component Controller", func() {
 		}
 		compObj = &appsv1alpha1.Component{}
 		Eventually(testapps.CheckObjExists(&testCtx, compKey, compObj, true)).Should(Succeed())
-		if len(phase) == 0 {
+		if phase == nil {
 			Eventually(testapps.GetComponentObservedGeneration(&testCtx, compKey)).Should(BeEquivalentTo(1))
 			if compObj.Spec.Replicas == 0 {
 				Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(appsv1alpha1.StoppedClusterCompPhase))
@@ -308,17 +308,17 @@ var _ = Describe("Component Controller", func() {
 
 	createClusterObj := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster")
-		createClusterObjVx(compName, compDefName, false, processor, "")
+		createClusterObjVx(compName, compDefName, false, processor, nil)
 	}
 
 	createClusterObjV2 := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster with new component definition")
-		createClusterObjVx(compName, compDefName, true, processor, "")
+		createClusterObjVx(compName, compDefName, true, processor, nil)
 	}
 
 	createClusterObjV2WithPhase := func(compName, compDefName string, processor func(*testapps.MockClusterFactory), phase appsv1alpha1.ClusterPhase) {
 		By("Creating a cluster with new component definition")
-		createClusterObjVx(compName, compDefName, true, processor, phase)
+		createClusterObjVx(compName, compDefName, true, processor, &phase)
 	}
 
 	mockCompRunning := func(compName string) {
@@ -722,18 +722,22 @@ var _ = Describe("Component Controller", func() {
 								Backup: &dpv1alpha1.BackupActionSpec{
 									BackupData: &dpv1alpha1.BackupDataActionSpec{
 										JobActionSpec: dpv1alpha1.JobActionSpec{
-											Image:   "xtrabackup",
-											Command: []string{""},
+											BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{
+												Image:   "xtrabackup",
+												Command: []string{""},
+											},
 										},
 									},
 								},
 								Restore: &dpv1alpha1.RestoreActionSpec{
 									PrepareData: &dpv1alpha1.JobActionSpec{
-										Image: "xtrabackup",
-										Command: []string{
-											"sh",
-											"-c",
-											"/backup_scripts.sh",
+										BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{
+											Image: "xtrabackup",
+											Command: []string{
+												"sh",
+												"-c",
+												"/backup_scripts.sh",
+											},
 										},
 									},
 								},
@@ -1146,7 +1150,7 @@ var _ = Describe("Component Controller", func() {
 			}
 			g.Expect(cond).ShouldNot(BeNil())
 			g.Expect(cond.Status).Should(BeEquivalentTo(metav1.ConditionTrue))
-			g.Expect(cond.Message).Should(ContainSubstring("root"))
+			g.Expect(cond.Message).ShouldNot(ContainSubstring("root"))
 			g.Expect(cond.Message).Should(ContainSubstring("admin"))
 		})).Should(Succeed())
 	}
@@ -1212,48 +1216,62 @@ var _ = Describe("Component Controller", func() {
 		createClusterObjV2(compName, compDefObj.Name, nil)
 
 		By("check workload template env")
-		targetEnvVars := map[string]corev1.EnvVar{
-			"SERVICE_HOST": {
+		targetEnvVars := []corev1.EnvVar{
+			{
 				Name:  "SERVICE_HOST",
 				Value: constant.GenerateComponentServiceName(clusterObj.Name, compName, compDefObj.Spec.Services[0].Name),
 			},
-			"SERVICE_PORT": {
+			{
 				Name:  "SERVICE_PORT",
 				Value: strconv.Itoa(int(compDefObj.Spec.Services[0].Spec.Ports[0].Port)),
 			},
-			"USERNAME": {
-				Name:  "USERNAME",
-				Value: compDefObj.Spec.SystemAccounts[0].Name,
+			{
+				Name: "USERNAME",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: constant.GenerateAccountSecretName(clusterObj.Name, compName, compDefObj.Spec.SystemAccounts[0].Name),
+						},
+						Key: constant.AccountNameForSecret,
+					},
+				},
 			},
-			// "PASSWORD": {
-			//	Name:  "PASSWORD",
-			//	Value: "",
-			// },
-			constant.KBEnvNamespace: {
+			{
+				Name: "PASSWORD",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: constant.GenerateAccountSecretName(clusterObj.Name, compName, compDefObj.Spec.SystemAccounts[0].Name),
+						},
+						Key: constant.AccountPasswdForSecret,
+					},
+				},
+			},
+			{
 				Name:  constant.KBEnvNamespace,
 				Value: clusterObj.Namespace,
 			},
-			constant.KBEnvClusterName: {
+			{
 				Name:  constant.KBEnvClusterName,
 				Value: clusterObj.Name,
 			},
-			constant.KBEnvClusterUID: {
+			{
 				Name:  constant.KBEnvClusterUID,
 				Value: string(clusterObj.UID),
 			},
-			constant.KBEnvClusterCompName: {
+			{
 				Name:  constant.KBEnvClusterCompName,
 				Value: constant.GenerateClusterComponentName(clusterObj.Name, compName),
 			},
-			constant.KBEnvCompName: {
+			{
 				Name:  constant.KBEnvCompName,
 				Value: compName,
 			},
-			// constant.KBEnvCompReplicas: {
-			//	Name:  constant.KBEnvCompReplicas,
-			//	Value: "1", // default replicas
-			// },
-			constant.KBEnvPodName: {
+			{
+				Name:  constant.KBEnvCompReplicas,
+				Value: "1", // default replicas
+			},
+			{
 				Name: constant.KBEnvPodName,
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{
@@ -1262,7 +1280,7 @@ var _ = Describe("Component Controller", func() {
 					},
 				},
 			},
-			constant.KBEnvPodUID: {
+			{
 				Name: constant.KBEnvPodUID,
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{
@@ -1271,7 +1289,7 @@ var _ = Describe("Component Controller", func() {
 					},
 				},
 			},
-			constant.KBEnvPodIP: {
+			{
 				Name: constant.KBEnvPodIP,
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{
@@ -1280,7 +1298,7 @@ var _ = Describe("Component Controller", func() {
 					},
 				},
 			},
-			constant.KBEnvPodIPs: {
+			{
 				Name: constant.KBEnvPodIPs,
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{
@@ -1289,12 +1307,12 @@ var _ = Describe("Component Controller", func() {
 					},
 				},
 			},
-			constant.KBEnvPodFQDN: {
+			{
 				Name: constant.KBEnvPodFQDN,
 				Value: fmt.Sprintf("%s.%s-headless.%s.svc", constant.EnvPlaceHolder(constant.KBEnvPodName),
 					constant.EnvPlaceHolder(constant.KBEnvClusterCompName), constant.EnvPlaceHolder(constant.KBEnvNamespace)),
 			},
-			constant.KBEnvNodeName: {
+			{
 				Name: constant.KBEnvNodeName,
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{
@@ -1303,7 +1321,7 @@ var _ = Describe("Component Controller", func() {
 					},
 				},
 			},
-			constant.KBEnvHostIP: {
+			{
 				Name: constant.KBEnvHostIP,
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{
@@ -1312,7 +1330,7 @@ var _ = Describe("Component Controller", func() {
 					},
 				},
 			},
-			constant.KBEnvServiceAccountName: {
+			{
 				Name: constant.KBEnvServiceAccountName,
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{
@@ -1327,16 +1345,33 @@ var _ = Describe("Component Controller", func() {
 			Name:      compObj.Name,
 		}
 		Eventually(testapps.CheckObj(&testCtx, rsmKey, func(g Gomega, rsm *workloads.ReplicatedStateMachine) {
+			envVars, _ := buildEnvVarsNData(nil, targetEnvVars, false)
+			targetEnvVarsMapping := map[string]corev1.EnvVar{}
+			for i, v := range envVars {
+				targetEnvVarsMapping[v.Name] = envVars[i]
+			}
 			for _, cc := range [][]corev1.Container{rsm.Spec.Template.Spec.InitContainers, rsm.Spec.Template.Spec.Containers} {
 				for _, c := range cc {
 					envValueMapping := map[string]corev1.EnvVar{}
 					for i, env := range c.Env {
-						if _, ok := targetEnvVars[env.Name]; ok {
+						if _, ok := targetEnvVarsMapping[env.Name]; ok {
 							envValueMapping[env.Name] = c.Env[i]
 						}
 					}
-					g.Expect(envValueMapping).Should(BeEquivalentTo(targetEnvVars))
+					g.Expect(envValueMapping).Should(BeEquivalentTo(targetEnvVarsMapping))
+					// check envData source
+					g.Expect(c.EnvFrom).Should(ContainElement(envConfigMapSource(clusterObj.Name, compName)))
 				}
+			}
+		})).Should(Succeed())
+		envCMKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateClusterComponentEnvPattern(clusterObj.Name, compName),
+		}
+		Eventually(testapps.CheckObj(&testCtx, envCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			_, envData := buildEnvVarsNData(nil, targetEnvVars, false)
+			for k, v := range envData {
+				Expect(cm.Data).Should(HaveKeyWithValue(k, v))
 			}
 		})).Should(Succeed())
 	}
@@ -1368,7 +1403,7 @@ var _ = Describe("Component Controller", func() {
 		for _, replicas := range []int32{replicasLimit.MinReplicas / 2, replicasLimit.MaxReplicas * 2} {
 			createClusterObjV2WithPhase(compName, compDefObj.Name, func(f *testapps.MockClusterFactory) {
 				f.SetReplicas(replicas)
-			}, appsv1alpha1.AbnormalClusterPhase)
+			}, "")
 			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
 				g.Expect(comp.Spec.Replicas).Should(BeEquivalentTo(replicas))
 				g.Expect(comp.Status.Conditions).Should(HaveLen(1))
@@ -1735,7 +1770,7 @@ var _ = Describe("Component Controller", func() {
 		sts.Status.ObservedGeneration = sts.Generation
 		Expect(k8sClient.Status().Patch(ctx, sts, stsPatch)).Should(Succeed())
 
-		By("Checking consensus set pods' role are updated in cluster status")
+		By("Checking pods' role are updated in cluster status")
 		Eventually(func(g Gomega) {
 			fetched := &appsv1alpha1.Cluster{}
 			g.Expect(k8sClient.Get(ctx, clusterKey, fetched)).To(Succeed())
@@ -1744,23 +1779,6 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(fetched.Status.Components).To(HaveKey(compName))
 			_, ok := fetched.Status.Components[compName]
 			g.Expect(ok).Should(BeTrue())
-			// TODO(component): workload status
-			// getStsPodsName := func(sts *appsv1.StatefulSet) []string {
-			//	pods, err := common.GetPodListByStatefulSet(ctx, k8sClient, sts)
-			//	Expect(err).To(Succeed())
-			//
-			//	names := make([]string, 0)
-			//	for _, pod := range pods {
-			//		names = append(names, pod.Name)
-			//	}
-			//	return names
-			// }
-			// consensusStatus := compStatus.ConsensusSetStatus
-			// g.Expect(consensusStatus != nil).To(BeTrue())
-			// g.Expect(consensusStatus.Leader.Pod).To(BeElementOf(getStsPodsName(sts)))
-			// g.Expect(consensusStatus.Followers).Should(HaveLen(2))
-			// g.Expect(consensusStatus.Followers[0].Pod).To(BeElementOf(getStsPodsName(sts)))
-			// g.Expect(consensusStatus.Followers[1].Pod).To(BeElementOf(getStsPodsName(sts)))
 		}).Should(Succeed())
 
 		By("Waiting the component be running")
@@ -1961,6 +1979,7 @@ var _ = Describe("Component Controller", func() {
 						newImageCnt += 1
 					}
 				}
+				g.Expect(oldImageCnt + newImageCnt).Should(Equal(oldImageCntExpected + newImageCntExpected))
 				g.Expect(oldImageCnt).Should(Equal(oldImageCntExpected))
 				g.Expect(newImageCnt).Should(Equal(newImageCntExpected))
 			}).Should(Succeed())
@@ -2135,13 +2154,11 @@ var _ = Describe("Component Controller", func() {
 			cleanEnv()
 		})
 
-		for compName, compDefName := range compNameNDef {
+		for key := range compNameNDef {
+			compName := key
+			compDefName := compNameNDef[key]
 			It(fmt.Sprintf("[comp: %s] should create/delete pods to match the desired replica number if updating cluster's replica number to a valid value", compName), func() {
 				testChangeReplicas(compName, compDefName)
-			})
-
-			It(fmt.Sprintf("[comp: %s] update kubeblocks-tools image", compName), func() {
-				testUpdateKubeBlocksToolsImage(compName, compDefName)
 			})
 		}
 	})
@@ -2163,7 +2180,16 @@ var _ = Describe("Component Controller", func() {
 			mockStorageClass = testk8s.CreateMockStorageClass(&testCtx, testk8s.DefaultStorageClassName)
 		})
 
-		for compName, compDefName := range compNameNDef {
+		for key := range compNameNDef {
+			compName := key
+			compDefName := compNameNDef[key]
+
+			Context(fmt.Sprintf("[comp: %s] update kubeblocks-tools image ", compName), func() {
+				It(fmt.Sprintf("[comp: %s] update kubeblocks-tools image", compName), func() {
+					testUpdateKubeBlocksToolsImage(compName, compDefName)
+				})
+			})
+
 			Context(fmt.Sprintf("[comp: %s] volume expansion", compName), func() {
 				It("should update PVC request storage size accordingly", func() {
 					testVolumeExpansion(compName, compDefName, mockStorageClass)

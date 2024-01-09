@@ -86,10 +86,9 @@ func GenerateClusterComponentEnvPattern(clusterName, compName string) string {
 	return fmt.Sprintf("%s-%s-env", clusterName, compName)
 }
 
-// GenerateDefaultCompServiceAccountPattern generates default component service account pattern
-// fullCompName is the full name of component with clusterName prefix
-func GenerateDefaultCompServiceAccountPattern(fullCompName string) string {
-	return fmt.Sprintf("%s-%s", KBLowerPrefix, fullCompName)
+// GenerateDefaultServiceAccountName generates default service account name for a cluster.
+func GenerateDefaultServiceAccountName(name string) string {
+	return fmt.Sprintf("%s-%s", KBLowerPrefix, name)
 }
 
 // GenerateRSMNamePattern generates rsm name pattern
@@ -116,4 +115,9 @@ func GeneratePodSubDomain(clusterName, compName string) string {
 func GeneratePodFQDN(namespace, clusterName, compName string, ordinal int) string {
 	return fmt.Sprintf("%s.%s.%s.svc",
 		GeneratePodName(clusterName, compName, ordinal), GeneratePodSubDomain(clusterName, compName), namespace)
+}
+
+// GenerateVirtualComponentDefinition generates the virtual component definition name.
+func GenerateVirtualComponentDefinition(compDefSuffix string) string {
+	return fmt.Sprintf("%s-%s", KBGeneratedVirtualCompDefPrefix, compDefSuffix)
 }

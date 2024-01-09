@@ -120,7 +120,7 @@ var _ = Describe("Backup Deleter Test", func() {
 
 			By("check job exist")
 			job := &batchv1.Job{}
-			key := BuildDeleteBackupFilesJobKey(backup)
+			key := BuildDeleteBackupFilesJobKey(backup, false)
 			Eventually(testapps.CheckObjExists(&testCtx, key, job, true)).Should(Succeed())
 
 			By("delete backup with job running")

@@ -22,6 +22,7 @@ package backup
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -124,13 +125,13 @@ func excludeLabelsForWorkload() []string {
 
 // BuildBackupWorkloadLabels builds the labels for workload which owned by backup.
 func BuildBackupWorkloadLabels(backup *dpv1alpha1.Backup) map[string]string {
-	labels := backup.Labels
-	if labels == nil {
-		labels = map[string]string{}
-	} else {
-		for _, v := range excludeLabelsForWorkload() {
-			delete(labels, v)
+	labels := map[string]string{}
+	excludeLabels := excludeLabelsForWorkload()
+	for k, v := range backup.Labels {
+		if slices.Contains(excludeLabels, k) {
+			continue
 		}
+		labels[k] = v
 	}
 	labels[types.BackupNameLabelKey] = backup.Name
 	return labels
@@ -177,6 +178,15 @@ func BuildBackupPath(backup *dpv1alpha1.Backup, pathPrefix string) string {
 		return fmt.Sprintf("/%s%s/%s", backup.Namespace, pathPrefix, backup.Name)
 	}
 	return fmt.Sprintf("/%s/%s/%s", backup.Namespace, pathPrefix, backup.Name)
+}
+
+// BuildKopiaRepoPath builds the path of kopia repository.
+func BuildKopiaRepoPath(backup *dpv1alpha1.Backup, pathPrefix string) string {
+	pathPrefix = strings.TrimRight(pathPrefix, "/")
+	if strings.TrimSpace(pathPrefix) == "" || strings.HasPrefix(pathPrefix, "/") {
+		return fmt.Sprintf("/%s%s/%s", backup.Namespace, pathPrefix, types.KopiaRepoFolderName)
+	}
+	return fmt.Sprintf("/%s/%s/%s", backup.Namespace, pathPrefix, types.KopiaRepoFolderName)
 }
 
 func GetSchedulePolicyByMethod(backupSchedule *dpv1alpha1.BackupSchedule, method string) *dpv1alpha1.SchedulePolicy {

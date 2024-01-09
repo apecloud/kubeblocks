@@ -188,18 +188,22 @@ func (c *compDefServicesConvertor) convert(args ...any) (any, error) {
 	}
 	headlessSvc := c.removeDuplicatePorts(headlessSvcBuilder.GetObject())
 
-	services := []appsv1alpha1.Service{
+	services := []appsv1alpha1.ComponentService{
 		{
-			Name:         "default",
-			ServiceName:  "",
-			Spec:         svc.Spec,
-			RoleSelector: c.roleSelector(clusterCompDef),
+			Service: appsv1alpha1.Service{
+				Name:         "default",
+				ServiceName:  "",
+				Spec:         svc.Spec,
+				RoleSelector: c.roleSelector(clusterCompDef),
+			},
 		},
 		{
-			Name:         "headless",
-			ServiceName:  "headless",
-			Spec:         headlessSvc.Spec,
-			RoleSelector: c.roleSelector(clusterCompDef),
+			Service: appsv1alpha1.Service{
+				Name:         "headless",
+				ServiceName:  "headless",
+				Spec:         headlessSvc.Spec,
+				RoleSelector: c.roleSelector(clusterCompDef),
+			},
 		},
 	}
 	return services, nil
@@ -328,22 +332,25 @@ type compDefUpdateStrategyConvertor struct{}
 
 func (c *compDefUpdateStrategyConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	defaultUpdateStrategy := appsv1alpha1.SerialStrategy
-	strategy := &defaultUpdateStrategy
-
+	var strategy *appsv1alpha1.UpdateStrategy
 	switch clusterCompDef.WorkloadType {
 	case appsv1alpha1.Consensus:
+		if clusterCompDef.RSMSpec != nil && clusterCompDef.RSMSpec.MemberUpdateStrategy != nil {
+			strategy = func() *appsv1alpha1.UpdateStrategy {
+				s := appsv1alpha1.UpdateStrategy(*clusterCompDef.RSMSpec.MemberUpdateStrategy)
+				return &s
+			}()
+		}
 		if clusterCompDef.ConsensusSpec != nil {
 			strategy = &clusterCompDef.ConsensusSpec.UpdateStrategy
 		}
 	case appsv1alpha1.Replication:
-		if clusterCompDef.ReplicationSpec != nil {
-			strategy = &clusterCompDef.ReplicationSpec.UpdateStrategy
-		}
+		// be compatible with the behaviour of RSM in 0.7, set SerialStrategy for Replication workloads by default.
+		serialStrategy := appsv1alpha1.SerialStrategy
+		strategy = &serialStrategy
+	// be compatible with the behaviour of RSM in 0.7, don't set update strategy for Stateful and Stateless workloads.
 	case appsv1alpha1.Stateful:
-		if clusterCompDef.StatefulSpec != nil {
-			strategy = &clusterCompDef.StatefulSpec.UpdateStrategy
-		}
+		// do nothing
 	case appsv1alpha1.Stateless:
 		// do nothing
 	default:
@@ -376,7 +383,7 @@ func (c *compDefRolesConvertor) convert(args ...any) (any, error) {
 			},
 			{
 				Name:        constant.Secondary,
-				Serviceable: false,
+				Serviceable: true,
 				Writable:    false,
 				Votable:     true,
 			},

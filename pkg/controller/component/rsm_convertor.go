@@ -30,9 +30,9 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
-// BuildRSMFrom builds a new Component object based on Cluster, SynthesizedComponent.
-func BuildRSMFrom(cluster *appsv1alpha1.Cluster, synthesizeComp *SynthesizedComponent, protoRSM *workloads.ReplicatedStateMachine) (*workloads.ReplicatedStateMachine, error) {
-	if cluster == nil || synthesizeComp == nil {
+// BuildRSMFrom builds a new Component object based on SynthesizedComponent.
+func BuildRSMFrom(synthesizeComp *SynthesizedComponent, protoRSM *workloads.ReplicatedStateMachine) (*workloads.ReplicatedStateMachine, error) {
+	if synthesizeComp == nil {
 		return nil, nil
 	}
 	if protoRSM == nil {
@@ -49,7 +49,7 @@ func BuildRSMFrom(cluster *appsv1alpha1.Cluster, synthesizeComp *SynthesizedComp
 		"podmanagementpolicy":       &rsmPodManagementPolicyConvertor{},
 		"updatestrategy":            &rsmUpdateStrategyConvertor{},
 	}
-	if err := covertObject(convertors, &protoRSM.Spec, cluster, synthesizeComp); err != nil {
+	if err := covertObject(convertors, &protoRSM.Spec, synthesizeComp); err != nil {
 		return nil, err
 	}
 	return protoRSM, nil
@@ -83,16 +83,12 @@ type rsmPodManagementPolicyConvertor struct{}
 type rsmUpdateStrategyConvertor struct{}
 
 // parseRSMConvertorArgs parses the args of rsm convertor.
-func parseRSMConvertorArgs(args ...any) (*appsv1alpha1.Cluster, *SynthesizedComponent, error) {
-	cluster, ok := args[0].(*appsv1alpha1.Cluster)
+func parseRSMConvertorArgs(args ...any) (*SynthesizedComponent, error) {
+	synthesizeComp, ok := args[0].(*SynthesizedComponent)
 	if !ok {
-		return nil, nil, errors.New("args[0] is not a cluster object")
+		return nil, errors.New("args[0] not a SynthesizedComponent object")
 	}
-	synthesizeComp, ok := args[1].(*SynthesizedComponent)
-	if !ok {
-		return nil, nil, errors.New("args[1] not a SynthesizedComponent object")
-	}
-	return cluster, synthesizeComp, nil
+	return synthesizeComp, nil
 }
 
 // rsmServiceConvertor converts the given object into ReplicatedStateMachine.Spec.Service.
@@ -135,7 +131,7 @@ func (c *rsmAlternativeServicesConvertor) convert(args ...any) (any, error) {
 
 // rsmRolesConvertor converts the ComponentDefinition.Spec.Roles into ReplicatedStateMachine.Spec.Roles.
 func (c *rsmRolesConvertor) convert(args ...any) (any, error) {
-	_, synthesizeComp, err := parseRSMConvertorArgs(args...)
+	synthesizeComp, err := parseRSMConvertorArgs(args...)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +140,7 @@ func (c *rsmRolesConvertor) convert(args ...any) (any, error) {
 
 // rsmRoleProbeConvertor converts the ComponentDefinition.Spec.LifecycleActions.RoleProbe into ReplicatedStateMachine.Spec.RoleProbe.
 func (c *rsmRoleProbeConvertor) convert(args ...any) (any, error) {
-	_, synthesizeComp, err := parseRSMConvertorArgs(args...)
+	synthesizeComp, err := parseRSMConvertorArgs(args...)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +181,7 @@ func (c *rsmCredentialConvertor) convert(args ...any) (any, error) {
 		sysInitAccount *appsv1alpha1.SystemAccount
 	)
 
-	cluster, synthesizeComp, err := parseRSMConvertorArgs(args...)
+	synthesizeComp, err := parseRSMConvertorArgs(args...)
 	if err != nil {
 		return nil, err
 	}
@@ -198,9 +194,9 @@ func (c *rsmCredentialConvertor) convert(args ...any) (any, error) {
 		}
 	}
 	if sysInitAccount != nil {
-		secretName = constant.GenerateAccountSecretName(cluster.Name, synthesizeComp.Name, sysInitAccount.Name)
+		secretName = constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
 	} else {
-		secretName = constant.GenerateDefaultConnCredential(cluster.Name)
+		secretName = constant.GenerateDefaultConnCredential(synthesizeComp.ClusterName)
 	}
 	credential := &workloads.Credential{
 		Username: workloads.CredentialVar{
@@ -229,30 +225,30 @@ func (c *rsmCredentialConvertor) convert(args ...any) (any, error) {
 }
 
 func (c *rsmMembershipReconfigurationConvertor) convert(args ...any) (any, error) {
-	// cluster, synthesizeComp, err := parseRSMConvertorArgs(args...)
+	// synthesizeComp, err := parseRSMConvertorArgs(args...)
 	return "", nil // TODO
 }
 
 func (c *rsmMemberUpdateStrategyConvertor) convert(args ...any) (any, error) {
-	_, synthesizeComp, err := parseRSMConvertorArgs(args...)
+	synthesizeComp, err := parseRSMConvertorArgs(args...)
 	if err != nil {
 		return nil, err
 	}
 	var memberUpdateStrategy *workloads.MemberUpdateStrategy
-	switch *synthesizeComp.UpdateStrategy {
-	case appsv1alpha1.SerialStrategy:
-		memberSerialUpdateStrategy := workloads.SerialUpdateStrategy
-		memberUpdateStrategy = &memberSerialUpdateStrategy
-	case appsv1alpha1.ParallelStrategy:
-		memberParallelUpdateStrategy := workloads.ParallelUpdateStrategy
-		memberUpdateStrategy = &memberParallelUpdateStrategy
-	case appsv1alpha1.BestEffortParallelStrategy:
-		memberBestEffortParallelUpdateStrategy := workloads.BestEffortParallelUpdateStrategy
-		memberUpdateStrategy = &memberBestEffortParallelUpdateStrategy
-	default:
-		return nil, err
+	if synthesizeComp.UpdateStrategy != nil {
+		switch *synthesizeComp.UpdateStrategy {
+		case appsv1alpha1.SerialStrategy:
+			memberSerialUpdateStrategy := workloads.SerialUpdateStrategy
+			memberUpdateStrategy = &memberSerialUpdateStrategy
+		case appsv1alpha1.ParallelStrategy:
+			memberParallelUpdateStrategy := workloads.ParallelUpdateStrategy
+			memberUpdateStrategy = &memberParallelUpdateStrategy
+		case appsv1alpha1.BestEffortParallelStrategy:
+			memberBestEffortParallelUpdateStrategy := workloads.BestEffortParallelUpdateStrategy
+			memberUpdateStrategy = &memberBestEffortParallelUpdateStrategy
+		}
 	}
-	return memberUpdateStrategy, err
+	return memberUpdateStrategy, nil
 }
 
 func (c *rsmPodManagementPolicyConvertor) convert(args ...any) (any, error) {
@@ -262,7 +258,7 @@ func (c *rsmPodManagementPolicyConvertor) convert(args ...any) (any, error) {
 }
 
 func (c *rsmUpdateStrategyConvertor) convert(args ...any) (any, error) {
-	// cluster, synthesizeComp, err := parseRSMConvertorArgs(args...)
+	// synthesizeComp, err := parseRSMConvertorArgs(args...)
 	return "", nil // TODO
 }
 

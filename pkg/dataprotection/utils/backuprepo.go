@@ -38,15 +38,15 @@ const (
 	datasafedConfigMountPath = "/etc/datasafed"
 )
 
-func InjectDatasafed(podSpec *corev1.PodSpec, repo *dpv1alpha1.BackupRepo, repoVolumeMountPath string, backupPath string) {
+func InjectDatasafed(podSpec *corev1.PodSpec, repo *dpv1alpha1.BackupRepo, repoVolumeMountPath string, kopiaRepoPath string) {
 	if repo.AccessByMount() {
-		InjectDatasafedWithPVC(podSpec, repo.Status.BackupPVCName, repoVolumeMountPath, backupPath)
+		InjectDatasafedWithPVC(podSpec, repo.Status.BackupPVCName, repoVolumeMountPath, kopiaRepoPath)
 	} else if repo.AccessByTool() {
-		InjectDatasafedWithConfig(podSpec, repo.Status.ToolConfigSecretName, backupPath)
+		InjectDatasafedWithConfig(podSpec, repo.Status.ToolConfigSecretName, kopiaRepoPath)
 	}
 }
 
-func InjectDatasafedWithPVC(podSpec *corev1.PodSpec, pvcName string, mountPath string, backupPath string) {
+func InjectDatasafedWithPVC(podSpec *corev1.PodSpec, pvcName string, mountPath string, kopiaRepoPath string) {
 	volumeName := "dp-backup-data"
 	volume := corev1.Volume{
 		Name: volumeName,
@@ -67,11 +67,17 @@ func InjectDatasafedWithPVC(podSpec *corev1.PodSpec, pvcName string, mountPath s
 			Value: mountPath,
 		},
 	}
+	if kopiaRepoPath != "" {
+		envs = append(envs, corev1.EnvVar{
+			Name:  dptypes.DPDatasafedKopiaRepoRoot,
+			Value: kopiaRepoPath,
+		})
+	}
 	injectElements(podSpec, toSlice(volume), toSlice(volumeMount), envs)
 	injectDatasafedInstaller(podSpec)
 }
 
-func InjectDatasafedWithConfig(podSpec *corev1.PodSpec, configSecretName string, backupPath string) {
+func InjectDatasafedWithConfig(podSpec *corev1.PodSpec, configSecretName string, kopiaRepoPath string) {
 	volumeName := "dp-datasafed-config"
 	volume := corev1.Volume{
 		Name: volumeName,
@@ -86,7 +92,14 @@ func InjectDatasafedWithConfig(podSpec *corev1.PodSpec, configSecretName string,
 		ReadOnly:  true,
 		MountPath: datasafedConfigMountPath,
 	}
-	injectElements(podSpec, toSlice(volume), toSlice(volumeMount), nil)
+	var envs []corev1.EnvVar
+	if kopiaRepoPath != "" {
+		envs = append(envs, corev1.EnvVar{
+			Name:  dptypes.DPDatasafedKopiaRepoRoot,
+			Value: kopiaRepoPath,
+		})
+	}
+	injectElements(podSpec, toSlice(volume), toSlice(volumeMount), envs)
 	injectDatasafedInstaller(podSpec)
 }
 

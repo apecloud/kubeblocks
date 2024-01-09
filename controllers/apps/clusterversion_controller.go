@@ -22,7 +22,6 @@ package apps
 import (
 	"context"
 	"fmt"
-	"runtime"
 	"strings"
 	"time"
 
@@ -35,14 +34,12 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsconfig "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusterversions,verbs=get;list;watch;create;update;patch;delete
@@ -58,7 +55,6 @@ type ClusterVersionReconciler struct {
 
 func init() {
 	clusterDefUpdateHandlers["clusterVersion"] = clusterVersionUpdateHandler
-	viper.SetDefault(maxConcurReconClusterVersionKey, runtime.NumCPU())
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -150,9 +146,6 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 func (r *ClusterVersionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.ClusterVersion{}).
-		WithOptions(controller.Options{
-			MaxConcurrentReconciles: viper.GetInt(maxConcurReconClusterVersionKey),
-		}).
 		Complete(r)
 }
 

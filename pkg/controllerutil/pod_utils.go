@@ -34,7 +34,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
@@ -337,8 +336,8 @@ func GetIntOrPercentValue(intOrStr *metautil.IntOrString) (int, bool, error) {
 }
 
 // GetPortByPortName gets the Port from pod by name
-func GetPortByPortName(pod *corev1.Pod, portName string) (int32, error) {
-	for _, container := range pod.Spec.Containers {
+func GetPortByPortName(containers []corev1.Container, portName string) (int32, error) {
+	for _, container := range containers {
 		for _, port := range container.Ports {
 			if port.Name == portName {
 				return port.ContainerPort, nil
@@ -349,36 +348,41 @@ func GetPortByPortName(pod *corev1.Pod, portName string) (int32, error) {
 }
 
 func GetLorryGRPCPort(pod *corev1.Pod) (int32, error) {
-	return GetPortByPortName(pod, constant.LorryGRPCPortName)
+	return GetLorryGRPCPortFromContainers(pod.Spec.Containers)
+}
+
+func GetLorryGRPCPortFromContainers(containers []corev1.Container) (int32, error) {
+	return GetPortByPortName(containers, constant.LorryGRPCPortName)
 }
 
 func GetLorryHTTPPort(pod *corev1.Pod) (int32, error) {
-	return GetPortByPortName(pod, constant.LorryHTTPPortName)
+	return GetLorryHTTPPortFromContainers(pod.Spec.Containers)
 }
 
-// GuessLorryHTTPPort guesses lorry container and serving port.
-// TODO(xuriwuyun): should provide a deterministic way to find the lorry serving port.
-func GuessLorryHTTPPort(pod *corev1.Pod) (int32, error) {
-	lorryImage := viper.GetString(constant.KBToolsImage)
-	for _, container := range pod.Spec.Containers {
-		if container.Image != lorryImage {
-			continue
-		}
-		if len(container.Ports) > 0 {
-			return container.Ports[0].ContainerPort, nil
-		}
-	}
-	return 0, fmt.Errorf("lorry port not found")
+func GetLorryHTTPPortFromContainers(containers []corev1.Container) (int32, error) {
+	return GetPortByPortName(containers, constant.LorryHTTPPortName)
 }
 
-// GetLorryContainerName gets the probe container from pod
+// GetLorryContainerName gets the lorry container from pod
 func GetLorryContainerName(pod *corev1.Pod) (string, error) {
-	for _, container := range pod.Spec.Containers {
-		if len(container.Command) > 0 && strings.Contains(container.Command[0], "lorry") {
-			return container.Name, nil
-		}
+	container := GetLorryContainer(pod.Spec.Containers)
+	if container != nil {
+		return container.Name, nil
 	}
 	return "", fmt.Errorf("lorry container not found")
+}
+
+func GetLorryContainer(containers []corev1.Container) *corev1.Container {
+	var container *corev1.Container
+	for i := range containers {
+		container = &containers[i]
+		for _, port := range container.Ports {
+			if port.Name == constant.LorryHTTPPortName {
+				return container
+			}
+		}
+	}
+	return nil
 }
 
 // PodIsReadyWithLabel checks if pod is ready for ConsensusSet/ReplicationSet component,
@@ -440,4 +444,111 @@ func BuildPodHostDNS(pod *corev1.Pod) string {
 		return strings.Join(hostDNS, ".")
 	}
 	return pod.Status.PodIP
+}
+
+// ResolvePodSpecDefaultFields set default value for some known fields of proto PodSpec @pobj.
+func ResolvePodSpecDefaultFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
+	resolveVolume := func(v corev1.Volume, vv *corev1.Volume) {
+		if vv.DownwardAPI != nil && v.DownwardAPI != nil {
+			for i := range vv.DownwardAPI.Items {
+				vf := v.DownwardAPI.Items[i]
+				if vf.FieldRef == nil {
+					continue
+				}
+				vvf := &vv.DownwardAPI.Items[i]
+				if vvf.FieldRef != nil && len(vvf.FieldRef.APIVersion) == 0 {
+					vvf.FieldRef.APIVersion = vf.FieldRef.APIVersion
+				}
+			}
+			if vv.DownwardAPI.DefaultMode == nil {
+				vv.DownwardAPI.DefaultMode = v.DownwardAPI.DefaultMode
+			}
+		}
+		if vv.ConfigMap != nil && v.ConfigMap != nil {
+			if vv.ConfigMap.DefaultMode == nil {
+				vv.ConfigMap.DefaultMode = v.ConfigMap.DefaultMode
+			}
+		}
+	}
+	for i := 0; i < min(len(obj.Volumes), len(pobj.Volumes)); i++ {
+		resolveVolume(obj.Volumes[i], &pobj.Volumes[i])
+	}
+	for i := 0; i < min(len(obj.InitContainers), len(pobj.InitContainers)); i++ {
+		ResolveContainerDefaultFields(obj.InitContainers[i], &pobj.InitContainers[i])
+	}
+	for i := 0; i < min(len(obj.Containers), len(pobj.Containers)); i++ {
+		ResolveContainerDefaultFields(obj.Containers[i], &pobj.Containers[i])
+	}
+	if len(pobj.RestartPolicy) == 0 {
+		pobj.RestartPolicy = obj.RestartPolicy
+	}
+	if pobj.TerminationGracePeriodSeconds == nil {
+		pobj.TerminationGracePeriodSeconds = obj.TerminationGracePeriodSeconds
+	}
+	if len(pobj.DNSPolicy) == 0 {
+		pobj.DNSPolicy = obj.DNSPolicy
+	}
+	if len(pobj.DeprecatedServiceAccount) == 0 {
+		pobj.DeprecatedServiceAccount = obj.DeprecatedServiceAccount
+	}
+	if pobj.SecurityContext == nil {
+		pobj.SecurityContext = obj.SecurityContext
+	}
+	if len(pobj.SchedulerName) == 0 {
+		pobj.SchedulerName = obj.SchedulerName
+	}
+	if len(pobj.Tolerations) == 0 {
+		pobj.Tolerations = obj.Tolerations
+	}
+	if pobj.Priority == nil {
+		pobj.Priority = obj.Priority
+	}
+	if pobj.EnableServiceLinks == nil {
+		pobj.EnableServiceLinks = obj.EnableServiceLinks
+	}
+	if pobj.PreemptionPolicy == nil {
+		pobj.PreemptionPolicy = obj.PreemptionPolicy
+	}
+}
+
+// ResolveContainerDefaultFields set default value for some known fields of proto Container @pcontainer.
+func ResolveContainerDefaultFields(container corev1.Container, pcontainer *corev1.Container) {
+	if len(pcontainer.TerminationMessagePath) == 0 {
+		pcontainer.TerminationMessagePath = container.TerminationMessagePath
+	}
+	if len(pcontainer.TerminationMessagePolicy) == 0 {
+		pcontainer.TerminationMessagePolicy = container.TerminationMessagePolicy
+	}
+	if len(pcontainer.ImagePullPolicy) == 0 {
+		pcontainer.ImagePullPolicy = container.ImagePullPolicy
+	}
+
+	resolveContainerProbe := func(p corev1.Probe, pp *corev1.Probe) {
+		if pp.TimeoutSeconds == 0 {
+			pp.TimeoutSeconds = p.TimeoutSeconds
+		}
+		if pp.PeriodSeconds == 0 {
+			pp.PeriodSeconds = p.PeriodSeconds
+		}
+		if pp.SuccessThreshold == 0 {
+			pp.SuccessThreshold = p.SuccessThreshold
+		}
+		if pp.FailureThreshold == 0 {
+			pp.FailureThreshold = p.FailureThreshold
+		}
+		if pp.HTTPGet != nil && len(pp.HTTPGet.Scheme) == 0 {
+			if p.HTTPGet != nil {
+				pp.HTTPGet.Scheme = p.HTTPGet.Scheme
+			}
+		}
+	}
+	if pcontainer.LivenessProbe != nil && container.LivenessProbe != nil {
+		resolveContainerProbe(*container.LivenessProbe, pcontainer.LivenessProbe)
+	}
+	if pcontainer.ReadinessProbe != nil && container.ReadinessProbe != nil {
+		resolveContainerProbe(*container.ReadinessProbe, pcontainer.ReadinessProbe)
+	}
+	if pcontainer.StartupProbe != nil && container.StartupProbe != nil {
+		resolveContainerProbe(*container.StartupProbe, pcontainer.StartupProbe)
+	}
 }

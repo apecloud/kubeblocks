@@ -256,13 +256,16 @@ var _ = Describe("object generation transformer test.", func() {
 						Name:          constant.LorryGRPCPortName,
 						ContainerPort: defaultRoleProbeGRPCPort,
 					},
+					{
+						Name:          constant.LorryHTTPPortName,
+						ContainerPort: defaultRoleProbeDaemonPort,
+					},
 				},
 			})
 			injectRoleProbeBaseContainer(*rsm, templateCopy, "", nil)
 			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
 			probeContainer := templateCopy.Spec.Containers[1]
-			Expect(probeContainer.ReadinessProbe).ShouldNot(BeNil())
-			Expect(len(probeContainer.Ports)).Should(Equal(1))
+			Expect(len(probeContainer.Ports)).Should(Equal(2))
 			Expect(probeContainer.Ports[0].ContainerPort).Should(BeElementOf([]int32{int32(defaultRoleProbeGRPCPort), int32(defaultRoleProbeDaemonPort)}))
 		})
 
@@ -277,12 +280,16 @@ var _ = Describe("object generation transformer test.", func() {
 						Name:          constant.LorryGRPCPortName,
 						ContainerPort: 9555,
 					},
+					{
+						Name:          constant.LorryHTTPPortName,
+						ContainerPort: defaultRoleProbeDaemonPort,
+					},
 				},
 			})
 			injectRoleProbeBaseContainer(*rsm, templateCopy, "", nil)
 			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
 			probeContainer := templateCopy.Spec.Containers[1]
-			Expect(len(probeContainer.Ports)).Should(Equal(1))
+			Expect(len(probeContainer.Ports)).Should(Equal(2))
 			Expect(probeContainer.Ports[0].ContainerPort).Should(Equal(int32(9555)))
 		})
 
@@ -297,12 +304,16 @@ var _ = Describe("object generation transformer test.", func() {
 						Name:          constant.LorryGRPCPortName,
 						ContainerPort: defaultRoleProbeGRPCPort,
 					},
+					{
+						Name:          constant.LorryHTTPPortName,
+						ContainerPort: defaultRoleProbeDaemonPort,
+					},
 				},
 			})
 			injectRoleProbeBaseContainer(*rsm, templateCopy, "", nil)
 			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
 			probeContainer := templateCopy.Spec.Containers[1]
-			Expect(len(probeContainer.Ports)).Should(Equal(1))
+			Expect(len(probeContainer.Ports)).Should(Equal(2))
 			Expect(probeContainer.Ports[0].ContainerPort).Should(Equal(int32(defaultRoleProbeGRPCPort)))
 		})
 
@@ -317,12 +328,16 @@ var _ = Describe("object generation transformer test.", func() {
 						Name:          constant.LorryGRPCPortName,
 						ContainerPort: defaultRoleProbeGRPCPort,
 					},
+					{
+						Name:          constant.LorryHTTPPortName,
+						ContainerPort: defaultRoleProbeDaemonPort,
+					},
 				},
 			})
 			injectRoleProbeBaseContainer(*rsm, templateCopy, "", nil)
 			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
 			probeContainer := templateCopy.Spec.Containers[1]
-			Expect(len(probeContainer.Ports)).Should(Equal(1))
+			Expect(len(probeContainer.Ports)).Should(Equal(2))
 			Expect(probeContainer.Ports[0].ContainerPort).Should(Equal(int32(defaultRoleProbeGRPCPort)))
 		})
 

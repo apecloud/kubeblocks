@@ -29,6 +29,7 @@ const (
 	CfgKeyCtrlrReconcileRetryDurationMS = "CM_RECON_RETRY_DURATION_MS"       // accept time
 	CfgRecoverVolumeExpansionFailure    = "RECOVER_VOLUME_EXPANSION_FAILURE" // refer to feature gates RecoverVolumeExpansionFailure of k8s.
 	CfgKeyProvider                      = "KUBE_PROVIDER"
+	CfgHostPortConfigMapName            = "HOST_PORT_CM_NAME"
 
 	// addon config keys
 	CfgKeyAddonJobTTL        = "ADDON_JOB_TTL"
@@ -87,14 +88,14 @@ const (
 	BackupProtectionLabelKey                 = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
 	AddonProviderLabelKey                    = "kubeblocks.io/provider"          // AddonProviderLabelKey marks the addon provider
 	RoleLabelKey                             = "kubeblocks.io/role"              // RoleLabelKey consensusSet and replicationSet role label key
+	ReadyWithoutPrimaryKey                   = "kubeblocks.io/ready-without-primary"
 	VolumeTypeLabelKey                       = "kubeblocks.io/volume-type"
 	ClusterAccountLabelKey                   = "account.kubeblocks.io/name"
 	KBAppClusterUIDLabelKey                  = "apps.kubeblocks.io/cluster-uid"
 	KBAppComponentLabelKey                   = "apps.kubeblocks.io/component-name"
 	KBAppComponentDefRefLabelKey             = "apps.kubeblocks.io/component-def-ref" // refer clusterDefinition.Spec.ComponentDefs[*].Name before KubeBlocks Version 0.8.0 or refer ComponentDefinition.Name after KubeBlocks Version 0.8.0
 	KBAppClusterDefTypeLabelKey              = "apps.kubeblocks.io/cluster-type"      // refer clusterDefinition.Spec.Type (deprecated)
-	AppConfigTypeLabelKey                    = "apps.kubeblocks.io/config-type"
-	KBManagedByKey                           = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created
+	KBManagedByKey                           = "apps.kubeblocks.io/managed-by"        // KBManagedByKey marks resources that auto created
 	PVCNameLabelKey                          = "apps.kubeblocks.io/pvc-name"
 	VolumeClaimTemplateNameLabelKey          = "apps.kubeblocks.io/vct-name"
 	VolumeClaimTemplateNameLabelKeyForLegacy = "vct.kubeblocks.io/name" // Deprecated: only compatible with version 0.5, will be removed in 0.7
@@ -150,10 +151,19 @@ const (
 	LastRoleSnapshotVersionAnnotationKey        = "apps.kubeblocks.io/last-role-snapshot-version"
 	HostPortAnnotationKey                       = "kubeblocks.io/host-port"
 
+	// NodePortSvcAnnotationKey defines the feature gate of NodePort Service defined in ComponentDefinition.Spec.Services.
+	// Components defined in the annotation value, their all services of type NodePort defined in ComponentDefinition will be created; otherwise, they will be ignored.
+	// Multiple components are separated by ','. for example: "kubeblocks.io/enabled-node-port-svc: comp1,comp2"
+	NodePortSvcAnnotationKey = "kubeblocks.io/enabled-node-port-svc"
+	// PodOrdinalSvcAnnotationKey defines the feature gate of PodOrdinal Service defined in ComponentDefinition.Spec.Services.
+	// Components defined in the annotation value, their all Services defined in the ComponentDefinition with the GeneratePodOrdinalService attribute set to true will be created; otherwise, they will be ignored.
+	// This can generate a corresponding Service for each Pod, which can be used in certain specific scenarios: for example, creating a dedicated access service for each read-only Pod.
+	// Multiple components are separated by ','. for example: "kubeblocks.io/enabled-node-port-svc: comp1,comp2"
+	PodOrdinalSvcAnnotationKey = "kubeblocks.io/enabled-pod-ordinal-svc"
+
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName             = "cluster.kubeblocks.io/finalizer"
 	DBComponentFinalizerName           = "component.kubeblocks.io/finalizer"
-	DBComponentDefinitionFinalizerName = "componentdefinition.kubeblocks.io/finalizer"
 	ConfigurationTemplateFinalizerName = "config.kubeblocks.io/finalizer"
 	ServiceDescriptorFinalizerName     = "servicedescriptor.kubeblocks.io/finalizer"
 	OpsRequestFinalizerName            = "opsrequest.kubeblocks.io/finalizer"
@@ -278,10 +288,6 @@ const (
 )
 
 const (
-	ComponentStatusDefaultPodName = "Unknown"
-)
-
-const (
 	FeatureGateReplicatedStateMachine = "REPLICATED_STATE_MACHINE" // enable rsm
 )
 
@@ -303,4 +309,12 @@ const (
 	VolumeRestorePolicyKeyForRestore = "volumeRestorePolicy"
 	RestoreTimeKeyForRestore         = "restoreTime"
 	ConnectionPassword               = "connectionPassword"
+)
+
+const (
+	KBAppMultiClusterPlacementKey = "apps.kubeblocks.io/multi-cluster-placement"
+)
+
+const (
+	KBGeneratedVirtualCompDefPrefix = "KB_GENERATED_VIRTUAL_COMP_DEF"
 )

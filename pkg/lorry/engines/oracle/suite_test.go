@@ -17,10 +17,16 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package client
+package oracle
 
-import "sigs.k8s.io/controller-runtime/pkg/client"
+import (
+	"testing"
 
-type ReadonlyClient interface {
-	client.Reader
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+)
+
+func TestEngine(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "oracle Suite")
 }

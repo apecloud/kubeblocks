@@ -265,7 +265,8 @@ func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAc
 		if !isProbesEnabled(compDef) && !volumeProtectionEnable && !dataProtectionEnable {
 			return nil, false, nil
 		}
-		serviceAccountName = constant.GenerateDefaultCompServiceAccountPattern(comp.Name)
+		// use cluster.name to keep compatible with existed clusters
+		serviceAccountName = constant.GenerateDefaultServiceAccountName(cluster.Name)
 	}
 
 	if isRoleBindingExist(transCtx, serviceAccountName) && isServiceAccountExist(transCtx, serviceAccountName) {

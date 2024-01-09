@@ -159,9 +159,9 @@ func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 		return err
 	}
 
-	objCopy := copyAndMergeRSM(runningRSM, protoRSM, cluster)
+	objCopy := copyAndMergeRSM(runningRSM, protoRSM, synthesizeComp)
 	if objCopy != nil && !cli.IsAction(dag, objCopy, model.ActionNoopPtr()) {
-		cli.Update(dag, nil, objCopy, model.ReplaceIfExistingOption)
+		cli.Update(dag, nil, objCopy, &model.ReplaceIfExistingOption{})
 	}
 
 	// to work around that the scaled PVC will be deleted at object action.
@@ -229,7 +229,7 @@ func buildPodSpecVolumeMounts(synthesizeComp *component.SynthesizedComponent) {
 // copyAndMergeRSM merges two RSM objects for updating:
 //  1. new an object targetObj by copying from oldObj
 //  2. merge all fields can be updated from newObj into targetObj
-func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, cluster *appsv1alpha1.Cluster) *workloads.ReplicatedStateMachine {
+func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, synthesizeComp *component.SynthesizedComponent) *workloads.ReplicatedStateMachine {
 	// mergeAnnotations keeps the original annotations.
 	mergeMetadataMap := func(originalMap map[string]string, targetMap *map[string]string) {
 		if targetMap == nil || originalMap == nil {
@@ -247,13 +247,13 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, cluster *
 	}
 
 	// buildWorkLoadAnnotations builds the annotations for Deployment/StatefulSet
-	buildWorkLoadAnnotations := func(obj client.Object, cluster *appsv1alpha1.Cluster) {
+	buildWorkLoadAnnotations := func(obj client.Object) {
 		workloadAnnotations := obj.GetAnnotations()
 		if workloadAnnotations == nil {
 			workloadAnnotations = map[string]string{}
 		}
 		// record the cluster generation to check if the sts is latest
-		workloadAnnotations[constant.KubeBlocksGenerationKey] = strconv.FormatInt(cluster.Generation, 10)
+		workloadAnnotations[constant.KubeBlocksGenerationKey] = synthesizeComp.ClusterGeneration
 		obj.SetAnnotations(workloadAnnotations)
 	}
 
@@ -273,6 +273,27 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, cluster *
 		}
 	}
 
+	// be compatible with existed cluster
+	updateService := func(rsmObj, rsmProto *workloads.ReplicatedStateMachine) *corev1.Service {
+		if rsmProto.Spec.Service != nil {
+			return rsmProto.Spec.Service
+		}
+		if rsmObj.Spec.Service == nil {
+			return nil
+		}
+		defaultServiceName := rsmObj.Name
+		for _, svc := range synthesizeComp.ComponentServices {
+			if svc.GeneratePodOrdinalService {
+				continue
+			}
+			serviceName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, svc.ServiceName)
+			if defaultServiceName == serviceName {
+				return rsmObj.Spec.Service
+			}
+		}
+		return nil
+	}
+
 	rsmObjCopy := oldRsm.DeepCopy()
 	rsmProto := newRsm
 
@@ -284,15 +305,14 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, cluster *
 	}
 	mergeMetadataMap(rsmObjCopy.Annotations, &rsmProto.Annotations)
 	rsmObjCopy.Annotations = rsmProto.Annotations
-	buildWorkLoadAnnotations(rsmObjCopy, cluster)
+	buildWorkLoadAnnotations(rsmObjCopy)
 
 	// keep the original template annotations.
 	// if annotations exist and are replaced, the rsm will be updated.
 	mergeMetadataMap(rsmObjCopy.Spec.Template.Annotations, &rsmProto.Spec.Template.Annotations)
 	rsmObjCopy.Spec.Template = rsmProto.Spec.Template
 	rsmObjCopy.Spec.Replicas = rsmProto.Spec.Replicas
-	updateUpdateStrategy(rsmObjCopy, rsmProto)
-	rsmObjCopy.Spec.Service = rsmProto.Spec.Service
+	rsmObjCopy.Spec.Service = updateService(rsmObjCopy, rsmProto)
 	rsmObjCopy.Spec.AlternativeServices = rsmProto.Spec.AlternativeServices
 	rsmObjCopy.Spec.Roles = rsmProto.Spec.Roles
 	rsmObjCopy.Spec.RoleProbe = rsmProto.Spec.RoleProbe
@@ -301,12 +321,16 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, cluster *
 	rsmObjCopy.Spec.Credential = rsmProto.Spec.Credential
 	rsmObjCopy.Spec.NodeAssignment = rsmProto.Spec.NodeAssignment
 
-	ResolvePodSpecDefaultFields(oldRsm.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
+	if rsmProto.Spec.UpdateStrategy.Type != "" || rsmProto.Spec.UpdateStrategy.RollingUpdate != nil {
+		updateUpdateStrategy(rsmObjCopy, rsmProto)
+	}
+
+	intctrlutil.ResolvePodSpecDefaultFields(oldRsm.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
 	DelayUpdatePodSpecSystemFields(oldRsm.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
 
 	isSpecUpdated := !reflect.DeepEqual(&oldRsm.Spec, &rsmObjCopy.Spec)
 	if isSpecUpdated {
-		UpdatePodSpecSystemFields(&rsmObjCopy.Spec.Template.Spec)
+		UpdatePodSpecSystemFields(&rsmProto.Spec.Template.Spec, &rsmObjCopy.Spec.Template.Spec)
 	}
 
 	isLabelsUpdated := !reflect.DeepEqual(oldRsm.Labels, rsmObjCopy.Labels)
@@ -522,7 +546,14 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn(stsObj *apps.StatefulSet) err
 			return nil
 		}
 		// if HA functionality is not enabled, no need to switchover
-		err := lorryCli.Switchover(r.reqCtx.Ctx, pod.Name, "")
+		err := lorryCli.Switchover(r.reqCtx.Ctx, pod.Name, "", false)
+		if err == lorry.NotImplemented {
+			// For the purpose of upgrade compatibility, if the version of Lorry is 0.7 and
+			// the version of KB is upgraded to 0.8 or newer, lorry client will return an NotImplemented error,
+			// in this case, here just return success.
+			r.reqCtx.Log.Info("lorry switchover api is not implemented")
+			return nil
+		}
 		if err == nil {
 			return fmt.Errorf("switchover succeed, wait role label to be updated")
 		}
@@ -556,7 +587,12 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn(stsObj *apps.StatefulSet) err
 		}
 
 		if err2 := lorryCli.LeaveMember(r.reqCtx.Ctx); err2 != nil {
-			if err == nil {
+			// For the purpose of upgrade compatibility, if the version of Lorry is 0.7 and
+			// the version of KB is upgraded to 0.8 or newer, lorry client will return an NotImplemented error,
+			// in this case, here just ignore it.
+			if err2 == lorry.NotImplemented {
+				r.reqCtx.Log.Info("lorry leave member api is not implemented")
+			} else if err == nil {
 				err = err2
 			}
 		}

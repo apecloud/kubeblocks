@@ -54,10 +54,8 @@ type BackupPolicy struct {
 
 	// componentDef references componentDefinition. Need to
 	// comply with IANA Service Naming rule.
-	// +kubebuilder:validation:MaxLength=22
-	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	// +optional
-	ComponentDef string `json:"componentDef,omitempty"`
+	ComponentDefs []string `json:"componentDefs,omitempty"`
 
 	// target instance for backup.
 	// +optional
@@ -102,11 +100,15 @@ type EnvMappingVar struct {
 
 type ValueFrom struct {
 	// mapped ClusterVersionRef to env value.
-	// +kubebuilder:validation:Required
-	ClusterVersionRef []ClusterVersionMapping `json:"clusterVersionRef"`
+	// +optional
+	ClusterVersionRef []ValueMapping `json:"clusterVersionRef,omitempty"`
+
+	// mapped ComponentDefinition to env value.
+	// +optional
+	ComponentDef []ValueMapping `json:"componentDef,omitempty"`
 }
 
-type ClusterVersionMapping struct {
+type ValueMapping struct {
 	// the array of ClusterVersion name which can be mapped to the env value.
 	// +kubebuilder:validation:Required
 	Names []string `json:"names"`
@@ -153,7 +155,6 @@ type TargetInstance struct {
 	// such as if workload type is Replication and component's replicas is 1,
 	// the secondary role is invalid. and it also will be ignored when component is Stateful/Stateless.
 	// the role will be transformed to a role LabelSelector for BackupPolicy's target attribute.
-	// +optional
 	Role string `json:"role"`
 
 	// refer to spec.componentDef.systemAccounts.accounts[*].name in ClusterDefinition.
@@ -163,9 +164,18 @@ type TargetInstance struct {
 	// +optional
 	Account string `json:"account,omitempty"`
 
+	// PodSelectionStrategy specifies the strategy to select when multiple pods are
+	// selected for backup target.
+	// Valid values are:
+	// - Any: select any one pod that match the labelsSelector.
+	// - All: select all pods that match the labelsSelector.
+	// +optional
+	Strategy dpv1alpha1.PodSelectionStrategy `json:"strategy,omitempty"`
+
 	// connectionCredentialKey defines connection credential key in secret
 	// which created by spec.ConnectionCredential of the ClusterDefinition.
 	// it will be ignored when "account" is set.
+	// +optional
 	ConnectionCredentialKey ConnectionCredentialKey `json:"connectionCredentialKey,omitempty"`
 }
 

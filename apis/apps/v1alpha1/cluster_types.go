@@ -71,7 +71,7 @@ type ClusterSpec struct {
 	// services defines the services to access a cluster.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
-	Services []Service `json:"services,omitempty"`
+	Services []ClusterService `json:"services,omitempty"`
 
 	// affinity is a group of affinity scheduling rules.
 	// +optional
@@ -288,8 +288,7 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	Name string `json:"name"`
 
-	// componentDefRef references componentDef defined in ClusterDefinition spec. Need to
-	// comply with IANA Service Naming rule.
+	// componentDefRef references componentDef defined in ClusterDefinition spec. Need to comply with IANA Service Naming rule.
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDefRef is immutable"
@@ -467,67 +466,9 @@ type ClusterComponentStatus struct {
 	// +optional
 	PodsReadyTime *metav1.Time `json:"podsReadyTime,omitempty"`
 
-	// consensusSetStatus specifies the mapping of role and pod name.
-	// +optional
-	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use MembersStatus instead."
-	ConsensusSetStatus *ConsensusSetStatus `json:"consensusSetStatus,omitempty"`
-
-	// replicationSetStatus specifies the mapping of role and pod name.
-	// +optional
-	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use MembersStatus instead."
-	ReplicationSetStatus *ReplicationSetStatus `json:"replicationSetStatus,omitempty"`
-
 	// members' status.
 	// +optional
 	MembersStatus []workloads.MemberStatus `json:"membersStatus,omitempty"`
-}
-
-type ConsensusSetStatus struct {
-	// Leader status.
-	// +kubebuilder:validation:Required
-	Leader ConsensusMemberStatus `json:"leader"`
-
-	// Followers status.
-	// +optional
-	Followers []ConsensusMemberStatus `json:"followers,omitempty"`
-
-	// Learner status.
-	// +optional
-	Learner *ConsensusMemberStatus `json:"learner,omitempty"`
-}
-
-type ConsensusMemberStatus struct {
-	// Defines the role name.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=leader
-	Name string `json:"name"`
-
-	// accessMode defines what service this pod provides.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=ReadWrite
-	AccessMode AccessMode `json:"accessMode"`
-
-	// Pod name.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=Unknown
-	Pod string `json:"pod"`
-}
-
-type ReplicationSetStatus struct {
-	// Primary status.
-	// +kubebuilder:validation:Required
-	Primary ReplicationMemberStatus `json:"primary"`
-
-	// Secondaries status.
-	// +optional
-	Secondaries []ReplicationMemberStatus `json:"secondaries,omitempty"`
-}
-
-type ReplicationMemberStatus struct {
-	// Pod name.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=Unknown
-	Pod string `json:"pod"`
 }
 
 type ClusterSwitchPolicy struct {

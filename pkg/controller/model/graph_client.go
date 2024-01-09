@@ -28,19 +28,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
-// GraphOption specifies behaviors of GraphWriter methods.
-// currently enum is enough, maybe extend to interface in the future.
-type GraphOption string
-
-const (
-	// ReplaceIfExistingOption tells the GraphWriter methods to replace Obj and OriObj with the given ones if already existing.
-	// used in Action methods: Create, Update, Patch, Status, Noop and Delete
-	ReplaceIfExistingOption = "ReplaceIfExisting"
-
-	// HaveDifferentTypeWithOption is used in FindAll method to find all objects have different type with the given one.
-	HaveDifferentTypeWithOption = "HaveDifferentTypeWith"
-)
-
 type GraphWriter interface {
 	// Root setups the given obj as root vertex of the underlying DAG.
 	Root(dag *graph.DAG, objOld, objNew client.Object, action *Action)
@@ -66,7 +53,7 @@ type GraphWriter interface {
 	// Do does 'action' to 'objOld' and 'objNew' and return the vertex created.
 	// this method creates a vertex directly even if the given object already exists in the underlying DAG.
 	// WARN: this is a rather low-level API, will be refactored out in near future, avoid to use it.
-	Do(dag *graph.DAG, objOld, objNew client.Object, action *Action, parent *ObjectVertex) *ObjectVertex
+	Do(dag *graph.DAG, objOld, objNew client.Object, action *Action, parent *ObjectVertex, opts ...GraphOption) *ObjectVertex
 
 	// IsAction tells whether the action of the vertex of this obj is same as 'action'.
 	IsAction(dag *graph.DAG, obj client.Object, action *Action) bool
@@ -137,14 +124,21 @@ func (r *realGraphClient) Noop(dag *graph.DAG, obj client.Object, opts ...GraphO
 	r.doWrite(dag, nil, obj, ActionNoopPtr(), opts...)
 }
 
-func (r *realGraphClient) Do(dag *graph.DAG, objOld, objNew client.Object, action *Action, parent *ObjectVertex) *ObjectVertex {
+func (r *realGraphClient) Do(dag *graph.DAG, objOld, objNew client.Object, action *Action, parent *ObjectVertex, opts ...GraphOption) *ObjectVertex {
 	if dag.Root() == nil {
 		panic(fmt.Sprintf("root vertex not found. obj: %T, name: %s", objNew, objNew.GetName()))
 	}
+
+	graphOpts := &GraphOptions{}
+	for _, opt := range opts {
+		opt.ApplyTo(graphOpts)
+	}
+
 	vertex := &ObjectVertex{
-		OriObj: objOld,
-		Obj:    objNew,
-		Action: action,
+		OriObj:    objOld,
+		Obj:       objNew,
+		Action:    action,
+		ClientOpt: graphOpts.clientOpt,
 	}
 	switch {
 	case parent == nil:
@@ -187,13 +181,12 @@ func (r *realGraphClient) DependOn(dag *graph.DAG, object client.Object, depende
 }
 
 func (r *realGraphClient) FindAll(dag *graph.DAG, obj interface{}, opts ...GraphOption) []client.Object {
+	graphOpts := &GraphOptions{}
+	for _, opt := range opts {
+		opt.ApplyTo(graphOpts)
+	}
 	hasSameType := func() bool {
-		for _, opt := range opts {
-			if opt == HaveDifferentTypeWithOption {
-				return false
-			}
-		}
-		return true
+		return !graphOpts.haveDifferentTypeWith
 	}()
 	assignableTo := func(src, dst reflect.Type) bool {
 		if dst == nil {
@@ -214,28 +207,26 @@ func (r *realGraphClient) FindAll(dag *graph.DAG, obj interface{}, opts ...Graph
 }
 
 func (r *realGraphClient) doWrite(dag *graph.DAG, objOld, objNew client.Object, action *Action, opts ...GraphOption) {
-	replaceExisting := func() bool {
-		for _, opt := range opts {
-			if opt == ReplaceIfExistingOption {
-				return true
-			}
-		}
-		return false
-	}()
+	graphOpts := &GraphOptions{}
+	for _, opt := range opts {
+		opt.ApplyTo(graphOpts)
+	}
+
 	vertex := r.findMatchedVertex(dag, objNew)
 	switch {
 	case vertex != nil:
 		objVertex, _ := vertex.(*ObjectVertex)
 		objVertex.Action = action
-		if replaceExisting {
+		if graphOpts.replaceIfExisting {
 			objVertex.Obj = objNew
 			objVertex.OriObj = objOld
 		}
 	default:
 		vertex = &ObjectVertex{
-			Obj:    objNew,
-			OriObj: objOld,
-			Action: action,
+			Obj:       objNew,
+			OriObj:    objOld,
+			Action:    action,
+			ClientOpt: graphOpts.clientOpt,
 		}
 		dag.AddConnectRoot(vertex)
 	}

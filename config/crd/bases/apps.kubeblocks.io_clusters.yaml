@@ -1025,32 +1025,10 @@ spec:
                     componentSelector:
                       description: ComponentSelector extends the ServiceSpec.Selector
                         by allowing you to specify a component as selectors for the
-                        service. For component-level services, a default component
-                        selector with the component name will be added automatically.
-                        if GeneratePodOrdinalService sets to true, ComponentSelector
-                        must be specified.
+                        service.
                       type: string
-                    generatePodOrdinalService:
-                      default: false
-                      description: 'GeneratePodOrdinalService indicates whether to
-                        create a corresponding Service for each Pod of the selected
-                        Component. If sets to true, a set of Service will be automatically
-                        generated for each Pod. and ComponentSelector must be specified.
-                        They can be referred to by adding the PodOrdinal to the defined
-                        ServiceName with named pattern <Service.ServiceName>-<PodOrdinal>.
-                        For example, a Service might be defined as follows: - name:
-                        my-service serviceName: my-service generatePodOrdinalService:
-                        true componentSelector: my-component spec: type: NodePort
-                        ports: - name: http port: 80 targetPort: 8080 Assuming that
-                        the Component has 3 replicas, then three services would be
-                        generated: my-service-0, my-service-1, and my-service-2, each
-                        pointing to its respective Pod.'
-                      type: boolean
                     name:
-                      description: Name defines the name or namePrefix of the service.
-                        if GeneratePodOrdinalService sets to true, the Name indicates
-                        the namePrefix of the service and the fullName will be generated
-                        with named pattern <Service.Name>-<PodOrdinal>. otherwise,
+                      description: Name defines the name of the service. otherwise,
                         it indicates the name of the service. Others can refer to
                         this service by its name. (e.g., connection credential) Cannot
                         be updated.
@@ -1062,17 +1040,12 @@ spec:
                         be ignored.
                       type: string
                     serviceName:
-                      description: 'ServiceName defines the name or namePrefix of
-                        the underlying service object. if GeneratePodOrdinalService
-                        sets to true, the ServiceName indicates the namePrefix of
-                        the underlying service object. otherwise, it indicates the
-                        name of the underlying service object. If not specified, the
-                        default service name with different patterns will be used:
-                        - <CLUSTER_NAME>: for cluster-level services - <CLUSTER_NAME>-<COMPONENT_NAME>:
-                        for component-level services - <CLUSTER_NAME>-<COMPONENT_NAME>-<POD_ORDINAL>:
-                        for pod-level services when GeneratePodOrdinalService set
-                        to true Only one default service name is allowed. Cannot be
-                        updated.'
+                      description: 'ServiceName defines the name of the underlying
+                        service object. If not specified, the default service name
+                        with different patterns will be used: - <CLUSTER_NAME>: for
+                        cluster-level services - <CLUSTER_NAME>-<COMPONENT_NAME>:
+                        for component-level services Only one default service name
+                        is allowed. Cannot be updated.'
                       type: string
                     spec:
                       description: Spec defines the behavior of a service. https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -1519,90 +1492,6 @@ spec:
                 additionalProperties:
                   description: ClusterComponentStatus records components status.
                   properties:
-                    consensusSetStatus:
-                      description: consensusSetStatus specifies the mapping of role
-                        and pod name.
-                      properties:
-                        followers:
-                          description: Followers status.
-                          items:
-                            properties:
-                              accessMode:
-                                default: ReadWrite
-                                description: accessMode defines what service this
-                                  pod provides.
-                                enum:
-                                - None
-                                - Readonly
-                                - ReadWrite
-                                type: string
-                              name:
-                                default: leader
-                                description: Defines the role name.
-                                type: string
-                              pod:
-                                default: Unknown
-                                description: Pod name.
-                                type: string
-                            required:
-                            - accessMode
-                            - name
-                            - pod
-                            type: object
-                          type: array
-                        leader:
-                          description: Leader status.
-                          properties:
-                            accessMode:
-                              default: ReadWrite
-                              description: accessMode defines what service this pod
-                                provides.
-                              enum:
-                              - None
-                              - Readonly
-                              - ReadWrite
-                              type: string
-                            name:
-                              default: leader
-                              description: Defines the role name.
-                              type: string
-                            pod:
-                              default: Unknown
-                              description: Pod name.
-                              type: string
-                          required:
-                          - accessMode
-                          - name
-                          - pod
-                          type: object
-                        learner:
-                          description: Learner status.
-                          properties:
-                            accessMode:
-                              default: ReadWrite
-                              description: accessMode defines what service this pod
-                                provides.
-                              enum:
-                              - None
-                              - Readonly
-                              - ReadWrite
-                              type: string
-                            name:
-                              default: leader
-                              description: Defines the role name.
-                              type: string
-                            pod:
-                              default: Unknown
-                              description: Pod name.
-                              type: string
-                          required:
-                          - accessMode
-                          - name
-                          - pod
-                          type: object
-                      required:
-                      - leader
-                      type: object
                     membersStatus:
                       description: members' status.
                       items:
@@ -1611,6 +1500,10 @@ spec:
                             default: Unknown
                             description: PodName pod name.
                             type: string
+                          readyWithoutPrimary:
+                            description: Is it required for rsm to have at least one
+                              primary pod to be ready.
+                            type: boolean
                           role:
                             properties:
                               accessMode:
@@ -1686,35 +1579,6 @@ spec:
                         pod.
                       format: date-time
                       type: string
-                    replicationSetStatus:
-                      description: replicationSetStatus specifies the mapping of role
-                        and pod name.
-                      properties:
-                        primary:
-                          description: Primary status.
-                          properties:
-                            pod:
-                              default: Unknown
-                              description: Pod name.
-                              type: string
-                          required:
-                          - pod
-                          type: object
-                        secondaries:
-                          description: Secondaries status.
-                          items:
-                            properties:
-                              pod:
-                                default: Unknown
-                                description: Pod name.
-                                type: string
-                            required:
-                            - pod
-                            type: object
-                          type: array
-                      required:
-                      - primary
-                      type: object
                   type: object
                 description: components record the current status information of all
                   components of the cluster.

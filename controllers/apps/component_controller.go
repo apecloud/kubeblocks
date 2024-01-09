@@ -110,7 +110,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	reqCtx.Log.V(1).Info("reconcile", "component", req.NamespacedName)
 
-	planBuilder := NewComponentPlanBuilder(reqCtx, r.Client, req)
+	planBuilder := newComponentPlanBuilder(reqCtx, r.Client, req)
 	if err := planBuilder.Init(); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}

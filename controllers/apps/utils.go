@@ -30,6 +30,8 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -91,4 +93,31 @@ func mergeMap(dst, src map[string]string) {
 	for key, val := range src {
 		dst[key] = val
 	}
+}
+
+// func placement(obj client.Object) string {
+//	if obj.GetAnnotations() == nil {
+//		return ""
+//	}
+//	return obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey]
+// }
+//
+// func inLocalContext() model.GraphOption {
+//	return model.WithClientOption(multicluster.InLocalContext())
+// }
+//
+// func inUniversalContext() model.GraphOption {
+//	return model.WithClientOption(multicluster.InUniversalContext())
+// }
+
+func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
+	// if v.ClientOpt != nil {
+	//	opt, ok := v.ClientOpt.(*multicluster.ClientOption)
+	//	if ok {
+	//		return opt
+	//	}
+	//	panic(fmt.Sprintf("unknown client option: %T", v.ClientOpt))
+	//}
+	// return multicluster.InGlobalContext()
+	return nil
 }

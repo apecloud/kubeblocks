@@ -509,6 +509,7 @@ spec:
                             description: 'strategy specifies the strategy to select
                               the target pod when multiple pods are selected. Valid
                               values are: - Any: select any one pod that match the
+                              labelsSelector. - All: select all pods that match the
                               labelsSelector.'
                             enum:
                             - Any
@@ -680,6 +681,9 @@ spec:
                 description: formatVersion is the backup format version, including
                   major, minor and patch version.
                 type: string
+              kopiaRepoPath:
+                description: kopiaRepoPath records the path of the Kopia repository.
+                type: string
               path:
                 description: path is the directory inside the backup repository where
                   the backup data is stored. It is an absolute path in the backup
@@ -788,7 +792,8 @@ spec:
                         default: Any
                         description: 'strategy specifies the strategy to select the
                           target pod when multiple pods are selected. Valid values
-                          are: - Any: select any one pod that match the labelsSelector.'
+                          are: - Any: select any one pod that match the labelsSelector.
+                          - All: select all pods that match the labelsSelector.'
                         enum:
                         - Any
                         - All

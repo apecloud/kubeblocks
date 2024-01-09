@@ -151,7 +151,9 @@ var _ = Describe("builder", func() {
 		Expect(err).Should(Succeed())
 		Expect(synthesizeComp).ShouldNot(BeNil())
 		// to resolve and inject env vars
-		Expect(component.ResolveEnvNTemplateVars(reqCtx.Ctx, testCtx.Cli, synthesizeComp, cluster.Annotations, nil)).Should(Succeed())
+		_, envVars, err := component.ResolveTemplateNEnvVars(reqCtx.Ctx, testCtx.Cli, synthesizeComp, cluster.Annotations, nil)
+		Expect(err).Should(Succeed())
+		component.InjectEnvVars(synthesizeComp, envVars, nil)
 		return synthesizeComp
 	}
 	newClusterObjs := func(clusterDefObj *appsv1alpha1.ClusterDefinition) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.Cluster, *component.SynthesizedComponent) {
@@ -270,6 +272,11 @@ var _ = Describe("builder", func() {
 
 			By("set workload type to Replication")
 			clusterDef.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Replication
+			clusterDef.Spec.ComponentDefs[0].ReplicationSpec = &appsv1alpha1.ReplicationSetSpec{
+				StatefulSetSpec: appsv1alpha1.StatefulSetSpec{
+					UpdateStrategy: appsv1alpha1.SerialStrategy,
+				},
+			}
 			cluster.Spec.ComponentSpecs[0].Replicas = 2
 			replComponent := newAllFieldsComponent(clusterDef, nil, cluster)
 			rsm, err = BuildRSM(cluster, replComponent)

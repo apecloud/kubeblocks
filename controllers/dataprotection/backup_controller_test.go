@@ -763,7 +763,7 @@ var _ = Describe("Backup Controller test", func() {
 
 			getJobKey := func() client.ObjectKey {
 				return client.ObjectKey{
-					Name:      dpbackup.GenerateBackupJobName(backup, dpbackup.BackupDataJobNamePrefix),
+					Name:      dpbackup.GenerateBackupJobName(backup, dpbackup.BackupDataJobNamePrefix+"-0"),
 					Namespace: backup.Namespace,
 				}
 			}

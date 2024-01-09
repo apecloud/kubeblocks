@@ -681,6 +681,9 @@ spec:
                 description: formatVersion is the backup format version, including
                   major, minor and patch version.
                 type: string
+              kopiaRepoPath:
+                description: kopiaRepoPath records the path of the Kopia repository.
+                type: string
               path:
                 description: path is the directory inside the backup repository where
                   the backup data is stored. It is an absolute path in the backup

@@ -180,6 +180,15 @@ func BuildBackupPath(backup *dpv1alpha1.Backup, pathPrefix string) string {
 	return fmt.Sprintf("/%s/%s/%s", backup.Namespace, pathPrefix, backup.Name)
 }
 
+// BuildKopiaRepoPath builds the path of kopia repository.
+func BuildKopiaRepoPath(backup *dpv1alpha1.Backup, pathPrefix string) string {
+	pathPrefix = strings.TrimRight(pathPrefix, "/")
+	if strings.TrimSpace(pathPrefix) == "" || strings.HasPrefix(pathPrefix, "/") {
+		return fmt.Sprintf("/%s%s/%s", backup.Namespace, pathPrefix, types.KopiaRepoFolderName)
+	}
+	return fmt.Sprintf("/%s/%s/%s", backup.Namespace, pathPrefix, types.KopiaRepoFolderName)
+}
+
 func GetSchedulePolicyByMethod(backupSchedule *dpv1alpha1.BackupSchedule, method string) *dpv1alpha1.SchedulePolicy {
 	for _, s := range backupSchedule.Spec.Schedules {
 		if s.BackupMethod == method {

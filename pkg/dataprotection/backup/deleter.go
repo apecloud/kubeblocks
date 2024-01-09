@@ -155,50 +155,77 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 		}
 	}
 	// do delete action
-	return DeletionStatusDeleting, d.createDeleteBackupFilesJob(jobKey, backup, backupRepo, legacyPVCName, backup.Status.Path)
+	return DeletionStatusDeleting, d.createDeleteBackupFilesJob(jobKey, backup, backupRepo, legacyPVCName)
+}
+
+func (d *Deleter) buildDeleteBackupFilesScript(backupPath string) string {
+
+	// this script first deletes the directory where the backup is located (including files
+	// in the directory), and then traverses up the path level by level to clean up empty directories.
+	deleteScript := fmt.Sprintf(`
+set -x
+export PATH="$PATH:$%s"
+targetPath="%s"
+
+echo "removing backup files in ${targetPath}"
+DATASAFED_KOPIA_MAINTENANCE=true datasafed rm -r "${targetPath}"
+
+# remove empty dirs from leaf to root
+function rmdirs() {
+	curr="$1"
+	while true; do
+		curr=$(dirname "${curr}")
+		if [ "${curr}" == "/" ]; then
+			echo "reach to root, done"
+			break
+		fi
+		result=$(datasafed list "${curr}")
+		if [ -z "$result" ]; then
+			echo "${curr} is empty, removing it..."
+			datasafed rmdir "${curr}"
+		else
+			echo "${curr} is not empty, done"
+			break
+		fi
+	done
+}
+
+if [ "${DATASAFED_KOPIA_REPO_ROOT}" == "" ]; then
+	# kopia is not used, simply remove empty dirs from the storage
+	rmdirs "${targetPath}"
+else
+	# remove empty dirs from the kopia repository
+	rmdirs "${targetPath}"
+
+	# remove the kopia repository itself from the storage if it's empty
+	result=$(datasafed list "/")
+	if [ -z "$result" ]; then
+		kopiaRepoPath="${DATASAFED_KOPIA_REPO_ROOT}"
+		unset DATASAFED_KOPIA_REPO_ROOT
+		echo "kopia repository at '${kopiaRepoPath}' is empty, removing it from the storage..."
+		datasafed rm -r "${kopiaRepoPath}"
+		datasafed rm -r "${kopiaRepoPath}.meta"
+
+		# remove empty dirs from the storage
+		rmdirs "${kopiaRepoPath}"
+	fi
+fi
+	`, dptypes.DPDatasafedBinPath, backupPath)
+
+	return deleteScript
 }
 
 func (d *Deleter) createDeleteBackupFilesJob(
 	jobKey types.NamespacedName,
 	backup *dpv1alpha1.Backup,
 	backupRepo *dpv1alpha1.BackupRepo,
-	legacyPVCName string,
-	backupFilePath string) error {
-
-	// this script first deletes the directory where the backup is located (including files
-	// in the directory), and then traverses up the path level by level to clean up empty directories.
-	deleteScript := fmt.Sprintf(`
-set -x
-export PATH="$PATH:$%s";
-targetPath="%s";
-
-echo "removing backup files in ${targetPath}";
-datasafed rm -r "${targetPath}";
-
-curr="${targetPath}";
-while true; do
-	parent=$(dirname "${curr}");
-	if [ "${parent}" == "/" ]; then
-		echo "reach to root, done";
-		break;
-	fi;
-	result=$(datasafed list "${parent}");
-	if [ -z "$result" ]; then
-		echo "${parent} is empty, removing it...";
-		datasafed rmdir "${parent}";
-	else
-		echo "${parent} is not empty, done";
-		break;
-	fi;
-	curr="${parent}";
-done
-	`, dptypes.DPDatasafedBinPath, backupFilePath)
+	legacyPVCName string) error {
 
 	runAsUser := int64(0)
 	container := corev1.Container{
 		Name:            backup.Name,
 		Command:         []string{"sh", "-c"},
-		Args:            []string{deleteScript},
+		Args:            []string{d.buildDeleteBackupFilesScript(backup.Status.Path)},
 		Image:           viper.GetString(constant.KBToolsImage),
 		ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)),
 		SecurityContext: &corev1.SecurityContext{
@@ -206,15 +233,14 @@ done
 			RunAsUser:                &runAsUser,
 		},
 	}
-	return d.createDeleteJob(container, jobKey, backup, backupRepo, legacyPVCName, backupFilePath)
+	return d.createDeleteJob(container, jobKey, backup, backupRepo, legacyPVCName)
 }
 
 func (d *Deleter) createDeleteJob(container corev1.Container,
 	jobKey types.NamespacedName,
 	backup *dpv1alpha1.Backup,
 	backupRepo *dpv1alpha1.BackupRepo,
-	legacyPVCName,
-	backupFilePath string) error {
+	legacyPVCName string) error {
 	ctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 
 	// build pod
@@ -225,10 +251,11 @@ func (d *Deleter) createDeleteJob(container corev1.Container,
 	if err := utils.AddTolerations(&podSpec); err != nil {
 		return err
 	}
+	kopiaRepoPath := backup.Status.KopiaRepoPath
 	if backupRepo != nil {
-		utils.InjectDatasafed(&podSpec, backupRepo, RepoVolumeMountPath, backupFilePath)
+		utils.InjectDatasafed(&podSpec, backupRepo, RepoVolumeMountPath, kopiaRepoPath)
 	} else {
-		utils.InjectDatasafedWithPVC(&podSpec, legacyPVCName, RepoVolumeMountPath, backupFilePath)
+		utils.InjectDatasafedWithPVC(&podSpec, legacyPVCName, RepoVolumeMountPath, kopiaRepoPath)
 	}
 
 	// build job
@@ -298,7 +325,7 @@ func (d *Deleter) doPreDeleteAction(
 			RunAsUser:                &runAsUser,
 		},
 	}
-	return preJob, d.createDeleteJob(container, preJobKey, backup, backupRepo, legacyPVCName, backupFilePath)
+	return preJob, d.createDeleteJob(container, preJobKey, backup, backupRepo, legacyPVCName)
 }
 
 func (d *Deleter) DeleteVolumeSnapshots(backup *dpv1alpha1.Backup) error {

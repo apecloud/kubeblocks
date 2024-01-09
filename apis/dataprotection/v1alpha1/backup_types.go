@@ -118,6 +118,10 @@ type BackupStatus struct {
 	// +optional
 	Path string `json:"path,omitempty"`
 
+	// kopiaRepoPath records the path of the Kopia repository.
+	// +optional
+	KopiaRepoPath string `json:"kopiaRepoPath,omitempty"`
+
 	// persistentVolumeClaimName is the name of the persistent volume claim that
 	// is used to store the backup data.
 	// +optional

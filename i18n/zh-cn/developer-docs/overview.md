@@ -12,5 +12,5 @@ sidebar_label: 开发者指南
 
 * [集成](./integration/add-ons-of-kubeblocks.md)
 * [API 参考](./api-reference/cluster.md)
-* [外部组件引用](./api-reference/cluster.md)
+* [外部组件引用](./external-component/reference-external-component.md)
 * [故障注入](./fault_injection/introduction.md)

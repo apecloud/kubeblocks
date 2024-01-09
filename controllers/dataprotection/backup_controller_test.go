@@ -348,7 +348,7 @@ var _ = Describe("Backup Controller test", func() {
 				testapps.DeleteObject(&testCtx, backupKey, &dpv1alpha1.Backup{})
 
 				By("checking new created Job")
-				jobKey := dpbackup.BuildDeleteBackupFilesJobKey(backup)
+				jobKey := dpbackup.BuildDeleteBackupFilesJobKey(backup, false)
 				job := &batchv1.Job{}
 				Eventually(testapps.CheckObjExists(&testCtx, jobKey, job, true)).Should(Succeed())
 				volumeName := "dp-backup-data"

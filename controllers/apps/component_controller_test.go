@@ -722,18 +722,22 @@ var _ = Describe("Component Controller", func() {
 								Backup: &dpv1alpha1.BackupActionSpec{
 									BackupData: &dpv1alpha1.BackupDataActionSpec{
 										JobActionSpec: dpv1alpha1.JobActionSpec{
-											Image:   "xtrabackup",
-											Command: []string{""},
+											BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{
+												Image:   "xtrabackup",
+												Command: []string{""},
+											},
 										},
 									},
 								},
 								Restore: &dpv1alpha1.RestoreActionSpec{
 									PrepareData: &dpv1alpha1.JobActionSpec{
-										Image: "xtrabackup",
-										Command: []string{
-											"sh",
-											"-c",
-											"/backup_scripts.sh",
+										BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{
+											Image: "xtrabackup",
+											Command: []string{
+												"sh",
+												"-c",
+												"/backup_scripts.sh",
+											},
 										},
 									},
 								},

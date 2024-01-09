@@ -21,29 +21,44 @@ package component
 
 import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloadsalpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Test RSM Convertor", func() {
-	var (
-		compDef *appsv1alpha1.ComponentDefinition
-	)
-	command := []string{"foo", "bar"}
-	//command1 := []string{"abc", "def"}
-	args := []string{"zoo", "boo"}
+	Context("rsm convertors", func() {
+		var (
+			// compDef *appsv1alpha1.ComponentDefinition
+			synComp *SynthesizedComponent
+		)
+		command := []string{"foo", "bar"}
+		// command1 := []string{"abc", "def"}
+		args := []string{"zoo", "boo"}
 
-	BeforeEach(func() {
-		compDef = &appsv1alpha1.ComponentDefinition{}
-		compDef.Spec.LifecycleActions.RoleProbe.CustomHandler.Exec.Command = command
-		compDef.Spec.LifecycleActions.RoleProbe.CustomHandler.Exec.Args = args
-	})
-	It("convert", func() {
-		convertor := &rsmRoleProbeConvertor{}
-		res, err := convertor.convert(compDef)
-		Expect(err).Should(Succeed())
-		probe := res.(*appsv1alpha1.RoleProbe)
-		Expect(probe.CustomHandler.Exec.Command).Should(BeEquivalentTo(command))
-		Expect(probe.CustomHandler.Exec.Args).Should(BeEquivalentTo(args))
+		BeforeEach(func() {
+			synComp = &SynthesizedComponent{
+				LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{
+					RoleProbe: &appsv1alpha1.RoleProbe{
+						LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
+							CustomHandler: &appsv1alpha1.Action{
+								Exec: &appsv1alpha1.ExecAction{
+									Command: command,
+									Args:    args,
+								},
+							},
+						},
+					},
+				},
+			}
+		})
+		It("convert", func() {
+			convertor := &rsmRoleProbeConvertor{}
+			res, err := convertor.convert(synComp)
+			Expect(err).Should(Succeed())
+			probe := res.(*workloadsalpha1.RoleProbe)
+			Expect(probe.CustomHandler[0].Command).Should(BeEquivalentTo(command))
+			Expect(probe.CustomHandler[0].Args).Should(BeEquivalentTo(args))
+		})
 	})
 })

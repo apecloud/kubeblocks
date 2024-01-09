@@ -36,7 +36,7 @@ Parameters:
 - version: version of the addon
 - model: model of the addon
 - provider: provider of the addon
-- descripton: description of the addon
+- description: description of the addon
 - autoInstall: autoInstall of the addon
 - kbVersion: KubeBlocks version that this addon is compatible with
 */}}
@@ -64,6 +64,7 @@ metadata:
     addon.kubeblocks.io/model: {{ .model }}
   annotations:
     addon.kubeblocks.io/kubeblocks-version: {{ .kbVersion | squote }}
+    addon.kubeblocks.io/is-engine: true
   {{- if .Values.keepAddons }}
     helm.sh/resource-policy: keep
   {{- end }}

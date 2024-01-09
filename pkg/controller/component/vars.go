@@ -538,8 +538,8 @@ func resolveServiceVarRefWithPodOrdinal(ctx context.Context, cli client.Reader, 
 	return vars1, vars2, nil
 }
 
-func resolveServiceVarRefWithSelector(ctx context.Context, cli client.Reader,
-	synthesizedComp *SynthesizedComponent, defineKey string, selector appsv1alpha1.ServiceVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error) {
+func resolveServiceVarRefWithSelector(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1alpha1.ServiceVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error) {
 	var resolveFunc func(context.Context, client.Reader, *SynthesizedComponent, string, appsv1alpha1.ServiceVarSelector) (*corev1.EnvVar, *corev1.EnvVar, error)
 	switch {
 	case selector.Host != nil:

@@ -8720,6 +8720,11 @@ spec:
                                 the new member to start log syncing previous none-nil
                                 action's Image will be used if not configured
                               properties:
+                                args:
+                                  description: Args is used to perform statements.
+                                  items:
+                                    type: string
+                                  type: array
                                 command:
                                   description: Command will be executed in Container
                                     to retrieve or process role info
@@ -8738,6 +8743,11 @@ spec:
                                 previous none-nil action's Image will be used if not
                                 configured
                               properties:
+                                args:
+                                  description: Args is used to perform statements.
+                                  items:
+                                    type: string
+                                  type: array
                                 command:
                                   description: Command will be executed in Container
                                     to retrieve or process role info
@@ -8756,6 +8766,11 @@ spec:
                                 member previous none-nil action's Image will be used
                                 if not configured
                               properties:
+                                args:
+                                  description: Args is used to perform statements.
+                                  items:
+                                    type: string
+                                  type: array
                                 command:
                                   description: Command will be executed in Container
                                     to retrieve or process role info
@@ -8774,6 +8789,11 @@ spec:
                                 cluster that the new member can join voting now previous
                                 none-nil action's Image will be used if not configured
                               properties:
+                                args:
+                                  description: Args is used to perform statements.
+                                  items:
+                                    type: string
+                                  type: array
                                 command:
                                   description: Command will be executed in Container
                                     to retrieve or process role info
@@ -8792,6 +8812,11 @@ spec:
                                 latest [BusyBox](https://busybox.net/) image will
                                 be used if Image not configured
                               properties:
+                                args:
+                                  description: Args is used to perform statements.
+                                  items:
+                                    type: string
+                                  type: array
                                 command:
                                   description: Command will be executed in Container
                                     to retrieve or process role info
@@ -8832,6 +8857,11 @@ spec:
                                 part of credential"
                               items:
                                 properties:
+                                  args:
+                                    description: Args is used to perform statements.
+                                    items:
+                                      type: string
+                                    type: array
                                   command:
                                     description: Command will be executed in Container
                                       to retrieve or process role info

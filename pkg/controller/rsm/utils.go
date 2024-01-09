@@ -363,11 +363,13 @@ func buildActionPodTemplate(rsm *workloads.ReplicatedStateMachine, env []corev1.
 	reconfiguration := rsm.Spec.MembershipReconfiguration
 	image := findActionImage(reconfiguration, actionType)
 	command := getActionCommand(reconfiguration, actionType)
+	args := getActionArgs(reconfiguration, actionType)
 	container := corev1.Container{
 		Name:            actionType,
 		Image:           image,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		Command:         command,
+		Args:            args,
 		Env:             env,
 	}
 	template := &corev1.PodTemplateSpec{
@@ -463,6 +465,31 @@ func getActionCommand(reconfiguration *workloads.MembershipReconfiguration, acti
 		return getCommand(reconfiguration.LogSyncAction)
 	case jobTypePromote:
 		return getCommand(reconfiguration.PromoteAction)
+	}
+	return nil
+}
+
+func getActionArgs(reconfiguration *workloads.MembershipReconfiguration, actionType string) []string {
+	if reconfiguration == nil {
+		return nil
+	}
+	getArgs := func(action *workloads.Action) []string {
+		if action == nil {
+			return nil
+		}
+		return action.Args
+	}
+	switch actionType {
+	case jobTypeSwitchover:
+		return getArgs(reconfiguration.SwitchoverAction)
+	case jobTypeMemberJoinNotifying:
+		return getArgs(reconfiguration.MemberJoinAction)
+	case jobTypeMemberLeaveNotifying:
+		return getArgs(reconfiguration.MemberLeaveAction)
+	case jobTypeLogSync:
+		return getArgs(reconfiguration.LogSyncAction)
+	case jobTypePromote:
+		return getArgs(reconfiguration.PromoteAction)
 	}
 	return nil
 }

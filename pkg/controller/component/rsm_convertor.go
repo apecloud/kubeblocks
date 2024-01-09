@@ -168,6 +168,7 @@ func (c *rsmRoleProbeConvertor) convert(args ...any) (any, error) {
 		rsmRoleProbeCmdAction := workloads.Action{
 			Image:   synthesizeComp.LifecycleActions.RoleProbe.CustomHandler.Image,
 			Command: synthesizeComp.LifecycleActions.RoleProbe.CustomHandler.Exec.Command,
+			Args:    synthesizeComp.LifecycleActions.RoleProbe.CustomHandler.Exec.Args,
 		}
 		rsmRoleProbe.CustomHandler = []workloads.Action{rsmRoleProbeCmdAction}
 	}

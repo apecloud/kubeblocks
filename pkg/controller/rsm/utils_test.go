@@ -328,6 +328,24 @@ var _ = Describe("utils test", func() {
 		})
 	})
 
+	Context("getActionArgs function", func() {
+		It("should work well", func() {
+			reconfiguration := &workloads.MembershipReconfiguration{
+				SwitchoverAction:  &workloads.Action{Args: []string{"switchover args"}},
+				MemberJoinAction:  &workloads.Action{Args: []string{"memberjoin args"}},
+				MemberLeaveAction: &workloads.Action{Args: []string{"memberleave args"}},
+				LogSyncAction:     &workloads.Action{Args: []string{"logsync args"}},
+				PromoteAction:     &workloads.Action{Args: []string{"promote args"}},
+			}
+
+			Expect(getActionArgs(reconfiguration, jobTypeSwitchover)).Should(Equal(reconfiguration.SwitchoverAction.Args))
+			Expect(getActionArgs(reconfiguration, jobTypeMemberJoinNotifying)).Should(Equal(reconfiguration.MemberJoinAction.Args))
+			Expect(getActionArgs(reconfiguration, jobTypeMemberLeaveNotifying)).Should(Equal(reconfiguration.MemberLeaveAction.Args))
+			Expect(getActionArgs(reconfiguration, jobTypeLogSync)).Should(Equal(reconfiguration.LogSyncAction.Args))
+			Expect(getActionArgs(reconfiguration, jobTypePromote)).Should(Equal(reconfiguration.PromoteAction.Args))
+		})
+	})
+
 	Context("AddAnnotationScope function", func() {
 		It("should work well", func() {
 			By("call with a nil map")

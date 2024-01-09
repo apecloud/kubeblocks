@@ -1150,7 +1150,7 @@ var _ = Describe("Component Controller", func() {
 			}
 			g.Expect(cond).ShouldNot(BeNil())
 			g.Expect(cond.Status).Should(BeEquivalentTo(metav1.ConditionTrue))
-			g.Expect(cond.Message).Should(ContainSubstring("root"))
+			g.Expect(cond.Message).ShouldNot(ContainSubstring("root"))
 			g.Expect(cond.Message).Should(ContainSubstring("admin"))
 		})).Should(Succeed())
 	}

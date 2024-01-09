@@ -106,7 +106,7 @@ var _ = Describe("ReplicatedStateMachine Webhook", func() {
 			Expect(err.Error()).Should(ContainSubstring("servicePort must provide"))
 		})
 
-		FIt("should succeed if spec is well defined", func() {
+		It("should succeed if spec is well defined", func() {
 			rsm.Spec.Roles = []ReplicaRole{
 				{
 					Name:       "leader",

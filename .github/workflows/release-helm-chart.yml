@@ -47,6 +47,18 @@ jobs:
     secrets: inherit
 
   release-addons-chart:
+    needs: release-chart
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.52
+    with:
+      GITHUB_REPO: "apecloud/kubeblocks-addons"
+      GITHUB_REF: ${{ github.ref }}
+      CHART_DIR: "addons"
+      APECD_REF: "v0.1.52"
+      ENABLE_JIHU: false
+    secrets: inherit
+
+  release-addons-chart-jihu:
+    needs: [ release-addons-chart ]
     strategy:
       fail-fast: false
       matrix:
@@ -62,14 +74,13 @@ jobs:
                       pulsar, pulsar-cluster, qdrant, qdrant-cluster, redis, redis-cluster, risingwave, risingwave-cluster,
                       starrocks, starrocks-cluster, tdengine, tdengine-cluster, tidb, tidb-cluster, weaviate,
                       weaviate-cluster, xinference, xinference-cluster, zookeeper, zookeeper-cluster ]
-    needs: release-chart
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.40
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts-jihu.yml@v0.1.52
     with:
       GITHUB_REPO: "apecloud/kubeblocks-addons"
-      CHART_DIR: "addons"
-      CHART_NAME: "${{ matrix.addon-name }}"
-      APECD_REF: "v0.1.40"
       GITHUB_REF: ${{ github.ref }}
+      CHART_DIR: "addons"
+      SPECIFY_CHART: "${{ matrix.addon-name }}"
+      APECD_REF: "v0.1.52"
     secrets: inherit
 
   release-charts-image:

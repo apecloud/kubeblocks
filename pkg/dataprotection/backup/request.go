@@ -425,8 +425,7 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 		}
 	}
 
-	utils.InjectDatasafed(podSpec, r.BackupRepo, RepoVolumeMountPath,
-		BuildBackupPath(r.Backup, r.BackupPolicy.Spec.PathPrefix))
+	utils.InjectDatasafed(podSpec, r.BackupRepo, RepoVolumeMountPath, r.Status.KopiaRepoPath)
 	return podSpec, nil
 }
 

@@ -48,6 +48,17 @@ type BackupPolicySpec struct {
 	// backupMethods defines the backup methods.
 	// +kubebuilder:validation:Required
 	BackupMethods []BackupMethod `json:"backupMethods"`
+
+	// useKopia specifies whether backup data should be stored in a Kopia repository.
+	// Data within the Kopia repository is both compressed and encrypted. Furthermore,
+	// data deduplication is implemented across various backups of the same cluster.
+	// This approach significantly reduces the actual storage usage, particularly for
+	// clusters with a low update frequency.
+	// NOTE: This feature should NOT be enabled when using KubeBlocks Community Edition,
+	// otherwise the backup will not be processed.
+	// +optional
+	// +kubebuilder:default=false
+	UseKopia bool `json:"useKopia"`
 }
 
 type BackupTarget struct {

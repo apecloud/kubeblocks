@@ -929,16 +929,6 @@ func GetClusterUpRunningPhases() []ClusterPhase {
 	}
 }
 
-// GetExposeRunningPhases returns Cluster running or partially running phases.
-func GetExposeRunningPhases() []ClusterPhase {
-	return []ClusterPhase{
-		RunningClusterPhase,
-		UpdatingClusterPhase,
-		AbnormalClusterPhase,
-		FailedClusterPhase,
-	}
-}
-
 // GetReconfiguringRunningPhases return Cluster running or partially running phases.
 func GetReconfiguringRunningPhases() []ClusterPhase {
 	return []ClusterPhase{

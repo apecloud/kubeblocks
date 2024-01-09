@@ -833,7 +833,7 @@ spec:
                       used if not configured
                     properties:
                       args:
-                        description: args is used to perform statements.
+                        description: Args is used to perform statements.
                         items:
                           type: string
                         type: array
@@ -855,7 +855,7 @@ spec:
                       none-nil action's Image will be used if not configured
                     properties:
                       args:
-                        description: args is used to perform statements.
+                        description: Args is used to perform statements.
                         items:
                           type: string
                         type: array
@@ -877,7 +877,7 @@ spec:
                       previous none-nil action's Image will be used if not configured
                     properties:
                       args:
-                        description: args is used to perform statements.
+                        description: Args is used to perform statements.
                         items:
                           type: string
                         type: array
@@ -900,7 +900,7 @@ spec:
                       Image will be used if not configured
                     properties:
                       args:
-                        description: args is used to perform statements.
+                        description: Args is used to perform statements.
                         items:
                           type: string
                         type: array
@@ -923,7 +923,7 @@ spec:
                       not configured
                     properties:
                       args:
-                        description: args is used to perform statements.
+                        description: Args is used to perform statements.
                         items:
                           type: string
                         type: array
@@ -1030,7 +1030,7 @@ spec:
                     items:
                       properties:
                         args:
-                          description: args is used to perform statements.
+                          description: Args is used to perform statements.
                           items:
                             type: string
                           type: array

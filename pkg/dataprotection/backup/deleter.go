@@ -149,7 +149,7 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 		_, finishedType, msg := utils.IsJobFinished(preJob)
 		if finishedType == batchv1.JobFailed {
 			return DeletionStatusFailed,
-				fmt.Errorf("deletion backup files job \"%s\" failed, you can delete it to re-delete the backup files, %s", job.Name, msg)
+				fmt.Errorf("pre-delete backup files job \"%s\" failed, you can delete it to re-delete the backup files, %s", job.Name, msg)
 		} else if finishedType != batchv1.JobComplete {
 			return DeletionStatusDeleting, nil
 		}

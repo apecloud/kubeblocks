@@ -293,7 +293,7 @@ func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, compSpecs []appsv
 	if restoreTime != "" {
 		restoreInfoMap[constant.RestoreTimeKeyForRestore] = restoreTime
 	}
-	connectionPassword := backup.Annotations[dptypes.ConnectionPasswordKey]
+	connectionPassword := backup.Annotations[dptypes.ConnectionPasswordAnnotationKey]
 	if connectionPassword != "" {
 		restoreInfoMap[constant.ConnectionPassword] = connectionPassword
 	}

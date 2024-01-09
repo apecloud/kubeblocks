@@ -48,6 +48,10 @@ const (
 	DefaultBackupRepoAnnotationKey = "dataprotection.kubeblocks.io/is-default-repo"
 	// ReconfigureRefAnnotationKey specifies the reconfigure ref.
 	ReconfigureRefAnnotationKey = "dataprotection.kubeblocks.io/reconfigure-ref"
+	// ConnectionPasswordAnnotationKey specifies the password of the connection credential.
+	ConnectionPasswordAnnotationKey = "dataprotection.kubeblocks.io/connection-password"
+	// GeminiAcknowledgedAnnotationKey indicates whether Gemini has acknowledged the backup.
+	GeminiAcknowledgedAnnotationKey = "dataprotection.kubeblocks.io/gemini-acknowledged"
 )
 
 // label keys
@@ -70,8 +74,6 @@ const (
 	AutoBackupLabelKey = "dataprotection.kubeblocks.io/autobackup"
 	// BackupTargetPodLabelKey specifies the backup target pod label key.
 	BackupTargetPodLabelKey = "dataprotection.kubeblocks.io/target-pod-name"
-	// ConnectionPasswordKey specifies the password of the connection credential.
-	ConnectionPasswordKey = "dataprotection.kubeblocks.io/connection-password"
 )
 
 // env names
@@ -107,9 +109,13 @@ const (
 	// DPDatasafedLocalBackendPath force datasafed to use local backend with the path
 	// NOTE: do not add 'DP_' for this constant, it is the datasafed built-in environment.
 	DPDatasafedLocalBackendPath = "DATASAFED_LOCAL_BACKEND_PATH"
+	// DPDatasafedKopiaRepoRoot specifies the root of the Kopia repository
+	// NOTE: do not add 'DP_' for this constant, it is the datasafed built-in environment.
+	DPDatasafedKopiaRepoRoot = "DATASAFED_KOPIA_REPO_ROOT"
 )
 
 const (
 	RestoreKind            = "Restore"
 	DataprotectionAPIGroup = "dataprotection.kubeblocks.io"
+	KopiaRepoFolderName    = "kopia"
 )

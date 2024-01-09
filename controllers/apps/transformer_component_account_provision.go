@@ -87,6 +87,9 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 		return nil
 	}
 	for _, account := range transCtx.SynthesizeComponent.SystemAccounts {
+		if account.InitAccount {
+			continue
+		}
 		if t.isAccountProvisioned(cond, account) {
 			continue
 		}

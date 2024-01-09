@@ -47,11 +47,27 @@ jobs:
     secrets: inherit
 
   release-addons-chart:
+    strategy:
+      fail-fast: false
+      matrix:
+        addon-name: [ apecloud-mysql, apecloud-mysql-cluster, apecloud-postgresql, apecloud-postgresql-cluster,
+                      clickhouse, clickhouse-cluster, elasticsearch, elasticsearch-cluster, etcd, etcd-cluster,
+                      flink, flink-cluster, foxlake, foxlake-cluster, greptimedb, greptimedb-cluster, influxdb,
+                      kafka, kafka-cluster, llm, llm-cluster, mariadb, mariadb-cluster, milvus, milvus-cluster,
+                      minio, minio-cluster, mongodb, mongodb-cluster, mongodb-sharding-cluster, mysql, mysql-cluster,
+                      nebula, nebula-cluster, neon, neon-cluster, oceanbase, oceanbase-cluster, official-postgresql,
+                      official-postgresql-cluster, opengauss, opengauss-cluster, openldap, openldap-cluster,
+                      opensearch, opensearch-cluster, oracle, oracle-cluster, oracle-mysql, oracle-mysql-cluster,
+                      orioledb, orioledb-cluster, polardbx, polardbx-cluster, postgresql, postgresql-cluster,
+                      pulsar, pulsar-cluster, qdrant, qdrant-cluster, redis, redis-cluster, risingwave, risingwave-cluster,
+                      starrocks, starrocks-cluster, tdengine, tdengine-cluster, tidb, tidb-cluster, weaviate,
+                      weaviate-cluster, xinference, xinference-cluster, zookeeper, zookeeper-cluster ]
     needs: release-chart
     uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.40
     with:
       GITHUB_REPO: "apecloud/kubeblocks-addons"
       CHART_DIR: "addons"
+      CHART_NAME: "${{ matrix.addon-name }}"
       APECD_REF: "v0.1.40"
       GITHUB_REF: ${{ github.ref }}
     secrets: inherit

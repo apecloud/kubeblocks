@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -56,14 +57,14 @@ func (t *componentVarsTransformer) Transform(ctx graph.TransformContext, dag *gr
 	reader := &varsReader{transCtx.Client, graphCli, dag}
 	synthesizedComp := transCtx.SynthesizeComponent
 
-	generated, err := isGeneratedComponent(transCtx.Cluster, transCtx.ComponentOrig)
+	legacy, err := generatedComponent4LegacyCluster(transCtx)
 	if err != nil {
 		return err
 	}
 
 	var templateVars map[string]any
 	var envVars []corev1.EnvVar
-	if generated {
+	if legacy {
 		templateVars, envVars, err = component.ResolveEnvVars4LegacyCluster(transCtx.Context, reader,
 			synthesizedComp, transCtx.Cluster.Annotations, transCtx.CompDef.Spec.Vars)
 	} else {
@@ -75,10 +76,33 @@ func (t *componentVarsTransformer) Transform(ctx graph.TransformContext, dag *gr
 	}
 
 	// pass all direct value env vars through CM
-	envVars2, envData := buildEnvVarsNData(synthesizedComp, envVars, generated)
-	setTemplateNEnvVars(synthesizedComp, templateVars, envVars2, generated)
+	envVars2, envData := buildEnvVarsNData(synthesizedComp, envVars, legacy)
+	setTemplateNEnvVars(synthesizedComp, templateVars, envVars2, legacy)
 
 	return createOrUpdateEnvConfigMap(ctx, dag, envData)
+}
+
+// generatedComponent4LegacyCluster checks whether the cluster to which this component belongs was created before 0.8.
+func generatedComponent4LegacyCluster(transCtx *componentTransformContext) (bool, error) {
+	generated, err := isGeneratedComponent(transCtx.Cluster, transCtx.ComponentOrig)
+	if err != nil {
+		return false, err
+	}
+	if !generated {
+		return false, nil
+	}
+
+	synthesizedComp := transCtx.SynthesizeComponent
+	rsmObj := &workloads.ReplicatedStateMachine{}
+	rsmKey := types.NamespacedName{
+		Namespace: synthesizedComp.Namespace,
+		Name:      constant.GenerateRSMNamePattern(synthesizedComp.ClusterName, synthesizedComp.Name),
+	}
+	if err = transCtx.Client.Get(transCtx.Context, rsmKey, rsmObj); err != nil {
+		return false, client.IgnoreNotFound(err)
+	}
+
+	return !model.IsOwnerOf(transCtx.ComponentOrig, rsmObj), nil
 }
 
 func buildEnvVarsNData(synthesizedComp *component.SynthesizedComponent, vars []corev1.EnvVar, legacy bool) ([]corev1.EnvVar, map[string]string) {

@@ -31,7 +31,7 @@ kbcli fault time --time-offset=-5s
 
 ## 使用 YAML 文件模拟故障注入
 
-本节介绍如何使用 YAML 文件模拟故障注入。你可以参考 [Chaos Mesh 官方文档](https://chaos-mesh.org/zh/docs/next/simulate-time-chaos-on-kubernetes/#使用-yaml-方式创建实验) 获取更详细的信息。
+本节介绍如何使用 YAML 文件模拟故障注入。你可以参考 [Chaos Mesh 官方文档](https://chaos-mesh.org/zh/docs/next/simulate-time-chaos-on-kubernetes/#使用-yaml-方式创建实验)获取更详细的信息。
 
 1. 将实验配置写入到 `time.yaml` 文件中。
 

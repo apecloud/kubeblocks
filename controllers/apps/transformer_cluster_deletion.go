@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -206,6 +207,7 @@ func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
 	namespacedKindsPlus := []client.ObjectList{
 		&appsv1alpha1.ComponentList{},
 		&workloads.ReplicatedStateMachineList{},
+		&appsv1.StatefulSetList{}, // be compatible with 0.6 workloads.
 		&policyv1.PodDisruptionBudgetList{},
 		&corev1.ServiceList{},
 		&corev1.ServiceAccountList{},

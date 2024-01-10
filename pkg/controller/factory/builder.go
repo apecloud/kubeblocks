@@ -53,22 +53,25 @@ import (
 // BuildRSM builds a ReplicatedStateMachine object based on Cluster, SynthesizedComponent.
 func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) (*workloads.ReplicatedStateMachine, error) {
 	var (
-		clusterDefName = synthesizedComp.ClusterDefName
-		compDefName    = synthesizedComp.CompDefName
-		namespace      = synthesizedComp.Namespace
-		clusterName    = synthesizedComp.ClusterName
-		compName       = synthesizedComp.Name
+		clusterDefName     = synthesizedComp.ClusterDefName
+		clusterCompDefName = synthesizedComp.ClusterCompDefName
+		compDefName        = synthesizedComp.CompDefName
+		namespace          = synthesizedComp.Namespace
+		clusterName        = synthesizedComp.ClusterName
+		compName           = synthesizedComp.Name
 	)
 	labels := constant.GetKBWellKnownLabelsWithCompDef(compDefName, clusterName, compName)
+	compDefLabel := constant.GetComponentDefLabel(compDefName)
 	if len(clusterDefName) > 0 {
 		// TODO(xingran): for backward compatibility in kubeBlocks version 0.8.0, it will be removed in the future.
 		labels = constant.GetKBWellKnownLabels(clusterDefName, clusterName, compName)
+		compDefLabel = constant.GetClusterCompDefLabel(clusterCompDefName)
 	}
 
 	// TODO(xingran): Need to review how to set pod labels based on the new ComponentDefinition API. workloadType label has been removed.
 	podBuilder := builder.NewPodBuilder("", "").
 		AddLabelsInMap(labels).
-		AddLabelsInMap(constant.GetComponentDefLabel(compDefName)).
+		AddLabelsInMap(compDefLabel).
 		AddLabelsInMap(constant.GetAppVersionLabel(compDefName))
 	template := corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
@@ -80,7 +83,7 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synthesi
 		AddAnnotations(constant.KubeBlocksGenerationKey, synthesizedComp.ClusterGeneration).
 		AddAnnotationsInMap(getMonitorAnnotations(synthesizedComp)).
 		AddLabelsInMap(labels).
-		AddLabelsInMap(constant.GetComponentDefLabel(compDefName)).
+		AddLabelsInMap(compDefLabel).
 		AddMatchLabelsInMap(labels).
 		SetServiceName(constant.GenerateRSMServiceNamePattern(rsmName)).
 		SetReplicas(synthesizedComp.Replicas).

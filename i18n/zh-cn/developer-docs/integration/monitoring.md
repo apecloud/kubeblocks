@@ -13,7 +13,7 @@ sidebar_label: 监控
 ## 开始之前
 
 1. 了解 K8s 基本概念，例如 Pod、Sidecar 模式等。
-2. 阅读并完成[添加数据库引擎](./how-to-add-an-add-on.md)文档中的步骤。
+2. 阅读[添加数据库引擎](./how-to-add-an-add-on.md)文档。
 3. 了解基本的监控系统概念，例如 Prometheus、 Grafana 等。
 
 ## 背景知识

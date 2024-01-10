@@ -14,7 +14,7 @@ sidebar_label: 多组件配置
 
 ## 开始之前
 
-- 阅读并完成[添加数据库引擎](./how-to-add-an-add-on.md)文档中的步骤。
+- 阅读[添加数据库引擎](./how-to-add-an-add-on.md)文档。
 - 了解 KubeBlocks 常见概念，例如 ClusterDefinition、Cluster、ComponentRef、Component 等。
 
 ## NebulaGraph 架构

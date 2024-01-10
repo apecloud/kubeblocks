@@ -16,7 +16,7 @@ import TabItem from '@theme/TabItem';
 ## 开始之前
 
 1. 了解 K8s 基本概念，例如 Pod，ConfigMap 等。
-2. 阅读并完成[添加数据库引擎](./how-to-add-an-add-on.md)文档中的步骤。
+2. 阅读[添加数据库引擎](./how-to-add-an-add-on.md)文档。
 3. 了解 Go Template（非必须）。
 
 ## 背景知识

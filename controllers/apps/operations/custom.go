@@ -233,13 +233,7 @@ func (c CustomOpsHandler) buildJob(reqCtx intctrlutil.RequestCtx,
 		if len(jobSpec.Template.Spec.Tolerations) == 0 {
 			jobSpec.Template.Spec.Tolerations = comp.Tolerations
 		}
-		getSAName := func() string {
-			if comp.ServiceAccountName != "" {
-				return comp.ServiceAccountName
-			}
-			return constant.GenerateDefaultServiceAccountName(opsRes.Cluster.Name)
-		}
-		jobSpec.Template.Spec.ServiceAccountName = getSAName()
+		jobSpec.Template.Spec.ServiceAccountName = comp.ServiceAccountName
 		return &jobSpec, nil
 	}
 

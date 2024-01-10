@@ -16,7 +16,7 @@ import TabItem from '@theme/TabItem';
 ## 开始之前
 
 1. 了解 K8s 基本概念，例如 Pod，ConfigMap 等。
-2. 完成[教程 1](./how-to-add-an-add-on.md)。
+2. 阅读[添加数据库引擎](./how-to-add-an-add-on.md)文档。
 3. 了解 Go Template（非必须）。
 
 ## 背景知识
@@ -56,7 +56,7 @@ KubeBlocks 具有强大的渲染能力，能让你快速定制一个 ***自适�
 15      innodb_buffer_pool_size={{ $pool_buffer_size }}
 16      {{- end }}
 17 
-18      # If the memory is less than 8Gi, disable performance_schema
+18      # 如果内存小于 8Gi，禁用 performance_schema
 19      {{- if lt $phy_memory 8589934592 }}
 20      performance_schema=OFF
 21      {{- end }}

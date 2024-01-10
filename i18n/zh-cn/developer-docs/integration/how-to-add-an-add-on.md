@@ -33,7 +33,7 @@ sidebar_label: 添加数据库引擎
 
 | 术语              | 设置                                                                                                     |
 |-------------------|--------------------------------------------------------------------------------------------------------------|
-| CLusterDefinition | 启动脚本：默认。<br /> 配置文件：默认。<br /> 服务端口：3306。<br /> Component 个数：1，即 MySQL。 |
+| ClusterDefinition | 启动脚本：默认。<br /> 配置文件：默认。<br /> 服务端口：3306。<br /> Component 个数：1，即 MySQL。 |
 | ClusterVersion    | Image: docker.io/mysql:8.0.34                                                                                |
 | Cluster.yaml      | 由用户创建时指定。                                                           |
 
@@ -50,7 +50,7 @@ sidebar_label: 添加数据库引擎
 ```bash
 > tree oracle-mysql
 .
-├── Chart.yaml        #  包含 chart 相关信息的 YAML 文件
+├── Chart.yaml        # 包含 chart 相关信息的 YAML 文件
 ├── templates         # 模板目录，赋值后将生成有效的 Kubernetes 清单文件
 │   ├── NOTES.txt     # 可选：纯文本文件，包含简短的使用说明
 │   ├── _helpers.tpl  # 放置 helpers 的位置，可以在整个 chart 中重复使用
@@ -86,7 +86,7 @@ sidebar_label: 添加数据库引擎
 
     `$(SVC_PORT_mysql)` 通过选择端口名来指定要暴露的端口号，这里为 `mysql`。
 
-    更多关于环境变量的说明，参看[环境变量与占位符](./environment-variables-and-placeholders.md)文档。
+    更多关于环境变量的说明，参看[环境变量和占位符](./environment-variables-and-placeholders.md)文档。
 
   - `ComponentDefs`
 
@@ -121,7 +121,7 @@ sidebar_label: 添加数据库引擎
     
     记住这个 `name`，后面要考的。
 
-  - `characterType` [可选]
+  - `characterType` [选填]
 
     `characterType` 是一个字符串类型，用来识别这是一个什么引擎，例如 `mysql`、`postgresql`、`redis` 等。它主要用于数据库连接，在操作数据库时，它能快速识别引擎类型，找到匹配的操作命令。
     
@@ -138,7 +138,7 @@ sidebar_label: 添加数据库引擎
     
     因为这里使用的是 MySQL 单机版，因此使用 `Stateful` 就足够了。
 
-  - `service` [可选]
+  - `service` [选填]
 
     ```yaml
           service:
@@ -154,11 +154,11 @@ sidebar_label: 添加数据库引擎
     
     通过 `$(SVC_PORT_mysql)$` 来选择端口，`mysql` 就是这里的 `service.ports[0].name` mysql。
 
-     :::note
+    :::note
 
-     如果 `connectionCredential` 中填写了端口名，必须确保端口名出现在这里。
+    如果 `connectionCredential` 中填写了端口名，必须确保端口名出现在这里。
 
-     :::
+    :::
 
   - `podSpec`
 
@@ -221,7 +221,7 @@ sidebar_label: 添加数据库引擎
 
 :::
 
-### 2.2 按照 Helm chart
+### 2.2 安装 Helm chart
 
 安装 Helm。
 
@@ -406,20 +406,20 @@ metadata:
   name: mycluster
   namespace: default
 spec:
-  clusterDefinitionRef: oracle-mysql        # Specify ClusterDefinition
-  clusterVersionRef: oracle-mysql-8.0.32    # Specify ClusterVersion
-  componentSpecs:                           # List required components
-  - componentDefRef: mysql-compdef          # The type of the first component: mysql-compdef
-    name: mysql-comp                        # The name of the first component: mysql-comp
+  clusterDefinitionRef: oracle-mysql        # 指定 ClusterDefinition
+  clusterVersionRef: oracle-mysql-8.0.32    # 指定 ClusterVersion
+  componentSpecs:                           # 枚举要用的组件
+  - componentDefRef: mysql-compdef          # 第一个组件, 它的组件类型为 mysql-compdef
+    name: mysql-comp                        # 第一个组件, 名为 mysql-comp
     replicas: 1 
-    resources:                              # Specify CPU and memory size
+    resources:                              # 指定 CPU 和内存大小
       limits:
         cpu: "1"
         memory: 1Gi
       requests:
         cpu: "1"
         memory: 1Gi
-    volumeClaimTemplates:                   # Set the PVC information, where the name must correspond to that of the Component Def.
+    volumeClaimTemplates:                   # 设置 PVC 信息，这里的 name 必须和 Component Def 中的对应
     - name: data
       spec:
         accessModes:

@@ -12,5 +12,5 @@ Guides and resources to unleash your development potential. Developer docs inclu
 
 * [Integration](./integration/add-ons-of-kubeblocks.md)
 * [API Reference](./api-reference/cluster.md)
-* [External Components](./external-component/reference-external-component.md)
+* [External Component](./external-component/reference-external-component.md)
 * [Fault Injection](./fault_injection/introduction.md)

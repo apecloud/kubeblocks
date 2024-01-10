@@ -544,6 +544,7 @@ func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *apps
 					Image: clusterCompDef.RSMSpec.RoleProbe.CustomHandler[0].Image,
 					Exec: &appsv1alpha1.ExecAction{
 						Command: clusterCompDef.RSMSpec.RoleProbe.CustomHandler[0].Command,
+						Args:    clusterCompDef.RSMSpec.RoleProbe.CustomHandler[0].Args,
 					},
 				},
 			},

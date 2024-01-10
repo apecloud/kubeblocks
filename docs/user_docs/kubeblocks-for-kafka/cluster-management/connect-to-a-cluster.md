@@ -153,11 +153,11 @@ If you use AWS EKS, you may want to access to the Kafka cluster from EC2 instanc
 
    ![gain elb address](./../../../img/connect-to-kafka-cluster-gain-elb-address.png)
 
-    :::note
+  :::note
 
-    xxxxxx-xxx.cn-northwest-1.elb.amazonaws.com.cn is the ELB address accessible within the same VPC of K8s.
+  xxxxxx-xxx.cn-northwest-1.elb.amazonaws.com.cn is the ELB address accessible within the same VPC of K8s.
 
-    :::
+  :::
 
 3. Use the ELB address to connect.
 
@@ -237,11 +237,11 @@ The current version only supports Kafka broker with a single replica (combined: 
 
    ![gain ELB address cross vpc](./../../../img/kafka-connect-cross-vpc.png)
 
-    :::note
+  :::note
 
-    xxxx-xxxx.cn-northwest-1.elb.amazonaws.com.cn is the ELB address accessible over the public network.
+  xxxx-xxxx.cn-northwest-1.elb.amazonaws.com.cn is the ELB address accessible over the public network.
 
-    :::
+  :::
 
 3. Configure hostname mapping.
    1. Login to the remote machine.

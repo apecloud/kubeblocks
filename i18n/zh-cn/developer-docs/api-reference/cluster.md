@@ -1,9 +1,9 @@
 ---
-title: Cluster API Reference
-description: Cluster API Reference
-keywords: [cluster, api]
+title: 集群 API 参考
+description: 集群 API 参考
+keywords: [集群, API]
 sidebar_position: 1
-sidebar_label: Cluster
+sidebar_label: 集群 API 参考
 ---
 <br />
 <p>Packages:</p>

@@ -59,6 +59,7 @@ var _ = Describe("ReplicatedStateMachine Webhook", func() {
 							{
 								Image:   "foo",
 								Command: []string{"bar"},
+								Args:    []string{"baz"},
 							},
 						},
 					},

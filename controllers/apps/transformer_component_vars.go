@@ -118,12 +118,16 @@ func buildEnvVarsNData(synthesizedComp *component.SynthesizedComponent, vars []c
 		return vars, envData
 	}
 
+	hasReference := func(v corev1.EnvVar) bool {
+		return len(component.VarReferenceRegExp().FindAllStringSubmatchIndex(v.Value, -1)) > 0
+	}
+
 	envVars := make([]corev1.EnvVar, 0)
 	for i, v := range vars {
-		if v.ValueFrom == nil {
-			envData[v.Name] = v.Value
-		} else {
+		if v.ValueFrom != nil || hasReference(v) {
 			envVars = append(envVars, vars[i])
+		} else {
+			envData[v.Name] = v.Value
 		}
 	}
 	return envVars, envData

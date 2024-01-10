@@ -402,12 +402,6 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 		synthesizeComp.VolumeTypes = clusterCompDef.VolumeTypes
 		synthesizeComp.VolumeProtection = clusterCompDef.VolumeProtectionSpec
 		synthesizeComp.MinAvailable = clusterCompSpec.GetMinAvailable(clusterCompDef.GetMinAvailable())
-		// TODO(xingran): this is to ensure compatibility with instances prior to version 0.8.0.
-		// The old implementation relies on ClusterCompDef for environmental variables and sets them in labels on the rsm and pod.
-		// All places relying on the `app.kubernetes.io/component` label need to be refactored.
-		if synthesizeComp.CompDefName == "" {
-			synthesizeComp.CompDefName = clusterCompDef.Name
-		}
 		// TLS is a backward compatible field, which is used in configuration rendering before version 0.8.0.
 		if synthesizeComp.TLSConfig != nil {
 			synthesizeComp.TLS = true

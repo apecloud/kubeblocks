@@ -1,9 +1,9 @@
 ---
-title: Backup API Reference
-description: Backup API Reference
-keywords: [backup, api]
+title: 备份 API 参考
+description:  备份 API 参考
+keywords: [备份, API]
 sidebar_position: 2
-sidebar_label: Backup
+sidebar_label: 备份 API 参考
 ---
 <br />
 <p>Packages:</p>

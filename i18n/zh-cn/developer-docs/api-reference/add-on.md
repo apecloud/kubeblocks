@@ -1,9 +1,9 @@
 ---
-title: Add-On API Reference
-description: Add-On API Reference
-keywords: [add-on, api]
+title: 集成 API 参考
+description: 集成 API 参考
+keywords: [集成, API]
 sidebar_position: 3
-sidebar_label: Add-On
+sidebar_label: 集成 API 参考
 ---
 <br />
 <p>Packages:</p>

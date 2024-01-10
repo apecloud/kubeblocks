@@ -36,6 +36,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // componentAccountTransformer handles component system accounts.
@@ -64,7 +66,7 @@ func (t *componentAccountTransformer) Transform(ctx graph.TransformContext, dag 
 		if exist {
 			continue
 		}
-		secret, err := t.buildAccountSecret(ctx, synthesizeComp, account)
+		secret, err := t.buildAccountSecret(transCtx, synthesizeComp, account)
 		if err != nil {
 			return err
 		}
@@ -90,7 +92,7 @@ func (t *componentAccountTransformer) checkAccountSecretExist(ctx graph.Transfor
 	}
 }
 
-func (t *componentAccountTransformer) buildAccountSecret(ctx graph.TransformContext,
+func (t *componentAccountTransformer) buildAccountSecret(ctx *componentTransformContext,
 	synthesizeComp *component.SynthesizedComponent, account appsv1alpha1.SystemAccount) (*corev1.Secret, error) {
 	var password []byte
 	if account.SecretRef != nil {
@@ -99,7 +101,7 @@ func (t *componentAccountTransformer) buildAccountSecret(ctx graph.TransformCont
 			return nil, err
 		}
 	} else {
-		password = t.generatePassword(account)
+		password = t.buildPassword(ctx, account)
 	}
 	return t.buildAccountSecretWithPassword(synthesizeComp, account, password), nil
 }
@@ -117,6 +119,20 @@ func (t *componentAccountTransformer) getPasswordFromSecret(ctx graph.TransformC
 		return nil, fmt.Errorf("referenced account secret has no required credential field")
 	}
 	return secret.Data[constant.AccountPasswdForSecret], nil
+}
+
+func (t *componentAccountTransformer) buildPassword(ctx *componentTransformContext, account appsv1alpha1.SystemAccount) []byte {
+	if !account.InitAccount {
+		return t.generatePassword(account)
+	}
+	// get restore password if exists during recovery.
+	password, ok := ctx.Cluster.Annotations[constant.ConnectionPassword]
+	if !ok {
+		return t.generatePassword(account)
+	}
+	e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
+	password, _ = e.Decrypt([]byte(password))
+	return []byte(password)
 }
 
 func (t *componentAccountTransformer) generatePassword(account appsv1alpha1.SystemAccount) []byte {

@@ -233,7 +233,15 @@ func (c CustomOpsHandler) buildJob(reqCtx intctrlutil.RequestCtx,
 		if len(jobSpec.Template.Spec.Tolerations) == 0 {
 			jobSpec.Template.Spec.Tolerations = comp.Tolerations
 		}
-		jobSpec.Template.Spec.ServiceAccountName = comp.ServiceAccountName
+		if comp.ServiceAccountName != "" {
+			jobSpec.Template.Spec.ServiceAccountName = comp.ServiceAccountName
+		} else {
+			saKey := client.ObjectKey{Namespace: opsRes.Cluster.Namespace,
+				Name: constant.GenerateDefaultServiceAccountName(opsRes.Cluster.Name)}
+			if exists, _ := intctrlutil.CheckResourceExists(reqCtx.Ctx, cli, saKey, &corev1.ServiceAccount{}); exists {
+				jobSpec.Template.Spec.ServiceAccountName = comp.ServiceAccountName
+			}
+		}
 		return &jobSpec, nil
 	}
 

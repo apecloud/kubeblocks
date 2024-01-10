@@ -1296,7 +1296,7 @@ var _ = Describe("Component Controller", func() {
 			{
 				Name: constant.KBEnvPodFQDN,
 				Value: fmt.Sprintf("%s.%s-headless.%s.svc", constant.EnvPlaceHolder(constant.KBEnvPodName),
-					constant.EnvPlaceHolder(constant.KBEnvClusterCompName), constant.EnvPlaceHolder(constant.KBEnvNamespace)),
+					constant.GenerateClusterComponentName(clusterObj.Name, compName), constant.EnvPlaceHolder(constant.KBEnvNamespace)),
 			},
 			{
 				Name: constant.KBEnvNodeName,

@@ -65,8 +65,7 @@ import TabItem from '@theme/TabItem';
   <TabItem value="kubectl" label="kubectl">
   
   查看 `apecloud-mysql` 集群定义是否可用。
-
-
+  
   ```bash
   kubectl get clusterdefinition apecloud-mysql
   >

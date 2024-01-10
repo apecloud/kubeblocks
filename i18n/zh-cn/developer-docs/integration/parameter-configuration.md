@@ -16,7 +16,7 @@ import TabItem from '@theme/TabItem';
 ## 开始之前
 
 1. 了解 K8s 基本概念，例如 Pod、ConfigMap 等。
-2. 完成[教程 3](./parameter-template.md)。
+2. 阅读并完成[参数模板](./parameter-template.md)文档中的步骤。
 3. 了解 Go Template (非必须)。
 4. 了解 CUE Lang (非必须)。
 

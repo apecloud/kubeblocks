@@ -13,7 +13,7 @@ sidebar_label: 监控
 ## 开始之前
 
 1. 了解 K8s 基本概念，例如 Pod、Sidecar 模式等。
-2. 完成[教程 1](./how-to-add-an-add-on.md)。
+2. 阅读并完成[添加数据库引擎](./how-to-add-an-add-on.md)文档中的步骤。
 3. 了解基本的监控系统概念，例如 Prometheus、 Grafana 等。
 
 ## 背景知识
@@ -119,7 +119,7 @@ componentDefs:
         scrapePath: "/metrics"  # Exporter 路径，用于 Prometheus Pull 数据
 ```
 
-KuBeBlocks 支持多种监控方案。如果用开源的 Prometheus/Grafana 方案，需要在 `monitor` 中需要配置 Exporter 的监听端口和 metrics 路径。这里的配置需要和 [添加 Exporter 容器](#添加-exporter-容器) 中配置的容器端口（container-port）对应。
+KuBeBlocks 支持多种监控方案。如果用开源的 Prometheus/Grafana 方案，需要在 `monitor` 中需要配置 Exporter 的监听端口和 metrics 路径。这里的配置需要和[添加 Exporter 容器](#添加-exporter-容器)中配置的容器端口（container-port）对应。
 
 ## 配置 Grafana 仪表盘
 

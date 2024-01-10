@@ -33,7 +33,7 @@ Table 1. 展示了 KubeBlocks 中与备份相关的常见概念，后文会通�
 
 ## 开始之前
 
-- 完成[教程 1](./how-to-add-an-add-on.md) 中的配置过程。
+- 完成[添加数据库引擎](./how-to-add-an-add-on.md)文档中的配置过程。
 - 了解 K8s 的基本概念，例如 Pod、PVC、PV、VolumeSnapshot 等。
 
 ## 步骤 1. 准备环境
@@ -91,7 +91,7 @@ KubeBlocks 支持对数据和日志的不同备份方式。这里只配置了数
 
 ### BackupPolicy template
 
-I这是备份策略的模版，主要描述：
+这是备份策略的模版，主要描述：
 
 1. 为 Cluster 的哪个组件备份；
 2. 是否定时备份；

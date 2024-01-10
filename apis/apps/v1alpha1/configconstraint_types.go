@@ -129,6 +129,10 @@ type ReloadOptions struct {
 	// goTplTrigger performs the reload command.
 	// +optional
 	TPLScriptTrigger *TPLScriptTrigger `json:"tplScriptTrigger"`
+
+	// autoTrigger performs the reload command.
+	// +optional
+	AutoTrigger *AutoTrigger `json:"autoTrigger"`
 }
 
 type UnixSignalTrigger struct {
@@ -228,6 +232,12 @@ type TPLScriptTrigger struct {
 	// Specify synchronize updates parameters to the config manager.
 	// +optional
 	Sync *bool `json:"sync,omitempty"`
+}
+
+type AutoTrigger struct {
+	// processName is process name
+	// +optional
+	ProcessName string `json:"processName"`
 }
 
 type FormatterConfig struct {

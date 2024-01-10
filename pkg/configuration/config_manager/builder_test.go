@@ -92,6 +92,9 @@ var _ = Describe("Config Builder Test", func() {
 				Namespace:          scriptsNS,
 			},
 		}
+		autoHandle := &appsv1alpha1.AutoTrigger{
+			ProcessName: "postgres",
+		}
 
 		switch t {
 		default:
@@ -105,6 +108,9 @@ var _ = Describe("Config Builder Test", func() {
 		case appsv1alpha1.TPLScriptType:
 			return &appsv1alpha1.ReloadOptions{
 				TPLScriptTrigger: scriptHandle}
+		case appsv1alpha1.AutoType:
+			return &appsv1alpha1.ReloadOptions{
+				AutoTrigger: autoHandle}
 		}
 	}
 	newConfigSpecMeta := func() []ConfigSpecMeta {

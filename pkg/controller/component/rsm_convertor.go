@@ -176,23 +176,24 @@ func (c *rsmRoleProbeConvertor) convert(args ...any) (any, error) {
 }
 
 func (c *rsmCredentialConvertor) convert(args ...any) (any, error) {
-	var (
-		secretName     string
-		sysInitAccount *appsv1alpha1.SystemAccount
-	)
-
 	synthesizeComp, err := parseRSMConvertorArgs(args...)
 	if err != nil {
 		return nil, err
 	}
 
 	// use the system init account as the default credential
+	var sysInitAccount *appsv1alpha1.SystemAccount
 	for index, sysAccount := range synthesizeComp.SystemAccounts {
 		if sysAccount.InitAccount {
 			sysInitAccount = &synthesizeComp.SystemAccounts[index]
 			break
 		}
 	}
+	if sysInitAccount == nil && len(synthesizeComp.CompDefName) != 0 {
+		return nil, nil
+	}
+
+	var secretName string
 	if sysInitAccount != nil {
 		secretName = constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
 	} else {
@@ -220,7 +221,6 @@ func (c *rsmCredentialConvertor) convert(args ...any) (any, error) {
 			},
 		},
 	}
-
 	return credential, nil
 }
 

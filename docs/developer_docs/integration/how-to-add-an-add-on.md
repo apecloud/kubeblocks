@@ -157,11 +157,11 @@ There are two YAML files under `templates`, `clusterDefinition.yaml` and `cluste
 
     You can invoke `$(SVC_PORT_mysql)$` to select a port, where `mysql` is the `service.ports[0].name` here.
 
-     :::note
+    :::note
 
-     If the `connectionCredential` is filled with a port name, make sure the port name appears here.
+    If the `connectionCredential` is filled with a port name, make sure the port name appears here.
 
-     :::
+    :::
 
   - `podSpec`
 

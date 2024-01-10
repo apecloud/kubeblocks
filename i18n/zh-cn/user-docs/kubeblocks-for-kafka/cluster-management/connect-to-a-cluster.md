@@ -154,11 +154,11 @@ import TabItem from '@theme/TabItem';
 
    ![获取 ELB 地址](../../../img/connect-to-a-kafka-cluster-gain-elb-address.png)
 
-     :::note
+  :::note
 
-     xxxxxx-xxx.cn-northwest-1.elb.amazonaws.com.cn 是 K8s 外部同一 VPC 下能访问的 ELB 地址。
+  xxxxxx-xxx.cn-northwest-1.elb.amazonaws.com.cn 是 K8s 外部同一 VPC 下能访问的 ELB 地址。
 
-     :::
+  :::
 
 3. 使用 ELB 地址进行连接。
 
@@ -238,11 +238,11 @@ import TabItem from '@theme/TabItem';
 
    ![获取 ELB 地址](./../../../img/kafka-connect-cross-vpc.png)
 
-     :::note
+  :::note
 
-     xxxx-xxxx.cn-northwest-1.elb.amazonaws.com.cn 是公网下能访问的 ELB 地址。
+  xxxx-xxxx.cn-northwest-1.elb.amazonaws.com.cn 是公网下能访问的 ELB 地址。
 
-     :::
+  :::
 
 3. 配置 hostname 映射。
    1. 登录远程机器。

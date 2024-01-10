@@ -154,11 +154,11 @@ sidebar_label: 添加数据库引擎
     
     通过 `$(SVC_PORT_mysql)$` 来选择端口，`mysql` 就是这里的 `service.ports[0].name` mysql。
 
-     :::note
+    :::note
 
-     如果 `connectionCredential` 中填写了端口名，必须确保端口名出现在这里。
+    如果 `connectionCredential` 中填写了端口名，必须确保端口名出现在这里。
 
-     :::
+    :::
 
   - `podSpec`
 

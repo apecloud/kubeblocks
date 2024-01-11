@@ -39,6 +39,14 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
+var (
+	varReferenceRegExp = regexp.MustCompile(`\$\(([^)]+)\)`)
+)
+
+func VarReferenceRegExp() *regexp.Regexp {
+	return varReferenceRegExp
+}
+
 // ResolveTemplateNEnvVars resolves all built-in and user-defined vars for config template and Env usage.
 func ResolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	annotations map[string]string, definedVars []appsv1alpha1.EnvVar) (map[string]any, []corev1.EnvVar, error) {
@@ -193,8 +201,7 @@ func resolveVarReferenceNEscaping(templateVars, credentialVars map[string]corev1
 	if len(v.Value) == 0 {
 		return v, v
 	}
-	re := regexp.MustCompile(`\$\(([^)]+)\)`)
-	matches := re.FindAllStringSubmatchIndex(v.Value, -1)
+	matches := varReferenceRegExp.FindAllStringSubmatchIndex(v.Value, -1)
 	if len(matches) == 0 {
 		return v, v
 	}
@@ -304,16 +311,19 @@ func buildDefaultEnvVars(synthesizedComp *SynthesizedComponent, legacy bool) []c
 			},
 		})
 	}
+	clusterCompName := func() string {
+		return constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name)
+	}()
 	if legacy {
 		vars = append(vars, []corev1.EnvVar{
 			{Name: constant.KBEnvClusterName, Value: synthesizedComp.ClusterName},
 			{Name: constant.KBEnvCompName, Value: synthesizedComp.Name},
-			{Name: constant.KBEnvClusterCompName, Value: constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name)},
+			{Name: constant.KBEnvClusterCompName, Value: clusterCompName},
 			{Name: constant.KBEnvClusterUIDPostfix8Deprecated, Value: clusterUIDPostfix(synthesizedComp)}}...)
 	}
 	vars = append(vars, corev1.EnvVar{
 		Name:  constant.KBEnvPodFQDN,
-		Value: fmt.Sprintf("%s.%s-headless.%s.svc", constant.EnvPlaceHolder(constant.KBEnvPodName), constant.EnvPlaceHolder(constant.KBEnvClusterCompName), constant.EnvPlaceHolder(constant.KBEnvNamespace)),
+		Value: fmt.Sprintf("%s.%s-headless.%s.svc", constant.EnvPlaceHolder(constant.KBEnvPodName), clusterCompName, constant.EnvPlaceHolder(constant.KBEnvNamespace)),
 	})
 	return vars
 }

@@ -132,7 +132,7 @@ type ReloadOptions struct {
 
 	// autoTrigger performs the reload command.
 	// +optional
-	AutoTrigger *AutoTrigger `json:"autoTrigger"`
+	AutoTrigger *AutoTrigger `json:"autoTrigger,omitempty"`
 }
 
 type UnixSignalTrigger struct {
@@ -237,7 +237,7 @@ type TPLScriptTrigger struct {
 type AutoTrigger struct {
 	// processName is process name
 	// +optional
-	ProcessName string `json:"processName"`
+	ProcessName string `json:"processName,omitempty"`
 }
 
 type FormatterConfig struct {

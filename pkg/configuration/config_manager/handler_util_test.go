@@ -319,7 +319,7 @@ var _ = Describe("Handler Util Test", func() {
 		})
 
 		It("auto trigger test", func() {
-			ccName := "config_constraint"
+			ccName := "auto_trigger_config_constraint"
 			cc := mockConfigConstraint(ccName, &appsv1alpha1.ReloadOptions{
 				AutoTrigger: &appsv1alpha1.AutoTrigger{
 					ProcessName: "test",

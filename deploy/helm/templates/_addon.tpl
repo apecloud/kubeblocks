@@ -44,12 +44,12 @@ Parameters:
 - autoInstall: autoInstall of the addon
 - kbVersion: KubeBlocks version that this addon is compatible with
 */}}
-{{- define "kubeblocks.buildAddon" }}
+{{- define "kubeblocks.buildAddonCR" }}
 {{- $install := .Release.IsInstall }}
 {{- $upgrade := (and .Release.IsUpgrade .Values.upgradeAddons) }}
 {{- $existingAddon := lookup "extensions.kubeblocks.io/v1alpha1" "Addon" "" .name -}}
 {{- if or $install (and $upgrade (not $existingAddon)) -}}
-{{- include "kubeblocks.buildAddonCR" . }}
+{{- include "kubeblocks.buildAddon" . }}
 {{- else if and (not $upgrade) $existingAddon -}}
 {{- $obj := fromYaml (toYaml $existingAddon) -}}
 {{- $metadata := get $obj "metadata" -}}
@@ -58,7 +58,7 @@ Parameters:
 {{- $obj = set $obj "metadata" $metadata -}}
 {{ $obj | toYaml }}
 {{- else if and $upgrade $existingAddon -}}
-{{- $addonCR := include "kubeblocks.buildAddonCR" . -}}
+{{- $addonCR := include "kubeblocks.buildAddon" . -}}
 {{- $addonObj := fromYaml $addonCR -}}
 {{- $spec := get $addonObj "spec" -}}
 {{- $spec = set $spec "installable" (get (get $existingAddon "spec") "installable") -}}
@@ -71,7 +71,7 @@ Parameters:
 {{- end -}}
 {{- end -}}
 
-{{- define "kubeblocks.buildAddonCR" }}
+{{- define "kubeblocks.buildAddon" }}
 {{- $addonImageRegistry := include "kubeblocks.imageRegistry" . }}
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon

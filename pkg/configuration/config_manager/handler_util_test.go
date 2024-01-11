@@ -46,19 +46,19 @@ func TestIsSupportReload(t *testing.T) {
 		args args
 		want bool
 	}{{
-		name: "reload_test",
+		name: "reload_test_with_nil_reload_options",
 		args: args{
 			reload: nil,
 		},
 		want: false,
 	}, {
-		name: "reload_test",
+		name: "reload_test_with_empty_reload_options",
 		args: args{
 			reload: &appsv1alpha1.ReloadOptions{},
 		},
 		want: false,
 	}, {
-		name: "reload_test",
+		name: "reload_test_with_unix_signal",
 		args: args{
 			reload: &appsv1alpha1.ReloadOptions{
 				UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
@@ -69,7 +69,7 @@ func TestIsSupportReload(t *testing.T) {
 		},
 		want: true,
 	}, {
-		name: "reload_test",
+		name: "reload_test_with_shell",
 		args: args{
 			reload: &appsv1alpha1.ReloadOptions{
 				ShellTrigger: &appsv1alpha1.ShellTrigger{
@@ -79,7 +79,7 @@ func TestIsSupportReload(t *testing.T) {
 		},
 		want: true,
 	}, {
-		name: "reload_test",
+		name: "reload_test_with_tpl_script",
 		args: args{
 			reload: &appsv1alpha1.ReloadOptions{
 				TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
@@ -92,7 +92,7 @@ func TestIsSupportReload(t *testing.T) {
 		},
 		want: true,
 	}, {
-		name: "reload_test",
+		name: "auto_trigger_reload_test_with_process_name",
 		args: args{
 			reload: &appsv1alpha1.ReloadOptions{
 				AutoTrigger: &appsv1alpha1.AutoTrigger{
@@ -102,7 +102,7 @@ func TestIsSupportReload(t *testing.T) {
 		},
 		want: true,
 	}, {
-		name: "reload_test",
+		name: "auto_trigger_reload_test",
 		args: args{
 			reload: &appsv1alpha1.ReloadOptions{
 				AutoTrigger: &appsv1alpha1.AutoTrigger{},

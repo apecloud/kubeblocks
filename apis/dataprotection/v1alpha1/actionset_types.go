@@ -88,7 +88,7 @@ const (
 type BackupActionSpec struct {
 	// backupData specifies the backup data action.
 	// +kubebuilder:validation:Required
-	BackupData *BackupDataActionSpec `json:"backupData"`
+	BackupData *BackupDataActionSpec `json:"backupData,omitempty"`
 
 	// preBackup specifies a hook that should be executed before the backup.
 	// +optional

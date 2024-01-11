@@ -127,8 +127,9 @@ type OpsVarSource struct {
 
 type EnvVarRef struct {
 	// container name which defines in componentDefinition or is injected by kubeBlocks controller.
-	// +kubebuilder:validation:Required
-	ContainerName string `json:"containerName"`
+	// if not specified, will use the first container by default.
+	// +optional
+	ContainerName string `json:"containerName,omitempty"`
 
 	// env name, it will .
 	// +kubebuilder:validation:Required

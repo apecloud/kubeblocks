@@ -25,11 +25,12 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/stretchr/testify/assert"
+	ctrl "sigs.k8s.io/controller-runtime"
+
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/mysql"
 	"github.com/apecloud/kubeblocks/pkg/viperx"
-	"github.com/stretchr/testify/assert"
-	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 const (

@@ -15,16 +15,20 @@ Example:
 {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "apecloud-mysql" "version" "0.5.0" "values" .Values) }}
 */}}
 {{- define "kubeblocks.addonChartLocationURL" }}
-{{- $fullChart := print .name "-" .version }}
-{{- $base := .values.addonChartLocationBase }}
-{{- if hasPrefix "oci://" $base }}
-chartLocationURL: {{ $base }}/{{ .name }}
-{{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" $base }}
-chartLocationURL: {{ $base }}/{{ $fullChart }}/{{ $fullChart }}.tgz
-{{- else }}
-chartLocationURL: {{ $base }}/{{ $fullChart }}.tgz
+chartLocationURL: {{ include "kubeblocks.addonChartLocationURLValue" . }}
 {{- end }}
-{{- end }}
+
+{{- define "kubeblocks.addonChartLocationURLValue" }}
+{{- $fullChart := print .name "-" .version -}}
+{{- $base := .values.addonChartLocationBase -}}
+{{- if hasPrefix "oci://" $base -}}
+{{ $base }}/{{ .name }}
+{{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" $base -}}
+{{ $base }}/{{ $fullChart }}/{{ $fullChart }}.tgz
+{{- else -}}
+{{ $base }}/{{ $fullChart }}.tgz
+{{- end -}}
+{{- end -}}
 
 {{/*
 Build add-on CR.
@@ -42,16 +46,10 @@ Parameters:
 */}}
 {{- define "kubeblocks.buildAddonCR" }}
 {{- $addonImageRegistry := include "kubeblocks.imageRegistry" . }}
-{{- $upgrade:= or .Release.IsInstall (and .Release.IsUpgrade .Values.upgradeAddons) }}
+{{- $install := .Release.IsInstall }}
+{{- $upgrade := (and .Release.IsUpgrade .Values.upgradeAddons) }}
 {{- $existingAddon := lookup "extensions.kubeblocks.io/v1alpha1" "Addon" "" .name -}}
-{{- if and (not $upgrade) $existingAddon -}}
-{{- $obj := fromYaml (toYaml $existingAddon) -}}
-{{- $metadata := get $obj "metadata" -}}
-{{- $metadata = unset $metadata "managedFields" -}}
-{{- $metadata = unset $metadata "resourceVersion" -}}
-{{- $obj = set $obj "metadata" $metadata -}}
-{{ $obj | toYaml }}
-{{- else -}}
+{{- if or $install (and $upgrade (not $existingAddon)) -}}
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
@@ -82,5 +80,43 @@ spec:
   - enabled: true
   installable:
     autoInstall: {{ .autoInstall }}
+{{- else if and (not $upgrade) $existingAddon -}}
+  {{- $obj := fromYaml (toYaml $existingAddon) -}}
+  {{- $metadata := get $obj "metadata" -}}
+  {{- $metadata = unset $metadata "managedFields" -}}
+  {{- $metadata = unset $metadata "resourceVersion" -}}
+  {{- $obj = set $obj "metadata" $metadata -}}
+  {{ $obj | toYaml }}
+{{- else if and $upgrade $existingAddon -}}
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- .selectorLabels | nindent 4 }}
+    addon.kubeblocks.io/version: {{ .version }}
+    addon.kubeblocks.io/name: {{ .name }}
+    addon.kubeblocks.io/provider: {{ .provider }}
+    addon.kubeblocks.io/model: {{ .model }}
+  annotations:
+    addon.kubeblocks.io/kubeblocks-version: {{ .kbVersion | squote }}
+  {{- if .Values.keepAddons }}
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: {{ .description | squote }}
+  type: Helm
+  helm:
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" .name "version" .version "values" .Values) | indent 4 }}
+    chartsImage: {{ .Values.addonChartsImage.registry | default $addonImageRegistry }}/{{ .Values.addonChartsImage.repository }}:{{ .Values.addonChartsImage.tag | default .Chart.AppVersion }}
+    chartsPathInImage: {{ .Values.addonChartsImage.chartsPath }}
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: {{ .version }}
+      {{- end }}
+  defaultInstallValues:
+  - enabled: true
+  installable:
+    autoInstall: {{ get (get (get $existingAddon "spec") "installable") "autoInstall" }}
 {{- end -}}
 {{- end -}}

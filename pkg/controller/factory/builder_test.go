@@ -334,12 +334,6 @@ var _ = Describe("builder", func() {
 			Expect(*rsm.Spec.MemberUpdateStrategy).Should(BeEquivalentTo(workloads.BestEffortParallelUpdateStrategy))
 		})
 
-		It("builds PDB correctly", func() {
-			_, _, synthesizedComponent := newClusterObjs(nil)
-			pdb := BuildPDB(synthesizedComponent)
-			Expect(pdb).ShouldNot(BeNil())
-		})
-
 		It("builds BackupJob correctly", func() {
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
 			backupJobKey := types.NamespacedName{

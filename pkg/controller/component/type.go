@@ -23,7 +23,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -92,8 +91,4 @@ type SynthesizedComponent struct {
 	CharacterType         string                          `json:"characterType,omitempty"`
 	WorkloadType          v1alpha1.WorkloadType           `json:"workloadType,omitempty"`
 	HorizontalScalePolicy *v1alpha1.HorizontalScalePolicy `json:"horizontalScalePolicy,omitempty"`
-	// MinAvailable is used to determine whether to create a PDB (Pod Disruption Budget) object.
-	// However, the functionality of PDB should be implemented within the RSM. Therefore, PDB objects are no longer needed in the new API, and the MinAvailable field should be deprecated.
-	// The old MinAvailable field, which is determined based on the deprecated "workloadType" field, is also no longer applicable in the new API.
-	MinAvailable *intstr.IntOrString `json:"minAvailable,omitempty"`
 }

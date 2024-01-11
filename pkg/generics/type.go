@@ -26,7 +26,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -77,13 +76,9 @@ var RSMSignature = func(_ workloads.ReplicatedStateMachine, _ *workloads.Replica
 var StatefulSetSignature = func(_ appsv1.StatefulSet, _ *appsv1.StatefulSet, _ appsv1.StatefulSetList, _ *appsv1.StatefulSetList) {
 }
 var DeploymentSignature = func(_ appsv1.Deployment, _ *appsv1.Deployment, _ appsv1.DeploymentList, _ *appsv1.DeploymentList) {}
-var ReplicaSetSignature = func(_ appsv1.ReplicaSet, _ *appsv1.ReplicaSet, _ appsv1.ReplicaSetList, _ *appsv1.ReplicaSetList) {}
 
 var JobSignature = func(_ batchv1.Job, _ *batchv1.Job, _ batchv1.JobList, _ *batchv1.JobList) {}
 var CronJobSignature = func(_ batchv1.CronJob, _ *batchv1.CronJob, _ batchv1.CronJobList, _ *batchv1.CronJobList) {}
-
-var PodDisruptionBudgetSignature = func(_ policyv1.PodDisruptionBudget, _ *policyv1.PodDisruptionBudget, _ policyv1.PodDisruptionBudgetList, _ *policyv1.PodDisruptionBudgetList) {
-}
 
 var StorageClassSignature = func(_ storagev1.StorageClass, _ *storagev1.StorageClass, _ storagev1.StorageClassList, _ *storagev1.StorageClassList) {
 }

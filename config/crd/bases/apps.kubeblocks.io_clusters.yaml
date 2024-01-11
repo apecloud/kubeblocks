@@ -320,12 +320,6 @@ spec:
                       x-kubernetes-validations:
                       - message: name is immutable
                         rule: self == oldSelf
-                    noCreatePDB:
-                      default: false
-                      description: noCreatePDB defines the PodDisruptionBudget creation
-                        behavior and is set to true if creation of PodDisruptionBudget
-                        for this component is not needed. It defaults to false.
-                      type: boolean
                     nodes:
                       description: Nodes defines the list of nodes that pods can schedule
                         If the RsmTransformPolicy is specified as ToPod,the list of

@@ -377,12 +377,6 @@ type ClusterComponentSpec struct {
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
-	// noCreatePDB defines the PodDisruptionBudget creation behavior and is set to true if creation of PodDisruptionBudget
-	// for this component is not needed. It defaults to false.
-	// +kubebuilder:default=false
-	// +optional
-	NoCreatePDB bool `json:"noCreatePDB,omitempty"`
-
 	// updateStrategy defines the update strategy for the component.
 	// +optional
 	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
@@ -410,22 +404,6 @@ type ClusterComponentSpec struct {
 	// If the RsmTransformPolicy is specified as ToPod,the list of instances will be used.
 	// +optional
 	Instances []string `json:"instances,omitempty"`
-}
-
-// GetMinAvailable wraps the 'prefer' value return. As for component replicaCount <= 1, it will return 0,
-// and as for replicaCount=2 it will return 1.
-func (r *ClusterComponentSpec) GetMinAvailable(prefer *intstr.IntOrString) *intstr.IntOrString {
-	if r == nil || r.NoCreatePDB || prefer == nil {
-		return nil
-	}
-	if r.Replicas <= 1 {
-		m := intstr.FromInt(0)
-		return &m
-	} else if r.Replicas == 2 {
-		m := intstr.FromInt(1)
-		return &m
-	}
-	return prefer
 }
 
 type ComponentMessageMap map[string]string

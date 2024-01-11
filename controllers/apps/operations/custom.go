@@ -233,7 +233,7 @@ func (c CustomOpsHandler) buildJob(reqCtx intctrlutil.RequestCtx,
 			saKey := client.ObjectKey{Namespace: opsRes.Cluster.Namespace,
 				Name: constant.GenerateDefaultServiceAccountName(opsRes.Cluster.Name)}
 			if exists, _ := intctrlutil.CheckResourceExists(reqCtx.Ctx, cli, saKey, &corev1.ServiceAccount{}); exists {
-				jobSpec.Template.Spec.ServiceAccountName = comp.ServiceAccountName
+				jobSpec.Template.Spec.ServiceAccountName = saKey.Name
 			}
 		}
 		return &jobSpec, nil
@@ -442,6 +442,9 @@ func (c CustomOpsHandler) buildEnvVars(reqCtx intctrlutil.RequestCtx,
 	}
 
 	getContainer := func(containerName string) *corev1.Container {
+		if containerName == "" {
+			return &targetPod.Spec.Containers[0]
+		}
 		for i := range targetPod.Spec.Containers {
 			container := targetPod.Spec.Containers[i]
 			if container.Name == containerName {

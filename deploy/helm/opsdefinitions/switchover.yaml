@@ -9,12 +9,10 @@ spec:
     - name: TARGET_POD_IP
       valueFrom:
         envVarRef:
-          containerName: observer-container
           envName: KB_POD_IP
     - name: LORRY_HTTP_PORT
       valueFrom:
         envVarRef:
-          containerName: observer-container
           envName: LORRY_HTTP_PORT
   parametersSchema:
     openAPIV3Schema:

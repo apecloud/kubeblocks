@@ -44,12 +44,35 @@ Parameters:
 - autoInstall: autoInstall of the addon
 - kbVersion: KubeBlocks version that this addon is compatible with
 */}}
-{{- define "kubeblocks.buildAddonCR" }}
-{{- $addonImageRegistry := include "kubeblocks.imageRegistry" . }}
+{{- define "kubeblocks.buildAddon" }}
 {{- $install := .Release.IsInstall }}
 {{- $upgrade := (and .Release.IsUpgrade .Values.upgradeAddons) }}
 {{- $existingAddon := lookup "extensions.kubeblocks.io/v1alpha1" "Addon" "" .name -}}
 {{- if or $install (and $upgrade (not $existingAddon)) -}}
+{{- include "kubeblocks.buildAddonCR" . }}
+{{- else if and (not $upgrade) $existingAddon -}}
+{{- $obj := fromYaml (toYaml $existingAddon) -}}
+{{- $metadata := get $obj "metadata" -}}
+{{- $metadata = unset $metadata "managedFields" -}}
+{{- $metadata = unset $metadata "resourceVersion" -}}
+{{- $obj = set $obj "metadata" $metadata -}}
+{{ $obj | toYaml }}
+{{- else if and $upgrade $existingAddon -}}
+{{- $addonCR := include "kubeblocks.buildAddonCR" . -}}
+{{- $addonObj := fromYaml $addonCR -}}
+{{- $spec := get $addonObj "spec" -}}
+{{- $spec = set $spec "installable" (get (get $existingAddon "spec") "installable") -}}
+{{- $install = (get (get $existingAddon "spec") "install") -}}
+{{- if $install -}}
+{{- $spec = set $spec "install" $install -}}
+{{- end -}}
+{{- $addonObj = set $addonObj "spec" $spec -}}
+{{ $addonObj | toYaml }}
+{{- end -}}
+{{- end -}}
+
+{{- define "kubeblocks.buildAddonCR" }}
+{{- $addonImageRegistry := include "kubeblocks.imageRegistry" . }}
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
@@ -80,43 +103,4 @@ spec:
   - enabled: true
   installable:
     autoInstall: {{ .autoInstall }}
-{{- else if and (not $upgrade) $existingAddon -}}
-  {{- $obj := fromYaml (toYaml $existingAddon) -}}
-  {{- $metadata := get $obj "metadata" -}}
-  {{- $metadata = unset $metadata "managedFields" -}}
-  {{- $metadata = unset $metadata "resourceVersion" -}}
-  {{- $obj = set $obj "metadata" $metadata -}}
-  {{ $obj | toYaml }}
-{{- else if and $upgrade $existingAddon -}}
-apiVersion: extensions.kubeblocks.io/v1alpha1
-kind: Addon
-metadata:
-  name: {{ .name }}
-  labels:
-    {{- .selectorLabels | nindent 4 }}
-    addon.kubeblocks.io/version: {{ .version }}
-    addon.kubeblocks.io/name: {{ .name }}
-    addon.kubeblocks.io/provider: {{ .provider }}
-    addon.kubeblocks.io/model: {{ .model }}
-  annotations:
-    addon.kubeblocks.io/kubeblocks-version: {{ .kbVersion | squote }}
-  {{- if .Values.keepAddons }}
-    helm.sh/resource-policy: keep
-  {{- end }}
-spec:
-  description: {{ .description | squote }}
-  type: Helm
-  helm:
-    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" .name "version" .version "values" .Values) | indent 4 }}
-    chartsImage: {{ .Values.addonChartsImage.registry | default $addonImageRegistry }}/{{ .Values.addonChartsImage.repository }}:{{ .Values.addonChartsImage.tag | default .Chart.AppVersion }}
-    chartsPathInImage: {{ .Values.addonChartsImage.chartsPath }}
-    installOptions:
-      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-      version: {{ .version }}
-      {{- end }}
-  defaultInstallValues:
-  - enabled: true
-  installable:
-    autoInstall: {{ get (get (get $existingAddon "spec") "installable") "autoInstall" }}
-{{- end -}}
-{{- end -}}
+{{- end }}

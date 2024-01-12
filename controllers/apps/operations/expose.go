@@ -342,6 +342,9 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 			case appsv1alpha1.Replication:
 				return constant.Primary, nil
 			case appsv1alpha1.Consensus:
+				if clusterCompDef.ConsensusSpec != nil {
+					return clusterCompDef.ConsensusSpec.Leader.Name, nil
+				}
 				return constant.Leader, nil
 			}
 		}

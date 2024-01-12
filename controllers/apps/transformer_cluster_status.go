@@ -175,9 +175,7 @@ func (t *clusterStatusTransformer) removeInvalidCompStatus(transCtx *clusterTran
 // removeInnerCompStatus removes the component of status.components which is created by simplified API.
 func (t *clusterStatusTransformer) removeInnerCompStatus(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) {
 	compSpecs := make([]*appsv1alpha1.ClusterComponentSpec, 0)
-	for i := range transCtx.ComponentSpecs {
-		compSpecs = append(compSpecs, transCtx.ComponentSpecs[i])
-	}
+	compSpecs = append(compSpecs, transCtx.ComponentSpecs...)
 	t.removeCompStatus(cluster, compSpecs)
 }
 

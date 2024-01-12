@@ -103,7 +103,7 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 		lorryContainers = append(lorryContainers, *lorryContainer)
 	}
 
-	buildLorryServiceContainer(synthesizeComp, &lorryContainers[0], int(lorryHTTPPort), lorryGRPCPort)
+	buildLorryServiceContainer(synthesizeComp, &lorryContainers[0], int(lorryHTTPPort), int(lorryGRPCPort), clusterCompSpec)
 
 	reqCtx.Log.V(1).Info("lorry", "containers", lorryContainers)
 	synthesizeComp.PodSpec.Containers = append(synthesizeComp.PodSpec.Containers, lorryContainers...)
@@ -122,7 +122,8 @@ func buildBasicContainer(synthesizeComp *SynthesizedComponent) *corev1.Container
 		GetObject()
 }
 
-func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container *corev1.Container, lorrySvcHTTPPort, lorrySvcGRPCPort int) {
+func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container *corev1.Container, lorryHTTPPort,
+	lorryGRPCPort int, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) {
 	container.Name = constant.LorryContainerName
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
@@ -164,23 +165,23 @@ func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container 
 		}
 	}
 
-	container.Env = append(container.Env, buildLorryEnvs(synthesizeComp)...)
+	container.Env = append(container.Env, buildLorryEnvs(synthesizeComp, clusterCompSpec)...)
 	container.Ports = []corev1.ContainerPort{
 		{
-			ContainerPort: int32(lorrySvcHTTPPort),
+			ContainerPort: int32(lorryHTTPPort),
 			Name:          constant.LorryHTTPPortName,
 			Protocol:      "TCP",
 		},
 		{
-			ContainerPort: int32(lorrySvcGRPCPort),
+			ContainerPort: int32(lorryGRPCPort),
 			Name:          constant.LorryGRPCPortName,
 			Protocol:      "TCP",
 		},
 	}
-	
+
 }
 
-func buildLorryEnvs(synthesizeComp *SynthesizedComponent) []corev1.EnvVar {
+func buildLorryEnvs(synthesizeComp *SynthesizedComponent, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) []corev1.EnvVar {
 	var (
 		secretName     string
 		sysInitAccount *appsv1alpha1.SystemAccount
@@ -206,9 +207,10 @@ func buildLorryEnvs(synthesizeComp *SynthesizedComponent) []corev1.EnvVar {
 			Name:      constant.KBEnvBuiltinHandler,
 			Value:     string(getBuiltinActionHandler(synthesizeComp)),
 			ValueFrom: nil,
-		})
+		},
+	}
 	if secretName != "" {
-		container.Env = append(container.Env,
+		envs = append(envs,
 			corev1.EnvVar{
 				Name: constant.KBEnvServiceUser,
 				ValueFrom: &corev1.EnvVarSource{
@@ -298,8 +300,8 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 	}
 
 	actions := []*appsv1alpha1.LifecycleActionHandler{
-		synthesizeComp.LifecycleActions.PostStart,
-		synthesizeComp.LifecycleActions.PreStop,
+		synthesizeComp.LifecycleActions.PostProvision,
+		synthesizeComp.LifecycleActions.PreTerminate,
 		synthesizeComp.LifecycleActions.MemberJoin,
 		synthesizeComp.LifecycleActions.MemberLeave,
 		synthesizeComp.LifecycleActions.Readonly,

@@ -39,7 +39,7 @@ func BuildWeSyncer(reqCtx intctrlutil.RequestCtx, synthesizeComp *SynthesizedCom
 	}
 
 	container := buildBasicContainer(synthesizeComp)
-	weSyncerSvcHTTPPort := viper.GetInt32(constant.KBEnvWeSyncerHTTPPort)
+	weSyncerSvcHTTPPort := viper.GetInt32(constant.KBEnvSyncerHTTPPort)
 	availablePorts, err := getAvailableContainerPorts(synthesizeComp.PodSpec.Containers, []int32{weSyncerSvcHTTPPort})
 	if err != nil {
 		reqCtx.Log.Info("get lorry container port failed", "error", err)
@@ -57,7 +57,7 @@ func BuildWeSyncer(reqCtx intctrlutil.RequestCtx, synthesizeComp *SynthesizedCom
 
 func buildWeSyncerInitContainer(component *SynthesizedComponent, container *corev1.Container) {
 	container.Image = viper.GetString(constant.KBWesyncerImage)
-	container.Name = constant.WesyncerInitContainerName
+	container.Name = constant.SyncerInitContainerName
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	container.Command = []string{"cp", "-r", "/bin/wesyncer", "/config", "/kubeblocks/"}
 	container.StartupProbe = nil
@@ -100,7 +100,7 @@ func buildWeSyncerEnvs(synthesizeComp *SynthesizedComponent) []corev1.EnvVar {
 		}
 	}
 	if sysInitAccount != nil {
-		secretName = constant.GenerateComponentConnCredential(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
+		secretName = constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
 	} else {
 		secretName = constant.GenerateDefaultConnCredential(synthesizeComp.ClusterName)
 	}
@@ -153,7 +153,7 @@ func getWeSyncerType(synthesizeComp *SynthesizedComponent) string {
 		}
 	}
 
-	if *synthesizeComp.RoleArbitrator == appsv1alpha1.WesyncerRoleArbitrator && haType != "" {
+	if *synthesizeComp.RoleArbitrator == appsv1alpha1.SyncerRoleArbitrator && haType != "" {
 		return haType
 	}
 

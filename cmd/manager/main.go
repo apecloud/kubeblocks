@@ -112,7 +112,7 @@ func init() {
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
 	viper.SetDefault(constant.KBWesyncerImage, "registry.cn-hangzhou.aliyuncs.com/xuriwuyun/wesyncer:latest")
 	viper.SetDefault(constant.KBEnvLorryHTTPPort, 3501)
-	viper.SetDefault(constant.KBEnvWeSyncerHTTPPort, 3601)
+	viper.SetDefault(constant.KBEnvSyncerHTTPPort, 3601)
 	viper.SetDefault(constant.KBEnvLorryGRPCPort, 50001)
 	viper.SetDefault(constant.KBEnvLorryLogLevel, "info")
 	viper.SetDefault("KUBEBLOCKS_SERVICEACCOUNT_NAME", "kubeblocks")

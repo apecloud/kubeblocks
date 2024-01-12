@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -134,8 +135,9 @@ func isGeneratedComponent(cluster *appsv1alpha1.Cluster,
 	if err != nil {
 		return false, err
 	}
+
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		if compSpec.Name == compName {
+		if slices.Contains(component.GenShardCompNameList(&compSpec), compName) {
 			if len(compSpec.ComponentDef) > 0 {
 				if compSpec.ComponentDef != comp.Spec.CompDef {
 					err = fmt.Errorf("component definitions referred in cluster and component are different: %s vs %s",

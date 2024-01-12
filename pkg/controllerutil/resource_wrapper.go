@@ -21,6 +21,7 @@ package controllerutil
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -108,7 +109,27 @@ func (r *ResourceFetcher[T]) ClusterVer() *T {
 
 func (r *ResourceFetcher[T]) ClusterComponent() *T {
 	return r.Wrap(func() (err error) {
-		r.ClusterComObj = r.ClusterObj.Spec.GetComponentByName(r.ComponentName)
+		for _, compSpec := range r.ClusterObj.Spec.ComponentSpecs {
+			if compSpec.Shards != nil {
+				for i := 0; i < int(*compSpec.Shards); i++ {
+					shardClusterCompSpec := compSpec.DeepCopy()
+					shardClusterCompSpec.Shards = nil
+					if i == 0 {
+						shardClusterCompSpec.Name = compSpec.Name
+					} else {
+						shardClusterCompSpec.Name = fmt.Sprintf("%s-%d", compSpec.Name, i)
+					}
+					if shardClusterCompSpec.Name == r.ComponentName {
+						r.ClusterComObj = shardClusterCompSpec
+						return
+					}
+				}
+			}
+			if compSpec.Name == r.ComponentName {
+				r.ClusterComObj = &compSpec
+				return
+			}
+		}
 		return
 	})
 }

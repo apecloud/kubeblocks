@@ -78,26 +78,16 @@ func newCustomizedEngine(execConfig *appsv1alpha1.CmdExecutorConfig, dbcluster *
 	}
 }
 
-func replaceEnvsValues(clusterName string, sysAccounts *appsv1alpha1.SystemAccountSpec) {
-	connCredentialPlaceHolderMap := componetutil.GetEnvReplacementMapForConnCredential(clusterName)
-	compConnCredentialPlaceHolderMap := componetutil.GetEnvReplacementMapForConnCredential(clusterName)
-
-	mergeMap := func(map1, map2 map[string]string) map[string]string {
-		mergedMap := make(map[string]string)
-		for k, v := range map1 {
-			mergedMap[k] = v
-		}
-		for k, v := range map2 {
-			mergedMap[k] = v
-		}
-		return mergedMap
+func replaceEnvsValues(clusterName string, sysAccounts *appsv1alpha1.SystemAccountSpec, placeholders map[string]string) {
+	mergedPlaceholders := componetutil.GetEnvReplacementMapForConnCredential(clusterName)
+	for k, v := range placeholders {
+		mergedPlaceholders[k] = v
 	}
 
 	// replace systemAccounts.cmdExecutorConfig.env[].valueFrom.secretKeyRef.name variables
 	cmdConfig := sysAccounts.CmdExecutorConfig
 	if cmdConfig != nil {
-		cmdConfig.Env = componetutil.ReplaceSecretEnvVars(mergeMap(connCredentialPlaceHolderMap, compConnCredentialPlaceHolderMap), cmdConfig.Env)
-		cmdConfig.Env = componetutil.ReplaceSecretEnvVars(mergeMap(connCredentialPlaceHolderMap, compConnCredentialPlaceHolderMap), cmdConfig.Env)
+		cmdConfig.Env = componetutil.ReplaceSecretEnvVars(mergedPlaceholders, cmdConfig.Env)
 	}
 
 	accounts := sysAccounts.Accounts
@@ -105,7 +95,7 @@ func replaceEnvsValues(clusterName string, sysAccounts *appsv1alpha1.SystemAccou
 		if acc.ProvisionPolicy.Type == appsv1alpha1.ReferToExisting {
 			// replace systemAccounts.accounts[*].provisionPolicy.secretRef.name variables
 			secretRef := acc.ProvisionPolicy.SecretRef
-			name := componetutil.ReplaceNamedVars(mergeMap(connCredentialPlaceHolderMap, compConnCredentialPlaceHolderMap), secretRef.Name, 1, false)
+			name := componetutil.ReplaceNamedVars(mergedPlaceholders, secretRef.Name, 1, false)
 			if name != secretRef.Name {
 				secretRef.Name = name
 			}

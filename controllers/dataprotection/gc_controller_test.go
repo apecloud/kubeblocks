@@ -86,7 +86,7 @@ var _ = Describe("Data Protection Garbage Collection Controller", func() {
 
 		getJobKey := func(backup *dpv1alpha1.Backup) client.ObjectKey {
 			return client.ObjectKey{
-				Name:      dpbackup.GenerateBackupJobName(backup, dpbackup.BackupDataJobNamePrefix),
+				Name:      dpbackup.GenerateBackupJobName(backup, dpbackup.BackupDataJobNamePrefix+"-0"),
 				Namespace: backup.Namespace,
 			}
 		}

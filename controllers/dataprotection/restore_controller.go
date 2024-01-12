@@ -135,7 +135,9 @@ func (r *RestoreReconciler) newAction(reqCtx intctrlutil.RequestCtx, restore *dp
 	if restore.Labels == nil {
 		restore.Labels = map[string]string{}
 	}
-	restore.Labels[constant.AppManagedByLabelKey] = dptypes.AppName
+	if _, ok := restore.Labels[constant.AppManagedByLabelKey]; !ok {
+		restore.Labels[constant.AppManagedByLabelKey] = dptypes.AppName
+	}
 	if !reflect.DeepEqual(restore.ObjectMeta, oldRestore.ObjectMeta) {
 		if err := r.Client.Patch(reqCtx.Ctx, restore, patch); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")

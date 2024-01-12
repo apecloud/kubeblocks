@@ -97,7 +97,7 @@ func mockConfigResource() (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint) {
 	return configmap, constraint
 }
 
-func mockReconcileResource() (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint, *appsv1alpha1.Cluster, *appsv1alpha1.ClusterVersion, *component.SynthesizedComponent) {
+func mockReconcileResource() (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint, *appsv1alpha1.Cluster, *component.SynthesizedComponent) {
 	configmap, constraint := mockConfigResource()
 
 	By("Create a clusterDefinition obj")
@@ -140,15 +140,14 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint,
 	}, testCtx.Cli, clusterObj, clusterObj.Spec.GetComponentByName(statefulCompName))
 	Expect(err).ShouldNot(HaveOccurred())
 
-	return configmap, constraint, clusterObj, clusterVersionObj, synthesizedComp
+	return configmap, constraint, clusterObj, synthesizedComp
 }
 
-func initConfiguration(resourceCtx *intctrlutil.ResourceCtx, synthesizedComponent *component.SynthesizedComponent, clusterObj *appsv1alpha1.Cluster, clusterVersionObj *appsv1alpha1.ClusterVersion) error {
+func initConfiguration(resourceCtx *intctrlutil.ResourceCtx, synthesizedComponent *component.SynthesizedComponent, clusterObj *appsv1alpha1.Cluster) error {
 	return configuration.NewCreatePipeline(configuration.ReconcileCtx{
 		ResourceCtx: resourceCtx,
 		Component:   synthesizedComponent,
 		Cluster:     clusterObj,
-		ClusterVer:  clusterVersionObj,
 		PodSpec:     synthesizedComponent.PodSpec,
 	}).
 		Prepare().

@@ -38,10 +38,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-var (
-	defaultServiceName = fmt.Sprintf("%s-%s", appsv1alpha1.KBClusterName, appsv1alpha1.KBComponentName)
-)
-
 // ComponentDefinitionReconciler reconciles a ComponentDefinition object
 type ComponentDefinitionReconciler struct {
 	client.Client
@@ -85,7 +81,7 @@ func (r *ComponentDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error
 
 func (r *ComponentDefinitionReconciler) reconcile(rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) (ctrl.Result, error) {
-	res, err := intctrlutil.HandleCRDeletion(rctx, r, cmpd, constant.DBComponentDefinitionFinalizerName, r.deletionHandler(rctx, cmpd))
+	res, err := intctrlutil.HandleCRDeletion(rctx, r, cmpd, componentDefinitionFinalizerName, r.deletionHandler(rctx, cmpd))
 	if res != nil {
 		return *res, err
 	}
@@ -150,14 +146,15 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 	cmpd *appsv1alpha1.ComponentDefinition) error {
 	for _, validator := range []func(client.Client, intctrlutil.RequestCtx, *appsv1alpha1.ComponentDefinition) error{
 		r.validateRuntime,
+		r.validateVars,
 		r.validateVolumes,
 		r.validateServices,
 		r.validateConfigs,
 		r.validateScripts,
 		r.validatePolicyRules,
 		r.validateLabels,
+		r.validateReplicasLimit,
 		r.validateSystemAccounts,
-		r.validateConnectionCredentials,
 		r.validateReplicaRoles,
 		r.validateLifecycleActions,
 		r.validateComponentDefRef,
@@ -170,6 +167,11 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 }
 
 func (r *ComponentDefinitionReconciler) validateRuntime(cli client.Client, rctx intctrlutil.RequestCtx,
+	cmpd *appsv1alpha1.ComponentDefinition) error {
+	return nil
+}
+
+func (r *ComponentDefinitionReconciler) validateVars(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
 	return nil
 }
@@ -201,11 +203,6 @@ func (r *ComponentDefinitionReconciler) validateServices(cli client.Client, rctx
 		return fmt.Errorf("duplicate names of component service are not allowed")
 	}
 
-	for i, svc := range cmpd.Spec.Services {
-		if len(svc.ServiceName) == 0 {
-			cmpd.Spec.Services[i].ServiceName = defaultServiceName
-		}
-	}
 	if !checkUniqueItemWithValue(cmpd.Spec.Services, "ServiceName", nil) {
 		return fmt.Errorf("duplicate service names are not allowed")
 	}
@@ -252,12 +249,18 @@ func (r *ComponentDefinitionReconciler) validateLabels(cli client.Client, rctx i
 	return nil
 }
 
+func (r *ComponentDefinitionReconciler) validateReplicasLimit(cli client.Client, rctx intctrlutil.RequestCtx,
+	cmpd *appsv1alpha1.ComponentDefinition) error {
+	return nil
+}
+
 func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
-	if len(cmpd.Spec.SystemAccounts) != 0 && (cmpd.Spec.LifecycleActions == nil || cmpd.Spec.LifecycleActions.AccountProvision == nil) {
-		return fmt.Errorf("the AccountProvision action is needed to provision system accounts")
+	for _, v := range cmpd.Spec.SystemAccounts {
+		if v.SecretRef == nil && (cmpd.Spec.LifecycleActions == nil || cmpd.Spec.LifecycleActions.AccountProvision == nil) {
+			return fmt.Errorf(`the AccountProvision action is needed to provision system account %s`, v.Name)
+		}
 	}
-
 	if !checkUniqueItemWithValue(cmpd.Spec.SystemAccounts, "Name", nil) {
 		return fmt.Errorf("duplicate system accounts are not allowed")
 	}
@@ -271,79 +274,6 @@ func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client
 		}
 	}
 	return nil
-}
-
-func (r *ComponentDefinitionReconciler) validateConnectionCredentials(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
-	if !checkUniqueItemWithValue(cmpd.Spec.ConnectionCredentials, "Name", nil) {
-		return fmt.Errorf("duplicate connection credential names are not allowed")
-	}
-	for _, cc := range cmpd.Spec.ConnectionCredentials {
-		if err := r.validateConnectionCredential(cli, rctx, cmpd, cc); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (r *ComponentDefinitionReconciler) validateConnectionCredential(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition, cc appsv1alpha1.ConnectionCredential) error {
-	if err := r.validateConnectionCredentialService(cmpd, cc); err != nil {
-		return err
-	}
-	if err := r.validateConnectionCredentialAccount(cmpd, cc); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (r *ComponentDefinitionReconciler) validateConnectionCredentialService(cmpd *appsv1alpha1.ComponentDefinition,
-	cc appsv1alpha1.ConnectionCredential) error {
-	if len(cc.ServiceName) == 0 {
-		return fmt.Errorf("there is no component service name defined for connection credential: %s", cc.Name)
-	}
-	for _, svc := range cmpd.Spec.Services {
-		if svc.Name == cc.ServiceName {
-			return r.validateConnectionCredentialPort(cmpd, cc, svc.Spec.Ports)
-		}
-	}
-	return fmt.Errorf("there is no matched service for connection credential: %s", cc.Name)
-}
-
-func (r *ComponentDefinitionReconciler) validateConnectionCredentialPort(cmpd *appsv1alpha1.ComponentDefinition,
-	cc appsv1alpha1.ConnectionCredential, ports []corev1.ServicePort) error {
-	if len(cc.PortName) == 0 {
-		switch len(ports) {
-		case 0:
-			return fmt.Errorf("there is no port defined for connection credential: %s", cc.Name)
-		case 1:
-			return nil
-		default:
-			return fmt.Errorf("there are multiple ports defined, it must be specified a port for connection credential: %s", cc.Name)
-		}
-	}
-	for _, port := range ports {
-		if port.Name == cc.PortName {
-			return nil
-		}
-	}
-	return fmt.Errorf("there is no matched port for connection credential: %s", cc.Name)
-}
-
-func (r *ComponentDefinitionReconciler) validateConnectionCredentialAccount(cmpd *appsv1alpha1.ComponentDefinition,
-	cc appsv1alpha1.ConnectionCredential) error {
-	if len(cc.AccountName) == 0 {
-		return nil
-	}
-	if cmpd.Spec.SystemAccounts == nil {
-		return fmt.Errorf("there is no account defined for connection credential: %s", cc.Name)
-	}
-	for _, account := range cmpd.Spec.SystemAccounts {
-		if account.Name == cc.AccountName {
-			return nil
-		}
-	}
-	return fmt.Errorf("there is no matched account for connection credential: %s", cc.Name)
 }
 
 func (r *ComponentDefinitionReconciler) validateReplicaRoles(cli client.Client, reqCtx intctrlutil.RequestCtx,
@@ -379,8 +309,8 @@ func (r *ComponentDefinitionReconciler) validateLifecycleActionBuiltInHandlers(l
 	actions := []struct {
 		LifeCycleActionHandlers *appsv1alpha1.LifecycleActionHandler
 	}{
-		{lifecycleActions.PostStart},
-		{lifecycleActions.PreStop},
+		{lifecycleActions.PostProvision},
+		{lifecycleActions.PreTerminate},
 		{lifecycleActions.MemberJoin},
 		{lifecycleActions.MemberLeave},
 		{lifecycleActions.Readonly},
@@ -450,6 +380,7 @@ func getBuiltinActionHandlers() []appsv1alpha1.BuiltinActionHandlerType {
 	return []appsv1alpha1.BuiltinActionHandlerType{
 		appsv1alpha1.MySQLBuiltinActionHandler,
 		appsv1alpha1.WeSQLBuiltinActionHandler,
+		appsv1alpha1.OceanbaseBuiltinActionHandler,
 		appsv1alpha1.RedisBuiltinActionHandler,
 		appsv1alpha1.MongoDBBuiltinActionHandler,
 		appsv1alpha1.ETCDBuiltinActionHandler,

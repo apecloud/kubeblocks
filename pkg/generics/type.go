@@ -105,6 +105,8 @@ var ComponentSignature = func(appsv1alpha1.Component, *appsv1alpha1.Component, a
 }
 var ComponentDefinitionSignature = func(appsv1alpha1.ComponentDefinition, *appsv1alpha1.ComponentDefinition, appsv1alpha1.ComponentDefinitionList, *appsv1alpha1.ComponentDefinitionList) {
 }
+var OpsDefinitionSignature = func(_ appsv1alpha1.OpsDefinition, _ *appsv1alpha1.OpsDefinition, _ appsv1alpha1.OpsDefinitionList, _ *appsv1alpha1.OpsDefinitionList) {
+}
 var OpsRequestSignature = func(_ appsv1alpha1.OpsRequest, _ *appsv1alpha1.OpsRequest, _ appsv1alpha1.OpsRequestList, _ *appsv1alpha1.OpsRequestList) {
 }
 var ConfigConstraintSignature = func(_ appsv1alpha1.ConfigConstraint, _ *appsv1alpha1.ConfigConstraint, _ appsv1alpha1.ConfigConstraintList, _ *appsv1alpha1.ConfigConstraintList) {
@@ -136,6 +138,9 @@ var StorageProviderSignature = func(_ storagev1alpha1.StorageProvider, _ *storag
 }
 
 var ConfigurationSignature = func(_ appsv1alpha1.Configuration, _ *appsv1alpha1.Configuration, _ appsv1alpha1.ConfigurationList, _ *appsv1alpha1.ConfigurationList) {
+}
+
+var ServiceDescriptorSignature = func(_ appsv1alpha1.ServiceDescriptor, _ *appsv1alpha1.ServiceDescriptor, _ appsv1alpha1.ServiceDescriptorList, _ *appsv1alpha1.ServiceDescriptorList) {
 }
 
 func ToGVK(object client.Object) schema.GroupVersionKind {

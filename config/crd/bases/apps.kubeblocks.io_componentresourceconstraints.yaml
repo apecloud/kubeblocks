@@ -42,6 +42,31 @@ spec:
             description: ComponentResourceConstraintSpec defines the desired state
               of ComponentResourceConstraint
             properties:
+              componentSelector:
+                description: componentSelector is used to bind the resource constraint
+                  to components based on ComponentDefinition API.
+                items:
+                  properties:
+                    componentDefRef:
+                      description: In versions prior to KB 0.8.0, ComponentDefRef
+                        is the name of the component definition in the ClusterDefinition.
+                        In KB 0.8.0 and later versions, ComponentDefRef is the name
+                        of ComponentDefinition.
+                      type: string
+                    rules:
+                      description: rules are the constraint rules that will be applied
+                        to the component.
+                      items:
+                        type: string
+                      type: array
+                  required:
+                  - componentDefRef
+                  - rules
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - componentDefRef
+                x-kubernetes-list-type: map
               rules:
                 description: Component resource constraint rules.
                 items:
@@ -168,7 +193,7 @@ spec:
                 x-kubernetes-list-type: map
               selector:
                 description: selector is used to bind the resource constraint to cluster
-                  definitions.
+                  definitions based on ClusterDefinition API.
                 items:
                   properties:
                     clusterDefRef:
@@ -180,8 +205,10 @@ spec:
                       items:
                         properties:
                           componentDefRef:
-                            description: componentDefRef is the name of the component
-                              definition in the cluster definition.
+                            description: In versions prior to KB 0.8.0, ComponentDefRef
+                              is the name of the component definition in the ClusterDefinition.
+                              In KB 0.8.0 and later versions, ComponentDefRef is the
+                              name of ComponentDefinition.
                             type: string
                           rules:
                             description: rules are the constraint rules that will

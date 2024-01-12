@@ -97,6 +97,11 @@ type BackupActionSpec struct {
 	// postBackup specifies a hook that should be executed after the backup.
 	// +optional
 	PostBackup []ActionSpec `json:"postBackup,omitempty"`
+
+	// preDelete defines that custom deletion action which can be executed before executing the built-in deletion action.
+	// note that preDelete action job will ignore the env/envFrom.
+	// +optional
+	PreDeleteBackup *BaseJobActionSpec `json:"preDelete,omitempty"`
 }
 
 // BackupDataActionSpec defines how to back up data.
@@ -168,9 +173,7 @@ type ExecActionSpec struct {
 
 // JobActionSpec is an action that creates a Kubernetes Job to execute a command.
 type JobActionSpec struct {
-	// image specifies the image of backup container.
-	// +kubebuilder:validation:Required
-	Image string `json:"image"`
+	BaseJobActionSpec `json:",inline"`
 
 	// runOnTargetPodNode specifies whether to run the job workload on the
 	// target pod node. If backup container should mount the target pod's
@@ -180,10 +183,6 @@ type JobActionSpec struct {
 	// +kubebuilder:default=false
 	RunOnTargetPodNode *bool `json:"runOnTargetPodNode,omitempty"`
 
-	// command specifies the commands to back up the volume data.
-	// +kubebuilder:validation:Required
-	Command []string `json:"command"`
-
 	// OnError specifies how should behave if it encounters an error executing
 	// this action.
 	// +optional
@@ -191,7 +190,19 @@ type JobActionSpec struct {
 	OnError ActionErrorMode `json:"onError,omitempty"`
 }
 
+// BaseJobActionSpec is an action that creates a Kubernetes Job to execute a command.
+type BaseJobActionSpec struct {
+	// image specifies the image of backup container.
+	// +kubebuilder:validation:Required
+	Image string `json:"image"`
+
+	// command specifies the commands to back up the volume data.
+	// +kubebuilder:validation:Required
+	Command []string `json:"command"`
+}
+
 // ActionErrorMode defines how should treat an error from an action.
+// TODO: now, only support Fail mode, will support Continue mode in the future.
 // +kubebuilder:validation:Enum=Continue;Fail
 type ActionErrorMode string
 

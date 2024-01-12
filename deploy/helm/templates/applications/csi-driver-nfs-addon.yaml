@@ -1,0 +1,63 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: csi-driver-nfs
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    "addon.kubeblocks.io/provider": community
+    "addon.kubeblocks.io/version": "4.5.0"
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: Container Storage Interface (CSI) driver for NFS based volumes
+  type: Helm
+
+  helm:
+    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "csi-driver-nfs" "version" "4.5.0" "values" .Values) | indent 4 }}
+    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: 4.5.0
+      {{- end }}
+
+    installValues:
+      {{- $cloudProvider := (include "kubeblocks.cloudProvider" .) }}
+      {{- if eq $cloudProvider "huaweiCloud" }}
+      setValues:
+        - kubeletDir=/mnt/paas/kubernetes/kubelet
+      {{- else if eq $cloudProvider "gcp" }}
+      # In GKE, the system-node-critical and system-cluster-critical priority classes
+      # can't be used for non-system pods, but csi-driver-nfs uses "system-cluster-critical"
+      # by default, so override them here.
+      setValues:
+        - controller.priorityClassName=""
+        - node.priorityClassName=""
+        - externalSnapshotter.priorityClassName=""
+      {{- end }}
+
+    valuesMapping:
+      valueMap:
+        replicaCount: controller.replicas
+      jsonMap:
+        tolerations: controller.tolerations
+
+  defaultInstallValues:
+    - enabled: true
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
+
+  installable:
+    {{- $autoInstall := false }}
+    {{- /* auto install csi-driver-nfs if it's required by backup repos */ -}}
+    {{- if .Values.backupRepo.create }}
+      {{- if eq .Values.backupRepo.accessMethod "Mount" }}
+        {{- if eq .Values.backupRepo.storageProvider "nfs" }}
+          {{- $autoInstall = true }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+    autoInstall: {{ $autoInstall }}

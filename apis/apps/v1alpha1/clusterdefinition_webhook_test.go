@@ -92,7 +92,8 @@ var _ = Describe("clusterDefinition webhook", func() {
 					Image: "mysql-8.0.30",
 				},
 				CommandExecutorItem: CommandExecutorItem{
-					Command: []string{"mysql", "-e", "$(KB_ACCOUNT_STATEMENT)"},
+					Command: []string{"mysql"},
+					Args:    []string{"-e", "$(KB_ACCOUNT_STATEMENT)"},
 				},
 			}
 			By("By creating a new clusterDefinition with duplicated accounts")
@@ -443,11 +444,6 @@ spec:
           - mountPath: /data/config/mysql
             name: mysql-config
         env:
-          - name: "MYSQL_ROOT_PASSWORD"
-            valueFrom:
-              secretKeyRef:
-                name: $(CONN_CREDENTIAL_SECRET_NAME)
-                key: password
         command: ["/usr/bin/bash", "-c"]
 `, name)
 	clusterDefinition := &ClusterDefinition{}

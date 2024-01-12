@@ -47,7 +47,6 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps"
 	dpctrl "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
-	"github.com/apecloud/kubeblocks/pkg/common"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -103,7 +102,7 @@ func GetConsensusRoleCountMap(testCtx testutil.TestContext, k8sClient client.Cli
 	}
 
 	sts := stsList.Items[0]
-	pods, err := common.GetPodListByStatefulSet(testCtx.Ctx, k8sClient, &sts)
+	pods, err := intctrlutil.GetPodListByStatefulSet(testCtx.Ctx, k8sClient, &sts)
 
 	if err != nil {
 		return roleCountMap

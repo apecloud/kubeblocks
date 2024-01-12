@@ -43,7 +43,6 @@ import (
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -58,7 +57,7 @@ const (
 // clusterTransformContext a graph.TransformContext implementation for Cluster reconciliation
 type clusterTransformContext struct {
 	context.Context
-	Client roclient.ReadonlyClient
+	Client client.Reader
 	record.EventRecorder
 	logr.Logger
 	Cluster        *appsv1alpha1.Cluster
@@ -95,7 +94,7 @@ func (c *clusterTransformContext) GetContext() context.Context {
 	return c.Context
 }
 
-func (c *clusterTransformContext) GetClient() roclient.ReadonlyClient {
+func (c *clusterTransformContext) GetClient() client.Reader {
 	return c.Client
 }
 
@@ -209,14 +208,13 @@ func (p *clusterPlan) handlePlanExecutionError(err error) error {
 	clusterCopy := p.transCtx.OrigCluster.DeepCopy()
 	condition := newFailedApplyResourcesCondition(err)
 	meta.SetStatusCondition(&clusterCopy.Status.Conditions, condition)
-	sendWarningEventWithError(p.transCtx.GetRecorder(), clusterCopy, ReasonApplyResourcesFailed, err)
 	return p.cli.Status().Patch(p.transCtx.Context, clusterCopy, client.MergeFrom(p.transCtx.OrigCluster))
 }
 
 // Do the real works
 
-// NewClusterPlanBuilder returns a clusterPlanBuilder powered PlanBuilder
-func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client) graph.PlanBuilder {
+// newClusterPlanBuilder returns a clusterPlanBuilder powered PlanBuilder
+func newClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client) graph.PlanBuilder {
 	return &clusterPlanBuilder{
 		req: ctx.Req,
 		cli: cli,
@@ -265,54 +263,6 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 	return c.reconcileObject(node)
 }
 
-func (c *clusterPlanBuilder) reconcileObject(node *model.ObjectVertex) error {
-	switch *node.Action {
-	case model.CREATE:
-		err := c.cli.Create(c.transCtx.Context, node.Obj)
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return err
-		}
-	case model.UPDATE:
-		err := c.cli.Update(c.transCtx.Context, node.Obj)
-		if err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-	case model.PATCH:
-		patch := client.MergeFrom(node.OriObj)
-		if err := c.cli.Patch(c.transCtx.Context, node.Obj, patch); err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-	case model.DELETE:
-		if controllerutil.RemoveFinalizer(node.Obj, constant.DBClusterFinalizerName) {
-			err := c.cli.Update(c.transCtx.Context, node.Obj)
-			if err != nil && !apierrors.IsNotFound(err) {
-				return err
-			}
-		}
-		// delete secondary objects
-		if _, ok := node.Obj.(*appsv1alpha1.Cluster); !ok {
-			err := intctrlutil.BackgroundDeleteObject(c.cli, c.transCtx.Context, node.Obj)
-			if err != nil && !apierrors.IsNotFound(err) {
-				return err
-			}
-		}
-	case model.STATUS:
-		patch := client.MergeFrom(node.OriObj)
-		if err := c.cli.Status().Patch(c.transCtx.Context, node.Obj, patch); err != nil {
-			return err
-		}
-		// handle condition and phase changing triggered events
-		if newCluster, ok := node.Obj.(*appsv1alpha1.Cluster); ok {
-			oldCluster, _ := node.OriObj.(*appsv1alpha1.Cluster)
-			c.emitConditionUpdatingEvent(oldCluster.Status.Conditions, newCluster.Status.Conditions)
-			c.emitStatusUpdatingEvent(oldCluster.Status, newCluster.Status)
-		}
-	case model.NOOP:
-		// nothing
-	}
-	return nil
-}
-
 func (c *clusterPlanBuilder) reconcileCluster(node *model.ObjectVertex) error {
 	cluster := node.Obj.(*appsv1alpha1.Cluster).DeepCopy()
 	origCluster := node.OriObj.(*appsv1alpha1.Cluster)
@@ -328,6 +278,95 @@ func (c *clusterPlanBuilder) reconcileCluster(node *model.ObjectVertex) error {
 	case model.CREATE, model.UPDATE:
 		return fmt.Errorf("cluster can't be created or updated: %s", cluster.Name)
 	}
+	return nil
+}
+
+func (c *clusterPlanBuilder) reconcileObject(node *model.ObjectVertex) error {
+	ctx := c.transCtx.Context
+	switch *node.Action {
+	case model.CREATE:
+		return c.reconcileCreateObject(ctx, node)
+	case model.UPDATE:
+		return c.reconcileUpdateObject(ctx, node)
+	case model.PATCH:
+		return c.reconcilePatchObject(ctx, node)
+	case model.DELETE:
+		return c.reconcileDeleteObject(ctx, node)
+	case model.STATUS:
+		return c.reconcileStatusObject(ctx, node)
+	case model.NOOP:
+		return c.reconcileNoopObject(ctx, node)
+	}
+	return nil
+}
+
+func (c *clusterPlanBuilder) reconcileCreateObject(ctx context.Context, node *model.ObjectVertex) error {
+	err := c.cli.Create(ctx, node.Obj, clientOption(node))
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+	return nil
+}
+
+func (c *clusterPlanBuilder) reconcileUpdateObject(ctx context.Context, node *model.ObjectVertex) error {
+	err := c.cli.Update(ctx, node.Obj, clientOption(node))
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
+func (c *clusterPlanBuilder) reconcilePatchObject(ctx context.Context, node *model.ObjectVertex) error {
+	patch := client.MergeFrom(node.OriObj)
+	err := c.cli.Patch(ctx, node.Obj, patch, clientOption(node))
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
+func (c *clusterPlanBuilder) reconcileDeleteObject(ctx context.Context, node *model.ObjectVertex) error {
+	if controllerutil.RemoveFinalizer(node.Obj, constant.DBClusterFinalizerName) {
+		err := c.cli.Update(ctx, node.Obj, clientOption(node))
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+	backgroundDeleteObject := func() error {
+		deletePropagation := metav1.DeletePropagationBackground
+		deleteOptions := &client.DeleteOptions{
+			PropagationPolicy: &deletePropagation,
+		}
+		if err := c.cli.Delete(ctx, node.Obj, deleteOptions, clientOption(node)); err != nil {
+			return client.IgnoreNotFound(err)
+		}
+		return nil
+	}
+	// delete secondary objects
+	if _, ok := node.Obj.(*appsv1alpha1.Cluster); !ok {
+		err := backgroundDeleteObject()
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *clusterPlanBuilder) reconcileStatusObject(ctx context.Context, node *model.ObjectVertex) error {
+	patch := client.MergeFrom(node.OriObj)
+	if err := c.cli.Status().Patch(ctx, node.Obj, patch, clientOption(node)); err != nil {
+		return err
+	}
+	// handle condition and phase changing triggered events
+	if newCluster, ok := node.Obj.(*appsv1alpha1.Cluster); ok {
+		oldCluster, _ := node.OriObj.(*appsv1alpha1.Cluster)
+		c.emitConditionUpdatingEvent(oldCluster.Status.Conditions, newCluster.Status.Conditions)
+		c.emitStatusUpdatingEvent(oldCluster.Status, newCluster.Status)
+	}
+	return nil
+}
+
+func (c *clusterPlanBuilder) reconcileNoopObject(ctx context.Context, node *model.ObjectVertex) error {
 	return nil
 }
 

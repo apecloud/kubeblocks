@@ -21,7 +21,6 @@ package mongodb
 
 import (
 	"fmt"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -58,15 +57,15 @@ mongosh mongodb://%s:%s@%s/%s
 func (r Commands) ConnectCommand(connectInfo *engines.AuthInfo) []string {
 	userName := r.info.UserEnv
 	userPass := r.info.PasswordEnv
-
+	dsn := fmt.Sprintf("mongodb://%s:%s@$KB_POD_FQDN:27017/admin?replicaSet=$KB_CLUSTER_COMP_NAME", userName, userPass)
 	if connectInfo != nil {
 		userName = connectInfo.UserName
 		userPass = connectInfo.UserPasswd
+		dsn = fmt.Sprintf("mongodb://%s:%s@$KB_POD_FQDN:27017/admin?replicaSet=$KB_CLUSTER_COMP_NAME", userName, userPass)
 	}
 
-	mongodbCmd := []string{fmt.Sprintf("export CLIENT=`which mongosh>/dev/null&&echo %s||echo mongo`; $CLIENT %s", r.info.Client, engines.AddSingleQuote(fmt.Sprintf("mongodb://%s:%s@$KB_POD_FQDN:27017/admin?replicaSet=$KB_CLUSTER_COMP_NAME", userName, userPass)))}
-
-	return []string{"sh", "-c", strings.Join(mongodbCmd, " ")}
+	mongodbCmd := fmt.Sprintf("export CLIENT=`which mongosh>/dev/null&&echo %s||echo mongo`; $CLIENT %s", r.info.Client, dsn)
+	return []string{"sh", "-c", mongodbCmd}
 }
 
 func (r Commands) Container() string {

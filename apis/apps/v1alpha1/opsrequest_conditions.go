@@ -42,6 +42,7 @@ const (
 	ConditionTypeExpose             = "Exposing"
 	ConditionTypeDataScript         = "ExecuteDataScript"
 	ConditionTypeBackup             = "Backup"
+	ConditionTypeCustomOperation    = "CustomOperation"
 
 	// condition and event reasons
 
@@ -275,7 +276,7 @@ func NewReconfigureCondition(ops *OpsRequest) *metav1.Condition {
 		LastTransitionTime: metav1.Now(),
 		Message: fmt.Sprintf("Start to reconfigure in Cluster: %s, Component: %s",
 			ops.Spec.ClusterRef,
-			ops.Spec.Reconfigure.ComponentName),
+			getComponentName(ops.Spec)),
 	}
 }
 
@@ -301,7 +302,7 @@ func NewReconfigureRunningCondition(ops *OpsRequest, conditionType string, confi
 	}
 	message := fmt.Sprintf("Reconfiguring in Cluster: %s, Component: %s, ConfigSpec: %s",
 		ops.Spec.ClusterRef,
-		ops.Spec.Reconfigure.ComponentName,
+		getComponentName(ops.Spec),
 		configSpecName)
 	if len(info) > 0 {
 		message = message + ", info: " + info[0]
@@ -313,6 +314,13 @@ func NewReconfigureRunningCondition(ops *OpsRequest, conditionType string, confi
 		LastTransitionTime: metav1.Now(),
 		Message:            message,
 	}
+}
+
+func getComponentName(request OpsRequestSpec) string {
+	if request.Reconfigure != nil {
+		return request.Reconfigure.ComponentName
+	}
+	return ""
 }
 
 // NewReconfigureFailedCondition creates a condition for the failed reconfigure.

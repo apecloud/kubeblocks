@@ -192,13 +192,15 @@ jobs:
     name: check helm
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]')
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts-check.yml@v0.1.34
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts-check.yml@v0.1.43
     with:
       MAKE_OPS: "bump-chart-ver"
-      VERSION: "v0.7.0-check"
+      VERSION: "v0.8.0-check"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
-      APECD_REF: "v0.1.34"
+      APECD_REF: "v0.1.43"
+      MAKE_OPS_POST: "install"
+      GO_VERSION: "1.21"
     secrets: inherit
 
   pr-check:

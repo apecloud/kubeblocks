@@ -22,6 +22,7 @@ package configuration
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -61,7 +62,7 @@ func createConfigObjects(cli client.Client, ctx context.Context, objs []client.O
 // buildConfigManagerWithComponent build the configmgr sidecar container and update it
 // into PodSpec if configuration reload option is on
 func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []appsv1alpha1.ComponentConfigSpec,
-	ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) error {
+	ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) error {
 	var err error
 	var buildParams *cfgcm.CfgManagerBuildParams
 
@@ -79,7 +80,7 @@ func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []apps
 	if len(configSpecMetas) == 0 {
 		return nil
 	}
-	if buildParams, err = buildConfigManagerParams(cli, ctx, cluster, component, configSpecMetas, volumeDirs, podSpec); err != nil {
+	if buildParams, err = buildConfigManagerParams(cli, ctx, cluster, synthesizedComp, configSpecMetas, volumeDirs, podSpec); err != nil {
 		return err
 	}
 	if buildParams == nil {
@@ -88,7 +89,7 @@ func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []apps
 
 	// This sidecar container will be able to view and signal processes from other containers
 	checkAndUpdateSharProcessNamespace(podSpec, buildParams, configSpecMetas)
-	container, err := factory.BuildCfgManagerContainer(buildParams, component)
+	container, err := factory.BuildCfgManagerContainer(buildParams, synthesizedComp)
 	if err != nil {
 		return err
 	}
@@ -100,6 +101,14 @@ func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []apps
 	if len(buildParams.ToolsContainers) > 0 {
 		podSpec.InitContainers = append(podSpec.InitContainers, buildParams.ToolsContainers...)
 	}
+	filter := func(c *corev1.Container) bool {
+		names := []string{container.Name}
+		for _, cc := range buildParams.ToolsContainers {
+			names = append(names, cc.Name)
+		}
+		return slices.Contains(names, c.Name)
+	}
+	component.InjectEnvVars4Containers(synthesizedComp, synthesizedComp.EnvVars, synthesizedComp.EnvFromSources, filter)
 	return nil
 }
 
@@ -205,6 +214,15 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 		Cluster:                   cluster,
 		ConfigSpecsBuildParams:    configSpecBuildParams,
 		ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),
+		ContainerPort:             viper.GetInt32(constant.ConfigManagerGPRCPortEnv),
+	}
+
+	if podSpec.HostNetwork {
+		containerPort, err := GetConfigManagerGRPCPort(podSpec.Containers)
+		if err != nil {
+			return nil, err
+		}
+		cfgManagerParams.ContainerPort = containerPort
 	}
 
 	if err := cfgcm.BuildConfigManagerContainerParams(cli, ctx, cfgManagerParams, volumeDirs); err != nil {
@@ -214,4 +232,22 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 		return nil, err
 	}
 	return cfgManagerParams, nil
+}
+
+func GetConfigManagerGRPCPort(containers []corev1.Container) (int32, error) {
+	for _, container := range containers {
+		if found := foundPortByConfigManagerPortName(container); found != nil {
+			return found.ContainerPort, nil
+		}
+	}
+	return -1, core.MakeError("failed to find config manager grpc port, please add named config-manager port")
+}
+
+func foundPortByConfigManagerPortName(container corev1.Container) *corev1.ContainerPort {
+	for _, port := range container.Ports {
+		if port.Name == constant.ConfigManagerPortName {
+			return &port
+		}
+	}
+	return nil
 }

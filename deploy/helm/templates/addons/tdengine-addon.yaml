@@ -1,8 +1,0 @@
-{{- include "kubeblocks.buildAddonCR" (merge (dict
-  "kbVersion" ">=0.7.0"
-  "name" "tdengine"
-  "version" "0.7.0"
-  "model" "time-series"
-  "provider" "community"
-  "description" "TDengine is an open source, high-performance, cloud native time-series database optimized for Internet of Things (IoT), Connected Cars, and Industrial IoT."
-  "autoInstall" false) . ) -}}

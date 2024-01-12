@@ -70,7 +70,7 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 		// if the backup is volume snapshot, ignore to delete files
 		return DeletionStatusSucceeded, nil
 	}
-	jobKey := BuildDeleteBackupFilesJobKey(backup)
+	jobKey := BuildDeleteBackupFilesJobKey(backup, false)
 	job := &batchv1.Job{}
 	exists, err := ctrlutil.CheckResourceExists(d.Ctx, d.Client, jobKey, job)
 	if err != nil {
@@ -122,7 +122,7 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 	}
 
 	backupFilePath := backup.Status.Path
-	if backupFilePath == "" || !strings.Contains(backupFilePath, backup.Name) {
+	if backupFilePath == "" || (!strings.Contains(backupFilePath, backup.Name)) {
 		// For compatibility: the FilePath field is changing from time to time,
 		// and it may not contain the backup name as a path component if the Backup object
 		// was created in a previous version. In this case, it's dangerous to execute
@@ -131,54 +131,101 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 			"backupFilePath", backupFilePath, "backup", backup.Name)
 		return DeletionStatusSucceeded, nil
 	}
-	return DeletionStatusDeleting, d.createDeleteBackupFilesJob(jobKey, backup, backupRepo, legacyPVCName, backup.Status.Path)
+
+	// make sure the path has a leading slash
+	if !strings.HasPrefix(backupFilePath, "/") {
+		backupFilePath = "/" + backupFilePath
+	}
+	// do pre-delete action
+	preDeleteAction, err := d.getPreDeleteAction(backup.Status.BackupMethod)
+	if err != nil {
+		return DeletionStatusUnknown, err
+	}
+	if preDeleteAction != nil {
+		preJob, err := d.doPreDeleteAction(backup, backupRepo, preDeleteAction, legacyPVCName, backupFilePath)
+		if err != nil {
+			return DeletionStatusUnknown, err
+		}
+		_, finishedType, msg := utils.IsJobFinished(preJob)
+		if finishedType == batchv1.JobFailed {
+			return DeletionStatusFailed,
+				fmt.Errorf("pre-delete backup files job \"%s\" failed, you can delete it to re-delete the backup files, %s", job.Name, msg)
+		} else if finishedType != batchv1.JobComplete {
+			return DeletionStatusDeleting, nil
+		}
+	}
+	// do delete action
+	return DeletionStatusDeleting, d.createDeleteBackupFilesJob(jobKey, backup, backupRepo, legacyPVCName)
+}
+
+func (d *Deleter) buildDeleteBackupFilesScript(backupPath string) string {
+
+	// this script first deletes the directory where the backup is located (including files
+	// in the directory), and then traverses up the path level by level to clean up empty directories.
+	deleteScript := fmt.Sprintf(`
+set -x
+export PATH="$PATH:$%s"
+targetPath="%s"
+
+echo "removing backup files in ${targetPath}"
+DATASAFED_KOPIA_MAINTENANCE=true datasafed rm -r "${targetPath}"
+
+# remove empty dirs from leaf to root
+function rmdirs() {
+	curr="$1"
+	while true; do
+		curr=$(dirname "${curr}")
+		if [ "${curr}" == "/" ]; then
+			echo "reach to root, done"
+			break
+		fi
+		result=$(datasafed list "${curr}")
+		if [ -z "$result" ]; then
+			echo "${curr} is empty, removing it..."
+			datasafed rmdir "${curr}"
+		else
+			echo "${curr} is not empty, done"
+			break
+		fi
+	done
+}
+
+if [ "${DATASAFED_KOPIA_REPO_ROOT}" == "" ]; then
+	# kopia is not used, simply remove empty dirs from the storage
+	rmdirs "${targetPath}"
+else
+	# remove empty dirs from the kopia repository
+	rmdirs "${targetPath}"
+
+	# remove the kopia repository itself from the storage if it's empty
+	result=$(datasafed list "/")
+	if [ -z "$result" ]; then
+		kopiaRepoPath="${DATASAFED_KOPIA_REPO_ROOT}"
+		unset DATASAFED_KOPIA_REPO_ROOT
+		echo "kopia repository at '${kopiaRepoPath}' is empty, removing it from the storage..."
+		datasafed rm -r "${kopiaRepoPath}"
+		datasafed rm -r "${kopiaRepoPath}.meta"
+
+		# remove empty dirs from the storage
+		rmdirs "${kopiaRepoPath}"
+	fi
+fi
+	`, dptypes.DPDatasafedBinPath, backupPath)
+
+	return deleteScript
 }
 
 func (d *Deleter) createDeleteBackupFilesJob(
 	jobKey types.NamespacedName,
 	backup *dpv1alpha1.Backup,
 	backupRepo *dpv1alpha1.BackupRepo,
-	legacyPVCName string,
-	backupFilePath string) error {
-	// make sure the path has a leading slash
-	if !strings.HasPrefix(backupFilePath, "/") {
-		backupFilePath = "/" + backupFilePath
-	}
-
-	// this script first deletes the directory where the backup is located (including files
-	// in the directory), and then traverses up the path level by level to clean up empty directories.
-	deleteScript := fmt.Sprintf(`
-set -x
-export PATH="$PATH:$%s";
-targetPath="%s";
-
-echo "removing backup files in ${targetPath}";
-datasafed rm -r "${targetPath}";
-
-curr="${targetPath}";
-while true; do
-	parent=$(dirname "${curr}");
-	if [ "${parent}" == "/" ]; then
-		echo "reach to root, done";
-		break;
-	fi;
-	result=$(datasafed list "${parent}");
-	if [ -z "$result" ]; then
-		echo "${parent} is empty, removing it...";
-		datasafed rmdir "${parent}";
-	else
-		echo "${parent} is not empty, done";
-		break;
-	fi;
-	curr="${parent}";
-done
-	`, dptypes.DPDatasafedBinPath, backupFilePath)
+	legacyPVCName string) error {
 
 	runAsUser := int64(0)
 	container := corev1.Container{
 		Name:            backup.Name,
 		Command:         []string{"sh", "-c"},
-		Args:            []string{deleteScript},
+		Args:            []string{d.buildDeleteBackupFilesScript(backup.Status.Path)},
 		Image:           viper.GetString(constant.KBToolsImage),
 		ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)),
 		SecurityContext: &corev1.SecurityContext{
@@ -186,6 +233,14 @@ done
 			RunAsUser:                &runAsUser,
 		},
 	}
+	return d.createDeleteJob(container, jobKey, backup, backupRepo, legacyPVCName)
+}
+
+func (d *Deleter) createDeleteJob(container corev1.Container,
+	jobKey types.NamespacedName,
+	backup *dpv1alpha1.Backup,
+	backupRepo *dpv1alpha1.BackupRepo,
+	legacyPVCName string) error {
 	ctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 
 	// build pod
@@ -196,10 +251,11 @@ done
 	if err := utils.AddTolerations(&podSpec); err != nil {
 		return err
 	}
+	kopiaRepoPath := backup.Status.KopiaRepoPath
 	if backupRepo != nil {
-		utils.InjectDatasafed(&podSpec, backupRepo, RepoVolumeMountPath, backupFilePath)
+		utils.InjectDatasafed(&podSpec, backupRepo, RepoVolumeMountPath, kopiaRepoPath)
 	} else {
-		utils.InjectDatasafedWithPVC(&podSpec, legacyPVCName, RepoVolumeMountPath, backupFilePath)
+		utils.InjectDatasafedWithPVC(&podSpec, legacyPVCName, RepoVolumeMountPath, kopiaRepoPath)
 	}
 
 	// build job
@@ -227,6 +283,49 @@ done
 	}
 	d.Log.V(1).Info("create a job to delete backup files", "job", job)
 	return client.IgnoreAlreadyExists(d.Client.Create(d.Ctx, job))
+}
+
+func (d *Deleter) getPreDeleteAction(backupMethod *dpv1alpha1.BackupMethod) (*dpv1alpha1.BaseJobActionSpec, error) {
+	if backupMethod == nil || backupMethod.ActionSetName == "" {
+		return nil, nil
+	}
+	actionSet, err := utils.GetActionSetByName(d.RequestCtx, d.Client, backupMethod.ActionSetName)
+	if err != nil {
+		return nil, err
+	}
+	return actionSet.Spec.Backup.PreDeleteBackup, nil
+}
+
+func (d *Deleter) doPreDeleteAction(
+	backup *dpv1alpha1.Backup,
+	backupRepo *dpv1alpha1.BackupRepo,
+	preDeleteAction *dpv1alpha1.BaseJobActionSpec,
+	legacyPVCName string,
+	backupFilePath string) (*batchv1.Job, error) {
+	preJobKey := BuildDeleteBackupFilesJobKey(backup, true)
+	preJob := &batchv1.Job{}
+	if exists, err := ctrlutil.CheckResourceExists(d.Ctx, d.Client, preJobKey, preJob); err != nil {
+		return nil, err
+	} else if exists {
+		return preJob, nil
+	}
+	// create pre-delete action
+	runAsUser := int64(0)
+	container := corev1.Container{
+		Name:    backup.Name,
+		Command: preDeleteAction.Command,
+		Image:   preDeleteAction.Image,
+		Env: []corev1.EnvVar{
+			{Name: dptypes.DPBackupBasePath, Value: backupFilePath},
+			{Name: dptypes.DPBackupName, Value: backup.Name},
+		},
+		ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)),
+		SecurityContext: &corev1.SecurityContext{
+			AllowPrivilegeEscalation: boolptr.False(),
+			RunAsUser:                &runAsUser,
+		},
+	}
+	return preJob, d.createDeleteJob(container, preJobKey, backup, backupRepo, legacyPVCName)
 }
 
 func (d *Deleter) DeleteVolumeSnapshots(backup *dpv1alpha1.Backup) error {
@@ -270,8 +369,12 @@ func (d *Deleter) DeleteVolumeSnapshots(backup *dpv1alpha1.Backup) error {
 	return nil
 }
 
-func BuildDeleteBackupFilesJobKey(backup *dpv1alpha1.Backup) client.ObjectKey {
-	jobName := fmt.Sprintf("%s-%s%s", backup.UID[:8], deleteBackupFilesJobNamePrefix, backup.Name)
+func BuildDeleteBackupFilesJobKey(backup *dpv1alpha1.Backup, isPreDelete bool) client.ObjectKey {
+	var preDeletePrefix string
+	if isPreDelete {
+		preDeletePrefix = "pre"
+	}
+	jobName := fmt.Sprintf("%s-%s%s%s", backup.UID[:8], preDeletePrefix, deleteBackupFilesJobNamePrefix, backup.Name)
 	if len(jobName) > 63 {
 		jobName = jobName[:63]
 	}

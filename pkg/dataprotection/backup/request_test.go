@@ -139,7 +139,7 @@ var _ = Describe("Request Test", func() {
 					Name:            testdp.VSBackupMethodName,
 					SnapshotVolumes: boolptr.True(),
 				}
-				_, err := request.buildCreateVolumeSnapshotAction()
+				_, err := request.buildCreateVolumeSnapshotAction(targetPod, "CreateVolumeSnapshot")
 				Expect(err).Should(HaveOccurred())
 			})
 

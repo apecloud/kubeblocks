@@ -49,6 +49,11 @@ const (
 	DataProtectionPopulatePVCLabelKey      = "dataprotection.kubeblocks.io/populate-pvc"
 )
 
+// Annotations key
+const (
+	DataProtectionBackupExtrasLabelKey = "dataprotection.kubeblocks.io/backup-extras"
+)
+
 // env name for restore
 
 const (
@@ -63,4 +68,4 @@ const (
 // Restore constant
 const Restore = "restore"
 
-var defaultBackoffLimit int32 = 3
+var defaultBackoffLimit int32 = 2

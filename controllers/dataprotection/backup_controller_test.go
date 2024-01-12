@@ -20,10 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 import (
+	"fmt"
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"time"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -35,6 +37,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -126,7 +129,7 @@ var _ = Describe("Backup Controller test", func() {
 
 			getJobKey := func() client.ObjectKey {
 				return client.ObjectKey{
-					Name:      dpbackup.GenerateBackupJobName(backup, dpbackup.BackupDataJobNamePrefix),
+					Name:      dpbackup.GenerateBackupJobName(backup, dpbackup.BackupDataJobNamePrefix+"-0"),
 					Namespace: backup.Namespace,
 				}
 			}
@@ -143,7 +146,7 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Status.PersistentVolumeClaimName).Should(Equal(repoPVCName))
 					g.Expect(fetched.Status.Path).Should(Equal(dpbackup.BuildBackupPath(fetched, backupPolicy.Spec.PathPrefix)))
 					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
-					g.Expect(fetched.Annotations[dptypes.ConnectionPasswordKey]).ShouldNot(BeEmpty())
+					g.Expect(fetched.Annotations[dptypes.ConnectionPasswordAnnotationKey]).ShouldNot(BeEmpty())
 				})).Should(Succeed())
 
 				By("check backup job's nodeName equals pod's nodeName")
@@ -218,7 +221,7 @@ var _ = Describe("Backup Controller test", func() {
 
 				getJobKey := func() client.ObjectKey {
 					return client.ObjectKey{
-						Name:      dpbackup.GenerateBackupJobName(backup, dpbackup.BackupDataJobNamePrefix),
+						Name:      dpbackup.GenerateBackupJobName(backup, dpbackup.BackupDataJobNamePrefix+"-0"),
 						Namespace: backup.Namespace,
 					}
 				}
@@ -253,6 +256,75 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Status.Expiration).ShouldNot(BeNil())
 				})).Should(Succeed())
 			})
+
+			It("create an backup with backupMethod's", func() {
+				By("Set backupMethod's target")
+				Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(bp *dpv1alpha1.BackupPolicy) {
+					backupPolicy.Spec.BackupMethods[0].Target = &dpv1alpha1.BackupTarget{
+						PodSelector: &dpv1alpha1.PodSelector{
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									constant.AppInstanceLabelKey:    testdp.ClusterName,
+									constant.KBAppComponentLabelKey: testdp.ComponentName,
+									constant.RoleLabelKey:           constant.Follower,
+								},
+							},
+						},
+					}
+				})).Should(Succeed())
+				By("check targets pod")
+				reqCtx := intctrlutil.RequestCtx{
+					Ctx: ctx,
+				}
+				targets, err := GetTargetPods(reqCtx, k8sClient, "", &backupPolicy.Spec.BackupMethods[0], backupPolicy)
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(targets).Should(HaveLen(1))
+				Expect(targets[0].Name).Should(Equal(testdp.ClusterName + "-" + testdp.ComponentName + "-1"))
+			})
+
+			It("create an backup with backupMethod's and podSelection strategy is All", func() {
+				By("Set backupMethod's target and podSelection strategy to All")
+				Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(bp *dpv1alpha1.BackupPolicy) {
+					backupPolicy.Spec.BackupMethods[0].Target = &dpv1alpha1.BackupTarget{
+						PodSelector: &dpv1alpha1.PodSelector{
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									constant.AppInstanceLabelKey:    testdp.ClusterName,
+									constant.KBAppComponentLabelKey: testdp.ComponentName,
+								},
+							},
+							Strategy: dpv1alpha1.PodSelectionStrategyAll,
+						},
+					}
+				})).Should(Succeed())
+				By("check targets pod")
+				reqCtx := intctrlutil.RequestCtx{
+					Ctx: ctx,
+				}
+				targets, err := GetTargetPods(reqCtx, k8sClient, "", &backupPolicy.Spec.BackupMethods[0], backupPolicy)
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(targets).Should(HaveLen(2))
+
+				By("create a backup")
+				backup := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
+					backup.Spec.RetentionPeriod = "1h"
+				})
+				getJobKey := func(index int) client.ObjectKey {
+					return client.ObjectKey{
+						Name:      dpbackup.GenerateBackupJobName(backup, fmt.Sprintf("%s-%d", dpbackup.BackupDataJobNamePrefix, index)),
+						Namespace: backup.Namespace,
+					}
+				}
+
+				By("mock jobs are completed and backup should be completed")
+				testdp.PatchK8sJobStatus(&testCtx, getJobKey(0), batchv1.JobComplete)
+				testdp.PatchK8sJobStatus(&testCtx, getJobKey(1), batchv1.JobComplete)
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
+					g.Expect(fetched.Status.CompletionTimestamp).ShouldNot(BeNil())
+					g.Expect(fetched.Status.Expiration.Second()).Should(Equal(fetched.Status.CompletionTimestamp.Add(time.Hour).Second()))
+				})).Should(Succeed())
+			})
 		})
 
 		Context("deletes a backup", func() {
@@ -276,7 +348,7 @@ var _ = Describe("Backup Controller test", func() {
 				testapps.DeleteObject(&testCtx, backupKey, &dpv1alpha1.Backup{})
 
 				By("checking new created Job")
-				jobKey := dpbackup.BuildDeleteBackupFilesJobKey(backup)
+				jobKey := dpbackup.BuildDeleteBackupFilesJobKey(backup, false)
 				job := &batchv1.Job{}
 				Eventually(testapps.CheckObjExists(&testCtx, jobKey, job, true)).Should(Succeed())
 				volumeName := "dp-backup-data"
@@ -656,6 +728,101 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(backup.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.BackupPhaseFailed))
 					g.Expect(backup.Status.FailureReason).Should(ContainSubstring("no default BackupRepo found"))
 				})).Should(Succeed())
+			})
+		})
+	})
+
+	When("use kopia", func() {
+		var (
+			backupPolicy *dpv1alpha1.BackupPolicy
+			repoPVCName  string
+			cluster      *appsv1alpha1.Cluster
+		)
+
+		BeforeEach(func() {
+			By("creating an actionSet")
+			actionSet := testdp.NewFakeActionSet(&testCtx)
+
+			By("creating storage provider")
+			_ = testdp.NewFakeStorageProvider(&testCtx, nil)
+
+			By("creating backup repo")
+			_, repoPVCName = testdp.NewFakeBackupRepo(&testCtx, nil)
+
+			By("creating a backupPolicy from actionSet: " + actionSet.Name)
+			backupPolicy = testdp.NewFakeBackupPolicy(&testCtx, nil)
+
+			cluster = clusterInfo.Cluster
+		})
+
+		Context("wait for gemini to handle", func() {
+			var (
+				backupKey types.NamespacedName
+				backup    *dpv1alpha1.Backup
+			)
+
+			getJobKey := func() client.ObjectKey {
+				return client.ObjectKey{
+					Name:      dpbackup.GenerateBackupJobName(backup, dpbackup.BackupDataJobNamePrefix+"-0"),
+					Namespace: backup.Namespace,
+				}
+			}
+
+			BeforeEach(func() {
+				By("making the backupPolicy to use kopia")
+				Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(backupPolicy),
+					func(policy *dpv1alpha1.BackupPolicy) {
+						policy.Spec.UseKopia = true
+					})).Should(Succeed())
+				By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
+				backup = testdp.NewFakeBackup(&testCtx, nil)
+				backupKey = client.ObjectKeyFromObject(backup)
+			})
+
+			It("should continue to process after gemini acknowledged", func() {
+				By("check backup status")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).Should(BeEmpty())
+				})).Should(Succeed())
+
+				By("simulate gemini processing")
+				Eventually(testapps.GetAndChangeObj(&testCtx, backupKey, func(backup *dpv1alpha1.Backup) {
+					if backup.Annotations == nil {
+						backup.Annotations = map[string]string{}
+					}
+					backup.Annotations[dptypes.GeminiAcknowledgedAnnotationKey] = trueVal
+				})).Should(Succeed())
+
+				By("check backup status again")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.PersistentVolumeClaimName).Should(Equal(repoPVCName))
+					g.Expect(fetched.Status.Path).Should(Equal(dpbackup.BuildBackupPath(fetched, backupPolicy.Spec.PathPrefix)))
+					g.Expect(fetched.Status.KopiaRepoPath).Should(Equal(dpbackup.BuildKopiaRepoPath(fetched, backupPolicy.Spec.PathPrefix)))
+					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
+					g.Expect(fetched.Annotations[dptypes.ConnectionPasswordAnnotationKey]).ShouldNot(BeEmpty())
+				})).Should(Succeed())
+
+				testdp.PatchK8sJobStatus(&testCtx, getJobKey(), batchv1.JobComplete)
+
+				By("backup job should have completed")
+				Eventually(testapps.CheckObj(&testCtx, getJobKey(), func(g Gomega, fetched *batchv1.Job) {
+					_, finishedType, _ := dputils.IsJobFinished(fetched)
+					g.Expect(fetched.Labels[constant.AppManagedByLabelKey]).Should(Equal(dptypes.AppName))
+					g.Expect(finishedType).To(Equal(batchv1.JobComplete))
+				})).Should(Succeed())
+
+				By("backup should have completed")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
+					g.Expect(fetched.Labels[dptypes.ClusterUIDLabelKey]).Should(Equal(string(cluster.UID)))
+					g.Expect(fetched.Labels[constant.AppInstanceLabelKey]).Should(Equal(testdp.ClusterName))
+					g.Expect(fetched.Labels[constant.KBAppComponentLabelKey]).Should(Equal(testdp.ComponentName))
+					g.Expect(fetched.Labels[constant.AppManagedByLabelKey]).Should(Equal(dptypes.AppName))
+					g.Expect(fetched.Annotations[constant.ClusterSnapshotAnnotationKey]).ShouldNot(BeEmpty())
+				})).Should(Succeed())
+
+				By("backup job should be deleted after backup completed")
+				Eventually(testapps.CheckObjExists(&testCtx, getJobKey(), &batchv1.Job{}, false)).Should(Succeed())
 			})
 		})
 	})

@@ -19,29 +19,77 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package constant
 
-const (
-	KBEnvNamespace            = "KB_NAMESPACE"
-	KBEnvHostIP               = "KB_HOST_IP"
-	KBEnvNodeName             = "KB_NODENAME"
-	KBEnvPodName              = "KB_POD_NAME"
-	KBEnvPodUID               = "KB_POD_UID"
-	KBEnvVolumeProtectionSpec = "KB_VOLUME_PROTECTION_SPEC"
-	KBEnvWeSyncerHTTPPort     = "WESYNCER_SERVICE_HTTP_PORT"
-	KBEnvLorryHTTPPort        = "LORRY_SERVICE_HTTP_PORT"
-	KBEnvLorryGRPCPort        = "LORRY_SERVICE_GRPC_PORT"
-	KBEnvLorryLogLevel        = "LORRY_SERVICE_LOG_LEVEL"
+import (
+	"fmt"
 )
 
-// Lorry env names
+func EnvPlaceHolder(env string) string {
+	return fmt.Sprintf("$(%s)", env)
+}
+
+// Global
 const (
-	KBEnvClusterName     = "KB_CLUSTER_NAME"
-	KBEnvComponentName   = "KB_COMP_NAME"
-	KBEnvClusterCompName = "KB_CLUSTER_COMP_NAME"
+	KBEnvNamespace = "KB_NAMESPACE"
+)
+
+// Cluster
+const (
+	KBEnvClusterName                  = "KB_CLUSTER_NAME"
+	KBEnvClusterUID                   = "KB_CLUSTER_UID"
+	KBEnvClusterCompName              = "KB_CLUSTER_COMP_NAME"
+	KBEnvClusterUIDPostfix8Deprecated = "KB_CLUSTER_UID_POSTFIX_8"
+)
+
+// Component
+const (
+	KBEnvCompName           = "KB_COMP_NAME"
+	KBEnvCompReplicas       = "KB_COMP_REPLICAS"
+	KBEnvCompServiceVersion = "KB_COMP_SERVICE_VERSION"
+)
+
+// Pod
+const (
+	KBEnvPodName          = "KB_POD_NAME"
+	KBEnvPodUID           = "KB_POD_UID"
+	KBEnvPodIP            = "KB_POD_IP"
+	KBEnvPodIPs           = "KB_POD_IPS"
+	KBEnvPodFQDN          = "KB_POD_FQDN"
+	KBEnvPodOrdinal       = "KB_POD_ORDINAL"
+	KBEnvPodIPDeprecated  = "KB_PODIP"
+	KBEnvPodIPsDeprecated = "KB_PODIPS"
+)
+
+// Host
+const (
+	KBEnvHostIP           = "KB_HOST_IP"
+	KBEnvNodeName         = "KB_NODENAME"
+	KBEnvHostIPDeprecated = "KB_HOSTIP"
+)
+
+// ServiceAccount
+const (
+	KBEnvServiceAccountName = "KB_SA_NAME"
+)
+
+// TLS
+const (
+	KBEnvTLSCertPath = "KB_TLS_CERT_PATH"
+	KBEnvTLSCertFile = "KB_TLS_CERT_FILE"
+	KBEnvTLSCAFile   = "KB_TLS_CA_FILE"
+	KBEnvTLSKeyFile  = "KB_TLS_KEY_FILE"
+)
+
+// Lorry
+const (
 	KBEnvWorkloadType    = "KB_WORKLOAD_TYPE"
 	KBEnvBuiltinHandler  = "KB_BUILTIN_HANDLER"
 	KBEnvCharacterType   = "KB_SERVICE_CHARACTER_TYPE"
 	KBEnvServiceUser     = "KB_SERVICE_USER"
 	KBEnvServicePassword = "KB_SERVICE_PASSWORD"
+	KBEnvLorryHTTPPort   = "LORRY_HTTP_PORT"
+	KBEnvLorryGRPCPort   = "LORRY_SERVICE_GRPC_PORT"
+	KBEnvLorryLogLevel   = "LORRY_SERVICE_LOG_LEVEL"
+	KBEnvSyncerHTTPPort  = "SYNCER_SERVICE_HTTP_PORT"
 
 	// KBEnvServiceRoles defines the Roles configured in the cluster definition that are visible to users.
 	KBEnvServiceRoles = "KB_SERVICE_ROLES"
@@ -64,4 +112,6 @@ const (
 	// KBEnvRsmRoleUpdateMechanism defines the method to send events: DirectAPIServerEventUpdate(through lorry service), ReadinessProbeEventUpdate(through kubelet service)
 	KBEnvRsmRoleUpdateMechanism = "KB_RSM_ROLE_UPDATE_MECHANISM"
 	KBEnvRoleProbeTimeout       = "KB_RSM_ROLE_PROBE_TIMEOUT"
+
+	KBEnvVolumeProtectionSpec = "KB_VOLUME_PROTECTION_SPEC"
 )

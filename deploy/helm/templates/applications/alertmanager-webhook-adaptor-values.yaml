@@ -1,3 +1,4 @@
+{{- $imageRegistry := include "kubeblocks.imageRegistry" . }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,4 +11,10 @@ metadata:
   {{- end }}
 data:
   values-kubeblocks-override.yaml: |-
-     {{- get ( .Values | toYaml | fromYaml ) "alertmanager-webhook-adaptor" | toYaml | nindent 4 }}
+     {{- $alertmanagerWebhookAdaptor := get .Values "alertmanager-webhook-adaptor" }}
+     {{- $image := get $alertmanagerWebhookAdaptor "image" }}
+     {{- if not $image.registry }}
+       {{- $image = set $image  "registry" $imageRegistry }}
+     {{- end }}
+     {{- $alertmanagerWebhookAdaptor = set $alertmanagerWebhookAdaptor "image" $image }}
+     {{- toYaml $alertmanagerWebhookAdaptor | nindent 4 }}

@@ -76,24 +76,9 @@ func GenerateDefaultComponentHeadlessServiceName(clusterName, compName string) s
 }
 
 // GenerateDefaultConnCredential generates the default connection credential name for cluster.
+// TODO: deprecated, will be removed later.
 func GenerateDefaultConnCredential(clusterName string) string {
-	return GenerateClusterConnCredential(clusterName, "")
-}
-
-// GenerateClusterConnCredential generates the connection credential name for cluster.
-func GenerateClusterConnCredential(clusterName, name string) string {
-	if len(name) == 0 {
-		name = "conn-credential"
-	}
-	return fmt.Sprintf("%s-%s", clusterName, name)
-}
-
-// GenerateComponentConnCredential generates the connection credential name for component.
-func GenerateComponentConnCredential(clusterName, compName, name string) string {
-	if len(name) == 0 {
-		name = "conn-credential"
-	}
-	return fmt.Sprintf("%s-%s-%s", clusterName, compName, name)
+	return fmt.Sprintf("%s-conn-credential", clusterName)
 }
 
 // GenerateClusterComponentEnvPattern generates cluster and component pattern
@@ -101,10 +86,9 @@ func GenerateClusterComponentEnvPattern(clusterName, compName string) string {
 	return fmt.Sprintf("%s-%s-env", clusterName, compName)
 }
 
-// GenerateDefaultCompServiceAccountPattern generates default component service account pattern
-// fullCompName is the full name of component with clusterName prefix
-func GenerateDefaultCompServiceAccountPattern(fullCompName string) string {
-	return fmt.Sprintf("%s-%s", KBLowerPrefix, fullCompName)
+// GenerateDefaultServiceAccountName generates default service account name for a cluster.
+func GenerateDefaultServiceAccountName(name string) string {
+	return fmt.Sprintf("%s-%s", KBLowerPrefix, name)
 }
 
 // GenerateRSMNamePattern generates rsm name pattern
@@ -115,4 +99,25 @@ func GenerateRSMNamePattern(clusterName, compName string) string {
 // GenerateRSMServiceNamePattern generates rsm name pattern
 func GenerateRSMServiceNamePattern(rsmName string) string {
 	return fmt.Sprintf("%s-headless", rsmName)
+}
+
+// GeneratePodName generates the connection credential name for component.
+func GeneratePodName(clusterName, compName string, ordinal int) string {
+	return fmt.Sprintf("%s-%d", GenerateClusterComponentName(clusterName, compName), ordinal)
+}
+
+// GeneratePodSubDomain generates the connection credential name for component.
+func GeneratePodSubDomain(clusterName, compName string) string {
+	return GenerateDefaultComponentHeadlessServiceName(clusterName, compName)
+}
+
+// GeneratePodFQDN generates the connection credential name for component.
+func GeneratePodFQDN(namespace, clusterName, compName string, ordinal int) string {
+	return fmt.Sprintf("%s.%s.%s.svc",
+		GeneratePodName(clusterName, compName, ordinal), GeneratePodSubDomain(clusterName, compName), namespace)
+}
+
+// GenerateVirtualComponentDefinition generates the virtual component definition name.
+func GenerateVirtualComponentDefinition(compDefSuffix string) string {
+	return fmt.Sprintf("%s-%s", KBGeneratedVirtualCompDefPrefix, compDefSuffix)
 }

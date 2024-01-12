@@ -1,3 +1,4 @@
+{{- $imageRegistry := include "kubeblocks.imageRegistry" . }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,4 +11,10 @@ metadata:
   {{- end }}
 data:
   values-kubeblocks-override.yaml: |-
-    {{- get ( .Values | toYaml | fromYaml ) "agamotto" | toYaml | nindent 4 }}
+    {{- $agamotto := get .Values "agamotto" }}
+    {{- $image := get $agamotto "image" }}
+    {{- if not $image.registry }}
+      {{- $image = set $image  "registry" $imageRegistry }}
+    {{- end }}
+    {{- $agamotto = set $agamotto "image" $image }}
+    {{- toYaml $agamotto | nindent 4 }}

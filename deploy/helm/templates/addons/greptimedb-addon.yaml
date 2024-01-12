@@ -1,8 +1,0 @@
-{{- include "kubeblocks.buildAddonCR" (merge (dict
-  "kbVersion" ">=0.7.0"
-  "name" "greptimedb"
-  "version" "0.7.0"
-  "model" "time-series"
-  "provider" "community"
-  "description" "GreptimeDB is an Apache 2.0 licensed distributed time-series database."
-  "autoInstall" false) . ) -}}

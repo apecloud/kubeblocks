@@ -28,6 +28,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/spf13/viper"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 )
@@ -44,15 +45,15 @@ type DBManagerBase struct {
 }
 
 func NewDBManagerBase(logger logr.Logger) (*DBManagerBase, error) {
-	currentMemberName := viper.GetString("KB_POD_NAME")
+	currentMemberName := viper.GetString(constant.KBEnvPodName)
 	if currentMemberName == "" {
-		return nil, fmt.Errorf("KB_POD_NAME is not set")
+		return nil, fmt.Errorf("%s is not set", constant.KBEnvPodName)
 	}
 
 	mgr := DBManagerBase{
 		CurrentMemberName: currentMemberName,
-		ClusterCompName:   viper.GetString("KB_CLUSTER_COMP_NAME"),
-		Namespace:         viper.GetString("KB_NAMESPACE"),
+		ClusterCompName:   viper.GetString(constant.KBEnvClusterCompName),
+		Namespace:         viper.GetString(constant.KBEnvNamespace),
 		Logger:            logger,
 	}
 	return &mgr, nil

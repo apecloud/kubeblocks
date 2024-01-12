@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
+	"fmt"
 	"strconv"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -103,11 +104,11 @@ bootstrap:
 					Name: "mytest",
 					Env: []corev1.EnvVar{
 						{
-							Name:  "KB_CLUSTER_NAME",
+							Name:  constant.KBEnvClusterName,
 							Value: "my",
 						},
 						{
-							Name:  "KB_COMP_NAME",
+							Name:  constant.KBEnvCompName,
 							Value: "mysql",
 						},
 						{
@@ -152,7 +153,7 @@ bootstrap:
 							ValueFrom: &corev1.EnvVarSource{
 								SecretKeyRef: &corev1.SecretKeySelector{
 									LocalObjectReference: corev1.LocalObjectReference{
-										Name: constant.KBConnCredentialPlaceHolder,
+										Name: "my-conn-credential",
 									},
 									Key: "password",
 								},
@@ -234,7 +235,8 @@ bootstrap:
 						Namespace: "default",
 					},
 				},
-				nil, ctx, mockClient.Client(),
+				ctx, mockClient.Client(),
+				nil,
 			)
 
 			localObjs := []coreclient.Object{
@@ -255,8 +257,8 @@ bootstrap:
 				// SPILO_CONFIGURATION from valueFrom configmap key
 				// KB_LEADER from envFrom configmap
 				// MEMORY_SIZE, CPU from resourceFieldRef
-				"my":            "{{ getEnvByName ( index $.podSpec.containers 0 ) \"KB_CLUSTER_NAME\" }}",
-				"mysql":         "{{ getEnvByName ( index $.podSpec.containers 0 ) \"KB_COMP_NAME\" }}",
+				"my":            fmt.Sprintf("{{ getEnvByName ( index $.podSpec.containers 0 ) \"%s\" }}", constant.KBEnvClusterName),
+				"mysql":         fmt.Sprintf("{{ getEnvByName ( index $.podSpec.containers 0 ) \"%s\" }}", constant.KBEnvCompName),
 				"root":          "{{ getEnvByName ( index $.podSpec.containers 0 ) \"MYSQL_USER\" }}",
 				"4zrqfl2r":      "{{ getEnvByName ( index $.podSpec.containers 0 ) \"MYSQL_PASSWORD\" }}",
 				patroniTemplate: "{{ getEnvByName ( index $.podSpec.containers 0 ) \"SPILO_CONFIGURATION\" }}",

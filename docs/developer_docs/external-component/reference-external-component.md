@@ -26,7 +26,7 @@ As its definition indicates, referencing the external component can be divided i
 
   This external component can be Kubernetes-based or non-Kubernetes. When referencing this component, first create a ServiceDescriptor CR (custom resources) which defines both the service and resources for referencing.
 
-* Reference a KubeBlocks-based component
+* Referencing a KubeBlocks-based component
 
   This type of component is based on KubeBlocks clusters. When referencing this component, just fill in the referenced Cluster and no ServiceDescriptor is required.
 

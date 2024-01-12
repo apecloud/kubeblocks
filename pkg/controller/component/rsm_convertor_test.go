@@ -21,8 +21,43 @@ package component
 
 import (
 	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloadsalpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
 var _ = Describe("Test RSM Convertor", func() {
-	// TODO: add test cases
+	Context("rsm convertors", func() {
+		var (
+			synComp *SynthesizedComponent
+		)
+		command := []string{"foo", "bar"}
+		args := []string{"zoo", "boo"}
+
+		BeforeEach(func() {
+			synComp = &SynthesizedComponent{
+				LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{
+					RoleProbe: &appsv1alpha1.RoleProbe{
+						LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
+							CustomHandler: &appsv1alpha1.Action{
+								Exec: &appsv1alpha1.ExecAction{
+									Command: command,
+									Args:    args,
+								},
+							},
+						},
+					},
+				},
+			}
+		})
+		It("convert", func() {
+			convertor := &rsmRoleProbeConvertor{}
+			res, err := convertor.convert(synComp)
+			Expect(err).Should(Succeed())
+			probe := res.(*workloadsalpha1.RoleProbe)
+			Expect(probe.CustomHandler[0].Command).Should(BeEquivalentTo(command))
+			Expect(probe.CustomHandler[0].Args).Should(BeEquivalentTo(args))
+		})
+	})
 })

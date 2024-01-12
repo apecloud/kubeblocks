@@ -1,8 +1,0 @@
-{{- include "kubeblocks.buildAddonCR" (merge (dict
-  "kbVersion" ">=0.7.0"
-  "name" "nebula"
-  "version" "0.7.0"
-  "model" "graph"
-  "provider" "community"
-  "description" "NebulaGraph is an Apache 2.0 licensed distributed graph database."
-  "autoInstall" false) . ) -}}

@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 const (
@@ -166,17 +165,7 @@ var (
 				MountPath: "/scripts",
 			},
 		},
-		Env: []corev1.EnvVar{{
-			Name: "MYSQL_ROOT_PASSWORD",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: constant.KBConnCredentialPlaceHolder,
-					},
-					Key: "password",
-				},
-			},
-		}},
+		Env:     []corev1.EnvVar{{}},
 		Command: []string{"/scripts/setup.sh"},
 	}
 
@@ -265,40 +254,44 @@ var (
 				NeedSnapshot: true,
 			},
 		},
-		Services: []appsv1alpha1.Service{
+		Services: []appsv1alpha1.ComponentService{
 			{
-				Name:        "rw",
-				ServiceName: "rw",
-				Spec: corev1.ServiceSpec{
-					Ports: []corev1.ServicePort{
-						{
-							Protocol: corev1.ProtocolTCP,
-							Port:     3306,
-							TargetPort: intstr.IntOrString{
-								Type:   intstr.String,
-								StrVal: "mysql",
+				Service: appsv1alpha1.Service{
+					Name:        "rw",
+					ServiceName: "rw",
+					Spec: corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{
+							{
+								Protocol: corev1.ProtocolTCP,
+								Port:     3306,
+								TargetPort: intstr.IntOrString{
+									Type:   intstr.String,
+									StrVal: "mysql",
+								},
 							},
 						},
 					},
+					RoleSelector: "leader",
 				},
-				RoleSelector: "leader",
 			},
 			{
-				Name:        "ro",
-				ServiceName: "ro",
-				Spec: corev1.ServiceSpec{
-					Ports: []corev1.ServicePort{
-						{
-							Protocol: corev1.ProtocolTCP,
-							Port:     3306,
-							TargetPort: intstr.IntOrString{
-								Type:   intstr.String,
-								StrVal: "mysql",
+				Service: appsv1alpha1.Service{
+					Name:        "ro",
+					ServiceName: "ro",
+					Spec: corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{
+							{
+								Protocol: corev1.ProtocolTCP,
+								Port:     3306,
+								TargetPort: intstr.IntOrString{
+									Type:   intstr.String,
+									StrVal: "mysql",
+								},
 							},
 						},
 					},
+					RoleSelector: "follower",
 				},
-				RoleSelector: "follower",
 			},
 		},
 		SystemAccounts: []appsv1alpha1.SystemAccount{
@@ -323,18 +316,6 @@ var (
 				},
 			},
 		},
-		ConnectionCredentials: []appsv1alpha1.ConnectionCredential{
-			{
-				Name:        "root",
-				ServiceName: "rw",
-				AccountName: "root",
-			},
-			{
-				Name:        "admin",
-				ServiceName: "rw",
-				AccountName: "admin",
-			},
-		},
 		Roles: []appsv1alpha1.ReplicaRole{
 			{
 				Name:        "leader",
@@ -356,9 +337,9 @@ var (
 			},
 		},
 		LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{
-			PostStart: defaultLifecycleActionHandler,
-			PreStop:   defaultLifecycleActionHandler,
-			RoleProbe: &appsv1alpha1.RoleProbeSpec{
+			PostProvision: defaultLifecycleActionHandler,
+			PreTerminate:  defaultLifecycleActionHandler,
+			RoleProbe: &appsv1alpha1.RoleProbe{
 				LifecycleActionHandler: *defaultLifecycleActionHandler,
 				FailureThreshold:       3,
 				PeriodSeconds:          1,

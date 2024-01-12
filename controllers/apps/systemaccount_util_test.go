@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"fmt"
 	"math/rand"
 	"reflect"
 	"strings"
@@ -29,9 +30,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+)
+
+var (
+	secret4Referent            = "secret-4-referent"
+	secret4ReferentPlaceholder = fmt.Sprintf("$(%s)", secret4Referent)
 )
 
 func mockSystemAccountsSpec() *appsv1alpha1.SystemAccountSpec {
@@ -99,7 +104,7 @@ func mockCreateByRefSystemAccount(name appsv1alpha1.AccountName, scope appsv1alp
 			Scope: scope,
 			SecretRef: &appsv1alpha1.ProvisionSecretRef{
 				Namespace: testCtx.DefaultNamespace,
-				Name:      constant.KBConnCredentialPlaceHolder,
+				Name:      secret4ReferentPlaceholder,
 			},
 		},
 	}
@@ -170,7 +175,7 @@ func TestRenderJob(t *testing.T) {
 	}
 
 	accountsSetting := clusterDef.Spec.ComponentDefs[0].SystemAccounts
-	replaceEnvsValues(cluster.Name, accountsSetting)
+	replaceEnvsValues(cluster.Name, accountsSetting, map[string]string{secret4ReferentPlaceholder: secret4Referent})
 	cmdExecutorConfig := accountsSetting.CmdExecutorConfig
 
 	engine := newCustomizedEngine(cmdExecutorConfig, cluster, mysqlCompName)
@@ -243,7 +248,7 @@ func TestRenderJob(t *testing.T) {
 			assert.Contains(t, tolerationKeys, testDataPlaneTolerationKey)
 			assert.Contains(t, tolerationKeys, toleration[0].Key)
 		case appsv1alpha1.ReferToExisting:
-			assert.False(t, strings.Contains(acc.ProvisionPolicy.SecretRef.Name, constant.KBConnCredentialPlaceHolder))
+			assert.False(t, strings.Contains(acc.ProvisionPolicy.SecretRef.Name, secret4ReferentPlaceholder))
 		}
 	}
 }
@@ -328,7 +333,7 @@ func TestRenderCreationStmt(t *testing.T) {
 	assert.NotNil(t, compDef.SystemAccounts)
 
 	accountsSetting := compDef.SystemAccounts
-	replaceEnvsValues(clusterName, accountsSetting)
+	replaceEnvsValues(clusterName, accountsSetting, nil)
 
 	compKey := componentUniqueKey{
 		namespace:     testCtx.DefaultNamespace,

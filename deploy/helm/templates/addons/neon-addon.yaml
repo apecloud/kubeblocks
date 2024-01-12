@@ -1,8 +1,0 @@
-{{- include "kubeblocks.buildAddonCR" (merge (dict
-  "kbVersion" ">=0.7.0"
-  "name" "neon"
-  "version" "0.7.0"
-  "model" "RDBMS"
-  "provider" "community"
-  "description" "Neon is a fully managed serverless PostgreSQL with a generous free tier. Neon separates storage and compute and offers modern developer features such as serverless, branching, bottomless storage, and more. Before deploying neon, you must execute `kbcli addon enable cert-manager` command to deploy cert-manager."
-  "autoInstall" false) . ) -}}

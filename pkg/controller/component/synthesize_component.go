@@ -20,10 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -31,16 +34,20 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
-	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+)
+
+var (
+	defaultShmQuantity = resource.MustParse("64Mi")
 )
 
 // BuildSynthesizedComponent builds a new SynthesizedComponent object, which is a mixture of component-related configs from ComponentDefinition and Component.
 func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
+	cluster *appsv1alpha1.Cluster,
 	compDef *appsv1alpha1.ComponentDefinition,
 	comp *appsv1alpha1.Component) (*SynthesizedComponent, error) {
-	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil, nil)
+	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, cluster, nil)
 }
 
 // BuildSynthesizedComponent4Generated builds SynthesizedComponent for generated Component which w/o ComponentDefinition.
@@ -136,28 +143,32 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	}
 	compDefObj := compDef.DeepCopy()
 	synthesizeComp := &SynthesizedComponent{
-		Namespace:             comp.Namespace,
-		ClusterName:           clusterName,
-		ClusterUID:            clusterUID,
-		Name:                  compName,
-		FullCompName:          comp.Name,
-		CompDefName:           compDef.Name,
-		PodSpec:               &compDef.Spec.Runtime,
-		LogConfigs:            compDefObj.Spec.LogConfigs,
-		ConfigTemplates:       compDefObj.Spec.Configs,
-		ScriptTemplates:       compDefObj.Spec.Scripts,
-		Labels:                compDefObj.Spec.Labels,
-		Roles:                 compDefObj.Spec.Roles,
-		ConnectionCredentials: compDefObj.Spec.ConnectionCredentials,
-		UpdateStrategy:        compDefObj.Spec.UpdateStrategy,
-		PolicyRules:           compDefObj.Spec.PolicyRules,
-		LifecycleActions:      compDefObj.Spec.LifecycleActions,
-		SystemAccounts:        compDefObj.Spec.SystemAccounts,
-		RoleArbitrator:        compDefObj.Spec.RoleArbitrator,
-		Replicas:              comp.Spec.Replicas,
-		EnabledLogs:           comp.Spec.EnabledLogs,
-		TLSConfig:             comp.Spec.TLSConfig,
-		ServiceAccountName:    comp.Spec.ServiceAccountName,
+		Namespace:          comp.Namespace,
+		ClusterName:        clusterName,
+		ClusterUID:         clusterUID,
+		Comp2CompDefs:      buildComp2CompDefs(cluster, clusterCompSpec),
+		Name:               compName,
+		FullCompName:       comp.Name,
+		CompDefName:        compDef.Name,
+		ClusterGeneration:  clusterGeneration(cluster, comp),
+		PodSpec:            &compDef.Spec.Runtime,
+		LogConfigs:         compDefObj.Spec.LogConfigs,
+		ConfigTemplates:    compDefObj.Spec.Configs,
+		ScriptTemplates:    compDefObj.Spec.Scripts,
+		Labels:             compDefObj.Spec.Labels,
+		Roles:              compDefObj.Spec.Roles,
+		UpdateStrategy:     compDefObj.Spec.UpdateStrategy,
+		PolicyRules:        compDefObj.Spec.PolicyRules,
+		LifecycleActions:   compDefObj.Spec.LifecycleActions,
+		SystemAccounts:     compDefObj.Spec.SystemAccounts,
+		RoleArbitrator:     compDefObj.Spec.RoleArbitrator,
+		Replicas:           comp.Spec.Replicas,
+		EnabledLogs:        comp.Spec.EnabledLogs,
+		TLSConfig:          comp.Spec.TLSConfig,
+		ServiceAccountName: comp.Spec.ServiceAccountName,
+		Nodes:              comp.Spec.Nodes,
+		Instances:          comp.Spec.Instances,
+		RsmTransformPolicy: comp.Spec.RsmTransformPolicy,
 	}
 
 	// build backward compatible fields, including workload, services, componentRefEnvs, clusterDefName, clusterCompDefName, and clusterCompVer, etc.
@@ -176,14 +187,16 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	}
 
 	// build and update resources
-	// TODO(xingran): ComponentResourceConstraint API needs to be restructured.
-	if err := buildAndUpdateResources(synthesizeComp, comp); err != nil {
+	// TODO(xingran): remove the dependency of SynthesizedComponent.ClusterDefName and SynthesizedComponent.ClusterCompDefName in the future
+	if err := buildAndUpdateResources(reqCtx, cli, synthesizeComp, comp); err != nil {
 		reqCtx.Log.Error(err, "build and update resources failed.")
 		return nil, err
 	}
 
 	// build volumeClaimTemplates
 	buildVolumeClaimTemplates(synthesizeComp, comp)
+
+	limitSharedMemoryVolumeSize(synthesizeComp, comp)
 
 	// build componentService
 	buildComponentServices(synthesizeComp, compDefObj)
@@ -196,7 +209,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 
 	// build lorryContainer
 	// TODO(xingran): buildLorryContainers relies on synthesizeComp.CharacterType and synthesizeComp.WorkloadType, which will be deprecated in the future.
-	if err := buildLorryContainers(reqCtx, synthesizeComp); err != nil {
+	if err := buildLorryContainers(reqCtx, synthesizeComp, clusterCompSpec); err != nil {
 		reqCtx.Log.Error(err, "build lorry containers failed.")
 		return nil, err
 	}
@@ -215,11 +228,38 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	// replace podSpec containers env default credential placeholder
 	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForConnCredential(synthesizeComp.ClusterName))
 
-	// replace podSpec containers env component connection credential placeholder
-	// TODO(xingran): This is a temporary solution used to reference component connection credentials defined in ComponentDefinition. it will be refactored in the future.
-	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForCompConnCredential(synthesizeComp.ClusterName, synthesizeComp.Name))
-
 	return synthesizeComp, nil
+}
+
+func clusterGeneration(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) string {
+	if comp != nil && comp.Annotations != nil {
+		if generation, ok := comp.Annotations[constant.KubeBlocksGenerationKey]; ok {
+			return generation
+		}
+	}
+	// back-off to use cluster.Generation
+	return strconv.FormatInt(cluster.Generation, 10)
+}
+
+func buildComp2CompDefs(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) map[string]string {
+	if cluster == nil {
+		return nil
+	}
+	if len(cluster.Spec.ComponentSpecs) == 0 {
+		if clusterCompSpec == nil || len(clusterCompSpec.ComponentDef) == 0 {
+			return nil
+		}
+		return map[string]string{
+			clusterCompSpec.Name: clusterCompSpec.ComponentDef,
+		}
+	}
+	mapping := make(map[string]string)
+	for _, comp := range cluster.Spec.ComponentSpecs {
+		if len(comp.ComponentDef) > 0 {
+			mapping[comp.Name] = comp.ComponentDef
+		}
+	}
+	return mapping
 }
 
 // buildAffinitiesAndTolerations builds affinities and tolerations for component.
@@ -235,10 +275,36 @@ func buildAffinitiesAndTolerations(comp *appsv1alpha1.Component, synthesizeComp 
 	return nil
 }
 
-// buildVolumeClaimTemplates builds volumeClaimTemplates for component.
 func buildVolumeClaimTemplates(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) {
 	if comp.Spec.VolumeClaimTemplates != nil {
 		synthesizeComp.VolumeClaimTemplates = toVolumeClaimTemplates(&comp.Spec)
+	}
+}
+
+// limitSharedMemoryVolumeSize limits the shared memory volume size to memory requests/limits.
+func limitSharedMemoryVolumeSize(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) {
+	shm := defaultShmQuantity
+	if comp.Spec.Resources.Limits != nil {
+		if comp.Spec.Resources.Limits.Memory().Cmp(shm) > 0 {
+			shm = *comp.Spec.Resources.Limits.Memory()
+		}
+	}
+	if comp.Spec.Resources.Requests != nil {
+		if comp.Spec.Resources.Requests.Memory().Cmp(shm) > 0 {
+			shm = *comp.Spec.Resources.Requests.Memory()
+		}
+	}
+	for i, vol := range synthesizeComp.PodSpec.Volumes {
+		if vol.EmptyDir == nil {
+			continue
+		}
+		if vol.EmptyDir.Medium != corev1.StorageMediumMemory {
+			continue
+		}
+		if vol.EmptyDir.SizeLimit != nil && !vol.EmptyDir.SizeLimit.IsZero() {
+			continue
+		}
+		synthesizeComp.PodSpec.Volumes[i].EmptyDir.SizeLimit = &shm
 	}
 }
 
@@ -256,28 +322,32 @@ func toVolumeClaimTemplates(compSpec *appsv1alpha1.ComponentSpec) []corev1.Persi
 }
 
 // buildResources builds and updates podSpec resources for component.
-func buildAndUpdateResources(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
+// TODO(xingran): remove the dependency of SynthesizedComponent.ClusterDefName and SynthesizedComponent.ClusterCompDefName in the future
+func buildAndUpdateResources(reqCtx intctrlutil.RequestCtx, cli client.Reader, synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
 	if comp.Spec.Resources.Requests != nil || comp.Spec.Resources.Limits != nil {
 		synthesizeComp.PodSpec.Containers[0].Resources = comp.Spec.Resources
 	}
-	// TODO(xingran): update component resource with ComponentResourceConstraint and ComponentClassDefinition
-	// However, the current API related to ComponentClassDefinition and ComponentResourceConstraint heavily relies on cd (ClusterDefinition) and cv (ClusterVersion), requiring a restructuring.
-	// if err = updateResources(cluster, component, *clusterCompSpec, clsMgr); err != nil {
-	//	reqCtx.Log.Error(err, "update class resources failed")
-	//	return nil, err
-	// }
+	clsMgr, err := getClassManager(reqCtx.Ctx, cli, synthesizeComp)
+	if err != nil {
+		return err
+	}
+	if err := updateResources(synthesizeComp, comp, clsMgr); err != nil {
+		reqCtx.Log.Error(err, "update class resources failed")
+		return err
+	}
 	return nil
 }
 
 // buildServiceReferences builds serviceReferences for component.
-func buildServiceReferences(reqCtx intctrlutil.RequestCtx, cli roclient.ReadonlyClient,
+func buildServiceReferences(reqCtx intctrlutil.RequestCtx, cli client.Reader,
 	synthesizeComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) error {
 	serviceReferences, err := GenServiceReferences(reqCtx, cli, synthesizeComp.Namespace, synthesizeComp.ClusterName, compDef, comp)
 	if err != nil {
 		return err
 	}
 	synthesizeComp.ServiceReferences = serviceReferences
-	return nil
+
+	return resolveServiceReferences(reqCtx.Ctx, cli, synthesizeComp)
 }
 
 // buildComponentRef builds componentServices for component.
@@ -298,7 +368,7 @@ func buildServiceAccountName(synthesizeComp *SynthesizedComponent) {
 	if synthesizeComp.LifecycleActions == nil || synthesizeComp.LifecycleActions.RoleProbe == nil {
 		return
 	}
-	synthesizeComp.ServiceAccountName = constant.GenerateDefaultCompServiceAccountPattern(synthesizeComp.FullCompName)
+	synthesizeComp.ServiceAccountName = constant.GenerateDefaultServiceAccountName(synthesizeComp.ClusterName)
 	// set component.PodSpec.ServiceAccountName
 	synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
 }
@@ -327,21 +397,13 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 		synthesizeComp.WorkloadType = clusterCompDef.WorkloadType
 		synthesizeComp.CharacterType = clusterCompDef.CharacterType
 		synthesizeComp.HorizontalScalePolicy = clusterCompDef.HorizontalScalePolicy
-		synthesizeComp.StatelessSpec = clusterCompDef.StatelessSpec
-		synthesizeComp.StatefulSpec = clusterCompDef.StatefulSpec
-		synthesizeComp.ConsensusSpec = clusterCompDef.ConsensusSpec
-		synthesizeComp.ReplicationSpec = clusterCompDef.ReplicationSpec
-		synthesizeComp.RSMSpec = clusterCompDef.RSMSpec
-		synthesizeComp.StatefulSetWorkload = clusterCompDef.GetStatefulSetWorkload()
 		synthesizeComp.Probes = clusterCompDef.Probes
 		synthesizeComp.VolumeTypes = clusterCompDef.VolumeTypes
 		synthesizeComp.VolumeProtection = clusterCompDef.VolumeProtectionSpec
 		synthesizeComp.MinAvailable = clusterCompSpec.GetMinAvailable(clusterCompDef.GetMinAvailable())
-		// TODO(xingran): this is to ensure compatibility with instances prior to version 0.8.0.
-		// The old implementation relies on ClusterCompDef for environmental variables and sets them in labels on the rsm and pod.
-		// All places relying on the `app.kubernetes.io/component` label need to be refactored.
-		if synthesizeComp.CompDefName == "" {
-			synthesizeComp.CompDefName = clusterCompDef.Name
+		// TLS is a backward compatible field, which is used in configuration rendering before version 0.8.0.
+		if synthesizeComp.TLSConfig != nil {
+			synthesizeComp.TLS = true
 		}
 	}
 
@@ -475,16 +537,10 @@ func doContainerAttrOverride(compContainer *corev1.Container, container corev1.C
 }
 
 // GetEnvReplacementMapForConnCredential gets the replacement map for connect credential
+// TODO: deprecated, will be removed later.
 func GetEnvReplacementMapForConnCredential(clusterName string) map[string]string {
 	return map[string]string{
 		constant.KBConnCredentialPlaceHolder: constant.GenerateDefaultConnCredential(clusterName),
-	}
-}
-
-// GetEnvReplacementMapForCompConnCredential gets the replacement map for component connect credential
-func GetEnvReplacementMapForCompConnCredential(clusterName, componentName string) map[string]string {
-	return map[string]string{
-		constant.KBComponentConnCredentialPlaceHolder: constant.GenerateClusterComponentName(clusterName, componentName),
 	}
 }
 
@@ -501,16 +557,16 @@ func replaceContainerPlaceholderTokens(component *SynthesizedComponent, namedVal
 func GetReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName string) map[string]string {
 	cc := constant.GenerateClusterComponentName(clusterName, componentName)
 	replacementMap := map[string]string{
-		constant.KBClusterNamePlaceHolder:     clusterName,
-		constant.KBCompNamePlaceHolder:        componentName,
-		constant.KBClusterCompNamePlaceHolder: cc,
-		constant.KBComponentEnvCMPlaceHolder:  constant.GenerateClusterComponentEnvPattern(clusterName, componentName),
+		constant.EnvPlaceHolder(constant.KBEnvClusterName):     clusterName,
+		constant.EnvPlaceHolder(constant.KBEnvCompName):        componentName,
+		constant.EnvPlaceHolder(constant.KBEnvClusterCompName): cc,
+		constant.KBComponentEnvCMPlaceHolder:                   constant.GenerateClusterComponentEnvPattern(clusterName, componentName),
 	}
+	clusterUIDPostfix := clusterUID
 	if len(clusterUID) > 8 {
-		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = clusterUID[len(clusterUID)-8:]
-	} else {
-		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = clusterUID
+		clusterUIDPostfix = clusterUID[len(clusterUID)-8:]
 	}
+	replacementMap[constant.EnvPlaceHolder(constant.KBEnvClusterUIDPostfix8Deprecated)] = clusterUIDPostfix
 	return replacementMap
 }
 
@@ -567,42 +623,76 @@ func overrideSwitchoverSpecAttr(switchoverSpec *appsv1alpha1.SwitchoverSpec, cvS
 	}
 }
 
-// TODO(component)
-// func updateResources(cluster *appsv1alpha1.Cluster, component *SynthesizedComponent, clusterCompSpec appsv1alpha1.ClusterComponentSpec, clsMgr *class.Manager) error {
-//	if ignoreResourceConstraint(cluster) {
-//		return nil
-//	}
-//
-//	if clsMgr == nil {
-//		return nil
-//	}
-//
-//	expectResources, err := clsMgr.GetResources(cluster.Spec.ClusterDefRef, &clusterCompSpec)
-//	if err != nil || expectResources == nil {
-//		return err
-//	}
-//
-//	actualResources := component.PodSpec.Containers[0].Resources
-//	if actualResources.Requests == nil {
-//		actualResources.Requests = corev1.ResourceList{}
-//	}
-//	if actualResources.Limits == nil {
-//		actualResources.Limits = corev1.ResourceList{}
-//	}
-//	for k, v := range expectResources {
-//		actualResources.Requests[k] = v
-//		actualResources.Limits[k] = v
-//	}
-//	component.PodSpec.Containers[0].Resources = actualResources
-//	return nil
-// }
-
-func GetConfigSpecByName(component *SynthesizedComponent, configSpec string) *appsv1alpha1.ComponentConfigSpec {
-	for i := range component.ConfigTemplates {
-		template := &component.ConfigTemplates[i]
+func GetConfigSpecByName(synthesizedComp *SynthesizedComponent, configSpec string) *appsv1alpha1.ComponentConfigSpec {
+	for i := range synthesizedComp.ConfigTemplates {
+		template := &synthesizedComp.ConfigTemplates[i]
 		if template.Name == configSpec {
 			return template
 		}
 	}
+	return nil
+}
+
+// getClassManager gets the class manager for build resource constraint.
+// TODO(xingran): remove the dependency of SynthesizedComponent.ClusterDefName and SynthesizedComponent.ClusterCompDefName in the future
+func getClassManager(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent) (*Manager, error) {
+	var (
+		classDefinitionList appsv1alpha1.ComponentClassDefinitionList
+		ml                  []client.ListOption
+	)
+	if synthesizedComp.ClusterDefName != "" {
+		ml = []client.ListOption{
+			client.MatchingLabels{constant.ClusterDefLabelKey: synthesizedComp.ClusterDefName},
+		}
+	} else {
+		ml = []client.ListOption{
+			client.MatchingLabels{constant.ComponentDefinitionLabelKey: synthesizedComp.CompDefName},
+		}
+	}
+
+	if err := cli.List(ctx, &classDefinitionList, ml...); err != nil {
+		return nil, err
+	}
+
+	var constraintList appsv1alpha1.ComponentResourceConstraintList
+	if err := cli.List(ctx, &constraintList); err != nil {
+		return nil, err
+	}
+	return NewManager(classDefinitionList, constraintList)
+}
+
+// updateResources updates the resources of pod spec with the expected resources from class manager.
+// TODO(xingran): remove the dependency of SynthesizedComponent.ClusterDefName and SynthesizedComponent.ClusterCompDefName in the future
+func updateResources(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.Component, clsMgr *Manager) error {
+	var (
+		expectResources corev1.ResourceList
+		err             error
+	)
+
+	if ignoreResourceConstraint(comp) {
+		return nil
+	}
+
+	if clsMgr == nil {
+		return nil
+	}
+
+	expectResources, err = clsMgr.GetResources(synthesizedComp, comp)
+	if err != nil || expectResources == nil {
+		return err
+	}
+
+	actualResources := synthesizedComp.PodSpec.Containers[0].Resources
+	if actualResources.Requests == nil {
+		actualResources.Requests = corev1.ResourceList{}
+	}
+	if actualResources.Limits == nil {
+		actualResources.Limits = corev1.ResourceList{}
+	}
+	for k, v := range expectResources {
+		actualResources.Requests[k] = v
+		actualResources.Limits[k] = v
+	}
+	synthesizedComp.PodSpec.Containers[0].Resources = actualResources
 	return nil
 }

@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"golang.org/x/exp/slices"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -88,6 +89,7 @@ func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&workloadsv1alpha1.ReplicatedStateMachine{}, handler.EnqueueRequestsFromMapFunc(r.parseFirstOpsRequestForRSM)).
 		Watches(&dpv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.parseBackupOpsRequest)).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.parseVolumeExpansionOpsRequest)).
+		Owns(&batchv1.Job{}).
 		Complete(r)
 }
 
@@ -113,7 +115,7 @@ func (r *OpsRequestReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, ops
 	if opsRes.OpsRequest.Status.Phase == appsv1alpha1.OpsRunningPhase {
 		return nil, nil
 	}
-	return intctrlutil.HandleCRDeletion(reqCtx, r, opsRes.OpsRequest, opsRequestFinalizerName, func() (*ctrl.Result, error) {
+	return intctrlutil.HandleCRDeletion(reqCtx, r, opsRes.OpsRequest, constant.OpsRequestFinalizerName, func() (*ctrl.Result, error) {
 		return nil, operations.DequeueOpsRequestInClusterAnnotation(reqCtx.Ctx, r.Client, opsRes)
 	})
 }
@@ -198,6 +200,9 @@ func (r *OpsRequestReconciler) handleCancelSignal(reqCtx intctrlutil.RequestCtx,
 
 // handleSucceedOpsRequest the opsRequest will be deleted after one hour when status.phase is Succeed
 func (r *OpsRequestReconciler) handleSucceedOpsRequest(reqCtx intctrlutil.RequestCtx, opsRequest *appsv1alpha1.OpsRequest) (*ctrl.Result, error) {
+	if err := r.deleteExternalJobs(reqCtx.Ctx, opsRequest); err != nil {
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+	}
 	if opsRequest.Status.CompletionTimestamp.IsZero() || opsRequest.Spec.TTLSecondsAfterSucceed == 0 {
 		return intctrlutil.ResultToP(intctrlutil.Reconciled())
 	}
@@ -367,6 +372,19 @@ func (r *OpsRequestReconciler) parseVolumeExpansionOpsRequest(ctx context.Contex
 		})
 	}
 	return requests
+}
+
+func (r *OpsRequestReconciler) deleteExternalJobs(ctx context.Context, ops *appsv1alpha1.OpsRequest) error {
+	jobList := &batchv1.JobList{}
+	if err := r.Client.List(ctx, jobList, client.InNamespace(ops.Namespace), client.MatchingLabels{constant.OpsRequestNameLabelKey: ops.Name}); err != nil {
+		return err
+	}
+	for i := range jobList.Items {
+		if err := intctrlutil.BackgroundDeleteObject(r.Client, ctx, &jobList.Items[i]); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *OpsRequestReconciler) parseBackupOpsRequest(ctx context.Context, object client.Object) []reconcile.Request {

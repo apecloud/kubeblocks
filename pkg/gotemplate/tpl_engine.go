@@ -32,7 +32,6 @@ import (
 
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
-	types2 "github.com/apecloud/kubeblocks/pkg/controller/client"
 )
 
 const (
@@ -70,7 +69,7 @@ type TplEngine struct {
 	importModules *set.LinkedHashSetString
 	importFuncs   map[string]functional
 
-	cli types2.ReadonlyClient
+	cli client.Reader
 	ctx context.Context
 }
 
@@ -214,7 +213,7 @@ func (t *TplEngine) importSelfModuleFuncs(funcs map[string]functional, fn func(t
 }
 
 // NewTplEngine creates go template helper
-func NewTplEngine(values *TplValues, funcs *BuiltInObjectsFunc, tplName string, cli types2.ReadonlyClient, ctx context.Context, options ...TplEngineOptions) *TplEngine {
+func NewTplEngine(values *TplValues, funcs *BuiltInObjectsFunc, tplName string, cli client.Reader, ctx context.Context, options ...TplEngineOptions) *TplEngine {
 	coreBuiltinFuncs := sprig.TxtFuncMap()
 
 	// custom funcs

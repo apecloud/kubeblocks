@@ -231,19 +231,6 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
 		})
 
-		It("duplicate service names - default & named", func() {
-			By("create a ComponentDefinition obj")
-			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
-				SetRuntime(nil).
-				AddService("default", "", 3306, "leader").
-				AddService("readonly", defaultServiceName, 3306, "follower").
-				AddRole("leader", true, true).
-				AddRole("follower", true, false).
-				Create(&testCtx).GetObject()
-
-			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
-		})
-
 		It("w/o port", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
@@ -325,21 +312,6 @@ var _ = Describe("ComponentDefinition Controller", func() {
 				AddSystemAccount(string(appsv1alpha1.AdminAccount), true, "create user").
 				AddSystemAccount(string(appsv1alpha1.ProbeAccount), false, "create user").
 				AddSystemAccount(string(appsv1alpha1.MonitorAccount), false, "create user").
-				SetLifecycleAction("AccountProvision", defaultActionHandler).
-				Create(&testCtx).GetObject()
-
-			checkObjectStatus(componentDefObj, appsv1alpha1.AvailablePhase)
-		})
-	})
-
-	Context("connection credential", func() {
-		It("ok", func() {
-			By("create a ComponentDefinition obj")
-			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
-				SetRuntime(nil).
-				AddService("default", "", 3306, "").
-				AddSystemAccount(string(appsv1alpha1.AdminAccount), false, "create user").
-				AddConnectionCredential("default", "default", "", string(appsv1alpha1.AdminAccount)).
 				SetLifecycleAction("AccountProvision", defaultActionHandler).
 				Create(&testCtx).GetObject()
 

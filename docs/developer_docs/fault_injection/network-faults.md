@@ -26,7 +26,7 @@ Common flags for all types of network faults.
 
 | Option                   | Description               | Default value | Required |
 | :----------------------- | :------------------------ | :------------ | :------- |
-| Pod name  | Add a pod name to make this pod in the default namespace unavailable. For example, <br /> `kbcli fault pod kill mysql-cluster-mysql-0` | Default | No |
+| `pod name`  | Specify the name of the Pod to inject the fault. For example, add the Pod name `mysql-cluster-mysql-0` to the command, and the complete command would be `kubectl fault pod kill mysql-cluster-mysql-0`.  | Default | No |
 | `--direction` | It indicates the direction of target packets. Available values include `from` (the packets from target), `to` (the packets to target), and `both` ( the packets from or to target). | `to` | No |
 | `-e`,`--external-target` | It indicates the network targets outside Kubernetes, which can be IPv4 addresses or domain names. This parameter only works with `direction: to`. | None | No |
 | `--target-mode` | It specifies the mode of the target. If a target is specified, the `target-mode` mode should be specified together. `one` (selecting a random Pod), `all` (selecting all eligible Pods), `fixed` (selecting a specified number of eligible Pods), `fixed-percent` (selecting a specified percentage of Pods from the eligible Pods), and `random-max-percent` (selecting the maximum percentage of Pods from the eligible Pods) are selectable. | None | No |
@@ -269,7 +269,8 @@ This section introduces the YAML configuration file examples. You can view the Y
 
 1. Write the experiment configuration to the `network-corrupt.yaml` file.
 
-    In the following example, Chaos Mesh injects duplicate chaos into the specified Pod and this experiment lasts for 1 minute and the duplicate rate is 50%.
+    In the following example, Chaos Mesh injects corrupt chaos into the specified Pod and this experiment lasts for 1 minute and the packet corrupt rate is 50%.
+
 
     ```yaml
     apiVersion: chaos-mesh.org/v1alpha1
@@ -342,11 +343,9 @@ This table describes the fields in the YAML file.
 
 | Parameter | Type  | Description | Default value | Required | Example |
 | :---      | :---  | :---        | :---          | :---     | :---    |
-| action | string | It specifies the fault type to inject. The supported types include `pod-failure`, `pod-kill`, and `container-kill`. | None | Yes | `pod-kill` |
+| action | string | It specifies the fault type to inject. The supported types include `partition`, `loss`, `delay`, `duplicate`, `corrupt` and `bandwidth`. | None | Yes | `bandwidth` |
 | duration | string | It specifies the duration of the experiment. | None | Yes | 10s |
 | mode | string | It specifies the mode of the experiment. The mode options include `one` (selecting a random Pod), `all` (selecting all eligible Pods), `fixed` (selecting a specified number of eligible Pods), `fixed-percent` (selecting a specified percentage of Pods from the eligible Pods), and `random-max-percent` (selecting the maximum percentage of Pods from the eligible Pods). | None | Yes | `fixed-percent` |
 | value | string | It provides parameters for the `mode` configuration, depending on `mode`. For example, when `mode` is set to `fixed-percent`, `value` specifies the percentage of Pods. | None | No | 50 |
-| selector | struct | It specifies the target Pod by defining node and labels.| None | Yes. <br /> If not specified, the system kills all pods under the default namespece. |  |
-| containerNames | string | When you configure `action` to `container-kill`, this configuration is mandatory to specify the target container name for injecting faults. | None | No | mysql |
-| gracePeriod | int64 | When you configure `action` to `pod-kill`, this configuration is mandatory to specify the duration before deleting Pod. | 0 | No | 0 |
+| selector | struct | It specifies the target Pod by defining node and labels.| None | Yes. <br /> If not specified, the system kills all pods under the default namespece. |
 | duration | string | It specifies the duration of the experiment. | None | Yes | 30s |

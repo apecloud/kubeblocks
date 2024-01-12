@@ -23,6 +23,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/pkg/common"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
@@ -47,6 +50,17 @@ func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext
 	if model.IsObjectDeleting(compOrig) {
 		return nil
 	}
+	if common.IsCompactMode(compOrig.Annotations) {
+		transCtx.V(1).Info("Component is in compact mode, no need to create configuration related objects",
+			"component", client.ObjectKeyFromObject(transCtx.ComponentOrig))
+		return nil
+	}
+
+	// wait for the completion of relevant conditions
+	components, err := t.needWaiting(transCtx)
+	if err != nil {
+		return err
+	}
 
 	// get dependOnObjs which will be used in configuration render
 	var dependOnObjs []client.Object
@@ -61,12 +75,11 @@ func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext
 			continue
 		}
 	}
+	if components != nil {
+		dependOnObjs = append(dependOnObjs, components...)
+	}
 
 	// configuration render
-	// In versions prior to KubeBlocks 0.8.0, users were able to access the ClusterVersion object in configuration template rendering to retrieve the corresponding values.
-	// However, after KubeBlocks 0.8.0 version, the ClusterVersion will be deprecated. This means that the previous functionality will be affected, and this change was expected.
-	// In this case, the ClusterVersion will be set to nil, and there will be a subsequent refactoring of the configuration rendering module to remove the ClusterVersion entirely.
-	// TODO(xingran): remove clusterVersion in configuration rendering
 	if err := plan.RenderConfigNScriptFiles(
 		&intctrlutil.ResourceCtx{
 			Context:       transCtx.Context,
@@ -75,7 +88,6 @@ func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext
 			ClusterName:   synthesizeComp.ClusterName,
 			ComponentName: synthesizeComp.Name,
 		},
-		nil,
 		cluster,
 		synthesizeComp,
 		synthesizeComp.PodSpec,
@@ -83,4 +95,15 @@ func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext
 		return err
 	}
 	return nil
+}
+
+// needWaiting checks if it is necessary to wait for the completion of relevant conditions.
+func (t *componentConfigurationTransformer) needWaiting(ctx *componentTransformContext) ([]client.Object, error) {
+	if !ctx.CompDef.Spec.Runtime.HostNetwork {
+		// if the component not uses hostNetwork, ignore it.
+		return nil, nil
+	}
+	// HACK for hostNetwork
+	// TODO: define the api to inject dynamic info of the cluster components
+	return component.CheckAndGetClusterComponents(ctx.Context, t.Client, ctx.Cluster)
 }

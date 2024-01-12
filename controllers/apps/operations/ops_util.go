@@ -22,7 +22,6 @@ package operations
 import (
 	"context"
 	"fmt"
-	"math"
 	"reflect"
 	"time"
 
@@ -105,8 +104,8 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 	if len(componentNameMap) == 0 {
 		checkAllClusterComponent = true
 	}
-	patch := client.MergeFrom(opsRequest.DeepCopy())
-	oldOpsRequestStatus := opsRequest.Status.DeepCopy()
+	oldOpsRequest := opsRequest.DeepCopy()
+	patch := client.MergeFrom(oldOpsRequest)
 	if opsRequest.Status.Components == nil {
 		opsRequest.Status.Components = map[string]appsv1alpha1.OpsRequestComponentStatus{}
 	}
@@ -154,7 +153,7 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 		opsRequest.Status.Components[k] = compStatus
 	}
 	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedProgressCount, expectProgressCount)
-	if !reflect.DeepEqual(opsRequest.Status, *oldOpsRequestStatus) {
+	if !reflect.DeepEqual(opsRequest.Status, oldOpsRequest.Status) {
 		if err = cli.Status().Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
 			return opsRequestPhase, 0, err
 		}
@@ -275,8 +274,8 @@ func patchValidateErrorCondition(ctx context.Context, cli client.Client, opsRes 
 	return PatchOpsStatus(ctx, cli, opsRes, appsv1alpha1.OpsFailedPhase, condition)
 }
 
-// patchFastFailErrorCondition patches a new failed condition to the OpsRequest.status.conditions.
-func patchFastFailErrorCondition(ctx context.Context, cli client.Client, opsRes *OpsResource, err error) error {
+// patchFatalFailErrorCondition patches a new failed condition to the OpsRequest.status.conditions.
+func patchFatalFailErrorCondition(ctx context.Context, cli client.Client, opsRes *OpsResource, err error) error {
 	condition := appsv1alpha1.NewFailedCondition(opsRes.OpsRequest, err)
 	return PatchOpsStatus(ctx, cli, opsRes, appsv1alpha1.OpsFailedPhase, condition)
 }
@@ -406,6 +405,13 @@ func isOpsRequestFailedPhase(opsRequestPhase appsv1alpha1.OpsPhase) bool {
 	return opsRequestPhase == appsv1alpha1.OpsFailedPhase
 }
 
+// patchReconfigureOpsStatus when Reconfigure is running, we should update status to OpsRequest.Status.ConfigurationStatus.
+//
+// NOTES:
+// opsStatus describes status of OpsRequest.
+// reconfiguringStatus describes status of reconfiguring operation, which contains multiple configuration templates.
+// cmStatus describes status of configmap, it is uniquely associated with a configuration template, which contains multiple keys, each key is name of a configuration file.
+// execStatus describes the result of the execution of the state machine, which is designed to solve how to conduct the reconfiguring operation, such as whether to restart, how to send a signal to the process.
 func updateReconfigureStatusByCM(reconfiguringStatus *appsv1alpha1.ReconfiguringStatus, tplName string,
 	handleReconfigureStatus handleReconfigureOpsStatus) error {
 	for i, cmStatus := range reconfiguringStatus.ConfigurationStatus {
@@ -423,43 +429,6 @@ func updateReconfigureStatusByCM(reconfiguringStatus *appsv1alpha1.Reconfiguring
 	})
 	cmStatus := &reconfiguringStatus.ConfigurationStatus[cmCount]
 	return handleReconfigureStatus(cmStatus)
-}
-
-// patchReconfigureOpsStatus when Reconfigure is running, we should update status to OpsRequest.Status.ConfigurationStatus.
-//
-// NOTES:
-// opsStatus describes status of OpsRequest.
-// reconfiguringStatus describes status of reconfiguring operation, which contains multiple configuration templates.
-// cmStatus describes status of configmap, it is uniquely associated with a configuration template, which contains multiple keys, each key is name of a configuration file.
-// execStatus describes the result of the execution of the state machine, which is designed to solve how to conduct the reconfiguring operation, such as whether to restart, how to send a signal to the process.
-func patchReconfigureOpsStatus(
-	opsRes *OpsResource,
-	tplName string,
-	handleReconfigureStatus handleReconfigureOpsStatus) error {
-	var opsRequest = opsRes.OpsRequest
-	if opsRequest.Status.ReconfiguringStatus == nil {
-		opsRequest.Status.ReconfiguringStatus = &appsv1alpha1.ReconfiguringStatus{
-			ConfigurationStatus: make([]appsv1alpha1.ConfigurationItemStatus, 0),
-		}
-	}
-
-	reconfiguringStatus := opsRequest.Status.ReconfiguringStatus
-	return updateReconfigureStatusByCM(reconfiguringStatus, tplName, handleReconfigureStatus)
-}
-
-// getSlowestReconfiguringProgress gets the progress of the reconfiguring operations.
-func getSlowestReconfiguringProgress(status []appsv1alpha1.ConfigurationItemStatus) string {
-	slowest := appsv1alpha1.ConfigurationItemStatus{
-		SucceedCount:  math.MaxInt32,
-		ExpectedCount: -1,
-	}
-
-	for _, st := range status {
-		if st.SucceedCount < slowest.SucceedCount {
-			slowest = st
-		}
-	}
-	return fmt.Sprintf("%d/%d", slowest.SucceedCount, slowest.ExpectedCount)
 }
 
 func getTargetResourcesOfLastComponent(lastConfiguration appsv1alpha1.LastConfiguration, compName string, resourceKey appsv1alpha1.ComponentResourceKey) []string {

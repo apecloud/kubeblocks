@@ -29,6 +29,7 @@ const (
 	CfgKeyCtrlrReconcileRetryDurationMS = "CM_RECON_RETRY_DURATION_MS"       // accept time
 	CfgRecoverVolumeExpansionFailure    = "RECOVER_VOLUME_EXPANSION_FAILURE" // refer to feature gates RecoverVolumeExpansionFailure of k8s.
 	CfgKeyProvider                      = "KUBE_PROVIDER"
+	CfgHostPortConfigMapName            = "HOST_PORT_CM_NAME"
 
 	// addon config keys
 	CfgKeyAddonJobTTL        = "ADDON_JOB_TTL"
@@ -46,17 +47,10 @@ const (
 )
 
 const (
-	KBConnCredentialPlaceHolder     = "$(CONN_CREDENTIAL_SECRET_NAME)"
-	KBComponentEnvCMPlaceHolder     = "$(COMP_ENV_CM_NAME)"
-	KBCompNamePlaceHolder           = "$(KB_COMP_NAME)"
-	KBClusterNamePlaceHolder        = "$(KB_CLUSTER_NAME)"
-	KBClusterCompNamePlaceHolder    = "$(KB_CLUSTER_COMP_NAME)"
-	KBClusterUIDPostfix8PlaceHolder = "$(KB_CLUSTER_UID_POSTFIX_8)"
-	KBToolsImagePlaceHolder         = "$(KUBEBLOCKS_TOOLS_IMAGE)"
-
-	// KBComponentConnCredentialPlaceHolder is the prefix of the placeholder for componentDefinition connection credential secret name
-	// TODO(xingran): This is a temporary solution used to reference component connection credentials defined in ComponentDefinition. The suffix is ComponentDefinition.Spec.ConnectionCredentials[x].Name, There will be a unified referencing scheme designed in the future.
-	KBComponentConnCredentialPlaceHolder = "$(COMPONENT_CONN_CREDENTIAL_SECRET_NAME)"
+	// TODO: deprecated, will be removed later.
+	KBConnCredentialPlaceHolder = "$(CONN_CREDENTIAL_SECRET_NAME)"
+	KBComponentEnvCMPlaceHolder = "$(COMP_ENV_CM_NAME)"
+	KBToolsImagePlaceHolder     = "$(KUBEBLOCKS_TOOLS_IMAGE)"
 )
 
 const (
@@ -95,14 +89,14 @@ const (
 	BackupProtectionLabelKey                 = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
 	AddonProviderLabelKey                    = "kubeblocks.io/provider"          // AddonProviderLabelKey marks the addon provider
 	RoleLabelKey                             = "kubeblocks.io/role"              // RoleLabelKey consensusSet and replicationSet role label key
+	ReadyWithoutPrimaryKey                   = "kubeblocks.io/ready-without-primary"
 	VolumeTypeLabelKey                       = "kubeblocks.io/volume-type"
 	ClusterAccountLabelKey                   = "account.kubeblocks.io/name"
 	KBAppClusterUIDLabelKey                  = "apps.kubeblocks.io/cluster-uid"
 	KBAppComponentLabelKey                   = "apps.kubeblocks.io/component-name"
-	KBAppComponentDefRefLabelKey             = "apps.kubeblocks.io/component-def-ref"
-	KBAppClusterDefTypeLabelKey              = "apps.kubeblocks.io/cluster-type" // refer clusterDefinition.Spec.Type (deprecated)
-	AppConfigTypeLabelKey                    = "apps.kubeblocks.io/config-type"
-	KBManagedByKey                           = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created
+	KBAppComponentDefRefLabelKey             = "apps.kubeblocks.io/component-def-ref" // refer clusterDefinition.Spec.ComponentDefs[*].Name before KubeBlocks Version 0.8.0 or refer ComponentDefinition.Name after KubeBlocks Version 0.8.0
+	KBAppClusterDefTypeLabelKey              = "apps.kubeblocks.io/cluster-type"      // refer clusterDefinition.Spec.Type (deprecated)
+	KBManagedByKey                           = "apps.kubeblocks.io/managed-by"        // KBManagedByKey marks resources that auto created
 	PVCNameLabelKey                          = "apps.kubeblocks.io/pvc-name"
 	VolumeClaimTemplateNameLabelKey          = "apps.kubeblocks.io/vct-name"
 	VolumeClaimTemplateNameLabelKeyForLegacy = "vct.kubeblocks.io/name" // Deprecated: only compatible with version 0.5, will be removed in 0.7
@@ -126,6 +120,10 @@ const (
 	OpsRequestNameLabelKey                   = "ops.kubeblocks.io/ops-name"
 	ServiceDescriptorNameLabelKey            = "servicedescriptor.kubeblocks.io/name"
 	RestoreForHScaleLabelKey                 = "apps.kubeblocks.io/restore-for-hscale"
+	ResourceConstraintProviderLabelKey       = "resourceconstraint.kubeblocks.io/provider"
+
+	// StatefulSetPodNameLabelKey is used to mark the pod name of the StatefulSet
+	StatefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
 
 	// kubeblocks.io annotations
 	ClusterSnapshotAnnotationKey                = "kubeblocks.io/cluster-snapshot"           // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
@@ -152,14 +150,24 @@ const (
 	KubeBlocksGenerationKey                     = "kubeblocks.io/generation"
 	ExtraEnvAnnotationKey                       = "kubeblocks.io/extra-env"
 	LastRoleSnapshotVersionAnnotationKey        = "apps.kubeblocks.io/last-role-snapshot-version"
-	ResourceConstraintProviderLabelKey          = "resourceconstraint.kubeblocks.io/provider"
+	HostPortAnnotationKey                       = "kubeblocks.io/host-port"
+
+	// NodePortSvcAnnotationKey defines the feature gate of NodePort Service defined in ComponentDefinition.Spec.Services.
+	// Components defined in the annotation value, their all services of type NodePort defined in ComponentDefinition will be created; otherwise, they will be ignored.
+	// Multiple components are separated by ','. for example: "kubeblocks.io/enabled-node-port-svc: comp1,comp2"
+	NodePortSvcAnnotationKey = "kubeblocks.io/enabled-node-port-svc"
+	// PodOrdinalSvcAnnotationKey defines the feature gate of PodOrdinal Service defined in ComponentDefinition.Spec.Services.
+	// Components defined in the annotation value, their all Services defined in the ComponentDefinition with the GeneratePodOrdinalService attribute set to true will be created; otherwise, they will be ignored.
+	// This can generate a corresponding Service for each Pod, which can be used in certain specific scenarios: for example, creating a dedicated access service for each read-only Pod.
+	// Multiple components are separated by ','. for example: "kubeblocks.io/enabled-node-port-svc: comp1,comp2"
+	PodOrdinalSvcAnnotationKey = "kubeblocks.io/enabled-pod-ordinal-svc"
 
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName             = "cluster.kubeblocks.io/finalizer"
 	DBComponentFinalizerName           = "component.kubeblocks.io/finalizer"
-	DBComponentDefinitionFinalizerName = "componentdefinition.kubeblocks.io/finalizer"
 	ConfigurationTemplateFinalizerName = "config.kubeblocks.io/finalizer"
 	ServiceDescriptorFinalizerName     = "servicedescriptor.kubeblocks.io/finalizer"
+	OpsRequestFinalizerName            = "opsrequest.kubeblocks.io/finalizer"
 
 	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"
@@ -182,6 +190,10 @@ const (
 
 	RBACRoleName        = "kubeblocks-cluster-pod-role"
 	RBACClusterRoleName = "kubeblocks-volume-protection-pod-role"
+
+	// FeatureReconciliationInCompactModeAnnotationKey indicates that the controller should run in compact mode,
+	// means to try the best to cutoff useless objects.
+	FeatureReconciliationInCompactModeAnnotationKey = "kubeblocks.io/compact-mode"
 )
 
 const (
@@ -232,13 +244,17 @@ const (
 	WesyncerHTTPPortName               = "wesyncer-port"
 	LorryHTTPPortName                  = "lorry-http-port"
 	LorryGRPCPortName                  = "lorry-grpc-port"
-	WesyncerInitContainerName          = "kb-init-wesyncer"
-	LorryContainerName                 = "kb-lorry"
-	WeSyncerContainerName              = "kb-we-syncer"
+	SyncerContainerName                = "syncer"
+	LorryContainerName                 = "lorry"
+	SyncerInitContainerName            = "init-syncer"
+	LorryInitContainerName             = "init-lorry"
+	ProbeInitContainerName             = "kb-initprobe"
 	RoleProbeContainerName             = "kb-checkrole"
 	StatusProbeContainerName           = "kb-checkstatus"
 	RunningProbeContainerName          = "kb-checkrunning"
 	VolumeProtectionProbeContainerName = "kb-volume-protection"
+	LorryRoleProbePath                 = "/v1.0/checkrole"
+	LorryVolumeProtectPath             = "/v1.0/volumeprotection"
 
 	// the filedpath name used in event.InvolvedObject.FieldPath
 	ProbeCheckStatusPath  = "spec.containers{" + StatusProbeContainerName + "}"
@@ -257,6 +273,8 @@ const (
 	ReconfigureManagerSource  = "manager"
 	ReconfigureUserSource     = "ops"
 	ReconfigureTemplateSource = "external-template"
+
+	ConfigManagerPortName = "config-manager"
 )
 
 const (
@@ -272,10 +290,6 @@ const (
 const (
 	AccountNameForSecret   = "username"
 	AccountPasswdForSecret = "password"
-)
-
-const (
-	ComponentStatusDefaultPodName = "Unknown"
 )
 
 const (
@@ -300,4 +314,12 @@ const (
 	VolumeRestorePolicyKeyForRestore = "volumeRestorePolicy"
 	RestoreTimeKeyForRestore         = "restoreTime"
 	ConnectionPassword               = "connectionPassword"
+)
+
+const (
+	KBAppMultiClusterPlacementKey = "apps.kubeblocks.io/multi-cluster-placement"
+)
+
+const (
+	KBGeneratedVirtualCompDefPrefix = "KB_GENERATED_VIRTUAL_COMP_DEF"
 )

@@ -21,7 +21,6 @@ package apps
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -34,15 +33,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
-)
-
-var (
-	errReqClusterObj = errors.New("required arg *appsv1alpha1.Cluster is nil")
 )
 
 // GetClusterByObject gets cluster by related k8s workloads.
@@ -85,75 +82,6 @@ func getObjectListByCustomLabels(ctx context.Context, cli client.Client, cluster
 	return cli.List(ctx, objectList, matchLabels, inNamespace)
 }
 
-// getClusterComponentSpecByName gets componentSpec from cluster with compSpecName.
-func getClusterComponentSpecByName(cluster appsv1alpha1.Cluster, compSpecName string) *appsv1alpha1.ClusterComponentSpec {
-	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		if compSpec.Name == compSpecName {
-			return &compSpec
-		}
-	}
-	return nil
-}
-
-// initClusterComponentStatusIfNeed Initialize the state of the corresponding component in cluster.status.components
-func initClusterComponentStatusIfNeed(
-	cluster *appsv1alpha1.Cluster,
-	componentName string,
-	workloadType appsv1alpha1.WorkloadType) error {
-	if cluster == nil {
-		return errReqClusterObj
-	}
-
-	// REVIEW: should have following removed
-	// if _, ok := cluster.Status.Components[componentName]; !ok {
-	// 	cluster.Status.SetComponentStatus(componentName, appsv1alpha1.ClusterComponentStatus{
-	// 		Phase: cluster.Status.Phase,
-	// 	})
-	// }
-	componentStatus := cluster.Status.Components[componentName]
-	switch workloadType {
-	case appsv1alpha1.Consensus:
-		if componentStatus.ConsensusSetStatus != nil {
-			break
-		}
-		componentStatus.ConsensusSetStatus = &appsv1alpha1.ConsensusSetStatus{
-			Leader: appsv1alpha1.ConsensusMemberStatus{
-				Pod:        constant.ComponentStatusDefaultPodName,
-				AccessMode: appsv1alpha1.None,
-				Name:       "",
-			},
-		}
-	case appsv1alpha1.Replication:
-		if componentStatus.ReplicationSetStatus != nil {
-			break
-		}
-		componentStatus.ReplicationSetStatus = &appsv1alpha1.ReplicationSetStatus{
-			Primary: appsv1alpha1.ReplicationMemberStatus{
-				Pod: constant.ComponentStatusDefaultPodName,
-			},
-		}
-	}
-	cluster.Status.SetComponentStatus(componentName, componentStatus)
-	return nil
-}
-
-// getCompRelatedObjectList gets the related pods and workloads of the component
-func getCompRelatedObjectList(ctx context.Context,
-	cli client.Client,
-	cluster appsv1alpha1.Cluster,
-	compName string,
-	relatedWorkloads client.ObjectList) (*corev1.PodList, error) {
-	podList, err := intctrlcomp.GetComponentPodList(ctx, cli, cluster, compName)
-	if err != nil {
-		return nil, err
-	}
-	if err = intctrlcomp.GetObjectListByComponentName(ctx,
-		cli, cluster, relatedWorkloads, compName); err != nil {
-		return nil, err
-	}
-	return podList, nil
-}
-
 // parseCustomLabelPattern parses the custom label pattern to GroupVersionKind.
 func parseCustomLabelPattern(pattern string) (schema.GroupVersionKind, error) {
 	patterns := strings.Split(pattern, "/")
@@ -180,122 +108,34 @@ func replaceKBEnvPlaceholderTokens(clusterName, uid, componentName, strToReplace
 	return intctrlcomp.ReplaceNamedVars(builtInEnvMap, strToReplace, -1, true)
 }
 
-// ResolvePodSpecDefaultFields set default value for some known fields of proto PodSpec @pobj.
-func ResolvePodSpecDefaultFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
-	resolveVolume := func(v corev1.Volume, vv *corev1.Volume) {
-		if vv.DownwardAPI != nil && v.DownwardAPI != nil {
-			for i := range vv.DownwardAPI.Items {
-				vf := v.DownwardAPI.Items[i]
-				if vf.FieldRef == nil {
-					continue
-				}
-				vvf := &vv.DownwardAPI.Items[i]
-				if vvf.FieldRef != nil && len(vvf.FieldRef.APIVersion) == 0 {
-					vvf.FieldRef.APIVersion = vf.FieldRef.APIVersion
-				}
-			}
-			if vv.DownwardAPI.DefaultMode == nil {
-				vv.DownwardAPI.DefaultMode = v.DownwardAPI.DefaultMode
-			}
-		}
-		if vv.ConfigMap != nil && v.ConfigMap != nil {
-			if vv.ConfigMap.DefaultMode == nil {
-				vv.ConfigMap.DefaultMode = v.ConfigMap.DefaultMode
-			}
-		}
-	}
-	resolveContainer := func(c corev1.Container, cc *corev1.Container) {
-		if len(cc.TerminationMessagePath) == 0 {
-			cc.TerminationMessagePath = c.TerminationMessagePath
-		}
-		if len(cc.TerminationMessagePolicy) == 0 {
-			cc.TerminationMessagePolicy = c.TerminationMessagePolicy
-		}
-		if len(cc.ImagePullPolicy) == 0 {
-			cc.ImagePullPolicy = c.ImagePullPolicy
-		}
-
-		resolveContainerProbe := func(p corev1.Probe, pp *corev1.Probe) {
-			if pp.TimeoutSeconds == 0 {
-				pp.TimeoutSeconds = p.TimeoutSeconds
-			}
-			if pp.PeriodSeconds == 0 {
-				pp.PeriodSeconds = p.PeriodSeconds
-			}
-			if pp.SuccessThreshold == 0 {
-				pp.SuccessThreshold = p.SuccessThreshold
-			}
-			if pp.FailureThreshold == 0 {
-				pp.FailureThreshold = p.FailureThreshold
-			}
-			if pp.HTTPGet != nil && len(pp.HTTPGet.Scheme) == 0 {
-				if p.HTTPGet != nil {
-					pp.HTTPGet.Scheme = p.HTTPGet.Scheme
-				}
-			}
-		}
-		if cc.LivenessProbe != nil && c.LivenessProbe != nil {
-			resolveContainerProbe(*c.LivenessProbe, cc.LivenessProbe)
-		}
-		if cc.ReadinessProbe != nil && c.ReadinessProbe != nil {
-			resolveContainerProbe(*c.ReadinessProbe, cc.ReadinessProbe)
-		}
-		if cc.StartupProbe != nil && c.StartupProbe != nil {
-			resolveContainerProbe(*c.StartupProbe, cc.StartupProbe)
-		}
-	}
-	for i := 0; i < min(len(obj.Volumes), len(pobj.Volumes)); i++ {
-		resolveVolume(obj.Volumes[i], &pobj.Volumes[i])
-	}
-	for i := 0; i < min(len(obj.InitContainers), len(pobj.InitContainers)); i++ {
-		resolveContainer(obj.InitContainers[i], &pobj.InitContainers[i])
-	}
-	for i := 0; i < min(len(obj.Containers), len(pobj.Containers)); i++ {
-		resolveContainer(obj.Containers[i], &pobj.Containers[i])
-	}
-	if len(pobj.RestartPolicy) == 0 {
-		pobj.RestartPolicy = obj.RestartPolicy
-	}
-	if pobj.TerminationGracePeriodSeconds == nil {
-		pobj.TerminationGracePeriodSeconds = obj.TerminationGracePeriodSeconds
-	}
-	if len(pobj.DNSPolicy) == 0 {
-		pobj.DNSPolicy = obj.DNSPolicy
-	}
-	if len(pobj.DeprecatedServiceAccount) == 0 {
-		pobj.DeprecatedServiceAccount = obj.DeprecatedServiceAccount
-	}
-	if pobj.SecurityContext == nil {
-		pobj.SecurityContext = obj.SecurityContext
-	}
-	if len(pobj.SchedulerName) == 0 {
-		pobj.SchedulerName = obj.SchedulerName
-	}
-	if len(pobj.Tolerations) == 0 {
-		pobj.Tolerations = obj.Tolerations
-	}
-	if pobj.Priority == nil {
-		pobj.Priority = obj.Priority
-	}
-	if pobj.EnableServiceLinks == nil {
-		pobj.EnableServiceLinks = obj.EnableServiceLinks
-	}
-	if pobj.PreemptionPolicy == nil {
-		pobj.PreemptionPolicy = obj.PreemptionPolicy
-	}
-}
-
 // DelayUpdatePodSpecSystemFields to delay the updating to system fields in pod spec.
 func DelayUpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	for i := range pobj.Containers {
 		delayUpdateKubeBlocksToolsImage(obj.Containers, &pobj.Containers[i])
 	}
+	updateLorryContainer(obj.Containers, pobj.Containers)
 }
 
 // UpdatePodSpecSystemFields to update system fields in pod spec.
-func UpdatePodSpecSystemFields(pobj *corev1.PodSpec) {
+func UpdatePodSpecSystemFields(obj *corev1.PodSpec, pobj *corev1.PodSpec) {
 	for i := range pobj.Containers {
 		updateKubeBlocksToolsImage(&pobj.Containers[i])
+	}
+
+	updateLorryContainer(obj.Containers, pobj.Containers)
+}
+
+func updateLorryContainer(containers []corev1.Container, pcontainers []corev1.Container) {
+	srcLorryContainer := controllerutil.GetLorryContainer(containers)
+	dstLorryContainer := controllerutil.GetLorryContainer(pcontainers)
+	if srcLorryContainer == nil || dstLorryContainer == nil {
+		return
+	}
+	for i, c := range pcontainers {
+		if c.Name == dstLorryContainer.Name {
+			pcontainers[i] = *srcLorryContainer.DeepCopy()
+			return
+		}
 	}
 }
 
@@ -339,7 +179,7 @@ func UpdateComponentInfoToPods(
 	cluster *appsv1alpha1.Cluster,
 	component *intctrlcomp.SynthesizedComponent,
 	dag *graph.DAG) error {
-	if cluster == nil || component == nil {
+	if cluster == nil || component == nil || component.RsmTransformPolicy == v1alpha1.ToPod {
 		return nil
 	}
 	ml := client.MatchingLabels{
@@ -412,11 +252,11 @@ func UpdateCustomLabelToPods(ctx context.Context,
 			})
 			// pod already in dag, merge labels
 			if idx >= 0 {
-				updateObjLabel(cluster.Name, string(cluster.UID), component.Name, labelKey, string(labelValue), pods[idx])
+				updateObjLabel(cluster.Name, string(cluster.UID), component.Name, labelKey, labelValue, pods[idx])
 				continue
 			}
 			pod := &podList.Items[i]
-			updateObjLabel(cluster.Name, string(cluster.UID), component.Name, labelKey, string(labelValue), pod)
+			updateObjLabel(cluster.Name, string(cluster.UID), component.Name, labelKey, labelValue, pod)
 			graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), nil)
 		}
 	}

@@ -1,8 +1,0 @@
-{{- include "kubeblocks.buildAddonCR" (merge (dict
-  "kbVersion" ">=0.7.0"
-  "name" "tidb"
-  "version" "0.1.0-alpha.1"
-  "model" "RDBMS"
-  "provider" "community"
-  "description" "TiDB is an open-source, cloud-native, distributed, MySQL-Compatible database for elastic scale and real-time analytics."
-  "autoInstall" false) . ) -}}

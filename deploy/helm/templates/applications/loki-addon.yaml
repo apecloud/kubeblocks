@@ -4,7 +4,8 @@ metadata:
   name: {{ include "addon.loki.name" . }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
-    "kubeblocks.io/provider": community
+    "addon.kubeblocks.io/provider": community
+    "addon.kubeblocks.io/version": "5.8.9"
   {{- if .Values.keepAddons }}
   annotations:
     helm.sh/resource-policy: keep

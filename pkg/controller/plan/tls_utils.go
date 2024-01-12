@@ -29,12 +29,11 @@ import (
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	client2 "github.com/apecloud/kubeblocks/pkg/controller/client"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 )
 
 // ComposeTLSSecret composes a TSL secret object.
@@ -50,7 +49,7 @@ func ComposeTLSSecret(namespace, clusterName, componentName string) (*v1.Secret,
 		SetStringData(map[string]string{}).
 		GetObject()
 
-	const tpl = `{{- $cert := genSelfSignedCert "KubeBlocks" nil nil 365 }}
+	const tpl = `{{- $cert := genCA "KubeBlocks" 3650 }}
 {{ $cert.Cert }}
 {{ $cert.Key }}
 `
@@ -64,9 +63,9 @@ func ComposeTLSSecret(namespace, clusterName, componentName string) (*v1.Secret,
 	}
 	cert := out[:index]
 	key := out[index:]
-	secret.StringData[factory.CAName] = cert
-	secret.StringData[factory.CertName] = cert
-	secret.StringData[factory.KeyName] = key
+	secret.StringData[constant.CAName] = cert
+	secret.StringData[constant.CertName] = cert
+	secret.StringData[constant.KeyName] = key
 	return secret, nil
 }
 
@@ -85,7 +84,7 @@ func buildFromTemplate(tpl string, vars interface{}) (string, error) {
 	return b.String(), nil
 }
 
-func CheckTLSSecretRef(ctx context.Context, cli client2.ReadonlyClient, namespace string,
+func CheckTLSSecretRef(ctx context.Context, cli client.Reader, namespace string,
 	secretRef *dbaasv1alpha1.TLSSecretRef) error {
 	if secretRef == nil {
 		return errors.New("issuer.secretRef shouldn't be nil when issuer is UserProvided")

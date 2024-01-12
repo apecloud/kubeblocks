@@ -11,7 +11,7 @@
 ![maturity](https://img.shields.io/static/v1?label=maturity&message=alpha&color=red)
 [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/kubeblocks)](https://artifacthub.io/packages/search?repo=kubeblocks)
 
-![image](./docs/img/banner-readme.png)
+![image](./docs/img/banner-readme.jpeg)
 
 ## What is KubeBlocks
 
@@ -42,6 +42,7 @@ KubeBlocks integrates the most popular database/message-queue/data-processing en
   KubeBlocks provides the addon mechanism for integrating new engines. So it can be extended to run the databases your project needs.
 
 ### Goals
+
 - Being open and cloud-neutral
 - Promoting the containerization of database workloads
 - Promoting IaC and GitOps in the field of databases
@@ -62,7 +63,7 @@ KubeBlocks integrates the most popular database/message-queue/data-processing en
 
 ## Community
 
-- KubeBlocks [Slack Channel](https://join.slack.com/t/kubeblocks/shared_invite/zt-23vym7xpx-Xu3xcE7HmcqGKvTX4U9yTg)
+- KubeBlocks [Slack Channel](https://join.slack.com/t/kubeblocks/shared_invite/zt-29tx52d8n-vli24S6gtD5ODJlNUqLqbQ)
 - KubeBlocks Github [Discussions](https://github.com/apecloud/kubeblocks/discussions)
 
 ## Contributing to KubeBlocks

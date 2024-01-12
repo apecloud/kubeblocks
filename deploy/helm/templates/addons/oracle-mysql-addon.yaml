@@ -1,8 +1,0 @@
-{{- include "kubeblocks.buildAddonCR" (merge (dict
-  "kbVersion" ">=0.7.0"
-  "name" "oracle-mysql"
-  "version" "0.7.0"
-  "model" "RDBMS"
-  "provider" "apecloud"
-  "description" "MySQL is a widely used, open-source relational database management system (RDBMS)."
-  "autoInstall" false) . ) -}}

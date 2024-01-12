@@ -29,7 +29,7 @@ This table below describes the general flags for I/O faults.
 | Option                   | Description               | Default value | Required |
 | :----------------------- | :------------------------ | :------------ | :------- |
 | `--volume-path` | It specifies the mount point of volume in the target container. It must be the root directory of the mount. | None | Yes |
-| `--path` | It specifies the valid range of fault injections. It can be either a wildcard or a single file. | * | None |
+| `--path` | It specifies the valid range of fault injections. It can be either a wildcard or a single file. | * | No |
 | `--percent` | It specifies the probability of failure per operation and its unit is %. | 100 | No |
 | `--container`, `-c` | It specifies the name of the container into which the fault is injected. | None | No |
 | `--method` | It specifies the I/O operation. `read` and `write` are supported. | * | No |
@@ -62,11 +62,9 @@ Common error number:
 
 You can find the full error number list [here](https://raw.githubusercontent.com/torvalds/linux/master/include/uapi/asm-generic/errno-base.h).
 
-The command below inject an error in `/data`.
+The command below injects a file fault into the directory `/data`, which gives a 100% probability of failure in all file system operations under this directory and returns error code 22 (invalid argument).
 
-Chaos Mesh injects a file fault into the directory `/data`, which gives a 100% probability of failure in all file system operations under this directory and returns error code 22 (invalid argument).
-
-`--errno` specifies the error number that the system returens and it is required.
+`--errno` specifies the error number that the system returns and it is required.
 
 ```bash
 kbcli fault io errno --volume-path=/data --errno=22
@@ -74,7 +72,7 @@ kbcli fault io errno --volume-path=/data --errno=22
 
 ### Attribute override
 
-Chaos Mesh injects an attrOverride fault into the `/data` directory, giving a 100% probability that all file system operations in this directory will change the target file permissions to 72 (110 in octal), which will allow files to be executed only by the owner and their group and not authorized to perform other actions.
+The command below injects an attrOverride fault into the `/data` directory, giving a 100% probability that all file system operations in this directory will change the target file permissions to 72 (110 in octal), which will allow files to be executed only by the owner and their group and not authorized to perform other actions.
 
 ```bash
 kbcli fault io attribute --volume-path=/data --perm=72
@@ -84,7 +82,7 @@ You can use the following flags to modify attributes.
 
 📎 Table 2. kbcli fault io attribute flags description
 
-| Option                   | Description               | Default value | Reuiqred |
+| Option                   | Description               | Default value | Required |
 | :----------------------- | :------------------------ | :------------ | :------- |
 | `--blocks` | Number of blocks that a file uses. | None | No |
 | `--ino` | ino number. | None | No |
@@ -96,7 +94,7 @@ You can use the following flags to modify attributes.
 
 ### Mistake
 
-Chaos Mesh injects read and write faults into the directory `/data`, which gives a 10% probability of failure in the read and write operations under this directory. During this process, one random position with a maximum length of 10 bytes will be replaced with 0 bytes.
+The command below injects read and write faults into the directory `/data`, which gives a 10% probability of failure in the read and write operations under this directory. During this process, one random position with a maximum length of 10 bytes will be replaced with 0 bytes.
 
 ```bash
 kbcli fault io mistake --volume-path=/data --filling=zero --max-occurrences=10 --max-length=1
@@ -104,7 +102,7 @@ kbcli fault io mistake --volume-path=/data --filling=zero --max-occurrences=10 -
 
 📎 Table 3. kbcli fault io mistake flags description
 
-| Option                   | Description               | Default value | Reuiqred |
+| Option                   | Description               | Default value | Required |
 | :----------------------- | :------------------------ | :------------ | :------- |
 | `--filling` | The wrong data to be filled. Only zero (fill 0) or random (fill random bytes) are supported. | None | Yes |
 | `max-occurrences` | Maximum number of errors in each operation. | None | Yes |

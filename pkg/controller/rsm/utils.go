@@ -38,13 +38,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	roclient "github.com/apecloud/kubeblocks/pkg/controller/client"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -178,14 +177,19 @@ func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) 
 		if !intctrlutil.PodIsReadyWithLabel(pod) {
 			continue
 		}
+		readyWithoutPrimary := false
 		roleName := getRoleName(pod)
 		role, ok := roleMap[roleName]
 		if !ok {
 			continue
 		}
+		if value, ok := pod.Labels[constant.ReadyWithoutPrimaryKey]; ok && value == "true" {
+			readyWithoutPrimary = true
+		}
 		memberStatus := workloads.MemberStatus{
-			PodName:     pod.Name,
-			ReplicaRole: role,
+			PodName:             pod.Name,
+			ReplicaRole:         role,
+			ReadyWithoutPrimary: readyWithoutPrimary,
 		}
 		newMembersStatus = append(newMembersStatus, memberStatus)
 	}
@@ -201,21 +205,26 @@ func getRoleName(pod corev1.Pod) string {
 	return strings.ToLower(pod.Labels[constant.RoleLabelKey])
 }
 
-func ownedKinds() []client.ObjectList {
-	return []client.ObjectList{
-		&appsv1.StatefulSetList{},
+func ownedKinds(policy workloads.RsmTransformPolicy) []client.ObjectList {
+	kinds := []client.ObjectList{
 		&corev1.ServiceList{},
 		&corev1.ConfigMapList{},
 	}
+	if policy == workloads.ToPod {
+		kinds = append(kinds, &corev1.PodList{})
+	} else {
+		kinds = append(kinds, &appsv1.StatefulSetList{})
+	}
+	return kinds
 }
 
-func deletionKinds() []client.ObjectList {
-	kinds := ownedKinds()
+func deletionKinds(policy workloads.RsmTransformPolicy) []client.ObjectList {
+	kinds := ownedKinds(policy)
 	kinds = append(kinds, &batchv1.JobList{})
 	return kinds
 }
 
-func getPodsOfStatefulSet(ctx context.Context, cli roclient.ReadonlyClient, stsObj *appsv1.StatefulSet) ([]corev1.Pod, error) {
+func getPodsOfStatefulSet(ctx context.Context, cli client.Reader, stsObj *appsv1.StatefulSet) ([]corev1.Pod, error) {
 	podList := &corev1.PodList{}
 	selector, err := metav1.LabelSelectorAsMap(stsObj.Spec.Selector)
 	if err != nil {
@@ -354,11 +363,13 @@ func buildActionPodTemplate(rsm *workloads.ReplicatedStateMachine, env []corev1.
 	reconfiguration := rsm.Spec.MembershipReconfiguration
 	image := findActionImage(reconfiguration, actionType)
 	command := getActionCommand(reconfiguration, actionType)
+	args := getActionArgs(reconfiguration, actionType)
 	container := corev1.Container{
 		Name:            actionType,
 		Image:           image,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		Command:         command,
+		Args:            args,
 		Env:             env,
 	}
 	template := &corev1.PodTemplateSpec{
@@ -454,6 +465,31 @@ func getActionCommand(reconfiguration *workloads.MembershipReconfiguration, acti
 		return getCommand(reconfiguration.LogSyncAction)
 	case jobTypePromote:
 		return getCommand(reconfiguration.PromoteAction)
+	}
+	return nil
+}
+
+func getActionArgs(reconfiguration *workloads.MembershipReconfiguration, actionType string) []string {
+	if reconfiguration == nil {
+		return nil
+	}
+	getArgs := func(action *workloads.Action) []string {
+		if action == nil {
+			return nil
+		}
+		return action.Args
+	}
+	switch actionType {
+	case jobTypeSwitchover:
+		return getArgs(reconfiguration.SwitchoverAction)
+	case jobTypeMemberJoinNotifying:
+		return getArgs(reconfiguration.MemberJoinAction)
+	case jobTypeMemberLeaveNotifying:
+		return getArgs(reconfiguration.MemberLeaveAction)
+	case jobTypeLogSync:
+		return getArgs(reconfiguration.LogSyncAction)
+	case jobTypePromote:
+		return getArgs(reconfiguration.PromoteAction)
 	}
 	return nil
 }
@@ -640,9 +676,13 @@ func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
 		return false
 	}
 	// check whether latest spec has been sent to the underlying workload(sts)
-	if rsm.Status.ObservedGeneration != rsm.Generation ||
-		rsm.Status.CurrentGeneration != rsm.Generation {
+	if rsm.Status.ObservedGeneration != rsm.Generation {
 		return false
+	}
+	if rsm.Spec.RsmTransformPolicy != workloads.ToPod {
+		if rsm.Status.CurrentGeneration != rsm.Generation {
+			return false
+		}
 	}
 	// check whether the underlying workload(sts) is ready
 	if rsm.Spec.Replicas == nil {
@@ -671,6 +711,9 @@ func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
 	}
 	hasLeader := false
 	for _, status := range membersStatus {
+		if status.ReadyWithoutPrimary {
+			return true
+		}
 		if status.IsLeader {
 			hasLeader = true
 			break
@@ -757,9 +800,36 @@ func getEnvConfigMapName(rsmName string) string {
 // IsOwnedByRsm is used to judge if the obj is owned by rsm
 func IsOwnedByRsm(obj client.Object) bool {
 	for _, ref := range obj.GetOwnerReferences() {
-		if ref.Kind == appsv1alpha1.ReplicatedStateMachineKind && ref.Controller != nil && *ref.Controller {
+		if ref.Kind == workloads.ReplicatedStateMachineKind && ref.Controller != nil && *ref.Controller {
 			return true
 		}
 	}
 	return false
+}
+
+// func placement(rsm workloads.ReplicatedStateMachine) string {
+//	if rsm.Annotations == nil {
+//		return ""
+//	}
+//	return rsm.Annotations[constant.KBAppMultiClusterPlacementKey]
+// }
+//
+// func inLocalContext() model.GraphOption {
+//	return model.WithClientOption(multicluster.InLocalContext())
+// }
+//
+// func inLocalContextOneshot() model.GraphOption {
+//	return model.WithClientOption(multicluster.InLocalContextOneshot())
+// }
+
+func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
+	// if v.ClientOpt != nil {
+	//	opt, ok := v.ClientOpt.(*multicluster.ClientOption)
+	//	if ok {
+	//		return opt
+	//	}
+	//	panic(fmt.Sprintf("unknown client option: %T", v.ClientOpt))
+	// }
+	// return multicluster.InGlobalContext()
+	return nil
 }

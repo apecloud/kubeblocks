@@ -33,7 +33,7 @@ Cluster Format: Deploying a MySQL 8.0 Standalone.
 
 | Term              | Settings                                                                                                     |
 |-------------------|--------------------------------------------------------------------------------------------------------------|
-| CLusterDefinition | Startup Scripts: Default Configuration Files: Default Service Port: 3306 Number of Components: 1, i.e. MySQL |
+| ClusterDefinition | Startup Scripts: Default <br /> Configuration Files: Default <br />Service Port: 3306 <br />Number of Components: 1, i.e. MySQL |
 | ClusterVersion    | Image: docker.io/mysql:8.0.34                                                                                |
 | Cluster.yaml      | Specified by the user during creation                                                                        |
 
@@ -86,7 +86,7 @@ There are two YAML files under `templates`, `clusterDefinition.yaml` and `cluste
 
     `$(SVC_PORT_mysql)` specifies the port number to be exposed by selecting the port name. Here the port name is mysql.
 
-    For more information, please refer to KubeBlocks Environment Variables (this doc is under developing and will be published soon).
+    For more information, please refer to KubeBlocks [Environment Variables](./environment-variables-and-placeholders.md).
 
   - `ComponentDefs`
 
@@ -157,11 +157,11 @@ There are two YAML files under `templates`, `clusterDefinition.yaml` and `cluste
 
     You can invoke `$(SVC_PORT_mysql)$` to select a port, where `mysql` is the `service.ports[0].name` here.
 
-:::note
+    :::note
 
-If the `connectionCredential` is filled with a port name, make sure the port name appears here.
+    If the `connectionCredential` is filled with a port name, make sure the port name appears here.
 
-:::
+    :::
 
   - `podSpec`
 

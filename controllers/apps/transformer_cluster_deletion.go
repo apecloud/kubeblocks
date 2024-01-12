@@ -21,9 +21,11 @@ package apps
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -39,6 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // clusterDeletionTransformer handles cluster deletion
@@ -173,6 +176,16 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		return newRequeueError(time.Second*1, "not all sub-resources deleted")
 	}
 
+	// release the allocated host ports
+	// TODO release ports if scale in the components
+	// TODO release ports one by one without using prefix
+	pm := intctrlutil.GetPortManager()
+	for _, comp := range transCtx.Cluster.Spec.ComponentSpecs {
+		if err = pm.ReleaseByPrefix(fmt.Sprintf("%s-%s", transCtx.Cluster.Name, comp.Name)); err != nil {
+			return newRequeueError(time.Second*1, "release host ports failed")
+		}
+	}
+
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
 	return graph.ErrPrematureStop
 }
@@ -194,6 +207,7 @@ func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
 	namespacedKindsPlus := []client.ObjectList{
 		&appsv1alpha1.ComponentList{},
 		&workloads.ReplicatedStateMachineList{},
+		&appsv1.StatefulSetList{}, // be compatible with 0.6 workloads.
 		&policyv1.PodDisruptionBudgetList{},
 		&corev1.ServiceList{},
 		&corev1.ServiceAccountList{},

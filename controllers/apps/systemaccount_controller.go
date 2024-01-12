@@ -42,6 +42,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
@@ -162,6 +163,11 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return intctrlutil.Reconciled()
 	}
 
+	if common.IsCompactMode(cluster.Annotations) {
+		reqCtx.Log.V(1).Info("Cluster is in compact mode, no need to create accounts related secrets", "cluster", req.NamespacedName)
+		return intctrlutil.Reconciled()
+	}
+
 	clusterdefinition := &appsv1alpha1.ClusterDefinition{}
 	clusterDefNS := types.NamespacedName{Name: cluster.Spec.ClusterDefRef}
 	if err := r.Client.Get(reqCtx.Ctx, clusterDefNS, clusterdefinition); err != nil {
@@ -218,7 +224,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		reqCtx.Log.V(1).Info("detected database facts", "cluster", req.NamespacedName, "accounts", detectedEngineFacts)
 
 		// replace KubeBlocks ENVs.
-		replaceEnvsValues(cluster.Name, compDef.SystemAccounts)
+		replaceEnvsValues(cluster.Name, compDef.SystemAccounts, nil)
 
 		for _, account := range compDef.SystemAccounts.Accounts {
 			accountID := account.Name.GetAccountID()
@@ -436,7 +442,7 @@ func (r *SystemAccountReconciler) getEngineFacts(reqCtx intctrlutil.RequestCtx, 
 		return appsv1alpha1.KBAccountInvalid, fmt.Errorf("no pod is running for cluster: %s, component %s", key.clusterName, key.componentName)
 	}
 
-	lorryClient, err := lorry.NewHTTPClientWithPod(target)
+	lorryClient, err := lorry.NewClient(*target)
 	if err != nil {
 		return appsv1alpha1.KBAccountInvalid, err
 	}

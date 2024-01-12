@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -46,7 +47,6 @@ var _ graph.PlanBuilder = &PlanBuilder{}
 type Plan struct {
 	dag      *graph.DAG
 	walkFunc graph.WalkFunc
-	cli      client.Client
 	transCtx *rsmTransformContext
 }
 
@@ -89,7 +89,6 @@ func (b *PlanBuilder) Build() (graph.Plan, error) {
 	plan := &Plan{
 		dag:      dag,
 		walkFunc: b.rsmWalkFunc,
-		cli:      b.cli,
 		transCtx: b.transCtx,
 	}
 	return plan, err
@@ -111,36 +110,57 @@ func (b *PlanBuilder) rsmWalkFunc(v graph.Vertex) error {
 	if vertex.Action == nil {
 		return errors.New("vertex action can't be nil")
 	}
+	ctx := b.transCtx.Context
 	switch *vertex.Action {
 	case model.CREATE:
-		err := b.cli.Create(b.transCtx.Context, vertex.Obj)
-		if err != nil && !apierrors.IsAlreadyExists(err) {
+		return b.createObject(ctx, vertex)
+	case model.UPDATE:
+		return b.updateObject(ctx, vertex)
+	case model.DELETE:
+		return b.deleteObject(ctx, vertex)
+	case model.STATUS:
+		return b.statusObject(ctx, vertex)
+	}
+	return nil
+}
+
+func (b *PlanBuilder) createObject(ctx context.Context, vertex *model.ObjectVertex) error {
+	err := b.cli.Create(ctx, vertex.Obj, clientOption(vertex))
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+	return nil
+}
+
+func (b *PlanBuilder) updateObject(ctx context.Context, vertex *model.ObjectVertex) error {
+	err := b.cli.Update(ctx, vertex.Obj, clientOption(vertex))
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
+func (b *PlanBuilder) deleteObject(ctx context.Context, vertex *model.ObjectVertex) error {
+	finalizer := getFinalizer(vertex.Obj)
+	if controllerutil.RemoveFinalizer(vertex.Obj, finalizer) {
+		err := b.cli.Update(ctx, vertex.Obj, clientOption(vertex))
+		if err != nil && !apierrors.IsNotFound(err) {
+			b.transCtx.Logger.Error(err, fmt.Sprintf("delete %T error: %s", vertex.Obj, vertex.Obj.GetName()))
 			return err
 		}
-	case model.UPDATE:
-		err := b.cli.Update(b.transCtx.Context, vertex.Obj)
+	}
+	if !model.IsObjectDeleting(vertex.Obj) {
+		err := b.cli.Delete(ctx, vertex.Obj, clientOption(vertex))
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
-	case model.DELETE:
-		finalizer := getFinalizer(vertex.Obj)
-		if controllerutil.RemoveFinalizer(vertex.Obj, finalizer) {
-			err := b.cli.Update(b.transCtx.Context, vertex.Obj)
-			if err != nil && !apierrors.IsNotFound(err) {
-				b.transCtx.Logger.Error(err, fmt.Sprintf("delete %T error: %s", vertex.Obj, vertex.Obj.GetName()))
-				return err
-			}
-		}
-		if !model.IsObjectDeleting(vertex.Obj) {
-			err := b.cli.Delete(b.transCtx.Context, vertex.Obj)
-			if err != nil && !apierrors.IsNotFound(err) {
-				return err
-			}
-		}
-	case model.STATUS:
-		if err := b.cli.Status().Update(b.transCtx.Context, vertex.Obj); err != nil {
-			return err
-		}
+	}
+	return nil
+}
+
+func (b *PlanBuilder) statusObject(ctx context.Context, vertex *model.ObjectVertex) error {
+	if err := b.cli.Status().Update(ctx, vertex.Obj, clientOption(vertex)); err != nil {
+		return err
 	}
 	return nil
 }

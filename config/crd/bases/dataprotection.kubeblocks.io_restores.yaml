@@ -59,6 +59,13 @@ spec:
           spec:
             description: RestoreSpec defines the desired state of Restore
             properties:
+              backoffLimit:
+                description: Specifies the number of retries before marking the restore
+                  failed.
+                format: int32
+                maximum: 10
+                minimum: 0
+                type: integer
               backup:
                 description: 'backup to be restored. The restore behavior based on
                   the backup type: 1. Full: will be restored the full backup directly.

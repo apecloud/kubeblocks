@@ -1,3 +1,4 @@
+{{- $imageRegistry := include "kubeblocks.imageRegistry" . }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,4 +11,10 @@ metadata:
   {{- end }}
 data:
   values-kubeblocks-override.yaml: |-
-    {{- get ( .Values | toYaml | fromYaml ) "snapshot-controller" | toYaml | nindent 4 }}
+    {{- $snapshotController := get .Values "snapshot-controller" }}
+    {{- $image := get $snapshotController "image" }}
+    {{- if not $image.repository }}
+       {{- $image = set $image  "repository" (printf "%s/apecloud/snapshot-controller" $imageRegistry) }}
+    {{- end }}
+    {{- $snapshotController = set $snapshotController "image" $image }}
+    {{- toYaml $snapshotController | nindent 4 }}

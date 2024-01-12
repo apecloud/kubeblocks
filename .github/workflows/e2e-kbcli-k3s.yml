@@ -1,0 +1,75 @@
+name: E2E Test KBCLI K3S
+
+on:
+  workflow_dispatch:
+    inputs:
+      VERSION:
+        description: 'kubeblocks release version'
+        required: true
+        default: ''
+      PRE_VERSION:
+        description: 'kubeblocks previous version of upgrade'
+        required: false
+        default: ''
+      TEST_TYPE:
+        description: 'test type (e.g. apecloud-mysql|postgresql|redis|mongodb|kafka|pulsar|weaviate|qdrant|
+        smartengine|mysqlscale|greptimedb|nebula|risingwave|starrocks|etcd|foxlake|oracle-mysql|asmysql|
+        openldap|milvus|clickhouse|pika|opensearch|elasticsearch|tdengine|vllm|orioledb|official-pg|ggml|
+        zookeeper|mariadb|tidb|xinference|oracle|opengauss|influxdb)'
+        required: false
+        default: ''
+      CLUSTER_VERSION:
+        description: 'k8s cluster version (e.g. 1.26)'
+        required: false
+        default: '1.26'
+        type: choice
+        options:
+          - 1.27
+          - 1.26
+          - 1.25
+          - 1.24
+      BRANCH_NAME:
+        description: 'testinfra branch name'
+        required: false
+        default: 'main'
+      ARGS:
+        description: 'kbcli test args'
+        required: false
+        default: ''
+
+run-name: kbcli:${{ inputs.PRE_VERSION }} to ${{ inputs.VERSION }} K3S:${{ inputs.CLUSTER_VERSION }} ${{ inputs.TEST_TYPE }}
+
+env:
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      release-version: ${{ steps.get_release_version.outputs.release-version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: check release version
+        id: get_release_version
+        run: |
+          RELEASE_VERSION=`bash .github/utils/utils.sh --type 18 \
+              --tag-name "${{ inputs.VERSION }}"`
+          if [[ -z "$RELEASE_VERSION" ]]; then
+              echo "release version ${{ inputs.VERSION }} not exists"
+              exit 1
+          else
+              echo $RELEASE_VERSION
+              echo release-version=$RELEASE_VERSION >> $GITHUB_OUTPUT
+          fi
+
+  k3s:
+    needs: check
+    uses: apecloud/apecloud-cd/.github/workflows/kbcli-test-k3s.yml@main
+    with:
+      KB_VERSION: "${{ needs.check.outputs.release-version }}"
+      KB_PRE_VERSION: "${{ inputs.PRE_VERSION }}"
+      CLUSTER_VERSION: "${{ inputs.CLUSTER_VERSION }}"
+      BRANCH_NAME: "${{ inputs.BRANCH_NAME }}"
+      ARGS: "${{ inputs.ARGS }}"
+      TEST_TYPE: "${{ inputs.TEST_TYPE }}"
+    secrets: inherit

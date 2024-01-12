@@ -57,7 +57,7 @@ func TestNewManager(t *testing.T) {
 
 		assert.Nil(t, manager)
 		assert.NotNil(t, err)
-		assert.ErrorContains(t, err, "KB_POD_NAME is not set")
+		assert.ErrorContains(t, err, fmt.Sprintf("%s is not set", constant.KBEnvPodName))
 	})
 
 	viper.Set(constant.KBEnvPodName, "fake")
@@ -507,6 +507,8 @@ func TestManager_IsClusterInitialized(t *testing.T) {
 	manager.serverID = 1
 
 	t.Run("query server id failed", func(t *testing.T) {
+		mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
+			"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}))
 		mock.ExpectQuery("select @@global.server_id").
 			WillReturnError(fmt.Errorf("some error"))
 
@@ -517,6 +519,8 @@ func TestManager_IsClusterInitialized(t *testing.T) {
 	})
 
 	t.Run("server id equal to manager's server id", func(t *testing.T) {
+		mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
+			"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}))
 		mock.ExpectQuery("select @@global.server_id").
 			WillReturnRows(sqlmock.NewRows([]string{"@@global.server_id"}).AddRow(1))
 
@@ -526,6 +530,8 @@ func TestManager_IsClusterInitialized(t *testing.T) {
 	})
 
 	t.Run("set server id failed", func(t *testing.T) {
+		mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
+			"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}))
 		mock.ExpectQuery("select @@global.server_id").
 			WillReturnRows(sqlmock.NewRows([]string{"@@global.server_id"}).AddRow(2))
 		mock.ExpectExec("set global server_id").
@@ -538,6 +544,8 @@ func TestManager_IsClusterInitialized(t *testing.T) {
 	})
 
 	t.Run("set server id successfully", func(t *testing.T) {
+		mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
+			"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}))
 		mock.ExpectQuery("select @@global.server_id").
 			WillReturnRows(sqlmock.NewRows([]string{"@@global.server_id"}).AddRow(2))
 		mock.ExpectExec("set global server_id").
@@ -545,6 +553,21 @@ func TestManager_IsClusterInitialized(t *testing.T) {
 
 		isInitialized, err := manager.IsClusterInitialized(ctx, nil)
 		assert.True(t, isInitialized)
+		assert.Nil(t, err)
+	})
+
+	t.Run("set semi sync successfully", func(t *testing.T) {
+		mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
+			"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}).AddRow("ACTIVE"))
+		mock.ExpectExec("SET GLOBAL rpl_semi_sync_source_enabled = 1;" +
+			"SET GLOBAL rpl_semi_sync_source_timeout = 1000;").
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
+			"WHERE PLUGIN_NAME ='rpl_semi_sync_replica';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}).AddRow("ACTIVE"))
+		mock.ExpectExec("SET GLOBAL rpl_semi_sync_replica_enabled = 1;").
+			WillReturnResult(sqlmock.NewResult(1, 1))
+		err := manager.EnableSemiSyncIfNeed(ctx)
 		assert.Nil(t, err)
 	})
 

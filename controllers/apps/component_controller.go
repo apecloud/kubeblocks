@@ -110,16 +110,18 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	reqCtx.Log.V(1).Info("reconcile", "component", req.NamespacedName)
 
+	planBuilder := newComponentPlanBuilder(reqCtx, r.Client, req)
+	if err := planBuilder.Init(); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
 	requeueError := func(err error) (ctrl.Result, error) {
 		if re, ok := err.(intctrlutil.RequeueError); ok {
 			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
 		}
+		c := planBuilder.(*componentPlanBuilder)
+		sendWarningEventWithError(r.Recorder, c.transCtx.Component, corev1.EventTypeWarning, err)
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
-	}
-
-	planBuilder := NewComponentPlanBuilder(reqCtx, r.Client, req)
-	if err := planBuilder.Init(); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
 	plan, errBuild := planBuilder.
@@ -132,6 +134,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentLoadResourcesTransformer{Client: r.Client},
 			// do validation for the spec & definition consistency
 			&componentValidationTransformer{},
+			// allocate port for hostNetwork component
+			&componentHostPortTransformer{},
 			// handle component PDB
 			&componentPDBTransformer{},
 			// handle component services
@@ -140,20 +144,24 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentAccountTransformer{},
 			// provision component system accounts
 			&componentAccountProvisionTransformer{},
-			// handle component connection credentials
-			&componentCredentialTransformer{},
 			// handle tls volume and cert
 			&componentTLSTransformer{},
 			// handle component custom volumes
 			&componentCustomVolumesTransformer{},
+			// resolve and build vars for template and Env
+			&componentVarsTransformer{},
 			// render component configurations
 			&componentConfigurationTransformer{Client: r.Client},
+			// handle restore before workloads transform
+			&componentRestoreTransformer{Client: r.Client},
 			// handle the component workload
 			&componentWorkloadTransformer{Client: r.Client},
 			// handle RBAC for component workloads
 			&componentRBACTransformer{},
 			// add our finalizer to all objects
 			&componentOwnershipTransformer{},
+			// handle component postProvision lifecycle action
+			&componentPostProvisionTransformer{Client: r.Client},
 			// update component status
 			&componentStatusTransformer{Client: r.Client},
 		).Build()
@@ -178,15 +186,16 @@ func (r *ComponentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	b := ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.Component{}).
-		Owns(&workloads.ReplicatedStateMachine{}).
+		Watches(&workloads.ReplicatedStateMachine{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&dpv1alpha1.Backup{}).
 		Owns(&dpv1alpha1.Restore{}).
-		Owns(&corev1.PersistentVolumeClaim{}).
+		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Owns(&policyv1.PodDisruptionBudget{}).
 		Owns(&batchv1.Job{}).
+		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler)).
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources))
 
 	if viper.GetBool(constant.EnableRBACManager) {
@@ -219,6 +228,21 @@ func (r *ComponentReconciler) filterComponentResources(ctx context.Context, obj 
 			NamespacedName: types.NamespacedName{
 				Namespace: obj.GetNamespace(),
 				Name:      fullCompName,
+			},
+		},
+	}
+}
+
+func (r *ComponentReconciler) configurationEventHandler(ctx context.Context, obj client.Object) []reconcile.Request {
+	if _, ok := obj.(*appsv1alpha1.Configuration); !ok {
+		return []reconcile.Request{}
+	}
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Namespace: obj.GetNamespace(),
+				// hack: depends on that the name of configuration object is same as Component, check GenerateComponentConfigurationName for reference.
+				Name: obj.GetName(),
 			},
 		},
 	}

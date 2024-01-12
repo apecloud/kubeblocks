@@ -39,6 +39,9 @@ type BackupSpec struct {
 	// Supported values are "Retain" and "Delete".
 	// "Retain" means that the backup can not be deleted and remains in 'Deleting' phase.
 	// "Delete" means that the backup content and its physical snapshot on backup repository are deleted.
+	// TODO: for the retain policy, we should support in the future for only deleting
+	//   the backup custom objects but retaining the backup contents in backup repository.
+	//   The current implementation only prevent accidental deletion of backup data.
 	// +kubebuilder:validation:Enum=Delete;Retain
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Delete
@@ -115,6 +118,10 @@ type BackupStatus struct {
 	// +optional
 	Path string `json:"path,omitempty"`
 
+	// kopiaRepoPath records the path of the Kopia repository.
+	// +optional
+	KopiaRepoPath string `json:"kopiaRepoPath,omitempty"`
+
 	// persistentVolumeClaimName is the name of the persistent volume claim that
 	// is used to store the backup data.
 	// +optional
@@ -141,6 +148,9 @@ type BackupStatus struct {
 	// volumeSnapshots records the volume snapshot status for the action.
 	// +optional
 	VolumeSnapshots []VolumeSnapshotStatus `json:"volumeSnapshots,omitempty"`
+
+	// extra records the extra info for the backup.
+	Extras []map[string]string `json:"extras,omitempty"`
 }
 
 // BackupTimeRange records the time range of backed up data, for PITR, this is the

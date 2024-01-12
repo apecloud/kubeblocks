@@ -101,6 +101,13 @@ type ComponentDefinitionSpec struct {
 	// +kubebuilder:validation:Required
 	Runtime corev1.PodSpec `json:"runtime"`
 
+	// Vars represents user-defined variables.
+	// These variables can be utilized as environment variables for Pods and Actions, or to render the templates of config and script.
+	// When used as environment variables, these variables are placed in front of the environment variables declared in the Pod.
+	// Cannot be updated.
+	// +optional
+	Vars []EnvVar `json:"vars,omitempty"`
+
 	// Volumes defines the persistent volumes needed by the component.
 	// The users are responsible for providing these volumes when creating a component instance.
 	// Cannot be updated.
@@ -111,7 +118,7 @@ type ComponentDefinitionSpec struct {
 	// In addition, a reserved headless service will be created by default, with the name pattern {clusterName}-{componentName}-headless.
 	// Cannot be updated.
 	// +optional
-	Services []Service `json:"services,omitempty"`
+	Services []ComponentService `json:"services,omitempty"`
 
 	// The configs field provided by provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
@@ -121,6 +128,7 @@ type ComponentDefinitionSpec struct {
 	// +listType=map
 	// +listMapKey=name
 	// +optional
+	// TODO: support referencing configs from other components or clusters.
 	Configs []ComponentConfigSpec `json:"configs,omitempty"`
 
 	// LogConfigs is detail log file config which provided by provider.
@@ -157,18 +165,18 @@ type ComponentDefinitionSpec struct {
 	// If a label key conflicts with any other system labels or user-specified labels, it will be silently ignored.
 	// Cannot be updated.
 	// +optional
-	Labels map[string]BuiltInString `json:"labels,omitempty"`
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// ReplicasLimit defines the limit of valid replicas supported.
+	// Cannot be updated.
+	// +optional
+	ReplicasLimit *ReplicasLimit `json:"replicasLimit,omitempty"`
 
 	// SystemAccounts defines the pre-defined system accounts required to manage the component.
 	// TODO(component): accounts KB required
 	// Cannot be updated.
 	// +optional
 	SystemAccounts []SystemAccount `json:"systemAccounts,omitempty"`
-
-	// ConnectionCredentials defines the default connection credentials that can be used to access the component service.
-	// Cannot be updated.
-	// +optional
-	ConnectionCredentials []ConnectionCredential `json:"connectionCredentials,omitempty"`
 
 	// UpdateStrategy defines the strategy for updating the component instance.
 	// Cannot be updated.
@@ -193,7 +201,7 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	LifecycleActions *ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
 
-	// serviceRefDeclarations is used to declare the service reference of the current component.
+	// ServiceRefDeclarations is used to declare the service reference of the current component.
 	// Cannot be updated.
 	// +optional
 	ServiceRefDeclarations []ServiceRefDeclaration `json:"serviceRefDeclarations,omitempty"`
@@ -242,6 +250,19 @@ type ComponentVolume struct {
 	HighWatermark int `json:"highWatermark,omitempty"`
 }
 
+// ReplicasLimit defines the limit of valid replicas supported.
+// +kubebuilder:validation:XValidation:rule="self.minReplicas >= 0 && self.maxReplicas <= 128",message="the minimum and maximum limit of replicas should be in the range of [0, 128]"
+// +kubebuilder:validation:XValidation:rule="self.minReplicas <= self.maxReplicas",message="the minimum replicas limit should be no greater than the maximum"
+type ReplicasLimit struct {
+	// The minimum limit of replicas.
+	// +required
+	MinReplicas int32 `json:"minReplicas"`
+
+	// The maximum limit of replicas.
+	// +required
+	MaxReplicas int32 `json:"maxReplicas"`
+}
+
 type SystemAccount struct {
 	// The name of the account.
 	// Others can refer to this account by the name.
@@ -278,9 +299,8 @@ type SystemAccount struct {
 type RoleArbitrator string
 
 const (
-	ExternalRoleArbitrator   RoleArbitrator = "External"
-	KubeBlocksRoleArbitrator RoleArbitrator = "KubeBlocks"
-	WesyncerRoleArbitrator   RoleArbitrator = "Wesyncer"
+	ExternalRoleArbitrator RoleArbitrator = "External"
+	LorryRoleArbitrator    RoleArbitrator = "Syncer"
 )
 
 // ReplicaRole represents a role that can be assumed by a component instance.
@@ -380,6 +400,16 @@ type RetryPolicy struct {
 	RetryInterval time.Duration `json:"retryInterval,omitempty"`
 }
 
+// PreConditionType defines the preCondition type of the action execution.
+type PreConditionType string
+
+const (
+	ImmediatelyPreConditionType    PreConditionType = "Immediately"
+	RuntimeReadyPreConditionType   PreConditionType = "RuntimeReady"
+	ComponentReadyPreConditionType PreConditionType = "ComponentReady"
+	ClusterReadyPreConditionType   PreConditionType = "ClusterReady"
+)
+
 // Action defines an operational action that can be performed by a component instance.
 // There are some pre-defined environment variables that can be used when writing action commands, check @BuiltInVars for reference.
 //
@@ -442,6 +472,19 @@ type Action struct {
 	// Cannot be updated.
 	// +optional
 	RetryPolicy *RetryPolicy `json:"retryPolicy,omitempty"`
+
+	// PreCondition defines the condition when the action will be executed.
+	// - Immediately: The Action is executed immediately after the Component object is created,
+	// without guaranteeing the availability of the Component and its underlying resources. only after the action is successfully executed will the Component's state turn to ready.
+	// - RuntimeReady: The Action is executed after the Component object is created and once all underlying Runtimes are ready.
+	// only after the action is successfully executed will the Component's state turn to ready.
+	// - ComponentReady: The Action is executed after the Component object is created and once the Component is ready.
+	// the execution process does not impact the state of the Component and the Cluster.
+	// - ClusterReady: The Action is executed after the Cluster object is created and once the Cluster is ready.
+	// the execution process does not impact the state of the Component and the Cluster.
+	// Cannot be updated.
+	// +optional
+	PreCondition *PreConditionType `json:"preCondition,omitempty"`
 }
 
 // BuiltinActionHandlerType defines build-in action handlers provided by Lorry.
@@ -450,6 +493,7 @@ type BuiltinActionHandlerType string
 const (
 	MySQLBuiltinActionHandler              BuiltinActionHandlerType = "mysql"
 	WeSQLBuiltinActionHandler              BuiltinActionHandlerType = "wesql"
+	OceanbaseBuiltinActionHandler          BuiltinActionHandlerType = "oceanbase"
 	RedisBuiltinActionHandler              BuiltinActionHandlerType = "redis"
 	MongoDBBuiltinActionHandler            BuiltinActionHandlerType = "mongodb"
 	ETCDBuiltinActionHandler               BuiltinActionHandlerType = "etcd"
@@ -475,20 +519,30 @@ type LifecycleActionHandler struct {
 
 // ComponentLifecycleActions defines a set of operational actions for interacting with component services and processes.
 type ComponentLifecycleActions struct {
-	// PostStart is called immediately after a component is created.
+	// PostProvision defines the actions to be executed and the corresponding policy when a component is created.
+	// You can define the preCondition for executing PostProvision using Action.PreCondition. The default PostProvision action preCondition is ComponentReady.
+	// The PostProvision Action will be executed only once.
+	// Dedicated env vars for the action:
+	// - KB_CLUSTER_COMPONENT_LIST: The list of all components in the cluster, joined by ',' (e.g., "comp1,comp2").
+	// - KB_CLUSTER_COMPONENT_POD_NAME_LIST: The list of all pods name in this component, joined by ',' (e.g., "pod1,pod2").
+	// - KB_CLUSTER_COMPONENT_POD_IP_LIST: The list of pod IPs where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. joined by ',' (e.g., "podIp1,podIp2").
+	// - KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST: The list of hostName where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. joined by ',' (e.g., "hostName1,hostName2").
+	// - KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST: The list of host IPs where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. joined by ',' (e.g., "hostIp1,hostIp2").
 	// Cannot be updated.
 	// +optional
-	PostStart *LifecycleActionHandler `json:"postStart,omitempty"`
+	PostProvision *LifecycleActionHandler `json:"postProvision,omitempty"`
 
-	// PreStop is called immediately before a component is terminated due to an API request.
+	// PreTerminate defines the actions to be executed when a component is terminated due to an API request.
+	// The PreTerminate Action will be executed only once. Upon receiving a scale-down command for the Component, it is executed immediately.
+	// Only after the preTerminate action is successfully executed, the destruction of the Component and its underlying resources proceeds.
 	// Cannot be updated.
 	// +optional
-	PreStop *LifecycleActionHandler `json:"preStop,omitempty"`
+	PreTerminate *LifecycleActionHandler `json:"preTerminate,omitempty"`
 
 	// RoleProbe defines how to probe the role of replicas.
 	// Cannot be updated.
 	// +optional
-	RoleProbe *RoleProbeSpec `json:"roleProbe,omitempty"`
+	RoleProbe *RoleProbe `json:"roleProbe,omitempty"`
 
 	// Switchover defines how to proactively switch the current leader to a new replica to minimize the impact on availability.
 	// This action is typically invoked when the leader is about to become unavailable due to events, such as:
@@ -507,7 +561,7 @@ type ComponentLifecycleActions struct {
 	// - KB_CONSENSUS_LEADER_POD_: The prefix of the environment variables of the original leader's Pod before switchover.
 	// Cannot be updated.
 	// +optional
-	Switchover *ComponentSwitchoverSpec `json:"switchover,omitempty"`
+	Switchover *ComponentSwitchover `json:"switchover,omitempty"`
 
 	// MemberJoin defines how to add a new replica to the replication group.
 	// This action is typically invoked when a new replica needs to be added, such as during scale-out.
@@ -567,7 +621,7 @@ type ComponentLifecycleActions struct {
 	AccountProvision *LifecycleActionHandler `json:"accountProvision,omitempty"`
 }
 
-type ComponentSwitchoverSpec struct {
+type ComponentSwitchover struct {
 	// withCandidate corresponds to the switchover of the specified candidate primary or leader instance.
 	// Currently, only Action.Exec is supported, Action.HTTP is not supported.
 	// +optional
@@ -584,7 +638,7 @@ type ComponentSwitchoverSpec struct {
 	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
 }
 
-type RoleProbeSpec struct {
+type RoleProbe struct {
 	LifecycleActionHandler `json:",inline"`
 
 	// Number of seconds after the container has started before liveness probes are initiated.

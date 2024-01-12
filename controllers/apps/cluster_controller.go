@@ -21,25 +21,18 @@ package apps
 
 import (
 	"context"
-	"time"
 
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
@@ -94,6 +87,13 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	reqCtx.Log.V(1).Info("reconcile", "cluster", req.NamespacedName)
 
+	// the cluster reconciliation loop is a 3-stage model: plan Init, plan Build and plan Execute
+	// Init stage
+	planBuilder := newClusterPlanBuilder(reqCtx, r.Client)
+	if err := planBuilder.Init(); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
 	requeueError := func(err error) (ctrl.Result, error) {
 		if re, ok := err.(intctrlutil.RequeueError); ok {
 			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
@@ -101,14 +101,9 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if apierrors.IsConflict(err) {
 			return intctrlutil.Requeue(reqCtx.Log, err.Error())
 		}
+		c := planBuilder.(*clusterPlanBuilder)
+		sendWarningEventWithError(r.Recorder, c.transCtx.Cluster, corev1.EventTypeWarning, err)
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
-	}
-
-	// the cluster reconciliation loop is a 3-stage model: plan Init, plan Build and plan Execute
-	// Init stage
-	planBuilder := NewClusterPlanBuilder(reqCtx, r.Client)
-	if err := planBuilder.Init(); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
 	// Build stage
@@ -138,14 +133,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&ClusterAPINormalizationTransformer{},
 			// handle cluster services
 			&clusterServiceTransformer{},
-			// handle restore before clusterComponentTransformer
-			&clusterRestoreTransformer{Client: r.Client},
 			// create all cluster components objects
 			&clusterComponentTransformer{},
 			// update cluster components' status
 			&clusterComponentStatusTransformer{},
 			// create default cluster connection credential secret object
-			&clusterCredentialTransformer{},
+			&clusterConnCredentialTransformer{},
 			// build backuppolicy and backupschedule from backupPolicyTemplate
 			&clusterBackupPolicyTransformer{},
 			// add our finalizer to all objects
@@ -172,41 +165,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	retryDurationMS := viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)
-	if retryDurationMS != 0 {
-		requeueDuration = time.Millisecond * time.Duration(retryDurationMS)
-	}
-	// TODO: add filter predicate for core API objects
-	b := ctrl.NewControllerManagedBy(mgr).
+	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.Cluster{}).
 		Owns(&appsv1alpha1.Component{}).
-		Owns(&corev1.Service{}).
-		Owns(&corev1.Secret{}).
-		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.Service{}). // cluster services
+		Owns(&corev1.Secret{}).  // cluster conn-credential secret
 		Owns(&dpv1alpha1.BackupPolicy{}).
 		Owns(&dpv1alpha1.BackupSchedule{}).
-		Owns(&dpv1alpha1.Restore{}).
-		Owns(&batchv1.Job{}).
-		Owns(&appsv1alpha1.Configuration{}).
-		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.filterClusterResources))
-
-	return b.Complete(r)
-}
-
-func (r *ClusterReconciler) filterClusterResources(ctx context.Context, obj client.Object) []reconcile.Request {
-	labels := obj.GetLabels()
-	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
-		return []reconcile.Request{}
-	}
-	if _, ok := labels[constant.AppInstanceLabelKey]; !ok {
-		return []reconcile.Request{}
-	}
-	return []reconcile.Request{
-		{
-			NamespacedName: types.NamespacedName{
-				Namespace: obj.GetNamespace(),
-				Name:      labels[constant.AppInstanceLabelKey],
-			},
-		},
-	}
+		Complete(r)
 }

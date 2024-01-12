@@ -257,6 +257,13 @@ spec:
                         type: string
                       type: array
                       x-kubernetes-list-type: set
+                    instances:
+                      description: Instances defines the list of instance to be deleted
+                        priorly If the RsmTransformPolicy is specified as ToPod,the
+                        list of instances will be used.
+                      items:
+                        type: string
+                      type: array
                     issuer:
                       description: issuer defines provider context for TLS certs.
                         required when TLS enabled
@@ -319,10 +326,42 @@ spec:
                         behavior and is set to true if creation of PodDisruptionBudget
                         for this component is not needed. It defaults to false.
                       type: boolean
+                    nodes:
+                      description: Nodes defines the list of nodes that pods can schedule
+                        If the RsmTransformPolicy is specified as ToPod,the list of
+                        nodes will be used. If the list of nodes is empty, no specific
+                        node will be assigned. However, if the list of node is filled,
+                        all pods will be evenly scheduled across the nodes in the
+                        list.
+                      items:
+                        description: "NodeName is a type that holds a api.Node's Name
+                          identifier. Being a type captures intent and helps make
+                          sure that the node name is not confused with similar concepts
+                          (the hostname, the cloud provider id, the cloud provider
+                          name etc) \n To clarify the various types: \n - Node.Name
+                          is the Name field of the Node in the API.  This should be
+                          stored in a NodeName. Unfortunately, because Name is part
+                          of ObjectMeta, we can't store it as a NodeName at the API
+                          level. \n - Hostname is the hostname of the local machine
+                          (from uname -n). However, some components allow the user
+                          to pass in a --hostname-override flag, which will override
+                          this in most places. In the absence of anything more meaningful,
+                          kubelet will use Hostname as the Node.Name when it creates
+                          the Node. \n * The cloudproviders have the own names: GCE
+                          has InstanceName, AWS has InstanceId. \n For GCE, InstanceName
+                          is the Name of an Instance object in the GCE API.  On GCE,
+                          Instance.Name becomes the Hostname, and thus it makes sense
+                          also to use it as the Node.Name.  But that is GCE specific,
+                          and it is up to the cloudprovider how to do this mapping.
+                          \n For AWS, the InstanceID is not yet suitable for use as
+                          a Node.Name, so we actually use the PrivateDnsName for the
+                          Node.Name.  And this is _not_ always the same as the hostname:
+                          if we are using a custom DHCP domain it won't be."
+                        type: string
+                      type: array
                     replicas:
                       default: 1
-                      description: Component replicas. The default value is used in
-                        ClusterDefinition spec if not specified.
+                      description: Component replicas.
                       format: int32
                       minimum: 0
                       type: integer
@@ -376,6 +415,15 @@ spec:
                           type: object
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
+                    rsmTransformPolicy:
+                      default: ToSts
+                      description: 'RsmTransformPolicy defines the policy generate
+                        sts using rsm. ToSts: rsm transforms to statefulSet ToPod:
+                        rsm transforms to pods'
+                      enum:
+                      - ToPod
+                      - ToSts
+                      type: string
                     serviceAccountName:
                       description: serviceAccountName is the name of the ServiceAccount
                         that running component depends on.
@@ -899,40 +947,6 @@ spec:
                 x-kubernetes-validations:
                 - message: duplicated component
                   rule: self.all(x, size(self.filter(c, c.name == x.name)) == 1)
-              connectionCredentials:
-                description: connectionCredentials defines the credentials used to
-                  access a cluster.
-                items:
-                  properties:
-                    accountName:
-                      description: AccountName specifies the name of account used
-                        to access the service. If specified, the account must be defined
-                        in @SystemAccounts. Cannot be updated.
-                      type: string
-                    componentName:
-                      description: ComponentName specifies the name of component where
-                        the account defined. For cluster-level connection credential,
-                        this field is required. Cannot be updated.
-                      type: string
-                    name:
-                      description: The name of the ConnectionCredential. Cannot be
-                        updated.
-                      type: string
-                    portName:
-                      description: PortName specifies the name of the port to access
-                        the service. If the service has multiple ports, a specific
-                        port must be specified to use here. Otherwise, the unique
-                        port of the service will be used. Cannot be updated.
-                      type: string
-                    serviceName:
-                      description: ServiceName specifies the name of service to use
-                        for accessing. Cannot be updated.
-                      type: string
-                  required:
-                  - name
-                  type: object
-                type: array
-                x-kubernetes-preserve-unknown-fields: true
               monitor:
                 description: monitor specifies the configuration of monitor
                 properties:
@@ -988,20 +1002,28 @@ spec:
                 description: services defines the services to access a cluster.
                 items:
                   properties:
+                    annotations:
+                      additionalProperties:
+                        type: string
+                      description: 'If ServiceType is LoadBalancer, cloud provider
+                        related parameters can be put here More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.'
+                      type: object
                     componentSelector:
                       description: ComponentSelector extends the ServiceSpec.Selector
                         by allowing you to specify a component as selectors for the
-                        service. For component-level services, a default component
-                        selector with the component name will be added automatically.
+                        service.
                       type: string
                     name:
-                      description: The name of the service. Others can refer to this
-                        service by its name. (e.g., connection credential) Cannot
+                      description: Name defines the name of the service. otherwise,
+                        it indicates the name of the service. Others can refer to
+                        this service by its name. (e.g., connection credential) Cannot
                         be updated.
                       type: string
                     roleSelector:
                       description: RoleSelector extends the ServiceSpec.Selector by
                         allowing you to specify defined role as selector for the service.
+                        if GeneratePodOrdinalService sets to true, RoleSelector will
+                        be ignored.
                       type: string
                     serviceName:
                       description: 'ServiceName defines the name of the underlying
@@ -1456,90 +1478,6 @@ spec:
                 additionalProperties:
                   description: ClusterComponentStatus records components status.
                   properties:
-                    consensusSetStatus:
-                      description: consensusSetStatus specifies the mapping of role
-                        and pod name.
-                      properties:
-                        followers:
-                          description: Followers status.
-                          items:
-                            properties:
-                              accessMode:
-                                default: ReadWrite
-                                description: accessMode defines what service this
-                                  pod provides.
-                                enum:
-                                - None
-                                - Readonly
-                                - ReadWrite
-                                type: string
-                              name:
-                                default: leader
-                                description: Defines the role name.
-                                type: string
-                              pod:
-                                default: Unknown
-                                description: Pod name.
-                                type: string
-                            required:
-                            - accessMode
-                            - name
-                            - pod
-                            type: object
-                          type: array
-                        leader:
-                          description: Leader status.
-                          properties:
-                            accessMode:
-                              default: ReadWrite
-                              description: accessMode defines what service this pod
-                                provides.
-                              enum:
-                              - None
-                              - Readonly
-                              - ReadWrite
-                              type: string
-                            name:
-                              default: leader
-                              description: Defines the role name.
-                              type: string
-                            pod:
-                              default: Unknown
-                              description: Pod name.
-                              type: string
-                          required:
-                          - accessMode
-                          - name
-                          - pod
-                          type: object
-                        learner:
-                          description: Learner status.
-                          properties:
-                            accessMode:
-                              default: ReadWrite
-                              description: accessMode defines what service this pod
-                                provides.
-                              enum:
-                              - None
-                              - Readonly
-                              - ReadWrite
-                              type: string
-                            name:
-                              default: leader
-                              description: Defines the role name.
-                              type: string
-                            pod:
-                              default: Unknown
-                              description: Pod name.
-                              type: string
-                          required:
-                          - accessMode
-                          - name
-                          - pod
-                          type: object
-                      required:
-                      - leader
-                      type: object
                     membersStatus:
                       description: members' status.
                       items:
@@ -1548,6 +1486,10 @@ spec:
                             default: Unknown
                             description: PodName pod name.
                             type: string
+                          readyWithoutPrimary:
+                            description: Is it required for rsm to have at least one
+                              primary pod to be ready.
+                            type: boolean
                           role:
                             properties:
                               accessMode:
@@ -1623,35 +1565,6 @@ spec:
                         pod.
                       format: date-time
                       type: string
-                    replicationSetStatus:
-                      description: replicationSetStatus specifies the mapping of role
-                        and pod name.
-                      properties:
-                        primary:
-                          description: Primary status.
-                          properties:
-                            pod:
-                              default: Unknown
-                              description: Pod name.
-                              type: string
-                          required:
-                          - pod
-                          type: object
-                        secondaries:
-                          description: Secondaries status.
-                          items:
-                            properties:
-                              pod:
-                                default: Unknown
-                                description: Pod name.
-                                type: string
-                            required:
-                            - pod
-                            type: object
-                          type: array
-                      required:
-                      - primary
-                      type: object
                   type: object
                 description: components record the current status information of all
                   components of the cluster.

@@ -20,6 +20,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // TODO: @wangyelei could refactor to ops group
@@ -27,7 +28,7 @@ import (
 // OpsRequestSpec defines the desired state of OpsRequest
 // +kubebuilder:validation:XValidation:rule="has(self.cancel) && self.cancel ? (self.type in ['VerticalScaling', 'HorizontalScaling']) : true",message="forbidden to cancel the opsRequest which type not in ['VerticalScaling','HorizontalScaling']"
 type OpsRequestSpec struct {
-	// clusterRef references clusterDefinition.
+	// clusterRef references cluster object.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
 	ClusterRef string `json:"clusterRef"`
@@ -102,11 +103,21 @@ type OpsRequestSpec struct {
 	// +listMapKey=componentName
 	VerticalScalingList []VerticalScaling `json:"verticalScaling,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
+	// Deprecate: replace by reconfigures.
+
 	// reconfigure defines the variables that need to input when updating configuration.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.reconfigure"
 	// +kubebuilder:validation:XValidation:rule="self.configurations.size() > 0", message="Value can not be empty"
 	Reconfigure *Reconfigure `json:"reconfigure,omitempty"`
+
+	// reconfigure defines the variables that need to input when updating configuration.
+	// +optional
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	Reconfigures []Reconfigure `json:"reconfigures,omitempty"`
 
 	// expose defines services the component needs to expose.
 	// +optional
@@ -139,6 +150,8 @@ type OpsRequestSpec struct {
 	// restoreSpec defines how to restore the cluster.
 	// +optional
 	RestoreSpec *RestoreSpec `json:"restoreSpec,omitempty"`
+
+	CustomSpec *CustomOpsSpec `json:"customSpec,omitempty"`
 }
 
 // ComponentOps defines the common variables of component scope operations.
@@ -214,6 +227,23 @@ type HorizontalScaling struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
 	Replicas int32 `json:"replicas"`
+
+	// Nodes defines the list of nodes that pods can schedule when scale up
+	// If the RsmTransformPolicy is specified as ToPod and expected replicas is more than current replicas,the list of
+	// Nodes will be used. If the list of Nodes is empty, no specific node will be assigned. However, if the list of Nodes
+	// is filled, all pods will be evenly scheduled across the Nodes in the list when scale up.
+	// +optional
+	Nodes []types.NodeName `json:"nodes,omitempty"`
+
+	// Instances defines the name of instance that rsm scale down priorly.
+	// If the RsmTransformPolicy is specified as ToPod and expected replicas is less than current replicas, the list of
+	// Instances will be used.
+	// current replicas - expected replicas > len(Instances): Scale down from the list of Instances priorly, the others
+	//	will select from NodeAssignment.
+	// current replicas - expected replicas < len(Instances): Scale down from the list of Instances.
+	// current replicas - expected replicas < len(Instances): Scale down from a part of Instances.
+	// +optional
+	Instances []string `json:"instances,omitempty"`
 }
 
 // Reconfigure defines the variables that need to input when updating configuration.
@@ -266,6 +296,23 @@ type ConfigurationItem struct {
 	Keys []ParameterConfig `json:"keys" patchStrategy:"merge,retainKeys" patchMergeKey:"key"`
 }
 
+type CustomOpsSpec struct {
+	// +kubebuilder:validation:Required
+	// cluster component name.
+	ComponentName string `json:"componentName"`
+
+	// +kubebuilder:validation:Required
+	// reference a opsDefinition
+	OpsDefinitionRef string `json:"opsDefinitionRef"`
+
+	// the input for this operation declared in the opsDefinition.spec.parametersSchema.
+	// will create corresponding jobs for each array element.
+	// if the param type is array, the format must be "v1,v2,v3".
+	// +kubebuilder:validation:MaxItem=10
+	// +optional
+	Params []map[string]string `json:"params,omitempty"`
+}
+
 type ParameterPair struct {
 	// key is name of the parameter to be updated.
 	// +kubebuilder:validation:Required
@@ -293,13 +340,87 @@ type ParameterConfig struct {
 	FileContent string `json:"fileContent,omitempty"`
 }
 
+// ExposeSwitch defines the switch of expose operation.
+// +enum
+// +kubebuilder:validation:Enum={Enable, Disable}
+type ExposeSwitch string
+
+const (
+	EnableExposeSwitch  ExposeSwitch = "Enable"
+	DisableExposeSwitch ExposeSwitch = "Disable"
+)
+
 type Expose struct {
 	ComponentOps `json:",inline"`
 
-	// Setting the list of services to be exposed.
+	// switch defines the switch of expose operation.
+	// if switch is set to Enable, the service will be exposed. if switch is set to Disable, the service will be removed.
+	// +kubebuilder:validation:Required
+	Switch ExposeSwitch `json:"switch"`
+
+	// Setting the list of services to be exposed or removed.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minitems=0
-	Services []ClusterComponentService `json:"services"`
+	Services []OpsService `json:"services"`
+}
+
+type OpsService struct {
+	// Name defines the name of the service.
+	// otherwise, it indicates the name of the service.
+	// Others can refer to this service by its name. (e.g., connection credential)
+	// Cannot be updated.
+	// +required
+	Name string `json:"name"`
+
+	// If ServiceType is LoadBalancer, cloud provider related parameters can be put here
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// The list of ports that are exposed by this service.
+	// If Ports are not provided, the default Services Ports defined in the ClusterDefinition or ComponentDefinition that are neither of NodePort nor LoadBalancer service type will be used.
+	// If there is no corresponding Service defined in the ClusterDefinition or ComponentDefinition, the expose operation will fail.
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
+	// +patchMergeKey=port
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=port
+	// +listMapKey=protocol
+	// +optional
+	Ports []corev1.ServicePort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"port" protobuf:"bytes,1,rep,name=ports"`
+
+	// RoleSelector extends the ServiceSpec.Selector by allowing you to specify defined role as selector for the service.
+	// +optional
+	RoleSelector string `json:"roleSelector,omitempty"`
+
+	// Route service traffic to pods with label keys and values matching this
+	// selector. If empty or not present, the service is assumed to have an
+	// external process managing its endpoints, which Kubernetes will not
+	// modify. Only applies to types ClusterIP, NodePort, and LoadBalancer.
+	// Ignored if type is ExternalName.
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/
+	// +optional
+	// +mapType=atomic
+	Selector map[string]string `json:"selector,omitempty" protobuf:"bytes,2,rep,name=selector"`
+
+	// type determines how the Service is exposed. Defaults to ClusterIP. Valid
+	// options are ExternalName, ClusterIP, NodePort, and LoadBalancer.
+	// "ClusterIP" allocates a cluster-internal IP address for load-balancing
+	// to endpoints. Endpoints are determined by the selector or if that is not
+	// specified, by manual construction of an Endpoints object or
+	// EndpointSlice objects. If clusterIP is "None", no virtual IP is
+	// allocated and the endpoints are published as a set of endpoints rather
+	// than a virtual IP.
+	// "NodePort" builds on ClusterIP and allocates a port on every node which
+	// routes to the same endpoints as the clusterIP.
+	// "LoadBalancer" builds on NodePort and creates an external load-balancer
+	// (if supported in the current cloud) which routes to the same endpoints
+	// as the clusterIP.
+	// "ExternalName" aliases this service to the specified externalName.
+	// Several other fields do not apply to ExternalName services.
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
+	// +optional
+	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
 }
 
 type RestoreFromSpec struct {
@@ -415,12 +536,15 @@ type RestoreSpec struct {
 	// +kubebuilder:validation:Required
 	BackupName string `json:"backupName"`
 
+	// effectiveCommonComponentDef describes this backup will be restored for all components which refer to common ComponentDefinition.
+	EffectiveCommonComponentDef bool `json:"effectiveCommonComponentDef,omitempty"`
+
 	// restoreTime point in time to restore
 	RestoreTimeStr string `json:"restoreTimeStr,omitempty"`
 
 	// the volume claim restore policy, support values: [Serial, Parallel]
 	// +kubebuilder:validation:Enum=Serial;Parallel
-	// +kubebuilder:default=Serial
+	// +kubebuilder:default=Parallel
 	VolumeRestorePolicy string `json:"volumeRestorePolicy,omitempty"`
 }
 
@@ -487,9 +611,15 @@ type OpsRequestStatus struct {
 	// +optional
 	CancelTimestamp metav1.Time `json:"cancelTimestamp,omitempty"`
 
+	// Deprecate: replace by ReconfiguringStatusAsComponent.
+
 	// reconfiguringStatus defines the status information of reconfiguring.
 	// +optional
 	ReconfiguringStatus *ReconfiguringStatus `json:"reconfiguringStatus,omitempty"`
+
+	// reconfiguringStatus defines the status information of reconfiguring.
+	// +optional
+	ReconfiguringStatusAsComponent map[string]*ReconfiguringStatus `json:"reconfiguringStatusAsComponent,omitempty"`
 
 	// conditions describes opsRequest detail status.
 	// +optional
@@ -594,9 +724,16 @@ type OpsRequestComponentStatus struct {
 }
 
 type ReconfiguringStatus struct {
+	// conditions describes reconfiguring detail status.
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
 	// configurationStatus describes the status of the component reconfiguring.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map

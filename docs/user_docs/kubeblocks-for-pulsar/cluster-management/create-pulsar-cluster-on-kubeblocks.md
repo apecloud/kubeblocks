@@ -1,5 +1,5 @@
 ---
-title: Create Pulsar Cluster on KubeBlocks
+title: Create a Pulsar Cluster
 description: How to Create Pulsar Cluster on KubeBlocks
 keywords: [pulsar, create cluster]
 sidebar_position: 1
@@ -14,12 +14,12 @@ KubeBlocks supports Pulsar's daily operations, including basic lifecycle operati
 
 ## Environment Recommendation
 
-Refer to the Pulsar official document for the configuration, such as memory, cup, and storage, of each component.
+Refer to the Pulsar official document for the configuration, such as memory, cpu, and storage, of each component.
 
 |      Components        |                                 Replicas                                  |
 | :--------------------  | :------------------------------------------------------------------------ |
 |       zookeeper        |          1 for test environment or 3 for production environment           |
-|        bookies         |  at lease 3 for test environment, at lease 4 for production environment   |
+|        bookies         |  at least 3 for test environment, at lease 4 for production environment   |
 |        broker          |      at least 1, for production environment, 3 replicas recommended       |
 | recovery (Optional)    | 1; if autoRecovery is not enabled for bookie, at least 3 replicas needed  |
 |   proxy (Optional)     |           1; and for production environment, 3 replicas needed            |
@@ -28,7 +28,7 @@ Refer to the Pulsar official document for the configuration, such as memory, cup
 
 1. Create the Pulsar cluster template file `values-production.yaml` for `helm` locally.
   
-   Copy the following information to the local file `values-production.yamlCre`.
+   Copy the following information to the local file `values-production.yaml`.
 
    ```bash
    ## Bookies configuration

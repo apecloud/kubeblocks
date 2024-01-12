@@ -293,6 +293,14 @@ func (r *BackupReconciler) prepareBackupRequest(
 		request.ActionSet = actionSet
 	}
 
+	if !snapshotVolumes && backupPolicy.Spec.UseKopia {
+		acked := backup.Annotations[dptypes.GeminiAcknowledgedAnnotationKey]
+		if acked != trueVal {
+			return nil, intctrlutil.NewErrorf(dperrors.ErrorTypeWaitForExternalHandler,
+				`wait for external handler to handle this backup because policy.spec.useKopia is true`)
+		}
+	}
+
 	request.BackupPolicy = backupPolicy
 	if !snapshotVolumes {
 		// if use volume snapshot, ignore backup repo
@@ -303,14 +311,10 @@ func (r *BackupReconciler) prepareBackupRequest(
 	request.BackupMethod = backupMethod
 
 	targetPods, err := GetTargetPods(reqCtx, r.Client,
-		backup.Annotations[dptypes.BackupTargetPodLabelKey], backupPolicy)
+		backup.Annotations[dptypes.BackupTargetPodLabelKey], backupMethod, backupPolicy)
 	if err != nil || len(targetPods) == 0 {
 		return nil, fmt.Errorf("failed to get target pods by backup policy %s/%s",
 			backupPolicy.Namespace, backupPolicy.Name)
-	}
-
-	if len(targetPods) > 1 {
-		return nil, fmt.Errorf("do not support more than one target pods")
 	}
 	request.TargetPods = targetPods
 	return request, nil
@@ -328,6 +332,9 @@ func (r *BackupReconciler) patchBackupStatus(
 	}
 	if request.BackupRepoPVC != nil {
 		request.Status.PersistentVolumeClaimName = request.BackupRepoPVC.Name
+	}
+	if request.BackupPolicy.Spec.UseKopia {
+		request.Status.KopiaRepoPath = dpbackup.BuildKopiaRepoPath(request.Backup, request.BackupPolicy.Spec.PathPrefix)
 	}
 	// init action status
 	actions, err := request.BuildActions()
@@ -581,7 +588,7 @@ func setConnectionPasswordAnnotation(request *dpbackup.Request) error {
 		return err
 	}
 	if ciphertext != "" {
-		request.Backup.Annotations[dptypes.ConnectionPasswordKey] = ciphertext
+		request.Backup.Annotations[dptypes.ConnectionPasswordAnnotationKey] = ciphertext
 	}
 	return nil
 }
@@ -596,6 +603,11 @@ func getClusterObjectString(cluster *appsv1alpha1.Cluster) (*string, error) {
 			Name:      cluster.Name,
 		},
 		TypeMeta: cluster.TypeMeta,
+	}
+	if v, ok := cluster.Annotations[constant.ExtraEnvAnnotationKey]; ok {
+		newCluster.Annotations = map[string]string{
+			constant.ExtraEnvAnnotationKey: v,
+		}
 	}
 	clusterBytes, err := json.Marshal(newCluster)
 	if err != nil {

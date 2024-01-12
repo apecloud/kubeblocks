@@ -248,6 +248,24 @@ spec:
                           type: object
                       type: object
                     type: array
+                  preDelete:
+                    description: preDelete defines that custom deletion action which
+                      can be executed before executing the built-in deletion action.
+                      note that preDelete action job will ignore the env/envFrom.
+                    properties:
+                      command:
+                        description: command specifies the commands to back up the
+                          volume data.
+                        items:
+                          type: string
+                        type: array
+                      image:
+                        description: image specifies the image of backup container.
+                        type: string
+                    required:
+                    - command
+                    - image
+                    type: object
                 type: object
               backupType:
                 allOf:

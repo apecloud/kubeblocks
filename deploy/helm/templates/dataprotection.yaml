@@ -1,3 +1,4 @@
+{{- $dataProtectionImageRegistry := include "kubeblocks.imageRegistry" . }}
 {{- if .Values.dataProtection.enabled }}
 apiVersion: apps/v1
 kind: Deployment
@@ -38,6 +39,8 @@ spec:
         - name: tools
           image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
           command:
             - /bin/true
       containers:
@@ -93,14 +96,14 @@ spec:
                   name: {{ include "kubeblocks.fullname" . }}-secret
                   key: dataProtectionEncryptionKey
             - name: DATASAFED_IMAGE
-              value: "{{ .Values.dataProtection.image.registry | default "docker.io" }}/{{ .Values.dataProtection.image.datasafed.repository }}:{{ .Values.dataProtection.image.datasafed.tag | default "latest" }}"
+              value: "{{ .Values.dataProtection.image.registry | default $dataProtectionImageRegistry }}/{{ .Values.dataProtection.image.datasafed.repository }}:{{ .Values.dataProtection.image.datasafed.tag | default "latest" }}"
             - name: GC_FREQUENCY_SECONDS
               value: "{{ .Values.dataProtection.gcFrequencySeconds }}"
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          image: "{{ .Values.dataProtection.image.registry | default "docker.io" }}/{{ .Values.dataProtection.image.repository }}:{{ .Values.dataProtection.image.tag | default .Chart.AppVersion }}"
+          image: "{{ .Values.dataProtection.image.registry | default $dataProtectionImageRegistry }}/{{ .Values.dataProtection.image.repository }}:{{ .Values.dataProtection.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.dataProtection.image.pullPolicy }}
           ports:
             - name: webhook-server

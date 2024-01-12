@@ -76,12 +76,12 @@ func NewKubernetesStore() (*KubernetesStore, error) {
 
 	clusterName := os.Getenv(constant.KBEnvClusterName)
 	if clusterName == "" {
-		return nil, errors.New("KB_CLUSTER_NAME must be set")
+		return nil, errors.New(fmt.Sprintf("%s must be set", constant.KBEnvClusterName))
 	}
 
-	componentName := os.Getenv(constant.KBEnvComponentName)
+	componentName := os.Getenv(constant.KBEnvCompName)
 	if componentName == "" {
-		return nil, errors.New("KB_COMP_NAME must be set")
+		return nil, errors.New(fmt.Sprintf("%s must be set", constant.KBEnvCompName))
 	}
 
 	clusterCompName := os.Getenv(constant.KBEnvClusterCompName)
@@ -91,12 +91,12 @@ func NewKubernetesStore() (*KubernetesStore, error) {
 
 	currentMemberName := os.Getenv(constant.KBEnvPodName)
 	if clusterName == "" {
-		return nil, errors.New("KB_POD_NAME must be set")
+		return nil, errors.New(fmt.Sprintf("%s must be set", constant.KBEnvPodName))
 	}
 
 	namespace := os.Getenv(constant.KBEnvNamespace)
 	if namespace == "" {
-		return nil, errors.New("KB_NAMESPACE must be set")
+		return nil, errors.New(fmt.Sprintf("%s must be set", constant.KBEnvNamespace))
 	}
 
 	store := &KubernetesStore{
@@ -136,6 +136,11 @@ func (store *KubernetesStore) GetClusterName() string {
 	return store.clusterName
 }
 
+func (store *KubernetesStore) SetCompName(componentName string) {
+	store.componentName = componentName
+	store.clusterCompName = store.clusterName + "-" + componentName
+}
+
 func (store *KubernetesStore) GetClusterFromCache() *Cluster {
 	if store.cluster != nil {
 		return store.cluster
@@ -166,24 +171,29 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 		}
 	}
 
-	members, err := store.GetMembers()
-	if err != nil {
-		store.logger.Info("get members error", "error", err)
+	var members []Member
+	if store.cluster != nil && int(replicas) == len(store.cluster.Members) {
+		members = store.cluster.Members
+	} else {
+		members, err = store.GetMembers()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	leader, err := store.GetLeader()
 	if err != nil {
-		store.logger.Info("get leader error", "error", err)
+		store.logger.Info("get leader failed", "error", err)
 	}
 
 	switchover, err := store.GetSwitchover()
 	if err != nil {
-		store.logger.Info("get switchover error", "error", err)
+		store.logger.Info("get switchover failed", "error", err)
 	}
 
 	haConfig, err := store.GetHaConfig()
 	if err != nil {
-		store.logger.Info("get HaConfig error", "error", err)
+		store.logger.Info("get HaConfig failed", "error", err)
 	}
 
 	cluster := &Cluster{
@@ -221,7 +231,7 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 		member := &members[i]
 		member.Name = pod.Name
 		// member.Name = fmt.Sprintf("%s.%s-headless.%s.svc", pod.Name, store.clusterCompName, store.namespace)
-		member.Role = pod.Labels["app.kubernetes.io/role"]
+		member.Role = pod.Labels[constant.RoleLabelKey]
 		member.PodIP = pod.Status.PodIP
 		member.DBPort = getDBPort(&pod)
 		member.LorryPort = getLorryPort(&pod)
@@ -352,7 +362,8 @@ func (store *KubernetesStore) DeleteLeader() error {
 }
 
 func (store *KubernetesStore) AttemptAcquireLease() error {
-	now := strconv.FormatInt(time.Now().Unix(), 10)
+	timestamp := time.Now().Unix()
+	now := strconv.FormatInt(timestamp, 10)
 	ttl := store.cluster.HaConfig.ttl
 	leaderName := store.currentMemberName
 	annotation := map[string]string{
@@ -371,11 +382,13 @@ func (store *KubernetesStore) AttemptAcquireLease() error {
 	cm, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 	if err != nil {
 		store.logger.Error(err, "Acquire lease failed")
-	} else {
-		store.cluster.Leader.Resource = cm
+		return err
 	}
 
-	return err
+	store.cluster.Leader.Resource = cm
+	store.cluster.Leader.AcquireTime = timestamp
+	store.cluster.Leader.RenewTime = timestamp
+	return nil
 }
 
 func (store *KubernetesStore) HasLease() bool {
@@ -407,6 +420,7 @@ func (store *KubernetesStore) ReleaseLease() error {
 	store.logger.Info("release lease")
 	configMap := store.cluster.Leader.Resource.(*corev1.ConfigMap)
 	configMap.Annotations["leader"] = ""
+	store.cluster.Leader.Name = ""
 
 	if store.cluster.Leader.DBState != nil {
 		str, _ := json.Marshal(store.cluster.Leader.DBState)
@@ -628,7 +642,7 @@ func getDBPort(pod *corev1.Pod) string {
 func getLorryPort(pod *corev1.Pod) string {
 	for _, container := range pod.Spec.Containers {
 		for _, port := range container.Ports {
-			if port.Name == "probe-http-port" {
+			if port.Name == constant.LorryHTTPPortName {
 				return strconv.Itoa(int(port.ContainerPort))
 			}
 		}

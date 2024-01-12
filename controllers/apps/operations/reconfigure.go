@@ -20,9 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"fmt"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -67,9 +69,6 @@ func handleReconfigureStatusProgress(result *appsv1alpha1.ReconcileDetail, opsSt
 			cmStatus.Message = result.ErrMessage
 			cmStatus.Status = string(phase)
 		}
-		if cmStatus.SucceedCount != core.Unconfirmed && cmStatus.ExpectedCount != core.Unconfirmed {
-			opsStatus.Progress = getSlowestReconfiguringProgress(opsStatus.ReconfiguringStatus.ConfigurationStatus)
-		}
 		return
 	}
 }
@@ -89,15 +88,14 @@ func handleNewReconfigureRequest(configPatch *core.ConfigPatchInfo, lastAppliedC
 	}
 }
 
-func (r *reconfigureAction) syncDependResources(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*intctrlutil.Fetcher, error) {
+func (r *reconfigureAction) syncDependResources(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, configSpec appsv1alpha1.ConfigurationItem, componentName string) (*intctrlutil.Fetcher, error) {
 	ops := &opsRes.OpsRequest.Spec
-	configSpec := ops.Reconfigure.Configurations[0]
 	fetcher := intctrlutil.NewResourceFetcher(&intctrlutil.ResourceCtx{
 		Context:       reqCtx.Ctx,
 		Client:        cli,
 		Namespace:     opsRes.Cluster.Namespace,
 		ClusterName:   ops.ClusterRef,
-		ComponentName: ops.Reconfigure.ComponentName,
+		ComponentName: componentName,
 	})
 
 	err := fetcher.Cluster().
@@ -112,65 +110,136 @@ func (r *reconfigureAction) syncDependResources(reqCtx intctrlutil.RequestCtx, c
 	return fetcher, nil
 }
 
-func (r *reconfigureAction) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
-	status := opsRes.OpsRequest.Status
-	if len(status.Conditions) == 0 {
-		return status.Phase, 30 * time.Second, nil
-	}
-	if isNoChange(status.Conditions) {
-		return appsv1alpha1.OpsSucceedPhase, 0, nil
+func (r *reconfigureAction) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
+	var (
+		isFinished = true
+		opsRequest = resource.OpsRequest.Spec
+	)
+
+	// Node: support multiple component
+	opsDeepCopy := resource.OpsRequest.DeepCopy()
+	statusAsComponents := make([]appsv1alpha1.ConfigurationItemStatus, 0)
+	for _, reconfigureParams := range fromReconfigureOperations(opsRequest, reqCtx, cli, resource) {
+		phase, err := r.doSyncReconfigureStatus(reconfigureParams)
+		switch {
+		case err != nil:
+			return "", 30 * time.Second, err
+		case phase == appsv1alpha1.OpsFailedPhase:
+			return appsv1alpha1.OpsFailedPhase, 0, nil
+		case phase != appsv1alpha1.OpsSucceedPhase:
+			isFinished = false
+		}
+		statusAsComponents = append(statusAsComponents, reconfigureParams.configurationStatus.ConfigurationStatus[0])
 	}
 
-	ops := &opsRes.OpsRequest.Spec
-	if ops.Reconfigure == nil || len(ops.Reconfigure.Configurations) == 0 {
-		return appsv1alpha1.OpsFailedPhase, 0, nil
+	phase := appsv1alpha1.OpsRunningPhase
+	if isFinished {
+		phase = appsv1alpha1.OpsSucceedPhase
 	}
+	return syncReconfigureForOps(reqCtx, cli, resource, statusAsComponents, opsDeepCopy, phase)
+}
 
-	resource, err := r.syncDependResources(reqCtx, cli, opsRes)
-	if err != nil {
+func fromReconfigureOperations(request appsv1alpha1.OpsRequestSpec, reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) (reconfigures []reconfigureParams) {
+	var operations []appsv1alpha1.Reconfigure
+
+	if request.Reconfigure != nil {
+		operations = append(operations, *request.Reconfigure)
+	}
+	operations = append(operations, request.Reconfigures...)
+
+	for _, reconfigure := range operations {
+		if len(reconfigure.Configurations) == 0 {
+			continue
+		}
+		reconfigures = append(reconfigures, reconfigureParams{
+			resource:            resource,
+			reqCtx:              reqCtx,
+			cli:                 cli,
+			clusterName:         resource.Cluster.Name,
+			componentName:       reconfigure.ComponentName,
+			opsRequest:          resource.OpsRequest,
+			configurationItem:   reconfigure.Configurations[0],
+			configurationStatus: initReconfigureStatus(resource.OpsRequest, reconfigure.ComponentName),
+		})
+	}
+	return reconfigures
+}
+
+func syncReconfigureForOps(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource, statusAsComponents []appsv1alpha1.ConfigurationItemStatus, opsDeepCopy *appsv1alpha1.OpsRequest, phase appsv1alpha1.OpsPhase) (appsv1alpha1.OpsPhase, time.Duration, error) {
+	succeedCount := 0
+	expectedCount := 0
+	opsRequest := resource.OpsRequest
+	invalidProgress := false
+	for _, status := range statusAsComponents {
+		if status.SucceedCount < 0 || status.ExpectedCount < 0 {
+			invalidProgress = true
+			break
+		}
+		succeedCount += int(status.SucceedCount)
+		expectedCount += int(status.ExpectedCount)
+	}
+	if !invalidProgress {
+		opsRequest.Status.Progress = fmt.Sprintf("%d/%d", succeedCount, expectedCount)
+	}
+	if err := PatchOpsStatusWithOpsDeepCopy(reqCtx.Ctx, cli, resource, opsDeepCopy, phase); err != nil {
 		return "", 30 * time.Second, err
 	}
-	configSpec := ops.Reconfigure.Configurations[0]
+	return phase, 30 * time.Second, nil
+}
+
+func (r *reconfigureAction) doSyncReconfigureStatus(params reconfigureParams) (appsv1alpha1.OpsPhase, error) {
+	configSpec := params.configurationItem
+	resource, err := r.syncDependResources(params.reqCtx,
+		params.cli, params.resource, configSpec, params.componentName)
+	if err != nil {
+		return "", err
+	}
+
 	item := resource.ConfigurationObj.Spec.GetConfigurationItem(configSpec.Name)
 	itemStatus := resource.ConfigurationObj.Status.GetItemStatus(configSpec.Name)
 	if item == nil || itemStatus == nil {
-		return appsv1alpha1.OpsRunningPhase, 30 * time.Second, nil
+		return appsv1alpha1.OpsRunningPhase, nil
 	}
 
 	switch phase := reconfiguringPhase(resource, *item, itemStatus); phase {
 	case appsv1alpha1.CCreatingPhase, appsv1alpha1.CInitPhase:
-		return appsv1alpha1.OpsFailedPhase, 0, core.MakeError("the configuration is creating or initializing, is not ready to reconfigure")
+		return appsv1alpha1.OpsFailedPhase, core.MakeError("the configuration is creating or initializing, is not ready to reconfigure")
 	case appsv1alpha1.CFailedAndPausePhase:
-		return syncStatus(cli, reqCtx, opsRes, itemStatus, phase, appsv1alpha1.OpsFailedPhase, appsv1alpha1.ReasonReconfigureFailed)
+		return appsv1alpha1.OpsFailedPhase,
+			syncStatus(params.configurationStatus, params.resource, itemStatus, phase)
 	case appsv1alpha1.CFinishedPhase:
-		return syncStatus(cli, reqCtx, opsRes, itemStatus, phase, appsv1alpha1.OpsSucceedPhase, appsv1alpha1.ReasonReconfigureSucceed)
+		return appsv1alpha1.OpsSucceedPhase,
+			syncStatus(params.configurationStatus, params.resource, itemStatus, phase)
 	default:
-		return syncStatus(cli, reqCtx, opsRes, itemStatus, phase, appsv1alpha1.OpsRunningPhase, appsv1alpha1.ReasonReconfigureRunning)
+		return appsv1alpha1.OpsRunningPhase,
+			syncStatus(params.configurationStatus, params.resource, itemStatus, phase)
 	}
 }
 
 func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) error {
-	var (
-		opsRequest    = resource.OpsRequest
-		spec          = &opsRequest.Spec
-		clusterName   = spec.ClusterRef
-		componentName = spec.Reconfigure.ComponentName
-		reconfigure   = spec.Reconfigure
-	)
+	opsRequest := resource.OpsRequest.Spec
+	// Node: support multiple component
+	for _, reconfigureParams := range fromReconfigureOperations(opsRequest, reqCtx, cli, resource) {
+		if err := r.doReconfiguring(reconfigureParams); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-	if !needReconfigure(opsRequest) {
+func (r *reconfigureAction) doReconfiguring(params reconfigureParams) error {
+	if !needReconfigure(params.opsRequest, params.configurationStatus) {
 		return nil
 	}
 
-	// TODO support multi tpl conditions merge
-	item := reconfigure.Configurations[0]
+	item := params.configurationItem
 	opsPipeline := newPipeline(reconfigureContext{
-		cli:           cli,
-		reqCtx:        reqCtx,
-		resource:      resource,
+		cli:           params.cli,
+		reqCtx:        params.reqCtx,
+		resource:      params.resource,
 		config:        item,
-		clusterName:   clusterName,
-		componentName: componentName,
+		clusterName:   params.clusterName,
+		componentName: params.componentName,
 	})
 
 	result := opsPipeline.
@@ -184,34 +253,32 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 		Complete()
 
 	if result.err != nil {
-		return processMergedFailed(resource, result.failed, result.err)
+		return processMergedFailed(params.resource, result.failed, result.err)
 	}
 
-	reqCtx.Recorder.Eventf(resource.OpsRequest,
+	params.reqCtx.Recorder.Eventf(params.resource.OpsRequest,
 		corev1.EventTypeNormal,
 		appsv1alpha1.ReasonReconfigurePersisted,
-		"the reconfiguring operation of component[%s] in cluster[%s] merged successfully", componentName, clusterName)
+		"the reconfiguring operation of component[%s] in cluster[%s] merged successfully", params.componentName, params.clusterName)
 
 	// merged successfully
-	if err := patchReconfigureOpsStatus(resource, opsPipeline.configSpec.Name,
+	if err := updateReconfigureStatusByCM(params.configurationStatus, opsPipeline.configSpec.Name,
 		handleNewReconfigureRequest(result.configPatch, result.lastAppliedConfigs)); err != nil {
 		return err
 	}
-	condition := constructReconfiguringConditions(result, resource, opsPipeline.configSpec)
-	resource.OpsRequest.SetStatusCondition(*condition)
+	condition := constructReconfiguringConditions(result, params.resource, opsPipeline.configSpec)
+	meta.SetStatusCondition(&params.configurationStatus.Conditions, *condition)
 	return nil
 }
 
-func needReconfigure(request *appsv1alpha1.OpsRequest) bool {
+func needReconfigure(request *appsv1alpha1.OpsRequest, status *appsv1alpha1.ReconfiguringStatus) bool {
 	// Update params to configmap
-	if request.Spec.Type != appsv1alpha1.ReconfiguringType ||
-		request.Spec.Reconfigure == nil ||
-		len(request.Spec.Reconfigure.Configurations) == 0 {
+	if request.Spec.Type != appsv1alpha1.ReconfiguringType {
 		return false
 	}
 
 	// Check if the reconfiguring operation has been processed.
-	for _, condition := range request.Status.Conditions {
+	for _, condition := range status.Conditions {
 		if isExpectedPhase(condition, []string{appsv1alpha1.ReasonReconfigurePersisted, appsv1alpha1.ReasonReconfigureNoChanged}, metav1.ConditionTrue) {
 			return false
 		}
@@ -219,23 +286,15 @@ func needReconfigure(request *appsv1alpha1.OpsRequest) bool {
 	return true
 }
 
-func syncStatus(cli client.Client,
-	reqCtx intctrlutil.RequestCtx,
+func syncStatus(reconfiguringStatus *appsv1alpha1.ReconfiguringStatus,
 	opsRes *OpsResource,
 	status *appsv1alpha1.ConfigurationItemDetailStatus,
-	phase appsv1alpha1.ConfigurationPhase,
-	opsPhase appsv1alpha1.OpsPhase,
-	reconfigurePhase string) (appsv1alpha1.OpsPhase, time.Duration, error) {
-	opsDeepCopy := opsRes.OpsRequest.DeepCopy()
-	if err := patchReconfigureOpsStatus(opsRes, status.Name,
-		handleReconfigureStatusProgress(status.ReconcileDetail, &opsRes.OpsRequest.Status, phase)); err != nil {
-		return "", 30 * time.Second, err
-	}
-	if err := PatchOpsStatusWithOpsDeepCopy(reqCtx.Ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
-		appsv1alpha1.NewReconfigureRunningCondition(opsRes.OpsRequest, reconfigurePhase, status.Name)); err != nil {
-		return "", 30 * time.Second, err
-	}
-	return opsPhase, 30 * time.Second, nil
+	phase appsv1alpha1.ConfigurationPhase) error {
+	err := updateReconfigureStatusByCM(reconfiguringStatus, status.Name,
+		handleReconfigureStatusProgress(status.ReconcileDetail, &opsRes.OpsRequest.Status, phase))
+	meta.SetStatusCondition(&reconfiguringStatus.Conditions, *appsv1alpha1.NewReconfigureRunningCondition(
+		opsRes.OpsRequest, string(phase), status.Name))
+	return err
 }
 
 func reconfiguringPhase(resource *intctrlutil.Fetcher,
@@ -256,11 +315,24 @@ func isExpectedPhase(condition metav1.Condition, expectedTypes []string, expecte
 	return false
 }
 
-func isNoChange(conditions []metav1.Condition) bool {
-	for i := len(conditions); i > 0; i-- {
-		if isExpectedPhase(conditions[i-1], []string{appsv1alpha1.ReasonReconfigureNoChanged}, metav1.ConditionTrue) {
-			return true
+func initReconfigureStatus(opsRequest *appsv1alpha1.OpsRequest, componentName string) *appsv1alpha1.ReconfiguringStatus {
+	status := &opsRequest.Status
+	if componentName == "" || (opsRequest.Spec.Reconfigure != nil && opsRequest.Spec.Reconfigure.ComponentName == componentName) {
+		if status.ReconfiguringStatus == nil {
+			status.ReconfiguringStatus = &appsv1alpha1.ReconfiguringStatus{
+				ConfigurationStatus: make([]appsv1alpha1.ConfigurationItemStatus, 0),
+			}
+		}
+		return status.ReconfiguringStatus
+	}
+
+	if status.ReconfiguringStatusAsComponent == nil {
+		status.ReconfiguringStatusAsComponent = make(map[string]*appsv1alpha1.ReconfiguringStatus)
+	}
+	if _, ok := status.ReconfiguringStatusAsComponent[componentName]; !ok {
+		status.ReconfiguringStatusAsComponent[componentName] = &appsv1alpha1.ReconfiguringStatus{
+			ConfigurationStatus: make([]appsv1alpha1.ConfigurationItemStatus, 0),
 		}
 	}
-	return false
+	return status.ReconfiguringStatusAsComponent[componentName]
 }

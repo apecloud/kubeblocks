@@ -82,6 +82,14 @@ func (builder *ComponentDefinitionBuilder) AddVolumeMounts(containerName string,
 	return builder
 }
 
+func (builder *ComponentDefinitionBuilder) AddVar(v appsv1alpha1.EnvVar) *ComponentDefinitionBuilder {
+	if builder.get().Spec.Vars == nil {
+		builder.get().Spec.Vars = make([]appsv1alpha1.EnvVar, 0)
+	}
+	builder.get().Spec.Vars = append(builder.get().Spec.Vars, v)
+	return builder
+}
+
 func (builder *ComponentDefinitionBuilder) AddVolume(name string, snapshot bool, watermark int) *ComponentDefinitionBuilder {
 	vol := appsv1alpha1.ComponentVolume{
 		Name:          name,
@@ -105,14 +113,16 @@ func (builder *ComponentDefinitionBuilder) AddService(name, serviceName string, 
 }
 
 func (builder *ComponentDefinitionBuilder) AddServiceExt(name, serviceName string, serviceSpec corev1.ServiceSpec, roleSelector string) *ComponentDefinitionBuilder {
-	svc := appsv1alpha1.Service{
-		Name:         name,
-		ServiceName:  serviceName,
-		Spec:         serviceSpec,
-		RoleSelector: roleSelector,
+	svc := appsv1alpha1.ComponentService{
+		Service: appsv1alpha1.Service{
+			Name:         name,
+			ServiceName:  serviceName,
+			Spec:         serviceSpec,
+			RoleSelector: roleSelector,
+		},
 	}
 	if builder.get().Spec.Services == nil {
-		builder.get().Spec.Services = make([]appsv1alpha1.Service, 0)
+		builder.get().Spec.Services = make([]appsv1alpha1.ComponentService, 0)
 	}
 	builder.get().Spec.Services = append(builder.get().Spec.Services, svc)
 	return builder
@@ -181,8 +191,16 @@ func (builder *ComponentDefinitionBuilder) SetPolicyRules(rules []rbacv1.PolicyR
 	return builder
 }
 
-func (builder *ComponentDefinitionBuilder) SetLabels(labels map[string]appsv1alpha1.BuiltInString) *ComponentDefinitionBuilder {
+func (builder *ComponentDefinitionBuilder) SetLabels(labels map[string]string) *ComponentDefinitionBuilder {
 	builder.get().Spec.Labels = labels
+	return builder
+}
+
+func (builder *ComponentDefinitionBuilder) SetReplicasLimit(minReplicas, maxReplicas int32) *ComponentDefinitionBuilder {
+	builder.get().Spec.ReplicasLimit = &appsv1alpha1.ReplicasLimit{
+		MinReplicas: minReplicas,
+		MaxReplicas: maxReplicas,
+	}
 	return builder
 }
 
@@ -196,20 +214,6 @@ func (builder *ComponentDefinitionBuilder) AddSystemAccount(accountName string, 
 		builder.get().Spec.SystemAccounts = make([]appsv1alpha1.SystemAccount, 0)
 	}
 	builder.get().Spec.SystemAccounts = append(builder.get().Spec.SystemAccounts, account)
-	return builder
-}
-
-func (builder *ComponentDefinitionBuilder) AddConnectionCredential(name, serviceName, portName, accountName string) *ComponentDefinitionBuilder {
-	credential := appsv1alpha1.ConnectionCredential{
-		Name:        name,
-		ServiceName: serviceName,
-		PortName:    portName,
-		AccountName: accountName,
-	}
-	if builder.get().Spec.ConnectionCredentials == nil {
-		builder.get().Spec.ConnectionCredentials = make([]appsv1alpha1.ConnectionCredential, 0)
-	}
-	builder.get().Spec.ConnectionCredentials = append(builder.get().Spec.ConnectionCredentials, credential)
 	return builder
 }
 

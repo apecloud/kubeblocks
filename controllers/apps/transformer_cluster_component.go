@@ -27,8 +27,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -46,10 +48,20 @@ func (t *clusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
-	// has no components defined
-	if len(transCtx.ComponentSpecs) == 0 || !transCtx.OrigCluster.IsUpdating() {
+	if len(transCtx.ComponentSpecs) == 0 {
 		return nil
 	}
+
+	allCompObjExist, err := checkAllCompObjExist(transCtx, transCtx.Cluster)
+	if err != nil {
+		return err
+	}
+
+	// if all component objects exist and cluster is not updating, skip reconciling components
+	if !transCtx.OrigCluster.IsUpdating() && allCompObjExist {
+		return nil
+	}
+
 	return t.reconcileComponents(transCtx, dag)
 }
 
@@ -133,6 +145,18 @@ func (t *clusterComponentTransformer) handleCompsUpdate(transCtx *clusterTransfo
 	return nil
 }
 
+func checkAllCompObjExist(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) (bool, error) {
+	compList := &appsv1alpha1.ComponentList{}
+	labels := constant.GetClusterWellKnownLabels(cluster.Name)
+	if err := transCtx.Client.List(transCtx.Context, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
+		return false, err
+	}
+	if len(compList.Items) != len(cluster.Spec.ComponentSpecs) {
+		return false, nil
+	}
+	return true, nil
+}
+
 // getRunningCompObject gets the component object from cache snapshot
 func getRunningCompObject(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster, compName string) (*appsv1alpha1.Component, error) {
 	compKey := types.NamespacedName{
@@ -173,6 +197,8 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	compObjCopy.Spec.Affinity = compProto.Spec.Affinity
 	compObjCopy.Spec.Tolerations = compProto.Spec.Tolerations
 	compObjCopy.Spec.TLSConfig = compProto.Spec.TLSConfig
+	compObjCopy.Spec.Nodes = compProto.Spec.Nodes
+	compObjCopy.Spec.Instances = compProto.Spec.Instances
 
 	if reflect.DeepEqual(oldCompObj.Annotations, compObjCopy.Annotations) &&
 		reflect.DeepEqual(oldCompObj.Labels, compObjCopy.Labels) &&

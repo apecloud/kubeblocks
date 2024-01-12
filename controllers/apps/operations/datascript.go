@@ -43,19 +43,9 @@ import (
 )
 
 var _ OpsHandler = DataScriptOpsHandler{}
-var _ error = &FastFailError{}
 
 // DataScriptOpsHandler handles DataScript operation, it is more like a one-time command operation.
 type DataScriptOpsHandler struct {
-}
-
-// FastFailError is an error type that will not retry the operation.
-type FastFailError struct {
-	message string
-}
-
-func (e *FastFailError) Error() string {
-	return fmt.Sprintf("fail with message: %s", e.message)
 }
 
 func init() {
@@ -80,21 +70,21 @@ func (o DataScriptOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.C
 	component := cluster.Spec.GetComponentByName(spec.ComponentName)
 	if component == nil {
 		// we have checked component exists in validation, so this should not happen
-		return &FastFailError{message: fmt.Sprintf("component %s not found in cluster %s", spec.ComponentName, cluster.Name)}
+		return intctrlutil.NewFatalError(fmt.Sprintf("component %s not found in cluster %s", spec.ComponentName, cluster.Name))
 	}
 
 	clusterDef, err := getClusterDefByName(reqCtx.Ctx, cli, cluster.Spec.ClusterDefRef)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// fail fast if cluster def does not exists
-			return &FastFailError{message: err.Error()}
+			return intctrlutil.NewFatalError(err.Error())
 		}
 		return err
 	}
 	// get componentDef
 	componentDef := clusterDef.GetComponentDefByName(component.ComponentDefRef)
 	if componentDef == nil {
-		return &FastFailError{message: fmt.Sprintf("componentDef %s not found in clusterDef %s", component.ComponentDefRef, clusterDef.Name)}
+		return intctrlutil.NewFatalError(fmt.Sprintf("componentDef %s not found in clusterDef %s", component.ComponentDefRef, clusterDef.Name))
 	}
 
 	// create jobs
@@ -240,7 +230,7 @@ func buildDataScriptJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, clust
 	ops *appsv1alpha1.OpsRequest, charType string) ([]*batchv1.Job, error) {
 	engineForJob, err := register.NewClusterCommands(charType)
 	if err != nil || engineForJob == nil {
-		return nil, &FastFailError{message: err.Error()}
+		return nil, intctrlutil.NewFatalError(err.Error())
 	}
 
 	buildJob := func(endpoint string) (*batchv1.Job, error) {
@@ -262,7 +252,7 @@ func buildDataScriptJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, clust
 		}
 		// verify secrets exist
 		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: secretFrom.Name}, &corev1.Secret{}); err != nil {
-			return nil, &FastFailError{message: err.Error()}
+			return nil, intctrlutil.NewFatalError(err.Error())
 		}
 
 		envs = append(envs, corev1.EnvVar{
@@ -291,7 +281,7 @@ func buildDataScriptJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, clust
 		// parse scripts
 		scripts, err := getScriptContent(reqCtx, cli, ops.Spec.ScriptSpec)
 		if err != nil {
-			return nil, &FastFailError{message: err.Error()}
+			return nil, intctrlutil.NewFatalError(err.Error())
 		}
 
 		envs = append(envs, corev1.EnvVar{
@@ -301,7 +291,7 @@ func buildDataScriptJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, clust
 
 		jobCmdTpl, envVars, err := engineForJob.ExecuteCommand(scripts)
 		if err != nil {
-			return nil, &FastFailError{message: err.Error()}
+			return nil, intctrlutil.NewFatalError(err.Error())
 		}
 		if envVars != nil {
 			envs = append(envs, envVars...)
@@ -311,7 +301,7 @@ func buildDataScriptJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, clust
 			containerImg = ops.Spec.ScriptSpec.Image
 		}
 		if len(containerImg) == 0 {
-			return nil, &FastFailError{message: "image is empty"}
+			return nil, intctrlutil.NewFatalError("image is empty")
 		}
 
 		container := corev1.Container{
@@ -333,7 +323,7 @@ func buildDataScriptJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, clust
 				Namespace: cluster.Namespace,
 			},
 		}
-
+		intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 		// set backoff limit to 0, so that the job will not be restarted
 		job.Spec.BackoffLimit = pointer.Int32(0)
 		job.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
@@ -344,13 +334,13 @@ func buildDataScriptJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, clust
 		// add tolerations
 		tolerations, err := componetutil.BuildTolerations(cluster, component)
 		if err != nil {
-			return nil, &FastFailError{message: err.Error()}
+			return nil, intctrlutil.NewFatalError(err.Error())
 		}
 		job.Spec.Template.Spec.Tolerations = tolerations
 		// add owner reference
 		scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 		if err := controllerutil.SetOwnerReference(ops, job, scheme); err != nil {
-			return nil, &FastFailError{message: err.Error()}
+			return nil, intctrlutil.NewFatalError(err.Error())
 		}
 		return job, nil
 	}
@@ -362,10 +352,10 @@ func buildDataScriptJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, clust
 	jobs := make([]*batchv1.Job, 0)
 	if ops.Spec.ScriptSpec.Selector == nil {
 		if endpoint, err = getTargetService(reqCtx, cli, client.ObjectKeyFromObject(cluster), component.Name); err != nil {
-			return nil, &FastFailError{message: err.Error()}
+			return nil, intctrlutil.NewFatalError(err.Error())
 		}
 		if job, err = buildJob(endpoint); err != nil {
-			return nil, &FastFailError{message: err.Error()}
+			return nil, intctrlutil.NewFatalError(err.Error())
 		}
 		jobs = append(jobs, job)
 		return jobs, nil
@@ -373,7 +363,7 @@ func buildDataScriptJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, clust
 
 	selector, err := metav1.LabelSelectorAsSelector(ops.Spec.ScriptSpec.Selector)
 	if err != nil {
-		return nil, &FastFailError{message: err.Error()}
+		return nil, intctrlutil.NewFatalError(err.Error())
 	}
 
 	pods := &corev1.PodList{}
@@ -384,15 +374,15 @@ func buildDataScriptJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, clust
 		},
 		client.MatchingLabelsSelector{Selector: selector},
 	); err != nil {
-		return nil, &FastFailError{message: err.Error()}
+		return nil, intctrlutil.NewFatalError(err.Error())
 	} else if len(pods.Items) == 0 {
-		return nil, &FastFailError{message: "no pods found"}
+		return nil, intctrlutil.NewFatalError(err.Error())
 	}
 
 	for _, pod := range pods.Items {
 		endpoint = pod.Status.PodIP
 		if job, err = buildJob(endpoint); err != nil {
-			return nil, &FastFailError{message: err.Error()}
+			return nil, intctrlutil.NewFatalError(err.Error())
 		} else {
 			jobs = append(jobs, job)
 		}

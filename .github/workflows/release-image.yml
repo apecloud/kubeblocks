@@ -1,4 +1,4 @@
-name: RELEASE-IMAGE
+name: Release Images
 
 on:
   schedule:
@@ -35,6 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release-version: ${{ steps.get_release_version.outputs.release_version }}
+      release-version-bump: ${{ steps.get_release_version.outputs.release_version_bump }}
     steps:
       - name: Get Release Version
         id: get_release_version
@@ -48,6 +49,8 @@ jobs:
             RELEASE_VERSION=${{ env.RELEASE_VERSION }}
           fi
           echo release_version=$RELEASE_VERSION >> $GITHUB_OUTPUT
+          RELEASE_VERSION_BUMP="${RELEASE_VERSION/v/}"
+          echo release_version_bump=$RELEASE_VERSION_BUMP >> $GITHUB_OUTPUT
 
   release-image:
     if: ${{ inputs.dockerfile == '' || inputs.dockerfile == 'Dockerfile' }}
@@ -95,6 +98,19 @@ jobs:
       VERSION: "${{ needs.release-version.outputs.release-version }}"
       APECD_REF: "v0.1.24"
       DOCKERFILE_PATH: "./docker/Dockerfile-dataprotection"
+    secrets: inherit
+
+  release-charts-image:
+    if: ${{ github.event_name  == 'workflow_dispatch' && (inputs.dockerfile == '' || inputs.dockerfile == 'Dockerfile-charts') }}
+    needs: release-version
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.24
+    with:
+      MAKE_OPS_PRE: "helm-package VERSION=${{ needs.release-version.outputs.release-version-bump }}"
+      IMG: "apecloud/kubeblocks-charts"
+      VERSION: "${{ needs.release-version.outputs.release-version }}"
+      GO_VERSION: "1.21"
+      APECD_REF: "v0.1.24"
+      DOCKERFILE_PATH: "./docker/Dockerfile-charts"
     secrets: inherit
 
   release-dev-image:
@@ -157,3 +173,58 @@ jobs:
       CONTENT: "release image ${{ needs.release-message.outputs.release-version }} ${{ needs.release-message.outputs.content-result }}"
       APECD_REF: "v0.1.38"
     secrets: inherit
+
+  release-result:
+    if: github.event.action == 'published'
+    needs: [ release-message ]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        type: [image, chart]
+    steps:
+      - name: Restore ${{ matrix.type }} Artifact
+        id: cache-artifact-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            ${{ env.RELEASE_VERSION }}-${{ matrix.type }}
+          key: ${{ env.RELEASE_VERSION }}-${{ matrix.type }}
+
+      - name: check release result
+        run: |
+          release_result=$( cat ${{ env.RELEASE_VERSION }}-${{ matrix.type }} )
+          if [[ "$release_result" != "success" ]]; then
+              exit 1
+          fi
+
+  e2e-kbcli:
+    needs: [ release-message, release-result ]
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.35
+    strategy:
+      fail-fast: false
+      matrix:
+        test-type: [ apecloud-mysql|postgresql|redis|mongodb|kafka|pulsar|weaviate|qdrant|smartengine|mysqlscale|tidb|xinference ,
+                     greptimedb|nebula|risingwave|starrocks|etcd|oceanbase|foxlake|omysql|asmysql|openldap|milvus|clickhouse|opengauss ,
+                     polardbx|pika|opensearch|elasticsearch|tdengine|vllm|orioledb|official-pg|ggml|zookeeper|mariadb|oracle|flink|influxdb ]
+    with:
+      GITHUB_REPO: "apecloud/kubeblocks"
+      BRANCH_NAME: "main"
+      WORKFLOW_ID: "e2e-kbcli.yml"
+      APECD_REF: "v0.1.35"
+      VERSION: "${{ needs.release-message.outputs.release-version }}"
+      EXTRA_ARGS: "TEST_TYPE=${{ matrix.test-type }}#CLOUD_PROVIDER=${{ vars.CLOUD_PROVIDER }}"
+    secrets: inherit
+
+  delete-cache:
+    needs: e2e-kbcli
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        type: [image, chart]
+    steps:
+      - uses: actions/checkout@v4
+      - name: delete ${{ matrix.type }} cache
+        continue-on-error: true
+        run: |
+          bash .github/utils/utils.sh --type 17 --tag-name "${{ env.RELEASE_VERSION }}-${{ matrix.type }}"
+

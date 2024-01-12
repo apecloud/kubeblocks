@@ -4,7 +4,8 @@ metadata:
   name: pyroscope-server
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
-    "kubeblocks.io/provider": community
+    "addon.kubeblocks.io/provider": community
+    "addon.kubeblocks.io/version": "0.2.92"
   {{- if .Values.keepAddons }}
   annotations:
     helm.sh/resource-policy: keep

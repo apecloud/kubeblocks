@@ -1,0 +1,10 @@
+{{- $selectorLabels := include "kubeblocks.selectorLabels" . }}
+{{- include "kubeblocks.buildAddonCR" (merge (dict
+  "kbVersion" ">=0.8.0"
+  "selectorLabels" $selectorLabels
+  "name" "oceanbase"
+  "version" "0.8.0"
+  "model" "RDBMS"
+  "provider" "community"
+  "description" "OceanBase Database is an enterprise-level native distributed database independently developed by Ant Group."
+  "autoInstall" false) . ) -}}

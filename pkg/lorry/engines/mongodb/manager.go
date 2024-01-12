@@ -64,15 +64,15 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 	}
 
 	opts := options.Client().
-		SetHosts(config.hosts).
-		SetReplicaSet(config.replSetName).
+		SetHosts(config.Hosts).
+		SetReplicaSet(config.ReplSetName).
 		SetAuth(options.Credential{
-			Password: config.password,
-			Username: config.username,
+			Password: config.Password,
+			Username: config.Username,
 		}).
 		SetWriteConcern(writeconcern.New(writeconcern.WMajority(), writeconcern.J(true))).
 		SetReadPreference(readpref.Primary()).
-		SetDirect(config.direct)
+		SetDirect(config.Direct)
 
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {
@@ -96,7 +96,7 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 	Mgr = &Manager{
 		DBManagerBase: *managerBase,
 		Client:        client,
-		Database:      client.Database(config.databaseName),
+		Database:      client.Database(config.DatabaseName),
 	}
 
 	return Mgr, nil
@@ -242,8 +242,8 @@ func (mgr *Manager) CreateRoot(ctx context.Context) error {
 		"db":   "admin",
 	}
 
-	mgr.Logger.Info(fmt.Sprintf("Create user: %s, passwd: %s, roles: %v", config.username, config.password, role))
-	err = CreateUser(ctx, client, config.username, config.password, role)
+	mgr.Logger.Info(fmt.Sprintf("Create user: %s, passwd: %s, roles: %v", config.Username, config.Password, role))
+	err = CreateUser(ctx, client, config.Username, config.Password, role)
 	if err != nil {
 		mgr.Logger.Info("Create Root failed", "error", err)
 		return err
@@ -391,10 +391,10 @@ func (mgr *Manager) GetReplSetClientWithHosts(ctx context.Context, hosts []strin
 
 	opts := options.Client().
 		SetHosts(hosts).
-		SetReplicaSet(config.replSetName).
+		SetReplicaSet(config.ReplSetName).
 		SetAuth(options.Credential{
-			Password: config.password,
-			Username: config.username,
+			Password: config.Password,
+			Username: config.Username,
 		}).
 		SetWriteConcern(writeconcern.New(writeconcern.WMajority(), writeconcern.J(true))).
 		SetReadPreference(readpref.Primary()).

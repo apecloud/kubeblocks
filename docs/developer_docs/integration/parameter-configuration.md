@@ -6,6 +6,9 @@ sidebar_position: 5
 sidebar_label: Parameter configuration
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Parameter configuration
 
 This tutorial takes Oracle MySQL as an example and explains how to configure parameter templates and parameters in KubeBlocks. You can find [the full PR here](https://github.com/apecloud/learn-kubeblocks-addon/tree/main/tutorial-3-config-and-reconfig/).
@@ -227,7 +230,7 @@ This example illustrates the configuration for verifying MySQL parameter values.
  }
 ```
 
-For example, the example above defines some constraints for the parameter `performance_schem` in MySQL.
+For example, the example above defines some constraints for the parameter `performance_schema` in MySQL.
 
 - Type: string
 - Available values: ON, OFF, 0, 1
@@ -338,7 +341,7 @@ Parameter configuration is a type of KubeBlocks operations, shorten as ops.
 
 After the kbcli reconfiguration command is performed, a Configuration ops is generated in KubeBlocks.
 
-As shown in Section 3.5, an ops named `mycluster-reconfiguring-7p442` is generated and you can run the command below to view the process, including the changes, policy and time.
+As shown in [View the change history](#view-the-change-history), an ops named `mycluster-reconfiguring-7p442` is generated and you can run the command below to view the process, including the changes, policy and time.
 
 ```bash
 kbcli cluster describe-op <your-reconfig-ops-name>

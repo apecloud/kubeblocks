@@ -23,6 +23,7 @@ import (
 	"fmt"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -43,8 +44,15 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	// build all component specs
 	transCtx.ComponentSpecs = make([]*appsv1alpha1.ClusterComponentSpec, 0)
 	cluster := transCtx.Cluster
+
+	// validate componentDef and componentDefRef
+	if err := validateComponentDefNComponentDefRef(cluster); err != nil {
+		return err
+	}
+
 	for i := range cluster.Spec.ComponentSpecs {
-		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, &cluster.Spec.ComponentSpecs[i])
+		clusterComSpec := cluster.Spec.ComponentSpecs[i]
+		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, &clusterComSpec)
 	}
 	if compSpec := apiconversion.HandleSimplifiedClusterAPI(transCtx.ClusterDef, cluster); compSpec != nil {
 		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, compSpec)
@@ -60,13 +68,33 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 			if err != nil {
 				return err
 			}
-			transCtx.ComponentDefs[compDef.Name] = compDef
-			transCtx.ComponentSpecs[i].ComponentDef = compDef.Name
+			virtualCompDefName := constant.GenerateVirtualComponentDefinition(compSpec.ComponentDefRef)
+			transCtx.ComponentDefs[virtualCompDefName] = compDef
+			transCtx.ComponentSpecs[i].ComponentDef = virtualCompDefName
 		} else {
 			// should be loaded at load resources transformer
 			if _, ok := transCtx.ComponentDefs[compSpec.ComponentDef]; !ok {
 				panic(fmt.Sprintf("runtime error - expected component definition object not found: %s", compSpec.ComponentDef))
 			}
+		}
+	}
+	return nil
+}
+
+func validateComponentDefNComponentDefRef(cluster *appsv1alpha1.Cluster) error {
+	if len(cluster.Spec.ComponentSpecs) == 0 {
+		return nil
+	}
+	hasCompDef := false
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		if len(compSpec.ComponentDefRef) == 0 && len(compSpec.ComponentDef) == 0 {
+			return fmt.Errorf("componentDef and componentDefRef cannot be both empty")
+		}
+		if len(compSpec.ComponentDef) == 0 && hasCompDef {
+			return fmt.Errorf("all componentSpecs in the same cluster must either specify ComponentDef or omit ComponentDef simultaneously")
+		}
+		if len(compSpec.ComponentDef) > 0 {
+			hasCompDef = true
 		}
 	}
 	return nil

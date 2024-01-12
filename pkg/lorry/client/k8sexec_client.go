@@ -21,7 +21,7 @@ package client
 
 import (
 	"bytes"
-	context "context"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -56,7 +56,7 @@ type K8sExecClient struct {
 }
 
 // NewK8sExecClientWithPod create a new OperationHTTPClient with lorry container
-func NewK8sExecClientWithPod(pod *corev1.Pod) (*K8sExecClient, error) {
+func NewK8sExecClientWithPod(restConfig *rest.Config, pod *corev1.Pod) (*K8sExecClient, error) {
 	var (
 		err error
 	)
@@ -82,9 +82,11 @@ func NewK8sExecClientWithPod(pod *corev1.Pod) (*K8sExecClient, error) {
 		Namespace:     pod.Namespace,
 	}
 
-	restConfig, err := ctrl.GetConfig()
-	if err != nil {
-		return nil, errors.Wrap(err, "get k8s config failed")
+	if restConfig == nil {
+		restConfig, err = ctrl.GetConfig()
+		if err != nil {
+			return nil, errors.Wrap(err, "get k8s config failed")
+		}
 	}
 
 	restConfig.GroupVersion = &schema.GroupVersion{Group: "", Version: "v1"}

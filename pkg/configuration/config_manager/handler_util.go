@@ -56,10 +56,17 @@ type CfgManagerBuildParams struct {
 	DownwardAPIVolumes        []corev1.VolumeMount
 	CMConfigVolumes           []corev1.Volume
 	ConfigLazyRenderedVolumes map[string]corev1.VolumeMount
+
+	// support host network
+	ContainerPort int32 `json:"containerPort"`
 }
 
 func IsSupportReload(reload *appsv1alpha1.ReloadOptions) bool {
-	return reload != nil && (reload.ShellTrigger != nil || reload.UnixSignalTrigger != nil || reload.TPLScriptTrigger != nil)
+	return reload != nil && (reload.ShellTrigger != nil || reload.UnixSignalTrigger != nil || reload.TPLScriptTrigger != nil || reload.AutoTrigger != nil)
+}
+
+func IsAutoReload(reload *appsv1alpha1.ReloadOptions) bool {
+	return reload != nil && reload.AutoTrigger != nil
 }
 
 func FromReloadTypeConfig(reloadOptions *appsv1alpha1.ReloadOptions) appsv1alpha1.CfgReloadType {
@@ -70,6 +77,8 @@ func FromReloadTypeConfig(reloadOptions *appsv1alpha1.ReloadOptions) appsv1alpha
 		return appsv1alpha1.ShellType
 	case reloadOptions.TPLScriptTrigger != nil:
 		return appsv1alpha1.TPLScriptType
+	case reloadOptions.AutoTrigger != nil:
+		return appsv1alpha1.AutoType
 	}
 	return ""
 }
@@ -82,6 +91,8 @@ func ValidateReloadOptions(reloadOptions *appsv1alpha1.ReloadOptions, cli client
 		return checkShellTrigger(reloadOptions.ShellTrigger)
 	case reloadOptions.TPLScriptTrigger != nil:
 		return checkTPLScriptTrigger(reloadOptions.TPLScriptTrigger, cli, ctx)
+	case reloadOptions.AutoTrigger != nil:
+		return nil
 	}
 	return core.MakeError("require special reload type!")
 }
@@ -149,7 +160,7 @@ func GetSupportReloadConfigSpecs(configSpecs []appsv1alpha1.ComponentConfigSpec,
 			return nil, core.WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
 		}
 		reloadOptions := cc.Spec.ReloadOptions
-		if !IsSupportReload(reloadOptions) {
+		if !IsSupportReload(reloadOptions) || IsAutoReload(reloadOptions) {
 			continue
 		}
 		reloadConfigSpecMeta = append(reloadConfigSpecMeta, ConfigSpecMeta{

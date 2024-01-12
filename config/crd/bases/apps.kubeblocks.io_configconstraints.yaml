@@ -220,6 +220,13 @@ spec:
                   reload depending on whether any parameters in the StaticParameters
                   have been modified.
                 properties:
+                  autoTrigger:
+                    description: autoTrigger performs the reload command.
+                    properties:
+                      processName:
+                        description: processName is process name
+                        type: string
+                    type: object
                   shellTrigger:
                     description: shellTrigger performs the reload command.
                     properties:

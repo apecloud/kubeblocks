@@ -1,8 +1,0 @@
-{{- include "kubeblocks.buildAddonCR" (merge (dict
-  "kbVersion" ">=0.7.0"
-  "name" "starrocks"
-  "version" "0.7.0"
-  "model" "RDBMS"
-  "provider" "community"
-  "description" "Starrocks is an open-source, high-performance analytical database."
-  "autoInstall" false) . ) -}}

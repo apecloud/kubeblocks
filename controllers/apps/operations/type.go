@@ -65,7 +65,20 @@ type OpsBehaviour struct {
 	OpsHandler OpsHandler
 }
 
+type reconfigureParams struct {
+	resource *OpsResource
+	reqCtx   intctrlutil.RequestCtx
+	cli      client.Client
+
+	clusterName         string
+	componentName       string
+	opsRequest          *appsv1alpha1.OpsRequest
+	configurationItem   appsv1alpha1.ConfigurationItem
+	configurationStatus *appsv1alpha1.ReconfiguringStatus
+}
+
 type OpsResource struct {
+	OpsDef         *appsv1alpha1.OpsDefinition
 	OpsRequest     *appsv1alpha1.OpsRequest
 	Cluster        *appsv1alpha1.Cluster
 	Recorder       record.EventRecorder

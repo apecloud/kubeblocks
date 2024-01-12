@@ -30,20 +30,20 @@ import (
 )
 
 func NewMongodbClient(ctx context.Context, config *Config) (*mongo.Client, error) {
-	if len(config.hosts) == 0 {
+	if len(config.Hosts) == 0 {
 		return nil, errors.New("Get replset client without hosts")
 	}
 
 	opts := options.Client().
-		SetHosts(config.hosts).
-		SetReplicaSet(config.replSetName).
+		SetHosts(config.Hosts).
+		SetReplicaSet(config.ReplSetName).
 		SetAuth(options.Credential{
-			Password: config.password,
-			Username: config.username,
+			Password: config.Password,
+			Username: config.Username,
 		}).
 		SetWriteConcern(writeconcern.New(writeconcern.WMajority(), writeconcern.J(true))).
 		SetReadPreference(readpref.Primary()).
-		SetDirect(config.direct)
+		SetDirect(config.Direct)
 
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {
@@ -54,40 +54,40 @@ func NewMongodbClient(ctx context.Context, config *Config) (*mongo.Client, error
 
 func NewReplSetClient(ctx context.Context, hosts []string) (*mongo.Client, error) {
 	config := GetConfig().DeepCopy()
-	config.hosts = hosts
-	config.direct = false
+	config.Hosts = hosts
+	config.Direct = false
 	return NewMongodbClient(ctx, config)
 
 }
 
 func NewMongosClient(ctx context.Context, hosts []string) (*mongo.Client, error) {
 	config := GetConfig().DeepCopy()
-	config.hosts = hosts
-	config.direct = false
-	config.replSetName = ""
+	config.Hosts = hosts
+	config.Direct = false
+	config.ReplSetName = ""
 
 	return NewMongodbClient(ctx, config)
 }
 
 func NewStandaloneClient(ctx context.Context, host string) (*mongo.Client, error) {
 	config := GetConfig().DeepCopy()
-	config.hosts = []string{host}
-	config.direct = true
-	config.replSetName = ""
+	config.Hosts = []string{host}
+	config.Direct = true
+	config.ReplSetName = ""
 
 	return NewMongodbClient(ctx, config)
 }
 
 func NewLocalUnauthClient(ctx context.Context) (*mongo.Client, error) {
 	config := GetConfig().DeepCopy()
-	config.direct = true
-	config.replSetName = ""
+	config.Direct = true
+	config.ReplSetName = ""
 
 	opts := options.Client().
-		SetHosts(config.hosts).
+		SetHosts(config.Hosts).
 		SetWriteConcern(writeconcern.New(writeconcern.WMajority(), writeconcern.J(true))).
 		SetReadPreference(readpref.Primary()).
-		SetDirect(config.direct)
+		SetDirect(config.Direct)
 
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {

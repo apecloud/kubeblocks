@@ -37,11 +37,15 @@ spec:
         - name: tools
           image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
           command:
             - /bin/true
         - name: datascript
           image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.datascript.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
           command:
             - /bin/true
       containers:
@@ -61,7 +65,6 @@ spec:
             - "--extensions={{- default "true" ( include "kubeblocks.addonControllerEnabled" . ) }}"
             - "--apps=true"
             - "--workloads=true"
-            - "--storage=true"
           env:
             - name: CM_NAMESPACE
               value: {{ .Release.Namespace }}
@@ -119,6 +122,8 @@ spec:
                   key: dataProtectionEncryptionKey
             - name: KUBE_PROVIDER
               value: {{ .Values.provider | quote }}
+            - name: HOST_PORT_CM_NAME
+              value: {{ include "kubeblocks.fullname" . }}-host-ports
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}

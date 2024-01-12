@@ -98,6 +98,10 @@ func (c *Cluster) GetMemberAddr(member Member) string {
 	return fmt.Sprintf("%s.%s-headless.%s.svc.%s", member.Name, c.ClusterCompName, c.Namespace, clusterDomain)
 }
 
+func (c *Cluster) GetMemberShortAddr(member Member) string {
+	return fmt.Sprintf("%s.%s-headless.%s.svc", member.Name, c.ClusterCompName, c.Namespace)
+}
+
 func (c *Cluster) GetMemberAddrs() []string {
 	hosts := make([]string, len(c.Members))
 	for i, member := range c.Members {
@@ -126,6 +130,10 @@ func (c *HaConfig) GetTTL() int {
 
 func (c *HaConfig) IsEnable() bool {
 	return c.enable
+}
+
+func (c *HaConfig) SetEnable(enable bool) {
+	c.enable = enable
 }
 
 func (c *HaConfig) GetMaxLagOnSwitchover() int64 {

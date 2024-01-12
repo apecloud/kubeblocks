@@ -23,7 +23,9 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -32,6 +34,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -40,6 +44,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // ResultToP converts a Result object to a pointer.
@@ -254,7 +259,8 @@ func SetOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer st
 	if !controllerutil.ContainsFinalizer(obj, finalizer) {
 		// pvc objects do not need to add finalizer
 		_, ok := obj.(*corev1.PersistentVolumeClaim)
-		if !ok {
+		_, isPod := obj.(*corev1.Pod)
+		if !ok && !isPod {
 			if !controllerutil.AddFinalizer(obj, finalizer) {
 				return ErrFailedToAddFinalizer
 			}
@@ -274,4 +280,241 @@ func CheckResourceExists(
 	}
 	// if found, return true
 	return true, nil
+}
+
+var (
+	portManager *PortManager
+)
+
+const (
+	// https://www.w3.org/Daemon/User/Installation/PrivilegedPorts.html
+	// The TCP/IP port numbers below 1024 are special in that normal users are not allowed to run servers on them.
+	// This is a security feaure, in that if you connect to a service on one of these ports you can be fairly sure
+	// that you have the real thing, and not a fake which some hacker has put up for you.
+	hostPortMin = int32(1025)
+	hostPortMax = int32(65536)
+)
+
+func InitHostPortManager(cli client.Client) error {
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      viper.GetString(constant.CfgHostPortConfigMapName),
+			Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
+		},
+		Data: make(map[string]string),
+	}
+	var err error
+	if err = cli.Create(context.Background(), cm); err != nil {
+		if !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+	}
+	portManager, err = NewPortManager(hostPortMin, hostPortMax, cli)
+	return err
+}
+
+func GetPortManager() *PortManager {
+	return portManager
+}
+
+func BuildHostPortName(clusterName, compName, containerName, portName string) string {
+	return fmt.Sprintf("%s-%s-%s-%s", clusterName, compName, containerName, portName)
+}
+
+type PortManager struct {
+	sync.Mutex
+	cli  client.Client
+	min  int32
+	max  int32
+	used map[int32]string
+	cm   *corev1.ConfigMap
+}
+
+// NewPortManager creates a new PortManager
+// TODO[ziang] Putting all the port information in one configmap may have performance issues and is not secure enough.
+// There is a risk of accidental deletion leading to the loss of cluster port information.
+func NewPortManager(min, max int32, cli client.Client) (*PortManager, error) {
+	pm := &PortManager{
+		min:  min,
+		max:  max,
+		cli:  cli,
+		used: make(map[int32]string),
+	}
+	if err := pm.sync(); err != nil {
+		return nil, err
+	}
+	return pm, nil
+}
+
+func (pm *PortManager) parsePort(port string) (int32, error) {
+	port = strings.TrimSpace(port)
+	if port == "" {
+		return 0, fmt.Errorf("port is empty")
+	}
+	p, err := strconv.ParseInt(port, 10, 32)
+	if err != nil {
+		return 0, err
+	}
+	return int32(p), nil
+}
+
+func (pm *PortManager) sync() error {
+	cm := &corev1.ConfigMap{}
+	objKey := types.NamespacedName{
+		Name:      viper.GetString(constant.CfgHostPortConfigMapName),
+		Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
+	}
+	if err := pm.cli.Get(context.Background(), objKey, cm); err != nil {
+		return err
+	}
+	if cm.Data == nil {
+		cm.Data = make(map[string]string)
+	}
+	used := make(map[int32]string)
+	for key, item := range cm.Data {
+		port, err := pm.parsePort(item)
+		if err != nil {
+			continue
+		}
+		used[port] = key
+	}
+
+	pm.cm = cm
+	pm.used = used
+	return nil
+}
+
+func (pm *PortManager) update(key string, port int32) error {
+	var err error
+	defer func() {
+		if apierrors.IsConflict(err) {
+			_ = pm.sync()
+		}
+	}()
+	cm := pm.cm.DeepCopy()
+	if cm.Data == nil {
+		cm.Data = make(map[string]string)
+	}
+	cm.Data[key] = fmt.Sprintf("%d", port)
+	err = pm.cli.Update(context.Background(), cm)
+	if err != nil {
+		return err
+	}
+
+	pm.cm = cm
+	pm.used[port] = key
+	return nil
+}
+
+func (pm *PortManager) delete(keys []string) error {
+	if pm.cm.Data == nil {
+		return nil
+	}
+
+	var err error
+	defer func() {
+		if apierrors.IsConflict(err) {
+			_ = pm.sync()
+		}
+	}()
+
+	cm := pm.cm.DeepCopy()
+	var ports []int32
+	for _, key := range keys {
+		value, ok := cm.Data[key]
+		if !ok {
+			continue
+		}
+		port, err := pm.parsePort(value)
+		if err != nil {
+			return err
+		}
+		ports = append(ports, port)
+		delete(cm.Data, key)
+	}
+	err = pm.cli.Update(context.Background(), cm)
+	if err != nil {
+		return err
+	}
+	pm.cm = cm
+	for _, port := range ports {
+		delete(pm.used, port)
+	}
+	return nil
+}
+
+func (pm *PortManager) UsePort(key string, port int32) error {
+	pm.Lock()
+	defer pm.Unlock()
+	if k, ok := pm.used[port]; ok && k != key {
+		return fmt.Errorf("port %d is used by %s", port, k)
+	}
+	if err := pm.update(key, port); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (pm *PortManager) AllocatePort(key string) (int32, error) {
+	pm.Lock()
+	defer pm.Unlock()
+
+	if value, ok := pm.cm.Data[key]; ok {
+		port, err := pm.parsePort(value)
+		if err != nil {
+			return 0, err
+		}
+		return port, nil
+	}
+
+	// allocate a new port randomly in range [hostPortMin, hostPortMax)
+	for i := 0; i < 10; i++ {
+		port := int32(rand.Int63nRange(int64(hostPortMin), int64(hostPortMax)))
+		if _, ok := pm.used[port]; ok {
+			continue
+		}
+		if err := pm.update(key, port); err != nil {
+			return 0, err
+		}
+		return port, nil
+	}
+	return 0, fmt.Errorf("failed to allocate port")
+}
+
+func (pm *PortManager) ReleasePort(key string) error {
+	return pm.ReleasePorts([]string{key})
+}
+
+func (pm *PortManager) ReleasePorts(keys []string) error {
+	pm.Lock()
+	defer pm.Unlock()
+	for _, key := range keys {
+		if err := pm.delete([]string{key}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (pm *PortManager) ReleaseByPrefix(prefix string) error {
+	if prefix == "" {
+		return nil
+	}
+	pm.Lock()
+	defer pm.Unlock()
+
+	var keys []string
+	for key := range pm.cm.Data {
+		if strings.HasPrefix(key, prefix) {
+			keys = append(keys, key)
+		}
+	}
+	if err := pm.delete(keys); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (pm *PortManager) NeedAllocate(port int32) bool {
+	return port <= 100
 }

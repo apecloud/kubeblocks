@@ -497,6 +497,7 @@ const (
 	ShellType      CfgReloadType = "exec"
 	HTTPType       CfgReloadType = "http"
 	TPLScriptType  CfgReloadType = "tpl"
+	AutoType       CfgReloadType = "auto"
 )
 
 // SignalType defines which signals are valid.

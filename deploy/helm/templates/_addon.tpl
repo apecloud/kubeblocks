@@ -15,16 +15,20 @@ Example:
 {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "apecloud-mysql" "version" "0.5.0" "values" .Values) }}
 */}}
 {{- define "kubeblocks.addonChartLocationURL" }}
-{{- $fullChart := print .name "-" .version }}
-{{- $base := .values.addonChartLocationBase }}
-{{- if hasPrefix "oci://" $base }}
-chartLocationURL: {{ $base }}/{{ .name }}
-{{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" $base }}
-chartLocationURL: {{ $base }}/{{ $fullChart }}/{{ $fullChart }}.tgz
-{{- else }}
-chartLocationURL: {{ $base }}/{{ $fullChart }}.tgz
+chartLocationURL: {{ include "kubeblocks.addonChartLocationURLValue" . }}
 {{- end }}
-{{- end }}
+
+{{- define "kubeblocks.addonChartLocationURLValue" }}
+{{- $fullChart := print .name "-" .version -}}
+{{- $base := .values.addonChartLocationBase -}}
+{{- if hasPrefix "oci://" $base -}}
+{{ $base }}/{{ .name }}
+{{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" $base -}}
+{{ $base }}/{{ $fullChart }}/{{ $fullChart }}.tgz
+{{- else -}}
+{{ $base }}/{{ $fullChart }}.tgz
+{{- end -}}
+{{- end -}}
 
 {{/*
 Build add-on CR.
@@ -41,17 +45,38 @@ Parameters:
 - kbVersion: KubeBlocks version that this addon is compatible with
 */}}
 {{- define "kubeblocks.buildAddonCR" }}
-{{- $addonImageRegistry := include "kubeblocks.imageRegistry" . }}
-{{- $upgrade:= or .Release.IsInstall (and .Release.IsUpgrade .Values.upgradeAddons) }}
+{{- $install := .Release.IsInstall }}
+{{- $upgrade := (and .Release.IsUpgrade .Values.upgradeAddons) }}
 {{- $existingAddon := lookup "extensions.kubeblocks.io/v1alpha1" "Addon" "" .name -}}
-{{- if and (not $upgrade) $existingAddon -}}
+{{- if or $install (and $upgrade (not $existingAddon)) -}}
+{{- include "kubeblocks.buildAddon" . }}
+{{- else if and (not $upgrade) $existingAddon -}}
 {{- $obj := fromYaml (toYaml $existingAddon) -}}
 {{- $metadata := get $obj "metadata" -}}
 {{- $metadata = unset $metadata "managedFields" -}}
 {{- $metadata = unset $metadata "resourceVersion" -}}
 {{- $obj = set $obj "metadata" $metadata -}}
 {{ $obj | toYaml }}
-{{- else -}}
+{{- else if and $upgrade $existingAddon -}}
+{{- $addonCR := include "kubeblocks.buildAddon" . -}}
+{{- $addonObj := fromYaml $addonCR -}}
+{{- $spec := get $addonObj "spec" -}}
+{{- $installable := get (get $existingAddon "spec") "installable" }}
+{{- if $installable -}}
+{{- $spec = set $spec "installable" $installable -}}
+{{- end -}}
+{{- $install = get (get $existingAddon "spec") "install" -}}
+{{- if $install -}}
+{{- $spec = set $spec "install" $install -}}
+{{- end -}}
+{{- $addonObj = set $addonObj "spec" $spec -}}
+{{ $addonObj | toYaml }}
+{{- end -}}
+{{- end -}}
+
+{{- define "kubeblocks.buildAddon" }}
+{{- $addonImageRegistry := include "kubeblocks.imageRegistry" . }}
+{{- $cloudProvider := (include "kubeblocks.cloudProvider" .) }}
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
@@ -78,9 +103,13 @@ spec:
       {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
       version: {{ .version }}
       {{- end }}
+    {{- if and (eq .name "pulsar") (eq $cloudProvider "huaweiCloud") }}
+    installValues:
+      setValues:
+        - cloudProvider=huaweiCloud
+    {{- end }}
   defaultInstallValues:
   - enabled: true
   installable:
     autoInstall: {{ .autoInstall }}
-{{- end -}}
-{{- end -}}
+{{- end }}

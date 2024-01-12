@@ -266,8 +266,6 @@ spec:
                     - command
                     - image
                     type: object
-                required:
-                - backupData
                 type: object
               backupType:
                 allOf:

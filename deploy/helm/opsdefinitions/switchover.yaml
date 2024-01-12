@@ -9,12 +9,10 @@ spec:
     - name: TARGET_POD_IP
       valueFrom:
         envVarRef:
-          containerName: observer-container
           envName: KB_POD_IP
     - name: LORRY_HTTP_PORT
       valueFrom:
         envVarRef:
-          containerName: observer-container
           envName: LORRY_HTTP_PORT
   parametersSchema:
     openAPIV3Schema:
@@ -58,7 +56,7 @@ spec:
                      role=$(kubectl get pod ${candidate} -ojson | jq -r '.metadata.labels["kubeblocks.io/role"]')
                      if [ "$role" == "primary" ] || [ "$role" == "leader" ] || [ "$role" == "master" ]; then
                         echo "INFO: switchover successfully, ${candidate} is ${role}"
-                        break
+                        exit 0
                      fi
                   else
                     # check if the candidate instance has been promote to primary
@@ -68,7 +66,7 @@ spec:
                          role=$(kubectl get pod ${podName} -ojson | jq -r '.metadata.labels["kubeblocks.io/role"]')
                          if [ "$role" == "primary" ] || [ "$role" == "leader" ] || [ "$role" == "master" ]; then
                             echo "INFO: switchover successfully, ${podName} is ${role}"
-                            break
+                            exit 0
                          fi
                        fi
                     done

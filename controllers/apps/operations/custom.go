@@ -189,11 +189,6 @@ func (c CustomOpsHandler) buildJob(reqCtx intctrlutil.RequestCtx,
 		if comp == nil {
 			return nil, nil
 		}
-		// get component definition
-		compDef, err := component.GetCompDefinition(reqCtx, cli, opsRes.Cluster, customSpec.ComponentName)
-		if err != nil {
-			return nil, err
-		}
 
 		// inject built-in env
 		fullCompName := constant.GenerateClusterComponentName(clusterName, compName)
@@ -202,11 +197,10 @@ func (c CustomOpsHandler) buildJob(reqCtx intctrlutil.RequestCtx,
 			{Name: constant.KBEnvCompName, Value: compName},
 			{Name: constant.KBEnvClusterCompName, Value: fullCompName},
 			{Name: constant.KBEnvCompReplicas, Value: strconv.Itoa(int(comp.Replicas))},
-			{Name: constant.KBEnvCompServiceVersion, Value: compDef.Spec.ServiceVersion},
 			{Name: kbEnvCompHeadlessSVCName, Value: constant.GenerateDefaultComponentHeadlessServiceName(clusterName, compName)},
 		}
 		varsRef := opsRes.OpsDef.Spec.VarsRef
-		if compVarsRef, err := c.buildComponentDefEnvs(opsRes, &env, compDef, compName); err != nil {
+		if compVarsRef, err := c.buildComponentDefEnvs(reqCtx, cli, opsRes, &env, compName); err != nil {
 			return nil, err
 		} else if compVarsRef != nil {
 			varsRef = compVarsRef
@@ -239,7 +233,7 @@ func (c CustomOpsHandler) buildJob(reqCtx intctrlutil.RequestCtx,
 			saKey := client.ObjectKey{Namespace: opsRes.Cluster.Namespace,
 				Name: constant.GenerateDefaultServiceAccountName(opsRes.Cluster.Name)}
 			if exists, _ := intctrlutil.CheckResourceExists(reqCtx.Ctx, cli, saKey, &corev1.ServiceAccount{}); exists {
-				jobSpec.Template.Spec.ServiceAccountName = comp.ServiceAccountName
+				jobSpec.Template.Spec.ServiceAccountName = saKey.Name
 			}
 		}
 		return &jobSpec, nil
@@ -343,14 +337,25 @@ func (c CustomOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, c
 	return nil
 }
 
-func (c CustomOpsHandler) buildComponentDefEnvs(opsRes *OpsResource, env *[]corev1.EnvVar, compDef *appsv1alpha1.ComponentDefinition, compName string) (*appsv1alpha1.VarsRef, error) {
+func (c CustomOpsHandler) buildComponentDefEnvs(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource,
+	env *[]corev1.EnvVar,
+	compName string) (*appsv1alpha1.VarsRef, error) {
 	if len(opsRes.OpsDef.Spec.ComponentDefinitionRefs) == 0 {
 		return nil, nil
+	}
+	// get component definition
+	compDef, err := component.GetCompDefinition(reqCtx, cli, opsRes.Cluster, compName)
+	if err != nil {
+		return nil, err
 	}
 	compDefRef := opsRes.OpsDef.GetComponentDefRef(compDef.Name)
 	if compDefRef == nil {
 		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`componentDefinition "%s" is not support for this operations`, compDef.Name))
 	}
+
+	*env = append(*env, corev1.EnvVar{Name: constant.KBEnvCompServiceVersion, Value: compDef.Spec.ServiceVersion})
 
 	buildSecretKeyRef := func(secretName, key string) *corev1.EnvVarSource {
 		return &corev1.EnvVarSource{
@@ -437,6 +442,9 @@ func (c CustomOpsHandler) buildEnvVars(reqCtx intctrlutil.RequestCtx,
 	}
 
 	getContainer := func(containerName string) *corev1.Container {
+		if containerName == "" {
+			return &targetPod.Spec.Containers[0]
+		}
 		for i := range targetPod.Spec.Containers {
 			container := targetPod.Spec.Containers[i]
 			if container.Name == containerName {
@@ -555,20 +563,22 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx, cli client.Client, ops
 	if comp == nil {
 		return intctrlutil.NewNotFound(`can not found component "%s" in cluster "%s"`, customSpec.ComponentName, opsRes.Cluster.Name)
 	}
-	compDef, err := component.GetCompDefinition(reqCtx, cli, opsRes.Cluster, customSpec.ComponentName)
-	if err != nil {
-		return err
-	}
-	if len(opsDef.Spec.ComponentDefinitionRefs) > 0 {
-		var componentDefMatched bool
-		for _, v := range opsDef.Spec.ComponentDefinitionRefs {
-			if v.Name == compDef.Name {
-				componentDefMatched = true
-				break
-			}
+	if len(opsRes.OpsDef.Spec.ComponentDefinitionRefs) > 0 {
+		compDef, err := component.GetCompDefinition(reqCtx, cli, opsRes.Cluster, customSpec.ComponentName)
+		if err != nil {
+			return err
 		}
-		if !componentDefMatched {
-			return intctrlutil.NewFatalError(fmt.Sprintf(`not supported componnet definition "%s"`, compDef.Name))
+		if len(opsDef.Spec.ComponentDefinitionRefs) > 0 {
+			var componentDefMatched bool
+			for _, v := range opsDef.Spec.ComponentDefinitionRefs {
+				if v.Name == compDef.Name {
+					componentDefMatched = true
+					break
+				}
+			}
+			if !componentDefMatched {
+				return intctrlutil.NewFatalError(fmt.Sprintf(`not supported componnet definition "%s"`, compDef.Name))
+			}
 		}
 	}
 	return nil

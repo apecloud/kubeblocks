@@ -106,13 +106,13 @@ spec:
                                       containerName:
                                         description: container name which defines
                                           in componentDefinition or is injected by
-                                          kubeBlocks controller.
+                                          kubeBlocks controller. if not specified,
+                                          will use the first container by default.
                                         type: string
                                       envName:
                                         description: env name, it will .
                                         type: string
                                     required:
-                                    - containerName
                                     - envName
                                     type: object
                                 type: object
@@ -8563,13 +8563,13 @@ spec:
                               properties:
                                 containerName:
                                   description: container name which defines in componentDefinition
-                                    or is injected by kubeBlocks controller.
+                                    or is injected by kubeBlocks controller. if not
+                                    specified, will use the first container by default.
                                   type: string
                                 envName:
                                   description: env name, it will .
                                   type: string
                               required:
-                              - containerName
                               - envName
                               type: object
                           type: object

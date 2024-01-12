@@ -1,52 +1,10 @@
-{{- $name:="pulsar" -}}
-{{- $version:="0.7.0" -}}
-{{- $upgrade:= or .Release.IsInstall (and .Release.IsUpgrade .Values.upgradeAddons) }}
-{{- $existingAddon := lookup "extensions.kubeblocks.io/v1alpha1" "Addon" "" $name -}}
-{{- if and (not $upgrade) $existingAddon -}}
-{{- $obj := fromYaml (toYaml $existingAddon) -}}
-{{- $metadata := get $obj "metadata" -}}
-{{- $metadata = unset $metadata "managedFields" -}}
-{{- $metadata = unset $metadata "resourceVersion" -}}
-{{- $obj = set $obj "metadata" $metadata -}}
-{{ $obj | toYaml }}
-{{- else -}}
-apiVersion: extensions.kubeblocks.io/v1alpha1
-kind: Addon
-metadata:
-  name: {{ $name }}
-  labels:
-    {{- include "kubeblocks.selectorLabels" . | nindent 4 }}
-    addon.kubeblocks.io/name: {{ $name }}
-    addon.kubeblocks.io/version: {{ $version }}
-    addon.kubeblocks.io/provider: community
-    addon.kubeblocks.io/model: streaming
-  annotations:
-    addon.kubeblocks.io/kubeblocks-version: '>=0.7.0'
-  {{- if .Values.keepAddons }}
-    helm.sh/resource-policy: keep
-  {{- end }}
-spec:
-  description: "Apache® Pulsar™ is an open-source, distributed messaging and streaming platform built for the cloud."
-  type: Helm
-  helm:
-    {{- include "kubeblocks.addonChartLocationURL" ( dict "name" $name "version" $version "values" .Values) | indent 4 }}
-    {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
-
-    installOptions:
-      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-      version: {{ default .Chart.Version .Values.versionOverride }}
-      {{- end }}
-
-    installValues:
-      {{- $cloudProvider := (include "kubeblocks.cloudProvider" .) }}
-      {{- if eq $cloudProvider "huaweiCloud" }}
-      setValues:
-        - cloudProvider=huaweiCloud
-      {{- end }}
-
-  installable:
-    autoInstall: true
-
-  defaultInstallValues:
-    - enabled: true
-  {{- end -}}
+{{- $selectorLabels := include "kubeblocks.selectorLabels" . }}
+{{- include "kubeblocks.buildAddonCR" (merge (dict
+  "kbVersion" ">=0.7.0"
+  "selectorLabels" $selectorLabels
+  "name" "pulsar"
+  "version" "0.7.1"
+  "model" "streaming"
+  "provider" "community"
+  "description" "Apache® Pulsar™ is an open-source, distributed messaging and streaming platform built for the cloud."
+  "autoInstall" true) . ) -}}

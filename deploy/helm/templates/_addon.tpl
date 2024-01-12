@@ -61,8 +61,11 @@ Parameters:
 {{- $addonCR := include "kubeblocks.buildAddon" . -}}
 {{- $addonObj := fromYaml $addonCR -}}
 {{- $spec := get $addonObj "spec" -}}
-{{- $spec = set $spec "installable" (get (get $existingAddon "spec") "installable") -}}
-{{- $install = (get (get $existingAddon "spec") "install") -}}
+{{- $installable := get (get $existingAddon "spec") "installable" }}
+{{- if $installable -}}
+{{- $spec = set $spec "installable" $installable -}}
+{{- end -}}
+{{- $install = get (get $existingAddon "spec") "install" -}}
 {{- if $install -}}
 {{- $spec = set $spec "install" $install -}}
 {{- end -}}
@@ -73,6 +76,7 @@ Parameters:
 
 {{- define "kubeblocks.buildAddon" }}
 {{- $addonImageRegistry := include "kubeblocks.imageRegistry" . }}
+{{- $cloudProvider := (include "kubeblocks.cloudProvider" .) }}
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
@@ -99,6 +103,11 @@ spec:
       {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
       version: {{ .version }}
       {{- end }}
+    {{- if and (eq .name "pulsar") (eq $cloudProvider "huaweiCloud") }}
+    installValues:
+      setValues:
+        - cloudProvider=huaweiCloud
+    {{- end }}
   defaultInstallValues:
   - enabled: true
   installable:

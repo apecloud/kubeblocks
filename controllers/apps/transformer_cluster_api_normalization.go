@@ -52,7 +52,18 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 
 	for i := range cluster.Spec.ComponentSpecs {
 		clusterComSpec := cluster.Spec.ComponentSpecs[i]
-		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, &clusterComSpec)
+		if clusterComSpec.Shards != nil && *clusterComSpec.Shards > 1 {
+			for i := 1; i < int(*clusterComSpec.Shards)-1; i++ {
+				shardClusterCompSpec := clusterComSpec.DeepCopy()
+				shardClusterCompSpec.Name = fmt.Sprintf("%s-%d", clusterComSpec.Name, i)
+				shardClusterCompSpec.Shards = nil
+				transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, shardClusterCompSpec)
+			}
+		} else {
+			genClusterCompSpec := clusterComSpec.DeepCopy()
+			genClusterCompSpec.Shards = nil
+			transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, genClusterCompSpec)
+		}
 	}
 	if compSpec := apiconversion.HandleSimplifiedClusterAPI(transCtx.ClusterDef, cluster); compSpec != nil {
 		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, compSpec)

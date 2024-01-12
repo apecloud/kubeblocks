@@ -151,7 +151,7 @@ func checkAllCompObjExist(transCtx *clusterTransformContext, cluster *appsv1alph
 	if err := transCtx.Client.List(transCtx.Context, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
 		return false, err
 	}
-	if len(compList.Items) != len(cluster.Spec.ComponentSpecs) {
+	if len(compList.Items) != len(transCtx.ComponentSpecs) {
 		return false, nil
 	}
 	return true, nil

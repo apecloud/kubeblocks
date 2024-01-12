@@ -337,7 +337,7 @@ type ClusterComponentSpec struct {
 	// and the rest of components follow the named pattern ClusterComponentSpec.Name-{shard index}, where shard index is greater than or equal to 1.
 	// +kubebuilder:validation:Minimum=0
 	// +optional
-	Shards int32 `json:"shards"`
+	Shards *int32 `json:"shards"`
 
 	// replicas defines the number of replicas for a single Component.
 	// +kubebuilder:validation:Required

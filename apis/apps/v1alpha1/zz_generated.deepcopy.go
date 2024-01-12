@@ -579,6 +579,11 @@ func (in *ClusterComponentSpec) DeepCopyInto(out *ClusterComponentSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.Shards != nil {
+		in, out := &in.Shards, &out.Shards
+		*out = new(int32)
+		**out = **in
+	}
 	if in.Affinity != nil {
 		in, out := &in.Affinity, &out.Affinity
 		*out = new(Affinity)

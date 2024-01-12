@@ -78,8 +78,14 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 	}
 
 	for _, svc := range cluster.Spec.Services {
-		if err = handleServiceFunc(&svc); err != nil {
+		genServices, err := t.genMultiServiceIfNeed(cluster, &svc)
+		if err != nil {
 			return err
+		}
+		for _, genService := range genServices {
+			if err = handleServiceFunc(genService); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -181,6 +187,50 @@ func (t *clusterServiceTransformer) buildService(transCtx *clusterTransformConte
 		}
 	}
 	return builder.GetObject(), nil
+}
+
+func (t *clusterServiceTransformer) genMultiServiceIfNeed(cluster *appsv1alpha1.Cluster, clusterService *appsv1alpha1.ClusterService) ([]*appsv1alpha1.ClusterService, error) {
+	if !clusterService.GenerateShardOrdinalService {
+		return []*appsv1alpha1.ClusterService{clusterService}, nil
+	}
+	if len(clusterService.ComponentSelector) == 0 {
+		return nil, fmt.Errorf("the component selector of service is not defined when generateShardOrdinalService is true, service: %s", clusterService.Name)
+	}
+
+	shards := func() int32 {
+		for _, compSpec := range cluster.Spec.ComponentSpecs {
+			if compSpec.Name != clusterService.ComponentSelector {
+				continue
+			}
+			if compSpec.Shards == nil {
+				continue
+			}
+			return *compSpec.Shards
+		}
+		return -1
+	}()
+
+	if shards <= 1 {
+		return []*appsv1alpha1.ClusterService{clusterService}, nil
+	}
+
+	shardOrdinalClusterSvcs := make([]*appsv1alpha1.ClusterService, 0, shards)
+	for i := int32(0); i < shards; i++ {
+		svc := clusterService.DeepCopy()
+		if i == 0 {
+			shardOrdinalClusterSvcs = append(shardOrdinalClusterSvcs, svc)
+			continue
+		}
+		svc.Name = fmt.Sprintf("%s-%d", clusterService.Name, i)
+		svc.ComponentSelector = fmt.Sprintf("%s-%d", clusterService.ComponentSelector, i)
+		if len(clusterService.ServiceName) == 0 {
+			svc.ServiceName = fmt.Sprintf("%d", i)
+		} else {
+			svc.ServiceName = fmt.Sprintf("%s-%d", clusterService.ServiceName, i)
+		}
+		shardOrdinalClusterSvcs = append(shardOrdinalClusterSvcs, svc)
+	}
+	return shardOrdinalClusterSvcs, nil
 }
 
 func (t *clusterServiceTransformer) builtinSelector(cluster *appsv1alpha1.Cluster) map[string]string {

@@ -215,7 +215,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	}
 
 	if err := BuildSyncer(reqCtx, synthesizeComp); err != nil {
-		reqCtx.Log.Error(err, "build wesyncer failed.")
+		reqCtx.Log.Error(err, "build syncer failed.")
 		return nil, err
 	}
 

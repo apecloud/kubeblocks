@@ -29,17 +29,17 @@ const (
 )
 
 const (
-	ApeCloudPostgresqlWeSyncerType = "apecloud-postgresql"
-	OfficialPostgresqlWeSyncerType = "official-postgresql"
-	MongoDBWeSyncerType            = "mongodb"
-	MySQLWeSyncerType              = "mysql"
-	WeSQLWeSyncerType              = "wesql"
+	ApeCloudPostgresqlSyncerType = "apecloud-postgresql"
+	OfficialPostgresqlSyncerType = "official-postgresql"
+	MongoDBSyncerType            = "mongodb"
+	MySQLSyncerType              = "mysql"
+	WeSQLSyncerType              = "wesql"
 )
 
 var SyncerSupportTypes = []string{
-	ApeCloudPostgresqlWeSyncerType,
-	OfficialPostgresqlWeSyncerType,
-	MongoDBWeSyncerType,
-	MySQLWeSyncerType,
-	WeSQLWeSyncerType,
+	ApeCloudPostgresqlSyncerType,
+	OfficialPostgresqlSyncerType,
+	MongoDBSyncerType,
+	MySQLSyncerType,
+	WeSQLSyncerType,
 }

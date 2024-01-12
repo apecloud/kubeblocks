@@ -31,62 +31,62 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-func BuildWeSyncer(reqCtx intctrlutil.RequestCtx, synthesizeComp *SynthesizedComponent) error {
+func BuildSyncer(reqCtx intctrlutil.RequestCtx, synthesizeComp *SynthesizedComponent) error {
 	// If it's not a built-in handler supported by Lorry, LorryContainers are not injected by default.
-	haType := getWeSyncerType(synthesizeComp)
+	haType := getSyncerType(synthesizeComp)
 	if haType == "" {
 		return nil
 	}
 
 	container := buildBasicContainer(synthesizeComp)
-	weSyncerSvcHTTPPort := viper.GetInt32(constant.KBEnvSyncerHTTPPort)
-	availablePorts, err := getAvailableContainerPorts(synthesizeComp.PodSpec.Containers, []int32{weSyncerSvcHTTPPort})
+	syncerSvcHTTPPort := viper.GetInt32(constant.KBEnvSyncerHTTPPort)
+	availablePorts, err := getAvailableContainerPorts(synthesizeComp.PodSpec.Containers, []int32{syncerSvcHTTPPort})
 	if err != nil {
 		reqCtx.Log.Info("get lorry container port failed", "error", err)
 		return err
 	}
-	weSyncerSvcHTTPPort = availablePorts[0]
+	syncerSvcHTTPPort = availablePorts[0]
 
 	initContainer := container.DeepCopy()
-	buildWeSyncerInitContainer(synthesizeComp, initContainer)
-	modifyMainContainerForWesyncer(synthesizeComp, int(weSyncerSvcHTTPPort))
+	buildSyncerInitContainer(synthesizeComp, initContainer)
+	modifyMainContainerForSyncer(synthesizeComp, int(syncerSvcHTTPPort))
 	synthesizeComp.PodSpec.InitContainers = append(synthesizeComp.PodSpec.InitContainers, *initContainer)
 
 	return nil
 }
 
-func buildWeSyncerInitContainer(component *SynthesizedComponent, container *corev1.Container) {
-	container.Image = viper.GetString(constant.KBWesyncerImage)
+func buildSyncerInitContainer(component *SynthesizedComponent, container *corev1.Container) {
+	container.Image = viper.GetString(constant.KBSyncerImage)
 	container.Name = constant.SyncerInitContainerName
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
-	container.Command = []string{"cp", "-r", "/bin/wesyncer", "/config", "/kubeblocks/"}
+	container.Command = []string{"cp", "-r", "/bin/syncer", "/config", "/kubeblocks/"}
 	container.StartupProbe = nil
 	container.ReadinessProbe = nil
 	volumeMount := corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"}
 	container.VolumeMounts = []corev1.VolumeMount{volumeMount}
 }
 
-func modifyMainContainerForWesyncer(component *SynthesizedComponent, weSyncerSvcHTTPPort int) {
+func modifyMainContainerForSyncer(component *SynthesizedComponent, syncerSvcHTTPPort int) {
 	container := component.PodSpec.Containers[0]
-	command := []string{"/kubeblocks/wesyncer",
+	command := []string{"/kubeblocks/syncer",
 		"--config-path", "/kubeblocks/config/components",
-		"--port", strconv.Itoa(weSyncerSvcHTTPPort),
+		"--port", strconv.Itoa(syncerSvcHTTPPort),
 		// "--zap-log-level", "debug",
 		"--"}
 	container.Command = append(command, container.Command...)
 	volumeMount := corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"}
 	container.VolumeMounts = append(container.VolumeMounts, volumeMount)
-	container.Env = append(container.Env, buildWeSyncerEnvs(component)...)
+	container.Env = append(container.Env, buildSyncerEnvs(component)...)
 
 	container.Ports = append(container.Ports, corev1.ContainerPort{
-		ContainerPort: int32(weSyncerSvcHTTPPort),
-		Name:          constant.WesyncerHTTPPortName,
+		ContainerPort: int32(syncerSvcHTTPPort),
+		Name:          constant.SyncerHTTPPortName,
 		Protocol:      "TCP",
 	})
 	component.PodSpec.Containers[0] = container
 }
 
-func buildWeSyncerEnvs(synthesizeComp *SynthesizedComponent) []corev1.EnvVar {
+func buildSyncerEnvs(synthesizeComp *SynthesizedComponent) []corev1.EnvVar {
 	var (
 		secretName     string
 		sysInitAccount *appsv1alpha1.SystemAccount
@@ -108,7 +108,7 @@ func buildWeSyncerEnvs(synthesizeComp *SynthesizedComponent) []corev1.EnvVar {
 		// inject the default built-in handler env to lorry container.
 		{
 			Name:      constant.KBEnvBuiltinHandler,
-			Value:     string(getWeSyncerType(synthesizeComp)),
+			Value:     string(getSyncerType(synthesizeComp)),
 			ValueFrom: nil,
 		},
 		{
@@ -137,18 +137,18 @@ func buildWeSyncerEnvs(synthesizeComp *SynthesizedComponent) []corev1.EnvVar {
 	return envs
 }
 
-func getWeSyncerType(synthesizeComp *SynthesizedComponent) string {
+func getSyncerType(synthesizeComp *SynthesizedComponent) string {
 	var haType string
 	if synthesizeComp.LifecycleActions.RoleProbe != nil && synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != nil {
 		haType = string(*synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler)
-		if slices.Contains(constant.WeSyncerSupportTypes, haType) {
+		if slices.Contains(constant.SyncerSupportTypes, haType) {
 			return haType
 		}
 	}
 
 	if synthesizeComp.CharacterType != "" {
 		haType = synthesizeComp.CharacterType
-		if slices.Contains(constant.WeSyncerSupportTypes, haType) {
+		if slices.Contains(constant.SyncerSupportTypes, haType) {
 			return haType
 		}
 	}

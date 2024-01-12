@@ -36,7 +36,7 @@ const (
 	WeSQLWeSyncerType              = "wesql"
 )
 
-var WeSyncerSupportTypes = []string{
+var SyncerSupportTypes = []string{
 	ApeCloudPostgresqlWeSyncerType,
 	OfficialPostgresqlWeSyncerType,
 	MongoDBWeSyncerType,

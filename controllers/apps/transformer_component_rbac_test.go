@@ -43,7 +43,7 @@ var _ = Describe("object rbac transformer test.", func() {
 		compDefName        = "test-compdef"
 		clusterName        = "test-cluster"
 		compName           = "default"
-		serviceAccountName = "kb-" + clusterName
+		serviceAccountName = constant.KBSlashLowerPrefix + clusterName
 	)
 
 	var transCtx graph.TransformContext

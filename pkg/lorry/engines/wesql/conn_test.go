@@ -82,7 +82,7 @@ func TestGetLeaderMember(t *testing.T) {
 
 	t.Run("get leader member success", func(t *testing.T) {
 		mock.ExpectQuery("select *").
-			WillReturnRows(sqlmock.NewRows([]string{"CURRENT_LEADER"}).AddRow(fakePodName + ".test-wesql.headless"))
+			WillReturnRows(sqlmock.NewRows([]string{"CURRENT_LEADER"}).AddRow(fakePodName + ".test-wesql.headless")) //nolint:goconst
 
 		leaderMember := manager.GetLeaderMember(cluster)
 		assert.NotNil(t, leaderMember)

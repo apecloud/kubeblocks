@@ -354,7 +354,7 @@ func (r *componentStatusHandler) isScaleOutFailed() (bool, error) {
 	stsProto := rsmcore.ConvertRSMToSTS(r.protoRSM)
 	backupKey := types.NamespacedName{
 		Namespace: stsObj.Namespace,
-		Name:      stsObj.Name + "-scaling",
+		Name:      stsObj.Name + constant.SlashScalingLowerSuffix,
 	}
 	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, stsObj, stsProto, backupKey)
 	if err != nil {

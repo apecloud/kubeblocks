@@ -54,8 +54,11 @@ const (
 )
 
 const (
-	KBPrefix      = "KB"
-	KBLowerPrefix = "kb"
+	KBPrefix           = "KB"
+	KBLowerPrefix      = "kb"
+	KBSlashLowerPrefix = "kb-"
+
+	SlashScalingLowerSuffix = "-scaling"
 )
 
 const (

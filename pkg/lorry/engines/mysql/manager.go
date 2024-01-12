@@ -454,8 +454,8 @@ func (mgr *Manager) EnsureServerID(ctx context.Context) (bool, error) {
 
 func (mgr *Manager) EnableSemiSyncIfNeed(ctx context.Context) error {
 	var status string
-	err := mgr.DB.QueryRowContext(ctx, "SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS "+
-		"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").Scan(&status)
+	err := mgr.DB.QueryRowContext(ctx, "SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS "+ //nolint:goconst
+		"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").Scan(&status) //nolint:goconst
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil

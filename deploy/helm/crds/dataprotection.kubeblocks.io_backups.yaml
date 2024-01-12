@@ -196,12 +196,18 @@ spec:
                         for PITR, this is the time range of recoverable data.
                       properties:
                         end:
-                          description: end records the end time of backup.
+                          description: end records the end time of backup(Coordinated
+                            Universal Time, UTC).
                           format: date-time
                           type: string
                         start:
-                          description: start records the start time of backup.
+                          description: start records the start time of backup(Coordinated
+                            Universal Time, UTC).
                           format: date-time
+                          type: string
+                        timeZone:
+                          description: 'time zone, only support zone offset, value
+                            range: "-12:59 ~ +13:00"'
                           type: string
                       type: object
                     totalSize:
@@ -879,12 +885,18 @@ spec:
                   PITR, this is the time range of recoverable data.
                 properties:
                   end:
-                    description: end records the end time of backup.
+                    description: end records the end time of backup(Coordinated Universal
+                      Time, UTC).
                     format: date-time
                     type: string
                   start:
-                    description: start records the start time of backup.
+                    description: start records the start time of backup(Coordinated
+                      Universal Time, UTC).
                     format: date-time
+                    type: string
+                  timeZone:
+                    description: 'time zone, only support zone offset, value range:
+                      "-12:59 ~ +13:00"'
                     type: string
                 type: object
               totalSize:

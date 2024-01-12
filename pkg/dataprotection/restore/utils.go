@@ -22,6 +22,7 @@ package restore
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -146,6 +147,45 @@ func getTimeFormat(envs []corev1.EnvVar) string {
 		}
 	}
 	return time.RFC3339
+}
+
+func getTimeZone(envs []corev1.EnvVar) string {
+	for _, env := range envs {
+		if env.Name == dptypes.DPTimeZone {
+			return env.Value
+		}
+	}
+	return ""
+}
+
+func transformTimeWithZone(targetTime *metav1.Time, timeZone string) (*metav1.Time, error) {
+	if timeZone == "" {
+		return targetTime, nil
+	}
+	formatErr := fmt.Errorf("incorrect format: only support such as +07:00")
+	if len(timeZone) != 6 {
+		return targetTime, formatErr
+	}
+	strs := strings.Split(timeZone, ":")
+	if len(strs) != 2 {
+		return targetTime, formatErr
+	}
+	hour, err := strconv.Atoi(strs[0])
+	if err != nil {
+		return targetTime, formatErr
+	}
+	minute, err := strconv.Atoi(strs[1])
+	if err != nil {
+		return targetTime, formatErr
+	}
+	offset := hour * 60 * 60
+	if hour < 0 {
+		offset += -1 * minute * 60
+	} else {
+		offset += minute * 60
+	}
+	zone := time.FixedZone("UTC", offset)
+	return &metav1.Time{Time: targetTime.In(zone)}, nil
 }
 
 func CompareWithBackupStopTime(backupI, backupJ dpv1alpha1.Backup) bool {

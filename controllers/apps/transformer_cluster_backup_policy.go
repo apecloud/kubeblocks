@@ -263,7 +263,7 @@ func (r *clusterBackupPolicyTransformer) syncBackupSchedule(backupSchedule *dpv1
 	for _, s := range backupSchedule.Spec.Schedules {
 		scheduleMethodMap[s.BackupMethod] = struct{}{}
 	}
-	backupSchedule.Annotations = r.buildAnnotations()
+	mergeMap(backupSchedule.Annotations, r.buildAnnotations())
 	// sync the newly added schedule policies.
 	for _, s := range r.backupPolicy.Schedules {
 		if _, ok := scheduleMethodMap[s.BackupMethod]; ok {

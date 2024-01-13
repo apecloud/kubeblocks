@@ -121,3 +121,8 @@ func GeneratePodFQDN(namespace, clusterName, compName string, ordinal int) strin
 func GenerateVirtualComponentDefinition(compDefSuffix string) string {
 	return fmt.Sprintf("%s-%s", KBGeneratedVirtualCompDefPrefix, compDefSuffix)
 }
+
+// GenerateDefaultServiceAccountName generates default service account name for a cluster.
+func GenerateResourceNameWithScalingSuffix(name string) string {
+	return fmt.Sprintf("%s-%s", name, SlashScalingLowerSuffix)
+}

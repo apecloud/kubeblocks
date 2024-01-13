@@ -417,7 +417,7 @@ func (r *componentWorkloadOps) postScaleOut(stsObj *apps.StatefulSet) error {
 	var (
 		snapshotKey = types.NamespacedName{
 			Namespace: stsObj.Namespace,
-			Name:      stsObj.Name + constant.SlashScalingLowerSuffix,
+			Name:      constant.GenerateResourceNameWithScalingSuffix(stsObj.Name),
 		}
 	)
 
@@ -460,7 +460,7 @@ func (r *componentWorkloadOps) scaleOut(stsObj *apps.StatefulSet) error {
 	var (
 		backupKey = types.NamespacedName{
 			Namespace: stsObj.Namespace,
-			Name:      stsObj.Name + constant.SlashScalingLowerSuffix,
+			Name:      constant.GenerateResourceNameWithScalingSuffix(stsObj.Name),
 		}
 	)
 

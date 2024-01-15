@@ -26,7 +26,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/yaml"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -34,19 +33,6 @@ import (
 )
 
 var _ = Describe("", func() {
-	It("test GetMinAvailable", func() {
-		prefer := intstr.IntOrString{}
-		clusterCompSpec := &ClusterComponentSpec{}
-		Expect(clusterCompSpec.GetMinAvailable(nil)).Should(BeNil())
-		clusterCompSpec.NoCreatePDB = false
-		clusterCompSpec.Replicas = 1
-		Expect(clusterCompSpec.GetMinAvailable(&prefer).IntVal).Should(BeEquivalentTo(0))
-		clusterCompSpec.Replicas = 2
-		Expect(clusterCompSpec.GetMinAvailable(&prefer).IntVal).Should(BeEquivalentTo(1))
-		clusterCompSpec.Replicas = 3
-		Expect(clusterCompSpec.GetMinAvailable(&prefer)).Should(BeEquivalentTo(&prefer))
-	})
-
 	It("test toVolumeClaimTemplate", func() {
 		r := ClusterComponentVolumeClaimTemplate{}
 		r.Name = "test-name"

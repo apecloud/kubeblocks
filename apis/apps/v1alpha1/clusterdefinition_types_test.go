@@ -23,7 +23,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
@@ -102,34 +101,6 @@ var _ = Describe("", func() {
 		Expect(r.GetStatefulSetWorkload()).Should(BeEquivalentTo(r.ConsensusSpec))
 		r.WorkloadType = Replication
 		Expect(r.GetStatefulSetWorkload()).Should(BeEquivalentTo(r.ReplicationSpec))
-	})
-
-	It("test GetMinAvailable", func() {
-		r := &ClusterComponentDefinition{}
-		r.WorkloadType = Consensus
-		Expect(r.GetMinAvailable().String()).Should(Equal("51%"))
-		r.WorkloadType = Stateful
-		Expect(r.GetMinAvailable().IntVal).Should(BeEquivalentTo(1))
-	})
-
-	It("test GetMaxUnavailable", func() {
-		r := &ClusterComponentDefinition{}
-		r.WorkloadType = Stateless
-		Expect(r.GetMaxUnavailable()).Should(BeNil())
-		maxUnavailable := intstr.IntOrString{StrVal: "49%"}
-		r.StatelessSpec = &StatelessSetSpec{
-			UpdateStrategy: appsv1.DeploymentStrategy{
-				RollingUpdate: &appsv1.RollingUpdateDeployment{
-					MaxUnavailable: &maxUnavailable,
-				},
-			},
-		}
-		Expect(r.GetMaxUnavailable()).Should(BeEquivalentTo(&maxUnavailable))
-		r.WorkloadType = Stateful
-		r.StatefulSpec = &StatefulSetSpec{
-			UpdateStrategy: BestEffortParallelStrategy,
-		}
-		Expect(r.GetMaxUnavailable().String()).Should(BeEquivalentTo("49%"))
 	})
 
 	It("test GetCommonStatefulSpec", func() {

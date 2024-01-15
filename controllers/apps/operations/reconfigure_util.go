@@ -159,7 +159,7 @@ func updateOpsLabelWithReconfigure(obj *appsv1alpha1.OpsRequest, params []core.P
 				return
 			}
 			maxLabelCount--
-			obj.Labels[key] = core.FromValueToString(val)
+			obj.Labels[core.GetValidFieldName(key)] = core.FromValueToString(val)
 		}
 	}
 	updateAnnotation := func(keyFile string, param map[string]interface{}) {

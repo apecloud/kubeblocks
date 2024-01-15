@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: check branch name
-        uses: apecloud/check-branch-name@v0.1.0
+        uses: apecloud-inc/check-branch-name@v0.1.0
         if: github.event.pull_request.head.repo.full_name == github.repository
         with:
           branch_pattern: 'feature/|bugfix/|release/|hotfix/|support/|releasing/|dependabot/'

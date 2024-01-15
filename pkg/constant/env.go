@@ -87,9 +87,9 @@ const (
 	KBEnvServiceUser     = "KB_SERVICE_USER"
 	KBEnvServicePassword = "KB_SERVICE_PASSWORD"
 	KBEnvLorryHTTPPort   = "LORRY_HTTP_PORT"
-	KBEnvLorryGRPCPort   = "LORRY_SERVICE_GRPC_PORT"
-	KBEnvLorryLogLevel   = "LORRY_SERVICE_LOG_LEVEL"
-	KBEnvSyncerHTTPPort  = "SYNCER_SERVICE_HTTP_PORT"
+	KBEnvLorryGRPCPort   = "LORRY_GRPC_PORT"
+	KBEnvLorryLogLevel   = "LORRY_LOG_LEVEL"
+	KBEnvSyncerHTTPPort  = "SYNCER_HTTP_PORT"
 
 	// KBEnvServiceRoles defines the Roles configured in the cluster definition that are visible to users.
 	KBEnvServiceRoles = "KB_SERVICE_ROLES"

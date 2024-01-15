@@ -132,40 +132,6 @@ func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container 
 		"--grpcport", strconv.Itoa(lorryGRPCPort),
 	}
 
-	if len(synthesizeComp.PodSpec.Containers) > 0 {
-		mainContainer := synthesizeComp.PodSpec.Containers[0]
-		if len(mainContainer.Ports) > 0 {
-			port := mainContainer.Ports[0]
-			dbPort := port.ContainerPort
-			container.Env = append(container.Env, corev1.EnvVar{
-				Name:      constant.KBEnvServicePort,
-				Value:     strconv.Itoa(int(dbPort)),
-				ValueFrom: nil,
-			})
-		}
-
-		dataVolumeName := dataVolume
-		for _, v := range synthesizeComp.Volumes {
-			// TODO(xingran): how to convert needSnapshot to original volumeTypeData ?
-			if v.NeedSnapshot {
-				dataVolumeName = v.Name
-			}
-		}
-		for _, volumeMount := range mainContainer.VolumeMounts {
-			if volumeMount.Name != dataVolumeName {
-				continue
-			}
-			vm := volumeMount.DeepCopy()
-			container.VolumeMounts = []corev1.VolumeMount{*vm}
-			container.Env = append(container.Env, corev1.EnvVar{
-				Name:      constant.KBEnvDataPath,
-				Value:     vm.MountPath,
-				ValueFrom: nil,
-			})
-		}
-	}
-
-	container.Env = append(container.Env, buildLorryEnvs(synthesizeComp, clusterCompSpec)...)
 	container.Ports = []corev1.ContainerPort{
 		{
 			ContainerPort: int32(lorryHTTPPort),
@@ -179,9 +145,10 @@ func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container 
 		},
 	}
 
+	buildLorryEnvs(container, synthesizeComp, clusterCompSpec)
 }
 
-func buildLorryEnvs(synthesizeComp *SynthesizedComponent, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) []corev1.EnvVar {
+func buildLorryEnvs(container *corev1.Container, synthesizeComp *SynthesizedComponent, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) {
 	var (
 		secretName     string
 		sysInitAccount *appsv1alpha1.SystemAccount
@@ -235,13 +202,46 @@ func buildLorryEnvs(synthesizeComp *SynthesizedComponent, clusterCompSpec *appsv
 			})
 	}
 
+	if len(synthesizeComp.PodSpec.Containers) > 0 {
+		mainContainer := synthesizeComp.PodSpec.Containers[0]
+		if len(mainContainer.Ports) > 0 {
+			port := mainContainer.Ports[0]
+			dbPort := port.ContainerPort
+			envs = append(envs, corev1.EnvVar{
+				Name:      constant.KBEnvServicePort,
+				Value:     strconv.Itoa(int(dbPort)),
+				ValueFrom: nil,
+			})
+		}
+
+		dataVolumeName := dataVolume
+		for _, v := range synthesizeComp.Volumes {
+			// TODO(xingran): how to convert needSnapshot to original volumeTypeData ?
+			if v.NeedSnapshot {
+				dataVolumeName = v.Name
+			}
+		}
+		for _, volumeMount := range mainContainer.VolumeMounts {
+			if volumeMount.Name != dataVolumeName {
+				continue
+			}
+			vm := volumeMount.DeepCopy()
+			container.VolumeMounts = []corev1.VolumeMount{*vm}
+			envs = append(envs, corev1.EnvVar{
+				Name:      constant.KBEnvDataPath,
+				Value:     vm.MountPath,
+				ValueFrom: nil,
+			})
+		}
+	}
+
 	// pass the volume protection spec to lorry container through env.
 	// TODO(xingran & leon):  volume protection should be based on componentDefinition.Spec.Volume
 	if volumeProtectionEnabled(synthesizeComp) {
 		envs = append(envs, buildEnv4VolumeProtection(*synthesizeComp.VolumeProtection))
 	}
 
-	return envs
+	container.Env = append(container.Env, envs...)
 }
 
 func buildRoleProbeContainer(roleChangedContainer *corev1.Container, roleProbe *appsv1alpha1.RoleProbe, probeSvcHTTPPort int) {

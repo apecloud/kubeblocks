@@ -63,6 +63,7 @@ const (
 const (
 	KBServiceAccountName     = "KUBEBLOCKS_SERVICEACCOUNT_NAME"
 	KBToolsImage             = "KUBEBLOCKS_TOOLS_IMAGE"
+	KBSyncerImage            = "KUBEBLOCKS_SYNCER_IMAGE"
 	KBImagePullPolicy        = "KUBEBLOCKS_IMAGE_PULL_POLICY"
 	KBDataScriptClientsImage = "KUBEBLOCKS_DATASCRIPT_CLIENTS_IMAGE"
 )
@@ -242,16 +243,20 @@ const (
 
 const (
 	// Container port name
+	SyncerHTTPPortName                 = "syncer-port"
 	LorryHTTPPortName                  = "lorry-http-port"
 	LorryGRPCPortName                  = "lorry-grpc-port"
-	LorryRoleProbePath                 = "/v1.0/checkrole"
-	LorryVolumeProtectPath             = "/v1.0/volumeprotection"
+	SyncerContainerName                = "syncer"
+	LorryContainerName                 = "lorry"
+	SyncerInitContainerName            = "init-syncer"
+	LorryInitContainerName             = "init-lorry"
 	ProbeInitContainerName             = "kb-initprobe"
-	WeSyncerContainerName              = "kb-we-syncer"
 	RoleProbeContainerName             = "kb-checkrole"
 	StatusProbeContainerName           = "kb-checkstatus"
 	RunningProbeContainerName          = "kb-checkrunning"
 	VolumeProtectionProbeContainerName = "kb-volume-protection"
+	LorryRoleProbePath                 = "/v1.0/checkrole"
+	LorryVolumeProtectPath             = "/v1.0/volumeprotection"
 
 	// the filedpath name used in event.InvolvedObject.FieldPath
 	ProbeCheckStatusPath  = "spec.containers{" + StatusProbeContainerName + "}"

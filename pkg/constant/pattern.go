@@ -121,3 +121,8 @@ func GeneratePodFQDN(namespace, clusterName, compName string, ordinal int) strin
 func GenerateVirtualComponentDefinition(compDefSuffix string) string {
 	return fmt.Sprintf("%s-%s", KBGeneratedVirtualCompDefPrefix, compDefSuffix)
 }
+
+// GenerateResourceNameWithScalingSuffix generates name with '-scaling' suffix.
+func GenerateResourceNameWithScalingSuffix(name string) string {
+	return fmt.Sprintf("%s-%s", name, SlashScalingLowerSuffix)
+}

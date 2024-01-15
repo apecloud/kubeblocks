@@ -26,6 +26,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -118,8 +119,8 @@ func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorr
 	}
 	initContainer := buildLorryInitContainer(synthesizeComp)
 	synthesizeComp.PodSpec.InitContainers = append(synthesizeComp.PodSpec.InitContainers, *initContainer)
+	mainContainer := getMainContainer(synthesizeComp.PodSpec.Containers)
 	if execImage == "" {
-		mainContainer := getMainContainer(synthesizeComp.PodSpec.Containers)
 		if mainContainer == nil {
 			return nil
 		}
@@ -139,6 +140,18 @@ func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorr
 		Name:  constant.KBEnvActionCommands,
 		Value: string(actionJSON),
 	})
+
+	envSet := sets.New([]string{}...)
+	for _, env := range lorryContainer.Env {
+		envSet.Insert(env.Name)
+	}
+
+	for _, env := range mainContainer.Env {
+		if envSet.Has(env.Name) {
+			continue
+		}
+		lorryContainer.Env = append(lorryContainer.Env, env)
+	}
 	return nil
 }
 

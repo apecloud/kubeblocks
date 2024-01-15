@@ -60,15 +60,32 @@ func init() {
 
 // ComponentDefinitionSpec provides a workload component specification with attributes that strongly work with stateful workloads and day-2 operation behaviors.
 type ComponentDefinitionSpec struct {
-	// Provider is the name of the component provider.
-	// +kubebuilder:validation:MaxLength=32
-	// +optional
-	Provider string `json:"provider,omitempty"`
-
 	// Description is a brief description of the component.
 	// +kubebuilder:validation:MaxLength=256
 	// +optional
 	Description string `json:"description,omitempty"`
+
+	// Version specifies the release version of ComponentDefinition.
+	// It is recommended to use this field along with BackwardCompatibleVersions for controlled upgrades.
+	// Cannot be updated.
+	// +kubebuilder:validation:MaxLength=32
+	// +optional
+	Version string `json:"version,omitempty"`
+
+	// BackwardCompatibleVersions specifies the backward-compatible versions of ComponentDefinition.
+	// It is a string array where each string can represent an exact version, a version with wildcards, or a version range expression.
+	//
+	// Examples:
+	// - "v1alpha1": Matches the exact version "v1alpha1"
+	// - "v1beta*": Matches all versions starting with "v1beta"
+	// - ">= v1alpha2, < v2.0.0": Matches all versions greater than or equal to "v1alpha2" and less than "v2.0.0"
+	//
+	// If any backward-compatible version is specified, only versions declared in this list are allowed for instance upgrades,
+	// attempting to upgrade an instance to a version not in this list will be rejected.
+	// This ensures controlled and predictable upgrades, preventing accidental upgrades to incompatible versions.
+	//
+	// +optional
+	BackwardCompatibleVersions []string `json:"backwardCompatibleVersions,omitempty"`
 
 	// ServiceKind defines what kind of well-known service that the component provides (e.g., MySQL, Redis, ETCD, case insensitive).
 	// Cannot be updated.
@@ -81,6 +98,11 @@ type ComponentDefinitionSpec struct {
 	// +kubebuilder:validation:MaxLength=32
 	// +optional
 	ServiceVersion string `json:"serviceVersion,omitempty"`
+
+	// Provider is the name of the component provider.
+	// +kubebuilder:validation:MaxLength=32
+	// +optional
+	Provider string `json:"provider,omitempty"`
 
 	// Runtime defines primarily runtime information for the component, including:
 	//   - Init containers

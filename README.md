@@ -71,7 +71,7 @@ KubeBlocks integrates the most popular database/message-queue/data-processing en
 Your contributions are welcomed and appreciated.
 
 - See the [Contributor Guide](docs/CONTRIBUTING.md) for details on typical contribution workflows.
-- See the [Developer Guide](docs/DEVELOPING.md) to get started with building and developing.
+- See the [Developer Guide](docs%2F00%20-%20index.md) to get started with building and developing.
 
 ## Report Vulnerability
 

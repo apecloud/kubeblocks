@@ -82,6 +82,8 @@ type ClusterSpec struct {
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
+	// !!!!! The following fields may be deprecated in subsequent versions, please DO NOT rely on them for new requirements.
+
 	// tenancy describes how pods are distributed across node.
 	// SharedNode means multiple pods may share the same node.
 	// DedicatedNode means each pod runs on their own dedicated node.

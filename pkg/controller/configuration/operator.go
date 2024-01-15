@@ -65,7 +65,6 @@ func (c *configOperator) Reconcile() error {
 		Configuration().       // sync Configuration
 		CreateConfigTemplate().
 		UpdatePodVolumes().
-		BuildConfigManagerSidecar().
 		UpdateConfigRelatedObject().
 		UpdateConfigurationStatus().
 		Complete()

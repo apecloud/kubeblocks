@@ -107,6 +107,38 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 
 	reqCtx.Log.V(1).Info("lorry", "containers", lorryContainers)
 	synthesizeComp.PodSpec.Containers = append(synthesizeComp.PodSpec.Containers, lorryContainers...)
+
+	return adaptLorryIfCustomHandlerDefined(synthesizeComp, &lorryContainers[0], int(lorryHTTPPort), int(lorryGRPCPort))
+}
+
+func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorryContainer *corev1.Container, lorryHTTPPort, lorryGRPCPort int) error {
+	actionCommands, execImage := getActionCommandsAndExecImage(synthesizeComp)
+	if len(actionCommands) == 0 {
+		return nil
+	}
+	initContainer := buildLorryInitContainer(synthesizeComp)
+	synthesizeComp.PodSpec.InitContainers = append(synthesizeComp.PodSpec.InitContainers, *initContainer)
+	if execImage == "" {
+		mainContainer := getMainContainer(synthesizeComp.PodSpec.Containers)
+		if mainContainer == nil {
+			return nil
+		}
+		execImage = mainContainer.Image
+	}
+
+	lorryContainer.Image = execImage
+	lorryContainer.VolumeMounts = append(lorryContainer.VolumeMounts, corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"})
+
+	lorryContainer.Command = []string{"/kubeblocks/lorry",
+		"--port", strconv.Itoa(lorryHTTPPort),
+		"--grpcport", strconv.Itoa(lorryGRPCPort),
+		"--config-path", "/kubeblocks/config/lorry/components/",
+	}
+	actionJSON, _ := json.Marshal(actionCommands)
+	lorryContainer.Env = append(lorryContainer.Env, corev1.EnvVar{
+		Name:  constant.KBEnvActionCommands,
+		Value: string(actionJSON),
+	})
 	return nil
 }
 
@@ -148,26 +180,20 @@ func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container 
 	buildLorryEnvs(container, synthesizeComp, clusterCompSpec)
 }
 
-func buildLorryEnvs(container *corev1.Container, synthesizeComp *SynthesizedComponent, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) {
-	var (
-		secretName     string
-		sysInitAccount *appsv1alpha1.SystemAccount
-	)
+func buildLorryInitContainer(component *SynthesizedComponent) *corev1.Container {
+	container := &corev1.Container{}
+	container.Image = viper.GetString(constant.KBToolsImage)
+	container.Name = constant.LorryInitContainerName
+	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
+	container.Command = []string{"cp", "-r", "/bin/lorry", "/config", "/kubeblocks/"}
+	container.StartupProbe = nil
+	container.ReadinessProbe = nil
+	volumeMount := corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"}
+	container.VolumeMounts = []corev1.VolumeMount{volumeMount}
+	return container
+}
 
-	// TODO(lorry): use the buildIn kbprobe system account as the default credential
-	for index, sysAccount := range synthesizeComp.SystemAccounts {
-		if sysAccount.InitAccount {
-			sysInitAccount = &synthesizeComp.SystemAccounts[index]
-			break
-		}
-	}
-	if clusterCompSpec == nil || clusterCompSpec.ComponentDef != "" {
-		if sysInitAccount != nil {
-			secretName = constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
-		}
-	} else {
-		secretName = constant.GenerateDefaultConnCredential(synthesizeComp.ClusterName)
-	}
+func buildLorryEnvs(container *corev1.Container, synthesizeComp *SynthesizedComponent, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) {
 	envs := []corev1.EnvVar{
 		// inject the default built-in handler env to lorry container.
 		{
@@ -176,34 +202,11 @@ func buildLorryEnvs(container *corev1.Container, synthesizeComp *SynthesizedComp
 			ValueFrom: nil,
 		},
 	}
-	if secretName != "" {
-		envs = append(envs,
-			corev1.EnvVar{
-				Name: constant.KBEnvServiceUser,
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: secretName,
-						},
-						Key: constant.AccountNameForSecret,
-					},
-				},
-			},
-			corev1.EnvVar{
-				Name: constant.KBEnvServicePassword,
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: secretName,
-						},
-						Key: constant.AccountPasswdForSecret,
-					},
-				},
-			})
-	}
 
-	if len(synthesizeComp.PodSpec.Containers) > 0 {
-		mainContainer := synthesizeComp.PodSpec.Containers[0]
+	envs = append(envs, buildEnv4DBAccount(synthesizeComp, clusterCompSpec)...)
+
+	mainContainer := getMainContainer(synthesizeComp.PodSpec.Containers)
+	if mainContainer != nil {
 		if len(mainContainer.Ports) > 0 {
 			port := mainContainer.Ports[0]
 			dbPort := port.ContainerPort
@@ -277,6 +280,55 @@ func buildVolumeProtectionProbeContainer(characterType string, c *corev1.Contain
 	c.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
+func buildEnv4DBAccount(synthesizeComp *SynthesizedComponent, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) []corev1.EnvVar {
+	var (
+		secretName     string
+		sysInitAccount *appsv1alpha1.SystemAccount
+	)
+
+	for index, sysAccount := range synthesizeComp.SystemAccounts {
+		if sysAccount.InitAccount {
+			sysInitAccount = &synthesizeComp.SystemAccounts[index]
+			break
+		}
+	}
+
+	if clusterCompSpec == nil || clusterCompSpec.ComponentDef != "" {
+		if sysInitAccount != nil {
+			secretName = constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
+		}
+	} else {
+		secretName = constant.GenerateDefaultConnCredential(synthesizeComp.ClusterName)
+	}
+	envs := []corev1.EnvVar{}
+	if secretName != "" {
+		envs = append(envs,
+			corev1.EnvVar{
+				Name: constant.KBEnvServiceUser,
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: secretName,
+						},
+						Key: constant.AccountNameForSecret,
+					},
+				},
+			},
+			corev1.EnvVar{
+				Name: constant.KBEnvServicePassword,
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: secretName,
+						},
+						Key: constant.AccountPasswdForSecret,
+					},
+				},
+			})
+	}
+	return envs
+}
+
 func buildEnv4VolumeProtection(spec appsv1alpha1.VolumeProtectionSpec) corev1.EnvVar {
 	value, err := json.Marshal(spec)
 	if err != nil {
@@ -319,4 +371,47 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 	}
 
 	return appsv1alpha1.CustomActionHandler
+}
+
+func getActionCommandsAndExecImage(synthesizeComp *SynthesizedComponent) (map[string][]string, string) {
+	if synthesizeComp.LifecycleActions == nil {
+		return nil, ""
+	}
+
+	actions := map[string]*appsv1alpha1.LifecycleActionHandler{
+		"postProvision":    synthesizeComp.LifecycleActions.PostProvision,
+		"preTerminate":     synthesizeComp.LifecycleActions.PreTerminate,
+		"memberJoin":       synthesizeComp.LifecycleActions.MemberJoin,
+		"memberLeave":      synthesizeComp.LifecycleActions.MemberLeave,
+		"readonly":         synthesizeComp.LifecycleActions.Readonly,
+		"readwrite":        synthesizeComp.LifecycleActions.Readwrite,
+		"dataPopulate":     synthesizeComp.LifecycleActions.DataPopulate,
+		"dataAssemble":     synthesizeComp.LifecycleActions.DataAssemble,
+		"reconfigure":      synthesizeComp.LifecycleActions.Reconfigure,
+		"accountProvision": synthesizeComp.LifecycleActions.AccountProvision,
+	}
+
+	if synthesizeComp.LifecycleActions.RoleProbe != nil {
+		actions["roleProbe"] = &synthesizeComp.LifecycleActions.RoleProbe.LifecycleActionHandler
+	}
+
+	var toolImage string
+	actionCommands := map[string][]string{}
+	for action, handler := range actions {
+		if handler != nil && handler.CustomHandler != nil && handler.CustomHandler.Exec != nil {
+			actionCommands[action] = handler.CustomHandler.Exec.Command
+			if handler.CustomHandler.Image != "" {
+				toolImage = handler.CustomHandler.Image
+			}
+		}
+	}
+
+	return actionCommands, toolImage
+}
+
+func getMainContainer(containers []corev1.Container) *corev1.Container {
+	if len(containers) > 0 {
+		return &containers[0]
+	}
+	return nil
 }

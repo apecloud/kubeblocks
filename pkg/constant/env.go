@@ -83,6 +83,7 @@ const (
 const (
 	KBEnvWorkloadType    = "KB_WORKLOAD_TYPE"
 	KBEnvBuiltinHandler  = "KB_BUILTIN_HANDLER"
+	KBEnvActionCommands  = "KB_ACTION_COMMANDS"
 	KBEnvCharacterType   = "KB_SERVICE_CHARACTER_TYPE"
 	KBEnvServiceUser     = "KB_SERVICE_USER"
 	KBEnvServicePassword = "KB_SERVICE_PASSWORD"

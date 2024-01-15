@@ -237,9 +237,9 @@ func main() {
 		err                    error
 	)
 
-	setupFlags()
-
 	setupLogger()
+
+	setupFlags()
 
 	// Find and read the config file
 	if err := viper.ReadInConfig(); err != nil { // Handle errors reading the config file

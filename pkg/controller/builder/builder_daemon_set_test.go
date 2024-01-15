@@ -32,7 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
-var _ = Describe("pdb builder", func() {
+var _ = Describe("daemon-set builder", func() {
 	It("should work well", func() {
 		const (
 			name = "foo"

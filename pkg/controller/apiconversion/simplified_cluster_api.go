@@ -160,6 +160,15 @@ func fillSimplifiedClusterAPI(cluster *appsv1alpha1.Cluster, clusterCompDef *app
 			clusterCompSpec.Services = append(clusterCompSpec.Services, svc)
 		}
 	}
+
+	if len(cluster.Spec.Tenancy) > 0 || len(cluster.Spec.AvailabilityPolicy) > 0 {
+		clusterCompSpec.Affinity = &appsv1alpha1.Affinity{
+			PodAntiAffinity: appsv1alpha1.Preferred,
+			TopologyKeys:    []string{affinityTopologyKey(cluster.Spec.AvailabilityPolicy)},
+			Tenancy:         cluster.Spec.Tenancy,
+		}
+	}
+
 	return clusterCompSpec
 }
 
@@ -178,4 +187,14 @@ func getCloudProvider() cloudProvider {
 		return cloudProviderTencent
 	}
 	return cloudProviderUnknown
+}
+
+func affinityTopologyKey(policyType appsv1alpha1.AvailabilityPolicyType) string {
+	switch policyType {
+	case appsv1alpha1.AvailabilityPolicyZone:
+		return "topology.kubernetes.io/zone"
+	case appsv1alpha1.AvailabilityPolicyNode:
+		return "kubernetes.io/hostname"
+	}
+	return ""
 }

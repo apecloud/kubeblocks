@@ -321,12 +321,6 @@ spec:
                       x-kubernetes-validations:
                       - message: name is immutable
                         rule: self == oldSelf
-                    noCreatePDB:
-                      default: false
-                      description: noCreatePDB defines the PodDisruptionBudget creation
-                        behavior and is set to true if creation of PodDisruptionBudget
-                        for this component is not needed. It defaults to false.
-                      type: boolean
                     nodes:
                       description: Nodes defines the list of nodes that pods can schedule
                         If the RsmTransformPolicy is specified as ToPod,the list of
@@ -961,6 +955,9 @@ spec:
                 x-kubernetes-validations:
                 - message: duplicated component
                   rule: self.all(x, size(self.filter(c, c.name == x.name)) == 1)
+                - message: two kinds of definition API can not be used simultaneously
+                  rule: self.all(x, size(self.filter(c, has(c.componentDef))) == 0)
+                    || self.all(x, size(self.filter(c, has(c.componentDef))) == size(self))
               monitor:
                 description: monitor specifies the configuration of monitor
                 properties:

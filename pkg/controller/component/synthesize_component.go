@@ -394,7 +394,6 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 		synthesizeComp.Probes = clusterCompDef.Probes
 		synthesizeComp.VolumeTypes = clusterCompDef.VolumeTypes
 		synthesizeComp.VolumeProtection = clusterCompDef.VolumeProtectionSpec
-		synthesizeComp.MinAvailable = clusterCompSpec.GetMinAvailable(clusterCompDef.GetMinAvailable())
 		// TLS is a backward compatible field, which is used in configuration rendering before version 0.8.0.
 		if synthesizeComp.TLSConfig != nil {
 			synthesizeComp.TLS = true

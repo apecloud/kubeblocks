@@ -31,7 +31,6 @@ import (
 	"github.com/google/uuid"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -295,20 +294,6 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 	}
 	replaceData(m)
 	return connCredential
-}
-
-func BuildPDB(synthesizedComp *component.SynthesizedComponent) *policyv1.PodDisruptionBudget {
-	var (
-		namespace   = synthesizedComp.Namespace
-		clusterName = synthesizedComp.ClusterName
-		compName    = synthesizedComp.Name
-		labels      = constant.GetKBWellKnownLabels(synthesizedComp.ClusterDefName, clusterName, compName)
-	)
-	return builder.NewPDBBuilder(namespace, constant.GenerateClusterComponentName(clusterName, compName)).
-		AddLabelsInMap(labels).
-		AddLabelsInMap(constant.GetClusterCompDefLabel(synthesizedComp.ClusterCompDefName)).
-		AddSelectorsInMap(labels).
-		GetObject()
 }
 
 func BuildPVC(cluster *appsv1alpha1.Cluster,

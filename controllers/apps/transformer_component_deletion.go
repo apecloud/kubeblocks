@@ -64,7 +64,6 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 // func compOwnedKinds() []client.ObjectList {
 //	return []client.ObjectList{
 //		&workloads.ReplicatedStateMachineList{},
-//		&policyv1.PodDisruptionBudgetList{},
 //		&corev1.ServiceList{},
 //		&corev1.ConfigMapList{},
 //		&corev1.SecretList{},

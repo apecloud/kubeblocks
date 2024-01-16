@@ -25,35 +25,28 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
-func GenShardCompNameList(clusterCompSpec *appsv1alpha1.ClusterComponentSpec) []string {
-	compList := make([]string, 0)
-	compList = append(compList, clusterCompSpec.Name)
-	if clusterCompSpec.Shards != nil && *clusterCompSpec.Shards > 1 {
-		for i := 1; i < int(*clusterCompSpec.Shards); i++ {
-			compList = append(compList, fmt.Sprintf("%s-%d", clusterCompSpec.Name, i))
-		}
+func GenShardCompNameList(shardSpec *appsv1alpha1.ShardSpec) []string {
+	compNameList := make([]string, 0)
+	if shardSpec == nil {
+		return compNameList
 	}
-	return compList
+	shardTpl := shardSpec.Template
+	for i := 1; i < int(shardSpec.Shards); i++ {
+		compNameList = append(compNameList, fmt.Sprintf("%s-%d", shardTpl.Name, i))
+	}
+	return compNameList
 }
 
-func GenShardCompSpecList(clusterCompSpec *appsv1alpha1.ClusterComponentSpec) []*appsv1alpha1.ClusterComponentSpec {
+func GenShardCompSpecList(shardSpec *appsv1alpha1.ShardSpec) []*appsv1alpha1.ClusterComponentSpec {
 	compSpecList := make([]*appsv1alpha1.ClusterComponentSpec, 0)
-	if clusterCompSpec.Shards != nil && *clusterCompSpec.Shards > 1 {
-		for i := 0; i < int(*clusterCompSpec.Shards); i++ {
-			shardClusterCompSpec := clusterCompSpec.DeepCopy()
-			shardClusterCompSpec.Shards = nil
-			if i == 0 {
-				compSpecList = append(compSpecList, shardClusterCompSpec)
-				continue
-			}
-			shardClusterCompSpec.Shards = nil
-			shardClusterCompSpec.Name = fmt.Sprintf("%s-%d", clusterCompSpec.Name, i)
-			compSpecList = append(compSpecList, shardClusterCompSpec)
-		}
-	} else {
-		genClusterCompSpec := clusterCompSpec.DeepCopy()
-		genClusterCompSpec.Shards = nil
-		compSpecList = append(compSpecList, genClusterCompSpec)
+	if shardSpec == nil {
+		return compSpecList
+	}
+	shardTpl := shardSpec.Template
+	for i := 0; i < int(shardSpec.Shards); i++ {
+		shardClusterCompSpec := shardTpl.DeepCopy()
+		shardClusterCompSpec.Name = fmt.Sprintf("%s-%d", shardTpl.Name, i)
+		compSpecList = append(compSpecList, shardClusterCompSpec)
 	}
 	return compSpecList
 }

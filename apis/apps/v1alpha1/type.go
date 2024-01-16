@@ -604,30 +604,14 @@ type StatefulSetWorkload interface {
 type ClusterService struct {
 	Service `json:",inline"`
 
+	// ShardSelector extends the ServiceSpec.Selector by allowing you to specify a shard template name
+	// defined in Cluster.Spec.ShardSpecs[x].Template.Name as selectors for the service.
+	// +optional
+	ShardSelector string `json:"shardSelector,omitempty"`
+
 	// ComponentSelector extends the ServiceSpec.Selector by allowing you to specify a component as selectors for the service.
-	// if Cluster.Spec.ComponentSpecs[x].Shards is not nil and GenerateShardOrdinalService sets to true, ComponentSelector is the prefix name of generated Component.
 	// +optional
 	ComponentSelector string `json:"componentSelector,omitempty"`
-
-	// GenerateShardOrdinalService indicates whether to create a corresponding Service for each Shard of the selected Component.
-	// If sets to true, a set of Service will be automatically generated for each shard Component when Cluster.Spec.ComponentSpecs[x].Shards is not nil.
-	// And ClusterService.ComponentSelector must be specified.
-	// For example, a ClusterService might be defined as follows:
-	// - name: my-service
-	//   serviceName: my-service
-	//   generateShardOrdinalService: true
-	//   componentSelector: my-component
-	//   roleSelector: leader
-	//   spec:
-	//     ports:
-	//     - name: http
-	//       port: 80
-	//       targetPort: 8080
-	// Assuming that componentSpec named my-component has 3 shards, then three services would be generated:
-	// <clusterName>-my-service, <clusterName>-my-service-1, and <clusterName>-my-service-2, each pointing to its respective Component Pods with target roleSelector.
-	// +kubebuilder:default=false
-	// +optional
-	GenerateShardOrdinalService bool `json:"generateShardOrdinalService,omitempty"`
 }
 
 type ComponentService struct {

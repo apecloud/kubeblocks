@@ -109,25 +109,19 @@ func (r *ResourceFetcher[T]) ClusterVer() *T {
 
 func (r *ResourceFetcher[T]) ClusterComponent() *T {
 	return r.Wrap(func() (err error) {
-		for _, compSpec := range r.ClusterObj.Spec.ComponentSpecs {
-			if compSpec.Shards != nil {
-				for i := 0; i < int(*compSpec.Shards); i++ {
-					shardClusterCompSpec := compSpec.DeepCopy()
-					shardClusterCompSpec.Shards = nil
-					if i == 0 {
-						shardClusterCompSpec.Name = compSpec.Name
-					} else {
-						shardClusterCompSpec.Name = fmt.Sprintf("%s-%d", compSpec.Name, i)
-					}
-					if shardClusterCompSpec.Name == r.ComponentName {
-						r.ClusterComObj = shardClusterCompSpec
-						return
-					}
+		r.ClusterComObj = r.ClusterObj.Spec.GetComponentByName(r.ComponentName)
+		if r.ClusterComObj != nil {
+			return
+		}
+		for _, shardSpec := range r.ClusterObj.Spec.ShardSpecs {
+			shardTpl := shardSpec.Template
+			for i := 0; i < int(shardSpec.Shards); i++ {
+				shardCompSpec := shardTpl.DeepCopy()
+				shardCompSpec.Name = fmt.Sprintf("%s-%d", shardTpl.Name, i)
+				if shardCompSpec.Name == r.ComponentName {
+					r.ClusterComObj = shardCompSpec
+					return
 				}
-			}
-			if compSpec.Name == r.ComponentName {
-				r.ClusterComObj = &compSpec
-				return
 			}
 		}
 		return

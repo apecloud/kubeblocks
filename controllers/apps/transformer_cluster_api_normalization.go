@@ -45,17 +45,22 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	transCtx.ComponentSpecs = make([]*appsv1alpha1.ClusterComponentSpec, 0)
 	cluster := transCtx.Cluster
 
-	// validate componentDef and componentDefRef
-	if err := validateComponentDefNComponentDefRef(cluster); err != nil {
-		return err
-	}
-
 	for i := range cluster.Spec.ComponentSpecs {
 		clusterComSpec := cluster.Spec.ComponentSpecs[i]
-		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, component.GenShardCompSpecList(&clusterComSpec)...)
+		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, &clusterComSpec)
 	}
+	for i := range cluster.Spec.ShardSpecs {
+		shardSpec := cluster.Spec.ShardSpecs[i]
+		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, component.GenShardCompSpecList(&shardSpec)...)
+	}
+
 	if compSpec := apiconversion.HandleSimplifiedClusterAPI(transCtx.ClusterDef, cluster); compSpec != nil {
 		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, compSpec)
+	}
+
+	// validate componentDef and componentDefRef
+	if err := validateComponentDefNComponentDefRef(transCtx); err != nil {
+		return err
 	}
 
 	// build all component definitions referenced
@@ -81,12 +86,12 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	return nil
 }
 
-func validateComponentDefNComponentDefRef(cluster *appsv1alpha1.Cluster) error {
-	if len(cluster.Spec.ComponentSpecs) == 0 {
+func validateComponentDefNComponentDefRef(transCtx *clusterTransformContext) error {
+	if len(transCtx.ComponentSpecs) == 0 {
 		return nil
 	}
 	hasCompDef := false
-	for _, compSpec := range cluster.Spec.ComponentSpecs {
+	for _, compSpec := range transCtx.ComponentSpecs {
 		if len(compSpec.ComponentDefRef) == 0 && len(compSpec.ComponentDef) == 0 {
 			return fmt.Errorf("componentDef and componentDefRef cannot be both empty")
 		}

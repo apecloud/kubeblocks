@@ -44,10 +44,12 @@ func (t *clusterLoadRefResourcesTransformer) Transform(ctx graph.TransformContex
 		setProvisioningStartedCondition(&cluster.Status.Conditions, cluster.Name, cluster.Generation, err)
 	}()
 
-	if len(cluster.Spec.ClusterDefRef) == 0 && len(t.allCompDefRefs(cluster)) != len(cluster.Spec.ComponentSpecs) {
+	allCompSpecs := t.allCompSpecs(cluster)
+	allCompDefRefs := t.allCompDefRefs(cluster)
+	if len(cluster.Spec.ClusterDefRef) == 0 && len(allCompDefRefs) != len(allCompSpecs) {
 		return newRequeueError(requeueDuration, "either cluster definition or component definition should be provided")
 	}
-	if len(t.allCompDefRefs(cluster)) != 0 && len(t.allCompDefRefs(cluster)) != len(cluster.Spec.ComponentSpecs) {
+	if len(allCompDefRefs) != 0 && len(allCompDefRefs) != len(allCompSpecs) {
 		return newRequeueError(requeueDuration, "two kinds of definitions cannot be used together")
 	}
 
@@ -114,26 +116,67 @@ func (t *clusterLoadRefResourcesTransformer) allCompDefRefs(cluster *appsv1alpha
 		}
 		refs = append(refs, comp.ComponentDef)
 	}
+	for _, shardSpec := range cluster.Spec.ShardSpecs {
+		if len(shardSpec.Template.ComponentDef) == 0 {
+			continue
+		}
+		for i := 1; i < int(shardSpec.Shards); i++ {
+			refs = append(refs, shardSpec.Template.ComponentDef)
+		}
+	}
 	return refs
+}
+
+func (t *clusterLoadRefResourcesTransformer) allCompSpecs(cluster *appsv1alpha1.Cluster) []string {
+	specs := make([]string, 0)
+	for _, comp := range cluster.Spec.ComponentSpecs {
+		specs = append(specs, comp.Name)
+	}
+	for _, shardSpec := range cluster.Spec.ShardSpecs {
+		for i := 1; i < int(shardSpec.Shards); i++ {
+			shardSpecName := fmt.Sprintf("%s-%d", shardSpec.Template.Name, i)
+			specs = append(specs, shardSpecName)
+		}
+	}
+	return specs
 }
 
 func (t *clusterLoadRefResourcesTransformer) loadAndCheckComponentDefinitions(
 	ctx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
-	for _, comp := range cluster.Spec.ComponentSpecs {
-		if len(comp.ComponentDef) == 0 {
-			continue
+
+	if ctx.ComponentDefs == nil {
+		ctx.ComponentDefs = make(map[string]*appsv1alpha1.ComponentDefinition)
+	}
+
+	loadAndCheck := func(compDefName string) error {
+		if len(compDefName) == 0 {
+			return nil
+		}
+		if _, ok := ctx.ComponentDefs[compDefName]; ok {
+			return nil
 		}
 		compDef := &appsv1alpha1.ComponentDefinition{}
-		if err := ctx.Client.Get(ctx.Context, types.NamespacedName{Name: comp.ComponentDef}, compDef); err != nil {
+		if err := ctx.Client.Get(ctx.Context, types.NamespacedName{Name: compDefName}, compDef); err != nil {
 			return err
 		}
 		if compDef.Status.Phase != appsv1alpha1.AvailablePhase {
-			return fmt.Errorf("the component definition referenced is unavailable: %s", comp.ComponentDef)
+			return fmt.Errorf("the component definition referenced is unavailable: %s", compDefName)
 		}
-		if ctx.ComponentDefs == nil {
-			ctx.ComponentDefs = make(map[string]*appsv1alpha1.ComponentDefinition)
-		}
-		ctx.ComponentDefs[compDef.Name] = compDef
+		ctx.ComponentDefs[compDefName] = compDef
+		return nil
 	}
+
+	for _, comp := range cluster.Spec.ComponentSpecs {
+		if err := loadAndCheck(comp.ComponentDef); err != nil {
+			return err
+		}
+	}
+
+	for _, shardSpec := range cluster.Spec.ShardSpecs {
+		if err := loadAndCheck(shardSpec.Template.ComponentDef); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

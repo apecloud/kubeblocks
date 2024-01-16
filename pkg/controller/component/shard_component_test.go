@@ -29,26 +29,24 @@ import (
 var _ = Describe("cluster shard component", func() {
 
 	Context("cluster shard component test", func() {
-		var (
-			defaultShards = int32(3)
-		)
-
 		It("cluster shard component test", func() {
-			shardClusterCompSpec := &appsv1alpha1.ClusterComponentSpec{
-				Name:     "test",
-				Shards:   &defaultShards,
-				Replicas: 2,
+			shardSpec := &appsv1alpha1.ShardSpec{
+				Template: appsv1alpha1.ClusterComponentSpec{
+					Name:     "test",
+					Replicas: 2,
+				},
+				Shards: 3,
 			}
 
-			compSpecList := GenShardCompSpecList(shardClusterCompSpec)
+			compSpecList := GenShardCompSpecList(shardSpec)
 			Expect(len(compSpecList)).Should(Equal(3))
-			Expect(compSpecList[0].Name).Should(Equal("test"))
+			Expect(compSpecList[0].Name).Should(Equal("test-0"))
 			Expect(compSpecList[0].Name).Should(Equal("test-1"))
 			Expect(compSpecList[0].Name).Should(Equal("test-2"))
 
-			compNameList := GenShardCompNameList(shardClusterCompSpec)
+			compNameList := GenShardCompNameList(shardSpec)
 			Expect(len(compNameList)).Should(Equal(3))
-			Expect(compNameList[0]).Should(Equal("test"))
+			Expect(compNameList[0]).Should(Equal("test-0"))
 			Expect(compNameList[0]).Should(Equal("test-1"))
 			Expect(compNameList[0]).Should(Equal("test-2"))
 		})

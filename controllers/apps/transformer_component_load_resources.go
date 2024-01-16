@@ -21,8 +21,7 @@ package apps
 
 import (
 	"fmt"
-	"slices"
-
+	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -136,17 +135,28 @@ func isGeneratedComponent(cluster *appsv1alpha1.Cluster,
 		return false, err
 	}
 
-	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		if slices.Contains(component.GenShardCompNameList(&compSpec), compName) {
-			if len(compSpec.ComponentDef) > 0 {
-				if compSpec.ComponentDef != comp.Spec.CompDef {
-					err = fmt.Errorf("component definitions referred in cluster and component are different: %s vs %s",
-						compSpec.ComponentDef, comp.Spec.CompDef)
-				}
-				return false, err
+	validateCompDef := func(compDefName string) (bool, error) {
+		if len(compDefName) > 0 {
+			if compDefName != comp.Spec.CompDef {
+				err = fmt.Errorf("component definitions referred in cluster and component are different: %s vs %s",
+					compDefName, comp.Spec.CompDef)
 			}
-			return true, nil
+			return false, err
+		}
+		return true, nil
+	}
+
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		if compSpec.Name == compName {
+			return validateCompDef(compSpec.ComponentDef)
 		}
 	}
+
+	for _, shardSpec := range cluster.Spec.ShardSpecs {
+		if slices.Contains(component.GenShardCompNameList(&shardSpec), compName) {
+			return validateCompDef(shardSpec.Template.ComponentDef)
+		}
+	}
+
 	return true, fmt.Errorf("component %s is not found in cluster %s", compName, cluster.Name)
 }

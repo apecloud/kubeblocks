@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"strings"
 
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -190,39 +191,35 @@ func (t *clusterServiceTransformer) buildService(transCtx *clusterTransformConte
 }
 
 func (t *clusterServiceTransformer) genMultiServiceIfNeed(cluster *appsv1alpha1.Cluster, clusterService *appsv1alpha1.ClusterService) ([]*appsv1alpha1.ClusterService, error) {
-	if !clusterService.GenerateShardOrdinalService {
+	if len(clusterService.ShardSelector) == 0 || len(cluster.Spec.ShardSpecs) == 0 {
 		return []*appsv1alpha1.ClusterService{clusterService}, nil
 	}
-	if len(clusterService.ComponentSelector) == 0 {
-		return nil, fmt.Errorf("the component selector of service is not defined when generateShardOrdinalService is true, service: %s", clusterService.Name)
+
+	shardTemplateName := ""
+	shards := int32(0)
+	for _, shardSpec := range cluster.Spec.ShardSpecs {
+		if shardSpec.Template.Name != clusterService.ShardSelector {
+			continue
+		}
+		shardTemplateName = shardSpec.Template.Name
+		shards = shardSpec.Shards
 	}
 
-	shards := func() int32 {
-		for _, compSpec := range cluster.Spec.ComponentSpecs {
-			if compSpec.Name != clusterService.ComponentSelector {
-				continue
-			}
-			if compSpec.Shards == nil {
-				continue
-			}
-			return *compSpec.Shards
-		}
-		return -1
-	}()
+	if len(shardTemplateName) == 0 {
+		return nil, fmt.Errorf("the shardSelector of service is not defined, service: %s, shard: %s", clusterService.Name, clusterService.ShardSelector)
+	}
 
-	if shards <= 1 {
+	enableShardOrdinalSvcTplNameList, ok := cluster.Annotations[constant.ShardOrdinalSvcAnnotationKey]
+	if !ok || !slices.Contains(strings.Split(enableShardOrdinalSvcTplNameList, ","), shardTemplateName) {
 		return []*appsv1alpha1.ClusterService{clusterService}, nil
 	}
 
 	shardOrdinalClusterSvcs := make([]*appsv1alpha1.ClusterService, 0, shards)
 	for i := int32(0); i < shards; i++ {
 		svc := clusterService.DeepCopy()
-		if i == 0 {
-			shardOrdinalClusterSvcs = append(shardOrdinalClusterSvcs, svc)
-			continue
-		}
 		svc.Name = fmt.Sprintf("%s-%d", clusterService.Name, i)
-		svc.ComponentSelector = fmt.Sprintf("%s-%d", clusterService.ComponentSelector, i)
+		// TODO(xingran): set to component selector?
+		svc.ComponentSelector = fmt.Sprintf("%s-%d", clusterService.ShardSelector, i)
 		if len(clusterService.ServiceName) == 0 {
 			svc.ServiceName = fmt.Sprintf("%d", i)
 		} else {

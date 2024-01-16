@@ -563,9 +563,9 @@ func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *apps
 		FailureThreshold: clusterCompDefRoleProbe.FailureThreshold,
 	}
 
-	if clusterCompDefRoleProbe.Commands == nil || len(clusterCompDefRoleProbe.Commands.Writes) == 0 || len(clusterCompDefRoleProbe.Commands.Queries) == 0 {
-		builtinHandler := c.convertBuiltinActionHandler(clusterCompDef)
-		roleProbe.BuiltinHandler = &builtinHandler
+	builtinHandler := c.convertBuiltinActionHandler(clusterCompDef)
+	roleProbe.BuiltinHandler = &builtinHandler
+	if clusterCompDefRoleProbe.Commands == nil || len(clusterCompDefRoleProbe.Commands.Queries) == 0 {
 		roleProbe.CustomHandler = nil
 		return roleProbe
 	}

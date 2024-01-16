@@ -1,4 +1,4 @@
-name: RELEASE-CHART
+name: Release Chart
 
 on:
   workflow_dispatch:
@@ -118,22 +118,37 @@ jobs:
       APECD_REF: "v0.1.38"
     secrets: inherit
 
+  get-addons-chart-dir:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.get_addons_chart_dir.outputs.matrix }}
+    steps:
+      - name: Checkout kubeblocks-addons Code
+        uses: actions/checkout@v4
+        with:
+          repository: apecloud/kubeblocks-addons
+          path: kubeblocks-addons
+          ref: ${{ github.ref }}
+      - name: get addons chart dir
+        id: get_addons_chart_dir
+        run: |
+          addons_list=$(ls kubeblocks-addons/addons)
+          ADDONS_DIR=""
+          for addons_name in $( echo "$addons_list" ); do
+              if [[ -z "$ADDONS_DIR" ]]; then
+                  ADDONS_DIR="{\"addon-name\":\"$addons_name\"}"
+              else
+                  ADDONS_DIR="$ADDONS_DIR,{\"addon-name\":\"$addons_name\"}"
+              fi
+          done
+          echo "$ADDONS_DIR"
+          echo "matrix={\"include\":[$ADDONS_DIR]}" >> $GITHUB_OUTPUT
+
   release-addons-chart-jihu:
+    needs: [ get-addons-chart-dir ]
     strategy:
       fail-fast: false
-      matrix:
-        addon-name: [ apecloud-mysql, apecloud-mysql-cluster, apecloud-postgresql, apecloud-postgresql-cluster,
-                      clickhouse, clickhouse-cluster, elasticsearch, elasticsearch-cluster, etcd, etcd-cluster,
-                      flink, flink-cluster, foxlake, foxlake-cluster, greptimedb, greptimedb-cluster, influxdb,
-                      kafka, kafka-cluster, llm, llm-cluster, mariadb, mariadb-cluster, milvus, milvus-cluster,
-                      minio, minio-cluster, mongodb, mongodb-cluster, mongodb-sharding-cluster, mysql, mysql-cluster,
-                      nebula, nebula-cluster, neon, neon-cluster, oceanbase, oceanbase-cluster, official-postgresql,
-                      official-postgresql-cluster, opengauss, opengauss-cluster, openldap, openldap-cluster,
-                      opensearch, opensearch-cluster, oracle, oracle-cluster, oracle-mysql, oracle-mysql-cluster,
-                      orioledb, orioledb-cluster, polardbx, polardbx-cluster, postgresql, postgresql-cluster,
-                      pulsar, pulsar-cluster, qdrant, qdrant-cluster, redis, redis-cluster, risingwave, risingwave-cluster,
-                      starrocks, starrocks-cluster, tdengine, tdengine-cluster, tidb, tidb-cluster, weaviate,
-                      weaviate-cluster, xinference, xinference-cluster, zookeeper, zookeeper-cluster ]
+      matrix: ${{ fromJSON(needs.get-addons-chart-dir.outputs.matrix) }}
     uses: apecloud/apecloud-cd/.github/workflows/release-charts-jihu.yml@v0.1.52
     with:
       GITHUB_REPO: "apecloud/kubeblocks-addons"

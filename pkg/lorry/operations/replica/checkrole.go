@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -138,6 +139,10 @@ func (s *CheckRole) Do(ctx context.Context, req *operations.OpsRequest) (*operat
 		role, err = manager.GetReplicaRole(ctx1, cluster)
 	} else {
 		role, err = util.ExecCommand(s.Command)
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			err = errors.New(string(exitErr.Stderr))
+		}
+
 	}
 
 	if err != nil {

@@ -504,7 +504,7 @@ func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Clu
 	mgr.Logger.Info(fmt.Sprintf("Delete member: %s", memberName))
 	configMembers := make([]ConfigMember, 0, len(rsConfig.Members)-1)
 	for _, configMember := range rsConfig.Members {
-		if strings.HasPrefix(configMember.Host, memberName) {
+		if !strings.HasPrefix(configMember.Host, memberName) {
 			configMembers = append(configMembers, configMember)
 		}
 	}

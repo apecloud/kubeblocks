@@ -105,24 +105,25 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 	}
 
 	buildLorryServiceContainer(synthesizeComp, &lorryContainers[0], int(lorryHTTPPort), int(lorryGRPCPort), clusterCompSpec)
+	adaptLorryIfCustomHandlerDefined(synthesizeComp, &lorryContainers[0], int(lorryHTTPPort), int(lorryGRPCPort))
 
 	reqCtx.Log.V(1).Info("lorry", "containers", lorryContainers)
 	synthesizeComp.PodSpec.Containers = append(synthesizeComp.PodSpec.Containers, lorryContainers...)
 
-	return adaptLorryIfCustomHandlerDefined(synthesizeComp, &lorryContainers[0], int(lorryHTTPPort), int(lorryGRPCPort))
+	return nil
 }
 
-func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorryContainer *corev1.Container, lorryHTTPPort, lorryGRPCPort int) error {
+func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorryContainer *corev1.Container, lorryHTTPPort, lorryGRPCPort int) {
 	actionCommands, execImage := getActionCommandsAndExecImage(synthesizeComp)
 	if len(actionCommands) == 0 {
-		return nil
+		return
 	}
 	initContainer := buildLorryInitContainer(synthesizeComp)
 	synthesizeComp.PodSpec.InitContainers = append(synthesizeComp.PodSpec.InitContainers, *initContainer)
 	mainContainer := getMainContainer(synthesizeComp.PodSpec.Containers)
 	if execImage == "" {
 		if mainContainer == nil {
-			return nil
+			return
 		}
 		execImage = mainContainer.Image
 	}
@@ -152,7 +153,6 @@ func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorr
 		}
 		lorryContainer.Env = append(lorryContainer.Env, env)
 	}
-	return nil
 }
 
 func buildBasicContainer(synthesizeComp *SynthesizedComponent, lorryHTTPPort int) *corev1.Container {

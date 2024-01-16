@@ -57,7 +57,6 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 		return nil
 	}
 
-	container := buildBasicContainer(synthesizeComp)
 	var lorryContainers []corev1.Container
 	lorryHTTPPort := viper.GetInt32(constant.KBEnvLorryHTTPPort)
 	lorryGRPCPort := viper.GetInt32(constant.KBEnvLorryGRPCPort)
@@ -79,6 +78,7 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 		}
 	}
 
+	container := buildBasicContainer(synthesizeComp, int(lorryHTTPPort))
 	// inject role probe container
 	var compRoleProbe *appsv1alpha1.RoleProbe
 	if synthesizeComp.LifecycleActions != nil {
@@ -155,14 +155,14 @@ func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorr
 	return nil
 }
 
-func buildBasicContainer(synthesizeComp *SynthesizedComponent) *corev1.Container {
+func buildBasicContainer(synthesizeComp *SynthesizedComponent, lorryHTTPPort int) *corev1.Container {
 	return builder.NewContainerBuilder("string").
 		SetImage("infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/google_containers/pause:3.6").
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddCommands("/pause").
 		SetStartupProbe(corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
-				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(3501)},
+				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(lorryHTTPPort)},
 			}}).
 		GetObject()
 }
@@ -272,7 +272,6 @@ func buildRoleProbeContainer(roleChangedContainer *corev1.Container, roleProbe *
 	probe.TimeoutSeconds = roleProbe.TimeoutSeconds
 	probe.FailureThreshold = roleProbe.FailureThreshold
 	roleChangedContainer.ReadinessProbe = probe
-	roleChangedContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
 func volumeProtectionEnabled(component *SynthesizedComponent) bool {
@@ -290,7 +289,6 @@ func buildVolumeProtectionProbeContainer(characterType string, c *corev1.Contain
 	probe.TimeoutSeconds = defaultVolumeProtectionProbe.TimeoutSeconds
 	probe.FailureThreshold = defaultVolumeProtectionProbe.FailureThreshold
 	c.ReadinessProbe = probe
-	c.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
 func buildEnv4DBAccount(synthesizeComp *SynthesizedComponent, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) []corev1.EnvVar {

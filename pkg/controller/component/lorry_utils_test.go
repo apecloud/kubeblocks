@@ -40,13 +40,13 @@ var _ = Describe("Lorry Utils", func() {
 	Context("build probe containers", func() {
 		var container *corev1.Container
 		var component *SynthesizedComponent
-		var probeServiceHTTPPort int
-		var probeServiceGRPCPort int
+		var lorryHTTPPort int
+		var lorryGRPCPort int
 		var clusterDefProbe *appsv1alpha1.ClusterDefinitionProbe
 
 		BeforeEach(func() {
-			probeServiceHTTPPort = 3501
-			probeServiceGRPCPort = 50001
+			lorryHTTPPort = 3501
+			lorryGRPCPort = 50001
 
 			clusterDefProbe = &appsv1alpha1.ClusterDefinitionProbe{}
 			clusterDefProbe.PeriodSeconds = 1
@@ -98,7 +98,7 @@ var _ = Describe("Lorry Utils", func() {
 				Containers: []corev1.Container{},
 			}
 
-			container = buildBasicContainer(component)
+			container = buildBasicContainer(component, lorryHTTPPort)
 		})
 
 		It("build role probe containers", func() {
@@ -120,7 +120,7 @@ var _ = Describe("Lorry Utils", func() {
 		})
 
 		It("should build role service container", func() {
-			buildLorryServiceContainer(component, container, probeServiceHTTPPort, probeServiceGRPCPort, nil)
+			buildLorryServiceContainer(component, container, lorryHTTPPort, lorryGRPCPort, nil)
 			Expect(container.Command).ShouldNot(BeEmpty())
 		})
 

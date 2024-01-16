@@ -161,6 +161,7 @@ func (c *rsmRoleProbeConvertor) convert(args ...any) (any, error) {
 	if synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != nil {
 		builtinHandler := string(*synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler)
 		rsmRoleProbe.BuiltinHandler = &builtinHandler
+		return nil, nil
 	}
 
 	// TODO(xingran): RSM Action does not support args[] yet

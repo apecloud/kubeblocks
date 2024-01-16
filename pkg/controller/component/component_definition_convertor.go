@@ -574,7 +574,6 @@ func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *apps
 	if len(clusterCompDefRoleProbe.Commands.Writes) == 0 {
 		commands = clusterCompDefRoleProbe.Commands.Queries
 	}
-	roleProbe.BuiltinHandler = nil
 	roleProbe.CustomHandler = &appsv1alpha1.Action{
 		Exec: &appsv1alpha1.ExecAction{
 			Command: commands,

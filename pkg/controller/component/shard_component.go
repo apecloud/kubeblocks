@@ -31,7 +31,7 @@ func GenShardCompNameList(shardSpec *appsv1alpha1.ShardSpec) []string {
 		return compNameList
 	}
 	shardTpl := shardSpec.Template
-	for i := 1; i < int(shardSpec.Shards); i++ {
+	for i := 0; i < int(shardSpec.Shards); i++ {
 		compNameList = append(compNameList, fmt.Sprintf("%s-%d", shardTpl.Name, i))
 	}
 	return compNameList

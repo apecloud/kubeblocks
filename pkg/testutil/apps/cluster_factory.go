@@ -63,6 +63,30 @@ func (factory *MockClusterFactory) AddClusterToleration(toleration corev1.Tolera
 	return factory
 }
 
+func (factory *MockClusterFactory) AddShardSpec(shardTplName string, compDefName string) *MockClusterFactory {
+	shardSpec := appsv1alpha1.ShardSpec{
+		Template: appsv1alpha1.ClusterComponentSpec{
+			Name:            shardTplName,
+			ComponentDefRef: compDefName,
+		},
+		Shards: 1,
+	}
+	factory.Get().Spec.ShardSpecs = append(factory.Get().Spec.ShardSpecs, shardSpec)
+	return factory
+}
+
+func (factory *MockClusterFactory) AddShardSpecV2(shardTplName string, compDefName string) *MockClusterFactory {
+	shardSpec := appsv1alpha1.ShardSpec{
+		Template: appsv1alpha1.ClusterComponentSpec{
+			Name:         shardTplName,
+			ComponentDef: compDefName,
+		},
+		Shards: 1,
+	}
+	factory.Get().Spec.ShardSpecs = append(factory.Get().Spec.ShardSpecs, shardSpec)
+	return factory
+}
+
 func (factory *MockClusterFactory) AddComponent(compName string, compDefName string) *MockClusterFactory {
 	comp := appsv1alpha1.ClusterComponentSpec{
 		Name:            compName,
@@ -93,6 +117,8 @@ func (factory *MockClusterFactory) AddService(service appsv1alpha1.ClusterServic
 
 type updateFn func(comp *appsv1alpha1.ClusterComponentSpec)
 
+type shardUpdateFn func(shardSpec *appsv1alpha1.ShardSpec)
+
 func (factory *MockClusterFactory) lastComponentRef(update updateFn) *MockClusterFactory {
 	comps := factory.Get().Spec.ComponentSpecs
 	if len(comps) > 0 {
@@ -100,6 +126,21 @@ func (factory *MockClusterFactory) lastComponentRef(update updateFn) *MockCluste
 	}
 	factory.Get().Spec.ComponentSpecs = comps
 	return factory
+}
+
+func (factory *MockClusterFactory) lastShardSpec(update shardUpdateFn) *MockClusterFactory {
+	shardSpecs := factory.Get().Spec.ShardSpecs
+	if len(shardSpecs) > 0 {
+		update(&shardSpecs[len(shardSpecs)-1])
+	}
+	factory.Get().Spec.ShardSpecs = shardSpecs
+	return factory
+}
+
+func (factory *MockClusterFactory) SetShards(shards int32) *MockClusterFactory {
+	return factory.lastShardSpec(func(shardSpec *appsv1alpha1.ShardSpec) {
+		shardSpec.Shards = shards
+	})
 }
 
 func (factory *MockClusterFactory) SetCompDef(compDef string) *MockClusterFactory {

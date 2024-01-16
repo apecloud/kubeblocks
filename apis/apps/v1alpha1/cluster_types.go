@@ -299,24 +299,24 @@ type ShardSpec struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
 	Shards int32 `json:"shards,omitempty"`
-
-	// updateStrategy defines the update strategy for the components within the shard.
-	// +optional
-	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
 }
 
 // ClusterComponentSpec defines the cluster component spec.
 // +kubebuilder:validation:XValidation:rule="has(self.componentDefRef) || has(self.componentDef)",message="either componentDefRef or componentDef should be provided"
+// //(TODO) +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDefRef) || has(self.componentDefRef)", message="componentDefRef is required once set"
+// //(TODO) +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDef) || has(self.componentDef)", message="componentDef is required once set"
 type ClusterComponentSpec struct {
 	// name defines cluster's component name, this name is also part of Service DNS name, so this name will comply with IANA Service Naming rule.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	// //(TODO) +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	Name string `json:"name"`
 
 	// componentDefRef references componentDef defined in ClusterDefinition spec. Need to comply with IANA Service Naming rule.
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	// //(TODO) +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDefRef is immutable"
 	// +optional
 	ComponentDefRef string `json:"componentDefRef,omitempty"`
 
@@ -324,6 +324,7 @@ type ClusterComponentSpec struct {
 	// If both componentDefRef and componentDef are provided, the componentDef will take precedence over componentDefRef.
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// //(TODO) +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDef is immutable"
 	// +optional
 	ComponentDef string `json:"componentDef,omitempty"`
 

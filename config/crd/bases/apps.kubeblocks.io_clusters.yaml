@@ -169,7 +169,11 @@ spec:
                   be empty at the same time.
                 items:
                   description: ClusterComponentSpec defines the cluster component
-                    spec.
+                    spec. //(TODO) +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDefRef)
+                    || has(self.componentDefRef)", message="componentDefRef is required
+                    once set" //(TODO) +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDef)
+                    || has(self.componentDef)", message="componentDef is required
+                    once set"
                   properties:
                     affinity:
                       description: affinity describes affinities specified by users.
@@ -231,14 +235,17 @@ spec:
                     componentDef:
                       description: componentDef references the name of the ComponentDefinition.
                         If both componentDefRef and componentDef are provided, the
-                        componentDef will take precedence over componentDefRef.
+                        componentDef will take precedence over componentDefRef. //(TODO)
+                        +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDef
+                        is immutable"
                       maxLength: 22
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     componentDefRef:
                       description: componentDefRef references componentDef defined
                         in ClusterDefinition spec. Need to comply with IANA Service
-                        Naming rule.
+                        Naming rule. //(TODO) +kubebuilder:validation:XValidation:rule="self
+                        == oldSelf",message="componentDefRef is immutable"
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
@@ -307,7 +314,8 @@ spec:
                     name:
                       description: name defines cluster's component name, this name
                         is also part of Service DNS name, so this name will comply
-                        with IANA Service Naming rule.
+                        with IANA Service Naming rule. //(TODO) +kubebuilder:validation:XValidation:rule="self
+                        == oldSelf",message="name is immutable"
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
@@ -1460,13 +1468,16 @@ spec:
                           description: componentDef references the name of the ComponentDefinition.
                             If both componentDefRef and componentDef are provided,
                             the componentDef will take precedence over componentDefRef.
+                            //(TODO) +kubebuilder:validation:XValidation:rule="self
+                            == oldSelf",message="componentDef is immutable"
                           maxLength: 22
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                         componentDefRef:
                           description: componentDefRef references componentDef defined
                             in ClusterDefinition spec. Need to comply with IANA Service
-                            Naming rule.
+                            Naming rule. //(TODO) +kubebuilder:validation:XValidation:rule="self
+                            == oldSelf",message="componentDefRef is immutable"
                           maxLength: 22
                           pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                           type: string
@@ -1536,7 +1547,8 @@ spec:
                         name:
                           description: name defines cluster's component name, this
                             name is also part of Service DNS name, so this name will
-                            comply with IANA Service Naming rule.
+                            comply with IANA Service Naming rule. //(TODO) +kubebuilder:validation:XValidation:rule="self
+                            == oldSelf",message="name is immutable"
                           maxLength: 22
                           pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                           type: string
@@ -2176,14 +2188,6 @@ spec:
                       - message: either componentDefRef or componentDef should be
                           provided
                         rule: has(self.componentDefRef) || has(self.componentDef)
-                    updateStrategy:
-                      description: updateStrategy defines the update strategy for
-                        the components within the shard.
-                      enum:
-                      - Serial
-                      - BestEffortParallel
-                      - Parallel
-                      type: string
                   type: object
                 maxItems: 128
                 minItems: 1

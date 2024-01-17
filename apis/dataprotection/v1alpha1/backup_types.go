@@ -157,6 +157,7 @@ type BackupStatus struct {
 // time range of recoverable data.
 type BackupTimeRange struct {
 	// time zone, only support zone offset, value range: "-12:59 ~ +13:00"
+	// +kubebuilder:validation:Pattern:=`^(\+|\-)(0[0-9]|1[0-3]):([0-5][0-9])$`
 	// +optional
 	TimeZone string `json:"timeZone,omitempty"`
 

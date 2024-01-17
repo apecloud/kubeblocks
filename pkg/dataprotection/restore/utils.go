@@ -149,15 +149,6 @@ func getTimeFormat(envs []corev1.EnvVar) string {
 	return time.RFC3339
 }
 
-func getTimeZone(envs []corev1.EnvVar) string {
-	for _, env := range envs {
-		if env.Name == dptypes.DPTimeZone {
-			return env.Value
-		}
-	}
-	return ""
-}
-
 func transformTimeWithZone(targetTime *metav1.Time, timeZone string) (*metav1.Time, error) {
 	if timeZone == "" {
 		return targetTime, nil

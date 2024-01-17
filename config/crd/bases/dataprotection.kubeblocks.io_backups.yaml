@@ -208,6 +208,7 @@ spec:
                         timeZone:
                           description: 'time zone, only support zone offset, value
                             range: "-12:59 ~ +13:00"'
+                          pattern: ^(\+|\-)(0[0-9]|1[0-3]):([0-5][0-9])$
                           type: string
                       type: object
                     totalSize:
@@ -897,6 +898,7 @@ spec:
                   timeZone:
                     description: 'time zone, only support zone offset, value range:
                       "-12:59 ~ +13:00"'
+                    pattern: ^(\+|\-)(0[0-9]|1[0-3]):([0-5][0-9])$
                     type: string
                 type: object
               totalSize:

@@ -390,16 +390,16 @@ func getActionCommandsWithExecImageOrContainerName(synthesizeComp *SynthesizedCo
 	}
 
 	actions := map[string]*appsv1alpha1.LifecycleActionHandler{
-		"postProvision":    synthesizeComp.LifecycleActions.PostProvision,
-		"preTerminate":     synthesizeComp.LifecycleActions.PreTerminate,
-		"memberJoin":       synthesizeComp.LifecycleActions.MemberJoin,
-		"memberLeave":      synthesizeComp.LifecycleActions.MemberLeave,
-		"readonly":         synthesizeComp.LifecycleActions.Readonly,
-		"readwrite":        synthesizeComp.LifecycleActions.Readwrite,
-		"dataPopulate":     synthesizeComp.LifecycleActions.DataPopulate,
-		"dataAssemble":     synthesizeComp.LifecycleActions.DataAssemble,
-		"reconfigure":      synthesizeComp.LifecycleActions.Reconfigure,
-		"accountProvision": synthesizeComp.LifecycleActions.AccountProvision,
+		// "postProvision":    synthesizeComp.LifecycleActions.PostProvision,
+		// "preTerminate":     synthesizeComp.LifecycleActions.PreTerminate,
+		"memberJoin":  synthesizeComp.LifecycleActions.MemberJoin,
+		"memberLeave": synthesizeComp.LifecycleActions.MemberLeave,
+		"readonly":    synthesizeComp.LifecycleActions.Readonly,
+		"readwrite":   synthesizeComp.LifecycleActions.Readwrite,
+		// "dataPopulate":     synthesizeComp.LifecycleActions.DataPopulate,
+		// "dataAssemble":     synthesizeComp.LifecycleActions.DataAssemble,
+		// "reconfigure":      synthesizeComp.LifecycleActions.Reconfigure,
+		// "accountProvision": synthesizeComp.LifecycleActions.AccountProvision,
 	}
 
 	if synthesizeComp.LifecycleActions.RoleProbe != nil {

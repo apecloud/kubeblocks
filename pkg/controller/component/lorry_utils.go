@@ -114,18 +114,18 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 }
 
 func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorryContainer *corev1.Container, lorryHTTPPort, lorryGRPCPort int) {
-	actionCommands, execImage := getActionCommandsAndExecImage(synthesizeComp)
+	actionCommands, execImage, containerName := getActionCommandsWithExecImageOrContainerName(synthesizeComp)
 	if len(actionCommands) == 0 {
 		return
 	}
 	initContainer := buildLorryInitContainer(synthesizeComp)
 	synthesizeComp.PodSpec.InitContainers = append(synthesizeComp.PodSpec.InitContainers, *initContainer)
-	mainContainer := getMainContainer(synthesizeComp.PodSpec.Containers)
+	execContainer := getExecContainer(synthesizeComp.PodSpec.Containers, containerName)
 	if execImage == "" {
-		if mainContainer == nil {
+		if execContainer == nil {
 			return
 		}
-		execImage = mainContainer.Image
+		execImage = execContainer.Image
 	}
 
 	lorryContainer.Image = execImage
@@ -147,7 +147,7 @@ func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorr
 		envSet.Insert(env.Name)
 	}
 
-	for _, env := range mainContainer.Env {
+	for _, env := range execContainer.Env {
 		if envSet.Has(env.Name) {
 			continue
 		}
@@ -384,9 +384,9 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 	return appsv1alpha1.CustomActionHandler
 }
 
-func getActionCommandsAndExecImage(synthesizeComp *SynthesizedComponent) (map[string][]string, string) {
+func getActionCommandsWithExecImageOrContainerName(synthesizeComp *SynthesizedComponent) (map[string][]string, string, string) {
 	if synthesizeComp.LifecycleActions == nil {
-		return nil, ""
+		return nil, "", ""
 	}
 
 	actions := map[string]*appsv1alpha1.LifecycleActionHandler{
@@ -407,6 +407,7 @@ func getActionCommandsAndExecImage(synthesizeComp *SynthesizedComponent) (map[st
 	}
 
 	var toolImage string
+	var containerName string
 	actionCommands := map[string][]string{}
 	for action, handler := range actions {
 		if handler != nil && handler.CustomHandler != nil && handler.CustomHandler.Exec != nil {
@@ -414,10 +415,26 @@ func getActionCommandsAndExecImage(synthesizeComp *SynthesizedComponent) (map[st
 			if handler.CustomHandler.Image != "" {
 				toolImage = handler.CustomHandler.Image
 			}
+			if handler.CustomHandler.Container != "" {
+				containerName = handler.CustomHandler.Container
+			}
 		}
 	}
 
-	return actionCommands, toolImage
+	return actionCommands, toolImage, containerName
+}
+
+func getExecContainer(containers []corev1.Container, name string) *corev1.Container {
+	if name == "" {
+		return getMainContainer(containers)
+	}
+
+	for i, _ := range containers {
+		if containers[i].Name == name {
+			return &containers[i]
+		}
+	}
+	return nil
 }
 
 func getMainContainer(containers []corev1.Container) *corev1.Container {

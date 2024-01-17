@@ -45,6 +45,7 @@ type restoreJobBuilder struct {
 	backupRepo         *dpv1alpha1.BackupRepo
 	buildWithRepo      bool
 	env                []corev1.EnvVar
+	envFrom            []corev1.EnvFromSource
 	commonVolumes      []corev1.Volume
 	commonVolumeMounts []corev1.VolumeMount
 	// specificVolumes should be rebuilt for each job.
@@ -177,37 +178,39 @@ func (r *restoreJobBuilder) attachBackupRepo() *restoreJobBuilder {
 
 // addCommonEnv adds the common envs for each restore job.
 func (r *restoreJobBuilder) addCommonEnv() *restoreJobBuilder {
-	backupName := r.backupSet.Backup.Name
+	backup := r.backupSet.Backup
+	backupName := backup.Name
 	// add backupName env
 	r.env = []corev1.EnvVar{{Name: dptypes.DPBackupName, Value: backupName}}
 	// add mount path env of backup dir
-	filePath := r.backupSet.Backup.Status.Path
+	filePath := backup.Status.Path
 	if filePath != "" {
 		r.env = append(r.env, corev1.EnvVar{Name: dptypes.DPBackupBasePath, Value: filePath})
 		// TODO: add continuous file path env
 	}
 	// add time env
 	actionSetEnv := r.backupSet.ActionSet.Spec.Env
-	timeFormat := getTimeFormat(r.backupSet.ActionSet.Spec.Env)
-	appendTimeEnv := func(envName, envTimestampName string, targetTime *metav1.Time) {
+	timeFormat := getTimeFormat(actionSetEnv)
+	appendTimeEnv := func(envName, envTimestampName, timeZone string, targetTime *metav1.Time) {
 		if targetTime.IsZero() {
 			return
 		}
+		targetTime, _ = transformTimeWithZone(targetTime, timeZone)
 		if envName != "" {
-			r.env = append(r.env, corev1.EnvVar{Name: envName, Value: targetTime.UTC().Format(timeFormat)})
+			r.env = append(r.env, corev1.EnvVar{Name: envName, Value: targetTime.Format(timeFormat)})
 		}
 		if envTimestampName != "" {
 			r.env = append(r.env, corev1.EnvVar{Name: envTimestampName, Value: strconv.FormatInt(targetTime.Unix(), 10)})
 		}
 	}
-	appendTimeEnv(dptypes.DPBackupStopTime, "", r.backupSet.Backup.GetEndTime())
+	appendTimeEnv(dptypes.DPBackupStopTime, "", backup.GetTimeZone(), backup.GetEndTime())
 	if r.backupSet.BaseBackup != nil {
-		appendTimeEnv(DPBaseBackupStartTime, DPBaseBackupStartTimestamp, r.backupSet.BaseBackup.GetStartTime())
-		appendTimeEnv(DPBaseBackupStopTime, DPBaseBackupStopTimestamp, r.backupSet.BaseBackup.GetEndTime())
+		appendTimeEnv(DPBaseBackupStartTime, DPBaseBackupStartTimestamp, r.backupSet.BaseBackup.GetTimeZone(), r.backupSet.BaseBackup.GetStartTime())
+		appendTimeEnv(DPBaseBackupStopTime, DPBaseBackupStopTimestamp, r.backupSet.BaseBackup.GetTimeZone(), r.backupSet.BaseBackup.GetEndTime())
 	}
 	if r.restore.Spec.RestoreTime != "" {
 		restoreTime, _ := time.Parse(time.RFC3339, r.restore.Spec.RestoreTime)
-		appendTimeEnv(DPRestoreTime, DPRestoreTimestamp, &metav1.Time{Time: restoreTime})
+		appendTimeEnv(DPRestoreTime, DPRestoreTimestamp, backup.GetTimeZone(), &metav1.Time{Time: restoreTime})
 	}
 	// append actionSet env
 	r.env = append(r.env, actionSetEnv...)
@@ -229,6 +232,7 @@ func (r *restoreJobBuilder) addTargetPodAndCredentialEnv(pod *corev1.Pod,
 	// Note: now only add the first container envs.
 	if len(pod.Spec.Containers) != 0 {
 		env = pod.Spec.Containers[0].Env
+		r.envFrom = pod.Spec.Containers[0].EnvFrom
 	}
 	env = append(env, corev1.EnvVar{Name: dptypes.DPDBHost, Value: intctrlutil.BuildPodHostDNS(pod)})
 	if connectionCredential != nil {
@@ -312,6 +316,7 @@ func (r *restoreJobBuilder) build() *batchv1.Job {
 		Name:         Restore,
 		Resources:    r.restore.Spec.ContainerResources,
 		Env:          r.env,
+		EnvFrom:      r.envFrom,
 		VolumeMounts: r.specificVolumeMounts,
 		Command:      r.command,
 		Args:         r.args,

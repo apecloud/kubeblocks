@@ -22,6 +22,7 @@ package restore
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -35,6 +36,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -103,8 +105,13 @@ var _ = Describe("Backup Deleter Test", func() {
 					backupMethodName = testdp.VSBackupMethodName
 				}
 				Expect(testapps.ChangeObjStatus(testCtx, backup, func() {
+					endTime, _ := time.Parse(time.RFC3339, "2023-01-01T10:00:00Z")
 					backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
 					backup.Status.PersistentVolumeClaimName = backupPVCName
+					backup.Status.TimeRange = &dpv1alpha1.BackupTimeRange{
+						TimeZone: "+08:00",
+						End:      &metav1.Time{Time: endTime},
+					}
 					testdp.MockBackupStatusMethod(backup, backupMethodName, testdp.DataVolumeName, actionSetName)
 				})).Should(Succeed())
 			}
@@ -318,7 +325,15 @@ var _ = Describe("Backup Deleter Test", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			// count of job should equal to 1
 			Expect(len(jobs)).Should(Equal(1))
-
+			// test timeZone transform
+			var backupStopTimeEnv string
+			for _, v := range jobs[0].Spec.Template.Spec.Containers[0].Env {
+				if v.Name == dptypes.DPBackupStopTime {
+					backupStopTimeEnv = v.Value
+					break
+				}
+			}
+			Expect(backupStopTimeEnv).Should(Equal("2023-01-01 18:00:00"))
 			checkVolumes(jobs[0], testdp.DataVolumeName, existVolume)
 		}
 

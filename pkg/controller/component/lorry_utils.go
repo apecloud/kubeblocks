@@ -429,7 +429,7 @@ func getExecContainer(containers []corev1.Container, name string) *corev1.Contai
 		return getMainContainer(containers)
 	}
 
-	for i, _ := range containers {
+	for i := range containers {
 		if containers[i].Name == name {
 			return &containers[i]
 		}

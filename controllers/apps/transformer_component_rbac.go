@@ -156,7 +156,7 @@ func isClusterRoleBindingExist(transCtx *componentTransformContext, serviceAccou
 	synthesizedComp := transCtx.SynthesizeComponent
 	namespaceName := types.NamespacedName{
 		Namespace: synthesizedComp.Namespace,
-		Name:      "kb-" + synthesizedComp.ClusterName,
+		Name:      constant.GenerateDefaultServiceAccountName(synthesizedComp.ClusterName),
 	}
 	crb := &rbacv1.ClusterRoleBinding{}
 	if err := transCtx.Client.Get(transCtx.Context, namespaceName, crb); err != nil {
@@ -194,7 +194,7 @@ func isRoleBindingExist(transCtx *componentTransformContext, serviceAccountName 
 	synthesizedComp := transCtx.SynthesizeComponent
 	namespaceName := types.NamespacedName{
 		Namespace: synthesizedComp.Namespace,
-		Name:      "kb-" + synthesizedComp.ClusterName,
+		Name:      constant.GenerateDefaultServiceAccountName(synthesizedComp.ClusterName),
 	}
 	rb := &rbacv1.RoleBinding{}
 	if err := transCtx.Client.Get(transCtx.Context, namespaceName, rb); err != nil {

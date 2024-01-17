@@ -363,6 +363,11 @@ func flattenMap(m map[string]interface{}, prefix string) []ParameterPair {
 		switch m2 := val.(type) {
 		case map[string]interface{}:
 			r = append(r, flattenMap(m2, fullKey)...)
+		case []interface{}:
+			r = append(r, ParameterPair{
+				Key:   transArrayFieldName(fullKey),
+				Value: util.ToPointer(transJSONString(val)),
+			})
 		default:
 			var v *string = nil
 			if val != nil {
@@ -393,4 +398,41 @@ func generateUpdateKeyParam(files map[string]interface{}, trimPrefix string, upd
 		}
 	}
 	return r
+}
+
+func transJSONString(val interface{}) string {
+	if val == nil {
+		return ""
+	}
+	b, _ := json.Marshal(val)
+	return string(b)
+}
+
+func fromJSONString(val *string) any {
+	if val == nil {
+		return nil
+	}
+	if *val == "" {
+		return []any{}
+	}
+	var v any
+	_ = json.Unmarshal([]byte(*val), &v)
+	return v
+}
+
+const ArrayFieldPrefix = "@"
+
+func transArrayFieldName(key string) string {
+	return ArrayFieldPrefix + key
+}
+
+func hasArrayField(key string) bool {
+	return strings.HasPrefix(key, ArrayFieldPrefix)
+}
+
+func GetValidFieldName(key string) string {
+	if hasArrayField(key) {
+		return strings.TrimPrefix(key, ArrayFieldPrefix)
+	}
+	return key
 }

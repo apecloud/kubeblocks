@@ -174,19 +174,24 @@ func (t *clusterServiceTransformer) buildService(transCtx *clusterTransformConte
 		Optimize4ExternalTraffic()
 
 	if len(clusterService.ComponentSelector) > 0 {
+		builder.AddSelector(constant.KBAppComponentLabelKey, clusterService.ComponentSelector)
+	}
+
+	if len(clusterService.ShardSelector) > 0 {
+		builder.AddSelector(constant.KBAppShardTemplateNameLabelKey, clusterService.ShardSelector)
+	}
+
+	if len(clusterService.RoleSelector) > 0 {
 		compDef, err := t.checkComponent(transCtx, clusterService)
 		if err != nil {
 			return nil, err
 		}
-		builder.AddSelector(constant.KBAppComponentLabelKey, clusterService.ComponentSelector)
-
-		if len(clusterService.RoleSelector) > 0 {
-			if err := t.checkComponentRoles(compDef, clusterService); err != nil {
-				return nil, err
-			}
-			builder.AddSelector(constant.RoleLabelKey, clusterService.RoleSelector)
+		if err := t.checkComponentRoles(compDef, clusterService); err != nil {
+			return nil, err
 		}
+		builder.AddSelector(constant.RoleLabelKey, clusterService.RoleSelector)
 	}
+
 	return builder.GetObject(), nil
 }
 
@@ -218,8 +223,9 @@ func (t *clusterServiceTransformer) genMultiServiceIfNeed(cluster *appsv1alpha1.
 	for i := int32(0); i < shards; i++ {
 		svc := clusterService.DeepCopy()
 		svc.Name = fmt.Sprintf("%s-%d", clusterService.Name, i)
-		// TODO(xingran): set to component selector?
+		// reset shard selector and set component selector to each shard ordinal service
 		svc.ComponentSelector = fmt.Sprintf("%s-%d", clusterService.ShardSelector, i)
+		svc.ShardSelector = ""
 		if len(clusterService.ServiceName) == 0 {
 			svc.ServiceName = fmt.Sprintf("%d", i)
 		} else {

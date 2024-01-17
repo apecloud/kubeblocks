@@ -171,6 +171,11 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		RsmTransformPolicy: comp.Spec.RsmTransformPolicy,
 	}
 
+	shardTplName, ok := comp.Labels[constant.KBAppShardTemplateNameLabelKey]
+	if ok {
+		synthesizeComp.ShardTemplateName = shardTplName
+	}
+
 	// build backward compatible fields, including workload, services, componentRefEnvs, clusterDefName, clusterCompDefName, and clusterCompVer, etc.
 	// if cluster referenced a clusterDefinition and clusterVersion, for backward compatibility, we need to merge the clusterDefinition and clusterVersion into the component
 	// TODO(xingran): it will be removed in the future

@@ -90,6 +90,12 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synthesi
 		SetNodeAssignment(synthesizedComp.NodesAssignment).
 		SetTemplate(template)
 
+	// add shard template name label if component is generated from shardSpec
+	if len(synthesizedComp.ShardTemplateName) > 0 {
+		podBuilder.AddLabelsInMap(constant.GetShardTemplateNameLabel(synthesizedComp.ShardTemplateName))
+		rsmBuilder.AddLabelsInMap(constant.GetShardTemplateNameLabel(synthesizedComp.ShardTemplateName))
+	}
+
 	var vcts []corev1.PersistentVolumeClaim
 	for _, vct := range synthesizedComp.VolumeClaimTemplates {
 		vcts = append(vcts, vctToPVC(vct))

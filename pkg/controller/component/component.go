@@ -99,6 +99,11 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1
 		compBuilder.AddAnnotations(constant.FeatureReconciliationInCompactModeAnnotationKey,
 			cluster.GetAnnotations()[constant.FeatureReconciliationInCompactModeAnnotationKey])
 	}
+	// if the component is generated from shardSpec, add shard template name as label
+	isShardComp, shardTplName := isShardComponent(cluster, clusterCompSpec.Name)
+	if isShardComp {
+		compBuilder.AddLabelsInMap(constant.GetShardTemplateNameLabel(shardTplName))
+	}
 	return compBuilder.GetObject(), nil
 }
 
@@ -190,6 +195,14 @@ func getClusterCompSpec4Component(clusterDef *appsv1alpha1.ClusterDefinition, cl
 			return &cluster.Spec.ComponentSpecs[i], nil
 		}
 	}
+	for _, shardSpec := range cluster.Spec.ShardSpecs {
+		shardCompList := GenShardCompSpecList(&shardSpec)
+		for i, shardComp := range shardCompList {
+			if shardComp.Name == compName {
+				return shardCompList[i], nil
+			}
+		}
+	}
 	return apiconversion.HandleSimplifiedClusterAPI(clusterDef, cluster), nil
 }
 
@@ -250,4 +263,19 @@ func CheckAndGetClusterComponents(ctx context.Context, cli client.Client, cluste
 		components = append(components, v)
 	}
 	return components, nil
+}
+
+// isShardComponent checks if the component is a shard component and returns the shard name.
+func isShardComponent(cluster *appsv1alpha1.Cluster, compName string) (bool, string) {
+	if cluster == nil || len(cluster.Spec.ShardSpecs) == 0 {
+		return false, ""
+	}
+	for _, shardSpec := range cluster.Spec.ShardSpecs {
+		for _, shardComp := range GenShardCompSpecList(&shardSpec) {
+			if shardComp.Name == compName {
+				return true, shardSpec.Template.Name
+			}
+		}
+	}
+	return false, ""
 }

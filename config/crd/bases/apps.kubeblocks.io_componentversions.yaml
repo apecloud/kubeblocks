@@ -9,11 +9,15 @@ metadata:
 spec:
   group: apps.kubeblocks.io
   names:
+    categories:
+    - kubeblocks
     kind: ComponentVersion
     listKind: ComponentVersionList
     plural: componentversions
+    shortNames:
+    - cmpv
     singular: componentversion
-  scope: Namespaced
+  scope: Cluster
   versions:
   - name: v1alpha1
     schema:
@@ -35,96 +39,94 @@ spec:
           spec:
             description: ComponentVersionSpec defines the desired state of ComponentVersion
             properties:
-              components:
-                description: Components is a list of component instances within this
-                  ComponentVersion.
+              compatibilityRules:
+                description: CompatibilityRules defines compatibility rules between
+                  sets of component definitions and releases.
                 items:
-                  description: ComponentInstance represents an instance of a component
-                    within a ComponentVersion.
+                  description: ComponentVersionCompatibilityRule defines the compatibility
+                    between a set of component definitions and a set of releases.
+                  properties:
+                    compDefs:
+                      description: 'CompDefs specifies names for the component definitions
+                        associated with this ComponentVersion. Each name in the list
+                        can represent an exact name, or a name with wildcards. Examples:
+                        - "mysql-8.0.30-v1alpha1": Matches the exact name "mysql-8.0.30-v1alpha1"
+                        - "mysql-8.0.30-*": Matches all names starting with "mysql-8.0.30-"'
+                      items:
+                        type: string
+                      maxItems: 128
+                      minItems: 1
+                      type: array
+                    versions:
+                      description: Versions is a list of version identifiers for the
+                        releases.
+                      items:
+                        type: string
+                      maxItems: 128
+                      minItems: 1
+                      type: array
+                  required:
+                  - compDefs
+                  - versions
+                  type: object
+                type: array
+              releases:
+                description: Releases represents different releases of component instances
+                  within this ComponentVersion.
+                items:
+                  description: ComponentVersionRelease represents a release of component
+                    instances within a ComponentVersion.
                   properties:
                     apps:
-                      description: Apps is a list of applications within this component.
+                      description: Apps represents different application versions
+                        within this release.
                       items:
-                        description: ComponentApp represents an application within
-                          a component.
+                        description: ComponentAppVersion represents the version information
+                          for a specific application.
                         properties:
-                          appVersions:
-                            description: AppVersions is a list of versions associated
-                              with this application.
-                            items:
-                              description: ComponentAppVersion represents the version
-                                information for a specific application.
-                              properties:
-                                image:
-                                  description: Image is the container image associated
-                                    with this application version.
-                                  maxLength: 128
-                                  type: string
-                                  x-kubernetes-validations:
-                                  - message: Image is immutable
-                                    rule: self == oldSelf
-                                version:
-                                  description: Version is the version number of the
-                                    application.
-                                  maxLength: 64
-                                  type: string
-                                  x-kubernetes-validations:
-                                  - message: Version is immutable
-                                    rule: self == oldSelf
-                              required:
-                              - image
-                              - version
-                              type: object
-                            maxItems: 128
-                            minItems: 1
-                            type: array
-                            x-kubernetes-validations:
-                            - message: Duplicated app version
-                              rule: self.all(x, size(self.filter(c, c == x)) == 1)
-                            - message: AppVersion may only be added
-                              rule: oldSelf.all(x, x in self)
-                          name:
-                            description: Name is the name of the application, it indicates
-                              the name of container within the referred ComponentDefinition.
+                          image:
+                            description: Image is the container image associated with
+                              this application version. Cannot be updated.
+                            maxLength: 256
                             type: string
-                            x-kubernetes-validations:
-                            - message: Name is immutable
-                              rule: self == oldSelf
+                          name:
+                            description: Name is the name of the application, indicating
+                              the container name within the referenced ComponentDefinition.
+                              Cannot be updated.
+                            maxLength: 32
+                            type: string
+                          version:
+                            description: Version is the version number of the application.
+                              Cannot be updated.
+                            maxLength: 32
+                            type: string
                         required:
-                        - appVersions
+                        - image
                         - name
+                        - version
                         type: object
                       maxItems: 128
+                      minItems: 1
                       type: array
-                      x-kubernetes-validations:
-                      - message: Duplicated component app
-                        rule: self.all(x, size(self.filter(c, c.name == x.name)) ==
-                          1)
-                      - message: App can not be deleted
-                        rule: oldSelf.all(x, size(self.filter(c, c.name == x.name))
-                          == 1)
-                    compDefinition:
-                      description: CompDefinition is the reference to the ComponentDefinition
-                        of this component.
+                    changes:
+                      description: Changes provides information about the changes
+                        made in this release.
+                      maxLength: 256
                       type: string
-                      x-kubernetes-validations:
-                      - message: CompDefinition is immutable
-                        rule: self == oldSelf
+                    version:
+                      description: Version is a unique identifier for this release.
+                        If used, it will serve as the service version for component
+                        instances, overriding the one defined in the component definition.
+                        Cannot be updated.
+                      maxLength: 32
+                      type: string
                   required:
-                  - compDefinition
+                  - version
                   type: object
-                maxItems: 128
-                minItems: 1
                 type: array
-                x-kubernetes-validations:
-                - message: Duplicated component
-                  rule: self.all(x, size(self.filter(c, c.componentDef == x.componentDef))
-                    == 1)
-                - message: Component can not be deleted
-                  rule: oldSelf.all(x, size(self.filter(c, c.componentDef == x.componentDef))
-                    == 1)
             required:
-            - components
+            - compatibilityRules
+            - releases
             type: object
           status:
             description: ComponentVersionStatus defines the observed state of ComponentVersion

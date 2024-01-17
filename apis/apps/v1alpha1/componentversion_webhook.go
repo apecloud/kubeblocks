@@ -24,6 +24,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // log is for logging in this package.
@@ -54,25 +55,25 @@ func (r *ComponentVersion) Default() {
 var _ webhook.Validator = &ComponentVersion{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *ComponentVersion) ValidateCreate() error {
+func (r *ComponentVersion) ValidateCreate() (admission.Warnings, error) {
 	componentversionlog.Info("validate create", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object creation.
-	return nil
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *ComponentVersion) ValidateUpdate(old runtime.Object) error {
+func (r *ComponentVersion) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	componentversionlog.Info("validate update", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object update.
-	return nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *ComponentVersion) ValidateDelete() error {
+func (r *ComponentVersion) ValidateDelete() (admission.Warnings, error) {
 	componentversionlog.Info("validate delete", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object deletion.
-	return nil
+	return nil, nil
 }

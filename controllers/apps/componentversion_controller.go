@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"slices"
 
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -95,14 +96,19 @@ func (r *ComponentVersionReconciler) reconcile(rctx intctrlutil.RequestCtx,
 		return intctrlutil.Reconciled()
 	}
 
-	if err = r.validate(r.Client, rctx, compVersion); err != nil {
+	rules, err := r.buildCompatibilityRules(r.Client, rctx, compVersion)
+	if err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
+	}
+
+	if err = r.validate(compVersion, rules); err != nil {
 		if err1 := r.unavailable(r.Client, rctx, compVersion, err); err1 != nil {
 			return intctrlutil.CheckedRequeueWithError(err1, rctx.Log, "")
 		}
 		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
 	}
 
-	err = r.updateLabels(r.Client, rctx, compVersion)
+	err = r.updateLabels(r.Client, rctx, compVersion, rules)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
 	}
@@ -115,6 +121,33 @@ func (r *ComponentVersionReconciler) reconcile(rctx intctrlutil.RequestCtx,
 	intctrlutil.RecordCreatedEvent(r.Recorder, compVersion)
 
 	return intctrlutil.Reconciled()
+}
+
+func (r *ComponentVersionReconciler) buildCompatibilityRules(cli client.Client, rctx intctrlutil.RequestCtx,
+	compVersion *appsv1alpha1.ComponentVersion) (map[*appsv1alpha1.ComponentDefinition][]string, error) {
+	compDefs := make(map[*appsv1alpha1.ComponentDefinition][]string)
+	for _, rule := range compVersion.Spec.CompatibilityRules {
+		for _, compDef := range rule.CompDefs {
+			equal := func(cmpd *appsv1alpha1.ComponentDefinition) bool {
+				return cmpd.Name == compDef
+			}
+			if slices.IndexFunc(maps.Keys(compDefs), equal) >= 0 {
+				continue
+			}
+			cmpd := &appsv1alpha1.ComponentDefinition{}
+			key := types.NamespacedName{
+				Name: compDef,
+			}
+			if err := cli.Get(rctx.Ctx, key, cmpd); err != nil {
+				if apierrors.IsNotFound(err) {
+					continue
+				}
+				return nil, err
+			}
+			compDefs[cmpd] = rule.Versions
+		}
+	}
+	return compDefs, nil
 }
 
 func (r *ComponentVersionReconciler) deletionHandler(rctx intctrlutil.RequestCtx,
@@ -152,58 +185,51 @@ func (r *ComponentVersionReconciler) status(cli client.Client, rctx intctrlutil.
 }
 
 func (r *ComponentVersionReconciler) updateLabels(cli client.Client, rctx intctrlutil.RequestCtx,
-	compVersion *appsv1alpha1.ComponentVersion) error {
-	updateLabel := func(cmpd *appsv1alpha1.ComponentDefinition) {
-		if compVersion.Labels == nil {
-			compVersion.Labels = make(map[string]string)
-		}
+	compVersion *appsv1alpha1.ComponentVersion, rules map[*appsv1alpha1.ComponentDefinition][]string) error {
+	updated := false
+	if compVersion.Labels == nil {
+		compVersion.Labels = make(map[string]string)
+	}
+	for cmpd, _ := range rules {
 		if _, ok := compVersion.Labels[cmpd.Name]; ok {
-			return
+			continue
 		}
 		compVersion.Labels[cmpd.Name] = cmpd.Name
+		updated = true
 	}
-	for _, comp := range compVersion.Spec.Components {
-		cmpd := &appsv1alpha1.ComponentDefinition{}
-		key := types.NamespacedName{
-			Name: comp.CompDefinition,
-		}
-		if err := cli.Get(rctx.Ctx, key, cmpd); err != nil {
-			return err
-		}
-		updateLabel(cmpd)
+	if updated {
+		return cli.Update(rctx.Ctx, compVersion)
 	}
-	return cli.Update(rctx.Ctx, compVersion)
+	return nil
 }
 
-func (r *ComponentVersionReconciler) validate(cli client.Client, rctx intctrlutil.RequestCtx, compVersion *appsv1alpha1.ComponentVersion) error {
-	for _, comp := range compVersion.Spec.Components {
-		if err := r.validateComponent(cli, rctx, comp); err != nil {
+func (r *ComponentVersionReconciler) validate(compVersion *appsv1alpha1.ComponentVersion,
+	rules map[*appsv1alpha1.ComponentDefinition][]string) error {
+	for _, release := range compVersion.Spec.Releases {
+		if err := r.validateRelease(release, rules); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *ComponentVersionReconciler) validateComponent(cli client.Client, rctx intctrlutil.RequestCtx, comp appsv1alpha1.ComponentInstance) error {
-	cmpd := &appsv1alpha1.ComponentDefinition{}
-	key := types.NamespacedName{
-		Name: comp.CompDefinition,
-	}
-	if err := cli.Get(rctx.Ctx, key, cmpd); err != nil {
-		if apierrors.IsNotFound(err) {
-			return fmt.Errorf("referred ComponentDefinition %s is not found", comp.CompDefinition)
+func (r *ComponentVersionReconciler) validateRelease(release appsv1alpha1.ComponentVersionRelease,
+	rules map[*appsv1alpha1.ComponentDefinition][]string) error {
+	for cmpd, versions := range rules {
+		if !slices.Contains(versions, release.Version) {
+			continue
 		}
-		return err
-	}
-	for _, app := range comp.Apps {
-		if err := r.validateApp(*cmpd, app); err != nil {
-			return err
+		for _, app := range release.Apps {
+			if err := r.validateApp(*cmpd, app); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-func (r *ComponentVersionReconciler) validateApp(cmpd appsv1alpha1.ComponentDefinition, app appsv1alpha1.ComponentApp) error {
+func (r *ComponentVersionReconciler) validateApp(cmpd appsv1alpha1.ComponentDefinition,
+	app appsv1alpha1.ComponentAppVersion) error {
 	cmp := func(c corev1.Container) bool {
 		return c.Name == app.Name
 	}

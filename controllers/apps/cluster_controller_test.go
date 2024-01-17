@@ -60,6 +60,7 @@ var _ = Describe("Cluster Controller", func() {
 		consensusCompDefName   = "consensus"
 		replicationCompName    = "replication"
 		replicationCompDefName = "replication"
+		defaultShardCount      = 2
 	)
 
 	var (
@@ -194,9 +195,9 @@ var _ = Describe("Cluster Controller", func() {
 		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
 			WithRandomName()
 		if !v2 {
-			factory.AddShardSpec(compTplName, compDefName).SetShards(2)
+			factory.AddShardSpec(compTplName, compDefName).SetShards(defaultShardCount)
 		} else {
-			factory.AddShardSpecV2(compTplName, compDefName).SetShards(2)
+			factory.AddShardSpecV2(compTplName, compDefName).SetShards(defaultShardCount)
 		}
 		if processor != nil {
 			processor(factory)
@@ -230,7 +231,7 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 
 		By("Wait component created")
-		for i := 0; i < 2; i++ {
+		for i := 0; i < defaultShardCount; i++ {
 			compKey := types.NamespacedName{
 				Namespace: clusterObj.Namespace,
 				Name:      constant.GenerateClusterComponentName(clusterObj.Name, fmt.Sprintf("%s-%d", compTplName, i)),
@@ -265,7 +266,7 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 
 		By("Wait component created")
-		for i := 0; i < 2; i++ {
+		for i := 0; i < defaultShardCount; i++ {
 			compKey := types.NamespacedName{
 				Namespace: clusterObj.Namespace,
 				Name:      constant.GenerateClusterComponentName(clusterObj.Name, fmt.Sprintf("%s-%d", compTplName, i)),
@@ -483,7 +484,7 @@ var _ = Describe("Cluster Controller", func() {
 		svcType   corev1.ServiceType
 	}
 
-	validateClusterServiceList := func(g Gomega, expectServices map[string]expectService, compName string) {
+	validateClusterServiceList := func(g Gomega, expectServices map[string]expectService, compName string, shardCount *int) {
 		svcList := &corev1.ServiceList{}
 		g.Expect(k8sClient.List(testCtx.Ctx, svcList, client.MatchingLabels{
 			constant.AppInstanceLabelKey: clusterKey.Name,
@@ -498,14 +499,8 @@ var _ = Describe("Cluster Controller", func() {
 			services = append(services, &svcList.Items[i])
 		}
 
-		for svcName, svcSpec := range expectServices {
-			idx := slices.IndexFunc(services, func(e *corev1.Service) bool {
-				return e.Name == constant.GenerateClusterServiceName(clusterObj.Name, svcName)
-			})
-			g.Expect(idx >= 0).To(BeTrue())
-			svc := services[idx]
+		validateSvc := func(svc *corev1.Service, svcSpec expectService) {
 			g.Expect(svc.Spec.Type).Should(Equal(svcSpec.svcType))
-			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.KBAppComponentLabelKey, compName))
 			// g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.RoleLabelKey, "leader"))
 			switch {
 			case svc.Spec.Type == corev1.ServiceTypeLoadBalancer:
@@ -519,7 +514,32 @@ var _ = Describe("Cluster Controller", func() {
 				// }
 			}
 		}
-		g.Expect(len(expectServices)).Should(Equal(len(services)))
+
+		if shardCount == nil {
+			for svcName, svcSpec := range expectServices {
+				idx := slices.IndexFunc(services, func(e *corev1.Service) bool {
+					return e.Name == constant.GenerateClusterServiceName(clusterObj.Name, svcName)
+				})
+				g.Expect(idx >= 0).To(BeTrue())
+				svc := services[idx]
+				g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.KBAppComponentLabelKey, compName))
+				validateSvc(svc, svcSpec)
+			}
+			g.Expect(len(expectServices)).Should(Equal(len(services)))
+		} else {
+			for svcName, svcSpec := range expectServices {
+				for i := 0; i < *shardCount; i++ {
+					idx := slices.IndexFunc(services, func(e *corev1.Service) bool {
+						return e.Name == constant.GenerateClusterServiceName(clusterObj.Name, fmt.Sprintf("%s-%d", svcName, i))
+					})
+					g.Expect(idx >= 0).To(BeTrue())
+					svc := services[idx]
+					g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.KBAppComponentLabelKey, fmt.Sprintf("%s-%d", compName, i)))
+					validateSvc(svc, svcSpec)
+				}
+			}
+			g.Expect(len(expectServices) * *shardCount).Should(Equal(len(services)))
+		}
 	}
 
 	testClusterServiceCreateAndDelete := func(compName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory))) {
@@ -569,7 +589,7 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(testCtx.CheckedCreateObj(testCtx.Ctx, svcObj)).Should(Succeed())
 
 		By("check all services created")
-		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compName) }).Should(Succeed())
+		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compName, nil) }).Should(Succeed())
 
 		By("delete a cluster service")
 		delete(expectServices, deleteService.Name)
@@ -584,14 +604,14 @@ var _ = Describe("Cluster Controller", func() {
 		})()).ShouldNot(HaveOccurred())
 
 		By("check the service has been deleted, and the non-managed service has not been deleted")
-		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compName) }).Should(Succeed())
+		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compName, nil) }).Should(Succeed())
 
 		By("add the deleted service back")
 		expectServices[deleteService.Name] = expectService{deleteService.Spec.ClusterIP, deleteService.Spec.Type}
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 			cluster.Spec.Services = append(cluster.Spec.Services, deleteService)
 		})()).ShouldNot(HaveOccurred())
-		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compName) }).Should(Succeed())
+		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compName, nil) }).Should(Succeed())
 	}
 
 	testClusterShardServiceCreateAndDelete := func(compTplName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory))) {
@@ -625,24 +645,26 @@ var _ = Describe("Cluster Controller", func() {
 				AddService(services[2])
 		})
 
+		shards := defaultShardCount
 		deleteService := services[2]
 		lastService := services[3]
 
 		By("create last cluster service manually which will not owned by cluster")
-		lastServiceName := constant.GenerateClusterServiceName(clusterObj.Name, lastService.ServiceName)
-		svcObj := builder.NewServiceBuilder(clusterObj.Namespace, lastServiceName).
-			AddLabelsInMap(constant.GetClusterWellKnownLabels(clusterObj.Name)).
-			SetSpec(&lastService.Spec).
-			AddSelector(constant.KBAppComponentLabelKey, lastService.ComponentSelector).
-			// AddSelector(constant.RoleLabelKey, lastService.RoleSelector[0]).
-			Optimize4ExternalTraffic().
-			GetObject()
-		Expect(testCtx.CheckedCreateObj(testCtx.Ctx, svcObj)).Should(Succeed())
+		for i := 0; i < shards; i++ {
+			lastServiceName := constant.GenerateClusterServiceName(clusterObj.Name, fmt.Sprintf("%s-%d", lastService.ServiceName, i))
+			svcObj := builder.NewServiceBuilder(clusterObj.Namespace, lastServiceName).
+				AddLabelsInMap(constant.GetClusterWellKnownLabels(clusterObj.Name)).
+				SetSpec(&lastService.Spec).
+				AddSelector(constant.KBAppComponentLabelKey, lastService.ShardSelector).
+				Optimize4ExternalTraffic().
+				GetObject()
+			Expect(testCtx.CheckedCreateObj(testCtx.Ctx, svcObj)).Should(Succeed())
+		}
 
-		By("check all services created")
-		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compTplName) }).Should(Succeed())
+		By("check all shard services created")
+		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compTplName, &shards) }).Should(Succeed())
 
-		By("delete a cluster service")
+		By("delete a cluster shard service")
 		delete(expectServices, deleteService.Name)
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 			var svcs []appsv1alpha1.ClusterService
@@ -655,14 +677,14 @@ var _ = Describe("Cluster Controller", func() {
 		})()).ShouldNot(HaveOccurred())
 
 		By("check the service has been deleted, and the non-managed service has not been deleted")
-		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compTplName) }).Should(Succeed())
+		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compTplName, &shards) }).Should(Succeed())
 
 		By("add the deleted service back")
 		expectServices[deleteService.Name] = expectService{deleteService.Spec.ClusterIP, deleteService.Spec.Type}
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 			cluster.Spec.Services = append(cluster.Spec.Services, deleteService)
 		})()).ShouldNot(HaveOccurred())
-		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compTplName) }).Should(Succeed())
+		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compTplName, &shards) }).Should(Succeed())
 	}
 
 	testClusterFinalizer := func(compName string, createObj func(appsv1alpha1.TerminationPolicyType)) {

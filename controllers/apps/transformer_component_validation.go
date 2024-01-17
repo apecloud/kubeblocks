@@ -52,7 +52,7 @@ func (t *componentValidationTransformer) Transform(ctx graph.TransformContext, d
 func validateEnabledLogs(comp *appsv1alpha1.Component, compDef *appsv1alpha1.ComponentDefinition) error {
 	invalidLogNames := validateEnabledLogConfigs(compDef, comp.Spec.EnabledLogs)
 	if len(invalidLogNames) > 0 {
-		return fmt.Errorf("EnabledLogs: %s are not defined in Component: %s of the ComponentDefinition", invalidLogNames, comp.Name)
+		return fmt.Errorf("logs %s are not defined in the definition", invalidLogNames)
 	}
 	return nil
 }

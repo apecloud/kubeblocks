@@ -53,6 +53,9 @@ spec:
             description: ComponentSpec defines the desired state of Component
             properties:
               affinity:
+                description: Affinity specifies the scheduling constraints for the
+                  component's workload. If specified, it will override the cluster-wide
+                  affinity.
                 properties:
                   nodeLabels:
                     additionalProperties:
@@ -208,9 +211,8 @@ spec:
                 type: array
               enabledLogs:
                 description: enabledLogs indicates which log file takes effect in
-                  the database cluster. element is the log type which is defined in
-                  ComponentDefinition logConfig.name, and will set relative variables
-                  about this log type in database kernel.
+                  the database cluster, element is the log type which is defined in
+                  ComponentDefinition logConfig.name.
                 items:
                   type: string
                 type: array
@@ -261,8 +263,8 @@ spec:
                 type: array
               replicas:
                 default: 1
-                description: Component replicas. The default value is used in ClusterDefinition
-                  spec if not specified.
+                description: Replicas specifies the desired number of replicas for
+                  the component's workload.
                 format: int32
                 minimum: 0
                 type: integer
@@ -433,6 +435,9 @@ spec:
                     type: object
                 type: object
               tolerations:
+                description: Tolerations specify the tolerations for the component's
+                  workload. If specified, they will override the cluster-wide toleration
+                  settings.
                 items:
                   description: The pod this Toleration is attached to tolerates any
                     taint that matches the triple <key,value,effect> using the matching
@@ -471,13 +476,6 @@ spec:
                       type: string
                   type: object
                 type: array
-              updateStrategy:
-                description: UpdateStrategy defines Cluster Component update strategy.
-                enum:
-                - Serial
-                - BestEffortParallel
-                - Parallel
-                type: string
               volumeClaimTemplates:
                 description: VolumeClaimTemplates information for statefulset.spec.volumeClaimTemplates.
                 items:

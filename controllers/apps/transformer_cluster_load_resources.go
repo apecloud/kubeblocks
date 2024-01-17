@@ -110,11 +110,11 @@ func (t *clusterLoadRefResourcesTransformer) Transform(ctx graph.TransformContex
 
 func (t *clusterLoadRefResourcesTransformer) allCompDefRefs(cluster *appsv1alpha1.Cluster) []string {
 	refs := make([]string, 0)
-	for _, comp := range cluster.Spec.ComponentSpecs {
-		if len(comp.ComponentDef) == 0 {
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		if len(compSpec.ComponentDef) == 0 {
 			continue
 		}
-		refs = append(refs, comp.ComponentDef)
+		refs = append(refs, compSpec.ComponentDef)
 	}
 	for _, shardSpec := range cluster.Spec.ShardSpecs {
 		if len(shardSpec.Template.ComponentDef) == 0 {
@@ -129,8 +129,8 @@ func (t *clusterLoadRefResourcesTransformer) allCompDefRefs(cluster *appsv1alpha
 
 func (t *clusterLoadRefResourcesTransformer) allCompSpecs(cluster *appsv1alpha1.Cluster) []string {
 	specs := make([]string, 0)
-	for _, comp := range cluster.Spec.ComponentSpecs {
-		specs = append(specs, comp.Name)
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		specs = append(specs, compSpec.Name)
 	}
 	for _, shardSpec := range cluster.Spec.ShardSpecs {
 		for i := 1; i < int(shardSpec.Shards); i++ {
@@ -166,8 +166,8 @@ func (t *clusterLoadRefResourcesTransformer) loadAndCheckComponentDefinitions(
 		return nil
 	}
 
-	for _, comp := range cluster.Spec.ComponentSpecs {
-		if err := loadAndCheck(comp.ComponentDef); err != nil {
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		if err := loadAndCheck(compSpec.ComponentDef); err != nil {
 			return err
 		}
 	}

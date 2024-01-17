@@ -162,10 +162,10 @@ func (r *ComponentVersionReconciler) updateLabels(cli client.Client, rctx intctr
 		}
 		compVersion.Labels[cmpd.Name] = cmpd.Name
 	}
-	for _, comp := range compVersion.Spec.Components {
+	for compDef := range compVersion.Spec.Components {
 		cmpd := &appsv1alpha1.ComponentDefinition{}
 		key := types.NamespacedName{
-			Name: comp.CompDefinition,
+			Name: compDef,
 		}
 		if err := cli.Get(rctx.Ctx, key, cmpd); err != nil {
 			return err
@@ -175,27 +175,29 @@ func (r *ComponentVersionReconciler) updateLabels(cli client.Client, rctx intctr
 	return cli.Update(rctx.Ctx, compVersion)
 }
 
-func (r *ComponentVersionReconciler) validate(cli client.Client, rctx intctrlutil.RequestCtx, compVersion *appsv1alpha1.ComponentVersion) error {
-	for _, comp := range compVersion.Spec.Components {
-		if err := r.validateComponent(cli, rctx, comp); err != nil {
+func (r *ComponentVersionReconciler) validate(cli client.Client, rctx intctrlutil.RequestCtx,
+	compVersion *appsv1alpha1.ComponentVersion) error {
+	for compDef, compApps := range compVersion.Spec.Components {
+		if err := r.validateComponent(cli, rctx, compDef, compApps); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *ComponentVersionReconciler) validateComponent(cli client.Client, rctx intctrlutil.RequestCtx, comp appsv1alpha1.ComponentInstance) error {
+func (r *ComponentVersionReconciler) validateComponent(cli client.Client, rctx intctrlutil.RequestCtx,
+	compDef string, compApps []appsv1alpha1.ComponentApp) error {
 	cmpd := &appsv1alpha1.ComponentDefinition{}
 	key := types.NamespacedName{
-		Name: comp.CompDefinition,
+		Name: compDef,
 	}
 	if err := cli.Get(rctx.Ctx, key, cmpd); err != nil {
 		if apierrors.IsNotFound(err) {
-			return fmt.Errorf("referred ComponentDefinition %s is not found", comp.CompDefinition)
+			return fmt.Errorf("referred ComponentDefinition %s is not found", compDef)
 		}
 		return err
 	}
-	for _, app := range comp.Apps {
+	for _, app := range compApps {
 		if err := r.validateApp(*cmpd, app); err != nil {
 			return err
 		}

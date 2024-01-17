@@ -25,58 +25,42 @@ import (
 
 // ComponentVersionSpec defines the desired state of ComponentVersion
 type ComponentVersionSpec struct {
-	// Components is a list of component instances within this ComponentVersion.
+	// Components is a mapping from the definition name to a list of component apps within this ComponentVersion.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:MaxItems=128
-	// +kubebuilder:validation:XValidation:rule="self.all(x, size(self.filter(c, c.componentDef == x.componentDef)) == 1)",message="Duplicated component"
-	// +kubebuilder:validation:XValidation:rule="oldSelf.all(x, size(self.filter(c, c.componentDef == x.componentDef)) == 1)",message="Component can not be deleted"
-	Components []ComponentInstance `json:"components"`
-}
-
-// ComponentInstance represents an instance of a component within a ComponentVersion.
-type ComponentInstance struct {
-	// CompDefinition is the reference to the ComponentDefinition of this component.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="CompDefinition is immutable"
-	CompDefinition string `json:"compDefinition"`
-
-	// Apps is a list of applications within this component.
-	// +kubebuilder:validation:MaxItems=128
-	// +kubebuilder:validation:XValidation:rule="self.all(x, size(self.filter(c, c.name == x.name)) == 1)",message="Duplicated component app"
-	// +kubebuilder:validation:XValidation:rule="oldSelf.all(x, size(self.filter(c, c.name == x.name)) == 1)",message="App can not be deleted"
-	// +optional
-	Apps []ComponentApp `json:"apps"`
+	// +kubebuilder:validation:MinProperties=1
+	// +kubebuilder:validation:MaxProperties=128
+	Components map[string][]ComponentApp `json:"components"`
 }
 
 // ComponentApp represents an application within a component.
 type ComponentApp struct {
 	// Name is the name of the application, it indicates the name of container within the referred ComponentDefinition.
+	// Cannot be updated.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Name is immutable"
+	// +kubebuilder:validation:MaxLength=32
 	Name string `json:"name"`
 
 	// AppVersions is a list of versions associated with this application.
+	// Cannot be updated.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
-	// +kubebuilder:validation:XValidation:rule="self.all(x, size(self.filter(c, c == x)) == 1)",message="Duplicated app version"
-	// +kubebuilder:validation:XValidation:rule="oldSelf.all(x, x in self)",message="AppVersion may only be added"
 	AppVersions []ComponentAppVersion `json:"appVersions"`
 }
 
 // ComponentAppVersion represents the version information for a specific application.
 type ComponentAppVersion struct {
 	// Version is the version number of the application.
+	// If this version is used, it will be used as the service version for component instances, overwriting the one defined in the component definition.
+	// Cannot be updated.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=64
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Version is immutable"
 	Version string `json:"version"`
 
 	// Image is the container image associated with this application version.
+	// Cannot be updated.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=128
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Image is immutable"
 	Image string `json:"image"`
 }
 
@@ -96,8 +80,12 @@ type ComponentVersionStatus struct {
 	Message string `json:"message,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:openapi-gen=true
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cmpv
 
 // ComponentVersion is the Schema for the componentversions API
 type ComponentVersion struct {

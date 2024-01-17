@@ -200,7 +200,6 @@ resources:
   version: v1alpha1
 - api:
     crdVersion: v1
-    namespaced: true
   controller: true
   domain: kubeblocks.io
   group: apps
@@ -226,7 +225,6 @@ resources:
     webhookVersion: v1
 - api:
     crdVersion: v1
-    namespaced: true
   controller: true
   domain: kubeblocks.io
   group: apps
@@ -235,7 +233,6 @@ resources:
   version: v1alpha1
 - api:
     crdVersion: v1
-    namespaced: true
   controller: true
   domain: kubeblocks.io
   group: apps

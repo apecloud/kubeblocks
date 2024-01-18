@@ -423,6 +423,7 @@ func (mgr *Manager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string
 // IsClusterInitialized is a method to check if cluster is initialized or not
 func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	if cluster != nil {
+		// The maximum length of the server addr is 255 characters. Before MySQL 8.0.17 it was 60 characters.
 		var version string
 		err := mgr.DB.QueryRowContext(ctx, "select version()").Scan(&version)
 		if err != nil {

@@ -383,7 +383,7 @@ func BuildDeleteBackupFilesJobKey(backup *dpv1alpha1.Backup, isPreDelete bool) c
 	}
 	jobName := fmt.Sprintf("%s-%s%s%s", backup.UID[:8], preDeletePrefix, deleteBackupFilesJobNamePrefix, backup.Name)
 	if len(jobName) > 63 {
-		jobName = jobName[:63]
+		jobName = strings.TrimRight(jobName[:63], "-")
 	}
 	return client.ObjectKey{Namespace: backup.Namespace, Name: jobName}
 }

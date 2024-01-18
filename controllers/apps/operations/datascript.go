@@ -314,7 +314,7 @@ func buildDataScriptJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, clust
 		randomStr, _ := password.Generate(4, 0, 0, true, false)
 		jobName := fmt.Sprintf("%s-%s-%s-%s", cluster.Name, "script", ops.Name, randomStr)
 		if len(jobName) > 63 {
-			jobName = jobName[:63]
+			jobName = strings.TrimRight(jobName[:63], "-")
 		}
 
 		job := &batchv1.Job{

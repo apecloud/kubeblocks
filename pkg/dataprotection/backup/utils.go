@@ -149,7 +149,7 @@ func GenerateBackupJobName(backup *dpv1alpha1.Backup, prefix string) string {
 	name := fmt.Sprintf("%s-%s-%s", prefix, backup.Name, backup.UID[:8])
 	// job name cannot exceed 63 characters for label name limit.
 	if len(name) > 63 {
-		return name[:63]
+		return strings.TrimRight(name[:63], "-")
 	}
 	return name
 }

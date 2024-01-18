@@ -314,7 +314,9 @@ spec:
                     name:
                       description: name defines cluster's component name, this name
                         is also part of Service DNS name, so this name will comply
-                        with IANA Service Naming rule. //(TODO) +kubebuilder:validation:XValidation:rule="self
+                        with IANA Service Naming rule. When ClusterComponentSpec is
+                        referenced as a template, name is optional. Otherwise, it
+                        is required. //(TODO) +kubebuilder:validation:XValidation:rule="self
                         == oldSelf",message="name is immutable"
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
@@ -921,7 +923,6 @@ spec:
                         type: object
                       type: array
                   required:
-                  - name
                   - replicas
                   type: object
                   x-kubernetes-validations:
@@ -930,9 +931,6 @@ spec:
                 maxItems: 128
                 minItems: 1
                 type: array
-                x-kubernetes-list-map-keys:
-                - name
-                x-kubernetes-list-type: map
                 x-kubernetes-validations:
                 - message: duplicated component
                   rule: self.all(x, size(self.filter(c, c.name == x.name)) == 1)
@@ -1028,8 +1026,7 @@ spec:
                     shardSelector:
                       description: ShardSelector extends the ServiceSpec.Selector
                         by allowing you to specify a shard template name defined in
-                        Cluster.Spec.ShardSpecs[x].Template.Name as selectors for
-                        the service.
+                        Cluster.Spec.ShardSpecs[x].Name as selectors for the service.
                       type: string
                     spec:
                       description: Spec defines the behavior of a service. https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -1392,12 +1389,31 @@ spec:
                 items:
                   description: ShardSpec defines the shard spec.
                   properties:
+                    name:
+                      description: name defines shard template name, this name is
+                        also part of Service DNS name, so this name will comply with
+                        IANA Service Naming rule.
+                      maxLength: 22
+                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
+                      type: string
+                      x-kubernetes-validations:
+                      - message: name is immutable
+                        rule: self == oldSelf
                     shards:
-                      description: shards indicates the number of component. if shards=0,
-                        it means the number of component is scaled down to 0, and
-                        the Component object and underlying resources will be deleted
-                        synchronously. if shards>0, it means there are shards number
-                        of components. components follow the named pattern <Template.Name>-{shardID}.
+                      description: 'shards indicates the number of component. 1. When
+                        the number of shards increases, the relevant Actions defined
+                        in the Definition will be triggered if the conditions are
+                        met. This is specifically divided into two cases: 1.1 If the
+                        Template references a ClusterDefinition through ComponentDefRef,
+                        then the postStart Action defined in the ClusterDefinition
+                        will be executed. 1.2 [Recommended] If the Template references
+                        a ComponentDefinition through ComponentDef, then the postProvision
+                        Action defined in the ComponentDefinition will be executed.
+                        2. When the number of shards decreases, only the preTerminate
+                        Action defined in the ComponentDefinition is supported for
+                        execution if the conditions are met. Additionally, the resources
+                        and data associated with the corresponding Component will
+                        be deleted as well.'
                       format: int32
                       minimum: 0
                       type: integer
@@ -1547,7 +1563,9 @@ spec:
                         name:
                           description: name defines cluster's component name, this
                             name is also part of Service DNS name, so this name will
-                            comply with IANA Service Naming rule. //(TODO) +kubebuilder:validation:XValidation:rule="self
+                            comply with IANA Service Naming rule. When ClusterComponentSpec
+                            is referenced as a template, name is optional. Otherwise,
+                            it is required. //(TODO) +kubebuilder:validation:XValidation:rule="self
                             == oldSelf",message="name is immutable"
                           maxLength: 22
                           pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
@@ -1846,7 +1864,7 @@ spec:
                           x-kubernetes-preserve-unknown-fields: true
                         updateStrategy:
                           description: updateStrategy defines the update strategy
-                            for the component.
+                            for the component. Not supported.
                           enum:
                           - Serial
                           - BestEffortParallel
@@ -2181,17 +2199,21 @@ spec:
                             type: object
                           type: array
                       required:
-                      - name
                       - replicas
                       type: object
                       x-kubernetes-validations:
                       - message: either componentDefRef or componentDef should be
                           provided
                         rule: has(self.componentDefRef) || has(self.componentDef)
+                  required:
+                  - name
                   type: object
                 maxItems: 128
                 minItems: 1
                 type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               storage:
                 description: storage specifies the storage of the first componentSpec,
                   if the storage of the first componentSpec is specified, this value

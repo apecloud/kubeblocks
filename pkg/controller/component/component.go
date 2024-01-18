@@ -272,7 +272,7 @@ func isShardComponent(cluster *appsv1alpha1.Cluster, compName string) (bool, str
 	for _, shardSpec := range cluster.Spec.ShardSpecs {
 		for _, shardComp := range GenShardCompSpecList(&shardSpec) {
 			if shardComp.Name == compName {
-				return true, shardSpec.Template.Name
+				return true, shardSpec.Name
 			}
 		}
 	}

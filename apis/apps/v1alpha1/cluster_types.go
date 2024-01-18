@@ -60,6 +60,8 @@ type ClusterSpec struct {
 	// List of shardSpec which is used to define components with a sharding topology structure.
 	// ShardSpecs and ComponentSpecs cannot both be empty at the same time.
 	// +kubebuilder:validation:Optional
+	// +listType=map
+	// +listMapKey=name
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
 	// +optional
@@ -67,10 +69,6 @@ type ClusterSpec struct {
 
 	// List of componentSpec which is used to define the components that make up a cluster.
 	// ComponentSpecs and ShardSpecs cannot both be empty at the same time.
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
 	// +kubebuilder:validation:XValidation:rule="self.all(x, size(self.filter(c, c.name == x.name)) == 1)",message="duplicated component"
@@ -289,13 +287,23 @@ type ClusterStatus struct {
 
 // ShardSpec defines the shard spec.
 type ShardSpec struct {
+	// name defines shard template name, this name is also part of Service DNS name, so this name will comply with IANA Service Naming rule.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=22
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
+	Name string `json:"name"`
+
 	// template defines the component template.
 	// +kubebuilder:validation:Required
 	Template ClusterComponentSpec `json:"template,omitempty"`
 
 	// shards indicates the number of component.
-	// if shards=0, it means the number of component is scaled down to 0, and the Component object and underlying resources will be deleted synchronously.
-	// if shards>0, it means there are shards number of components. components follow the named pattern <Template.Name>-{shardID}.
+	// 1. When the number of shards increases, the relevant Actions defined in the Definition will be triggered if the conditions are met. This is specifically divided into two cases:
+	//    1.1 If the Template references a ClusterDefinition through ComponentDefRef, then the postStart Action defined in the ClusterDefinition will be executed.
+	//    1.2 [Recommended] If the Template references a ComponentDefinition through ComponentDef, then the postProvision Action defined in the ComponentDefinition will be executed.
+	// 2. When the number of shards decreases, only the preTerminate Action defined in the ComponentDefinition is supported for execution if the conditions are met.
+	//    Additionally, the resources and data associated with the corresponding Component will be deleted as well.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
 	Shards int32 `json:"shards,omitempty"`
@@ -307,10 +315,11 @@ type ShardSpec struct {
 // //(TODO) +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDef) || has(self.componentDef)", message="componentDef is required once set"
 type ClusterComponentSpec struct {
 	// name defines cluster's component name, this name is also part of Service DNS name, so this name will comply with IANA Service Naming rule.
-	// +kubebuilder:validation:Required
+	// When ClusterComponentSpec is referenced as a template, name is optional. Otherwise, it is required.
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	// //(TODO) +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
+	// +optional
 	Name string `json:"name"`
 
 	// componentDefRef references componentDef defined in ClusterDefinition spec. Need to comply with IANA Service Naming rule.

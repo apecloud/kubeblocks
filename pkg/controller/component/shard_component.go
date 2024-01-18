@@ -20,9 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"fmt"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 func GenShardCompNameList(shardSpec *appsv1alpha1.ShardSpec) []string {
@@ -30,9 +29,8 @@ func GenShardCompNameList(shardSpec *appsv1alpha1.ShardSpec) []string {
 	if shardSpec == nil {
 		return compNameList
 	}
-	shardTpl := shardSpec.Template
 	for i := 0; i < int(shardSpec.Shards); i++ {
-		compNameList = append(compNameList, fmt.Sprintf("%s-%d", shardTpl.Name, i))
+		compNameList = append(compNameList, constant.GenerateShardComponentName(shardSpec.Name, i))
 	}
 	return compNameList
 }
@@ -45,7 +43,7 @@ func GenShardCompSpecList(shardSpec *appsv1alpha1.ShardSpec) []*appsv1alpha1.Clu
 	shardTpl := shardSpec.Template
 	for i := 0; i < int(shardSpec.Shards); i++ {
 		shardClusterCompSpec := shardTpl.DeepCopy()
-		shardClusterCompSpec.Name = fmt.Sprintf("%s-%d", shardTpl.Name, i)
+		shardClusterCompSpec.Name = constant.GenerateShardComponentName(shardSpec.Name, i)
 		compSpecList = append(compSpecList, shardClusterCompSpec)
 	}
 	return compSpecList

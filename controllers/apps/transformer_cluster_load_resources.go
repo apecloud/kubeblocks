@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
@@ -134,7 +135,7 @@ func (t *clusterLoadRefResourcesTransformer) allCompSpecs(cluster *appsv1alpha1.
 	}
 	for _, shardSpec := range cluster.Spec.ShardSpecs {
 		for i := 1; i < int(shardSpec.Shards); i++ {
-			shardSpecName := fmt.Sprintf("%s-%d", shardSpec.Template.Name, i)
+			shardSpecName := constant.GenerateShardComponentName(shardSpec.Name, i)
 			specs = append(specs, shardSpecName)
 		}
 	}

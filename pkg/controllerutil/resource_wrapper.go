@@ -21,13 +21,13 @@ package controllerutil
 
 import (
 	"context"
-	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type ResourceCtx struct {
@@ -117,7 +117,7 @@ func (r *ResourceFetcher[T]) ClusterComponent() *T {
 			shardTpl := shardSpec.Template
 			for i := 0; i < int(shardSpec.Shards); i++ {
 				shardCompSpec := shardTpl.DeepCopy()
-				shardCompSpec.Name = fmt.Sprintf("%s-%d", shardTpl.Name, i)
+				shardCompSpec.Name = constant.GenerateShardComponentName(shardSpec.Name, i)
 				if shardCompSpec.Name == r.ComponentName {
 					r.ClusterComObj = shardCompSpec
 					return

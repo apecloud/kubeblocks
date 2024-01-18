@@ -32,9 +32,9 @@ var _ = Describe("cluster shard component", func() {
 		It("cluster shard component test", func() {
 			shardSpec := &appsv1alpha1.ShardSpec{
 				Template: appsv1alpha1.ClusterComponentSpec{
-					Name:     "test",
 					Replicas: 2,
 				},
+				Name:   "test",
 				Shards: 3,
 			}
 

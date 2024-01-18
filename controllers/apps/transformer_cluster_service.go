@@ -203,10 +203,10 @@ func (t *clusterServiceTransformer) genMultiServiceIfNeed(cluster *appsv1alpha1.
 	shardTemplateName := ""
 	shards := int32(0)
 	for _, shardSpec := range cluster.Spec.ShardSpecs {
-		if shardSpec.Template.Name != clusterService.ShardSelector {
+		if shardSpec.Name != clusterService.ShardSelector {
 			continue
 		}
-		shardTemplateName = shardSpec.Template.Name
+		shardTemplateName = shardSpec.Name
 		shards = shardSpec.Shards
 	}
 
@@ -223,9 +223,8 @@ func (t *clusterServiceTransformer) genMultiServiceIfNeed(cluster *appsv1alpha1.
 	for i := int32(0); i < shards; i++ {
 		svc := clusterService.DeepCopy()
 		svc.Name = fmt.Sprintf("%s-%d", clusterService.Name, i)
-		// reset shard selector and set component selector to each shard ordinal service
-		svc.ComponentSelector = fmt.Sprintf("%s-%d", clusterService.ShardSelector, i)
-		svc.ShardSelector = ""
+		// set component selector to each shard ordinal service
+		svc.ComponentSelector = constant.GenerateShardComponentName(clusterService.ShardSelector, int(i))
 		if len(clusterService.ServiceName) == 0 {
 			svc.ServiceName = fmt.Sprintf("%d", i)
 		} else {

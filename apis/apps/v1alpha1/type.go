@@ -605,7 +605,7 @@ type ClusterService struct {
 	Service `json:",inline"`
 
 	// ShardSelector extends the ServiceSpec.Selector by allowing you to specify a shard template name
-	// defined in Cluster.Spec.ShardSpecs[x].Template.Name as selectors for the service.
+	// defined in Cluster.Spec.ShardSpecs[x].Name as selectors for the service.
 	// +optional
 	ShardSelector string `json:"shardSelector,omitempty"`
 

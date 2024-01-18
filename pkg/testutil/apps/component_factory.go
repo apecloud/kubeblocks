@@ -70,11 +70,6 @@ func (factory *MockComponentFactory) SetResources(resources corev1.ResourceRequi
 	return factory
 }
 
-func (factory *MockComponentFactory) SetEnabledLogs(logName ...string) *MockComponentFactory {
-	factory.Get().Spec.EnabledLogs = logName
-	return factory
-}
-
 func (factory *MockComponentFactory) SetMonitor(monitor bool) *MockComponentFactory {
 	factory.Get().Spec.Monitor = monitor
 	return factory

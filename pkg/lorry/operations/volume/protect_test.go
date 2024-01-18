@@ -134,12 +134,12 @@ var _ = Describe("Volume Protection Operation", func() {
 			Expect(len(protection.Volumes)).Should(Equal(len(volumeProtectionSpec.Volumes)))
 		})
 
-		It("init - invalid volume protection spec env", func() {
+		It("init - empty volume protection spec env", func() {
 			viper.SetDefault(constant.KBEnvVolumeProtectionSpec, "")
 			protection := &Protection{
 				Requester: &mockVolumeStatsRequester{},
 			}
-			Expect(protection.initVolumes()).Should(HaveOccurred())
+			Expect(protection.initVolumes()).Should(BeNil())
 		})
 
 		It("init - init requester error", func() {

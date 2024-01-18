@@ -924,7 +924,6 @@ spec:
                         type: object
                       type: array
                   required:
-                  - name
                   - replicas
                   type: object
                   x-kubernetes-validations:
@@ -2213,7 +2212,6 @@ spec:
                             type: object
                           type: array
                       required:
-                      - name
                       - replicas
                       type: object
                       x-kubernetes-validations:

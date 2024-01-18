@@ -320,10 +320,10 @@ type ShardSpec struct {
 type ClusterComponentSpec struct {
 	// name defines cluster's component name, this name is also part of Service DNS name, so this name will comply with IANA Service Naming rule.
 	// When ClusterComponentSpec is referenced as a template, name is optional. Otherwise, it is required.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:default=""
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
+	// +optional
 	Name string `json:"name"`
 
 	// componentDefRef references componentDef defined in ClusterDefinition spec. Need to comply with IANA Service Naming rule.

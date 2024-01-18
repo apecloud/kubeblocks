@@ -422,25 +422,27 @@ func (mgr *Manager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string
 
 // IsClusterInitialized is a method to check if cluster is initialized or not
 func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
-	var version string
-	err := mgr.DB.QueryRowContext(ctx, "select version()").Scan(&version)
-	if err != nil {
-		mgr.Logger.Info("Get version failed", "error", err)
-		return false, err
-	}
-	currentMemberName := mgr.GetCurrentMemberName()
-	member := cluster.GetMemberWithName(currentMemberName)
-	addr := cluster.GetMemberShortAddr(*member)
-	maxLength := 255
-	if IsSmallerVersion(version, "8.0.17") {
-		maxLength = 60
+	if cluster != nil {
+		var version string
+		err := mgr.DB.QueryRowContext(ctx, "select version()").Scan(&version)
+		if err != nil {
+			mgr.Logger.Info("Get version failed", "error", err)
+			return false, err
+		}
+		currentMemberName := mgr.GetCurrentMemberName()
+		member := cluster.GetMemberWithName(currentMemberName)
+		addr := cluster.GetMemberShortAddr(*member)
+		maxLength := 255
+		if IsSmallerVersion(version, "8.0.17") {
+			maxLength = 60
+		}
+
+		if len(addr) > maxLength {
+			return false, errors.Errorf("The length of the member address must be less than or equal to %d", maxLength)
+		}
 	}
 
-	if len(addr) > maxLength {
-		return false, errors.Errorf("The length of the member address must be less than or equal to %d", maxLength)
-	}
-
-	err = mgr.EnableSemiSyncIfNeed(ctx)
+	err := mgr.EnableSemiSyncIfNeed(ctx)
 	if err != nil {
 		return false, err
 	}

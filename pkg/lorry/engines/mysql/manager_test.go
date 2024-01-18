@@ -264,7 +264,7 @@ func TestManager_IsMemberLagging(t *testing.T) {
 
 	t.Run("No leader DBState info", func(t *testing.T) {
 		isMemberLagging, lags := manager.IsMemberLagging(ctx, cluster, nil)
-		assert.False(t, isMemberLagging)
+		assert.True(t, isMemberLagging)
 		assert.Zero(t, lags)
 	})
 
@@ -273,7 +273,7 @@ func TestManager_IsMemberLagging(t *testing.T) {
 		_, _ = NewConfig(fakePropertiesWithWrongURL)
 
 		isMemberLagging, lags := manager.IsMemberLagging(ctx, cluster, &dcs.Member{})
-		assert.False(t, isMemberLagging)
+		assert.True(t, isMemberLagging)
 		assert.Zero(t, lags)
 	})
 
@@ -283,7 +283,7 @@ func TestManager_IsMemberLagging(t *testing.T) {
 			WillReturnError(fmt.Errorf("some error"))
 
 		isMemberLagging, lags := manager.IsMemberLagging(ctx, cluster, &dcs.Member{Name: fakePodName})
-		assert.False(t, isMemberLagging)
+		assert.True(t, isMemberLagging)
 		assert.Zero(t, lags)
 	})
 
@@ -560,7 +560,7 @@ func TestManager_IsClusterInitialized(t *testing.T) {
 		mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
 			"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}).AddRow("ACTIVE"))
 		mock.ExpectExec("SET GLOBAL rpl_semi_sync_source_enabled = 1;" +
-			"SET GLOBAL rpl_semi_sync_source_timeout = 1000;").
+			"SET GLOBAL rpl_semi_sync_source_timeout = 100000;").
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
 		mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +

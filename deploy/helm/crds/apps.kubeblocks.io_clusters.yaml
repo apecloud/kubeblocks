@@ -603,7 +603,7 @@ spec:
                       x-kubernetes-preserve-unknown-fields: true
                     updateStrategy:
                       description: updateStrategy defines the update strategy for
-                        the component.
+                        the component. Not supported.
                       enum:
                       - Serial
                       - BestEffortParallel

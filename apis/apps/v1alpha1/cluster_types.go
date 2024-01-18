@@ -403,6 +403,7 @@ type ClusterComponentSpec struct {
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
 	// updateStrategy defines the update strategy for the component.
+	// Not supported.
 	// +optional
 	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
 

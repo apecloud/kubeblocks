@@ -135,8 +135,3 @@ func (builder *ComponentBuilder) SetClassRef(classRef *appsv1alpha1.ClassDefRef)
 	builder.get().Spec.ClassDefRef = classRef
 	return builder
 }
-
-func (builder *ComponentBuilder) SetUpdateStrategy(updateStrategy *appsv1alpha1.UpdateStrategy) *ComponentBuilder {
-	builder.get().Spec.UpdateStrategy = updateStrategy
-	return builder
-}

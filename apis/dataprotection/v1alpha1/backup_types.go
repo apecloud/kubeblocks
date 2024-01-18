@@ -156,11 +156,16 @@ type BackupStatus struct {
 // BackupTimeRange records the time range of backed up data, for PITR, this is the
 // time range of recoverable data.
 type BackupTimeRange struct {
-	// start records the start time of backup.
+	// time zone, only support zone offset, value range: "-12:59 ~ +13:00"
+	// +kubebuilder:validation:Pattern:=`^(\+|\-)(0[0-9]|1[0-3]):([0-5][0-9])$`
+	// +optional
+	TimeZone string `json:"timeZone,omitempty"`
+
+	// start records the start time of backup(Coordinated Universal Time, UTC).
 	// +optional
 	Start *metav1.Time `json:"start,omitempty"`
 
-	// end records the end time of backup.
+	// end records the end time of backup(Coordinated Universal Time, UTC).
 	// +optional
 	End *metav1.Time `json:"end,omitempty"`
 }
@@ -342,4 +347,12 @@ func (r *Backup) GetEndTime() *metav1.Time {
 		return s.TimeRange.End
 	}
 	return s.CompletionTimestamp
+}
+
+func (r *Backup) GetTimeZone() string {
+	s := r.Status
+	if s.TimeRange != nil {
+		return s.TimeRange.TimeZone
+	}
+	return ""
 }

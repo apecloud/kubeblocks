@@ -49,7 +49,6 @@ type SynthesizedComponent struct {
 	PodSpec              *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 	Monitor              *MonitorConfig                         `json:"monitor,omitempty"`
-	EnabledLogs          []string                               `json:"enabledLogs,omitempty"`
 	LogConfigs           []v1alpha1.LogConfig                   `json:"logConfigs,omitempty"`
 	ConfigTemplates      []v1alpha1.ComponentConfigSpec         `json:"configTemplates,omitempty"`
 	ScriptTemplates      []v1alpha1.ComponentTemplateSpec       `json:"scriptTemplates,omitempty"`

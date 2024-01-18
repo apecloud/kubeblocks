@@ -25,6 +25,8 @@ import (
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctlruntime "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
@@ -59,4 +61,24 @@ func GetRESTClientForKB() (*rest.RESTClient, error) {
 	}
 
 	return client, nil
+}
+
+func GetControllerRuntimeClient() (client.Client, error) {
+	restConfig, err := ctlruntime.GetConfig()
+	httpClient, err := rest.HTTPClientFor(restConfig)
+	if err != nil {
+		return nil, err
+	}
+	mapper, err := apiutil.NewDynamicRESTMapper(restConfig, httpClient)
+	if err != nil {
+		return nil, err
+	}
+	_ = appsv1alpha1.AddToScheme(clientsetscheme.Scheme)
+	cc, err := client.New(restConfig, client.Options{
+		Mapper: mapper,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return cc, nil
 }

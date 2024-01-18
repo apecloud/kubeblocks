@@ -21,6 +21,7 @@ package configuration
 
 import (
 	"context"
+
 	"golang.org/x/exp/slices"
 
 	corev1 "k8s.io/api/core/v1"
@@ -30,13 +31,18 @@ import (
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/lorry/util/kubernetes"
 )
 
 // BuildConfigManagerWithComponentForLorry inject the config manager service into Lorry container if configuration reload option is on
 func BuildConfigManagerWithComponentForLorry(podSpec *corev1.PodSpec, configSpecs []appsv1alpha1.ComponentConfigSpec, container *corev1.Container,
-	ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) error {
-	var err error
+	ctx context.Context, cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) error {
 	var buildParams *cfgcm.CfgManagerBuildParams
+
+	cli, err := kubernetes.GetControllerRuntimeClient()
+	if err != nil {
+		return err
+	}
 
 	volumeDirs, usingConfigSpecs := getUsingVolumesByConfigSpecs(podSpec, configSpecs)
 	if len(volumeDirs) == 0 {

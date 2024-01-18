@@ -21,7 +21,6 @@ package apps
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 
 	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/types"
@@ -30,6 +29,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 

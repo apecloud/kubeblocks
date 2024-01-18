@@ -1549,7 +1549,7 @@ func randomNameForDerivedObject(repo *dpv1alpha1.BackupRepo, prefix string) stri
 
 func cutName(name string) string {
 	if len(name) > 63 {
-		return name[:63]
+		return strings.TrimSuffix(name[:63], "-")
 	}
 	return name
 }

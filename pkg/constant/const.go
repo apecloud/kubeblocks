@@ -161,7 +161,7 @@ const (
 	// PodOrdinalSvcAnnotationKey defines the feature gate of PodOrdinal Service defined in ComponentDefinition.Spec.Services.
 	// Components defined in the annotation value, their all Services defined in the ComponentDefinition with the GeneratePodOrdinalService attribute set to true will be created; otherwise, they will be ignored.
 	// This can generate a corresponding Service for each Pod, which can be used in certain specific scenarios: for example, creating a dedicated access service for each read-only Pod.
-	// Multiple components are separated by ','. for example: "kubeblocks.io/enabled-node-port-svc: comp1,comp2"
+	// Multiple components are separated by ','. for example: "kubeblocks.io/enabled-pod-ordinal-svc: comp1,comp2"
 	PodOrdinalSvcAnnotationKey = "kubeblocks.io/enabled-pod-ordinal-svc"
 	// ShardOrdinalSvcAnnotationKey defines the feature gate of ShardOrdinal Service defined in Cluster.Spec.Services.
 	// Components template name defined in the annotation value, a set of Service defined in Cluster.Spec.Services with the ShardSelector will be automatically generated for each shard Component when Cluster.Spec.ShardSpecs[x].shards is not nil.

@@ -102,6 +102,8 @@ const (
 	DPBackupInfoFile = "DP_BACKUP_INFO_FILE"
 	// DPTimeFormat golang time format string
 	DPTimeFormat = "DP_TIME_FORMAT"
+	// DPTimeZone golang time zone string
+	DPTimeZone = "DP_TIME_ZONE"
 	// DPBackupStopTime backup stop time
 	DPBackupStopTime = "DP_BACKUP_STOP_TIME" // backup stop time
 	// DPDatasafedBinPath the path containing the datasafed binary

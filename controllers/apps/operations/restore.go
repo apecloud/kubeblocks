@@ -133,7 +133,6 @@ func (r RestoreOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 
 func restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest) (*appsv1alpha1.Cluster, error) {
 	backupName := opsRequest.Spec.RestoreSpec.BackupName
-	restoreTimeStr := opsRequest.Spec.RestoreSpec.RestoreTimeStr
 
 	// check if the backup exists
 	backup := &dpv1alpha1.Backup{}
@@ -151,12 +150,13 @@ func restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 	}
 
 	// format and validate the restore time
-	restoreTimeStr, err := restore.FormatRestoreTimeAndValidate(restoreTimeStr, backup)
-	if err != nil {
-		return nil, err
+	if backupType == string(dpv1alpha1.BackupTypeContinuous) {
+		restoreTimeStr, err := restore.FormatRestoreTimeAndValidate(opsRequest.Spec.RestoreSpec.RestoreTimeStr, backup)
+		if err != nil {
+			return nil, err
+		}
+		opsRequest.Spec.RestoreSpec.RestoreTimeStr = restoreTimeStr
 	}
-	opsRequest.Spec.RestoreSpec.RestoreTimeStr = restoreTimeStr
-
 	// get the cluster object from backup
 	clusterObj, err := getClusterObjFromBackup(backup, opsRequest)
 	if err != nil {

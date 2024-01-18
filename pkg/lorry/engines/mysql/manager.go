@@ -219,14 +219,14 @@ func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, m
 	opTimestamp, err := mgr.GetOpTimestamp(ctx, db)
 	if err != nil {
 		mgr.Logger.Info("get op timestamp failed", "error", err)
-		return false, 0
+		return true, 0
 	}
-
-	if leaderDBState.OpTimestamp-opTimestamp <= cluster.HaConfig.GetMaxLagOnSwitchover() {
-		return false, 0
+	lag := leaderDBState.OpTimestamp - opTimestamp
+	if lag <= cluster.HaConfig.GetMaxLagOnSwitchover() {
+		return false, lag
 	}
-	mgr.Logger.Info(fmt.Sprintf("The member %s has lag: %d", member.Name, leaderDBState.OpTimestamp-opTimestamp))
-	return true, leaderDBState.OpTimestamp - opTimestamp
+	mgr.Logger.Info(fmt.Sprintf("The member %s has lag: %d", member.Name, lag))
+	return true, lag
 }
 
 func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {

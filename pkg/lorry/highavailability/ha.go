@@ -328,7 +328,8 @@ func (ha *Ha) IsHealthiestMember(ctx context.Context, cluster *dcs3.Cluster) boo
 
 		if candidate == currentMemberName {
 			ha.logger.Info("manual switchover to current member", "member", candidate)
-			return true
+			isCurrentLagging, _ := ha.dbManager.IsMemberLagging(ctx, cluster, currentMember)
+			return !isCurrentLagging
 		}
 
 		if candidate != "" {
@@ -452,15 +453,15 @@ func (ha *Ha) IsPodReady() (bool, error) {
 
 func (ha *Ha) isMinimumLag(ctx context.Context, cluster *dcs3.Cluster, member *dcs3.Member) bool {
 	isCurrentLagging, currentLag := ha.dbManager.IsMemberLagging(ctx, cluster, member)
-	if !isCurrentLagging {
-		return true
+	if isCurrentLagging {
+		return false
 	}
 
 	for _, m := range cluster.Members {
 		if m.Name != member.Name {
 			isLagging, lag := ha.dbManager.IsMemberLagging(ctx, cluster, &m)
 			// There are other members with smaller lag
-			if !isLagging || lag < currentLag {
+			if !isLagging && lag < currentLag {
 				return false
 			}
 		}

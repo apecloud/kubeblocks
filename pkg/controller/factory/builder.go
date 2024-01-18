@@ -67,10 +67,16 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synthesi
 		compDefLabel = constant.GetClusterCompDefLabel(clusterCompDefName)
 	}
 
+	var mergeLabels map[string]string
+	if len(synthesizedComp.Labels) > 0 {
+		mergeLabels = intctrlutil.MergeMetadataMaps(labels, compDefLabel, synthesizedComp.Labels)
+	} else {
+		mergeLabels = intctrlutil.MergeMetadataMaps(labels, compDefLabel)
+	}
+
 	// TODO(xingran): Need to review how to set pod labels based on the new ComponentDefinition API. workloadType label has been removed.
 	podBuilder := builder.NewPodBuilder("", "").
-		AddLabelsInMap(labels).
-		AddLabelsInMap(compDefLabel).
+		AddLabelsInMap(mergeLabels).
 		AddLabelsInMap(constant.GetAppVersionLabel(compDefName))
 	template := corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
@@ -81,20 +87,13 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synthesi
 	rsmBuilder := builder.NewReplicatedStateMachineBuilder(namespace, rsmName).
 		AddAnnotations(constant.KubeBlocksGenerationKey, synthesizedComp.ClusterGeneration).
 		AddAnnotationsInMap(getMonitorAnnotations(synthesizedComp)).
-		AddLabelsInMap(labels).
-		AddLabelsInMap(compDefLabel).
+		AddLabelsInMap(mergeLabels).
 		AddMatchLabelsInMap(labels).
 		SetServiceName(constant.GenerateRSMServiceNamePattern(rsmName)).
 		SetReplicas(synthesizedComp.Replicas).
 		SetRsmTransformPolicy(synthesizedComp.RsmTransformPolicy).
 		SetNodeAssignment(synthesizedComp.NodesAssignment).
 		SetTemplate(template)
-
-	// add shard template name label if component is generated from shardSpec
-	if len(synthesizedComp.ShardTemplateName) > 0 {
-		podBuilder.AddLabelsInMap(constant.GetShardTemplateNameLabel(synthesizedComp.ShardTemplateName))
-		rsmBuilder.AddLabelsInMap(constant.GetShardTemplateNameLabel(synthesizedComp.ShardTemplateName))
-	}
 
 	var vcts []corev1.PersistentVolumeClaim
 	for _, vct := range synthesizedComp.VolumeClaimTemplates {

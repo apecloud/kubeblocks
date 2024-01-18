@@ -102,12 +102,6 @@ func parseCustomLabelPattern(pattern string) (schema.GroupVersionKind, error) {
 	return schema.GroupVersionKind{}, fmt.Errorf("invalid pattern %s", pattern)
 }
 
-// replaceKBEnvPlaceholderTokens replaces the placeholder tokens in the string strToReplace with builtInEnvMap and return new string.
-func replaceKBEnvPlaceholderTokens(clusterName, uid, componentName, strToReplace string) string {
-	builtInEnvMap := intctrlcomp.GetReplacementMapForBuiltInEnv(clusterName, uid, componentName)
-	return intctrlcomp.ReplaceNamedVars(builtInEnvMap, strToReplace, -1, true)
-}
-
 // DelayUpdatePodSpecSystemFields to delay the updating to system fields in pod spec.
 func DelayUpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	for i := range pobj.Containers {
@@ -224,53 +218,4 @@ func UpdateComponentInfoToPods(
 		graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), nil)
 	}
 	return nil
-}
-
-// UpdateCustomLabelToPods updates custom label to pods
-func UpdateCustomLabelToPods(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	component *intctrlcomp.SynthesizedComponent,
-	dag *graph.DAG) error {
-	if cluster == nil || component == nil {
-		return nil
-	}
-	// list all pods in dag
-	graphCli := model.NewGraphClient(cli)
-	pods := graphCli.FindAll(dag, &corev1.Pod{})
-
-	for labelKey, labelValue := range component.Labels {
-		podList := &corev1.PodList{}
-		matchLabels := constant.GetComponentWellKnownLabels(cluster.Name, component.Name)
-		if err := getObjectListByCustomLabels(ctx, cli, *cluster, podList, client.MatchingLabels(matchLabels)); err != nil {
-			return err
-		}
-
-		for i := range podList.Items {
-			idx := slices.IndexFunc(pods, func(obj client.Object) bool {
-				return obj.GetName() == podList.Items[i].Name
-			})
-			// pod already in dag, merge labels
-			if idx >= 0 {
-				updateObjLabel(cluster.Name, string(cluster.UID), component.Name, labelKey, labelValue, pods[idx])
-				continue
-			}
-			pod := &podList.Items[i]
-			updateObjLabel(cluster.Name, string(cluster.UID), component.Name, labelKey, labelValue, pod)
-			graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), nil)
-		}
-	}
-	return nil
-}
-
-func updateObjLabel(clusterName, uid, componentName, labelKey, labelValue string, obj client.Object) {
-	key := replaceKBEnvPlaceholderTokens(clusterName, uid, componentName, labelKey)
-	value := replaceKBEnvPlaceholderTokens(clusterName, uid, componentName, labelValue)
-
-	labels := obj.GetLabels()
-	if labels == nil {
-		labels = make(map[string]string, 0)
-	}
-	labels[key] = value
-	obj.SetLabels(labels)
 }

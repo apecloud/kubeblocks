@@ -21,7 +21,6 @@ package apps
 
 import (
 	"fmt"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
@@ -60,9 +59,7 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 			genShardCompSpec := genShardingCompSpecList[j]
 			transCtx.GenerateComponentSpecs = append(transCtx.GenerateComponentSpecs, &GenerateComponentSpec{
 				ComponentSpec: genShardCompSpec,
-				Labels: map[string]string{
-					constant.KBAppShardTemplateNameLabelKey: shardingSpec.Name,
-				},
+				Labels:        constant.GetShardTemplateNameLabel(shardingSpec.Name),
 			})
 		}
 	}

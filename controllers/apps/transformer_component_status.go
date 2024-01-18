@@ -224,13 +224,6 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 		return err
 	}
 
-	// patch the current componentSpec workload's custom labels
-	// TODO(xingran): should be move this to rsm controller, and add custom annotations support. then add a independent transformer to deal with component level custom labels and annotations.
-	if err := UpdateCustomLabelToPods(r.reqCtx.Ctx, r.cli, r.cluster, r.synthesizeComp, r.dag); err != nil {
-		r.reqCtx.Event(r.cluster, corev1.EventTypeWarning, "Component Controller PatchWorkloadCustomLabelFailed", err.Error())
-		return err
-	}
-
 	// set primary-pod annotation
 	// TODO(free6om): primary-pod is only used in redis to bootstrap the redis cluster correctly.
 	// it is too hacky to be replaced by a better design.

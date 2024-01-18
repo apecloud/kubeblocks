@@ -310,7 +310,7 @@ func copyAndMergeRSM(oldRsm, newRsm *workloads.ReplicatedStateMachine, synthesiz
 	// keep the original template annotations.
 	// if annotations exist and are replaced, the rsm will be updated.
 	mergeMetadataMap(rsmObjCopy.Spec.Template.Annotations, &rsmProto.Spec.Template.Annotations)
-	rsmObjCopy.Spec.Template = rsmProto.Spec.Template
+	rsmObjCopy.Spec.Template = *rsmProto.Spec.Template.DeepCopy()
 	rsmObjCopy.Spec.Replicas = rsmProto.Spec.Replicas
 	rsmObjCopy.Spec.Service = updateService(rsmObjCopy, rsmProto)
 	rsmObjCopy.Spec.AlternativeServices = rsmProto.Spec.AlternativeServices

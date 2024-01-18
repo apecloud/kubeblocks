@@ -114,10 +114,17 @@ func (s *server) apiLogger(next fasthttp.RequestHandler) fasthttp.RequestHandler
 			reqLogger = logger.WithValues("useragent", userAgent)
 		}
 		start := time.Now()
-		reqLogger.Info("HTTP API Called", "method", string(ctx.Method()), "path", string(ctx.Path()))
+		path := string(ctx.Path())
+		if path == "/v1.0/checkrole" {
+			// do not log for checkrole
+			next(ctx)
+			return
+		}
+
+		reqLogger.Info("HTTP API Called", "method", string(ctx.Method()), "path", path)
 		next(ctx)
 		elapsed := float64(time.Since(start) / time.Millisecond)
-		reqLogger.Info("HTTP API Response", "status code", ctx.Response.StatusCode(), "cost", elapsed)
+		reqLogger.Info("HTTP API Called", "status code", ctx.Response.StatusCode(), "cost", elapsed)
 	}
 }
 

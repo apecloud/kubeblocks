@@ -99,7 +99,7 @@ func (c *Cluster) GetMemberAddr(member Member) string {
 }
 
 func (c *Cluster) GetMemberShortAddr(member Member) string {
-	return fmt.Sprintf("%s.%s-headless.%s.svc", member.Name, c.ClusterCompName, c.Namespace)
+	return fmt.Sprintf("%s.%s-headless", member.Name, c.ClusterCompName)
 }
 
 func (c *Cluster) GetMemberAddrs() []string {

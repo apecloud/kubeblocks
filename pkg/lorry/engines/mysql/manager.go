@@ -488,7 +488,7 @@ func (mgr *Manager) EnableSemiSyncIfNeed(ctx context.Context) error {
 	//    [ERROR] [MY-000067] [Server] unknown variable 'rpl_semi_sync_master_enabled=1'.
 	if status == "ACTIVE" {
 		setSourceEnable := "SET GLOBAL rpl_semi_sync_source_enabled = 1;" +
-			"SET GLOBAL rpl_semi_sync_source_timeout = 1000;"
+			"SET GLOBAL rpl_semi_sync_source_timeout = 100000;"
 		_, err = mgr.DB.Exec(setSourceEnable)
 		if err != nil {
 			mgr.Logger.Error(err, setSourceEnable+" execute failed")

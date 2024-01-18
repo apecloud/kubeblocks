@@ -48,7 +48,7 @@ func (t *clusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
-	if len(transCtx.ComponentSpecs) == 0 {
+	if len(transCtx.GenerateComponentSpecs) == 0 {
 		return nil
 	}
 
@@ -69,8 +69,8 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 	cluster := transCtx.Cluster
 
 	protoCompSpecMap := make(map[string]*appsv1alpha1.ClusterComponentSpec)
-	for _, spec := range transCtx.ComponentSpecs {
-		protoCompSpecMap[spec.Name] = spec
+	for _, genCompSpec := range transCtx.GenerateComponentSpecs {
+		protoCompSpecMap[genCompSpec.ComponentSpec.Name] = genCompSpec.ComponentSpec
 	}
 
 	protoCompSet := sets.KeySet(protoCompSpecMap)
@@ -151,7 +151,7 @@ func checkAllCompObjExist(transCtx *clusterTransformContext, cluster *appsv1alph
 	if err := transCtx.Client.List(transCtx.Context, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
 		return false, err
 	}
-	if len(compList.Items) != len(transCtx.ComponentSpecs) {
+	if len(compList.Items) != len(transCtx.GenerateComponentSpecs) {
 		return false, nil
 	}
 	return true, nil

@@ -113,11 +113,11 @@ func (r *ResourceFetcher[T]) ClusterComponent() *T {
 		if r.ClusterComObj != nil {
 			return
 		}
-		for _, shardSpec := range r.ClusterObj.Spec.ShardSpecs {
-			shardTpl := shardSpec.Template
-			for i := 0; i < int(shardSpec.Shards); i++ {
+		for _, shardingSpec := range r.ClusterObj.Spec.ShardingSpecs {
+			shardTpl := shardingSpec.Template
+			for i := 0; i < int(shardingSpec.Shards); i++ {
 				shardCompSpec := shardTpl.DeepCopy()
-				shardCompSpec.Name = constant.GenerateShardComponentName(shardSpec.Name, i)
+				shardCompSpec.Name = constant.GenerateShardName(shardingSpec.Name, i)
 				if shardCompSpec.Name == r.ComponentName {
 					r.ClusterComObj = shardCompSpec
 					return

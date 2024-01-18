@@ -17,33 +17,33 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package component
+package sharding
 
 import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
-func GenShardCompNameList(shardSpec *appsv1alpha1.ShardSpec) []string {
+func GenShardNameList(shardingSpec *appsv1alpha1.ShardingSpec) []string {
 	compNameList := make([]string, 0)
-	if shardSpec == nil {
+	if shardingSpec == nil {
 		return compNameList
 	}
-	for i := 0; i < int(shardSpec.Shards); i++ {
-		compNameList = append(compNameList, constant.GenerateShardComponentName(shardSpec.Name, i))
+	for i := 0; i < int(shardingSpec.Shards); i++ {
+		compNameList = append(compNameList, constant.GenerateShardName(shardingSpec.Name, i))
 	}
 	return compNameList
 }
 
-func GenShardCompSpecList(shardSpec *appsv1alpha1.ShardSpec) []*appsv1alpha1.ClusterComponentSpec {
+func GenShardingCompSpecList(shardingSpec *appsv1alpha1.ShardingSpec) []*appsv1alpha1.ClusterComponentSpec {
 	compSpecList := make([]*appsv1alpha1.ClusterComponentSpec, 0)
-	if shardSpec == nil {
+	if shardingSpec == nil {
 		return compSpecList
 	}
-	shardTpl := shardSpec.Template
-	for i := 0; i < int(shardSpec.Shards); i++ {
+	shardTpl := shardingSpec.Template
+	for i := 0; i < int(shardingSpec.Shards); i++ {
 		shardClusterCompSpec := shardTpl.DeepCopy()
-		shardClusterCompSpec.Name = constant.GenerateShardComponentName(shardSpec.Name, i)
+		shardClusterCompSpec.Name = constant.GenerateShardName(shardingSpec.Name, i)
 		compSpecList = append(compSpecList, shardClusterCompSpec)
 	}
 	return compSpecList

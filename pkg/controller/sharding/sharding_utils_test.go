@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package component
+package sharding
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -30,7 +30,7 @@ var _ = Describe("cluster shard component", func() {
 
 	Context("cluster shard component test", func() {
 		It("cluster shard component test", func() {
-			shardSpec := &appsv1alpha1.ShardSpec{
+			shardingSpec := &appsv1alpha1.ShardingSpec{
 				Template: appsv1alpha1.ClusterComponentSpec{
 					Replicas: 2,
 				},
@@ -38,17 +38,17 @@ var _ = Describe("cluster shard component", func() {
 				Shards: 3,
 			}
 
-			compSpecList := GenShardCompSpecList(shardSpec)
+			compSpecList := GenShardingCompSpecList(shardingSpec)
 			Expect(len(compSpecList)).Should(Equal(3))
 			Expect(compSpecList[0].Name).Should(Equal("test-0"))
 			Expect(compSpecList[1].Name).Should(Equal("test-1"))
 			Expect(compSpecList[2].Name).Should(Equal("test-2"))
 
-			compNameList := GenShardCompNameList(shardSpec)
-			Expect(len(compNameList)).Should(Equal(3))
-			Expect(compNameList[0]).Should(Equal("test-0"))
-			Expect(compNameList[1]).Should(Equal("test-1"))
-			Expect(compNameList[2]).Should(Equal("test-2"))
+			shardNameList := GenShardNameList(shardingSpec)
+			Expect(len(shardNameList)).Should(Equal(3))
+			Expect(shardNameList[0]).Should(Equal("test-0"))
+			Expect(shardNameList[1]).Should(Equal("test-1"))
+			Expect(shardNameList[2]).Should(Equal("test-2"))
 		})
 	})
 })

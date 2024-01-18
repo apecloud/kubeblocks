@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 
 	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/types"
@@ -153,9 +154,9 @@ func isGeneratedComponent(cluster *appsv1alpha1.Cluster,
 		}
 	}
 
-	for _, shardSpec := range cluster.Spec.ShardSpecs {
-		if slices.Contains(component.GenShardCompNameList(&shardSpec), compName) {
-			return validateCompDef(shardSpec.Template.ComponentDef)
+	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+		if slices.Contains(sharding.GenShardNameList(&shardingSpec), compName) {
+			return validateCompDef(shardingSpec.Template.ComponentDef)
 		}
 	}
 

@@ -54,8 +54,8 @@ func (t *clusterConnCredentialTransformer) Transform(ctx graph.TransformContext,
 }
 
 func (t *clusterConnCredentialTransformer) isLegacyCluster(transCtx *clusterTransformContext) bool {
-	for _, comp := range transCtx.ComponentSpecs {
-		compDef, ok := transCtx.ComponentDefs[comp.ComponentDef]
+	for _, genCompSpec := range transCtx.GenerateComponentSpecs {
+		compDef, ok := transCtx.ComponentDefs[genCompSpec.ComponentSpec.ComponentDef]
 		if ok && (len(compDef.UID) > 0 || !compDef.CreationTimestamp.IsZero()) {
 			return false
 		}
@@ -88,12 +88,12 @@ func (t *clusterConnCredentialTransformer) buildSynthesizedComponent(transCtx *c
 		if compDef.Service == nil {
 			continue
 		}
-		for _, compSpec := range transCtx.ComponentSpecs {
-			if compDef.Name != compSpec.ComponentDefRef {
+		for _, genCompSpec := range transCtx.GenerateComponentSpecs {
+			if compDef.Name != genCompSpec.ComponentSpec.ComponentDefRef {
 				continue
 			}
 			return &component.SynthesizedComponent{
-				Name:     compSpec.Name,
+				Name:     genCompSpec.ComponentSpec.Name,
 				Services: []corev1.Service{{Spec: compDef.Service.ToSVCSpec()}},
 			}
 		}

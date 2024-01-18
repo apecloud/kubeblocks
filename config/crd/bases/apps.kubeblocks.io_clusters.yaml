@@ -169,7 +169,11 @@ spec:
                   be empty at the same time.
                 items:
                   description: ClusterComponentSpec defines the cluster component
-                    spec.
+                    spec. //(TODO) +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDefRef)
+                    || has(self.componentDefRef)", message="componentDefRef is required
+                    once set" //(TODO) +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDef)
+                    || has(self.componentDef)", message="componentDef is required
+                    once set"
                   properties:
                     affinity:
                       description: affinity describes affinities specified by users.
@@ -231,23 +235,20 @@ spec:
                     componentDef:
                       description: componentDef references the name of the ComponentDefinition.
                         If both componentDefRef and componentDef are provided, the
-                        componentDef will take precedence over componentDefRef.
+                        componentDef will take precedence over componentDefRef. //(TODO)
+                        +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDef
+                        is immutable"
                       maxLength: 22
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
-                      x-kubernetes-validations:
-                      - message: componentDef is immutable
-                        rule: self == oldSelf
                     componentDefRef:
                       description: componentDefRef references componentDef defined
                         in ClusterDefinition spec. Need to comply with IANA Service
-                        Naming rule.
+                        Naming rule. //(TODO) +kubebuilder:validation:XValidation:rule="self
+                        == oldSelf",message="componentDefRef is immutable"
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
-                      x-kubernetes-validations:
-                      - message: componentDefRef is immutable
-                        rule: self == oldSelf
                     enabledLogs:
                       description: enabledLogs indicates which log file takes effect
                         in the database cluster. element is the log type which is
@@ -311,17 +312,15 @@ spec:
                         and export metrics to Time Series Database.
                       type: boolean
                     name:
-                      default: ""
                       description: name defines cluster's component name, this name
                         is also part of Service DNS name, so this name will comply
                         with IANA Service Naming rule. When ClusterComponentSpec is
                         referenced as a template, name is optional. Otherwise, it
-                        is required.
+                        is required. //(TODO) +kubebuilder:validation:XValidation:rule="self
+                        == oldSelf",message="name is immutable"
                       maxLength: 22
+                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
-                      x-kubernetes-validations:
-                      - message: name is immutable
-                        rule: self == oldSelf
                     nodes:
                       description: Nodes defines the list of nodes that pods can schedule
                         If the RsmTransformPolicy is specified as ToPod,the list of
@@ -929,16 +928,9 @@ spec:
                   x-kubernetes-validations:
                   - message: either componentDefRef or componentDef should be provided
                     rule: has(self.componentDefRef) || has(self.componentDef)
-                  - message: componentDefRef is required once set
-                    rule: '!has(oldSelf.componentDefRef) || has(self.componentDefRef)'
-                  - message: componentDef is required once set
-                    rule: '!has(oldSelf.componentDef) || has(self.componentDef)'
                 maxItems: 128
                 minItems: 1
                 type: array
-                x-kubernetes-list-map-keys:
-                - name
-                x-kubernetes-list-type: map
                 x-kubernetes-validations:
                 - message: duplicated component
                   rule: self.all(x, size(self.filter(c, c.name == x.name)) == 1)
@@ -1390,17 +1382,17 @@ spec:
                   type: object
                 type: array
                 x-kubernetes-preserve-unknown-fields: true
-              shardSpecs:
-                description: List of shardSpec which is used to define components
-                  with a sharding topology structure. ShardSpecs and ComponentSpecs
+              shardingSpecs:
+                description: List of ShardingSpec which is used to define components
+                  with a sharding topology structure. ShardingSpecs and ComponentSpecs
                   cannot both be empty at the same time.
                 items:
-                  description: ShardSpec defines the shard spec.
+                  description: ShardingSpec defines the sharding spec.
                   properties:
                     name:
-                      description: name defines shard template name, this name is
-                        also part of Service DNS name, so this name will comply with
-                        IANA Service Naming rule.
+                      description: name defines sharding template name, this name
+                        is also part of Service DNS name, so this name will comply
+                        with IANA Service Naming rule.
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
@@ -1492,22 +1484,19 @@ spec:
                           description: componentDef references the name of the ComponentDefinition.
                             If both componentDefRef and componentDef are provided,
                             the componentDef will take precedence over componentDefRef.
+                            //(TODO) +kubebuilder:validation:XValidation:rule="self
+                            == oldSelf",message="componentDef is immutable"
                           maxLength: 22
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
-                          x-kubernetes-validations:
-                          - message: componentDef is immutable
-                            rule: self == oldSelf
                         componentDefRef:
                           description: componentDefRef references componentDef defined
                             in ClusterDefinition spec. Need to comply with IANA Service
-                            Naming rule.
+                            Naming rule. //(TODO) +kubebuilder:validation:XValidation:rule="self
+                            == oldSelf",message="componentDefRef is immutable"
                           maxLength: 22
                           pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                           type: string
-                          x-kubernetes-validations:
-                          - message: componentDefRef is immutable
-                            rule: self == oldSelf
                         enabledLogs:
                           description: enabledLogs indicates which log file takes
                             effect in the database cluster. element is the log type
@@ -1572,17 +1561,15 @@ spec:
                             and export metrics to Time Series Database.
                           type: boolean
                         name:
-                          default: ""
                           description: name defines cluster's component name, this
                             name is also part of Service DNS name, so this name will
                             comply with IANA Service Naming rule. When ClusterComponentSpec
                             is referenced as a template, name is optional. Otherwise,
-                            it is required.
+                            it is required. //(TODO) +kubebuilder:validation:XValidation:rule="self
+                            == oldSelf",message="name is immutable"
                           maxLength: 22
+                          pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                           type: string
-                          x-kubernetes-validations:
-                          - message: name is immutable
-                            rule: self == oldSelf
                         nodes:
                           description: Nodes defines the list of nodes that pods can
                             schedule If the RsmTransformPolicy is specified as ToPod,the
@@ -2218,10 +2205,6 @@ spec:
                       - message: either componentDefRef or componentDef should be
                           provided
                         rule: has(self.componentDefRef) || has(self.componentDef)
-                      - message: componentDefRef is required once set
-                        rule: '!has(oldSelf.componentDefRef) || has(self.componentDefRef)'
-                      - message: componentDef is required once set
-                        rule: '!has(oldSelf.componentDef) || has(self.componentDef)'
                   required:
                   - name
                   type: object

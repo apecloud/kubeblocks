@@ -57,22 +57,20 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:Required
 	TerminationPolicy TerminationPolicyType `json:"terminationPolicy"`
 
-	// List of shardSpec which is used to define components with a sharding topology structure.
-	// ShardSpecs and ComponentSpecs cannot both be empty at the same time.
+	// List of ShardingSpec which is used to define components with a sharding topology structure.
+	// ShardingSpecs and ComponentSpecs cannot both be empty at the same time.
 	// +kubebuilder:validation:Optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
 	// +optional
-	ShardSpecs []ShardSpec `json:"shardSpecs,omitempty"`
+	ShardingSpecs []ShardingSpec `json:"shardingSpecs,omitempty"`
 
 	// List of componentSpec which is used to define the components that make up a cluster.
 	// ComponentSpecs and ShardSpecs cannot both be empty at the same time.
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
 	// +kubebuilder:validation:XValidation:rule="self.all(x, size(self.filter(c, c.name == x.name)) == 1)",message="duplicated component"
@@ -289,9 +287,9 @@ type ClusterStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
-// ShardSpec defines the shard spec.
-type ShardSpec struct {
-	// name defines shard template name, this name is also part of Service DNS name, so this name will comply with IANA Service Naming rule.
+// ShardingSpec defines the sharding spec.
+type ShardingSpec struct {
+	// name defines sharding template name, this name is also part of Service DNS name, so this name will comply with IANA Service Naming rule.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
@@ -315,21 +313,21 @@ type ShardSpec struct {
 
 // ClusterComponentSpec defines the cluster component spec.
 // +kubebuilder:validation:XValidation:rule="has(self.componentDefRef) || has(self.componentDef)",message="either componentDefRef or componentDef should be provided"
-// +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDefRef) || has(self.componentDefRef)", message="componentDefRef is required once set"
-// +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDef) || has(self.componentDef)", message="componentDef is required once set"
+// //(TODO) +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDefRef) || has(self.componentDefRef)", message="componentDefRef is required once set"
+// //(TODO) +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDef) || has(self.componentDef)", message="componentDef is required once set"
 type ClusterComponentSpec struct {
 	// name defines cluster's component name, this name is also part of Service DNS name, so this name will comply with IANA Service Naming rule.
 	// When ClusterComponentSpec is referenced as a template, name is optional. Otherwise, it is required.
-	// +kubebuilder:default=""
 	// +kubebuilder:validation:MaxLength=22
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	// //(TODO) +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	// +optional
 	Name string `json:"name"`
 
 	// componentDefRef references componentDef defined in ClusterDefinition spec. Need to comply with IANA Service Naming rule.
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDefRef is immutable"
+	// //(TODO) +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDefRef is immutable"
 	// +optional
 	ComponentDefRef string `json:"componentDefRef,omitempty"`
 
@@ -337,7 +335,7 @@ type ClusterComponentSpec struct {
 	// If both componentDefRef and componentDef are provided, the componentDef will take precedence over componentDefRef.
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDef is immutable"
+	// //(TODO) +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDef is immutable"
 	// +optional
 	ComponentDef string `json:"componentDef,omitempty"`
 

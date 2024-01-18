@@ -60,12 +60,19 @@ type clusterTransformContext struct {
 	Client client.Reader
 	record.EventRecorder
 	logr.Logger
-	Cluster        *appsv1alpha1.Cluster
-	OrigCluster    *appsv1alpha1.Cluster
-	ClusterDef     *appsv1alpha1.ClusterDefinition
-	ClusterVer     *appsv1alpha1.ClusterVersion
-	ComponentSpecs []*appsv1alpha1.ClusterComponentSpec
-	ComponentDefs  map[string]*appsv1alpha1.ComponentDefinition
+	Cluster                *appsv1alpha1.Cluster
+	OrigCluster            *appsv1alpha1.Cluster
+	ClusterDef             *appsv1alpha1.ClusterDefinition
+	ClusterVer             *appsv1alpha1.ClusterVersion
+	ComponentDefs          map[string]*appsv1alpha1.ComponentDefinition
+	GenerateComponentSpecs []*GenerateComponentSpec
+}
+
+type GenerateComponentSpec struct {
+	ComponentSpec *appsv1alpha1.ClusterComponentSpec
+
+	// labels to be added to the component
+	Labels map[string]string
 }
 
 // clusterPlanBuilder a graph.PlanBuilder implementation for Cluster reconciliation

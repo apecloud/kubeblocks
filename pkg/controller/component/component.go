@@ -22,6 +22,7 @@ package component
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	"strconv"
 	"strings"
 	"time"
@@ -194,8 +195,8 @@ func getClusterCompSpec4Component(clusterDef *appsv1alpha1.ClusterDefinition, cl
 			return &cluster.Spec.ComponentSpecs[i], nil
 		}
 	}
-	for _, shardSpec := range cluster.Spec.ShardSpecs {
-		shardCompList := GenShardCompSpecList(&shardSpec)
+	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+		shardCompList := sharding.GenShardingCompSpecList(&shardingSpec)
 		for i, shardComp := range shardCompList {
 			if shardComp.Name == compName {
 				return shardCompList[i], nil
@@ -266,13 +267,13 @@ func CheckAndGetClusterComponents(ctx context.Context, cli client.Client, cluste
 
 // isShardComponent checks if the component is a shard component and returns the shard name.
 func isShardComponent(cluster *appsv1alpha1.Cluster, compName string) (bool, string) {
-	if cluster == nil || len(cluster.Spec.ShardSpecs) == 0 {
+	if cluster == nil || len(cluster.Spec.ShardingSpecs) == 0 {
 		return false, ""
 	}
-	for _, shardSpec := range cluster.Spec.ShardSpecs {
-		for _, shardComp := range GenShardCompSpecList(&shardSpec) {
+	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+		for _, shardComp := range sharding.GenShardingCompSpecList(&shardingSpec) {
 			if shardComp.Name == compName {
-				return true, shardSpec.Name
+				return true, shardingSpec.Name
 			}
 		}
 	}

@@ -169,23 +169,23 @@ func (t *clusterStatusTransformer) reconcileClusterStatus(transCtx *clusterTrans
 // removeInvalidCompStatus removes the invalid component of status.components which is deleted from spec.components.
 func (t *clusterStatusTransformer) removeInvalidCompStatus(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) {
 	// removes deleted components and keeps created components by simplified API
-	t.removeCompStatus(cluster, transCtx.ComponentSpecs)
+	t.removeCompStatus(cluster, transCtx.GenerateComponentSpecs)
 }
 
 // removeInnerCompStatus removes the component of status.components which is created by simplified API.
 func (t *clusterStatusTransformer) removeInnerCompStatus(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) {
-	compSpecs := make([]*appsv1alpha1.ClusterComponentSpec, 0)
-	compSpecs = append(compSpecs, transCtx.ComponentSpecs...)
-	t.removeCompStatus(cluster, compSpecs)
+	genCompSpecs := make([]*GenerateComponentSpec, 0)
+	genCompSpecs = append(genCompSpecs, transCtx.GenerateComponentSpecs...)
+	t.removeCompStatus(cluster, genCompSpecs)
 }
 
 // removeCompStatus removes the component of status.components which is not in comp specs.
-func (t *clusterStatusTransformer) removeCompStatus(cluster *appsv1alpha1.Cluster, compSpecs []*appsv1alpha1.ClusterComponentSpec) {
+func (t *clusterStatusTransformer) removeCompStatus(cluster *appsv1alpha1.Cluster, genCompSpecs []*GenerateComponentSpec) {
 	tmpCompsStatus := map[string]appsv1alpha1.ClusterComponentStatus{}
 	compsStatus := cluster.Status.Components
-	for _, v := range compSpecs {
-		if compStatus, ok := compsStatus[v.Name]; ok {
-			tmpCompsStatus[v.Name] = compStatus
+	for _, genComp := range genCompSpecs {
+		if compStatus, ok := compsStatus[genComp.ComponentSpec.Name]; ok {
+			tmpCompsStatus[genComp.ComponentSpec.Name] = compStatus
 		}
 	}
 	// keep valid components' status

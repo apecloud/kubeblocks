@@ -67,7 +67,6 @@ func (factory *MockClusterFactory) AddShardSpec(shardTplName string, compDefName
 	shardSpec := appsv1alpha1.ShardSpec{
 		Template: appsv1alpha1.ClusterComponentSpec{
 			ComponentDefRef: compDefName,
-			Name:            "fake",
 			Replicas:        1,
 		},
 		Name:   shardTplName,
@@ -81,7 +80,6 @@ func (factory *MockClusterFactory) AddShardSpecV2(shardTplName string, compDefNa
 	shardSpec := appsv1alpha1.ShardSpec{
 		Template: appsv1alpha1.ClusterComponentSpec{
 			ComponentDef: compDefName,
-			Name:         "fake",
 			Replicas:     1,
 		},
 		Name:   shardTplName,

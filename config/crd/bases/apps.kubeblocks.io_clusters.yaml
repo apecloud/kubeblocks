@@ -319,7 +319,6 @@ spec:
                         is required. //(TODO) +kubebuilder:validation:XValidation:rule="self
                         == oldSelf",message="name is immutable"
                       maxLength: 22
-                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     nodes:
                       description: Nodes defines the list of nodes that pods can schedule
@@ -1568,7 +1567,6 @@ spec:
                             it is required. //(TODO) +kubebuilder:validation:XValidation:rule="self
                             == oldSelf",message="name is immutable"
                           maxLength: 22
-                          pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                           type: string
                         nodes:
                           description: Nodes defines the list of nodes that pods can

@@ -35,8 +35,7 @@ import (
 )
 
 // BuildConfigManagerWithComponentForLorry inject the config manager service into Lorry container if configuration reload option is on
-func BuildConfigManagerWithComponentForLorry(podSpec *corev1.PodSpec, configSpecs []appsv1alpha1.ComponentConfigSpec, container *corev1.Container,
-	ctx context.Context, cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) error {
+func BuildConfigManagerWithComponentForLorry(container *corev1.Container, ctx context.Context, cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) error {
 	var buildParams *cfgcm.CfgManagerBuildParams
 
 	cli, err := kubernetes.GetControllerRuntimeClient()
@@ -44,7 +43,7 @@ func BuildConfigManagerWithComponentForLorry(podSpec *corev1.PodSpec, configSpec
 		return err
 	}
 
-	volumeDirs, usingConfigSpecs := getUsingVolumesByConfigSpecs(podSpec, configSpecs)
+	volumeDirs, usingConfigSpecs := getUsingVolumesByConfigSpecs(synthesizedComp.PodSpec, synthesizedComp.ConfigTemplates)
 	if len(volumeDirs) == 0 {
 		return nil
 	}
@@ -59,7 +58,7 @@ func BuildConfigManagerWithComponentForLorry(podSpec *corev1.PodSpec, configSpec
 		return nil
 	}
 
-	if buildParams, err = buildLorryConfigManagerParams(cli, ctx, cluster, synthesizedComp, configSpecMetas, volumeDirs, podSpec); err != nil {
+	if buildParams, err = buildLorryConfigManagerParams(cli, ctx, cluster, synthesizedComp, configSpecMetas, volumeDirs, synthesizedComp.PodSpec); err != nil {
 		return err
 	}
 	if buildParams == nil {
@@ -67,15 +66,15 @@ func BuildConfigManagerWithComponentForLorry(podSpec *corev1.PodSpec, configSpec
 	}
 
 	// This sidecar container will be able to view and signal processes from other containers
-	checkAndUpdateShareProcessNamespace(podSpec, buildParams, configSpecMetas)
+	checkAndUpdateShareProcessNamespace(synthesizedComp.PodSpec, buildParams, configSpecMetas)
 
 	// for lorry
 	buildConfigManagerForLorryContainer(container, buildParams, synthesizedComp)
 
 	updateEnvPath(container, buildParams)
-	updateCfgManagerVolumes(podSpec, buildParams)
+	updateCfgManagerVolumes(synthesizedComp.PodSpec, buildParams)
 	if len(buildParams.ToolsContainers) > 0 {
-		podSpec.InitContainers = append(podSpec.InitContainers, buildParams.ToolsContainers...)
+		synthesizedComp.PodSpec.InitContainers = append(synthesizedComp.PodSpec.InitContainers, buildParams.ToolsContainers...)
 	}
 
 	filter := func(c *corev1.Container) bool {

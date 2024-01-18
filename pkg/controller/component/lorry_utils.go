@@ -107,8 +107,7 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 	buildLorryServiceContainer(synthesizeComp, &lorryContainers[0], int(lorryHTTPPort), int(lorryGRPCPort), clusterCompSpec)
 
 	// build config manager service for lorry
-	err = configuration.BuildConfigManagerWithComponentForLorry(synthesizeComp.PodSpec, synthesizeComp.ConfigTemplates, &lorryContainers[0],
-		reqCtx.Ctx, cluster, synthesizeComp)
+	err = configuration.BuildConfigManagerWithComponentForLorry(&lorryContainers[0], reqCtx.Ctx, cluster, synthesizeComp)
 	if err != nil {
 		reqCtx.Log.Info("build config manager for lorry failed", "error", err)
 		return err

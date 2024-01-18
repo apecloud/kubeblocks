@@ -20,10 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"github.com/apecloud/kubeblocks/cmd/reloader/app"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -118,6 +121,12 @@ func main() {
 	err = httpServer.StartNonBlocking()
 	if err != nil {
 		panic(errors.Wrap(err, "HTTP server initialize failed"))
+	}
+
+	cmd := app.NewConfigManagerCommand(context.Background(), filepath.Base(os.Args[0]))
+	if err = cmd.Execute(); err != nil && !errors.Is(errors.Cause(err), context.Canceled) {
+		fmt.Println(err)
+		os.Exit(-1)
 	}
 
 	stop := make(chan os.Signal, 1)

@@ -121,7 +121,12 @@ func getOrBuildComponentDefinition(ctx context.Context, cli client.Reader,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ComponentDefinition, error) {
 	if len(cluster.Spec.ClusterDefRef) > 0 && len(clusterCompSpec.ComponentDefRef) > 0 {
-		return BuildComponentDefinition(clusterDef, clusterVer, clusterCompSpec)
+		compDef, err := BuildComponentDefinition(clusterDef, clusterVer, clusterCompSpec)
+		if err != nil {
+			return nil, err
+		}
+		addPodHeadlessServiceIfNeed(cluster, compDef, clusterCompSpec.Name)
+		return compDef, nil
 	}
 	if len(clusterCompSpec.ComponentDef) > 0 {
 		compDef := &appsv1alpha1.ComponentDefinition{}
@@ -131,6 +136,39 @@ func getOrBuildComponentDefinition(ctx context.Context, cli client.Reader,
 		return compDef, nil
 	}
 	return nil, fmt.Errorf("the component definition is not provided")
+}
+
+func addPodHeadlessServiceIfNeed(cluster *appsv1alpha1.Cluster, compDef *appsv1alpha1.ComponentDefinition, compName string) {
+	services := compDef.Spec.Services
+	enablePodOrdinalSvcCompList, ok := cluster.Annotations[constant.PodOrdinalSvcAnnotationKey]
+	if !ok {
+		return
+	}
+	var generatePodService bool
+	for _, comp := range strings.Split(enablePodOrdinalSvcCompList, ",") {
+		if comp == compName {
+			generatePodService = true
+			break
+		}
+	}
+	if !generatePodService {
+		return
+	}
+	var podHeadlessService *appsv1alpha1.ComponentService
+	for _, service := range services {
+		if service.Name == "headless" {
+			podHeadlessService = service.DeepCopy()
+
+		}
+	}
+	if podHeadlessService == nil {
+		return
+	}
+	podHeadlessService.GeneratePodOrdinalService = true
+	podHeadlessService.RoleSelector = ""
+	podHeadlessService.Name = "pod-headless"
+	podHeadlessService.ServiceName = ""
+	compDef.Spec.Services = append(services, *podHeadlessService)
 }
 
 func getClusterReferencedResources(ctx context.Context, cli client.Reader,

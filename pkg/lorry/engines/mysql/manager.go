@@ -130,7 +130,7 @@ func (mgr *Manager) IsDBStartupReady() bool {
 func (mgr *Manager) IsReadonly(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
 	db, err := mgr.GetMemberConnection(cluster, member)
 	if err != nil {
-		mgr.Logger.Error(err, "Get Member conn failed")
+		mgr.Logger.Info("Get Member conn failed", "error", err.Error())
 		return false, err
 	}
 
@@ -140,7 +140,7 @@ func (mgr *Manager) IsReadonly(ctx context.Context, cluster *dcs.Cluster, member
 		Scan(&mgr.hostname, &mgr.version, &readonly, &mgr.binlogFormat,
 			&mgr.logbinEnabled, &mgr.logReplicationUpdatesEnabled)
 	if err != nil {
-		mgr.Logger.Error(err, "Get global readonly failed")
+		mgr.Logger.Info("Get global readonly failed", "error", err.Error())
 		return false, err
 	}
 	return readonly, nil
@@ -206,14 +206,14 @@ func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, m
 	var leaderDBState *dcs.DBState
 	if cluster.Leader == nil || cluster.Leader.DBState == nil {
 		mgr.Logger.Info("No leader DBState info")
-		return false, 0
+		return true, 0
 	}
 	leaderDBState = cluster.Leader.DBState
 
 	db, err := mgr.GetMemberConnection(cluster, member)
 	if err != nil {
 		mgr.Logger.Info("Get Member conn failed", "error", err)
-		return false, 0
+		return true, 0
 	}
 
 	opTimestamp, err := mgr.GetOpTimestamp(ctx, db)

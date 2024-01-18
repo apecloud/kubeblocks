@@ -243,6 +243,8 @@ func (ha *Ha) Start() {
 			if err != nil {
 				ha.logger.Error(err, "Cluster initialize failed")
 			}
+		} else if err != nil {
+			ha.logger.Info("Initialize the database cluster Failed.", "error", err.Error())
 		}
 		time.Sleep(5 * time.Second)
 		isInitialized, err = ha.dbManager.IsClusterInitialized(context.TODO(), cluster)

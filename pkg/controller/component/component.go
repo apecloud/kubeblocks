@@ -22,7 +22,6 @@ package component
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	"strconv"
 	"strings"
 	"time"
@@ -35,6 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 

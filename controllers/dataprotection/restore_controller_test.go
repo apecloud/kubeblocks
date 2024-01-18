@@ -40,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("Restore Controller test", func() {
@@ -161,6 +162,8 @@ var _ = Describe("Restore Controller test", func() {
 				client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
 				client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
 			for _, v := range jobList.Items {
+				Expect(v.Spec.Template.Spec.ServiceAccountName).WithOffset(1).
+					Should(Equal(viper.GetString(dptypes.CfgKeyWorkerServiceAccountName)))
 				testdp.PatchK8sJobStatus(&testCtx, client.ObjectKeyFromObject(&v), batchv1.JobComplete)
 			}
 		}

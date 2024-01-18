@@ -25,6 +25,12 @@ const AppName = "kubeblocks-dataprotection"
 const (
 	// CfgKeyGCFrequencySeconds is the key of gc frequency, its unit is second
 	CfgKeyGCFrequencySeconds = "GC_FREQUENCY_SECONDS"
+	// CfgKeyWorkerServiceAccountName is the key of service account name for worker
+	CfgKeyWorkerServiceAccountName = "WORKER_SERVICE_ACCOUNT_NAME"
+	// CfgKeyWorkerServiceAccountAnnotations is the key of annotations for the service account of the worker
+	CfgKeyWorkerServiceAccountAnnotations = "WORKER_SERVICE_ACCOUNT_ANNOTATIONS"
+	// CfgKeyWorkerClusterRoleName is the key of cluster role name for binding the service account of the worker
+	CfgKeyWorkerClusterRoleName = "WORKER_CLUSTER_ROLE_NAME"
 )
 
 // config default values

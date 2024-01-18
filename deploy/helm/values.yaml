@@ -308,6 +308,18 @@ dataProtection:
   encryptionKey: ""
   gcFrequencySeconds: 3600
 
+  worker:
+    serviceAccount:
+      # The name of the service account for worker pods.
+      # ServiceAccount resources will be created in every namespace where a worker pod needs to run.
+      # If not set, a name is generated using the fullname template.
+      name: ""
+
+      # Extra annotations when creating service accounts.
+      # This field is primarily for associating IAM roles in cloud environments.
+      # e.g. EKS associates IAM roles by adding the "eks.amazonaws.com/role-arn" annotation.
+      annotations: {}
+
   image:
     # if the value of dataProtection.image.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
     registry: ""

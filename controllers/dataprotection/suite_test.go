@@ -47,6 +47,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -84,6 +85,9 @@ var _ = BeforeSuite(func() {
 
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks:latest")
+	viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountName, "kb-kubeblocks-dataprotection-worker")
+	viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountAnnotations, `{"role-arn":"arn:xxx:xxx"}`)
+	viper.SetDefault(dptypes.CfgKeyWorkerClusterRoleName, "kb-kubeblocks-dataprotection-worker-role")
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{

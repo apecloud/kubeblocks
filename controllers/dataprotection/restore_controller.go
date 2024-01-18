@@ -59,6 +59,8 @@ type RestoreReconciler struct {
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restores/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restores/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
 
 func (r *RestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	reqCtx := intctrlutil.RequestCtx{
@@ -175,6 +177,13 @@ func (r *RestoreReconciler) inProgressAction(reqCtx intctrlutil.RequestCtx, rest
 	// skip processing for ErrorTypeWaitForExternalHandler when Restore is Running
 	if intctrlutil.IsTargetError(err, dperrors.ErrorTypeWaitForExternalHandler) {
 		return intctrlutil.Reconciled()
+	}
+	if err == nil {
+		var saName string
+		saName, err = EnsureWorkerServiceAccount(reqCtx, r.Client, restore.Namespace)
+		if err == nil {
+			restoreMgr.WorkerServiceAccount = saName
+		}
 	}
 	if err == nil {
 		// handle restore actions

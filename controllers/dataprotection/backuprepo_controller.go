@@ -155,6 +155,10 @@ type BackupRepoReconciler struct {
 // create or delete Jobs
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
+// manage service accounts for worker
+// +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
+
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 //
@@ -625,13 +629,17 @@ func (r *BackupRepoReconciler) preCheckRepo(reconCtx *reconcileContext) (err err
 		}
 		r.updateConditionInDefer(reconCtx.Ctx, reconCtx.repo, ConditionTypePreCheckPassed, reason, &status, &message, &err)
 	}()
+
+	namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+	saName := viper.GetString(dptypes.CfgKeyWorkerServiceAccountName)
+
 	var job *batchv1.Job
 	var pvc *corev1.PersistentVolumeClaim
 	switch {
 	case reconCtx.repo.AccessByMount():
-		job, pvc, err = r.runPreCheckJobForMounting(reconCtx)
+		job, pvc, err = r.runPreCheckJobForMounting(reconCtx, namespace, saName)
 	case reconCtx.repo.AccessByTool():
-		job, err = r.runPreCheckJobForTool(reconCtx)
+		job, err = r.runPreCheckJobForTool(reconCtx, namespace, saName)
 	default:
 		err = fmt.Errorf("unknown access method: %s", reconCtx.repo.Spec.AccessMethod)
 	}
@@ -705,8 +713,7 @@ func (r *BackupRepoReconciler) removePreCheckResources(reconCtx *reconcileContex
 	return nil
 }
 
-func (r *BackupRepoReconciler) runPreCheckJobForMounting(reconCtx *reconcileContext) (job *batchv1.Job, pvc *corev1.PersistentVolumeClaim, err error) {
-	namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+func (r *BackupRepoReconciler) runPreCheckJobForMounting(reconCtx *reconcileContext, namespace string, saName string) (job *batchv1.Job, pvc *corev1.PersistentVolumeClaim, err error) {
 	// create PVC
 	pvcName := reconCtx.preCheckResourceName()
 	pvc, err = r.createRepoPVC(reconCtx, pvcName, namespace, map[string]string{
@@ -744,6 +751,7 @@ func (r *BackupRepoReconciler) runPreCheckJobForMounting(reconCtx *reconcileCont
 							},
 						},
 					}},
+					ServiceAccountName: saName,
 				},
 			},
 			BackoffLimit: pointer.Int32(2),
@@ -775,8 +783,7 @@ func (r *BackupRepoReconciler) runPreCheckJobForMounting(reconCtx *reconcileCont
 	return job, pvc, nil
 }
 
-func (r *BackupRepoReconciler) runPreCheckJobForTool(reconCtx *reconcileContext) (job *batchv1.Job, err error) {
-	namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+func (r *BackupRepoReconciler) runPreCheckJobForTool(reconCtx *reconcileContext, namespace string, saName string) (job *batchv1.Job, err error) {
 	// create tool config
 	secretName := reconCtx.preCheckResourceName()
 	secret, err := r.createToolConfigSecret(reconCtx, secretName, namespace, map[string]string{
@@ -806,6 +813,7 @@ export PATH="$PATH:$DP_DATASAFED_BIN_PATH"
 echo "pre-check" | datasafed push - /precheck.txt`,
 						},
 					}},
+					ServiceAccountName: saName,
 				},
 			},
 			BackoffLimit: pointer.Int32(2),

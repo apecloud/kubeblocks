@@ -100,6 +100,9 @@ func init() {
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(dptypes.CfgKeyGCFrequencySeconds, dptypes.DefaultGCFrequencySeconds)
+	viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountName, "kb-kubeblocks-dataprotection-worker")
+	viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountAnnotations, "{}")
+	viper.SetDefault(dptypes.CfgKeyWorkerClusterRoleName, "kb-kubeblocks-dataprotection-worker-role")
 }
 
 func main() {
@@ -334,6 +337,14 @@ func validateRequiredToParseConfigs() error {
 		return json.Unmarshal([]byte(val), &affinity)
 	}
 
+	validateWorkerServiceAccountAnnotations := func(val string) error {
+		if val == "" {
+			return nil
+		}
+		annotations := map[string]string{}
+		return json.Unmarshal([]byte(val), &annotations)
+	}
+
 	if err := validateTolerations(viper.GetString(constant.CfgKeyCtrlrMgrTolerations)); err != nil {
 		return err
 	}
@@ -345,6 +356,9 @@ func validateRequiredToParseConfigs() error {
 		if err := json.Unmarshal([]byte(cmNodeSelector), &nodeSelector); err != nil {
 			return err
 		}
+	}
+	if err := validateWorkerServiceAccountAnnotations(viper.GetString(dptypes.CfgKeyWorkerServiceAccountAnnotations)); err != nil {
+		return err
 	}
 	return nil
 }

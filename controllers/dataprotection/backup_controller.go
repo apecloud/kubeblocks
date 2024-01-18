@@ -77,6 +77,9 @@ type BackupReconciler struct {
 // +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshotclasses,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshotclasses/finalizers,verbs=update;patch
 
+// +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
+
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the backup closer to the desired state.
 func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -169,6 +172,12 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 		Client:     r.Client,
 		Scheme:     r.Scheme,
 	}
+
+	saName, err := EnsureWorkerServiceAccount(reqCtx, r.Client, backup.Namespace)
+	if err != nil {
+		return fmt.Errorf("failed to get worker service account: %w", err)
+	}
+	deleter.WorkerServiceAccount = saName
 
 	status, err := deleter.DeleteBackupFiles(backup)
 	switch status {
@@ -317,6 +326,13 @@ func (r *BackupReconciler) prepareBackupRequest(
 			backupPolicy.Namespace, backupPolicy.Name)
 	}
 	request.TargetPods = targetPods
+
+	saName, err := EnsureWorkerServiceAccount(reqCtx, r.Client, backup.Namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get worker service account: %w", err)
+	}
+	request.WorkerServiceAccount = saName
+
 	return request, nil
 }
 

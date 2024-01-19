@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -197,18 +198,33 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 	}
 
 	cluster := &Cluster{
-		ClusterCompName: store.clusterCompName,
-		Namespace:       store.namespace,
-		Replicas:        replicas,
-		Members:         members,
-		Leader:          leader,
-		Switchover:      switchover,
-		HaConfig:        haConfig,
-		resource:        clusterResource,
+		ClusterCompName:   store.clusterCompName,
+		Namespace:         store.namespace,
+		Replicas:          replicas,
+		Members:           members,
+		Leader:            leader,
+		Switchover:        switchover,
+		HaConfig:          haConfig,
+		HasPodHeadlessSvc: store.HasPodDedicatedHeadlessSvc(clusterResource),
+		resource:          clusterResource,
 	}
 
 	store.cluster = cluster
 	return cluster, nil
+}
+
+func (store *KubernetesStore) HasPodDedicatedHeadlessSvc(cluster *appsv1alpha1.Cluster) bool {
+	var hasPodDedicatedHeadlessSvc bool
+	enablePodOrdinalSvcCompList, ok := cluster.Annotations[constant.PodOrdinalSvcAnnotationKey]
+	if ok {
+		for _, comp := range strings.Split(enablePodOrdinalSvcCompList, ",") {
+			if comp == store.componentName {
+				hasPodDedicatedHeadlessSvc = true
+				break
+			}
+		}
+	}
+	return hasPodDedicatedHeadlessSvc
 }
 
 func (store *KubernetesStore) GetMembers() ([]Member, error) {

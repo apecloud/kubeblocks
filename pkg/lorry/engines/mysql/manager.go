@@ -32,6 +32,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type Manager struct {
@@ -423,23 +424,9 @@ func (mgr *Manager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string
 // IsClusterInitialized is a method to check if cluster is initialized or not
 func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	if cluster != nil {
-		// The maximum length of the server addr is 255 characters. Before MySQL 8.0.17 it was 60 characters.
-		var version string
-		err := mgr.DB.QueryRowContext(ctx, "select version()").Scan(&version)
-		if err != nil {
-			mgr.Logger.Info("Get version failed", "error", err)
-			return false, err
-		}
-		currentMemberName := mgr.GetCurrentMemberName()
-		member := cluster.GetMemberWithName(currentMemberName)
-		addr := cluster.GetMemberShortAddr(*member)
-		maxLength := 255
-		if IsSmallerVersion(version, "8.0.17") {
-			maxLength = 60
-		}
-
-		if len(addr) > maxLength {
-			return false, errors.Errorf("The length of the member address must be less than or equal to %d", maxLength)
+		isValid, err := mgr.ValidateAddr(ctx, cluster)
+		if err != nil || !isValid {
+			return isValid, err
 		}
 	}
 
@@ -448,6 +435,34 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 		return false, err
 	}
 	return mgr.EnsureServerID(ctx)
+}
+func (mgr *Manager) GetMemberAddr(cluster *dcs.Cluster, member *dcs.Member) string {
+	if cluster.HasPodHeadlessSvc {
+		return member.Name
+	}
+	return cluster.GetMemberShortAddr(*member)
+}
+
+func (mgr *Manager) ValidateAddr(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
+	// The maximum length of the server addr is 255 characters. Before MySQL 8.0.17 it was 60 characters.
+	var version string
+	err := mgr.DB.QueryRowContext(ctx, "select version()").Scan(&version)
+	if err != nil {
+		mgr.Logger.Info("Get version failed", "error", err)
+		return false, err
+	}
+	currentMemberName := mgr.GetCurrentMemberName()
+	member := cluster.GetMemberWithName(currentMemberName)
+	addr := mgr.GetMemberAddr(cluster, member)
+	maxLength := 255
+	if IsSmallerVersion(version, "8.0.17") {
+		maxLength = 60
+	}
+
+	if len(addr) > maxLength {
+		return false, errors.Errorf("The length of the member address must be less than or equal to %d", maxLength)
+	}
+	return util.CheckDNSReadyWithRetry(addr, 60)
 }
 
 func (mgr *Manager) EnsureServerID(ctx context.Context) (bool, error) {
@@ -568,7 +583,7 @@ func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 
 	stopSlave := `stop slave;`
 	// MySQL 5.7 has a limitation where the length of the master_host cannot exceed 60 characters.
-	masterHost := cluster.GetMemberShortAddr(*leaderMember)
+	masterHost := mgr.GetMemberAddr(cluster, leaderMember)
 	changeMaster := fmt.Sprintf(`change master to master_host='%s',master_user='%s',master_password='%s',master_port=%s,master_auto_position=1;`,
 		masterHost, config.Username, config.password, leaderMember.DBPort)
 	startSlave := `start slave;`

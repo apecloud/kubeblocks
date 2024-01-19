@@ -196,9 +196,9 @@ sidebar_label: 添加数据库引擎
 
     这是一个 placeholder, 用来指代前文中提到的 Connection credential Secret。
 
-- ClusterVersion
+- `clusterVersion.yaml`
 
-   所有版本相关的信息都配置在 `ClusterVersion.yaml` 中。
+   所有版本相关的信息都配置在 `clusterVersion.yaml` 中。
    
    现在可以为每一个 Component 需要的每一个 container 补充 image 信息。
 

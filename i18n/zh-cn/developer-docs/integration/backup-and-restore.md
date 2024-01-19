@@ -276,7 +276,7 @@ KubeBlocks 支持备份到本地和云上对象存储。这里展示如何备份
 
 ## 参考资料
 
-- 关于 KubeBlocks 的备份恢复功能，可参考[备份恢复](./../../user-docs/backup-and-restore/overview.md)。
+- 关于 KubeBlocks 的备份恢复功能，可参考[备份恢复](./../../user-docs/backup-and-restore/overview.md)文档。
 
 ## 附录
 

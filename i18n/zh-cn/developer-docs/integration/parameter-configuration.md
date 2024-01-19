@@ -148,7 +148,6 @@ Table 1. 总结了 4 种常见的动态刷参方式。相应的，KubeBlocks 也
 
   本例选择 `tplScriptTrigger`，通过定义模板文件中的内容来配置参数。
 
-
   ```bash
     reloadOptions:
       tplScriptTrigger:                                 # 通过模板文件刷参

@@ -32,7 +32,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type Manager struct {
@@ -462,7 +461,7 @@ func (mgr *Manager) ValidateAddr(ctx context.Context, cluster *dcs.Cluster) (boo
 	if len(addr) > maxLength {
 		return false, errors.Errorf("The length of the member address must be less than or equal to %d", maxLength)
 	}
-	return util.CheckDNSReadyWithRetry(addr, 60)
+	return true, nil
 }
 
 func (mgr *Manager) EnsureServerID(ctx context.Context) (bool, error) {
@@ -586,6 +585,7 @@ func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 	masterHost := mgr.GetMemberAddr(cluster, leaderMember)
 	changeMaster := fmt.Sprintf(`change master to master_host='%s',master_user='%s',master_password='%s',master_port=%s,master_auto_position=1;`,
 		masterHost, config.Username, config.password, leaderMember.DBPort)
+	mgr.Logger.Info("follow new leader", "changemaster", changeMaster)
 	startSlave := `start slave;`
 
 	_, err := mgr.DB.Exec(stopSlave + changeMaster + startSlave)

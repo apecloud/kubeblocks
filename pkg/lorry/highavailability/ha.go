@@ -221,7 +221,7 @@ func (ha *Ha) Start() {
 	}
 
 	if !ha.disableDNSChecker {
-		util.WaitForPodReady()
+		util.WaitForPodReady(cluster.HasPodHeadlessSvc)
 	}
 
 	ha.logger.Info(fmt.Sprintf("cluster: %v", cluster))

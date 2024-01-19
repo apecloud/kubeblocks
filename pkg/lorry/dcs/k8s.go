@@ -164,10 +164,15 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 		return nil, err
 	}
 
+	hasPodHeadlessSvc := store.HasPodDedicatedHeadlessSvc(clusterResource)
 	var replicas int32
 	for _, component := range clusterResource.Spec.ComponentSpecs {
 		if component.Name == store.componentName {
 			replicas = component.Replicas
+			// only support old api now
+			if component.ComponentDef != "" {
+				hasPodHeadlessSvc = false
+			}
 			break
 		}
 	}
@@ -205,7 +210,7 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 		Leader:            leader,
 		Switchover:        switchover,
 		HaConfig:          haConfig,
-		HasPodHeadlessSvc: store.HasPodDedicatedHeadlessSvc(clusterResource),
+		HasPodHeadlessSvc: hasPodHeadlessSvc,
 		resource:          clusterResource,
 	}
 

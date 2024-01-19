@@ -29,7 +29,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -155,7 +154,7 @@ func isGeneratedComponent(cluster *appsv1alpha1.Cluster,
 	}
 
 	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		if slices.Contains(sharding.GenShardNameList(&shardingSpec), compName) {
+		if slices.Contains(ictrlutil.GenShardNameList(&shardingSpec), compName) {
 			return validateCompDef(shardingSpec.Template.ComponentDef)
 		}
 	}

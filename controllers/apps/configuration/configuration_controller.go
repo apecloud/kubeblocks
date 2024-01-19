@@ -35,6 +35,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -89,7 +90,7 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	fetcherTask := &Task{}
-	err := fetcherTask.Init(&intctrlutil.ResourceCtx{
+	err := fetcherTask.Init(&configctrl.ResourceCtx{
 		Context:       ctx,
 		Client:        r.Client,
 		Namespace:     configuration.Namespace,

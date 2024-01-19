@@ -28,7 +28,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // ClusterAPINormalizationTransformer handles cluster and component API conversion.
@@ -55,7 +55,7 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	}
 	for i := range cluster.Spec.ShardingSpecs {
 		shardingSpec := cluster.Spec.ShardingSpecs[i]
-		genShardingCompSpecList := sharding.GenShardingCompSpecList(&shardingSpec)
+		genShardingCompSpecList := controllerutil.GenShardingCompSpecList(&shardingSpec)
 		for j := range genShardingCompSpecList {
 			genShardCompSpec := genShardingCompSpecList[j]
 			transCtx.GenerateComponentSpecs = append(transCtx.GenerateComponentSpecs, &GenerateComponentSpec{

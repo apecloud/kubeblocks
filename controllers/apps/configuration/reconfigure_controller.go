@@ -40,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -181,7 +182,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 	}
 
 	reconcileContext := newConfigReconcileContext(
-		&intctrlutil.ResourceCtx{
+		&configctrl.ResourceCtx{
 			Context:       reqCtx.Ctx,
 			Client:        r.Client,
 			Namespace:     configMap.Namespace,

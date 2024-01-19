@@ -25,7 +25,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
-	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -54,12 +54,12 @@ type pipeline struct {
 	configSpec       *appsv1alpha1.ComponentConfigSpec
 
 	reconfigureContext
-	intctrlutil.ResourceFetcher[pipeline]
+	configctrl.ResourceFetcher[pipeline]
 }
 
 func newPipeline(ctx reconfigureContext) *pipeline {
 	pipeline := &pipeline{reconfigureContext: ctx}
-	pipeline.Init(&intctrlutil.ResourceCtx{
+	pipeline.Init(&configctrl.ResourceCtx{
 		Client:        ctx.cli,
 		Context:       ctx.reqCtx.Ctx,
 		Namespace:     ctx.resource.OpsRequest.Namespace,
@@ -162,7 +162,7 @@ func (p *pipeline) createUpdatePatch(item *appsv1alpha1.ConfigurationItemDetail,
 		return nil
 	}
 
-	updatedData, err := configuration.DoMerge(p.ConfigMapObj.Data, item.ConfigFileParams, p.configConstraint, *configSpec)
+	updatedData, err := configctrl.DoMerge(p.ConfigMapObj.Data, item.ConfigFileParams, p.configConstraint, *configSpec)
 	if err != nil {
 		p.isFailed = true
 		return err

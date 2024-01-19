@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package controllerutil
+package configuration
 
 import (
 	"context"
@@ -27,7 +27,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
-	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type ResourceCtx struct {
@@ -109,21 +109,7 @@ func (r *ResourceFetcher[T]) ClusterVer() *T {
 
 func (r *ResourceFetcher[T]) ClusterComponent() *T {
 	return r.Wrap(func() (err error) {
-		r.ClusterComObj = r.ClusterObj.Spec.GetComponentByName(r.ComponentName)
-		if r.ClusterComObj != nil {
-			return
-		}
-		for _, shardingSpec := range r.ClusterObj.Spec.ShardingSpecs {
-			shardTpl := shardingSpec.Template
-			for i := 0; i < int(shardingSpec.Shards); i++ {
-				shardCompSpec := shardTpl.DeepCopy()
-				shardCompSpec.Name = constant.GenerateShardName(shardingSpec.Name, i)
-				if shardCompSpec.Name == r.ComponentName {
-					r.ClusterComObj = shardCompSpec
-					return
-				}
-			}
-		}
+		r.ClusterComObj = controllerutil.GetOriginalOrGeneratedComponentSpecByName(r.ClusterObj, r.ComponentName)
 		return
 	})
 }

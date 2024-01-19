@@ -34,7 +34,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -188,18 +187,9 @@ func getClusterCompSpec4Component(clusterDef *appsv1alpha1.ClusterDefinition, cl
 	if err != nil {
 		return nil, err
 	}
-	for i, spec := range cluster.Spec.ComponentSpecs {
-		if spec.Name == compName {
-			return &cluster.Spec.ComponentSpecs[i], nil
-		}
-	}
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		shardCompList := sharding.GenShardingCompSpecList(&shardingSpec)
-		for i, shardComp := range shardCompList {
-			if shardComp.Name == compName {
-				return shardCompList[i], nil
-			}
-		}
+	compSpec := intctrlutil.GetOriginalOrGeneratedComponentSpecByName(cluster, compName)
+	if compSpec != nil {
+		return compSpec, nil
 	}
 	return apiconversion.HandleSimplifiedClusterAPI(clusterDef, cluster), nil
 }

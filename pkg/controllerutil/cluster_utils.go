@@ -17,28 +17,26 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package plan
+package controllerutil
 
 import (
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 )
 
-// RenderConfigNScriptFiles generates volumes for PodTemplate, volumeMount for container, rendered configTemplate and scriptTemplate,
-// and generates configManager sidecar for the reconfigure operation.
-func RenderConfigNScriptFiles(resourceCtx *configuration.ResourceCtx,
-	cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent,
-	podSpec *corev1.PodSpec,
-	localObjs []client.Object) error {
-	return configuration.NewConfigReconcileTask(
-		resourceCtx,
-		cluster,
-		component,
-		podSpec,
-		localObjs).Reconcile()
+// GetOriginalOrGeneratedComponentSpecByName get an original or generated cluster component spec by componentName.
+func GetOriginalOrGeneratedComponentSpecByName(cluster *appsv1alpha1.Cluster, componentName string) *appsv1alpha1.ClusterComponentSpec {
+	compSpec := cluster.Spec.GetComponentByName(componentName)
+	if compSpec != nil {
+		return compSpec
+	}
+	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+		genShardingCompList := GenShardingCompSpecList(&shardingSpec)
+		for i, shardingComp := range genShardingCompList {
+			if shardingComp.Name == componentName {
+				compSpec = genShardingCompList[i]
+				return compSpec
+			}
+		}
+	}
+	return nil
 }

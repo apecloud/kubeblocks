@@ -168,7 +168,7 @@ func addPodHeadlessServiceIfNeed(cluster *appsv1alpha1.Cluster, compDef *appsv1a
 	podHeadlessService.RoleSelector = ""
 	podHeadlessService.Name = "pod-headless"
 	podHeadlessService.ServiceName = ""
-	compDef.Spec.Services = append(services, *podHeadlessService)
+	compDef.Spec.Services = append(compDef.Spec.Services, *podHeadlessService)
 }
 
 func getClusterReferencedResources(ctx context.Context, cli client.Reader,

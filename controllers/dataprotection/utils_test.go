@@ -53,9 +53,9 @@ var _ = Describe("test EnsureWorkerServiceAccount", func() {
 	}
 
 	const (
-		defaultWorkerServiceAccountName        = "kubeblocks-dataprotection-worker"
+		defaultWorkerServiceAccountName        = "sa-name"
 		defaultWorkerServiceAccountAnnotations = `{"role-arn": "arn:xxx:xxx"}`
-		defaultWorkerClusterRoleName           = "kubeblocks-dataprotection-worker-role"
+		defaultWorkerClusterRoleName           = "worker-role"
 	)
 
 	var (
@@ -140,6 +140,14 @@ var _ = Describe("test EnsureWorkerServiceAccount", func() {
 	})
 
 	Context("testing invalid argument", func() {
+		updateDefaultEnv := func(key string, value string) func() {
+			old := viper.GetString(key)
+			viper.SetDefault(key, value)
+			return func() {
+				viper.SetDefault(key, old)
+			}
+		}
+
 		It("should return error if namespace is empty", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			_, err := EnsureWorkerServiceAccount(reqCtx, testCtx.Cli, "")
@@ -148,7 +156,7 @@ var _ = Describe("test EnsureWorkerServiceAccount", func() {
 		})
 
 		It("should return error if CfgKeyWorkerServiceAccountName is empty", func() {
-			viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountName, "")
+			defer updateDefaultEnv(dptypes.CfgKeyWorkerServiceAccountName, "")()
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			_, err := EnsureWorkerServiceAccount(reqCtx, testCtx.Cli, testCtx.DefaultNamespace)
 			Expect(err).To(HaveOccurred())
@@ -156,7 +164,7 @@ var _ = Describe("test EnsureWorkerServiceAccount", func() {
 		})
 
 		It("should return error if CfgKeyWorkerServiceAccountAnnotations is invalid json", func() {
-			viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountAnnotations, `{"bad": "json`)
+			defer updateDefaultEnv(dptypes.CfgKeyWorkerServiceAccountAnnotations, `{"bad": "json`)()
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			_, err := EnsureWorkerServiceAccount(reqCtx, testCtx.Cli, testCtx.DefaultNamespace)
 			Expect(err).To(HaveOccurred())
@@ -164,7 +172,7 @@ var _ = Describe("test EnsureWorkerServiceAccount", func() {
 		})
 
 		It("should return error if CfgKeyWorkerClusterRoleName is empty", func() {
-			viper.SetDefault(dptypes.CfgKeyWorkerClusterRoleName, "")
+			defer updateDefaultEnv(dptypes.CfgKeyWorkerClusterRoleName, "")()
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			_, err := EnsureWorkerServiceAccount(reqCtx, testCtx.Cli, testCtx.DefaultNamespace)
 			Expect(err).To(HaveOccurred())

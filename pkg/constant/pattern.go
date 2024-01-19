@@ -128,6 +128,6 @@ func GenerateResourceNameWithScalingSuffix(name string) string {
 }
 
 // GenerateShardName generates the shard component name.
-func GenerateShardName(shardTplName string, ordinal int) string {
-	return fmt.Sprintf("%s-%d", shardTplName, ordinal)
+func GenerateShardName(shardingName string, ordinal int) string {
+	return fmt.Sprintf("%s-%d", shardingName, ordinal)
 }

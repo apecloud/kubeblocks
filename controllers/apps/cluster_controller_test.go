@@ -556,7 +556,7 @@ var _ = Describe("Cluster Controller", func() {
 					})
 					g.Expect(idx >= 0).To(BeTrue())
 					svc := services[idx]
-					g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.KBAppShardTemplateNameLabelKey, compName))
+					g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.KBAppShardingNameLabelKey, compName))
 					validateSvc(svc, svcSpec)
 				}
 				g.Expect(len(expectServices)).Should(Equal(len(services)))

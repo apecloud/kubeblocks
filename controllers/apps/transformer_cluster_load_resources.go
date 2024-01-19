@@ -121,7 +121,7 @@ func (t *clusterLoadRefResourcesTransformer) allCompDefRefs(cluster *appsv1alpha
 		if len(shardingSpec.Template.ComponentDef) == 0 {
 			continue
 		}
-		for i := 1; i < int(shardingSpec.Shards); i++ {
+		for i := 0; i < int(shardingSpec.Shards); i++ {
 			refs = append(refs, shardingSpec.Template.ComponentDef)
 		}
 	}
@@ -134,7 +134,7 @@ func (t *clusterLoadRefResourcesTransformer) allCompSpecs(cluster *appsv1alpha1.
 		specs = append(specs, compSpec.Name)
 	}
 	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		for i := 1; i < int(shardingSpec.Shards); i++ {
+		for i := 0; i < int(shardingSpec.Shards); i++ {
 			shardName := constant.GenerateShardName(shardingSpec.Name, i)
 			specs = append(specs, shardName)
 		}

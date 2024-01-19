@@ -60,7 +60,7 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 			genShardCompSpec := genShardingCompSpecList[j]
 			transCtx.GenerateComponentSpecs = append(transCtx.GenerateComponentSpecs, &GenerateComponentSpec{
 				ComponentSpec: genShardCompSpec,
-				Labels:        constant.GetShardTemplateNameLabel(shardingSpec.Name),
+				Labels:        constant.GetShardingNameLabel(shardingSpec.Name),
 			})
 		}
 	}

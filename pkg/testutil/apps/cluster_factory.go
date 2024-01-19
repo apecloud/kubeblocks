@@ -63,28 +63,28 @@ func (factory *MockClusterFactory) AddClusterToleration(toleration corev1.Tolera
 	return factory
 }
 
-func (factory *MockClusterFactory) AddShardSpec(shardTplName string, compDefName string) *MockClusterFactory {
+func (factory *MockClusterFactory) AddShardSpec(shardingName string, compDefName string) *MockClusterFactory {
 	shardingSpec := appsv1alpha1.ShardingSpec{
 		Template: appsv1alpha1.ClusterComponentSpec{
 			Name:            "fake",
 			ComponentDefRef: compDefName,
 			Replicas:        1,
 		},
-		Name:   shardTplName,
+		Name:   shardingName,
 		Shards: 1,
 	}
 	factory.Get().Spec.ShardingSpecs = append(factory.Get().Spec.ShardingSpecs, shardingSpec)
 	return factory
 }
 
-func (factory *MockClusterFactory) AddShardSpecV2(shardTplName string, compDefName string) *MockClusterFactory {
+func (factory *MockClusterFactory) AddShardSpecV2(shardingName string, compDefName string) *MockClusterFactory {
 	shardingSpec := appsv1alpha1.ShardingSpec{
 		Template: appsv1alpha1.ClusterComponentSpec{
 			Name:         "fake",
 			ComponentDef: compDefName,
 			Replicas:     1,
 		},
-		Name:   shardTplName,
+		Name:   shardingName,
 		Shards: 1,
 	}
 	factory.Get().Spec.ShardingSpecs = append(factory.Get().Spec.ShardingSpecs, shardingSpec)

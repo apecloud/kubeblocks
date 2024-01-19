@@ -288,7 +288,7 @@ type ClusterStatus struct {
 
 // ShardingSpec defines the sharding spec.
 type ShardingSpec struct {
-	// name defines sharding template name, this name is also part of Service DNS name, so this name will comply with IANA Service Naming rule.
+	// name defines sharding name, this name is also part of Service DNS name, so this name will comply with IANA Service Naming rule.
 	// The name is also used to generate the name of the underlying components with the naming pattern <ShardingSpec.Name>-<ShardID>.
 	// At the same time, the name of component template defined in ShardingSpec.Template.Name will be ignored.
 	// +kubebuilder:validation:Required

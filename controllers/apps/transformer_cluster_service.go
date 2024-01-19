@@ -178,7 +178,7 @@ func (t *clusterServiceTransformer) buildService(transCtx *clusterTransformConte
 	}
 
 	if len(clusterService.ShardSelector) > 0 {
-		builder.AddSelector(constant.KBAppShardTemplateNameLabelKey, clusterService.ShardSelector)
+		builder.AddSelector(constant.KBAppShardingNameLabelKey, clusterService.ShardSelector)
 	}
 
 	if len(clusterService.RoleSelector) > 0 {

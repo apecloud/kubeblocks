@@ -80,10 +80,10 @@ func GetComponentDefLabel(compDefName string) map[string]string {
 	}
 }
 
-// GetShardTemplateNameLabel returns the shard template name label for component generated from shardSpec
-func GetShardTemplateNameLabel(shardTplName string) map[string]string {
+// GetShardingNameLabel returns the shard template name label for component generated from shardSpec
+func GetShardingNameLabel(shardingName string) map[string]string {
 	return map[string]string{
-		KBAppShardTemplateNameLabelKey: shardTplName,
+		KBAppShardingNameLabelKey: shardingName,
 	}
 }
 

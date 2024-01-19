@@ -120,7 +120,7 @@ kbcli fault network dns error --patterns=google.com --duration=1m
 | 参数 | 类型 | 说明 | 默认值 | 是否必填 | 示例 |
 | :-- | :-- | :-- | :-- | :-- | :-- |
 | `action` | string | 定义 DNS 故障的行为，可选值为 `random` 或 `error`。当值为 `random` 时， DNS 服务返回随机的 IP 地址；当值为 `error` 时 DNS 服务返回错误。| 无 | 是 | `random` 或 `error` |
-| `patterns` | 选择匹配故障行为的域名模版， 支持占位符 `?` 以及通配符 `*`。 | [] | 否 | `google.com`、`chaos-mesh.org`、`github.com` |
+| `patterns` | string array  | 选择匹配故障行为的域名模版， 支持占位符 `?` 以及通配符 `*`。 | [] | 否 | `google.com`、`chaos-mesh.org`、`github.com` |
 | `mode` | string | 指定实验的运行方式，可选项包括：`one`（表示随机选出一个符合条件的 Pod）、`all`（表示选出所有符合条件的 Pod）、`fixed`（表示选出指定数量且符合条件的 Pod）、`fixed-percent`（表示选出占符合条件的 Pod 中指定百分比的 Pod）和 `random-max-percent`（表示选出占符合条件的 Pod 中不超过指定百分比的 Pod）。 | 无 | 是 | `one` |
 | `value` | string | 取决于 `mode` 的配置，为 `mode` 提供对应的参数。例如，当你将 `mode` 配置为 `fixed-percent` 时，`value` 用于指定 Pod 的百分比。 | 无 | 否 | `1` |
 | `selector` | struct | 指定目标 Pod。| 无 | 是 |  |

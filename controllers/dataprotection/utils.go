@@ -303,13 +303,13 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 	}
 
 	var extraAnnotations map[string]string
-	annotationsJson := viper.GetString(dptypes.CfgKeyWorkerServiceAccountAnnotations)
-	if annotationsJson != "" {
+	annotationsJSON := viper.GetString(dptypes.CfgKeyWorkerServiceAccountAnnotations)
+	if annotationsJSON != "" {
 		extraAnnotations = make(map[string]string)
-		err := json.Unmarshal([]byte(annotationsJson), &extraAnnotations)
+		err := json.Unmarshal([]byte(annotationsJSON), &extraAnnotations)
 		if err != nil {
 			return "", fmt.Errorf("failed to unmarshal worker service account annotations: %s, json: %q",
-				err.Error(), annotationsJson)
+				err.Error(), annotationsJSON)
 		}
 	}
 

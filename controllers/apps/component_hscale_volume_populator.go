@@ -470,7 +470,7 @@ func getBackupMethods(backupPolicy *dpv1alpha1.BackupPolicy, useVolumeSnapshot b
 			otherMethods = append(otherMethods, method.Name)
 		}
 	}
-	if useVolumeSnapshot {
+	if useVolumeSnapshot && len(vsMethods) > 0 {
 		return vsMethods
 	}
 	return otherMethods

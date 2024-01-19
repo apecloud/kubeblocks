@@ -454,7 +454,7 @@ func (mgr *Manager) ValidateAddr(ctx context.Context, cluster *dcs.Cluster) (boo
 	member := cluster.GetMemberWithName(currentMemberName)
 	addr := mgr.GetMemberAddr(cluster, member)
 	maxLength := 255
-	if IsSmallerVersion(version, "8.0.17") {
+	if IsBeforeVersion(version, "8.0.17") {
 		maxLength = 60
 	}
 

@@ -158,7 +158,6 @@ func addPodHeadlessServiceIfNeed(cluster *appsv1alpha1.Cluster, compDef *appsv1a
 	for _, service := range services {
 		if service.Name == "headless" {
 			podHeadlessService = service.DeepCopy()
-
 		}
 	}
 	if podHeadlessService == nil {

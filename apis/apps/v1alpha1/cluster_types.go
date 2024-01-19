@@ -57,9 +57,8 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:Required
 	TerminationPolicy TerminationPolicyType `json:"terminationPolicy"`
 
-	// List of ShardingSpec which is used to define components with a sharding topology structure.
+	// List of ShardingSpec which is used to define components with a sharding topology structure that make up a cluster.
 	// ShardingSpecs and ComponentSpecs cannot both be empty at the same time.
-	// +kubebuilder:validation:Optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
@@ -70,7 +69,7 @@ type ClusterSpec struct {
 	ShardingSpecs []ShardingSpec `json:"shardingSpecs,omitempty"`
 
 	// List of componentSpec which is used to define the components that make up a cluster.
-	// ComponentSpecs and ShardSpecs cannot both be empty at the same time.
+	// ComponentSpecs and ShardingSpecs cannot both be empty at the same time.
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
 	// +kubebuilder:validation:XValidation:rule="self.all(x, size(self.filter(c, c.name == x.name)) == 1)",message="duplicated component"
@@ -290,15 +289,18 @@ type ClusterStatus struct {
 // ShardingSpec defines the sharding spec.
 type ShardingSpec struct {
 	// name defines sharding template name, this name is also part of Service DNS name, so this name will comply with IANA Service Naming rule.
+	// The name is also used to generate the name of the underlying components with the naming pattern <ShardingSpec.Name>-<ShardID>.
+	// At the same time, the name of component template defined in ShardingSpec.Template.Name will be ignored.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=22
-	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	Name string `json:"name"`
 
 	// template defines the component template.
+	// A ShardingSpec generates a set of components (also called shards) based on the component template, and this group of components or shards have the same specifications and definitions.
 	// +kubebuilder:validation:Required
-	Template ClusterComponentSpec `json:"template,omitempty"`
+	Template ClusterComponentSpec `json:"template"`
 
 	// shards indicates the number of component.
 	// 1. When the number of shards increases, the relevant Actions defined in the Definition will be triggered if the conditions are met. This is specifically divided into two cases:
@@ -308,6 +310,7 @@ type ShardingSpec struct {
 	//    Additionally, the resources and data associated with the corresponding Component will be deleted as well.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=256
 	Shards int32 `json:"shards,omitempty"`
 }
 

@@ -259,7 +259,7 @@ func buildComp2CompDefs(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1al
 
 // buildLabels builds labels for synthesizedComponent.
 func buildLabels(compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component, synthesizeComp *SynthesizedComponent) {
-	ReplaceKBEnvPlaceholderTokens := func(clusterName, uid, componentName, strToReplace string) string {
+	replaceKBEnvPlaceholderTokens := func(clusterName, uid, componentName, strToReplace string) string {
 		builtInEnvMap := GetReplacementMapForBuiltInEnv(clusterName, uid, componentName)
 		return ReplaceNamedVars(builtInEnvMap, strToReplace, -1, true)
 	}
@@ -270,8 +270,8 @@ func buildLabels(compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.C
 	}
 
 	for k, v := range compDef.Spec.Labels {
-		resolveKey := ReplaceKBEnvPlaceholderTokens(synthesizeComp.ClusterName, synthesizeComp.ClusterUID, synthesizeComp.Name, k)
-		resolveValue := ReplaceKBEnvPlaceholderTokens(synthesizeComp.ClusterName, synthesizeComp.ClusterUID, synthesizeComp.Name, v)
+		resolveKey := replaceKBEnvPlaceholderTokens(synthesizeComp.ClusterName, synthesizeComp.ClusterUID, synthesizeComp.Name, k)
+		resolveValue := replaceKBEnvPlaceholderTokens(synthesizeComp.ClusterName, synthesizeComp.ClusterUID, synthesizeComp.Name, v)
 		labels[resolveKey] = resolveValue
 	}
 

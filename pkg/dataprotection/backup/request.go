@@ -315,6 +315,10 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 				Value: targetPod.Name,
 			},
 			{
+				Name:  dptypes.DPTargetPodRole,
+				Value: targetPod.Labels[constant.RoleLabelKey],
+			},
+			{
 				Name:  dptypes.DPBackupBasePath,
 				Value: BuildBackupPath(r.Backup, r.BackupPolicy.Spec.PathPrefix),
 			},

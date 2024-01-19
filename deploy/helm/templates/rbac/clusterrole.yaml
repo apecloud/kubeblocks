@@ -48,4 +48,12 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - backups/status
+  verbs:
+  - get
+  - patch
+  - update
 {{- end }}

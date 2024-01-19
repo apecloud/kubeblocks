@@ -502,14 +502,3 @@ func (r *Request) InjectSyncProgressContainer(podSpec *corev1.PodSpec,
 func (r *Request) backupActionSetExists() bool {
 	return r.ActionSet != nil && r.ActionSet.Spec.Backup != nil
 }
-
-// TODO(x.zhou): remove this function
-func (r *Request) targetServiceAccountName() string {
-	saName := r.BackupPolicy.Spec.Target.ServiceAccountName
-	if len(saName) > 0 {
-		return saName
-	}
-	// service account name is not specified, use the target pod service account
-	targetPod := r.TargetPods[0]
-	return targetPod.Spec.ServiceAccountName
-}

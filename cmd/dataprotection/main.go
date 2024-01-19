@@ -100,9 +100,9 @@ func init() {
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(dptypes.CfgKeyGCFrequencySeconds, dptypes.DefaultGCFrequencySeconds)
-	viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountName, "kb-kubeblocks-dataprotection-worker")
+	viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountName, "kubeblocks-dataprotection-worker")
 	viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountAnnotations, "{}")
-	viper.SetDefault(dptypes.CfgKeyWorkerClusterRoleName, "kb-kubeblocks-dataprotection-worker-role")
+	viper.SetDefault(dptypes.CfgKeyWorkerClusterRoleName, "kubeblocks-dataprotection-worker-role")
 }
 
 func main() {

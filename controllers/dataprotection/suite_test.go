@@ -85,9 +85,9 @@ var _ = BeforeSuite(func() {
 
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks:latest")
-	viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountName, "kb-kubeblocks-dataprotection-worker")
+	viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountName, "kubeblocks-dataprotection-worker")
 	viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountAnnotations, `{"role-arn":"arn:xxx:xxx"}`)
-	viper.SetDefault(dptypes.CfgKeyWorkerClusterRoleName, "kb-kubeblocks-dataprotection-worker-role")
+	viper.SetDefault(dptypes.CfgKeyWorkerClusterRoleName, "kubeblocks-dataprotection-worker-role")
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{

@@ -548,7 +548,7 @@ func (store *KubernetesStore) GetSwitchOverConfigMap() (*corev1.ConfigMap, error
 		}
 		store.logger.Error(err, "Get switchover configmap failed")
 	}
-	store.logger.Info("Found switchover Setting", switchoverName)
+	store.logger.Info("Found switchover Setting", "configmap", switchoverName)
 	return switchOverConfigMap, err
 }
 

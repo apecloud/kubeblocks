@@ -73,7 +73,7 @@ If you are currently running KubeBlocks v0.6, please upgrade to v0.7.2 first.
     kubectl get addon -o json | jq '.items[] | {name: .metadata.name, annotations: .metadata.annotations}'
     ```
 
-1. Install CRD.
+2. Install CRD.
 
     To reduce the size of Helm chart, KubeBlocks v0.8 removes CRD from the Helm chart. Before upgrading, you need to install CRD.
 
@@ -81,7 +81,7 @@ If you are currently running KubeBlocks v0.6, please upgrade to v0.7.2 first.
     kubectl replace -f https://github.com/apecloud/kubeblocks/releases/download/v0.8.1/kubeblocks_crds.yaml
     ```
 
-2. Upgrade KubeBlocks.
+3. Upgrade KubeBlocks.
 
     ```shell
     helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.8.1 --set dataProtection.image.datasafed.tag=0.1.0

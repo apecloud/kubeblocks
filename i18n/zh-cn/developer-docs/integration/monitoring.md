@@ -32,7 +32,7 @@ Prometheus 在云原生、容器化和微服务架构中广泛应用，它可以
 
 Grafana 是一个开源的分析和监控平台，广泛用于可视化时间序列数据。它允许用户创建交互式和可自定义的仪表盘，以监视、分析和理解来自各种来源的数据。
 
-:paperclip: Table 1. Terminology
+:paperclip: Table 1. 术语表
 
 | 术语 | 说明 |
 | :--  | :---------- |
@@ -94,7 +94,7 @@ podSpec:
           value: "$(MYSQL_MONITOR_USER):$(MYSQL_MONITOR_PASSWORD)@(localhost:3306)/"
 ```
 
-如 Line 4~ 21 所示，这里在原来的 PodSpec 中添加了一个新的容器，其中 `DATA_SOURCE_NAME` 为 mysql-exporter 的环境变量。
+如上所示，这里在原来的 PodSpec 中添加了一个新的容器，其中 `DATA_SOURCE_NAME` 为 mysql-exporter 的环境变量。
 
 :::caution
 
@@ -203,13 +203,13 @@ kubeblocks-prometheus-server         kb-system   19090   Jul 24,2023 11:38 UTC+0
 
 2. 开启监控。
 
-   Opt 1. 创建集群时开启
+   选项 1. 创建集群时开启
 
    ```bash
    kbcli cluster create mycluster --cluster-definition='oracle-mysql' --monitor='true'
    ```
 
-   Opt 2. 在已有集群中开启
+   选项 2. 在已有集群中开启
 
    ```bash
    kbcli cluster update mycluster --monitor='true'

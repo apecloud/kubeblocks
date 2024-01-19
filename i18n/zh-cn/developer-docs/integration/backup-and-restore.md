@@ -22,14 +22,14 @@ import TabItem from '@theme/TabItem';
   
 Table 1. 展示了 KubeBlocks 中与备份相关的常见概念，后文会通过示例说明它们的作用和使用方法。
 
-:paperclip: Table 1. 术语
+:paperclip: Table 1. 术语表
 
-| 术语 | 说明 | Scope |
+| 术语 | 说明 | 范围 |
 | :--- | :---------- | :---- |
-| Backup | 备份对象 <br /> 即备份对象的实体。 | Namespace |
-| BackupPolicy | 备份策略 <br /> 定义各种备份类型的相关策略， 比如调度、备份保留时间、使用哪种备份工具等。 | Namespace |
-| BackupTool | 备份工具 <br /> 即 KubeBlocks 中备份工具的载体。每个 BackupTool 都应该实现对应备份工具的备份逻辑和恢复逻辑。 | Cluster |
-| BackupPolicyTemplate | 备份策略模板<br />即备份与 ClusterDefinition 结合的桥梁。在创建集群时，KubeBlocks 会根据 BackupPolicyTemplate 自动为每个集群对象生成一个默认的备份策略。 | Cluster |
+| Backup | 备份对象 <br /> 即备份对象的实体。 | 命名空间 |
+| BackupPolicy | 备份策略 <br /> 定义各种备份类型的相关策略， 比如调度、备份保留时间、使用哪种备份工具等。 | 命名空间 |
+| BackupTool | 备份工具 <br /> 即 KubeBlocks 中备份工具的载体。每个 BackupTool 都应该实现对应备份工具的备份逻辑和恢复逻辑。 | 集群 |
+| BackupPolicyTemplate | 备份策略模板<br />即备份与 ClusterDefinition 结合的桥梁。在创建集群时，KubeBlocks 会根据 BackupPolicyTemplate 自动为每个集群对象生成一个默认的备份策略。 | 集群 |
 
 ## 开始之前
 
@@ -127,7 +127,7 @@ spec:
 
 :::note
 
-如果你成功添加了 `BackupPolicyTemplate`，但是新建的 Cluster 没有默认的 BackupPolicy，请检查：
+如果你成功添加了 `BackupPolicyTemplate`，但是新建的集群没有默认的 BackupPolicy，请检查：
 
 1. `ClusterDefinionRef` 是否正确；
 2. `BackupPolicyTemplate` 的 lable 是否正确；
@@ -276,7 +276,7 @@ KubeBlocks 支持备份到本地和云上对象存储。这里展示如何备份
 
 ## 参考资料
 
-- 关于 KubeBlocks 的备份恢复功能，可参考[备份恢复](./../../user-docs/backup-and-restore/overview.md)。
+- 关于 KubeBlocks 的备份恢复功能，可参考[备份恢复](./../../user-docs/backup-and-restore/overview.md)文档。
 
 ## 附录
 

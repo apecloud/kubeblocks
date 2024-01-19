@@ -35,7 +35,7 @@ NebulaGraph 是一种存储与计算分离的架构，由三种服务构成：Gr
 
 ## 配置集群拓扑
 
-现在你已经了解了 NebulaGraph 由哪4个组件组成，每个组件如何启动和配置了。
+现在你已经了解了 NebulaGraph 由哪 4 个组件组成，每个组件如何启动和配置了。
 
 和单组件集群一样，你可以快速整理出一个多组件集群的定义。
 
@@ -110,10 +110,15 @@ spec:
 以下是 3 类常见的组件间依赖：
 
 1. **Service Reference**
+
    例如 Nebula-Console 需要获取 Nebula-Graphd 的 Service Name。
+
 2. **HostName Reference**
+
    例如 Nebula-Graphd 需要配置 Nebula-metad 的所有 Pod 的地址。该引用通常指向一个有状态的组件。
+
 3. **Field Reference**
+
    例如 Nebula-Console 需要获取 Nebula-Graph 的某一个服务端口名。
 
 这些被依赖的信息需要在集群启动时，通过环境变量的方式注入到该组件的 Pod 中（不论是通过 configmap 加载，还是定义为 pod env），这样才能确保集群正常启动。

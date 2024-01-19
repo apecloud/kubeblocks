@@ -23,11 +23,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/apecloud/kubeblocks/pkg/constant"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 	"github.com/pkg/errors"
 	probing "github.com/prometheus-community/pro-bing"
 	ctlruntime "sigs.k8s.io/controller-runtime"
+
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var pingerLogger = ctlruntime.Log.WithName("pinger")

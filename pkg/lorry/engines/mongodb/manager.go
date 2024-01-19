@@ -536,8 +536,12 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 	if err != nil {
 		return false
 	}
-	mgr.Logger.Info(fmt.Sprintf("cluster status: %v", status))
-	return status.OK != 0
+	isHeathly := status.OK != 0
+	if !isHeathly {
+		statusJSON, _ := json.Marshal(status)
+		mgr.Logger.Info("cluster is unhealthy", "status", string(statusJSON))
+	}
+	return isHeathly
 }
 
 func (mgr *Manager) IsPromoted(ctx context.Context) bool {

@@ -1025,9 +1025,8 @@ spec:
                       type: string
                     shardSelector:
                       description: ShardSelector extends the ServiceSpec.Selector
-                        by allowing you to specify a sharding template name defined
-                        in Cluster.Spec.ShardingSpecs[x].Name as selectors for the
-                        service.
+                        by allowing you to specify a sharding name defined in Cluster.Spec.ShardingSpecs[x].Name
+                        as selectors for the service.
                       type: string
                     spec:
                       description: Spec defines the behavior of a service. https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status

@@ -200,22 +200,22 @@ func (t *clusterServiceTransformer) genMultiServiceIfNeed(cluster *appsv1alpha1.
 		return []*appsv1alpha1.ClusterService{clusterService}, nil
 	}
 
-	shardingTemplateName := ""
+	shardingName := ""
 	shards := int32(0)
 	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
 		if shardingSpec.Name != clusterService.ShardSelector {
 			continue
 		}
-		shardingTemplateName = shardingSpec.Name
+		shardingName = shardingSpec.Name
 		shards = shardingSpec.Shards
 	}
 
-	if len(shardingTemplateName) == 0 {
+	if len(shardingName) == 0 {
 		return nil, fmt.Errorf("the shardSelector of service is not defined, service: %s, shard: %s", clusterService.Name, clusterService.ShardSelector)
 	}
 
-	enableShardOrdinalSvcTplNameList, ok := cluster.Annotations[constant.ShardOrdinalSvcAnnotationKey]
-	if !ok || !slices.Contains(strings.Split(enableShardOrdinalSvcTplNameList, ","), shardingTemplateName) {
+	enableShardSvcList, ok := cluster.Annotations[constant.ShardSvcAnnotationKey]
+	if !ok || !slices.Contains(strings.Split(enableShardSvcList, ","), shardingName) {
 		return []*appsv1alpha1.ClusterService{clusterService}, nil
 	}
 

@@ -666,15 +666,15 @@ var _ = Describe("Cluster Controller", func() {
 		shards := defaultShardCount
 		deleteService := services[0]
 
-		By("check only one service created for each shard when ShardOrdinalSvcAnnotationKey is not set")
+		By("check only one service created for each shard when ShardSvcAnnotationKey is not set")
 		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compTplName, &shards, false) }).Should(Succeed())
 
-		By("check shards number services were created for each shard when ShardOrdinalSvcAnnotationKey is set")
+		By("check shards number services were created for each shard when ShardSvcAnnotationKey is set")
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 			if cluster.Annotations == nil {
 				cluster.Annotations = map[string]string{}
 			}
-			cluster.Annotations[constant.ShardOrdinalSvcAnnotationKey] = compTplName
+			cluster.Annotations[constant.ShardSvcAnnotationKey] = compTplName
 		})()).ShouldNot(HaveOccurred())
 		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compTplName, &shards, true) }).Should(Succeed())
 

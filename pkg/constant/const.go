@@ -163,10 +163,10 @@ const (
 	// This can generate a corresponding Service for each Pod, which can be used in certain specific scenarios: for example, creating a dedicated access service for each read-only Pod.
 	// Multiple components are separated by ','. for example: "kubeblocks.io/enabled-pod-ordinal-svc: comp1,comp2"
 	PodOrdinalSvcAnnotationKey = "kubeblocks.io/enabled-pod-ordinal-svc"
-	// ShardOrdinalSvcAnnotationKey defines the feature gate of ShardOrdinal Service defined in Cluster.Spec.Services.
-	// Components template name defined in the annotation value, a set of Service defined in Cluster.Spec.Services with the ShardSelector will be automatically generated for each shard Component when Cluster.Spec.ShardSpecs[x].shards is not nil.
-	// Multiple component template names are separated by ','. for example: "kubeblocks.io/enabled-shard-ordinal-svc: proxy-shard,db-shard"
-	ShardOrdinalSvcAnnotationKey = "kubeblocks.io/enabled-shard-ordinal-svc"
+	// ShardSvcAnnotationKey defines the feature gate of creating service for each shard.
+	// Sharding name defined in the annotation value, a set of Service defined in Cluster.Spec.Services with the ShardSelector will be automatically generated for each shard when Cluster.Spec.ShardingSpecs[x].shards is not nil.
+	// Multiple sharding names are separated by ','. for example: "kubeblocks.io/enabled-shard-svc: proxy-shard,db-shard"
+	ShardSvcAnnotationKey = "kubeblocks.io/enabled-shard-svc"
 
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName             = "cluster.kubeblocks.io/finalizer"

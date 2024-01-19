@@ -656,7 +656,7 @@ var _ = Describe("Cluster Controller", func() {
 						ClusterIP: svc.clusterIP,
 					},
 				},
-				ShardSelector: compTplName,
+				ShardingSelector: compTplName,
 			})
 		}
 		createObj(compTplName, compDefName, func(f *testapps.MockClusterFactory) {

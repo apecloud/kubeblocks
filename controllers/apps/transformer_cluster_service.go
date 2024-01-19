@@ -177,8 +177,8 @@ func (t *clusterServiceTransformer) buildService(transCtx *clusterTransformConte
 		builder.AddSelector(constant.KBAppComponentLabelKey, clusterService.ComponentSelector)
 	}
 
-	if len(clusterService.ShardSelector) > 0 {
-		builder.AddSelector(constant.KBAppShardingNameLabelKey, clusterService.ShardSelector)
+	if len(clusterService.ShardingSelector) > 0 {
+		builder.AddSelector(constant.KBAppShardingNameLabelKey, clusterService.ShardingSelector)
 	}
 
 	if len(clusterService.RoleSelector) > 0 {
@@ -196,14 +196,14 @@ func (t *clusterServiceTransformer) buildService(transCtx *clusterTransformConte
 }
 
 func (t *clusterServiceTransformer) genMultiServiceIfNeed(cluster *appsv1alpha1.Cluster, clusterService *appsv1alpha1.ClusterService) ([]*appsv1alpha1.ClusterService, error) {
-	if len(clusterService.ShardSelector) == 0 || len(cluster.Spec.ShardingSpecs) == 0 {
+	if len(clusterService.ShardingSelector) == 0 || len(cluster.Spec.ShardingSpecs) == 0 {
 		return []*appsv1alpha1.ClusterService{clusterService}, nil
 	}
 
 	shardingName := ""
 	shards := int32(0)
 	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		if shardingSpec.Name != clusterService.ShardSelector {
+		if shardingSpec.Name != clusterService.ShardingSelector {
 			continue
 		}
 		shardingName = shardingSpec.Name
@@ -211,7 +211,7 @@ func (t *clusterServiceTransformer) genMultiServiceIfNeed(cluster *appsv1alpha1.
 	}
 
 	if len(shardingName) == 0 {
-		return nil, fmt.Errorf("the shardSelector of service is not defined, service: %s, shard: %s", clusterService.Name, clusterService.ShardSelector)
+		return nil, fmt.Errorf("the ShardingSelector of service is not defined, service: %s, shard: %s", clusterService.Name, clusterService.ShardingSelector)
 	}
 
 	enableShardSvcList, ok := cluster.Annotations[constant.ShardSvcAnnotationKey]
@@ -224,7 +224,7 @@ func (t *clusterServiceTransformer) genMultiServiceIfNeed(cluster *appsv1alpha1.
 		svc := clusterService.DeepCopy()
 		svc.Name = fmt.Sprintf("%s-%d", clusterService.Name, i)
 		// set component selector to each shard ordinal service
-		svc.ComponentSelector = constant.GenerateShardName(clusterService.ShardSelector, int(i))
+		svc.ComponentSelector = constant.GenerateShardName(clusterService.ShardingSelector, int(i))
 		if len(clusterService.ServiceName) == 0 {
 			svc.ServiceName = fmt.Sprintf("%d", i)
 		} else {

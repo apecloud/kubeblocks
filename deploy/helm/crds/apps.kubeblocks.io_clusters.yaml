@@ -1023,8 +1023,8 @@ spec:
                         for component-level services Only one default service name
                         is allowed. Cannot be updated.'
                       type: string
-                    shardSelector:
-                      description: ShardSelector extends the ServiceSpec.Selector
+                    shardingSelector:
+                      description: ShardingSelector extends the ServiceSpec.Selector
                         by allowing you to specify a sharding name defined in Cluster.Spec.ShardingSpecs[x].Name
                         as selectors for the service.
                       type: string

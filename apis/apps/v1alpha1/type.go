@@ -604,10 +604,10 @@ type StatefulSetWorkload interface {
 type ClusterService struct {
 	Service `json:",inline"`
 
-	// ShardSelector extends the ServiceSpec.Selector by allowing you to specify a sharding name
+	// ShardingSelector extends the ServiceSpec.Selector by allowing you to specify a sharding name
 	// defined in Cluster.Spec.ShardingSpecs[x].Name as selectors for the service.
 	// +optional
-	ShardSelector string `json:"shardSelector,omitempty"`
+	ShardingSelector string `json:"shardingSelector,omitempty"`
 
 	// ComponentSelector extends the ServiceSpec.Selector by allowing you to specify a component as selectors for the service.
 	// +optional

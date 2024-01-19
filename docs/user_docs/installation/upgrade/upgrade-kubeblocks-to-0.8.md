@@ -17,14 +17,14 @@ In this tutorial, you will learn how to upgrade to KubeBlocks v0.8.
 
 :::note
 
-Execute `kbcli version` to check the current KubeBlocks version you are using, and then upgrade.
+Execute `kbcli version` to check the current KubeBlocks version you are running, and then upgrade.
 
 
 :::
 
 ## Upgrade from KubeBlocks v0.6
 
-If you are currently using KubeBlocks v0.6, please upgrade to v0.7.2 first.
+If you are currently running KubeBlocks v0.6, please upgrade to v0.7.2 first.
 
 
 1. Download kbcli v0.7.2.
@@ -47,7 +47,7 @@ If you are currently using KubeBlocks v0.6, please upgrade to v0.7.2 first.
 
 1. Set keepAddons.
 
-    KubeBlocks v0.8 streamlines the default installed engines and removes greptime, influxdb, neon, oracle-mysql, orioledb, tdengine, mariadb, nebula, risingwave, starrocks, tidb, and zookeeper. To avoid deleting addon resources that are already in use during the upgrade, execute the following commands:
+    KubeBlocks v0.8 streamlines the default installed engines and separates the addons from KubeBlocks operators to KubeBlocks-Addons repo, such as greptime, influxdb, neon, oracle-mysql, orioledb, tdengine, mariadb, nebula, risingwave, starrocks, tidb, and zookeeper. To avoid deleting addon resources that are already in use during the upgrade, execute the following commands:
 
 - Check the current KubeBlocks version.
 
@@ -73,7 +73,7 @@ If you are currently using KubeBlocks v0.6, please upgrade to v0.7.2 first.
     kubectl get addon -o json | jq '.items[] | {name: .metadata.name, annotations: .metadata.annotations}'
     ```
 
-2. Install CRD.
+1. Install CRD.
 
     To reduce the size of Helm chart, KubeBlocks v0.8 removes CRD from the Helm chart. Before upgrading, you need to install CRD.
 
@@ -81,7 +81,7 @@ If you are currently using KubeBlocks v0.6, please upgrade to v0.7.2 first.
     kubectl replace -f https://github.com/apecloud/kubeblocks/releases/download/v0.8.1/kubeblocks_crds.yaml
     ```
 
-3. Upgrade KubeBlocks.
+2. Upgrade KubeBlocks.
 
     ```shell
     helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.8.1 --set dataProtection.image.datasafed.tag=0.1.0

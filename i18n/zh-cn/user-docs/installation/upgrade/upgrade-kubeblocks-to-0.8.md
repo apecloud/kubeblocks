@@ -44,7 +44,7 @@ import TabItem from '@theme/TabItem';
 
 1. 设置 keepAddons。
 
-    KubeBlocks v0.8 精简了默认安装的引擎，删除了 greptime，influxdb，neon，oracle-mysql，orioledb，tdengine，mariadb，nebula，risingwave，starrocks，tidb，zookeeper。 为避免升级时将已经在使用的 addon 资源删除，请先执行如下命令。
+    KubeBlocks v0.8 精简了默认安装的引擎，将 addon 从 KubeBlocks operator 分离到了 KubeBlocks-Addons 代码仓库中，例如 greptime，influxdb，neon，oracle-mysql，orioledb，tdengine，mariadb，nebula，risingwave，starrocks，tidb，zookeeper。为避免升级时将已经在使用的 addon 资源删除，请先执行如下命令。
 
 - 查看当前 KubeBlocks 版本。
 
@@ -70,7 +70,7 @@ import TabItem from '@theme/TabItem';
     kubectl get addon -o json | jq '.items[] | {name: .metadata.name, annotations: .metadata.annotations}'
     ```
 
-2. 安装 CRD。
+1. 安装 CRD。
 
     为避免 KubeBlocks 的 Helm chart 过大，v0.8 版本将 CRD 从 Helm chart 中移除了，升级前需要先安装 CRD。
 
@@ -78,7 +78,7 @@ import TabItem from '@theme/TabItem';
     kubectl replace -f https://github.com/apecloud/kubeblocks/releases/download/v0.8.1/kubeblocks_crds.yaml
     ```
 
-3. 升级 KubeBlocks。
+2. 升级 KubeBlocks。
 
    ```shell
    helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.8.1 --set dataProtection.image.datasafed.tag=0.1.0

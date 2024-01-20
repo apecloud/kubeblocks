@@ -78,6 +78,7 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1
 		SetAffinity(affinities).
 		SetTolerations(tolerations).
 		SetReplicas(clusterCompSpec.Replicas).
+		SetMinReadySeconds(clusterCompSpec.MinReadySeconds).
 		SetResources(clusterCompSpec.Resources).
 		SetMonitor(clusterCompSpec.Monitor).
 		SetServiceAccountName(clusterCompSpec.ServiceAccountName).

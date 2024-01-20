@@ -43,6 +43,7 @@ var _ = Describe("replicated_state_machine builder", func() {
 			selectorKey4, selectorValue4 = "foo-4", "bar-4"
 			serviceName                  = "foo"
 			replicas                     = int32(5)
+			minReadySeconds              = int32(11)
 			port                         = int32(12345)
 			policy                       = apps.OrderedReadyPodManagement
 		)
@@ -161,6 +162,7 @@ var _ = Describe("replicated_state_machine builder", func() {
 		}
 		rsm := NewReplicatedStateMachineBuilder(ns, name).
 			SetReplicas(replicas).
+			SetMinReadySeconds(minReadySeconds).
 			AddMatchLabel(selectorKey1, selectorValue1).
 			AddMatchLabels(selectorKey2, selectorValue2, selectorKey3, selectorValue3).
 			AddMatchLabelsInMap(selectors).
@@ -187,6 +189,8 @@ var _ = Describe("replicated_state_machine builder", func() {
 		Expect(rsm.Namespace).Should(Equal(ns))
 		Expect(rsm.Spec.Replicas).ShouldNot(BeNil())
 		Expect(*rsm.Spec.Replicas).Should(Equal(replicas))
+		Expect(rsm.Spec.MinReadySeconds).ShouldNot(BeNil())
+		Expect(rsm.Spec.MinReadySeconds).Should(Equal(minReadySeconds))
 		Expect(rsm.Spec.Selector).ShouldNot(BeNil())
 		Expect(rsm.Spec.Selector.MatchLabels).Should(HaveLen(4))
 		Expect(rsm.Spec.Selector.MatchLabels[selectorKey1]).Should(Equal(selectorValue1))

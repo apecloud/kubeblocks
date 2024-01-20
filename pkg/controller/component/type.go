@@ -45,6 +45,7 @@ type SynthesizedComponent struct {
 	FullCompName         string                                 `json:"fullCompName,omitempty"`  // the full name of the component with clusterName prefix
 	CompDefName          string                                 `json:"compDefName,omitempty"`   // the name of the componentDefinition
 	Replicas             int32                                  `json:"replicas"`
+	MinReadySeconds      int32                                  `json:"minReadySeconds"`
 	PodSpec              *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 	Monitor              *MonitorConfig                         `json:"monitor,omitempty"`

@@ -67,6 +67,11 @@ func (builder *ComponentBuilder) SetReplicas(replicas int32) *ComponentBuilder {
 	return builder
 }
 
+func (builder *ComponentBuilder) SetMinReadySeconds(minReadySeconds int32) *ComponentBuilder {
+	builder.get().Spec.MinReadySeconds = minReadySeconds
+	return builder
+}
+
 func (builder *ComponentBuilder) SetServiceAccountName(serviceAccountName string) *ComponentBuilder {
 	builder.get().Spec.ServiceAccountName = serviceAccountName
 	return builder

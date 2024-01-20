@@ -339,6 +339,14 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas"`
 
+	// Minimum number of seconds for which a newly created pod should be ready
+	// without any of its container crashing for it to be considered available.
+	// Defaults to 0 (pod will be considered available as soon as it is ready)
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=0
+	// +optional
+	MinReadySeconds int32 `json:"minReadySeconds,omitempty"`
+
 	// affinity describes affinities specified by users.
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`

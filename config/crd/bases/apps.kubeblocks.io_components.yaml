@@ -223,6 +223,15 @@ spec:
                 items:
                   type: string
                 type: array
+              minReadySeconds:
+                default: 0
+                description: Minimum number of seconds for which a newly created pod
+                  should be ready without any of its container crashing for it to
+                  be considered available. Defaults to 0 (pod will be considered available
+                  as soon as it is ready)
+                format: int32
+                minimum: 0
+                type: integer
               monitor:
                 default: false
                 description: monitor is a switch to enable monitoring and is set as

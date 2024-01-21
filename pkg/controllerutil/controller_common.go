@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -291,8 +290,11 @@ const (
 	// The TCP/IP port numbers below 1024 are special in that normal users are not allowed to run servers on them.
 	// This is a security feaure, in that if you connect to a service on one of these ports you can be fairly sure
 	// that you have the real thing, and not a fake which some hacker has put up for you.
-	hostPortMin = int32(1025)
-	hostPortMax = int32(65536)
+	defaultIncludeHostPorts = "1025-65536"
+
+	// https://kubernetes.io/docs/reference/networking/ports-and-protocols/
+	// exclude ports used by kubernetes
+	defaultExcludeHostPorts = "6443,10250,10257,10259,2379-2380,30000-32767"
 )
 
 func InitHostPortManager(cli client.Client) error {
@@ -300,6 +302,10 @@ func InitHostPortManager(cli client.Client) error {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      viper.GetString(constant.CfgHostPortConfigMapName),
 			Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
+			Annotations: map[string]string{
+				constant.HostPortIncludeAnnotationKey: defaultIncludeHostPorts,
+				constant.HostPortExcludeAnnotationKey: defaultExcludeHostPorts,
+			},
 		},
 		Data: make(map[string]string),
 	}
@@ -309,7 +315,8 @@ func InitHostPortManager(cli client.Client) error {
 			return err
 		}
 	}
-	portManager, err = NewPortManager(hostPortMin, hostPortMax, cli)
+
+	portManager, err = NewPortManager(cli)
 	return err
 }
 
@@ -323,20 +330,24 @@ func BuildHostPortName(clusterName, compName, containerName, portName string) st
 
 type PortManager struct {
 	sync.Mutex
-	cli  client.Client
-	min  int32
-	max  int32
-	used map[int32]string
-	cm   *corev1.ConfigMap
+	cli    client.Client
+	from   int32
+	to     int32
+	cursor int32
+	used   map[int32]string
+	cm     *corev1.ConfigMap
+}
+
+type PortRange struct {
+	Min int32
+	Max int32
 }
 
 // NewPortManager creates a new PortManager
 // TODO[ziang] Putting all the port information in one configmap may have performance issues and is not secure enough.
 // There is a risk of accidental deletion leading to the loss of cluster port information.
-func NewPortManager(min, max int32, cli client.Client) (*PortManager, error) {
+func NewPortManager(cli client.Client) (*PortManager, error) {
 	pm := &PortManager{
-		min:  min,
-		max:  max,
 		cli:  cli,
 		used: make(map[int32]string),
 	}
@@ -370,6 +381,69 @@ func (pm *PortManager) sync() error {
 	if cm.Data == nil {
 		cm.Data = make(map[string]string)
 	}
+	parsePortRange := func(item string) (int64, int64, error) {
+		parts := strings.Split(item, "-")
+		var (
+			from int64
+			to   int64
+			err  error
+		)
+		if len(parts) == 2 {
+			from, err = strconv.ParseInt(parts[0], 10, 32)
+			if err != nil {
+				return from, to, err
+			}
+			to, err = strconv.ParseInt(parts[1], 10, 32)
+			if err != nil {
+				return from, to, err
+			}
+		} else if len(parts) == 1 {
+			from, err = strconv.ParseInt(parts[0], 10, 32)
+			if err != nil {
+				return from, to, err
+			}
+			to = from
+		}
+		return from, to, fmt.Errorf("invalid port range %s", item)
+	}
+	parsePortRanges := func(portRanges string) ([]PortRange, error) {
+		var ranges []PortRange
+		for _, item := range strings.Split(portRanges, ",") {
+			item = strings.TrimSpace(item)
+			if item == "" {
+				continue
+			}
+			from, to, err := parsePortRange(item)
+			if err != nil {
+				return nil, err
+			}
+			ranges = append(ranges, PortRange{
+				Min: int32(from),
+				Max: int32(to),
+			})
+		}
+		return ranges, nil
+	}
+	includes, err := parsePortRanges(cm.Annotations[constant.HostPortIncludeAnnotationKey])
+	if err != nil {
+		return err
+	}
+	excludes, err := parsePortRanges(cm.Annotations[constant.HostPortExcludeAnnotationKey])
+	if err != nil {
+		return err
+	}
+	var (
+		from int32
+		to   int32
+	)
+	for _, item := range includes {
+		if item.Min < from || from == 0 {
+			from = item.Min
+		}
+		if item.Max > to {
+			to = item.Max
+		}
+	}
 	used := make(map[int32]string)
 	for key, item := range cm.Data {
 		port, err := pm.parsePort(item)
@@ -378,9 +452,17 @@ func (pm *PortManager) sync() error {
 		}
 		used[port] = key
 	}
+	for _, item := range excludes {
+		for port := item.Min; port <= item.Max; port++ {
+			used[port] = ""
+		}
+	}
 
 	pm.cm = cm
+	pm.from = from
+	pm.to = to
 	pm.used = used
+	pm.cursor = from
 	return nil
 }
 
@@ -467,18 +549,23 @@ func (pm *PortManager) AllocatePort(key string) (int32, error) {
 		return port, nil
 	}
 
-	// allocate a new port randomly in range [hostPortMin, hostPortMax)
-	for i := 0; i < 10; i++ {
-		port := int32(rand.Int63nRange(int64(hostPortMin), int64(hostPortMax)))
-		if _, ok := pm.used[port]; ok {
-			continue
-		}
-		if err := pm.update(key, port); err != nil {
-			return 0, err
-		}
-		return port, nil
+	if len(pm.used) >= int(pm.to-pm.from)+1 {
+		return 0, fmt.Errorf("no available port")
 	}
-	return 0, fmt.Errorf("failed to allocate port")
+
+	for {
+		if _, ok := pm.used[pm.cursor]; !ok {
+			break
+		}
+		pm.cursor++
+		if pm.cursor > pm.to {
+			pm.cursor = pm.from
+		}
+	}
+	if err := pm.update(key, pm.cursor); err != nil {
+		return 0, err
+	}
+	return pm.cursor, nil
 }
 
 func (pm *PortManager) ReleasePort(key string) error {

@@ -1821,3 +1821,17 @@ external-dns:
     effect: NoSchedule
 
 developMode: false
+
+# the final host ports is the difference between include and exclude: include - exclude
+hostPorts:
+  include:
+  - 1025-65536
+  # https://kubernetes.io/docs/reference/networking/ports-and-protocols/
+  # exclude some ports that are used by kubernetes
+  exclude:
+  - "6443"
+  - "10250"
+  - "10257"
+  - "10259"
+  - "2379-2380"
+  - "30000-32767"

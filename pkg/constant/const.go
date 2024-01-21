@@ -151,6 +151,8 @@ const (
 	ExtraEnvAnnotationKey                       = "kubeblocks.io/extra-env"
 	LastRoleSnapshotVersionAnnotationKey        = "apps.kubeblocks.io/last-role-snapshot-version"
 	HostPortAnnotationKey                       = "kubeblocks.io/host-port"
+	HostPortIncludeAnnotationKey                = "network.kubeblocks.io/host-ports-include"
+	HostPortExcludeAnnotationKey                = "network.kubeblocks.io/host-ports-exclude"
 
 	// NodePortSvcAnnotationKey defines the feature gate of NodePort Service defined in ComponentDefinition.Spec.Services.
 	// Components defined in the annotation value, their all services of type NodePort defined in ComponentDefinition will be created; otherwise, they will be ignored.

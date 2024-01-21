@@ -1829,7 +1829,7 @@ hostPorts:
   # This is a security feaure, in that if you connect to a service on one of these ports you can be fairly sure
   # that you have the real thing, and not a fake which some hacker has put up for you.
   include:
-  - 1025-65536
+  - "1025-65536"
   # https://kubernetes.io/docs/reference/networking/ports-and-protocols/
   # exclude ports used by kubernetes
   exclude:

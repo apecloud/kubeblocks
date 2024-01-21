@@ -300,7 +300,8 @@ func InitHostPortManager(cli client.Client) error {
 			to   int64
 			err  error
 		)
-		if len(parts) == 2 {
+		switch len(parts) {
+		case 2:
 			from, err = strconv.ParseInt(parts[0], 10, 32)
 			if err != nil {
 				return from, to, err
@@ -312,13 +313,13 @@ func InitHostPortManager(cli client.Client) error {
 			if from > to {
 				return from, to, fmt.Errorf("invalid port range %s", item)
 			}
-		} else if len(parts) == 1 {
+		case 1:
 			from, err = strconv.ParseInt(parts[0], 10, 32)
 			if err != nil {
 				return from, to, err
 			}
 			to = from
-		} else {
+		default:
 			return from, to, fmt.Errorf("invalid port range %s", item)
 		}
 		return from, to, nil

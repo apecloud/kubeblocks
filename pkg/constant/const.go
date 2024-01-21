@@ -30,6 +30,8 @@ const (
 	CfgRecoverVolumeExpansionFailure    = "RECOVER_VOLUME_EXPANSION_FAILURE" // refer to feature gates RecoverVolumeExpansionFailure of k8s.
 	CfgKeyProvider                      = "KUBE_PROVIDER"
 	CfgHostPortConfigMapName            = "HOST_PORT_CM_NAME"
+	CfgHostPortIncludeRanges            = "HOST_PORT_INCLUDE_RANGES"
+	CfgHostPortExcludeRanges            = "HOST_PORT_EXCLUDE_RANGES"
 
 	// addon config keys
 	CfgKeyAddonJobTTL        = "ADDON_JOB_TTL"

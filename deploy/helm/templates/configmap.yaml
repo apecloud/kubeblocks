@@ -22,9 +22,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "kubeblocks.fullname" . }}-host-ports
-  annotations:
-    network.kubeblocks.io/host-ports-include: '{{ join "," .Values.hostPorts.include }}'
-    network.kubeblocks.io/host-ports-exclude: '{{ join "," .Values.hostPorts.exclude }}'
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 data: {}

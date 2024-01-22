@@ -122,6 +122,10 @@ spec:
                   key: dataProtectionEncryptionKey
             - name: KUBE_PROVIDER
               value: {{ .Values.provider | quote }}
+            - name: HOST_PORT_INCLUDE_RANGES
+              value: '{{ join "," .Values.hostPorts.include }}'
+            - name: HOST_PORT_EXCLUDE_RANGES
+              value: '{{ join "," .Values.hostPorts.exclude }}'
             - name: HOST_PORT_CM_NAME
               value: {{ include "kubeblocks.fullname" . }}-host-ports
           {{- with .Values.securityContext }}

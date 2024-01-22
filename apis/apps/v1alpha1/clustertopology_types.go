@@ -25,13 +25,35 @@ import (
 
 // ClusterTopologySpec defines the desired state of ClusterTopology
 type ClusterTopologySpec struct {
-	// Components specifies components in the cluster.
+	// TODO: components the definition/topology defined
+
+	// Topologies represents the different topologies within the cluster.
+	// +required
+	Topologies []ClusterTopologyDefinition `json:"topologies"`
+}
+
+// ClusterTopologyDefinition represents the configuration for a specific cluster topology.
+type ClusterTopologyDefinition struct {
+	// Name is the unique identifier for the cluster topology.
+	// Cannot be updated.
+	// +required
+	Name string `json:"name"`
+
+	// Components specifies the components in the topology.
 	// +required
 	Components []ClusterTopologyComponent `json:"components"`
 
-	// Orders defines the orders for components in the cluster.
+	// Default indicates whether this topology is the default configuration.
+	// + optional
+	Default bool `json:"default,omitempty"`
+
+	// Orders defines the order of components within the topology.
 	// +optional
-	Orders *ClusterTopologyOrders `json:"orders,omitempty"`
+	Orders *ClusterTopologyComponentOrder `json:"orders,omitempty"`
+
+	// RequiredVersion specifies the minimum version required for this topology.
+	// +optional
+	RequiredVersion string `json:"requiredVersion,omitempty"`
 
 	//// services defines the default cluster services for this topology.
 	//// +kubebuilder:pruning:PreserveUnknownFields
@@ -41,34 +63,41 @@ type ClusterTopologySpec struct {
 	// TODO: resource allocation strategy.
 }
 
+// ClusterTopologyComponent defines a component within a cluster topology.
 type ClusterTopologyComponent struct {
 	// Name defines the name of the component.
 	// This name is also part of Service DNS name, following IANA Service Naming rules.
+	// Cannot be updated.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=22
+	// +kubebuilder:validation:MaxLength=16
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	Name string `json:"name"`
 
-	// CompDef is the name of the component definition to use.
+	// CompDef specifies the component definition to use, either as a specific name or a name prefix.
+	// During instance provisioning, the system searches for matching component definitions based on the specified criteria.
+	// The search order for component definitions is as follows:
+	//   1. Prioritize component definitions within the current Addon.
+	//   2. Consider component definitions already installed in the Kubernetes cluster.
+	//   3. Optionally search for component definitions in the Addon repository if specified.
 	// +kubebuilder:validation:Required
 	CompDef string `json:"compDef"`
 
-	// CompVersion is the component version associated with the specified component definition.
+	// ServiceVersion specifies the version associated with the referenced component definition.
+	// This field assists in determining the appropriate version of the component definition, considering multiple available definitions.
 	// +optional
-	CompVersion string `json:"compVersion"`
-
-	// Replicas specifies the default replicas for the component in this topology.
-	// +optional
-	Replicas *int32 `json:"replicas"`
+	ServiceVersion string `json:"serviceVersion,omitempty"`
 
 	// ServiceRefs define the service references for the component.
 	// +optional
 	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
+
+	// Replicas specifies the default replicas for the component in this topology.
+	// +optional
+	Replicas *int32 `json:"replicas,omitempty"`
 }
 
-// ClusterTopologyOrders defines the orders for components in the cluster.
-type ClusterTopologyOrders struct {
+// ClusterTopologyComponentOrder defines the order for components within a topology.
+type ClusterTopologyComponentOrder struct {
 	// StartupOrder defines the order in which components should be started in the cluster.
 	// Components with the same order can be listed together, separated by commas.
 	// +optional
@@ -83,6 +112,8 @@ type ClusterTopologyOrders struct {
 	// Components with the same order can be listed together, separated by commas.
 	// +optional
 	UpdateOrder []string `json:"updateOrder,omitempty"`
+
+	// TODO: upgrade order?
 }
 
 // ClusterTopologyStatus defines the observed state of ClusterTopology
@@ -99,7 +130,17 @@ type ClusterTopologyStatus struct {
 	// Extra message for current phase.
 	// +optional
 	Message string `json:"message,omitempty"`
+
+	// +optional
+	Topologies string `json:"topologies,omitempty"`
+
+	// +optional
+	ExternalServices string `json:"externalServices,omitempty"`
 }
+
+// TODO:
+//  1. how to display the aggregated topology and its service references line by line?
+//  2. the services and versions supported
 
 // +genclient
 // +genclient:nonNamespaced
@@ -107,10 +148,10 @@ type ClusterTopologyStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=ct
-// +kubebuilder:printcolumn:name="COMPONENTS",type="string",JSONPath=".spec.components[*].name",description="components"
-// +kubebuilder:printcolumn:name="EXTERNAL-REFERENCE",type="string",JSONPath=".spec.components[*].serviceRefs[*].name",description="external service reference"
-// +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
-// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:printcolumn:name="Topologies",type="string",JSONPath=".status.topologies",description="topologies"
+// +kubebuilder:printcolumn:name="External-Service",type="string",JSONPath=".status.externalServices",description="external service referenced"
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="status phase"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // ClusterTopology is the Schema for the clustertopologies API
 type ClusterTopology struct {

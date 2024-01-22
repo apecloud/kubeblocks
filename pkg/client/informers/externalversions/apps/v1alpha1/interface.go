@@ -30,6 +30,8 @@ type Interface interface {
 	Clusters() ClusterInformer
 	// ClusterDefinitions returns a ClusterDefinitionInformer.
 	ClusterDefinitions() ClusterDefinitionInformer
+	// ClusterTopologies returns a ClusterTopologyInformer.
+	ClusterTopologies() ClusterTopologyInformer
 	// ClusterVersions returns a ClusterVersionInformer.
 	ClusterVersions() ClusterVersionInformer
 	// Components returns a ComponentInformer.
@@ -74,6 +76,11 @@ func (v *version) Clusters() ClusterInformer {
 // ClusterDefinitions returns a ClusterDefinitionInformer.
 func (v *version) ClusterDefinitions() ClusterDefinitionInformer {
 	return &clusterDefinitionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// ClusterTopologies returns a ClusterTopologyInformer.
+func (v *version) ClusterTopologies() ClusterTopologyInformer {
+	return &clusterTopologyInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // ClusterVersions returns a ClusterVersionInformer.

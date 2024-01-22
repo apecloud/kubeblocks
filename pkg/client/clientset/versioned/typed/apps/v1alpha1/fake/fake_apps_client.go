@@ -40,6 +40,10 @@ func (c *FakeAppsV1alpha1) ClusterDefinitions() v1alpha1.ClusterDefinitionInterf
 	return &FakeClusterDefinitions{c}
 }
 
+func (c *FakeAppsV1alpha1) ClusterTopologies() v1alpha1.ClusterTopologyInterface {
+	return &FakeClusterTopologies{c}
+}
+
 func (c *FakeAppsV1alpha1) ClusterVersions() v1alpha1.ClusterVersionInterface {
 	return &FakeClusterVersions{c}
 }

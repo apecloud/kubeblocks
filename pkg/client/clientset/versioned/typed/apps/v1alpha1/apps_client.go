@@ -31,6 +31,7 @@ type AppsV1alpha1Interface interface {
 	BackupPolicyTemplatesGetter
 	ClustersGetter
 	ClusterDefinitionsGetter
+	ClusterTopologiesGetter
 	ClusterVersionsGetter
 	ComponentsGetter
 	ComponentClassDefinitionsGetter
@@ -57,6 +58,10 @@ func (c *AppsV1alpha1Client) Clusters(namespace string) ClusterInterface {
 
 func (c *AppsV1alpha1Client) ClusterDefinitions() ClusterDefinitionInterface {
 	return newClusterDefinitions(c)
+}
+
+func (c *AppsV1alpha1Client) ClusterTopologies() ClusterTopologyInterface {
+	return newClusterTopologies(c)
 }
 
 func (c *AppsV1alpha1Client) ClusterVersions() ClusterVersionInterface {

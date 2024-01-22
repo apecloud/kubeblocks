@@ -50,6 +50,26 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /mutate-apps-kubeblocks-io-v1alpha1-clustertopology
+  failurePolicy: Fail
+  name: mclustertopology.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clustertopologies
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /mutate-apps-kubeblocks-io-v1alpha1-component
   failurePolicy: Fail
   name: mcomponent.kb.io
@@ -169,6 +189,26 @@ webhooks:
     - UPDATE
     resources:
     - clusterdefinitions
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-apps-kubeblocks-io-v1alpha1-clustertopology
+  failurePolicy: Fail
+  name: vclustertopology.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clustertopologies
   sideEffects: None
 - admissionReviewVersions:
   - v1

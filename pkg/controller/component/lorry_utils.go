@@ -30,7 +30,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -107,7 +106,7 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 	buildLorryServiceContainer(synthesizeComp, &lorryContainers[0], int(lorryHTTPPort), int(lorryGRPCPort), clusterCompSpec)
 
 	// build config manager service for lorry
-	err = configuration.BuildConfigManagerWithComponentForLorry(&lorryContainers[0], reqCtx.Ctx, cluster, synthesizeComp)
+	err = BuildConfigManagerWithComponentForLorry(&lorryContainers[0], reqCtx.Ctx, cluster, synthesizeComp)
 	if err != nil {
 		reqCtx.Log.Info("build config manager for lorry failed", "error", err)
 		return err

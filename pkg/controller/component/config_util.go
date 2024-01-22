@@ -3,8 +3,6 @@ package component
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 	"slices"
 	"strings"
 
@@ -17,8 +15,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util/kubernetes"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (

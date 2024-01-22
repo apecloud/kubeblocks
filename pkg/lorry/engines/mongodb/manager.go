@@ -492,7 +492,7 @@ func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs
 }
 
 func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
-	client, err := mgr.GetReplSetClient(ctx, cluster)
+	client, err := mgr.GetLeaderClient(ctx, cluster)
 	if err != nil {
 		return err
 	}
@@ -506,10 +506,17 @@ func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Clu
 
 	mgr.Logger.Info(fmt.Sprintf("Delete member: %s", memberName))
 	configMembers := make([]ConfigMember, 0, len(rsConfig.Members)-1)
+	isDeleted := true
 	for _, configMember := range rsConfig.Members {
-		if !strings.HasPrefix(configMember.Host, memberName) {
-			configMembers = append(configMembers, configMember)
+		if strings.HasPrefix(configMember.Host, memberName) {
+			isDeleted = false
+			continue
 		}
+		configMembers = append(configMembers, configMember)
+	}
+	if isDeleted {
+		mgr.Logger.Info("member is already deleted", "member", memberName)
+		return nil
 	}
 
 	rsConfig.Members = configMembers
@@ -529,8 +536,12 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 	if err != nil {
 		return false
 	}
-	mgr.Logger.Info(fmt.Sprintf("cluster status: %v", status))
-	return status.OK != 0
+	isHeathly := status.OK != 0
+	if !isHeathly {
+		statusJSON, _ := json.Marshal(status)
+		mgr.Logger.Info("cluster is unhealthy", "status", string(statusJSON))
+	}
+	return isHeathly
 }
 
 func (mgr *Manager) IsPromoted(ctx context.Context) bool {

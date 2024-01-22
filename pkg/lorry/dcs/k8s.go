@@ -544,11 +544,11 @@ func (store *KubernetesStore) GetSwitchOverConfigMap() (*corev1.ConfigMap, error
 	switchOverConfigMap, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Get(store.ctx, switchoverName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			store.logger.Info(fmt.Sprintf("no switchOver [%s] setting", switchoverName))
 			return nil, nil
 		}
-		store.logger.Error(err, "Get switchOver configmap failed")
+		store.logger.Error(err, "Get switchover configmap failed")
 	}
+	store.logger.Info("Found switchover Setting", "configmap", switchoverName)
 	return switchOverConfigMap, err
 }
 

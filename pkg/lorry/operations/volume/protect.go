@@ -150,6 +150,10 @@ func (p *Protection) Do(ctx context.Context, req *operations.OpsRequest) (*opera
 func (p *Protection) initVolumes() error {
 	spec := &appsv1alpha1.VolumeProtectionSpec{}
 	raw := viper.GetString(constant.KBEnvVolumeProtectionSpec)
+	if raw == "" {
+		return nil
+	}
+
 	if err := json.Unmarshal([]byte(raw), spec); err != nil {
 		p.Logger.Error(err, "unmarshal volume protection spec error", "raw spec", raw)
 		return err

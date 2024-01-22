@@ -201,9 +201,9 @@ There are two YAML files under `templates`, `clusterDefinition.yaml` and `cluste
 
     This is a placeholder for ConnectionCredential Secret mentioned earlier.
 
-- ClusterVersion
+- `clusterVersion.yaml`
 
-   All version-related information is configured in `ClusterVersion.yaml`.
+   All version-related information is configured in `clusterVersion.yaml`.
 
    Now you can add the required image information for each container needed for each component.
 

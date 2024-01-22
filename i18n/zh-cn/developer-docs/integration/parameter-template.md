@@ -71,7 +71,7 @@ KubeBlocks 具有强大的渲染能力，能让你快速定制一个 ***自适�
 上面展示了一个通过 ConfigMap 定义的 MySQL 自适应参数模板。模板中配置了几个常见的 MySQL 参数，包括 `port`，`innodb_buffer_pool_size` 等。
 它根据容器启动时配置的 memory，
 - 计算得到 `innodb_buffer_size` 大小（Line 11 ~ Line 15）。
-- 在 memory 小于 8Gi 时，禁用 `performance_schema` 来减少对性能的影响（Line 32 ~ Line 34）。
+- 在 memory 小于 8Gi 时，禁用 `performance_schema` 来减少对性能的影响（Line 19 ~ Line 21）。
 
 `callBufferSizeByResource` 是 KubeBlocks 预定义的一个 bufferPool 计算规则，主要为 MySQL 服务。
 
@@ -117,7 +117,7 @@ KubeBlocks 具有强大的渲染能力，能让你快速定制一个 ***自适�
 
 - templateRef: 模板所在的 ConfigMap 对象名称。
 - volumeName: 挂载到 Pod 的卷名。
-- namespace: 模板文件的名空间（ConfigMap 是 namespace scope 的，一般为 KubeBlocks 安装的名空间）。
+- namespace: 模板文件的名空间（ConfigMap 是 namespace scope 的，一般为 KubeBlocks 安装的命名空间）。
 
 #### 查看配置信息
 

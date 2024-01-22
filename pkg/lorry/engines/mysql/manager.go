@@ -130,7 +130,7 @@ func (mgr *Manager) IsDBStartupReady() bool {
 func (mgr *Manager) IsReadonly(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
 	db, err := mgr.GetMemberConnection(cluster, member)
 	if err != nil {
-		mgr.Logger.Error(err, "Get Member conn failed")
+		mgr.Logger.Info("Get Member conn failed", "error", err.Error())
 		return false, err
 	}
 
@@ -140,7 +140,7 @@ func (mgr *Manager) IsReadonly(ctx context.Context, cluster *dcs.Cluster, member
 		Scan(&mgr.hostname, &mgr.version, &readonly, &mgr.binlogFormat,
 			&mgr.logbinEnabled, &mgr.logReplicationUpdatesEnabled)
 	if err != nil {
-		mgr.Logger.Error(err, "Get global readonly failed")
+		mgr.Logger.Info("Get global readonly failed", "error", err.Error())
 		return false, err
 	}
 	return readonly, nil
@@ -206,27 +206,27 @@ func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, m
 	var leaderDBState *dcs.DBState
 	if cluster.Leader == nil || cluster.Leader.DBState == nil {
 		mgr.Logger.Info("No leader DBState info")
-		return false, 0
+		return true, 0
 	}
 	leaderDBState = cluster.Leader.DBState
 
 	db, err := mgr.GetMemberConnection(cluster, member)
 	if err != nil {
 		mgr.Logger.Info("Get Member conn failed", "error", err)
-		return false, 0
+		return true, 0
 	}
 
 	opTimestamp, err := mgr.GetOpTimestamp(ctx, db)
 	if err != nil {
 		mgr.Logger.Info("get op timestamp failed", "error", err)
-		return false, 0
+		return true, 0
 	}
-
-	if leaderDBState.OpTimestamp-opTimestamp <= cluster.HaConfig.GetMaxLagOnSwitchover() {
-		return false, 0
+	lag := leaderDBState.OpTimestamp - opTimestamp
+	if lag <= cluster.HaConfig.GetMaxLagOnSwitchover() {
+		return false, lag
 	}
-	mgr.Logger.Info(fmt.Sprintf("The member %s has lag: %d", member.Name, leaderDBState.OpTimestamp-opTimestamp))
-	return true, leaderDBState.OpTimestamp - opTimestamp
+	mgr.Logger.Info(fmt.Sprintf("The member %s has lag: %d", member.Name, lag))
+	return true, lag
 }
 
 func (mgr *Manager) IsMemberHealthy(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) bool {
@@ -421,7 +421,28 @@ func (mgr *Manager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string
 // }
 
 // IsClusterInitialized is a method to check if cluster is initialized or not
-func (mgr *Manager) IsClusterInitialized(ctx context.Context, _ *dcs.Cluster) (bool, error) {
+func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
+	if cluster != nil {
+		// The maximum length of the server addr is 255 characters. Before MySQL 8.0.17 it was 60 characters.
+		var version string
+		err := mgr.DB.QueryRowContext(ctx, "select version()").Scan(&version)
+		if err != nil {
+			mgr.Logger.Info("Get version failed", "error", err)
+			return false, err
+		}
+		currentMemberName := mgr.GetCurrentMemberName()
+		member := cluster.GetMemberWithName(currentMemberName)
+		addr := cluster.GetMemberShortAddr(*member)
+		maxLength := 255
+		if IsSmallerVersion(version, "8.0.17") {
+			maxLength = 60
+		}
+
+		if len(addr) > maxLength {
+			return false, errors.Errorf("The length of the member address must be less than or equal to %d", maxLength)
+		}
+	}
+
 	err := mgr.EnableSemiSyncIfNeed(ctx)
 	if err != nil {
 		return false, err
@@ -470,7 +491,7 @@ func (mgr *Manager) EnableSemiSyncIfNeed(ctx context.Context) error {
 	//    [ERROR] [MY-000067] [Server] unknown variable 'rpl_semi_sync_master_enabled=1'.
 	if status == "ACTIVE" {
 		setSourceEnable := "SET GLOBAL rpl_semi_sync_source_enabled = 1;" +
-			"SET GLOBAL rpl_semi_sync_source_timeout = 1000;"
+			"SET GLOBAL rpl_semi_sync_source_timeout = 100000;"
 		_, err = mgr.DB.Exec(setSourceEnable)
 		if err != nil {
 			mgr.Logger.Error(err, setSourceEnable+" execute failed")
@@ -586,26 +607,26 @@ func (mgr *Manager) GetHealthiestMember(*dcs.Cluster, string) *dcs.Member {
 	return nil
 }
 
-// func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
-// 	isLeader, err := mgr.IsLeader(ctx, cluster)
-// 	if err == nil && isLeader {
-// 		// if current member is leader, just return
-// 		return nil
-// 	}
+func (mgr *Manager) HasOtherHealthyLeader(ctx context.Context, cluster *dcs.Cluster) *dcs.Member {
+	isLeader, err := mgr.IsLeader(ctx, cluster)
+	if err == nil && isLeader {
+		// if current member is leader, just return
+		return nil
+	}
 
-// 	for _, member := range cluster.Members {
-// 		if member.Name == mgr.CurrentMemberName {
-// 			continue
-// 		}
+	for _, member := range cluster.Members {
+		if member.Name == mgr.CurrentMemberName {
+			continue
+		}
 
-// 		isLeader, err := mgr.IsLeaderMember(ctx, cluster, &member)
-// 		if err == nil && isLeader {
-// 			return &member
-// 		}
-// 	}
+		isLeader, err := mgr.IsLeaderMember(ctx, cluster, &member)
+		if err == nil && isLeader {
+			return &member
+		}
+	}
 
-// 	return nil
-// }
+	return nil
+}
 
 // HasOtherHealthyMembers checks if there are any healthy members, excluding the leader
 func (mgr *Manager) HasOtherHealthyMembers(ctx context.Context, cluster *dcs.Cluster, leader string) []*dcs.Member {

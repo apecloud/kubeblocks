@@ -279,7 +279,7 @@ func (mgr *Manager) IsMemberLagging(ctx context.Context, cluster *dcs.Cluster, m
 		return true, maxLag + 1
 	}
 
-	return cluster.Leader.DBState.OpTimestamp-walPosition > cluster.HaConfig.GetMaxLagOnSwitchover(), cluster.Leader.DBState.OpTimestamp - walPosition
+	return cluster.Leader.DBState.OpTimestamp-walPosition > maxLag, cluster.Leader.DBState.OpTimestamp - walPosition
 }
 
 // Typically, the synchronous_commit parameter remains consistent between the primary and standby

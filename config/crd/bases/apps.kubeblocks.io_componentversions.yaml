@@ -19,7 +19,19 @@ spec:
     singular: componentversion
   scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: service versions
+      jsonPath: .status.serviceVersions
+      name: Versions
+      type: string
+    - description: status phase
+      jsonPath: .status.phase
+      name: Status
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: ComponentVersion is the Schema for the componentversions API
@@ -57,9 +69,8 @@ spec:
                       maxItems: 128
                       minItems: 1
                       type: array
-                    versions:
-                      description: Versions is a list of version identifiers for the
-                        releases.
+                    releases:
+                      description: Releases is a list of identifiers for the releases.
                       items:
                         type: string
                       maxItems: 128
@@ -67,8 +78,10 @@ spec:
                       type: array
                   required:
                   - compDefs
-                  - versions
+                  - releases
                   type: object
+                maxItems: 128
+                minItems: 1
                 type: array
               releases:
                 description: Releases represents different releases of component instances
@@ -77,52 +90,44 @@ spec:
                   description: ComponentVersionRelease represents a release of component
                     instances within a ComponentVersion.
                   properties:
-                    apps:
-                      description: Apps represents different application versions
-                        within this release.
-                      items:
-                        description: ComponentAppVersion represents the version information
-                          for a specific application.
-                        properties:
-                          image:
-                            description: Image is the container image associated with
-                              this application version. Cannot be updated.
-                            maxLength: 256
-                            type: string
-                          name:
-                            description: Name is the name of the application, indicating
-                              the container name within the referenced ComponentDefinition.
-                              Cannot be updated.
-                            maxLength: 32
-                            type: string
-                          version:
-                            description: Version is the version number of the application.
-                              Cannot be updated.
-                            maxLength: 32
-                            type: string
-                        required:
-                        - image
-                        - name
-                        - version
-                        type: object
-                      maxItems: 128
-                      minItems: 1
-                      type: array
                     changes:
                       description: Changes provides information about the changes
                         made in this release.
                       maxLength: 256
                       type: string
-                    version:
-                      description: Version is a unique identifier for this release.
-                        If used, it will serve as the service version for component
-                        instances, overriding the one defined in the component definition.
+                    images:
+                      additionalProperties:
+                        type: string
+                      description: Images define the new images for different containers
+                        within the release.
+                      maxProperties: 128
+                      minProperties: 1
+                      type: object
+                      x-kubernetes-validations:
+                      - message: Container name may not exceed maximum length of 32
+                          characters
+                        rule: self.all(key, size(key) <= 32)
+                      - message: Image name may not exceed maximum length of 256 characters
+                        rule: self.all(key, size(self[key]) <= 256)
+                    release:
+                      description: Release is a unique identifier for this release.
                         Cannot be updated.
                       maxLength: 32
                       type: string
+                    serviceVersion:
+                      description: ServiceVersion defines the version of the well-known
+                        service that the component provides. If the release is used,
+                        it will serve as the service version for component instances,
+                        overriding the one defined in the component definition. Cannot
+                        be updated.
+                      maxLength: 32
+                      type: string
                   required:
-                  - version
+                  - images
+                  - release
                   type: object
+                maxItems: 128
+                minItems: 1
                 type: array
             required:
             - compatibilityRules
@@ -146,6 +151,10 @@ spec:
                 enum:
                 - Available
                 - Unavailable
+                type: string
+              serviceVersions:
+                description: ServiceVersions represent the supported service versions
+                  of this ComponentVersion.
                 type: string
             type: object
         type: object

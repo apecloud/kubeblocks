@@ -27,10 +27,14 @@ import (
 type ComponentVersionSpec struct {
 	// CompatibilityRules defines compatibility rules between sets of component definitions and releases.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=128
 	CompatibilityRules []ComponentVersionCompatibilityRule `json:"compatibilityRules"`
 
 	// Releases represents different releases of component instances within this ComponentVersion.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=128
 	Releases []ComponentVersionRelease `json:"releases"`
 }
 
@@ -47,53 +51,40 @@ type ComponentVersionCompatibilityRule struct {
 	// +kubebuilder:validation:MaxItems=128
 	CompDefs []string `json:"compDefs"`
 
-	// Versions is a list of version identifiers for the releases.
+	// Releases is a list of identifiers for the releases.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
-	Versions []string `json:"versions"`
+	Releases []string `json:"releases"`
 }
 
 // ComponentVersionRelease represents a release of component instances within a ComponentVersion.
 type ComponentVersionRelease struct {
-	// Version is a unique identifier for this release.
-	// If used, it will serve as the service version for component instances, overriding the one defined in the component definition.
+	// Release is a unique identifier for this release.
 	// Cannot be updated.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=32
-	Version string `json:"version"`
+	Release string `json:"release"`
 
 	// Changes provides information about the changes made in this release.
 	// +kubebuilder:validation:MaxLength=256
 	// +optional
 	Changes string `json:"changes,omitempty"`
 
-	// Apps represents different application versions within this release.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:MaxItems=128
-	Apps []ComponentAppVersion `json:"apps,omitempty"`
-}
-
-// ComponentAppVersion represents the version information for a specific application.
-type ComponentAppVersion struct {
-	// Name is the name of the application, indicating the container name within the referenced ComponentDefinition.
+	// ServiceVersion defines the version of the well-known service that the component provides.
+	// If the release is used, it will serve as the service version for component instances, overriding the one defined in the component definition.
 	// Cannot be updated.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=32
-	Name string `json:"name"`
+	// +optional
+	ServiceVersion string `json:"serviceVersion,omitempty"`
 
-	// Version is the version number of the application.
-	// Cannot be updated.
+	// Images define the new images for different containers within the release.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=32
-	Version string `json:"version"`
-
-	// Image is the container image associated with this application version.
-	// Cannot be updated.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=256
-	Image string `json:"image"`
+	// +kubebuilder:validation:MinProperties=1
+	// +kubebuilder:validation:MaxProperties=128
+	// +kubebuilder:validation:XValidation:rule="self.all(key, size(key) <= 32)",message="Container name may not exceed maximum length of 32 characters"
+	// +kubebuilder:validation:XValidation:rule="self.all(key, size(self[key]) <= 256)",message="Image name may not exceed maximum length of 256 characters"
+	Images map[string]string `json:"images"`
 }
 
 // ComponentVersionStatus defines the observed state of ComponentVersion
@@ -110,6 +101,10 @@ type ComponentVersionStatus struct {
 	// Extra message for current phase.
 	// +optional
 	Message string `json:"message,omitempty"`
+
+	// ServiceVersions represent the supported service versions of this ComponentVersion.
+	// +optional
+	ServiceVersions string `json:"serviceVersions,omitempty"`
 }
 
 // +genclient
@@ -118,6 +113,9 @@ type ComponentVersionStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cmpv
+// +kubebuilder:printcolumn:name="Versions",type="string",JSONPath=".status.serviceVersions",description="service versions"
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="status phase"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // ComponentVersion is the Schema for the componentversions API
 type ComponentVersion struct {

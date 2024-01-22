@@ -90,6 +90,8 @@ const (
 	DPDBPort = "DP_DB_PORT"
 	// DPTargetPodName the target pod name
 	DPTargetPodName = "DP_TARGET_POD_NAME"
+	// DPTargetPodRole the target pod role
+	DPTargetPodRole = "DP_TARGET_POD_ROLE"
 	// DPBackupBasePath the base path for backup data in the storage
 	DPBackupBasePath = "DP_BACKUP_BASE_PATH"
 	// DPBackupName backup CR name

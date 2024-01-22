@@ -94,7 +94,7 @@ podSpec:
           value: "$(MYSQL_MONITOR_USER):$(MYSQL_MONITOR_PASSWORD)@(localhost:3306)/"
 ```
 
-As shown from Line 4 to 21, a new container has been added to the original PodSpec. `DATA_SOURCE_NAME` is an environment variable specific to the mysql-exporter.
+As shown, a new container has been added to the original PodSpec. `DATA_SOURCE_NAME` is an environment variable specific to the mysql-exporter.
 
 :::caution
 

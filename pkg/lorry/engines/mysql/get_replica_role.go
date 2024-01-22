@@ -35,7 +35,7 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (s
 
 	if !cluster.IsLocked() {
 		mgr.Logger.Info("cluster has no leader lease")
-		return mgr.getReplicaRoleFromDB(ctx)
+		return "", errors.New("cluster has no leader lease")
 	}
 
 	if cluster.Leader.Name != mgr.CurrentMemberName {
@@ -45,7 +45,7 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (s
 	return models.PRIMARY, nil
 }
 
-func (mgr *Manager) getReplicaRoleFromDB(ctx context.Context) (string, error) {
+func (mgr *Manager) GetReplicaRoleFromDB(ctx context.Context) (string, error) {
 	slaveRunning, err := mgr.isSlaveRunning(ctx)
 	if err != nil {
 		return "", err

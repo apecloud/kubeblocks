@@ -155,8 +155,18 @@ func setupFlags() {
 
 	flag.String(kubeContextsFlagKey.String(), "", "Kube contexts the manager will talk to.")
 
+	opts := zap.Options{
+		Development: false,
+	}
+	opts.BindFlags(flag.CommandLine)
+
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
+
+	// NOTES:
+	// zap is "Blazing fast, structured, leveled logging in Go.", DON'T event try
+	// to refactor this logging lib to anything else. Check FAQ - https://github.com/uber-go/zap/blob/master/FAQ.md
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	// set normalizeFunc to replace flag name to viper name
 	normalizeFunc := pflag.CommandLine.GetNormalizeFunc()
@@ -170,18 +180,6 @@ func setupFlags() {
 		setupLog.Error(err, "unable to bind flags")
 		os.Exit(1)
 	}
-}
-
-func setupLogger() {
-	opts := zap.Options{
-		Development: false,
-	}
-	opts.BindFlags(flag.CommandLine)
-
-	// NOTES:
-	// zap is "Blazing fast, structured, leveled logging in Go.", DON'T event try
-	// to refactor this logging lib to anything else. Check FAQ - https://github.com/uber-go/zap/blob/master/FAQ.md
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 }
 
 func validateRequiredToParseConfigs() error {
@@ -236,8 +234,6 @@ func main() {
 		kubeContexts           string
 		err                    error
 	)
-
-	setupLogger()
 
 	setupFlags()
 

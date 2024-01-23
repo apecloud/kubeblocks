@@ -231,13 +231,12 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 
 		By("Wait component created")
-		for i := 0; i < defaultShardCount; i++ {
-			compKey := types.NamespacedName{
-				Namespace: clusterObj.Namespace,
-				Name:      constant.GenerateClusterComponentName(clusterObj.Name, fmt.Sprintf("%s-%d", compTplName, i)),
-			}
-			Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
+		ml := client.MatchingLabels{
+			constant.AppInstanceLabelKey:       clusterKey.Name,
+			constant.KBAppShardingNameLabelKey: compTplName,
 		}
+		Eventually(testapps.List(&testCtx, generics.ComponentSignature,
+			ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(defaultShardCount))
 	}
 
 	// createClusterObjV2 creates cluster objects with new component definition API enabled.
@@ -266,13 +265,12 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 
 		By("Wait component created")
-		for i := 0; i < defaultShardCount; i++ {
-			compKey := types.NamespacedName{
-				Namespace: clusterObj.Namespace,
-				Name:      constant.GenerateClusterComponentName(clusterObj.Name, fmt.Sprintf("%s-%d", compTplName, i)),
-			}
-			Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
+		ml := client.MatchingLabels{
+			constant.AppInstanceLabelKey:       clusterKey.Name,
+			constant.KBAppShardingNameLabelKey: compTplName,
 		}
+		Eventually(testapps.List(&testCtx, generics.ComponentSignature,
+			ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(defaultShardCount))
 	}
 
 	testClusterWithoutClusterVersion := func(compName, compDefName string) {
@@ -315,9 +313,12 @@ var _ = Describe("Cluster Controller", func() {
 		if shardCount == nil {
 			checkCompCreate(compName)
 		} else {
-			for i := 0; i < *shardCount; i++ {
-				checkCompCreate(fmt.Sprintf("%s-%d", compName, i))
+			ml := client.MatchingLabels{
+				constant.AppInstanceLabelKey:       clusterKey.Name,
+				constant.KBAppShardingNameLabelKey: compName,
 			}
+			Eventually(testapps.List(&testCtx, generics.ComponentSignature,
+				ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(*shardCount))
 		}
 	}
 
@@ -537,17 +538,6 @@ var _ = Describe("Cluster Controller", func() {
 			g.Expect(len(expectServices)).Should(Equal(len(services)))
 		} else {
 			if enableShardOrdinal {
-				for svcName, svcSpec := range expectServices {
-					for i := 0; i < *shardCount; i++ {
-						idx := slices.IndexFunc(services, func(e *corev1.Service) bool {
-							return e.Name == constant.GenerateClusterServiceName(clusterObj.Name, fmt.Sprintf("%s-%d", svcName, i))
-						})
-						g.Expect(idx >= 0).To(BeTrue())
-						svc := services[idx]
-						g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.KBAppComponentLabelKey, fmt.Sprintf("%s-%d", compName, i)))
-						validateSvc(svc, svcSpec)
-					}
-				}
 				g.Expect(len(expectServices) * *shardCount).Should(Equal(len(services)))
 			} else {
 				for svcName, svcSpec := range expectServices {

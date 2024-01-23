@@ -195,6 +195,9 @@ func (r *LogCollectionReconciler) patchBackupStatus(reqCtx intctrlutil.RequestCt
 	if err != nil {
 		return fmt.Errorf("collect error logs failed: %s", err.Error())
 	}
+	if errorLogs == "" {
+		return nil
+	}
 	patch := client.MergeFrom(backup.DeepCopy())
 	backup.Status.FailureReason = errorLogs
 	return r.Client.Status().Patch(reqCtx.Ctx, backup, patch)
@@ -227,6 +230,9 @@ func (r *LogCollectionReconciler) patchRestoreStatus(reqCtx intctrlutil.RequestC
 			errorLogs, err := r.collectErrorLogs(reqCtx, job)
 			if err != nil {
 				return fmt.Errorf("collect error logs failed: %s", err.Error())
+			}
+			if errorLogs == "" {
+				return nil
 			}
 			actions[i].Message = fmt.Sprintf("%s: %s", logPrefix, errorLogs)
 			break

@@ -27,7 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
@@ -45,12 +44,12 @@ func (t *clusterLoadRefResourcesTransformer) Transform(ctx graph.TransformContex
 		setProvisioningStartedCondition(&cluster.Status.Conditions, cluster.Name, cluster.Generation, err)
 	}()
 
-	allCompSpecs := t.allCompSpecs(cluster)
+	allCompSpecCnt := t.allCompSpecCnt(cluster)
 	allCompDefRefs := t.allCompDefRefs(cluster)
-	if len(cluster.Spec.ClusterDefRef) == 0 && len(allCompDefRefs) != len(allCompSpecs) {
+	if len(cluster.Spec.ClusterDefRef) == 0 && len(allCompDefRefs) != allCompSpecCnt {
 		return newRequeueError(requeueDuration, "either cluster definition or component definition should be provided")
 	}
-	if len(allCompDefRefs) != 0 && len(allCompDefRefs) != len(allCompSpecs) {
+	if len(allCompDefRefs) != 0 && len(allCompDefRefs) != allCompSpecCnt {
 		return newRequeueError(requeueDuration, "two kinds of definitions cannot be used together")
 	}
 
@@ -128,18 +127,12 @@ func (t *clusterLoadRefResourcesTransformer) allCompDefRefs(cluster *appsv1alpha
 	return refs
 }
 
-func (t *clusterLoadRefResourcesTransformer) allCompSpecs(cluster *appsv1alpha1.Cluster) []string {
-	specs := make([]string, 0)
-	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		specs = append(specs, compSpec.Name)
-	}
+func (t *clusterLoadRefResourcesTransformer) allCompSpecCnt(cluster *appsv1alpha1.Cluster) int {
+	compSpecCount := len(cluster.Spec.ComponentSpecs)
 	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		for i := 0; i < int(shardingSpec.Shards); i++ {
-			shardName := constant.GenerateShardName(shardingSpec.Name, i)
-			specs = append(specs, shardName)
-		}
+		compSpecCount += int(shardingSpec.Shards)
 	}
-	return specs
+	return compSpecCount
 }
 
 func (t *clusterLoadRefResourcesTransformer) loadAndCheckComponentDefinitions(

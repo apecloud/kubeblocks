@@ -46,7 +46,7 @@ func (t *clusterComponentStatusTransformer) Transform(ctx graph.TransformContext
 	}
 
 	// has no components defined
-	if len(transCtx.GenerateComponentSpecs) == 0 || !transCtx.OrigCluster.IsStatusUpdating() {
+	if len(transCtx.ComponentSpecs) == 0 || !transCtx.OrigCluster.IsStatusUpdating() {
 		return nil
 	}
 	return t.reconcileComponentsStatus(transCtx)
@@ -58,10 +58,10 @@ func (t *clusterComponentStatusTransformer) reconcileComponentsStatus(transCtx *
 		cluster.Status.Components = make(map[string]appsv1alpha1.ClusterComponentStatus)
 	}
 	// We cannot use cluster.status.components here because of simplified API generated component is not in it.
-	for _, genCompSpec := range transCtx.GenerateComponentSpecs {
+	for _, compSpec := range transCtx.ComponentSpecs {
 		compKey := types.NamespacedName{
 			Namespace: cluster.Namespace,
-			Name:      component.FullName(cluster.Name, genCompSpec.ComponentSpec.Name),
+			Name:      component.FullName(cluster.Name, compSpec.Name),
 		}
 		comp := &appsv1alpha1.Component{}
 		if err := transCtx.Client.Get(transCtx.Context, compKey, comp); err != nil {
@@ -70,7 +70,7 @@ func (t *clusterComponentStatusTransformer) reconcileComponentsStatus(transCtx *
 			}
 			return err
 		}
-		cluster.Status.Components[genCompSpec.ComponentSpec.Name] = t.buildClusterCompStatus(transCtx, comp, genCompSpec.ComponentSpec.Name)
+		cluster.Status.Components[compSpec.Name] = t.buildClusterCompStatus(transCtx, comp, compSpec.Name)
 	}
 	return nil
 }

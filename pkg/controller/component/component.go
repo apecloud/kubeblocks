@@ -181,13 +181,17 @@ func getClusterCompDefAndVersion(clusterDef *appsv1alpha1.ClusterDefinition,
 	return clusterCompDef, clusterCompVer, nil
 }
 
-func getClusterCompSpec4Component(clusterDef *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster,
+func getClusterCompSpec4Component(ctx context.Context, cli client.Reader,
+	clusterDef *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster,
 	comp *appsv1alpha1.Component) (*appsv1alpha1.ClusterComponentSpec, error) {
 	compName, err := ShortName(cluster.Name, comp.Name)
 	if err != nil {
 		return nil, err
 	}
-	compSpec := intctrlutil.GetOriginalOrGeneratedComponentSpecByName(cluster, compName)
+	compSpec, err := intctrlutil.GetOriginalOrGeneratedComponentSpecByName(ctx, cli, cluster, compName)
+	if err != nil {
+		return nil, err
+	}
 	if compSpec != nil {
 		return compSpec, nil
 	}

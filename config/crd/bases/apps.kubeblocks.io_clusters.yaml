@@ -1418,7 +1418,7 @@ spec:
                         and data associated with the corresponding Component will
                         be deleted as well.'
                       format: int32
-                      maximum: 256
+                      maximum: 8192
                       minimum: 0
                       type: integer
                     template:

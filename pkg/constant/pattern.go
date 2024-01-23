@@ -126,8 +126,3 @@ func GenerateVirtualComponentDefinition(compDefSuffix string) string {
 func GenerateResourceNameWithScalingSuffix(name string) string {
 	return fmt.Sprintf("%s-%s", name, SlashScalingLowerSuffix)
 }
-
-// GenerateShardName generates the shard component name.
-func GenerateShardName(shardingName string, ordinal int) string {
-	return fmt.Sprintf("%s-%d", shardingName, ordinal)
-}

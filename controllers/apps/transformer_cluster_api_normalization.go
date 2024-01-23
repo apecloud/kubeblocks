@@ -43,33 +43,33 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	}
 
 	// build all component specs
-	transCtx.GenerateComponentSpecs = make([]*GenerateComponentSpec, 0)
+	transCtx.ComponentSpecs = make([]*appsv1alpha1.ClusterComponentSpec, 0)
+	transCtx.ShardingComponentSpecs = make(map[string][]*appsv1alpha1.ClusterComponentSpec, 0)
+	transCtx.Labels = make([]map[string]string, 0)
 	cluster := transCtx.Cluster
 
 	for i := range cluster.Spec.ComponentSpecs {
 		clusterComSpec := cluster.Spec.ComponentSpecs[i]
-		transCtx.GenerateComponentSpecs = append(transCtx.GenerateComponentSpecs, &GenerateComponentSpec{
-			ComponentSpec: &clusterComSpec,
-			Labels:        nil,
-		})
+		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, &clusterComSpec)
+		transCtx.Labels = append(transCtx.Labels, nil)
 	}
 	for i := range cluster.Spec.ShardingSpecs {
 		shardingSpec := cluster.Spec.ShardingSpecs[i]
-		genShardingCompSpecList := controllerutil.GenShardingCompSpecList(&shardingSpec)
+		genShardingCompSpecList, err := controllerutil.GenShardingCompSpecList(transCtx.Context, transCtx.Client, cluster, &shardingSpec)
+		if err != nil {
+			return err
+		}
+		transCtx.ShardingComponentSpecs[shardingSpec.Name] = genShardingCompSpecList
 		for j := range genShardingCompSpecList {
 			genShardCompSpec := genShardingCompSpecList[j]
-			transCtx.GenerateComponentSpecs = append(transCtx.GenerateComponentSpecs, &GenerateComponentSpec{
-				ComponentSpec: genShardCompSpec,
-				Labels:        constant.GetShardingNameLabel(shardingSpec.Name),
-			})
+			transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, genShardCompSpec)
+			transCtx.Labels = append(transCtx.Labels, constant.GetShardingNameLabel(shardingSpec.Name))
 		}
 	}
 
 	if compSpec := apiconversion.HandleSimplifiedClusterAPI(transCtx.ClusterDef, cluster); compSpec != nil {
-		transCtx.GenerateComponentSpecs = append(transCtx.GenerateComponentSpecs, &GenerateComponentSpec{
-			ComponentSpec: compSpec,
-			Labels:        nil,
-		})
+		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, compSpec)
+		transCtx.Labels = append(transCtx.Labels, nil)
 	}
 
 	// validate componentDef and componentDefRef
@@ -81,19 +81,19 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	if transCtx.ComponentDefs == nil {
 		transCtx.ComponentDefs = make(map[string]*appsv1alpha1.ComponentDefinition)
 	}
-	for i, genCompSpec := range transCtx.GenerateComponentSpecs {
-		if len(genCompSpec.ComponentSpec.ComponentDef) == 0 {
-			compDef, err := component.BuildComponentDefinition(transCtx.ClusterDef, transCtx.ClusterVer, genCompSpec.ComponentSpec)
+	for i, compSpec := range transCtx.ComponentSpecs {
+		if len(compSpec.ComponentDef) == 0 {
+			compDef, err := component.BuildComponentDefinition(transCtx.ClusterDef, transCtx.ClusterVer, compSpec)
 			if err != nil {
 				return err
 			}
-			virtualCompDefName := constant.GenerateVirtualComponentDefinition(genCompSpec.ComponentSpec.ComponentDefRef)
+			virtualCompDefName := constant.GenerateVirtualComponentDefinition(compSpec.ComponentDefRef)
 			transCtx.ComponentDefs[virtualCompDefName] = compDef
-			transCtx.GenerateComponentSpecs[i].ComponentSpec.ComponentDef = virtualCompDefName
+			transCtx.ComponentSpecs[i].ComponentDef = virtualCompDefName
 		} else {
 			// should be loaded at load resources transformer
-			if _, ok := transCtx.ComponentDefs[genCompSpec.ComponentSpec.ComponentDef]; !ok {
-				panic(fmt.Sprintf("runtime error - expected component definition object not found: %s", genCompSpec.ComponentSpec.ComponentDef))
+			if _, ok := transCtx.ComponentDefs[compSpec.ComponentDef]; !ok {
+				panic(fmt.Sprintf("runtime error - expected component definition object not found: %s", compSpec.ComponentDef))
 			}
 		}
 	}
@@ -101,18 +101,18 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 }
 
 func validateComponentDefNComponentDefRef(transCtx *clusterTransformContext) error {
-	if len(transCtx.GenerateComponentSpecs) == 0 {
+	if len(transCtx.ComponentSpecs) == 0 {
 		return nil
 	}
 	hasCompDef := false
-	for _, genCompSpec := range transCtx.GenerateComponentSpecs {
-		if len(genCompSpec.ComponentSpec.ComponentDefRef) == 0 && len(genCompSpec.ComponentSpec.ComponentDef) == 0 {
+	for _, compSpec := range transCtx.ComponentSpecs {
+		if len(compSpec.ComponentDefRef) == 0 && len(compSpec.ComponentDef) == 0 {
 			return fmt.Errorf("componentDef and componentDefRef cannot be both empty")
 		}
-		if len(genCompSpec.ComponentSpec.ComponentDef) == 0 && hasCompDef {
+		if len(compSpec.ComponentDef) == 0 && hasCompDef {
 			return fmt.Errorf("all componentSpecs in the same cluster must either specify ComponentDef or omit ComponentDef simultaneously")
 		}
-		if len(genCompSpec.ComponentSpec.ComponentDef) > 0 {
+		if len(compSpec.ComponentDef) > 0 {
 			hasCompDef = true
 		}
 	}

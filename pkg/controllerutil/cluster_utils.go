@@ -20,23 +20,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package controllerutil
 
 import (
+	"context"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 // GetOriginalOrGeneratedComponentSpecByName get an original or generated cluster component spec by componentName.
-func GetOriginalOrGeneratedComponentSpecByName(cluster *appsv1alpha1.Cluster, componentName string) *appsv1alpha1.ClusterComponentSpec {
+func GetOriginalOrGeneratedComponentSpecByName(ctx context.Context, cli client.Reader,
+	cluster *appsv1alpha1.Cluster, componentName string) (*appsv1alpha1.ClusterComponentSpec, error) {
 	compSpec := cluster.Spec.GetComponentByName(componentName)
 	if compSpec != nil {
-		return compSpec
+		return compSpec, nil
 	}
 	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		genShardingCompList := GenShardingCompSpecList(&shardingSpec)
+		genShardingCompList, err := GenShardingCompSpecList(ctx, cli, cluster, &shardingSpec)
+		if err != nil {
+			return nil, err
+		}
 		for i, shardingComp := range genShardingCompList {
 			if shardingComp.Name == componentName {
 				compSpec = genShardingCompList[i]
-				return compSpec
+				return compSpec, nil
 			}
 		}
 	}
-	return nil
+	return nil, nil
 }

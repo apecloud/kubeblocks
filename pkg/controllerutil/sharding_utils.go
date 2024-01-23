@@ -20,31 +20,122 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package controllerutil
 
 import (
+	"context"
+	"fmt"
+	"strings"
+
+	"github.com/pkg/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
-func GenShardNameList(shardingSpec *appsv1alpha1.ShardingSpec) []string {
-	compNameList := make([]string, 0)
-	if shardingSpec == nil {
-		return compNameList
+func ListNCheckShardingComponents(ctx context.Context, cli client.Reader,
+	cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec) ([]appsv1alpha1.Component, error) {
+	shardingComps, err := ListShardingComponents(ctx, cli, cluster, shardingSpec)
+	if err != nil {
+		return nil, err
 	}
-	for i := 0; i < int(shardingSpec.Shards); i++ {
-		compNameList = append(compNameList, constant.GenerateShardName(shardingSpec.Name, i))
+	if cluster.Generation == cluster.Status.ObservedGeneration && len(shardingComps) != int(shardingSpec.Shards) {
+		return nil, errors.New("sharding components are not correct when cluster is not updating")
 	}
-	return compNameList
+	return shardingComps, nil
 }
 
-func GenShardingCompSpecList(shardingSpec *appsv1alpha1.ShardingSpec) []*appsv1alpha1.ClusterComponentSpec {
-	compSpecList := make([]*appsv1alpha1.ClusterComponentSpec, 0)
+func ListShardingComponents(ctx context.Context, cli client.Reader,
+	cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec) ([]appsv1alpha1.Component, error) {
+	compList := &appsv1alpha1.ComponentList{}
+	ml := client.MatchingLabels{
+		constant.AppInstanceLabelKey:       cluster.Name,
+		constant.KBAppShardingNameLabelKey: shardingSpec.Name,
+	}
+	if err := cli.List(ctx, compList, client.InNamespace(cluster.Namespace), ml); err != nil {
+		return nil, err
+	}
+	return compList.Items, nil
+}
+
+func ListShardingCompNames(ctx context.Context, cli client.Reader,
+	cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec) ([]string, error) {
+	compNameList := make([]string, 0)
 	if shardingSpec == nil {
-		return compSpecList
+		return compNameList, nil
 	}
+
+	existShardingComps, err := ListNCheckShardingComponents(ctx, cli, cluster, shardingSpec)
+	if err != nil {
+		return compNameList, err
+	}
+	for _, comp := range existShardingComps {
+		compShortName, err := parseCompShortName(cluster.Name, comp.Name)
+		if err != nil {
+			return nil, err
+		}
+		compNameList = append(compNameList, compShortName)
+	}
+	return compNameList, nil
+}
+
+func GenShardingCompSpecList(ctx context.Context, cli client.Reader,
+	cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec) ([]*appsv1alpha1.ClusterComponentSpec, error) {
+	compSpecList := make([]*appsv1alpha1.ClusterComponentSpec, 0)
+	compNameMap := make(map[string]string)
+	if shardingSpec == nil {
+		return compSpecList, nil
+	}
+
+	existShardingComps, err := ListNCheckShardingComponents(ctx, cli, cluster, shardingSpec)
+	if err != nil {
+		return nil, err
+	}
+
 	shardTpl := shardingSpec.Template
-	for i := 0; i < int(shardingSpec.Shards); i++ {
+	for _, existShardingComp := range existShardingComps {
+		existShardingCompShortName, err := parseCompShortName(cluster.Name, existShardingComp.Name)
+		if err != nil {
+			return nil, err
+		}
 		shardClusterCompSpec := shardTpl.DeepCopy()
-		shardClusterCompSpec.Name = constant.GenerateShardName(shardingSpec.Name, i)
+		shardClusterCompSpec.Name = existShardingCompShortName
 		compSpecList = append(compSpecList, shardClusterCompSpec)
+		compNameMap[existShardingCompShortName] = existShardingCompShortName
 	}
-	return compSpecList
+	switch {
+	case len(existShardingComps) == int(shardingSpec.Shards):
+		return compSpecList, err
+	case len(existShardingComps) < int(shardingSpec.Shards):
+		for i := len(existShardingComps); i < int(shardingSpec.Shards); i++ {
+			shardClusterCompSpec := shardTpl.DeepCopy()
+			genCompName := genRandomShardName(shardingSpec.Name, compNameMap)
+			shardClusterCompSpec.Name = genCompName
+			compSpecList = append(compSpecList, shardClusterCompSpec)
+			compNameMap[genCompName] = genCompName
+		}
+	case len(existShardingComps) > int(shardingSpec.Shards):
+		// TODO: order by?
+		compSpecList = compSpecList[:int(shardingSpec.Shards)]
+	}
+	return compSpecList, nil
+}
+
+// genRandomShardName generates a random name for sharding component.
+func genRandomShardName(shardingName string, existShardNamesMap map[string]string) string {
+	genName := common.SimpleNameGenerator.GenerateName(shardingName)
+	for {
+		if _, ok := existShardNamesMap[genName]; !ok {
+			break
+		}
+		genName = common.SimpleNameGenerator.GenerateName(shardingName)
+	}
+	return genName
+}
+
+func parseCompShortName(clusterName, compName string) (string, error) {
+	name, found := strings.CutPrefix(compName, fmt.Sprintf("%s-", clusterName))
+	if !found {
+		return "", fmt.Errorf("the component name has no cluster name as prefix: %s", compName)
+	}
+	return name, nil
 }

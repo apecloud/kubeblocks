@@ -109,7 +109,10 @@ func (r *ResourceFetcher[T]) ClusterVer() *T {
 
 func (r *ResourceFetcher[T]) ClusterComponent() *T {
 	return r.Wrap(func() (err error) {
-		r.ClusterComObj = controllerutil.GetOriginalOrGeneratedComponentSpecByName(r.ClusterObj, r.ComponentName)
+		r.ClusterComObj, err = controllerutil.GetOriginalOrGeneratedComponentSpecByName(r.Context, r.Client, r.ClusterObj, r.ComponentName)
+		if err != nil {
+			return err
+		}
 		return
 	})
 }

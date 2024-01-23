@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"context"
 	"fmt"
 
 	"golang.org/x/exp/slices"
@@ -61,7 +62,7 @@ func (t *componentLoadResourcesTransformer) Transform(ctx graph.TransformContext
 	transCtx.Cluster = cluster
 
 	generated := false
-	generated, err = isGeneratedComponent(cluster, comp)
+	generated, err = isGeneratedComponent(transCtx.Context, transCtx.Client, cluster, comp)
 	if err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
@@ -129,8 +130,7 @@ func (t *componentLoadResourcesTransformer) getNCheckCompDef(transCtx *component
 	return compDef, nil
 }
 
-func isGeneratedComponent(cluster *appsv1alpha1.Cluster,
-	comp *appsv1alpha1.Component) (bool, error) {
+func isGeneratedComponent(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) (bool, error) {
 	compName, err := component.ShortName(cluster.Name, comp.Name)
 	if err != nil {
 		return false, err
@@ -154,7 +154,11 @@ func isGeneratedComponent(cluster *appsv1alpha1.Cluster,
 	}
 
 	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		if slices.Contains(ictrlutil.GenShardNameList(&shardingSpec), compName) {
+		shardCompNames, err := ictrlutil.ListShardingCompNames(ctx, cli, cluster, &shardingSpec)
+		if err != nil {
+			return false, err
+		}
+		if slices.Contains(shardCompNames, compName) {
 			return validateCompDef(shardingSpec.Template.ComponentDef)
 		}
 	}

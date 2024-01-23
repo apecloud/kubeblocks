@@ -59,7 +59,7 @@ func BuildSynthesizedComponent4Generated(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, nil, err
 	}
-	clusterCompSpec, err := getClusterCompSpec4Component(clusterDef, cluster, comp)
+	clusterCompSpec, err := getClusterCompSpec4Component(reqCtx.Ctx, cli, clusterDef, cluster, comp)
 	if err != nil {
 		return nil, nil, err
 	}

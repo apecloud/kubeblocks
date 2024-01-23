@@ -310,7 +310,7 @@ type ShardingSpec struct {
 	//    Additionally, the resources and data associated with the corresponding Component will be deleted as well.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Maximum=256
+	// +kubebuilder:validation:Maximum=8192
 	Shards int32 `json:"shards,omitempty"`
 }
 

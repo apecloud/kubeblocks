@@ -169,23 +169,28 @@ func (t *clusterStatusTransformer) reconcileClusterStatus(transCtx *clusterTrans
 // removeInvalidCompStatus removes the invalid component of status.components which is deleted from spec.components.
 func (t *clusterStatusTransformer) removeInvalidCompStatus(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) {
 	// removes deleted components and keeps created components by simplified API
-	t.removeCompStatus(cluster, transCtx.GenerateComponentSpecs)
+	t.removeCompStatus(cluster, transCtx.ComponentSpecs)
 }
 
 // removeInnerCompStatus removes the component of status.components which is created by simplified API.
 func (t *clusterStatusTransformer) removeInnerCompStatus(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) {
-	genCompSpecs := make([]*GenerateComponentSpec, 0)
-	genCompSpecs = append(genCompSpecs, transCtx.GenerateComponentSpecs...)
-	t.removeCompStatus(cluster, genCompSpecs)
+	compSpecs := make([]*appsv1alpha1.ClusterComponentSpec, 0)
+	for i := range cluster.Spec.ComponentSpecs {
+		compSpecs = append(compSpecs, &cluster.Spec.ComponentSpecs[i])
+	}
+	for _, v := range transCtx.ShardingComponentSpecs {
+		compSpecs = append(compSpecs, v...)
+	}
+	t.removeCompStatus(cluster, compSpecs)
 }
 
 // removeCompStatus removes the component of status.components which is not in comp specs.
-func (t *clusterStatusTransformer) removeCompStatus(cluster *appsv1alpha1.Cluster, genCompSpecs []*GenerateComponentSpec) {
+func (t *clusterStatusTransformer) removeCompStatus(cluster *appsv1alpha1.Cluster, compSpecs []*appsv1alpha1.ClusterComponentSpec) {
 	tmpCompsStatus := map[string]appsv1alpha1.ClusterComponentStatus{}
 	compsStatus := cluster.Status.Components
-	for _, genComp := range genCompSpecs {
-		if compStatus, ok := compsStatus[genComp.ComponentSpec.Name]; ok {
-			tmpCompsStatus[genComp.ComponentSpec.Name] = compStatus
+	for _, v := range compSpecs {
+		if compStatus, ok := compsStatus[v.Name]; ok {
+			tmpCompsStatus[v.Name] = compStatus
 		}
 	}
 	// keep valid components' status

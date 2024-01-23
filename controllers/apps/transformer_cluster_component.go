@@ -48,7 +48,7 @@ func (t *clusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
-	if len(transCtx.GenerateComponentSpecs) == 0 {
+	if len(transCtx.ComponentSpecs) == 0 {
 		return nil
 	}
 
@@ -68,11 +68,15 @@ func (t *clusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTransformContext, dag *graph.DAG) error {
 	cluster := transCtx.Cluster
 
+	if len(transCtx.ComponentSpecs) != len(transCtx.Labels) {
+		return fmt.Errorf("component specs and labels are not matched")
+	}
+
 	protoCompSpecMap := make(map[string]*appsv1alpha1.ClusterComponentSpec)
 	protoCompLabelsMap := make(map[string]map[string]string)
-	for _, genCompSpec := range transCtx.GenerateComponentSpecs {
-		protoCompSpecMap[genCompSpec.ComponentSpec.Name] = genCompSpec.ComponentSpec
-		protoCompLabelsMap[genCompSpec.ComponentSpec.Name] = genCompSpec.Labels
+	for i, compSpec := range transCtx.ComponentSpecs {
+		protoCompSpecMap[compSpec.Name] = compSpec
+		protoCompLabelsMap[compSpec.Name] = transCtx.Labels[i]
 	}
 
 	protoCompSet := sets.KeySet(protoCompSpecMap)
@@ -153,7 +157,7 @@ func checkAllCompObjExist(transCtx *clusterTransformContext, cluster *appsv1alph
 	if err := transCtx.Client.List(transCtx.Context, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
 		return false, err
 	}
-	if len(compList.Items) != len(transCtx.GenerateComponentSpecs) {
+	if len(compList.Items) != len(transCtx.ComponentSpecs) {
 		return false, nil
 	}
 	return true, nil

@@ -79,7 +79,7 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 	}
 
 	for _, svc := range cluster.Spec.Services {
-		genServices, err := t.genMultiServiceIfNeed(cluster, &svc)
+		genServices, err := t.genMultiServiceIfNeed(transCtx, cluster, &svc)
 		if err != nil {
 			return err
 		}
@@ -106,24 +106,24 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 // convertLegacyClusterCompSpecServices converts legacy services defined in Cluster.Spec.ComponentSpecs[x].Services to Cluster.Spec.Services.
 func (t *clusterServiceTransformer) convertLegacyClusterCompSpecServices(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) ([]appsv1alpha1.ClusterService, error) {
 	convertedServices := make([]appsv1alpha1.ClusterService, 0)
-	for _, genCompSpec := range transCtx.GenerateComponentSpecs {
-		if len(genCompSpec.ComponentSpec.Services) == 0 {
+	for _, compSpec := range transCtx.ComponentSpecs {
+		if len(compSpec.Services) == 0 {
 			continue
 		}
 
 		// We only handle legacy services defined based on Cluster.Spec.ComponentSpecs[x].Services prior to version 0.8.0 of kubeblocks.
 		// After kubeblocks 0.8.0 it should be defined via Cluster.Spec.Services.
-		if transCtx.ClusterDef == nil || len(genCompSpec.ComponentSpec.ComponentDefRef) == 0 {
+		if transCtx.ClusterDef == nil || len(compSpec.ComponentDefRef) == 0 {
 			continue
 		}
 
-		clusterCompDef := transCtx.ClusterDef.GetComponentDefByName(genCompSpec.ComponentSpec.ComponentDefRef)
+		clusterCompDef := transCtx.ClusterDef.GetComponentDefByName(compSpec.ComponentDefRef)
 		if clusterCompDef == nil {
 			continue
 		}
 		defaultLegacyServicePorts := clusterCompDef.Service.ToSVCPorts()
 
-		for _, item := range genCompSpec.ComponentSpec.Services {
+		for _, item := range compSpec.Services {
 			legacyService := &appsv1alpha1.ClusterService{
 				Service: appsv1alpha1.Service{
 					Name:        constant.GenerateClusterServiceName(cluster.Name, item.Name),
@@ -134,9 +134,9 @@ func (t *clusterServiceTransformer) convertLegacyClusterCompSpecServices(transCt
 						Type:  item.ServiceType,
 					},
 				},
-				ComponentSelector: genCompSpec.ComponentSpec.Name,
+				ComponentSelector: compSpec.Name,
 			}
-			legacyServiceName := constant.GenerateComponentServiceName(cluster.Name, genCompSpec.ComponentSpec.Name, item.Name)
+			legacyServiceName := constant.GenerateComponentServiceName(cluster.Name, compSpec.Name, item.Name)
 			legacyServiceExist, err := checkLegacyServiceExist(transCtx, legacyServiceName, cluster.Namespace)
 			if err != nil {
 				return nil, err
@@ -151,6 +151,9 @@ func (t *clusterServiceTransformer) convertLegacyClusterCompSpecServices(transCt
 				legacyService.RoleSelector = constant.Primary
 			case appsv1alpha1.Consensus:
 				legacyService.RoleSelector = constant.Leader
+				if clusterCompDef.ConsensusSpec != nil {
+					legacyService.RoleSelector = clusterCompDef.ConsensusSpec.Leader.Name
+				}
 			}
 			convertedServices = append(convertedServices, *legacyService)
 		}
@@ -195,19 +198,20 @@ func (t *clusterServiceTransformer) buildService(transCtx *clusterTransformConte
 	return builder.GetObject(), nil
 }
 
-func (t *clusterServiceTransformer) genMultiServiceIfNeed(cluster *appsv1alpha1.Cluster, clusterService *appsv1alpha1.ClusterService) ([]*appsv1alpha1.ClusterService, error) {
+func (t *clusterServiceTransformer) genMultiServiceIfNeed(transCtx *clusterTransformContext,
+	cluster *appsv1alpha1.Cluster, clusterService *appsv1alpha1.ClusterService) ([]*appsv1alpha1.ClusterService, error) {
 	if len(clusterService.ShardingSelector) == 0 || len(cluster.Spec.ShardingSpecs) == 0 {
 		return []*appsv1alpha1.ClusterService{clusterService}, nil
 	}
 
 	shardingName := ""
-	shards := int32(0)
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		if shardingSpec.Name != clusterService.ShardingSelector {
+	shardingCompSpecs := make([]*appsv1alpha1.ClusterComponentSpec, 0)
+	for k, v := range transCtx.ShardingComponentSpecs {
+		if k != clusterService.ShardingSelector {
 			continue
 		}
-		shardingName = shardingSpec.Name
-		shards = shardingSpec.Shards
+		shardingName = k
+		shardingCompSpecs = v
 	}
 
 	if len(shardingName) == 0 {
@@ -219,16 +223,16 @@ func (t *clusterServiceTransformer) genMultiServiceIfNeed(cluster *appsv1alpha1.
 		return []*appsv1alpha1.ClusterService{clusterService}, nil
 	}
 
-	shardOrdinalClusterSvcs := make([]*appsv1alpha1.ClusterService, 0, shards)
-	for i := int32(0); i < shards; i++ {
+	shardOrdinalClusterSvcs := make([]*appsv1alpha1.ClusterService, 0, len(shardingCompSpecs))
+	for _, shardingCompSpec := range shardingCompSpecs {
 		svc := clusterService.DeepCopy()
-		svc.Name = fmt.Sprintf("%s-%d", clusterService.Name, i)
+		svc.Name = fmt.Sprintf("%s-%s", clusterService.Name, shardingCompSpec.Name)
 		// set component selector to each shard ordinal service
-		svc.ComponentSelector = constant.GenerateShardName(clusterService.ShardingSelector, int(i))
+		svc.ComponentSelector = shardingCompSpec.Name
 		if len(clusterService.ServiceName) == 0 {
-			svc.ServiceName = fmt.Sprintf("%d", i)
+			svc.ServiceName = fmt.Sprintf("%s", shardingCompSpec.Name)
 		} else {
-			svc.ServiceName = fmt.Sprintf("%s-%d", clusterService.ServiceName, i)
+			svc.ServiceName = fmt.Sprintf("%s-%s", clusterService.ServiceName, shardingCompSpec.Name)
 		}
 		shardOrdinalClusterSvcs = append(shardOrdinalClusterSvcs, svc)
 	}
@@ -245,9 +249,9 @@ func (t *clusterServiceTransformer) builtinSelector(cluster *appsv1alpha1.Cluste
 
 func (t *clusterServiceTransformer) checkComponent(transCtx *clusterTransformContext, clusterService *appsv1alpha1.ClusterService) (*appsv1alpha1.ComponentDefinition, error) {
 	compName := clusterService.ComponentSelector
-	for _, genCompSpec := range transCtx.GenerateComponentSpecs {
-		if genCompSpec.ComponentSpec.Name == compName {
-			compDef, ok := transCtx.ComponentDefs[genCompSpec.ComponentSpec.ComponentDef]
+	for _, compSpec := range transCtx.ComponentSpecs {
+		if compSpec.Name == compName {
+			compDef, ok := transCtx.ComponentDefs[compSpec.ComponentDef]
 			if !ok {
 				return nil, fmt.Errorf("the component definition of service selector is not defined, service: %s, component: %s", clusterService.Name, compName)
 			}

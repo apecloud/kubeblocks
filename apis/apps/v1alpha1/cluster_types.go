@@ -292,7 +292,7 @@ type ShardingSpec struct {
 	// The name is also used to generate the name of the underlying components with the naming pattern <ShardingSpec.Name>-<ShardID>.
 	// At the same time, the name of component template defined in ShardingSpec.Template.Name will be ignored.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=22
+	// +kubebuilder:validation:MaxLength=15
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	Name string `json:"name"`

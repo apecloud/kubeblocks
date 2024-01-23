@@ -1396,7 +1396,7 @@ spec:
                         the underlying components with the naming pattern <ShardingSpec.Name>-<ShardID>.
                         At the same time, the name of component template defined in
                         ShardingSpec.Template.Name will be ignored.
-                      maxLength: 22
+                      maxLength: 15
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                       x-kubernetes-validations:

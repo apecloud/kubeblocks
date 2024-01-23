@@ -130,6 +130,8 @@ func (t *componentLoadResourcesTransformer) getNCheckCompDef(transCtx *component
 	return compDef, nil
 }
 
+// isGeneratedComponent checks if the component is generated from componentDefRef.
+// TODO: remove the dependency on cluster.Spec
 func isGeneratedComponent(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) (bool, error) {
 	compName, err := component.ShortName(cluster.Name, comp.Name)
 	if err != nil {

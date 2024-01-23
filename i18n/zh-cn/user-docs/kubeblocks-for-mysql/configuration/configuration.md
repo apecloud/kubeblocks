@@ -204,12 +204,12 @@ Linux 和 macOS 系统可以使用 vi 编辑器编辑配置文件，Windows 系�
    kbcli cluster edit-config mysql-cluster --config-spec=mysql-consensusset-config
    ```
 
-    :::note
+   :::note
 
-    * ApeCloud MySQL 目前支持多个模板，需通过 `--config-spec` 指定一个配置模板。执行 `kbcli cluster describe-config mysql-cluster` 查看所有模板的名称。
-    * 如果集群中有多个组件，请使用 `--component` 参数指定一个组件。
+   * ApeCloud MySQL 目前支持多个模板，需通过 `--config-spec` 指定一个配置模板。执行 `kbcli cluster describe-config mysql-cluster` 查看所有模板的名称。
+   * 如果集群中有多个组件，请使用 `--component` 参数指定一个组件。
 
-    :::
+   :::
 
 2. 查看参数配置状态。
 
@@ -223,12 +223,12 @@ Linux 和 macOS 系统可以使用 vi 编辑器编辑配置文件，Windows 系�
    kbcli cluster connect mysql-cluster
    ```
 
-    :::note
+   :::note
 
-    1. `edit-config` 不能同时编辑静态参数和动态参数。
-    2.  KubeBlocks 未来将支持删除参数。
+   1. `edit-config` 不能同时编辑静态参数和动态参数。
+   2.  KubeBlocks 未来将支持删除参数。
 
-    :::
+   :::
 
 ## 查看历史记录并比较参数差异
 

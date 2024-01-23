@@ -230,7 +230,7 @@ func (t *clusterServiceTransformer) genMultiServiceIfNeed(transCtx *clusterTrans
 		// set component selector to each shard ordinal service
 		svc.ComponentSelector = shardingCompSpec.Name
 		if len(clusterService.ServiceName) == 0 {
-			svc.ServiceName = fmt.Sprintf("%s", shardingCompSpec.Name)
+			svc.ServiceName = shardingCompSpec.Name
 		} else {
 			svc.ServiceName = fmt.Sprintf("%s-%s", clusterService.ServiceName, shardingCompSpec.Name)
 		}

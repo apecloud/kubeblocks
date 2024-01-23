@@ -316,7 +316,7 @@ INSERT INTO kubeblocks.kb_health_check VALUES(%d, UNIX_TIMESTAMP()) ON DUPLICATE
 COMMIT;`, engines.CheckStatusType)
 	_, err := db.ExecContext(ctx, writeSQL)
 	if err != nil {
-		mgr.Logger.Error(err, fmt.Sprintf("SQL %s executing failed", writeSQL))
+		mgr.Logger.Info(writeSQL+" executing failed", "error", err.Error())
 		return false
 	}
 	return true
@@ -377,7 +377,7 @@ func (mgr *Manager) GetSlaveStatus(context.Context, *sql.DB) (RowMap, error) {
 		return nil
 	})
 	if err != nil {
-		mgr.Logger.Error(err, "error executing %s")
+		mgr.Logger.Info("executing "+sql+" failed", "error", err.Error())
 		return nil, err
 	}
 	return rowMap, nil
@@ -392,7 +392,7 @@ func (mgr *Manager) GetMasterStatus(context.Context, *sql.DB) (RowMap, error) {
 		return nil
 	})
 	if err != nil {
-		mgr.Logger.Error(err, fmt.Sprintf("error executing %s", sql))
+		mgr.Logger.Info("executing "+sql+" failed", "error", err.Error())
 		return nil, err
 	}
 	return rowMap, nil
@@ -489,7 +489,7 @@ func (mgr *Manager) EnableSemiSyncIfNeed(ctx context.Context) error {
 		if err == sql.ErrNoRows {
 			return nil
 		}
-		mgr.Logger.Error(err, "Get rpl_semi_sync_source plugin status failed: %v")
+		mgr.Logger.Info("Get rpl_semi_sync_source plugin status failed", "error", err.Error())
 		return err
 	}
 
@@ -502,7 +502,7 @@ func (mgr *Manager) EnableSemiSyncIfNeed(ctx context.Context) error {
 			"SET GLOBAL rpl_semi_sync_source_timeout = 100000;"
 		_, err = mgr.DB.Exec(setSourceEnable)
 		if err != nil {
-			mgr.Logger.Error(err, setSourceEnable+" execute failed")
+			mgr.Logger.Info(setSourceEnable+" execute failed", "error", err.Error())
 			return err
 		}
 	}
@@ -513,7 +513,7 @@ func (mgr *Manager) EnableSemiSyncIfNeed(ctx context.Context) error {
 		if err == sql.ErrNoRows {
 			return nil
 		}
-		mgr.Logger.Error(err, "Get rpl_semi_sync_replica plugin status failed: %v")
+		mgr.Logger.Info("Get rpl_semi_sync_replica plugin status failed", "error", err.Error())
 		return err
 	}
 
@@ -521,7 +521,7 @@ func (mgr *Manager) EnableSemiSyncIfNeed(ctx context.Context) error {
 		setSourceEnable := "SET GLOBAL rpl_semi_sync_replica_enabled = 1;"
 		_, err = mgr.DB.Exec(setSourceEnable)
 		if err != nil {
-			mgr.Logger.Error(err, setSourceEnable+" execute failed")
+			mgr.Logger.Info(setSourceEnable+" execute failed", "error", err.Error())
 			return err
 		}
 	}
@@ -538,7 +538,7 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 	stopSlave := `stop slave;`
 	resp, err := mgr.DB.Exec(stopReadOnly + stopSlave)
 	if err != nil {
-		mgr.Logger.Error(err, "promote err")
+		mgr.Logger.Info("promote failed", "error", err.Error())
 		return err
 	}
 
@@ -553,7 +553,7 @@ func (mgr *Manager) Demote(context.Context) error {
 
 	_, err := mgr.DB.Exec(setReadOnly)
 	if err != nil {
-		mgr.Logger.Error(err, "demote err")
+		mgr.Logger.Info("demote failed", "error", err.Error())
 		return err
 	}
 	return nil
@@ -574,7 +574,7 @@ func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 		return nil
 	}
 
-	stopSlave := `stop slave;`
+	stopSlave := `stop slave;reset master;`
 	// MySQL 5.7 has a limitation where the length of the master_host cannot exceed 60 characters.
 	masterHost := cluster.GetMemberShortAddr(*leaderMember)
 	changeMaster := fmt.Sprintf(`change master to master_host='%s',master_user='%s',master_password='%s',master_port=%s,master_auto_position=1;`,
@@ -584,7 +584,7 @@ func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 
 	_, err := mgr.DB.Exec(stopSlave + changeMaster + startSlave)
 	if err != nil {
-		mgr.Logger.Error(err, "sql query failed, err")
+		mgr.Logger.Info("Follow master failed", "error", err.Error())
 		return err
 	}
 
@@ -604,7 +604,7 @@ func (mgr *Manager) isRecoveryConfOutdated(leader string) bool {
 	ioRunning := rowMap.GetString("Slave_IO_Running")
 	sqlRunning := rowMap.GetString("Slave_SQL_Running")
 	if ioRunning == "No" || sqlRunning == "No" {
-		mgr.Logger.Error(nil, fmt.Sprintf("slave status error, %v", rowMap))
+		mgr.Logger.Info("slave status error", "status", rowMap)
 		return true
 	}
 
@@ -666,7 +666,7 @@ func (mgr *Manager) Lock(context.Context, string) error {
 
 	_, err := mgr.DB.Exec(setReadOnly)
 	if err != nil {
-		mgr.Logger.Error(err, "Lock err")
+		mgr.Logger.Info("Lock failed", "error", err.Error())
 		return err
 	}
 	mgr.IsLocked = true
@@ -678,7 +678,7 @@ func (mgr *Manager) Unlock(context.Context) error {
 
 	_, err := mgr.DB.Exec(setReadOnlyOff)
 	if err != nil {
-		mgr.Logger.Error(err, "Unlock err")
+		mgr.Logger.Info("Unlock failed", "error", err.Error())
 		return err
 	}
 	mgr.IsLocked = false

@@ -165,6 +165,9 @@ var _ = BeforeSuite(func() {
 	err = (&Component{}).SetupWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
+	err = (&ComponentVersion{}).SetupWebhookWithManager(mgr)
+	Expect(err).NotTo(HaveOccurred())
+
 	err = (&ClusterTopology{}).SetupWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 

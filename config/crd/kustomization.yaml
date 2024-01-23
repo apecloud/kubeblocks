@@ -24,6 +24,7 @@ resources:
 - bases/apps.kubeblocks.io_componentdefinitions.yaml
 - bases/apps.kubeblocks.io_components.yaml
 - bases/apps.kubeblocks.io_opsdefinitions.yaml
+- bases/apps.kubeblocks.io_componentversions.yaml
 - bases/apps.kubeblocks.io_clustertopologies.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
@@ -54,6 +55,7 @@ patchesStrategicMerge:
 #- patches/webhook_in_componentdefinitions.yaml
 #- patches/webhook_in_components.yaml
 #- patches/webhook_in_opsdefinitions.yaml
+#- patches/webhook_in_componentversions.yaml
 #- patches/webhook_in_clustertopologies.yaml
 #+kubebuilder:scaffold:crdkustomizewebhookpatch
 
@@ -83,6 +85,7 @@ patchesStrategicMerge:
 #- patches/cainjection_in_componentdefinitions.yaml
 #- patches/cainjection_in_components.yaml
 #- patches/cainjection_in_opsdefinitions.yaml
+#- patches/cainjection_in_componentversions.yaml
 #- patches/cainjection_in_clustertopologies.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch
 

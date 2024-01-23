@@ -75,6 +75,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().ComponentDefinitions().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("componentresourceconstraints"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().ComponentResourceConstraints().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("componentversions"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().ComponentVersions().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("configconstraints"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().ConfigConstraints().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("opsdefinitions"):

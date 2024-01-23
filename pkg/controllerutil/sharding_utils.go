@@ -78,7 +78,7 @@ func ListShardingCompNames(ctx context.Context, cli client.Reader,
 	return compNameList, nil
 }
 
-func GenShardingCompSpecList(ctx context.Context, cli client.Reader,
+func ListShardingCompSpecs(ctx context.Context, cli client.Reader,
 	cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec) ([]*appsv1alpha1.ClusterComponentSpec, error) {
 	compSpecList := make([]*appsv1alpha1.ClusterComponentSpec, 0)
 	compNameMap := make(map[string]string)
@@ -102,18 +102,34 @@ func GenShardingCompSpecList(ctx context.Context, cli client.Reader,
 		compSpecList = append(compSpecList, shardClusterCompSpec)
 		compNameMap[existShardingCompShortName] = existShardingCompShortName
 	}
+	return compSpecList, nil
+}
+
+func GenShardingCompSpecList(ctx context.Context, cli client.Reader,
+	cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec) ([]*appsv1alpha1.ClusterComponentSpec, error) {
+	compSpecList := make([]*appsv1alpha1.ClusterComponentSpec, 0)
+	existShardingCompSpecs, err := ListShardingCompSpecs(ctx, cli, cluster, shardingSpec)
+	if err != nil {
+		return nil, err
+	}
+	compSpecList = append(compSpecList, existShardingCompSpecs...)
+	compNameMap := make(map[string]string)
+	for _, existShardingCompSpec := range existShardingCompSpecs {
+		compNameMap[existShardingCompSpec.Name] = existShardingCompSpec.Name
+	}
+	shardTpl := shardingSpec.Template
 	switch {
-	case len(existShardingComps) == int(shardingSpec.Shards):
-		return compSpecList, err
-	case len(existShardingComps) < int(shardingSpec.Shards):
-		for i := len(existShardingComps); i < int(shardingSpec.Shards); i++ {
+	case len(existShardingCompSpecs) == int(shardingSpec.Shards):
+		return existShardingCompSpecs, err
+	case len(existShardingCompSpecs) < int(shardingSpec.Shards):
+		for i := len(existShardingCompSpecs); i < int(shardingSpec.Shards); i++ {
 			shardClusterCompSpec := shardTpl.DeepCopy()
 			genCompName := genRandomShardName(shardingSpec.Name, compNameMap)
 			shardClusterCompSpec.Name = genCompName
 			compSpecList = append(compSpecList, shardClusterCompSpec)
 			compNameMap[genCompName] = genCompName
 		}
-	case len(existShardingComps) > int(shardingSpec.Shards):
+	case len(existShardingCompSpecs) > int(shardingSpec.Shards):
 		// TODO: order by?
 		compSpecList = compSpecList[:int(shardingSpec.Shards)]
 	}

@@ -79,6 +79,7 @@ spec:
                               already installed in the Kubernetes cluster. 3. Optionally
                               search for component definitions in the Addon repository
                               if specified.'
+                            maxLength: 128
                             type: string
                           name:
                             description: Name defines the name of the component. This
@@ -151,6 +152,7 @@ spec:
                               assists in determining the appropriate version of the
                               component definition, considering multiple available
                               definitions.
+                            maxLength: 32
                             type: string
                         required:
                         - compDef

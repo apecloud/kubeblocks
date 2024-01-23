@@ -33,7 +33,9 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -82,7 +84,41 @@ func (r *ComponentVersionReconciler) Reconcile(ctx context.Context, req ctrl.Req
 func (r *ComponentVersionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.ComponentVersion{}).
+		Watches(&appsv1alpha1.ComponentDefinition{}, handler.EnqueueRequestsFromMapFunc(r.compatibleCompVersion)).
 		Complete(r)
+}
+
+func (r *ComponentVersionReconciler) compatibleCompVersion(ctx context.Context, obj client.Object) []reconcile.Request {
+	compDef, ok := obj.(*appsv1alpha1.ComponentDefinition)
+	if !ok {
+		return nil
+	}
+	versions := &appsv1alpha1.ComponentVersionList{}
+	if err := r.Client.List(ctx, versions); err != nil {
+		return nil
+	}
+	requests := make([]reconcile.Request, 0)
+	for _, compVersion := range versions.Items {
+		if r.isCompatibleWith(*compDef, compVersion) {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name: compVersion.Name,
+				},
+			})
+		}
+	}
+	return requests
+}
+
+func (r *ComponentVersionReconciler) isCompatibleWith(compDef appsv1alpha1.ComponentDefinition, compVer appsv1alpha1.ComponentVersion) bool {
+	for _, rule := range compVer.Spec.CompatibilityRules {
+		for _, name := range rule.CompDefs {
+			if strings.HasPrefix(compDef.Name, name) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (r *ComponentVersionReconciler) reconcile(rctx intctrlutil.RequestCtx,
@@ -92,24 +128,25 @@ func (r *ComponentVersionReconciler) reconcile(rctx intctrlutil.RequestCtx,
 		return *res, err
 	}
 
-	if compVersion.Status.ObservedGeneration == compVersion.Generation &&
-		slices.Contains([]appsv1alpha1.Phase{appsv1alpha1.AvailablePhase}, compVersion.Status.Phase) {
-		return intctrlutil.Reconciled()
-	}
+	// if compVersion.Status.ObservedGeneration == compVersion.Generation &&
+	//	slices.Contains([]appsv1alpha1.Phase{appsv1alpha1.AvailablePhase}, compVersion.Status.Phase) {
+	//	return intctrlutil.Reconciled()
+	// }
 
-	compatibilityRules, err := r.buildCompatibilityRules(r.Client, rctx, compVersion)
+	releaseToCompDefinitions, err := r.buildReleaseToCompDefinitionMapping(r.Client, rctx, compVersion)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
 	}
 
-	if err = r.validate(compVersion, compatibilityRules); err != nil {
+	if err = r.validate(compVersion, releaseToCompDefinitions); err != nil {
 		if err1 := r.unavailable(r.Client, rctx, compVersion, err); err1 != nil {
 			return intctrlutil.CheckedRequeueWithError(err1, rctx.Log, "")
 		}
 		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
 	}
 
-	err = r.updateLabels(r.Client, rctx, compVersion, compatibilityRules)
+	// patch the supported component definitions as labels to the object.
+	err = r.updateSupportedCompDefLabels(r.Client, rctx, compVersion, releaseToCompDefinitions)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
 	}
@@ -124,31 +161,44 @@ func (r *ComponentVersionReconciler) reconcile(rctx intctrlutil.RequestCtx,
 	return intctrlutil.Reconciled()
 }
 
-func (r *ComponentVersionReconciler) buildCompatibilityRules(cli client.Client, rctx intctrlutil.RequestCtx,
-	compVersion *appsv1alpha1.ComponentVersion) (map[*appsv1alpha1.ComponentDefinition][]string, error) {
-	compDefs := make(map[*appsv1alpha1.ComponentDefinition][]string)
+func (r *ComponentVersionReconciler) buildReleaseToCompDefinitionMapping(cli client.Client, rctx intctrlutil.RequestCtx,
+	compVersion *appsv1alpha1.ComponentVersion) (map[string]map[string]*appsv1alpha1.ComponentDefinition, error) {
+	compDefs := make(map[string]*appsv1alpha1.ComponentDefinition)
 	for _, rule := range compVersion.Spec.CompatibilityRules {
 		for _, compDef := range rule.CompDefs {
-			equal := func(cmpd *appsv1alpha1.ComponentDefinition) bool {
-				return cmpd.Name == compDef
-			}
-			if slices.IndexFunc(maps.Keys(compDefs), equal) >= 0 {
+			if _, ok := compDefs[compDef]; ok {
 				continue
 			}
 			cmpd := &appsv1alpha1.ComponentDefinition{}
 			key := types.NamespacedName{
-				Name: compDef,
+				Name: compDef, // TODO: wildcard
 			}
-			if err := cli.Get(rctx.Ctx, key, cmpd); err != nil {
-				if apierrors.IsNotFound(err) {
-					continue
-				}
+			err := cli.Get(rctx.Ctx, key, cmpd)
+			switch {
+			case err != nil && !apierrors.IsNotFound(err):
 				return nil, err
+			case err != nil:
+				compDefs[compDef] = nil
+			default:
+				compDefs[compDef] = cmpd
 			}
-			compDefs[cmpd] = rule.Releases
 		}
 	}
-	return compDefs, nil
+	releaseToCompDefinitions := make(map[string]map[string]*appsv1alpha1.ComponentDefinition)
+	for _, rule := range compVersion.Spec.CompatibilityRules {
+		for _, release := range rule.Releases {
+			if _, ok := releaseToCompDefinitions[release]; !ok {
+				releaseToCompDefinitions[release] = map[string]*appsv1alpha1.ComponentDefinition{}
+			}
+			for _, compDef := range rule.CompDefs {
+				if _, ok := releaseToCompDefinitions[release][compDef]; ok {
+					continue
+				}
+				releaseToCompDefinitions[release][compDef] = compDefs[compDef]
+			}
+		}
+	}
+	return releaseToCompDefinitions, nil
 }
 
 func (r *ComponentVersionReconciler) deletionHandler(rctx intctrlutil.RequestCtx,
@@ -198,18 +248,20 @@ func (r *ComponentVersionReconciler) supportedServiceVersions(compVersion *appsv
 	return strings.Join(keys, ",") // TODO
 }
 
-func (r *ComponentVersionReconciler) updateLabels(cli client.Client, rctx intctrlutil.RequestCtx,
-	compVersion *appsv1alpha1.ComponentVersion, compatibilityRules map[*appsv1alpha1.ComponentDefinition][]string) error {
+func (r *ComponentVersionReconciler) updateSupportedCompDefLabels(cli client.Client, rctx intctrlutil.RequestCtx,
+	compVersion *appsv1alpha1.ComponentVersion, releaseToCompDefinitions map[string]map[string]*appsv1alpha1.ComponentDefinition) error {
 	updated := false
 	if compVersion.Labels == nil {
 		compVersion.Labels = make(map[string]string)
 	}
-	for cmpd := range compatibilityRules {
-		if _, ok := compVersion.Labels[cmpd.Name]; ok {
-			continue
+	for _, compDefs := range releaseToCompDefinitions {
+		for name := range compDefs {
+			if _, ok := compVersion.Labels[name]; ok {
+				continue
+			}
+			compVersion.Labels[name] = name
+			updated = true
 		}
-		compVersion.Labels[cmpd.Name] = cmpd.Name
-		updated = true
 	}
 	if updated {
 		return cli.Update(rctx.Ctx, compVersion)
@@ -218,9 +270,9 @@ func (r *ComponentVersionReconciler) updateLabels(cli client.Client, rctx intctr
 }
 
 func (r *ComponentVersionReconciler) validate(compVersion *appsv1alpha1.ComponentVersion,
-	compatibilityRules map[*appsv1alpha1.ComponentDefinition][]string) error {
+	releaseToCompDefinitions map[string]map[string]*appsv1alpha1.ComponentDefinition) error {
 	for _, release := range compVersion.Spec.Releases {
-		if err := r.validateRelease(release, compatibilityRules); err != nil {
+		if err := r.validateRelease(release, releaseToCompDefinitions); err != nil {
 			return err
 		}
 	}
@@ -228,12 +280,13 @@ func (r *ComponentVersionReconciler) validate(compVersion *appsv1alpha1.Componen
 }
 
 func (r *ComponentVersionReconciler) validateRelease(release appsv1alpha1.ComponentVersionRelease,
-	compatibilityRules map[*appsv1alpha1.ComponentDefinition][]string) error {
-	for cmpd, releases := range compatibilityRules {
-		if !slices.Contains(releases, release.Release) {
-			continue
-		}
-		for name := range release.Images {
+	releaseToCompDefinitions map[string]map[string]*appsv1alpha1.ComponentDefinition) error {
+	cmpds, ok := releaseToCompDefinitions[release.Release]
+	if !ok {
+		return fmt.Errorf("release %s has no any supported ComponentDefinition", release.Release)
+	}
+	for name := range release.Images {
+		for _, cmpd := range cmpds {
 			if err := r.validateContainer(*cmpd, name); err != nil {
 				return err
 			}

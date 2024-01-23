@@ -80,10 +80,12 @@ type ClusterTopologyComponent struct {
 	//   2. Consider component definitions already installed in the Kubernetes cluster.
 	//   3. Optionally search for component definitions in the Addon repository if specified.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=128
 	CompDef string `json:"compDef"`
 
 	// ServiceVersion specifies the version associated with the referenced component definition.
 	// This field assists in determining the appropriate version of the component definition, considering multiple available definitions.
+	// +kubebuilder:validation:MaxLength=32
 	// +optional
 	ServiceVersion string `json:"serviceVersion,omitempty"`
 

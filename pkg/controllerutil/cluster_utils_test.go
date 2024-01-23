@@ -23,43 +23,97 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/generics"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
 var _ = Describe("cluster utils test", func() {
 
+	// Cleanups
+	cleanEnv := func() {
+		// must wait till resources deleted and no longer existed before the testcases start,
+		// otherwise if later it needs to create some new resource objects with the same name,
+		// in race conditions, it will find the existence of old objects, resulting failure to
+		// create the new objects.
+		By("clean resources")
+
+		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
+
+		// delete rest mocked objects
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		// namespaced
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ServiceSignature, true, inNS)
+	}
+
 	Context("cluster utils test", func() {
+		const (
+			clusterDefName        = "test-clusterdef"
+			clusterVersionName    = "test-clusterversion"
+			clusterName           = "test-cls"
+			mysqlCompDefName      = "replicasets"
+			mysqlCompName         = "mysql"
+			mysqlShardingName     = "mysql-sharding"
+			mysqlShardingCompName = "mysql-sharding-comp"
+		)
+
+		var (
+			clusterDef     *appsv1alpha1.ClusterDefinition
+			clusterVersion *appsv1alpha1.ClusterVersion
+			cluster        *appsv1alpha1.Cluster
+		)
+
+		BeforeEach(func() {
+			cleanEnv()
+
+			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
+				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
+				GetObject()
+			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
+				AddComponentVersion(mysqlCompDefName).
+				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+				GetObject()
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+				clusterDef.Name, clusterVersion.Name).
+				SetUID(clusterName).
+				AddComponent(mysqlCompName, mysqlCompDefName).
+				AddShardSpecV2(mysqlShardingName, mysqlCompDefName).
+				SetShards(0).
+				Create(&testCtx).GetObject()
+		})
+
 		It("get original or generated cluster component spec test", func() {
-			cluster := &appsv1alpha1.Cluster{
-				Spec: appsv1alpha1.ClusterSpec{
-					ShardingSpecs: []appsv1alpha1.ShardingSpec{
-						{
-							Template: appsv1alpha1.ClusterComponentSpec{
-								Replicas: 2,
-								Name:     "fakeCompName",
-							},
-							Name:   "shardingName",
-							Shards: 3,
-						},
-					},
-					ComponentSpecs: []appsv1alpha1.ClusterComponentSpec{
-						{
-							Name: "compName",
-						},
-					},
-				},
-			}
-
-			compSpec := GetOriginalOrGeneratedComponentSpecByName(cluster, "compName")
+			compSpec, err := GetOriginalOrGeneratedComponentSpecByName(testCtx.Ctx, k8sClient, cluster, mysqlCompName)
+			Expect(err).ShouldNot(HaveOccurred())
 			Expect(compSpec).ShouldNot(BeNil())
-			Expect(compSpec.Name).Should(Equal("compName"))
+			Expect(compSpec.Name).Should(Equal(mysqlCompName))
 
-			compSpec = GetOriginalOrGeneratedComponentSpecByName(cluster, "fakeCompName")
+			compSpec, err = GetOriginalOrGeneratedComponentSpecByName(testCtx.Ctx, k8sClient, cluster, "fakeCompName")
+			Expect(err).ShouldNot(HaveOccurred())
 			Expect(compSpec).Should(BeNil())
 
-			compSpec = GetOriginalOrGeneratedComponentSpecByName(cluster, "shardingName-0")
+			By("create mock sharding component object")
+			mockCompObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, cluster.Name+"-"+mysqlShardingCompName, "").
+				AddLabels(constant.AppInstanceLabelKey, cluster.Name).
+				AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
+				AddLabels(constant.KBAppShardingNameLabelKey, mysqlShardingName).
+				SetReplicas(1).
+				Create(&testCtx).
+				GetObject()
+			compKey := client.ObjectKeyFromObject(mockCompObj)
+			Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
+
+			compSpec, err = GetOriginalOrGeneratedComponentSpecByName(testCtx.Ctx, k8sClient, cluster, mysqlShardingCompName)
+			Expect(err).ShouldNot(HaveOccurred())
 			Expect(compSpec).ShouldNot(BeNil())
-			Expect(compSpec.Name).Should(Equal("shardingName-0"))
+			Expect(compSpec.Name).Should(Equal(mysqlShardingCompName))
 		})
 	})
 })

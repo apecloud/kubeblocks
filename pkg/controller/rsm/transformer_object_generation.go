@@ -359,6 +359,7 @@ func buildSts(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envC
 		SetSelector(rsm.Spec.Selector).
 		SetServiceName(headlessSvcName).
 		SetReplicas(*rsm.Spec.Replicas).
+		SetMinReadySeconds(rsm.Spec.MinReadySeconds).
 		SetPodManagementPolicy(rsm.Spec.PodManagementPolicy).
 		SetVolumeClaimTemplates(rsm.Spec.VolumeClaimTemplates...).
 		SetTemplate(*template).

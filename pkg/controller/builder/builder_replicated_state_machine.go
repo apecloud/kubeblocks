@@ -48,6 +48,11 @@ func (builder *ReplicatedStateMachineBuilder) SetReplicas(replicas int32) *Repli
 	return builder
 }
 
+func (builder *ReplicatedStateMachineBuilder) SetMinReadySeconds(minReadySeconds int32) *ReplicatedStateMachineBuilder {
+	builder.get().Spec.MinReadySeconds = minReadySeconds
+	return builder
+}
+
 func (builder *ReplicatedStateMachineBuilder) SetRsmTransformPolicy(transformPolicy workloads.RsmTransformPolicy) *ReplicatedStateMachineBuilder {
 	builder.get().Spec.RsmTransformPolicy = transformPolicy
 	return builder

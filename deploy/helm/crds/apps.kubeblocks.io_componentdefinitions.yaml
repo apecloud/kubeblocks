@@ -3970,6 +3970,15 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
+              minReadySeconds:
+                default: 0
+                description: Minimum number of seconds for which a newly created pod
+                  should be ready without any of its container crashing for it to
+                  be considered available. Defaults to 0 (pod will be considered available
+                  as soon as it is ready)
+                format: int32
+                minimum: 0
+                type: integer
               monitor:
                 description: Monitor is monitoring config which provided by provider.
                   Cannot be updated.

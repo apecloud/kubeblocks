@@ -423,23 +423,9 @@ func (mgr *Manager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string
 // IsClusterInitialized is a method to check if cluster is initialized or not
 func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	if cluster != nil {
-		// The maximum length of the server addr is 255 characters. Before MySQL 8.0.17 it was 60 characters.
-		var version string
-		err := mgr.DB.QueryRowContext(ctx, "select version()").Scan(&version)
-		if err != nil {
-			mgr.Logger.Info("Get version failed", "error", err)
-			return false, err
-		}
-		currentMemberName := mgr.GetCurrentMemberName()
-		member := cluster.GetMemberWithName(currentMemberName)
-		addr := cluster.GetMemberShortAddr(*member)
-		maxLength := 255
-		if IsSmallerVersion(version, "8.0.17") {
-			maxLength = 60
-		}
-
-		if len(addr) > maxLength {
-			return false, errors.Errorf("The length of the member address must be less than or equal to %d", maxLength)
+		isValid, err := mgr.ValidateAddr(ctx, cluster)
+		if err != nil || !isValid {
+			return isValid, err
 		}
 	}
 
@@ -448,6 +434,28 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 		return false, err
 	}
 	return mgr.EnsureServerID(ctx)
+}
+
+func (mgr *Manager) ValidateAddr(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
+	// The maximum length of the server addr is 255 characters. Before MySQL 8.0.17 it was 60 characters.
+	var version string
+	err := mgr.DB.QueryRowContext(ctx, "select version()").Scan(&version)
+	if err != nil {
+		mgr.Logger.Info("Get version failed", "error", err)
+		return false, err
+	}
+	currentMemberName := mgr.GetCurrentMemberName()
+	member := cluster.GetMemberWithName(currentMemberName)
+	addr := cluster.GetMemberShortAddr(*member)
+	maxLength := 255
+	if IsBeforeVersion(version, "8.0.17") {
+		maxLength = 60
+	}
+
+	if len(addr) > maxLength {
+		return false, errors.Errorf("The length of the member address must be less than or equal to %d", maxLength)
+	}
+	return true, nil
 }
 
 func (mgr *Manager) EnsureServerID(ctx context.Context) (bool, error) {
@@ -571,6 +579,7 @@ func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 	masterHost := cluster.GetMemberShortAddr(*leaderMember)
 	changeMaster := fmt.Sprintf(`change master to master_host='%s',master_user='%s',master_password='%s',master_port=%s,master_auto_position=1;`,
 		masterHost, config.Username, config.password, leaderMember.DBPort)
+	mgr.Logger.Info("follow new leader", "changemaster", changeMaster)
 	startSlave := `start slave;`
 
 	_, err := mgr.DB.Exec(stopSlave + changeMaster + startSlave)

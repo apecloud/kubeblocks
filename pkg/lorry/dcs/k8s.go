@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -164,15 +163,10 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 		return nil, err
 	}
 
-	hasPodHeadlessSvc := store.HasPodDedicatedHeadlessSvc(clusterResource)
 	var replicas int32
 	for _, component := range clusterResource.Spec.ComponentSpecs {
 		if component.Name == store.componentName {
 			replicas = component.Replicas
-			// only support old api now
-			if component.ComponentDef != "" {
-				hasPodHeadlessSvc = false
-			}
 			break
 		}
 	}
@@ -203,33 +197,18 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 	}
 
 	cluster := &Cluster{
-		ClusterCompName:   store.clusterCompName,
-		Namespace:         store.namespace,
-		Replicas:          replicas,
-		Members:           members,
-		Leader:            leader,
-		Switchover:        switchover,
-		HaConfig:          haConfig,
-		HasPodHeadlessSvc: hasPodHeadlessSvc,
-		resource:          clusterResource,
+		ClusterCompName: store.clusterCompName,
+		Namespace:       store.namespace,
+		Replicas:        replicas,
+		Members:         members,
+		Leader:          leader,
+		Switchover:      switchover,
+		HaConfig:        haConfig,
+		resource:        clusterResource,
 	}
 
 	store.cluster = cluster
 	return cluster, nil
-}
-
-func (store *KubernetesStore) HasPodDedicatedHeadlessSvc(cluster *appsv1alpha1.Cluster) bool {
-	var hasPodDedicatedHeadlessSvc bool
-	enablePodOrdinalSvcCompList, ok := cluster.Annotations[constant.PodOrdinalSvcAnnotationKey]
-	if ok {
-		for _, comp := range strings.Split(enablePodOrdinalSvcCompList, ",") {
-			if comp == store.componentName {
-				hasPodDedicatedHeadlessSvc = true
-				break
-			}
-		}
-	}
-	return hasPodDedicatedHeadlessSvc
 }
 
 func (store *KubernetesStore) GetMembers() ([]Member, error) {
@@ -565,11 +544,11 @@ func (store *KubernetesStore) GetSwitchOverConfigMap() (*corev1.ConfigMap, error
 	switchOverConfigMap, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Get(store.ctx, switchoverName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			store.logger.Info(fmt.Sprintf("no switchOver [%s] setting", switchoverName))
 			return nil, nil
 		}
-		store.logger.Error(err, "Get switchOver configmap failed")
+		store.logger.Error(err, "Get switchover configmap failed")
 	}
+	store.logger.Info("Found switchover Setting", "configmap", switchoverName)
 	return switchOverConfigMap, err
 }
 

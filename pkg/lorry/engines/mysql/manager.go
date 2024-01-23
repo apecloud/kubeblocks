@@ -435,12 +435,6 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 	}
 	return mgr.EnsureServerID(ctx)
 }
-func (mgr *Manager) GetMemberAddr(cluster *dcs.Cluster, member *dcs.Member) string {
-	if cluster.HasPodHeadlessSvc {
-		return member.Name
-	}
-	return cluster.GetMemberShortAddr(*member)
-}
 
 func (mgr *Manager) ValidateAddr(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	// The maximum length of the server addr is 255 characters. Before MySQL 8.0.17 it was 60 characters.
@@ -452,7 +446,7 @@ func (mgr *Manager) ValidateAddr(ctx context.Context, cluster *dcs.Cluster) (boo
 	}
 	currentMemberName := mgr.GetCurrentMemberName()
 	member := cluster.GetMemberWithName(currentMemberName)
-	addr := mgr.GetMemberAddr(cluster, member)
+	addr := cluster.GetMemberShortAddr(*member)
 	maxLength := 255
 	if IsBeforeVersion(version, "8.0.17") {
 		maxLength = 60
@@ -582,7 +576,7 @@ func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 
 	stopSlave := `stop slave;`
 	// MySQL 5.7 has a limitation where the length of the master_host cannot exceed 60 characters.
-	masterHost := mgr.GetMemberAddr(cluster, leaderMember)
+	masterHost := cluster.GetMemberShortAddr(*leaderMember)
 	changeMaster := fmt.Sprintf(`change master to master_host='%s',master_user='%s',master_password='%s',master_port=%s,master_auto_position=1;`,
 		masterHost, config.Username, config.password, leaderMember.DBPort)
 	mgr.Logger.Info("follow new leader", "changemaster", changeMaster)

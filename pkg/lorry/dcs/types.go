@@ -27,16 +27,15 @@ import (
 )
 
 type Cluster struct {
-	ClusterCompName   string
-	Namespace         string
-	Replicas          int32
-	HaConfig          *HaConfig
-	Leader            *Leader
-	Members           []Member
-	Switchover        *Switchover
-	Extra             map[string]string
-	HasPodHeadlessSvc bool
-	resource          any
+	ClusterCompName string
+	Namespace       string
+	Replicas        int32
+	HaConfig        *HaConfig
+	Leader          *Leader
+	Members         []Member
+	Switchover      *Switchover
+	Extra           map[string]string
+	resource        any
 }
 
 func (c *Cluster) HasMember(memberName string) bool {

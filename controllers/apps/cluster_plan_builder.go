@@ -71,15 +71,6 @@ type clusterTransformContext struct {
 	ShardingComponentSpecs map[string][]*appsv1alpha1.ClusterComponentSpec
 	// Labels to be added to components, corresponding one-to-one with ComponentSpecs.
 	Labels []map[string]string
-
-	GenerateComponentSpecs []*GenerateComponentSpec
-}
-
-type GenerateComponentSpec struct {
-	ComponentSpec *appsv1alpha1.ClusterComponentSpec
-
-	// labels to be added to the component
-	Labels map[string]string
 }
 
 // clusterPlanBuilder a graph.PlanBuilder implementation for Cluster reconciliation

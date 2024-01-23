@@ -302,15 +302,16 @@ type ShardingSpec struct {
 	// +kubebuilder:validation:Required
 	Template ClusterComponentSpec `json:"template"`
 
-	// shards indicates the number of component.
-	// 1. When the number of shards increases, the relevant Actions defined in the Definition will be triggered if the conditions are met. This is specifically divided into two cases:
-	//    1.1 If the Template references a ClusterDefinition through ComponentDefRef, then the postStart Action defined in the ClusterDefinition will be executed.
-	//    1.2 [Recommended] If the Template references a ComponentDefinition through ComponentDef, then the postProvision Action defined in the ComponentDefinition will be executed.
-	// 2. When the number of shards decreases, only the preTerminate Action defined in the ComponentDefinition is supported for execution if the conditions are met.
+	// shards indicates the number of component, and these components have the same specifications and definitions.
+	// It should be noted that the number of replicas for each component should be defined by template.replicas.
+	// Moreover, the logical relationship between these components should be maintained by the components themselves,
+	// KubeBlocks only provides the following capabilities for managing the lifecycle of sharding:
+	// 1. When the number of shards increases, the postProvision Action defined in the ComponentDefinition will be executed if the conditions are met.
+	// 2. When the number of shards decreases, the preTerminate Action defined in the ComponentDefinition will be executed if the conditions are met.
 	//    Additionally, the resources and data associated with the corresponding Component will be deleted as well.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Maximum=8192
+	// +kubebuilder:validation:Maximum=2048
 	Shards int32 `json:"shards,omitempty"`
 }
 

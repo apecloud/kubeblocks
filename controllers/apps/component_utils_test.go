@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -199,10 +198,9 @@ var _ = Describe("Component Utils", func() {
 			sts := testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusCompName)
 			pods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
 			mockLabelKey := "mock-label-key"
-			mockLabelPlaceHolderValue := fmt.Sprintf("%s-%s",
-				constant.EnvPlaceHolder(constant.KBEnvClusterName), constant.EnvPlaceHolder(constant.KBEnvCompName))
+			mockLabelValue := "mock-label-value"
 			customLabels := map[string]string{
-				mockLabelKey: mockLabelPlaceHolderValue,
+				mockLabelKey: mockLabelValue,
 			}
 			comp := &component.SynthesizedComponent{
 				Name:   consensusCompName,
@@ -217,7 +215,7 @@ var _ = Describe("Component Utils", func() {
 			Expect(podList).Should(HaveLen(3))
 			for _, pod := range podList {
 				Expect(pod.GetLabels()).ShouldNot(BeNil())
-				Expect(pod.GetLabels()[mockLabelKey]).Should(Equal(fmt.Sprintf("%s-%s", clusterName, comp.Name)))
+				Expect(pod.GetLabels()[mockLabelKey]).Should(Equal(mockLabelValue))
 			}
 		})
 	})

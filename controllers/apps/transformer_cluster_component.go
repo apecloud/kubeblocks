@@ -22,7 +22,6 @@ package apps
 import (
 	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -158,13 +157,6 @@ func checkAllCompsReady(transCtx *clusterTransformContext, cluster *appsv1alpha1
 	}
 	if len(compList.Items) != len(transCtx.ComponentSpecs) {
 		return false, nil
-	}
-	// check cluster and component generation, if not equal, component objects need to be reconciled
-	for _, comp := range compList.Items {
-		v, ok := comp.Labels[constant.KubeBlocksGenerationKey]
-		if !ok || v != strconv.FormatInt(cluster.Generation, 10) {
-			return false, nil
-		}
 	}
 	return true, nil
 }

@@ -19,7 +19,7 @@ KubeBlocks 是基于 Kubernetes 的云原生数据基础设施，可以帮助用
 | foxlake         | ApeCloud FoxLake 是一个开源的云原生数据仓库。|
 | ggml            | GGML 是一个为机器学习设计的张量库，它的目标是使大型模型能够在高性能的消费级硬件上运行。 |
 | greptimedb      | GreptimeDB 是一个云原生时间序列数据库，具有分布式、可扩展和高效的特性。 |
-| influxdb        | InfluxDB 能够执行实施分析，通过专门构建的数据库，优化大型实践序列数据库 ｜
+| influxdb        | InfluxDB 作为专用的时序数据库，可执行实时分析，优化大型时序数据工作负载的处理和扩展。 ｜
 | kafka           | Apache Kafka 是一个开源的分布式事件流平台，广泛应用于高性能数据流水线、流式分析、数据集成和关键应用程序等场景，目前已经被数千家公司采用。 |
 | mariadb         | MariaDB 是一个高性能的开源关系型数据库管理系统，广泛用于 Web 和应用服务器。 |
 | milvus          | Milvus 是一个灵活、可靠且高性能的云原生开源向量数据库。                                                                                                                        |

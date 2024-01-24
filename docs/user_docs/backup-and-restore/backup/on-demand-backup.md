@@ -63,7 +63,7 @@ mybackup   mysql-cluster-mysql-backup-policy   xtrabackup   my-repo   Completed 
 
 :::note
 
-The `dataprotection.kubeblocks.io/connection-password` in annotations uses the password of the cluster.
+The `dataprotection.kubeblocks.io/connection-password` in annotations uses the password of the original cluster.
 
 :::
 

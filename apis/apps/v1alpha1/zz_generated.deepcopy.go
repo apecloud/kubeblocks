@@ -1097,6 +1097,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.Backup != nil {
+		in, out := &in.Backup, &out.Backup
+		*out = new(ClusterBackup)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Replicas != nil {
 		in, out := &in.Replicas, &out.Replicas
 		*out = new(int32)
@@ -1109,11 +1114,6 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		in, out := &in.Network, &out.Network
 		*out = new(ClusterNetwork)
 		**out = **in
-	}
-	if in.Backup != nil {
-		in, out := &in.Backup, &out.Backup
-		*out = new(ClusterBackup)
-		(*in).DeepCopyInto(*out)
 	}
 }
 

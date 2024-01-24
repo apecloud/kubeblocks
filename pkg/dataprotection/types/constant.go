@@ -119,6 +119,7 @@ const (
 )
 
 const (
+	BackupKind             = "Backup"
 	RestoreKind            = "Restore"
 	DataprotectionAPIGroup = "dataprotection.kubeblocks.io"
 	KopiaRepoFolderName    = "kopia"

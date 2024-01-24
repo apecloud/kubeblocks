@@ -194,7 +194,7 @@ func CompareWithBackupStopTime(backupI, backupJ dpv1alpha1.Backup) bool {
 	return endTimeI.Before(endTimeJ)
 }
 
-func buildJobKeyForActionStatus(jobName string) string {
+func BuildJobKeyForActionStatus(jobName string) string {
 	return fmt.Sprintf("%s/%s", constant.JobKind, jobName)
 }
 
@@ -211,7 +211,7 @@ func getMountPathWithSourceVolume(backup *dpv1alpha1.Backup, volumeSource string
 }
 
 func restoreJobHasCompleted(statusActions []dpv1alpha1.RestoreStatusAction, jobName string) bool {
-	jobKey := buildJobKeyForActionStatus(jobName)
+	jobKey := BuildJobKeyForActionStatus(jobName)
 	for i := range statusActions {
 		if statusActions[i].ObjectKey == jobKey && statusActions[i].Status == dpv1alpha1.RestoreActionCompleted {
 			return true

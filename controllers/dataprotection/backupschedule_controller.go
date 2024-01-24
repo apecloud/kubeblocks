@@ -70,6 +70,8 @@ func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
+	reqCtx.Log.V(1).Info("reconcile", "backupSchedule", req.NamespacedName)
+
 	original := backupSchedule.DeepCopy()
 
 	// handle finalizer

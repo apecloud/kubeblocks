@@ -47,6 +47,8 @@ kind: Backup
 metadata:
   name: mybackup
   namespace: default
+  annotations:
+    dataprotection.kubeblocks.io/connection-password: Bw1cR15mzfldc9hzGuK4m1BZQOzha6aBb1i9nlvoBdoE9to4
 spec:
   backupMethod: xtrabackup
   backupPolicyName: mysql-cluster-mysql-backup-policy

@@ -70,7 +70,8 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synthesi
 
 	// TODO(xingran): Need to review how to set pod labels based on the new ComponentDefinition API. workloadType label has been removed.
 	podBuilder := builder.NewPodBuilder("", "").
-		AddLabelsInMap(mergeLabels).
+		AddLabelsInMap(labels).
+		AddLabelsInMap(compDefLabel).
 		AddLabelsInMap(constant.GetAppVersionLabel(compDefName))
 	template := corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,

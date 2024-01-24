@@ -219,3 +219,49 @@ func UpdateComponentInfoToPods(
 	}
 	return nil
 }
+
+// UpdateCustomLabelToPods updates custom label to pods
+func UpdateCustomLabelToPods(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	component *intctrlcomp.SynthesizedComponent,
+	dag *graph.DAG) error {
+	if cluster == nil || component == nil {
+		return nil
+	}
+	// list all pods in dag
+	graphCli := model.NewGraphClient(cli)
+	pods := graphCli.FindAll(dag, &corev1.Pod{})
+
+	for labelKey, labelValue := range component.Labels {
+		podList := &corev1.PodList{}
+		matchLabels := constant.GetComponentWellKnownLabels(cluster.Name, component.Name)
+		if err := getObjectListByCustomLabels(ctx, cli, *cluster, podList, client.MatchingLabels(matchLabels)); err != nil {
+			return err
+		}
+
+		for i := range podList.Items {
+			idx := slices.IndexFunc(pods, func(obj client.Object) bool {
+				return obj.GetName() == podList.Items[i].Name
+			})
+			// pod already in dag, merge labels
+			if idx >= 0 {
+				updateObjLabel(labelKey, labelValue, pods[idx])
+				continue
+			}
+			pod := &podList.Items[i]
+			updateObjLabel(labelKey, labelValue, pod)
+			graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), nil)
+		}
+	}
+	return nil
+}
+
+func updateObjLabel(labelKey, labelValue string, obj client.Object) {
+	labels := obj.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string, 0)
+	}
+	labels[labelKey] = labelValue
+	obj.SetLabels(labels)
+}

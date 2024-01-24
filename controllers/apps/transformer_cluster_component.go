@@ -53,13 +53,13 @@ func (t *clusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
-	allCompObjExist, err := checkAllCompObjExist(transCtx, transCtx.Cluster)
+	allCompsReady, err := checkAllCompsReady(transCtx, transCtx.Cluster)
 	if err != nil {
 		return err
 	}
 
-	// if all component objects exist and cluster is not updating, skip reconciling components
-	if !transCtx.OrigCluster.IsUpdating() && allCompObjExist {
+	// if all component objects ready and cluster is not updating, skip reconciling components
+	if !transCtx.OrigCluster.IsUpdating() && allCompsReady {
 		return nil
 	}
 
@@ -150,7 +150,7 @@ func (t *clusterComponentTransformer) handleCompsUpdate(transCtx *clusterTransfo
 	return nil
 }
 
-func checkAllCompObjExist(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) (bool, error) {
+func checkAllCompsReady(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) (bool, error) {
 	compList := &appsv1alpha1.ComponentList{}
 	labels := constant.GetClusterWellKnownLabels(cluster.Name)
 	if err := transCtx.Client.List(transCtx.Context, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {

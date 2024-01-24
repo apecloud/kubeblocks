@@ -109,9 +109,9 @@ spec:
                         rule: self.all(key, size(key) <= 32)
                       - message: Image name may not exceed maximum length of 256 characters
                         rule: self.all(key, size(self[key]) <= 256)
-                    release:
-                      description: Release is a unique identifier for this release.
-                        Cannot be updated.
+                    name:
+                      description: Name is a unique identifier for this release. Cannot
+                        be updated.
                       maxLength: 32
                       type: string
                     serviceVersion:
@@ -124,7 +124,7 @@ spec:
                       type: string
                   required:
                   - images
-                  - release
+                  - name
                   type: object
                 maxItems: 128
                 minItems: 1

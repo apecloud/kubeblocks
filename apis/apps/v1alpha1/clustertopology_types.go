@@ -40,6 +40,8 @@ type ClusterTopologyDefinition struct {
 	Name string `json:"name"`
 
 	// Components specifies the components in the topology.
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=128
 	// +required
 	Components []ClusterTopologyComponent `json:"components"`
 
@@ -50,10 +52,6 @@ type ClusterTopologyDefinition struct {
 	// Orders defines the order of components within the topology.
 	// +optional
 	Orders *ClusterTopologyComponentOrder `json:"orders,omitempty"`
-
-	// RequiredVersion specifies the minimum version required for this topology.
-	// +optional
-	RequiredVersion string `json:"requiredVersion,omitempty"`
 
 	//// services defines the default cluster services for this topology.
 	//// +kubebuilder:pruning:PreserveUnknownFields
@@ -92,6 +90,10 @@ type ClusterTopologyComponent struct {
 	// ServiceRefs define the service references for the component.
 	// +optional
 	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
+
+	// RequiredVersion specifies the minimum version required for this topology.
+	// +optional
+	RequiredVersion string `json:"requiredVersion,omitempty"`
 
 	// Replicas specifies the default replicas for the component in this topology.
 	// +optional

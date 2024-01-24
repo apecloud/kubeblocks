@@ -60,11 +60,11 @@ type ComponentVersionCompatibilityRule struct {
 
 // ComponentVersionRelease represents a release of component instances within a ComponentVersion.
 type ComponentVersionRelease struct {
-	// Release is a unique identifier for this release.
+	// Name is a unique identifier for this release.
 	// Cannot be updated.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=32
-	Release string `json:"release"`
+	Name string `json:"name"`
 
 	// Changes provides information about the changes made in this release.
 	// +kubebuilder:validation:MaxLength=256

@@ -93,6 +93,10 @@ spec:
                               the component in this topology.
                             format: int32
                             type: integer
+                          requiredVersion:
+                            description: RequiredVersion specifies the minimum version
+                              required for this topology.
+                            type: string
                           serviceRefs:
                             description: ServiceRefs define the service references
                               for the component.
@@ -158,6 +162,8 @@ spec:
                         - compDef
                         - name
                         type: object
+                      maxItems: 128
+                      minItems: 1
                       type: array
                     default:
                       description: Default indicates whether this topology is the
@@ -193,10 +199,6 @@ spec:
                             type: string
                           type: array
                       type: object
-                    requiredVersion:
-                      description: RequiredVersion specifies the minimum version required
-                        for this topology.
-                      type: string
                   required:
                   - components
                   - name

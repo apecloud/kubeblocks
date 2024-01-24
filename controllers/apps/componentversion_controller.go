@@ -281,9 +281,9 @@ func (r *ComponentVersionReconciler) validate(compVersion *appsv1alpha1.Componen
 
 func (r *ComponentVersionReconciler) validateRelease(release appsv1alpha1.ComponentVersionRelease,
 	releaseToCompDefinitions map[string]map[string]*appsv1alpha1.ComponentDefinition) error {
-	cmpds, ok := releaseToCompDefinitions[release.Release]
+	cmpds, ok := releaseToCompDefinitions[release.Name]
 	if !ok {
-		return fmt.Errorf("release %s has no any supported ComponentDefinition", release.Release)
+		return fmt.Errorf("release %s has no any supported ComponentDefinition", release.Name)
 	}
 	for name := range release.Images {
 		for _, cmpd := range cmpds {

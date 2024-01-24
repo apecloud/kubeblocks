@@ -991,6 +991,7 @@ spec:
               services:
                 description: services defines the services to access a cluster.
                 items:
+                  description: ClusterService defines the service of a cluster.
                   properties:
                     annotations:
                       additionalProperties:
@@ -1001,7 +1002,8 @@ spec:
                     componentSelector:
                       description: ComponentSelector extends the ServiceSpec.Selector
                         by allowing you to specify a component as selectors for the
-                        service.
+                        service. ComponentSelector and ShardingSelector cannot be
+                        set at the same time.
                       type: string
                     name:
                       description: Name defines the name of the service. otherwise,
@@ -1026,7 +1028,8 @@ spec:
                     shardingSelector:
                       description: ShardingSelector extends the ServiceSpec.Selector
                         by allowing you to specify a sharding name defined in Cluster.Spec.ShardingSpecs[x].Name
-                        as selectors for the service.
+                        as selectors for the service. ShardingSelector and ComponentSelector
+                        cannot be set at the same time.
                       type: string
                     spec:
                       description: Spec defines the behavior of a service. https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status

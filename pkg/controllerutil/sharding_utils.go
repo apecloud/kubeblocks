@@ -146,9 +146,8 @@ func GenShardingCompSpecList(ctx context.Context, cli client.Reader,
 // genRandomShardName generates a random name for sharding component.
 func genRandomShardName(shardingName string, existShardNamesMap map[string]string) (string, error) {
 	shardingNamePrefix := constant.GenerateShardingNamePrefix(shardingName)
-	genName := common.SimpleNameGenerator.GenerateName(shardingNamePrefix)
 	for i := 0; i < GenerateNameMaxRetryTimes; i++ {
-		genName = common.SimpleNameGenerator.GenerateName(shardingNamePrefix)
+		genName := common.SimpleNameGenerator.GenerateName(shardingNamePrefix)
 		if _, ok := existShardNamesMap[genName]; !ok {
 			return genName, nil
 		}

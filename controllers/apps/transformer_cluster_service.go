@@ -79,6 +79,9 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 	}
 
 	for _, svc := range cluster.Spec.Services {
+		if len(svc.ShardingSelector) > 0 && len(svc.ComponentSelector) > 0 {
+			return fmt.Errorf("the ShardingSelector and ComponentSelector of service can't be defined at the same time, service: %s", svc.Name)
+		}
 		genServices, err := t.genMultiServiceIfNeed(transCtx, cluster, &svc)
 		if err != nil {
 			return err
@@ -176,12 +179,13 @@ func (t *clusterServiceTransformer) buildService(transCtx *clusterTransformConte
 		AddSelectorsInMap(t.builtinSelector(cluster)).
 		Optimize4ExternalTraffic()
 
-	if len(clusterService.ComponentSelector) > 0 {
-		builder.AddSelector(constant.KBAppComponentLabelKey, clusterService.ComponentSelector)
-	}
-
 	if len(clusterService.ShardingSelector) > 0 {
 		builder.AddSelector(constant.KBAppShardingNameLabelKey, clusterService.ShardingSelector)
+		if enableShardService(cluster, clusterService.ShardingSelector) && len(clusterService.ComponentSelector) > 0 {
+			builder.AddSelector(constant.KBAppComponentLabelKey, clusterService.ComponentSelector)
+		}
+	} else if len(clusterService.ComponentSelector) > 0 {
+		builder.AddSelector(constant.KBAppComponentLabelKey, clusterService.ComponentSelector)
 	}
 
 	if len(clusterService.RoleSelector) > 0 {
@@ -218,8 +222,7 @@ func (t *clusterServiceTransformer) genMultiServiceIfNeed(transCtx *clusterTrans
 		return nil, fmt.Errorf("the ShardingSelector of service is not defined, service: %s, shard: %s", clusterService.Name, clusterService.ShardingSelector)
 	}
 
-	enableShardSvcList, ok := cluster.Annotations[constant.ShardSvcAnnotationKey]
-	if !ok || !slices.Contains(strings.Split(enableShardSvcList, ","), shardingName) {
+	if !enableShardService(cluster, shardingName) {
 		return []*appsv1alpha1.ClusterService{clusterService}, nil
 	}
 
@@ -373,4 +376,12 @@ func checkLegacyServiceExist(ctx graph.TransformContext, serviceName, namespace 
 		return false, err
 	}
 	return true, nil
+}
+
+func enableShardService(cluster *appsv1alpha1.Cluster, shardingName string) bool {
+	enableShardSvcList, ok := cluster.Annotations[constant.ShardSvcAnnotationKey]
+	if !ok || !slices.Contains(strings.Split(enableShardSvcList, ","), shardingName) {
+		return false
+	}
+	return true
 }

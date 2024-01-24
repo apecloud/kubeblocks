@@ -32,6 +32,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
+const (
+	GenerateNameMaxRetryTimes = 1000000
+)
+
 func ListNCheckShardingComponents(ctx context.Context, cli client.Reader,
 	cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec) ([]appsv1alpha1.Component, error) {
 	shardingComps, err := ListShardingComponents(ctx, cli, cluster, shardingSpec)
@@ -124,7 +128,10 @@ func GenShardingCompSpecList(ctx context.Context, cli client.Reader,
 	case len(existShardingCompSpecs) < int(shardingSpec.Shards):
 		for i := len(existShardingCompSpecs); i < int(shardingSpec.Shards); i++ {
 			shardClusterCompSpec := shardTpl.DeepCopy()
-			genCompName := genRandomShardName(shardingSpec.Name, compNameMap)
+			genCompName, err := genRandomShardName(shardingSpec.Name, compNameMap)
+			if err != nil {
+				return nil, err
+			}
 			shardClusterCompSpec.Name = genCompName
 			compSpecList = append(compSpecList, shardClusterCompSpec)
 			compNameMap[genCompName] = genCompName
@@ -137,16 +144,16 @@ func GenShardingCompSpecList(ctx context.Context, cli client.Reader,
 }
 
 // genRandomShardName generates a random name for sharding component.
-func genRandomShardName(shardingName string, existShardNamesMap map[string]string) string {
-	genName := common.SimpleNameGenerator.GenerateName(shardingName)
-	// TODO: add max retry times?
-	for {
+func genRandomShardName(shardingName string, existShardNamesMap map[string]string) (string, error) {
+	shardingNamePrefix := constant.GenerateShardingNamePrefix(shardingName)
+	genName := common.SimpleNameGenerator.GenerateName(shardingNamePrefix)
+	for i := 0; i < GenerateNameMaxRetryTimes; i++ {
+		genName = common.SimpleNameGenerator.GenerateName(shardingNamePrefix)
 		if _, ok := existShardNamesMap[genName]; !ok {
-			break
+			return genName, nil
 		}
-		genName = common.SimpleNameGenerator.GenerateName(shardingName)
 	}
-	return genName
+	return "", fmt.Errorf("failed to generate a unique random name for sharding component: %s after %d retries", shardingName, GenerateNameMaxRetryTimes)
 }
 
 func parseCompShortName(clusterName, compName string) (string, error) {

@@ -136,6 +136,9 @@ func (r *LogCollectionReconciler) ownedByDataProtection(job *batchv1.Job) bool {
 	if len(job.OwnerReferences) == 0 {
 		return false
 	}
+	if !strings.HasPrefix(job.OwnerReferences[0].APIVersion, dptypes.DataprotectionAPIGroup) {
+		return false
+	}
 	return slices.Contains([]string{dptypes.BackupKind, dptypes.RestoreKind}, job.OwnerReferences[0].Kind)
 }
 

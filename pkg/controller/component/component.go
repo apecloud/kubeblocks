@@ -82,7 +82,6 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1
 		SetMonitor(clusterCompSpec.Monitor).
 		SetServiceAccountName(clusterCompSpec.ServiceAccountName).
 		SetVolumeClaimTemplates(clusterCompSpec.VolumeClaimTemplates).
-		SetEnabledLogs(clusterCompSpec.EnabledLogs).
 		SetServiceRefs(clusterCompSpec.ServiceRefs).
 		SetClassRef(clusterCompSpec.ClassDefRef).
 		SetTLSConfig(clusterCompSpec.TLS, clusterCompSpec.Issuer).

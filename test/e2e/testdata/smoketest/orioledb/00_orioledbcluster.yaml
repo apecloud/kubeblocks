@@ -70,8 +70,6 @@ spec:
       componentDefRef: orioledb      
       monitor: false      
       replicas: 1
-      enabledLogs:
-        - running
       serviceAccountName: kb-oriole-cluster
       switchPolicy:
         type: Noop      

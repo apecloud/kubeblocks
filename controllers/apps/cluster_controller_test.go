@@ -176,11 +176,9 @@ var _ = Describe("Cluster Controller", func() {
 			WithRandomName()
 		if !v2 {
 			factory.AddComponent(compName, compDefName).SetReplicas(1)
-			// SetEnabledLogs("error").
 			// AddVolumeClaimTemplate(testapps.DataVolumeName, testapps.NewPVCSpec("5Gi")).
 		} else {
 			factory.AddComponentV2(compName, compDefName).SetReplicas(1)
-			// SetEnabledLogs("error").
 			// AddVolumeClaimTemplate(testapps.DataVolumeName, testapps.NewPVCSpec("5Gi")).
 		}
 		if processor != nil {

@@ -132,12 +132,6 @@ func (factory *MockClusterFactory) SetComponentAffinity(affinity *appsv1alpha1.A
 	})
 }
 
-func (factory *MockClusterFactory) SetEnabledLogs(logName ...string) *MockClusterFactory {
-	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
-		comp.EnabledLogs = logName
-	})
-}
-
 func (factory *MockClusterFactory) SetClassDefRef(classDefRef *appsv1alpha1.ClassDefRef) *MockClusterFactory {
 	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
 		comp.ClassDefRef = classDefRef

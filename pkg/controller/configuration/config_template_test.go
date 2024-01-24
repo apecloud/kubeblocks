@@ -344,26 +344,6 @@ true
 `,
 				expected: "",
 				wantErr:  false,
-			}, {
-				name: "kb component test",
-				tpl: `
-{{- if mustHas "error" $.component.enabledLogs }}
-    log_error=log/mysqld.err
-{{- end }}
-`,
-				expected: "",
-				wantErr:  true,
-			}, {
-				name: "kb component test",
-				tpl: `
-{{- if hasKey $.component "enabledLogs" }}
-{{- if mustHas "error" $.component.enabledLogs }}
-    log_error=log/mysqld.err
-{{- end }}
-{{- end -}}
-`,
-				expected: "",
-				wantErr:  false,
 			}}
 
 			for _, tt := range tests {

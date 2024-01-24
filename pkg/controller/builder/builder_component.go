@@ -77,11 +77,6 @@ func (builder *ComponentBuilder) SetResources(resources corev1.ResourceRequireme
 	return builder
 }
 
-func (builder *ComponentBuilder) SetEnabledLogs(logNames []string) *ComponentBuilder {
-	builder.get().Spec.EnabledLogs = logNames
-	return builder
-}
-
 func (builder *ComponentBuilder) SetMonitor(monitor bool) *ComponentBuilder {
 	builder.get().Spec.Monitor = monitor
 	return builder

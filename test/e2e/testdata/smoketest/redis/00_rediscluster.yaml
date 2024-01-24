@@ -70,8 +70,6 @@ spec:
       componentDefRef: redis # ref clusterDefinition componentDefs.name      
       monitor: false      
       replicas: 1
-      enabledLogs:
-        - running
       serviceAccountName: kb-redis-cluster
       switchPolicy:
         type: Noop      

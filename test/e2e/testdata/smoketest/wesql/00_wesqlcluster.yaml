@@ -70,9 +70,6 @@ spec:
       componentDefRef: mysql # ref clusterdefinition componentDefs.name      
       monitor: false
       replicas: 1
-      enabledLogs:
-        - slow
-        - error
       serviceAccountName: kb-mysql-cluster      
       resources:
         limits:

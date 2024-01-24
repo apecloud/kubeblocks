@@ -37,9 +37,6 @@ import (
 
 const (
 	errorLogName      = "error"
-	leader            = "leader"
-	follower          = "follower"
-	learner           = "learner"
 	ConsensusReplicas = 3
 )
 
@@ -71,7 +68,7 @@ func CreateConsensusMysqlCluster(
 	}
 	pvcSpec := NewPVCSpec(size)
 	return NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-		AddComponent(consensusCompName, workloadType).SetReplicas(ConsensusReplicas).SetEnabledLogs(errorLogName).
+		AddComponent(consensusCompName, workloadType).SetReplicas(ConsensusReplicas).
 		AddVolumeClaimTemplate("data", pvcSpec).Create(testCtx).GetObject()
 }
 

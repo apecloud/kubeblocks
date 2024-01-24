@@ -209,14 +209,6 @@ spec:
                   - volumeName
                   type: object
                 type: array
-              enabledLogs:
-                description: enabledLogs indicates which log file takes effect in
-                  the database cluster, element is the log type which is defined in
-                  ComponentDefinition logConfig.name.
-                items:
-                  type: string
-                type: array
-                x-kubernetes-list-type: set
               instances:
                 description: Instances defines the list of instance to be deleted
                   priorly

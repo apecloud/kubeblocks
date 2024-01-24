@@ -18,9 +18,7 @@ package v1alpha1
 
 import (
 	"fmt"
-	"strings"
 
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -330,6 +328,7 @@ type ClusterComponentSpec struct {
 	// element is the log type which is defined in cluster definition logConfig.name,
 	// and will set relative variables about this log type in database kernel.
 	// +listType=set
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	EnabledLogs []string `json:"enabledLogs,omitempty"`
 
@@ -805,22 +804,6 @@ func (r ClusterSpec) GetComponentDefRefName(componentName string) string {
 		}
 	}
 	return ""
-}
-
-// ValidateEnabledLogs validates enabledLogs config in cluster.yaml, and returns metav1.Condition when detecting invalid values.
-func (r ClusterSpec) ValidateEnabledLogs(cd *ClusterDefinition) error {
-	message := make([]string, 0)
-	for _, comp := range r.ComponentSpecs {
-		invalidLogNames := cd.ValidateEnabledLogConfigs(comp.ComponentDefRef, comp.EnabledLogs)
-		if len(invalidLogNames) == 0 {
-			continue
-		}
-		message = append(message, fmt.Sprintf("EnabledLogs: %s are not defined in Component: %s of the clusterDefinition", invalidLogNames, comp.Name))
-	}
-	if len(message) > 0 {
-		return errors.New(strings.Join(message, ";"))
-	}
-	return nil
 }
 
 // GetDefNameMappingComponents returns ComponentDefRef name mapping ClusterComponentSpec.

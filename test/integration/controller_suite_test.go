@@ -216,7 +216,6 @@ func CreateSimpleConsensusMySQLClusterWithConfig(
 		clusterDefObj.Name, clusterVersionObj.Name).
 		AddComponent(mysqlCompName, mysqlCompDefName).
 		SetReplicas(3).
-		SetEnabledLogs("error", "general", "slow").
 		AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 		Create(&testCtx).GetObject()
 

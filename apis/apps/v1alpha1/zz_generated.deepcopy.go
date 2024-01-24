@@ -2149,11 +2149,6 @@ func (in *ComponentSpec) DeepCopyInto(out *ComponentSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.EnabledLogs != nil {
-		in, out := &in.EnabledLogs, &out.EnabledLogs
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
 	if in.Affinity != nil {
 		in, out := &in.Affinity, &out.Affinity
 		*out = new(Affinity)

@@ -73,12 +73,6 @@ type ComponentSpec struct {
 	// +optional
 	Monitor bool `json:"monitor,omitempty"`
 
-	// enabledLogs indicates which log file takes effect in the database cluster,
-	// element is the log type which is defined in ComponentDefinition logConfig.name.
-	// +listType=set
-	// +optional
-	EnabledLogs []string `json:"enabledLogs,omitempty"`
-
 	// serviceAccountName is the name of the ServiceAccount that running component depends on.
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`

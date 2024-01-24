@@ -70,7 +70,7 @@ type clusterTransformContext struct {
 	// ShardingComponentSpecs includes all sharding component specs generated from ShardingSpecs
 	ShardingComponentSpecs map[string][]*appsv1alpha1.ClusterComponentSpec
 	// Labels to be added to components, corresponding one-to-one with ComponentSpecs.
-	Labels []map[string]string
+	Labels map[string]map[string]string
 }
 
 // clusterPlanBuilder a graph.PlanBuilder implementation for Cluster reconciliation

@@ -45,13 +45,13 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	// build all component specs
 	transCtx.ComponentSpecs = make([]*appsv1alpha1.ClusterComponentSpec, 0)
 	transCtx.ShardingComponentSpecs = make(map[string][]*appsv1alpha1.ClusterComponentSpec, 0)
-	transCtx.Labels = make([]map[string]string, 0)
+	transCtx.Labels = make(map[string]map[string]string, 0)
 	cluster := transCtx.Cluster
 
 	for i := range cluster.Spec.ComponentSpecs {
 		clusterComSpec := cluster.Spec.ComponentSpecs[i]
 		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, &clusterComSpec)
-		transCtx.Labels = append(transCtx.Labels, nil)
+		transCtx.Labels[clusterComSpec.Name] = nil
 	}
 	for i := range cluster.Spec.ShardingSpecs {
 		shardingSpec := cluster.Spec.ShardingSpecs[i]
@@ -63,13 +63,13 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 		for j := range genShardingCompSpecList {
 			genShardCompSpec := genShardingCompSpecList[j]
 			transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, genShardCompSpec)
-			transCtx.Labels = append(transCtx.Labels, constant.GetShardingNameLabel(shardingSpec.Name))
+			transCtx.Labels[genShardCompSpec.Name] = constant.GetShardingNameLabel(shardingSpec.Name)
 		}
 	}
 
 	if compSpec := apiconversion.HandleSimplifiedClusterAPI(transCtx.ClusterDef, cluster); compSpec != nil {
 		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, compSpec)
-		transCtx.Labels = append(transCtx.Labels, nil)
+		transCtx.Labels[compSpec.Name] = nil
 	}
 
 	// validate componentDef and componentDefRef

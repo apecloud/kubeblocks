@@ -73,10 +73,8 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 	}
 
 	protoCompSpecMap := make(map[string]*appsv1alpha1.ClusterComponentSpec)
-	protoCompLabelsMap := make(map[string]map[string]string)
-	for i, compSpec := range transCtx.ComponentSpecs {
+	for _, compSpec := range transCtx.ComponentSpecs {
 		protoCompSpecMap[compSpec.Name] = compSpec
-		protoCompLabelsMap[compSpec.Name] = transCtx.Labels[i]
 	}
 
 	protoCompSet := sets.KeySet(protoCompSpecMap)
@@ -92,12 +90,12 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 	}
 
 	// component objects to be created
-	if err := t.handleCompsCreate(transCtx, dag, protoCompSpecMap, protoCompLabelsMap, createCompSet); err != nil {
+	if err := t.handleCompsCreate(transCtx, dag, protoCompSpecMap, transCtx.Labels, createCompSet); err != nil {
 		return err
 	}
 
 	// component objects to be updated
-	if err := t.handleCompsUpdate(transCtx, dag, protoCompSpecMap, protoCompLabelsMap, updateCompSet); err != nil {
+	if err := t.handleCompsUpdate(transCtx, dag, protoCompSpecMap, transCtx.Labels, updateCompSet); err != nil {
 		return err
 	}
 

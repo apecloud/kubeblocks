@@ -61,6 +61,12 @@ NAME       POLICY                              METHOD       REPO      STATUS    
 mybackup   mysql-cluster-mysql-backup-policy   xtrabackup   my-repo   Completed   4426858      2m8s       2023-10-30T07:19:21Z   2023-10-30T07:21:28Z
 ```
 
+:::note
+
+annotations 中的 `dataprotection.kubeblocks.io/connection-password` 使用原集群的密码。
+
+:::
+
 </TabItem>
 
 </Tabs>

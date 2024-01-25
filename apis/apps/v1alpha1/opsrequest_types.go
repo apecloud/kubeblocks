@@ -548,12 +548,6 @@ type RestoreSpec struct {
 	VolumeRestorePolicy string `json:"volumeRestorePolicy,omitempty"`
 }
 
-type ClusterServicePolicy struct {
-	// preserveNodePort describe the original nodePort be retained during recovery.
-	// it will reset the nodePort by default.
-	PreserveNodePort bool `json:"preserveNodePort"`
-}
-
 // ScriptSecret defines the secret to be used to execute the script.
 type ScriptSecret struct {
 	// name is the name of the secret.

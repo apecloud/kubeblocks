@@ -269,7 +269,7 @@ func (r *componentStatusHandler) isComponentAvailable(pods []*corev1.Pod) (bool,
 
 	hasPodAvailable := false
 	for _, pod := range pods {
-		if !podutils.IsPodAvailable(pod, 0, metav1.Time{Time: time.Now()}) {
+		if !podutils.IsPodAvailable(pod, r.runningRSM.Spec.MinReadySeconds, metav1.Time{Time: time.Now()}) {
 			continue
 		}
 		if shouldCheckRole && hasLeaderRoleLabel(pod) {

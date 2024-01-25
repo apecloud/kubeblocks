@@ -20,9 +20,13 @@ spec:
   scope: Cluster
   versions:
   - additionalPrinterColumns:
-    - description: main component names
-      jsonPath: .spec.componentDefs[0].name
-      name: MAIN-COMPONENT-NAME
+    - description: topologies
+      jsonPath: .status.topologies
+      name: Topologies
+      type: string
+    - description: external service referenced
+      jsonPath: .status.externalServices
+      name: External-Service
       type: string
     - description: status phase
       jsonPath: .status.phase
@@ -10004,6 +10008,157 @@ spec:
                   and \"$(SVC_PORT_mysql)\" in the connection credential value is
                   3306."
                 type: object
+              topologies:
+                description: Topologies represents the different topologies within
+                  the cluster.
+                items:
+                  description: ClusterTopology represents the definition for a specific
+                    cluster topology.
+                  properties:
+                    components:
+                      description: Components specifies the components in the topology.
+                      items:
+                        description: ClusterTopologyComponent defines a component
+                          within a cluster topology.
+                        properties:
+                          compDef:
+                            description: 'CompDef specifies the component definition
+                              to use, either as a specific name or a name prefix.
+                              During instance provisioning, the system searches for
+                              matching component definitions based on the specified
+                              criteria. The search order for component definitions
+                              is as follows: 1. Prioritize component definitions within
+                              the current Addon. 2. Consider component definitions
+                              already installed in the Kubernetes cluster. 3. Optionally
+                              search for component definitions in the Addon repository
+                              if specified.'
+                            maxLength: 128
+                            type: string
+                          name:
+                            description: Name defines the name of the component. This
+                              name is also part of Service DNS name, following IANA
+                              Service Naming rules. Cannot be updated.
+                            maxLength: 16
+                            pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
+                            type: string
+                          replicas:
+                            description: Replicas specifies the default replicas for
+                              the component in this topology.
+                            format: int32
+                            type: integer
+                          requiredVersion:
+                            description: RequiredVersion specifies the minimum version
+                              required for this topology.
+                            type: string
+                          serviceRefs:
+                            description: ServiceRefs define the service references
+                              for the component.
+                            items:
+                              properties:
+                                cluster:
+                                  description: 'When referencing a service provided
+                                    by other KubeBlocks cluster, you need to provide
+                                    the name of the Cluster being referenced. By default,
+                                    when other KubeBlocks Cluster are referenced,
+                                    the ClusterDefinition.spec.connectionCredential
+                                    secret corresponding to the referenced Cluster
+                                    will be used to bind to the current component.
+                                    Currently, if a KubeBlocks cluster is to be referenced,
+                                    the connection credential secret should include
+                                    and correspond to the following fields: endpoint,
+                                    port, username, and password. Under this referencing
+                                    approach, the ServiceKind and ServiceVersion of
+                                    service reference declaration defined in the ClusterDefinition
+                                    will not be validated. If both Cluster and ServiceDescriptor
+                                    are specified, the Cluster takes precedence.'
+                                  type: string
+                                name:
+                                  description: name of the service reference declaration.
+                                    references the serviceRefDeclaration name defined
+                                    in clusterDefinition.componentDefs[*].serviceRefDeclarations[*].name
+                                  type: string
+                                namespace:
+                                  description: namespace defines the namespace of
+                                    the referenced Cluster or the namespace of the
+                                    referenced ServiceDescriptor object. If not set,
+                                    the referenced Cluster and ServiceDescriptor will
+                                    be searched in the namespace of the current cluster
+                                    by default.
+                                  type: string
+                                serviceDescriptor:
+                                  description: serviceDescriptor defines the service
+                                    descriptor of the service provided by external
+                                    sources. When referencing a service provided by
+                                    external sources, you need to provide the ServiceDescriptor
+                                    object name to establish the service binding.
+                                    And serviceDescriptor is the name of the ServiceDescriptor
+                                    object, furthermore, the ServiceDescriptor.spec.serviceKind
+                                    and ServiceDescriptor.spec.serviceVersion should
+                                    match clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceKind
+                                    and the regular expression defines in clusterDefinition.componentDefs[*].serviceRefDeclarations[*].serviceRefDeclarationSpecs[*].serviceVersion.
+                                    If both Cluster and ServiceDescriptor are specified,
+                                    the Cluster takes precedence.
+                                  type: string
+                              required:
+                              - name
+                              type: object
+                            type: array
+                          serviceVersion:
+                            description: ServiceVersion specifies the version associated
+                              with the referenced component definition. This field
+                              assists in determining the appropriate version of the
+                              component definition, considering multiple available
+                              definitions.
+                            maxLength: 32
+                            type: string
+                        required:
+                        - compDef
+                        - name
+                        type: object
+                      maxItems: 128
+                      minItems: 1
+                      type: array
+                    default:
+                      description: Default indicates whether this topology is the
+                        default configuration.
+                      type: boolean
+                    name:
+                      description: Name is the unique identifier for the cluster topology.
+                        Cannot be updated.
+                      type: string
+                    orders:
+                      description: Orders defines the orders of components within
+                        the topology.
+                      properties:
+                        shutdownOrder:
+                          description: ShutdownOrder defines the order in which components
+                            should be shut down in the cluster. Components with the
+                            same order can be listed together, separated by commas.
+                          items:
+                            type: string
+                          type: array
+                        startupOrder:
+                          description: StartupOrder defines the order in which components
+                            should be started in the cluster. Components with the
+                            same order can be listed together, separated by commas.
+                          items:
+                            type: string
+                          type: array
+                        updateOrder:
+                          description: UpdateOrder defines the order in which components
+                            should be updated in the cluster. Components with the
+                            same order can be listed together, separated by commas.
+                          items:
+                            type: string
+                          type: array
+                      type: object
+                  required:
+                  - components
+                  - name
+                  type: object
+                maxItems: 128
+                minItems: 1
+                type: array
               type:
                 description: Cluster definition type defines well known application
                   cluster type, e.g. mysql/redis/mongodb
@@ -10016,6 +10171,8 @@ spec:
           status:
             description: ClusterDefinitionStatus defines the observed state of ClusterDefinition
             properties:
+              externalServices:
+                type: string
               message:
                 description: Extra message in current phase
                 type: string
@@ -10032,6 +10189,8 @@ spec:
                 enum:
                 - Available
                 - Unavailable
+                type: string
+              topologies:
                 type: string
             type: object
         type: object

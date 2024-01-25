@@ -29,16 +29,17 @@ import (
 
 // ClusterDefinitionSpec defines the desired state of ClusterDefinition
 type ClusterDefinitionSpec struct {
-
 	// Cluster definition type defines well known application cluster type, e.g. mysql/redis/mongodb
 	// +kubebuilder:validation:MaxLength=24
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	Type string `json:"type,omitempty"`
 
 	// componentDefs provides cluster components definitions.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
@@ -61,8 +62,105 @@ type ClusterDefinitionSpec struct {
 	// - `$(SVC_PORT_{PORT-NAME})` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
 	//    `{"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306}`, and "$(SVC_PORT_mysql)" in the
 	//    connection credential value is 3306.
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
+
+	// TODO: components the definition defined
+
+	// Topologies represents the different topologies within the cluster.
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=128
+	// +optional
+	Topologies []ClusterTopology `json:"topologies,omitempty"`
+}
+
+// ClusterTopology represents the definition for a specific cluster topology.
+type ClusterTopology struct {
+	// Name is the unique identifier for the cluster topology.
+	// Cannot be updated.
+	// +required
+	Name string `json:"name"`
+
+	// Components specifies the components in the topology.
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=128
+	// +required
+	Components []ClusterTopologyComponent `json:"components"`
+
+	// Orders defines the orders of components within the topology.
+	// +optional
+	Orders *ClusterTopologyOrders `json:"orders,omitempty"`
+
+	// Default indicates whether this topology is the default configuration.
+	// + optional
+	Default bool `json:"default,omitempty"`
+
+	//// services defines the default cluster services for this topology.
+	//// +kubebuilder:pruning:PreserveUnknownFields
+	//// +optional
+	// Services []ClusterService `json:"services,omitempty"`
+
+	// TODO: resource allocation strategy.
+}
+
+// ClusterTopologyComponent defines a component within a cluster topology.
+type ClusterTopologyComponent struct {
+	// Name defines the name of the component.
+	// This name is also part of Service DNS name, following IANA Service Naming rules.
+	// Cannot be updated.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=16
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// CompDef specifies the component definition to use, either as a specific name or a name prefix.
+	// During instance provisioning, the system searches for matching component definitions based on the specified criteria.
+	// The search order for component definitions is as follows:
+	//   1. Prioritize component definitions within the current Addon.
+	//   2. Consider component definitions already installed in the Kubernetes cluster.
+	//   3. Optionally search for component definitions in the Addon repository if specified.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=128
+	CompDef string `json:"compDef"`
+
+	// ServiceVersion specifies the version associated with the referenced component definition.
+	// This field assists in determining the appropriate version of the component definition, considering multiple available definitions.
+	// +kubebuilder:validation:MaxLength=32
+	// +optional
+	ServiceVersion string `json:"serviceVersion,omitempty"`
+
+	// ServiceRefs define the service references for the component.
+	// +optional
+	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
+
+	// RequiredVersion specifies the minimum version required for this topology.
+	// +optional
+	RequiredVersion string `json:"requiredVersion,omitempty"`
+
+	// Replicas specifies the default replicas for the component in this topology.
+	// +optional
+	Replicas *int32 `json:"replicas,omitempty"`
+}
+
+// ClusterTopologyOrders defines the orders for components within a topology.
+type ClusterTopologyOrders struct {
+	// StartupOrder defines the order in which components should be started in the cluster.
+	// Components with the same order can be listed together, separated by commas.
+	// +optional
+	StartupOrder []string `json:"startupOrder,omitempty"`
+
+	// ShutdownOrder defines the order in which components should be shut down in the cluster.
+	// Components with the same order can be listed together, separated by commas.
+	// +optional
+	ShutdownOrder []string `json:"shutdownOrder,omitempty"`
+
+	// UpdateOrder defines the order in which components should be updated in the cluster.
+	// Components with the same order can be listed together, separated by commas.
+	// +optional
+	UpdateOrder []string `json:"updateOrder,omitempty"`
+
+	// TODO: upgrade order?
 }
 
 // SystemAccountSpec specifies information to create system accounts.
@@ -169,6 +267,12 @@ type ProvisionStatements struct {
 
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition
 type ClusterDefinitionStatus struct {
+	// observedGeneration is the most recent generation observed for this
+	// ClusterDefinition. It corresponds to the ClusterDefinition's generation, which is
+	// updated on mutation by the API Server.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
 	// ClusterDefinition phase, valid values are `empty`, `Available`, 'Unavailable`.
 	// Available is ClusterDefinition become available, and can be referenced for co-related objects.
 	Phase Phase `json:"phase,omitempty"`
@@ -177,11 +281,11 @@ type ClusterDefinitionStatus struct {
 	// +optional
 	Message string `json:"message,omitempty"`
 
-	// observedGeneration is the most recent generation observed for this
-	// ClusterDefinition. It corresponds to the ClusterDefinition's generation, which is
-	// updated on mutation by the API Server.
 	// +optional
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	Topologies string `json:"topologies,omitempty"`
+
+	// +optional
+	ExternalServices string `json:"externalServices,omitempty"`
 }
 
 func (r ClusterDefinitionStatus) GetTerminalPhases() []Phase {
@@ -966,13 +1070,18 @@ type GVKResource struct {
 	Selector map[string]string `json:"selector,omitempty"`
 }
 
+// TODO:
+//  1. how to display the aggregated topology and its service references line by line?
+//  2. the services and versions supported
+
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cd
-// +kubebuilder:printcolumn:name="MAIN-COMPONENT-NAME",type="string",JSONPath=".spec.componentDefs[0].name",description="main component names"
+// +kubebuilder:printcolumn:name="Topologies",type="string",JSONPath=".status.topologies",description="topologies"
+// +kubebuilder:printcolumn:name="External-Service",type="string",JSONPath=".status.externalServices",description="external service referenced"
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 

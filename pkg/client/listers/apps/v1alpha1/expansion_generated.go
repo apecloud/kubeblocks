@@ -34,10 +34,6 @@ type ClusterNamespaceListerExpansion interface{}
 // ClusterDefinitionLister.
 type ClusterDefinitionListerExpansion interface{}
 
-// ClusterTopologyListerExpansion allows custom methods to be added to
-// ClusterTopologyLister.
-type ClusterTopologyListerExpansion interface{}
-
 // ClusterVersionListerExpansion allows custom methods to be added to
 // ClusterVersionLister.
 type ClusterVersionListerExpansion interface{}

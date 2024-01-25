@@ -366,15 +366,6 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&appscontrollers.ClusterTopologyReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("cluster-topology-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ClusterTopology")
-			os.Exit(1)
-		}
-
 		if err = (&appscontrollers.OpsDefinitionReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
@@ -520,11 +511,6 @@ func main() {
 
 		if err = (&appsv1alpha1.ComponentVersion{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "ComponentVersion")
-			os.Exit(1)
-		}
-
-		if err = (&appsv1alpha1.ClusterTopology{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterTopology")
 			os.Exit(1)
 		}
 

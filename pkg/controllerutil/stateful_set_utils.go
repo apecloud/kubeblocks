@@ -47,31 +47,6 @@ func IsMemberOf(set *appsv1.StatefulSet, pod *corev1.Pod) bool {
 	return getParentName(pod) == set.Name
 }
 
-// statefulSetOfComponentIsReady checks if statefulSet of component is ready.
-func statefulSetOfComponentIsReady(sts *appsv1.StatefulSet, statefulStatusRevisionIsEquals bool, targetReplicas *int32) bool {
-	if targetReplicas == nil {
-		targetReplicas = sts.Spec.Replicas
-	}
-	return statefulSetPodsAreReady(sts, *targetReplicas) && statefulStatusRevisionIsEquals
-}
-
-// statefulSetPodsAreReady checks if all pods of statefulSet are ready.
-func statefulSetPodsAreReady(sts *appsv1.StatefulSet, targetReplicas int32) bool {
-	return sts.Status.AvailableReplicas == targetReplicas &&
-		sts.Status.Replicas == targetReplicas &&
-		sts.Status.ObservedGeneration == sts.Generation
-}
-
-func convertToStatefulSet(obj client.Object) *appsv1.StatefulSet {
-	if obj == nil {
-		return nil
-	}
-	if sts, ok := obj.(*appsv1.StatefulSet); ok {
-		return sts
-	}
-	return nil
-}
-
 // ParseParentNameAndOrdinal gets the name of cluster-component and StatefulSet's ordinal as extracted from its Name. If
 // the StatefulSet's Name was not match a statefulSetRegex, its parent is considered to be empty string,
 // and its ordinal is considered to be -1.

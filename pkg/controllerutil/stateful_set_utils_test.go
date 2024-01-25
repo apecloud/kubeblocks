@@ -22,8 +22,6 @@ package controllerutil
 import (
 	"testing"
 
-	apps "k8s.io/api/apps/v1"
-
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
@@ -53,39 +51,5 @@ func TestIsMemberOf(t *testing.T) {
 	}
 	if IsMemberOf(set2, pod) {
 		t.Error("isMemberOf returned false positive")
-	}
-}
-
-func TestStatefulSetPodsAreReady(t *testing.T) {
-	sts := testk8s.NewFakeStatefulSet("test", 3)
-	testk8s.MockStatefulSetReady(sts)
-	ready := statefulSetPodsAreReady(sts, *sts.Spec.Replicas)
-	if !ready {
-		t.Errorf("StatefulSet pods should be ready")
-	}
-	convertSts := convertToStatefulSet(sts)
-	if convertSts == nil {
-		t.Errorf("Convert to statefulSet should be succeed")
-	}
-	convertSts = convertToStatefulSet(&apps.Deployment{})
-	if convertSts != nil {
-		t.Errorf("Convert to statefulSet should be failed")
-	}
-	convertSts = convertToStatefulSet(nil)
-	if convertSts != nil {
-		t.Errorf("Convert to statefulSet should be failed")
-	}
-}
-
-func TestSStatefulSetOfComponentIsReady(t *testing.T) {
-	sts := testk8s.NewFakeStatefulSet("test", 3)
-	testk8s.MockStatefulSetReady(sts)
-	ready := statefulSetOfComponentIsReady(sts, true, nil)
-	if !ready {
-		t.Errorf("StatefulSet should be ready")
-	}
-	ready = statefulSetOfComponentIsReady(sts, false, nil)
-	if ready {
-		t.Errorf("StatefulSet should not be ready")
 	}
 }

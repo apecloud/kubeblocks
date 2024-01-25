@@ -62,7 +62,14 @@ type CfgManagerBuildParams struct {
 }
 
 func IsSupportReload(reload *appsv1alpha1.ReloadOptions) bool {
-	return reload != nil && (reload.ShellTrigger != nil || reload.UnixSignalTrigger != nil || reload.TPLScriptTrigger != nil || reload.AutoTrigger != nil)
+	return reload != nil && isValidReloadPolicy(*reload)
+}
+
+func isValidReloadPolicy(reload appsv1alpha1.ReloadOptions) bool {
+	return reload.AutoTrigger != nil ||
+		reload.ShellTrigger != nil ||
+		reload.TPLScriptTrigger != nil ||
+		reload.UnixSignalTrigger != nil
 }
 
 func IsAutoReload(reload *appsv1alpha1.ReloadOptions) bool {

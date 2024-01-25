@@ -436,12 +436,21 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 	return mgr.EnsureServerID(ctx)
 }
 
+func (mgr *Manager) GetVersion(ctx context.Context) (string, error) {
+	if mgr.version != "" {
+		return mgr.version, nil
+	}
+	err := mgr.DB.QueryRowContext(ctx, "select version()").Scan(&mgr.version)
+	if err != nil {
+		return "", errors.Wrap(err, "Get version failed")
+	}
+	return mgr.version, nil
+}
+
 func (mgr *Manager) ValidateAddr(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	// The maximum length of the server addr is 255 characters. Before MySQL 8.0.17 it was 60 characters.
-	var version string
-	err := mgr.DB.QueryRowContext(ctx, "select version()").Scan(&version)
+	version, err := mgr.GetVersion(ctx)
 	if err != nil {
-		mgr.Logger.Info("Get version failed", "error", err)
 		return false, err
 	}
 	currentMemberName := mgr.GetCurrentMemberName()

@@ -92,7 +92,53 @@ KubeBlocks 是基于 Kubernetes 的云原生数据基础设施，可以帮助用
 | xinference                            | 1.16.0                            | ✔️      | N/A    | N/A          | ✔️          | ✔️       | N/A            | N/A  | N/A    | N/A                         | N/A     | N/A      | N/A        | N/A     |
 | zookeeper                             | 3.7.1                             | ✔️      | ✔️      | ✔️            | ✔️          | ✔️       | N/A            | ✔️    | ✔️      | N/A                         | N/A     | N/A      | N/A        | N/A     |
 
-## Use add-ons
+## 使用引擎
+
+### 使用索引安装引擎
+
+With the release of KubeBlocks v0.8.0, addons are decoupled from KubeBlocks and some addons are not installed by default. If you want to use these addons, add addons first by index. KubeBlocks v0.8.0 发布后，addon 和 KubeBlocks 解耦，KubeBlocks 仅默认安装了部分引擎，如需体验其它引擎，需通过索引安装相关引擎。
+
+官网引擎索引仓库为 [KubeBlocks index](https://github.com/apecloud/block-index)。引擎代码维护在 [KubeBlocks addon repo](https://github.com/apecloud/kubeblocks-addons)。
+
+1. 查看引擎仓库索引。
+
+   kbcli 默认创建名为 `kubeblocks` 的索引，可使用 `kbcli addon index list` 查看该索引。
+
+   ```bash
+   kbcli addon index list
+   >
+   INDEX        URL
+   kubeblocks   https://github.com/apecloud/block-index.git 
+   ```
+
+   For example, 如果命令执行结果未显示或者你想要添加自定义索引仓库，则表明索引未建立，可使用 `kbcli addon index add <index-name> <source>` 命令手动添加索引。例如，
+
+   ```bash
+   kbcli addon index add kubeblocks https://github.com/apecloud/block-index.git
+   ```
+
+2. （可选）索引建立后，可以通过 `addon search` 命令检查想要安装的引擎是否在索引信息中存在
+
+   ```bash
+   kbcli addon search mariadb
+   >
+   ADDON     VERSION   INDEX
+   mariadb   0.7.0     kubeblocks
+   ```
+
+3. 安装引擎。
+
+   当引擎有多个版本和索引源时，可使用 `--index` 指定索引源，`--version` 指定安装版本。系统默认以 `kubeblocks` 索引仓库 为索引源，安装最新版本。
+
+   ```bash
+   kbcli addon install mariadb --index kubeblocks --version 0.7.0
+   ```
+
+   **后续操作**
+
+   引擎安装完成后，可查看引擎列表、启用引擎。
+
+### 查看引擎列表
 
 执行 `kbcli addon list` 命令查看已经支持的引擎。
 

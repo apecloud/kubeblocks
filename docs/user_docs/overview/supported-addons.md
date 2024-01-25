@@ -129,7 +129,7 @@ The official index repo is [KubeBlocks index](https://github.com/apecloud/block-
 
 3. Install the addon.
 
-   If there are multiple index sources and versions for an addon, you can specify them by adding flags.
+   If there are multiple index sources and versions for an addon, you can specify them by adding flags. The system installs the latest version in the `kubeblocks` index by default.
 
    ```bash
    kbcli addon install mariadb --index kubeblocks --version 0.7.0

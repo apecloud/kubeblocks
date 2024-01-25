@@ -58,8 +58,8 @@ spec:
 </TabItem>
 
 </Tabs>
-  
-After scheduled backup is enabled, execute the following command to check if a CronJob object has been created:
+
+After the scheduled backup is enabled, execute the following command to check if a CronJob object has been created:
 
 ```bash
 kubectl get cronjob

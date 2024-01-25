@@ -49,14 +49,17 @@ KubeBlocks supports restoring clusters from backups with the following instructi
 
     <TabItem value="kubectl" label="kubectl">
 
+    You can set the `connectionPassword.annotations` of the restored cluster as that of the original cluster. The password of the original cluster can be accessed by viewing the annotation of `dataprotection.kubeblocks.io/connection-password` in the backup YAML file.
+
     ```bash
     $ kubectl apply -f - <<-'EOF'
     apiVersion: apps.kubeblocks.io/v1alpha1
     kind: Cluster
     metadata:
       name: myrestore
+      namespace: default
       annotations:
-        kubeblocks.io/restore-from-backup: '{"mysql":{"name":"mybackup","namespace":"default"}}'
+        kubeblocks.io/restore-from-backup: '{"mysql":{"name":"mybackup","namespace":"default","connectionPassword": "Bw1cR15mzfldc9hzGuK4m1BZQOzha6aBb1i9nlvoBdoE9to4"}}'
     spec:
       clusterDefinitionRef: apecloud-mysql
       clusterVersionRef: ac-mysql-8.0.30

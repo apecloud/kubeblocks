@@ -664,7 +664,13 @@ func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
 	replicas := *rsm.Spec.Replicas
 	if rsm.Status.Replicas != replicas ||
 		rsm.Status.ReadyReplicas != replicas ||
-		rsm.Status.AvailableReplicas != replicas ||
+		// The AvailableReplicas was introduced in Kubernetes release 1.22. It, along with MinReadySeconds,
+		// provides the availability semantics for StatefulSets. For more detailed information about this,
+		// please check the doc for reference: https://kubernetes.io/blog/2021/08/27/minreadyseconds-statefulsets/.
+		// Considering that MinReadySeconds is not explicitly set in the current KB, the value of AvailableReplicas
+		// is always same as ReadyReplicas. Therefore, it is safe to disable the check for AvailableReplicas
+		// to keep compatibility with Kubernetes versions prior to 1.22.
+		// rsm.Status.AvailableReplicas != replicas ||
 		rsm.Status.UpdatedReplicas != replicas {
 		return false
 	}

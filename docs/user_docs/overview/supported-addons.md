@@ -93,19 +93,63 @@ KubeBlocks, as a cloud-native data infrastructure based on Kubernetes, providing
 | xinference                            | 1.16.0                            | ✔️      | N/A    | N/A          | ✔️          | ✔️       | N/A            | N/A  | N/A    | N/A                         | N/A     | N/A      | N/A        | N/A     |
 | zookeeper                             | 3.7.1                             | ✔️      | ✔️      | ✔️            | ✔️          | ✔️       | N/A            | ✔️    | ✔️      | N/A                         | N/A     | N/A      | N/A        | N/A     |
 
-## Use add-ons
+## Use addons
 
-### List add-ons
+### Use the index to install an addon
 
-To list supported add-ons, run `kbcli addon list` command.
+With the release of KubeBlocks v0.8.0, addons are decoupled from KubeBlocks and some addons are not installed by default. If you want to use these addons, add addons first by index.
 
-### Enable/Disable add-ons
+The official index repo is [KubeBlocks index](https://github.com/apecloud/block-index). The code of all addons is maintained in the [KubeBlocks addon repo](https://github.com/apecloud/kubeblocks-addons).
 
-To manually enable or disable add-ons, follow the steps below.
+1. View the index.
+
+   kbcli creates an index named `kubeblocks` by default and you can check whether this index is created by running `kbcli addon index list`.
+
+   ```bash
+   kbcli addon index list
+   >
+   INDEX        URL
+   kubeblocks   https://github.com/apecloud/block-index.git 
+   ```
+
+   If the list is empty or you want to add your index, you can add the index manually by using `kbcli addon index add <index-name> <source>`. For example,
+
+   ```bash
+   kbcli addon index add kubeblocks https://github.com/apecloud/block-index.git
+   ```
+
+2. (Optional) Search whether the addon exists in the index.
+
+   ```bash
+   kbcli addon search mariadb
+   >
+   ADDON     VERSION   INDEX
+   mariadb   0.7.0     kubeblocks
+   ```
+
+3. Install the addon.
+
+   If there are multiple index sources and versions for an addon, you can specify them by adding flags.
+
+   ```bash
+   kbcli addon install mariadb --index kubeblocks --version 0.7.0
+   ```
+
+   **What's next**
+
+   After the addon is installed, you can list and enable it.
+
+### List addons
+
+To list supported addons, run `kbcli addon list` command.
+
+### Enable/Disable addons
+
+To manually enable or disable addons, follow the steps below.
 
 ***Steps:***
 
-1. To enable the add-on, use `kbcli addon enable`.
+1. To enable an addon, use `kbcli addon enable`.
 
    ***Example***
 
@@ -113,9 +157,9 @@ To manually enable or disable add-ons, follow the steps below.
    kbcli addon enable snapshot-controller
    ```
 
-   To disable the add-on, use `kbcli addon disable`.
+   To disable an addon, use `kbcli addon disable`.
 
-2. List the add-ons again to check whether it is enabled.
+2. List the addons again to check whether it is enabled.
 
    ```bash
    kbcli addon list

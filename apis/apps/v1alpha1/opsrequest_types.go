@@ -546,9 +546,6 @@ type RestoreSpec struct {
 	// +kubebuilder:validation:Enum=Serial;Parallel
 	// +kubebuilder:default=Parallel
 	VolumeRestorePolicy string `json:"volumeRestorePolicy,omitempty"`
-
-	// clusterServicePolicy defines the restore policy for cluster services.
-	ClusterServicePolicy ClusterServicePolicy `json:"clusterServicePolicy"`
 }
 
 type ClusterServicePolicy struct {

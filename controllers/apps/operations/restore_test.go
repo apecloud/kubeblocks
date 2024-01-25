@@ -97,7 +97,7 @@ var _ = Describe("Restore OpsRequest", func() {
 		It("", func() {
 
 			By("create Restore OpsRequest")
-			opsRes.OpsRequest = createRestoreOpsObj(clusterName, "restore-ops-"+randomStr, backupName, false)
+			opsRes.OpsRequest = createRestoreOpsObj(clusterName, "restore-ops-"+randomStr, backupName)
 			// set ops phase to Pending
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
 
@@ -117,7 +117,7 @@ var _ = Describe("Restore OpsRequest", func() {
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 		})
 
-		testClusterServicePolicy := func(preserveNodePort bool) {
+		It("test if source cluster exists services", func() {
 			By("mock backup annotations and labels")
 			opsRes.Cluster.Spec.Services = []appsv1alpha1.ClusterService{
 				{
@@ -144,7 +144,7 @@ var _ = Describe("Restore OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("create Restore OpsRequest")
-			opsRes.OpsRequest = createRestoreOpsObj(restoreClusterName, "restore-ops-"+randomStr, backupName, preserveNodePort)
+			opsRes.OpsRequest = createRestoreOpsObj(restoreClusterName, "restore-ops-"+randomStr, backupName)
 			// set ops phase to Pending
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
 
@@ -156,29 +156,17 @@ var _ = Describe("Restore OpsRequest", func() {
 			By("test restore action")
 			restoreHandler := RestoreOpsHandler{}
 			_ = restoreHandler.Action(reqCtx, k8sClient, opsRes)
-		}
 
-		It("test clusterServicePolicy when preserveNodePort is false", func() {
-			testClusterServicePolicy(false)
 			By("the nodePort should be reset")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: restoreClusterName, Namespace: opsRes.OpsRequest.Namespace}, func(g Gomega, restoreCluster *appsv1alpha1.Cluster) {
-				Expect(restoreCluster.Spec.Services).Should(HaveLen(1))
-				Expect(restoreCluster.Spec.Services[0].Spec.Ports[0].NodePort).Should(Equal(int32(0)))
+				Expect(restoreCluster.Spec.Services).Should(HaveLen(0))
 			})).Should(Succeed())
 		})
 
-		It("test clusterServicePolicy when preserveNodePort is true", func() {
-			testClusterServicePolicy(true)
-			By("the nodePort should be reset")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: restoreClusterName, Namespace: opsRes.OpsRequest.Namespace}, func(g Gomega, restoreCluster *appsv1alpha1.Cluster) {
-				Expect(restoreCluster.Spec.Services).Should(HaveLen(1))
-				Expect(restoreCluster.Spec.Services[0].Spec.Ports[0].NodePort).Should(Equal(nodePort))
-			})).Should(Succeed())
-		})
 	})
 })
 
-func createRestoreOpsObj(clusterName, restoreOpsName, backupName string, preserveNodePort bool) *appsv1alpha1.OpsRequest {
+func createRestoreOpsObj(clusterName, restoreOpsName, backupName string) *appsv1alpha1.OpsRequest {
 	ops := &appsv1alpha1.OpsRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      restoreOpsName,
@@ -193,9 +181,6 @@ func createRestoreOpsObj(clusterName, restoreOpsName, backupName string, preserv
 			Type:       appsv1alpha1.RestoreType,
 			RestoreSpec: &appsv1alpha1.RestoreSpec{
 				BackupName: backupName,
-				ClusterServicePolicy: appsv1alpha1.ClusterServicePolicy{
-					PreserveNodePort: preserveNodePort,
-				},
 			},
 		},
 	}

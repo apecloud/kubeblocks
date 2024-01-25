@@ -192,17 +192,7 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 	}
 	cluster.Annotations[constant.RestoreFromBackupAnnotationKey] = restoreAnnotation
 	cluster.Name = opsRequest.Spec.ClusterRef
-	r.handleClusterServicePolicy(cluster, restoreSpec.ClusterServicePolicy)
+	// Reset cluster services
+	cluster.Spec.Services = nil
 	return cluster, nil
-}
-
-func (r RestoreOpsHandler) handleClusterServicePolicy(cluster *appsv1alpha1.Cluster, clusterServicePolicy appsv1alpha1.ClusterServicePolicy) {
-	if !clusterServicePolicy.PreserveNodePort {
-		for i, v := range cluster.Spec.Services {
-			for j := range v.Spec.Ports {
-				v.Spec.Ports[j].NodePort = 0
-			}
-			cluster.Spec.Services[i] = v
-		}
-	}
 }

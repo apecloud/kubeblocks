@@ -7,7 +7,7 @@ sidebar_label: 支持的数据库类型
 ---
 # 支持的数据库类型
 
-KubeBlocks 是基于 Kubernetes 的云原生数据基础设施，可以帮助用户轻松构建关系型、NoSQL、流计算和向量型数据库服务。而这些数据库类型通常以 add-on 引擎的形式添加到 KubeBlocks 中。
+KubeBlocks 是基于 Kubernetes 的云原生数据基础设施，可以帮助用户轻松构建关系型、NoSQL、流计算和向量型数据库服务。而这些数据库类型通常以引擎（addon）的形式添加到 KubeBlocks 中。除了支持数据库引擎外，KubeBlocks 引擎还支持适配云环境的插件及其他应用。
 
 | 数据库引擎       | 简介                                                                                                                                                                                                       |
 |:----------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -96,7 +96,7 @@ KubeBlocks 是基于 Kubernetes 的云原生数据基础设施，可以帮助用
 
 ### 使用索引安装引擎
 
-With the release of KubeBlocks v0.8.0, addons are decoupled from KubeBlocks and some addons are not installed by default. If you want to use these addons, add addons first by index. KubeBlocks v0.8.0 发布后，addon 和 KubeBlocks 解耦，KubeBlocks 仅默认安装了部分引擎，如需体验其它引擎，需通过索引安装相关引擎。
+KubeBlocks v0.8.0 发布后，引擎（addon）与 KubeBlocks 解耦，KubeBlocks 仅默认安装了部分引擎，如需体验其它引擎，需通过索引安装相关引擎。
 
 官网引擎索引仓库为 [KubeBlocks index](https://github.com/apecloud/block-index)。引擎代码维护在 [KubeBlocks addon repo](https://github.com/apecloud/kubeblocks-addons)。
 
@@ -111,7 +111,7 @@ With the release of KubeBlocks v0.8.0, addons are decoupled from KubeBlocks and 
    kubeblocks   https://github.com/apecloud/block-index.git 
    ```
 
-   For example, 如果命令执行结果未显示或者你想要添加自定义索引仓库，则表明索引未建立，可使用 `kbcli addon index add <index-name> <source>` 命令手动添加索引。例如，
+   如果命令执行结果未显示或者你想要添加自定义索引仓库，则表明索引未建立，可使用 `kbcli addon index add <index-name> <source>` 命令手动添加索引。例如，
 
    ```bash
    kbcli addon index add kubeblocks https://github.com/apecloud/block-index.git

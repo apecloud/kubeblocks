@@ -281,6 +281,7 @@ type ClusterDefinitionStatus struct {
 	// +optional
 	Message string `json:"message,omitempty"`
 
+	// Topologies this ClusterDefinition supported.
 	// +optional
 	Topologies string `json:"topologies,omitempty"`
 
@@ -1071,7 +1072,7 @@ type GVKResource struct {
 }
 
 // TODO:
-//  1. how to display the aggregated topology and its service references line by line?
+//  1. how to display the aggregated topologies and its service references line by line?
 //  2. the services and versions supported
 
 // +genclient

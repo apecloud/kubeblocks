@@ -10191,6 +10191,7 @@ spec:
                 - Unavailable
                 type: string
               topologies:
+                description: Topologies this ClusterDefinition supported.
                 type: string
             type: object
         type: object

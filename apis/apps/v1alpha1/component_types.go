@@ -33,6 +33,11 @@ type ComponentSpec struct {
 	// +kubebuilder:validation:Required
 	CompDef string `json:"compDef"`
 
+	// ServiceVersion specifies the version of the service that the component provisioning.
+	// +kubebuilder:validation:MaxLength=32
+	// +optional
+	ServiceVersion string `json:"serviceVersion,omitempty"`
+
 	// classDefRef references the class defined in ComponentClassDefinition.
 	// +optional
 	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`

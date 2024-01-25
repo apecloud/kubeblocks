@@ -343,7 +343,6 @@ type ClusterComponentSpec struct {
 	// element is the log type which is defined in cluster definition logConfig.name,
 	// and will set relative variables about this log type in database kernel.
 	// +listType=set
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	EnabledLogs []string `json:"enabledLogs,omitempty"`
 

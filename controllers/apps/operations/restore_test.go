@@ -20,17 +20,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"encoding/json"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 )
 
 var _ = Describe("Restore OpsRequest", func() {
@@ -39,7 +45,9 @@ var _ = Describe("Restore OpsRequest", func() {
 		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
 		clusterVersionName    = "clusterversion-for-ops-" + randomStr
 		clusterName           = "cluster-for-ops-" + randomStr
+		restoreClusterName    = "restore-cluster"
 		backupName            = "backup-for-ops-" + randomStr
+		nodePort              = int32(31212)
 	)
 
 	cleanEnv := func() {
@@ -57,6 +65,7 @@ var _ = Describe("Restore OpsRequest", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
 	}
 
 	BeforeEach(cleanEnv)
@@ -67,16 +76,28 @@ var _ = Describe("Restore OpsRequest", func() {
 		var (
 			opsRes *OpsResource
 			reqCtx intctrlutil.RequestCtx
+			backup *dpv1alpha1.Backup
 		)
 		BeforeEach(func() {
 			By("init operations resources ")
 			opsRes, _, _ = initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 			reqCtx = intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+
+			By("create Backup")
+			backup = testdp.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+				SetBackupPolicyName(testdp.BackupPolicyName).
+				SetBackupMethod(testdp.VSBackupMethodName).
+				Create(&testCtx).GetObject()
+
+			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
+				backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+			})).Should(Succeed())
 		})
 
 		It("", func() {
+
 			By("create Restore OpsRequest")
-			opsRes.OpsRequest = createRestoreOpsObj(clusterName, "restore-ops-"+randomStr, backupName)
+			opsRes.OpsRequest = createRestoreOpsObj(clusterName, "restore-ops-"+randomStr, backupName, false)
 			// set ops phase to Pending
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
 
@@ -95,10 +116,69 @@ var _ = Describe("Restore OpsRequest", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 		})
+
+		testClusterServicePolicy := func(preserveNodePort bool) {
+			By("mock backup annotations and labels")
+			opsRes.Cluster.Spec.Services = []appsv1alpha1.ClusterService{
+				{
+					ComponentSelector: consensusComp,
+					Service: appsv1alpha1.Service{
+						Name: "svc",
+						Spec: corev1.ServiceSpec{
+							Ports: []corev1.ServicePort{
+								{Name: "port", Port: 3306, NodePort: nodePort},
+							},
+						},
+					},
+				}}
+			Expect(testapps.ChangeObj(&testCtx, backup, func(backup *dpv1alpha1.Backup) {
+				backup.Labels = map[string]string{
+					dptypes.BackupTypeLabelKey:      string(dpv1alpha1.BackupTypeFull),
+					constant.KBAppComponentLabelKey: consensusComp,
+				}
+				opsRes.Cluster.ResourceVersion = ""
+				clusterBytes, _ := json.Marshal(opsRes.Cluster)
+				backup.Annotations = map[string]string{
+					constant.ClusterSnapshotAnnotationKey: string(clusterBytes),
+				}
+			})).Should(Succeed())
+
+			By("create Restore OpsRequest")
+			opsRes.OpsRequest = createRestoreOpsObj(restoreClusterName, "restore-ops-"+randomStr, backupName, preserveNodePort)
+			// set ops phase to Pending
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
+
+			By("mock restore OpsRequest is Running")
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+
+			By("test restore action")
+			restoreHandler := RestoreOpsHandler{}
+			_ = restoreHandler.Action(reqCtx, k8sClient, opsRes)
+		}
+
+		It("test clusterServicePolicy when preserveNodePort is false", func() {
+			testClusterServicePolicy(false)
+			By("the nodePort should be reset")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: restoreClusterName, Namespace: opsRes.OpsRequest.Namespace}, func(g Gomega, restoreCluster *appsv1alpha1.Cluster) {
+				Expect(restoreCluster.Spec.Services).Should(HaveLen(1))
+				Expect(restoreCluster.Spec.Services[0].Spec.Ports[0].NodePort).Should(Equal(int32(0)))
+			})).Should(Succeed())
+		})
+
+		It("test clusterServicePolicy when preserveNodePort is true", func() {
+			testClusterServicePolicy(true)
+			By("the nodePort should be reset")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: restoreClusterName, Namespace: opsRes.OpsRequest.Namespace}, func(g Gomega, restoreCluster *appsv1alpha1.Cluster) {
+				Expect(restoreCluster.Spec.Services).Should(HaveLen(1))
+				Expect(restoreCluster.Spec.Services[0].Spec.Ports[0].NodePort).Should(Equal(nodePort))
+			})).Should(Succeed())
+		})
 	})
 })
 
-func createRestoreOpsObj(clusterName, restoreOpsName, backupName string) *appsv1alpha1.OpsRequest {
+func createRestoreOpsObj(clusterName, restoreOpsName, backupName string, preserveNodePort bool) *appsv1alpha1.OpsRequest {
 	ops := &appsv1alpha1.OpsRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      restoreOpsName,
@@ -113,6 +193,9 @@ func createRestoreOpsObj(clusterName, restoreOpsName, backupName string) *appsv1
 			Type:       appsv1alpha1.RestoreType,
 			RestoreSpec: &appsv1alpha1.RestoreSpec{
 				BackupName: backupName,
+				ClusterServicePolicy: appsv1alpha1.ClusterServicePolicy{
+					PreserveNodePort: preserveNodePort,
+				},
 			},
 		},
 	}

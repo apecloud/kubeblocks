@@ -77,14 +77,14 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 		return nil
 	}
 
-	for _, svc := range cluster.Spec.Services {
-		if err = handleServiceFunc(&svc); err != nil {
+	for i := range cluster.Spec.Services {
+		if err = handleServiceFunc(&cluster.Spec.Services[i]); err != nil {
 			return err
 		}
 	}
 
-	for _, svc := range convertedServices {
-		if err = handleServiceFunc(&svc); err != nil {
+	for i := range convertedServices {
+		if err = handleServiceFunc(&convertedServices[i]); err != nil {
 			return err
 		}
 	}

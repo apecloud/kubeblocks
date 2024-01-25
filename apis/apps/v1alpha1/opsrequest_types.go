@@ -546,6 +546,15 @@ type RestoreSpec struct {
 	// +kubebuilder:validation:Enum=Serial;Parallel
 	// +kubebuilder:default=Parallel
 	VolumeRestorePolicy string `json:"volumeRestorePolicy,omitempty"`
+
+	// clusterServicePolicy defines the restore policy for cluster services.
+	ClusterServicePolicy ClusterServicePolicy `json:"clusterServicePolicy"`
+}
+
+type ClusterServicePolicy struct {
+	// preserveNodePort describe the original nodePort be retained during recovery.
+	// it will reset the nodePort by default.
+	PreserveNodePort bool `json:"preserveNodePort"`
 }
 
 // ScriptSecret defines the secret to be used to execute the script.

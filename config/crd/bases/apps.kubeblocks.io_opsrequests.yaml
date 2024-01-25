@@ -610,6 +610,18 @@ spec:
                   backupName:
                     description: backupName is the name of the backup.
                     type: string
+                  clusterServicePolicy:
+                    description: clusterServicePolicy defines the restore policy for
+                      cluster services.
+                    properties:
+                      preserveNodePort:
+                        description: preserveNodePort describe the original nodePort
+                          be retained during recovery. it will reset the nodePort
+                          by default.
+                        type: boolean
+                    required:
+                    - preserveNodePort
+                    type: object
                   effectiveCommonComponentDef:
                     description: effectiveCommonComponentDef describes this backup
                       will be restored for all components which refer to common ComponentDefinition.
@@ -627,6 +639,7 @@ spec:
                     type: string
                 required:
                 - backupName
+                - clusterServicePolicy
                 type: object
               scriptSpec:
                 description: scriptSpec defines the script to be executed.

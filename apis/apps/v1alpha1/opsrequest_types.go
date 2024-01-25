@@ -148,6 +148,7 @@ type OpsRequestSpec struct {
 	BackupSpec *BackupSpec `json:"backupSpec,omitempty"`
 
 	// restoreSpec defines how to restore the cluster.
+	// note that this restore operation will roll back cluster services.
 	// +optional
 	RestoreSpec *RestoreSpec `json:"restoreSpec,omitempty"`
 

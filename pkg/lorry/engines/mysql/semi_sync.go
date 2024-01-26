@@ -29,11 +29,24 @@ import (
 var semiSyncMaxTimeout int = 4294967295
 var semiSyncSourceVersion string = "8.0.26"
 
-func (mgr *Manager) EnableSemiSyncSource(ctx context.Context) error {
+func (mgr *Manager) GetSemiSyncSourcePlugin() string {
 	plugin := "rpl_semi_sync_source"
 	if IsBeforeVersion(mgr.version, semiSyncSourceVersion) {
 		plugin = "rpl_semi_sync_master"
 	}
+	return plugin
+}
+
+func (mgr *Manager) GetSemiSyncReplicaPlugin() string {
+	plugin := "rpl_semi_sync_Replica"
+	if IsBeforeVersion(mgr.version, semiSyncSourceVersion) {
+		plugin = "rpl_semi_sync_slave"
+	}
+	return plugin
+}
+
+func (mgr *Manager) EnableSemiSyncSource(ctx context.Context) error {
+	plugin := mgr.GetSemiSyncSourcePlugin()
 	var status string
 	sql := fmt.Sprintf("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS WHERE PLUGIN_NAME ='%s';", plugin)
 	err := mgr.DB.QueryRowContext(ctx, sql).Scan(&status)
@@ -57,12 +70,30 @@ func (mgr *Manager) EnableSemiSyncSource(ctx context.Context) error {
 	}
 	return nil
 }
+func (mgr *Manager) IsSemiSyncSourceEnabled(ctx context.Context) (bool, error) {
+	plugin := mgr.GetSemiSyncSourcePlugin()
+	var value int
+	sql := fmt.Sprintf("select @@global.%s_enabled", plugin)
+	err := mgr.DB.QueryRowContext(ctx, sql).Scan(&value)
+	if err != nil {
+		return false, errors.Wrapf(err, "exec %s failed", sql)
+	}
+	return value == 1, nil
+}
+
+func (mgr *Manager) GetSemiSyncSourceTimeout(ctx context.Context) (int, error) {
+	plugin := mgr.GetSemiSyncSourcePlugin()
+	var value int
+	sql := fmt.Sprintf("select @@global.%s_timeout", plugin)
+	err := mgr.DB.QueryRowContext(ctx, sql).Scan(&value)
+	if err != nil {
+		return 0, errors.Wrapf(err, "exec %s failed", sql)
+	}
+	return value, nil
+}
 
 func (mgr *Manager) DisableSemiSyncSource(ctx context.Context) error {
-	plugin := "rpl_semi_sync_source"
-	if IsBeforeVersion(mgr.version, semiSyncSourceVersion) {
-		plugin = "rpl_semi_sync_master"
-	}
+	plugin := mgr.GetSemiSyncSourcePlugin()
 	setSourceDisable := fmt.Sprintf("SET GLOBAL %s_enabled = 0;", plugin)
 	_, err := mgr.DB.Exec(setSourceDisable)
 	if err != nil {
@@ -72,10 +103,7 @@ func (mgr *Manager) DisableSemiSyncSource(ctx context.Context) error {
 }
 
 func (mgr *Manager) EnableSemiSyncReplica(ctx context.Context) error {
-	plugin := "rpl_semi_sync_replica"
-	if IsBeforeVersion(mgr.version, semiSyncSourceVersion) {
-		plugin = "rpl_semi_sync_slave"
-	}
+	plugin := mgr.GetSemiSyncReplicaPlugin()
 	var status string
 	sql := fmt.Sprintf("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS WHERE PLUGIN_NAME ='%s';", plugin)
 	err := mgr.DB.QueryRowContext(ctx, sql).Scan(&status)
@@ -94,11 +122,19 @@ func (mgr *Manager) EnableSemiSyncReplica(ctx context.Context) error {
 	return nil
 }
 
-func (mgr *Manager) DisableSemiSyncReplica(ctx context.Context) error {
-	plugin := "rpl_semi_sync_replica"
-	if IsBeforeVersion(mgr.version, semiSyncSourceVersion) {
-		plugin = "rpl_semi_sync_slave"
+func (mgr *Manager) IsSemiSyncReplicaEnabled(ctx context.Context) (bool, error) {
+	plugin := mgr.GetSemiSyncReplicaPlugin()
+	var value int
+	sql := fmt.Sprintf("select @@global.%s_enabled", plugin)
+	err := mgr.DB.QueryRowContext(ctx, sql).Scan(&value)
+	if err != nil {
+		return false, errors.Wrapf(err, "exec %s failed", sql)
 	}
+	return value == 1, nil
+}
+
+func (mgr *Manager) DisableSemiSyncReplica(ctx context.Context) error {
+	plugin := mgr.GetSemiSyncReplicaPlugin()
 	setReplicaDisable := fmt.Sprintf("SET GLOBAL %s_enabled = 0;", plugin)
 	_, err := mgr.DB.Exec(setReplicaDisable)
 	if err != nil {

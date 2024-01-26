@@ -422,6 +422,11 @@ func (mgr *Manager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string
 
 // IsClusterInitialized is a method to check if cluster is initialized or not
 func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
+	_, err := mgr.GetVersion(ctx)
+	if err != nil {
+		return false, err
+	}
+
 	if cluster != nil {
 		isValid, err := mgr.ValidateAddr(ctx, cluster)
 		if err != nil || !isValid {
@@ -429,10 +434,10 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 		}
 	}
 
-	err := mgr.EnableSemiSyncIfNeed(ctx)
-	if err != nil {
-		return false, err
-	}
+	// err = mgr.EnableSemiSyncIfNeed(ctx)
+	// if err != nil {
+	// 	return false, err
+	// }
 	return mgr.EnsureServerID(ctx)
 }
 
@@ -449,15 +454,11 @@ func (mgr *Manager) GetVersion(ctx context.Context) (string, error) {
 
 func (mgr *Manager) ValidateAddr(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	// The maximum length of the server addr is 255 characters. Before MySQL 8.0.17 it was 60 characters.
-	version, err := mgr.GetVersion(ctx)
-	if err != nil {
-		return false, err
-	}
 	currentMemberName := mgr.GetCurrentMemberName()
 	member := cluster.GetMemberWithName(currentMemberName)
 	addr := cluster.GetMemberShortAddr(*member)
 	maxLength := 255
-	if IsBeforeVersion(version, "8.0.17") {
+	if IsBeforeVersion(mgr.version, "8.0.17") {
 		maxLength = 60
 	}
 

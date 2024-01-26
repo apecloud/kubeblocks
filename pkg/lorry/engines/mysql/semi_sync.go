@@ -143,7 +143,7 @@ func (mgr *Manager) EnableSemiSyncReplica(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "get "+plugin+" status failed")
 	}
-	if status == "ACTIVE" {
+	if status != "ACTIVE" {
 		return errors.Errorf("plugin %s is not active: %s", plugin, status)
 	}
 

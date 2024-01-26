@@ -61,6 +61,7 @@ var _ = Describe("service builder", func() {
 			AddPorts(ports...).
 			AddContainerPorts(containerPorts...).
 			SetType(serviceType).
+			SetPublishNotReadyAddresses(true).
 			GetObject()
 
 		Expect(svc.Name).Should(Equal(name))
@@ -75,6 +76,7 @@ var _ = Describe("service builder", func() {
 		Expect(svc.Spec.Ports).Should(HaveLen(2))
 		Expect(svc.Spec.Ports[0]).Should(Equal(ports[0]))
 		Expect(svc.Spec.Type).Should(Equal(serviceType))
+		Expect(svc.Spec.PublishNotReadyAddresses).Should(Equal(true))
 		Expect(svc.Spec.ExternalTrafficPolicy).Should(Equal(corev1.ServiceExternalTrafficPolicyTypeLocal))
 		hasPort := func(containerPort corev1.ContainerPort, servicePorts []corev1.ServicePort) bool {
 			for _, servicePort := range servicePorts {

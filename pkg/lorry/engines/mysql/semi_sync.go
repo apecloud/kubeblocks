@@ -24,6 +24,8 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+
+	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 )
 
 var semiSyncMaxTimeout int = 4294967295
@@ -38,7 +40,7 @@ func (mgr *Manager) GetSemiSyncSourcePlugin() string {
 }
 
 func (mgr *Manager) GetSemiSyncReplicaPlugin() string {
-	plugin := "rpl_semi_sync_Replica"
+	plugin := "rpl_semi_sync_replica"
 	if IsBeforeVersion(mgr.version, semiSyncSourceVersion) {
 		plugin = "rpl_semi_sync_slave"
 	}
@@ -62,14 +64,39 @@ func (mgr *Manager) EnableSemiSyncSource(ctx context.Context) error {
 		return errors.Errorf("plugin %s is not active: %s", plugin, status)
 	}
 
+	isSemiSyncSourceEnabled, err := mgr.IsSemiSyncSourceEnabled(ctx)
+	if err != nil {
+		return err
+	}
+	if isSemiSyncSourceEnabled {
+		return nil
+	}
 	setSourceEnable := fmt.Sprintf("SET GLOBAL %s_enabled = 1;", plugin)
-	setSourceTimeout := fmt.Sprintf("SET GLOBAL %s_timeout = %d;", plugin, semiSyncMaxTimeout)
+	setSourceTimeout := fmt.Sprintf("SET GLOBAL %s_timeout = 10000;", plugin)
 	_, err = mgr.DB.Exec(setSourceEnable + setSourceTimeout)
 	if err != nil {
 		return errors.Wrap(err, setSourceEnable+setSourceTimeout+" execute failed")
 	}
 	return nil
 }
+
+func (mgr *Manager) DisableSemiSyncSource(ctx context.Context) error {
+	isSemiSyncSourceEnabled, err := mgr.IsSemiSyncSourceEnabled(ctx)
+	if err != nil {
+		return err
+	}
+	if !isSemiSyncSourceEnabled {
+		return nil
+	}
+	plugin := mgr.GetSemiSyncSourcePlugin()
+	setSourceDisable := fmt.Sprintf("SET GLOBAL %s_enabled = 0;", plugin)
+	_, err = mgr.DB.Exec(setSourceDisable)
+	if err != nil {
+		return errors.Wrap(err, setSourceDisable+" execute failed")
+	}
+	return nil
+}
+
 func (mgr *Manager) IsSemiSyncSourceEnabled(ctx context.Context) (bool, error) {
 	plugin := mgr.GetSemiSyncSourcePlugin()
 	var value int
@@ -92,12 +119,18 @@ func (mgr *Manager) GetSemiSyncSourceTimeout(ctx context.Context) (int, error) {
 	return value, nil
 }
 
-func (mgr *Manager) DisableSemiSyncSource(ctx context.Context) error {
-	plugin := mgr.GetSemiSyncSourcePlugin()
-	setSourceDisable := fmt.Sprintf("SET GLOBAL %s_enabled = 0;", plugin)
-	_, err := mgr.DB.Exec(setSourceDisable)
+func (mgr *Manager) SetSemiSyncSourceTimeout(ctx context.Context, cluster *dcs.Cluster, leader *dcs.Member) error {
+	db, err := mgr.GetMemberConnection(cluster, leader)
 	if err != nil {
-		return errors.Wrap(err, setSourceDisable+" execute failed")
+		mgr.Logger.Info("Get Member conn failed", "error", err.Error())
+		return err
+	}
+
+	plugin := mgr.GetSemiSyncSourcePlugin()
+	setSourceTimeout := fmt.Sprintf("SET GLOBAL %s_timeout = %d;", plugin, semiSyncMaxTimeout)
+	_, err = db.Exec(setSourceTimeout)
+	if err != nil {
+		return errors.Wrap(err, setSourceTimeout+" execute failed")
 	}
 	return nil
 }
@@ -110,10 +143,18 @@ func (mgr *Manager) EnableSemiSyncReplica(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "get "+plugin+" status failed")
 	}
-
 	if status == "ACTIVE" {
 		return errors.Errorf("plugin %s is not active: %s", plugin, status)
 	}
+
+	isSemiSyncReplicaEnabled, err := mgr.IsSemiSyncReplicaEnabled(ctx)
+	if err != nil {
+		return err
+	}
+	if isSemiSyncReplicaEnabled {
+		return nil
+	}
+
 	setReplicaEnable := fmt.Sprintf("SET GLOBAL %s_enabled = 1;", plugin)
 	_, err = mgr.DB.Exec(setReplicaEnable)
 	if err != nil {
@@ -134,9 +175,16 @@ func (mgr *Manager) IsSemiSyncReplicaEnabled(ctx context.Context) (bool, error) 
 }
 
 func (mgr *Manager) DisableSemiSyncReplica(ctx context.Context) error {
+	isSemiSyncReplicaEnabled, err := mgr.IsSemiSyncReplicaEnabled(ctx)
+	if err != nil {
+		return err
+	}
+	if !isSemiSyncReplicaEnabled {
+		return nil
+	}
 	plugin := mgr.GetSemiSyncReplicaPlugin()
 	setReplicaDisable := fmt.Sprintf("SET GLOBAL %s_enabled = 0;", plugin)
-	_, err := mgr.DB.Exec(setReplicaDisable)
+	_, err = mgr.DB.Exec(setReplicaDisable)
 	if err != nil {
 		return errors.Wrap(err, setReplicaDisable+" execute failed")
 	}

@@ -19,7 +19,9 @@ spec:
     singular: componentclassdefinition
   scope: Cluster
   versions:
-  - name: v1alpha1
+  - deprecated: true
+    deprecationWarning: This API is deprecated from KB 0.9.0.
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: ComponentClassDefinition is the Schema for the componentclassdefinitions

@@ -21,7 +21,7 @@ When the space water level of all configured volumes falls below the defined thr
 
 2. The full disk locking function relies on the read permission (get & list) of the two system resource nodes and nodes/stats. If you create an instance via kbcli, make sure to grant the controller administrative rights to the ClusterRoleBinding.
 
-3. Supported engines for KubeBlocks v0.6.0: ApeCloud MySQL, PostgreSQL, MongoDB.
+3. Currently, full disk lock is available for ApeCloud MySQL, PostgreSQL and MongoDB.
 
 :::
 

@@ -18,7 +18,7 @@ KubeBlocks 的磁盘满锁功能确保了数据库的稳定性和可用性。该
 
 1. 磁盘满锁功能目前支持全局（ClusterDefinition）启用或禁用，暂不支持集群维度的控制。动态启用或禁用此功能可能会影响使用此 ClusterDefinition 的现有集群实例，并导致它们重新启动。请谨慎操作。
 2. 磁盘满锁功能依赖于两个系统资源节点和 nodes/stats 的读取权限（get 和 list）。如果你通过 kbcli 创建实例，请确保为控制器授予 ClusterRoleBinding 的管理权限。
-3. KubeBlocks v0.6.0 支持的引擎：ApeCloud MySQL、PostgreSQL、MongoDB。
+3. 支持的引擎：ApeCloud MySQL、PostgreSQL、MongoDB。
 
 :::
 

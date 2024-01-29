@@ -159,6 +159,7 @@ type StorageConstraint struct {
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:categories={kubeblocks,all},scope=Cluster,shortName=crc
+// +kubebuilder:deprecatedversion:warning="Due to the lack of practical use cases, this API is deprecated from KB 0.9.0."
 
 // ComponentResourceConstraint is the Schema for the componentresourceconstraints API
 type ComponentResourceConstraint struct {

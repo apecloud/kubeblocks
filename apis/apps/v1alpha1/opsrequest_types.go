@@ -148,6 +148,7 @@ type OpsRequestSpec struct {
 	BackupSpec *BackupSpec `json:"backupSpec,omitempty"`
 
 	// restoreSpec defines how to restore the cluster.
+	// note that this restore operation will roll back cluster services.
 	// +optional
 	RestoreSpec *RestoreSpec `json:"restoreSpec,omitempty"`
 
@@ -192,6 +193,7 @@ type VerticalScaling struct {
 	corev1.ResourceRequirements `json:",inline"`
 
 	// classDefRef reference class defined in ComponentClassDefinition.
+	// +kubebuilder:deprecatedversion:warning="Due to the lack of practical use cases, this field is deprecated from KB 0.9.0."
 	// +optional
 	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 }
@@ -668,6 +670,7 @@ type LastComponentConfiguration struct {
 	corev1.ResourceRequirements `json:",inline,omitempty"`
 
 	// classDefRef reference class defined in ComponentClassDefinition.
+	// +kubebuilder:deprecatedversion:warning="Due to the lack of practical use cases, this field is deprecated from KB 0.9.0."
 	// +optional
 	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 

@@ -44,8 +44,8 @@ func TestManager_GetRole(t *testing.T) {
 		cluster := &dcs.Cluster{}
 
 		role, err := manager.GetReplicaRole(ctx, cluster)
-		assert.Empty(t, role)
-		assert.NotNil(t, err)
+		assert.Equal(t, role, models.SECONDARY)
+		assert.Nil(t, err)
 	})
 
 	t.Run("get role successfully", func(t *testing.T) {

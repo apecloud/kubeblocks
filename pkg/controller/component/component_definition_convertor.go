@@ -180,7 +180,8 @@ func (c *compDefServicesConvertor) convert(args ...any) (any, error) {
 		GetObject()
 
 	headlessSvcBuilder := builder.NewHeadlessServiceBuilder("", "").
-		AddPorts(clusterCompDef.Service.ToSVCSpec().Ports...)
+		AddPorts(clusterCompDef.Service.ToSVCSpec().Ports...).
+		SetPublishNotReadyAddresses(true)
 	if clusterCompDef.PodSpec != nil {
 		for _, container := range clusterCompDef.PodSpec.Containers {
 			headlessSvcBuilder = headlessSvcBuilder.AddContainerPorts(container.Ports...)

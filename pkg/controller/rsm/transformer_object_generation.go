@@ -326,7 +326,8 @@ func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 	hdlBuilder := builder.NewHeadlessServiceBuilder(rsm.Namespace, getHeadlessSvcName(rsm)).
 		AddLabelsInMap(labels).
 		AddSelectorsInMap(selectors).
-		AddAnnotationsInMap(annotations)
+		AddAnnotationsInMap(annotations).
+		SetPublishNotReadyAddresses(true)
 
 	for _, container := range rsm.Spec.Template.Spec.Containers {
 		for _, port := range container.Ports {

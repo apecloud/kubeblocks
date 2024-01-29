@@ -109,6 +109,11 @@ func (builder *ServiceBuilder) SetSpec(spec *corev1.ServiceSpec) *ServiceBuilder
 	return builder
 }
 
+func (builder *ServiceBuilder) SetPublishNotReadyAddresses(enabled bool) *ServiceBuilder {
+	builder.get().Spec.PublishNotReadyAddresses = enabled
+	return builder
+}
+
 func (builder *ServiceBuilder) Optimize4ExternalTraffic() *ServiceBuilder {
 	if builder.get().Spec.Type == corev1.ServiceTypeLoadBalancer && len(builder.get().Spec.ExternalTrafficPolicy) == 0 {
 		// Set externalTrafficPolicy to Local has two benefits:

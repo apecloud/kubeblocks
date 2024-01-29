@@ -898,11 +898,11 @@ var _ = Describe("Cluster Controller", func() {
 				testClusterComponent(consensusCompName, compDefObj.Name, createClusterObjV2, nil)
 			})
 
-			It("create shardSpec cluster with component template object", func() {
+			It("create shardingSpec cluster with component template object", func() {
 				testClusterComponent(consensusCompName, compDefName, createClusterObjWithShard, &shards)
 			})
 
-			It("create shardSpec cluster with new component template object", func() {
+			It("create shardingSpec cluster with new component template object", func() {
 				testClusterComponent(consensusCompName, compDefObj.Name, createClusterObjWithShardV2, &shards)
 			})
 

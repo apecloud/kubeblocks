@@ -121,7 +121,7 @@ func (factory *MockClusterFactory) AddService(service appsv1alpha1.ClusterServic
 
 type updateFn func(comp *appsv1alpha1.ClusterComponentSpec)
 
-type shardUpdateFn func(shardSpec *appsv1alpha1.ShardingSpec)
+type shardingUpdateFn func(shardingSpec *appsv1alpha1.ShardingSpec)
 
 func (factory *MockClusterFactory) lastComponentRef(update updateFn) *MockClusterFactory {
 	comps := factory.Get().Spec.ComponentSpecs
@@ -132,7 +132,7 @@ func (factory *MockClusterFactory) lastComponentRef(update updateFn) *MockCluste
 	return factory
 }
 
-func (factory *MockClusterFactory) lastShardingSpec(update shardUpdateFn) *MockClusterFactory {
+func (factory *MockClusterFactory) lastShardingSpec(update shardingUpdateFn) *MockClusterFactory {
 	shardingSpecs := factory.Get().Spec.ShardingSpecs
 	if len(shardingSpecs) > 0 {
 		update(&shardingSpecs[len(shardingSpecs)-1])

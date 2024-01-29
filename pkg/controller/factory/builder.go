@@ -328,6 +328,7 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	rsmBuilder := builder.NewReplicatedStateMachineBuilder(cluster.Namespace, rsmName).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 		AddAnnotationsInMap(monitorAnnotations).
+		AddAnnotations(constant.KBEnvClusterUID, string(cluster.UID)).
 		AddLabelsInMap(commonLabels).
 		AddLabels(constant.AppComponentLabelKey, component.CompDefName).
 		AddMatchLabelsInMap(commonLabels).

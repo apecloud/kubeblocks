@@ -84,7 +84,7 @@ Refer to the Pulsar official document for the configuration, such as memory, cup
      - zookeeper: 3 replicas
 
      ```bash
-     helm install pulsar kubeblocks/pulsar-cluster --version "0.6.0-beta.11" -f values-production.yaml --set monitor.enabled=true
+     helm install pulsar kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set monitor.enabled=true
      ```
 
    - **Option 2**: Create pulsar cluster with proxy.
@@ -95,7 +95,7 @@ Refer to the Pulsar official document for the configuration, such as memory, cup
      - zookeeper: 3 replicas
 
      ```bash
-     helm install pulsar kubeblocks/pulsar-cluster --version "0.6.0-beta.11" -f values-production.yaml --set proxy.enable=true  --set monitor.enabled=true  
+     helm install pulsar kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set proxy.enable=true  --set monitor.enabled=true  
      ```
 
    - **Option 3**:  Create pulsar cluster with proxy and deploy `bookies-recovery` component.  
@@ -107,7 +107,7 @@ Refer to the Pulsar official document for the configuration, such as memory, cup
      - bookies-recovery: 3 replicas
 
      ```bash
-     helm install pulsar kubeblocks/pulsar-cluster --version "0.6.0-beta.11" -f values-production.yaml --set proxy.enable=true --set bookiesRecovery.enable=true --set monitor.enabled=true 
+     helm install pulsar kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set proxy.enable=true --set bookiesRecovery.enable=true --set monitor.enabled=true 
      ```
 
    - **Option 4**: Create pulsar cluster and specify bookies and zookeeper storage parameters.
@@ -117,7 +117,7 @@ Refer to the Pulsar official document for the configuration, such as memory, cup
      - zookeeper: 3 replicas
 
      ```bash
-     helm install pulsar kubeblocks/pulsar-cluster --version "0.6.0-beta.11" -f values-production.yaml --set bookies.persistence.data.storageClassName=<sc name>,bookies.persistence.log.storageClassName=<sc name>,zookeeper.persistence.data.storageClassName=<sc name>,zookeeper.persistence.log.storageClassName=<sc name> --set monitor.enabled=true
+     helm install pulsar kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set bookies.persistence.data.storageClassName=<sc name>,bookies.persistence.log.storageClassName=<sc name>,zookeeper.persistence.data.storageClassName=<sc name>,zookeeper.persistence.log.storageClassName=<sc name> --set monitor.enabled=true
      ```
 
    You can specify the storage name `<sc name>`.

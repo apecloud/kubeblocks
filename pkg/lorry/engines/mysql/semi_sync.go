@@ -53,7 +53,7 @@ func (mgr *Manager) EnableSemiSyncSource(ctx context.Context) error {
 	sql := fmt.Sprintf("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS WHERE PLUGIN_NAME ='%s';", plugin)
 	err := mgr.DB.QueryRowContext(ctx, sql).Scan(&status)
 	if err != nil {
-		errors.Wrapf(err, "Get %s plugin status failed", plugin)
+		return errors.Wrapf(err, "Get %s plugin status failed", plugin)
 	}
 
 	// In MySQL 8.0, semi-sync configuration options should not be specified in my.cnf,

@@ -49,7 +49,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: setup k3d k3s
-        uses: apecloud/setup-k3d-k3s@v1
+        uses: apecloud-inc/setup-k3d-k3s@v1
         with:
           k3d-name: ${{ env.K3D_NAME }}
           version: ${{ env.K3S_VERSION }}

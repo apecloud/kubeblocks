@@ -195,9 +195,9 @@ var _ = Describe("Cluster Controller", func() {
 		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
 			WithRandomName()
 		if !v2 {
-			factory.AddShardSpec(compTplName, compDefName).SetShards(defaultShardCount)
+			factory.AddShardingSpec(compTplName, compDefName).SetShards(defaultShardCount)
 		} else {
-			factory.AddShardSpecV2(compTplName, compDefName).SetShards(defaultShardCount)
+			factory.AddShardingSpecV2(compTplName, compDefName).SetShards(defaultShardCount)
 		}
 		if processor != nil {
 			processor(factory)

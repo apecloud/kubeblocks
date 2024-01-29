@@ -84,7 +84,7 @@ var _ = Describe("cluster utils test", func() {
 				clusterDef.Name, clusterVersion.Name).
 				SetUID(clusterName).
 				AddComponent(mysqlCompName, mysqlCompDefName).
-				AddShardSpecV2(mysqlShardingName, mysqlCompDefName).
+				AddShardingSpecV2(mysqlShardingName, mysqlCompDefName).
 				SetShards(0).
 				Create(&testCtx).GetObject()
 		})

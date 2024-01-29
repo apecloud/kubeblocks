@@ -179,9 +179,9 @@ func (t *clusterStatusTransformer) removeInnerCompStatus(transCtx *clusterTransf
 		compSpecs = append(compSpecs, &cluster.Spec.ComponentSpecs[i])
 	}
 	// TODO: how to display the status of sharding components
-	for _, v := range transCtx.ShardingComponentSpecs {
+	/*	for _, v := range transCtx.ShardingComponentSpecs {
 		compSpecs = append(compSpecs, v...)
-	}
+	}*/
 	t.removeCompStatus(cluster, compSpecs)
 }
 

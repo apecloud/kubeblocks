@@ -131,3 +131,8 @@ func GenerateResourceNameWithScalingSuffix(name string) string {
 func GenerateShardingNamePrefix(shardingName string) string {
 	return fmt.Sprintf("%s-", shardingName)
 }
+
+// GenerateShardingNameSvcPrefix generates sharding service name prefix.
+func GenerateShardingNameSvcPrefix(shardingSvcName string) string {
+	return fmt.Sprintf("%s-", shardingSvcName)
+}

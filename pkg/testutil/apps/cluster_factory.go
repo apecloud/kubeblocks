@@ -63,7 +63,7 @@ func (factory *MockClusterFactory) AddClusterToleration(toleration corev1.Tolera
 	return factory
 }
 
-func (factory *MockClusterFactory) AddShardSpec(shardingName string, compDefName string) *MockClusterFactory {
+func (factory *MockClusterFactory) AddShardingSpec(shardingName string, compDefName string) *MockClusterFactory {
 	shardingSpec := appsv1alpha1.ShardingSpec{
 		Template: appsv1alpha1.ClusterComponentSpec{
 			Name:            "fake",
@@ -77,7 +77,7 @@ func (factory *MockClusterFactory) AddShardSpec(shardingName string, compDefName
 	return factory
 }
 
-func (factory *MockClusterFactory) AddShardSpecV2(shardingName string, compDefName string) *MockClusterFactory {
+func (factory *MockClusterFactory) AddShardingSpecV2(shardingName string, compDefName string) *MockClusterFactory {
 	shardingSpec := appsv1alpha1.ShardingSpec{
 		Template: appsv1alpha1.ClusterComponentSpec{
 			Name:         "fake",

@@ -68,22 +68,20 @@ func (t *clusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTransformContext, dag *graph.DAG) error {
 	cluster := transCtx.Cluster
 
-	if len(transCtx.ComponentSpecs) != len(transCtx.Labels) {
-		return fmt.Errorf("component specs and labels are not matched")
-	}
-
 	protoCompSpecMap := make(map[string]*appsv1alpha1.ClusterComponentSpec)
 	for _, compSpec := range transCtx.ComponentSpecs {
 		protoCompSpecMap[compSpec.Name] = compSpec
 	}
 
 	protoCompSet := sets.KeySet(protoCompSpecMap)
-	// TODO(refactor): should review that whether it is reasonable to use component status
-	clusterStatusCompSet := sets.KeySet(cluster.Status.Components)
+	runningCompSet, err := component.GetClusterComponentShortNameSet(transCtx.Context, transCtx.Client, cluster)
+	if err != nil {
+		return err
+	}
 
-	createCompSet := protoCompSet.Difference(clusterStatusCompSet)
-	updateCompSet := protoCompSet.Intersection(clusterStatusCompSet)
-	deleteCompSet := clusterStatusCompSet.Difference(protoCompSet)
+	createCompSet := protoCompSet.Difference(runningCompSet)
+	updateCompSet := protoCompSet.Intersection(runningCompSet)
+	deleteCompSet := runningCompSet.Difference(protoCompSet)
 	if len(deleteCompSet) > 0 {
 		return fmt.Errorf("cluster components cannot be removed at runtime: %s",
 			strings.Join(deleteCompSet.UnsortedList(), ","))

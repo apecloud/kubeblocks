@@ -51,7 +51,6 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	for i := range cluster.Spec.ComponentSpecs {
 		clusterComSpec := cluster.Spec.ComponentSpecs[i]
 		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, &clusterComSpec)
-		transCtx.Labels[clusterComSpec.Name] = nil
 	}
 	for i := range cluster.Spec.ShardingSpecs {
 		shardingSpec := cluster.Spec.ShardingSpecs[i]
@@ -69,7 +68,6 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 
 	if compSpec := apiconversion.HandleSimplifiedClusterAPI(transCtx.ClusterDef, cluster); compSpec != nil {
 		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, compSpec)
-		transCtx.Labels[compSpec.Name] = nil
 	}
 
 	// validate componentDef and componentDefRef

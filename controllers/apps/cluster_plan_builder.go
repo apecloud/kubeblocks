@@ -69,7 +69,7 @@ type clusterTransformContext struct {
 	ComponentSpecs []*appsv1alpha1.ClusterComponentSpec
 	// ShardingComponentSpecs includes all sharding component specs generated from ShardingSpecs
 	ShardingComponentSpecs map[string][]*appsv1alpha1.ClusterComponentSpec
-	// Labels to be added to components, corresponding one-to-one with ComponentSpecs.
+	// Labels to be added to components, mapping with ComponentSpecs.
 	Labels map[string]map[string]string
 }
 

@@ -555,21 +555,6 @@ func TestManager_IsClusterInitialized(t *testing.T) {
 		assert.Nil(t, err)
 	})
 
-	//t.Run("set semi sync successfully", func(t *testing.T) {
-	//	mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
-	//		"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}).AddRow("ACTIVE"))
-	//	mock.ExpectExec("SET GLOBAL rpl_semi_sync_source_enabled = 1;" +
-	//		"SET GLOBAL rpl_semi_sync_source_timeout = 100000;").
-	//		WillReturnResult(sqlmock.NewResult(1, 1))
-
-	//	mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
-	//		"WHERE PLUGIN_NAME ='rpl_semi_sync_replica';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}).AddRow("ACTIVE"))
-	//	mock.ExpectExec("SET GLOBAL rpl_semi_sync_replica_enabled = 1;").
-	//		WillReturnResult(sqlmock.NewResult(1, 1))
-	//	err := manager.EnableSemiSyncIfNeed(ctx)
-	//	assert.Nil(t, err)
-	//})
-
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled expectations: %v", err)
 	}

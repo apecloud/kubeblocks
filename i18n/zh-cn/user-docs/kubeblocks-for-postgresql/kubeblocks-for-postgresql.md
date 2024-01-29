@@ -1,11 +1,11 @@
 ---
-title: KubeBlocks 中的 PostgreSQL
+title: 用 KubeBlocks 管理 PostgreSQL
 description: KubeBlocks 中的 PostgreSQL 功能列表
 keywords: [postgresql, 简介, 功能]
 sidebar_position: 1
 ---
 
-# KubeBlocks for PostgreSQL
+# 用 KubeBlocks 管理 PostgreSQL
 
 * [简介](./introduction/introduction.md)
 * [集群管理](./cluster-management/create-and-connect-a-postgresql-cluster.md)

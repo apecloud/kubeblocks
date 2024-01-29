@@ -234,7 +234,7 @@ func VersionParts(version string) []string {
 	return strings.Split(version, ".")
 }
 
-func IsSmallerVersion(version string, otherVersion string) bool {
+func IsBeforeVersion(version string, otherVersion string) bool {
 	thisVersions := VersionParts(version)
 	otherVersions := VersionParts(otherVersion)
 	if len(thisVersions) < len(otherVersions) {

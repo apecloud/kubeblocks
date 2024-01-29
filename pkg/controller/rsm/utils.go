@@ -691,8 +691,11 @@ func IsRSMReady(rsm *workloads.ReplicatedStateMachine) bool {
 	replicas := *rsm.Spec.Replicas
 	if rsm.Status.Replicas != replicas ||
 		rsm.Status.ReadyReplicas != replicas ||
-		rsm.Status.AvailableReplicas != replicas ||
 		rsm.Status.UpdatedReplicas != replicas {
+		return false
+	}
+	// check availableReplicas only if minReadySeconds is set
+	if rsm.Spec.MinReadySeconds > 0 && rsm.Status.AvailableReplicas != replicas {
 		return false
 	}
 	// check whether role probe has done

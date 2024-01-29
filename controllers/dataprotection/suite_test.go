@@ -22,6 +22,7 @@ package dataprotection
 import (
 	"context"
 	"go/build"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -194,6 +195,15 @@ var _ = BeforeSuite(func() {
 		Recorder: k8sManager.GetEventRecorderFor("volume-populate-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
+
+	if err = (&LogCollectionReconciler{
+		Client:     k8sManager.GetClient(),
+		Scheme:     k8sManager.GetScheme(),
+		Recorder:   k8sManager.GetEventRecorderFor("log-collection-controller"),
+		RestConfig: k8sManager.GetConfig(),
+	}).SetupWithManager(k8sManager); err != nil {
+		os.Exit(1)
+	}
 
 	err = mockGCReconciler(k8sManager).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())

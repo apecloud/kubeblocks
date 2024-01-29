@@ -30,9 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// DescendingOrdinalSts is a sort.Interface that Sorts a list of StatefulSet based on the ordinals extracted from the statefulSet.
-type DescendingOrdinalSts []*appsv1.StatefulSet
-
 // statefulSetRegex is a regular expression that extracts StatefulSet's ordinal from the Name of StatefulSet
 var statefulSetRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 
@@ -42,34 +39,9 @@ func getParentName(pod *corev1.Pod) string {
 	return parent
 }
 
-// IsMemberOf tests if pod is a member of set.
-func IsMemberOf(set *appsv1.StatefulSet, pod *corev1.Pod) bool {
+// isMemberOf tests if pod is a member of set.
+func isMemberOf(set *appsv1.StatefulSet, pod *corev1.Pod) bool {
 	return getParentName(pod) == set.Name
-}
-
-// statefulSetOfComponentIsReady checks if statefulSet of component is ready.
-func statefulSetOfComponentIsReady(sts *appsv1.StatefulSet, statefulStatusRevisionIsEquals bool, targetReplicas *int32) bool {
-	if targetReplicas == nil {
-		targetReplicas = sts.Spec.Replicas
-	}
-	return statefulSetPodsAreReady(sts, *targetReplicas) && statefulStatusRevisionIsEquals
-}
-
-// statefulSetPodsAreReady checks if all pods of statefulSet are ready.
-func statefulSetPodsAreReady(sts *appsv1.StatefulSet, targetReplicas int32) bool {
-	return sts.Status.AvailableReplicas == targetReplicas &&
-		sts.Status.Replicas == targetReplicas &&
-		sts.Status.ObservedGeneration == sts.Generation
-}
-
-func convertToStatefulSet(obj client.Object) *appsv1.StatefulSet {
-	if obj == nil {
-		return nil
-	}
-	if sts, ok := obj.(*appsv1.StatefulSet); ok {
-		return sts
-	}
-	return nil
 }
 
 // ParseParentNameAndOrdinal gets the name of cluster-component and StatefulSet's ordinal as extracted from its Name. If
@@ -95,11 +67,11 @@ func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *app
 	if err != nil {
 		return nil, err
 	}
-	return GetPodListByStatefulSetWithSelector(ctx, cli, stsObj, selector)
+	return getPodListByStatefulSetWithSelector(ctx, cli, stsObj, selector)
 }
 
-// GetPodListByStatefulSetWithSelector gets statefulSet pod list.
-func GetPodListByStatefulSetWithSelector(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, selector client.MatchingLabels) ([]corev1.Pod, error) {
+// getPodListByStatefulSetWithSelector gets statefulSet pod list.
+func getPodListByStatefulSetWithSelector(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, selector client.MatchingLabels) ([]corev1.Pod, error) {
 	podList := &corev1.PodList{}
 	if err := cli.List(ctx, podList,
 		&client.ListOptions{Namespace: stsObj.Namespace},
@@ -108,7 +80,7 @@ func GetPodListByStatefulSetWithSelector(ctx context.Context, cli client.Client,
 	}
 	var pods []corev1.Pod
 	for _, pod := range podList.Items {
-		if IsMemberOf(stsObj, &pod) {
+		if isMemberOf(stsObj, &pod) {
 			pods = append(pods, pod)
 		}
 	}

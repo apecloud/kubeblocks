@@ -43,6 +43,7 @@ var _ = Describe("replicated_state_machine builder", func() {
 			selectorKey4, selectorValue4 = "foo-4", "bar-4"
 			serviceName                  = "foo"
 			replicas                     = int32(5)
+			minReadySeconds              = int32(11)
 			port                         = int32(12345)
 			policy                       = apps.OrderedReadyPodManagement
 		)
@@ -161,6 +162,7 @@ var _ = Describe("replicated_state_machine builder", func() {
 		}
 		rsm := NewReplicatedStateMachineBuilder(ns, name).
 			SetReplicas(replicas).
+			SetMinReadySeconds(minReadySeconds).
 			AddMatchLabel(selectorKey1, selectorValue1).
 			AddMatchLabels(selectorKey2, selectorValue2, selectorKey3, selectorValue3).
 			AddMatchLabelsInMap(selectors).

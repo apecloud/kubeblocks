@@ -316,7 +316,7 @@ INSERT INTO kubeblocks.kb_health_check VALUES(%d, UNIX_TIMESTAMP()) ON DUPLICATE
 COMMIT;`, engines.CheckStatusType)
 	_, err := db.ExecContext(ctx, writeSQL)
 	if err != nil {
-		mgr.Logger.Error(err, fmt.Sprintf("SQL %s executing failed", writeSQL))
+		mgr.Logger.Info(writeSQL+" executing failed", "error", err.Error())
 		return false
 	}
 	return true
@@ -377,7 +377,7 @@ func (mgr *Manager) GetSlaveStatus(context.Context, *sql.DB) (RowMap, error) {
 		return nil
 	})
 	if err != nil {
-		mgr.Logger.Error(err, "error executing %s")
+		mgr.Logger.Info("executing "+sql+" failed", "error", err.Error())
 		return nil, err
 	}
 	return rowMap, nil
@@ -392,7 +392,7 @@ func (mgr *Manager) GetMasterStatus(context.Context, *sql.DB) (RowMap, error) {
 		return nil
 	})
 	if err != nil {
-		mgr.Logger.Error(err, fmt.Sprintf("error executing %s", sql))
+		mgr.Logger.Info("executing "+sql+" failed", "error", err.Error())
 		return nil, err
 	}
 	return rowMap, nil
@@ -423,23 +423,9 @@ func (mgr *Manager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string
 // IsClusterInitialized is a method to check if cluster is initialized or not
 func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	if cluster != nil {
-		// The maximum length of the server addr is 255 characters. Before MySQL 8.0.17 it was 60 characters.
-		var version string
-		err := mgr.DB.QueryRowContext(ctx, "select version()").Scan(&version)
-		if err != nil {
-			mgr.Logger.Info("Get version failed", "error", err)
-			return false, err
-		}
-		currentMemberName := mgr.GetCurrentMemberName()
-		member := cluster.GetMemberWithName(currentMemberName)
-		addr := cluster.GetMemberShortAddr(*member)
-		maxLength := 255
-		if IsSmallerVersion(version, "8.0.17") {
-			maxLength = 60
-		}
-
-		if len(addr) > maxLength {
-			return false, errors.Errorf("The length of the member address must be less than or equal to %d", maxLength)
+		isValid, err := mgr.ValidateAddr(ctx, cluster)
+		if err != nil || !isValid {
+			return isValid, err
 		}
 	}
 
@@ -448,6 +434,28 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 		return false, err
 	}
 	return mgr.EnsureServerID(ctx)
+}
+
+func (mgr *Manager) ValidateAddr(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
+	// The maximum length of the server addr is 255 characters. Before MySQL 8.0.17 it was 60 characters.
+	var version string
+	err := mgr.DB.QueryRowContext(ctx, "select version()").Scan(&version)
+	if err != nil {
+		mgr.Logger.Info("Get version failed", "error", err)
+		return false, err
+	}
+	currentMemberName := mgr.GetCurrentMemberName()
+	member := cluster.GetMemberWithName(currentMemberName)
+	addr := cluster.GetMemberShortAddr(*member)
+	maxLength := 255
+	if IsBeforeVersion(version, "8.0.17") {
+		maxLength = 60
+	}
+
+	if len(addr) > maxLength {
+		return false, errors.Errorf("The length of the member address must be less than or equal to %d", maxLength)
+	}
+	return true, nil
 }
 
 func (mgr *Manager) EnsureServerID(ctx context.Context) (bool, error) {
@@ -481,7 +489,7 @@ func (mgr *Manager) EnableSemiSyncIfNeed(ctx context.Context) error {
 		if err == sql.ErrNoRows {
 			return nil
 		}
-		mgr.Logger.Error(err, "Get rpl_semi_sync_source plugin status failed: %v")
+		mgr.Logger.Info("Get rpl_semi_sync_source plugin status failed", "error", err.Error())
 		return err
 	}
 
@@ -494,7 +502,7 @@ func (mgr *Manager) EnableSemiSyncIfNeed(ctx context.Context) error {
 			"SET GLOBAL rpl_semi_sync_source_timeout = 100000;"
 		_, err = mgr.DB.Exec(setSourceEnable)
 		if err != nil {
-			mgr.Logger.Error(err, setSourceEnable+" execute failed")
+			mgr.Logger.Info(setSourceEnable+" execute failed", "error", err.Error())
 			return err
 		}
 	}
@@ -505,7 +513,7 @@ func (mgr *Manager) EnableSemiSyncIfNeed(ctx context.Context) error {
 		if err == sql.ErrNoRows {
 			return nil
 		}
-		mgr.Logger.Error(err, "Get rpl_semi_sync_replica plugin status failed: %v")
+		mgr.Logger.Info("Get rpl_semi_sync_replica plugin status failed", "error", err.Error())
 		return err
 	}
 
@@ -513,7 +521,7 @@ func (mgr *Manager) EnableSemiSyncIfNeed(ctx context.Context) error {
 		setSourceEnable := "SET GLOBAL rpl_semi_sync_replica_enabled = 1;"
 		_, err = mgr.DB.Exec(setSourceEnable)
 		if err != nil {
-			mgr.Logger.Error(err, setSourceEnable+" execute failed")
+			mgr.Logger.Info(setSourceEnable+" execute failed", "error", err.Error())
 			return err
 		}
 	}
@@ -530,7 +538,7 @@ func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
 	stopSlave := `stop slave;`
 	resp, err := mgr.DB.Exec(stopReadOnly + stopSlave)
 	if err != nil {
-		mgr.Logger.Error(err, "promote err")
+		mgr.Logger.Info("promote failed", "error", err.Error())
 		return err
 	}
 
@@ -545,7 +553,7 @@ func (mgr *Manager) Demote(context.Context) error {
 
 	_, err := mgr.DB.Exec(setReadOnly)
 	if err != nil {
-		mgr.Logger.Error(err, "demote err")
+		mgr.Logger.Info("demote failed", "error", err.Error())
 		return err
 	}
 	return nil
@@ -571,11 +579,12 @@ func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 	masterHost := cluster.GetMemberShortAddr(*leaderMember)
 	changeMaster := fmt.Sprintf(`change master to master_host='%s',master_user='%s',master_password='%s',master_port=%s,master_auto_position=1;`,
 		masterHost, config.Username, config.password, leaderMember.DBPort)
+	mgr.Logger.Info("follow new leader", "changemaster", changeMaster)
 	startSlave := `start slave;`
 
 	_, err := mgr.DB.Exec(stopSlave + changeMaster + startSlave)
 	if err != nil {
-		mgr.Logger.Error(err, "sql query failed, err")
+		mgr.Logger.Info("Follow master failed", "error", err.Error())
 		return err
 	}
 
@@ -595,7 +604,7 @@ func (mgr *Manager) isRecoveryConfOutdated(leader string) bool {
 	ioRunning := rowMap.GetString("Slave_IO_Running")
 	sqlRunning := rowMap.GetString("Slave_SQL_Running")
 	if ioRunning == "No" || sqlRunning == "No" {
-		mgr.Logger.Error(nil, fmt.Sprintf("slave status error, %v", rowMap))
+		mgr.Logger.Info("slave status error", "status", rowMap)
 		return true
 	}
 
@@ -657,7 +666,7 @@ func (mgr *Manager) Lock(context.Context, string) error {
 
 	_, err := mgr.DB.Exec(setReadOnly)
 	if err != nil {
-		mgr.Logger.Error(err, "Lock err")
+		mgr.Logger.Info("Lock failed", "error", err.Error())
 		return err
 	}
 	mgr.IsLocked = true
@@ -669,7 +678,7 @@ func (mgr *Manager) Unlock(context.Context) error {
 
 	_, err := mgr.DB.Exec(setReadOnlyOff)
 	if err != nil {
-		mgr.Logger.Error(err, "Unlock err")
+		mgr.Logger.Info("Unlock failed", "error", err.Error())
 		return err
 	}
 	mgr.IsLocked = false

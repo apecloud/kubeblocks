@@ -565,7 +565,7 @@ func (r *RestoreManager) CheckJobsDone(
 	for i := range fetchedJobs {
 		statusAction := dpv1alpha1.RestoreStatusAction{
 			Name:       actionName,
-			ObjectKey:  buildJobKeyForActionStatus(fetchedJobs[i].Name),
+			ObjectKey:  BuildJobKeyForActionStatus(fetchedJobs[i].Name),
 			BackupName: backupSet.Backup.Name,
 		}
 		done, _, errMsg := utils.IsJobFinished(fetchedJobs[i])

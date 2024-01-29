@@ -78,23 +78,25 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 		return nil
 	}
 
-	for _, svc := range cluster.Spec.Services {
+	for i := range cluster.Spec.Services {
+		svc := &cluster.Spec.Services[i]
 		if len(svc.ShardingSelector) > 0 && len(svc.ComponentSelector) > 0 {
 			return fmt.Errorf("the ShardingSelector and ComponentSelector of service can't be defined at the same time, service: %s", svc.Name)
 		}
-		genServices, err := t.genMultiServiceIfNeed(transCtx, cluster, &svc)
+		genServices, err := t.genMultiServiceIfNeed(transCtx, cluster, svc)
 		if err != nil {
 			return err
 		}
-		for _, genService := range genServices {
-			if err = handleServiceFunc(&svc, genService); err != nil {
+		for j := range genServices {
+			genSvc := genServices[j]
+			if err = handleServiceFunc(svc, genSvc); err != nil {
 				return err
 			}
 		}
 	}
 
-	for _, svc := range convertedServices {
-		if err = handleServiceFunc(&svc, &svc); err != nil {
+	for i := range convertedServices {
+		if err = handleServiceFunc(&convertedServices[i], &convertedServices[i]); err != nil {
 			return err
 		}
 	}

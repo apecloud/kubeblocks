@@ -46,7 +46,6 @@ func init() {
 	// register restore operation, it will create a new cluster
 	// so set IsClusterCreationEnabled to true
 	restoreBehaviour := OpsBehaviour{
-		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
 		OpsHandler:        RestoreOpsHandler{},
 		IsClusterCreation: true,
 	}
@@ -68,7 +67,7 @@ func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	opsRequest := opsRes.OpsRequest
 
 	// restore the cluster from the backup
-	if cluster, err = restoreClusterFromBackup(reqCtx, cli, opsRequest); err != nil {
+	if cluster, err = r.restoreClusterFromBackup(reqCtx, cli, opsRequest); err != nil {
 		return err
 	}
 
@@ -131,7 +130,7 @@ func (r RestoreOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 	return nil
 }
 
-func restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest) (*appsv1alpha1.Cluster, error) {
+func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest) (*appsv1alpha1.Cluster, error) {
 	backupName := opsRequest.Spec.RestoreSpec.BackupName
 
 	// check if the backup exists
@@ -146,7 +145,7 @@ func restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 	// check if the backup is completed
 	backupType := backup.Labels[dptypes.BackupTypeLabelKey]
 	if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted && backupType != string(dpv1alpha1.BackupTypeContinuous) {
-		return nil, fmt.Errorf("backup %s status is %s, only completed backup can be used to restore", backupName, backup.Status.Phase)
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf("backup %s status is %s, only completed backup can be used to restore", backupName, backup.Status.Phase))
 	}
 
 	// format and validate the restore time
@@ -158,7 +157,7 @@ func restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 		opsRequest.Spec.RestoreSpec.RestoreTimeStr = restoreTimeStr
 	}
 	// get the cluster object from backup
-	clusterObj, err := getClusterObjFromBackup(backup, opsRequest)
+	clusterObj, err := r.getClusterObjFromBackup(backup, opsRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -172,12 +171,12 @@ func restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 	return clusterObj, nil
 }
 
-func getClusterObjFromBackup(backup *dpv1alpha1.Backup, opsRequest *appsv1alpha1.OpsRequest) (*appsv1alpha1.Cluster, error) {
+func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, opsRequest *appsv1alpha1.OpsRequest) (*appsv1alpha1.Cluster, error) {
 	cluster := &appsv1alpha1.Cluster{}
 	// use the cluster snapshot to restore firstly
 	clusterString, ok := backup.Annotations[constant.ClusterSnapshotAnnotationKey]
 	if !ok {
-		return nil, fmt.Errorf("missing snapshot annotation in backup %s, %s is empty in Annotations", backup.Name, constant.ClusterSnapshotAnnotationKey)
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf("missing snapshot annotation in backup %s, %s is empty in Annotations", backup.Name, constant.ClusterSnapshotAnnotationKey))
 	}
 	if err := json.Unmarshal([]byte(clusterString), &cluster); err != nil {
 		return nil, err
@@ -193,5 +192,7 @@ func getClusterObjFromBackup(backup *dpv1alpha1.Backup, opsRequest *appsv1alpha1
 	}
 	cluster.Annotations[constant.RestoreFromBackupAnnotationKey] = restoreAnnotation
 	cluster.Name = opsRequest.Spec.ClusterRef
+	// Reset cluster services
+	cluster.Spec.Services = nil
 	return cluster, nil
 }

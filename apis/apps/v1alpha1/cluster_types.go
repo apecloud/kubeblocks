@@ -307,7 +307,7 @@ type ClusterComponentSpec struct {
 	ComponentDef string `json:"componentDef,omitempty"`
 
 	// classDefRef references the class defined in ComponentClassDefinition.
-	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.9.0."
+	// +kubebuilder:deprecatedversion:warning="Due to the lack of practical use cases, this field is deprecated from KB 0.9.0."
 	// +optional
 	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 

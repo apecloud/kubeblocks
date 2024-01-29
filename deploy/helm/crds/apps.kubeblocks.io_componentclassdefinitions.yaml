@@ -20,7 +20,8 @@ spec:
   scope: Cluster
   versions:
   - deprecated: true
-    deprecationWarning: This API is deprecated from KB 0.9.0.
+    deprecationWarning: Due to the lack of practical use cases, this API is deprecated
+      from KB 0.9.0.
     name: v1alpha1
     schema:
       openAPIV3Schema:

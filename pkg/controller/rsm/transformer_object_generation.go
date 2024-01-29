@@ -781,7 +781,6 @@ func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string 
 	envData[prefix+"REPLICA_COUNT"] = strReplicas
 	generateReplicaEnv(prefix)
 	generateMemberEnv(prefix)
-	envData[prefix+"CLUSTER_UID"] = uid
 
 	// have backward compatible handling for CM key with 'compDefName' being part of the key name, prior 0.5.0
 	// and introduce env/cm key naming reference complexity

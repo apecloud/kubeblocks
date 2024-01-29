@@ -26,6 +26,7 @@ const (
 	KBEnvPodName              = "KB_POD_NAME"
 	KBEnvPodUID               = "KB_POD_UID"
 	KBEnvVolumeProtectionSpec = "KB_VOLUME_PROTECTION_SPEC"
+	KBEnvClusterUID           = "KB_CLUSTER_UID"
 )
 
 const (

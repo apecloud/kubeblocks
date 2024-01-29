@@ -104,6 +104,7 @@ type ComponentClassDefinitionStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=ccd
+// +kubebuilder:deprecatedversion:warning="Due to the lack of practical use cases, this API is deprecated from KB 0.9.0."
 
 // ComponentClassDefinition is the Schema for the componentclassdefinitions API
 type ComponentClassDefinition struct {

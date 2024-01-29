@@ -123,7 +123,7 @@ You can specify the BackupRepo information in a YAML configuration file when ins
 
 :::
 
-1. Specify the configuration file when installing KubeBlocks.
+2. Specify the configuration file when installing KubeBlocks.
 
    ```bash
    kbcli kubeblocks install -f backuprepo.yaml

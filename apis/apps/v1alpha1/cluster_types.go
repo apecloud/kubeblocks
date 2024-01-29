@@ -50,6 +50,12 @@ type ClusterSpec struct {
 	// +optional
 	ClusterVersionRef string `json:"clusterVersionRef,omitempty"`
 
+	// Topology specifies the topology to use for the cluster.
+	// If not specified, the default topology will be used.
+	// Cannot be updated.
+	// +optional
+	Topology string `json:"topology,omitempty"`
+
 	// Cluster termination policy. Valid values are DoNotTerminate, Halt, Delete, WipeOut.
 	// DoNotTerminate will block delete operation.
 	// Halt will delete workload resources such as statefulset, deployment workloads but keep PVCs.
@@ -314,6 +320,11 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDef is immutable"
 	// +optional
 	ComponentDef string `json:"componentDef,omitempty"`
+
+	// ServiceVersion specifies the version of the service that the component provisioning.
+	// +kubebuilder:validation:MaxLength=32
+	// +optional
+	ServiceVersion string `json:"serviceVersion,omitempty"`
 
 	//// +optional
 	// ServiceVersion string `json:"serviceVersion,omitempty"`

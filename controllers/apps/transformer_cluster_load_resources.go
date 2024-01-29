@@ -20,13 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"errors"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
@@ -44,96 +43,130 @@ func (t *clusterLoadRefResourcesTransformer) Transform(ctx graph.TransformContex
 		setProvisioningStartedCondition(&cluster.Status.Conditions, cluster.Name, cluster.Generation, err)
 	}()
 
-	if len(cluster.Spec.ClusterDefRef) == 0 && len(t.allCompDefRefs(cluster)) != len(cluster.Spec.ComponentSpecs) {
-		return newRequeueError(requeueDuration, "either cluster definition or component definition should be provided")
-	}
-	if len(t.allCompDefRefs(cluster)) != 0 && len(t.allCompDefRefs(cluster)) != len(cluster.Spec.ComponentSpecs) {
-		return newRequeueError(requeueDuration, "two kinds of definitions cannot be used together")
-	}
-
-	validateExistence := func(key client.ObjectKey, object client.Object) error {
-		err = transCtx.Client.Get(transCtx.Context, key, object)
-		if err != nil {
-			return newRequeueError(requeueDuration, err.Error())
-		}
-		return nil
-	}
-
-	// validate cd & cv's existence
-	// if we can't get the referenced cd & cv, set provisioning condition failed, and jump to plan.Execute()
-	var (
-		cd *appsv1alpha1.ClusterDefinition
-		cv *appsv1alpha1.ClusterVersion
-	)
-	if len(cluster.Spec.ClusterDefRef) > 0 {
-		cd = &appsv1alpha1.ClusterDefinition{}
-		if err = validateExistence(types.NamespacedName{Name: cluster.Spec.ClusterDefRef}, cd); err != nil {
-			return err
-		}
-	}
-	if len(cluster.Spec.ClusterVersionRef) > 0 {
-		cv = &appsv1alpha1.ClusterVersion{}
-		if err = validateExistence(types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}, cv); err != nil {
-			return err
-		}
-	}
-
-	// validate cd & cv's availability
-	// if wrong phase, set provisioning condition failed, and jump to plan.Execute()
-	if (cd != nil && cd.Status.Phase != appsv1alpha1.AvailablePhase) || (cv != nil && cv.Status.Phase != appsv1alpha1.AvailablePhase) {
-		message := fmt.Sprintf("ref resource is unavailable, this problem needs to be solved first. cd: %s", cd.Name)
-		if cv != nil {
-			message = fmt.Sprintf("%s, cv: %s", message, cv.Name)
-		}
-		err = errors.New(message)
-		return newRequeueError(requeueDuration, message)
-	}
-
-	// inject cd & cv into the shared ctx
-	transCtx.ClusterDef = cd
-	if cd == nil {
-		transCtx.ClusterDef = &appsv1alpha1.ClusterDefinition{}
-	}
-	transCtx.ClusterVer = cv
-	if cv == nil {
-		transCtx.ClusterVer = &appsv1alpha1.ClusterVersion{}
-	}
-
-	if err = t.loadAndCheckComponentDefinitions(transCtx, cluster); err != nil {
+	if t.apiValidation(cluster); err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
+	if err = t.loadNCheckClusterDefinition(transCtx, cluster); err != nil {
+		return newRequeueError(requeueDuration, err.Error())
+	}
+
+	if err = t.loadNCheckClusterVersion(transCtx, cluster); err != nil {
+		return newRequeueError(requeueDuration, err.Error())
+	}
+
+	if withClusterTopology(cluster) {
+		// check again with cluster definition loaded
+		if validateClusterTopology(transCtx.ClusterDef, cluster); err != nil {
+			return newRequeueError(requeueDuration, err.Error())
+		}
+	}
 	return nil
 }
 
-func (t *clusterLoadRefResourcesTransformer) allCompDefRefs(cluster *appsv1alpha1.Cluster) []string {
-	refs := make([]string, 0)
-	for _, comp := range cluster.Spec.ComponentSpecs {
-		if len(comp.ComponentDef) == 0 {
-			continue
-		}
-		refs = append(refs, comp.ComponentDef)
+func (t *clusterLoadRefResourcesTransformer) apiValidation(cluster *appsv1alpha1.Cluster) error {
+	if withClusterTopology(cluster) {
+		return nil
 	}
-	return refs
+	if legacyClusterDef(cluster) {
+		return nil
+	}
+	if apiconversion.HasSimplifiedClusterAPI(cluster) {
+		return nil
+	}
+	return fmt.Errorf("cluster API validate error, clusterDef: %s, topology: %s, comps: %d, legacy comps: %d, new comps: %d, simplified API: %v",
+		cluster.Spec.ClusterDefRef, cluster.Spec.Topology, compCnt(cluster), legacyCompCnt(cluster), newCompCnt(cluster), apiconversion.HasSimplifiedClusterAPI(cluster))
 }
 
-func (t *clusterLoadRefResourcesTransformer) loadAndCheckComponentDefinitions(
-	ctx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
-	for _, comp := range cluster.Spec.ComponentSpecs {
-		if len(comp.ComponentDef) == 0 {
-			continue
-		}
-		compDef := &appsv1alpha1.ComponentDefinition{}
-		if err := ctx.Client.Get(ctx.Context, types.NamespacedName{Name: comp.ComponentDef}, compDef); err != nil {
+func (t *clusterLoadRefResourcesTransformer) loadNCheckClusterDefinition(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
+	var cd *appsv1alpha1.ClusterDefinition
+	if len(cluster.Spec.ClusterDefRef) > 0 {
+		cd = &appsv1alpha1.ClusterDefinition{}
+		key := types.NamespacedName{Name: cluster.Spec.ClusterDefRef}
+		if err := transCtx.Client.Get(transCtx.Context, key, cd); err != nil {
 			return err
 		}
-		if compDef.Status.Phase != appsv1alpha1.AvailablePhase {
-			return fmt.Errorf("the component definition referenced is unavailable: %s", comp.ComponentDef)
+	}
+
+	if cd != nil && cd.Status.Phase != appsv1alpha1.AvailablePhase {
+		return fmt.Errorf("referred ClusterDefinition is unavailable: %s", cd.Name)
+	}
+
+	if cd == nil {
+		cd = &appsv1alpha1.ClusterDefinition{}
+	}
+	transCtx.ClusterDef = cd
+	return nil
+}
+
+func (t *clusterLoadRefResourcesTransformer) loadNCheckClusterVersion(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
+	var cv *appsv1alpha1.ClusterVersion
+	if len(cluster.Spec.ClusterVersionRef) > 0 {
+		cv = &appsv1alpha1.ClusterVersion{}
+		key := types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}
+		if err := transCtx.Client.Get(transCtx.Context, key, cv); err != nil {
+			return err
 		}
-		if ctx.ComponentDefs == nil {
-			ctx.ComponentDefs = make(map[string]*appsv1alpha1.ComponentDefinition)
+	}
+
+	if cv != nil && cv.Status.Phase != appsv1alpha1.AvailablePhase {
+		return fmt.Errorf("referred ClusterVersion is unavailable: %s", cv.Name)
+	}
+
+	if cv == nil {
+		cv = &appsv1alpha1.ClusterVersion{}
+	}
+	transCtx.ClusterVer = cv
+	return nil
+}
+
+func validateClusterTopology(clusterDef *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster) error {
+	clusterTopology := referredClusterTopology(clusterDef, cluster.Spec.Topology)
+	if clusterTopology == nil {
+		return fmt.Errorf("specified cluster topology not found: %s", cluster.Spec.Topology)
+	}
+
+	comps := make(map[string]bool, 0)
+	for _, comp := range clusterTopology.Components {
+		comps[comp.Name] = true
+	}
+
+	for _, comp := range cluster.Spec.ComponentSpecs {
+		if !comps[comp.Name] {
+			return fmt.Errorf("component %s not defined in topology %s", comp.Name, clusterTopology.Name)
 		}
-		ctx.ComponentDefs[compDef.Name] = compDef
 	}
 	return nil
+}
+
+func withClusterTopology(cluster *appsv1alpha1.Cluster) bool {
+	return len(cluster.Spec.ClusterDefRef) > 0 && compCnt(cluster) == newCompCnt(cluster)
+}
+
+func legacyClusterDef(cluster *appsv1alpha1.Cluster) bool {
+	return len(cluster.Spec.ClusterDefRef) > 0 && len(cluster.Spec.Topology) == 0 && compCnt(cluster) == legacyCompCnt(cluster)
+}
+
+func compCnt(cluster *appsv1alpha1.Cluster) int {
+	return len(cluster.Spec.ComponentSpecs)
+}
+
+func legacyCompCnt(cluster *appsv1alpha1.Cluster) int {
+	cnt := 0
+	for _, comp := range cluster.Spec.ComponentSpecs {
+		if len(comp.ComponentDef) == 0 {
+			cnt += 1
+		}
+	}
+	return cnt
+}
+
+func newCompCnt(cluster *appsv1alpha1.Cluster) int {
+	cnt := 0
+	for _, comp := range cluster.Spec.ComponentSpecs {
+		if len(comp.ComponentDef) != 0 {
+			cnt += 1
+		}
+	}
+	return cnt
 }

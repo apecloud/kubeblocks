@@ -331,3 +331,26 @@ func (r *ClusterDefinitionReconciler) validateTopologyCompReplicas(compDefs []*a
 	}
 	return nil
 }
+
+// defaultClusterTopology returns the default cluster topology in specified cluster definition.
+func defaultClusterTopology(clusterDef *appsv1alpha1.ClusterDefinition) *appsv1alpha1.ClusterTopology {
+	for i, topology := range clusterDef.Spec.Topologies {
+		if topology.Default {
+			return &clusterDef.Spec.Topologies[i]
+		}
+	}
+	return nil
+}
+
+// referredClusterTopology returns the cluster topology which has name @name.
+func referredClusterTopology(clusterDef *appsv1alpha1.ClusterDefinition, name string) *appsv1alpha1.ClusterTopology {
+	if len(name) == 0 {
+		return defaultClusterTopology(clusterDef)
+	}
+	for i, topology := range clusterDef.Spec.Topologies {
+		if topology.Name == name {
+			return &clusterDef.Spec.Topologies[i]
+		}
+	}
+	return nil
+}

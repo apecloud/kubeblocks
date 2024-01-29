@@ -139,7 +139,7 @@ func (t *componentLoadResourcesTransformer) getNCheckCompDef(transCtx *component
 
 func (t *componentLoadResourcesTransformer) resolveComponentVersion(transCtx *componentTransformContext,
 	compDef *appsv1alpha1.ComponentDefinition) error {
-	compVersions, err := t.getCompatibleCompVersions(transCtx.Context, compDef)
+	compVersions, err := compatibleCompVersions(transCtx.Context, t.Client, compDef)
 	if err != nil {
 		return err
 	}
@@ -147,30 +147,6 @@ func (t *componentLoadResourcesTransformer) resolveComponentVersion(transCtx *co
 		return nil
 	}
 	return t.resolveImagesWithCompVersions(compVersions, transCtx.Component, compDef)
-}
-
-func (t *componentLoadResourcesTransformer) getCompatibleCompVersions(ctx context.Context,
-	compDef *appsv1alpha1.ComponentDefinition) ([]*appsv1alpha1.ComponentVersion, error) {
-	compVersionList := &appsv1alpha1.ComponentVersionList{}
-	labels := client.MatchingLabels{
-		compDef.Name: compDef.Name,
-	}
-	if err := t.Client.List(ctx, compVersionList, labels); err != nil {
-		return nil, err
-	}
-
-	if len(compVersionList.Items) == 0 {
-		return nil, nil
-	}
-
-	compVersions := make([]*appsv1alpha1.ComponentVersion, 0)
-	for i, compVersion := range compVersionList.Items {
-		if compVersion.Status.Phase != appsv1alpha1.AvailablePhase {
-			return nil, fmt.Errorf("matched ComponentVersion %s is not available", compVersion.Name)
-		}
-		compVersions = append(compVersions, &compVersionList.Items[i])
-	}
-	return compVersions, nil
 }
 
 func (t *componentLoadResourcesTransformer) resolveImagesWithCompVersions(compVersions []*appsv1alpha1.ComponentVersion,
@@ -300,6 +276,29 @@ func isGeneratedComponent(cluster *appsv1alpha1.Cluster,
 		}
 	}
 	return true, fmt.Errorf("component %s is not found in cluster %s", compName, cluster.Name)
+}
+
+func compatibleCompVersions(ctx context.Context, cli client.Reader, compDef *appsv1alpha1.ComponentDefinition) ([]*appsv1alpha1.ComponentVersion, error) {
+	compVersionList := &appsv1alpha1.ComponentVersionList{}
+	labels := client.MatchingLabels{
+		compDef.Name: compDef.Name,
+	}
+	if err := cli.List(ctx, compVersionList, labels); err != nil {
+		return nil, err
+	}
+
+	if len(compVersionList.Items) == 0 {
+		return nil, nil
+	}
+
+	compVersions := make([]*appsv1alpha1.ComponentVersion, 0)
+	for i, compVersion := range compVersionList.Items {
+		if compVersion.Status.Phase != appsv1alpha1.AvailablePhase {
+			return nil, fmt.Errorf("matched ComponentVersion %s is not available", compVersion.Name)
+		}
+		compVersions = append(compVersions, &compVersionList.Items[i])
+	}
+	return compVersions, nil
 }
 
 // TODO

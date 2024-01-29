@@ -488,6 +488,11 @@ spec:
                         - name
                         type: object
                       type: array
+                    serviceVersion:
+                      description: ServiceVersion specifies the version of the service
+                        that the component provisioning.
+                      maxLength: 32
+                      type: string
                     services:
                       description: Services expose endpoints that can be accessed
                         by clients.
@@ -1460,6 +1465,10 @@ spec:
                   type: object
                 type: array
                 x-kubernetes-preserve-unknown-fields: true
+              topology:
+                description: Topology specifies the topology to use for the cluster.
+                  If not specified, the default topology will be used. Cannot be updated.
+                type: string
             required:
             - terminationPolicy
             type: object

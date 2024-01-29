@@ -391,6 +391,11 @@ spec:
                   - name
                   type: object
                 type: array
+              serviceVersion:
+                description: ServiceVersion specifies the version of the service that
+                  the component provisioning.
+                maxLength: 32
+                type: string
               tlsConfig:
                 properties:
                   enable:

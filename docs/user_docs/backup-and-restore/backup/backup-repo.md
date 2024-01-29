@@ -117,13 +117,13 @@ You can specify the BackupRepo information in a YAML configuration file when ins
 
 :::note
 
-* For KubeBlocks v0.8.0, the available `storageProvider` options are `s3`, `cos`, `gcs-s3comp`, `obs`, `oss`, `minio`, `pvc`, and `nas`. FTP and NFS protocols are also supported.
+* For KubeBlocks v0.8.0, the available `storageProvider` options are `s3`, `cos`, `gcs-s3comp`, `obs`, `oss`, `minio`, `pvc`, and `nas`. NAS supports FTP and NFS protocols.
 * For different `storageProvider`, the configuration may differ. `config` and `secrets` in the above example are applied to S3.
 * Execute the command `kubectl get storageproviders.storage.kubeblocks.io` to view the supported `storageProvider` options.
 
 :::
 
-2. Specify the configuration file when installing KubeBlocks.
+1. Specify the configuration file when installing KubeBlocks.
 
    ```bash
    kbcli kubeblocks install -f backuprepo.yaml

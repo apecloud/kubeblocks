@@ -118,7 +118,7 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
     :::note
 
-    * 在 KubeBlocks v0.8.0 中，`storageProvider` 目前可选 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`minio`、`pvc`、`nas`。此外，也支持 FTP 和 NFS 协议。
+    * 在 KubeBlocks v0.8.0 中，`storageProvider` 目前可选 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`minio`、`pvc`、`nas`。NAS 支持 FTP 和 NFS 协议。
     * 不同 `storageProvider` 所需的配置信息并不统一，上面展示的 `config` 和 `secrets` 适用于 s3。
     * 执行 `kubectl get storageproviders.storage.kubeblocks.io` 命令可以查看支持的 `storageProvider`。
 

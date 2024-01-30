@@ -20,15 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"context"
 	"fmt"
 	"slices"
-	"strings"
 
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/version"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -245,7 +242,7 @@ func (t *componentLoadResourcesTransformer) checkNMergeImages(serviceVersion str
 		return user
 	}
 	for _, name := range append(maps.Keys(appsInDef), maps.Keys(appsByUser)...) {
-		apps[name] = merge(name, appsByUser[name], appsByUser[name])
+		apps[name] = merge(name, appsInDef[name], appsByUser[name])
 	}
 	return apps
 }
@@ -257,52 +254,12 @@ type appNameVersionImage struct {
 	err     error
 }
 
-func isGeneratedComponent(cluster *appsv1alpha1.Cluster,
-	comp *appsv1alpha1.Component) (bool, error) {
-	compName, err := component.ShortName(cluster.Name, comp.Name)
-	if err != nil {
-		return false, err
+func isGeneratedComponent(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) (bool, error) {
+	if withClusterTopology(cluster) {
+		return false, nil
 	}
-	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		if compSpec.Name == compName {
-			if len(compSpec.ComponentDef) > 0 {
-				if !strings.HasPrefix(comp.Spec.CompDef, compSpec.ComponentDef) {
-					err = fmt.Errorf("component definitions referred in cluster and component are different: %s vs %s",
-						compSpec.ComponentDef, comp.Spec.CompDef)
-				}
-				return false, err
-			}
-			return true, nil
-		}
+	if withLegacyClusterDef(cluster) || withSimplifiedClusterAPI(cluster) {
+		return true, nil
 	}
-	return true, fmt.Errorf("component %s is not found in cluster %s", compName, cluster.Name)
-}
-
-func compatibleCompVersions(ctx context.Context, cli client.Reader, compDef *appsv1alpha1.ComponentDefinition) ([]*appsv1alpha1.ComponentVersion, error) {
-	compVersionList := &appsv1alpha1.ComponentVersionList{}
-	labels := client.MatchingLabels{
-		compDef.Name: compDef.Name,
-	}
-	if err := cli.List(ctx, compVersionList, labels); err != nil {
-		return nil, err
-	}
-
-	if len(compVersionList.Items) == 0 {
-		return nil, nil
-	}
-
-	compVersions := make([]*appsv1alpha1.ComponentVersion, 0)
-	for i, compVersion := range compVersionList.Items {
-		if compVersion.Status.Phase != appsv1alpha1.AvailablePhase {
-			return nil, fmt.Errorf("matched ComponentVersion %s is not available", compVersion.Name)
-		}
-		compVersions = append(compVersions, &compVersionList.Items[i])
-	}
-	return compVersions, nil
-}
-
-// TODO
-func compareServiceVersion(required, provide string) bool {
-	ret, err := version.MustParseSemantic(required).Compare(provide)
-	return err == nil && ret == 0
+	return true, fmt.Errorf("unknown cluster API")
 }

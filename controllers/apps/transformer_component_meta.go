@@ -53,6 +53,7 @@ func (t *componentMetaTransformer) Transform(ctx graph.TransformContext, dag *gr
 	labelName := labels[constant.ComponentDefinitionLabelKey]
 	if labelName != component.Spec.CompDef {
 		labels[constant.ComponentDefinitionLabelKey] = component.Spec.CompDef
+		// TODO: service version label
 		needUpdate = true
 	}
 

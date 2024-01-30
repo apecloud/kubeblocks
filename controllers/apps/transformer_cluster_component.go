@@ -184,11 +184,10 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	compObjCopy.Labels = compProto.Labels
 
 	// merge spec
-	// TODO: update compDef & serviceVersion & serviceRefs - upgrade
+	mergeComponent4Upgrade(compObjCopy, compProto)
 	compObjCopy.Spec.Monitor = compProto.Spec.Monitor
 	compObjCopy.Spec.ClassDefRef = compProto.Spec.ClassDefRef
 	compObjCopy.Spec.Resources = compProto.Spec.Resources
-	compObjCopy.Spec.ServiceRefs = compProto.Spec.ServiceRefs
 	compObjCopy.Spec.Replicas = compProto.Spec.Replicas
 	compObjCopy.Spec.Configs = compProto.Spec.Configs
 	compObjCopy.Spec.EnabledLogs = compProto.Spec.EnabledLogs
@@ -206,4 +205,15 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 		return nil
 	}
 	return compObjCopy
+}
+
+func mergeComponent4Upgrade(obj, proto *appsv1alpha1.Component) {
+	check4Upgrade := func() bool {
+		return false // TODO
+	}
+	if check4Upgrade() {
+		obj.Spec.CompDef = proto.Spec.CompDef
+		obj.Spec.ServiceVersion = proto.Spec.ServiceVersion
+		obj.Spec.ServiceRefs = proto.Spec.ServiceRefs
+	}
 }

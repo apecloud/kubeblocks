@@ -44,7 +44,7 @@ func (t *clusterLoadRefResourcesTransformer) Transform(ctx graph.TransformContex
 		setProvisioningStartedCondition(&cluster.Status.Conditions, cluster.Name, cluster.Generation, err)
 	}()
 
-	if t.apiValidation(cluster); err != nil {
+	if err = t.apiValidation(cluster); err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
@@ -58,7 +58,7 @@ func (t *clusterLoadRefResourcesTransformer) Transform(ctx graph.TransformContex
 
 	if withClusterTopology(cluster) {
 		// check again with cluster definition loaded
-		if validateClusterTopology(transCtx.ClusterDef, cluster); err != nil {
+		if err = validateClusterTopology(transCtx.ClusterDef, cluster); err != nil {
 			return newRequeueError(requeueDuration, err.Error())
 		}
 	}
@@ -152,12 +152,12 @@ func clusterCompCnt(cluster *appsv1alpha1.Cluster) int {
 
 func clusterLegacyCompCnt(cluster *appsv1alpha1.Cluster) int {
 	return generics.CountFunc(cluster.Spec.ComponentSpecs, func(spec appsv1alpha1.ClusterComponentSpec) bool {
-		return len(spec.ComponentDef) == 0
+		return len(spec.ComponentDefRef) != 0 && len(spec.ComponentDef) == 0
 	})
 }
 
 func clusterNewCompCnt(cluster *appsv1alpha1.Cluster) int {
 	return generics.CountFunc(cluster.Spec.ComponentSpecs, func(spec appsv1alpha1.ClusterComponentSpec) bool {
-		return len(spec.ComponentDef) != 0
+		return len(spec.ComponentDefRef) == 0
 	})
 }

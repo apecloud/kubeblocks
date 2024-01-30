@@ -23,6 +23,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -227,4 +228,28 @@ func QueryRowsMap(db *sql.DB, query string, onRow func(RowMap) error, args ...in
 	}
 	err = ScanRowsToMaps(rows, onRow)
 	return
+}
+
+func VersionParts(version string) []string {
+	return strings.Split(version, ".")
+}
+
+func IsBeforeVersion(version string, otherVersion string) bool {
+	thisVersions := VersionParts(version)
+	otherVersions := VersionParts(otherVersion)
+	if len(thisVersions) < len(otherVersions) {
+		return false
+	}
+
+	for i := 0; i < len(thisVersions); i++ {
+		thisToken, _ := strconv.Atoi(thisVersions[i])
+		otherToken, _ := strconv.Atoi(otherVersions[i])
+		if thisToken < otherToken {
+			return true
+		}
+		if thisToken > otherToken {
+			return false
+		}
+	}
+	return false
 }

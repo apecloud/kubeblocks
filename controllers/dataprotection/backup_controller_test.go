@@ -135,7 +135,7 @@ var _ = Describe("Backup Controller test", func() {
 			}
 
 			BeforeEach(func() {
-				By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
+				By("creating a backup from backupPolicy " + testdp.BackupPolicyName) //nolint:goconst
 				backup = testdp.NewFakeBackup(&testCtx, nil)
 				backupKey = client.ObjectKeyFromObject(backup)
 			})

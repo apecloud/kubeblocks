@@ -149,7 +149,7 @@ func GenerateBackupJobName(backup *dpv1alpha1.Backup, prefix string) string {
 	name := fmt.Sprintf("%s-%s-%s", prefix, backup.Name, backup.UID[:8])
 	// job name cannot exceed 63 characters for label name limit.
 	if len(name) > 63 {
-		return name[:63]
+		return strings.TrimSuffix(name[:63], "-")
 	}
 	return name
 }
@@ -158,7 +158,7 @@ func GenerateBackupJobName(backup *dpv1alpha1.Backup, prefix string) string {
 func GenerateCRNameByBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule, method string) string {
 	name := fmt.Sprintf("%s-%s", generateUniqueNameWithBackupSchedule(backupSchedule), backupSchedule.Namespace)
 	if len(name) > 30 {
-		name = strings.TrimRight(name[:30], "-")
+		name = strings.TrimSuffix(name[:30], "-")
 	}
 	return fmt.Sprintf("%s-%s", name, method)
 }

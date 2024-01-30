@@ -326,7 +326,8 @@ func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 	hdlBuilder := builder.NewHeadlessServiceBuilder(rsm.Namespace, getHeadlessSvcName(rsm)).
 		AddLabelsInMap(labels).
 		AddSelectorsInMap(selectors).
-		AddAnnotationsInMap(annotations)
+		AddAnnotationsInMap(annotations).
+		SetPublishNotReadyAddresses(true)
 
 	for _, container := range rsm.Spec.Template.Spec.Containers {
 		for _, port := range container.Ports {
@@ -359,6 +360,7 @@ func buildSts(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envC
 		SetSelector(rsm.Spec.Selector).
 		SetServiceName(headlessSvcName).
 		SetReplicas(*rsm.Spec.Replicas).
+		SetMinReadySeconds(rsm.Spec.MinReadySeconds).
 		SetPodManagementPolicy(rsm.Spec.PodManagementPolicy).
 		SetVolumeClaimTemplates(rsm.Spec.VolumeClaimTemplates...).
 		SetTemplate(*template).
@@ -780,7 +782,6 @@ func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string 
 	envData[prefix+"REPLICA_COUNT"] = strReplicas
 	generateReplicaEnv(prefix)
 	generateMemberEnv(prefix)
-	envData[prefix+"CLUSTER_UID"] = uid
 
 	// have backward compatible handling for CM key with 'compDefName' being part of the key name, prior 0.5.0
 	// and introduce env/cm key naming reference complexity

@@ -47,6 +47,8 @@ kind: Backup
 metadata:
   name: mybackup
   namespace: default
+  annotations:
+    dataprotection.kubeblocks.io/connection-password: Bw1cR15mzfldc9hzGuK4m1BZQOzha6aBb1i9nlvoBdoE9to4
 spec:
   backupMethod: xtrabackup
   backupPolicyName: mysql-cluster-mysql-backup-policy
@@ -58,6 +60,12 @@ kubectl get backup mybackup
 NAME       POLICY                              METHOD       REPO      STATUS      TOTAL-SIZE   DURATION   CREATION-TIME          COMPLETION-TIME        EXPIRATION-TIME
 mybackup   mysql-cluster-mysql-backup-policy   xtrabackup   my-repo   Completed   4426858      2m8s       2023-10-30T07:19:21Z   2023-10-30T07:21:28Z
 ```
+
+:::note
+
+The `dataprotection.kubeblocks.io/connection-password` in annotations uses the password of the original cluster.
+
+:::
 
 </TabItem>
 

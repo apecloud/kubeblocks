@@ -2154,11 +2154,6 @@ func (in *ComponentSpec) DeepCopyInto(out *ComponentSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.UpdateStrategy != nil {
-		in, out := &in.UpdateStrategy, &out.UpdateStrategy
-		*out = new(UpdateStrategy)
-		**out = **in
-	}
 	if in.Affinity != nil {
 		in, out := &in.Affinity, &out.Affinity
 		*out = new(Affinity)

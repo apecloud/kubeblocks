@@ -80,11 +80,6 @@ func getPodsForOnlineUpdate(params reconfigureParams) ([]corev1.Pod, error) {
 	}
 
 	pods, err := GetComponentPods(params)
-	// stsObj := &params.ComponentUnits[0]
-	// pods, err := components.GetPodListByStatefulSetWithSelector(params.Ctx.Ctx, params.Client, stsObj, client.MatchingLabels{
-	//	constant.KBAppComponentLabelKey: params.ClusterComponent.Name,
-	//	constant.AppInstanceLabelKey:    params.Cluster.Name,
-	// })
 	if err != nil {
 		return nil, err
 	}

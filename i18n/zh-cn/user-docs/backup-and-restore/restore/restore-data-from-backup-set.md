@@ -33,7 +33,7 @@ KubeBlocks 支持从备份集中恢复数据。
 
     <TabItem value="kbcli" label="kbcli" default>
 
-    ```powershell
+    ```bash
     # 恢复集群
     kbcli cluster restore myrestore --backup mybackup
     >
@@ -49,14 +49,17 @@ KubeBlocks 支持从备份集中恢复数据。
 
     <TabItem value="kubectl" label="kubectl">
 
+    可使用原集群的 connection password 作为恢复的集群的 `connectionPassword.annotations` 值。可从备份 YAML 文件中的 `dataprotection.kubeblocks.io/connection-password` annotation 中获取原集群的 connection password。
+
     ```bash
     $ kubectl apply -f - <<-'EOF'
     apiVersion: apps.kubeblocks.io/v1alpha1
     kind: Cluster
     metadata:
       name: myrestore
+      namespace: default
       annotations:
-        kubeblocks.io/restore-from-backup: '{"mysql":{"name":"mybackup","namespace":"default"}}'
+        kubeblocks.io/restore-from-backup: '{"mysql":{"name":"mybackup","namespace":"default","connectionPassword": "Bw1cR15mzfldc9hzGuK4m1BZQOzha6aBb1i9nlvoBdoE9to4"}}'
     spec:
       clusterDefinitionRef: apecloud-mysql
       clusterVersionRef: ac-mysql-8.0.30

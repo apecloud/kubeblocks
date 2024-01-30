@@ -147,7 +147,7 @@ func (mgr *Manager) setLogSource(ctx context.Context, db *sql.DB, candidateMembe
 		sourceAddr, repUser, mgr.ReplicaTenant, repPassword, mgr.ReplicaTenant)
 	_, err := db.Exec(sql)
 	if err != nil {
-		mgr.Logger.Info(sql+" failed", "error", err)
+		mgr.Logger.Info(sql+" failed", "error", err) //nolint:goconst
 		return err
 	}
 

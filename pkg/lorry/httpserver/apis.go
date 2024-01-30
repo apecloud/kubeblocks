@@ -101,7 +101,7 @@ func OperationWrapper(op operations.Operation) fasthttp.RequestHandler {
 		if err != nil {
 			msg := NewErrorResponse("ERR_MALFORMED_REQUEST_DATA", fmt.Sprintf("marshal request data field: %v", err))
 			respond(reqCtx, withError(fasthttp.StatusInternalServerError, msg))
-			logger.Error(err, "marshal request data field")
+			logger.Info("marshal request data field", "error", err.Error())
 			return
 		}
 		opsReq := &operations.OpsRequest{
@@ -112,7 +112,7 @@ func OperationWrapper(op operations.Operation) fasthttp.RequestHandler {
 		if err := op.PreCheck(ctx, opsReq); err != nil {
 			msg := NewErrorResponse("ERR_PRECHECK_FAILED", fmt.Sprintf("operation precheck failed: %v", err))
 			respond(reqCtx, withError(fasthttp.StatusInternalServerError, msg))
-			logger.Error(err, "operation precheck failed")
+			logger.Info("operation precheck failed", "error", err.Error())
 			return
 		}
 
@@ -127,7 +127,7 @@ func OperationWrapper(op operations.Operation) fasthttp.RequestHandler {
 					statusCode = fasthttp.StatusNotImplemented
 				} else {
 					statusCode = fasthttp.StatusInternalServerError
-					logger.Error(err, "operation exec failed")
+					logger.Info("operation exec failed", "error", err.Error())
 				}
 				msg := NewErrorResponse("ERR_OPERATION_FAILED", fmt.Sprintf("operation exec failed: %v", err))
 				respond(reqCtx, withError(statusCode, msg))

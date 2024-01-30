@@ -158,7 +158,7 @@ var _ = Describe("Reconfigure util test", func() {
 
 			opsRes := &OpsResource{
 				Recorder: k8sManager.GetEventRecorderFor("Reconfiguring"),
-				OpsRequest: testapps.NewOpsRequestObj("reconfigure-ops-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
+				OpsRequest: testapps.NewOpsRequestObj("reconfigure-ops-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace, //nolint:goconst
 					clusterName, appsv1alpha1.ReconfiguringType),
 			}
 			reqCtx := intctrlutil.RequestCtx{

@@ -196,9 +196,9 @@ sidebar_label: 添加数据库引擎
 
     这是一个 placeholder, 用来指代前文中提到的 Connection credential Secret。
 
-- ClusterVersion
+- `clusterVersion.yaml`
 
-   所有版本相关的信息都配置在 `ClusterVersion.yaml` 中。
+   所有版本相关的信息都配置在 `clusterVersion.yaml` 中。
    
    现在可以为每一个 Component 需要的每一个 container 补充 image 信息。
 
@@ -257,7 +257,7 @@ Cluster mycluster created
 
 如果只有一个 ClusterVersion 对象关联该 ClusterDefinition，kbcli在创建集群时，会使用该 ClusterVersion。
 
-如果有多个 ClusterVersion 对象该关联 ClusterDefinition，则需要显式指定。
+如果有多个 ClusterVersion 对象关联该 ClusterDefinition，则需要显式指定。
 
 :::
 
@@ -302,7 +302,7 @@ Cluster mycluster created
 
 **D. 简单运维，如 Stop**
 
-   Stopping the cluster releases all computing resources.
+   停止集群将释放所有计算资源。
 
    ```bash
    kbcli cluster stop mycluster
@@ -393,11 +393,11 @@ spec:
 
    这样就可以快速为你的引擎实现多版本支持了。
 
-### A.2 kbcli 创建 Cluster 不能满足需求怎么办？
+### A.2 kbcli 创建集群不能满足需求怎么办？
 
 `kbcli` 提供了一套便捷且通用的方案来创建集群。创建时会设置一些值，例如资源大小，但这并不能满足每个引擎的需求，尤其是当集群包含多个组件且需要选择性使用时。
 
-为了解决这个问题，你可以用一个 Helm chart 来渲染 Cluster，或者通过 `cluster.yaml` 文件来创建，例如：
+为了解决这个问题，你可以用一个 Helm chart 来渲染集群，或者通过 `cluster.yaml` 文件来创建，例如：
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1

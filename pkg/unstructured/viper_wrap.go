@@ -27,6 +27,7 @@ import (
 
 	"github.com/spf13/cast"
 	oviper "github.com/spf13/viper"
+	"gopkg.in/ini.v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
@@ -99,7 +100,11 @@ func newCfgViper(cfgType appsv1alpha1.CfgFileFormat) *oviper.Viper {
 	if cfgType == appsv1alpha1.Properties || cfgType == appsv1alpha1.Dotenv {
 		defaultKeySep = CfgDelimiterPlaceholder
 	}
-	v := oviper.NewWithOptions(oviper.KeyDelimiter(defaultKeySep))
+	// TODO config constraint support LoadOptions
+	v := oviper.NewWithOptions(oviper.KeyDelimiter(defaultKeySep), oviper.IniLoadOptions(ini.LoadOptions{
+		SpaceBeforeInlineComment: true,
+		PreserveSurroundedQuote:  true,
+	}))
 	v.SetConfigType(strings.ToLower(string(cfgType)))
 	return v
 }

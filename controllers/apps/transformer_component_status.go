@@ -269,7 +269,7 @@ func (r *componentStatusHandler) isComponentAvailable(pods []*corev1.Pod) (bool,
 
 	hasPodAvailable := false
 	for _, pod := range pods {
-		if !podutils.IsPodAvailable(pod, 0, metav1.Time{Time: time.Now()}) {
+		if !podutils.IsPodAvailable(pod, r.runningRSM.Spec.MinReadySeconds, metav1.Time{Time: time.Now()}) {
 			continue
 		}
 		if shouldCheckRole && hasLeaderRoleLabel(pod) {
@@ -354,7 +354,7 @@ func (r *componentStatusHandler) isScaleOutFailed() (bool, error) {
 	stsProto := rsmcore.ConvertRSMToSTS(r.protoRSM)
 	backupKey := types.NamespacedName{
 		Namespace: stsObj.Namespace,
-		Name:      stsObj.Name + "-scaling",
+		Name:      constant.GenerateResourceNameWithScalingSuffix(stsObj.Name),
 	}
 	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, stsObj, stsProto, backupKey)
 	if err != nil {

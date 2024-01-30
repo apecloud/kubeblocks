@@ -66,6 +66,7 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
 	// +kubebuilder:validation:XValidation:rule="self.all(x, size(self.filter(c, c.name == x.name)) == 1)",message="duplicated component"
+	// +kubebuilder:validation:XValidation:rule="self.all(x, size(self.filter(c, has(c.componentDef))) == 0) || self.all(x, size(self.filter(c, has(c.componentDef))) == size(self))",message="two kinds of definition API can not be used simultaneously"
 	ComponentSpecs []ClusterComponentSpec `json:"componentSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// services defines the services to access a cluster.
@@ -81,6 +82,8 @@ type ClusterSpec struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// !!!!! The following fields may be deprecated in subsequent versions, please DO NOT rely on them for new requirements.
 
 	// tenancy describes how pods are distributed across node.
 	// SharedNode means multiple pods may share the same node.
@@ -304,6 +307,7 @@ type ClusterComponentSpec struct {
 	ComponentDef string `json:"componentDef,omitempty"`
 
 	// classDefRef references the class defined in ComponentClassDefinition.
+	// +kubebuilder:deprecatedversion:warning="Due to the lack of practical use cases, this field is deprecated from KB 0.9.0."
 	// +optional
 	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 
@@ -377,13 +381,8 @@ type ClusterComponentSpec struct {
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
-	// noCreatePDB defines the PodDisruptionBudget creation behavior and is set to true if creation of PodDisruptionBudget
-	// for this component is not needed. It defaults to false.
-	// +kubebuilder:default=false
-	// +optional
-	NoCreatePDB bool `json:"noCreatePDB,omitempty"`
-
 	// updateStrategy defines the update strategy for the component.
+	// Not supported.
 	// +optional
 	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
 
@@ -410,22 +409,6 @@ type ClusterComponentSpec struct {
 	// If the RsmTransformPolicy is specified as ToPod,the list of instances will be used.
 	// +optional
 	Instances []string `json:"instances,omitempty"`
-}
-
-// GetMinAvailable wraps the 'prefer' value return. As for component replicaCount <= 1, it will return 0,
-// and as for replicaCount=2 it will return 1.
-func (r *ClusterComponentSpec) GetMinAvailable(prefer *intstr.IntOrString) *intstr.IntOrString {
-	if r == nil || r.NoCreatePDB || prefer == nil {
-		return nil
-	}
-	if r.Replicas <= 1 {
-		m := intstr.FromInt(0)
-		return &m
-	} else if r.Replicas == 2 {
-		m := intstr.FromInt(1)
-		return &m
-	}
-	return prefer
 }
 
 type ComponentMessageMap map[string]string

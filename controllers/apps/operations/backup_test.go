@@ -35,9 +35,9 @@ var _ = Describe("Backup OpsRequest", func() {
 
 	var (
 		randomStr             = testCtx.GetRandomStr()
-		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterVersionName    = "clusterversion-for-ops-" + randomStr
-		clusterName           = "cluster-for-ops-" + randomStr
+		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr //nolint:goconst
+		clusterVersionName    = "clusterversion-for-ops-" + randomStr     //nolint:goconst
+		clusterName           = "cluster-for-ops-" + randomStr            //nolint:goconst
 	)
 
 	cleanEnv := func() {

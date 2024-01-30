@@ -30,6 +30,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	configmanager "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
@@ -161,7 +162,7 @@ func (param *reconfigureParams) maxRollingReplicas() int32 {
 		replicas       = param.getTargetReplicas()
 	)
 
-	if param.SynthesizedComponent == nil || param.SynthesizedComponent.MinAvailable == nil {
+	if param.SynthesizedComponent == nil {
 		return defaultRolling
 	}
 
@@ -208,19 +209,30 @@ func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *core.
 		return nil, core.MakeError("cfg not modify. [%v]", cfgPatch)
 	}
 
+	// if not specify policy, auto decision reconfiguring policy.
 	if enableAutoDecision(restart, policy) {
-		if dynamicUpdate, err := core.IsUpdateDynamicParameters(cc, cfgPatch); err != nil {
+		dynamicUpdate, err := core.IsUpdateDynamicParameters(cc, cfgPatch)
+		if err != nil {
 			return nil, err
-		} else if dynamicUpdate {
+		}
+
+		// make decision
+		switch {
+		case !dynamicUpdate: // static parameters update
+		case configmanager.IsAutoReload(cc.ReloadOptions): // if core support hot update, don't need to do anything
+			policy = appsv1alpha1.AutoReload
+		case enableSyncReload(policy, cc.ReloadOptions): // sync config-manager exec hot update
+			policy = appsv1alpha1.OperatorSyncUpdate
+		default: // config-manager auto trigger to hot update
 			policy = appsv1alpha1.AutoReload
 		}
-		if enableSyncReload(policy, cc.ReloadOptions) {
-			policy = appsv1alpha1.OperatorSyncUpdate
-		}
 	}
+
+	// if not specify policy, or cannot decision policy, use default policy.
 	if policy == appsv1alpha1.NonePolicy {
 		policy = appsv1alpha1.NormalPolicy
 	}
+
 	if action, ok := upgradePolicyMap[policy]; ok {
 		return action, nil
 	}

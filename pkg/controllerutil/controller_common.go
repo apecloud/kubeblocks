@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -286,15 +285,6 @@ var (
 	portManager *PortManager
 )
 
-const (
-	// https://www.w3.org/Daemon/User/Installation/PrivilegedPorts.html
-	// The TCP/IP port numbers below 1024 are special in that normal users are not allowed to run servers on them.
-	// This is a security feaure, in that if you connect to a service on one of these ports you can be fairly sure
-	// that you have the real thing, and not a fake which some hacker has put up for you.
-	hostPortMin = int32(1025)
-	hostPortMax = int32(65536)
-)
-
 func InitHostPortManager(cli client.Client) error {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -303,13 +293,70 @@ func InitHostPortManager(cli client.Client) error {
 		},
 		Data: make(map[string]string),
 	}
+	parsePortRange := func(item string) (int64, int64, error) {
+		parts := strings.Split(item, "-")
+		var (
+			from int64
+			to   int64
+			err  error
+		)
+		switch len(parts) {
+		case 2:
+			from, err = strconv.ParseInt(parts[0], 10, 32)
+			if err != nil {
+				return from, to, err
+			}
+			to, err = strconv.ParseInt(parts[1], 10, 32)
+			if err != nil {
+				return from, to, err
+			}
+			if from > to {
+				return from, to, fmt.Errorf("invalid port range %s", item)
+			}
+		case 1:
+			from, err = strconv.ParseInt(parts[0], 10, 32)
+			if err != nil {
+				return from, to, err
+			}
+			to = from
+		default:
+			return from, to, fmt.Errorf("invalid port range %s", item)
+		}
+		return from, to, nil
+	}
+	parsePortRanges := func(portRanges string) ([]PortRange, error) {
+		var ranges []PortRange
+		for _, item := range strings.Split(portRanges, ",") {
+			item = strings.TrimSpace(item)
+			if item == "" {
+				continue
+			}
+			from, to, err := parsePortRange(item)
+			if err != nil {
+				return nil, err
+			}
+			ranges = append(ranges, PortRange{
+				Min: int32(from),
+				Max: int32(to),
+			})
+		}
+		return ranges, nil
+	}
 	var err error
 	if err = cli.Create(context.Background(), cm); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			return err
 		}
 	}
-	portManager, err = NewPortManager(hostPortMin, hostPortMax, cli)
+	includes, err := parsePortRanges(viper.GetString(constant.CfgHostPortIncludeRanges))
+	if err != nil {
+		return err
+	}
+	excludes, err := parsePortRanges(viper.GetString(constant.CfgHostPortExcludeRanges))
+	if err != nil {
+		return err
+	}
+	portManager, err = NewPortManager(includes, excludes, cli)
 	return err
 }
 
@@ -323,22 +370,45 @@ func BuildHostPortName(clusterName, compName, containerName, portName string) st
 
 type PortManager struct {
 	sync.Mutex
-	cli  client.Client
-	min  int32
-	max  int32
-	used map[int32]string
-	cm   *corev1.ConfigMap
+	cli      client.Client
+	from     int32
+	to       int32
+	cursor   int32
+	includes []PortRange
+	excludes []PortRange
+	used     map[int32]string
+	cm       *corev1.ConfigMap
+}
+
+type PortRange struct {
+	Min int32
+	Max int32
 }
 
 // NewPortManager creates a new PortManager
 // TODO[ziang] Putting all the port information in one configmap may have performance issues and is not secure enough.
 // There is a risk of accidental deletion leading to the loss of cluster port information.
-func NewPortManager(min, max int32, cli client.Client) (*PortManager, error) {
+func NewPortManager(includes []PortRange, excludes []PortRange, cli client.Client) (*PortManager, error) {
+	var (
+		from int32
+		to   int32
+	)
+	for _, item := range includes {
+		if item.Min < from || from == 0 {
+			from = item.Min
+		}
+		if item.Max > to {
+			to = item.Max
+		}
+	}
 	pm := &PortManager{
-		min:  min,
-		max:  max,
-		cli:  cli,
-		used: make(map[int32]string),
+		cli:      cli,
+		from:     from,
+		to:       to,
+		cursor:   from,
+		includes: includes,
+		excludes: excludes,
+		used:     make(map[int32]string),
 	}
 	if err := pm.sync(); err != nil {
 		return nil, err
@@ -377,6 +447,11 @@ func (pm *PortManager) sync() error {
 			continue
 		}
 		used[port] = key
+	}
+	for _, item := range pm.excludes {
+		for port := item.Min; port <= item.Max; port++ {
+			used[port] = ""
+		}
 	}
 
 	pm.cm = cm
@@ -467,18 +542,23 @@ func (pm *PortManager) AllocatePort(key string) (int32, error) {
 		return port, nil
 	}
 
-	// allocate a new port randomly in range [hostPortMin, hostPortMax)
-	for i := 0; i < 10; i++ {
-		port := int32(rand.Int63nRange(int64(hostPortMin), int64(hostPortMax)))
-		if _, ok := pm.used[port]; ok {
-			continue
-		}
-		if err := pm.update(key, port); err != nil {
-			return 0, err
-		}
-		return port, nil
+	if len(pm.used) >= int(pm.to-pm.from)+1 {
+		return 0, fmt.Errorf("no available port")
 	}
-	return 0, fmt.Errorf("failed to allocate port")
+
+	for {
+		if _, ok := pm.used[pm.cursor]; !ok {
+			break
+		}
+		pm.cursor++
+		if pm.cursor > pm.to {
+			pm.cursor = pm.from
+		}
+	}
+	if err := pm.update(key, pm.cursor); err != nil {
+		return 0, err
+	}
+	return pm.cursor, nil
 }
 
 func (pm *PortManager) ReleasePort(key string) error {

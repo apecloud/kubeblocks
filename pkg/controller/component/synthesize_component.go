@@ -158,12 +158,12 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		Labels:             compDefObj.Spec.Labels,
 		Roles:              compDefObj.Spec.Roles,
 		UpdateStrategy:     compDefObj.Spec.UpdateStrategy,
+		MinReadySeconds:    compDefObj.Spec.MinReadySeconds,
 		PolicyRules:        compDefObj.Spec.PolicyRules,
 		LifecycleActions:   compDefObj.Spec.LifecycleActions,
 		SystemAccounts:     compDefObj.Spec.SystemAccounts,
 		RoleArbitrator:     compDefObj.Spec.RoleArbitrator,
 		Replicas:           comp.Spec.Replicas,
-		EnabledLogs:        comp.Spec.EnabledLogs,
 		TLSConfig:          comp.Spec.TLSConfig,
 		ServiceAccountName: comp.Spec.ServiceAccountName,
 		Nodes:              comp.Spec.Nodes,
@@ -400,7 +400,6 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 		synthesizeComp.Probes = clusterCompDef.Probes
 		synthesizeComp.VolumeTypes = clusterCompDef.VolumeTypes
 		synthesizeComp.VolumeProtection = clusterCompDef.VolumeProtectionSpec
-		synthesizeComp.MinAvailable = clusterCompSpec.GetMinAvailable(clusterCompDef.GetMinAvailable())
 		// TLS is a backward compatible field, which is used in configuration rendering before version 0.8.0.
 		if synthesizeComp.TLSConfig != nil {
 			synthesizeComp.TLS = true

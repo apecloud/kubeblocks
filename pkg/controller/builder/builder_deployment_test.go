@@ -30,7 +30,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
-var _ = Describe("pdb builder", func() {
+var _ = Describe("deployment builder", func() {
 	It("should work well", func() {
 		const (
 			name = "foo"

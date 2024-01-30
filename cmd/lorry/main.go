@@ -20,10 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"github.com/apecloud/kubeblocks/cmd/reloader/app"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -35,11 +38,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	kzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/grpcserver"
-	"github.com/apecloud/kubeblocks/pkg/lorry/highavailability"
 	"github.com/apecloud/kubeblocks/pkg/lorry/httpserver"
 	opsregister "github.com/apecloud/kubeblocks/pkg/lorry/operations/register"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -91,18 +92,18 @@ func main() {
 	}
 
 	// Start HA
-	characterType := viper.GetString(constant.KBEnvCharacterType)
-	if viper.IsSet(constant.KBEnvBuiltinHandler) {
-		characterType = viper.GetString(constant.KBEnvBuiltinHandler)
-	}
-	workloadType := viper.GetString(constant.KBEnvWorkloadType)
-	if highavailability.IsHAAvailable(characterType, workloadType) {
-		ha := highavailability.NewHa(disableDNSChecker)
-		if ha != nil {
-			defer ha.ShutdownWithWait()
-			go ha.Start()
-		}
-	}
+	// characterType := viper.GetString(constant.KBEnvCharacterType)
+	// if viper.IsSet(constant.KBEnvBuiltinHandler) {
+	// 	characterType = viper.GetString(constant.KBEnvBuiltinHandler)
+	// }
+	// workloadType := viper.GetString(constant.KBEnvWorkloadType)
+	// if highavailability.IsHAAvailable(characterType, workloadType) {
+	// 	ha := highavailability.NewHa()
+	// 	if ha != nil {
+	// 		defer ha.ShutdownWithWait()
+	// 		go ha.Start()
+	// 	}
+	// }
 
 	// start grpc server for role probe
 	grpcServer, err := grpcserver.NewGRPCServer()
@@ -120,6 +121,12 @@ func main() {
 	err = httpServer.StartNonBlocking()
 	if err != nil {
 		panic(errors.Wrap(err, "HTTP server initialize failed"))
+	}
+
+	cmd := app.NewConfigManagerCommand(context.Background(), filepath.Base(os.Args[0]))
+	if err = cmd.Execute(); err != nil && !errors.Is(errors.Cause(err), context.Canceled) {
+		fmt.Println(err)
+		os.Exit(-1)
 	}
 
 	stop := make(chan os.Signal, 1)

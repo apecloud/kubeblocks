@@ -138,7 +138,7 @@ var _ = Describe("Lorry Utils", func() {
 			}
 			Expect(buildLorryContainers(reqCtx, component, nil)).Should(Succeed())
 			Expect(component.PodSpec.Containers).Should(HaveLen(1))
-			Expect(component.PodSpec.Containers[0].Name).Should(Equal(constant.WeSyncerContainerName))
+			Expect(component.PodSpec.Containers[0].Name).Should(Equal(constant.SyncerContainerName))
 		})
 
 		It("build volume protection probe container without RBAC", func() {

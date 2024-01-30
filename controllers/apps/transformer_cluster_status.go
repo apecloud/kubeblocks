@@ -162,7 +162,7 @@ func (t *clusterStatusTransformer) reconcileClusterStatus(transCtx *clusterTrans
 	t.reconcileClusterPhase(cluster)
 
 	// removes the component of status.components which is created by simplified API.
-	t.removeInnerCompStatus(cluster)
+	t.removeInnerCompStatus(transCtx, cluster)
 	return nil
 }
 
@@ -173,11 +173,15 @@ func (t *clusterStatusTransformer) removeInvalidCompStatus(transCtx *clusterTran
 }
 
 // removeInnerCompStatus removes the component of status.components which is created by simplified API.
-func (t *clusterStatusTransformer) removeInnerCompStatus(cluster *appsv1alpha1.Cluster) {
+func (t *clusterStatusTransformer) removeInnerCompStatus(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) {
 	compSpecs := make([]*appsv1alpha1.ClusterComponentSpec, 0)
 	for i := range cluster.Spec.ComponentSpecs {
 		compSpecs = append(compSpecs, &cluster.Spec.ComponentSpecs[i])
 	}
+	// TODO: how to display the status of sharding components
+	/*	for _, v := range transCtx.ShardingComponentSpecs {
+		compSpecs = append(compSpecs, v...)
+	}*/
 	t.removeCompStatus(cluster, compSpecs)
 }
 

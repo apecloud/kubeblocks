@@ -29,12 +29,12 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type Task struct {
-	intctrlutil.ResourceFetcher[Task]
+	configctrl.ResourceFetcher[Task]
 
 	Status *appsv1alpha1.ConfigurationItemDetailStatus
 	Name   string
@@ -82,7 +82,7 @@ func syncImpl(fetcher *Task,
 	revision string,
 	configSpec *appsv1alpha1.ComponentConfigSpec,
 	dependOnObjs []client.Object) (err error) {
-	err = configuration.NewReconcilePipeline(configuration.ReconcileCtx{
+	err = configctrl.NewReconcilePipeline(configctrl.ReconcileCtx{
 		ResourceCtx: fetcher.ResourceCtx,
 		Cluster:     fetcher.ClusterObj,
 		Component:   component,

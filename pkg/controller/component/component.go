@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -58,7 +59,7 @@ func GetClusterUID(comp *appsv1alpha1.Component) (string, error) {
 }
 
 // BuildComponent builds a new Component object from cluster component spec and definition.
-func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.Component, error) {
+func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec, customLabels map[string]string) (*appsv1alpha1.Component, error) {
 	compName := FullName(cluster.Name, clusterCompSpec.Name)
 	affinities := BuildAffinity(cluster, clusterCompSpec)
 	tolerations, err := BuildTolerations(cluster, clusterCompSpec)
@@ -97,6 +98,9 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1
 	if common.IsCompactMode(cluster.GetAnnotations()) {
 		compBuilder.AddAnnotations(constant.FeatureReconciliationInCompactModeAnnotationKey,
 			cluster.GetAnnotations()[constant.FeatureReconciliationInCompactModeAnnotationKey])
+	}
+	if customLabels != nil {
+		compBuilder.AddLabelsInMap(customLabels)
 	}
 	return compBuilder.GetObject(), nil
 }
@@ -178,16 +182,19 @@ func getClusterCompDefAndVersion(clusterDef *appsv1alpha1.ClusterDefinition,
 	return clusterCompDef, clusterCompVer, nil
 }
 
-func getClusterCompSpec4Component(clusterDef *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster,
+func getClusterCompSpec4Component(ctx context.Context, cli client.Reader,
+	clusterDef *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster,
 	comp *appsv1alpha1.Component) (*appsv1alpha1.ClusterComponentSpec, error) {
 	compName, err := ShortName(cluster.Name, comp.Name)
 	if err != nil {
 		return nil, err
 	}
-	for i, spec := range cluster.Spec.ComponentSpecs {
-		if spec.Name == compName {
-			return &cluster.Spec.ComponentSpecs[i], nil
-		}
+	compSpec, err := intctrlutil.GetOriginalOrGeneratedComponentSpecByName(ctx, cli, cluster, compName)
+	if err != nil {
+		return nil, err
+	}
+	if compSpec != nil {
+		return compSpec, nil
 	}
 	return apiconversion.HandleSimplifiedClusterAPI(clusterDef, cluster), nil
 }
@@ -249,4 +256,30 @@ func CheckAndGetClusterComponents(ctx context.Context, cli client.Client, cluste
 		components = append(components, v)
 	}
 	return components, nil
+}
+
+// ListClusterComponents lists the components of the cluster.
+func ListClusterComponents(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster) ([]appsv1alpha1.Component, error) {
+	compList := &appsv1alpha1.ComponentList{}
+	if err := cli.List(ctx, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels{constant.AppInstanceLabelKey: cluster.Name}); err != nil {
+		return nil, err
+	}
+	return compList.Items, nil
+}
+
+// GetClusterComponentShortNameSet gets the component short name set of the cluster.
+func GetClusterComponentShortNameSet(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster) (sets.Set[string], error) {
+	compList, err := ListClusterComponents(ctx, cli, cluster)
+	if err != nil {
+		return nil, err
+	}
+	compSet := sets.Set[string]{}
+	for _, comp := range compList {
+		compShortName, err := ShortName(cluster.Name, comp.Name)
+		if err != nil {
+			return nil, err
+		}
+		compSet.Insert(compShortName)
+	}
+	return compSet, nil
 }

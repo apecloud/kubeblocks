@@ -80,27 +80,18 @@ func GetComponentDefLabel(compDefName string) map[string]string {
 	}
 }
 
+// GetShardingNameLabel returns the shard template name label for component generated from shardSpec
+func GetShardingNameLabel(shardingName string) map[string]string {
+	return map[string]string{
+		KBAppShardingNameLabelKey: shardingName,
+	}
+}
+
 // GetClusterCompDefLabel returns the label for ClusterComponentDefinition (refer clusterDefinition.Spec.ComponentDefs[*].Name)
 // TODO:ClusterCompDef will be deprecated in the future
 func GetClusterCompDefLabel(clusterCompDefName string) map[string]string {
 	return map[string]string{
 		AppComponentLabelKey: clusterCompDefName,
-	}
-}
-
-// GetWorkloadTypeLabel returns the label for WorkloadType (refer clusterDefinition.Spec.ComponentDefs[*].WorkloadType)
-// TODO:workloadType will be deprecated in the future
-func GetWorkloadTypeLabel(workloadType string) map[string]string {
-	return map[string]string{
-		WorkloadTypeLabelKey: workloadType,
-	}
-}
-
-// GetClusterVersionLabel returns the label for ClusterVersion
-// TODO:clusterVersion will be deprecated in the future
-func GetClusterVersionLabel(clusterVersion string) map[string]string {
-	return map[string]string{
-		AppVersionLabelKey: clusterVersion,
 	}
 }
 

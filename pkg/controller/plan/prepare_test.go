@@ -129,7 +129,7 @@ var _ = Describe("Prepare Test", func() {
 			synthesizeComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp.PodSpec).ShouldNot(BeNil())
-			resCtx := &intctrlutil.ResourceCtx{
+			resCtx := &configuration.ResourceCtx{
 				Context:       testCtx.Ctx,
 				Client:        testCtx.Cli,
 				Namespace:     synthesizeComp.Namespace,

@@ -52,13 +52,13 @@ func (t *clusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
-	allCompObjExist, err := checkAllCompObjExist(transCtx, transCtx.Cluster)
+	allCompsReady, err := checkAllCompsReady(transCtx, transCtx.Cluster)
 	if err != nil {
 		return err
 	}
 
-	// if all component objects exist and cluster is not updating, skip reconciling components
-	if !transCtx.OrigCluster.IsUpdating() && allCompObjExist {
+	// if all component objects ready and cluster is not updating, skip reconciling components
+	if !transCtx.OrigCluster.IsUpdating() && allCompsReady {
 		return nil
 	}
 
@@ -69,29 +69,31 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 	cluster := transCtx.Cluster
 
 	protoCompSpecMap := make(map[string]*appsv1alpha1.ClusterComponentSpec)
-	for _, spec := range transCtx.ComponentSpecs {
-		protoCompSpecMap[spec.Name] = spec
+	for _, compSpec := range transCtx.ComponentSpecs {
+		protoCompSpecMap[compSpec.Name] = compSpec
 	}
 
 	protoCompSet := sets.KeySet(protoCompSpecMap)
-	// TODO(refactor): should review that whether it is reasonable to use component status
-	clusterStatusCompSet := sets.KeySet(cluster.Status.Components)
+	runningCompSet, err := component.GetClusterComponentShortNameSet(transCtx.Context, transCtx.Client, cluster)
+	if err != nil {
+		return err
+	}
 
-	createCompSet := protoCompSet.Difference(clusterStatusCompSet)
-	updateCompSet := protoCompSet.Intersection(clusterStatusCompSet)
-	deleteCompSet := clusterStatusCompSet.Difference(protoCompSet)
+	createCompSet := protoCompSet.Difference(runningCompSet)
+	updateCompSet := protoCompSet.Intersection(runningCompSet)
+	deleteCompSet := runningCompSet.Difference(protoCompSet)
 	if len(deleteCompSet) > 0 {
 		return fmt.Errorf("cluster components cannot be removed at runtime: %s",
 			strings.Join(deleteCompSet.UnsortedList(), ","))
 	}
 
 	// component objects to be created
-	if err := t.handleCompsCreate(transCtx, dag, protoCompSpecMap, createCompSet); err != nil {
+	if err := t.handleCompsCreate(transCtx, dag, protoCompSpecMap, transCtx.Labels, createCompSet); err != nil {
 		return err
 	}
 
 	// component objects to be updated
-	if err := t.handleCompsUpdate(transCtx, dag, protoCompSpecMap, updateCompSet); err != nil {
+	if err := t.handleCompsUpdate(transCtx, dag, protoCompSpecMap, transCtx.Labels, updateCompSet); err != nil {
 		return err
 	}
 
@@ -99,11 +101,11 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 }
 
 func (t *clusterComponentTransformer) handleCompsCreate(transCtx *clusterTransformContext, dag *graph.DAG,
-	protoCompSpecMap map[string]*appsv1alpha1.ClusterComponentSpec, createCompSet sets.Set[string]) error {
+	protoCompSpecMap map[string]*appsv1alpha1.ClusterComponentSpec, protoCompLabelsMap map[string]map[string]string, createCompSet sets.Set[string]) error {
 	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for compName := range createCompSet {
-		comp, err := component.BuildComponent(cluster, protoCompSpecMap[compName])
+		comp, err := component.BuildComponent(cluster, protoCompSpecMap[compName], protoCompLabelsMap[compName])
 		if err != nil {
 			return err
 		}
@@ -121,7 +123,7 @@ func (t *clusterComponentTransformer) initClusterCompStatus(cluster *appsv1alpha
 }
 
 func (t *clusterComponentTransformer) handleCompsUpdate(transCtx *clusterTransformContext, dag *graph.DAG,
-	protoCompSpecMap map[string]*appsv1alpha1.ClusterComponentSpec, updateCompSet sets.Set[string]) error {
+	protoCompSpecMap map[string]*appsv1alpha1.ClusterComponentSpec, protoCompLabelsMap map[string]map[string]string, updateCompSet sets.Set[string]) error {
 	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for compName := range updateCompSet {
@@ -129,7 +131,7 @@ func (t *clusterComponentTransformer) handleCompsUpdate(transCtx *clusterTransfo
 		if getErr != nil && !apierrors.IsNotFound(getErr) {
 			return getErr
 		}
-		comp, buildErr := component.BuildComponent(cluster, protoCompSpecMap[compName])
+		comp, buildErr := component.BuildComponent(cluster, protoCompSpecMap[compName], protoCompLabelsMap[compName])
 		if buildErr != nil {
 			return buildErr
 		}
@@ -145,13 +147,13 @@ func (t *clusterComponentTransformer) handleCompsUpdate(transCtx *clusterTransfo
 	return nil
 }
 
-func checkAllCompObjExist(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) (bool, error) {
+func checkAllCompsReady(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) (bool, error) {
 	compList := &appsv1alpha1.ComponentList{}
 	labels := constant.GetClusterWellKnownLabels(cluster.Name)
 	if err := transCtx.Client.List(transCtx.Context, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
 		return false, err
 	}
-	if len(compList.Items) != len(cluster.Spec.ComponentSpecs) {
+	if len(compList.Items) != len(transCtx.ComponentSpecs) {
 		return false, nil
 	}
 	return true, nil
@@ -178,8 +180,8 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	compProto := newCompObj
 
 	// merge labels and annotations
-	ictrlutil.MergeMetadataMap(compObjCopy.Annotations, &compProto.Annotations)
-	ictrlutil.MergeMetadataMap(compObjCopy.Labels, &compProto.Labels)
+	ictrlutil.MergeMetadataMapInplace(compObjCopy.Annotations, &compProto.Annotations)
+	ictrlutil.MergeMetadataMapInplace(compObjCopy.Labels, &compProto.Labels)
 	compObjCopy.Annotations = compProto.Annotations
 	compObjCopy.Labels = compProto.Labels
 

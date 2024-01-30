@@ -33,7 +33,6 @@ import (
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
@@ -51,7 +50,7 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 	var k8sMockClient *testutil.K8sClientMockHelper
 
 	createConfigReconcileTask := func() *configOperator {
-		task := NewConfigReconcileTask(&intctrlutil.ResourceCtx{
+		task := NewConfigReconcileTask(&ResourceCtx{
 			Client:        k8sMockClient.Client(),
 			Context:       ctx,
 			Namespace:     testCtx.DefaultNamespace,

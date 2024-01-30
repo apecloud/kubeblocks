@@ -601,10 +601,18 @@ type StatefulSetWorkload interface {
 	GetUpdateStrategy() UpdateStrategy
 }
 
+// ClusterService defines the service of a cluster.
 type ClusterService struct {
 	Service `json:",inline"`
 
+	// ShardingSelector extends the ServiceSpec.Selector by allowing you to specify a sharding name
+	// defined in Cluster.Spec.ShardingSpecs[x].Name as selectors for the service.
+	// ShardingSelector and ComponentSelector cannot be set at the same time.
+	// +optional
+	ShardingSelector string `json:"shardingSelector,omitempty"`
+
 	// ComponentSelector extends the ServiceSpec.Selector by allowing you to specify a component as selectors for the service.
+	// ComponentSelector and ShardingSelector cannot be set at the same time.
 	// +optional
 	ComponentSelector string `json:"componentSelector,omitempty"`
 }

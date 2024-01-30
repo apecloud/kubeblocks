@@ -121,3 +121,13 @@ func GeneratePodFQDN(namespace, clusterName, compName string, ordinal int) strin
 func GenerateVirtualComponentDefinition(compDefSuffix string) string {
 	return fmt.Sprintf("%s-%s", KBGeneratedVirtualCompDefPrefix, compDefSuffix)
 }
+
+// GenerateShardingNamePrefix generates sharding name prefix.
+func GenerateShardingNamePrefix(shardingName string) string {
+	return fmt.Sprintf("%s-", shardingName)
+}
+
+// GenerateShardingNameSvcPrefix generates sharding service name prefix.
+func GenerateShardingNameSvcPrefix(shardingSvcName string) string {
+	return fmt.Sprintf("%s-", shardingSvcName)
+}

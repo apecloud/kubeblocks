@@ -68,6 +68,7 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synthesi
 		labels = constant.GetKBWellKnownLabels(clusterDefName, clusterName, compName)
 		compDefLabel = constant.GetClusterCompDefLabel(clusterCompDefName)
 	}
+	mergeLabels := intctrlutil.MergeMetadataMaps(labels, compDefLabel, synthesizedComp.Labels)
 
 	// TODO(xingran): Need to review how to set pod labels based on the new ComponentDefinition API. workloadType label has been removed.
 	podBuilder := builder.NewPodBuilder("", "").
@@ -83,8 +84,7 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synthesi
 	rsmBuilder := builder.NewReplicatedStateMachineBuilder(namespace, rsmName).
 		AddAnnotations(constant.KubeBlocksGenerationKey, synthesizedComp.ClusterGeneration).
 		AddAnnotationsInMap(getMonitorAnnotations(synthesizedComp)).
-		AddLabelsInMap(labels).
-		AddLabelsInMap(compDefLabel).
+		AddLabelsInMap(mergeLabels).
 		AddMatchLabelsInMap(labels).
 		SetServiceName(constant.GenerateRSMServiceNamePattern(rsmName)).
 		SetReplicas(synthesizedComp.Replicas).

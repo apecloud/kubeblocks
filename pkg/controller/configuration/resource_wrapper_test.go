@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package controllerutil
+package configuration
 
 import (
 	"context"
@@ -34,18 +34,17 @@ import (
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
-const (
-	clusterDefName     = "test-clusterdef"
-	clusterVersionName = "test-clusterversion"
-	clusterName        = "test-cluster"
-
-	mysqlCompDefName = "replicasets"
-	mysqlCompName    = "mysql"
-	mysqlConfigName  = "mysql-config-template"
-	mysqlVolumeName  = "mysql-config"
-)
-
 var _ = Describe("resource Fetcher", func() {
+	const (
+		clusterDefName     = "test-clusterdef"
+		clusterVersionName = "test-clusterversion"
+		clusterName        = "test-cluster"
+
+		mysqlCompDefName = "replicasets"
+		mysqlCompName    = "mysql"
+		mysqlConfigName  = "mysql-config-template"
+		mysqlVolumeName  = "mysql-config"
+	)
 
 	var (
 		k8sMockClient  *testutil.K8sClientMockHelper

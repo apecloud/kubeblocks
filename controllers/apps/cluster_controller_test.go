@@ -60,6 +60,7 @@ var _ = Describe("Cluster Controller", func() {
 		consensusCompDefName   = "consensus"
 		replicationCompName    = "replication"
 		replicationCompDefName = "replication"
+		defaultShardCount      = 2
 	)
 
 	var (
@@ -190,6 +191,21 @@ var _ = Describe("Cluster Controller", func() {
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 	}
 
+	createClusterObjWithShardNoWait := func(compTplName, compDefName string, v2 bool, processor func(*testapps.MockClusterFactory)) {
+		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
+			WithRandomName()
+		if !v2 {
+			factory.AddShardingSpec(compTplName, compDefName).SetShards(defaultShardCount)
+		} else {
+			factory.AddShardingSpecV2(compTplName, compDefName).SetShards(defaultShardCount)
+		}
+		if processor != nil {
+			processor(factory)
+		}
+		clusterObj = factory.Create(&testCtx).GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+	}
+
 	createClusterObj := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster")
 		createClusterObjNoWait(compName, compDefName, false, processor)
@@ -204,6 +220,23 @@ var _ = Describe("Cluster Controller", func() {
 			Name:      constant.GenerateClusterComponentName(clusterObj.Name, compName),
 		}
 		Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
+	}
+
+	createClusterObjWithShard := func(compTplName, compDefName string, processor func(*testapps.MockClusterFactory)) {
+		By("Creating a cluster")
+		createClusterObjWithShardNoWait(compTplName, compDefName, false, processor)
+
+		By("Waiting for the cluster enter Creating phase")
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
+
+		By("Wait component created")
+		ml := client.MatchingLabels{
+			constant.AppInstanceLabelKey:       clusterKey.Name,
+			constant.KBAppShardingNameLabelKey: compTplName,
+		}
+		Eventually(testapps.List(&testCtx, generics.ComponentSignature,
+			ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(defaultShardCount))
 	}
 
 	// createClusterObjV2 creates cluster objects with new component definition API enabled.
@@ -223,6 +256,23 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
 	}
 
+	createClusterObjWithShardV2 := func(compTplName, compDefName string, processor func(*testapps.MockClusterFactory)) {
+		By("Creating a cluster with new component definition")
+		createClusterObjWithShardNoWait(compTplName, compDefName, true, processor)
+
+		By("Waiting for the cluster enter Creating phase")
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
+
+		By("Wait component created")
+		ml := client.MatchingLabels{
+			constant.AppInstanceLabelKey:       clusterKey.Name,
+			constant.KBAppShardingNameLabelKey: compTplName,
+		}
+		Eventually(testapps.List(&testCtx, generics.ComponentSignature,
+			ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(defaultShardCount))
+	}
+
 	testClusterWithoutClusterVersion := func(compName, compDefName string) {
 		By("creating a cluster w/o cluster version")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, "").
@@ -239,25 +289,37 @@ var _ = Describe("Cluster Controller", func() {
 		waitForCreatingResourceCompletely(clusterKey, statelessCompName, statefulCompName, consensusCompName, replicationCompName)
 	}
 
-	testClusterComponent := func(compName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory))) {
+	testClusterComponent := func(compName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory)), shardCount *int) {
 		createObj(compName, compDefName, nil)
 
 		By("check component created")
-		compKey := types.NamespacedName{
-			Namespace: clusterObj.Namespace,
-			Name:      constant.GenerateClusterComponentName(clusterObj.Name, compName),
+		checkCompCreate := func(compName string) {
+			compKey := types.NamespacedName{
+				Namespace: clusterObj.Namespace,
+				Name:      constant.GenerateClusterComponentName(clusterObj.Name, compName),
+			}
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
+				g.Expect(comp.Generation).Should(BeEquivalentTo(1))
+				for k, v := range constant.GetComponentWellKnownLabels(clusterObj.Name, compName) {
+					g.Expect(comp.Labels).Should(HaveKeyWithValue(k, v))
+				}
+				if compDefName == compDefObj.Name {
+					g.Expect(comp.Spec.CompDef).Should(Equal(compDefName))
+				} else {
+					g.Expect(comp.Spec.CompDef).Should(BeEmpty())
+				}
+			})).Should(Succeed())
 		}
-		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
-			g.Expect(comp.Generation).Should(BeEquivalentTo(1))
-			for k, v := range constant.GetComponentWellKnownLabels(clusterObj.Name, compName) {
-				g.Expect(comp.Labels).Should(HaveKeyWithValue(k, v))
+		if shardCount == nil {
+			checkCompCreate(compName)
+		} else {
+			ml := client.MatchingLabels{
+				constant.AppInstanceLabelKey:       clusterKey.Name,
+				constant.KBAppShardingNameLabelKey: compName,
 			}
-			if compDefName == compDefObj.Name {
-				g.Expect(comp.Spec.CompDef).Should(Equal(compDefName))
-			} else {
-				g.Expect(comp.Spec.CompDef).Should(BeEmpty())
-			}
-		})).Should(Succeed())
+			Eventually(testapps.List(&testCtx, generics.ComponentSignature,
+				ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(*shardCount))
+		}
 	}
 
 	testClusterService := func(compName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory))) {
@@ -432,9 +494,9 @@ var _ = Describe("Cluster Controller", func() {
 		svcType   corev1.ServiceType
 	}
 
-	validateClusterServiceList := func(g Gomega, expectServices map[string]expectService, compName string) {
+	validateClusterServiceList := func(g Gomega, expectServices map[string]expectService, compName string, shardCount *int, enableShardOrdinal bool) {
 		svcList := &corev1.ServiceList{}
-		g.Expect(k8sClient.List(testCtx.Ctx, svcList, client.MatchingLabels{
+		g.Expect(testCtx.Cli.List(testCtx.Ctx, svcList, client.MatchingLabels{
 			constant.AppInstanceLabelKey: clusterKey.Name,
 		}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
 
@@ -447,14 +509,8 @@ var _ = Describe("Cluster Controller", func() {
 			services = append(services, &svcList.Items[i])
 		}
 
-		for svcName, svcSpec := range expectServices {
-			idx := slices.IndexFunc(services, func(e *corev1.Service) bool {
-				return e.Name == constant.GenerateClusterServiceName(clusterObj.Name, svcName)
-			})
-			g.Expect(idx >= 0).To(BeTrue())
-			svc := services[idx]
+		validateSvc := func(svc *corev1.Service, svcSpec expectService) {
 			g.Expect(svc.Spec.Type).Should(Equal(svcSpec.svcType))
-			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.KBAppComponentLabelKey, compName))
 			// g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.RoleLabelKey, "leader"))
 			switch {
 			case svc.Spec.Type == corev1.ServiceTypeLoadBalancer:
@@ -468,7 +524,34 @@ var _ = Describe("Cluster Controller", func() {
 				// }
 			}
 		}
-		g.Expect(len(expectServices)).Should(Equal(len(services)))
+
+		if shardCount == nil {
+			for svcName, svcSpec := range expectServices {
+				idx := slices.IndexFunc(services, func(e *corev1.Service) bool {
+					return e.Name == constant.GenerateClusterServiceName(clusterObj.Name, svcName)
+				})
+				g.Expect(idx >= 0).To(BeTrue())
+				svc := services[idx]
+				g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.KBAppComponentLabelKey, compName))
+				validateSvc(svc, svcSpec)
+			}
+			g.Expect(len(expectServices)).Should(Equal(len(services)))
+		} else {
+			if enableShardOrdinal {
+				g.Expect(len(expectServices) * *shardCount).Should(Equal(len(services)))
+			} else {
+				for svcName, svcSpec := range expectServices {
+					idx := slices.IndexFunc(services, func(e *corev1.Service) bool {
+						return e.Name == constant.GenerateClusterServiceName(clusterObj.Name, svcName)
+					})
+					g.Expect(idx >= 0).To(BeTrue())
+					svc := services[idx]
+					g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.KBAppShardingNameLabelKey, compName))
+					validateSvc(svc, svcSpec)
+				}
+				g.Expect(len(expectServices)).Should(Equal(len(services)))
+			}
+		}
 	}
 
 	testClusterServiceCreateAndDelete := func(compName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory))) {
@@ -518,7 +601,7 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(testCtx.CheckedCreateObj(testCtx.Ctx, svcObj)).Should(Succeed())
 
 		By("check all services created")
-		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compName) }).Should(Succeed())
+		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compName, nil, false) }).Should(Succeed())
 
 		By("delete a cluster service")
 		delete(expectServices, deleteService.Name)
@@ -533,14 +616,79 @@ var _ = Describe("Cluster Controller", func() {
 		})()).ShouldNot(HaveOccurred())
 
 		By("check the service has been deleted, and the non-managed service has not been deleted")
-		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compName) }).Should(Succeed())
+		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compName, nil, false) }).Should(Succeed())
 
 		By("add the deleted service back")
 		expectServices[deleteService.Name] = expectService{deleteService.Spec.ClusterIP, deleteService.Spec.Type}
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 			cluster.Spec.Services = append(cluster.Spec.Services, deleteService)
 		})()).ShouldNot(HaveOccurred())
-		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compName) }).Should(Succeed())
+		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compName, nil, false) }).Should(Succeed())
+	}
+
+	testClusterShardServiceCreateAndDelete := func(compTplName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory))) {
+		expectServices := map[string]expectService{
+			testapps.ServiceDefaultName:  {"", corev1.ServiceTypeClusterIP},
+			testapps.ServiceHeadlessName: {corev1.ClusterIPNone, corev1.ServiceTypeClusterIP},
+		}
+
+		services := make([]appsv1alpha1.ClusterService, 0)
+		for name, svc := range expectServices {
+			services = append(services, appsv1alpha1.ClusterService{
+				Service: appsv1alpha1.Service{
+					Name:        name,
+					ServiceName: name,
+					Spec: corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{
+							{Port: 3306},
+						},
+						Type:      svc.svcType,
+						ClusterIP: svc.clusterIP,
+					},
+				},
+				ShardingSelector: compTplName,
+			})
+		}
+		createObj(compTplName, compDefName, func(f *testapps.MockClusterFactory) {
+			f.AddService(services[0]).AddService(services[1])
+		})
+
+		shards := defaultShardCount
+		deleteService := services[0]
+
+		By("check only one service created for each shard when ShardSvcAnnotationKey is not set")
+		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compTplName, &shards, false) }).Should(Succeed())
+
+		By("check shards number services were created for each shard when ShardSvcAnnotationKey is set")
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+			if cluster.Annotations == nil {
+				cluster.Annotations = map[string]string{}
+			}
+			cluster.Annotations[constant.ShardSvcAnnotationKey] = compTplName
+		})()).ShouldNot(HaveOccurred())
+		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compTplName, &shards, true) }).Should(Succeed())
+
+		By("delete a cluster shard service")
+		delete(expectServices, deleteService.Name)
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+			var svcs []appsv1alpha1.ClusterService
+			for _, item := range cluster.Spec.Services {
+				if item.Name != deleteService.Name {
+					svcs = append(svcs, item)
+				}
+			}
+			cluster.Spec.Services = svcs
+		})()).ShouldNot(HaveOccurred())
+
+		By("check the service has been deleted, and the non-managed service has not been deleted")
+		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compTplName, &shards, true) }).Should(Succeed())
+
+		By("add the deleted service back")
+		expectServices[deleteService.Name] = expectService{deleteService.Spec.ClusterIP, deleteService.Spec.Type}
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+			cluster.Spec.Services = append(cluster.Spec.Services, deleteService)
+		})()).ShouldNot(HaveOccurred())
+		Eventually(func(g Gomega) { validateClusterServiceList(g, expectServices, compTplName, &shards, true) }).Should(Succeed())
 	}
 
 	testClusterFinalizer := func(compName string, createObj func(appsv1alpha1.TerminationPolicyType)) {
@@ -738,15 +886,24 @@ var _ = Describe("Cluster Controller", func() {
 			testClusterWithoutClusterVersion(consensusCompName, consensusCompDefName)
 		})
 
+		shards := defaultShardCount
 		for compDefName, createObj := range map[string]func(string, string, func(*testapps.MockClusterFactory)){
 			consensusCompDefName: createClusterObj, // TODO(component): how to add v2 here?
 		} {
 			It("create cluster with component object", func() {
-				testClusterComponent(consensusCompName, compDefName, createObj)
+				testClusterComponent(consensusCompName, compDefName, createObj, nil)
 			})
 
 			It("create cluster with new component object", func() {
-				testClusterComponent(consensusCompName, compDefObj.Name, createClusterObjV2)
+				testClusterComponent(consensusCompName, compDefObj.Name, createClusterObjV2, nil)
+			})
+
+			It("create shardingSpec cluster with component template object", func() {
+				testClusterComponent(consensusCompName, compDefName, createClusterObjWithShard, &shards)
+			})
+
+			It("create shardingSpec cluster with new component template object", func() {
+				testClusterComponent(consensusCompName, compDefObj.Name, createClusterObjWithShardV2, &shards)
 			})
 
 			It("with cluster service set", func() {
@@ -764,6 +921,10 @@ var _ = Describe("Cluster Controller", func() {
 			// TODO(component): move this case out of the context
 			It("should create and delete cluster service correctly", func() {
 				testClusterServiceCreateAndDelete(consensusCompName, compDefName, createObj)
+			})
+
+			It("should create and delete shard topology cluster service correctly", func() {
+				testClusterShardServiceCreateAndDelete(consensusCompName, compDefName, createClusterObjWithShard)
 			})
 		}
 	})

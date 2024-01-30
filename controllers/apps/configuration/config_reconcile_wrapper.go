@@ -27,15 +27,15 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
 type configSpecList []appsv1alpha1.ComponentConfigSpec
 
 type configReconcileContext struct {
-	intctrlutil.ResourceFetcher[configReconcileContext]
+	configctrl.ResourceFetcher[configReconcileContext]
 
 	Name           string
 	MatchingLabels client.MatchingLabels
@@ -50,7 +50,7 @@ type configReconcileContext struct {
 	ConfigConstraint *appsv1alpha1.ConfigConstraint
 }
 
-func newConfigReconcileContext(resourceCtx *intctrlutil.ResourceCtx,
+func newConfigReconcileContext(resourceCtx *configctrl.ResourceCtx,
 	cm *corev1.ConfigMap,
 	cc *appsv1alpha1.ConfigConstraint,
 	configSpecName string,

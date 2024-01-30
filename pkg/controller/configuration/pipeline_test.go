@@ -36,7 +36,6 @@ import (
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
@@ -135,7 +134,7 @@ max_connections = '1000'
 
 			By("create configuration resource")
 			createPipeline := NewCreatePipeline(ReconcileCtx{
-				ResourceCtx: &intctrlutil.ResourceCtx{
+				ResourceCtx: &ResourceCtx{
 					Client:        k8sMockClient.Client(),
 					Context:       ctx,
 					Namespace:     testCtx.DefaultNamespace,

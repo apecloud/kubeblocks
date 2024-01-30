@@ -63,7 +63,7 @@ func (t *componentLoadResourcesTransformer) Transform(ctx graph.TransformContext
 	transCtx.Cluster = cluster
 
 	generated := false
-	generated, err = isGeneratedComponent(cluster, comp)
+	generated, err = isGeneratedComponent(cluster)
 	if err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
@@ -254,7 +254,7 @@ type appNameVersionImage struct {
 	err     error
 }
 
-func isGeneratedComponent(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) (bool, error) {
+func isGeneratedComponent(cluster *appsv1alpha1.Cluster) (bool, error) {
 	if withClusterTopology(cluster) {
 		return false, nil
 	}

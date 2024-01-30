@@ -97,6 +97,7 @@ const (
 	ClusterAccountLabelKey                   = "account.kubeblocks.io/name"
 	KBAppClusterUIDLabelKey                  = "apps.kubeblocks.io/cluster-uid"
 	KBAppComponentLabelKey                   = "apps.kubeblocks.io/component-name"
+	KBAppShardingNameLabelKey                = "apps.kubeblocks.io/sharding-name"
 	KBAppComponentDefRefLabelKey             = "apps.kubeblocks.io/component-def-ref" // refer clusterDefinition.Spec.ComponentDefs[*].Name before KubeBlocks Version 0.8.0 or refer ComponentDefinition.Name after KubeBlocks Version 0.8.0
 	KBAppClusterDefTypeLabelKey              = "apps.kubeblocks.io/cluster-type"      // refer clusterDefinition.Spec.Type (deprecated)
 	KBManagedByKey                           = "apps.kubeblocks.io/managed-by"        // KBManagedByKey marks resources that auto created
@@ -165,8 +166,12 @@ const (
 	// PodOrdinalSvcAnnotationKey defines the feature gate of PodOrdinal Service defined in ComponentDefinition.Spec.Services.
 	// Components defined in the annotation value, their all Services defined in the ComponentDefinition with the GeneratePodOrdinalService attribute set to true will be created; otherwise, they will be ignored.
 	// This can generate a corresponding Service for each Pod, which can be used in certain specific scenarios: for example, creating a dedicated access service for each read-only Pod.
-	// Multiple components are separated by ','. for example: "kubeblocks.io/enabled-node-port-svc: comp1,comp2"
+	// Multiple components are separated by ','. for example: "kubeblocks.io/enabled-pod-ordinal-svc: comp1,comp2"
 	PodOrdinalSvcAnnotationKey = "kubeblocks.io/enabled-pod-ordinal-svc"
+	// ShardSvcAnnotationKey defines the feature gate of creating service for each shard.
+	// Sharding name defined in the annotation value, a set of Service defined in Cluster.Spec.Services with the ShardingSelector will be automatically generated for each shard when Cluster.Spec.ShardingSpecs[x].shards is not nil.
+	// Multiple sharding names are separated by ','. for example: "kubeblocks.io/enabled-shard-svc: proxy-shard,db-shard"
+	ShardSvcAnnotationKey = "kubeblocks.io/enabled-shard-svc"
 
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName             = "cluster.kubeblocks.io/finalizer"

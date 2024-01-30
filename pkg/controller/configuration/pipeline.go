@@ -36,7 +36,7 @@ import (
 )
 
 type ReconcileCtx struct {
-	*intctrlutil.ResourceCtx
+	*ResourceCtx
 
 	Cluster   *appsv1alpha1.Cluster
 	Component *component.SynthesizedComponent
@@ -50,7 +50,7 @@ type pipeline struct {
 	renderWrapper renderWrapper
 
 	ctx ReconcileCtx
-	intctrlutil.ResourceFetcher[pipeline]
+	ResourceFetcher[pipeline]
 }
 
 type updatePipeline struct {
@@ -66,7 +66,7 @@ type updatePipeline struct {
 	configPatch *core.ConfigPatchInfo
 
 	ctx ReconcileCtx
-	intctrlutil.ResourceFetcher[updatePipeline]
+	ResourceFetcher[updatePipeline]
 }
 
 func NewCreatePipeline(ctx ReconcileCtx) *pipeline {

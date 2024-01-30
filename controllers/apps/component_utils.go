@@ -102,12 +102,6 @@ func parseCustomLabelPattern(pattern string) (schema.GroupVersionKind, error) {
 	return schema.GroupVersionKind{}, fmt.Errorf("invalid pattern %s", pattern)
 }
 
-// replaceKBEnvPlaceholderTokens replaces the placeholder tokens in the string strToReplace with builtInEnvMap and return new string.
-func replaceKBEnvPlaceholderTokens(clusterName, uid, componentName, strToReplace string) string {
-	builtInEnvMap := intctrlcomp.GetReplacementMapForBuiltInEnv(clusterName, uid, componentName)
-	return intctrlcomp.ReplaceNamedVars(builtInEnvMap, strToReplace, -1, true)
-}
-
 // DelayUpdatePodSpecSystemFields to delay the updating to system fields in pod spec.
 func DelayUpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	for i := range pobj.Containers {
@@ -252,25 +246,22 @@ func UpdateCustomLabelToPods(ctx context.Context,
 			})
 			// pod already in dag, merge labels
 			if idx >= 0 {
-				updateObjLabel(cluster.Name, string(cluster.UID), component.Name, labelKey, labelValue, pods[idx])
+				updateObjLabel(labelKey, labelValue, pods[idx])
 				continue
 			}
 			pod := &podList.Items[i]
-			updateObjLabel(cluster.Name, string(cluster.UID), component.Name, labelKey, labelValue, pod)
+			updateObjLabel(labelKey, labelValue, pod)
 			graphCli.Do(dag, nil, pod, model.ActionUpdatePtr(), nil)
 		}
 	}
 	return nil
 }
 
-func updateObjLabel(clusterName, uid, componentName, labelKey, labelValue string, obj client.Object) {
-	key := replaceKBEnvPlaceholderTokens(clusterName, uid, componentName, labelKey)
-	value := replaceKBEnvPlaceholderTokens(clusterName, uid, componentName, labelValue)
-
+func updateObjLabel(labelKey, labelValue string, obj client.Object) {
 	labels := obj.GetLabels()
 	if labels == nil {
 		labels = make(map[string]string, 0)
 	}
-	labels[key] = value
+	labels[labelKey] = labelValue
 	obj.SetLabels(labels)
 }

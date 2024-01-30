@@ -59,7 +59,7 @@ func BuildSynthesizedComponent4Generated(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, nil, err
 	}
-	clusterCompSpec, err := getClusterCompSpec4Component(clusterDef, cluster, comp)
+	clusterCompSpec, err := getClusterCompSpec4Component(reqCtx.Ctx, cli, clusterDef, cluster, comp)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -107,7 +107,7 @@ func BuildSynthesizedComponentWrapper4Test(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	comp, err := BuildComponent(cluster, clusterCompSpec)
+	comp, err := BuildComponent(cluster, clusterCompSpec, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +155,6 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		LogConfigs:         compDefObj.Spec.LogConfigs,
 		ConfigTemplates:    compDefObj.Spec.Configs,
 		ScriptTemplates:    compDefObj.Spec.Scripts,
-		Labels:             compDefObj.Spec.Labels,
 		Roles:              compDefObj.Spec.Roles,
 		UpdateStrategy:     compDefObj.Spec.UpdateStrategy,
 		MinReadySeconds:    compDefObj.Spec.MinReadySeconds,
@@ -192,6 +191,9 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		reqCtx.Log.Error(err, "build and update resources failed.")
 		return nil, err
 	}
+
+	// build labels
+	buildLabels(compDef, comp, synthesizeComp)
 
 	// build volumeClaimTemplates
 	buildVolumeClaimTemplates(synthesizeComp, comp)
@@ -254,6 +256,32 @@ func buildComp2CompDefs(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1al
 		}
 	}
 	return mapping
+}
+
+// buildLabels builds labels for synthesizedComponent.
+func buildLabels(compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component, synthesizeComp *SynthesizedComponent) {
+	replaceKBEnvPlaceholderTokens := func(clusterName, uid, componentName, strToReplace string) string {
+		builtInEnvMap := GetReplacementMapForBuiltInEnv(clusterName, uid, componentName)
+		return ReplaceNamedVars(builtInEnvMap, strToReplace, -1, true)
+	}
+
+	labels := make(map[string]string)
+	if compDef.Labels == nil && comp.Labels == nil {
+		return
+	}
+
+	for k, v := range compDef.Spec.Labels {
+		resolveKey := replaceKBEnvPlaceholderTokens(synthesizeComp.ClusterName, synthesizeComp.ClusterUID, synthesizeComp.Name, k)
+		resolveValue := replaceKBEnvPlaceholderTokens(synthesizeComp.ClusterName, synthesizeComp.ClusterUID, synthesizeComp.Name, v)
+		labels[resolveKey] = resolveValue
+	}
+
+	// override labels from component
+	for k, v := range comp.Labels {
+		labels[k] = v
+	}
+
+	synthesizeComp.Labels = labels
 }
 
 // buildAffinitiesAndTolerations builds affinities and tolerations for component.

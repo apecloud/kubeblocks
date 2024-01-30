@@ -50,12 +50,40 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	}
 
 	// build all component specs
+	transCtx.ComponentSpecs = make([]*appsv1alpha1.ClusterComponentSpec, 0)
+	transCtx.ShardingComponentSpecs = make(map[string][]*appsv1alpha1.ClusterComponentSpec, 0)
+	transCtx.Labels = make(map[string]map[string]string, 0)
+
 	cluster := transCtx.Cluster
 	transCtx.ComponentSpecs = t.buildCompSpecs(transCtx, cluster)
 
 	// resolve all component definitions referenced
 	return t.resolveCompDefinitions(transCtx, cluster)
 }
+
+// func shardingComps() {
+//	for i := range cluster.Spec.ComponentSpecs {
+//		clusterComSpec := cluster.Spec.ComponentSpecs[i]
+//		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, &clusterComSpec)
+//	}
+//	for i := range cluster.Spec.ShardingSpecs {
+//		shardingSpec := cluster.Spec.ShardingSpecs[i]
+//		genShardingCompSpecList, err := controllerutil.GenShardingCompSpecList(transCtx.Context, transCtx.Client, cluster, &shardingSpec)
+//		if err != nil {
+//			return err
+//		}
+//		transCtx.ShardingComponentSpecs[shardingSpec.Name] = genShardingCompSpecList
+//		for j := range genShardingCompSpecList {
+//			genShardCompSpec := genShardingCompSpecList[j]
+//			transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, genShardCompSpec)
+//			transCtx.Labels[genShardCompSpec.Name] = constant.GetShardingNameLabel(shardingSpec.Name)
+//		}
+//	}
+//
+//	if compSpec := apiconversion.HandleSimplifiedClusterAPI(transCtx.ClusterDef, cluster); compSpec != nil {
+//		transCtx.ComponentSpecs = append(transCtx.ComponentSpecs, compSpec)
+//	}
+// }
 
 func (t *ClusterAPINormalizationTransformer) buildCompSpecs(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) []*appsv1alpha1.ClusterComponentSpec {
 	if withClusterTopology(cluster) {

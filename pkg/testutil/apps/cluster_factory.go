@@ -63,6 +63,34 @@ func (factory *MockClusterFactory) AddClusterToleration(toleration corev1.Tolera
 	return factory
 }
 
+func (factory *MockClusterFactory) AddShardingSpec(shardingName string, compDefName string) *MockClusterFactory {
+	shardingSpec := appsv1alpha1.ShardingSpec{
+		Template: appsv1alpha1.ClusterComponentSpec{
+			Name:            "fake",
+			ComponentDefRef: compDefName,
+			Replicas:        1,
+		},
+		Name:   shardingName,
+		Shards: 1,
+	}
+	factory.Get().Spec.ShardingSpecs = append(factory.Get().Spec.ShardingSpecs, shardingSpec)
+	return factory
+}
+
+func (factory *MockClusterFactory) AddShardingSpecV2(shardingName string, compDefName string) *MockClusterFactory {
+	shardingSpec := appsv1alpha1.ShardingSpec{
+		Template: appsv1alpha1.ClusterComponentSpec{
+			Name:         "fake",
+			ComponentDef: compDefName,
+			Replicas:     1,
+		},
+		Name:   shardingName,
+		Shards: 1,
+	}
+	factory.Get().Spec.ShardingSpecs = append(factory.Get().Spec.ShardingSpecs, shardingSpec)
+	return factory
+}
+
 func (factory *MockClusterFactory) AddComponent(compName string, compDefName string) *MockClusterFactory {
 	comp := appsv1alpha1.ClusterComponentSpec{
 		Name:            compName,
@@ -93,6 +121,8 @@ func (factory *MockClusterFactory) AddService(service appsv1alpha1.ClusterServic
 
 type updateFn func(comp *appsv1alpha1.ClusterComponentSpec)
 
+type shardingUpdateFn func(shardingSpec *appsv1alpha1.ShardingSpec)
+
 func (factory *MockClusterFactory) lastComponentRef(update updateFn) *MockClusterFactory {
 	comps := factory.Get().Spec.ComponentSpecs
 	if len(comps) > 0 {
@@ -100,6 +130,21 @@ func (factory *MockClusterFactory) lastComponentRef(update updateFn) *MockCluste
 	}
 	factory.Get().Spec.ComponentSpecs = comps
 	return factory
+}
+
+func (factory *MockClusterFactory) lastShardingSpec(update shardingUpdateFn) *MockClusterFactory {
+	shardingSpecs := factory.Get().Spec.ShardingSpecs
+	if len(shardingSpecs) > 0 {
+		update(&shardingSpecs[len(shardingSpecs)-1])
+	}
+	factory.Get().Spec.ShardingSpecs = shardingSpecs
+	return factory
+}
+
+func (factory *MockClusterFactory) SetShards(shards int32) *MockClusterFactory {
+	return factory.lastShardingSpec(func(shardingSpec *appsv1alpha1.ShardingSpec) {
+		shardingSpec.Shards = shards
+	})
 }
 
 func (factory *MockClusterFactory) SetCompDef(compDef string) *MockClusterFactory {

@@ -23,6 +23,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -308,6 +309,22 @@ func (mgr *Manager) GetDBState(ctx context.Context, cluster *dcs.Cluster) *dcs.D
 	return dbState
 }
 
+func (mgr *Manager) GetSecondsBehindMaster(ctx context.Context) (int, error) {
+	slaveStatus, err := mgr.GetSlaveStatus(ctx, mgr.DB)
+	if err != nil {
+		mgr.Logger.Info("show slave status failed", "error", err)
+		return 0, err
+	}
+	if len(slaveStatus) == 0 {
+		return 0, nil
+	}
+	secondsBehindMaster := slaveStatus.GetString("Seconds_Behind_Master")
+	if secondsBehindMaster == "NULL" {
+		return 0, nil
+	}
+	return strconv.Atoi(secondsBehindMaster)
+}
+
 func (mgr *Manager) WriteCheck(ctx context.Context, db *sql.DB) bool {
 	writeSQL := fmt.Sprintf(`BEGIN;
 CREATE DATABASE IF NOT EXISTS kubeblocks;
@@ -422,6 +439,11 @@ func (mgr *Manager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string
 
 // IsClusterInitialized is a method to check if cluster is initialized or not
 func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
+	_, err := mgr.GetVersion(ctx)
+	if err != nil {
+		return false, err
+	}
+
 	if cluster != nil {
 		isValid, err := mgr.ValidateAddr(ctx, cluster)
 		if err != nil || !isValid {
@@ -429,26 +451,31 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 		}
 	}
 
-	err := mgr.EnableSemiSyncIfNeed(ctx)
-	if err != nil {
-		return false, err
-	}
+	// err = mgr.EnableSemiSyncIfNeed(ctx)
+	// if err != nil {
+	// 	return false, err
+	// }
 	return mgr.EnsureServerID(ctx)
+}
+
+func (mgr *Manager) GetVersion(ctx context.Context) (string, error) {
+	if mgr.version != "" {
+		return mgr.version, nil
+	}
+	err := mgr.DB.QueryRowContext(ctx, "select version()").Scan(&mgr.version)
+	if err != nil {
+		return "", errors.Wrap(err, "Get version failed")
+	}
+	return mgr.version, nil
 }
 
 func (mgr *Manager) ValidateAddr(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	// The maximum length of the server addr is 255 characters. Before MySQL 8.0.17 it was 60 characters.
-	var version string
-	err := mgr.DB.QueryRowContext(ctx, "select version()").Scan(&version)
-	if err != nil {
-		mgr.Logger.Info("Get version failed", "error", err)
-		return false, err
-	}
 	currentMemberName := mgr.GetCurrentMemberName()
 	member := cluster.GetMemberWithName(currentMemberName)
 	addr := cluster.GetMemberShortAddr(*member)
 	maxLength := 255
-	if IsBeforeVersion(version, "8.0.17") {
+	if IsBeforeVersion(mgr.version, "8.0.17") {
 		maxLength = 60
 	}
 
@@ -529,11 +556,29 @@ func (mgr *Manager) EnableSemiSyncIfNeed(ctx context.Context) error {
 }
 
 func (mgr *Manager) Promote(ctx context.Context, cluster *dcs.Cluster) error {
+	err := mgr.EnableSemiSyncSource(ctx)
+	if err != nil {
+		return err
+	}
+
+	err = mgr.DisableSemiSyncReplica(ctx)
+	if err != nil {
+		return err
+	}
+
 	if (mgr.globalState["super_read_only"] == "0" && mgr.globalState["read_only"] == "0") &&
 		(len(mgr.slaveStatus) == 0 || (mgr.slaveStatus.GetString("Slave_IO_Running") == "No" &&
 			mgr.slaveStatus.GetString("Slave_SQL_Running") == "No")) {
 		return nil
 	}
+
+	// wait relay log to play
+	secondsBehindMaster, err := mgr.GetSecondsBehindMaster(ctx)
+	for err != nil || secondsBehindMaster != 0 {
+		time.Sleep(time.Second)
+		secondsBehindMaster, err = mgr.GetSecondsBehindMaster(ctx)
+	}
+
 	stopReadOnly := `set global read_only=off;set global super_read_only=off;`
 	stopSlave := `stop slave;`
 	resp, err := mgr.DB.Exec(stopReadOnly + stopSlave)
@@ -573,6 +618,14 @@ func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 	if !mgr.isRecoveryConfOutdated(cluster.Leader.Name) {
 		return nil
 	}
+	err := mgr.EnableSemiSyncReplica(ctx)
+	if err != nil {
+		return err
+	}
+	err = mgr.DisableSemiSyncSource(ctx)
+	if err != nil {
+		return err
+	}
 
 	stopSlave := `stop slave;`
 	// MySQL 5.7 has a limitation where the length of the master_host cannot exceed 60 characters.
@@ -582,9 +635,14 @@ func (mgr *Manager) Follow(ctx context.Context, cluster *dcs.Cluster) error {
 	mgr.Logger.Info("follow new leader", "changemaster", changeMaster)
 	startSlave := `start slave;`
 
-	_, err := mgr.DB.Exec(stopSlave + changeMaster + startSlave)
+	_, err = mgr.DB.Exec(stopSlave + changeMaster + startSlave)
 	if err != nil {
 		mgr.Logger.Info("Follow master failed", "error", err.Error())
+		return err
+	}
+
+	err = mgr.SetSemiSyncSourceTimeout(ctx, cluster, leaderMember)
+	if err != nil {
 		return err
 	}
 

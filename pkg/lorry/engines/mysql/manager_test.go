@@ -28,6 +28,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/go-sql-driver/mysql"
+	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 
@@ -504,11 +505,10 @@ func TestManager_GetMasterStatus(t *testing.T) {
 func TestManager_IsClusterInitialized(t *testing.T) {
 	ctx := context.TODO()
 	manager, mock, _ := mockDatabase(t)
+	manager.version = "5.7.42"
 	manager.serverID = 1
 
 	t.Run("query server id failed", func(t *testing.T) {
-		mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
-			"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}))
 		mock.ExpectQuery("select @@global.server_id").
 			WillReturnError(fmt.Errorf("some error"))
 
@@ -519,8 +519,6 @@ func TestManager_IsClusterInitialized(t *testing.T) {
 	})
 
 	t.Run("server id equal to manager's server id", func(t *testing.T) {
-		mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
-			"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}))
 		mock.ExpectQuery("select @@global.server_id").
 			WillReturnRows(sqlmock.NewRows([]string{"@@global.server_id"}).AddRow(1))
 
@@ -530,8 +528,6 @@ func TestManager_IsClusterInitialized(t *testing.T) {
 	})
 
 	t.Run("set server id failed", func(t *testing.T) {
-		mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
-			"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}))
 		mock.ExpectQuery("select @@global.server_id").
 			WillReturnRows(sqlmock.NewRows([]string{"@@global.server_id"}).AddRow(2))
 		mock.ExpectExec("set global server_id").
@@ -544,8 +540,10 @@ func TestManager_IsClusterInitialized(t *testing.T) {
 	})
 
 	t.Run("set server id successfully", func(t *testing.T) {
-		mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
-			"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}))
+		manager.version = ""
+		const version = "5.7.42"
+		mock.ExpectQuery("select version()").
+			WillReturnRows(sqlmock.NewRows([]string{"version"}).AddRow(version))
 		mock.ExpectQuery("select @@global.server_id").
 			WillReturnRows(sqlmock.NewRows([]string{"@@global.server_id"}).AddRow(2))
 		mock.ExpectExec("set global server_id").
@@ -553,21 +551,7 @@ func TestManager_IsClusterInitialized(t *testing.T) {
 
 		isInitialized, err := manager.IsClusterInitialized(ctx, nil)
 		assert.True(t, isInitialized)
-		assert.Nil(t, err)
-	})
-
-	t.Run("set semi sync successfully", func(t *testing.T) {
-		mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
-			"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}).AddRow("ACTIVE"))
-		mock.ExpectExec("SET GLOBAL rpl_semi_sync_source_enabled = 1;" +
-			"SET GLOBAL rpl_semi_sync_source_timeout = 100000;").
-			WillReturnResult(sqlmock.NewResult(1, 1))
-
-		mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
-			"WHERE PLUGIN_NAME ='rpl_semi_sync_replica';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}).AddRow("ACTIVE"))
-		mock.ExpectExec("SET GLOBAL rpl_semi_sync_replica_enabled = 1;").
-			WillReturnResult(sqlmock.NewResult(1, 1))
-		err := manager.EnableSemiSyncIfNeed(ctx)
+		assert.Equal(t, manager.version, version)
 		assert.Nil(t, err)
 	})
 
@@ -583,8 +567,10 @@ func TestManager_Promote(t *testing.T) {
 	manager.slaveStatus = RowMap{}
 
 	t.Run("execute promote failed", func(t *testing.T) {
-		mock.ExpectExec("set global read_only=off").
-			WillReturnError(fmt.Errorf("some error"))
+		mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
+			"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").WillReturnError(errors.New("some error"))
+		// mock.ExpectExec("set global read_only=off").
+		// 	WillReturnError(fmt.Errorf("some error"))
 
 		err := manager.Promote(ctx, nil)
 		assert.NotNil(t, err)
@@ -592,6 +578,12 @@ func TestManager_Promote(t *testing.T) {
 	})
 
 	t.Run("execute promote successfully", func(t *testing.T) {
+		mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
+			"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}).AddRow("ACTIVE"))
+		mock.ExpectQuery("select @@global.rpl_semi_sync_source_enabled").WillReturnRows(sqlmock.NewRows([]string{"STATUS"}).AddRow(1))
+		mock.ExpectQuery("select @@global.rpl_semi_sync_replica_enabled").WillReturnRows(sqlmock.NewRows([]string{"STATUS"}).AddRow(0))
+		mock.ExpectQuery("show slave status").
+			WillReturnRows(sqlmock.NewRows([]string{"Seconds_Behind_Master"}).AddRow(0))
 		mock.ExpectExec("set global read_only=off").
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -600,6 +592,10 @@ func TestManager_Promote(t *testing.T) {
 	})
 
 	t.Run("current member has been promoted", func(t *testing.T) {
+		mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
+			"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}).AddRow("ACTIVE"))
+		mock.ExpectQuery("select @@global.rpl_semi_sync_source_enabled").WillReturnRows(sqlmock.NewRows([]string{"STATUS"}).AddRow(1))
+		mock.ExpectQuery("select @@global.rpl_semi_sync_replica_enabled").WillReturnRows(sqlmock.NewRows([]string{"STATUS"}).AddRow(0))
 		manager.globalState["super_read_only"] = "0"
 		manager.globalState["read_only"] = "0"
 
@@ -681,6 +677,10 @@ func TestManager_Follow(t *testing.T) {
 		},
 	}
 	t.Run("execute follow failed", func(t *testing.T) {
+		mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
+			"WHERE PLUGIN_NAME ='rpl_semi_sync_replica';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}).AddRow("ACTIVE"))
+		mock.ExpectQuery("select @@global.rpl_semi_sync_replica_enabled").WillReturnRows(sqlmock.NewRows([]string{"STATUS"}).AddRow(1))
+		mock.ExpectQuery("select @@global.rpl_semi_sync_source_enabled").WillReturnRows(sqlmock.NewRows([]string{"STATUS"}).AddRow(0))
 		mock.ExpectExec("stop slave").
 			WillReturnError(fmt.Errorf("some error"))
 
@@ -690,10 +690,23 @@ func TestManager_Follow(t *testing.T) {
 	})
 
 	t.Run("execute follow successfully", func(t *testing.T) {
+		mock.ExpectQuery("SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS " +
+			"WHERE PLUGIN_NAME ='rpl_semi_sync_replica';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}).AddRow("ACTIVE"))
+		mock.ExpectQuery("select @@global.rpl_semi_sync_replica_enabled").WillReturnRows(sqlmock.NewRows([]string{"STATUS"}).AddRow(1))
+		mock.ExpectQuery("select @@global.rpl_semi_sync_source_enabled").WillReturnRows(sqlmock.NewRows([]string{"STATUS"}).AddRow(0))
 		mock.ExpectExec("stop slave").
 			WillReturnResult(sqlmock.NewResult(1, 1))
+		mock.ExpectExec("SET GLOBAL rpl_semi_sync_source_timeout = 4294967295").
+			WillReturnResult(sqlmock.NewResult(1, 1))
+		addr := cluster.GetMemberAddrWithPort(*cluster.GetLeaderMember())
+		mysqlConfig, err := mysql.ParseDSN(config.url)
+		assert.Nil(t, err)
+		mysqlConfig.User = config.Username
+		mysqlConfig.Passwd = config.password
+		mysqlConfig.Addr = addr
+		connectionPoolCache[mysqlConfig.FormatDSN()] = manager.DB
 
-		err := manager.Follow(ctx, cluster)
+		err = manager.Follow(ctx, cluster)
 		assert.Nil(t, err)
 	})
 

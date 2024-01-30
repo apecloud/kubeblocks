@@ -61,9 +61,9 @@ spec:
                     compDefs:
                       description: 'CompDefs specifies names for the component definitions
                         associated with this ComponentVersion. Each name in the list
-                        can represent an exact name, or a name with wildcards. Examples:
-                        - "mysql-8.0.30-v1alpha1": Matches the exact name "mysql-8.0.30-v1alpha1"
-                        - "mysql-8.0.30-*": Matches all names starting with "mysql-8.0.30-"'
+                        can represent an exact name, or a name prefix. Examples: -
+                        "mysql-8.0.30-v1alpha1": Matches the exact name "mysql-8.0.30-v1alpha1"
+                        - "mysql-8.0.30": Matches all names starting with "mysql-8.0.30"'
                       items:
                         type: string
                       maxItems: 128
@@ -125,6 +125,7 @@ spec:
                   required:
                   - images
                   - name
+                  - serviceVersion
                   type: object
                 maxItems: 128
                 minItems: 1

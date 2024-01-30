@@ -144,7 +144,7 @@ func (r *ClusterDefinitionReconciler) status(rctx intctrlutil.RequestCtx,
 	clusterDef.Status.Phase = phase
 	clusterDef.Status.Message = message
 	clusterDef.Status.Topologies = r.supportedTopologies(clusterDef)
-	clusterDef.Status.ExternalServices = r.referredExternalServices(clusterDef)
+	clusterDef.Status.ServiceRefs = r.referredServiceRefs(clusterDef)
 	return r.Client.Status().Patch(rctx.Ctx, clusterDef, patch)
 }
 
@@ -157,8 +157,8 @@ func (r *ClusterDefinitionReconciler) supportedTopologies(clusterDef *appsv1alph
 	return strings.Join(topologies, ",") // TODO
 }
 
-func (r *ClusterDefinitionReconciler) referredExternalServices(clusterDef *appsv1alpha1.ClusterDefinition) string {
-	return ""
+func (r *ClusterDefinitionReconciler) referredServiceRefs(clusterDef *appsv1alpha1.ClusterDefinition) string {
+	return "" // TODO
 }
 
 func (r *ClusterDefinitionReconciler) reconcile(rctx intctrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition) (*ctrl.Result, error) {
@@ -282,24 +282,19 @@ func (r *ClusterDefinitionReconciler) validateTopologyComponent(compDefs map[str
 		return fmt.Errorf("duplicate topology component serviceRef")
 	}
 	for _, serviceRef := range comp.ServiceRefs {
-		if err := r.validateTopologyCompServiceRefs(defs, comp, serviceRef); err != nil {
+		if err := r.validateTopologyServiceRefs(defs, comp, serviceRef); err != nil {
 			return err
 		}
 	}
-	if len(comp.RequiredVersion) > 0 {
-		if err := r.validateTopologyCompRequiredVersion(defs, comp); err != nil {
-			return err
-		}
-	}
-	if comp.Replicas != nil {
-		if err := r.validateTopologyCompReplicas(defs, comp, *comp.Replicas); err != nil {
+	if len(comp.RequiredServiceVersion) > 0 {
+		if err := r.validateTopologyRequiredServiceVersion(defs, comp); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *ClusterDefinitionReconciler) validateTopologyCompServiceRefs(compDefs []*appsv1alpha1.ComponentDefinition,
+func (r *ClusterDefinitionReconciler) validateTopologyServiceRefs(compDefs []*appsv1alpha1.ComponentDefinition,
 	comp appsv1alpha1.ClusterTopologyComponent, serviceRef appsv1alpha1.ServiceRef) error {
 	match := func(d appsv1alpha1.ServiceRefDeclaration) bool {
 		return d.Name == serviceRef.Name
@@ -313,22 +308,9 @@ func (r *ClusterDefinitionReconciler) validateTopologyCompServiceRefs(compDefs [
 	return nil
 }
 
-func (r *ClusterDefinitionReconciler) validateTopologyCompRequiredVersion(compDefs []*appsv1alpha1.ComponentDefinition,
+func (r *ClusterDefinitionReconciler) validateTopologyRequiredServiceVersion(compDefs []*appsv1alpha1.ComponentDefinition,
 	comp appsv1alpha1.ClusterTopologyComponent) error {
 	// TODO
-	return nil
-}
-
-func (r *ClusterDefinitionReconciler) validateTopologyCompReplicas(compDefs []*appsv1alpha1.ComponentDefinition,
-	comp appsv1alpha1.ClusterTopologyComponent, replicas int32) error {
-	for _, compDef := range compDefs {
-		limit := compDef.Spec.ReplicasLimit
-		if limit != nil {
-			if replicas < limit.MinReplicas || replicas > limit.MaxReplicas {
-				return fmt.Errorf("topology component %s default replicas %d out-of-limit", comp.Name, replicas)
-			}
-		}
-	}
 	return nil
 }
 

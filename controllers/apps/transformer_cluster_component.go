@@ -184,6 +184,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	compObjCopy.Labels = compProto.Labels
 
 	// merge spec
+	// TODO: update compDef & serviceVersion & serviceRefs - upgrade
 	compObjCopy.Spec.Monitor = compProto.Spec.Monitor
 	compObjCopy.Spec.ClassDefRef = compProto.Spec.ClassDefRef
 	compObjCopy.Spec.Resources = compProto.Spec.Resources

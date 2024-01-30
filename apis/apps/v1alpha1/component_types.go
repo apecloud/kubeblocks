@@ -31,9 +31,10 @@ import (
 type ComponentSpec struct {
 	// compDef is the name of the referenced componentDefinition.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=128
 	CompDef string `json:"compDef"`
 
-	// ServiceVersion specifies the version of the service that the component provisioning.
+	// ServiceVersion specifies the version of the service provisioned by the component.
 	// +kubebuilder:validation:MaxLength=32
 	// +optional
 	ServiceVersion string `json:"serviceVersion,omitempty"`

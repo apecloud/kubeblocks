@@ -41,10 +41,10 @@ type ComponentVersionSpec struct {
 // ComponentVersionCompatibilityRule defines the compatibility between a set of component definitions and a set of releases.
 type ComponentVersionCompatibilityRule struct {
 	// CompDefs specifies names for the component definitions associated with this ComponentVersion.
-	// Each name in the list can represent an exact name, or a name with wildcards.
+	// Each name in the list can represent an exact name, or a name prefix.
 	// Examples:
 	// - "mysql-8.0.30-v1alpha1": Matches the exact name "mysql-8.0.30-v1alpha1"
-	// - "mysql-8.0.30-*": Matches all names starting with "mysql-8.0.30-"
+	// - "mysql-8.0.30": Matches all names starting with "mysql-8.0.30"
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
@@ -74,9 +74,9 @@ type ComponentVersionRelease struct {
 	// ServiceVersion defines the version of the well-known service that the component provides.
 	// If the release is used, it will serve as the service version for component instances, overriding the one defined in the component definition.
 	// Cannot be updated.
+	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=32
-	// +optional
-	ServiceVersion string `json:"serviceVersion,omitempty"`
+	ServiceVersion string `json:"serviceVersion"`
 
 	// Images define the new images for different containers within the release.
 	// +kubebuilder:validation:Required

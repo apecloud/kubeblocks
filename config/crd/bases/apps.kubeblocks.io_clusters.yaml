@@ -232,7 +232,7 @@ spec:
                       description: componentDef references the name of the ComponentDefinition.
                         If both componentDefRef and componentDef are provided, the
                         componentDef will take precedence over componentDefRef.
-                      maxLength: 22
+                      maxLength: 128
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                       x-kubernetes-validations:
@@ -490,7 +490,10 @@ spec:
                       type: array
                     serviceVersion:
                       description: ServiceVersion specifies the version of the service
-                        that the component provisioning.
+                        provisioned by the component. If not explicitly specified,
+                        the version defined in the referenced topology will be used.
+                        If no version is specified in the topology, the latest available
+                        version will be used.
                       maxLength: 32
                       type: string
                     services:
@@ -1468,6 +1471,7 @@ spec:
               topology:
                 description: Topology specifies the topology to use for the cluster.
                   If not specified, the default topology will be used. Cannot be updated.
+                maxLength: 32
                 type: string
             required:
             - terminationPolicy

@@ -79,6 +79,7 @@ type ClusterDefinitionSpec struct {
 type ClusterTopology struct {
 	// Name is the unique identifier for the cluster topology.
 	// Cannot be updated.
+	// +kubebuilder:validation:MaxLength=32
 	// +required
 	Name string `json:"name"`
 
@@ -95,13 +96,6 @@ type ClusterTopology struct {
 	// Default indicates whether this topology is the default configuration.
 	// + optional
 	Default bool `json:"default,omitempty"`
-
-	//// services defines the default cluster services for this topology.
-	//// +kubebuilder:pruning:PreserveUnknownFields
-	//// +optional
-	// Services []ClusterService `json:"services,omitempty"`
-
-	// TODO: resource allocation strategy.
 }
 
 // ClusterTopologyComponent defines a component within a cluster topology.
@@ -115,32 +109,26 @@ type ClusterTopologyComponent struct {
 	Name string `json:"name"`
 
 	// CompDef specifies the component definition to use, either as a specific name or a name prefix.
-	// During instance provisioning, the system searches for matching component definitions based on the specified criteria.
-	// The search order for component definitions is as follows:
-	//   1. Prioritize component definitions within the current Addon.
-	//   2. Consider component definitions already installed in the Kubernetes cluster.
-	//   3. Optionally search for component definitions in the Addon repository if specified.
+	// Cannot be updated.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=128
 	CompDef string `json:"compDef"`
-
-	// ServiceVersion specifies the version associated with the referenced component definition.
-	// This field assists in determining the appropriate version of the component definition, considering multiple available definitions.
-	// +kubebuilder:validation:MaxLength=32
-	// +optional
-	ServiceVersion string `json:"serviceVersion,omitempty"`
 
 	// ServiceRefs define the service references for the component.
 	// +optional
 	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
 
-	// RequiredVersion specifies the minimum version required for this topology.
+	// ServiceVersion specifies the service version associated with the referenced component definition.
+	// This field helps in determining the appropriate version of the component definition, considering multiple available versions.
+	// If not explicitly specified, the latest available version will be used.
+	// +kubebuilder:validation:MaxLength=32
 	// +optional
-	RequiredVersion string `json:"requiredVersion,omitempty"`
+	ServiceVersion string `json:"serviceVersion,omitempty"`
 
-	// Replicas specifies the default replicas for the component in this topology.
+	// RequiredServiceVersion specifies the minimum service version required for this topology.
+	// +kubebuilder:validation:MaxLength=32
 	// +optional
-	Replicas *int32 `json:"replicas,omitempty"`
+	RequiredServiceVersion string `json:"requiredServiceVersion,omitempty"`
 }
 
 // ClusterTopologyOrders defines the orders for components within a topology.
@@ -286,7 +274,7 @@ type ClusterDefinitionStatus struct {
 	Topologies string `json:"topologies,omitempty"`
 
 	// +optional
-	ExternalServices string `json:"externalServices,omitempty"`
+	ServiceRefs string `json:"serviceRefs,omitempty"`
 }
 
 func (r ClusterDefinitionStatus) GetTerminalPhases() []Phase {
@@ -1082,7 +1070,7 @@ type GVKResource struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cd
 // +kubebuilder:printcolumn:name="Topologies",type="string",JSONPath=".status.topologies",description="topologies"
-// +kubebuilder:printcolumn:name="External-Service",type="string",JSONPath=".status.externalServices",description="external service referenced"
+// +kubebuilder:printcolumn:name="ServiceRefs",type="string",JSONPath=".status.serviceRefs",description="service references"
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 

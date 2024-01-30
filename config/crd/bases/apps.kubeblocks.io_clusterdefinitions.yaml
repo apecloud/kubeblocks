@@ -24,9 +24,9 @@ spec:
       jsonPath: .status.topologies
       name: Topologies
       type: string
-    - description: external service referenced
-      jsonPath: .status.externalServices
-      name: External-Service
+    - description: service references
+      jsonPath: .status.serviceRefs
+      name: ServiceRefs
       type: string
     - description: status phase
       jsonPath: .status.phase
@@ -10022,16 +10022,9 @@ spec:
                           within a cluster topology.
                         properties:
                           compDef:
-                            description: 'CompDef specifies the component definition
+                            description: CompDef specifies the component definition
                               to use, either as a specific name or a name prefix.
-                              During instance provisioning, the system searches for
-                              matching component definitions based on the specified
-                              criteria. The search order for component definitions
-                              is as follows: 1. Prioritize component definitions within
-                              the current Addon. 2. Consider component definitions
-                              already installed in the Kubernetes cluster. 3. Optionally
-                              search for component definitions in the Addon repository
-                              if specified.'
+                              Cannot be updated.
                             maxLength: 128
                             type: string
                           name:
@@ -10041,14 +10034,10 @@ spec:
                             maxLength: 16
                             pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                             type: string
-                          replicas:
-                            description: Replicas specifies the default replicas for
-                              the component in this topology.
-                            format: int32
-                            type: integer
-                          requiredVersion:
-                            description: RequiredVersion specifies the minimum version
-                              required for this topology.
+                          requiredServiceVersion:
+                            description: RequiredServiceVersion specifies the minimum
+                              service version required for this topology.
+                            maxLength: 32
                             type: string
                           serviceRefs:
                             description: ServiceRefs define the service references
@@ -10104,11 +10093,12 @@ spec:
                               type: object
                             type: array
                           serviceVersion:
-                            description: ServiceVersion specifies the version associated
-                              with the referenced component definition. This field
-                              assists in determining the appropriate version of the
-                              component definition, considering multiple available
-                              definitions.
+                            description: ServiceVersion specifies the service version
+                              associated with the referenced component definition.
+                              This field helps in determining the appropriate version
+                              of the component definition, considering multiple available
+                              versions. If not explicitly specified, the latest available
+                              version will be used.
                             maxLength: 32
                             type: string
                         required:
@@ -10125,6 +10115,7 @@ spec:
                     name:
                       description: Name is the unique identifier for the cluster topology.
                         Cannot be updated.
+                      maxLength: 32
                       type: string
                     orders:
                       description: Orders defines the orders of components within
@@ -10171,8 +10162,6 @@ spec:
           status:
             description: ClusterDefinitionStatus defines the observed state of ClusterDefinition
             properties:
-              externalServices:
-                type: string
               message:
                 description: Extra message in current phase
                 type: string
@@ -10189,6 +10178,8 @@ spec:
                 enum:
                 - Available
                 - Unavailable
+                type: string
+              serviceRefs:
                 type: string
               topologies:
                 description: Topologies this ClusterDefinition supported.

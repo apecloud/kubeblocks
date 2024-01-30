@@ -51,18 +51,18 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	cluster := transCtx.Cluster
 	transCtx.ComponentSpecs = t.buildCompSpecs(transCtx, cluster)
 
-	// build all component definitions referenced
-	return t.buildCompDefinitions(transCtx, cluster)
+	// resolve all component definitions referenced
+	return t.resolveCompDefinitions(transCtx, cluster)
 }
 
 func (t *ClusterAPINormalizationTransformer) buildCompSpecs(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) []*appsv1alpha1.ClusterComponentSpec {
 	if withClusterTopology(cluster) {
 		return t.buildCompSpecs4ClusterTopology(transCtx.ClusterDef, cluster)
 	}
-	if legacyClusterDef(cluster) {
+	if withLegacyClusterDef(cluster) {
 		return t.buildCompSpecs4LegacyCluster(cluster)
 	}
-	if apiconversion.HasSimplifiedClusterAPI(cluster) {
+	if withSimplifiedClusterAPI(cluster) {
 		return t.buildCompSpecs4SimplifiedAPI(transCtx.ClusterDef, cluster)
 	}
 	return nil
@@ -106,7 +106,7 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4ClusterTopology(clus
 
 	specifiedCompSpecs := make(map[string]*appsv1alpha1.ClusterComponentSpec)
 	for i, compSpec := range cluster.Spec.ComponentSpecs {
-		specifiedCompSpecs[compSpec.Name] = &cluster.Spec.ComponentSpecs[i]
+		specifiedCompSpecs[compSpec.Name] = cluster.Spec.ComponentSpecs[i].DeepCopy()
 	}
 
 	compSpecs := make([]*appsv1alpha1.ClusterComponentSpec, 0)
@@ -135,7 +135,7 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4SimplifiedAPI(cluste
 	return []*appsv1alpha1.ClusterComponentSpec{apiconversion.HandleSimplifiedClusterAPI(clusterDef, cluster)}
 }
 
-func (t *ClusterAPINormalizationTransformer) buildCompDefinitions(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
+func (t *ClusterAPINormalizationTransformer) resolveCompDefinitions(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
 	if transCtx.ComponentDefs == nil {
 		transCtx.ComponentDefs = make(map[string]*appsv1alpha1.ComponentDefinition)
 	}
@@ -154,6 +154,8 @@ func (t *ClusterAPINormalizationTransformer) buildCompDefinitions(transCtx *clus
 				return err
 			}
 			transCtx.ComponentDefs[compDef.Name] = compDef
+			// set the compSpec.ComponentDef as exact name resolved
+			transCtx.ComponentSpecs[i].ComponentDef = compDef.Name
 		}
 	}
 	return nil

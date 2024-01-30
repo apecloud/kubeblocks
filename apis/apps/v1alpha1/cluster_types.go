@@ -53,6 +53,7 @@ type ClusterSpec struct {
 	// Topology specifies the topology to use for the cluster.
 	// If not specified, the default topology will be used.
 	// Cannot be updated.
+	// +kubebuilder:validation:MaxLength=32
 	// +optional
 	Topology string `json:"topology,omitempty"`
 
@@ -315,19 +316,18 @@ type ClusterComponentSpec struct {
 
 	// componentDef references the name of the ComponentDefinition.
 	// If both componentDefRef and componentDef are provided, the componentDef will take precedence over componentDefRef.
-	// +kubebuilder:validation:MaxLength=22
+	// +kubebuilder:validation:MaxLength=128
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDef is immutable"
 	// +optional
 	ComponentDef string `json:"componentDef,omitempty"`
 
-	// ServiceVersion specifies the version of the service that the component provisioning.
+	// ServiceVersion specifies the version of the service provisioned by the component.
+	// If not explicitly specified, the version defined in the referenced topology will be used.
+	// If no version is specified in the topology, the latest available version will be used.
 	// +kubebuilder:validation:MaxLength=32
 	// +optional
 	ServiceVersion string `json:"serviceVersion,omitempty"`
-
-	//// +optional
-	// ServiceVersion string `json:"serviceVersion,omitempty"`
 
 	// classDefRef references the class defined in ComponentClassDefinition.
 	// +kubebuilder:deprecatedversion:warning="Due to the lack of practical use cases, this field is deprecated from KB 0.9.0."

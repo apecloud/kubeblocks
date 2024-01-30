@@ -200,12 +200,12 @@ func (u *Upgrader) SaveOldResources() error {
 	u.ResourcesMap = objsMap
 	// save to tmp work dir
 	for namespace, objs := range objsMap {
-		workDir = fmt.Sprintf("%s/%s", workDir, namespace)
-		if err = os.MkdirAll(workDir, os.ModePerm); err != nil {
+		currWorkDir := fmt.Sprintf("%s/%s", workDir, namespace)
+		if err = os.MkdirAll(currWorkDir, os.ModePerm); err != nil {
 			return err
 		}
 		for i, v := range objs {
-			filePath := fmt.Sprintf("%s/%s.yaml", workDir, v.GetName())
+			filePath := fmt.Sprintf("%s/%s.yaml", currWorkDir, v.GetName())
 			if u.fileExists(filePath) {
 				obj, err := u.getUnstructuredFromFile(filePath)
 				if err != nil {

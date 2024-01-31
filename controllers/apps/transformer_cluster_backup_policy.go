@@ -356,14 +356,21 @@ func (r *clusterBackupPolicyTransformer) buildBackupPolicy(comp *appsv1alpha1.Cl
 func (r *clusterBackupPolicyTransformer) syncBackupMethods(backupPolicy *dpv1alpha1.BackupPolicy,
 	comp *appsv1alpha1.ClusterComponentSpec) {
 	var backupMethods []dpv1alpha1.BackupMethod
+	oldBackupMethodMap := map[string]dpv1alpha1.BackupMethod{}
+	for _, v := range backupPolicy.Spec.BackupMethods {
+		oldBackupMethodMap[v.Name] = v
+	}
 	for _, v := range r.backupPolicy.BackupMethods {
-		mappingEnv := r.doEnvMapping(comp, v.EnvMapping)
-		v.BackupMethod.Env = dputils.MergeEnv(v.BackupMethod.Env, mappingEnv)
-		if v.Target != nil {
-			v.BackupMethod.Target = r.buildBackupTarget(*v.Target, comp)
-			r.syncRoleLabelSelector(v.BackupMethod.Target, v.Target.Role)
+		backupMethod := v.BackupMethod
+		if m, ok := oldBackupMethodMap[backupMethod.Name]; ok {
+			backupMethod = m
+		} else if v.Target != nil {
+			backupMethod.Target = r.buildBackupTarget(*v.Target, comp)
+			r.syncRoleLabelSelector(backupMethod.Target, v.Target.Role)
 		}
-		backupMethods = append(backupMethods, v.BackupMethod)
+		mappingEnv := r.doEnvMapping(comp, v.EnvMapping)
+		backupMethod.Env = dputils.MergeEnv(backupMethod.Env, mappingEnv)
+		backupMethods = append(backupMethods, backupMethod)
 	}
 	backupPolicy.Spec.BackupMethods = backupMethods
 }

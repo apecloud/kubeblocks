@@ -20,13 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"crypto/md5"
+	"encoding/binary"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -95,12 +99,18 @@ func (t *componentAccountTransformer) checkAccountSecretExist(ctx graph.Transfor
 func (t *componentAccountTransformer) buildAccountSecret(ctx *componentTransformContext,
 	synthesizeComp *component.SynthesizedComponent, account appsv1alpha1.SystemAccount) (*corev1.Secret, error) {
 	var password []byte
-	if account.SecretRef != nil {
+	switch {
+	case account.SecretRef != nil:
 		var err error
 		if password, err = t.getPasswordFromSecret(ctx, account); err != nil {
 			return nil, err
 		}
-	} else {
+	case len(account.Seed) > 0:
+		var err error
+		if password, err = t.buildPasswordFromSeed(account.Seed); err != nil {
+			return nil, err
+		}
+	default:
 		password = t.buildPassword(ctx, account)
 	}
 	return t.buildAccountSecretWithPassword(synthesizeComp, account, password), nil
@@ -119,6 +129,17 @@ func (t *componentAccountTransformer) getPasswordFromSecret(ctx graph.TransformC
 		return nil, fmt.Errorf("referenced account secret has no required credential field")
 	}
 	return secret.Data[constant.AccountPasswdForSecret], nil
+}
+
+func (t *componentAccountTransformer) buildPasswordFromSeed(seed string) ([]byte, error) {
+	h := md5.New()
+	_, err := io.WriteString(h, seed)
+	if err != nil {
+		return nil, err
+	}
+	uSeed := binary.BigEndian.Uint64(h.Sum(nil))
+	rand.Seed(int64(uSeed))
+	return []byte(rand.String(16)), nil
 }
 
 func (t *componentAccountTransformer) buildPassword(ctx *componentTransformContext, account appsv1alpha1.SystemAccount) []byte {

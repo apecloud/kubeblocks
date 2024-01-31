@@ -30,6 +30,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -40,6 +42,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
 // ComponentVersionReconciler reconciles a ComponentVersion object
@@ -282,11 +285,17 @@ func (r *ComponentVersionReconciler) validate(compVersion *appsv1alpha1.Componen
 func (r *ComponentVersionReconciler) validateRelease(release appsv1alpha1.ComponentVersionRelease,
 	releaseToCompDefinitions map[string]map[string]*appsv1alpha1.ComponentDefinition) error {
 	cmpds, ok := releaseToCompDefinitions[release.Name]
-	if !ok {
+	notNil := func(cmpd *appsv1alpha1.ComponentDefinition) bool {
+		return cmpd != nil
+	}
+	if !ok || generics.CountFunc(maps.Values(cmpds), notNil) == 0 {
 		return fmt.Errorf("release %s has no any supported ComponentDefinition", release.Name)
 	}
 	for name := range release.Images {
 		for _, cmpd := range cmpds {
+			if cmpd == nil {
+				continue
+			}
 			if err := r.validateContainer(*cmpd, name); err != nil {
 				return err
 			}
@@ -306,4 +315,243 @@ func (r *ComponentVersionReconciler) validateContainer(cmpd appsv1alpha1.Compone
 		return nil
 	}
 	return fmt.Errorf("container %s is not found in ComponentDefinition %s", name, cmpd.Name)
+}
+
+func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader, compDefName, serviceVersion string) (*appsv1alpha1.ComponentDefinition, string, error) {
+	var (
+		compDef *appsv1alpha1.ComponentDefinition
+	)
+	compDefs, err := listCompDefinitionsWithPrefix(ctx, cli, compDefName)
+	if err != nil {
+		return compDef, serviceVersion, err
+	}
+
+	serviceVersionToCompDefs, err := buildServiceVersionToCompDefsMapping(ctx, cli, compDefs, serviceVersion)
+	if err != nil {
+		return compDef, serviceVersion, err
+	}
+
+	// use specified service version or the latest.
+	if len(serviceVersion) == 0 {
+		serviceVersions := maps.Keys(serviceVersionToCompDefs)
+		slices.Sort(serviceVersions)
+		serviceVersion = serviceVersions[len(serviceVersions)-1]
+	}
+
+	compatibleCompDefs := serviceVersionToCompDefs[serviceVersion]
+	if len(compatibleCompDefs) == 0 {
+		return compDef, serviceVersion, fmt.Errorf("no matched component definition found: %s", compDefName)
+	}
+
+	compatibleCompDefNames := maps.Keys(compatibleCompDefs)
+	slices.Sort(compatibleCompDefNames)
+	compatibleCompDefName := compatibleCompDefNames[len(compatibleCompDefNames)-1]
+
+	return compatibleCompDefs[compatibleCompDefName], serviceVersion, nil
+}
+
+func buildServiceVersionToCompDefsMapping(ctx context.Context, cli client.Reader,
+	compDefs []*appsv1alpha1.ComponentDefinition, serviceVersion string) (map[string]map[string]*appsv1alpha1.ComponentDefinition, error) {
+	result := make(map[string]map[string]*appsv1alpha1.ComponentDefinition)
+
+	insert := func(version string, compDef *appsv1alpha1.ComponentDefinition) {
+		if _, ok := result[version]; !ok {
+			result[version] = make(map[string]*appsv1alpha1.ComponentDefinition)
+		}
+		result[version][compDef.Name] = compDef
+	}
+
+	checkedInsert := func(version string, compDef *appsv1alpha1.ComponentDefinition) {
+		if len(serviceVersion) == 0 {
+			insert(version, compDef)
+		} else if compareServiceVersion(serviceVersion, version) {
+			insert(version, compDef)
+		}
+	}
+
+	for _, compDef := range compDefs {
+		compVersions, err := compatibleCompVersions(ctx, cli, compDef)
+		if err != nil {
+			return nil, err
+		}
+
+		serviceVersions := sets.New[string]()
+		for _, compVersion := range compVersions {
+			serviceVersions = serviceVersions.Union(compatibleServiceVersions(compDef, compVersion))
+		}
+
+		for version := range serviceVersions {
+			checkedInsert(version, compDef)
+		}
+	}
+	return result, nil
+}
+
+// compatibleCompVersions returns all component versions that are compatible with specified component definition.
+func compatibleCompVersions(ctx context.Context, cli client.Reader, compDef *appsv1alpha1.ComponentDefinition) ([]*appsv1alpha1.ComponentVersion, error) {
+	compVersionList := &appsv1alpha1.ComponentVersionList{}
+	labels := client.MatchingLabels{
+		compDef.Name: compDef.Name,
+	}
+	if err := cli.List(ctx, compVersionList, labels); err != nil {
+		return nil, err
+	}
+
+	if len(compVersionList.Items) == 0 {
+		return nil, nil
+	}
+
+	compVersions := make([]*appsv1alpha1.ComponentVersion, 0)
+	for i, compVersion := range compVersionList.Items {
+		if compVersion.Status.Phase != appsv1alpha1.AvailablePhase {
+			return nil, fmt.Errorf("matched ComponentVersion %s is not available", compVersion.Name)
+		}
+		compVersions = append(compVersions, &compVersionList.Items[i])
+	}
+	return compVersions, nil
+}
+
+// compatibleServiceVersions returns service versions that are compatible with specified component definition.
+func compatibleServiceVersions(compDef *appsv1alpha1.ComponentDefinition, compVersion *appsv1alpha1.ComponentVersion) sets.Set[string] {
+	prefixMatch := func(prefix string) bool {
+		return strings.HasPrefix(compDef.Name, prefix)
+	}
+	releases := make(map[string]bool, 0)
+	for _, rule := range compVersion.Spec.CompatibilityRules {
+		if slices.IndexFunc(rule.CompDefs, prefixMatch) >= 0 {
+			for _, release := range rule.Releases {
+				releases[release] = true
+			}
+		}
+	}
+	serviceVersions := sets.New[string]()
+	for _, release := range compVersion.Spec.Releases {
+		if releases[release.Name] {
+			serviceVersions = serviceVersions.Insert(release.ServiceVersion)
+		}
+	}
+	return serviceVersions
+}
+
+// TODO
+func compareServiceVersion(required, provide string) bool {
+	ret, err := version.MustParseSemantic(required).Compare(provide)
+	return err == nil && ret == 0
+}
+
+func resolveComponentVersion(ctx context.Context, cli client.Reader, compDef *appsv1alpha1.ComponentDefinition, serviceVersion string) error {
+	compVersions, err := compatibleCompVersions(ctx, cli, compDef)
+	if err != nil {
+		return err
+	}
+	if len(compVersions) == 0 {
+		return nil
+	}
+	return resolveImagesWithCompVersions(compDef, compVersions, serviceVersion)
+}
+
+func resolveImagesWithCompVersions(compDef *appsv1alpha1.ComponentDefinition,
+	compVersions []*appsv1alpha1.ComponentVersion, serviceVersion string) error {
+	appsInDef := covertImagesFromCompDefinition(compDef)
+	appsByUser := findMatchedImagesFromCompVersions(compVersions, serviceVersion)
+
+	apps := checkNMergeImages(serviceVersion, appsInDef, appsByUser)
+
+	checkNUpdateImage := func(c *corev1.Container) error {
+		var err error
+		app, ok := apps[c.Name]
+		switch {
+		case ok && app.err == nil:
+			c.Image = app.image
+		case ok:
+			err = app.err
+		default:
+			err = fmt.Errorf("no matched image found for container %s", c.Name)
+		}
+		return err
+	}
+
+	for i := range compDef.Spec.Runtime.InitContainers {
+		if err := checkNUpdateImage(&compDef.Spec.Runtime.InitContainers[i]); err != nil {
+			return err
+		}
+	}
+	for i := range compDef.Spec.Runtime.Containers {
+		if err := checkNUpdateImage(&compDef.Spec.Runtime.Containers[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func covertImagesFromCompDefinition(compDef *appsv1alpha1.ComponentDefinition) map[string]appNameVersionImage {
+	apps := make(map[string]appNameVersionImage)
+	checkNAdd := func(c *corev1.Container) {
+		if len(c.Image) > 0 {
+			apps[c.Name] = appNameVersionImage{
+				name:    c.Name,
+				version: compDef.Spec.ServiceVersion,
+				image:   c.Image,
+			}
+		}
+	}
+	for i := range compDef.Spec.Runtime.InitContainers {
+		checkNAdd(&compDef.Spec.Runtime.InitContainers[i])
+	}
+	for i := range compDef.Spec.Runtime.Containers {
+		checkNAdd(&compDef.Spec.Runtime.Containers[i])
+	}
+	return apps
+}
+
+func findMatchedImagesFromCompVersions(compVersions []*appsv1alpha1.ComponentVersion, serviceVersion string) map[string]appNameVersionImage {
+	appsWithReleases := make(map[string]map[string]appNameVersionImage)
+	for _, compVersion := range compVersions {
+		for _, release := range compVersion.Spec.Releases {
+			if compareServiceVersion(serviceVersion, release.ServiceVersion) {
+				for name, image := range release.Images {
+					if _, ok := appsWithReleases[name]; !ok {
+						appsWithReleases[name] = make(map[string]appNameVersionImage)
+					}
+					appsWithReleases[name][release.Name] = appNameVersionImage{
+						name:    name,
+						version: release.ServiceVersion,
+						image:   image,
+					}
+				}
+			}
+		}
+	}
+	apps := make(map[string]appNameVersionImage)
+	for name, releases := range appsWithReleases {
+		names := maps.Keys(releases)
+		slices.Sort(names)
+		// use the latest release
+		apps[name] = releases[names[len(names)-1]]
+	}
+	return apps
+}
+
+func checkNMergeImages(serviceVersion string, appsInDef, appsByUser map[string]appNameVersionImage) map[string]appNameVersionImage {
+	apps := make(map[string]appNameVersionImage)
+	merge := func(name string, def, user appNameVersionImage) appNameVersionImage {
+		if len(user.name) == 0 {
+			if !compareServiceVersion(serviceVersion, def.version) {
+				def.err = fmt.Errorf("no matched image found for container %s with required version %s", name, serviceVersion)
+			}
+			return def
+		}
+		return user
+	}
+	for _, name := range append(maps.Keys(appsInDef), maps.Keys(appsByUser)...) {
+		apps[name] = merge(name, appsInDef[name], appsByUser[name])
+	}
+	return apps
+}
+
+type appNameVersionImage struct {
+	name    string
+	version string
+	image   string
+	err     error
 }

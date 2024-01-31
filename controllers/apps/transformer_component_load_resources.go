@@ -21,12 +21,8 @@ package apps
 
 import (
 	"fmt"
-	"slices"
 
-	"golang.org/x/exp/maps"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -35,9 +31,7 @@ import (
 )
 
 // componentLoadResourcesTransformer handles referenced resources validation and load them into context
-type componentLoadResourcesTransformer struct {
-	client.Client
-}
+type componentLoadResourcesTransformer struct{}
 
 var _ graph.Transformer = &componentLoadResourcesTransformer{}
 
@@ -94,11 +88,16 @@ func (t *componentLoadResourcesTransformer) transformForGeneratedComponent(trans
 }
 
 func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx *componentTransformContext) error {
-	compDef, err := t.getNCheckCompDef(transCtx)
+	var (
+		ctx  = transCtx.Context
+		cli  = transCtx.Client
+		comp = transCtx.Component
+	)
+	compDef, err := getNCheckCompDefinition(ctx, cli, comp.Spec.CompDef)
 	if err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
-	if err = t.resolveComponentVersion(transCtx, compDef); err != nil {
+	if err = resolveComponentVersion(ctx, cli, compDef, comp.Spec.ServiceVersion); err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
 	transCtx.CompDef = compDef
@@ -108,7 +107,6 @@ func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx
 		Log:      transCtx.Logger,
 		Recorder: transCtx.EventRecorder,
 	}
-	comp := transCtx.Component
 	synthesizedComp, err := component.BuildSynthesizedComponent(reqCtx, transCtx.Client, transCtx.Cluster, compDef, comp)
 	if err != nil {
 		message := fmt.Sprintf("build synthesized component for %s failed: %s", comp.Name, err.Error())
@@ -117,141 +115,6 @@ func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx
 	transCtx.SynthesizeComponent = synthesizedComp
 
 	return nil
-}
-
-func (t *componentLoadResourcesTransformer) getNCheckCompDef(transCtx *componentTransformContext) (*appsv1alpha1.ComponentDefinition, error) {
-	compKey := types.NamespacedName{
-		Namespace: transCtx.Component.Namespace,
-		Name:      transCtx.Component.Spec.CompDef,
-	}
-	compDef := &appsv1alpha1.ComponentDefinition{}
-	if err := transCtx.Client.Get(transCtx.Context, compKey, compDef); err != nil {
-		return nil, err
-	}
-	if compDef.Status.Phase != appsv1alpha1.AvailablePhase {
-		return nil, fmt.Errorf("ComponentDefinition referenced is unavailable: %s", compDef.Name)
-	}
-	return compDef, nil
-}
-
-func (t *componentLoadResourcesTransformer) resolveComponentVersion(transCtx *componentTransformContext,
-	compDef *appsv1alpha1.ComponentDefinition) error {
-	compVersions, err := compatibleCompVersions(transCtx.Context, t.Client, compDef)
-	if err != nil {
-		return err
-	}
-	if len(compVersions) == 0 {
-		return nil
-	}
-	return t.resolveImagesWithCompVersions(compVersions, transCtx.Component, compDef)
-}
-
-func (t *componentLoadResourcesTransformer) resolveImagesWithCompVersions(compVersions []*appsv1alpha1.ComponentVersion,
-	comp *appsv1alpha1.Component, compDef *appsv1alpha1.ComponentDefinition) error {
-	appsInDef := t.covertImagesFromCompDefinition(compDef)
-	appsByUser := t.findMatchedImagesFromCompVersions(compVersions, comp.Spec.ServiceVersion)
-
-	apps := t.checkNMergeImages(comp.Spec.ServiceVersion, appsInDef, appsByUser)
-
-	checkNUpdateImage := func(c *corev1.Container) error {
-		var err error
-		app, ok := apps[c.Name]
-		switch {
-		case ok && app.err == nil:
-			c.Image = app.image
-		case ok:
-			err = app.err
-		default:
-			err = fmt.Errorf("no matched image found for container %s", c.Name)
-		}
-		return err
-	}
-
-	for i := range compDef.Spec.Runtime.InitContainers {
-		if err := checkNUpdateImage(&compDef.Spec.Runtime.InitContainers[i]); err != nil {
-			return err
-		}
-	}
-	for i := range compDef.Spec.Runtime.Containers {
-		if err := checkNUpdateImage(&compDef.Spec.Runtime.Containers[i]); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (t *componentLoadResourcesTransformer) covertImagesFromCompDefinition(compDef *appsv1alpha1.ComponentDefinition) map[string]appNameVersionImage {
-	apps := make(map[string]appNameVersionImage)
-	checkNAdd := func(c *corev1.Container) {
-		if len(c.Image) > 0 {
-			apps[c.Name] = appNameVersionImage{
-				name:    c.Name,
-				version: compDef.Spec.ServiceVersion,
-				image:   c.Image,
-			}
-		}
-	}
-	for i := range compDef.Spec.Runtime.InitContainers {
-		checkNAdd(&compDef.Spec.Runtime.InitContainers[i])
-	}
-	for i := range compDef.Spec.Runtime.Containers {
-		checkNAdd(&compDef.Spec.Runtime.Containers[i])
-	}
-	return apps
-}
-
-func (t *componentLoadResourcesTransformer) findMatchedImagesFromCompVersions(
-	compVersions []*appsv1alpha1.ComponentVersion, serviceVersion string) map[string]appNameVersionImage {
-	appsWithReleases := make(map[string]map[string]appNameVersionImage)
-	for _, compVersion := range compVersions {
-		for _, release := range compVersion.Spec.Releases {
-			if compareServiceVersion(serviceVersion, release.ServiceVersion) {
-				for name, image := range release.Images {
-					if _, ok := appsWithReleases[name]; !ok {
-						appsWithReleases[name] = make(map[string]appNameVersionImage)
-					}
-					appsWithReleases[name][release.Name] = appNameVersionImage{
-						name:    name,
-						version: release.ServiceVersion,
-						image:   image,
-					}
-				}
-			}
-		}
-	}
-	apps := make(map[string]appNameVersionImage)
-	for name, releases := range appsWithReleases {
-		names := maps.Keys(releases)
-		slices.Sort(names)
-		// use the latest release
-		apps[name] = releases[names[len(names)-1]]
-	}
-	return apps
-}
-
-func (t *componentLoadResourcesTransformer) checkNMergeImages(serviceVersion string,
-	appsInDef, appsByUser map[string]appNameVersionImage) map[string]appNameVersionImage {
-	apps := make(map[string]appNameVersionImage)
-	merge := func(name string, def, user appNameVersionImage) appNameVersionImage {
-		if len(user.name) == 0 {
-			if !compareServiceVersion(serviceVersion, def.version) {
-				def.err = fmt.Errorf("no matched image found for container %s with required version %s", name, serviceVersion)
-			}
-			return def
-		}
-		return user
-	}
-	for _, name := range append(maps.Keys(appsInDef), maps.Keys(appsByUser)...) {
-		apps[name] = merge(name, appsInDef[name], appsByUser[name])
-	}
-	return apps
-}
-
-type appNameVersionImage struct {
-	name    string
-	version string
-	image   string
-	err     error
 }
 
 func isGeneratedComponent(cluster *appsv1alpha1.Cluster) (bool, error) {

@@ -20,15 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"context"
 	"fmt"
-	"strings"
-
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -49,16 +41,15 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 		return nil
 	}
 
-	// build all component specs
 	transCtx.ComponentSpecs = make([]*appsv1alpha1.ClusterComponentSpec, 0)
 	transCtx.ShardingComponentSpecs = make(map[string][]*appsv1alpha1.ClusterComponentSpec, 0)
 	transCtx.Labels = make(map[string]map[string]string, 0)
 
-	cluster := transCtx.Cluster
-	transCtx.ComponentSpecs = t.buildCompSpecs(transCtx, cluster)
+	// build all component specs
+	transCtx.ComponentSpecs = t.buildCompSpecs(transCtx, transCtx.Cluster)
 
 	// resolve all component definitions referenced
-	return t.resolveCompDefinitions(transCtx, cluster)
+	return t.resolveCompDefinitions(transCtx, transCtx.Cluster)
 }
 
 // func shardingComps() {
@@ -180,7 +171,8 @@ func (t *ClusterAPINormalizationTransformer) resolveCompDefinitions(transCtx *cl
 			transCtx.ComponentSpecs[i].ComponentDef = compDef.Name
 			compDef.Name = "" // TODO
 		} else {
-			compDef, serviceVersion, err := t.resolveCompDefinitionNServiceVersion(transCtx, compSpec)
+			compDef, serviceVersion, err := resolveCompDefinitionNServiceVersion(
+				transCtx.Context, transCtx.Client, compSpec.ComponentDef, compSpec.ServiceVersion)
 			if err != nil {
 				return err
 			}
@@ -201,150 +193,4 @@ func (t *ClusterAPINormalizationTransformer) buildCompDefinition4Legacy(transCtx
 	}
 	compDef.Name = constant.GenerateVirtualComponentDefinition(compSpec.ComponentDefRef)
 	return compDef, nil
-}
-
-func (t *ClusterAPINormalizationTransformer) resolveCompDefinitionNServiceVersion(transCtx *clusterTransformContext,
-	compSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ComponentDefinition, string, error) {
-	var (
-		compDef        *appsv1alpha1.ComponentDefinition
-		serviceVersion string
-	)
-	compDefs, err := t.listCompDefinitions(transCtx, compSpec.ComponentDef)
-	if err != nil {
-		return compDef, serviceVersion, err
-	}
-
-	serviceVersionToCompDefs, err := t.buildServiceVersionToCompDefsMapping(transCtx.Context, transCtx.Client, compDefs, compSpec.ServiceVersion)
-	if err != nil {
-		return compDef, serviceVersion, err
-	}
-
-	// use specified service version or the latest.
-	serviceVersion = compSpec.ServiceVersion
-	if len(compSpec.ServiceVersion) == 0 {
-		serviceVersions := maps.Keys(serviceVersionToCompDefs)
-		slices.Sort(serviceVersions)
-		serviceVersion = serviceVersions[len(serviceVersions)-1]
-	}
-
-	compatibleCompDefs := serviceVersionToCompDefs[serviceVersion]
-	if len(compatibleCompDefs) == 0 {
-		return compDef, serviceVersion, fmt.Errorf("no matched component definition found: %s", compSpec.ComponentDef)
-	}
-
-	compatibleCompDefNames := maps.Keys(compatibleCompDefs)
-	slices.Sort(compatibleCompDefNames)
-	compatibleCompDefName := compatibleCompDefNames[len(compatibleCompDefNames)-1]
-
-	return compatibleCompDefs[compatibleCompDefName], serviceVersion, nil
-}
-
-func (t *ClusterAPINormalizationTransformer) listCompDefinitions(transCtx *clusterTransformContext, compDef string) ([]*appsv1alpha1.ComponentDefinition, error) {
-	compDefList := &appsv1alpha1.ComponentDefinitionList{}
-	if err := transCtx.Client.List(transCtx.Context, compDefList); err != nil {
-		return nil, err
-	}
-	compDefsFullyMatched := make([]*appsv1alpha1.ComponentDefinition, 0)
-	compDefsPrefixMatched := make([]*appsv1alpha1.ComponentDefinition, 0)
-	for i, item := range compDefList.Items {
-		if item.Name == compDef {
-			compDefsFullyMatched = append(compDefsFullyMatched, &compDefList.Items[i])
-		}
-		if strings.HasPrefix(item.Name, compDef) {
-			compDefsPrefixMatched = append(compDefsPrefixMatched, &compDefList.Items[i])
-		}
-	}
-	if len(compDefsFullyMatched) > 0 {
-		return compDefsFullyMatched, nil
-	}
-	return compDefsPrefixMatched, nil
-}
-
-func (t *ClusterAPINormalizationTransformer) buildServiceVersionToCompDefsMapping(ctx context.Context, cli client.Reader,
-	compDefs []*appsv1alpha1.ComponentDefinition, serviceVersion string) (map[string]map[string]*appsv1alpha1.ComponentDefinition, error) {
-	result := make(map[string]map[string]*appsv1alpha1.ComponentDefinition)
-
-	insert := func(version string, compDef *appsv1alpha1.ComponentDefinition) {
-		if _, ok := result[version]; !ok {
-			result[version] = make(map[string]*appsv1alpha1.ComponentDefinition)
-		}
-		result[version][compDef.Name] = compDef
-	}
-
-	checkedInsert := func(version string, compDef *appsv1alpha1.ComponentDefinition) {
-		if len(serviceVersion) == 0 {
-			insert(version, compDef)
-		} else if compareServiceVersion(serviceVersion, version) {
-			insert(version, compDef)
-		}
-	}
-
-	for _, compDef := range compDefs {
-		compVersions, err := compatibleCompVersions(ctx, cli, compDef)
-		if err != nil {
-			return nil, err
-		}
-
-		serviceVersions := sets.New[string]()
-		for _, compVersion := range compVersions {
-			serviceVersions = serviceVersions.Union(compatibleServiceVersions(compDef, compVersion))
-		}
-
-		for version := range serviceVersions {
-			checkedInsert(version, compDef)
-		}
-	}
-	return result, nil
-}
-
-// compatibleCompVersions returns all component versions that are compatible with specified component definition.
-func compatibleCompVersions(ctx context.Context, cli client.Reader, compDef *appsv1alpha1.ComponentDefinition) ([]*appsv1alpha1.ComponentVersion, error) {
-	compVersionList := &appsv1alpha1.ComponentVersionList{}
-	labels := client.MatchingLabels{
-		compDef.Name: compDef.Name,
-	}
-	if err := cli.List(ctx, compVersionList, labels); err != nil {
-		return nil, err
-	}
-
-	if len(compVersionList.Items) == 0 {
-		return nil, nil
-	}
-
-	compVersions := make([]*appsv1alpha1.ComponentVersion, 0)
-	for i, compVersion := range compVersionList.Items {
-		if compVersion.Status.Phase != appsv1alpha1.AvailablePhase {
-			return nil, fmt.Errorf("matched ComponentVersion %s is not available", compVersion.Name)
-		}
-		compVersions = append(compVersions, &compVersionList.Items[i])
-	}
-	return compVersions, nil
-}
-
-// compatibleServiceVersions returns service versions that are compatible with specified component definition.
-func compatibleServiceVersions(compDef *appsv1alpha1.ComponentDefinition, compVersion *appsv1alpha1.ComponentVersion) sets.Set[string] {
-	prefixMatch := func(prefix string) bool {
-		return strings.HasPrefix(compDef.Name, prefix)
-	}
-	releases := make(map[string]bool, 0)
-	for _, rule := range compVersion.Spec.CompatibilityRules {
-		if slices.IndexFunc(rule.CompDefs, prefixMatch) >= 0 {
-			for _, release := range rule.Releases {
-				releases[release] = true
-			}
-		}
-	}
-	serviceVersions := sets.New[string]()
-	for _, release := range compVersion.Spec.Releases {
-		if releases[release.Name] {
-			serviceVersions = serviceVersions.Insert(release.ServiceVersion)
-		}
-	}
-	return serviceVersions
-}
-
-// TODO
-func compareServiceVersion(required, provide string) bool {
-	ret, err := version.MustParseSemantic(required).Compare(provide)
-	return err == nil && ret == 0
 }

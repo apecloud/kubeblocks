@@ -36,5 +36,15 @@ func (mgr *Manager) Query(ctx context.Context, cmd string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return json.Marshal(data)
+	// convert interface{} to []byte
+	switch v := data.(type) {
+	case map[interface{}]interface{}:
+		strMap := make(map[string]interface{})
+		for key, value := range v {
+			strMap[key.(string)] = value
+		}
+		return json.Marshal(strMap)
+	default:
+		return json.Marshal(v)
+	}
 }

@@ -11952,6 +11952,20 @@ spec:
                       - name
                       - namespace
                       type: object
+                    shareableSpec:
+                      description: SharingType defines the sharing type of the SystemAccount.
+                        If SharingType is not specified, a separate SystemAccount
+                        will be generated for each Component. If SharingType is specified
+                        as InterCompDefSharing, a corresponding SystemAccount will
+                        be generated at the Cluster level, and all Components in the
+                        cluster can share that resource. If SharingType is specified
+                        as IntraCompDefSharing, a corresponding SystemAccount will
+                        be generated at the ComponentDefinition level, and all Components
+                        in the same ComponentDefinition can share that resource.
+                      enum:
+                      - InterCompDefSharing
+                      - IntraCompDefSharing
+                      type: string
                     statement:
                       description: Statement specifies the statement used to create
                         the account with required privileges. Cannot be updated.
@@ -12018,11 +12032,44 @@ spec:
                           description: Selects a defined var of a Credential (SystemAccount).
                           properties:
                             compDef:
-                              description: CompDef specifies the definition used by
-                                the component that the referent object resident in.
+                              description: 'CompDef specifies the definition used
+                                by the component that the referenced object resident
+                                in. When specifying a CompDef, there are several scenarios:
+                                1. [Supported] The same CompDef is referenced by only
+                                one Component, and there is only one corresponding
+                                referenced object resource. 2. [Supported] The same
+                                CompDef is referenced by multiple Components, but
+                                there is only one corresponding referenced object
+                                resource, meaning multiple Components share this resource.
+                                In this case, to reference this resource, please set
+                                IntraCompDefShareable to true. 3. [WIP] The same CompDef
+                                is referenced by multiple Components, and there are
+                                multiple corresponding referenced object resources.
+                                Each referenced resource corresponds to a specific
+                                Component.'
                               type: string
+                            interCompDefShareable:
+                              description: InterCompDefShareable indicates whether
+                                the referenced object is shared between components
+                                with different component definitions. If InterCompDefShareable
+                                sets to true, the CompDef should be empty and IntraCompDefShareable
+                                can not be true.
+                              type: boolean
+                            intraCompDefShareable:
+                              default: false
+                              description: IntraCompDefShareable indicates whether
+                                the referenced object is shared between components
+                                with the same component definition. If IntraCompDefShareable
+                                sets to true, the CompDef should be specified and
+                                InterCompDefShareable can not be true.
+                              type: boolean
                             name:
-                              description: Name of the referent object.
+                              description: Name of the referenced object. For example,
+                                if the referenced object is a Service, then the name
+                                here is the ServiceName of the Service. If the referenced
+                                object is a Credential (SystemAccount), then the name
+                                here is the name of the Credential (SystemAccount),
+                                and so on.
                               type: string
                             optional:
                               description: Specify whether the object must be defined.
@@ -12065,8 +12112,21 @@ spec:
                           description: Selects a defined var of a ServiceRef.
                           properties:
                             compDef:
-                              description: CompDef specifies the definition used by
-                                the component that the referent object resident in.
+                              description: 'CompDef specifies the definition used
+                                by the component that the referenced object resident
+                                in. When specifying a CompDef, there are several scenarios:
+                                1. [Supported] The same CompDef is referenced by only
+                                one Component, and there is only one corresponding
+                                referenced object resource. 2. [Supported] The same
+                                CompDef is referenced by multiple Components, but
+                                there is only one corresponding referenced object
+                                resource, meaning multiple Components share this resource.
+                                In this case, to reference this resource, please set
+                                IntraCompDefShareable to true. 3. [WIP] The same CompDef
+                                is referenced by multiple Components, and there are
+                                multiple corresponding referenced object resources.
+                                Each referenced resource corresponds to a specific
+                                Component.'
                               type: string
                             endpoint:
                               description: VarOption defines whether a variable is
@@ -12075,8 +12135,28 @@ spec:
                               - Required
                               - Optional
                               type: string
+                            interCompDefShareable:
+                              description: InterCompDefShareable indicates whether
+                                the referenced object is shared between components
+                                with different component definitions. If InterCompDefShareable
+                                sets to true, the CompDef should be empty and IntraCompDefShareable
+                                can not be true.
+                              type: boolean
+                            intraCompDefShareable:
+                              default: false
+                              description: IntraCompDefShareable indicates whether
+                                the referenced object is shared between components
+                                with the same component definition. If IntraCompDefShareable
+                                sets to true, the CompDef should be specified and
+                                InterCompDefShareable can not be true.
+                              type: boolean
                             name:
-                              description: Name of the referent object.
+                              description: Name of the referenced object. For example,
+                                if the referenced object is a Service, then the name
+                                here is the ServiceName of the Service. If the referenced
+                                object is a Credential (SystemAccount), then the name
+                                here is the name of the Credential (SystemAccount),
+                                and so on.
                               type: string
                             optional:
                               description: Specify whether the object must be defined.
@@ -12107,8 +12187,21 @@ spec:
                           description: Selects a defined var of a Service.
                           properties:
                             compDef:
-                              description: CompDef specifies the definition used by
-                                the component that the referent object resident in.
+                              description: 'CompDef specifies the definition used
+                                by the component that the referenced object resident
+                                in. When specifying a CompDef, there are several scenarios:
+                                1. [Supported] The same CompDef is referenced by only
+                                one Component, and there is only one corresponding
+                                referenced object resource. 2. [Supported] The same
+                                CompDef is referenced by multiple Components, but
+                                there is only one corresponding referenced object
+                                resource, meaning multiple Components share this resource.
+                                In this case, to reference this resource, please set
+                                IntraCompDefShareable to true. 3. [WIP] The same CompDef
+                                is referenced by multiple Components, and there are
+                                multiple corresponding referenced object resources.
+                                Each referenced resource corresponds to a specific
+                                Component.'
                               type: string
                             generatePodOrdinalServiceVar:
                               default: false
@@ -12137,8 +12230,28 @@ spec:
                               - Required
                               - Optional
                               type: string
+                            interCompDefShareable:
+                              description: InterCompDefShareable indicates whether
+                                the referenced object is shared between components
+                                with different component definitions. If InterCompDefShareable
+                                sets to true, the CompDef should be empty and IntraCompDefShareable
+                                can not be true.
+                              type: boolean
+                            intraCompDefShareable:
+                              default: false
+                              description: IntraCompDefShareable indicates whether
+                                the referenced object is shared between components
+                                with the same component definition. If IntraCompDefShareable
+                                sets to true, the CompDef should be specified and
+                                InterCompDefShareable can not be true.
+                              type: boolean
                             name:
-                              description: Name of the referent object.
+                              description: Name of the referenced object. For example,
+                                if the referenced object is a Service, then the name
+                                here is the ServiceName of the Service. If the referenced
+                                object is a Credential (SystemAccount), then the name
+                                here is the name of the Credential (SystemAccount),
+                                and so on.
                               type: string
                             nodePort:
                               properties:

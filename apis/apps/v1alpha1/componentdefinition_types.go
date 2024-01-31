@@ -299,7 +299,26 @@ type SystemAccount struct {
 	// Cannot be updated.
 	// +optional
 	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
+
+	// SharingType defines the sharing type of the system account.
+	// If SharingType is not specified, a separate SystemAccount will be generated for each Component.
+	// If SharingType is specified as InterCompDefSharing, a corresponding SystemAccount will be generated at the Cluster level, and all Components in the cluster can share that resource.
+	// If SharingType is specified as IntraCompDefSharing, a corresponding SystemAccount will be generated at the ComponentDefinition level, and all Components in the same ComponentDefinition can share that resource.
+	// +optional
+	SharingType *SharingType `json:"shareableSpec,omitempty"`
 }
+
+// SharingType defines the sharing type of the resource.
+// +enum
+// +kubebuilder:validation:Enum={InterCompDefSharing,IntraCompDefSharing}
+type SharingType string
+
+const (
+	// InterCompDefSharing means the resource can be shared between different component definitions.
+	InterCompDefSharing SharingType = "InterCompDefSharing"
+	// IntraCompDefSharing means the resource can only be shared within the same component definition.
+	IntraCompDefSharing SharingType = "IntraCompDefSharing"
+)
 
 // RoleArbitrator defines how to arbitrate the role of replicas.
 // +enum

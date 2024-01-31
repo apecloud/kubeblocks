@@ -834,11 +834,29 @@ type ServiceRefVarSelector struct {
 
 // ClusterObjectReference contains information to let you locate the referenced object inside the same cluster.
 type ClusterObjectReference struct {
-	// CompDef specifies the definition used by the component that the referent object resident in.
+	// CompDef specifies the definition used by the component that the referenced object resident in.
+	// When specifying a CompDef, there are several scenarios:
+	// 1. [Supported] The same CompDef is referenced by only one Component, and there is only one corresponding referenced object resource.
+	// 2. [Supported] The same CompDef is referenced by multiple Components, but there is only one corresponding referenced object resource,
+	// 	  meaning multiple Components share this resource. In this case, to reference this resource, please set IntraCompDefShareable to true.
+	// 3. [WIP] The same CompDef is referenced by multiple Components, and there are multiple corresponding referenced object resources. Each referenced resource corresponds to a specific Component.
 	// +optional
 	CompDef string `json:"compDef,omitempty"`
 
-	// Name of the referent object.
+	// IntraCompDefShareable indicates whether the referenced object is shared between components with the same component definition.
+	// If IntraCompDefShareable sets to true, the CompDef should be specified and InterCompDefShareable can not be true.
+	// +kubebuilder:default=false
+	// +optional
+	IntraCompDefShareable bool `json:"intraCompDefShareable,omitempty"`
+
+	// InterCompDefShareable indicates whether the referenced object is shared between components with different component definitions.
+	// If InterCompDefShareable sets to true, the CompDef should be empty and IntraCompDefShareable can not be true.
+	// +optional
+	InterCompDefShareable bool `json:"interCompDefShareable,omitempty"`
+
+	// Name of the referenced object.
+	// For example, if the referenced object is a Service, then the name here is the ServiceName of the Service.
+	// If the referenced object is a Credential (SystemAccount), then the name here is the name of the Credential (SystemAccount), and so on.
 	// +optional
 	Name string `json:"name,omitempty"`
 

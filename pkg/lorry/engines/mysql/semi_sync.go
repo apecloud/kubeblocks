@@ -72,7 +72,7 @@ func (mgr *Manager) EnableSemiSyncSource(ctx context.Context) error {
 		return nil
 	}
 	setSourceEnable := fmt.Sprintf("SET GLOBAL %s_enabled = 1;", plugin)
-	setSourceTimeout := fmt.Sprintf("SET GLOBAL %s_timeout = 10000;", plugin)
+	setSourceTimeout := fmt.Sprintf("SET GLOBAL %s_timeout = 0;", plugin)
 	_, err = mgr.DB.Exec(setSourceEnable + setSourceTimeout)
 	if err != nil {
 		return errors.Wrap(err, setSourceEnable+setSourceTimeout+" execute failed")

@@ -319,7 +319,7 @@ func (mgr *Manager) GetSecondsBehindMaster(ctx context.Context) (int, error) {
 		return 0, nil
 	}
 	secondsBehindMaster := slaveStatus.GetString("Seconds_Behind_Master")
-	if secondsBehindMaster == "NULL" {
+	if secondsBehindMaster == "NULL" || secondsBehindMaster == "" {
 		return 0, nil
 	}
 	return strconv.Atoi(secondsBehindMaster)

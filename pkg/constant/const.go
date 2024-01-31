@@ -65,7 +65,6 @@ const (
 const (
 	KBServiceAccountName     = "KUBEBLOCKS_SERVICEACCOUNT_NAME"
 	KBToolsImage             = "KUBEBLOCKS_TOOLS_IMAGE"
-	KBSyncerImage            = "KUBEBLOCKS_SYNCER_IMAGE"
 	KBImagePullPolicy        = "KUBEBLOCKS_IMAGE_PULL_POLICY"
 	KBDataScriptClientsImage = "KUBEBLOCKS_DATASCRIPT_CLIENTS_IMAGE"
 )
@@ -247,12 +246,9 @@ const (
 
 const (
 	// Container port name
-	SyncerHTTPPortName                 = "syncer-port"
 	LorryHTTPPortName                  = "lorry-http-port"
 	LorryGRPCPortName                  = "lorry-grpc-port"
-	SyncerContainerName                = "syncer"
 	LorryContainerName                 = "lorry"
-	SyncerInitContainerName            = "init-syncer"
 	LorryInitContainerName             = "init-lorry"
 	ProbeInitContainerName             = "kb-initprobe"
 	RoleProbeContainerName             = "kb-checkrole"

@@ -214,11 +214,6 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		return nil, err
 	}
 
-	if err := BuildSyncer(reqCtx, synthesizeComp); err != nil {
-		reqCtx.Log.Error(err, "build syncer failed.")
-		return nil, err
-	}
-
 	// build serviceReferences
 	if err = buildServiceReferences(reqCtx, cli, synthesizeComp, compDef, comp); err != nil {
 		reqCtx.Log.Error(err, "build service references failed.")

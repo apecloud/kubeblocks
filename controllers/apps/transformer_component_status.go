@@ -505,7 +505,7 @@ func (r *componentStatusHandler) updateComponentStatus(phaseTransitionMsg string
 // In the future, there is a need for a better design to replace this kind of workaround.
 func (r *componentStatusHandler) updatePrimaryIndex() error {
 	// TODO(xingran): consider if there are alternative ways to determine whether it is necessary to specify primary info in the Controller
-	if r.synthesizeComp.RoleArbitrator == nil || *r.synthesizeComp.RoleArbitrator != appsv1alpha1.SyncerRoleArbitrator {
+	if r.synthesizeComp.RoleArbitrator == nil || *r.synthesizeComp.RoleArbitrator != appsv1alpha1.LorryRoleArbitrator {
 		return nil
 	}
 	podList, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name))

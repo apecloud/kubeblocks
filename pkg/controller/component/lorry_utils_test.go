@@ -124,7 +124,7 @@ var _ = Describe("Lorry Utils", func() {
 			Expect(container.Command).ShouldNot(BeEmpty())
 		})
 
-		It("build we-syncer container", func() {
+		It("build lorry container", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
 				Log: logger,
@@ -138,7 +138,7 @@ var _ = Describe("Lorry Utils", func() {
 			}
 			Expect(buildLorryContainers(reqCtx, component, nil)).Should(Succeed())
 			Expect(component.PodSpec.Containers).Should(HaveLen(1))
-			Expect(component.PodSpec.Containers[0].Name).Should(Equal(constant.SyncerContainerName))
+			Expect(component.PodSpec.Containers[0].Name).Should(Equal(constant.LorryContainerName))
 		})
 
 		It("build volume protection probe container without RBAC", func() {

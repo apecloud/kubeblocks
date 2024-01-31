@@ -308,7 +308,7 @@ type RoleArbitrator string
 
 const (
 	ExternalRoleArbitrator RoleArbitrator = "External"
-	SyncerRoleArbitrator   RoleArbitrator = "Syncer"
+	LorryRoleArbitrator    RoleArbitrator = "Lorry"
 )
 
 // ReplicaRole represents a role that can be assumed by a component instance.
@@ -509,8 +509,8 @@ const (
 	OfficialPostgresqlBuiltinActionHandler BuiltinActionHandlerType = "official-postgresql"
 	ApeCloudPostgresqlBuiltinActionHandler BuiltinActionHandlerType = "apecloud-postgresql"
 	PolarDBXBuiltinActionHandler           BuiltinActionHandlerType = "polardbx"
-	UnknownBuiltinActionHandler            BuiltinActionHandlerType = "unknown"
 	CustomActionHandler                    BuiltinActionHandlerType = "custom"
+	UnknownBuiltinActionHandler            BuiltinActionHandlerType = "unknown"
 )
 
 type LifecycleActionHandler struct {

@@ -79,7 +79,7 @@ func TestManager_SemiSync(t *testing.T) {
 				"WHERE PLUGIN_NAME ='rpl_semi_sync_source';").WillReturnRows(sqlmock.NewRows([]string{"PLUGIN_STATUS"}).AddRow("ACTIVE"))
 			mock.ExpectQuery("select @@global.rpl_semi_sync_source_enabled").WillReturnRows(sqlmock.NewRows([]string{"STATUS"}).AddRow(0))
 			mock.ExpectExec("SET GLOBAL rpl_semi_sync_source_enabled = 1;" +
-				"SET GLOBAL rpl_semi_sync_source_timeout = 10000;").
+				"SET GLOBAL rpl_semi_sync_source_timeout = 0;").
 				WillReturnResult(sqlmock.NewResult(1, 1))
 			err := manager.EnableSemiSyncSource(ctx)
 			assert.Nil(t, err)

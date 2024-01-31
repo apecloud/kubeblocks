@@ -364,11 +364,9 @@ func (r *clusterBackupPolicyTransformer) syncBackupMethods(backupPolicy *dpv1alp
 		backupMethod := v.BackupMethod
 		if m, ok := oldBackupMethodMap[backupMethod.Name]; ok {
 			backupMethod = m
-		} else {
-			if v.Target != nil {
-				backupMethod.Target = r.buildBackupTarget(*v.Target, comp)
-				r.syncRoleLabelSelector(backupMethod.Target, v.Target.Role)
-			}
+		} else if v.Target != nil {
+			backupMethod.Target = r.buildBackupTarget(*v.Target, comp)
+			r.syncRoleLabelSelector(backupMethod.Target, v.Target.Role)
 		}
 		mappingEnv := r.doEnvMapping(comp, v.EnvMapping)
 		backupMethod.Env = dputils.MergeEnv(backupMethod.Env, mappingEnv)

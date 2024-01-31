@@ -257,14 +257,15 @@ const (
 	// Container port name
 	LorryHTTPPortName                  = "lorry-http-port"
 	LorryGRPCPortName                  = "lorry-grpc-port"
-	LorryRoleProbePath                 = "/v1.0/checkrole"
-	LorryVolumeProtectPath             = "/v1.0/volumeprotection"
+	LorryContainerName                 = "lorry"
+	LorryInitContainerName             = "init-lorry"
 	ProbeInitContainerName             = "kb-initprobe"
-	WeSyncerContainerName              = "kb-we-syncer"
 	RoleProbeContainerName             = "kb-checkrole"
 	StatusProbeContainerName           = "kb-checkstatus"
 	RunningProbeContainerName          = "kb-checkrunning"
 	VolumeProtectionProbeContainerName = "kb-volume-protection"
+	LorryRoleProbePath                 = "/v1.0/checkrole"
+	LorryVolumeProtectPath             = "/v1.0/volumeprotection"
 
 	// the filedpath name used in event.InvolvedObject.FieldPath
 	ProbeCheckStatusPath  = "spec.containers{" + StatusProbeContainerName + "}"

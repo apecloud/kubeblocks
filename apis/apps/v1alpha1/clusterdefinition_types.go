@@ -50,6 +50,7 @@ type ClusterDefinitionSpec struct {
 	//
 	// Built-in objects are:
 	// - `$(RANDOM_PASSWD)` - random 8 characters.
+	// - `$(STRONG_RANDOM_PASSWD)` - random 16 characters, with mixed cases, digits and symbols.
 	// - `$(UUID)` - generate a random UUID v4 string.
 	// - `$(UUID_B64)` - generate a random UUID v4 BASE64 encoded string.
 	// - `$(UUID_STR_B64)` - generate a random UUID v4 string then BASE64 encoded.

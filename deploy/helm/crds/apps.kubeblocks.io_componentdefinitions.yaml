@@ -11954,7 +11954,7 @@ spec:
                       type: object
                     seed:
                       description: Seed specifies the seed used to generate the account's
-                        password.
+                        password. Cannot be updated.
                       type: string
                     statement:
                       description: Statement specifies the statement used to create

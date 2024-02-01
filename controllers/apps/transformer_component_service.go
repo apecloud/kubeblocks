@@ -68,7 +68,7 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 			continue
 		}
 		// component controller does not handle the clusterIp service if the feature gate is not enabled. the default behavior is 'created'.
-		if t.skipClusterIpService(cluster, synthesizeComp, &service) {
+		if t.skipClusterIPService(cluster, synthesizeComp, &service) {
 			continue
 		}
 
@@ -171,7 +171,7 @@ func (t *componentServiceTransformer) skipPodOrdinalService(cluster *appsv1alpha
 	return true
 }
 
-func (t *componentServiceTransformer) skipClusterIpService(cluster *appsv1alpha1.Cluster,
+func (t *componentServiceTransformer) skipClusterIPService(cluster *appsv1alpha1.Cluster,
 	synthesizeComp *component.SynthesizedComponent, compService *appsv1alpha1.ComponentService) bool {
 	if compService == nil {
 		return true
@@ -184,11 +184,11 @@ func (t *componentServiceTransformer) skipClusterIpService(cluster *appsv1alpha1
 	if cluster == nil || cluster.Annotations == nil {
 		return false
 	}
-	disabledClusterIpSvcCompList, ok := cluster.Annotations[constant.DisabledClusterIpSvcAnnotationKey]
+	disabledClusterIPSvcCompList, ok := cluster.Annotations[constant.DisabledClusterIPSvcAnnotationKey]
 	if !ok {
 		return false
 	}
-	for _, compName := range strings.Split(disabledClusterIpSvcCompList, ",") {
+	for _, compName := range strings.Split(disabledClusterIPSvcCompList, ",") {
 		if compName == synthesizeComp.Name {
 			return true
 		}

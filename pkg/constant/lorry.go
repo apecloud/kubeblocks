@@ -27,19 +27,3 @@ const (
 	ETCDCharacterType       = "etcd"
 	PolarDBXCharacterType   = "polardbx"
 )
-
-const (
-	ApeCloudPostgresqlWeSyncerType = "apecloud-postgresql"
-	MongoDBWeSyncerType            = "mongodb"
-	MySQLWeSyncerType              = "mysql"
-	WeSQLWeSyncerType              = "wesql"
-)
-
-func GetSupportWeSyncerType() []string {
-	return []string{
-		ApeCloudPostgresqlWeSyncerType,
-		MongoDBWeSyncerType,
-		MySQLWeSyncerType,
-		WeSQLWeSyncerType,
-	}
-}

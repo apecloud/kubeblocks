@@ -509,6 +509,7 @@ const (
 	OfficialPostgresqlBuiltinActionHandler BuiltinActionHandlerType = "official-postgresql"
 	ApeCloudPostgresqlBuiltinActionHandler BuiltinActionHandlerType = "apecloud-postgresql"
 	PolarDBXBuiltinActionHandler           BuiltinActionHandlerType = "polardbx"
+	CustomActionHandler                    BuiltinActionHandlerType = "custom"
 	UnknownBuiltinActionHandler            BuiltinActionHandlerType = "unknown"
 )
 

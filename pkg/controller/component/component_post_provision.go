@@ -287,7 +287,7 @@ func renderPostProvisionCmdJob(ctx context.Context,
 		return job, nil
 	}
 
-	envs, envFroms, err := buildPostProvisionEnvs(cluster, synthesizeComp, pods, &tplPod)
+	envs, envFroms, err := buildPostProvisionEnvs(ctx, cli, cluster, synthesizeComp, pods, &tplPod)
 	if err != nil {
 		return nil, err
 	}
@@ -301,7 +301,9 @@ func renderPostProvisionCmdJob(ctx context.Context,
 }
 
 // buildPostProvisionEnvs builds the postProvision command job envs.
-func buildPostProvisionEnvs(cluster *appsv1alpha1.Cluster,
+func buildPostProvisionEnvs(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
 	synthesizeComp *SynthesizedComponent,
 	pods []corev1.Pod,
 	tplPod *corev1.Pod) ([]corev1.EnvVar, []corev1.EnvFromSource, error) {
@@ -319,7 +321,10 @@ func buildPostProvisionEnvs(cluster *appsv1alpha1.Cluster,
 		workloadEnvFroms = append(workloadEnvFroms, tplPod.Spec.Containers[0].EnvFrom...)
 	}
 
-	compEnvs := genClusterComponentEnv(cluster, pods)
+	compEnvs, err := genClusterComponentEnv(ctx, cli, cluster, pods)
+	if err != nil {
+		return nil, nil, err
+	}
 	if len(compEnvs) > 0 {
 		workloadEnvs = append(workloadEnvs, compEnvs...)
 	}
@@ -328,9 +333,9 @@ func buildPostProvisionEnvs(cluster *appsv1alpha1.Cluster,
 }
 
 // genClusterComponentEnv generates the cluster component relative envs.
-func genClusterComponentEnv(cluster *appsv1alpha1.Cluster, pods []corev1.Pod) []corev1.EnvVar {
-	if cluster == nil || cluster.Spec.ComponentSpecs == nil {
-		return nil
+func genClusterComponentEnv(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, pods []corev1.Pod) ([]corev1.EnvVar, error) {
+	if cluster == nil || (cluster.Spec.ComponentSpecs == nil && cluster.Spec.ShardingSpecs == nil) {
+		return nil, nil
 	}
 	compEnvs := make([]corev1.EnvVar, 0)
 	compList := make([]string, 0, len(cluster.Spec.ComponentSpecs))
@@ -342,6 +347,15 @@ func genClusterComponentEnv(cluster *appsv1alpha1.Cluster, pods []corev1.Pod) []
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		compList = append(compList, compSpec.Name)
 	}
+
+	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+		shardingCompNames, err := intctrlutil.ListShardingCompNames(ctx, cli, cluster, &shardingSpec)
+		if err != nil {
+			return nil, err
+		}
+		compList = append(compList, shardingCompNames...)
+	}
+
 	compEnvs = append(compEnvs, corev1.EnvVar{
 		Name:  kbPostProvisionClusterCompList,
 		Value: strings.Join(compList, ","),
@@ -371,7 +385,7 @@ func genClusterComponentEnv(cluster *appsv1alpha1.Cluster, pods []corev1.Pod) []
 			Value: strings.Join(compHostIPList, ","),
 		}}...)
 
-	return compEnvs
+	return compEnvs, nil
 }
 
 // genPostProvisionJobName generates the postProvision job name.

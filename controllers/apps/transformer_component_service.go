@@ -180,7 +180,7 @@ func (t *componentServiceTransformer) skipClusterIPService(cluster *appsv1alpha1
 	if compService.Spec.Type != corev1.ServiceTypeClusterIP {
 		return false
 	}
-	// if Service type is NodePort, but the feature gate annotation is not enabled, it should be created.
+	// if Service type is ClusterIp, but the feature gate annotation does not declare which components are disabled, it should be created.
 	if cluster == nil || cluster.Annotations == nil {
 		return false
 	}

@@ -3,7 +3,7 @@
   "kbVersion" ">=0.7.0"
   "selectorLabels" $selectorLabels
   "name" "elasticsearch"
-  "version" "0.7.0"
+  "version" "0.8.0"
   "model" "search-engine"
   "provider" "community"
   "description" "Elasticsearch is a distributed search and analytics engine. It is used for web search, log monitoring, and real-time analytics. Ideal for Big Data applications."

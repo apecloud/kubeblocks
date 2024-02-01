@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// fork from github.com/sethvargo/go-password/password
+// fork from github.com/sethvargo/go-password/password, and add GenerateWithSeed function to generate password with seed
 
 package common
 

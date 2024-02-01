@@ -20,10 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"crypto/md5"
+	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/sethvargo/go-password/password"
@@ -132,8 +131,8 @@ func (t *componentAccountTransformer) getPasswordFromSecret(ctx graph.TransformC
 }
 
 func (t *componentAccountTransformer) buildPasswordFromSeed(seed string) ([]byte, error) {
-	h := md5.New()
-	_, err := io.WriteString(h, seed)
+	h := sha256.New()
+	_, err := h.Write([]byte(seed))
 	if err != nil {
 		return nil, err
 	}

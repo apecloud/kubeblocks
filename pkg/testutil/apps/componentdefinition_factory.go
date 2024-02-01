@@ -52,6 +52,11 @@ func NewComponentDefinitionFactoryExt(name, provider, description, serviceKind, 
 	return f
 }
 
+func (f *MockComponentDefinitionFactory) SetServiceVersion(serviceVersion string) *MockComponentDefinitionFactory {
+	f.Get().Spec.ServiceVersion = serviceVersion
+	return f
+}
+
 func (f *MockComponentDefinitionFactory) SetDefaultSpec() *MockComponentDefinitionFactory {
 	f.Get().Spec = defaultComponentDefSpec
 	return f

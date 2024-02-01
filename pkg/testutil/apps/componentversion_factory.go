@@ -38,6 +38,11 @@ func NewComponentVersionFactory(name string) *MockComponentVersionFactory {
 	return f
 }
 
+func (f *MockComponentVersionFactory) SetSpec(spec appsv1alpha1.ComponentVersionSpec) *MockComponentVersionFactory {
+	f.Get().Spec = spec
+	return f
+}
+
 func (f *MockComponentVersionFactory) AddRelease(name, changes, serviceVersion string, images map[string]string) *MockComponentVersionFactory {
 	release := appsv1alpha1.ComponentVersionRelease{
 		Name:           name,
